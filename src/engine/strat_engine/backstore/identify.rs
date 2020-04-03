@@ -243,11 +243,13 @@ pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>
 #[cfg(test)]
 mod tests {
 
+    use std::collections::HashSet;
+
     use uuid::Uuid;
 
     use crate::engine::strat_engine::{
         backstore::{
-            devices::{initialize_devices, process_devices},
+            devices::{initialize_devices, process_and_verify_devices},
             metadata::MDADataSize,
             udev::block_device_apply,
         },
@@ -265,11 +267,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
 
         initialize_devices(
-            process_devices(paths)
-                .unwrap()
-                .into_iter()
-                .map(|(info, _)| info)
-                .collect(),
+            process_and_verify_devices(pool_uuid, &HashSet::new(), paths).unwrap(),
             pool_uuid,
             MDADataSize::default(),
             None,

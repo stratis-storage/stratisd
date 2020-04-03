@@ -21,8 +21,8 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
-                devices::{initialize_devices, process_devices, wipe_blockdevs, DeviceInfo},
-                metadata::{MDADataSize, StratisIdentifiers},
+                devices::{initialize_devices, process_and_verify_devices, wipe_blockdevs},
+                metadata::MDADataSize,
             },
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
         },
@@ -123,98 +123,6 @@ pub struct BlockDevMgr {
     last_update_time: Option<DateTime<Utc>>,
 }
 
-// Check coherence of pool and device UUIDs with existing state of current
-// blockdevmgr. If the selection of devices is incompatible with the current
-// state of the blockdevmgr, or simply invalid, return an error.
-//
-// Postcondition: All infos in the returned vector have their corresponding
-// stratis_identifiers value equal to None. Either their Stratis identifiers
-// indicated an error, or else the devices specified are already owned by
-// this blockdevmgr and should not be added again.
-//
-// FIXME:
-// Note that this method _should_ be somewhat temporary. We hope that in
-// another step the functionality contained will be hoisted up closer to
-// the D-Bus/engine interface, as it computes some idempotency information.
-fn check_device_ids(
-    pool_uuid: PoolUuid,
-    current_uuids: &HashSet<DevUuid>,
-    devices: Vec<(DeviceInfo, Option<StratisIdentifiers>)>,
-) -> StratisResult<Vec<DeviceInfo>> {
-    let stratis_identifiers: HashMap<PoolUuid, HashSet<DevUuid>> = devices
-        .iter()
-        .filter_map(|(_, stratis_identifiers)| stratis_identifiers.as_ref())
-        .fold(HashMap::new(), |mut acc, identifiers| {
-            acc.entry(identifiers.pool_uuid)
-                .or_insert_with(HashSet::new)
-                .insert(identifiers.device_uuid);
-            acc
-        });
-
-    let (this_pool, other_pools): (Vec<_>, Vec<_>) = stratis_identifiers
-        .iter()
-        .partition(|(k, _)| **k == pool_uuid);
-
-    if !other_pools.is_empty() {
-        let error_string = other_pools
-            .iter()
-            .map(|(p, devs)| {
-                let dev_string = devices
-                    .iter()
-                    .filter(|(_, stratis_identifiers)| match stratis_identifiers {
-                        None => false,
-                        Some(StratisIdentifiers { pool_uuid, .. }) => devs.contains(pool_uuid),
-                    })
-                    .map(|(info, _)| info.devnode.display().to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                format!(
-                    "Devices ({}) appear to belong to Stratis pool with UUID {}",
-                    dev_string,
-                    p.to_simple_ref()
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("; ");
-        let error_message = format!(
-            "Some devices specified appear to be already in use by other Stratis pools: {}",
-            error_string
-        );
-        return Err(StratisError::Engine(ErrorEnum::Invalid, error_message));
-    }
-
-    if !this_pool.is_empty() {
-        let (_, dev_uuids) = this_pool[0];
-
-        let invalid_uuids = dev_uuids.difference(current_uuids).collect::<Vec<_>>();
-
-        if !invalid_uuids.is_empty() {
-            let error_string = devices
-                .iter()
-                .filter(|(_, stratis_identifiers)| match stratis_identifiers {
-                    None => false,
-                    Some(StratisIdentifiers { pool_uuid, .. }) => {
-                        invalid_uuids.contains(&pool_uuid)
-                    }
-                })
-                .map(|(info, _)| info.devnode.display().to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
-            let error_message = format!(
-                "Devices ({}) appear to be already in use by this pool; they may be in use by the other tier",
-                error_string
-            );
-            return Err(StratisError::Engine(ErrorEnum::Invalid, error_message));
-        }
-    }
-
-    Ok(devices
-        .into_iter()
-        .filter(|(_, stratis_identifiers)| stratis_identifiers.is_none())
-        .map(|(info, _)| info)
-        .collect())
-}
-
 impl BlockDevMgr {
     /// Make a struct that represents an existing BlockDevMgr.
     pub fn new(
@@ -233,7 +141,7 @@ impl BlockDevMgr {
         paths: &[&Path],
         mda_data_size: MDADataSize,
     ) -> StratisResult<BlockDevMgr> {
-        let devices = check_device_ids(pool_uuid, &HashSet::new(), process_devices(paths)?)?;
+        let devices = process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?;
 
         Ok(BlockDevMgr::new(
             initialize_devices(devices, pool_uuid, mda_data_size, None)?,
@@ -258,7 +166,7 @@ impl BlockDevMgr {
             .iter()
             .map(|bd| bd.uuid())
             .collect::<HashSet<_>>();
-        let devices = check_device_ids(pool_uuid, &current_uuids, process_devices(paths)?)?;
+        let devices = process_and_verify_devices(pool_uuid, &current_uuids, paths)?;
 
         // FIXME: This is a bug. If new devices are added to a pool, and the
         // variable length metadata requires more than the minimum allocated,

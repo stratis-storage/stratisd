@@ -133,9 +133,6 @@ impl CryptInitializer {
             device.keyslot_handle().add_by_key(
                 None,
                 None,
-                #[cfg(cryptsetup_compat)]
-                (*key).deref(),
-                #[cfg(not(cryptsetup_compat))]
                 key.as_ref(),
                 CryptVolumeKeyFlags::empty(),
             ),

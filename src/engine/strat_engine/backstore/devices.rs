@@ -672,7 +672,8 @@ mod tests {
     use super::*;
 
     /// Test that initializing devices claims all and that destroying
-    /// them releases all.
+    /// them releases all. Verify that already initialized devices are
+    /// rejected or filtered as appropriate.
     fn test_ownership(
         paths: &[&Path],
         key_description: Option<&str>,
@@ -707,22 +708,101 @@ mod tests {
             )));
         }
 
-        for blockdev in blockdevs.iter() {
-            let pool_uuid_from_disk =
-                device_identifiers(&mut OpenOptions::new().read(true).open(&blockdev.devnode())?)?
-                    .ok_or_else(|| {
-                        StratisError::Error(
-                            "No device identifiers were present on the device when they \
-                    should have been"
-                                .to_string(),
-                        )
-                    })?
-                    .pool_uuid;
-            if pool_uuid != pool_uuid_from_disk {
-                return Err(Box::new(StratisError::Error(
-                    "Pool UUID in the metadata does not match the input pool UUID".to_string(),
+        let stratis_devnodes: Vec<PathBuf> = blockdevs.iter().map(|bd| bd.devnode()).collect();
+
+        let stratis_identifiers: Vec<Option<StratisIdentifiers>> = stratis_devnodes
+            .iter()
+            .map(|dev| {
+                OpenOptions::new()
+                    .read(true)
+                    .open(&dev)
+                    .map_err(|err| err.into())
+                    .and_then(|mut f| device_identifiers(&mut f))
+            })
+            .collect::<StratisResult<Vec<Option<StratisIdentifiers>>>>()?;
+
+        if stratis_identifiers.iter().any(Option::is_none) {
+            return Err(Box::new(StratisError::Error(
+                "Some device which should have had Stratis identifiers on it did not".to_string(),
+            )));
+        }
+
+        if stratis_identifiers
+            .iter()
+            .any(|x| x.expect("returned in line above if any are None").pool_uuid != pool_uuid)
+        {
+            return Err(Box::new(StratisError::Error(
+                "Some device had the wrong pool UUID".to_string(),
+            )));
+        }
+
+        let initialized_uuids: HashSet<DevUuid> = stratis_identifiers
+            .iter()
+            .map(|ids| {
+                ids.expect("returned in line above if any are None")
+                    .device_uuid
+            })
+            .collect();
+
+        if !process_and_verify_devices(
+            pool_uuid,
+            &initialized_uuids,
+            stratis_devnodes
+                .iter()
+                .map(|p| p.as_path())
+                .collect::<Vec<_>>()
+                .as_slice(),
+        )?
+        .is_empty()
+        {
+            return Err(Box::new(StratisError::Error(
+                "Failed to eliminate devices already initialized for this pool from list of devices to initialize".to_string()
+            )));
+        }
+
+        if process_and_verify_devices(
+            pool_uuid,
+            &HashSet::new(),
+            stratis_devnodes
+                .iter()
+                .map(|p| p.as_path())
+                .collect::<Vec<_>>()
+                .as_slice(),
+        )
+        .is_ok()
+        {
+            return Err(Box::new(StratisError::Error(
+                "Failed to return an error when some device processed was not in the set of already initialized devices".to_string()
+            )));
+        }
+
+        if process_and_verify_devices(
+            Uuid::new_v4(),
+            &initialized_uuids,
+            stratis_devnodes
+                .iter()
+                .map(|p| p.as_path())
+                .collect::<Vec<_>>()
+                .as_slice(),
+        )
+        .is_ok()
+        {
+            return Err(Box::new(StratisError::Error(
+                "Failed to return an error when processing devices for a pool UUID which is not the same as that for which the devices were initialized".to_string()
+            )));
+        }
+
+        let result = process_and_verify_devices(pool_uuid, &initialized_uuids, paths);
+        if key_description.is_some() && result.is_ok() {
+            return Err(Box::new(StratisError::Error(
+                "Failed to return an error when encountering devices that are LUKS2".to_string(),
+            )));
+        }
+
+        if key_description.is_none() && !result?.is_empty() {
+            return Err(Box::new(StratisError::Error(
+                        "Failed to filter all previously initialized devices which should have all been eliminated on the basis of already belonging to pool with the given pool UUID".to_string()
                 )));
-            }
         }
 
         wipe_blockdevs(&blockdevs)?;

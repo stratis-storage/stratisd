@@ -18,7 +18,17 @@ use crate::{
 
 const FORMAT_VERSION: u16 = 1;
 
-/// Get a devicemapper name from the device UUIDs.
+/// Get a devicemapper name from the device UUID.
+///
+/// Prerequisite: len(format!("{}", FORMAT_VERSION)
+///             + len("stratis")                         7
+///             + len("private")                         7
+///             + len("crypt")                           5
+///             + num_dashes                             4
+///             + len(dev uuid)                          32
+///             < 128
+///
+/// which is equivalent to len(format!("{}", FORMAT_VERSION) < 73
 pub fn format_crypt_name(dev_uuid: &DevUuid) -> String {
     format!(
         "stratis-{}-private-{}-crypt",

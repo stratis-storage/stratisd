@@ -124,14 +124,6 @@ fn dev_info(
             let mut f = OpenOptions::new().read(true).write(true).open(&devnode)?;
             let dev_size = blkdev_size(&f)?;
 
-            if dev_size < MIN_DEV_SIZE {
-                let error_message = format!(
-                    "Device {} is smaller than the minimum required size for a Stratis blockdev, {}",
-                    devnode.display(),
-                    MIN_DEV_SIZE);
-                return Err(StratisError::Engine(ErrorEnum::Invalid, error_message));
-            };
-
             // FIXME: Read device identifiers from either an Unowned or a
             // Stratis device. For a Stratis device, this is the correct thing
             // to do. For an unowned device, this is the best available check
@@ -398,6 +390,21 @@ pub fn process_and_verify_devices(
     paths: &[&Path],
 ) -> StratisResult<Vec<DeviceInfo>> {
     check_device_ids(pool_uuid, current_uuids, process_devices(paths)?)
+        .and_then(|vec| {
+            vec
+                .into_iter()
+                .map(|info| {
+                    if info.size < MIN_DEV_SIZE {
+                        let error_message = format!(
+                            "Device {} is {} which is smaller than the minimum required size for a Stratis blockdev, {}",
+                            info.devnode.display(),
+                            info.size,
+                            MIN_DEV_SIZE);
+                        Err(StratisError::Engine(ErrorEnum::Invalid, error_message))
+                    } else { Ok(info) }
+                })
+                .collect()
+        })
 }
 
 /// Initialze devices in devices.

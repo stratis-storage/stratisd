@@ -14,6 +14,10 @@ use crate::engine::strat_engine::{
 };
 
 mod cleanup_errors {
+    // FIXME: It should be possible to remove this allow when the next
+    // version of error_chain is released.
+    #![allow(deprecated)]
+
     error_chain! {
         foreign_links {
             Ioe(std::io::Error);

@@ -4,7 +4,7 @@
 
 use std::{error::Error, ffi::CString, fs::File, io::Read, path::Path};
 
-use crate::engine::strat_engine::backstore::STRATIS_PASS_SIZE;
+use crate::engine::strat_engine::backstore::MAX_STRATIS_PASS_SIZE;
 
 /// Takes physical device paths from loopback or real tests and passes
 /// them through to a compatible test definition. This method
@@ -19,7 +19,7 @@ where
     let type_cstring = "user\0";
     let description = "test-description-for-stratisd";
     let description_cstring = CString::new(description).unwrap();
-    let mut key_data = [0; STRATIS_PASS_SIZE];
+    let mut key_data = [0; MAX_STRATIS_PASS_SIZE];
     File::open("/dev/urandom")
         .unwrap()
         .read_exact(&mut key_data)

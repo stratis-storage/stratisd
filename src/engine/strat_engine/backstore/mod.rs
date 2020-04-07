@@ -26,4 +26,4 @@ pub use self::{
 };
 
 #[cfg(test)]
-pub use self::crypt::STRATIS_PASS_SIZE;
+pub use self::crypt::MAX_STRATIS_PASS_SIZE;

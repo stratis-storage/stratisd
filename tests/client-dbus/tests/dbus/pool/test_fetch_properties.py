@@ -100,3 +100,15 @@ class FetchPropertiesTestCase(SimTestCase):
         # dbus-python Booleans are actually ints, but they define equality
         # that works for bools
         self.assertIn(has_cache, (True, False))
+
+    def test_fetch_data_crypt_key_description(self):
+        """
+        Test FetchProperties_1_2 for pool KeyDescription
+        """
+        property_name = "KeyDescription"
+        (key_desc_success, key_desc) = FetchProperties_2_1.Methods.GetProperties(
+            self._pool_object, {"properties": [property_name]}
+        )[property_name]
+
+        self.assertEqual(key_desc_success, True)
+        self.assertEqual(key_desc, (False, ""))

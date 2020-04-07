@@ -145,8 +145,6 @@ impl CryptInitializer {
             "Failed to assign the LUKS2 keyring token to the Stratis keyslot"
         );
 
-        // The default activation name is [POOLUUID]-[DEVUUID] which should be unique
-        // across all Stratis pools.
         let activation_name = format_crypt_name(&self.dev_uuid);
 
         // Initialize stratis token

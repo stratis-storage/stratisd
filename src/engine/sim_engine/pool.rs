@@ -105,7 +105,6 @@ impl Pool for SimPool {
         _pool_uuid: PoolUuid,
         _pool_name: &str,
         blockdevs: &[&Path],
-        key_desc: Option<String>,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
         if self.is_encrypted() {
             return Err(StratisError::Engine(
@@ -122,7 +121,7 @@ impl Pool for SimPool {
             }
             let blockdev_pairs: Vec<_> = blockdevs
                 .iter()
-                .map(|p| SimDev::new(Rc::clone(&self.rdm), p, key_desc.clone()))
+                .map(|p| SimDev::new(Rc::clone(&self.rdm), p, None))
                 .collect();
             let blockdev_uuids: Vec<_> = blockdev_pairs.iter().map(|(uuid, _)| *uuid).collect();
             self.cache_devs.extend(blockdev_pairs);

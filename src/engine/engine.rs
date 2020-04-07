@@ -91,7 +91,6 @@ pub trait Pool: Debug {
         pool_uuid: PoolUuid,
         pool_name: &str,
         blockdevs: &[&Path],
-        key_desc: Option<String>,
     ) -> StratisResult<SetCreateAction<DevUuid>>;
 
     /// Creates the filesystems specified by specs.

@@ -14,7 +14,9 @@ use crate::{
     dbus_api::{
         blockdev::create_dbus_blockdev,
         types::TData,
-        util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
+        util::{
+            engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok, option_to_tuple,
+        },
     },
     engine::{BlockDevTier, EngineAction, Name, Pool, PoolUuid},
 };
@@ -52,6 +54,17 @@ where
         .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
 
     closure((pool_name, pool_uuid, pool))
+}
+
+pub fn get_pool_encryption_key_desc(
+    m: &MethodInfo<MTFn<TData>, TData>,
+) -> Result<(bool, String), String> {
+    pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
+        Ok(option_to_tuple(
+            pool.key_desc().map(|key| key.to_string()),
+            "".to_string(),
+        ))
+    })
 }
 
 pub fn get_pool_has_cache(m: &MethodInfo<MTFn<TData>, TData>) -> Result<bool, String> {

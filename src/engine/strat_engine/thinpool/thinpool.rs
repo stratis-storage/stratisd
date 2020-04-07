@@ -1894,7 +1894,7 @@ mod tests {
         let old_device = backstore
             .device()
             .expect("Space already allocated from backstore, backstore must have device");
-        backstore.init_cache(pool_uuid, paths1, None).unwrap();
+        backstore.init_cache(pool_uuid, paths1).unwrap();
         let new_device = backstore
             .device()
             .expect("Space already allocated from backstore, backstore must have device");

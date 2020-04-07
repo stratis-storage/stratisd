@@ -18,6 +18,7 @@ use devicemapper::{Sectors, IEC};
 use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
+        shared::init_cache_idempotent_or_err,
         sim_engine::{blockdev::SimDev, filesystem::SimFilesystem, randomization::Randomizer},
         structures::Table,
         types::{
@@ -29,10 +30,16 @@ use crate::{
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
+// NOTE: There are currently two separate key descriptions which currently must be the
+// same and as a result are functionally equivalent at the moment. The reason for this
+// separation is to allow ease in future development if separate key descriptions are ever
+// needed for data devices and cache devices.
 #[derive(Debug)]
 pub struct SimPool {
     block_devs: HashMap<DevUuid, SimDev>,
+    block_devs_key_desc: Option<String>,
     cache_devs: HashMap<DevUuid, SimDev>,
+    cache_devs_key_desc: Option<String>,
     filesystems: Table<SimFilesystem>,
     redundancy: Redundancy,
     rdm: Rc<RefCell<Randomizer>>,
@@ -47,14 +54,19 @@ impl SimPool {
         rdm: &Rc<RefCell<Randomizer>>,
         paths: &[&Path],
         redundancy: Redundancy,
+        key_desc: Option<String>,
     ) -> (PoolUuid, SimPool) {
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
-        let device_pairs = devices.iter().map(|p| SimDev::new(Rc::clone(rdm), p, None));
+        let device_pairs = devices
+            .iter()
+            .map(|p| SimDev::new(Rc::clone(rdm), p, key_desc.clone()));
         (
             Uuid::new_v4(),
             SimPool {
                 block_devs: HashMap::from_iter(device_pairs),
+                block_devs_key_desc: key_desc.clone(),
                 cache_devs: HashMap::new(),
+                cache_devs_key_desc: key_desc,
                 filesystems: Table::default(),
                 redundancy,
                 rdm: Rc::clone(rdm),
@@ -81,9 +93,48 @@ impl SimPool {
                     .map(|bd| (BlockDevTier::Cache, bd))
             })
     }
+
+    fn datadevs_encrypted(&self) -> bool {
+        self.block_devs_key_desc.is_some()
+    }
 }
 
 impl Pool for SimPool {
+    fn init_cache(
+        &mut self,
+        _pool_uuid: PoolUuid,
+        _pool_name: &str,
+        blockdevs: &[&Path],
+        key_desc: Option<String>,
+    ) -> StratisResult<SetCreateAction<DevUuid>> {
+        if self.is_encrypted() {
+            return Err(StratisError::Engine(
+                ErrorEnum::Invalid,
+                "Use of a cache is not supported with an encrypted pool".to_string(),
+            ));
+        }
+        if !self.has_cache() {
+            if blockdevs.is_empty() {
+                return Err(StratisError::Engine(
+                    ErrorEnum::Invalid,
+                    "At least one blockdev path is required to initialize a cache.".to_string(),
+                ));
+            }
+            let blockdev_pairs: Vec<_> = blockdevs
+                .iter()
+                .map(|p| SimDev::new(Rc::clone(&self.rdm), p, key_desc.clone()))
+                .collect();
+            let blockdev_uuids: Vec<_> = blockdev_pairs.iter().map(|(uuid, _)| *uuid).collect();
+            self.cache_devs.extend(blockdev_pairs);
+            Ok(SetCreateAction::new(blockdev_uuids))
+        } else {
+            init_cache_idempotent_or_err(
+                blockdevs,
+                self.cache_devs.iter().map(|(_, bd)| bd.devnode()),
+            )
+        }
+    }
+
     fn create_filesystems<'a, 'b>(
         &'a mut self,
         _pool_uuid: PoolUuid,
@@ -113,12 +164,16 @@ impl Pool for SimPool {
         tier: BlockDevTier,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
         if paths.is_empty() {
+            // Pool must be initialized with data devices so only check
+            // if the cache has been initialized.
             return if !self.has_cache() && tier == BlockDevTier::Cache {
                 Err(StratisError::Engine(
                     ErrorEnum::Invalid,
-                    "At least one blockdev path is required to initialize a cache.".to_string(),
+                    "The cache has not been initialized; you must use init_cache first to initialize the cache.".to_string(),
                 ))
             } else {
+                // If the cache has been initialized or we are adding zero blockdevs,
+                // treat adding no new blockdevs as the empty set.
                 Ok(SetCreateAction::new(vec![]))
             };
         }
@@ -126,7 +181,16 @@ impl Pool for SimPool {
 
         let device_pairs: Vec<_> = devices
             .iter()
-            .map(|p| SimDev::new(Rc::clone(&self.rdm), p, None))
+            .map(|p| {
+                SimDev::new(
+                    Rc::clone(&self.rdm),
+                    p,
+                    match tier {
+                        BlockDevTier::Data => self.block_devs_key_desc.clone(),
+                        BlockDevTier::Cache => self.cache_devs_key_desc.clone(),
+                    },
+                )
+            })
             .collect();
 
         let the_vec = match tier {
@@ -317,7 +381,11 @@ impl Pool for SimPool {
     }
 
     fn is_encrypted(&self) -> bool {
-        false
+        self.datadevs_encrypted()
+    }
+
+    fn key_desc(&self) -> Option<&str> {
+        self.block_devs_key_desc.as_deref()
     }
 }
 
@@ -346,6 +414,7 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
+                None,
             )
             .unwrap()
             .changed()
@@ -368,6 +437,7 @@ mod tests {
             .create_pool(
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                None,
                 None,
             )
             .unwrap()
@@ -397,6 +467,7 @@ mod tests {
             .create_pool(
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                None,
                 None,
             )
             .unwrap()
@@ -428,6 +499,7 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
+                None,
             )
             .unwrap()
             .changed()
@@ -451,6 +523,7 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
+                None,
             )
             .unwrap()
             .changed()
@@ -472,6 +545,7 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
+                None,
             )
             .unwrap()
             .changed()
@@ -492,6 +566,7 @@ mod tests {
             .create_pool(
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                None,
                 None,
             )
             .unwrap()
@@ -520,6 +595,7 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
+                None,
             )
             .unwrap()
             .changed()
@@ -538,6 +614,7 @@ mod tests {
             .create_pool(
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                None,
                 None,
             )
             .unwrap()
@@ -565,6 +642,7 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
+                None,
             )
             .unwrap()
             .changed()
@@ -589,6 +667,7 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
+                None,
             )
             .unwrap()
             .changed()
@@ -612,6 +691,7 @@ mod tests {
             .create_pool(
                 "pool_name",
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                None,
                 None,
             )
             .unwrap()

@@ -1266,7 +1266,7 @@ mod tests {
         devlinks::cleanup_devlinks(Vec::new().into_iter());
 
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default()).unwrap();
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
 
         let mut pool = ThinPool::new(
             pool_uuid,
@@ -1309,7 +1309,7 @@ mod tests {
         devlinks::cleanup_devlinks(Vec::new().into_iter());
         let (first_path, remaining_paths) = paths.split_at(1);
         let mut backstore =
-            Backstore::initialize(pool_uuid, first_path, MDADataSize::default()).unwrap();
+            Backstore::initialize(pool_uuid, first_path, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1416,7 +1416,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default()).unwrap();
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1529,7 +1529,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default()).unwrap();
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1578,7 +1578,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default()).unwrap();
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1645,7 +1645,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default()).unwrap();
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1700,7 +1700,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default()).unwrap();
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1793,7 +1793,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default()).unwrap();
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1841,7 +1841,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths2, MDADataSize::default()).unwrap();
+            Backstore::initialize(pool_uuid, paths2, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1894,7 +1894,7 @@ mod tests {
         let old_device = backstore
             .device()
             .expect("Space already allocated from backstore, backstore must have device");
-        backstore.add_cachedevs(pool_uuid, paths1).unwrap();
+        backstore.init_cache(pool_uuid, paths1, None).unwrap();
         let new_device = backstore
             .device()
             .expect("Space already allocated from backstore, backstore must have device");

@@ -226,6 +226,8 @@ pub mod blkdev_size {
 
     #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
     /// The total size of one entire block device belonging to Stratis.
+    /// Note that in the presence of encryption, this is the size of the
+    /// dm-crypt device, _not_ the size of the underlying block device.
     pub struct BlockdevSize(Sectors);
 
     impl BlockdevSize {

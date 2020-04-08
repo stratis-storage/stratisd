@@ -19,7 +19,7 @@ use crate::{
         strat_engine::{
             backstore::{
                 crypt::CryptHandle,
-                metadata::{disown_device, BDAExtendedSize, MDADataSize, BDA},
+                metadata::{disown_device, BDAExtendedSize, BlockdevSize, MDADataSize, BDA},
                 range_alloc::RangeAllocator,
                 shared::BlockDevPath,
             },
@@ -164,6 +164,13 @@ impl StratBlockDev {
         self.used.available()
     }
 
+    /// The total size of the Stratis block device.
+    pub fn total_size(&self) -> BlockdevSize {
+        let size = self.used.size();
+        assert_eq!(self.bda.dev_size(), size);
+        size
+    }
+
     /// The maximum size of variable length metadata that can be accommodated.
     /// self.max_metadata_size() < self.metadata_size()
     pub fn max_metadata_size(&self) -> MDADataSize {
@@ -198,9 +205,7 @@ impl BlockDev for StratBlockDev {
     }
 
     fn size(&self) -> Sectors {
-        let size = self.used.size();
-        assert_eq!(self.bda.dev_size(), size);
-        size.sectors()
+        self.total_size().sectors()
     }
 
     fn set_dbus_path(&mut self, path: MaybeDbusPath) {

@@ -17,7 +17,6 @@ use devicemapper::{Bytes, Device, LinearDevTargetParams, LinearTargetParams, Sec
 
 use crate::{
     engine::{
-        engine::BlockDev,
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
@@ -346,7 +345,10 @@ impl BlockDevMgr {
     /// self.size() > self.avail_space() because some sectors are certainly
     /// allocated for Stratis metadata
     pub fn size(&self) -> Sectors {
-        self.block_devs.iter().map(|b| b.size()).sum()
+        self.block_devs
+            .iter()
+            .map(|b| b.total_size().sectors())
+            .sum()
     }
 
     /// The number of sectors given over to Stratis metadata

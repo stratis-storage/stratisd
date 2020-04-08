@@ -6,39 +6,35 @@ use std::{
     collections::{hash_map, HashMap},
     fmt,
     iter::IntoIterator,
-    ops::Deref,
 };
 
-use uuid::Uuid;
-
-use crate::engine::types::Name;
+use crate::engine::types::{AsUuid, Name};
 
 /// Map UUID and name to T items.
-pub struct Table<T, U> {
+pub struct Table<U, T> {
     name_to_uuid: HashMap<Name, U>,
     items: HashMap<U, (Name, T)>,
 }
 
-impl<T, U> fmt::Debug for Table<T, U>
+impl<U, T> fmt::Debug for Table<U, T>
 where
+    U: fmt::Debug + AsUuid,
     T: fmt::Debug,
-    U: fmt::Debug + Deref<Target = Uuid>,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_map()
-            .entries(
-                self.iter()
-                    .map(|(name, uuid, item)| ((name.to_string(), uuid.to_simple_ref()), item)),
-            )
+            .entries(self.iter().map(|(name, uuid, item)| {
+                ((name.to_string(), uuid.as_uuid().to_simple_ref()), item)
+            }))
             .finish()
     }
 }
 
-impl<T, U> Default for Table<T, U>
+impl<U, T> Default for Table<U, T>
 where
-    U: Deref<Target = Uuid>,
+    U: AsUuid,
 {
-    fn default() -> Table<T, U> {
+    fn default() -> Table<U, T> {
         Table {
             name_to_uuid: HashMap::default(),
             items: HashMap::default(),
@@ -46,13 +42,13 @@ where
     }
 }
 
-pub struct Iter<'a, T: 'a, U: 'a> {
+pub struct Iter<'a, U: 'a, T: 'a> {
     items: hash_map::Iter<'a, U, (Name, T)>,
 }
 
-impl<'a, T, U> Iterator for Iter<'a, T, U>
+impl<'a, U, T> Iterator for Iter<'a, U, T>
 where
-    U: Deref<Target = Uuid>,
+    U: AsUuid,
 {
     type Item = (&'a Name, &'a U, &'a T);
 
@@ -69,13 +65,13 @@ where
     }
 }
 
-pub struct IterMut<'a, T: 'a, U: 'a> {
+pub struct IterMut<'a, U: 'a, T: 'a> {
     items: hash_map::IterMut<'a, U, (Name, T)>,
 }
 
-impl<'a, T, U> Iterator for IterMut<'a, T, U>
+impl<'a, U, T> Iterator for IterMut<'a, U, T>
 where
-    U: Deref<Target = Uuid>,
+    U: AsUuid,
 {
     type Item = (&'a Name, &'a U, &'a mut T);
 
@@ -92,13 +88,13 @@ where
     }
 }
 
-pub struct IntoIter<T, U> {
+pub struct IntoIter<U, T> {
     items: hash_map::IntoIter<U, (Name, T)>,
 }
 
-impl<T, U> Iterator for IntoIter<T, U>
+impl<U, T> Iterator for IntoIter<U, T>
 where
-    U: Deref<Target = Uuid>,
+    U: AsUuid,
 {
     type Item = (Name, U, T);
 
@@ -115,38 +111,38 @@ where
     }
 }
 
-impl<T, U> IntoIterator for Table<T, U>
+impl<U, T> IntoIterator for Table<U, T>
 where
-    U: Deref<Target = Uuid>,
+    U: AsUuid,
 {
     type Item = (Name, U, T);
-    type IntoIter = IntoIter<T, U>;
+    type IntoIter = IntoIter<U, T>;
 
-    fn into_iter(self) -> IntoIter<T, U> {
+    fn into_iter(self) -> IntoIter<U, T> {
         self.into_iter()
     }
 }
 
-impl<'a, T, U> IntoIterator for &'a Table<T, U>
+impl<'a, U, T> IntoIterator for &'a Table<U, T>
 where
-    U: Deref<Target = Uuid>,
+    U: AsUuid,
 {
     type Item = (&'a Name, &'a U, &'a T);
-    type IntoIter = Iter<'a, T, U>;
+    type IntoIter = Iter<'a, U, T>;
 
-    fn into_iter(self) -> Iter<'a, T, U> {
+    fn into_iter(self) -> Iter<'a, U, T> {
         self.iter()
     }
 }
 
-impl<'a, T, U> IntoIterator for &'a mut Table<T, U>
+impl<'a, U, T> IntoIterator for &'a mut Table<U, T>
 where
-    U: Deref<Target = Uuid>,
+    U: AsUuid,
 {
     type Item = (&'a Name, &'a U, &'a mut T);
-    type IntoIter = IterMut<'a, T, U>;
+    type IntoIter = IterMut<'a, U, T>;
 
-    fn into_iter(self) -> IterMut<'a, T, U> {
+    fn into_iter(self) -> IterMut<'a, U, T> {
         self.iter_mut()
     }
 }
@@ -154,9 +150,9 @@ where
 /// All operations are O(1), although Name lookups are slightly disadvantaged
 /// vs. Uuid lookups. In order to rename a T item, it must be removed,
 /// renamed, and reinserted under the new name.
-impl<T, U> Table<T, U>
+impl<U, T> Table<U, T>
 where
-    U: Deref<Target = Uuid>,
+    U: AsUuid,
 {
     pub fn is_empty(&self) -> bool {
         self.items.is_empty()
@@ -166,19 +162,19 @@ where
         self.items.len()
     }
 
-    pub fn iter(&self) -> Iter<T, U> {
+    pub fn iter(&self) -> Iter<U, T> {
         Iter {
             items: self.items.iter(),
         }
     }
 
-    pub fn iter_mut(&mut self) -> IterMut<T, U> {
+    pub fn iter_mut(&mut self) -> IterMut<U, T> {
         IterMut {
             items: self.items.iter_mut(),
         }
     }
 
-    pub fn into_iter(self) -> IntoIter<T, U> {
+    pub fn into_iter(self) -> IntoIter<U, T> {
         IntoIter {
             items: self.items.into_iter(),
         }
@@ -311,9 +307,9 @@ mod tests {
 
     // A global invariant checker for the table.
     // Verifies proper relationship between internal data structures.
-    fn table_invariant<T, U>(table: &Table<T, U>)
+    fn table_invariant<U, T>(table: &Table<U, T>)
     where
-        U: Deref<Target = Uuid>,
+        U: AsUuid,
     {
         for (uuid, &(ref name, _)) in &table.items {
             assert_eq!(uuid, &table.name_to_uuid[name])
@@ -343,7 +339,7 @@ mod tests {
     /// Verify that the table is now empty and that removing by name yields
     /// no result.
     fn remove_existing_item() {
-        let mut t: Table<TestThing> = Table::default();
+        let mut t: Table<Uuid, TestThing> = Table::default();
         table_invariant(&t);
 
         let uuid = Uuid::new_v4();
@@ -373,7 +369,7 @@ mod tests {
     /// This is good, because then you can't have a thing that is both in
     /// the table and not in the table.
     fn insert_same_keys() {
-        let mut t: Table<TestThing> = Table::default();
+        let mut t: Table<Uuid, TestThing> = Table::default();
         table_invariant(&t);
 
         let uuid = Uuid::new_v4();
@@ -414,7 +410,7 @@ mod tests {
     /// Insert a thing and then insert another thing with the same name.
     /// The previously inserted thing should be returned.
     fn insert_same_name() {
-        let mut t: Table<TestThing> = Table::default();
+        let mut t: Table<Uuid, TestThing> = Table::default();
         table_invariant(&t);
 
         let uuid = Uuid::new_v4();
@@ -458,7 +454,7 @@ mod tests {
     /// Insert a thing and then insert another thing with the same uuid.
     /// The previously inserted thing should be returned.
     fn insert_same_uuid() {
-        let mut t: Table<TestThing> = Table::default();
+        let mut t: Table<Uuid, TestThing> = Table::default();
         table_invariant(&t);
 
         let uuid = Uuid::new_v4();
@@ -502,7 +498,7 @@ mod tests {
     /// Insert two things, then insert a thing that matches one name and one
     /// uuid of each. Both existing things should be returned.
     fn insert_same_uuid_and_same_name() {
-        let mut t: Table<TestThing> = Table::default();
+        let mut t: Table<Uuid, TestThing> = Table::default();
         table_invariant(&t);
 
         let uuid1 = Uuid::new_v4();

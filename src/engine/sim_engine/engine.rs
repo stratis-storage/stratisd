@@ -29,7 +29,7 @@ use crate::{
 
 #[derive(Debug, Default)]
 pub struct SimEngine {
-    pools: Table<SimPool>,
+    pools: Table<PoolUuid, SimPool>,
     rdm: Rc<RefCell<Randomizer>>,
     key_handler: SimKeyActions,
 }

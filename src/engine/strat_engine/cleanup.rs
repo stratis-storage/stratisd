@@ -5,12 +5,12 @@
 // Code to handle cleanup after a failed operation.
 
 use crate::{
-    engine::{strat_engine::pool::StratPool, structures::Table},
+    engine::{strat_engine::pool::StratPool, structures::Table, types::PoolUuid},
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
 /// Teardown pools.
-pub fn teardown_pools(pools: Table<StratPool>) -> StratisResult<()> {
+pub fn teardown_pools(pools: Table<PoolUuid, StratPool>) -> StratisResult<()> {
     let mut untorndown_pools = Vec::new();
     for (_, uuid, mut pool) in pools {
         pool.teardown()

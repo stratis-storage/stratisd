@@ -5,7 +5,9 @@
 use std::{
     borrow::Borrow,
     convert::TryFrom,
-    fmt, io,
+    fmt::{self, Debug},
+    hash::Hash,
+    io,
     ops::Deref,
     path::{Path, PathBuf},
     rc::Rc,
@@ -25,9 +27,23 @@ use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
 use uuid::Uuid;
 
+// Potential FIXME: Do we want to require all of these traits to be implemented
+// in the definition? All of them are required for the current implementation
+// of table and it may or may not be good to explicitly call them out in
+// the definition of the trait.
+pub trait AsUuid: Debug + PartialEq + Eq + Hash + Copy + Clone {
+    fn as_uuid(&self) -> &Uuid;
+}
+
 pub type DevUuid = Uuid;
 pub type FilesystemUuid = Uuid;
 pub type PoolUuid = Uuid;
+
+impl AsUuid for Uuid {
+    fn as_uuid(&self) -> &Uuid {
+        self
+    }
+}
 
 /// A DM pool operates in 4 modes.  See drivers/md/dm-thin.c (enum pool_mode).
 /// The 4 modes map to Running, OutOfDataSpace, ReadOnly and Failed - in degrading

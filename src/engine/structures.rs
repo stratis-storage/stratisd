@@ -18,7 +18,7 @@ pub struct Table<U, T> {
 
 impl<U, T> fmt::Debug for Table<U, T>
 where
-    U: fmt::Debug + AsUuid,
+    U: AsUuid,
     T: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

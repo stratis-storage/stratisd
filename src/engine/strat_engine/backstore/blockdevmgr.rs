@@ -121,6 +121,7 @@ pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<TargetLine<LinearDevTargetParam
 pub struct BlockDevMgr {
     block_devs: Vec<StratBlockDev>,
     last_update_time: Option<DateTime<Utc>>,
+    key_desc: Option<String>,
 }
 
 impl BlockDevMgr {
@@ -128,10 +129,12 @@ impl BlockDevMgr {
     pub fn new(
         block_devs: Vec<StratBlockDev>,
         last_update_time: Option<DateTime<Utc>>,
+        key_desc: Option<String>,
     ) -> BlockDevMgr {
         BlockDevMgr {
             block_devs,
             last_update_time,
+            key_desc,
         }
     }
 
@@ -140,12 +143,14 @@ impl BlockDevMgr {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         mda_data_size: MDADataSize,
+        key_desc: Option<String>,
     ) -> StratisResult<BlockDevMgr> {
         let devices = process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?;
 
         Ok(BlockDevMgr::new(
-            initialize_devices(devices, pool_uuid, mda_data_size, None)?,
+            initialize_devices(devices, pool_uuid, mda_data_size, key_desc.as_deref())?,
             None,
+            key_desc,
         ))
     }
 
@@ -172,7 +177,12 @@ impl BlockDevMgr {
         // variable length metadata requires more than the minimum allocated,
         // then the necessary amount must be provided or the data can not be
         // saved.
-        let bds = initialize_devices(devices, pool_uuid, MDADataSize::default(), None)?;
+        let bds = initialize_devices(
+            devices,
+            pool_uuid,
+            MDADataSize::default(),
+            self.key_desc.as_deref(),
+        )?;
         let bdev_uuids = bds.iter().map(|bd| bd.uuid()).collect();
         self.block_devs.extend(bds);
         Ok(bdev_uuids)
@@ -347,6 +357,14 @@ impl BlockDevMgr {
             .map(|bd| bd.metadata_size().sectors())
             .sum()
     }
+
+    pub fn key_desc(&self) -> Option<&str> {
+        self.key_desc.as_deref()
+    }
+
+    pub fn is_encrypted(&self) -> bool {
+        self.key_desc.is_some()
+    }
 }
 
 impl Recordable<Vec<BaseBlockDevSave>> for BlockDevMgr {
@@ -372,7 +390,7 @@ mod tests {
     /// in balance.
     fn test_blockdevmgr_used(paths: &[&Path]) {
         let mut mgr =
-            BlockDevMgr::initialize(Uuid::new_v4(), paths, MDADataSize::default()).unwrap();
+            BlockDevMgr::initialize(Uuid::new_v4(), paths, MDADataSize::default(), None).unwrap();
         assert_eq!(mgr.avail_space() + mgr.metadata_size(), mgr.size());
 
         let allocated = Sectors(2);
@@ -419,11 +437,12 @@ mod tests {
         let uuid = Uuid::new_v4();
         let uuid2 = Uuid::new_v4();
 
-        let mut bd_mgr = BlockDevMgr::initialize(uuid, paths1, MDADataSize::default()).unwrap();
+        let mut bd_mgr =
+            BlockDevMgr::initialize(uuid, paths1, MDADataSize::default(), None).unwrap();
         cmd::udev_settle().unwrap();
 
         assert_matches!(
-            BlockDevMgr::initialize(uuid2, paths1, MDADataSize::default()),
+            BlockDevMgr::initialize(uuid2, paths1, MDADataSize::default(), None),
             Err(_)
         );
 
@@ -431,7 +450,7 @@ mod tests {
         assert_matches!(bd_mgr.add(uuid, paths1), Ok(_));
         assert_eq!(bd_mgr.block_devs.len(), original_length);
 
-        BlockDevMgr::initialize(uuid, paths2, MDADataSize::default()).unwrap();
+        BlockDevMgr::initialize(uuid, paths2, MDADataSize::default(), None).unwrap();
         cmd::udev_settle().unwrap();
 
         assert_matches!(bd_mgr.add(uuid, paths2), Err(_));

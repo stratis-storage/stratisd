@@ -57,6 +57,10 @@ impl<T> SetCreateAction<T> {
     pub fn new(changed: Vec<T>) -> Self {
         SetCreateAction { changed }
     }
+
+    pub fn empty() -> Self {
+        SetCreateAction { changed: vec![] }
+    }
 }
 
 impl<T> EngineAction for SetCreateAction<T> {

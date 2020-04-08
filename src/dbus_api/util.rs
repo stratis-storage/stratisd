@@ -29,6 +29,14 @@ pub fn tuple_to_option<T>(value: (bool, T)) -> Option<T> {
     }
 }
 
+/// Convert an option type to a tuple as option
+pub fn option_to_tuple<T>(value: Option<T>, default: T) -> (bool, T) {
+    match value {
+        Some(v) => (true, v),
+        None => (false, default),
+    }
+}
+
 /// Map a result obtained for the FetchProperties interface to a value used
 /// to represent an option.  An error in the result
 /// argument yields a false in the return value, indicating that the value

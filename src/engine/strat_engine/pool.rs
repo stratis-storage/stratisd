@@ -17,6 +17,7 @@ use devicemapper::{Device, DmName, DmNameBuf, Sectors};
 use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
+        shared::init_cache_idempotent_or_err,
         strat_engine::{
             backstore::{Backstore, MDADataSize},
             names::validate_name,
@@ -147,13 +148,15 @@ impl StratPool {
         name: &str,
         paths: &[&Path],
         redundancy: Redundancy,
+        key_desc: Option<String>,
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = Uuid::new_v4();
 
         // FIXME: Initializing with the minimum MDA size is not necessarily
         // enough. If there are enough devices specified, more space will be
         // required.
-        let mut backstore = Backstore::initialize(pool_uuid, paths, MDADataSize::default())?;
+        let mut backstore =
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), key_desc)?;
 
         let thinpool = ThinPool::new(
             pool_uuid,
@@ -272,9 +275,52 @@ impl StratPool {
             thinpool_dev: self.thin_pool.record(),
         }
     }
+
+    fn datadevs_encrypted(&self) -> bool {
+        self.backstore.data_tier_is_encrypted()
+    }
 }
 
 impl Pool for StratPool {
+    fn init_cache(
+        &mut self,
+        pool_uuid: PoolUuid,
+        pool_name: &str,
+        blockdevs: &[&Path],
+    ) -> StratisResult<SetCreateAction<DevUuid>> {
+        if self.is_encrypted() {
+            return Err(StratisError::Engine(
+                ErrorEnum::Invalid,
+                "Use of a cache is not supported with an encrypted pool".to_string(),
+            ));
+        }
+        if !self.has_cache() {
+            if blockdevs.is_empty() {
+                return Err(StratisError::Engine(
+                    ErrorEnum::Invalid,
+                    "At least one blockdev path is required to initialize a cache.".to_string(),
+                ));
+            }
+
+            // If adding cache devices, must suspend the pool, since the cache
+            // must be augmented with the new devices.
+            self.thin_pool.suspend()?;
+            let devices_result = self.backstore.init_cache(pool_uuid, blockdevs);
+            self.thin_pool.resume()?;
+            let devices = devices_result?;
+            self.write_metadata(pool_name)?;
+            Ok(SetCreateAction::new(devices))
+        } else {
+            init_cache_idempotent_or_err(
+                blockdevs,
+                self.backstore
+                    .cachedevs()
+                    .into_iter()
+                    .map(|(_, bd)| bd.devnode()),
+            )
+        }
+    }
+
     fn create_filesystems<'a, 'b>(
         &'a mut self,
         pool_uuid: PoolUuid,
@@ -308,34 +354,42 @@ impl Pool for StratPool {
         paths: &[&Path],
         tier: BlockDevTier,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
-        if paths.is_empty() {
-            return if !self.has_cache() && tier == BlockDevTier::Cache {
-                Err(StratisError::Engine(
-                    ErrorEnum::Invalid,
-                    "At least one blockdev path is required to initialize a cache.".to_string(),
-                ))
-            } else {
-                Ok(SetCreateAction::new(vec![]))
-            };
-        }
         let bdev_info = if tier == BlockDevTier::Cache {
-            // If adding cache devices, must suspend the pool, since the cache
-            // must be augmeneted with the new devices.
-            self.thin_pool.suspend()?;
-            let bdev_info_res = self
-                .backstore
-                .add_cachedevs(pool_uuid, paths)
-                .and_then(|bdi| {
-                    self.thin_pool
-                        .set_device(self.backstore.device().expect(
-                            "Since thin pool exists, space must have been allocated \
-                             from the backstore, so backstore must have a cap device",
-                        ))
-                        .and(Ok(bdi))
-                });
-            self.thin_pool.resume()?;
-            let bdev_info = bdev_info_res?;
-            Ok(SetCreateAction::new(bdev_info))
+            if self.has_cache() {
+                if paths.is_empty() {
+                    // If the cache has been initialized and we are adding zero blockdevs,
+                    // treat adding no new blockdevs as the empty set.
+                    Ok(SetCreateAction::new(vec![]))
+                } else {
+                    // If adding cache devices, must suspend the pool; the cache
+                    // must be augmented with the new devices. Note that this
+                    // justifies checking whether the cache is initialized
+                    // before beginning the operation; it is unreasonable to
+                    // do an interesting operation like suspending the pool if
+                    // the blockdevs are not going to be added anyway.
+                    self.thin_pool.suspend()?;
+                    let bdev_info_res =
+                        self.backstore
+                            .add_cachedevs(pool_uuid, paths)
+                            .and_then(|bdi| {
+                                self.thin_pool
+                                    .set_device(self.backstore.device().expect(
+                                        "Since thin pool exists, space must have been allocated \
+                                         from the backstore, so backstore must have a cap device",
+                                    ))
+                                    .and(Ok(bdi))
+                            });
+                    self.thin_pool.resume()?;
+                    let bdev_info = bdev_info_res?;
+                    Ok(SetCreateAction::new(bdev_info))
+                }
+            } else {
+                Err(StratisError::Error(format!(
+                            "No cache has been initialized for pool with UUID {} and name {}; it is therefore impossible to add additional devices to the cache",
+                            pool_uuid.to_simple_ref(),
+                            pool_name)
+                ))
+            }
         } else {
             // If just adding data devices, no need to suspend the pool.
             // No action will be taken on the DM devices.
@@ -512,7 +566,11 @@ impl Pool for StratPool {
     }
 
     fn is_encrypted(&self) -> bool {
-        false
+        self.datadevs_encrypted()
+    }
+
+    fn key_desc(&self) -> Option<&str> {
+        self.backstore.data_key_desc()
     }
 }
 
@@ -540,6 +598,7 @@ mod tests {
 
     fn invariant(pool: &StratPool, pool_name: &str) {
         check_metadata(&pool.record(&Name::new(pool_name.into()))).unwrap();
+        assert!(!(pool.is_encrypted() && pool.backstore.has_cache()));
     }
 
     /// Verify that metadata can be read from pools.
@@ -554,13 +613,15 @@ mod tests {
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let name1 = "name1";
-        let (uuid1, mut pool1) = StratPool::initialize(name1, paths1, Redundancy::NONE).unwrap();
+        let (uuid1, mut pool1) =
+            StratPool::initialize(name1, paths1, Redundancy::NONE, None).unwrap();
         invariant(&pool1, name1);
 
         let metadata1 = pool1.record(name1);
 
         let name2 = "name2";
-        let (uuid2, mut pool2) = StratPool::initialize(name2, paths2, Redundancy::NONE).unwrap();
+        let (uuid2, mut pool2) =
+            StratPool::initialize(name2, paths2, Redundancy::NONE, None).unwrap();
         invariant(&pool2, name2);
 
         let metadata2 = pool2.record(name2);
@@ -614,7 +675,7 @@ mod tests {
     fn test_empty_pool(paths: &[&Path]) {
         assert_eq!(paths.len(), 0);
         assert_matches!(
-            StratPool::initialize("stratis_test_pool", paths, Redundancy::NONE),
+            StratPool::initialize("stratis_test_pool", paths, Redundancy::NONE, None),
             Err(_)
         );
     }
@@ -640,7 +701,7 @@ mod tests {
 
         let name = "stratis-test-pool";
         devlinks::cleanup_devlinks(Vec::new().into_iter());
-        let (uuid, mut pool) = StratPool::initialize(name, paths2, Redundancy::NONE).unwrap();
+        let (uuid, mut pool) = StratPool::initialize(name, paths2, Redundancy::NONE, None).unwrap();
         devlinks::pool_added(name);
         invariant(&pool, name);
 
@@ -680,8 +741,7 @@ mod tests {
                 .unwrap();
         }
 
-        pool.add_blockdevs(uuid, name, paths1, BlockDevTier::Cache)
-            .unwrap();
+        pool.init_cache(uuid, name, paths1).unwrap();
         invariant(&pool, name);
 
         let metadata2 = pool.record(name);
@@ -760,7 +820,8 @@ mod tests {
 
         let name = "stratis-test-pool";
         devlinks::cleanup_devlinks(Vec::new().into_iter());
-        let (pool_uuid, mut pool) = StratPool::initialize(name, paths1, Redundancy::NONE).unwrap();
+        let (pool_uuid, mut pool) =
+            StratPool::initialize(name, paths1, Redundancy::NONE, None).unwrap();
         devlinks::pool_added(name);
         invariant(&pool, name);
 

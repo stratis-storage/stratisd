@@ -151,6 +151,16 @@ impl DataTier {
     pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut StratBlockDev)> {
         self.block_mgr.blockdevs_mut()
     }
+
+    /// Data tier is encrypted
+    pub fn is_encrypted(&self) -> bool {
+        self.block_mgr.is_encrypted()
+    }
+
+    /// Data tier key description
+    pub fn key_desc(&self) -> Option<&str> {
+        self.block_mgr.key_desc()
+    }
 }
 
 impl Recordable<DataTierSave> for DataTier {
@@ -185,7 +195,7 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
 
-        let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MDADataSize::default()).unwrap();
+        let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MDADataSize::default(), None).unwrap();
 
         let mut data_tier = DataTier::new(mgr);
 

@@ -72,6 +72,27 @@ pub trait BlockDev: Debug {
 }
 
 pub trait Pool: Debug {
+    /// Initialize the cache with the provided cache block devices.
+    /// Returns a list of the the block devices that were actually added as cache
+    /// devices. In practice, this will have three types of return values:
+    /// * An error if the cache has already been initialized with a different set
+    /// of block devices.
+    /// * `SetCreateAction::Identity` if the cache has already been initialized with
+    /// the same set of block devices.
+    /// * `SetCreateAction::Created` containing all provided block devices if the
+    /// cache has not yet been initialized.
+    ///
+    /// This ensures the contract of providing a truly idempotent API as the cache
+    /// can only be initialized once and if an attempt is made to initialize it
+    /// twice with different sets of block devices, the user should be notified
+    /// of their error.
+    fn init_cache(
+        &mut self,
+        pool_uuid: PoolUuid,
+        pool_name: &str,
+        blockdevs: &[&Path],
+    ) -> StratisResult<SetCreateAction<DevUuid>>;
+
     /// Creates the filesystems specified by specs.
     /// Returns a list of the names of filesystems actually created.
     /// Returns an error if any of the specified names are already in use
@@ -88,6 +109,8 @@ pub trait Pool: Debug {
     /// Returns a list of uuids corresponding to devices actually added.
     /// Returns an error if a blockdev can not be added because it is owned
     /// or there was an error while reading or writing a blockdev.
+    /// Also return an error if the tier specified is Cache, and the cache
+    /// is not yet initialized.
     fn add_blockdevs(
         &mut self,
         pool_uuid: PoolUuid,
@@ -192,6 +215,10 @@ pub trait Pool: Debug {
 
     /// Determine if the pool's data is encrypted
     fn is_encrypted(&self) -> bool;
+
+    /// Get key description for the key in the kernel keyring used for encryption
+    /// if it is encrypted
+    fn key_desc(&self) -> Option<&str>;
 }
 
 pub trait Engine: Debug {
@@ -204,6 +231,7 @@ pub trait Engine: Debug {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
+        key_desc: Option<String>,
     ) -> StratisResult<CreateAction<PoolUuid>>;
 
     /// Handle a libudev event.

@@ -122,7 +122,7 @@ impl Backstore {
         last_update_time: DateTime<Utc>,
     ) -> StratisResult<Backstore> {
         let (datadevs, cachedevs) = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
-        let block_mgr = BlockDevMgr::new(datadevs, Some(last_update_time));
+        let block_mgr = BlockDevMgr::new(datadevs, Some(last_update_time), None);
         let data_tier = DataTier::setup(block_mgr, &backstore_save.data_tier)?;
         let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
         let origin = LinearDev::setup(
@@ -133,7 +133,7 @@ impl Backstore {
         )?;
 
         let (cache_tier, cache, origin) = if !cachedevs.is_empty() {
-            let block_mgr = BlockDevMgr::new(cachedevs, Some(last_update_time));
+            let block_mgr = BlockDevMgr::new(cachedevs, Some(last_update_time), None);
             match backstore_save.cache_tier {
                 Some(ref cache_tier_save) => {
                     let cache_tier = CacheTier::setup(block_mgr, cache_tier_save)?;
@@ -169,8 +169,14 @@ impl Backstore {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         mda_data_size: MDADataSize,
+        key_desc: Option<String>,
     ) -> StratisResult<Backstore> {
-        let data_tier = DataTier::new(BlockDevMgr::initialize(pool_uuid, paths, mda_data_size)?);
+        let data_tier = DataTier::new(BlockDevMgr::initialize(
+            pool_uuid,
+            paths,
+            mda_data_size,
+            key_desc,
+        )?);
 
         Ok(Backstore {
             data_tier,
@@ -181,9 +187,62 @@ impl Backstore {
         })
     }
 
+    /// Initialize the cache tier and add cachedevs to the backstore.
+    ///
+    /// Returns all `DevUuid`s of devices that were added to the cache on initialization.
+    ///
+    /// Precondition: Must be invoked only after some space has been allocated
+    /// from the backstore. This ensures that there is certainly a cap device.
+    // Precondition: self.cache.is_none() && self.linear.is_some()
+    // Postcondition: self.cache.is_some() && self.linear.is_none()
+    pub fn init_cache(
+        &mut self,
+        pool_uuid: PoolUuid,
+        paths: &[&Path],
+    ) -> StratisResult<Vec<DevUuid>> {
+        match self.cache_tier {
+            Some(_) => unreachable!("self.cache.is_none()"),
+            None => {
+                if paths.is_empty() {
+                    return Err(StratisError::Engine(
+                        ErrorEnum::Invalid,
+                        "Must initialize cache with at least one blockdev.".to_string(),
+                    ));
+                }
+
+                // Note that variable length metadata is not stored on the
+                // cachedevs, so the mda_size can always be the minimum.
+                // If it is desired to change a cache dev to a data dev, it
+                // should be removed and then re-added in order to ensure
+                // that the MDA region is set to the correct size.
+                let bdm = BlockDevMgr::initialize(pool_uuid, paths, MDADataSize::default(), None)?;
+
+                let cache_tier = CacheTier::new(bdm)?;
+
+                let linear = self.linear
+                    .take()
+                    .expect("some space has already been allocated from the backstore => (cache_tier.is_none() <=> self.linear.is_some())");
+
+                let cache = make_cache(pool_uuid, &cache_tier, linear, true)?;
+
+                self.cache = Some(cache);
+
+                let uuids = cache_tier
+                    .block_mgr
+                    .blockdevs()
+                    .iter()
+                    .map(|&(uuid, _)| uuid)
+                    .collect::<Vec<_>>();
+
+                self.cache_tier = Some(cache_tier);
+
+                Ok(uuids)
+            }
+        }
+    }
+
     /// Add cachedevs to the backstore.
     ///
-    /// If the cache tier does not already exist, create it.
     /// If the addition of the cache devs would result in a cache with a
     /// cache sub-device size greater than 32 TiB return an error.
     /// FIXME: This restriction on the size of the cache sub-device is
@@ -191,8 +250,9 @@ impl Backstore {
     ///
     /// Precondition: Must be invoked only after some space has been allocated
     /// from the backstore. This ensures that there is certainly a cap device.
-    // Precondition: self.linear.is_some() XOR self.cache.is_some()
-    // Postcondition: self.cache.is_some() && self.linear.is_none()
+    // Precondition: self.linear.is_none() && self.cache.is_some()
+    // Precondition: self.cache_key_desc has the desired key description
+    // Precondition: self.cache.is_some() && self.linear.is_none()
     pub fn add_cachedevs(
         &mut self,
         pool_uuid: PoolUuid,
@@ -223,35 +283,7 @@ impl Backstore {
 
                 Ok(uuids)
             }
-            None => {
-                // Note that variable length metadata is not stored on the
-                // cachedevs, so the mda_size can always be the minimum.
-                // If it is desired to change a cache dev to a data dev, it
-                // should be removed and then re-added in order to ensure
-                // that the MDA region is set to the correct size.
-                let bdm = BlockDevMgr::initialize(pool_uuid, paths, MDADataSize::default())?;
-
-                let cache_tier = CacheTier::new(bdm)?;
-
-                let linear = self.linear
-                    .take()
-                    .expect("some space has already been allocated from the backstore => (cache_tier.is_none() <=> self.linear.is_some())");
-
-                let cache = make_cache(pool_uuid, &cache_tier, linear, true)?;
-
-                self.cache = Some(cache);
-
-                let uuids = cache_tier
-                    .block_mgr
-                    .blockdevs()
-                    .iter()
-                    .map(|&(uuid, _)| uuid)
-                    .collect::<Vec<_>>();
-
-                self.cache_tier = Some(cache_tier);
-
-                Ok(uuids)
-            }
+            None => unreachable!("self.cache.is_some()"),
         }
     }
 
@@ -396,19 +428,27 @@ impl Backstore {
         }
     }
 
+    /// Get only the datadevs in the pool.
+    pub fn datadevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
+        self.data_tier.blockdevs().to_vec()
+    }
+
+    /// Get only the cachdevs in the pool.
+    pub fn cachedevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
+        match self.cache_tier {
+            Some(ref cache) => cache.blockdevs().to_vec(),
+            None => Vec::new(),
+        }
+    }
+
     /// Return a reference to all the blockdevs that this pool has ownership
     /// of. The blockdevs may be returned in any order. It is unsafe to assume
     /// that they are grouped by tier or any other organization.
     pub fn blockdevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
-        match self.cache_tier {
-            Some(ref cache) => cache
-                .blockdevs()
-                .iter()
-                .chain(self.data_tier.blockdevs().iter())
-                .cloned()
-                .collect(),
-            None => self.data_tier.blockdevs(),
-        }
+        self.datadevs()
+            .into_iter()
+            .chain(self.cachedevs().into_iter())
+            .collect()
     }
 
     pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut StratBlockDev)> {
@@ -579,6 +619,14 @@ impl Backstore {
         )
     }
 
+    pub fn data_key_desc(&self) -> Option<&str> {
+        self.data_tier.key_desc()
+    }
+
+    pub fn data_tier_is_encrypted(&self) -> bool {
+        self.data_tier.is_encrypted()
+    }
+
     pub fn has_cache(&self) -> bool {
         self.cache_tier.is_some()
     }
@@ -658,7 +706,7 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
         let mut backstore =
-            Backstore::initialize(pool_uuid, initdatapaths, MDADataSize::default()).unwrap();
+            Backstore::initialize(pool_uuid, initdatapaths, MDADataSize::default(), None).unwrap();
 
         invariant(&backstore);
 
@@ -667,7 +715,7 @@ mod tests {
             .alloc(pool_uuid, &[INITIAL_BACKSTORE_ALLOCATION])
             .unwrap();
 
-        let cache_uuids = backstore.add_cachedevs(pool_uuid, initcachepaths).unwrap();
+        let cache_uuids = backstore.init_cache(pool_uuid, initcachepaths).unwrap();
 
         invariant(&backstore);
 
@@ -753,7 +801,7 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default()).unwrap();
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
 
         assert_matches!(
             backstore
@@ -819,7 +867,7 @@ mod tests {
 
         let (backstore_save, devices) = {
             let mut backstore =
-                Backstore::initialize(pool_uuid, paths1, MDADataSize::default()).unwrap();
+                Backstore::initialize(pool_uuid, paths1, MDADataSize::default(), None).unwrap();
 
             for path in paths1 {
                 assert_eq!(
@@ -840,7 +888,7 @@ mod tests {
 
             let old_device = backstore.device();
 
-            backstore.add_cachedevs(pool_uuid, paths2).unwrap();
+            backstore.init_cache(pool_uuid, paths2).unwrap();
 
             for path in paths2 {
                 assert_eq!(

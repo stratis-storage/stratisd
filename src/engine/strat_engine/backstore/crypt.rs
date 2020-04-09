@@ -506,16 +506,16 @@ fn ensure_inactive(device: &mut CryptDevice, name: &str) -> Result<()> {
             name
         );
     }
-    if log_on_failure!(
+    let status = log_on_failure!(
         libcryptsetup_rs::status(Some(device), name),
         "Failed to determine status of device with name {}",
         name
-    ) != CryptStatusInfo::Inactive
-    {
+    );
+    if status != CryptStatusInfo::Inactive {
         warn!(
             "Device deactivation of name {} reported success but device \
-            still reports something other than an inactive status",
-            name
+            still reports a status of {:?}",
+            name, status,
         );
         return Err(LibcryptErr::Other(
             "Deactivation of device failed.".to_string(),
@@ -886,18 +886,20 @@ mod tests {
                 )));
             }
 
-            let disk_buffer =
-                unsafe { slice::from_raw_parts(mapped_ptr as *const u8, device_size) };
-            for window in disk_buffer.windows(WINDOW_SIZE) {
-                if window == &*random_buffer as &[u8] {
-                    unsafe {
-                        libc::munmap(mapped_ptr, device_size);
-                        libc::close(fd);
-                    };
-                    return Err(Box::new(io::Error::new(
-                        io::ErrorKind::Other,
-                        "Disk was not encrypted!",
-                    )));
+            {
+                let disk_buffer =
+                    unsafe { slice::from_raw_parts(mapped_ptr as *const u8, device_size) };
+                for window in disk_buffer.windows(WINDOW_SIZE) {
+                    if window == &*random_buffer as &[u8] {
+                        unsafe {
+                            libc::munmap(mapped_ptr, device_size);
+                            libc::close(fd);
+                        };
+                        return Err(Box::new(io::Error::new(
+                            io::ErrorKind::Other,
+                            "Disk was not encrypted!",
+                        )));
+                    }
                 }
             }
 
@@ -905,6 +907,10 @@ mod tests {
                 libc::munmap(mapped_ptr, device_size);
                 libc::close(fd);
             };
+
+            // Needed to ensure that the device is no longer busy and that
+            // munmap is completed.
+            std::thread::sleep(std::time::Duration::new(1, 0));
 
             handle.deactivate()?;
 

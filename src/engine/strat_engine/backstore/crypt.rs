@@ -222,6 +222,11 @@ impl CryptHandle {
     }
 
     #[cfg(test)]
+    fn as_crypt_device(&mut self) -> &mut CryptDevice {
+        &mut self.device
+    }
+
+    #[cfg(test)]
     pub fn can_setup(physical_path: &Path) -> bool {
         fn can_setup_with_failures(physical_path: &Path) -> Result<bool> {
             let mut device = log_on_failure!(
@@ -506,16 +511,16 @@ fn ensure_inactive(device: &mut CryptDevice, name: &str) -> Result<()> {
             name
         );
     }
-    if log_on_failure!(
+    let status = log_on_failure!(
         libcryptsetup_rs::status(Some(device), name),
         "Failed to determine status of device with name {}",
         name
-    ) != CryptStatusInfo::Inactive
-    {
+    );
+    if status != CryptStatusInfo::Inactive {
         warn!(
             "Device deactivation of name {} reported success but device \
-            still reports something other than an inactive status",
-            name
+            still reports a status of {:?}",
+            name, status,
         );
         return Err(LibcryptErr::Other(
             "Deactivation of device failed.".to_string(),
@@ -751,11 +756,11 @@ mod tests {
         error::Error,
         fs::{File, OpenOptions},
         io::{Read, Write},
+        mem::MaybeUninit,
+        ptr, slice,
     };
 
     use uuid::Uuid;
-
-    use devicemapper::Sectors;
 
     use crate::{
         engine::strat_engine::tests::{crypt, loopbacked, real},
@@ -823,6 +828,7 @@ mod tests {
     /// searches that need to be done compared to a smaller sliding window
     /// and also to decrease the probability of the random sequence being found
     /// on the disk due to leftover data from other tests.
+    // TODO: Rewrite libc calls using nix crate.
     fn test_crypt_device_ops(paths: &[&Path]) {
         fn crypt_test(paths: &[&Path], key_desc: &str) -> std::result::Result<(), Box<dyn Error>> {
             let path = paths.get(0).ok_or_else(|| {
@@ -844,23 +850,87 @@ mod tests {
 
             const WINDOW_SIZE: usize = 1024 * 1024;
             let mut devicenode = OpenOptions::new().write(true).open(logical_path)?;
-            let mut random_buffer = [0; WINDOW_SIZE];
-            File::open("/dev/urandom")?.read_exact(&mut random_buffer)?;
-            devicenode.write_all(&random_buffer)?;
+            let mut random_buffer = Box::new([0; WINDOW_SIZE]);
+            File::open("/dev/urandom")?.read_exact(&mut *random_buffer)?;
+            devicenode.write_all(&*random_buffer)?;
             std::mem::drop(devicenode);
 
-            let mut disk_buffer = Vec::new();
-            let mut devicenode = File::open(path)?;
-            devicenode.read_to_end(&mut disk_buffer)?;
-            for window in disk_buffer.windows(WINDOW_SIZE) {
-                if window == &random_buffer as &[u8] {
-                    return Err(Box::new(io::Error::new(
-                        io::ErrorKind::Other,
-                        "Disk was not encrypted!",
-                    )));
+            let dev_path_cstring = CString::new(path.to_str().ok_or_else(|| {
+                Box::new(io::Error::new(
+                    io::ErrorKind::Other,
+                    "Failed to convert path to string",
+                ))
+            })?)
+            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+            let fd = unsafe { libc::open(dev_path_cstring.as_ptr(), libc::O_RDONLY) };
+            if fd < 0 {
+                return Err(Box::new(io::Error::last_os_error()));
+            }
+
+            let mut stat: MaybeUninit<libc::stat> = MaybeUninit::zeroed();
+            let fstat_result = unsafe { libc::fstat(fd, stat.as_mut_ptr()) };
+            if fstat_result < 0 {
+                return Err(Box::new(io::Error::last_os_error()));
+            }
+            let device_size = unsafe { stat.assume_init() }.st_size as usize;
+            let mapped_ptr = unsafe {
+                libc::mmap(
+                    ptr::null_mut(),
+                    device_size,
+                    libc::PROT_READ,
+                    libc::MAP_SHARED,
+                    fd,
+                    0,
+                )
+            };
+            if mapped_ptr.is_null() {
+                return Err(Box::new(io::Error::new(
+                    io::ErrorKind::Other,
+                    "mmap failed",
+                )));
+            }
+
+            {
+                let disk_buffer =
+                    unsafe { slice::from_raw_parts(mapped_ptr as *const u8, device_size) };
+                for window in disk_buffer.windows(WINDOW_SIZE) {
+                    if window == &*random_buffer as &[u8] {
+                        unsafe {
+                            libc::munmap(mapped_ptr, device_size);
+                            libc::close(fd);
+                        };
+                        return Err(Box::new(io::Error::new(
+                            io::ErrorKind::Other,
+                            "Disk was not encrypted!",
+                        )));
+                    }
                 }
             }
-            std::mem::drop(devicenode);
+
+            unsafe {
+                libc::munmap(mapped_ptr, device_size);
+                libc::close(fd);
+            };
+
+            let device_name = handle.name.clone();
+            loop {
+                match libcryptsetup_rs::status(Some(handle.as_crypt_device()), &device_name) {
+                    Ok(CryptStatusInfo::Busy) => (),
+                    Ok(CryptStatusInfo::Active) => break,
+                    Ok(s) => {
+                        return Err(Box::new(io::Error::new(
+                            io::ErrorKind::Other,
+                            format!("Crypt device is in invalid state {:?}", s),
+                        )))
+                    }
+                    Err(e) => {
+                        return Err(Box::new(io::Error::new(
+                            io::ErrorKind::Other,
+                            format!("Checking device status returned error: {}", e),
+                        )))
+                    }
+                }
+            }
 
             handle.deactivate()?;
 
@@ -876,25 +946,9 @@ mod tests {
     }
 
     #[test]
-    fn loop_test_crypt_device_ops() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Exactly(1, None),
-            test_crypt_device_ops,
-        );
-    }
-
-    #[test]
     fn real_test_crypt_device_ops() {
         real::test_with_spec(
             &real::DeviceLimits::Exactly(1, None, Some(Sectors(1024 * 1024 * 1024 / 512))),
-            test_crypt_device_ops,
-        );
-    }
-
-    #[test]
-    fn travis_test_crypt_device_ops() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Exactly(1, None),
             test_crypt_device_ops,
         );
     }

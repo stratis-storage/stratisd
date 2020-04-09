@@ -418,7 +418,7 @@ class UdevAdd(unittest.TestCase):
         """
         See documentation for _single_pool.
         """
-        self._single_pool(16)
+        self._single_pool(8)
 
     def test_spurious_adds(self):
         """

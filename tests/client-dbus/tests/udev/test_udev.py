@@ -177,7 +177,10 @@ class _Service:
         assert _get_stratis_devices() == []
 
         service = subprocess.Popen(
-            [_STRATISD], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+            [_STRATISD],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
         )
 
         dbus_interface_present = False

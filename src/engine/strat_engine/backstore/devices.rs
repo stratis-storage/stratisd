@@ -376,7 +376,15 @@ fn check_device_ids(
 
     Ok(devices
         .into_iter()
-        .filter(|(_, stratis_identifiers)| stratis_identifiers.is_none())
+        .filter(|(info, stratis_identifiers)| {
+            if let Some(stratis_identifiers) = stratis_identifiers {
+                info!("Device {} has the same pool UUID, {}, and device UUID, {}, as another device that is already in this tier and pool; omitting it from the set of devices to initialize",
+                      info.devnode.display(),
+                      stratis_identifiers.pool_uuid.to_simple_ref(),
+                      stratis_identifiers.device_uuid.to_simple_ref());
+            }
+            stratis_identifiers.is_none()
+        })
         .map(|(info, _)| info)
         .collect())
 }

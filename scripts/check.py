@@ -6,11 +6,11 @@ import subprocess
 import sys
 
 arg_map = {
-    "scripts": [
+    "stratis_id": [
         "--reports=no",
         "--disable=I",
         "--msg-template='{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}'",
-    ],
+    ]
 }
 
 

@@ -95,6 +95,7 @@ def _hex_dump(data):
             % (slc_index, " ".join(format(x, "02x") for x in slc), str(slc))
         )
 
+
 def dump_stratis_signature_area(block_device):
     """
     Dumps stratis signature space!

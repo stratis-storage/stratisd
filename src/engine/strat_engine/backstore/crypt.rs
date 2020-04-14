@@ -222,6 +222,11 @@ impl CryptHandle {
     }
 
     #[cfg(test)]
+    fn as_crypt_device(&mut self) -> &mut CryptDevice {
+        &mut self.device
+    }
+
+    #[cfg(test)]
     pub fn can_setup(physical_path: &Path) -> bool {
         fn can_setup_with_failures(physical_path: &Path) -> Result<bool> {
             let mut device = log_on_failure!(
@@ -910,9 +915,15 @@ mod tests {
                 libc::close(fd);
             };
 
-            // Needed to ensure that the device is no longer busy and that
-            // munmap is completed.
-            std::thread::sleep(std::time::Duration::new(1, 0));
+            let device_name = handle.name.clone();
+            loop {
+                match libcryptsetup_rs::status(Some(handle.as_crypt_device()), &device_name) {
+                    Ok(CryptStatusInfo::Busy) => (),
+                    Ok(CryptStatusInfo::Active) => break,
+                    Ok(s) => panic!("Crypt device is in invalid state {:?}", s),
+                    Err(e) => panic!("Checking device status returned error: {}", e),
+                }
+            }
 
             handle.deactivate()?;
 

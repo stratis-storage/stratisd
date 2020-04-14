@@ -919,8 +919,18 @@ mod tests {
                 match libcryptsetup_rs::status(Some(handle.as_crypt_device()), &device_name) {
                     Ok(CryptStatusInfo::Busy) => (),
                     Ok(CryptStatusInfo::Active) => break,
-                    Ok(s) => panic!("Crypt device is in invalid state {:?}", s),
-                    Err(e) => panic!("Checking device status returned error: {}", e),
+                    Ok(s) => {
+                        return Err(Box::new(io::Error::new(
+                            io::ErrorKind::Other,
+                            format!("Crypt device is in invalid state {:?}", s),
+                        )))
+                    }
+                    Err(e) => {
+                        return Err(Box::new(io::Error::new(
+                            io::ErrorKind::Other,
+                            format!("Checking device status returned error: {}", e),
+                        )))
+                    }
                 }
             }
 

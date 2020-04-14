@@ -762,8 +762,6 @@ mod tests {
 
     use uuid::Uuid;
 
-    use devicemapper::Sectors;
-
     use crate::{
         engine::strat_engine::tests::{crypt, loopbacked, real},
         stratis::StratisError,

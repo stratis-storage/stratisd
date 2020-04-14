@@ -825,7 +825,7 @@ mod tests {
     /// searches that need to be done compared to a smaller sliding window
     /// and also to decrease the probability of the random sequence being found
     /// on the disk due to leftover data from other tests.
-    // FIXME: Rewrite libc calls using nix crate.
+    // TODO: Rewrite libc calls using nix crate.
     // FIXME: Find a way to wait for munmap to complete other than sleeping.
     fn test_crypt_device_ops(paths: &[&Path]) {
         fn crypt_test(paths: &[&Path], key_desc: &str) -> std::result::Result<(), Box<dyn Error>> {

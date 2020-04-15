@@ -549,21 +549,6 @@ fn ensure_inactive(device: &mut CryptDevice, name: &str) -> Result<()> {
             name
         );
     }
-    let status = log_on_failure!(
-        libcryptsetup_rs::status(Some(device), name),
-        "Failed to determine status of device with name {}",
-        name
-    );
-    if status != CryptStatusInfo::Inactive {
-        warn!(
-            "Device deactivation of name {} reported success but device \
-            still reports a status of {:?}",
-            name, status,
-        );
-        return Err(LibcryptErr::Other(
-            "Deactivation of device failed.".to_string(),
-        ));
-    }
     Ok(())
 }
 

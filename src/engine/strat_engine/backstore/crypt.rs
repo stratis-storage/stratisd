@@ -212,7 +212,6 @@ pub struct CryptHandle {
 }
 
 impl CryptHandle {
-    /// Create new
     pub(crate) fn new(device: CryptDevice, physical_path: PathBuf, name: String) -> Self {
         CryptHandle {
             device,
@@ -226,22 +225,73 @@ impl CryptHandle {
         &mut self.device
     }
 
+    /// Create a device handle and load the LUKS2 header into memory from
+    /// a phyiscal path.
+    fn device_from_physical_path(physical_path: &Path) -> Result<Option<CryptDevice>> {
+        let mut device = log_on_failure!(
+            CryptInit::init(physical_path),
+            "Failed to acquire a context for device {}",
+            physical_path.display()
+        );
+        if device
+            .context_handle()
+            .load::<()>(EncryptionFormat::Luks2, None)
+            .is_err()
+        {
+            info!("Device {} is not a LUKS2 device", physical_path.display());
+            Ok(None)
+        } else {
+            Ok(Some(device))
+        }
+    }
+
+    /// Check whether the given physical device can be unlocked with the current
+    /// environment (e.g. the proper key is in the kernel keyring, the device
+    /// is formatted as a LUKS2 device, etc.)
+    // TODO: Use this method when adding blockdevs to a pool to verify that
+    // the same key is being used to encrypt new devices as already encrypted devices.
+    #[allow(dead_code)]
+    pub fn can_unlock(physical_path: &Path) -> bool {
+        fn can_unlock_with_failures(physical_path: &Path) -> Result<bool> {
+            let device_result = CryptHandle::device_from_physical_path(physical_path);
+            match device_result {
+                Ok(Some(mut dev)) => check_luks2_token(&mut dev).map(|_| true),
+                _ => Ok(false),
+            }
+        }
+
+        can_unlock_with_failures(physical_path)
+            .map_err(|e| {
+                warn!(
+                    "stratisd was unable to simulate opening the given device \
+                    in the current environment. This may be due to an expired \
+                    or missing key in the kernel keyring: {}",
+                    e,
+                );
+            })
+            .unwrap_or(false)
+    }
+
+    /// This method will check that the metadata on the given device is
+    /// for the LUKS2 format and that the LUKS2 metadata is formatted
+    /// properly as a Stratis encrypted device.
+    ///
+    /// NOTE: This will not validate that the proper key is in the kernel
+    /// keyring. For that, use `CryptHandle::can_unlock()`.
+    ///
+    /// The checks include:
+    /// * is a LUKS2 device
+    /// * has a valid Stratis LUKS2 token
+    /// * has a token of the proper type for LUKS2 keyring unlocking
+    // TODO: Remove #[cfg(test)] when device discovery is implemented. This method
+    // will be useful for device discovery.
     #[cfg(test)]
     pub fn can_setup(physical_path: &Path) -> bool {
         fn can_setup_with_failures(physical_path: &Path) -> Result<bool> {
-            let mut device = log_on_failure!(
-                CryptInit::init(physical_path),
-                "Failed to acquire a context for device {}",
-                physical_path.display()
-            );
-            if device
-                .context_handle()
-                .load::<()>(EncryptionFormat::Luks2, None)
-                .is_err()
-            {
-                Ok(false)
-            } else {
-                Ok(is_encrypted_stratis_device(&mut device))
+            let device_result = CryptHandle::device_from_physical_path(physical_path);
+            match device_result {
+                Ok(Some(mut dev)) => Ok(is_encrypted_stratis_device(&mut dev)),
+                _ => Ok(false),
             }
         }
 
@@ -257,20 +307,22 @@ impl CryptHandle {
             .unwrap_or(false)
     }
 
+    /// Query the device metadata to reconstruct a handle for performing operations
+    /// on an existing encrypted device.
     pub fn setup(physical_path: &Path) -> Result<Option<Self>> {
-        let mut device = log_on_failure!(
-            CryptInit::init(physical_path),
-            "Failed to acquire handle to device {} while loading from disk",
-            physical_path.display()
-        );
-        if device
-            .context_handle()
-            .load::<()>(EncryptionFormat::Luks2, None)
-            .is_err()
-            || !is_encrypted_stratis_device(&mut device)
-        {
-            return Ok(None);
-        }
+        let device_result = CryptHandle::device_from_physical_path(physical_path);
+        let mut device = match device_result {
+            Ok(None) => return Ok(None),
+            Ok(Some(mut dev)) => {
+                if !is_encrypted_stratis_device(&mut dev) {
+                    return Ok(None);
+                } else {
+                    dev
+                }
+            }
+            Err(e) => return Err(e),
+        };
+
         let name = CryptHandle::name_from_metadata(&mut device)?;
         Ok(Some(CryptHandle {
             device,
@@ -366,20 +418,6 @@ impl CryptHandle {
 /// * the device has a valid Stratis LUKS2 token.
 fn is_encrypted_stratis_device(device: &mut CryptDevice) -> bool {
     fn device_operations(device: &mut CryptDevice) -> Result<bool> {
-        check_luks2_token(device)?;
-
-        // Checking the LUKS2 token type not be entirely necessary as we've already
-        // validated that the token can decrypt the volume which should also
-        // validate that the appropriate key is in the keyring.
-        //
-        // Only potential benefit of checking the type of the token is that a LUKS2 token
-        // of another type may be present and capable of unlocking a non-Stratis device
-        // using something other than the keyring for example.
-        //
-        // Given that only Stratis devices should have a Stratis token, this may
-        // still be superfluous as we will check for that after before determining
-        // whether or not it is a Stratis device and nothing is ever activated so
-        // we do not need to guard against unlocking a device that is not ours.
         let luks_json = log_on_failure!(
             device.token_handle().json_get(LUKS2_TOKEN_ID),
             "Failed to get LUKS2 keyring JSON token"

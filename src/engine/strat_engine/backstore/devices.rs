@@ -305,39 +305,40 @@ impl MaybeEncrypted {
 fn check_device_ids(
     pool_uuid: PoolUuid,
     current_uuids: &HashSet<DevUuid>,
-    devices: Vec<(DeviceInfo, Option<StratisIdentifiers>)>,
+    mut devices: Vec<(DeviceInfo, Option<StratisIdentifiers>)>,
 ) -> StratisResult<Vec<DeviceInfo>> {
-    let stratis_identifiers: HashMap<PoolUuid, HashSet<DevUuid>> = devices
-        .iter()
-        .filter_map(|(_, stratis_identifiers)| stratis_identifiers.as_ref())
-        .fold(HashMap::new(), |mut acc, identifiers| {
-            acc.entry(identifiers.pool_uuid)
-                .or_insert_with(HashSet::new)
-                .insert(identifiers.device_uuid);
-            acc
-        });
+    let (mut stratis_devices, mut non_stratis_devices) = (vec![], vec![]);
 
-    let (this_pool, other_pools): (Vec<_>, Vec<_>) = stratis_identifiers
-        .iter()
-        .partition(|(k, _)| **k == pool_uuid);
+    for (info, ids) in devices.drain(..) {
+        match ids {
+            Some(ids) => stratis_devices.push((info, ids)),
+            None => non_stratis_devices.push(info),
+        }
+    }
 
-    if !other_pools.is_empty() {
-        let error_string = other_pools
+    let mut pools: HashMap<PoolUuid, Vec<(DevUuid, DeviceInfo)>> =
+        stratis_devices
+            .drain(..)
+            .fold(HashMap::new(), |mut acc, (info, identifiers)| {
+                acc.entry(identifiers.pool_uuid)
+                    .or_insert_with(Vec::new)
+                    .push((identifiers.device_uuid, info));
+                acc
+            });
+
+    let this_pool: Option<Vec<(DevUuid, DeviceInfo)>> = pools.remove(&pool_uuid);
+
+    if !pools.is_empty() {
+        let error_string = pools
             .iter()
-            .map(|(p, devs)| {
-                let dev_string = devices
-                    .iter()
-                    .filter(|(_, stratis_identifiers)| match stratis_identifiers {
-                        None => false,
-                        Some(StratisIdentifiers { pool_uuid, .. }) => devs.contains(pool_uuid),
-                    })
-                    .map(|(info, _)| info.devnode.display().to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ");
+            .map(|(pool_uuid, devs)| {
                 format!(
-                    "Devices ({}) appear to belong to Stratis pool with UUID {}",
-                    dev_string,
-                    p.to_simple_ref()
+                    "devices ({}) appear to belong to Stratis pool with UUID {}",
+                    devs.iter()
+                        .map(|(_, info)| info.devnode.display().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    pool_uuid.to_simple_ref()
                 )
             })
             .collect::<Vec<_>>()
@@ -349,44 +350,49 @@ fn check_device_ids(
         return Err(StratisError::Engine(ErrorEnum::Invalid, error_message));
     }
 
-    if !this_pool.is_empty() {
-        let (_, dev_uuids) = this_pool[0];
+    if let Some(mut this_pool) = this_pool {
+        let (mut included, mut not_included) = (vec![], vec![]);
+        for (dev_uuid, info) in this_pool.drain(..) {
+            if current_uuids.contains(&dev_uuid) {
+                included.push((dev_uuid, info))
+            } else {
+                not_included.push((dev_uuid, info))
+            }
+        }
 
-        let invalid_uuids = dev_uuids.difference(current_uuids).collect::<Vec<_>>();
-
-        if !invalid_uuids.is_empty() {
-            let error_string = devices
-                .iter()
-                .filter(|(_, stratis_identifiers)| match stratis_identifiers {
-                    None => false,
-                    Some(StratisIdentifiers { pool_uuid, .. }) => {
-                        invalid_uuids.contains(&pool_uuid)
-                    }
-                })
-                .map(|(info, _)| info.devnode.display().to_string())
-                .collect::<Vec<_>>()
-                .join(", ");
+        if !not_included.is_empty() {
             let error_message = format!(
-                "Devices ({}) appear to be already in use by this pool; they may be in use by the other tier",
-                error_string
+                "Devices ({}) appear to be already in use by this pool which has UUID {}; they may be in use by the other tier",
+                not_included
+                    .iter()
+                    .map(|(_, info)| info.devnode.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                pool_uuid.to_simple_ref()
             );
             return Err(StratisError::Engine(ErrorEnum::Invalid, error_message));
         }
+
+        if !included.is_empty() {
+            info!(
+                "Devices [{}] appear to be already in use by this pool which has UUID {}; omitting from the set of devices to initialize",
+                included
+                    .iter()
+                    .map(|(dev_uuid, info)| {
+                        format!(
+                            "(device node: {}, device UUID: {})",
+                            info.devnode.display().to_string(),
+                            dev_uuid.to_simple_ref()
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                pool_uuid.to_simple_ref()
+            );
+        }
     }
 
-    Ok(devices
-        .into_iter()
-        .filter(|(info, stratis_identifiers)| {
-            if let Some(stratis_identifiers) = stratis_identifiers {
-                info!("Device {} has the same pool UUID, {}, and device UUID, {}, as another device that is already in this tier and pool; omitting it from the set of devices to initialize",
-                      info.devnode.display(),
-                      stratis_identifiers.pool_uuid.to_simple_ref(),
-                      stratis_identifiers.device_uuid.to_simple_ref());
-            }
-            stratis_identifiers.is_none()
-        })
-        .map(|(info, _)| info)
-        .collect())
+    Ok(non_stratis_devices)
 }
 
 /// Combine the functionality of process_devices and check_device_ids.

@@ -28,7 +28,7 @@ before_install:
   # remove due to system dependencies
   - sudo dpkg --purge --force-all libcryptsetup12
 
-matrix:
+jobs:
     fast_finish: true
     allow_failures:
         # Allow audit task to fail

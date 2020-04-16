@@ -875,6 +875,18 @@ mod tests {
                 }
             }
 
+            for handle in handles.iter_mut() {
+                handle.wipe()?;
+            }
+
+            for path in paths {
+                if !CryptHandle::can_unlock(path) {
+                    return Err(Box::new(StratisError::Error(
+                        "All devices should not longer be able to be unlocked".to_string(),
+                    )));
+                }
+            }
+
             Ok(())
         }
 

@@ -85,7 +85,7 @@ pub struct CryptInitializer {
 }
 
 impl CryptInitializer {
-    pub fn new(physical_path: PathBuf, pool_uuid: PoolUuid, dev_uuid: DevUuid) -> Self {
+    pub fn new(physical_path: PathBuf, pool_uuid: PoolUuid, dev_uuid: DevUuid) -> CryptInitializer {
         CryptInitializer {
             physical_path,
             pool_uuid,
@@ -212,7 +212,7 @@ pub struct CryptHandle {
 }
 
 impl CryptHandle {
-    pub(crate) fn new(device: CryptDevice, physical_path: PathBuf, name: String) -> Self {
+    pub(crate) fn new(device: CryptDevice, physical_path: PathBuf, name: String) -> CryptHandle {
         CryptHandle {
             device,
             physical_path,
@@ -309,7 +309,7 @@ impl CryptHandle {
 
     /// Query the device metadata to reconstruct a handle for performing operations
     /// on an existing encrypted device.
-    pub fn setup(physical_path: &Path) -> Result<Option<Self>> {
+    pub fn setup(physical_path: &Path) -> Result<Option<CryptHandle>> {
         let device_result = CryptHandle::device_from_physical_path(physical_path);
         let mut device = match device_result {
             Ok(None) => return Ok(None),

@@ -238,7 +238,6 @@ impl CryptHandle {
             .load::<()>(EncryptionFormat::Luks2, None)
             .is_err()
         {
-            info!("Device {} is not a LUKS2 device", physical_path.display());
             Ok(None)
         } else {
             Ok(Some(device))
@@ -250,7 +249,7 @@ impl CryptHandle {
     /// is formatted as a LUKS2 device, etc.)
     // TODO: Use this method when adding blockdevs to a pool to verify that
     // the same key is being used to encrypt new devices as already encrypted devices.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn can_unlock(physical_path: &Path) -> bool {
         fn can_unlock_with_failures(physical_path: &Path) -> Result<bool> {
             let device_result = CryptHandle::device_from_physical_path(physical_path);
@@ -616,6 +615,8 @@ fn ensure_wiped(device: &mut CryptDevice, physical_path: &Path, name: &str) -> R
 /// Check that the token can open the device.
 ///
 /// No activation will actually occur, only validation.
+// TODO: Remove #[cfg(test)] once can_unlock is used.
+#[cfg(test)]
 fn check_luks2_token(device: &mut CryptDevice) -> Result<()> {
     log_on_failure!(
         device.token_handle().activate_by_token::<()>(
@@ -836,6 +837,71 @@ mod tests {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Exactly(1, None),
             test_failed_init,
+        );
+    }
+
+    /// Test the method `can_unlock` works on an initialized device in both
+    /// active and inactive states.
+    fn test_can_unlock(paths: &[&Path]) {
+        fn crypt_test(paths: &[&Path], key_desc: &str) -> std::result::Result<(), Box<dyn Error>> {
+            let mut handles = vec![];
+
+            let pool_uuid = Uuid::new_v4();
+            for path in paths {
+                let dev_uuid = Uuid::new_v4();
+
+                let handle = CryptInitializer::new((*path).to_owned(), pool_uuid, dev_uuid)
+                    .initialize(key_desc)?;
+                handles.push(handle);
+            }
+
+            for path in paths {
+                if !CryptHandle::can_unlock(path) {
+                    return Err(Box::new(StratisError::Error(
+                        "All devices should be able to be unlocked".to_string(),
+                    )));
+                }
+            }
+
+            for handle in handles.iter_mut() {
+                handle.deactivate()?;
+            }
+
+            for path in paths {
+                if !CryptHandle::can_unlock(path) {
+                    return Err(Box::new(StratisError::Error(
+                        "All devices should be able to be unlocked".to_string(),
+                    )));
+                }
+            }
+
+            Ok(())
+        }
+
+        crypt::insert_and_cleanup_key(paths, crypt_test)
+    }
+
+    #[test]
+    fn loop_test_can_unlock() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(1, 3, None),
+            test_can_unlock,
+        );
+    }
+
+    #[test]
+    fn real_test_can_unlock() {
+        real::test_with_spec(
+            &real::DeviceLimits::Range(1, 3, None, None),
+            test_can_unlock,
+        );
+    }
+
+    #[test]
+    fn travis_test_can_unlock() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(1, 3, None),
+            test_can_unlock,
         );
     }
 

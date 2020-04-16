@@ -880,9 +880,9 @@ mod tests {
             }
 
             for path in paths {
-                if !CryptHandle::can_unlock(path) {
+                if CryptHandle::can_unlock(path) {
                     return Err(Box::new(StratisError::Error(
-                        "All devices should not longer be able to be unlocked".to_string(),
+                        "All devices should no longer be able to be unlocked".to_string(),
                     )));
                 }
             }

@@ -247,9 +247,6 @@ impl CryptHandle {
     /// Check whether the given physical device can be unlocked with the current
     /// environment (e.g. the proper key is in the kernel keyring, the device
     /// is formatted as a LUKS2 device, etc.)
-    // TODO: Use this method when adding blockdevs to a pool to verify that
-    // the same key is being used to encrypt new devices as already encrypted devices.
-    #[cfg(test)]
     pub fn can_unlock(physical_path: &Path) -> bool {
         fn can_unlock_with_failures(physical_path: &Path) -> Result<bool> {
             let device_result = CryptHandle::device_from_physical_path(physical_path);
@@ -615,8 +612,6 @@ fn ensure_wiped(device: &mut CryptDevice, physical_path: &Path, name: &str) -> R
 /// Check that the token can open the device.
 ///
 /// No activation will actually occur, only validation.
-// TODO: Remove #[cfg(test)] once can_unlock is used.
-#[cfg(test)]
 fn check_luks2_token(device: &mut CryptDevice) -> Result<()> {
     log_on_failure!(
         device.token_handle().activate_by_token::<()>(
@@ -843,7 +838,11 @@ mod tests {
     /// Test the method `can_unlock` works on an initialized device in both
     /// active and inactive states.
     fn test_can_unlock(paths: &[&Path]) {
-        fn crypt_test(paths: &[&Path], key_desc: &str) -> std::result::Result<(), Box<dyn Error>> {
+        fn crypt_test(
+            paths: &[&Path],
+            key_desc: &str,
+            _: Option<()>,
+        ) -> std::result::Result<(), Box<dyn Error>> {
             let mut handles = vec![];
 
             let pool_uuid = Uuid::new_v4();
@@ -931,7 +930,11 @@ mod tests {
     /// on the disk due to leftover data from other tests.
     // TODO: Rewrite libc calls using nix crate.
     fn test_crypt_device_ops(paths: &[&Path]) {
-        fn crypt_test(paths: &[&Path], key_desc: &str) -> std::result::Result<(), Box<dyn Error>> {
+        fn crypt_test(
+            paths: &[&Path],
+            key_desc: &str,
+            _: Option<()>,
+        ) -> std::result::Result<(), Box<dyn Error>> {
             let path = paths.get(0).ok_or_else(|| {
                 Box::new(StratisError::Error(
                     "This test only accepts a single device".to_string(),

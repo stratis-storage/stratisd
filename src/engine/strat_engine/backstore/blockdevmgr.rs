@@ -20,6 +20,7 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
+                crypt::CryptHandle,
                 devices::{initialize_devices, process_and_verify_devices, wipe_blockdevs},
                 metadata::MDADataSize,
             },
@@ -161,6 +162,19 @@ impl BlockDevMgr {
             .collect()
     }
 
+    /// Check that the registered key description for these block devices can
+    /// unlock at least one of the existing block devices registered.
+    /// Precondition: self.block_devs must have at least one device.
+    pub fn has_valid_passphrase(&self) -> bool {
+        CryptHandle::can_unlock(
+            self.block_devs
+                .iter()
+                .next()
+                .expect("Must have at least one blockdev")
+                .physical_path(),
+        )
+    }
+
     /// Add paths to self.
     /// Return the uuids of all blockdevs corresponding to paths that were
     /// added.
@@ -171,6 +185,17 @@ impl BlockDevMgr {
             .map(|bd| bd.uuid())
             .collect::<HashSet<_>>();
         let devices = process_and_verify_devices(pool_uuid, &current_uuids, paths)?;
+
+        if self.is_encrypted() && !self.has_valid_passphrase() {
+            return Err(StratisError::Engine(
+                ErrorEnum::Invalid,
+                "The key associated with the current registered key description \
+                was not able to unlock an existing encrypted device. Check that \
+                the same key is in the keyring that was used to create the encrypted \
+                pool."
+                    .to_string(),
+            ));
+        }
 
         // FIXME: This is a bug. If new devices are added to a pool, and the
         // variable length metadata requires more than the minimum allocated,
@@ -377,11 +402,13 @@ impl Recordable<Vec<BaseBlockDevSave>> for BlockDevMgr {
 
 #[cfg(test)]
 mod tests {
+    use std::error::Error;
+
     use uuid::Uuid;
 
     use crate::engine::strat_engine::{
         cmd,
-        tests::{loopbacked, real},
+        tests::{crypt, loopbacked, real},
     };
 
     use super::*;
@@ -424,6 +451,120 @@ mod tests {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(1, 3, None),
             test_blockdevmgr_used,
+        );
+    }
+
+    /// Test that the `BlockDevMgr` will add devices if the same key
+    /// is used to encrypted the existing devices and the added devices.
+    fn test_blockdevmgr_same_key(paths: &[&Path]) {
+        fn test_with_key(
+            paths: &[&Path],
+            key_desc: &str,
+            _: Option<()>,
+        ) -> Result<(), Box<dyn Error>> {
+            let pool_uuid = Uuid::new_v4();
+            let mut bdm = BlockDevMgr::initialize(
+                pool_uuid,
+                &paths[..2],
+                MDADataSize::default(),
+                Some(key_desc.to_string()),
+            )?;
+
+            if bdm.add(pool_uuid, &paths[2..3]).is_err() {
+                Err(Box::new(StratisError::Error(
+                    "Adding a blockdev with the same key to an encrypted pool should succeed"
+                        .to_string(),
+                )))
+            } else {
+                Ok(())
+            }
+        }
+
+        crypt::insert_and_cleanup_key(paths, test_with_key);
+    }
+
+    #[test]
+    fn loop_test_blockdevmgr_same_key() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(3, None),
+            test_blockdevmgr_same_key,
+        );
+    }
+
+    #[test]
+    fn real_test_blockdevmgr_same_key() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(3, None, None),
+            test_blockdevmgr_same_key,
+        );
+    }
+
+    #[test]
+    fn travis_test_blockdevmgr_same_key() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(3, None),
+            test_blockdevmgr_same_key,
+        );
+    }
+
+    /// Test that the `BlockDevMgr` will not add devices if a different key
+    /// is present in the keyring than was used to encrypted the existing
+    /// devices.
+    fn test_blockdevmgr_changed_key(paths: &[&Path]) {
+        fn test_with_first_key(
+            paths: &[&Path],
+            key_desc: &str,
+            _: Option<()>,
+        ) -> Result<(PoolUuid, BlockDevMgr), Box<dyn Error>> {
+            let pool_uuid = Uuid::new_v4();
+            let bdm = BlockDevMgr::initialize(
+                pool_uuid,
+                &paths[..2],
+                MDADataSize::default(),
+                Some(key_desc.to_string()),
+            )?;
+            Ok((pool_uuid, bdm))
+        }
+
+        fn test_with_second_key(
+            paths: &[&Path],
+            _: &str,
+            data: (PoolUuid, BlockDevMgr),
+        ) -> Result<(), Box<dyn Error>> {
+            let (pool_uuid, mut bdm) = data;
+            if bdm.add(pool_uuid, &paths[2..3]).is_ok() {
+                Err(Box::new(StratisError::Error(
+                    "Adding a blockdev with a new key to an encrypted pool should fail".to_string(),
+                )))
+            } else {
+                Ok(())
+            }
+        }
+
+        crypt::insert_and_cleanup_two_keys(paths, test_with_first_key, test_with_second_key);
+    }
+
+    #[test]
+    fn loop_test_blockdevmgr_changed_key() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(3, None),
+            test_blockdevmgr_changed_key,
+        );
+    }
+
+    #[test]
+    fn real_test_blockdevmgr_changed_key() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(3, None, None),
+            test_blockdevmgr_changed_key,
+        );
+    }
+
+    #[test]
+    fn travis_test_blockdevmgr_changed_key() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(3, None),
+            test_blockdevmgr_changed_key,
         );
     }
 

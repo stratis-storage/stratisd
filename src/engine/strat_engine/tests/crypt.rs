@@ -12,9 +12,13 @@ use crate::engine::strat_engine::backstore::MAX_STRATIS_PASS_SIZE;
 /// pointing to a key in the kernel keyring that has been randomly generated
 /// and added for this test. It will always be cleaned up after the test completes
 /// on both success and failure.
-pub fn insert_and_cleanup_key<F>(physical_paths: &[&Path], test: F)
+fn insert_and_cleanup_key_shared<F, I, O>(
+    physical_paths: &[&Path],
+    test: F,
+    input: I,
+) -> Result<O, Box<dyn Error>>
 where
-    F: Fn(&[&Path], &str) -> std::result::Result<(), Box<dyn Error>>,
+    F: Fn(&[&Path], &str, I) -> std::result::Result<O, Box<dyn Error>>,
 {
     let type_cstring = "user\0";
     let description = "test-description-for-stratisd";
@@ -39,7 +43,7 @@ where
         i => i,
     };
 
-    let result = test(physical_paths, description);
+    let result = test(physical_paths, description, input);
 
     if unsafe {
         libc::syscall(
@@ -56,5 +60,27 @@ where
         );
     }
 
-    result.unwrap()
+    result
+}
+
+/// Insert and clean up a single key for the lifetime of the test.
+pub fn insert_and_cleanup_key<F>(physical_paths: &[&Path], test: F)
+where
+    F: Fn(&[&Path], &str, Option<()>) -> std::result::Result<(), Box<dyn Error>>,
+{
+    insert_and_cleanup_key_shared::<F, Option<()>, ()>(physical_paths, test, Option::<()>::None)
+        .unwrap();
+}
+
+/// Keep the key description the same but change the data to a different key
+/// to test that stratisd can appropriately handle such a case without getting
+/// into a bad state.
+pub fn insert_and_cleanup_two_keys<FR, F, R>(physical_paths: &[&Path], test_one: FR, test_two: F)
+where
+    FR: Fn(&[&Path], &str, Option<()>) -> Result<R, Box<dyn Error>>,
+    F: Fn(&[&Path], &str, R) -> Result<(), Box<dyn Error>>,
+{
+    let return_value =
+        insert_and_cleanup_key_shared::<FR, Option<()>, R>(physical_paths, test_one, None).unwrap();
+    insert_and_cleanup_key_shared::<F, R, ()>(physical_paths, test_two, return_value).unwrap();
 }

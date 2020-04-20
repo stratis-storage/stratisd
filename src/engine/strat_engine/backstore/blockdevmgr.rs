@@ -164,7 +164,7 @@ impl BlockDevMgr {
 
     /// Check that the registered key description for these block devices can
     /// unlock at least one of the existing block devices registered.
-    /// Precondition: self.block_devs Must have at least one device.
+    /// Precondition: self.block_devs must have at least one device.
     pub fn has_valid_passphrase(&self) -> bool {
         CryptHandle::can_unlock(
             self.block_devs
@@ -451,6 +451,59 @@ mod tests {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(1, 3, None),
             test_blockdevmgr_used,
+        );
+    }
+
+    /// Test that the `BlockDevMgr` will add devices if the same key
+    /// is used to encrypted the existing devices and the added devices.
+    fn test_blockdevmgr_same_key(paths: &[&Path]) {
+        fn test_with_key(
+            paths: &[&Path],
+            key_desc: &str,
+            _: Option<()>,
+        ) -> Result<(), Box<dyn Error>> {
+            let pool_uuid = Uuid::new_v4();
+            let mut bdm = BlockDevMgr::initialize(
+                pool_uuid,
+                &paths[..2],
+                MDADataSize::default(),
+                Some(key_desc.to_string()),
+            )?;
+
+            if bdm.add(pool_uuid, &paths[2..3]).is_err() {
+                Err(Box::new(StratisError::Error(
+                    "Adding a blockdev with the same key to an encrypted pool should succeed"
+                        .to_string(),
+                )))
+            } else {
+                Ok(())
+            }
+        }
+
+        crypt::insert_and_cleanup_key(paths, test_with_key);
+    }
+
+    #[test]
+    fn loop_test_blockdevmgr_same_key() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(3, None),
+            test_blockdevmgr_same_key,
+        );
+    }
+
+    #[test]
+    fn real_test_blockdevmgr_same_key() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(3, None, None),
+            test_blockdevmgr_same_key,
+        );
+    }
+
+    #[test]
+    fn travis_test_blockdevmgr_same_key() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(3, None),
+            test_blockdevmgr_same_key,
         );
     }
 

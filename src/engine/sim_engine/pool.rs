@@ -162,20 +162,18 @@ impl Pool for SimPool {
         paths: &[&Path],
         tier: BlockDevTier,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
-        if paths.is_empty() {
-            // Pool must be initialized with data devices so only check
-            // if the cache has been initialized.
-            return if !self.has_cache() && tier == BlockDevTier::Cache {
-                Err(StratisError::Engine(
+        if tier == BlockDevTier::Cache && !self.has_cache() {
+            return Err(StratisError::Engine(
                     ErrorEnum::Invalid,
                     "The cache has not been initialized; you must use init_cache first to initialize the cache.".to_string(),
-                ))
-            } else {
-                // If the cache has been initialized or we are adding zero blockdevs,
-                // treat adding no new blockdevs as the empty set.
-                Ok(SetCreateAction::new(vec![]))
-            };
+                ));
         }
+
+        if paths.is_empty() {
+            // Treat adding no new blockdev as the empty set.
+            return Ok(SetCreateAction::new(vec![]));
+        }
+
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
 
         let device_pairs: Vec<_> = devices

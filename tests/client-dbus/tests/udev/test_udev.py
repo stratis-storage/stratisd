@@ -110,7 +110,7 @@ def _settle():
     subprocess.check_call(["udevadm", "settle"])
 
 
-def _expected_stratis_block_devices(expected_paths):
+def _wait_for_udev(expected_paths):
     """
     Look for Stratis devices. Check as many times as can be done in
     10 seconds or until the number of devices found equals the number
@@ -305,7 +305,7 @@ class UdevAdd(unittest.TestCase):
                 pool_data[pool_name] = device_tokens
                 expected_stratis_devices.extend(devnodes)
 
-        _expected_stratis_block_devices(expected_stratis_devices)
+        _wait_for_udev(expected_stratis_devices)
 
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), number_of_pools)
@@ -315,7 +315,7 @@ class UdevAdd(unittest.TestCase):
         ):
             self._lb_mgr.unplug(dev)
 
-        _expected_stratis_block_devices([])
+        _wait_for_udev([])
 
         last_index = dev_count_pool - 1
         with _ServiceContextManager():
@@ -328,7 +328,7 @@ class UdevAdd(unittest.TestCase):
                     device_token = devices[i]
                     self._lb_mgr.hotplug(device_token)
                     running_devices.append(self._lb_mgr.device_file(device_token))
-                    _expected_stratis_block_devices(running_devices)
+                    _wait_for_udev(running_devices)
                     _settle()
 
             self.assertEqual(len(_get_pools()), 0)
@@ -384,7 +384,7 @@ class UdevAdd(unittest.TestCase):
             _create_pool(pool_name, devnodes)
             self.assertEqual(len(_get_pools()), 1)
 
-        _expected_stratis_block_devices(devnodes)
+        _wait_for_udev(devnodes)
 
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), 1)
@@ -392,7 +392,7 @@ class UdevAdd(unittest.TestCase):
         for dev in device_tokens:
             self._lb_mgr.unplug(dev)
 
-        _expected_stratis_block_devices([])
+        _wait_for_udev([])
 
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), 0)
@@ -401,7 +401,7 @@ class UdevAdd(unittest.TestCase):
                 self._lb_mgr.hotplug(dev)
 
             _settle()
-            _expected_stratis_block_devices(devnodes)
+            _wait_for_udev(devnodes)
 
             self.assertEqual(len(_get_pools()), 1)
 
@@ -410,7 +410,7 @@ class UdevAdd(unittest.TestCase):
                     self._lb_mgr.generate_udev_add_event(dev)
 
             _settle()
-            _expected_stratis_block_devices(devnodes)
+            _wait_for_udev(devnodes)
 
             self.assertEqual(len(_get_pools()), 1)
 
@@ -452,12 +452,12 @@ class UdevAdd(unittest.TestCase):
             with _ServiceContextManager():
                 _create_pool(pool_name, devices)
 
-            _expected_stratis_block_devices(devices)
+            _wait_for_udev(devices)
 
             for dev in this_pool:
                 self._lb_mgr.unplug(dev)
 
-            _expected_stratis_block_devices([])
+            _wait_for_udev([])
 
         with _ServiceContextManager():
             # Hot plug activate each pool in sequence and force a duplicate name
@@ -469,7 +469,7 @@ class UdevAdd(unittest.TestCase):
                     devices_plugged.append(self._lb_mgr.device_file(dev))
 
             _settle()
-            _expected_stratis_block_devices(devices_plugged)
+            _wait_for_udev(devices_plugged)
 
             # The number of pools should never exceed one, since all the pools
             # previously formed in the test have the same name.
@@ -492,7 +492,7 @@ class UdevAdd(unittest.TestCase):
                     self._lb_mgr.generate_udev_add_event(dev)
 
                 _settle()
-                _expected_stratis_block_devices(devices_plugged)
+                _wait_for_udev(devices_plugged)
                 self.assertEqual(len(_get_pools()), len(current_pools) + 1)
 
             self.assertEqual(len(_get_pools()), num_pools)

@@ -347,7 +347,7 @@ class UdevAdd(unittest.TestCase):
         """
         self._test_driver(2, 4)
 
-    def _single_pool(self, num_devices, num_hotplugs=0):
+    def _single_pool(self, num_devices, *, num_hotplugs=0):
         """
         Creates a single pool with specified number of devices.
 
@@ -414,13 +414,13 @@ class UdevAdd(unittest.TestCase):
         """
         See documentation for _single_pool.
         """
-        self._single_pool(4, 4)
+        self._single_pool(4, num_hotplugs=4)
 
     def test_simple_udev_add(self):
         """
         See documentation for _single_pool.
         """
-        self._single_pool(1, 1)
+        self._single_pool(1, num_hotplugs=1)
 
     def test_duplicate_pool_name(self):
         """

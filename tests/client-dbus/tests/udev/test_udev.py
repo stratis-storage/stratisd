@@ -16,8 +16,10 @@ Used to test behavior of the udev device discovery mechanism.
 """
 
 # isort: STDLIB
+import base64
 import os
 import random
+import shutil
 import signal
 import string
 import subprocess
@@ -215,6 +217,76 @@ class _Service:
         output = self._service.communicate()
         assert list(_processes("stratisd")) == []
         return output
+
+
+class _KernelKey:  # pylint: disable=attribute-defined-outside-init
+    """
+    A handle for operating on keys in the kernel keyring. The specified key will
+    be available for the lifetime of the test when used with the Python with
+    keyword and will be cleaned up at the end of the scope of the with block.
+    """
+
+    def __init__(self, key_data):
+        """
+        Initialize a key with the provided key data (passphrase).
+        :param bytes key_data: The desired key contents
+        :raises RuntimeError: if the keyctl command is not found in $PATH
+                              or a keyctl command returns a non-zero exit code
+        """
+        if shutil.which("keyctl") is None:
+            raise RuntimeError("Executable keyctl was not found in $PATH")
+
+        self.key_data = key_data
+
+    @staticmethod
+    def _raise_keyctl_error(return_code, args):
+        """
+        Raise an error if keyctl failed to complete an operation
+        successfully.
+        :param int return_code: Return code of the keyctl command
+        :param args: The command line that caused the command to fail
+        :type args: list of str
+        :raises RuntimeError
+        """
+        if return_code != 0:
+            raise RuntimeError(
+                "Command '%s' failed with exit code %s" % (" ".join(args), return_code)
+            )
+
+    def __enter__(self):
+        """
+        This method allows _KernelKey to be used with the "with" keyword.
+        :return: The key description that can be used to access the
+                 provided key data in __init__.
+        """
+        with open("/dev/urandom", "rb") as urandom_f:
+            key_desc = base64.b64encode(urandom_f.read(16)).decode("utf-8")
+
+        args = ["keyctl", "get_persistent", "@s", "0"]
+        exit_values = subprocess.run(args, capture_output=True, text=True)
+        _KernelKey._raise_keyctl_error(exit_values.returncode, args)
+
+        self.persistent_id = exit_values.stdout.strip()
+
+        args = ["keyctl", "add", "user", key_desc, self.key_data, self.persistent_id]
+        exit_values = subprocess.run(args, capture_output=True)
+        _KernelKey._raise_keyctl_error(exit_values.returncode, args)
+
+        return key_desc
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        try:
+            args = ["keyctl", "clear", self.persistent_id]
+            exit_values = subprocess.run(args)
+            _KernelKey._raise_keyctl_error(exit_values.returncode, args)
+
+            args = ["keyctl", "clear", "@s"]
+            exit_values = subprocess.run(args)
+            _KernelKey._raise_keyctl_error(exit_values.returncode, args)
+        except RuntimeError as rexc:
+            if exception_value is None:
+                raise rexc
+            raise rexc from exception_value
 
 
 class _ServiceContextManager:  # pylint: disable=too-few-public-methods

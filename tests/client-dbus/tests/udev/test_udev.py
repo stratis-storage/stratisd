@@ -34,9 +34,9 @@ import pyudev
 
 # isort: LOCAL
 from stratisd_client_dbus import (
-    Manager,
+    ManagerR1,
     ObjectManager,
-    Pool,
+    PoolR1,
     StratisdErrors,
     get_object,
     pools,
@@ -60,19 +60,33 @@ def random_string(length):
     )
 
 
-def _create_pool(name, devices):
+def _create_pool(name, devices, *, key_description=None):
     """
     Creates a stratis pool. Tries three times before giving up.
     Raises an assertion error if it does not succeed after three tries.
     :param name:    Name of pool
     :param devices:  Devices to use for pool
+    :param key_description: optional key description
+    :type key_description: str or NoneType
     :return: Dbus proxy object representing pool.
     """
     error_reasons = []
     for _ in range(3):
-        ((_, (pool_object_path, _)), exit_code, error_str) = Manager.Methods.CreatePool(
+        (
+            (_, (pool_object_path, _)),
+            exit_code,
+            error_str,
+        ) = ManagerR1.Methods.CreatePool(
             get_object(TOP_OBJECT),
-            {"name": name, "redundancy": (True, 0), "devices": devices},
+            {
+                "name": name,
+                "redundancy": (True, 0),
+                "devices": devices,
+                # pylint: disable=bad-continuation
+                "key_desc": (False, "")
+                if key_description is None
+                else (True, key_description),
+            },
         )
         if exit_code == StratisdErrors.OK:
             return get_object(pool_object_path)
@@ -419,7 +433,7 @@ class UdevAdd(unittest.TestCase):
         """
         self._test_driver(2, 4)
 
-    def _single_pool(self, num_devices, *, num_hotplugs=0):
+    def _single_pool(self, num_devices, *, key_description=None, num_hotplugs=0):
         """
         Creates a single pool with specified number of devices.
 
@@ -437,6 +451,8 @@ class UdevAdd(unittest.TestCase):
         no further effect, i.e., no additional pools suddenly appear.
 
         :param int num_devices: Number of devices to use for pool
+        :param key_description: the key description if encrypting the pool
+        :type key_description: str or NoneType
         :param int num_hotplugs: Number of synthetic udev "add" event per device
         :return: None
         """
@@ -448,7 +464,7 @@ class UdevAdd(unittest.TestCase):
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), 0)
             pool_name = random_string(5)
-            _create_pool(pool_name, devnodes)
+            _create_pool(pool_name, devnodes, key_description=key_description)
             self.assertEqual(len(_get_pools()), 1)
 
         _wait_for_udev(devnodes)
@@ -542,7 +558,7 @@ class UdevAdd(unittest.TestCase):
 
                 # Rename all active pools to a randomly selected new name
                 for object_path, _ in current_pools:
-                    Pool.Methods.SetName(
+                    PoolR1.Methods.SetName(
                         get_object(object_path), {"name": random_string(10)}
                     )
 

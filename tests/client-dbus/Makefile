@@ -25,7 +25,7 @@ fmt-travis:
 
 .PHONY: udev-tests
 udev-tests:
-	py.test-3 ${PYTEST_OPTS} -s ./tests/udev
+	python3 -m unittest discover --verbose tests.udev
 
 .PHONY: tests
 tests: dbus-tests misc-tests udev-tests

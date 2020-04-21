@@ -839,7 +839,11 @@ mod tests {
 
     /// Test ownership with encryption
     fn test_ownership_crypt(paths: &[&Path]) {
-        fn call_crypt_test(paths: &[&Path], key_description: &str) -> Result<(), Box<dyn Error>> {
+        fn call_crypt_test(
+            paths: &[&Path],
+            key_description: &str,
+            _: Option<()>,
+        ) -> Result<(), Box<dyn Error>> {
             test_ownership(paths, Some(key_description))
         }
 
@@ -1010,7 +1014,11 @@ mod tests {
 
     // Run test_failure_cleanup for encrypted devices
     fn test_failure_cleanup_crypt(paths: &[&Path]) {
-        fn failure_cleanup_crypt(paths: &[&Path], key_desc: &str) -> Result<(), Box<dyn Error>> {
+        fn failure_cleanup_crypt(
+            paths: &[&Path],
+            key_desc: &str,
+            _: Option<()>,
+        ) -> Result<(), Box<dyn Error>> {
             test_failure_cleanup(paths, Some(key_desc))
         }
 

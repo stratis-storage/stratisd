@@ -113,27 +113,29 @@ def _settle():
 def _wait_for_udev(expected_paths):
     """
     Look for Stratis devices. Check as many times as can be done in
-    10 seconds or until the number of devices found equals the number
-    of devices expected. Always get the result of at least 1 Stratis
-    enumeration.
+    10 seconds or until the devices found are equal to the devices
+    expected. Always get the result of at least 1 Stratis enumeration.
     :param expected_paths: devnodes of paths that should belong to Stratis
     :type expected_paths: list of str
     :return: None (May assert)
     """
 
-    num_expected = len(expected_paths)
+    expected_devnodes = frozenset(expected_paths)
+    found_devnodes = None
 
-    found = None
     context = pyudev.Context()
     end_time = time.time() + 10.0
 
-    while time.time() < end_time and found != num_expected:
-        found = sum(
-            1 for _ in context.list_devices(subsystem="block", ID_FS_TYPE="stratis")
+    while time.time() < end_time and not expected_devnodes == found_devnodes:
+        found_devnodes = frozenset(
+            [
+                x.device_node
+                for x in context.list_devices(subsystem="block", ID_FS_TYPE="stratis")
+            ]
         )
         time.sleep(1)
 
-    assert found == num_expected
+    assert expected_devnodes == found_devnodes
 
 
 def _processes(name):

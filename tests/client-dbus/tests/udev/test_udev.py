@@ -510,6 +510,14 @@ class UdevAdd(unittest.TestCase):
         """
         self._single_pool(1, num_hotplugs=1)
 
+    @unittest.expectedFailure
+    def test_encryption(self):
+        """
+        See documentation for _single_pool.
+        """
+        with _KernelKey("test_key") as key_description:
+            self._single_pool(1, key_description=key_description)
+
     def test_duplicate_pool_name(self):
         """
         Create more than one pool with the same name, then dynamically fix it

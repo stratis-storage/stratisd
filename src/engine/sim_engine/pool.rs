@@ -163,15 +163,14 @@ impl Pool for SimPool {
         tier: BlockDevTier,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
         if tier == BlockDevTier::Cache && !self.has_cache() {
-               return Err(StratisError::Engine(
+            return Err(StratisError::Engine(
                     ErrorEnum::Invalid,
                     "The cache has not been initialized; you must use init_cache first to initialize the cache.".to_string(),
                 ));
         }
 
-        if paths.is_empty(){
-            // If the cache has been initialized and we are adding zero blockdevs,
-            // treat adding no new blockdev as the empty set.
+        if paths.is_empty() {
+            // Treat adding no new blockdev as the empty set.
             return Ok(SetCreateAction::new(vec![]));
         }
 

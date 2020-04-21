@@ -262,9 +262,7 @@ class UdevAdd(unittest.TestCase):
         _remove_stratis_dm_devices()
         self._lb_mgr.destroy_all()
 
-    def _test_driver(  # pylint: disable=bad-continuation
-        self, number_of_pools, dev_count_pool
-    ):  # pylint: disable=too-many-locals
+    def _test_driver(self, number_of_pools, dev_count_pool):
         """
         Run the following test:
 
@@ -292,10 +290,8 @@ class UdevAdd(unittest.TestCase):
         expected_stratis_devices = []
         with _ServiceContextManager():
             for _ in range(number_of_pools):
-                device_tokens = [
-                    self._lb_mgr.create_device() for _ in range(dev_count_pool)
-                ]
-                devnodes = [self._lb_mgr.device_file(t) for t in device_tokens]
+                device_tokens = self._lb_mgr.create_devices(dev_count_pool)
+                devnodes = self._lb_mgr.device_files(device_tokens)
 
                 _settle()
 
@@ -310,10 +306,9 @@ class UdevAdd(unittest.TestCase):
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), number_of_pools)
 
-        for dev in (
-            dev for device_tokens in pool_data.values() for dev in device_tokens
-        ):
-            self._lb_mgr.unplug(dev)
+        self._lb_mgr.unplug(
+            [dev for device_tokens in pool_data.values() for dev in device_tokens]
+        )
 
         _wait_for_udev([])
 
@@ -324,12 +319,11 @@ class UdevAdd(unittest.TestCase):
             # Add all but the last device for each pool
             running_devices = []
             for i in range(last_index):
-                for _, devices in pool_data.items():
-                    device_token = devices[i]
-                    self._lb_mgr.hotplug(device_token)
-                    running_devices.append(self._lb_mgr.device_file(device_token))
-                    _wait_for_udev(running_devices)
-                    _settle()
+                device_tokens = [devices[i] for _, devices in pool_data.items()]
+                self._lb_mgr.hotplug(device_tokens)
+                running_devices.extend(self._lb_mgr.device_files(device_tokens))
+                _wait_for_udev(running_devices)
+                _settle()
 
             self.assertEqual(len(_get_pools()), 0)
 
@@ -337,8 +331,9 @@ class UdevAdd(unittest.TestCase):
             self.assertEqual(len(_get_pools()), 0)
 
             # Add the last device that makes each pool complete
-            for _, devices in pool_data.items():
-                self._lb_mgr.hotplug(devices[last_index])
+            self._lb_mgr.hotplug(
+                [devices[last_index] for _, devices in pool_data.items()]
+            )
 
             _settle()
             self.assertEqual(len(_get_pools()), number_of_pools)
@@ -373,8 +368,8 @@ class UdevAdd(unittest.TestCase):
         :param int num_hotplugs: Number of synthetic udev "add" event per device
         :return: None
         """
-        device_tokens = [self._lb_mgr.create_device() for _ in range(num_devices)]
-        devnodes = [self._lb_mgr.device_file(t) for t in device_tokens]
+        device_tokens = self._lb_mgr.create_devices(num_devices)
+        devnodes = self._lb_mgr.device_files(device_tokens)
 
         _settle()
 
@@ -389,16 +384,14 @@ class UdevAdd(unittest.TestCase):
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), 1)
 
-        for dev in device_tokens:
-            self._lb_mgr.unplug(dev)
+        self._lb_mgr.unplug(device_tokens)
 
         _wait_for_udev([])
 
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), 0)
 
-            for dev in device_tokens:
-                self._lb_mgr.hotplug(dev)
+            self._lb_mgr.hotplug(device_tokens)
 
             _settle()
             _wait_for_udev(devnodes)
@@ -406,8 +399,7 @@ class UdevAdd(unittest.TestCase):
             self.assertEqual(len(_get_pools()), 1)
 
             for _ in range(num_hotplugs):
-                for dev in device_tokens:
-                    self._lb_mgr.generate_udev_add_event(dev)
+                self._lb_mgr.generate_udev_add_events(device_tokens)
 
             _settle()
             _wait_for_udev(devnodes)
@@ -443,8 +435,8 @@ class UdevAdd(unittest.TestCase):
 
         # Create some pools with duplicate names
         for i in range(num_pools):
-            this_pool = [self._lb_mgr.create_device() for _ in range(i + 1)]
-            devices = [self._lb_mgr.device_file(t) for t in this_pool]
+            this_pool = self._lb_mgr.create_devices(i + 1)
+            devices = self._lb_mgr.device_files(this_pool)
             _settle()
 
             pool_tokens.append(this_pool)
@@ -454,8 +446,7 @@ class UdevAdd(unittest.TestCase):
 
             _wait_for_udev(devices)
 
-            for dev in this_pool:
-                self._lb_mgr.unplug(dev)
+            self._lb_mgr.unplug(this_pool)
 
             _wait_for_udev([])
 
@@ -464,9 +455,8 @@ class UdevAdd(unittest.TestCase):
             # error.
             devices_plugged = []
             for i in range(num_pools):
-                for dev in pool_tokens[i]:
-                    self._lb_mgr.hotplug(dev)
-                    devices_plugged.append(self._lb_mgr.device_file(dev))
+                self._lb_mgr.hotplug(pool_tokens[i])
+                devices_plugged.extend(self._lb_mgr.device_files(pool_tokens[i]))
 
             _settle()
             _wait_for_udev(devices_plugged)
@@ -488,8 +478,9 @@ class UdevAdd(unittest.TestCase):
                     )
 
                 # Generate synthetic add events for every loop backed device
-                for dev in (dev for sublist in pool_tokens for dev in sublist):
-                    self._lb_mgr.generate_udev_add_event(dev)
+                self._lb_mgr.generate_udev_add_events(
+                    [dev for sublist in pool_tokens for dev in sublist]
+                )
 
                 _settle()
                 _wait_for_udev(devices_plugged)

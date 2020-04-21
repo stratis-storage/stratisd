@@ -41,65 +41,80 @@ class LoopBackDevices:
         self.count = 0
         self.devices = {}
 
-    def create_device(self):
+    def create_devices(self, number):
         """
-        Create a new loop back device, sparse backing file and attaching it.
+        Create new loop back devices.
 
         Note: The first time a loop back device is known it will generate
         a udev "add" event, subsequent backing file changes do not, thus we
         will need to generate it synthetically.
-        :return: opaque handle, done as device representing block device will
-                 change.
+        :param int number: the number of devices to create
+        :return: list of keys for the devices
+        :rtype: list of uuid.UUID
         """
-        backing_file = os.path.join(self.dir, "block_device_%d" % self.count)
-        self.count += 1
+        tokens = []
+        for _ in range(number):
+            backing_file = os.path.join(self.dir, "block_device_%d" % self.count)
+            self.count += 1
 
-        with open(backing_file, "ab") as dev:
-            dev.truncate(_SIZE_OF_DEVICE)
+            with open(backing_file, "ab") as dev:
+                dev.truncate(_SIZE_OF_DEVICE)
 
-        device = str.strip(
-            subprocess.check_output(
-                [_LOSETUP_BIN, "-f", "--show", backing_file]
-            ).decode("utf-8")
-        )
+            device = str.strip(
+                subprocess.check_output(
+                    [_LOSETUP_BIN, "-f", "--show", backing_file]
+                ).decode("utf-8")
+            )
 
-        token = uuid.uuid4()
-        self.devices[token] = (device, backing_file)
-        return token
+            token = uuid.uuid4()
+            self.devices[token] = (device, backing_file)
+            tokens.append(token)
 
-    def unplug(self, token):
+        return tokens
+
+    def unplug(self, tokens):
         """
-        Remove the device from the /dev tree, but doesn't remove backing file
-        :param token: Opaque representation of some loop back device
+        Remove the devices from the /dev tree, but doesn't remove backing file
+        :param tokens: Opaque representation of some loop back devices
+        :type tokens: list of uuid.UUID
         :return: None
+        :raises: AssertionError if any token not found
         """
-        if token in self.devices:
+        assert all(token in self.devices for token in tokens)
+        for token in tokens:
             (device, backing_file) = self.devices[token]
             subprocess.check_call([_LOSETUP_BIN, "-d", device])
             self.devices[token] = (None, backing_file)
 
-    def generate_udev_add_event(self, token):
+    def generate_udev_add_events(self, tokens):
         """
-        Synthetically create "add" udev event for this loop back device
-        :param token: Opaque representation of some loop back device
+        Synthetically create "add" udev event for specified loop back devices
+        :param tokens: Opaque representation of some loop back devices
+        :type tokens: list of uuid.UUID
         :return: None
+        :raises AssertionError: if any token not found or missing device node
         """
-        if token in self.devices:
+        assert all(token in self.devices for token in tokens)
+        for token in tokens:
             (device, _) = self.devices[token]
 
-            if device is not None:
-                device_name = os.path.split(device)[-1]
-                ufile = os.path.join("/sys/block", device_name, "uevent")
-                with open(ufile, "w") as event:
-                    event.write("add")
+            assert device is not None
 
-    def hotplug(self, token):
+            device_name = os.path.split(device)[-1]
+            ufile = os.path.join("/sys/block", device_name, "uevent")
+            with open(ufile, "w") as event:
+                event.write("add")
+
+    def hotplug(self, tokens):
         """
-        Attaches an existing backing file to a loop back device
-        :param token: Opaque representation of some loop back device
+        Attaches an existing backing file to specified loop back devices
+        :param tokens: Opaque representation of some loop back devices
+        :type tokens: list of uuid.UUID
         :return: None
+        :raise AssertionError: if token not present
         """
-        if token in self.devices:
+        assert all(token in self.devices for token in tokens)
+        for token in tokens:
             (_, backing_file) = self.devices[token]
 
             device = str.strip(
@@ -109,20 +124,21 @@ class LoopBackDevices:
             )
             self.devices[token] = (device, backing_file)
 
-            # Make sure an add occurs
-            self.generate_udev_add_event(token)
+        self.generate_udev_add_events(tokens)
 
-    def device_file(self, token):
+    def device_files(self, tokens):
         """
-        Return the block device full name for a loopback token
-        :param token: Opaque representation of some loop back device
-        :return: Full file path or None if not currently attached
-        :raises: KeyError if token is unknown
-        :raises: AssertionError if devnode is None
+        Return the block device full names for a list of tokens
+        :param tokens: Opaque representation of some loop back devices
+        :type tokens: list of uuid.UUID
+        :return: The list devices corresponding to the tokens
+        :rtype: list of str
+        :raises: KeyError if any token is not found
+        :raises: AssertionError if any devnode is None
         """
-        devnode, _ = self.devices[token]
-        assert devnode is not None
-        return devnode
+        result = [self.devices[token][0] for token in tokens]
+        assert all([devnode is not None for devnode in result])
+        return result
 
     def destroy_devices(self):
         """

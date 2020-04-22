@@ -88,7 +88,7 @@ class LoopBackDevices:
 
     def generate_udev_add_events(self, tokens):
         """
-        Synthetically create "add" udev event for specified loop back deviced
+        Synthetically create "add" udev event for specified loop back devices
         :param tokens: Opaque representation of some loop back devices
         :type tokens: list of uuid.UUID
         :return: None

@@ -30,7 +30,7 @@ pub const DEV_PATH: &str = "/stratis";
 /// * `PartialPoolDevices` returns the state of devices that were not able to create a
 /// complete pool.
 pub enum ReportType {
-    PartialPoolDevices,
+    ErroredPoolDevices,
 }
 
 impl<'a> TryFrom<&'a str> for ReportType {
@@ -38,7 +38,7 @@ impl<'a> TryFrom<&'a str> for ReportType {
 
     fn try_from(name: &str) -> StratisResult<ReportType> {
         match name {
-            "partial_pool_devices" => Ok(ReportType::PartialPoolDevices),
+            "errored_pool_report" => Ok(ReportType::ErroredPoolDevices),
             _ => Err(StratisError::Engine(
                 ErrorEnum::NotFound,
                 format!("Report {} not found", name),

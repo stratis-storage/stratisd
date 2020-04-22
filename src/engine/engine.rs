@@ -9,6 +9,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
+use serde_json::Value;
 use uuid::Uuid;
 
 use devicemapper::{Bytes, Sectors};
@@ -16,12 +17,17 @@ use devicemapper::{Bytes, Sectors};
 use crate::{
     engine::types::{
         BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid, MaybeDbusPath, Name,
-        PoolUuid, RenameAction, SetCreateAction, SetDeleteAction,
+        PoolUuid, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
     },
     stratis::StratisResult,
 };
 
 pub const DEV_PATH: &str = "/stratis";
+
+/// An interface for reporting internal engine state.
+pub trait Report {
+    fn get_report(&self, report_type: ReportType) -> Value;
+}
 
 pub trait Filesystem: Debug {
     /// path of the device node
@@ -221,7 +227,7 @@ pub trait Pool: Debug {
     fn key_desc(&self) -> Option<&str>;
 }
 
-pub trait Engine: Debug {
+pub trait Engine: Debug + Report {
     /// Create a Stratis pool.
     /// Returns the UUID of the newly created pool.
     /// Returns an error if the redundancy code does not correspond to a

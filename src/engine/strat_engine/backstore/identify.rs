@@ -54,9 +54,14 @@ use crate::engine::{
     types::PoolUuid,
 };
 
-// A miscellaneous group of identifiers found when identifiying a Stratis
-// device.
-pub type StratisInfo = (StratisIdentifiers, Device, PathBuf);
+/// A miscellaneous group of identifiers found when identifying a Stratis
+/// device.
+#[derive(Debug, Eq, PartialEq)]
+pub struct StratisInfo {
+    pub identifiers: StratisIdentifiers,
+    pub device_number: Device,
+    pub devnode: PathBuf,
+}
 
 // A wrapper for obtaining the device number as a devicemapper Device
 // which interprets absence of the value as an error, which it is in this
@@ -119,9 +124,11 @@ fn process_stratis_device(dev: &libudev::Device) -> Option<StratisInfo> {
                           devnode.display());
                     None
                 }
-                (Ok(devno), Ok(Ok(Some(identifiers)))) => {
-                    Some((identifiers, devno, devnode.to_path_buf()))
-                }
+                (Ok(device_number), Ok(Ok(Some(identifiers)))) => Some(StratisInfo {
+                    identifiers,
+                    device_number,
+                    devnode: devnode.to_path_buf(),
+                }),
             }
         }
         None => {
@@ -140,10 +147,10 @@ fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, HashMap<Devic
     let pool_map = enumerator
         .scan_devices()?
         .filter_map(|dev| identify_stratis_device(&dev))
-        .fold(HashMap::new(), |mut acc, (identifiers, device, devnode)| {
-            acc.entry(identifiers.pool_uuid)
+        .fold(HashMap::new(), |mut acc, info| {
+            acc.entry(info.identifiers.pool_uuid)
                 .or_insert_with(HashMap::new)
-                .insert(device, devnode);
+                .insert(info.device_number, info.devnode);
             acc
         });
     Ok(pool_map)
@@ -175,14 +182,14 @@ fn identify_stratis_device(dev: &libudev::Device) -> Option<StratisInfo> {
             }
         },
     }
-    .map(|(identifiers, device, devnode)| {
+    .map(|info| {
         info!("Stratis block device with device number \"{}\", device node \"{}\", pool UUID \"{}\", and device UUID \"{}\" discovered during initial search",
-              device,
-              devnode.display(),
-              identifiers.pool_uuid.to_simple_ref(),
-              identifiers.device_uuid.to_simple_ref()
+              info.device_number,
+              info.devnode.display(),
+              info.identifiers.pool_uuid.to_simple_ref(),
+              info.identifiers.device_uuid.to_simple_ref()
         );
-        (identifiers, device, devnode)
+        info
     })
 }
 
@@ -209,14 +216,14 @@ pub fn identify_block_device(dev: &libudev::Device) -> Option<StratisInfo> {
             _ => None,
         },
     }
-    .map(|(identifiers, device, devnode)| {
+    .map(|info| {
         debug!("Stratis block device with device number \"{}\", device node \"{}\", pool UUID \"{}\", and device UUID \"{}\" identified",
-              device,
-              devnode.display(),
-              identifiers.pool_uuid.to_simple_ref(),
-              identifiers.device_uuid.to_simple_ref()
+              info.device_number,
+              info.devnode.display(),
+              info.identifiers.pool_uuid.to_simple_ref(),
+              info.identifiers.device_uuid.to_simple_ref()
         );
-        (identifiers, device, devnode)
+        info
     })
 }
 
@@ -275,13 +282,12 @@ mod tests {
         .unwrap();
 
         for path in paths {
-            let (identifiers, _, dev_node) =
-                block_device_apply(path, |dev| process_stratis_device(dev))
-                    .unwrap()
-                    .unwrap()
-                    .unwrap();
-            assert_eq!(identifiers.pool_uuid, pool_uuid);
-            assert_eq!(&&dev_node, path);
+            let info = block_device_apply(path, |dev| process_stratis_device(dev))
+                .unwrap()
+                .unwrap()
+                .unwrap();
+            assert_eq!(info.identifiers.pool_uuid, pool_uuid);
+            assert_eq!(&&info.devnode, path);
         }
     }
 

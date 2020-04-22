@@ -169,8 +169,8 @@ impl StratEngine {
     /// If a new pool is created as a result of the processing, return
     /// the newly created pool and its UUID, otherwise return None.
     fn block_evaluate(&mut self, device: &libudev::Device) -> Option<(PoolUuid, &mut dyn Pool)> {
-        identify_block_device(device).and_then(move |(identifiers, device, dev_node)| {
-            let pool_uuid = identifiers.pool_uuid;
+        identify_block_device(device).and_then(move |info| {
+            let pool_uuid = info.identifiers.pool_uuid;
             if self.pools.contains_uuid(pool_uuid) {
                 None
             } else {
@@ -179,12 +179,12 @@ impl StratEngine {
                     .remove(&pool_uuid)
                     .unwrap_or_else(HashMap::new);
 
-                if devices.insert(device, dev_node).is_none() {
+                if devices.insert(info.device_number, info.devnode).is_none() {
                     info!(
                         "Stratis block device with device number \"{}\", pool UUID \"{}\", and device UUID \"{}\" discovered, i.e., identified for the first time during this execution of stratisd",
-                        device,
-                        identifiers.pool_uuid.to_simple_ref(),
-                        identifiers.device_uuid.to_simple_ref(),
+                        info.device_number,
+                        info.identifiers.pool_uuid.to_simple_ref(),
+                        info.identifiers.device_uuid.to_simple_ref(),
                     );
                 }
 

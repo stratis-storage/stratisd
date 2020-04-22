@@ -45,6 +45,16 @@ SPECS = {
 </method>
 </interface>
 """,
+    "org.storage.stratis2.Report.r1": """
+<interface name="org.storage.stratis2.Report.r1">
+<method name="GetReport">
+<arg name="name" type="s" direction="in"/>
+<arg name="result" type="(bs)" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+</interface>
+""",
     "org.storage.stratis2.Manager": """
 <interface name="org.storage.stratis2.Manager">
 <method name="ConfigureSimulator">

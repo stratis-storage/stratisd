@@ -10,9 +10,11 @@ use std::{
     rc::Rc,
 };
 
+use serde_json::{json, Value};
+
 use crate::{
     engine::{
-        engine::{Engine, Eventable, Pool},
+        engine::{Engine, Eventable, Pool, Report, ReportType},
         shared::create_pool_idempotent_or_err,
         sim_engine::{pool::SimPool, randomization::Randomizer},
         structures::Table,
@@ -27,7 +29,29 @@ pub struct SimEngine {
     rdm: Rc<RefCell<Randomizer>>,
 }
 
-impl SimEngine {}
+impl Report for SimEngine {
+    fn get_report(&self, report_type: ReportType) -> Value {
+        match report_type {
+            ReportType::PartialPoolDevices => json!([
+                {
+                    "pool_uuid": "0123456789abcdef0123456789abcdef",
+                    "devices": [
+                        "/dev/an/example/device",
+                        "/dev/another/example/device",
+                    ],
+                },
+                {
+                    "pool_uuid": "fedcba9876543210fedcba9876543210",
+                    "devices": [
+                        "/dev/more/example/devices",
+                        "/dev/yet/another/example/device",
+                        "/dev/last/example/device",
+                    ],
+                },
+            ]),
+        }
+    }
+}
 
 impl Engine for SimEngine {
     fn create_pool(

@@ -8,6 +8,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use serde_json::Value;
+
 use devicemapper::{Device, DmNameBuf};
 
 #[cfg(test)]
@@ -28,7 +30,7 @@ use crate::{
         },
         structures::Table,
         types::{CreateAction, DeleteAction, RenameAction},
-        Engine, EngineEvent, Name, Pool, PoolUuid,
+        Engine, EngineEvent, Name, Pool, PoolUuid, Report, ReportType,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -41,7 +43,7 @@ pub struct StratEngine {
 
     // Map of stratis devices that have been found but one or more stratis block devices are missing
     // which prevents the associated pools from being setup.
-    incomplete_pools: HashMap<PoolUuid, HashMap<Device, PathBuf>>,
+    partial_pool_devices: HashMap<PoolUuid, HashMap<Device, PathBuf>>,
 
     // Maps name of DM devices we are watching to the most recent event number
     // we've handled for each
@@ -74,7 +76,7 @@ impl StratEngine {
 
         let mut engine = StratEngine {
             pools: Table::default(),
-            incomplete_pools: HashMap::new(),
+            partial_pool_devices: HashMap::new(),
             watched_dev_last_event_nrs: HashMap::new(),
         };
 
@@ -88,7 +90,7 @@ impl StratEngine {
     }
 
     // Given a set of devices, try to set up a pool. If the setup fails,
-    // insert the devices into incomplete_pools.
+    // insert the devices into partial_pool_devices.
     fn try_setup_pool(&mut self, pool_uuid: PoolUuid, devices: HashMap<Device, PathBuf>) {
         // Setup a pool from constituent devices in the context of some already
         // setup pools.
@@ -151,7 +153,7 @@ impl StratEngine {
                 self.pools.insert(pool_name, pool_uuid, pool);
             }
             _ => {
-                self.incomplete_pools.insert(pool_uuid, devices);
+                self.partial_pool_devices.insert(pool_uuid, devices);
             }
         }
     }
@@ -173,7 +175,7 @@ impl StratEngine {
                 None
             } else {
                 let mut devices = self
-                    .incomplete_pools
+                    .partial_pool_devices
                     .remove(&pool_uuid)
                     .unwrap_or_else(HashMap::new);
 
@@ -202,6 +204,27 @@ impl StratEngine {
                     .map(|(_, pool)| (pool_uuid, pool as &mut dyn Pool))
             }
         })
+    }
+}
+
+/// Provide the report for pools which only have a subset of the devices required
+/// to reconstruct the pool available.
+fn partial_pool_report(
+    partial_pool_devices: &HashMap<PoolUuid, HashMap<Device, PathBuf>>,
+) -> Value {
+    Value::Array(partial_pool_devices.iter().map(|(uuid, map)| {
+        json!({
+            "pool_uuid": uuid.to_simple_ref().to_string(),
+            "devices": Value::Array(map.values().map(|p| Value::from(p.display().to_string())).collect()),
+        })
+    }).collect())
+}
+
+impl Report for StratEngine {
+    fn get_report(&self, report_type: ReportType) -> Value {
+        match report_type {
+            ReportType::PartialPoolDevices => partial_pool_report(&self.partial_pool_devices),
+        }
     }
 }
 
@@ -453,7 +476,7 @@ mod test {
         remove_dir_all(DEV_PATH).unwrap();
 
         let engine = StratEngine::initialize().unwrap();
-        assert_eq!(engine.incomplete_pools, HashMap::new());
+        assert_eq!(engine.partial_pool_devices, HashMap::new());
 
         assert!(engine.get_pool(uuid1).is_some());
         assert!(engine.get_pool(uuid2).is_some());

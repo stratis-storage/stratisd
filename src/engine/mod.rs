@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 pub use self::{
-    engine::{BlockDev, Engine, Filesystem, Pool},
+    engine::{BlockDev, Engine, Filesystem, Pool, Report, ReportType},
     event::{get_engine_listener_list_mut, EngineEvent, EngineListener},
     sim_engine::SimEngine,
     strat_engine::StratEngine,

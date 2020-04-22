@@ -3,12 +3,14 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
+    convert::TryFrom,
     fmt::Debug,
     os::unix::io::RawFd,
     path::{Path, PathBuf},
 };
 
 use chrono::{DateTime, Utc};
+use serde_json::Value;
 use uuid::Uuid;
 
 use devicemapper::{Bytes, Sectors};
@@ -18,10 +20,37 @@ use crate::{
         BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid, MaybeDbusPath, Name,
         PoolUuid, RenameAction, SetCreateAction, SetDeleteAction,
     },
-    stratis::StratisResult,
+    stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
 pub const DEV_PATH: &str = "/stratis";
+
+/// The type of report for which to query.
+///
+/// * `PartialPoolDevices` returns the state of devices that were not able to create a
+/// complete pool.
+pub enum ReportType {
+    PartialPoolDevices,
+}
+
+impl<'a> TryFrom<&'a str> for ReportType {
+    type Error = StratisError;
+
+    fn try_from(name: &str) -> StratisResult<ReportType> {
+        match name {
+            "partial_pool_devices" => Ok(ReportType::PartialPoolDevices),
+            _ => Err(StratisError::Engine(
+                ErrorEnum::NotFound,
+                format!("Report {} not found", name),
+            )),
+        }
+    }
+}
+
+/// An interface for reporting internal engine state.
+pub trait Report {
+    fn get_report(&self, report_type: ReportType) -> Value;
+}
 
 pub trait Filesystem: Debug {
     /// path of the device node
@@ -221,7 +250,7 @@ pub trait Pool: Debug {
     fn key_desc(&self) -> Option<&str>;
 }
 
-pub trait Engine: Debug {
+pub trait Engine: Debug + Report {
     /// Create a Stratis pool.
     /// Returns the UUID of the newly created pool.
     /// Returns an error if the redundancy code does not correspond to a

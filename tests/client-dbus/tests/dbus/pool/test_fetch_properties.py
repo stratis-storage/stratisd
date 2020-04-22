@@ -16,12 +16,7 @@ Test accessing properties of a pool using FetchProperties interface.
 """
 
 # isort: LOCAL
-from stratisd_client_dbus import (
-    FetchProperties,
-    FetchProperties_2_1,
-    Manager,
-    get_object,
-)
+from stratisd_client_dbus import FetchProperties, FetchPropertiesR1, Manager, get_object
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from .._misc import SimTestCase, device_name_list
@@ -63,7 +58,7 @@ class FetchPropertiesTestCase(SimTestCase):
         self.assertEqual(size_success, True)
         self.assertTrue(size.isnumeric())
 
-        (size_success, size) = FetchProperties_2_1.Methods.GetProperties(
+        (size_success, size) = FetchPropertiesR1.Methods.GetProperties(
             self._pool_object, {"properties": ["TotalPhysicalSize"]}
         )["TotalPhysicalSize"]
 
@@ -81,7 +76,7 @@ class FetchPropertiesTestCase(SimTestCase):
         self.assertEqual(size_success, True)
         self.assertTrue(size.isnumeric())
 
-        (size_success, size) = FetchProperties_2_1.Methods.GetProperties(
+        (size_success, size) = FetchPropertiesR1.Methods.GetProperties(
             self._pool_object, {"properties": ["TotalPhysicalUsed"]}
         )["TotalPhysicalUsed"]
 
@@ -90,9 +85,9 @@ class FetchPropertiesTestCase(SimTestCase):
 
     def test_fetch_has_cache_property(self):
         """
-        Test FetchProperties_2_1 for pool HasCache property
+        Test FetchProperties.r1 for pool HasCache property
         """
-        (has_cache_success, has_cache) = FetchProperties_2_1.Methods.GetProperties(
+        (has_cache_success, has_cache) = FetchPropertiesR1.Methods.GetProperties(
             self._pool_object, {"properties": ["HasCache"]}
         )["HasCache"]
 
@@ -103,10 +98,10 @@ class FetchPropertiesTestCase(SimTestCase):
 
     def test_fetch_data_crypt_key_description(self):
         """
-        Test FetchProperties_1_2 for pool KeyDescription
+        Test FetchProperties.r1 for pool KeyDescription
         """
         property_name = "KeyDescription"
-        (key_desc_success, key_desc) = FetchProperties_2_1.Methods.GetProperties(
+        (key_desc_success, key_desc) = FetchPropertiesR1.Methods.GetProperties(
             self._pool_object, {"properties": [property_name]}
         )[property_name]
 

@@ -16,8 +16,10 @@ Used to test behavior of the udev device discovery mechanism.
 """
 
 # isort: STDLIB
+import base64
 import os
 import random
+import shutil
 import signal
 import string
 import subprocess
@@ -32,9 +34,9 @@ import pyudev
 
 # isort: LOCAL
 from stratisd_client_dbus import (
-    Manager,
+    ManagerR1,
     ObjectManager,
-    Pool,
+    PoolR1,
     StratisdErrors,
     get_object,
     pools,
@@ -58,19 +60,33 @@ def random_string(length):
     )
 
 
-def _create_pool(name, devices):
+def _create_pool(name, devices, *, key_description=None):
     """
     Creates a stratis pool. Tries three times before giving up.
     Raises an assertion error if it does not succeed after three tries.
     :param name:    Name of pool
     :param devices:  Devices to use for pool
+    :param key_description: optional key description
+    :type key_description: str or NoneType
     :return: Dbus proxy object representing pool.
     """
     error_reasons = []
     for _ in range(3):
-        ((_, (pool_object_path, _)), exit_code, error_str) = Manager.Methods.CreatePool(
+        (
+            (_, (pool_object_path, _)),
+            exit_code,
+            error_str,
+        ) = ManagerR1.Methods.CreatePool(
             get_object(TOP_OBJECT),
-            {"name": name, "redundancy": (True, 0), "devices": devices},
+            {
+                "name": name,
+                "redundancy": (True, 0),
+                "devices": devices,
+                # pylint: disable=bad-continuation
+                "key_desc": (False, "")
+                if key_description is None
+                else (True, key_description),
+            },
         )
         if exit_code == StratisdErrors.OK:
             return get_object(pool_object_path)
@@ -110,30 +126,32 @@ def _settle():
     subprocess.check_call(["udevadm", "settle"])
 
 
-def _expected_stratis_block_devices(expected_paths):
+def _wait_for_udev(expected_paths):
     """
     Look for Stratis devices. Check as many times as can be done in
-    10 seconds or until the number of devices found equals the number
-    of devices expected. Always get the result of at least 1 Stratis
-    enumeration.
+    10 seconds or until the devices found are equal to the devices
+    expected. Always get the result of at least 1 Stratis enumeration.
     :param expected_paths: devnodes of paths that should belong to Stratis
     :type expected_paths: list of str
     :return: None (May assert)
     """
 
-    num_expected = len(expected_paths)
+    expected_devnodes = frozenset(expected_paths)
+    found_devnodes = None
 
-    found = None
     context = pyudev.Context()
     end_time = time.time() + 10.0
 
-    while time.time() < end_time and found != num_expected:
-        found = sum(
-            1 for _ in context.list_devices(subsystem="block", ID_FS_TYPE="stratis")
+    while time.time() < end_time and not expected_devnodes == found_devnodes:
+        found_devnodes = frozenset(
+            [
+                x.device_node
+                for x in context.list_devices(subsystem="block", ID_FS_TYPE="stratis")
+            ]
         )
         time.sleep(1)
 
-    assert found == num_expected
+    assert expected_devnodes == found_devnodes
 
 
 def _processes(name):
@@ -215,6 +233,76 @@ class _Service:
         return output
 
 
+class _KernelKey:  # pylint: disable=attribute-defined-outside-init
+    """
+    A handle for operating on keys in the kernel keyring. The specified key will
+    be available for the lifetime of the test when used with the Python with
+    keyword and will be cleaned up at the end of the scope of the with block.
+    """
+
+    def __init__(self, key_data):
+        """
+        Initialize a key with the provided key data (passphrase).
+        :param bytes key_data: The desired key contents
+        :raises RuntimeError: if the keyctl command is not found in $PATH
+                              or a keyctl command returns a non-zero exit code
+        """
+        if shutil.which("keyctl") is None:
+            raise RuntimeError("Executable keyctl was not found in $PATH")
+
+        self.key_data = key_data
+
+    @staticmethod
+    def _raise_keyctl_error(return_code, args):
+        """
+        Raise an error if keyctl failed to complete an operation
+        successfully.
+        :param int return_code: Return code of the keyctl command
+        :param args: The command line that caused the command to fail
+        :type args: list of str
+        :raises RuntimeError
+        """
+        if return_code != 0:
+            raise RuntimeError(
+                "Command '%s' failed with exit code %s" % (" ".join(args), return_code)
+            )
+
+    def __enter__(self):
+        """
+        This method allows _KernelKey to be used with the "with" keyword.
+        :return: The key description that can be used to access the
+                 provided key data in __init__.
+        """
+        with open("/dev/urandom", "rb") as urandom_f:
+            key_desc = base64.b64encode(urandom_f.read(16)).decode("utf-8")
+
+        args = ["keyctl", "get_persistent", "@s", "0"]
+        exit_values = subprocess.run(args, capture_output=True, text=True)
+        _KernelKey._raise_keyctl_error(exit_values.returncode, args)
+
+        self.persistent_id = exit_values.stdout.strip()
+
+        args = ["keyctl", "add", "user", key_desc, self.key_data, self.persistent_id]
+        exit_values = subprocess.run(args, capture_output=True)
+        _KernelKey._raise_keyctl_error(exit_values.returncode, args)
+
+        return key_desc
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        try:
+            args = ["keyctl", "clear", self.persistent_id]
+            exit_values = subprocess.run(args)
+            _KernelKey._raise_keyctl_error(exit_values.returncode, args)
+
+            args = ["keyctl", "clear", "@s"]
+            exit_values = subprocess.run(args)
+            _KernelKey._raise_keyctl_error(exit_values.returncode, args)
+        except RuntimeError as rexc:
+            if exception_value is None:
+                raise rexc
+            raise rexc from exception_value
+
+
 class _ServiceContextManager:  # pylint: disable=too-few-public-methods
     """
     A context manager for starting and stopping the daemon and cleaning up
@@ -262,9 +350,7 @@ class UdevAdd(unittest.TestCase):
         _remove_stratis_dm_devices()
         self._lb_mgr.destroy_all()
 
-    def _test_driver(  # pylint: disable=bad-continuation
-        self, number_of_pools, dev_count_pool
-    ):  # pylint: disable=too-many-locals
+    def _test_driver(self, number_of_pools, dev_count_pool):
         """
         Run the following test:
 
@@ -289,58 +375,53 @@ class UdevAdd(unittest.TestCase):
         """
 
         pool_data = {}
-        expected_stratis_devices = []
         with _ServiceContextManager():
             for _ in range(number_of_pools):
-                device_tokens = [
-                    self._lb_mgr.create_device() for _ in range(dev_count_pool)
-                ]
-                devnodes = [self._lb_mgr.device_file(t) for t in device_tokens]
+                device_tokens = self._lb_mgr.create_devices(dev_count_pool)
 
                 _settle()
 
                 pool_name = random_string(5)
 
-                _create_pool(pool_name, devnodes)
+                _create_pool(pool_name, self._lb_mgr.device_files(device_tokens))
                 pool_data[pool_name] = device_tokens
-                expected_stratis_devices.extend(devnodes)
 
-        _expected_stratis_block_devices(expected_stratis_devices)
+        all_tokens = [
+            dev for device_tokens in pool_data.values() for dev in device_tokens
+        ]
+        all_devnodes = self._lb_mgr.device_files(all_tokens)
+
+        _wait_for_udev(all_devnodes)
 
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), number_of_pools)
 
-        for dev in (
-            dev for device_tokens in pool_data.values() for dev in device_tokens
-        ):
-            self._lb_mgr.unplug(dev)
+        self._lb_mgr.unplug(all_tokens)
 
-        _expected_stratis_block_devices([])
+        _wait_for_udev([])
 
         last_index = dev_count_pool - 1
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), 0)
 
             # Add all but the last device for each pool
-            running_devices = []
-            for i in range(last_index):
-                for _, devices in pool_data.items():
-                    device_token = devices[i]
-                    self._lb_mgr.hotplug(device_token)
-                    running_devices.append(self._lb_mgr.device_file(device_token))
-                    _expected_stratis_block_devices(running_devices)
-                    _settle()
+            tokens_to_add = [
+                tok
+                for device_tokens in pool_data.values()
+                for tok in device_tokens[:last_index]
+            ]
+            self._lb_mgr.hotplug(tokens_to_add)
+            _wait_for_udev(self._lb_mgr.device_files(tokens_to_add))
 
-            self.assertEqual(len(_get_pools()), 0)
-
-        with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), 0)
 
             # Add the last device that makes each pool complete
-            for _, devices in pool_data.items():
-                self._lb_mgr.hotplug(devices[last_index])
+            self._lb_mgr.hotplug(
+                [device_tokens[last_index] for device_tokens in pool_data.values()]
+            )
 
-            _settle()
+            _wait_for_udev(all_devnodes)
+
             self.assertEqual(len(_get_pools()), number_of_pools)
 
             for name in pool_data:
@@ -352,7 +433,7 @@ class UdevAdd(unittest.TestCase):
         """
         self._test_driver(2, 4)
 
-    def _single_pool(self, num_devices, num_hotplugs=0):
+    def _single_pool(self, num_devices, *, key_description=None, num_hotplugs=0):
         """
         Creates a single pool with specified number of devices.
 
@@ -370,47 +451,44 @@ class UdevAdd(unittest.TestCase):
         no further effect, i.e., no additional pools suddenly appear.
 
         :param int num_devices: Number of devices to use for pool
+        :param key_description: the key description if encrypting the pool
+        :type key_description: str or NoneType
         :param int num_hotplugs: Number of synthetic udev "add" event per device
         :return: None
         """
-        device_tokens = [self._lb_mgr.create_device() for _ in range(num_devices)]
-        devnodes = [self._lb_mgr.device_file(t) for t in device_tokens]
+        device_tokens = self._lb_mgr.create_devices(num_devices)
+        devnodes = self._lb_mgr.device_files(device_tokens)
 
         _settle()
 
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), 0)
             pool_name = random_string(5)
-            _create_pool(pool_name, devnodes)
+            _create_pool(pool_name, devnodes, key_description=key_description)
             self.assertEqual(len(_get_pools()), 1)
 
-        _expected_stratis_block_devices(devnodes)
+        _wait_for_udev(devnodes)
 
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), 1)
 
-        for dev in device_tokens:
-            self._lb_mgr.unplug(dev)
+        self._lb_mgr.unplug(device_tokens)
 
-        _expected_stratis_block_devices([])
+        _wait_for_udev([])
 
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), 0)
 
-            for dev in device_tokens:
-                self._lb_mgr.hotplug(dev)
+            self._lb_mgr.hotplug(device_tokens)
 
-            _settle()
-            _expected_stratis_block_devices(devnodes)
+            _wait_for_udev(devnodes)
 
             self.assertEqual(len(_get_pools()), 1)
 
             for _ in range(num_hotplugs):
-                for dev in device_tokens:
-                    self._lb_mgr.generate_udev_add_event(dev)
+                self._lb_mgr.generate_udev_add_events(device_tokens)
 
             _settle()
-            _expected_stratis_block_devices(devnodes)
 
             self.assertEqual(len(_get_pools()), 1)
 
@@ -424,13 +502,21 @@ class UdevAdd(unittest.TestCase):
         """
         See documentation for _single_pool.
         """
-        self._single_pool(4, 4)
+        self._single_pool(4, num_hotplugs=4)
 
     def test_simple_udev_add(self):
         """
         See documentation for _single_pool.
         """
-        self._single_pool(1, 1)
+        self._single_pool(1, num_hotplugs=1)
+
+    @unittest.expectedFailure
+    def test_encryption(self):
+        """
+        See documentation for _single_pool.
+        """
+        with _KernelKey("test_key") as key_description:
+            self._single_pool(1, key_description=key_description)
 
     def test_duplicate_pool_name(self):
         """
@@ -443,33 +529,30 @@ class UdevAdd(unittest.TestCase):
 
         # Create some pools with duplicate names
         for i in range(num_pools):
-            this_pool = [self._lb_mgr.create_device() for _ in range(i + 1)]
-            devices = [self._lb_mgr.device_file(t) for t in this_pool]
+            this_pool = self._lb_mgr.create_devices(i + 1)
             _settle()
 
             pool_tokens.append(this_pool)
 
+            devnodes = self._lb_mgr.device_files(this_pool)
             with _ServiceContextManager():
-                _create_pool(pool_name, devices)
+                _create_pool(pool_name, devnodes)
 
-            _expected_stratis_block_devices(devices)
+            _wait_for_udev(devnodes)
 
-            for dev in this_pool:
-                self._lb_mgr.unplug(dev)
+            self._lb_mgr.unplug(this_pool)
 
-            _expected_stratis_block_devices([])
+            _wait_for_udev([])
+
+        all_tokens = [dev for sublist in pool_tokens for dev in sublist]
 
         with _ServiceContextManager():
             # Hot plug activate each pool in sequence and force a duplicate name
             # error.
-            devices_plugged = []
             for i in range(num_pools):
-                for dev in pool_tokens[i]:
-                    self._lb_mgr.hotplug(dev)
-                    devices_plugged.append(self._lb_mgr.device_file(dev))
+                self._lb_mgr.hotplug(pool_tokens[i])
 
-            _settle()
-            _expected_stratis_block_devices(devices_plugged)
+            _wait_for_udev(self._lb_mgr.device_files(all_tokens))
 
             # The number of pools should never exceed one, since all the pools
             # previously formed in the test have the same name.
@@ -483,16 +566,17 @@ class UdevAdd(unittest.TestCase):
 
                 # Rename all active pools to a randomly selected new name
                 for object_path, _ in current_pools:
-                    Pool.Methods.SetName(
+                    PoolR1.Methods.SetName(
                         get_object(object_path), {"name": random_string(10)}
                     )
 
                 # Generate synthetic add events for every loop backed device
-                for dev in (dev for sublist in pool_tokens for dev in sublist):
-                    self._lb_mgr.generate_udev_add_event(dev)
+                self._lb_mgr.generate_udev_add_events(
+                    [dev for sublist in pool_tokens for dev in sublist]
+                )
 
                 _settle()
-                _expected_stratis_block_devices(devices_plugged)
+
                 self.assertEqual(len(_get_pools()), len(current_pools) + 1)
 
             self.assertEqual(len(_get_pools()), num_pools)

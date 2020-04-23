@@ -7,6 +7,7 @@
 use std::{cmp, path::Path};
 
 use chrono::{DateTime, Utc};
+use serde_json::Value;
 
 use devicemapper::{CacheDev, Device, DmDevice, LinearDev, Sectors};
 
@@ -624,6 +625,31 @@ impl Backstore {
 
     pub fn has_cache(&self) -> bool {
         self.cache_tier.is_some()
+    }
+}
+
+impl<'a> Into<Value> for &'a Backstore {
+    fn into(self) -> Value {
+        json!({
+            "blockdevs": {
+                "datadevs": Value::Array(
+                    self.datadevs().iter().map(|(uuid, dev)| {
+                        json!({
+                            "uuid": uuid.to_simple_ref().to_string(),
+                            "path": dev.devnode().physical_path(),
+                        })
+                    }).collect()
+                ),
+                "cachedevs": Value::Array(
+                    self.cachedevs().iter().map(|(uuid, dev)| {
+                        json!({
+                            "uuid": uuid.to_simple_ref().to_string(),
+                            "path": dev.devnode().physical_path(),
+                        })
+                    }).collect()
+                ),
+            }
+        })
     }
 }
 

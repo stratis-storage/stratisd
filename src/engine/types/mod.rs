@@ -135,8 +135,10 @@ impl fmt::Display for Name {
 ///
 /// * `ErroredPoolDevices` returns the state of devices that caused an error while
 /// attempting to reconstruct a pool.
+/// * `EngineState` returns the entire state of the engine.
 pub enum ReportType {
     ErroredPoolDevices,
+    EngineState,
 }
 
 impl<'a> TryFrom<&'a str> for ReportType {
@@ -145,6 +147,7 @@ impl<'a> TryFrom<&'a str> for ReportType {
     fn try_from(name: &str) -> StratisResult<ReportType> {
         match name {
             "errored_pool_report" => Ok(ReportType::ErroredPoolDevices),
+            "engine_state_report" => Ok(ReportType::EngineState),
             _ => Err(StratisError::Engine(
                 ErrorEnum::NotFound,
                 format!("Report name {} not understood", name),

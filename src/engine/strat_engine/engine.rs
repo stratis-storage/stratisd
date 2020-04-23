@@ -2,9 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{clone::Clone, collections::HashMap, path::Path};
+use std::{clone::Clone, collections::HashMap, iter::FromIterator, path::Path};
 
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use devicemapper::DmNameBuf;
 
@@ -97,10 +97,46 @@ impl StratEngine {
     }
 }
 
+impl<'a> Into<Value> for &'a StratEngine {
+    // Precondition: (&StratPool).into() pattern matches Value::Object(_)
+    fn into(self) -> Value {
+        json!({
+            "pools": Value::Array(
+                self.pools.iter()
+                    .map(|(name, uuid, pool)| {
+                        let mut map = Map::from_iter(
+                            vec![
+                                (
+                                    "uuid".to_string(),
+                                    Value::from(uuid.to_simple_ref().to_string())
+                                ),
+                                (
+                                    "name".to_string(),
+                                    Value::from(name.to_string()),
+                                ),
+                            ].drain(..)
+                        );
+                        map.extend(
+                            if let Value::Object(map) = <&StratPool as Into<Value>>::into(pool) {
+                                map.into_iter()
+                            } else {
+                                unreachable!("StratPool conversion returns a JSON object");
+                            }
+                        );
+                        Value::from(map)
+                    })
+                    .collect()
+            ),
+            "errored_pools": &self.liminal_devices.report(),
+        })
+    }
+}
+
 impl Report for StratEngine {
     fn get_report(&self, report_type: ReportType) -> Value {
         match report_type {
             ReportType::ErroredPoolDevices => self.liminal_devices.report(),
+            ReportType::EngineState => self.into(),
         }
     }
 }

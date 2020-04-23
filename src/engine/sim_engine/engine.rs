@@ -29,10 +29,29 @@ pub struct SimEngine {
     rdm: Rc<RefCell<Randomizer>>,
 }
 
+impl<'a> Into<Value> for &'a SimEngine {
+    fn into(self) -> Value {
+        json!({
+            "pools": Value::Array(
+                // FIXME: Add reporting for devices in pools
+                self.pools.iter().map(|(name, uuid, _)| {
+                    json!({
+                        "pool_uuid": uuid.to_simple_ref().to_string(),
+                        "name": name.to_string(),
+                    })
+                })
+                .collect()
+            ),
+            "errored_pools": json!([]),
+        })
+    }
+}
+
 impl Report for SimEngine {
     fn get_report(&self, report_type: ReportType) -> Value {
         match report_type {
             ReportType::ErroredPoolDevices => json!([]),
+            ReportType::EngineState => self.into(),
         }
     }
 }

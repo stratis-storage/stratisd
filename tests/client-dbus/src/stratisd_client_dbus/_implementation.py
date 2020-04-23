@@ -42,6 +42,9 @@ ObjectManager = make_class(
     ET.fromstring(SPECS["org.freedesktop.DBus.ObjectManager"]),
     TIME_OUT,
 )
+ReportR1 = make_class(
+    "ReportR1", ET.fromstring(SPECS["org.storage.stratis2.Report.r1"]), TIME_OUT
+)
 Manager = make_class(
     "Manager", ET.fromstring(SPECS["org.storage.stratis2.Manager"]), TIME_OUT
 )

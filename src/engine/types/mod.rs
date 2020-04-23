@@ -2,12 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{borrow::Borrow, fmt, ops::Deref, rc::Rc};
+use std::{borrow::Borrow, convert::TryFrom, fmt, ops::Deref, rc::Rc};
 
 mod actions;
 pub use crate::engine::types::actions::{
     CreateAction, DeleteAction, EngineAction, RenameAction, SetCreateAction, SetDeleteAction,
 };
+use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
 use uuid::Uuid;
 
@@ -120,5 +121,27 @@ impl Borrow<str> for Name {
 impl fmt::Display for Name {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
+    }
+}
+
+/// The type of report for which to query.
+///
+/// * `ErroredPoolDevices` returns the state of devices that caused an error while
+/// attempting to reconstruct a pool.
+pub enum ReportType {
+    ErroredPoolDevices,
+}
+
+impl<'a> TryFrom<&'a str> for ReportType {
+    type Error = StratisError;
+
+    fn try_from(name: &str) -> StratisResult<ReportType> {
+        match name {
+            "errored_pool_report" => Ok(ReportType::ErroredPoolDevices),
+            _ => Err(StratisError::Engine(
+                ErrorEnum::NotFound,
+                format!("Report name {} not understood", name),
+            )),
+        }
     }
 }

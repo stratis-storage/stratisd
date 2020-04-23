@@ -14,11 +14,11 @@ use serde_json::{json, Value};
 
 use crate::{
     engine::{
-        engine::{Engine, Eventable, Pool, Report, ReportType},
+        engine::{Engine, Eventable, Pool, Report},
         shared::create_pool_idempotent_or_err,
         sim_engine::{pool::SimPool, randomization::Randomizer},
         structures::Table,
-        types::{CreateAction, DeleteAction, Name, PoolUuid, RenameAction},
+        types::{CreateAction, DeleteAction, Name, PoolUuid, RenameAction, ReportType},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };

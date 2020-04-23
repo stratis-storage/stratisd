@@ -29,8 +29,8 @@ use crate::{
             pool::StratPool,
         },
         structures::Table,
-        types::{CreateAction, DeleteAction, RenameAction},
-        Engine, EngineEvent, Name, Pool, PoolUuid, Report, ReportType,
+        types::{CreateAction, DeleteAction, RenameAction, ReportType},
+        Engine, EngineEvent, Name, Pool, PoolUuid, Report,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };

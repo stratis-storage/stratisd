@@ -3,7 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    convert::TryFrom,
     fmt::Debug,
     os::unix::io::RawFd,
     path::{Path, PathBuf},
@@ -18,34 +17,12 @@ use devicemapper::{Bytes, Sectors};
 use crate::{
     engine::types::{
         BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid, MaybeDbusPath, Name,
-        PoolUuid, RenameAction, SetCreateAction, SetDeleteAction,
+        PoolUuid, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::StratisResult,
 };
 
 pub const DEV_PATH: &str = "/stratis";
-
-/// The type of report for which to query.
-///
-/// * `PartialPoolDevices` returns the state of devices that were not able to create a
-/// complete pool.
-pub enum ReportType {
-    ErroredPoolDevices,
-}
-
-impl<'a> TryFrom<&'a str> for ReportType {
-    type Error = StratisError;
-
-    fn try_from(name: &str) -> StratisResult<ReportType> {
-        match name {
-            "errored_pool_report" => Ok(ReportType::ErroredPoolDevices),
-            _ => Err(StratisError::Engine(
-                ErrorEnum::NotFound,
-                format!("Report {} not found", name),
-            )),
-        }
-    }
-}
 
 /// An interface for reporting internal engine state.
 pub trait Report {

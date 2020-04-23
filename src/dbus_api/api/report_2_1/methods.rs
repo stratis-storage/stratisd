@@ -15,7 +15,6 @@ use crate::{
         util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
     },
     engine::ReportType,
-    stratis::StratisError,
 };
 
 pub fn get_report(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -40,7 +39,7 @@ pub fn get_report(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let msg = match serde_json::to_string(&engine.get_report(report_type)) {
         Ok(string) => return_message.append3((true, string), msg_code_ok(), msg_string_ok()),
         Err(e) => {
-            let (rc, rs) = engine_to_dbus_err_tuple(&StratisError::Serde(e));
+            let (rc, rs) = engine_to_dbus_err_tuple(&e.into());
             return_message.append3(default_return, rc, rs)
         }
     };

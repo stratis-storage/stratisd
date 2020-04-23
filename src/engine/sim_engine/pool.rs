@@ -11,6 +11,7 @@ use std::{
     vec::Vec,
 };
 
+use serde_json::Value;
 use uuid::Uuid;
 
 use devicemapper::{Sectors, IEC};
@@ -96,6 +97,39 @@ impl SimPool {
 
     fn datadevs_encrypted(&self) -> bool {
         self.block_devs_key_desc.is_some()
+    }
+}
+
+impl<'a> Into<Value> for &'a SimPool {
+    fn into(self) -> Value {
+        json!({
+            "filesystems": Value::Array(
+                self.filesystems.iter()
+                    .map(|(name, uuid, _)| json!({
+                        "name": name.to_string(),
+                        "uuid": uuid.to_simple_ref().to_string(),
+                    }))
+                    .collect()
+            ),
+            "blockdevs": {
+                "datadevs": Value::Array(
+                    self.block_devs.iter()
+                        .map(|(uuid, dev)| json!({
+                            "uuid": uuid.to_simple_ref().to_string(),
+                            "path": dev.devnode().physical_path(),
+                        }))
+                        .collect()
+                ),
+                "cachedevs": Value::Array(
+                    self.cache_devs.iter()
+                        .map(|(uuid, dev)| json!({
+                            "uuid": uuid.to_simple_ref().to_string(),
+                            "path": dev.devnode().physical_path(),
+                        }))
+                        .collect()
+                ),
+            },
+        })
     }
 }
 

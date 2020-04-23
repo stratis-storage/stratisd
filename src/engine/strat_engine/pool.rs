@@ -5,6 +5,7 @@
 use std::{collections::HashMap, iter::FromIterator, path::Path, vec::Vec};
 
 use chrono::{DateTime, Utc};
+use serde_json::{Map, Value};
 use uuid::Uuid;
 
 use devicemapper::{DmName, DmNameBuf, Sectors};
@@ -275,6 +276,28 @@ impl StratPool {
 
     fn datadevs_encrypted(&self) -> bool {
         self.backstore.data_tier_is_encrypted()
+    }
+}
+
+impl<'a> Into<Value> for &'a StratPool {
+    // Precondition: (&ThinPool).into() pattern matches Value::Object(_)
+    // Precondition: (&Backstore).into() pattern matches Value::Object(_)
+    fn into(self) -> Value {
+        let mut map = Map::from_iter(
+            if let Value::Object(map) = <&ThinPool as Into<Value>>::into(&self.thin_pool) {
+                map.into_iter()
+            } else {
+                unreachable!("ThinPool conversion returns a JSON object")
+            },
+        );
+        map.extend(
+            if let Value::Object(map) = <&Backstore as Into<Value>>::into(&self.backstore) {
+                map.into_iter()
+            } else {
+                unreachable!("Backstore conversion returns a JSON object")
+            },
+        );
+        Value::from(map)
     }
 }
 

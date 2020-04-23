@@ -97,10 +97,42 @@ impl StratEngine {
     }
 }
 
+impl<'a> Into<Value> for &'a StratEngine {
+    // Precondition: (&StratPool).into() pattern matches Value::Object(_)
+    fn into(self) -> Value {
+        json!({
+            "pools": Value::Array(
+                self.pools.iter()
+                    .map(|(name, uuid, pool)| {
+                        let mut json = json!({
+                            "uuid": Value::from(uuid.to_simple_ref().to_string()),
+                            "name": Value::from(name.to_string()),
+                        });
+                        if let Value::Object(ref mut map) = json {
+                            map.extend(
+                                if let Value::Object(map) = <&StratPool as Into<Value>>::into(pool) {
+                                    map.into_iter()
+                                } else {
+                                    unreachable!("StratPool conversion returns a JSON object");
+                                }
+                            );
+                        } else {
+                            unreachable!("json!() always creates a JSON object")
+                        }
+                        json
+                    })
+                    .collect()
+            ),
+            "errored_pools": self.liminal_devices.report(),
+        })
+    }
+}
+
 impl Report for StratEngine {
     fn get_report(&self, report_type: ReportType) -> Value {
         match report_type {
             ReportType::ErroredPoolDevices => self.liminal_devices.report(),
+            ReportType::EngineState => self.into(),
         }
     }
 }

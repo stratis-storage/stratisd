@@ -29,10 +29,37 @@ pub struct SimEngine {
     rdm: Rc<RefCell<Randomizer>>,
 }
 
+impl<'a> Into<Value> for &'a SimEngine {
+    // Precondition: SimPool Into<Value> impl return value always pattern matches
+    // Value::Object(_)
+    fn into(self) -> Value {
+        json!({
+            "pools": Value::Array(
+                self.pools.iter().map(|(name, uuid, pool)| {
+                    let json = json!({
+                        "pool_uuid": uuid.to_simple_ref().to_string(),
+                        "name": name.to_string(),
+                    });
+                    let pool_json = pool.into();
+                    if let (Value::Object(mut map), Value::Object(submap)) = (json, pool_json) {
+                        map.extend(submap.into_iter());
+                        Value::Object(map)
+                    } else {
+                        unreachable!("json!() output is always JSON object");
+                    }
+                })
+                .collect()
+            ),
+            "errored_pools": json!([]),
+        })
+    }
+}
+
 impl Report for SimEngine {
     fn get_report(&self, report_type: ReportType) -> Value {
         match report_type {
             ReportType::ErroredPoolDevices => json!([]),
+            ReportType::EngineState => self.into(),
         }
     }
 }

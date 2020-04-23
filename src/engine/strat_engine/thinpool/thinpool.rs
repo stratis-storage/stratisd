@@ -10,6 +10,7 @@ use std::{
     time::Duration,
 };
 
+use serde_json::Value;
 use uuid::Uuid;
 
 use devicemapper::{
@@ -1139,6 +1140,21 @@ impl ThinPool {
 
     pub fn set_dbus_path(&mut self, path: MaybeDbusPath) {
         self.dbus_path = path
+    }
+}
+
+impl<'a> Into<Value> for &'a ThinPool {
+    fn into(self) -> Value {
+        json!({
+            "filesystems": Value::Array(
+                self.filesystems.iter()
+                    .map(|(name, uuid, _)| json!({
+                        "name": name.to_string(),
+                        "uuid": uuid.to_simple_ref().to_string(),
+                    }))
+                    .collect()
+            )
+        })
     }
 }
 

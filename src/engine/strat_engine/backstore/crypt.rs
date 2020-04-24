@@ -187,6 +187,7 @@ impl CryptInitializer {
     }
 
     pub fn initialize(self, key_description: &str) -> Result<CryptHandle> {
+        let key_desc = KeyDescription::from(key_description.to_string());
         let physical_path = self.physical_path.clone();
         let dev_uuid = self.identifiers.device_uuid;
         let device = log_on_failure!(
@@ -195,7 +196,7 @@ impl CryptInitializer {
             nothing to clean up",
             physical_path.display()
         );
-        let result = self.initialize_no_cleanup(device, key_description);
+        let result = self.initialize_no_cleanup(device, &key_desc);
         result.map_err(|device| {
             if let Err(e) =
                 CryptInitializer::rollback(device, physical_path, format_crypt_name(&dev_uuid))
@@ -207,7 +208,11 @@ impl CryptInitializer {
         })
     }
 
-    fn initialize_with_err(&self, device: &mut CryptDevice, key_description: &str) -> Result<()> {
+    fn initialize_with_err(
+        &self,
+        device: &mut CryptDevice,
+        key_description: &KeyDescription,
+    ) -> Result<()> {
         log_on_failure!(
             device.context_handle().format::<()>(
                 EncryptionFormat::Luks2,
@@ -247,7 +252,7 @@ impl CryptInitializer {
         log_on_failure!(
             device
                 .token_handle()
-                .luks2_keyring_set(Some(LUKS2_TOKEN_ID), key_description),
+                .luks2_keyring_set(Some(LUKS2_TOKEN_ID), &key_description.to_string()),
             "Failed to initialize the LUKS2 token for driving keyring activation operations"
         );
         log_on_failure!(
@@ -279,7 +284,7 @@ impl CryptInitializer {
     fn initialize_no_cleanup(
         self,
         mut device: CryptDevice,
-        key_description: &str,
+        key_description: &KeyDescription,
     ) -> std::result::Result<CryptHandle, CryptDevice> {
         let dev_uuid = self.identifiers.device_uuid;
         let result = self.initialize_with_err(&mut device, key_description);
@@ -808,8 +813,8 @@ fn stratis_token_is_valid(json: &Value) -> bool {
 /// but no error occurred.
 ///
 /// Requires cryptsetup 2.3
-fn read_key(key_description: &str) -> Result<Option<SizedKeyMemory>> {
-    let read_key_result = keys::read_key(&KeyDescription::from(key_description.to_string()));
+fn read_key(key_description: &KeyDescription) -> Result<Option<SizedKeyMemory>> {
+    let read_key_result = keys::read_key(key_description);
     if read_key_result.is_err() {
         warn!(
             "Failed to read the key with key description {} from the keyring; \

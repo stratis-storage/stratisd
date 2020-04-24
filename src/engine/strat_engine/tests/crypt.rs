@@ -4,7 +4,7 @@
 
 use std::{error::Error, ffi::CString, fs::File, io::Read, path::Path};
 
-use crate::engine::engine::MAX_STRATIS_PASS_SIZE;
+use crate::engine::{engine::MAX_STRATIS_PASS_SIZE, strat_engine::names::KeyDescription};
 
 /// Takes physical device paths from loopback or real tests and passes
 /// them through to a compatible test definition. This method
@@ -21,8 +21,9 @@ where
     F: Fn(&[&Path], &str, I) -> std::result::Result<O, Box<dyn Error>>,
 {
     let type_cstring = "user\0";
-    let description = "test-description-for-stratisd";
-    let description_cstring = CString::new(description).unwrap();
+    let desc_str = "test-description-for-stratisd";
+    let description = KeyDescription::from(desc_str.to_string());
+    let description_cstring = CString::new(description.to_string()).unwrap();
     let mut key_data = [0; MAX_STRATIS_PASS_SIZE];
     File::open("/dev/urandom")
         .unwrap()
@@ -43,7 +44,7 @@ where
         i => i,
     };
 
-    let result = test(physical_paths, description, input);
+    let result = test(physical_paths, desc_str, input);
 
     if unsafe {
         libc::syscall(

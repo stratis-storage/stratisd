@@ -88,6 +88,13 @@ SPECS = {
 <arg name="return_code" type="q" direction="out"/>
 <arg name="return_string" type="s" direction="out"/>
 </method>
+<method name="AddKey">
+<arg name="key_desc" type="s" direction="in"/>
+<arg name="key_fd" type="h" direction="in"/>
+<arg name="result" type="(bb)" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
 <method name="CreatePool">
 <arg name="name" type="s" direction="in"/>
 <arg name="redundancy" type="(bq)" direction="in"/>

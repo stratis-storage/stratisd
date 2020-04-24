@@ -17,7 +17,11 @@ use libcryptsetup_rs::{
 };
 
 use crate::engine::{
-    strat_engine::{backstore::metadata::StratisIdentifiers, keys, names::format_crypt_name},
+    strat_engine::{
+        backstore::metadata::StratisIdentifiers,
+        keys,
+        names::{format_crypt_name, KeyDescription},
+    },
     types::SizedKeyMemory,
     DevUuid, PoolUuid,
 };
@@ -805,7 +809,7 @@ fn stratis_token_is_valid(json: &Value) -> bool {
 ///
 /// Requires cryptsetup 2.3
 fn read_key(key_description: &str) -> Result<Option<SizedKeyMemory>> {
-    let read_key_result = keys::read_key(key_description);
+    let read_key_result = keys::read_key(&KeyDescription::from(key_description.to_string()));
     if read_key_result.is_err() {
         warn!(
             "Failed to read the key with key description {} from the keyring; \

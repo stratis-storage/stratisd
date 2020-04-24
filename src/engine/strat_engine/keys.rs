@@ -15,6 +15,7 @@ use libcryptsetup_rs::SafeMemHandle;
 use crate::{
     engine::{
         engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
+        strat_engine::names::KeyDescription,
         types::{CreateAction, SizedKeyMemory},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -27,7 +28,7 @@ use crate::{
 /// type will be `Some` if the key was found in the keyring and will contain
 /// the key ID and the key contents. If no key was found with the provided
 /// key description, `None` will be returned.
-pub fn read_key(key_desc: &str) -> StratisResult<(Option<(u64, SizedKeyMemory)>, u64)> {
+pub fn read_key(key_desc: &KeyDescription) -> StratisResult<(Option<(u64, SizedKeyMemory)>, u64)> {
     // Attach persistent keyring to process keyring
     let persistent_id = match unsafe {
         syscall(
@@ -41,7 +42,7 @@ pub fn read_key(key_desc: &str) -> StratisResult<(Option<(u64, SizedKeyMemory)>,
         i => i,
     };
 
-    let key_desc_cstring = CString::new(key_desc).map_err(|_| {
+    let key_desc_cstring = CString::new(key_desc.to_string()).map_err(|_| {
         StratisError::Engine(
             ErrorEnum::Invalid,
             "Invalid key description provided".to_string(),
@@ -117,8 +118,12 @@ fn update_key(
 
 /// Add the key to the given keyring under with the provided key description.
 // Precondition: The key description was not already present.
-fn add_key(key_desc: &str, key_data: SizedKeyMemory, keyring_id: u64) -> StratisResult<()> {
-    let key_desc_cstring = CString::new(key_desc).map_err(|_| {
+fn add_key(
+    key_desc: &KeyDescription,
+    key_data: SizedKeyMemory,
+    keyring_id: u64,
+) -> StratisResult<()> {
+    let key_desc_cstring = CString::new(key_desc.to_string()).map_err(|_| {
         StratisError::Engine(
             ErrorEnum::Invalid,
             "Invalid key description provided".to_string(),
@@ -150,7 +155,10 @@ fn add_key(key_desc: &str, key_data: SizedKeyMemory, keyring_id: u64) -> Stratis
 /// * `Ok(CreateAction::Created(false)`: The key was newly added to the keyring.
 /// * `Ok(CreateAction::Created(true)`: The key description was already present
 /// in the keyring but the key data was updated.
-fn add_key_idem(key_desc: &str, key_data: SizedKeyMemory) -> StratisResult<CreateAction<bool>> {
+fn add_key_idem(
+    key_desc: &KeyDescription,
+    key_data: SizedKeyMemory,
+) -> StratisResult<CreateAction<bool>> {
     match read_key(key_desc) {
         Ok((Some((key_id, old_key_data)), _)) => {
             let changed = update_key(key_id, old_key_data, key_data)?;
@@ -193,10 +201,13 @@ impl KeyActions for StratKeyActions {
         }
         let sized_memory = SizedKeyMemory::new(memory, pos);
 
-        Ok(add_key_idem(key_desc, sized_memory)?)
+        Ok(add_key_idem(
+            &KeyDescription::from(key_desc.to_string()),
+            sized_memory,
+        )?)
     }
 
     fn read(&self, key_description: &str) -> StratisResult<Option<(u64, SizedKeyMemory)>> {
-        read_key(key_description).map(|(opt, _)| opt)
+        read_key(&KeyDescription::from(key_description.to_string())).map(|(opt, _)| opt)
     }
 }

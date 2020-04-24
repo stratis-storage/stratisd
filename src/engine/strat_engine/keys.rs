@@ -53,7 +53,7 @@ pub fn read_key(key_desc: &KeyDescription) -> StratisResult<(Option<(u64, SizedK
         syscall(
             SYS_keyctl,
             libc::KEYCTL_SEARCH,
-            persistent_id,
+            libc::KEY_SPEC_SESSION_KEYRING,
             concat!("user", "\0").as_ptr(),
             key_desc_cstring.as_ptr(),
         )

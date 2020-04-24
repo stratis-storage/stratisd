@@ -138,7 +138,7 @@ impl MetadataVol {
             .join(uuid.to_simple_ref().to_string())
             .with_extension("json");
 
-        let temp_path = path.clone().with_extension("temp");
+        let temp_path = path.with_extension("temp");
 
         let _mount = MountedMDV::mount(self)?;
 

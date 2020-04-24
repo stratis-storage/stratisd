@@ -191,11 +191,11 @@ impl BlockDev for StratBlockDev {
     }
 
     fn user_info(&self) -> Option<&str> {
-        self.user_info.as_ref().map(|x| &**x)
+        self.user_info.as_deref()
     }
 
     fn hardware_info(&self) -> Option<&str> {
-        self.hardware_info.as_ref().map(|x| &**x)
+        self.hardware_info.as_deref()
     }
 
     fn initialization_time(&self) -> DateTime<Utc> {

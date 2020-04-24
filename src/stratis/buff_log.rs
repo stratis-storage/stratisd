@@ -45,9 +45,9 @@ impl<L: Log> Handle<L> {
                             .build(),
                     )
                     .args(format_args!("{} {}", time, item.args))
-                    .file(item.file.as_ref().map(|s| &**s))
+                    .file(item.file.as_deref())
                     .line(item.line)
-                    .module_path(item.module_path.as_ref().map(|s| &**s))
+                    .module_path(item.module_path.as_deref())
                     .build(),
             );
         }

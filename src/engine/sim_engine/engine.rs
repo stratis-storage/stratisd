@@ -14,9 +14,9 @@ use serde_json::{json, Value};
 
 use crate::{
     engine::{
-        engine::{Engine, Eventable, Pool, Report},
+        engine::{Engine, Eventable, KeyActions, Pool, Report},
         shared::create_pool_idempotent_or_err,
-        sim_engine::{pool::SimPool, randomization::Randomizer},
+        sim_engine::{keys::SimKeyActions, pool::SimPool, randomization::Randomizer},
         structures::Table,
         types::{CreateAction, DeleteAction, Name, PoolUuid, RenameAction, ReportType},
     },
@@ -27,6 +27,7 @@ use crate::{
 pub struct SimEngine {
     pools: Table<SimPool>,
     rdm: Rc<RefCell<Randomizer>>,
+    key_handler: SimKeyActions,
 }
 
 impl Report for SimEngine {
@@ -149,6 +150,14 @@ impl Engine for SimEngine {
 
     fn evented(&mut self) -> StratisResult<()> {
         Ok(())
+    }
+
+    fn get_key_handler(&self) -> &dyn KeyActions {
+        &self.key_handler as &dyn KeyActions
+    }
+
+    fn get_key_handler_mut(&mut self) -> &mut dyn KeyActions {
+        &mut self.key_handler as &mut dyn KeyActions
     }
 }
 

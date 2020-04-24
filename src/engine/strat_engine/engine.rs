@@ -13,7 +13,7 @@ use crate::engine::strat_engine::cleanup::teardown_pools;
 
 use crate::{
     engine::{
-        engine::Eventable,
+        engine::{Eventable, KeyActions},
         event::get_engine_listener_list,
         shared::create_pool_idempotent_or_err,
         strat_engine::{
@@ -21,6 +21,7 @@ use crate::{
             cmd::verify_binaries,
             devlinks,
             dm::{get_dm, get_dm_init},
+            keys::StratKeyActions,
             liminal::LiminalDevices,
             names::validate_name,
             pool::StratPool,
@@ -45,6 +46,9 @@ pub struct StratEngine {
     // Maps name of DM devices we are watching to the most recent event number
     // we've handled for each
     watched_dev_last_event_nrs: HashMap<DmNameBuf, u32>,
+
+    // Handler for key operations
+    key_handler: StratKeyActions,
 }
 
 impl StratEngine {
@@ -87,6 +91,7 @@ impl StratEngine {
             pools,
             liminal_devices,
             watched_dev_last_event_nrs: HashMap::new(),
+            key_handler: StratKeyActions,
         })
     }
 
@@ -269,6 +274,14 @@ impl Engine for StratEngine {
         self.watched_dev_last_event_nrs = device_list;
 
         Ok(())
+    }
+
+    fn get_key_handler(&self) -> &dyn KeyActions {
+        &self.key_handler as &dyn KeyActions
+    }
+
+    fn get_key_handler_mut(&mut self) -> &mut dyn KeyActions {
+        &mut self.key_handler as &mut dyn KeyActions
     }
 }
 

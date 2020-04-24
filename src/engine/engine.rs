@@ -18,11 +18,25 @@ use crate::{
     engine::types::{
         BlockDevPath, BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid,
         MaybeDbusPath, Name, PoolUuid, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
+        SizedKeyMemory,
     },
     stratis::StratisResult,
 };
 
 pub const DEV_PATH: &str = "/stratis";
+/// The maximum size of pool passphrases stored in the kernel keyring
+pub const MAX_STRATIS_PASS_SIZE: usize = 512 / 8;
+
+pub trait KeyActions {
+    /// Add a key to the kernel keyring. The output is an idempotent return type
+    /// containing a `bool` which indicates whether a key with the requested
+    /// key description was in the keyring and the key data was updated.
+    fn add(&mut self, key_desc: &str, key_fd: RawFd) -> StratisResult<CreateAction<bool>>;
+    /// If a key is present in the kernel keyring with the given description,
+    /// read the contents into a chunk of memory memory and return the key ID and the
+    /// key contents. If the key does not exist, return `Ok(None)`.
+    fn read(&self, key_desc: &str) -> StratisResult<Option<(u64, SizedKeyMemory)>>;
+}
 
 /// An interface for reporting internal engine state.
 pub trait Report {
@@ -283,6 +297,12 @@ pub trait Engine: Debug + Report {
 
     /// Notify the engine that an event has occurred on the Eventable.
     fn evented(&mut self) -> StratisResult<()>;
+
+    /// Get the handler for kernel keyring operations.
+    fn get_key_handler(&self) -> &dyn KeyActions;
+
+    /// Get the handler for kernel keyring operations mutably.
+    fn get_key_handler_mut(&mut self) -> &mut dyn KeyActions;
 }
 
 /// Allows an Engine to include a fd in the event loop. See

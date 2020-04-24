@@ -5,6 +5,7 @@
 use std::{
     cell::RefCell,
     collections::{hash_map::RandomState, HashSet},
+    convert::TryFrom,
     iter::FromIterator,
     path::Path,
     rc::Rc,
@@ -14,11 +15,13 @@ use serde_json::{json, Value};
 
 use crate::{
     engine::{
-        engine::{Engine, Eventable, Pool, Report},
+        engine::{Engine, Eventable, KeyActions, Pool, Report},
         shared::create_pool_idempotent_or_err,
-        sim_engine::{pool::SimPool, randomization::Randomizer},
+        sim_engine::{keys::SimKeyActions, pool::SimPool, randomization::Randomizer},
         structures::Table,
-        types::{CreateAction, DeleteAction, Name, PoolUuid, RenameAction, ReportType},
+        types::{
+            CreateAction, DeleteAction, KeyDescription, Name, PoolUuid, RenameAction, ReportType,
+        },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -27,6 +30,7 @@ use crate::{
 pub struct SimEngine {
     pools: Table<SimPool>,
     rdm: Rc<RefCell<Randomizer>>,
+    key_handler: SimKeyActions,
 }
 
 impl<'a> Into<Value> for &'a SimEngine {
@@ -74,6 +78,23 @@ impl Engine for SimEngine {
     ) -> StratisResult<CreateAction<PoolUuid>> {
         let redundancy = calculate_redundancy!(redundancy);
 
+        let key_description = match key_desc {
+            Some(key_desc) => Some(KeyDescription::try_from(key_desc)?),
+            None => None,
+        };
+
+        if let Some(ref key_description) = key_description {
+            if !self.key_handler.contains_key(key_description) {
+                return Err(StratisError::Engine(
+                    ErrorEnum::NotFound,
+                    format!(
+                        "Key {} was not found in the keyring",
+                        key_description.as_application_str()
+                    ),
+                ));
+            }
+        }
+
         match self.pools.get_by_name(name) {
             Some((_, pool)) => create_pool_idempotent_or_err(pool, name, blockdev_paths),
             None => {
@@ -86,8 +107,12 @@ impl Engine for SimEngine {
                     let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
                     let devices = device_set.into_iter().cloned().collect::<Vec<&Path>>();
 
-                    let (pool_uuid, pool) =
-                        SimPool::new(&Rc::clone(&self.rdm), &devices, redundancy, key_desc);
+                    let (pool_uuid, pool) = SimPool::new(
+                        &Rc::clone(&self.rdm),
+                        &devices,
+                        redundancy,
+                        key_description.as_ref(),
+                    );
 
                     if self.rdm.borrow_mut().throw_die() {
                         return Err(StratisError::Engine(ErrorEnum::Error, "X".into()));
@@ -176,6 +201,14 @@ impl Engine for SimEngine {
 
     fn evented(&mut self) -> StratisResult<()> {
         Ok(())
+    }
+
+    fn get_key_handler(&self) -> &dyn KeyActions {
+        &self.key_handler as &dyn KeyActions
+    }
+
+    fn get_key_handler_mut(&mut self) -> &mut dyn KeyActions {
+        &mut self.key_handler as &mut dyn KeyActions
     }
 }
 

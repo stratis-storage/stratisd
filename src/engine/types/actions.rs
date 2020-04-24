@@ -47,6 +47,35 @@ impl<T> EngineAction for CreateAction<T> {
     }
 }
 
+/// Idempotent type representing a create action for a mapping from a key to a value
+#[derive(Debug, PartialEq, Eq)]
+pub enum MappingCreateAction<T> {
+    /// The key did not exist and the key and value are newly created.
+    Created(T),
+    /// The key and the value were not changed.
+    Identity,
+    /// The key existed and the value was updated.
+    ValueChanged(T),
+}
+
+impl<T> EngineAction for MappingCreateAction<T> {
+    type Return = T;
+
+    fn is_changed(&self) -> bool {
+        match *self {
+            MappingCreateAction::Created(_) | MappingCreateAction::ValueChanged(_) => true,
+            _ => false,
+        }
+    }
+
+    fn changed(self) -> Option<T> {
+        match self {
+            MappingCreateAction::Created(t) | MappingCreateAction::ValueChanged(t) => Some(t),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 /// An action which may create multiple things.
 pub struct SetCreateAction<T> {

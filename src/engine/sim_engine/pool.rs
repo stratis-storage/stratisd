@@ -23,9 +23,9 @@ use crate::{
         sim_engine::{blockdev::SimDev, filesystem::SimFilesystem, randomization::Randomizer},
         structures::Table,
         types::{
-            BlockDevTier, CreateAction, DevUuid, FilesystemUuid, FreeSpaceState, MaybeDbusPath,
-            Name, PoolExtendState, PoolState, PoolUuid, Redundancy, RenameAction, SetCreateAction,
-            SetDeleteAction,
+            BlockDevTier, CreateAction, DevUuid, FilesystemUuid, FreeSpaceState, KeyDescription,
+            MaybeDbusPath, Name, PoolExtendState, PoolState, PoolUuid, Redundancy, RenameAction,
+            SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -38,9 +38,9 @@ use crate::{
 #[derive(Debug)]
 pub struct SimPool {
     block_devs: HashMap<DevUuid, SimDev>,
-    block_devs_key_desc: Option<String>,
+    block_devs_key_desc: Option<KeyDescription>,
     cache_devs: HashMap<DevUuid, SimDev>,
-    cache_devs_key_desc: Option<String>,
+    cache_devs_key_desc: Option<KeyDescription>,
     filesystems: Table<SimFilesystem>,
     redundancy: Redundancy,
     rdm: Rc<RefCell<Randomizer>>,
@@ -55,19 +55,19 @@ impl SimPool {
         rdm: &Rc<RefCell<Randomizer>>,
         paths: &[&Path],
         redundancy: Redundancy,
-        key_desc: Option<String>,
+        key_desc: Option<&KeyDescription>,
     ) -> (PoolUuid, SimPool) {
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
         let device_pairs = devices
             .iter()
-            .map(|p| SimDev::new(Rc::clone(rdm), p, key_desc.clone()));
+            .map(|p| SimDev::new(Rc::clone(rdm), p, key_desc));
         (
             Uuid::new_v4(),
             SimPool {
                 block_devs: HashMap::from_iter(device_pairs),
-                block_devs_key_desc: key_desc.clone(),
+                block_devs_key_desc: key_desc.cloned(),
                 cache_devs: HashMap::new(),
-                cache_devs_key_desc: key_desc,
+                cache_devs_key_desc: key_desc.cloned(),
                 filesystems: Table::default(),
                 redundancy,
                 rdm: Rc::clone(rdm),
@@ -219,8 +219,8 @@ impl Pool for SimPool {
                     Rc::clone(&self.rdm),
                     p,
                     match tier {
-                        BlockDevTier::Data => self.block_devs_key_desc.clone(),
-                        BlockDevTier::Cache => self.cache_devs_key_desc.clone(),
+                        BlockDevTier::Data => self.block_devs_key_desc.as_ref(),
+                        BlockDevTier::Cache => self.cache_devs_key_desc.as_ref(),
                     },
                 )
             })
@@ -421,7 +421,9 @@ impl Pool for SimPool {
     }
 
     fn key_desc(&self) -> Option<&str> {
-        self.block_devs_key_desc.as_deref()
+        self.block_devs_key_desc
+            .as_ref()
+            .map(|k| k.as_application_str())
     }
 }
 

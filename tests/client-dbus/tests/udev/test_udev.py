@@ -28,7 +28,7 @@ from stratisd_client_dbus import PoolR1, get_object
 from ._loopback import LoopBackDevices
 from ._utils import (
     STRATIS_FS_TYPE,
-    KernelKey,
+    OptionalKeyServiceContextManager,
     ServiceContextManager,
     create_pool,
     get_devnodes,
@@ -252,13 +252,17 @@ class UdevTest3(UdevTest):
     daemon, brings it up again, and allows it to discover the existing pool.
     """
 
-    def _simple_initial_discovery_test(self, *, key_description=None):
+    def _simple_initial_discovery_test(self, *, key_spec=None):
         """
         A simple test of discovery on start up.
 
         * Create just one pool
         * Stop the daemon
         * Restart the daemon and verify that the pool is found
+
+        :param key_spec: specification for a key to be inserted into the kernel
+                         keyring consisting of the key description and key data
+        :type key_spec: (str, bytes) or NoneType
         """
         num_devices = 3
         device_tokens = self._lb_mgr.create_devices(num_devices)
@@ -266,7 +270,7 @@ class UdevTest3(UdevTest):
 
         settle()
 
-        with ServiceContextManager():
+        with OptionalKeyServiceContextManager(key_spec=key_spec) as key_description:
             self.assertEqual(len(get_pools()), 0)
             (_, (_, device_object_paths)) = create_pool(
                 random_string(5), devnodes, key_description=key_description
@@ -285,7 +289,7 @@ class UdevTest3(UdevTest):
 
             wait_for_udev(STRATIS_FS_TYPE, get_devnodes(device_object_paths))
 
-        with ServiceContextManager():
+        with OptionalKeyServiceContextManager(key_spec=key_spec):
             self.assertEqual(len(get_pools()), 1)
 
         remove_stratis_dm_devices()
@@ -294,8 +298,7 @@ class UdevTest3(UdevTest):
         """
         See documentation for _simple_initial_discovery_test.
         """
-        with KernelKey("test_key") as key_description:
-            self._simple_initial_discovery_test(key_description=key_description)
+        self._simple_initial_discovery_test(key_spec=("test_key_desc", "test_key"))
 
     def test_simple_initial_discovery(self):
         """

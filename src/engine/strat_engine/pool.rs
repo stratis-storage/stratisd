@@ -17,6 +17,7 @@ use crate::{
         strat_engine::{
             backstore::{Backstore, MDADataSize, StratBlockDev},
             names::validate_name,
+            names::KeyDescription,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
@@ -144,7 +145,7 @@ impl StratPool {
         name: &str,
         paths: &[&Path],
         redundancy: Redundancy,
-        key_desc: Option<String>,
+        key_desc: Option<&KeyDescription>,
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = Uuid::new_v4();
 
@@ -581,7 +582,9 @@ impl Pool for StratPool {
     }
 
     fn key_desc(&self) -> Option<&str> {
-        self.backstore.data_key_desc()
+        self.backstore
+            .data_key_desc()
+            .map(|k| k.as_application_str())
     }
 }
 

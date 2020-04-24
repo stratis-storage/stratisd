@@ -10,6 +10,7 @@ mod device;
 mod devlinks;
 mod dm;
 mod engine;
+mod keys;
 mod liminal;
 mod names;
 mod pool;

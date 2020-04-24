@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{clone::Clone, collections::HashMap, path::Path};
+use std::{clone::Clone, collections::HashMap, convert::TryFrom, path::Path};
 
 use serde_json::Value;
 
@@ -13,7 +13,7 @@ use crate::engine::strat_engine::cleanup::teardown_pools;
 
 use crate::{
     engine::{
-        engine::Eventable,
+        engine::{Eventable, KeyActions},
         event::get_engine_listener_list,
         shared::create_pool_idempotent_or_err,
         strat_engine::{
@@ -21,8 +21,9 @@ use crate::{
             cmd::verify_binaries,
             devlinks,
             dm::{get_dm, get_dm_init},
+            keys::StratKeyActions,
             liminal::LiminalDevices,
-            names::validate_name,
+            names::{validate_name, KeyDescription},
             pool::StratPool,
         },
         structures::Table,
@@ -45,6 +46,9 @@ pub struct StratEngine {
     // Maps name of DM devices we are watching to the most recent event number
     // we've handled for each
     watched_dev_last_event_nrs: HashMap<DmNameBuf, u32>,
+
+    // Handler for key operations
+    key_handler: StratKeyActions,
 }
 
 impl StratEngine {
@@ -87,6 +91,7 @@ impl StratEngine {
             pools,
             liminal_devices,
             watched_dev_last_event_nrs: HashMap::new(),
+            key_handler: StratKeyActions,
         })
     }
 
@@ -180,8 +185,17 @@ impl Engine for StratEngine {
                         "At least one blockdev is required to create a pool.".to_string(),
                     ))
                 } else {
-                    let (uuid, pool) =
-                        StratPool::initialize(name, blockdev_paths, redundancy, key_desc)?;
+                    let key_description = match key_desc {
+                        Some(desc) => Some(KeyDescription::try_from(desc)?),
+                        None => None,
+                    };
+
+                    let (uuid, pool) = StratPool::initialize(
+                        name,
+                        blockdev_paths,
+                        redundancy,
+                        key_description.as_ref(),
+                    )?;
 
                     let name = Name::new(name.to_owned());
                     devlinks::pool_added(&name);
@@ -301,6 +315,14 @@ impl Engine for StratEngine {
         self.watched_dev_last_event_nrs = device_list;
 
         Ok(())
+    }
+
+    fn get_key_handler(&self) -> &dyn KeyActions {
+        &self.key_handler as &dyn KeyActions
+    }
+
+    fn get_key_handler_mut(&mut self) -> &mut dyn KeyActions {
+        &mut self.key_handler as &mut dyn KeyActions
     }
 }
 

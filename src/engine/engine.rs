@@ -17,12 +17,46 @@ use devicemapper::{Bytes, Sectors};
 use crate::{
     engine::types::{
         BlockDevPath, BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid,
-        MaybeDbusPath, Name, PoolUuid, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
+        MappingCreateAction, MaybeDbusPath, Name, PoolUuid, RenameAction, ReportType,
+        SetCreateAction, SetDeleteAction,
     },
     stratis::StratisResult,
 };
 
 pub const DEV_PATH: &str = "/stratis";
+/// The maximum size of pool passphrases stored in the kernel keyring
+pub const MAX_STRATIS_PASS_SIZE: usize = 512 / 8;
+
+pub trait KeyActions {
+    /// Set a key in the kernel keyring. The output is an idempotent return type
+    /// containing a `bool` which indicates whether a key with the requested
+    /// key description was in the keyring and the key data was updated.
+    ///
+    /// If `interactive` is `true`, the end of a passphrase should be delimited
+    /// by a newline.
+    ///
+    /// Successful return values:
+    /// * `Ok(MappingCreateAction::Identity)`: The key was already in the keyring
+    /// with the appropriate key description and key data.
+    /// * `Ok(MappingCreateAction::Created(()))`: The key was newly added to the
+    /// keyring.
+    /// * `Ok(MappingCreateAction::Changed)`: The key description was already present
+    /// in the keyring but the key data was updated.
+    fn set(
+        &mut self,
+        key_desc: &str,
+        key_fd: RawFd,
+        interactive: bool,
+    ) -> StratisResult<MappingCreateAction<()>>;
+
+    /// Return a list of all key descriptions of keys added to the keyring by
+    /// Stratis that are still valid.
+    fn list(&self) -> StratisResult<Vec<String>>;
+
+    /// Unset a key with the given key description in the root persistent kernel
+    /// keyring.
+    fn unset(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>>;
+}
 
 /// An interface for reporting internal engine state.
 pub trait Report {
@@ -283,6 +317,12 @@ pub trait Engine: Debug + Report {
 
     /// Notify the engine that an event has occurred on the Eventable.
     fn evented(&mut self) -> StratisResult<()>;
+
+    /// Get the handler for kernel keyring operations.
+    fn get_key_handler(&self) -> &dyn KeyActions;
+
+    /// Get the handler for kernel keyring operations mutably.
+    fn get_key_handler_mut(&mut self) -> &mut dyn KeyActions;
 }
 
 /// Allows an Engine to include a fd in the event loop. See

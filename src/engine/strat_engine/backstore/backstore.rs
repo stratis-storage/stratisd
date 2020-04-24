@@ -23,7 +23,7 @@ use crate::{
             },
             device::wipe_sectors,
             dm::get_dm,
-            names::{format_backstore_ids, CacheRole},
+            names::{format_backstore_ids, CacheRole, KeyDescription},
             serde_structs::{BackstoreSave, CapSave, Recordable},
         },
         BlockDevTier, DevUuid, PoolUuid,
@@ -165,7 +165,7 @@ impl Backstore {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         mda_data_size: MDADataSize,
-        key_desc: Option<String>,
+        key_desc: Option<&KeyDescription>,
     ) -> StratisResult<Backstore> {
         let data_tier = DataTier::new(BlockDevMgr::initialize(
             pool_uuid,
@@ -615,7 +615,7 @@ impl Backstore {
         )
     }
 
-    pub fn data_key_desc(&self) -> Option<&str> {
+    pub fn data_key_desc(&self) -> Option<&KeyDescription> {
         self.data_tier.key_desc()
     }
 

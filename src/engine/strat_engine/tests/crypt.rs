@@ -2,9 +2,15 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{error::Error, ffi::CString, fs::File, io::Read, path::Path};
+use std::{convert::TryFrom, error::Error, fs::File, io::Read, path::Path};
 
-use crate::engine::strat_engine::backstore::MAX_STRATIS_PASS_SIZE;
+use libcryptsetup_rs::SafeMemHandle;
+
+use crate::engine::{
+    engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
+    strat_engine::{keys::StratKeyActions, names::KeyDescription},
+    types::SizedKeyMemory,
+};
 
 /// Takes physical device paths from loopback or real tests and passes
 /// them through to a compatible test definition. This method
@@ -18,47 +24,23 @@ fn insert_and_cleanup_key_shared<F, I, O>(
     input: I,
 ) -> Result<O, Box<dyn Error>>
 where
-    F: Fn(&[&Path], &str, I) -> std::result::Result<O, Box<dyn Error>>,
+    F: Fn(&[&Path], &KeyDescription, I) -> std::result::Result<O, Box<dyn Error>>,
 {
-    let type_cstring = "user\0";
-    let description = "test-description-for-stratisd";
-    let description_cstring = CString::new(description).unwrap();
-    let mut key_data = [0; MAX_STRATIS_PASS_SIZE];
+    let mut key_handle = StratKeyActions;
+    let desc_str = "test-description-for-stratisd";
+    let key_description = KeyDescription::try_from(desc_str.to_string()).expect("no semi-colons");
+    let mut mem = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
     File::open("/dev/urandom")
         .unwrap()
-        .read_exact(&mut key_data)
+        .read_exact(mem.as_mut())
         .unwrap();
+    let key_data = SizedKeyMemory::new(mem, MAX_STRATIS_PASS_SIZE);
 
-    let key_id = match unsafe {
-        libc::syscall(
-            libc::SYS_add_key,
-            type_cstring.as_ptr(),
-            description_cstring.as_ptr(),
-            key_data.as_ptr(),
-            key_data.len(),
-            libc::KEY_SPEC_SESSION_KEYRING,
-        )
-    } {
-        i if i < 0 => panic!("Failed to create key in keyring"),
-        i => i,
-    };
+    key_handle.set_no_fd(desc_str, key_data)?;
 
-    let result = test(physical_paths, description, input);
+    let result = test(physical_paths, &key_description, input);
 
-    if unsafe {
-        libc::syscall(
-            libc::SYS_keyctl,
-            libc::KEYCTL_UNLINK,
-            key_id,
-            libc::KEY_SPEC_SESSION_KEYRING,
-        )
-    } < 0
-    {
-        panic!(
-            "Failed to clean up key with key description {} from keyring",
-            description
-        );
-    }
+    key_handle.unset(desc_str)?;
 
     result
 }
@@ -66,7 +48,7 @@ where
 /// Insert and clean up a single key for the lifetime of the test.
 pub fn insert_and_cleanup_key<F>(physical_paths: &[&Path], test: F)
 where
-    F: Fn(&[&Path], &str, Option<()>) -> std::result::Result<(), Box<dyn Error>>,
+    F: Fn(&[&Path], &KeyDescription, Option<()>) -> std::result::Result<(), Box<dyn Error>>,
 {
     insert_and_cleanup_key_shared::<F, Option<()>, ()>(physical_paths, test, Option::<()>::None)
         .unwrap();
@@ -77,8 +59,8 @@ where
 /// into a bad state.
 pub fn insert_and_cleanup_two_keys<FR, F, R>(physical_paths: &[&Path], test_one: FR, test_two: F)
 where
-    FR: Fn(&[&Path], &str, Option<()>) -> Result<R, Box<dyn Error>>,
-    F: Fn(&[&Path], &str, R) -> Result<(), Box<dyn Error>>,
+    FR: Fn(&[&Path], &KeyDescription, Option<()>) -> Result<R, Box<dyn Error>>,
+    F: Fn(&[&Path], &KeyDescription, R) -> Result<(), Box<dyn Error>>,
 {
     let return_value =
         insert_and_cleanup_key_shared::<FR, Option<()>, R>(physical_paths, test_one, None).unwrap();

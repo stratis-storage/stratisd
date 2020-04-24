@@ -84,3 +84,10 @@ pub fn create_pool_shared(m: &MethodInfo<MTFn<TData>, TData>, has_key_desc: bool
     };
     Ok(vec![msg])
 }
+
+pub fn list_keys(info: &MethodInfo<MTFn<TData>, TData>) -> Result<Vec<String>, String> {
+    let dbus_context = info.tree.get_data();
+
+    let engine = dbus_context.engine.borrow();
+    engine.get_key_handler().list().map_err(|e| e.to_string())
+}

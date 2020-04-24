@@ -18,6 +18,46 @@ use crate::{
 
 const FORMAT_VERSION: u16 = 1;
 
+/// Prefix for the key descriptions added into the kernel keyring to indicate
+/// that they were added by Stratis.
+fn key_description_prefix() -> String {
+    format!("stratis-{}-key-", FORMAT_VERSION)
+}
+
+/// A data type respresenting a key description of a key added by stratisd.
+#[derive(Debug, PartialEq)]
+pub struct KeyDescription(String);
+
+impl KeyDescription {
+    #[cfg(test)]
+    pub fn from_system_key_desc(raw_key_desc: &str) -> Option<KeyDescription> {
+        let mut key_desc = raw_key_desc.to_string();
+        let prefix = key_description_prefix();
+        if key_desc.starts_with(prefix.as_str()) {
+            key_desc.replace_range(..prefix.len(), "");
+            if key_desc.is_empty() {
+                None
+            } else {
+                Some(KeyDescription(key_desc))
+            }
+        } else {
+            None
+        }
+    }
+}
+
+impl Display for KeyDescription {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}{}", key_description_prefix(), self.0)
+    }
+}
+
+impl From<String> for KeyDescription {
+    fn from(s: String) -> KeyDescription {
+        KeyDescription(s)
+    }
+}
+
 /// Get a devicemapper name from the device UUID.
 ///
 /// Prerequisite: len(format!("{}", FORMAT_VERSION)
@@ -257,8 +297,21 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
+
+    #[test]
+    fn test_key_desc() {
+        assert!(KeyDescription::from_system_key_desc("stratis-1-key-").is_none());
+        assert!(KeyDescription::from_system_key_desc("not-prefix-stratis-1-key-").is_none());
+        assert_eq!(
+            KeyDescription::from_system_key_desc("stratis-1-key-key_desc"),
+            Some(KeyDescription::from("key_desc".to_string()))
+        );
+        assert_eq!(
+            KeyDescription::from_system_key_desc("stratis-1-key-stratis-1-key"),
+            Some(KeyDescription::from("stratis-1-key".to_string()))
+        );
+    }
 
     #[test]
     #[allow(clippy::cognitive_complexity)]

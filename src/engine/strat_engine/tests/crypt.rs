@@ -4,7 +4,7 @@
 
 use std::{error::Error, ffi::CString, fs::File, io::Read, path::Path};
 
-use crate::engine::strat_engine::backstore::MAX_STRATIS_PASS_SIZE;
+use crate::engine::engine::MAX_STRATIS_PASS_SIZE;
 
 /// Takes physical device paths from loopback or real tests and passes
 /// them through to a compatible test definition. This method

@@ -12,8 +12,13 @@ use std::{
 };
 
 mod actions;
-pub use crate::engine::types::actions::{
-    CreateAction, DeleteAction, EngineAction, RenameAction, SetCreateAction, SetDeleteAction,
+mod keys;
+
+pub use crate::engine::types::{
+    actions::{
+        CreateAction, DeleteAction, EngineAction, RenameAction, SetCreateAction, SetDeleteAction,
+    },
+    keys::SizedKeyMemory,
 };
 use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 

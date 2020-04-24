@@ -10,13 +10,14 @@ mod device;
 mod devlinks;
 mod dm;
 mod engine;
+mod keys;
 mod liminal;
 mod names;
 mod pool;
 mod serde_structs;
 mod thinpool;
 
-pub use self::engine::StratEngine;
+pub use self::{engine::StratEngine, keys::StratKeyActions};
 
 #[cfg(test)]
 mod tests;

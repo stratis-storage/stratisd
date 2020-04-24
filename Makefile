@@ -76,6 +76,9 @@ test-travis:
 test:
 	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 cargo test -- --skip real_ --skip loop_ --skip travis_
 
+yamllint:
+	yamllint --strict .travis.yml
+
 docs: stratisd.8 docs-rust
 
 docs-travis: docs-rust
@@ -110,3 +113,4 @@ clippy:
 	test-real
 	test-travis
 	tree
+	yamllint

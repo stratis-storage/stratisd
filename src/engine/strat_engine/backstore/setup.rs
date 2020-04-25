@@ -29,23 +29,39 @@ use crate::{
 
 /// Get the most recent metadata from a set of Devices for a given pool UUID.
 /// Returns None if no metadata found for this pool.
+///
+/// Precondition: All devices represented by devnodes have been already
+/// identified as having the given pool UUID and their associated device
+/// UUID. Thus, it is an error if the BDA's information does not match that
+/// already known. It is also an error if the BDA can not be read at all
+/// as that BDA may belong to the device with the most recently written
+/// metadata.
 pub fn get_metadata(
     pool_uuid: PoolUuid,
     devnodes: &HashMap<Device, (DevUuid, PathBuf)>,
 ) -> StratisResult<Option<(DateTime<Utc>, PoolSave)>> {
-    // Get pairs of device nodes and matching BDAs
-    // If no BDA, or BDA UUID does not match pool UUID, skip.
-    // If there is an error reading the BDA, error. There could have been
-    // vital information on that BDA, for example, it may have contained
-    // the newest metadata.
     let mut bdas = Vec::new();
-    for (_, devnode) in devnodes.values() {
-        let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?;
-        if let Some(bda) = bda {
-            if bda.pool_uuid() == pool_uuid {
-                bdas.push((devnode, bda));
-            }
-        }
+    for (device_uuid, devnode) in devnodes.values() {
+        let bda = BDA::load(&mut OpenOptions::new()
+                            .read(true)
+                            .open(devnode)?)?
+            .ok_or_else(||
+                        StratisError::Error(format!(
+                                "Failed to read BDA from device {} which has previously been identified as a Stratis device with pool UUID {} and device UUID {}",
+                                devnode.display(),
+                                pool_uuid.to_simple_ref(),
+                                device_uuid.to_simple_ref())))?;
+        if bda.pool_uuid() != pool_uuid || bda.dev_uuid() != *device_uuid {
+            return Err(StratisError::Error(format!(
+                        "BDA identifiers (pool UUID: {}, device UUID: {}) for device {} do not agree with previously read identifiers (pool UUID: {}, device UUID: {})",
+                        bda.pool_uuid().to_simple_ref(),
+                        bda.dev_uuid().to_simple_ref(),
+                        devnode.display(),
+                        pool_uuid.to_simple_ref(),
+                        device_uuid.to_simple_ref()
+                        )));
+        };
+        bdas.push((devnode, bda));
     }
 
     // Most recent time should never be None if this was a properly

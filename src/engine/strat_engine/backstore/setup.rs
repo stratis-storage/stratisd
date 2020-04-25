@@ -31,7 +31,7 @@ use crate::{
 /// Returns None if no metadata found for this pool.
 pub fn get_metadata(
     pool_uuid: PoolUuid,
-    devnodes: &HashMap<Device, PathBuf>,
+    devnodes: &HashMap<Device, (DevUuid, PathBuf)>,
 ) -> StratisResult<Option<(DateTime<Utc>, PoolSave)>> {
     // Get pairs of device nodes and matching BDAs
     // If no BDA, or BDA UUID does not match pool UUID, skip.
@@ -39,7 +39,7 @@ pub fn get_metadata(
     // vital information on that BDA, for example, it may have contained
     // the newest metadata.
     let mut bdas = Vec::new();
-    for devnode in devnodes.values() {
+    for (_, devnode) in devnodes.values() {
         let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?;
         if let Some(bda) = bda {
             if bda.pool_uuid() == pool_uuid {
@@ -101,7 +101,7 @@ pub fn get_metadata(
 pub fn get_blockdevs(
     pool_uuid: PoolUuid,
     backstore_save: &BackstoreSave,
-    devnodes: &HashMap<Device, PathBuf>,
+    devnodes: &HashMap<Device, (DevUuid, PathBuf)>,
 ) -> StratisResult<(Vec<StratBlockDev>, Vec<StratBlockDev>)> {
     let recorded_data_map: HashMap<DevUuid, (usize, &BaseBlockDevSave)> = backstore_save
         .data_tier
@@ -219,7 +219,7 @@ pub fn get_blockdevs(
     }
 
     let (mut datadevs, mut cachedevs): (Vec<StratBlockDev>, Vec<StratBlockDev>) = (vec![], vec![]);
-    for (device, devnode) in devnodes {
+    for (device, (_, devnode)) in devnodes {
         let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?.ok_or_else(|| {
             StratisError::Engine(ErrorEnum::NotFound,
                                                  format!("Device {} with devnode {} was previously determined to belong to pool with uuid {} but no BDA was found",

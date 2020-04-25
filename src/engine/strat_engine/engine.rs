@@ -41,8 +41,8 @@ const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 pub struct StratEngine {
     pools: Table<StratPool>,
 
-    // Map of stratis devices that have been found but one or more stratis block devices are missing
-    // which prevents the associated pools from being setup.
+    // Maps pool UUIDs to information about sets of devices that are
+    // associated with that UUID but have not been converted into a pool.
     errored_pool_devices: HashMap<PoolUuid, HashMap<Device, PathBuf>>,
 
     // Maps name of DM devices we are watching to the most recent event number
@@ -207,8 +207,8 @@ impl StratEngine {
     }
 }
 
-/// Provide the report for pools which only have a subset of the devices required
-/// to reconstruct the pool available.
+/// Report about sets of devices which are associated with a particular pool
+/// UUID but which have not been converted into a Stratis pool.
 fn errored_pool_report(
     errored_pool_devices: &HashMap<PoolUuid, HashMap<Device, PathBuf>>,
 ) -> Value {

@@ -30,7 +30,7 @@ use crate::{
         },
         structures::Table,
         types::{CreateAction, DeleteAction, RenameAction, ReportType},
-        Engine, EngineEvent, Name, Pool, PoolUuid, Report,
+        DevUuid, Engine, EngineEvent, Name, Pool, PoolUuid, Report,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -43,7 +43,7 @@ pub struct StratEngine {
 
     // Maps pool UUIDs to information about sets of devices that are
     // associated with that UUID but have not been converted into a pool.
-    errored_pool_devices: HashMap<PoolUuid, HashMap<Device, PathBuf>>,
+    errored_pool_devices: HashMap<PoolUuid, HashMap<Device, (DevUuid, PathBuf)>>,
 
     // Maps name of DM devices we are watching to the most recent event number
     // we've handled for each
@@ -91,7 +91,11 @@ impl StratEngine {
 
     // Given a set of devices, try to set up a pool. If the setup fails,
     // insert the devices into errored_pool_devices.
-    fn try_setup_pool(&mut self, pool_uuid: PoolUuid, devices: HashMap<Device, PathBuf>) {
+    fn try_setup_pool(
+        &mut self,
+        pool_uuid: PoolUuid,
+        devices: HashMap<Device, (DevUuid, PathBuf)>,
+    ) {
         // Setup a pool from constituent devices in the context of some already
         // setup pools.
         // Return None if the pool's metadata was not found. This is a
@@ -105,7 +109,7 @@ impl StratEngine {
         // to the pool with pool_uuid.
         fn setup_pool(
             pool_uuid: PoolUuid,
-            devices: &HashMap<Device, PathBuf>,
+            devices: &HashMap<Device, (DevUuid, PathBuf)>,
             pools: &Table<StratPool>,
         ) -> Result<Option<(Name, StratPool)>, String> {
             let (timestamp, metadata) = match get_metadata(pool_uuid, devices) {
@@ -179,7 +183,7 @@ impl StratEngine {
                     .remove(&pool_uuid)
                     .unwrap_or_else(HashMap::new);
 
-                if devices.insert(info.device_number, info.devnode).is_none() {
+                if devices.insert(info.device_number, (info.identifiers.device_uuid, info.devnode)).is_none() {
                     info!(
                         "Stratis block device with device number \"{}\", pool UUID \"{}\", and device UUID \"{}\" discovered, i.e., identified for the first time during this execution of stratisd",
                         info.device_number,
@@ -210,12 +214,12 @@ impl StratEngine {
 /// Report about sets of devices which are associated with a particular pool
 /// UUID but which have not been converted into a Stratis pool.
 fn errored_pool_report(
-    errored_pool_devices: &HashMap<PoolUuid, HashMap<Device, PathBuf>>,
+    errored_pool_devices: &HashMap<PoolUuid, HashMap<Device, (DevUuid, PathBuf)>>,
 ) -> Value {
     Value::Array(errored_pool_devices.iter().map(|(uuid, map)| {
         json!({
             "pool_uuid": uuid.to_simple_ref().to_string(),
-            "devices": Value::Array(map.values().map(|p| Value::from(p.display().to_string())).collect()),
+            "devices": Value::Array(map.values().map(|(_, p)| Value::from(p.display().to_string())).collect()),
         })
     }).collect())
 }

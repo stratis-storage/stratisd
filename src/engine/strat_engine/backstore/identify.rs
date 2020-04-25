@@ -51,7 +51,7 @@ use crate::engine::{
         metadata::{device_identifiers, StratisIdentifiers},
         udev::{block_enumerator, decide_ownership, UdevOwnership},
     },
-    types::PoolUuid,
+    types::{DevUuid, PoolUuid},
 };
 
 /// A miscellaneous group of identifiers found when identifying a Stratis
@@ -139,7 +139,9 @@ fn process_stratis_device(dev: &libudev::Device) -> Option<StratisInfo> {
 }
 
 // Find all devices identified by udev as Stratis devices.
-fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
+#[allow(clippy::type_complexity)]
+fn find_all_stratis_devices(
+) -> libudev::Result<HashMap<PoolUuid, HashMap<Device, (DevUuid, PathBuf)>>> {
     let context = libudev::Context::new()?;
     let mut enumerator = block_enumerator(&context)?;
     enumerator.match_property("ID_FS_TYPE", "stratis")?;
@@ -150,7 +152,10 @@ fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, HashMap<Devic
         .fold(HashMap::new(), |mut acc, info| {
             acc.entry(info.identifiers.pool_uuid)
                 .or_insert_with(HashMap::new)
-                .insert(info.device_number, info.devnode);
+                .insert(
+                    info.device_number,
+                    (info.identifiers.device_uuid, info.devnode),
+                );
             acc
         });
     Ok(pool_map)
@@ -242,7 +247,8 @@ pub fn identify_block_device(dev: &libudev::Device) -> Option<StratisInfo> {
 /// enumerator.
 ///
 /// Returns a map of pool uuids to a map of devices to devnodes for each pool.
-pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, PathBuf>>> {
+#[allow(clippy::type_complexity)]
+pub fn find_all() -> libudev::Result<HashMap<PoolUuid, HashMap<Device, (DevUuid, PathBuf)>>> {
     info!("Beginning initial search for Stratis block devices");
     find_all_stratis_devices()
 }

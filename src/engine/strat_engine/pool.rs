@@ -193,7 +193,7 @@ impl StratPool {
     /// Precondition: A metadata verification step has already been run.
     pub fn setup(
         uuid: PoolUuid,
-        devnodes: &HashMap<Device, PathBuf>,
+        devnodes: &HashMap<Device, (DevUuid, PathBuf)>,
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
     ) -> StratisResult<(Name, StratPool)> {
@@ -630,14 +630,14 @@ mod tests {
             .backstore
             .blockdevs()
             .iter()
-            .map(|(_, blockdev)| (*blockdev.device(), blockdev.devnode()))
+            .map(|(device_uuid, blockdev)| (*blockdev.device(), (*device_uuid, blockdev.devnode())))
             .collect();
 
         let devnodes2 = pool2
             .backstore
             .blockdevs()
             .iter()
-            .map(|(_, blockdev)| (*blockdev.device(), blockdev.devnode()))
+            .map(|(device_uuid, blockdev)| (*blockdev.device(), (*device_uuid, blockdev.devnode())))
             .collect();
 
         let (_, pool_save1) = get_metadata(uuid1, &devnodes1).unwrap().unwrap();
@@ -764,7 +764,7 @@ mod tests {
             .backstore
             .blockdevs()
             .iter()
-            .map(|(_, blockdev)| (*blockdev.device(), blockdev.devnode()))
+            .map(|(device_uuid, blockdev)| (*blockdev.device(), (*device_uuid, blockdev.devnode())))
             .collect();
 
         pool.teardown().unwrap();

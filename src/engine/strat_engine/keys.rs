@@ -346,6 +346,20 @@ fn delete_key(key_id: KeySerial) -> StratisResult<()> {
 #[derive(Debug)]
 pub struct StratKeyActions;
 
+#[cfg(test)]
+impl StratKeyActions {
+    pub fn add_no_fd(
+        &mut self,
+        key_desc: &str,
+        key: SizedKeyMemory,
+    ) -> StratisResult<CreateAction<bool>> {
+        Ok(add_key_idem(
+            &KeyDescription::from(key_desc.to_string()),
+            key,
+        )?)
+    }
+}
+
 impl KeyActions for StratKeyActions {
     fn add(&mut self, key_desc: &str, key_fd: RawFd) -> StratisResult<CreateAction<bool>> {
         let key_file = unsafe { File::from_raw_fd(key_fd) };

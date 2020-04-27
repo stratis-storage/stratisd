@@ -351,42 +351,33 @@ impl Pool for StratPool {
         paths: &[&Path],
         tier: BlockDevTier,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
-        let bdev_info = if tier == BlockDevTier::Cache {
-            if self.has_cache() {
-                if paths.is_empty() {
-                    // If the cache has been initialized and we are adding zero blockdevs,
-                    // treat adding no new blockdevs as the empty set.
-                    Ok(SetCreateAction::new(vec![]))
-                } else {
-                    // If adding cache devices, must suspend the pool; the cache
-                    // must be augmented with the new devices. Note that this
-                    // justifies checking whether the cache is initialized
-                    // before beginning the operation; it is unreasonable to
-                    // do an interesting operation like suspending the pool if
-                    // the blockdevs are not going to be added anyway.
-                    self.thin_pool.suspend()?;
-                    let bdev_info_res =
-                        self.backstore
-                            .add_cachedevs(pool_uuid, paths)
-                            .and_then(|bdi| {
-                                self.thin_pool
-                                    .set_device(self.backstore.device().expect(
-                                        "Since thin pool exists, space must have been allocated \
-                                         from the backstore, so backstore must have a cap device",
-                                    ))
-                                    .and(Ok(bdi))
-                            });
-                    self.thin_pool.resume()?;
-                    let bdev_info = bdev_info_res?;
-                    Ok(SetCreateAction::new(bdev_info))
-                }
-            } else {
-                Err(StratisError::Error(format!(
+        let bdev_info = if tier == BlockDevTier::Cache && !self.has_cache() {
+            return Err(StratisError::Error(format!(
                             "No cache has been initialized for pool with UUID {} and name {}; it is therefore impossible to add additional devices to the cache",
                             pool_uuid.to_simple_ref(),
                             pool_name)
-                ))
-            }
+                ));
+        } else if paths.is_empty() {
+            //TODO: Substitute is_empty check with process_and_verify_devices
+            return Ok(SetCreateAction::new(vec![]));
+        } else if tier == BlockDevTier::Cache {
+            // If adding cache devices, must suspend the pool; the cache
+            // must be augmented with the new devices.
+            self.thin_pool.suspend()?;
+            let bdev_info_res = self
+                .backstore
+                .add_cachedevs(pool_uuid, paths)
+                .and_then(|bdi| {
+                    self.thin_pool
+                        .set_device(self.backstore.device().expect(
+                            "Since thin pool exists, space must have been allocated \
+                             from the backstore, so backstore must have a cap device",
+                        ))
+                        .and(Ok(bdi))
+                });
+            self.thin_pool.resume()?;
+            let bdev_info = bdev_info_res?;
+            Ok(SetCreateAction::new(bdev_info))
         } else {
             // If just adding data devices, no need to suspend the pool.
             // No action will be taken on the DM devices.

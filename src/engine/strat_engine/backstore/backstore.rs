@@ -118,7 +118,7 @@ impl Backstore {
     pub fn setup(
         pool_uuid: PoolUuid,
         backstore_save: &BackstoreSave,
-        devnodes: &HashMap<Device, PathBuf>,
+        devnodes: &HashMap<Device, (DevUuid, PathBuf)>,
         last_update_time: DateTime<Utc>,
     ) -> StratisResult<Backstore> {
         let (datadevs, cachedevs) = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
@@ -909,7 +909,9 @@ mod tests {
                 backstore
                     .blockdevs()
                     .iter()
-                    .map(|(_, blockdev)| (*blockdev.device(), blockdev.devnode()))
+                    .map(|(device_uuid, blockdev)| {
+                        (*blockdev.device(), (*device_uuid, blockdev.devnode()))
+                    })
                     .collect(),
             )
         };

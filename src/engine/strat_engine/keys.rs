@@ -33,6 +33,7 @@ const MAX_KEYCTL_DESCRIBE_STRING_LEN: usize = 4096;
 
 /// Get the ID of the persistent root user keyring and attach it to
 /// the session keyring.
+#[cfg(not(test))]
 fn get_persistent_keyring() -> StratisResult<KeySerial> {
     // Attach persistent keyring to session keyring
     match unsafe {
@@ -50,7 +51,10 @@ fn get_persistent_keyring() -> StratisResult<KeySerial> {
 
 /// Search for the given key description in the persistent root keyring.
 /// Returns the key ID or nothing if it was not found in the keyring.
-fn search_key(key_desc: &KeyDescription) -> StratisResult<Option<KeySerial>> {
+fn search_key(
+    keyring_id: KeySerial,
+    key_desc: &KeyDescription,
+) -> StratisResult<Option<KeySerial>> {
     let key_desc_cstring = CString::new(key_desc.to_string()).map_err(|_| {
         StratisError::Engine(
             ErrorEnum::Invalid,
@@ -62,7 +66,7 @@ fn search_key(key_desc: &KeyDescription) -> StratisResult<Option<KeySerial>> {
         syscall(
             SYS_keyctl,
             libc::KEYCTL_SEARCH,
-            libc::KEY_SPEC_SESSION_KEYRING,
+            keyring_id,
             concat!("user", "\0").as_ptr(),
             key_desc_cstring.as_ptr(),
         )
@@ -88,13 +92,16 @@ fn search_key(key_desc: &KeyDescription) -> StratisResult<Option<KeySerial>> {
 pub fn read_key(
     key_desc: &KeyDescription,
 ) -> StratisResult<(Option<(KeySerial, SizedKeyMemory)>, KeySerial)> {
-    let persistent_id = get_persistent_keyring()?;
+    #[cfg(test)]
+    let keyring_id = libc::KEY_SPEC_SESSION_KEYRING as KeySerial;
+    #[cfg(not(test))]
+    let keyring_id = get_persistent_keyring()?;
 
-    let key_id_option = search_key(key_desc)?;
+    let key_id_option = search_key(keyring_id, key_desc)?;
     let key_id = if let Some(ki) = key_id_option {
         ki
     } else {
-        return Ok((None, persistent_id));
+        return Ok((None, keyring_id));
     };
 
     let mut key_buffer = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
@@ -116,7 +123,7 @@ pub fn read_key(
                 key_id as KeySerial,
                 SizedKeyMemory::new(key_buffer, i as usize),
             )),
-            persistent_id as KeySerial,
+            keyring_id,
         )),
     }
 }
@@ -245,14 +252,17 @@ impl KeyIdList {
 
     /// Populate the list with IDs from the persistent root kernel keyring.
     fn populate(&mut self) -> StratisResult<()> {
-        let persistent_id = get_persistent_keyring()?;
+        #[cfg(test)]
+        let keyring_id = libc::KEY_SPEC_SESSION_KEYRING as KeySerial;
+        #[cfg(not(test))]
+        let keyring_id = get_persistent_keyring()?;
 
         // Read list of keys in the persistent keyring.
         match unsafe {
             syscall(
                 SYS_keyctl,
                 libc::KEYCTL_READ,
-                persistent_id,
+                keyring_id,
                 self.key_ids.as_mut_ptr(),
                 self.key_ids.len(),
             )
@@ -333,9 +343,12 @@ impl KeyIdList {
 
 /// Delete the key with ID `key_id` from the root peristent keyring.
 fn delete_key(key_id: KeySerial) -> StratisResult<()> {
-    let persistent_id = get_persistent_keyring()?;
+    #[cfg(test)]
+    let keyring_id = libc::KEY_SPEC_SESSION_KEYRING as KeySerial;
+    #[cfg(not(test))]
+    let keyring_id = get_persistent_keyring()?;
 
-    match unsafe { syscall(SYS_keyctl, libc::KEYCTL_UNLINK, key_id, persistent_id) } {
+    match unsafe { syscall(SYS_keyctl, libc::KEYCTL_UNLINK, key_id, keyring_id) } {
         i if i < 0 => Err(io::Error::last_os_error().into()),
         _ => Ok(()),
     }
@@ -397,7 +410,12 @@ impl KeyActions for StratKeyActions {
     }
 
     fn delete(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>> {
-        if let Some(key_id) = search_key(&KeyDescription::from(key_desc.to_string()))? {
+        #[cfg(test)]
+        let keyring_id = libc::KEY_SPEC_SESSION_KEYRING as KeySerial;
+        #[cfg(not(test))]
+        let keyring_id = get_persistent_keyring()?;
+
+        if let Some(key_id) = search_key(keyring_id, &KeyDescription::from(key_desc.to_string()))? {
             delete_key(key_id).map(|_| DeleteAction::Deleted(()))
         } else {
             Ok(DeleteAction::Identity)

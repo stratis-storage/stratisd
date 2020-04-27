@@ -10,6 +10,7 @@ mod device;
 mod devlinks;
 mod dm;
 mod engine;
+mod liminal;
 mod names;
 mod pool;
 mod serde_structs;

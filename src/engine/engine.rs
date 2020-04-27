@@ -16,7 +16,7 @@ use devicemapper::{Bytes, Sectors};
 
 use crate::{
     engine::types::{
-        BlockDevPath, BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid,
+        BlockDevPath, BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid, KeySerial,
         MaybeDbusPath, Name, PoolUuid, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
         SizedKeyMemory,
     },
@@ -31,11 +31,24 @@ pub trait KeyActions {
     /// Add a key to the kernel keyring. The output is an idempotent return type
     /// containing a `bool` which indicates whether a key with the requested
     /// key description was in the keyring and the key data was updated.
+    ///
+    /// Successful return values:
+    /// * `Ok(CreateAction::Identity)`: The key was already in the keyring with the
+    /// appropriate key description and key data.
+    /// * `Ok(CreateAction::Created(false)`: The key was newly added to the keyring.
+    /// * `Ok(CreateAction::Created(true)`: The key description was already present
+    /// in the keyring but the key data was updated.
     fn add(&mut self, key_desc: &str, key_fd: RawFd) -> StratisResult<CreateAction<bool>>;
+    /// Return a list of all key descriptions of keys added to the keyring by
+    /// Stratis that are still valid.
+    fn list(&self) -> StratisResult<Vec<String>>;
     /// If a key is present in the kernel keyring with the given description,
     /// read the contents into a chunk of memory memory and return the key ID and the
     /// key contents. If the key does not exist, return `Ok(None)`.
-    fn read(&self, key_desc: &str) -> StratisResult<Option<(u64, SizedKeyMemory)>>;
+    fn read(&self, key_desc: &str) -> StratisResult<Option<(KeySerial, SizedKeyMemory)>>;
+    /// Delete a key with the given key description in the root persistent kernel
+    /// keyring.
+    fn delete(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>>;
 }
 
 /// An interface for reporting internal engine state.

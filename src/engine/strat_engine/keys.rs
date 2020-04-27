@@ -6,7 +6,10 @@ use std::{
     ffi::CString,
     fs::File,
     io::{self, Read},
+    iter::Take,
     os::unix::io::{FromRawFd, RawFd},
+    slice::Iter,
+    str,
 };
 
 use libc::{syscall, SYS_add_key, SYS_keyctl};
@@ -16,21 +19,23 @@ use crate::{
     engine::{
         engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
         strat_engine::names::KeyDescription,
-        types::{CreateAction, SizedKeyMemory},
+        types::{CreateAction, DeleteAction, KeySerial, SizedKeyMemory},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
-/// Read a key with the provided key description into safely handled memory if it
-/// exists in the keyring.
-///
-/// The return type with be a tuple of an `Option` and a keyring id. The `Option`
-/// type will be `Some` if the key was found in the keyring and will contain
-/// the key ID and the key contents. If no key was found with the provided
-/// key description, `None` will be returned.
-pub fn read_key(key_desc: &KeyDescription) -> StratisResult<(Option<(u64, SizedKeyMemory)>, u64)> {
-    // Attach persistent keyring to process keyring
-    let persistent_id = match unsafe {
+/// This value indicates the maximum number of keys that can be listed at one time.
+/// The value is up for debate.
+const MAX_LISTABLE_KEYS: usize = 4096;
+/// This value indicates the maximum accepted length of a `KEYCTL_DESCRIBE` string
+/// returned when querying the kernel. The value is up for debate.
+const MAX_KEYCTL_DESCRIBE_STRING_LEN: usize = 4096;
+
+/// Get the ID of the persistent root user keyring and attach it to
+/// the session keyring.
+fn get_persistent_keyring() -> StratisResult<KeySerial> {
+    // Attach persistent keyring to session keyring
+    match unsafe {
         syscall(
             SYS_keyctl,
             libc::KEYCTL_GET_PERSISTENT,
@@ -38,10 +43,15 @@ pub fn read_key(key_desc: &KeyDescription) -> StratisResult<(Option<(u64, SizedK
             libc::KEY_SPEC_SESSION_KEYRING,
         )
     } {
-        i if i < 0 => return Err(io::Error::last_os_error().into()),
-        i => i,
-    };
+        i if i < 0 => Err(io::Error::last_os_error().into()),
+        i => Ok(i as KeySerial),
+    }
+}
 
+/// Search for the given key description in the persistent root keyring.
+/// Returns the key ID or nothing if it was not found in the keyring.
+fn search_key(key_desc: &KeyDescription) -> StratisResult<Option<KeySerial>> {
+    let persistent_id = get_persistent_keyring()?;
     let key_desc_cstring = CString::new(key_desc.to_string()).map_err(|_| {
         StratisError::Engine(
             ErrorEnum::Invalid,
@@ -53,18 +63,40 @@ pub fn read_key(key_desc: &KeyDescription) -> StratisResult<(Option<(u64, SizedK
         syscall(
             SYS_keyctl,
             libc::KEYCTL_SEARCH,
-            libc::KEY_SPEC_SESSION_KEYRING,
+            persistent_id,
             concat!("user", "\0").as_ptr(),
             key_desc_cstring.as_ptr(),
         )
     };
     if key_id < 0 {
         if unsafe { *libc::__errno_location() } == libc::ENOKEY {
-            return Ok((None, persistent_id as u64));
+            Ok(None)
         } else {
-            return Err(io::Error::last_os_error().into());
+            Err(io::Error::last_os_error().into())
         }
+    } else {
+        Ok(Some(key_id as KeySerial))
     }
+}
+
+/// Read a key with the provided key description into safely handled memory if it
+/// exists in the keyring.
+///
+/// The return type with be a tuple of an `Option` and a keyring id. The `Option`
+/// type will be `Some` if the key was found in the keyring and will contain
+/// the key ID and the key contents. If no key was found with the provided
+/// key description, `None` will be returned.
+pub fn read_key(
+    key_desc: &KeyDescription,
+) -> StratisResult<(Option<(KeySerial, SizedKeyMemory)>, KeySerial)> {
+    let persistent_id = get_persistent_keyring()?;
+
+    let key_id_option = search_key(key_desc)?;
+    let key_id = if let Some(ki) = key_id_option {
+        ki
+    } else {
+        return Ok((None, persistent_id));
+    };
 
     let mut key_buffer = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
     let mut_ref = key_buffer.as_mut();
@@ -81,8 +113,11 @@ pub fn read_key(key_desc: &KeyDescription) -> StratisResult<(Option<(u64, SizedK
     } {
         i if i < 0 => Err(io::Error::last_os_error().into()),
         i => Ok((
-            Some((key_id as u64, SizedKeyMemory::new(key_buffer, i as usize))),
-            persistent_id as u64,
+            Some((
+                key_id as KeySerial,
+                SizedKeyMemory::new(key_buffer, i as usize),
+            )),
+            persistent_id as KeySerial,
         )),
     }
 }
@@ -91,7 +126,7 @@ pub fn read_key(key_desc: &KeyDescription) -> StratisResult<(Option<(u64, SizedK
 /// is different from the old key data.
 // Precondition: The key description is already present in the keyring.
 fn update_key(
-    key_id: u64,
+    key_id: KeySerial,
     old_key_data: SizedKeyMemory,
     new_key_data: SizedKeyMemory,
 ) -> StratisResult<bool> {
@@ -121,7 +156,7 @@ fn update_key(
 fn add_key(
     key_desc: &KeyDescription,
     key_data: SizedKeyMemory,
-    keyring_id: u64,
+    keyring_id: KeySerial,
 ) -> StratisResult<()> {
     let key_desc_cstring = CString::new(key_desc.to_string()).map_err(|_| {
         StratisError::Engine(
@@ -176,6 +211,137 @@ fn add_key_idem(
     }
 }
 
+/// Parse the returned key string from `KEYCTL_DESCRIBE` into a key description.
+fn parse_keyctl_describe_string(key_str: &str) -> StratisResult<String> {
+    key_str
+        .rsplit(';')
+        .next()
+        .map(|s| s.to_string())
+        .ok_or_else(|| {
+            StratisError::Engine(
+                ErrorEnum::Invalid,
+                "Invalid format returned from the kernel query for the key description".to_string(),
+            )
+        })
+}
+
+/// A list of key IDs that were read from the persistent root keyring.
+///
+/// This list must keep track of the size externally because the buffer must be
+/// allocated as the maximum allowable size before it is coerced down to
+/// a pointer to use it in a syscall.
+struct KeyIdList {
+    key_ids: [KeySerial; MAX_LISTABLE_KEYS],
+    num_key_ids: usize,
+}
+
+impl KeyIdList {
+    /// Create a new list of key IDs.
+    fn new() -> KeyIdList {
+        KeyIdList {
+            key_ids: [0; MAX_LISTABLE_KEYS],
+            num_key_ids: 0,
+        }
+    }
+
+    /// Populate the list with IDs from the persistent root kernel keyring.
+    fn populate(&mut self) -> StratisResult<()> {
+        let persistent_id = get_persistent_keyring()?;
+
+        // Read list of keys in the persistent keyring.
+        match unsafe {
+            syscall(
+                SYS_keyctl,
+                libc::KEYCTL_READ,
+                persistent_id,
+                self.key_ids.as_mut_ptr(),
+                self.key_ids.len(),
+            )
+        } {
+            i if i < 0 => return Err(io::Error::last_os_error().into()),
+            i => {
+                let ret = i as usize;
+                let num_key_ids = if ret > MAX_LISTABLE_KEYS {
+                    warn!(
+                        "Some key entries were truncated. Stratis can only list \
+                        a maximum of {} keys.",
+                        MAX_LISTABLE_KEYS
+                    );
+                    MAX_LISTABLE_KEYS
+                } else {
+                    ret
+                };
+                self.num_key_ids = num_key_ids;
+            }
+        };
+        Ok(())
+    }
+
+    /// Get the number of key IDs currently stored in this list.
+    fn len(&self) -> usize {
+        self.num_key_ids
+    }
+
+    /// Iterate through the key IDs.
+    fn iter(&self) -> Take<Iter<KeySerial>> {
+        let len = self.len();
+        self.key_ids.iter().take(len)
+    }
+
+    /// Get the list of key descriptions corresponding to the kernel key IDs.
+    fn to_key_descs(&self) -> StratisResult<Vec<String>> {
+        let mut key_descs = Vec::new();
+        let mut keyctl_buffer = [0u8; MAX_KEYCTL_DESCRIBE_STRING_LEN];
+        for id in self.iter() {
+            let len = match unsafe {
+                syscall(
+                    SYS_keyctl,
+                    libc::KEYCTL_DESCRIBE,
+                    id,
+                    keyctl_buffer.as_mut_ptr(),
+                    keyctl_buffer.len(),
+                )
+            } {
+                i if i < 0 => return Err(io::Error::last_os_error().into()),
+                i => {
+                    let len = i as usize;
+                    if len > MAX_KEYCTL_DESCRIBE_STRING_LEN {
+                        warn!(
+                            "Discarding key description data for key ID {}. The \
+                            provided buffer is not large enough to contain the data.",
+                            id,
+                        );
+                        continue;
+                    }
+                    len
+                }
+            };
+
+            let keyctl_str = str::from_utf8(&keyctl_buffer[..len - 1]).map_err(|e| {
+                StratisError::Engine(
+                    ErrorEnum::Invalid,
+                    format!("Kernel key description was not valid UTF8: {}", e),
+                )
+            })?;
+            let parsed_string = parse_keyctl_describe_string(keyctl_str)?;
+            if let Some(kd) = KeyDescription::from_system_key_desc(&parsed_string) {
+                key_descs.push(kd.as_application_str().to_string());
+            }
+        }
+        Ok(key_descs)
+    }
+}
+
+/// Delete the key with ID `key_id` from the root peristent keyring.
+fn delete_key(key_id: KeySerial) -> StratisResult<()> {
+    let persistent_id = get_persistent_keyring()?;
+
+    match unsafe { syscall(SYS_keyctl, libc::KEYCTL_DESCRIBE, key_id, persistent_id) } {
+        i if i < 0 => Err(io::Error::last_os_error().into()),
+        _ => Ok(()),
+    }
+}
+
 /// Handle for kernel keyring interaction.
 #[derive(Debug)]
 pub struct StratKeyActions;
@@ -207,7 +373,21 @@ impl KeyActions for StratKeyActions {
         )?)
     }
 
-    fn read(&self, key_description: &str) -> StratisResult<Option<(u64, SizedKeyMemory)>> {
+    fn list(&self) -> StratisResult<Vec<String>> {
+        let mut key_ids = KeyIdList::new();
+        key_ids.populate()?;
+        key_ids.to_key_descs()
+    }
+
+    fn read(&self, key_description: &str) -> StratisResult<Option<(KeySerial, SizedKeyMemory)>> {
         read_key(&KeyDescription::from(key_description.to_string())).map(|(opt, _)| opt)
+    }
+
+    fn delete(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>> {
+        if let Some(key_id) = search_key(&KeyDescription::from(key_desc.to_string()))? {
+            delete_key(key_id).map(|_| DeleteAction::Deleted(()))
+        } else {
+            Ok(DeleteAction::Identity)
+        }
     }
 }

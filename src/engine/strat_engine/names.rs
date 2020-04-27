@@ -29,7 +29,8 @@ fn key_description_prefix() -> String {
 pub struct KeyDescription(String);
 
 impl KeyDescription {
-    #[cfg(test)]
+    /// Check if the system key description has the Stratis prefix. If so,
+    /// return `Some` with the prefix stripped. If not, return `None`.
     pub fn from_system_key_desc(raw_key_desc: &str) -> Option<KeyDescription> {
         let mut key_desc = raw_key_desc.to_string();
         let prefix = key_description_prefix();
@@ -43,6 +44,12 @@ impl KeyDescription {
         } else {
             None
         }
+    }
+
+    /// Return the application-level key description (the key description with no
+    /// Stratis prefix added).
+    pub fn as_application_str(&self) -> &str {
+        &self.0
     }
 }
 

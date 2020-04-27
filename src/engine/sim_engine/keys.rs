@@ -14,7 +14,7 @@ use libcryptsetup_rs::SafeMemHandle;
 use crate::{
     engine::{
         engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
-        types::{CreateAction, SizedKeyMemory},
+        types::{CreateAction, DeleteAction, KeySerial, SizedKeyMemory},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -50,7 +50,11 @@ impl KeyActions for SimKeyActions {
         }
     }
 
-    fn read(&self, key_desc: &str) -> StratisResult<Option<(u64, SizedKeyMemory)>> {
+    fn list(&self) -> StratisResult<Vec<String>> {
+        Ok(self.0.keys().cloned().collect())
+    }
+
+    fn read(&self, key_desc: &str) -> StratisResult<Option<(KeySerial, SizedKeyMemory)>> {
         match self.0.get(key_desc) {
             Some(key) => {
                 let mut mem = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
@@ -59,6 +63,13 @@ impl KeyActions for SimKeyActions {
                 Ok(Some((0xdead_beef, key)))
             }
             None => Ok(None),
+        }
+    }
+
+    fn delete(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>> {
+        match self.0.remove(key_desc) {
+            Some(_) => Ok(DeleteAction::Deleted(())),
+            None => Ok(DeleteAction::Identity),
         }
     }
 }

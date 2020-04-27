@@ -23,7 +23,7 @@ before_install:
     "deb http://us.archive.ubuntu.com/ubuntu/ eoan main"
   - sudo apt-get -q update
   # Update to a more recent version of blkid
-  - sudo apt-get -y install util-linux libblkid-dev keyutils
+  - sudo apt-get -y install util-linux libblkid-dev
   # cryptsetup-bin conflicts with custom built cryptsetup
   - sudo apt-get remove cryptsetup-bin
   - sudo apt-get install -y libargon2-0 libjson-c3
@@ -79,6 +79,9 @@ jobs:
           Makefile
           test-travis
         - keyctl list $(sudo keyctl get_persistent 0 @s)
+      before_script:
+        - sudo apt-get install -y keyutils
+
     - name: "build release using stable toolchain"
       rust: stable
       env: TASK=release

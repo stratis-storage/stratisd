@@ -224,6 +224,8 @@ pub fn get_blockdevs(
             tier,
             StratBlockDev::new(
                 device,
+                // FIXME: This block device could represent an encrypted or
+                // an unencrypted device.
                 BlockDevPath::Unencrypted(devnode.to_owned()),
                 bda,
                 segments.unwrap_or(&vec![]),

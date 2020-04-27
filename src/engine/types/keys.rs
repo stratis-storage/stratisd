@@ -4,6 +4,9 @@
 
 use libcryptsetup_rs::SafeMemHandle;
 
+/// Key serial ID type.
+pub type KeySerial = u32;
+
 /// A handle for memory designed to safely handle Stratis passphrases. It can
 /// be coerced to a slice reference for use in read-only operations.
 pub struct SizedKeyMemory {

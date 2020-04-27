@@ -2,9 +2,15 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{error::Error, ffi::CString, fs::File, io::Read, path::Path};
+use std::{error::Error, fs::File, io::Read, path::Path};
 
-use crate::engine::{engine::MAX_STRATIS_PASS_SIZE, strat_engine::names::KeyDescription};
+use libcryptsetup_rs::SafeMemHandle;
+
+use crate::engine::{
+    engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
+    strat_engine::keys::StratKeyActions,
+    types::SizedKeyMemory,
+};
 
 /// Takes physical device paths from loopback or real tests and passes
 /// them through to a compatible test definition. This method
@@ -20,46 +26,20 @@ fn insert_and_cleanup_key_shared<F, I, O>(
 where
     F: Fn(&[&Path], &str, I) -> std::result::Result<O, Box<dyn Error>>,
 {
-    let type_cstring = "user\0";
+    let mut key_handle = StratKeyActions;
     let desc_str = "test-description-for-stratisd";
-    let description = KeyDescription::from(desc_str.to_string());
-    let description_cstring = CString::new(description.to_string()).unwrap();
-    let mut key_data = [0; MAX_STRATIS_PASS_SIZE];
+    let mut mem = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
     File::open("/dev/urandom")
         .unwrap()
-        .read_exact(&mut key_data)
+        .read_exact(mem.as_mut())
         .unwrap();
+    let key_data = SizedKeyMemory::new(mem, MAX_STRATIS_PASS_SIZE);
 
-    let key_id = match unsafe {
-        libc::syscall(
-            libc::SYS_add_key,
-            type_cstring.as_ptr(),
-            description_cstring.as_ptr(),
-            key_data.as_ptr(),
-            key_data.len(),
-            libc::KEY_SPEC_SESSION_KEYRING,
-        )
-    } {
-        i if i < 0 => panic!("Failed to create key in keyring"),
-        i => i,
-    };
+    key_handle.add_no_fd(desc_str, key_data)?;
 
     let result = test(physical_paths, desc_str, input);
 
-    if unsafe {
-        libc::syscall(
-            libc::SYS_keyctl,
-            libc::KEYCTL_UNLINK,
-            key_id,
-            libc::KEY_SPEC_SESSION_KEYRING,
-        )
-    } < 0
-    {
-        panic!(
-            "Failed to clean up key with key description {} from keyring",
-            description
-        );
-    }
+    key_handle.delete(desc_str)?;
 
     result
 }

@@ -51,7 +51,6 @@ fn get_persistent_keyring() -> StratisResult<KeySerial> {
 /// Search for the given key description in the persistent root keyring.
 /// Returns the key ID or nothing if it was not found in the keyring.
 fn search_key(key_desc: &KeyDescription) -> StratisResult<Option<KeySerial>> {
-    let persistent_id = get_persistent_keyring()?;
     let key_desc_cstring = CString::new(key_desc.to_string()).map_err(|_| {
         StratisError::Engine(
             ErrorEnum::Invalid,
@@ -63,7 +62,7 @@ fn search_key(key_desc: &KeyDescription) -> StratisResult<Option<KeySerial>> {
         syscall(
             SYS_keyctl,
             libc::KEYCTL_SEARCH,
-            persistent_id,
+            libc::KEY_SPEC_SESSION_KEYRING,
             concat!("user", "\0").as_ptr(),
             key_desc_cstring.as_ptr(),
         )
@@ -336,7 +335,7 @@ impl KeyIdList {
 fn delete_key(key_id: KeySerial) -> StratisResult<()> {
     let persistent_id = get_persistent_keyring()?;
 
-    match unsafe { syscall(SYS_keyctl, libc::KEYCTL_DESCRIBE, key_id, persistent_id) } {
+    match unsafe { syscall(SYS_keyctl, libc::KEYCTL_UNLINK, key_id, persistent_id) } {
         i if i < 0 => Err(io::Error::last_os_error().into()),
         _ => Ok(()),
     }

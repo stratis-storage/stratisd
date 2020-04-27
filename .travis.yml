@@ -70,6 +70,7 @@ jobs:
     - name: "run Rust destructive unit tests using stable toolchain"
       rust: stable
       script:
+        - keyctl list $(sudo keyctl get_persistent 0 @s)
         - >
           sudo
           PATH=${TRAVIS_HOME}/.cargo/bin:$PATH RUST_LOG=libstratis=info
@@ -77,6 +78,10 @@ jobs:
           -f
           Makefile
           test-travis
+        - keyctl list $(sudo keyctl get_persistent 0 @s)
+      before_script:
+        - sudo apt-get install -y keyutils
+
     - name: "build release using stable toolchain"
       rust: stable
       env: TASK=release

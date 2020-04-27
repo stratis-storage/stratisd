@@ -33,7 +33,6 @@ const MAX_KEYCTL_DESCRIBE_STRING_LEN: usize = 4096;
 
 /// Get the ID of the persistent root user keyring and attach it to
 /// the session keyring.
-#[cfg(not(test))]
 fn get_persistent_keyring() -> StratisResult<KeySerial> {
     // Attach persistent keyring to session keyring
     match unsafe {
@@ -92,9 +91,6 @@ fn search_key(
 pub fn read_key(
     key_desc: &KeyDescription,
 ) -> StratisResult<(Option<(KeySerial, SizedKeyMemory)>, KeySerial)> {
-    #[cfg(test)]
-    let keyring_id = libc::KEY_SPEC_SESSION_KEYRING as KeySerial;
-    #[cfg(not(test))]
     let keyring_id = get_persistent_keyring()?;
 
     let key_id_option = search_key(keyring_id, key_desc)?;
@@ -252,9 +248,6 @@ impl KeyIdList {
 
     /// Populate the list with IDs from the persistent root kernel keyring.
     fn populate(&mut self) -> StratisResult<()> {
-        #[cfg(test)]
-        let keyring_id = libc::KEY_SPEC_SESSION_KEYRING as KeySerial;
-        #[cfg(not(test))]
         let keyring_id = get_persistent_keyring()?;
 
         // Read list of keys in the persistent keyring.
@@ -343,9 +336,6 @@ impl KeyIdList {
 
 /// Delete the key with ID `key_id` from the root peristent keyring.
 fn delete_key(key_id: KeySerial) -> StratisResult<()> {
-    #[cfg(test)]
-    let keyring_id = libc::KEY_SPEC_SESSION_KEYRING as KeySerial;
-    #[cfg(not(test))]
     let keyring_id = get_persistent_keyring()?;
 
     match unsafe { syscall(SYS_keyctl, libc::KEYCTL_UNLINK, key_id, keyring_id) } {
@@ -410,9 +400,6 @@ impl KeyActions for StratKeyActions {
     }
 
     fn delete(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>> {
-        #[cfg(test)]
-        let keyring_id = libc::KEY_SPEC_SESSION_KEYRING as KeySerial;
-        #[cfg(not(test))]
         let keyring_id = get_persistent_keyring()?;
 
         if let Some(key_id) = search_key(keyring_id, &KeyDescription::from(key_desc.to_string()))? {

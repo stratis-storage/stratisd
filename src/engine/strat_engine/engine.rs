@@ -17,7 +17,7 @@ use crate::{
         event::get_engine_listener_list,
         shared::create_pool_idempotent_or_err,
         strat_engine::{
-            backstore::{find_all, identify_block_device},
+            backstore::find_all,
             cmd::verify_binaries,
             devlinks,
             dm::{get_dm, get_dm_init},
@@ -109,23 +109,20 @@ impl Engine for StratEngine {
     fn handle_event(&mut self, event: &libudev::Event) -> Option<(PoolUuid, &mut dyn Pool)> {
         let event_type = event.event_type();
         if event_type == libudev::EventType::Add || event_type == libudev::EventType::Change {
-            identify_block_device(event.device()).and_then(move |info| {
-                let pool_uuid = info.identifiers.pool_uuid;
-                if let Some((pool_name, pool)) =
-                    self.liminal_devices.block_evaluate(&self.pools, info)
-                {
-                    self.pools.insert(pool_name, pool_uuid, pool);
-                    Some((
-                        pool_uuid,
-                        self.pools
-                            .get_mut_by_uuid(pool_uuid)
-                            .expect("just_inserted")
-                            .1 as &mut dyn Pool,
-                    ))
-                } else {
-                    None
-                }
-            })
+            if let Some((pool_uuid, pool_name, pool)) =
+                self.liminal_devices.block_evaluate(&self.pools, event)
+            {
+                self.pools.insert(pool_name, pool_uuid, pool);
+                Some((
+                    pool_uuid,
+                    self.pools
+                        .get_mut_by_uuid(pool_uuid)
+                        .expect("just_inserted")
+                        .1 as &mut dyn Pool,
+                ))
+            } else {
+                None
+            }
         } else {
             None
         }

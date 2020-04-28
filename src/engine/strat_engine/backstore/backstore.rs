@@ -4,11 +4,7 @@
 
 // Code to handle the backing store of a pool.
 
-use std::{
-    cmp,
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
+use std::{cmp, path::Path};
 
 use chrono::{DateTime, Utc};
 
@@ -23,7 +19,6 @@ use crate::{
                 cache_tier::CacheTier,
                 data_tier::DataTier,
                 metadata::MDADataSize,
-                setup::get_blockdevs,
             },
             device::wipe_sectors,
             dm::get_dm,
@@ -104,8 +99,8 @@ pub struct Backstore {
 
 impl Backstore {
     /// Make a Backstore object from blockdevs that already belong to Stratis.
-    /// Precondition: every device in devnodes has already been determined to
-    /// belong to the pool with the specified pool_uuid.
+    /// Precondition: every device in datadevs and cachedevs has already been
+    /// determined to belong to the pool with the specified pool_uuid.
     /// Precondition: backstore_save.cap.allocs[0].length <=
     ///       the sum of the lengths of the segments allocated
     /// to the data tier cap device.
@@ -118,10 +113,10 @@ impl Backstore {
     pub fn setup(
         pool_uuid: PoolUuid,
         backstore_save: &BackstoreSave,
-        devnodes: &HashMap<Device, (DevUuid, PathBuf)>,
+        datadevs: Vec<StratBlockDev>,
+        cachedevs: Vec<StratBlockDev>,
         last_update_time: DateTime<Utc>,
     ) -> StratisResult<Backstore> {
-        let (datadevs, cachedevs) = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
         let block_mgr = BlockDevMgr::new(datadevs, Some(last_update_time), None);
         let data_tier = DataTier::setup(block_mgr, &backstore_save.data_tier)?;
         let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
@@ -655,7 +650,7 @@ mod tests {
     use crate::engine::{
         engine::BlockDev,
         strat_engine::{
-            backstore::metadata::device_identifiers,
+            backstore::{metadata::device_identifiers, setup::get_blockdevs},
             cmd,
             tests::{loopbacked, real},
         },
@@ -917,8 +912,11 @@ mod tests {
         };
 
         {
+            let (datadevs, cachedevs) =
+                get_blockdevs(pool_uuid, &backstore_save, &devices).unwrap();
             let mut backstore =
-                Backstore::setup(pool_uuid, &backstore_save, &devices, Utc::now()).unwrap();
+                Backstore::setup(pool_uuid, &backstore_save, datadevs, cachedevs, Utc::now())
+                    .unwrap();
             invariant(&backstore);
 
             let backstore_save2 = backstore.record();
@@ -929,8 +927,11 @@ mod tests {
         }
 
         {
+            let (datadevs, cachedevs) =
+                get_blockdevs(pool_uuid, &backstore_save, &devices).unwrap();
             let mut backstore =
-                Backstore::setup(pool_uuid, &backstore_save, &devices, Utc::now()).unwrap();
+                Backstore::setup(pool_uuid, &backstore_save, datadevs, cachedevs, Utc::now())
+                    .unwrap();
             invariant(&backstore);
 
             let backstore_save2 = backstore.record();

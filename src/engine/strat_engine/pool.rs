@@ -19,7 +19,7 @@ use crate::{
         engine::{BlockDev, Filesystem, Pool},
         shared::init_cache_idempotent_or_err,
         strat_engine::{
-            backstore::{Backstore, MDADataSize},
+            backstore::{get_blockdevs, Backstore, MDADataSize},
             names::validate_name,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
@@ -199,7 +199,9 @@ impl StratPool {
     ) -> StratisResult<(Name, StratPool)> {
         check_metadata(metadata)?;
 
-        let mut backstore = Backstore::setup(uuid, &metadata.backstore, devnodes, timestamp)?;
+        let (datadevs, cachedevs) = get_blockdevs(uuid, &metadata.backstore, devnodes)?;
+        let mut backstore =
+            Backstore::setup(uuid, &metadata.backstore, datadevs, cachedevs, timestamp)?;
         let mut thinpool = ThinPool::setup(
             uuid,
             &metadata.thinpool_dev,

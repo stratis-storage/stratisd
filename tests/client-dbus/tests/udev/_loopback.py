@@ -81,7 +81,7 @@ class LoopBackDevices:
         :param tokens: Opaque representation of some loop back devices
         :type tokens: list of uuid.UUID
         :return: None
-        :raises: AssertionError if any token not found
+        :raises: RuntimeError if any token not found
         """
         _check_tokens(self, tokens)
         for token in tokens:
@@ -115,7 +115,7 @@ class LoopBackDevices:
         :param tokens: Opaque representation of some loop back devices
         :type tokens: list of uuid.UUID
         :return: None
-        :raise AssertionError: if token not present
+        :raise RuntimeError: if token not present
         """
         _check_tokens(self, tokens)
         for token in tokens:

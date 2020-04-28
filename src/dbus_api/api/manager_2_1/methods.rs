@@ -15,7 +15,7 @@ use crate::{
         types::TData,
         util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
     },
-    engine::CreateAction,
+    engine::{CreateAction, DeleteAction},
 };
 
 pub fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -43,6 +43,37 @@ pub fn add_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             let return_value = match idem_resp {
                 CreateAction::Created(is_changed) => (true, is_changed),
                 _ => (false, false),
+            };
+            return_message.append3(return_value, msg_code_ok(), msg_string_ok())
+        }
+        Err(e) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&e);
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+    Ok(vec![msg])
+}
+
+pub fn delete_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+
+    let key_desc: &str = get_next_arg(&mut iter, 0)?;
+
+    let dbus_context = m.tree.get_data();
+    let default_return = false;
+    let return_message = message.method_return();
+
+    let msg = match dbus_context
+        .engine
+        .borrow_mut()
+        .get_key_handler_mut()
+        .delete(key_desc)
+    {
+        Ok(idem_resp) => {
+            let return_value = match idem_resp {
+                DeleteAction::Deleted(()) => true,
+                _ => false,
             };
             return_message.append3(return_value, msg_code_ok(), msg_string_ok())
         }

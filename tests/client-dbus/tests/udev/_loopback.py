@@ -25,9 +25,11 @@ _LOSETUP_BIN = os.getenv("STRATIS_LOSETUP_BIN", "/usr/sbin/losetup")
 
 _SIZE_OF_DEVICE = 1024 ** 4  # 1 TiB
 
+
 def _check_tokens(self, tokens):
     if not all(token in self.devices for token in tokens):
         raise RuntimeError("No tokens found")
+
 
 class LoopBackDevices:
     """

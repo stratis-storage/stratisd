@@ -71,7 +71,11 @@ pub fn add_bdas(
 }
 
 /// Get the most recent metadata from a set of devices.
-/// Returns None if no metadata found for this pool.
+/// Returns None if no metadata found for this pool on any device. This can
+/// happen if the pool was constructed but failed in the interval before the
+/// metadata could be written.
+/// Returns an error if there is a last update time, but no metadata could
+/// be obtained from any of the devices.
 pub fn get_metadata(
     devnodes: &HashMap<Device, (DevUuid, PathBuf, BDA)>,
 ) -> StratisResult<Option<(DateTime<Utc>, PoolSave)>> {

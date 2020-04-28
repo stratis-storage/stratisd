@@ -22,7 +22,7 @@ pub use self::{
     blockdev::StratBlockDev,
     identify::{find_all, identify_block_device},
     metadata::MDADataSize,
-    setup::get_metadata,
+    setup::{get_blockdevs, get_metadata},
 };
 
 #[cfg(test)]

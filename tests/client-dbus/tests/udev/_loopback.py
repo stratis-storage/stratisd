@@ -95,13 +95,14 @@ class LoopBackDevices:
         :param tokens: Opaque representation of some loop back devices
         :type tokens: list of uuid.UUID
         :return: None
-        :raises AssertionError: if any token not found or missing device node
+        :raises RuntimeError: if any token not found or missing device node
         """
         _check_tokens(self, tokens)
         for token in tokens:
             (device, _) = self.devices[token]
 
-            assert device is not None
+            if device is None:
+                raise RuntimeError("Device node is missing")
 
             device_name = os.path.split(device)[-1]
             ufile = os.path.join("/sys/block", device_name, "uevent")

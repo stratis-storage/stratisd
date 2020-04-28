@@ -63,12 +63,12 @@ def random_string(length):
 def _create_pool(name, devices, *, key_description=None):
     """
     Creates a stratis pool. Tries three times before giving up.
-    Raises an assertion error if it does not succeed after three tries.
     :param name:    Name of pool
     :param devices:  Devices to use for pool
     :param key_description: optional key description
     :type key_description: str or NoneType
     :return: Dbus proxy object representing pool.
+    :raises RuntimeError: if pool is not created after three tries
     """
     error_reasons = []
     for _ in range(3):
@@ -94,7 +94,7 @@ def _create_pool(name, devices, *, key_description=None):
         error_reasons.append(error_str)
         time.sleep(1)
 
-    raise AssertionError(
+    raise RuntimeError(
         "Unable to create a pool %s %s reasons: %s" % (name, devices, error_reasons)
     )
 
@@ -133,7 +133,8 @@ def _wait_for_udev(expected_paths):
     expected. Always get the result of at least 1 Stratis enumeration.
     :param expected_paths: devnodes of paths that should belong to Stratis
     :type expected_paths: list of str
-    :return: None (May assert)
+    :return: None
+    :raises RuntimeError: if unexpected device nodes are found
     """
 
     expected_devnodes = frozenset(expected_paths)
@@ -151,7 +152,8 @@ def _wait_for_udev(expected_paths):
         )
         time.sleep(1)
 
-    assert expected_devnodes == found_devnodes
+    if expected_devnodes != found_devnodes:
+        raise RuntimeError("Found unexpected devnodes")
 
 
 def _processes(name):
@@ -170,11 +172,13 @@ def _processes(name):
 
 def _remove_stratis_dm_devices():
     """
-    Remove Stratis device mapper devices, fail with an assertion error if
+    Remove Stratis device mapper devices, fail with a runtime error if
     some have been missed.
+    :raises RuntimeError: if some devices are remaining
     """
     remove_stratis_setup()
-    assert _get_stratis_devices() == []
+    if _get_stratis_devices() != []:
+        raise RuntimeError("Some devices were not removed")
 
 
 class _Service:
@@ -191,8 +195,11 @@ class _Service:
 
         _settle()
 
-        assert list(_processes("stratisd")) == []
-        assert _get_stratis_devices() == []
+        if list(_processes("stratisd")) != []:
+            raise RuntimeError("A stratisd process is already running")
+
+        if _get_stratis_devices() != []:
+            raise RuntimeError("Devices existent prior to service start")
 
         service = subprocess.Popen(
             [_STRATISD],
@@ -216,9 +223,13 @@ class _Service:
 
         time.sleep(1)
         if service.poll() is not None:
-            raise Exception("Daemon unexpectedly exited with %s" % service.returncode)
+            raise RuntimeError(
+                "Daemon unexpectedly exited with %s" % service.returncode
+            )
 
-        assert dbus_interface_present, "No D-Bus interface for stratisd found"
+        if not dbus_interface_present:
+            raise RuntimeError("No D-Bus interface for stratisd found")
+
         self._service = service  # pylint: disable=attribute-defined-outside-init
         return self
 
@@ -229,7 +240,9 @@ class _Service:
         """
         self._service.send_signal(signal.SIGINT)
         output = self._service.communicate()
-        assert list(_processes("stratisd")) == []
+        if list(_processes("stratisd")) != []:
+            raise RuntimeError("Failed to stop stratisd service")
+
         return output
 
 

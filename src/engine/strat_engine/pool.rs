@@ -2,24 +2,19 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{
-    collections::HashMap,
-    iter::FromIterator,
-    path::{Path, PathBuf},
-    vec::Vec,
-};
+use std::{collections::HashMap, iter::FromIterator, path::Path, vec::Vec};
 
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
-use devicemapper::{Device, DmName, DmNameBuf, Sectors};
+use devicemapper::{DmName, DmNameBuf, Sectors};
 
 use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
         shared::init_cache_idempotent_or_err,
         strat_engine::{
-            backstore::{Backstore, MDADataSize},
+            backstore::{Backstore, MDADataSize, StratBlockDev},
             names::validate_name,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
@@ -193,13 +188,15 @@ impl StratPool {
     /// Precondition: A metadata verification step has already been run.
     pub fn setup(
         uuid: PoolUuid,
-        devnodes: &HashMap<Device, (DevUuid, PathBuf)>,
+        datadevs: Vec<StratBlockDev>,
+        cachedevs: Vec<StratBlockDev>,
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
     ) -> StratisResult<(Name, StratPool)> {
         check_metadata(metadata)?;
 
-        let mut backstore = Backstore::setup(uuid, &metadata.backstore, devnodes, timestamp)?;
+        let mut backstore =
+            Backstore::setup(uuid, &metadata.backstore, datadevs, cachedevs, timestamp)?;
         let mut thinpool = ThinPool::setup(
             uuid,
             &metadata.thinpool_dev,
@@ -587,8 +584,8 @@ mod tests {
 
     use crate::engine::{
         strat_engine::{
-            backstore::get_metadata,
             devlinks,
+            liminal::{add_bdas, get_blockdevs, get_metadata},
             tests::{loopbacked, real},
         },
         types::{EngineAction, PoolExtendState, PoolState, Redundancy},
@@ -640,16 +637,22 @@ mod tests {
             .map(|(device_uuid, blockdev)| (*blockdev.device(), (*device_uuid, blockdev.devnode())))
             .collect();
 
-        let (_, pool_save1) = get_metadata(uuid1, &devnodes1).unwrap().unwrap();
-        let (_, pool_save2) = get_metadata(uuid2, &devnodes2).unwrap().unwrap();
+        let infos1 = add_bdas(uuid1, &devnodes1).unwrap();
+        let infos2 = add_bdas(uuid2, &devnodes2).unwrap();
+
+        let (_, pool_save1) = get_metadata(&infos1).unwrap().unwrap();
+        let (_, pool_save2) = get_metadata(&infos2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
         assert_eq!(pool_save2, metadata2);
 
         pool1.teardown().unwrap();
         pool2.teardown().unwrap();
 
-        let (_, pool_save1) = get_metadata(uuid1, &devnodes1).unwrap().unwrap();
-        let (_, pool_save2) = get_metadata(uuid2, &devnodes2).unwrap().unwrap();
+        let infos1 = add_bdas(uuid1, &devnodes1).unwrap();
+        let infos2 = add_bdas(uuid2, &devnodes2).unwrap();
+
+        let (_, pool_save1) = get_metadata(&infos1).unwrap().unwrap();
+        let (_, pool_save2) = get_metadata(&infos2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
         assert_eq!(pool_save2, metadata2);
     }
@@ -769,8 +772,12 @@ mod tests {
 
         pool.teardown().unwrap();
 
-        let (timestamp, metadata) = get_metadata(uuid, &devices).unwrap().unwrap();
-        let (name, pool) = StratPool::setup(uuid, &devices, timestamp, &metadata).unwrap();
+        let infos = add_bdas(uuid, &devices).unwrap();
+        let (timestamp, metadata) = get_metadata(&infos).unwrap().unwrap();
+        let (datadevs, cachedevs) = get_blockdevs(&metadata.backstore, infos).unwrap();
+
+        let (name, pool) =
+            StratPool::setup(uuid, datadevs, cachedevs, timestamp, &metadata).unwrap();
         invariant(&pool, &name);
 
         let mut buf = [0u8; 10];

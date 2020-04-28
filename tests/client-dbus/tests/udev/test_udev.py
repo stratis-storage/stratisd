@@ -270,7 +270,7 @@ class _KernelKey:  # pylint: disable=attribute-defined-outside-init
         This method allows _KernelKey to be used with the "with" keyword.
         :return: The key description that can be used to access the
                  provided key data in __init__.
-        :raises subprocess.CalledProcessError
+        :raises subprocess.CalledProcessError:
         """
         with open("/dev/urandom", "rb") as urandom_f:
             key_desc = base64.b64encode(urandom_f.read(16)).decode("utf-8")

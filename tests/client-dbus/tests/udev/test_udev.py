@@ -63,7 +63,7 @@ def random_string(length):
 def _create_pool(name, devices, *, key_description=None):
     """
     Creates a stratis pool. Tries three times before giving up.
-    Raises an assertion error if it does not succeed after three tries.
+    Raises a runtime error if it does not succeed after three tries.
     :param name:    Name of pool
     :param devices:  Devices to use for pool
     :param key_description: optional key description
@@ -94,7 +94,7 @@ def _create_pool(name, devices, *, key_description=None):
         error_reasons.append(error_str)
         time.sleep(1)
 
-    raise AssertionError(
+    raise RuntimeError(
         "Unable to create a pool %s %s reasons: %s" % (name, devices, error_reasons)
     )
 

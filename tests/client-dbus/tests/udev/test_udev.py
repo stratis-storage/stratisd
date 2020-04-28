@@ -265,26 +265,12 @@ class _KernelKey:  # pylint: disable=attribute-defined-outside-init
 
         self.key_data = key_data
 
-    @staticmethod
-    def _raise_keyctl_error(return_code, args):
-        """
-        Raise an error if keyctl failed to complete an operation
-        successfully.
-        :param int return_code: Return code of the keyctl command
-        :param args: The command line that caused the command to fail
-        :type args: list of str
-        :raises RuntimeError
-        """
-        if return_code != 0:
-            raise RuntimeError(
-                "Command '%s' failed with exit code %s" % (" ".join(args), return_code)
-            )
-
     def __enter__(self):
         """
         This method allows _KernelKey to be used with the "with" keyword.
         :return: The key description that can be used to access the
                  provided key data in __init__.
+        :raises subprocess.CalledProcessError
         """
         with open("/dev/urandom", "rb") as urandom_f:
             key_desc = base64.b64encode(urandom_f.read(16)).decode("utf-8")
@@ -295,29 +281,26 @@ class _KernelKey:  # pylint: disable=attribute-defined-outside-init
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             universal_newlines=True,
+            check=True,
         )
-        _KernelKey._raise_keyctl_error(exit_values.returncode, args)
 
         self.persistent_id = exit_values.stdout.strip()
 
         args = ["keyctl", "add", "user", key_desc, self.key_data, self.persistent_id]
         exit_values = subprocess.run(
-            args, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True
         )
-        _KernelKey._raise_keyctl_error(exit_values.returncode, args)
 
         return key_desc
 
     def __exit__(self, exception_type, exception_value, traceback):
         try:
             args = ["keyctl", "clear", self.persistent_id]
-            exit_values = subprocess.run(args)
-            _KernelKey._raise_keyctl_error(exit_values.returncode, args)
+            subprocess.run(args, check=True)
 
             args = ["keyctl", "clear", "@s"]
-            exit_values = subprocess.run(args)
-            _KernelKey._raise_keyctl_error(exit_values.returncode, args)
-        except RuntimeError as rexc:
+            subprocess.run(args, check=True)
+        except (RuntimeError, subprocess.CalledProcessError) as rexc:
             if exception_value is None:
                 raise rexc
             raise rexc from exception_value

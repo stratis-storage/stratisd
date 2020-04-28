@@ -650,11 +650,9 @@ mod tests {
     use crate::engine::{
         engine::BlockDev,
         strat_engine::{
-            backstore::{
-                metadata::device_identifiers,
-                setup::{add_bdas, get_blockdevs},
-            },
+            backstore::metadata::device_identifiers,
             cmd,
+            setup::{add_bdas, get_blockdevs},
             tests::{loopbacked, real},
         },
     };

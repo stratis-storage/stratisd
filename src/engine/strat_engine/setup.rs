@@ -18,7 +18,7 @@ use devicemapper::{Device, Sectors};
 use crate::{
     engine::{
         strat_engine::{
-            backstore::{blockdev::StratBlockDev, metadata::BDA, shared::BlockDevPath},
+            backstore::{BlockDevPath, StratBlockDev, BDA},
             device::blkdev_size,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
         },

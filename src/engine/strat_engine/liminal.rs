@@ -12,9 +12,10 @@ use devicemapper::Device;
 
 use crate::engine::{
     strat_engine::{
-        backstore::{add_bdas, get_blockdevs, get_metadata, identify_block_device},
+        backstore::identify_block_device,
         devlinks::setup_pool_devlinks,
         pool::StratPool,
+        setup::{add_bdas, get_blockdevs, get_metadata},
     },
     structures::Table,
     types::{DevUuid, Name, PoolUuid},

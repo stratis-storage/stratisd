@@ -584,8 +584,8 @@ mod tests {
 
     use crate::engine::{
         strat_engine::{
-            backstore::{add_bdas, get_blockdevs, get_metadata},
             devlinks,
+            setup::{add_bdas, get_blockdevs, get_metadata},
             tests::{loopbacked, real},
         },
         types::{EngineAction, PoolExtendState, PoolState, Redundancy},

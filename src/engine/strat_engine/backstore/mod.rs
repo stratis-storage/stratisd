@@ -13,7 +13,6 @@ mod devices;
 mod identify;
 mod metadata;
 mod range_alloc;
-mod setup;
 mod shared;
 mod udev;
 
@@ -21,8 +20,8 @@ pub use self::{
     backstore::Backstore,
     blockdev::StratBlockDev,
     identify::{find_all, identify_block_device},
-    metadata::MDADataSize,
-    setup::{add_bdas, get_blockdevs, get_metadata},
+    metadata::{MDADataSize, BDA},
+    shared::BlockDevPath,
 };
 
 #[cfg(test)]

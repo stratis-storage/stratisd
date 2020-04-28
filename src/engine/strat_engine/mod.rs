@@ -14,7 +14,6 @@ mod liminal;
 mod names;
 mod pool;
 mod serde_structs;
-mod setup;
 mod thinpool;
 
 pub use self::engine::StratEngine;

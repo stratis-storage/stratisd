@@ -652,7 +652,7 @@ mod tests {
         strat_engine::{
             backstore::metadata::device_identifiers,
             cmd,
-            setup::{add_bdas, get_blockdevs},
+            liminal::{add_bdas, get_blockdevs},
             tests::{loopbacked, real},
         },
     };

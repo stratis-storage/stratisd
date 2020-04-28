@@ -287,9 +287,7 @@ class _KernelKey:  # pylint: disable=attribute-defined-outside-init
         self.persistent_id = exit_values.stdout.strip()
 
         args = ["keyctl", "add", "user", key_desc, self.key_data, self.persistent_id]
-        exit_values = subprocess.run(
-            args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True
-        )
+        subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
 
         return key_desc
 

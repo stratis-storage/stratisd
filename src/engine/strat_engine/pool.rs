@@ -355,15 +355,15 @@ impl Pool for StratPool {
         tier: BlockDevTier,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
         let bdev_info = if tier == BlockDevTier::Cache && !self.has_cache() {
-            Err(StratisError::Error(format!(
+            return Err(StratisError::Error(format!(
                             "No cache has been initialized for pool with UUID {} and name {}; it is therefore impossible to add additional devices to the cache",
                             pool_uuid.to_simple_ref(),
                             pool_name)
-                ))
+                ));
         } else if paths.is_empty() {
             // If the cache has been initialized and we are adding zero blockdevs,
             // treat adding no new blockdevs as the empty set.
-            Ok(SetCreateAction::new(vec![]))
+            return Ok(SetCreateAction::new(vec![]));
         } else if tier == BlockDevTier::Cache {
             // If adding cache devices, must suspend the pool; the cache
             // must be augmented with the new devices. Note that this

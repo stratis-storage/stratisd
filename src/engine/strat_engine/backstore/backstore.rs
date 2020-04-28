@@ -650,7 +650,10 @@ mod tests {
     use crate::engine::{
         engine::BlockDev,
         strat_engine::{
-            backstore::{metadata::device_identifiers, setup::get_blockdevs},
+            backstore::{
+                metadata::device_identifiers,
+                setup::{add_bdas, get_blockdevs},
+            },
             cmd,
             tests::{loopbacked, real},
         },
@@ -912,8 +915,8 @@ mod tests {
         };
 
         {
-            let (datadevs, cachedevs) =
-                get_blockdevs(pool_uuid, &backstore_save, &devices).unwrap();
+            let infos = add_bdas(pool_uuid, &devices).unwrap();
+            let (datadevs, cachedevs) = get_blockdevs(&backstore_save, infos).unwrap();
             let mut backstore =
                 Backstore::setup(pool_uuid, &backstore_save, datadevs, cachedevs, Utc::now())
                     .unwrap();
@@ -927,8 +930,8 @@ mod tests {
         }
 
         {
-            let (datadevs, cachedevs) =
-                get_blockdevs(pool_uuid, &backstore_save, &devices).unwrap();
+            let infos = add_bdas(pool_uuid, &devices).unwrap();
+            let (datadevs, cachedevs) = get_blockdevs(&backstore_save, infos).unwrap();
             let mut backstore =
                 Backstore::setup(pool_uuid, &backstore_save, datadevs, cachedevs, Utc::now())
                     .unwrap();

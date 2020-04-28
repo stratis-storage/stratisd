@@ -12,7 +12,7 @@ use devicemapper::Device;
 
 use crate::engine::{
     strat_engine::{
-        backstore::{get_blockdevs, get_metadata, identify_block_device},
+        backstore::{add_bdas, get_blockdevs, get_metadata, identify_block_device},
         devlinks::setup_pool_devlinks,
         pool::StratPool,
     },
@@ -66,7 +66,14 @@ impl LiminalDevices {
             pool_uuid: PoolUuid,
             devices: &HashMap<Device, (DevUuid, PathBuf)>,
         ) -> Result<Option<(Name, StratPool)>, String> {
-            let (timestamp, metadata) = match get_metadata(pool_uuid, devices) {
+            let infos = match add_bdas(pool_uuid, devices) {
+                Err(err) => return Err(format!(
+                        "There was an error encountered when reading the BDAs for the devices found for pool with UUID {}: {}",
+                        pool_uuid.to_simple_ref(),
+                        err)),
+                Ok(infos) => infos,
+            };
+            let (timestamp, metadata) = match get_metadata(&infos) {
                 Err(err) => return Err(format!(
                         "There was an error encountered when reading the metadata for the devices found for pool with UUID {}: {}",
                         pool_uuid.to_simple_ref(),
@@ -83,7 +90,7 @@ impl LiminalDevices {
                         uuid.to_simple_ref()));
             }
 
-            let (datadevs, cachedevs) = match get_blockdevs(pool_uuid, &metadata.backstore, devices) {
+            let (datadevs, cachedevs) = match get_blockdevs(&metadata.backstore, infos) {
                 Err(err) => return Err(format!(
                         "There was an error encountered when calculating the block devices for pool with UUID {} and name {}: {}",
                         pool_uuid.to_simple_ref(),

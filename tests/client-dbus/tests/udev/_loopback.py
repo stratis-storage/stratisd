@@ -138,10 +138,11 @@ class LoopBackDevices:
         :return: The list devices corresponding to the tokens
         :rtype: list of str
         :raises: KeyError if any token is not found
-        :raises: AssertionError if any devnode is None
+        :raises: RuntimeError if any devnode is None
         """
         result = [self.devices[token][0] for token in tokens]
-        assert all([devnode is not None for devnode in result])
+        if not all([devnode is not None for devnode in result]):
+            raise RuntimeError("At least one devnode is None")
         return result
 
     def destroy_devices(self):

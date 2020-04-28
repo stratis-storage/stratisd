@@ -5,7 +5,7 @@
 use dbus::tree::{Factory, MTFn, Method};
 
 use crate::dbus_api::{
-    api::manager_2_1::methods::{add_key, create_pool},
+    api::manager_2_1::methods::{add_key, create_pool, delete_key},
     types::TData,
 };
 
@@ -39,8 +39,20 @@ pub fn add_key_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TD
         // b: true if the key description already existed in the kernel keyring and
         //    the key data has been changed to a new value.
         //
-        // Rust representation: bool
+        // Rust representation: (bool, bool)
         .out_arg(("result", "(bb)"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"))
+}
+
+pub fn delete_key_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+    f.method("DeleteKey", (), delete_key)
+        .in_arg(("key_desc", "s"))
+        // b: true if the key was deleted from the keyring. false if the key
+        //    was not present in the keyring before the operation.
+        //
+        // Rust representation: bool
+        .out_arg(("result", "b"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"))
 }

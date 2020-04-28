@@ -48,6 +48,15 @@ impl Engine for SimEngine {
     ) -> StratisResult<CreateAction<PoolUuid>> {
         let redundancy = calculate_redundancy!(redundancy);
 
+        if let Some(ref key_desc) = key_desc {
+            if !self.key_handler.contains_key(key_desc) {
+                return Err(StratisError::Engine(
+                    ErrorEnum::NotFound,
+                    format!("Key {} was not found in the keyring", key_desc),
+                ));
+            }
+        }
+
         match self.pools.get_by_name(name) {
             Some((_, pool)) => create_pool_idempotent_or_err(pool, name, blockdev_paths),
             None => {

@@ -22,6 +22,12 @@ use crate::{
 #[derive(Debug, Default)]
 pub struct SimKeyActions(HashMap<String, String>);
 
+impl SimKeyActions {
+    pub fn contains_key(&self, key_desc: &str) -> bool {
+        self.0.contains_key(key_desc)
+    }
+}
+
 impl KeyActions for SimKeyActions {
     fn add(&mut self, key_desc: &str, key_fd: RawFd) -> StratisResult<CreateAction<bool>> {
         let mut line_iter = BufReader::new(unsafe { File::from_raw_fd(key_fd) }).lines();

@@ -12,7 +12,7 @@ use devicemapper::Device;
 
 use crate::engine::{
     strat_engine::{
-        backstore::{get_metadata, identify_block_device},
+        backstore::{get_blockdevs, get_metadata, identify_block_device},
         devlinks::setup_pool_devlinks,
         pool::StratPool,
     },
@@ -83,7 +83,16 @@ impl LiminalDevices {
                         uuid.to_simple_ref()));
             }
 
-            StratPool::setup(pool_uuid, devices, timestamp, &metadata)
+            let (datadevs, cachedevs) = match get_blockdevs(pool_uuid, &metadata.backstore, devices) {
+                Err(err) => return Err(format!(
+                        "There was an error encountered when calculating the block devices for pool with UUID {} and name {}: {}",
+                        pool_uuid.to_simple_ref(),
+                        &metadata.name,
+                        err)),
+                Ok((datadevs, cachedevs)) => (datadevs, cachedevs),
+            };
+
+            StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata)
                 .map_err(|err| {
                     format!(
                         "An attempt to set up pool with UUID {} from the assembled devices failed: {}",

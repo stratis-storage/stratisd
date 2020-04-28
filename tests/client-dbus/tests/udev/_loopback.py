@@ -25,6 +25,9 @@ _LOSETUP_BIN = os.getenv("STRATIS_LOSETUP_BIN", "/usr/sbin/losetup")
 
 _SIZE_OF_DEVICE = 1024 ** 4  # 1 TiB
 
+def _check_tokens(self, tokens):
+    if not all(token in self.devices for token in tokens):
+        raise RuntimeError("No tokens found")
 
 class LoopBackDevices:
     """
@@ -80,7 +83,7 @@ class LoopBackDevices:
         :return: None
         :raises: AssertionError if any token not found
         """
-        assert all(token in self.devices for token in tokens)
+        _check_tokens(self, tokens)
         for token in tokens:
             (device, backing_file) = self.devices[token]
             subprocess.check_call([_LOSETUP_BIN, "-d", device])
@@ -94,7 +97,7 @@ class LoopBackDevices:
         :return: None
         :raises AssertionError: if any token not found or missing device node
         """
-        assert all(token in self.devices for token in tokens)
+        _check_tokens(self, tokens)
         for token in tokens:
             (device, _) = self.devices[token]
 
@@ -113,7 +116,7 @@ class LoopBackDevices:
         :return: None
         :raise AssertionError: if token not present
         """
-        assert all(token in self.devices for token in tokens)
+        _check_tokens(self, tokens)
         for token in tokens:
             (_, backing_file) = self.devices[token]
 

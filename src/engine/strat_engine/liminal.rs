@@ -12,7 +12,7 @@ use devicemapper::Device;
 
 use crate::engine::{
     strat_engine::{
-        backstore::{get_metadata, StratisInfo},
+        backstore::{get_metadata, identify_block_device},
         devlinks::setup_pool_devlinks,
         pool::StratPool,
     },
@@ -126,45 +126,47 @@ impl LiminalDevices {
     pub fn block_evaluate(
         &mut self,
         pools: &Table<StratPool>,
-        info: StratisInfo,
-    ) -> Option<(Name, StratPool)> {
-        let pool_uuid = info.identifiers.pool_uuid;
-        if pools.contains_uuid(pool_uuid) {
-            // FIXME: There is the possibilty of an error condition here,
-            // if the device found is not in the already set up pool.
-            None
-        } else {
-            let mut devices = self
-                .errored_pool_devices
-                .remove(&pool_uuid)
-                .unwrap_or_else(HashMap::new);
+        event: &libudev::Event,
+    ) -> Option<(PoolUuid, Name, StratPool)> {
+        identify_block_device(event.device()).and_then(move |info| {
+            let pool_uuid = info.identifiers.pool_uuid;
+            if pools.contains_uuid(pool_uuid) {
+                // FIXME: There is the possibilty of an error condition here,
+                // if the device found is not in the already set up pool.
+                None
+            } else {
+                let mut devices = self
+                    .errored_pool_devices
+                    .remove(&pool_uuid)
+                    .unwrap_or_else(HashMap::new);
 
-            if devices
-                .insert(
-                    info.device_number,
-                    (info.identifiers.device_uuid, info.devnode),
-                )
-                .is_none()
-            {
-                info!(
-                    "Stratis block device with device number \"{}\", pool UUID \"{}\", and device UUID \"{}\" discovered, i.e., identified for the first time during this execution of stratisd",
-                    info.device_number,
-                    info.identifiers.pool_uuid.to_simple_ref(),
-                    info.identifiers.device_uuid.to_simple_ref(),
-                );
+                if devices
+                    .insert(
+                        info.device_number,
+                        (info.identifiers.device_uuid, info.devnode),
+                    )
+                    .is_none()
+                {
+                    info!(
+                        "Stratis block device with device number \"{}\", pool UUID \"{}\", and device UUID \"{}\" discovered, i.e., identified for the first time during this execution of stratisd",
+                        info.device_number,
+                        info.identifiers.pool_uuid.to_simple_ref(),
+                        info.identifiers.device_uuid.to_simple_ref(),
+                    );
+                }
+
+                // FIXME: An attempt to set up the pool is made, even if no
+                // new device has been added to the set of devices that appear
+                // to belong to the pool. The reason for this is that there
+                // may be many causes of failure to set up a pool, and that
+                // it may be worth another try. If an attempt to setup the
+                // pool is only made on discovery of a new device that may
+                // leave a pool that could be set up in limbo forever. An
+                // alternative, where the user can explicitly ask to try to
+                // set up an incomplete pool would be a better choice.
+                self.try_setup_pool(pools, pool_uuid, devices).map(|(name, pool)| (pool_uuid, name, pool))
             }
-
-            // FIXME: An attempt to set up the pool is made, even if no
-            // new device has been added to the set of devices that appear
-            // to belong to the pool. The reason for this is that there
-            // may be many causes of failure to set up a pool, and that
-            // it may be worth another try. If an attempt to setup the
-            // pool is only made on discovery of a new device that may
-            // leave a pool that could be set up in limbo forever. An
-            // alternative, where the user can explicitly ask to try to
-            // set up an incomplete pool would be a better choice.
-            self.try_setup_pool(pools, pool_uuid, devices)
-        }
+        })
     }
 
     /// Generate a JSON report giving some information about the internals

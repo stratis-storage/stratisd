@@ -27,8 +27,7 @@ use crate::{
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
-/// Get the most recent metadata from a set of Devices for a given pool UUID.
-/// Returns None if no metadata found for this pool.
+/// Augment the devnodes structure with the BDA read from the device.
 ///
 /// Precondition: All devices represented by devnodes have been already
 /// identified as having the given pool UUID and their associated device
@@ -36,41 +35,50 @@ use crate::{
 /// already known. It is also an error if the BDA can not be read at all
 /// as that BDA may belong to the device with the most recently written
 /// metadata.
-pub fn get_metadata(
+pub fn add_bdas(
     pool_uuid: PoolUuid,
     devnodes: &HashMap<Device, (DevUuid, PathBuf)>,
-) -> StratisResult<Option<(DateTime<Utc>, PoolSave)>> {
-    let mut bdas = Vec::new();
-    for (device_uuid, devnode) in devnodes.values() {
+) -> StratisResult<HashMap<Device, (DevUuid, PathBuf, BDA)>> {
+    let mut infos = HashMap::new();
+    for (device, (device_uuid, devnode)) in devnodes.iter() {
         let bda = BDA::load(&mut OpenOptions::new()
                             .read(true)
                             .open(devnode)?)?
             .ok_or_else(||
                         StratisError::Error(format!(
-                                "Failed to read BDA from device {} which has previously been identified as a Stratis device with pool UUID {} and device UUID {}",
+                                "Failed to read BDA from device {} with devnode {} which has previously been identified as a Stratis device with pool UUID {} and device UUID {}",
+                                device,
                                 devnode.display(),
                                 pool_uuid.to_simple_ref(),
                                 device_uuid.to_simple_ref())))?;
         if bda.pool_uuid() != pool_uuid || bda.dev_uuid() != *device_uuid {
             return Err(StratisError::Error(format!(
-                        "BDA identifiers (pool UUID: {}, device UUID: {}) for device {} do not agree with previously read identifiers (pool UUID: {}, device UUID: {})",
+                        "BDA identifiers (pool UUID: {}, device UUID: {}) for device {} with devnode {} do not agree with previously read identifiers (pool UUID: {}, device UUID: {})",
                         bda.pool_uuid().to_simple_ref(),
                         bda.dev_uuid().to_simple_ref(),
+                        device,
                         devnode.display(),
                         pool_uuid.to_simple_ref(),
                         device_uuid.to_simple_ref()
                         )));
         };
-        bdas.push((devnode, bda));
+        infos.insert(*device, (pool_uuid, devnode.to_owned(), bda));
     }
+    Ok(infos)
+}
 
+/// Get the most recent metadata from a set of devices.
+/// Returns None if no metadata found for this pool.
+pub fn get_metadata(
+    devnodes: &HashMap<Device, (DevUuid, PathBuf, BDA)>,
+) -> StratisResult<Option<(DateTime<Utc>, PoolSave)>> {
     // Most recent time should never be None if this was a properly
     // created pool; this allows for the method to be called in other
     // circumstances.
     let most_recent_time = {
-        match bdas
+        match devnodes
             .iter()
-            .filter_map(|&(_, ref bda)| bda.last_update_time())
+            .filter_map(|(_, (_, _, ref bda))| bda.last_update_time())
             .max()
         {
             Some(time) => time,
@@ -81,8 +89,9 @@ pub fn get_metadata(
     // Try to read from all available devnodes that could contain most
     // recent metadata. In the event of errors, continue to try until all are
     // exhausted.
-    bdas.iter()
-        .filter_map(|&(devnode, ref bda)| {
+    devnodes
+        .iter()
+        .filter_map(|(_, (_, devnode, ref bda))| {
             if bda.last_update_time() == Some(most_recent_time) {
                 OpenOptions::new()
                     .read(true)
@@ -107,17 +116,14 @@ pub fn get_metadata(
 /// Get all the blockdevs corresponding to this pool that can be obtained from
 /// the given devices. Sort the blockdevs in the order in which they were
 /// recorded in the metadata.
-/// Returns an error if a BDA can not be read or can not be found on any
-/// blockdev in devnodes.
 /// Returns an error if the blockdevs obtained do not match the metadata.
 /// Returns a tuple, of which the first are the data devs, and the second
 /// are the devs that support the cache tier.
 /// Precondition: Every device in devnodes has already been determined to
-/// belong to the pool with the specified pool uuid.
+/// belong to one pool; all BDAs agree on their pool UUID.
 pub fn get_blockdevs(
-    pool_uuid: PoolUuid,
     backstore_save: &BackstoreSave,
-    devnodes: &HashMap<Device, (DevUuid, PathBuf)>,
+    devnodes: HashMap<Device, (DevUuid, PathBuf, BDA)>,
 ) -> StratisResult<(Vec<StratBlockDev>, Vec<StratBlockDev>)> {
     let recorded_data_map: HashMap<DevUuid, (usize, &BaseBlockDevSave)> = backstore_save
         .data_tier
@@ -237,18 +243,10 @@ pub fn get_blockdevs(
     }
 
     let (mut datadevs, mut cachedevs): (Vec<StratBlockDev>, Vec<StratBlockDev>) = (vec![], vec![]);
-    for (device, (_, devnode)) in devnodes {
-        let bda = BDA::load(&mut OpenOptions::new().read(true).open(devnode)?)?.ok_or_else(|| {
-            StratisError::Engine(ErrorEnum::NotFound,
-                                                 format!("Device {} with devnode {} was previously determined to belong to pool with uuid {} but no BDA was found",
-                                                 device,
-                                                 devnode.display(),
-                                                 pool_uuid.to_simple_ref()))
-        })?;
-
+    for (device, (_, devnode, bda)) in devnodes {
         get_blockdev(
-            *device,
-            devnode,
+            device,
+            &devnode,
             bda,
             &recorded_data_map,
             &recorded_cache_map,

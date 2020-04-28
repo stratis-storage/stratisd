@@ -584,7 +584,7 @@ mod tests {
 
     use crate::engine::{
         strat_engine::{
-            backstore::{get_blockdevs, get_metadata},
+            backstore::{add_bdas, get_blockdevs, get_metadata},
             devlinks,
             tests::{loopbacked, real},
         },
@@ -637,16 +637,22 @@ mod tests {
             .map(|(device_uuid, blockdev)| (*blockdev.device(), (*device_uuid, blockdev.devnode())))
             .collect();
 
-        let (_, pool_save1) = get_metadata(uuid1, &devnodes1).unwrap().unwrap();
-        let (_, pool_save2) = get_metadata(uuid2, &devnodes2).unwrap().unwrap();
+        let infos1 = add_bdas(uuid1, &devnodes1).unwrap();
+        let infos2 = add_bdas(uuid2, &devnodes2).unwrap();
+
+        let (_, pool_save1) = get_metadata(&infos1).unwrap().unwrap();
+        let (_, pool_save2) = get_metadata(&infos2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
         assert_eq!(pool_save2, metadata2);
 
         pool1.teardown().unwrap();
         pool2.teardown().unwrap();
 
-        let (_, pool_save1) = get_metadata(uuid1, &devnodes1).unwrap().unwrap();
-        let (_, pool_save2) = get_metadata(uuid2, &devnodes2).unwrap().unwrap();
+        let infos1 = add_bdas(uuid1, &devnodes1).unwrap();
+        let infos2 = add_bdas(uuid2, &devnodes2).unwrap();
+
+        let (_, pool_save1) = get_metadata(&infos1).unwrap().unwrap();
+        let (_, pool_save2) = get_metadata(&infos2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
         assert_eq!(pool_save2, metadata2);
     }
@@ -766,8 +772,9 @@ mod tests {
 
         pool.teardown().unwrap();
 
-        let (timestamp, metadata) = get_metadata(uuid, &devices).unwrap().unwrap();
-        let (datadevs, cachedevs) = get_blockdevs(uuid, &metadata.backstore, &devices).unwrap();
+        let infos = add_bdas(uuid, &devices).unwrap();
+        let (timestamp, metadata) = get_metadata(&infos).unwrap().unwrap();
+        let (datadevs, cachedevs) = get_blockdevs(&metadata.backstore, infos).unwrap();
 
         let (name, pool) =
             StratPool::setup(uuid, datadevs, cachedevs, timestamp, &metadata).unwrap();

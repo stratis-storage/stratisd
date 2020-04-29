@@ -42,8 +42,8 @@ class LoopBackDevices:
         self.devices = {}
 
     def _check_tokens(self, tokens):
-        if not all(token in self.devices for token in tokens):
-            raise RuntimeError("No tokens found")
+        if any(token not in self.devices for token in tokens):
+            raise RuntimeError("One of the specified tokens is unknown to this manager")
 
     def create_devices(self, number):
         """
@@ -142,7 +142,7 @@ class LoopBackDevices:
         :raises: RuntimeError if any devnode is None
         """
         result = [self.devices[token][0] for token in tokens]
-        if not all([devnode is not None for devnode in result]):
+        if any([devnode is None for devnode in result]):
             raise RuntimeError("At least one devnode is None")
         return result
 

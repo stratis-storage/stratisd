@@ -361,16 +361,10 @@ impl Pool for StratPool {
                             pool_name)
                 ));
         } else if paths.is_empty() {
-            // If the cache has been initialized and we are adding zero blockdevs,
-            // treat adding no new blockdevs as the empty set.
             return Ok(SetCreateAction::new(vec![]));
         } else if tier == BlockDevTier::Cache {
             // If adding cache devices, must suspend the pool; the cache
-            // must be augmented with the new devices. Note that this
-            // justifies checking whether the cache is initialized
-            // before beginning the operation; it is unreasonable to
-            // do an interesting operation like suspending the pool if
-            // the blockdevs are not going to be added anyway.
+            // must be augmented with the new devices.
             self.thin_pool.suspend()?;
             let bdev_info_res = self
                 .backstore

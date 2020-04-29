@@ -221,7 +221,9 @@ class _Service:
 
         time.sleep(1)
         if service.poll() is not None:
-            raise Exception("Daemon unexpectedly exited with %s" % service.returncode)
+            raise RuntimeError(
+                "Daemon unexpectedly exited with %s" % service.returncode
+            )
 
         if not dbus_interface_present:
             raise RuntimeError("No D-Bus interface for stratisd found")

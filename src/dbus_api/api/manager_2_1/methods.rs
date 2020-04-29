@@ -2,9 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::os::unix::io::RawFd;
+use std::os::unix::io::AsRawFd;
 
 use dbus::{
+    arg::OwnedFd,
     tree::{MTFn, MethodInfo, MethodResult},
     Message,
 };
@@ -27,7 +28,7 @@ pub fn add_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut iter = message.iter_init();
 
     let key_desc: &str = get_next_arg(&mut iter, 0)?;
-    let key_fd: RawFd = get_next_arg(&mut iter, 1)?;
+    let key_fd: OwnedFd = get_next_arg(&mut iter, 1)?;
 
     let dbus_context = m.tree.get_data();
     let default_return = (false, false);
@@ -37,7 +38,7 @@ pub fn add_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .engine
         .borrow_mut()
         .get_key_handler_mut()
-        .add(key_desc, key_fd)
+        .add(key_desc, key_fd.as_raw_fd())
     {
         Ok(idem_resp) => {
             let return_value = match idem_resp {

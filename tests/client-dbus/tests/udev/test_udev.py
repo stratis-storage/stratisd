@@ -63,12 +63,12 @@ def random_string(length):
 def _create_pool(name, devices, *, key_description=None):
     """
     Creates a stratis pool. Tries three times before giving up.
-    Raises a runtime error if it does not succeed after three tries.
     :param name:    Name of pool
     :param devices:  Devices to use for pool
     :param key_description: optional key description
     :type key_description: str or NoneType
     :return: Dbus proxy object representing pool.
+    :raises RuntimeError: if pool is not created after three tries
     """
     error_reasons = []
     for _ in range(3):
@@ -133,7 +133,8 @@ def _wait_for_udev(expected_paths):
     expected. Always get the result of at least 1 Stratis enumeration.
     :param expected_paths: devnodes of paths that should belong to Stratis
     :type expected_paths: list of str
-    :return: None (May exit with a RuntimeError)
+    :return: None
+    :raises RuntimeError: if unexpected device nodes are found
     """
 
     expected_devnodes = frozenset(expected_paths)
@@ -173,6 +174,7 @@ def _remove_stratis_dm_devices():
     """
     Remove Stratis device mapper devices, fail with a runtime error if
     some have been missed.
+    :raises RuntimeError: if some devices are remaining
     """
     remove_stratis_setup()
     if _get_stratis_devices() != []:

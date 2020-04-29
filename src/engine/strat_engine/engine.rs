@@ -127,7 +127,7 @@ impl<'a> Into<Value> for &'a StratEngine {
                     })
                     .collect()
             ),
-            "errored_pools": &self.liminal_devices.report(),
+            "errored_pools": self.liminal_devices.report(),
         })
     }
 }

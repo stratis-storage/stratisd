@@ -41,6 +41,10 @@ class LoopBackDevices:
         self.count = 0
         self.devices = {}
 
+    def _check_tokens(self, tokens):
+        if any(token not in self.devices for token in tokens):
+            raise RuntimeError("One of the specified tokens is unknown to this manager")
+
     def create_devices(self, number):
         """
         Create new loop back devices.
@@ -78,9 +82,9 @@ class LoopBackDevices:
         :param tokens: Opaque representation of some loop back devices
         :type tokens: list of uuid.UUID
         :return: None
-        :raises: AssertionError if any token not found
+        :raises: RuntimeError if any token not found
         """
-        assert all(token in self.devices for token in tokens)
+        self._check_tokens(tokens)
         for token in tokens:
             (device, backing_file) = self.devices[token]
             subprocess.check_call([_LOSETUP_BIN, "-d", device])
@@ -92,13 +96,14 @@ class LoopBackDevices:
         :param tokens: Opaque representation of some loop back devices
         :type tokens: list of uuid.UUID
         :return: None
-        :raises AssertionError: if any token not found or missing device node
+        :raises RuntimeError: if any token not found or missing device node
         """
-        assert all(token in self.devices for token in tokens)
+        self._check_tokens(tokens)
         for token in tokens:
             (device, _) = self.devices[token]
 
-            assert device is not None
+            if device is None:
+                raise RuntimeError("Device node is missing")
 
             device_name = os.path.split(device)[-1]
             ufile = os.path.join("/sys/block", device_name, "uevent")
@@ -111,9 +116,9 @@ class LoopBackDevices:
         :param tokens: Opaque representation of some loop back devices
         :type tokens: list of uuid.UUID
         :return: None
-        :raise AssertionError: if token not present
+        :raise RuntimeError: if token not present
         """
-        assert all(token in self.devices for token in tokens)
+        self._check_tokens(tokens)
         for token in tokens:
             (_, backing_file) = self.devices[token]
 
@@ -134,10 +139,11 @@ class LoopBackDevices:
         :return: The list devices corresponding to the tokens
         :rtype: list of str
         :raises: KeyError if any token is not found
-        :raises: AssertionError if any devnode is None
+        :raises: RuntimeError if any devnode is None
         """
         result = [self.devices[token][0] for token in tokens]
-        assert all([devnode is not None for devnode in result])
+        if any([devnode is None for devnode in result]):
+            raise RuntimeError("At least one devnode is None")
         return result
 
     def destroy_devices(self):

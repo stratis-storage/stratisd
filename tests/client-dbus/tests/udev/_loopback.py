@@ -26,11 +26,6 @@ _LOSETUP_BIN = os.getenv("STRATIS_LOSETUP_BIN", "/usr/sbin/losetup")
 _SIZE_OF_DEVICE = 1024 ** 4  # 1 TiB
 
 
-def _check_tokens(self, tokens):
-    if not all(token in self.devices for token in tokens):
-        raise RuntimeError("No tokens found")
-
-
 class LoopBackDevices:
     """
     Class for creating and managing loop back devices which are needed for
@@ -45,6 +40,10 @@ class LoopBackDevices:
         self.dir = tempfile.mkdtemp("_stratis_loop_back")
         self.count = 0
         self.devices = {}
+
+    def _check_tokens(self, tokens):
+        if not all(token in self.devices for token in tokens):
+            raise RuntimeError("No tokens found")
 
     def create_devices(self, number):
         """
@@ -85,7 +84,7 @@ class LoopBackDevices:
         :return: None
         :raises: RuntimeError if any token not found
         """
-        _check_tokens(self, tokens)
+        self._check_tokens(tokens)
         for token in tokens:
             (device, backing_file) = self.devices[token]
             subprocess.check_call([_LOSETUP_BIN, "-d", device])
@@ -99,7 +98,7 @@ class LoopBackDevices:
         :return: None
         :raises RuntimeError: if any token not found or missing device node
         """
-        _check_tokens(self, tokens)
+        self._check_tokens(tokens)
         for token in tokens:
             (device, _) = self.devices[token]
 
@@ -119,7 +118,7 @@ class LoopBackDevices:
         :return: None
         :raise RuntimeError: if token not present
         """
-        _check_tokens(self, tokens)
+        self._check_tokens(tokens)
         for token in tokens:
             (_, backing_file) = self.devices[token]
 

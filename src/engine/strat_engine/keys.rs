@@ -364,34 +364,24 @@ impl StratKeyActions {
 }
 
 impl KeyActions for StratKeyActions {
-    fn add(
-        &mut self,
-        key_desc: &str,
-        key_fd: RawFd,
-        binary_input: bool,
-    ) -> StratisResult<CreateAction<bool>> {
-        let mut key_file = unsafe { File::from_raw_fd(key_fd) };
+    fn add(&mut self, key_desc: &str, key_fd: RawFd) -> StratisResult<CreateAction<bool>> {
+        let key_file = unsafe { File::from_raw_fd(key_fd) };
         let mut memory = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
-        let pos = if binary_input {
-            key_file.read(memory.as_mut())?
-        } else {
-            let mut pos = 0;
-            for byte in key_file.bytes() {
-                match byte.map(|b| b as char) {
-                    Ok('\n') => break,
-                    Ok(c) => {
-                        if pos >= MAX_STRATIS_PASS_SIZE {
-                            break;
-                        }
-
-                        memory.as_mut()[pos] = c as u8;
-                        pos += 1;
+        let mut pos = 0;
+        for byte in key_file.bytes() {
+            match byte.map(|b| b as char) {
+                Ok('\n') => break,
+                Ok(c) => {
+                    if pos >= MAX_STRATIS_PASS_SIZE {
+                        break;
                     }
-                    Err(e) => return Err(e.into()),
+
+                    memory.as_mut()[pos] = c as u8;
+                    pos += 1;
                 }
+                Err(e) => return Err(e.into()),
             }
-            pos
-        };
+        }
         let sized_memory = SizedKeyMemory::new(memory, pos);
 
         Ok(add_key_idem(

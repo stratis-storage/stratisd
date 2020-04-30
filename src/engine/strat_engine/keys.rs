@@ -364,19 +364,23 @@ impl StratKeyActions {
 }
 
 impl KeyActions for StratKeyActions {
-    fn add(&mut self, key_desc: &str, key_fd: RawFd) -> StratisResult<CreateAction<bool>> {
+    fn add(
+        &mut self,
+        key_desc: &str,
+        key_fd: RawFd,
+        interactive: bool,
+    ) -> StratisResult<CreateAction<bool>> {
         let key_file = unsafe { File::from_raw_fd(key_fd) };
         let mut memory = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
         let mut pos = 0;
         for byte in key_file.bytes() {
-            match byte.map(|b| b as char) {
-                Ok('\n') => break,
-                Ok(c) => {
-                    if pos >= MAX_STRATIS_PASS_SIZE {
+            match byte {
+                Ok(b) => {
+                    if (interactive && b as char == '\n') || pos >= MAX_STRATIS_PASS_SIZE {
                         break;
                     }
 
-                    memory.as_mut()[pos] = c as u8;
+                    memory.as_mut()[pos] = b;
                     pos += 1;
                 }
                 Err(e) => return Err(e.into()),

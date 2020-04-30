@@ -32,13 +32,21 @@ pub trait KeyActions {
     /// containing a `bool` which indicates whether a key with the requested
     /// key description was in the keyring and the key data was updated.
     ///
+    /// If `interactive` is `true`, the end of a passphrase should be delimited
+    /// by a newline.
+    ///
     /// Successful return values:
     /// * `Ok(CreateAction::Identity)`: The key was already in the keyring with the
     /// appropriate key description and key data.
     /// * `Ok(CreateAction::Created(false)`: The key was newly added to the keyring.
     /// * `Ok(CreateAction::Created(true)`: The key description was already present
     /// in the keyring but the key data was updated.
-    fn add(&mut self, key_desc: &str, key_fd: RawFd) -> StratisResult<CreateAction<bool>>;
+    fn add(
+        &mut self,
+        key_desc: &str,
+        key_fd: RawFd,
+        interactive: bool,
+    ) -> StratisResult<CreateAction<bool>>;
     /// Return a list of all key descriptions of keys added to the keyring by
     /// Stratis that are still valid.
     fn list(&self) -> StratisResult<Vec<String>>;

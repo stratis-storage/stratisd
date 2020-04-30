@@ -5,7 +5,7 @@
 use std::{
     collections::HashMap,
     fs::File,
-    io::{BufRead, BufReader, Write},
+    io::{Read, Write},
     os::unix::io::{FromRawFd, RawFd},
 };
 
@@ -16,11 +16,11 @@ use crate::{
         engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
         types::{CreateAction, DeleteAction, KeySerial, SizedKeyMemory},
     },
-    stratis::{StratisError, StratisResult},
+    stratis::StratisResult,
 };
 
 #[derive(Debug, Default)]
-pub struct SimKeyActions(HashMap<String, String>);
+pub struct SimKeyActions(HashMap<String, Vec<u8>>);
 
 impl SimKeyActions {
     pub fn contains_key(&self, key_desc: &str) -> bool {
@@ -29,27 +29,40 @@ impl SimKeyActions {
 }
 
 impl KeyActions for SimKeyActions {
-    fn add(&mut self, key_desc: &str, key_fd: RawFd) -> StratisResult<CreateAction<bool>> {
-        let mut line_iter = BufReader::new(unsafe { File::from_raw_fd(key_fd) }).lines();
-        let new_key_data = match line_iter.next() {
-            Some(Ok(kd)) => kd,
-            _ => {
-                return Err(StratisError::Error(
-                    "Unable to get data passed over the key file descriptor".to_string(),
-                ))
+    fn add(
+        &mut self,
+        key_desc: &str,
+        key_fd: RawFd,
+        interactive: bool,
+    ) -> StratisResult<CreateAction<bool>> {
+        let key_file = unsafe { File::from_raw_fd(key_fd) };
+        let new_key_data = &mut [0u8; MAX_STRATIS_PASS_SIZE];
+        let mut pos = 0;
+        for byte in key_file.bytes() {
+            match byte {
+                Ok(b) => {
+                    if (interactive && b as char == '\n') || pos >= MAX_STRATIS_PASS_SIZE {
+                        break;
+                    }
+
+                    new_key_data[pos] = b;
+                    pos += 1;
+                }
+                Err(e) => return Err(e.into()),
             }
-        };
+        }
+
         match self.read(key_desc) {
             Ok(Some((_, key_data))) => {
-                if key_data.as_ref() == new_key_data.as_bytes() {
+                if key_data.as_ref() == new_key_data as &[u8] {
                     Ok(CreateAction::Identity)
                 } else {
-                    self.0.insert(key_desc.to_string(), new_key_data);
+                    self.0.insert(key_desc.to_string(), new_key_data.to_vec());
                     Ok(CreateAction::Created(true))
                 }
             }
             Ok(None) => {
-                self.0.insert(key_desc.to_string(), new_key_data);
+                self.0.insert(key_desc.to_string(), new_key_data.to_vec());
                 Ok(CreateAction::Created(false))
             }
             Err(e) => Err(e),
@@ -64,7 +77,7 @@ impl KeyActions for SimKeyActions {
         match self.0.get(key_desc) {
             Some(key) => {
                 let mut mem = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
-                mem.as_mut().write_all(key.as_bytes())?;
+                mem.as_mut().write_all(key)?;
                 let key = SizedKeyMemory::new(mem, key.len());
                 Ok(Some((0xdead_beef, key)))
             }

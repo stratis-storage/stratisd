@@ -38,12 +38,7 @@ pub trait KeyActions {
     /// * `Ok(CreateAction::Created(false)`: The key was newly added to the keyring.
     /// * `Ok(CreateAction::Created(true)`: The key description was already present
     /// in the keyring but the key data was updated.
-    fn add(
-        &mut self,
-        key_desc: &str,
-        key_fd: RawFd,
-        binary_input: bool,
-    ) -> StratisResult<CreateAction<bool>>;
+    fn add(&mut self, key_desc: &str, key_fd: RawFd) -> StratisResult<CreateAction<bool>>;
     /// Return a list of all key descriptions of keys added to the keyring by
     /// Stratis that are still valid.
     fn list(&self) -> StratisResult<Vec<String>>;

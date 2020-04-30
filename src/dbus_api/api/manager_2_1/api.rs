@@ -35,6 +35,7 @@ pub fn add_key_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TD
     f.method("AddKey", (), add_key)
         .in_arg(("key_desc", "s"))
         .in_arg(("key_fd", "h"))
+        .in_arg(("interactive", "b"))
         // b: true if the key state was changed in the kernel keyring.
         // b: true if the key description already existed in the kernel keyring and
         //    the key data has been changed to a new value.

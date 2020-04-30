@@ -290,13 +290,20 @@ class _KernelKey:  # pylint: disable=attribute-defined-outside-init
             key_desc = base64.b64encode(urandom_f.read(16)).decode("utf-8")
 
         args = ["keyctl", "get_persistent", "@s", "0"]
-        exit_values = subprocess.run(args, capture_output=True, text=True)
+        exit_values = subprocess.run(
+            args,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+        )
         _KernelKey._raise_keyctl_error(exit_values.returncode, args)
 
         self.persistent_id = exit_values.stdout.strip()
 
         args = ["keyctl", "add", "user", key_desc, self.key_data, self.persistent_id]
-        exit_values = subprocess.run(args, capture_output=True)
+        exit_values = subprocess.run(
+            args, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        )
         _KernelKey._raise_keyctl_error(exit_values.returncode, args)
 
         return key_desc

@@ -361,6 +361,7 @@ impl Pool for StratPool {
                             pool_name)
                 ));
         } else if paths.is_empty() {
+            //TODO: Substitute is_empty check with process_and_verify_devices
             return Ok(SetCreateAction::new(vec![]));
         } else if tier == BlockDevTier::Cache {
             // If adding cache devices, must suspend the pool; the cache

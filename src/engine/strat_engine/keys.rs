@@ -373,17 +373,28 @@ impl KeyActions for StratKeyActions {
         let key_file = unsafe { File::from_raw_fd(key_fd) };
         let mut memory = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
         let mut pos = 0;
-        for byte in key_file.bytes() {
-            match byte {
-                Ok(b) => {
-                    if (interactive && b as char == '\n') || pos >= MAX_STRATIS_PASS_SIZE {
+        let mut bytes_iter = key_file.bytes();
+        loop {
+            match bytes_iter.next() {
+                Some(Ok(b)) => {
+                    if interactive && b as char == '\n' {
+                        break;
+                    }
+                    if pos == MAX_STRATIS_PASS_SIZE {
+                        if bytes_iter.next().is_some() {
+                            return Err(StratisError::Engine(
+                                ErrorEnum::Invalid,
+                                "Provided key was too long".to_string(),
+                            ));
+                        }
                         break;
                     }
 
                     memory.as_mut()[pos] = b;
                     pos += 1;
                 }
-                Err(e) => return Err(e.into()),
+                Some(Err(e)) => return Err(e.into()),
+                None => break,
             }
         }
         let sized_memory = SizedKeyMemory::new(memory, pos);

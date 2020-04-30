@@ -16,7 +16,7 @@ use crate::{
         engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
         types::{CreateAction, DeleteAction, KeySerial, SizedKeyMemory},
     },
-    stratis::StratisResult,
+    stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
 #[derive(Debug, Default)]
@@ -38,17 +38,28 @@ impl KeyActions for SimKeyActions {
         let key_file = unsafe { File::from_raw_fd(key_fd) };
         let new_key_data = &mut [0u8; MAX_STRATIS_PASS_SIZE];
         let mut pos = 0;
-        for byte in key_file.bytes() {
-            match byte {
-                Ok(b) => {
-                    if (interactive && b as char == '\n') || pos >= MAX_STRATIS_PASS_SIZE {
+        let mut bytes_iter = key_file.bytes();
+        loop {
+            match bytes_iter.next() {
+                Some(Ok(b)) => {
+                    if interactive && b as char == '\n' {
+                        break;
+                    }
+                    if pos == MAX_STRATIS_PASS_SIZE {
+                        if bytes_iter.next().is_some() {
+                            return Err(StratisError::Engine(
+                                ErrorEnum::Invalid,
+                                "Provided key was too long".to_string(),
+                            ));
+                        }
                         break;
                     }
 
                     new_key_data[pos] = b;
                     pos += 1;
                 }
-                Err(e) => return Err(e.into()),
+                Some(Err(e)) => return Err(e.into()),
+                None => break,
             }
         }
 

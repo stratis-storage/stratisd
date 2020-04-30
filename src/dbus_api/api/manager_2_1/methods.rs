@@ -29,17 +29,17 @@ pub fn add_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let key_desc: &str = get_next_arg(&mut iter, 0)?;
     let key_fd: OwnedFd = get_next_arg(&mut iter, 1)?;
+    let binary_input: bool = get_next_arg(&mut iter, 2)?;
 
     let dbus_context = m.tree.get_data();
     let default_return = (false, false);
     let return_message = message.method_return();
 
-    let msg = match dbus_context
-        .engine
-        .borrow_mut()
-        .get_key_handler_mut()
-        .add(key_desc, key_fd.as_raw_fd())
-    {
+    let msg = match dbus_context.engine.borrow_mut().get_key_handler_mut().add(
+        key_desc,
+        key_fd.as_raw_fd(),
+        binary_input,
+    ) {
         Ok(idem_resp) => {
             let return_value = match idem_resp {
                 CreateAction::Created(is_changed) => (true, is_changed),

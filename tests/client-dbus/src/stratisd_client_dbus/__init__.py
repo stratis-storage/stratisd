@@ -16,21 +16,21 @@ Top-level classes and methods.
 """
 
 from ._connection import get_object
-
-from ._implementation import Blockdev
-from ._implementation import FetchProperties
-from ._implementation import FetchPropertiesR1
-from ._implementation import Filesystem
-from ._implementation import Manager
-from ._implementation import ManagerR1
-from ._implementation import ObjectManager
-from ._implementation import Pool
-from ._implementation import PoolR1
-from ._implementation import ReportR1
-from ._implementation import blockdevs
-from ._implementation import pools
-from ._implementation import filesystems
-from ._implementation import MOBlockDev
-from ._implementation import MOPool
-
+from ._implementation import (
+    Blockdev,
+    FetchProperties,
+    FetchPropertiesR1,
+    Filesystem,
+    Manager,
+    ManagerR1,
+    MOBlockDev,
+    MOPool,
+    ObjectManager,
+    Pool,
+    PoolR1,
+    ReportR1,
+    blockdevs,
+    filesystems,
+    pools,
+)
 from ._stratisd_constants import StratisdErrors

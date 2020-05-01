@@ -16,6 +16,8 @@ use libcryptsetup_rs::{
     CryptVolumeKeyFlags, CryptWipePattern, EncryptionFormat, LibcryptErr, SafeMemHandle,
 };
 
+#[cfg(test)]
+use crate::engine::strat_engine::backstore::metadata::StratisIdentifiers;
 use crate::engine::{strat_engine::names::format_crypt_name, DevUuid, PoolUuid};
 
 type Result<T> = std::result::Result<T, LibcryptErr>;
@@ -270,7 +272,8 @@ impl CryptHandle {
 
     /// This method will check that the metadata on the given device is
     /// for the LUKS2 format and that the LUKS2 metadata is formatted
-    /// properly as a Stratis encrypted device.
+    /// properly as a Stratis encrypted device. If it is properly
+    /// formatted it will return the device identifiers (pool and device UUIDs).
     ///
     /// NOTE: This will not validate that the proper key is in the kernel
     /// keyring. For that, use `CryptHandle::can_unlock()`.
@@ -282,12 +285,18 @@ impl CryptHandle {
     // TODO: Remove #[cfg(test)] when device discovery is implemented. This method
     // will be useful for device discovery.
     #[cfg(test)]
-    pub fn can_setup(physical_path: &Path) -> bool {
-        fn can_setup_with_failures(physical_path: &Path) -> Result<bool> {
+    pub fn can_setup(physical_path: &Path) -> Option<StratisIdentifiers> {
+        fn can_setup_with_failures(physical_path: &Path) -> Result<Option<StratisIdentifiers>> {
             let device_result = CryptHandle::device_from_physical_path(physical_path);
             match device_result {
-                Ok(Some(mut dev)) => Ok(is_encrypted_stratis_device(&mut dev)),
-                _ => Ok(false),
+                Ok(Some(mut dev)) => {
+                    if is_encrypted_stratis_device(&mut dev) {
+                        CryptHandle::identifiers_from_metadata(&mut dev).map(Some)
+                    } else {
+                        Ok(None)
+                    }
+                }
+                _ => Ok(None),
             }
         }
 
@@ -300,7 +309,7 @@ impl CryptHandle {
                     e
                 );
             })
-            .unwrap_or(false)
+            .unwrap_or(None)
     }
 
     /// Query the device metadata to reconstruct a handle for performing operations
@@ -368,6 +377,40 @@ impl CryptHandle {
             "Could not get value for key activation_name from Stratis JSON token"
         );
         Ok(name)
+    }
+
+    /// Query the Stratis metadata for the device identifiers.
+    #[cfg(test)]
+    fn identifiers_from_metadata(device: &mut CryptDevice) -> Result<StratisIdentifiers> {
+        let json = log_on_failure!(
+            device.token_handle().json_get(STRATIS_TOKEN_ID),
+            "Failed to get Stratis JSON token from LUKS2 metadata"
+        );
+        let pool_uuid = log_on_failure!(
+            json.get(STRATIS_TOKEN_POOL_UUID_KEY)
+                .and_then(|type_val| type_val.as_str())
+                .and_then(|type_str| PoolUuid::parse_str(type_str).ok())
+                .ok_or_else(|| {
+                    LibcryptErr::Other(
+                        "Malformed or missing JSON value for activation_name".to_string(),
+                    )
+                }),
+            "Could not get value for key {} from Stratis JSON token",
+            STRATIS_TOKEN_POOL_UUID_KEY
+        );
+        let dev_uuid = log_on_failure!(
+            json.get(STRATIS_TOKEN_DEV_UUID_KEY)
+                .and_then(|type_val| type_val.as_str())
+                .and_then(|type_str| DevUuid::parse_str(type_str).ok())
+                .ok_or_else(|| {
+                    LibcryptErr::Other(
+                        "Malformed or missing JSON value for activation_name".to_string(),
+                    )
+                }),
+            "Could not get value for key {} from Stratis JSON token",
+            STRATIS_TOKEN_DEV_UUID_KEY
+        );
+        Ok(StratisIdentifiers::new(pool_uuid, dev_uuid))
     }
 
     /// Activate encrypted Stratis device using the name stored in the
@@ -806,7 +849,7 @@ mod tests {
         // Initialization cannot occur with a non-existent key
         assert!(result.is_err());
 
-        assert!(!CryptHandle::can_setup(path));
+        assert!(CryptHandle::can_setup(path).is_none());
 
         // TODO: Check actual superblock with libblkid
     }

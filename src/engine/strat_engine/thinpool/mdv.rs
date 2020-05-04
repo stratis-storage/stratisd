@@ -6,7 +6,7 @@
 
 use std::{
     convert::From,
-    fs::{create_dir, read_dir, remove_dir, remove_file, rename, OpenOptions},
+    fs::{create_dir, create_dir_all, read_dir, remove_dir, remove_file, rename, OpenOptions},
     io::{prelude::*, ErrorKind},
     path::{Path, PathBuf},
 };
@@ -17,7 +17,6 @@ use devicemapper::{DmDevice, LinearDev, LinearDevTargetParams, TargetLine};
 
 use crate::{
     engine::{
-        engine::DEV_PATH,
         strat_engine::{
             cmd::create_fs, dm::get_dm, serde_structs::FilesystemSave,
             thinpool::filesystem::StratFilesystem,
@@ -30,6 +29,7 @@ use crate::{
 // TODO: Monitor fs size and extend linear and fs if needed
 // TODO: Document format of stuff on MDV in SWDD (currently ad-hoc)
 
+const RUN_DIR: &str = "/run/stratisd";
 const FILESYSTEM_DIR: &str = "filesystems";
 
 #[derive(Debug)]
@@ -48,7 +48,7 @@ struct MountedMDV<'a> {
 impl<'a> MountedMDV<'a> {
     /// Borrow the MDV and ensure it's mounted.
     fn mount(mdv: &MetadataVol) -> StratisResult<MountedMDV> {
-        if let Err(err) = create_dir(&mdv.mount_pt) {
+        if let Err(err) = create_dir_all(&mdv.mount_pt) {
             if err.kind() != ErrorKind::AlreadyExists {
                 return Err(From::from(err));
             }
@@ -97,7 +97,7 @@ impl MetadataVol {
     /// Set up an existing Metadata Volume.
     pub fn setup(pool_uuid: PoolUuid, dev: LinearDev) -> StratisResult<MetadataVol> {
         let filename = format!(".mdv-{}", pool_uuid.to_simple_ref());
-        let mount_pt: PathBuf = vec![DEV_PATH, &filename].iter().collect();
+        let mount_pt: PathBuf = vec![RUN_DIR, &filename].iter().collect();
 
         let mdv = MetadataVol { dev, mount_pt };
 

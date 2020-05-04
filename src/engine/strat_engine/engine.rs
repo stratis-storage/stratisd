@@ -70,15 +70,11 @@ impl StratEngine {
             return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
         }
 
-        devlinks::setup_dev_path()?;
-
         let mut liminal_devices = LiminalDevices::default();
         let mut pools = Table::default();
         for (pool_name, pool_uuid, pool) in liminal_devices.setup_pools(find_all()?) {
             pools.insert(pool_name, pool_uuid, pool);
         }
-
-        devlinks::cleanup_devlinks(pools.iter());
 
         Ok(StratEngine {
             pools,
@@ -209,7 +205,6 @@ impl Engine for StratEngine {
                     )?;
 
                     let name = Name::new(name.to_owned());
-                    devlinks::pool_added(&name);
                     self.pools.insert(name, uuid, pool);
                     Ok(CreateAction::Created(uuid))
                 }
@@ -238,7 +233,6 @@ impl Engine for StratEngine {
             self.pools.insert(pool_name, uuid, pool);
             Err(err)
         } else {
-            devlinks::pool_removed(&pool_name);
             Ok(DeleteAction::Deleted(uuid))
         }
     }
@@ -268,7 +262,9 @@ impl Engine for StratEngine {
             });
 
             self.pools.insert(new_name.clone(), uuid, pool);
-            devlinks::pool_renamed(&old_name, &new_name);
+            if let Err(e) = devlinks::pool_renamed(&old_name) {
+                warn!("Pool rename symlink action failed: {}", e)
+            };
             Ok(RenameAction::Renamed(uuid))
         }
     }
@@ -348,10 +344,6 @@ impl Engine for StratEngine {
 
 #[cfg(test)]
 mod test {
-    use std::fs::remove_dir_all;
-
-    use crate::engine::engine::DEV_PATH;
-
     use crate::engine::strat_engine::tests::{loopbacked, real};
 
     use crate::engine::types::EngineAction;
@@ -402,7 +394,7 @@ mod test {
     /// 3. Teardown the engine.
     /// 4. Initialize the engine.
     /// 5. Verify that pools can be found again.
-    /// 6. Teardown the engine and remove "/stratis".
+    /// 6. Teardown the engine
     /// 7. Initialize the engine one more time.
     /// 8. Verify that both pools are found.
     fn test_setup(paths: &[&Path]) {
@@ -437,7 +429,6 @@ mod test {
         assert!(engine.get_pool(uuid2).is_some());
 
         engine.teardown().unwrap();
-        remove_dir_all(DEV_PATH).unwrap();
 
         let engine = StratEngine::initialize().unwrap();
 

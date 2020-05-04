@@ -1,0 +1,1 @@
+ENV{DM_NAME}=="stratis-1-[0-9a-f]*-thin-fs-[0-9a-f]*", PROGRAM="/usr/local/bin/uuids_to_names.py $env{DM_NAME}", SYMLINK+="stratis/%c{1}/%c{2}"

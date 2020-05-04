@@ -23,7 +23,7 @@ use crate::{
     stratis::StratisResult,
 };
 
-pub const DEV_PATH: &str = "/stratis";
+pub const DEV_PATH: &str = "/dev/stratis";
 /// The maximum size of pool passphrases stored in the kernel keyring
 pub const MAX_STRATIS_PASS_SIZE: usize = 512 / 8;
 

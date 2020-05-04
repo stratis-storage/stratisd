@@ -30,8 +30,8 @@ const STRATIS_TOKEN_KEYDESC_KEY: &str = "key_description";
 const STRATIS_TOKEN_POOL_UUID_KEY: &str = "pool_uuid";
 const STRATIS_TOKEN_DEV_UUID_KEY: &str = "device_uuid";
 
-const LUKS2_TOKEN_ID: c_uint = 0;
-const STRATIS_TOKEN_ID: c_uint = 1;
+const STRATIS_TOKEN_ID: c_uint = 0;
+const LUKS2_TOKEN_ID: c_uint = 1;
 
 const LUKS2_TOKEN_TYPE: &str = "luks2-keyring";
 const STRATIS_TOKEN_TYPE: &str = "stratis";

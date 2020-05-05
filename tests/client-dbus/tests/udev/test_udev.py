@@ -221,7 +221,12 @@ class _Service:
         time.sleep(1)
         if service.poll() is not None:
             raise RuntimeError(
-                "Daemon unexpectedly exited with %s" % service.returncode
+                "Daemon unexpectedly exited with %s, stdout: %s, stderr: %s"
+                % (
+                    service.returncode,
+                    service.stdout.readlines(),
+                    service.stderr.readlines(),
+                )
             )
 
         if not dbus_interface_present:

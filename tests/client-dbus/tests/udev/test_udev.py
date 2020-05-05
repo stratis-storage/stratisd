@@ -174,7 +174,7 @@ def _wait_for_udev(fs_type, expected_paths):
     :return: None
     :raises RuntimeError: if unexpected device nodes are found
     """
-    expected_devnodes = frozenset(expected_paths)
+    expected_devnodes = frozenset((os.path.realpath(x) for x in expected_paths))
     found_devnodes = None
 
     context = pyudev.Context()

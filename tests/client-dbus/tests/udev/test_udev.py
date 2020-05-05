@@ -52,6 +52,9 @@ from ._loopback import LoopBackDevices
 
 _STRATISD = os.environ["STRATISD"]
 
+_CRYPTO_LUKS_FS_TYPE = "crypto_LUKS"
+_STRATIS_FS_TYPE = "stratis"
+
 
 def random_string(length):
     """
@@ -437,14 +440,14 @@ class UdevAdd(unittest.TestCase):
         ]
         all_devnodes = self._lb_mgr.device_files(all_tokens)
 
-        _wait_for_udev("stratis", all_devnodes)
+        _wait_for_udev(_STRATIS_FS_TYPE, all_devnodes)
 
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), number_of_pools)
 
         self._lb_mgr.unplug(all_tokens)
 
-        _wait_for_udev("stratis", [])
+        _wait_for_udev(_STRATIS_FS_TYPE, [])
 
         last_index = dev_count_pool - 1
         with _ServiceContextManager():
@@ -457,7 +460,7 @@ class UdevAdd(unittest.TestCase):
                 for tok in device_tokens[:last_index]
             ]
             self._lb_mgr.hotplug(tokens_to_add)
-            _wait_for_udev("stratis", self._lb_mgr.device_files(tokens_to_add))
+            _wait_for_udev(_STRATIS_FS_TYPE, self._lb_mgr.device_files(tokens_to_add))
 
             self.assertEqual(len(_get_pools()), 0)
 
@@ -466,7 +469,7 @@ class UdevAdd(unittest.TestCase):
                 [device_tokens[last_index] for device_tokens in pool_data.values()]
             )
 
-            _wait_for_udev("stratis", all_devnodes)
+            _wait_for_udev(_STRATIS_FS_TYPE, all_devnodes)
 
             self.assertEqual(len(_get_pools()), number_of_pools)
 
@@ -515,14 +518,14 @@ class UdevAdd(unittest.TestCase):
             self.assertEqual(len(_get_pools()), 1)
 
             self.assertEqual(len(device_object_paths), len(devnodes))
-            _wait_for_udev("stratis", _get_devnodes(device_object_paths))
+            _wait_for_udev(_STRATIS_FS_TYPE, _get_devnodes(device_object_paths))
 
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), 1)
 
         self._lb_mgr.unplug(device_tokens)
 
-        _wait_for_udev("stratis", [])
+        _wait_for_udev(_STRATIS_FS_TYPE, [])
 
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), 0)
@@ -530,7 +533,8 @@ class UdevAdd(unittest.TestCase):
             self._lb_mgr.hotplug(device_tokens)
 
             _wait_for_udev(
-                "stratis" if key_description is None else "crypto_LUKS", devnodes
+                _STRATIS_FS_TYPE if key_description is None else _CRYPTO_LUKS_FS_TYPE,
+                devnodes,
             )
 
             self.assertEqual(len(_get_pools()), 1)
@@ -590,7 +594,7 @@ class UdevAdd(unittest.TestCase):
 
             self._lb_mgr.unplug(this_pool)
 
-            _wait_for_udev("stratis", [])
+            _wait_for_udev(_STRATIS_FS_TYPE, [])
 
         all_tokens = [dev for sublist in pool_tokens for dev in sublist]
 
@@ -600,7 +604,7 @@ class UdevAdd(unittest.TestCase):
             for i in range(num_pools):
                 self._lb_mgr.hotplug(pool_tokens[i])
 
-            _wait_for_udev("stratis", self._lb_mgr.device_files(all_tokens))
+            _wait_for_udev(_STRATIS_FS_TYPE, self._lb_mgr.device_files(all_tokens))
 
             # The number of pools should never exceed one, since all the pools
             # previously formed in the test have the same name.

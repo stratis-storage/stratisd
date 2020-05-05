@@ -588,8 +588,6 @@ class UdevAdd(unittest.TestCase):
             with _ServiceContextManager():
                 _create_pool(pool_name, devnodes)
 
-            _wait_for_udev("stratis", devnodes)
-
             self._lb_mgr.unplug(this_pool)
 
             _wait_for_udev("stratis", [])

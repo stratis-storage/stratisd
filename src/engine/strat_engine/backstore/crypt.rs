@@ -795,7 +795,11 @@ fn stratis_token_is_valid(json: &Value) -> bool {
 
     let result = StratisLuks2Token::try_from(json);
     if let Err(ref e) = result {
-        debug!("Conversion of Stratis JSON token failed with error: {}", e);
+        debug!(
+            "LUKS2 token in the Stratis token slot does not appear \
+            to be a Stratis token: {}.",
+            e,
+        );
     }
     result.is_ok()
 }

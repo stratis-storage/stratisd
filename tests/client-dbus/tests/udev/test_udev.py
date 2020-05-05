@@ -36,10 +36,12 @@ import pyudev
 from stratisd_client_dbus import (
     Blockdev,
     ManagerR1,
+    MOBlockDev,
     MOPool,
     ObjectManager,
     PoolR1,
     StratisdErrors,
+    blockdevs,
     get_object,
     pools,
 )
@@ -114,6 +116,25 @@ def _get_pools(name=None):
     return [
         (op, MOPool(info))
         for op, info in pools(props={} if name is None else {"Name": name}).search(
+            managed_objects
+        )
+    ]
+
+
+def _get_blockdevs_for_pool(pool_object_path):
+    """
+    Get a list of the blockdevs that belong to this pool.
+    :param str pool_object_path: D-Bus object path for this pool
+    :return: a list of blockdevs representing devices in the pool
+    :rtype: list of (str * MOBlockDev)
+    """
+    managed_objects = ObjectManager.Methods.GetManagedObjects(
+        get_object(TOP_OBJECT), {}
+    )
+
+    return [
+        (op, MOBlockDev(info))
+        for op, info in blockdevs(props={"Pool": pool_object_path}).search(
             managed_objects
         )
     ]

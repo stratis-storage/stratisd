@@ -190,7 +190,10 @@ def _wait_for_udev(fs_type, expected_paths):
         time.sleep(1)
 
     if expected_devnodes != found_devnodes:
-        raise RuntimeError("Found unexpected devnodes")
+        raise RuntimeError(
+            "Found unexpected devnodes: expected devnodes: %s != found_devnodes: %s"
+            % (", ".join(expected_devnodes), ", ".join(found_devnodes))
+        )
 
 
 def _processes(name):

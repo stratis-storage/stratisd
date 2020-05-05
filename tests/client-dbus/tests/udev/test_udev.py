@@ -34,6 +34,7 @@ import pyudev
 
 # isort: LOCAL
 from stratisd_client_dbus import (
+    Blockdev,
     ManagerR1,
     MOPool,
     ObjectManager,
@@ -115,6 +116,20 @@ def _get_pools(name=None):
         for op, info in pools(props={} if name is None else {"Name": name}).search(
             managed_objects
         )
+    ]
+
+
+def _get_devnodes(device_object_paths):
+    """
+    Get the device nodes belonging to these object paths.
+
+    :param blockdev_object_paths: list of object paths representing blockdevs
+    :type blockdev_object_paths: list of str
+    :returns: a list of device nodes corresponding to the object paths
+    :rtype: list of str
+    """
+    return [
+        Blockdev.Properties.Devnode.Get(get_object(op)) for op in device_object_paths
     ]
 
 

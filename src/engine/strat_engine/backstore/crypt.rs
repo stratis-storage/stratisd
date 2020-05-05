@@ -797,7 +797,7 @@ fn stratis_token_is_valid(json: &Value) -> bool {
     if let Err(ref e) = result {
         debug!(
             "LUKS2 token in the Stratis token slot does not appear \
-            to be a Stratis token: {}. Reporting as not a Stratis device.",
+            to be a Stratis token: {}.",
             e,
         );
     }

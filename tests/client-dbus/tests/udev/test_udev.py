@@ -67,16 +67,13 @@ def _create_pool(name, devices, *, key_description=None):
     :param devices:  Devices to use for pool
     :param key_description: optional key description
     :type key_description: str or NoneType
-    :return: Dbus proxy object representing pool.
+    :return: result of the CreatePool D-Bus method call if it succeeds
+    :rtype: bool * str * list of str
     :raises RuntimeError: if pool is not created after three tries
     """
     error_reasons = []
     for _ in range(3):
-        (
-            (_, (pool_object_path, _)),
-            exit_code,
-            error_str,
-        ) = ManagerR1.Methods.CreatePool(
+        (result, exit_code, error_str) = ManagerR1.Methods.CreatePool(
             get_object(TOP_OBJECT),
             {
                 "name": name,
@@ -89,7 +86,7 @@ def _create_pool(name, devices, *, key_description=None):
             },
         )
         if exit_code == StratisdErrors.OK:
-            return get_object(pool_object_path)
+            return result
 
         error_reasons.append(error_str)
         time.sleep(1)

@@ -509,11 +509,13 @@ class UdevAdd(unittest.TestCase):
 
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), 0)
-            pool_name = random_string(5)
-            _create_pool(pool_name, devnodes, key_description=key_description)
+            (_, (_, device_object_paths)) = _create_pool(
+                random_string(5), devnodes, key_description=key_description
+            )
             self.assertEqual(len(_get_pools()), 1)
 
-        _wait_for_udev("stratis", devnodes)
+            self.assertEqual(len(device_object_paths), len(devnodes))
+            _wait_for_udev("stratis", _get_devnodes(device_object_paths))
 
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), 1)
@@ -527,7 +529,9 @@ class UdevAdd(unittest.TestCase):
 
             self._lb_mgr.hotplug(device_tokens)
 
-            _wait_for_udev("stratis", devnodes)
+            _wait_for_udev(
+                "stratis" if key_description is None else "crypto_LUKS", devnodes
+            )
 
             self.assertEqual(len(_get_pools()), 1)
 

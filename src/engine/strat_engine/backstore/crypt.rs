@@ -3,12 +3,14 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
+    convert::TryFrom,
     ffi::CString,
     io,
     path::{Path, PathBuf},
 };
 
 use libc::{c_void, syscall, SYS_keyctl, SYS_request_key};
+use serde_json::Value;
 
 use devicemapper::Sectors;
 use libcryptsetup_rs::{
@@ -26,7 +28,6 @@ type Result<T> = std::result::Result<T, LibcryptErr>;
 const TOKEN_TYPE_KEY: &str = "type";
 const TOKEN_KEYSLOTS_KEY: &str = "keyslots";
 const STRATIS_TOKEN_DEVNAME_KEY: &str = "activation_name";
-const STRATIS_TOKEN_KEYDESC_KEY: &str = "key_description";
 const STRATIS_TOKEN_POOL_UUID_KEY: &str = "pool_uuid";
 const STRATIS_TOKEN_DEV_UUID_KEY: &str = "device_uuid";
 
@@ -84,6 +85,108 @@ pub struct CryptInitializer {
     physical_path: PathBuf,
     pool_uuid: PoolUuid,
     dev_uuid: DevUuid,
+}
+
+struct StratisLuks2Token {
+    devname: String,
+    pool_uuid: PoolUuid,
+    dev_uuid: DevUuid,
+}
+
+impl Into<Value> for StratisLuks2Token {
+    fn into(self) -> Value {
+        json!({
+            TOKEN_TYPE_KEY: STRATIS_TOKEN_TYPE,
+            TOKEN_KEYSLOTS_KEY: [],
+            STRATIS_TOKEN_DEVNAME_KEY: self.devname,
+            STRATIS_TOKEN_POOL_UUID_KEY: self.pool_uuid.to_simple_ref().to_string(),
+            STRATIS_TOKEN_DEV_UUID_KEY: self.dev_uuid.to_simple_ref().to_string(),
+        })
+    }
+}
+
+macro_rules! check_key {
+    ($condition:expr, $key:tt, $value:tt) => {
+        if $condition {
+            return Err(libcryptsetup_rs::LibcryptErr::Other(format!(
+                "Stratis token key '{}' requires a value of '{}'",
+                $key, $value,
+            )));
+        }
+    };
+}
+
+macro_rules! check_and_get_key {
+    ($get:expr, $key:tt) => {
+        if let Some(v) = $get {
+            v
+        } else {
+            return Err(libcryptsetup_rs::LibcryptErr::Other(format!(
+                "Stratis token is missing key '{}'",
+                $key
+            )));
+        }
+    };
+    ($get:expr, $func:expr, $key:tt, $ty:ty) => {
+        if let Some(ref v) = $get {
+            $func(v).map_err(|_| {
+                libcryptsetup_rs::LibcryptErr::Other(format!(
+                    "Failed to convert value for key '{}' to type {}",
+                    $key,
+                    stringify!($ty)
+                ))
+            })?
+        } else {
+            return Err(libcryptsetup_rs::LibcryptErr::Other(format!(
+                "Stratis token is missing key '{}'",
+                $key
+            )));
+        }
+    };
+}
+
+impl<'a> TryFrom<&'a Value> for StratisLuks2Token {
+    type Error = LibcryptErr;
+
+    fn try_from(v: &Value) -> Result<StratisLuks2Token> {
+        let map = if let Value::Object(m) = v {
+            m
+        } else {
+            return Err(LibcryptErr::InvalidConversion);
+        };
+
+        check_key!(
+            map.get(TOKEN_TYPE_KEY).and_then(|v| v.as_str()) != Some("stratis"),
+            "type",
+            "stratis"
+        );
+        check_key!(
+            map.get(TOKEN_KEYSLOTS_KEY).and_then(|v| v.as_array()) != Some(&Vec::new()),
+            "keyslots",
+            "[]"
+        );
+        let devname = check_and_get_key!(
+            map.get(STRATIS_TOKEN_DEVNAME_KEY).map(|s| s.to_string()),
+            STRATIS_TOKEN_DEVNAME_KEY
+        );
+        let pool_uuid = check_and_get_key!(
+            map.get(STRATIS_TOKEN_POOL_UUID_KEY).map(|s| s.to_string()),
+            PoolUuid::parse_str,
+            STRATIS_TOKEN_POOL_UUID_KEY,
+            PoolUuid
+        );
+        let dev_uuid = check_and_get_key!(
+            map.get(STRATIS_TOKEN_DEV_UUID_KEY).map(|s| s.to_string()),
+            DevUuid::parse_str,
+            STRATIS_TOKEN_DEV_UUID_KEY,
+            DevUuid
+        );
+        Ok(StratisLuks2Token {
+            devname,
+            pool_uuid,
+            dev_uuid,
+        })
+    }
 }
 
 impl CryptInitializer {
@@ -164,14 +267,12 @@ impl CryptInitializer {
         log_on_failure!(
             device.token_handle().json_set(
                 Some(STRATIS_TOKEN_ID),
-                &json!({
-                    TOKEN_TYPE_KEY: STRATIS_TOKEN_TYPE,
-                    TOKEN_KEYSLOTS_KEY: [],
-                    STRATIS_TOKEN_POOL_UUID_KEY: self.pool_uuid.to_simple_ref().to_string(),
-                    STRATIS_TOKEN_DEV_UUID_KEY: self.dev_uuid.to_simple_ref().to_string(),
-                    STRATIS_TOKEN_KEYDESC_KEY: key_description,
-                    STRATIS_TOKEN_DEVNAME_KEY: activation_name,
-                }),
+                &StratisLuks2Token {
+                    devname: activation_name.clone(),
+                    pool_uuid: self.pool_uuid,
+                    dev_uuid: self.dev_uuid,
+                }
+                .into(),
             ),
             "Failed to create the Stratis token"
         );
@@ -674,7 +775,7 @@ fn check_luks2_token(device: &mut CryptDevice) -> Result<()> {
 /// Validate that the LUKS2 token is present and valid
 ///
 /// May not be necessary. See the comment above the invocation.
-fn luks2_token_type_is_valid(json: &serde_json::Value) -> bool {
+fn luks2_token_type_is_valid(json: &Value) -> bool {
     json.get(TOKEN_TYPE_KEY)
         .and_then(|type_val| type_val.as_str())
         .map(|type_str| type_str == LUKS2_TOKEN_TYPE)
@@ -682,64 +783,10 @@ fn luks2_token_type_is_valid(json: &serde_json::Value) -> bool {
 }
 
 /// Validate that the Stratis token is present and valid
-fn stratis_token_is_valid(json: &serde_json::Value) -> bool {
+fn stratis_token_is_valid(json: &Value) -> bool {
     debug!("Stratis LUKS2 token: {}", json);
 
-    let type_valid = json
-        .get(TOKEN_TYPE_KEY)
-        .and_then(|type_val| type_val.as_str())
-        .map(|type_str| type_str == STRATIS_TOKEN_TYPE)
-        .unwrap_or(false);
-    if !type_valid {
-        debug!("Type value is invalid");
-    }
-
-    let keyslots_valid = json
-        .get(TOKEN_KEYSLOTS_KEY)
-        .and_then(|arr| arr.as_array())
-        .map(|arr| arr.is_empty())
-        .unwrap_or(false);
-    if !keyslots_valid {
-        debug!("Keyslots value is invalid");
-    }
-
-    let key_desc_valid = json
-        .get(STRATIS_TOKEN_KEYDESC_KEY)
-        .map(|key| key.is_string())
-        .unwrap_or(false);
-    if !key_desc_valid {
-        debug!("Key description value is invalid");
-    }
-
-    let pool_uuid_valid = json
-        .get(STRATIS_TOKEN_POOL_UUID_KEY)
-        .and_then(|uuid| uuid.as_str())
-        .and_then(|uuid_str| uuid::Uuid::parse_str(uuid_str).ok())
-        .is_some();
-    if !pool_uuid_valid {
-        debug!("Pool UUID value is invalid");
-    }
-
-    let dev_uuid_valid = json
-        .get(STRATIS_TOKEN_DEV_UUID_KEY)
-        .and_then(|uuid| uuid.as_str())
-        .and_then(|uuid_str| uuid::Uuid::parse_str(uuid_str).ok())
-        .is_some();
-    if !dev_uuid_valid {
-        debug!("Device UUID value is invalid");
-    }
-
-    let device_name_valid = json.get(STRATIS_TOKEN_DEVNAME_KEY).is_some();
-    if !device_name_valid {
-        debug!("Device name value is invalid");
-    }
-
-    type_valid
-        && keyslots_valid
-        && key_desc_valid
-        && pool_uuid_valid
-        && dev_uuid_valid
-        && device_name_valid
+    StratisLuks2Token::try_from(json).is_ok()
 }
 
 /// Read key from keyring with the given key description

@@ -35,6 +35,7 @@ import pyudev
 # isort: LOCAL
 from stratisd_client_dbus import (
     ManagerR1,
+    MOPool,
     ObjectManager,
     PoolR1,
     StratisdErrors,
@@ -103,15 +104,18 @@ def _get_pools(name=None):
     :param name: filter for pool name
     :type name: str or NoneType
     :return: list of pool information found
-    :rtype: list of (str * dict)
+    :rtype: list of (str * MOPool)
     """
     managed_objects = ObjectManager.Methods.GetManagedObjects(
         get_object(TOP_OBJECT), {}
     )
 
-    return list(
-        pools(props={} if name is None else {"Name": name}).search(managed_objects)
-    )
+    return [
+        (op, MOPool(info))
+        for op, info in pools(props={} if name is None else {"Name": name}).search(
+            managed_objects
+        )
+    ]
 
 
 def _settle():

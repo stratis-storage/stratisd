@@ -122,23 +122,24 @@ macro_rules! check_and_get_key {
             v
         } else {
             return Err(libcryptsetup_rs::LibcryptErr::Other(format!(
-                "Stratis token is missing key '{}'",
+                "Stratis token is missing key '{}' or the value is of the wrong type",
                 $key
             )));
         }
     };
     ($get:expr, $func:expr, $key:tt, $ty:ty) => {
         if let Some(ref v) = $get {
-            $func(v).map_err(|_| {
+            $func(v).map_err(|e| {
                 libcryptsetup_rs::LibcryptErr::Other(format!(
-                    "Failed to convert value for key '{}' to type {}",
+                    "Failed to convert value for key '{}' to type {}: {}",
                     $key,
-                    stringify!($ty)
+                    stringify!($ty),
+                    e
                 ))
             })?
         } else {
             return Err(libcryptsetup_rs::LibcryptErr::Other(format!(
-                "Stratis token is missing key '{}'",
+                "Stratis token is missing key '{}' or the value is of the wrong type",
                 $key
             )));
         }
@@ -156,9 +157,9 @@ impl<'a> TryFrom<&'a Value> for StratisLuks2Token {
         };
 
         check_key!(
-            map.get(TOKEN_TYPE_KEY).and_then(|v| v.as_str()) != Some("stratis"),
+            map.get(TOKEN_TYPE_KEY).and_then(|v| v.as_str()) != Some(STRATIS_TOKEN_TYPE),
             "type",
-            "stratis"
+            STRATIS_TOKEN_TYPE
         );
         check_key!(
             map.get(TOKEN_KEYSLOTS_KEY).and_then(|v| v.as_array()) != Some(&Vec::new()),
@@ -166,17 +167,23 @@ impl<'a> TryFrom<&'a Value> for StratisLuks2Token {
             "[]"
         );
         let devname = check_and_get_key!(
-            map.get(STRATIS_TOKEN_DEVNAME_KEY).map(|s| s.to_string()),
+            map.get(STRATIS_TOKEN_DEVNAME_KEY)
+                .and_then(|s| s.as_str())
+                .map(|s| s.to_string()),
             STRATIS_TOKEN_DEVNAME_KEY
         );
         let pool_uuid = check_and_get_key!(
-            map.get(STRATIS_TOKEN_POOL_UUID_KEY).map(|s| s.to_string()),
+            map.get(STRATIS_TOKEN_POOL_UUID_KEY)
+                .and_then(|s| s.as_str())
+                .map(|s| s.to_string()),
             PoolUuid::parse_str,
             STRATIS_TOKEN_POOL_UUID_KEY,
             PoolUuid
         );
         let dev_uuid = check_and_get_key!(
-            map.get(STRATIS_TOKEN_DEV_UUID_KEY).map(|s| s.to_string()),
+            map.get(STRATIS_TOKEN_DEV_UUID_KEY)
+                .and_then(|s| s.as_str())
+                .map(|s| s.to_string()),
             DevUuid::parse_str,
             STRATIS_TOKEN_DEV_UUID_KEY,
             DevUuid
@@ -786,7 +793,11 @@ fn luks2_token_type_is_valid(json: &Value) -> bool {
 fn stratis_token_is_valid(json: &Value) -> bool {
     debug!("Stratis LUKS2 token: {}", json);
 
-    StratisLuks2Token::try_from(json).is_ok()
+    let result = StratisLuks2Token::try_from(json);
+    if let Err(ref e) = result {
+        debug!("Conversion of Stratis JSON token failed with error: {}", e);
+    }
+    result.is_ok()
 }
 
 /// Read key from keyring with the given key description

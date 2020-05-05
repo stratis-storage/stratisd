@@ -20,7 +20,7 @@ use libcryptsetup_rs::{
 
 use crate::engine::{
     strat_engine::{backstore::metadata::StratisIdentifiers, names::format_crypt_name},
-    DevUuid, PoolUuid,
+    types::{DevUuid, PoolUuid},
 };
 
 type Result<T> = std::result::Result<T, LibcryptErr>;
@@ -451,7 +451,6 @@ impl CryptHandle {
     }
 
     /// Get the Stratis device identifiers for a given encrypted device.
-    #[allow(dead_code)]
     pub fn device_identifiers(&self) -> &StratisIdentifiers {
         &self.identifiers
     }

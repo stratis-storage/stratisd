@@ -49,11 +49,37 @@ use devicemapper::Device;
 
 use crate::engine::{
     strat_engine::backstore::{
+        crypt::CryptHandle,
         metadata::{device_identifiers, StratisIdentifiers},
         udev::{block_enumerator, decide_ownership, UdevOwnership},
     },
     types::{DevUuid, PoolUuid},
 };
+
+/// When devices are gathered they may be:
+/// * LUKS devices with token information indicating they belong to Stratis
+/// * Stratis devices, which may be:
+///     * Activated encrypted devices which Stratis does not manage
+///     * Stratis devices which do not have a corresponding crypt device
+/// In either case, the information at the time they are gathered will be the
+/// same Stratis info. The key description information, which only belongs to
+/// LUKS devices is not discovered at this time.
+#[derive(Debug, Eq, PartialEq)]
+pub enum DeviceInfo {
+    Luks(StratisInfo),
+    Stratis(StratisInfo),
+}
+
+impl fmt::Display for DeviceInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            DeviceInfo::Luks(info) => {
+                write!(f, "data for LUKS2 device belonging to Stratis: {}", info)
+            }
+            DeviceInfo::Stratis(info) => write!(f, "data for Stratis device: {}", info),
+        }
+    }
+}
 
 /// A miscellaneous group of identifiers found when identifying a Stratis
 /// device.
@@ -151,6 +177,35 @@ fn process_stratis_device(dev: &libudev::Device) -> Option<StratisInfo> {
     }
 }
 
+/// Process a device which udev information indicates is a LUKS device.
+fn process_luks_device(dev: &libudev::Device) -> Option<StratisInfo> {
+    match dev.devnode() {
+        Some(devnode) => {
+            match (
+                device_to_devno_wrapper(dev),
+                CryptHandle::setup(devnode),
+            ) {
+                (Err(err), _) => {
+                    warn!("udev identified device {} as a Stratis device but {}, disregarding the device",
+                          devnode.display(),
+                          err);
+                    None
+                }
+                (Ok(device_number), Ok(Some(handle))) => Some(StratisInfo {
+                    identifiers: *handle.device_identifiers(),
+                    device_number,
+                    devnode: handle.physical_device_path().to_path_buf(), 
+                }),
+                _ => None,
+            }
+        }
+        None => {
+            warn!("udev identified a device as a LUKS2 device, but the udev entry for the device had no device node, disregarding device");
+            None
+        }
+    }
+}
+
 // Find all devices identified by udev as Stratis devices.
 #[allow(clippy::type_complexity)]
 fn find_all_stratis_devices(
@@ -211,7 +266,7 @@ fn identify_stratis_device(dev: &libudev::Device) -> Option<StratisInfo> {
 /// Identify a block device in the context where a udev event has been
 /// captured for some block device. Return None if the device does not
 /// appear to be a Stratis device. Log at an appropriate level on all errors.
-pub fn identify_block_device(dev: &libudev::Device) -> Option<StratisInfo> {
+pub fn identify_block_device(dev: &libudev::Device) -> Option<DeviceInfo> {
     let initialized = dev.is_initialized();
     if !initialized {
         debug!("Found a udev entry for a device identified as a block device, but udev also identified it as uninitialized, disregarding the device");
@@ -227,7 +282,8 @@ pub fn identify_block_device(dev: &libudev::Device) -> Option<StratisInfo> {
             None
         }
         Ok(ownership) => match ownership {
-            UdevOwnership::Stratis => process_stratis_device(dev),
+            UdevOwnership::Stratis => process_stratis_device(dev).map(DeviceInfo::Stratis),
+            UdevOwnership::Luks => process_luks_device(dev).map(DeviceInfo::Luks),
             _ => None,
         },
     }

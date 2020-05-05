@@ -34,10 +34,14 @@ import pyudev
 
 # isort: LOCAL
 from stratisd_client_dbus import (
+    Blockdev,
     ManagerR1,
+    MOBlockDev,
+    MOPool,
     ObjectManager,
     PoolR1,
     StratisdErrors,
+    blockdevs,
     get_object,
     pools,
 )
@@ -103,15 +107,51 @@ def _get_pools(name=None):
     :param name: filter for pool name
     :type name: str or NoneType
     :return: list of pool information found
-    :rtype: list of (str * dict)
+    :rtype: list of (str * MOPool)
     """
     managed_objects = ObjectManager.Methods.GetManagedObjects(
         get_object(TOP_OBJECT), {}
     )
 
-    return list(
-        pools(props={} if name is None else {"Name": name}).search(managed_objects)
+    return [
+        (op, MOPool(info))
+        for op, info in pools(props={} if name is None else {"Name": name}).search(
+            managed_objects
+        )
+    ]
+
+
+def _get_blockdevs_for_pool(pool_object_path):
+    """
+    Get a list of the blockdevs that belong to this pool.
+    :param str pool_object_path: D-Bus object path for this pool
+    :return: a list of blockdevs representing devices in the pool
+    :rtype: list of (str * MOBlockDev)
+    """
+    managed_objects = ObjectManager.Methods.GetManagedObjects(
+        get_object(TOP_OBJECT), {}
     )
+
+    return [
+        (op, MOBlockDev(info))
+        for op, info in blockdevs(props={"Pool": pool_object_path}).search(
+            managed_objects
+        )
+    ]
+
+
+def _get_devnodes(device_object_paths):
+    """
+    Get the device nodes belonging to these object paths.
+
+    :param blockdev_object_paths: list of object paths representing blockdevs
+    :type blockdev_object_paths: list of str
+    :returns: a list of device nodes corresponding to the object paths
+    :rtype: list of str
+    """
+    return [
+        Blockdev.Properties.Devnode.Get(get_object(op)) for op in device_object_paths
+    ]
 
 
 def _settle():
@@ -123,18 +163,18 @@ def _settle():
     subprocess.check_call(["udevadm", "settle"])
 
 
-def _wait_for_udev(expected_paths):
+def _wait_for_udev(fs_type, expected_paths):
     """
-    Look for Stratis devices. Check as many times as can be done in
-    10 seconds or until the devices found are equal to the devices
-    expected. Always get the result of at least 1 Stratis enumeration.
+    Look for devices with ID_FS_TYPE=fs_type. Check as many times as can be
+    done in 10 seconds or until the devices found are equal to the devices
+    expected. Always get the result of at least 1 enumeration.
+    :param str fs_type: the type to look for ("stratis" or "crypto_LUKS")
     :param expected_paths: devnodes of paths that should belong to Stratis
     :type expected_paths: list of str
     :return: None
     :raises RuntimeError: if unexpected device nodes are found
     """
-
-    expected_devnodes = frozenset(expected_paths)
+    expected_devnodes = frozenset((os.path.realpath(x) for x in expected_paths))
     found_devnodes = None
 
     context = pyudev.Context()
@@ -144,13 +184,16 @@ def _wait_for_udev(expected_paths):
         found_devnodes = frozenset(
             [
                 x.device_node
-                for x in context.list_devices(subsystem="block", ID_FS_TYPE="stratis")
+                for x in context.list_devices(subsystem="block", ID_FS_TYPE=fs_type)
             ]
         )
         time.sleep(1)
 
     if expected_devnodes != found_devnodes:
-        raise RuntimeError("Found unexpected devnodes")
+        raise RuntimeError(
+            "Found unexpected devnodes: expected devnodes: %s != found_devnodes: %s"
+            % (", ".join(expected_devnodes), ", ".join(found_devnodes))
+        )
 
 
 def _processes(name):
@@ -394,14 +437,14 @@ class UdevAdd(unittest.TestCase):
         ]
         all_devnodes = self._lb_mgr.device_files(all_tokens)
 
-        _wait_for_udev(all_devnodes)
+        _wait_for_udev("stratis", all_devnodes)
 
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), number_of_pools)
 
         self._lb_mgr.unplug(all_tokens)
 
-        _wait_for_udev([])
+        _wait_for_udev("stratis", [])
 
         last_index = dev_count_pool - 1
         with _ServiceContextManager():
@@ -414,7 +457,7 @@ class UdevAdd(unittest.TestCase):
                 for tok in device_tokens[:last_index]
             ]
             self._lb_mgr.hotplug(tokens_to_add)
-            _wait_for_udev(self._lb_mgr.device_files(tokens_to_add))
+            _wait_for_udev("stratis", self._lb_mgr.device_files(tokens_to_add))
 
             self.assertEqual(len(_get_pools()), 0)
 
@@ -423,7 +466,7 @@ class UdevAdd(unittest.TestCase):
                 [device_tokens[last_index] for device_tokens in pool_data.values()]
             )
 
-            _wait_for_udev(all_devnodes)
+            _wait_for_udev("stratis", all_devnodes)
 
             self.assertEqual(len(_get_pools()), number_of_pools)
 
@@ -466,25 +509,29 @@ class UdevAdd(unittest.TestCase):
 
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), 0)
-            pool_name = random_string(5)
-            _create_pool(pool_name, devnodes, key_description=key_description)
+            (_, (_, device_object_paths)) = _create_pool(
+                random_string(5), devnodes, key_description=key_description
+            )
             self.assertEqual(len(_get_pools()), 1)
 
-        _wait_for_udev(devnodes)
+            self.assertEqual(len(device_object_paths), len(devnodes))
+            _wait_for_udev("stratis", _get_devnodes(device_object_paths))
 
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), 1)
 
         self._lb_mgr.unplug(device_tokens)
 
-        _wait_for_udev([])
+        _wait_for_udev("stratis", [])
 
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), 0)
 
             self._lb_mgr.hotplug(device_tokens)
 
-            _wait_for_udev(devnodes)
+            _wait_for_udev(
+                "stratis" if key_description is None else "crypto_LUKS", devnodes
+            )
 
             self.assertEqual(len(_get_pools()), 1)
 
@@ -541,11 +588,11 @@ class UdevAdd(unittest.TestCase):
             with _ServiceContextManager():
                 _create_pool(pool_name, devnodes)
 
-            _wait_for_udev(devnodes)
+            _wait_for_udev("stratis", devnodes)
 
             self._lb_mgr.unplug(this_pool)
 
-            _wait_for_udev([])
+            _wait_for_udev("stratis", [])
 
         all_tokens = [dev for sublist in pool_tokens for dev in sublist]
 
@@ -555,7 +602,7 @@ class UdevAdd(unittest.TestCase):
             for i in range(num_pools):
                 self._lb_mgr.hotplug(pool_tokens[i])
 
-            _wait_for_udev(self._lb_mgr.device_files(all_tokens))
+            _wait_for_udev("stratis", self._lb_mgr.device_files(all_tokens))
 
             # The number of pools should never exceed one, since all the pools
             # previously formed in the test have the same name.

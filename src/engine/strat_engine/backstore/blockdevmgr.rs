@@ -6,7 +6,6 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    fmt,
     path::Path,
 };
 
@@ -55,7 +54,7 @@ impl Segment {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct BlkDevSegment {
     pub(super) uuid: DevUuid,
     pub(super) segment: Segment,
@@ -68,15 +67,6 @@ impl BlkDevSegment {
 
     pub fn to_segment(&self) -> Segment {
         self.segment.clone()
-    }
-}
-
-impl fmt::Debug for BlkDevSegment {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("BlkDevSegment")
-            .field("uuid", &self.uuid.to_simple_ref())
-            .field("segment", &self.segment)
-            .finish()
     }
 }
 

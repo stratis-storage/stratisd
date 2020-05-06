@@ -40,7 +40,7 @@ pub enum MetadataLocation {
     Second,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct StratisIdentifiers {
     pub pool_uuid: PoolUuid,
     pub device_uuid: DevUuid,
@@ -55,12 +55,14 @@ impl StratisIdentifiers {
     }
 }
 
-impl fmt::Debug for StratisIdentifiers {
+impl fmt::Display for StratisIdentifiers {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("StratisIdentifiers")
-            .field("pool_uuid", &self.pool_uuid.to_simple_ref())
-            .field("device_uuid", &self.device_uuid.to_simple_ref())
-            .finish()
+        write!(
+            f,
+            "Stratis pool UUID: {}, Stratis device UUID: {}",
+            self.pool_uuid.to_simple_ref(),
+            self.pool_uuid.to_simple_ref()
+        )
     }
 }
 
@@ -82,7 +84,7 @@ where
     StaticHeader::wipe(f)
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct StaticHeader {
     pub blkdev_size: BlockdevSize,
     pub identifiers: StratisIdentifiers,
@@ -442,19 +444,6 @@ impl StaticHeader {
         f.write_all(&zeroed)?;
         f.sync_all()?;
         Ok(())
-    }
-}
-
-impl fmt::Debug for StaticHeader {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("StaticHeader")
-            .field("blkdev_size", &self.blkdev_size)
-            .field("identifiers", &self.identifiers)
-            .field("mda_size", &self.mda_size)
-            .field("reserved_size", &self.reserved_size)
-            .field("flags", &self.flags)
-            .field("initialization_time", &self.initialization_time)
-            .finish()
     }
 }
 

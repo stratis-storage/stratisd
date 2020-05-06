@@ -565,12 +565,75 @@ class UdevAdd(unittest.TestCase):
         self._single_pool(1, num_hotplugs=1)
 
     @unittest.expectedFailure
-    def test_encryption(self):
+    def test_encryption_single_pool(self):
         """
         See documentation for _single_pool.
         """
         with _KernelKey("test_key") as key_description:
             self._single_pool(1, key_description=key_description)
+
+    def _simple_event_test(self, *, key_description=None):
+        """
+        A simple test of event-based discovery.
+
+        * Create just one pool.
+        * Stop the daemon.
+        * Unplug the devices.
+        * Start the daemon.
+        * Plug the devices in one by one. The pool should come up when the last
+        device is plugged in.
+        """
+        id_fs_type_param = (
+            _STRATIS_FS_TYPE if key_description is None else _CRYPTO_LUKS_FS_TYPE
+        )
+        num_devices = 3
+        device_tokens = self._lb_mgr.create_devices(num_devices)
+        devnodes = self._lb_mgr.device_files(device_tokens)
+
+        _settle()
+
+        with _ServiceContextManager():
+            self.assertEqual(len(_get_pools()), 0)
+            (_, (_, device_object_paths)) = _create_pool(
+                random_string(5), devnodes, key_description=key_description
+            )
+            self.assertEqual(len(_get_pools()), 1)
+            self.assertEqual(len(device_object_paths), len(devnodes))
+
+        self._lb_mgr.unplug(device_tokens)
+        _wait_for_udev(id_fs_type_param, [])
+
+        with _ServiceContextManager():
+            self.assertEqual(len(_get_pools()), 0)
+
+            indices = list(range(num_devices))
+            random.shuffle(indices)
+
+            tokens_up = []
+            for index in indices[:-1]:
+                tokens_up.append(device_tokens[index])
+                self._lb_mgr.hotplug([tokens_up[-1]])
+                _wait_for_udev(id_fs_type_param, self._lb_mgr.device_files(tokens_up))
+                self.assertEqual(len(_get_pools()), 0)
+
+            tokens_up.append(device_tokens[indices[-1]])
+            self._lb_mgr.hotplug([tokens_up[-1]])
+            _wait_for_udev(id_fs_type_param, self._lb_mgr.device_files(tokens_up))
+            self.assertEqual(len(_get_pools()), 1)
+
+    @unittest.expectedFailure
+    def test_encryption_simple_event(self):
+        """
+        See documentation for _simple_event_test.
+        """
+        with _KernelKey("test_key") as key_description:
+            self._simple_event_test(key_description=key_description)
+
+    def test_simple_event(self):
+        """
+        See documentation for _simple_event_test.
+        """
+        self._simple_event_test()
 
     def test_duplicate_pool_name(self):
         """

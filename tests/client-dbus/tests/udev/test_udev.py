@@ -52,6 +52,9 @@ from ._loopback import LoopBackDevices
 
 _STRATISD = os.environ["STRATISD"]
 
+_CRYPTO_LUKS_FS_TYPE = "crypto_LUKS"
+_STRATIS_FS_TYPE = "stratis"
+
 
 def random_string(length):
     """
@@ -437,14 +440,14 @@ class UdevAdd(unittest.TestCase):
         ]
         all_devnodes = self._lb_mgr.device_files(all_tokens)
 
-        _wait_for_udev("stratis", all_devnodes)
+        _wait_for_udev(_STRATIS_FS_TYPE, all_devnodes)
 
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), number_of_pools)
 
         self._lb_mgr.unplug(all_tokens)
 
-        _wait_for_udev("stratis", [])
+        _wait_for_udev(_STRATIS_FS_TYPE, [])
 
         last_index = dev_count_pool - 1
         with _ServiceContextManager():
@@ -457,7 +460,7 @@ class UdevAdd(unittest.TestCase):
                 for tok in device_tokens[:last_index]
             ]
             self._lb_mgr.hotplug(tokens_to_add)
-            _wait_for_udev("stratis", self._lb_mgr.device_files(tokens_to_add))
+            _wait_for_udev(_STRATIS_FS_TYPE, self._lb_mgr.device_files(tokens_to_add))
 
             self.assertEqual(len(_get_pools()), 0)
 
@@ -466,7 +469,7 @@ class UdevAdd(unittest.TestCase):
                 [device_tokens[last_index] for device_tokens in pool_data.values()]
             )
 
-            _wait_for_udev("stratis", all_devnodes)
+            _wait_for_udev(_STRATIS_FS_TYPE, all_devnodes)
 
             self.assertEqual(len(_get_pools()), number_of_pools)
 
@@ -515,14 +518,14 @@ class UdevAdd(unittest.TestCase):
             self.assertEqual(len(_get_pools()), 1)
 
             self.assertEqual(len(device_object_paths), len(devnodes))
-            _wait_for_udev("stratis", _get_devnodes(device_object_paths))
+            _wait_for_udev(_STRATIS_FS_TYPE, _get_devnodes(device_object_paths))
 
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), 1)
 
         self._lb_mgr.unplug(device_tokens)
 
-        _wait_for_udev("stratis", [])
+        _wait_for_udev(_STRATIS_FS_TYPE, [])
 
         with _ServiceContextManager():
             self.assertEqual(len(_get_pools()), 0)
@@ -530,7 +533,8 @@ class UdevAdd(unittest.TestCase):
             self._lb_mgr.hotplug(device_tokens)
 
             _wait_for_udev(
-                "stratis" if key_description is None else "crypto_LUKS", devnodes
+                _STRATIS_FS_TYPE if key_description is None else _CRYPTO_LUKS_FS_TYPE,
+                devnodes,
             )
 
             self.assertEqual(len(_get_pools()), 1)
@@ -561,12 +565,75 @@ class UdevAdd(unittest.TestCase):
         self._single_pool(1, num_hotplugs=1)
 
     @unittest.expectedFailure
-    def test_encryption(self):
+    def test_encryption_single_pool(self):
         """
         See documentation for _single_pool.
         """
         with _KernelKey("test_key") as key_description:
             self._single_pool(1, key_description=key_description)
+
+    def _simple_event_test(self, *, key_description=None):
+        """
+        A simple test of event-based discovery.
+
+        * Create just one pool.
+        * Stop the daemon.
+        * Unplug the devices.
+        * Start the daemon.
+        * Plug the devices in one by one. The pool should come up when the last
+        device is plugged in.
+        """
+        id_fs_type_param = (
+            _STRATIS_FS_TYPE if key_description is None else _CRYPTO_LUKS_FS_TYPE
+        )
+        num_devices = 3
+        device_tokens = self._lb_mgr.create_devices(num_devices)
+        devnodes = self._lb_mgr.device_files(device_tokens)
+
+        _settle()
+
+        with _ServiceContextManager():
+            self.assertEqual(len(_get_pools()), 0)
+            (_, (_, device_object_paths)) = _create_pool(
+                random_string(5), devnodes, key_description=key_description
+            )
+            self.assertEqual(len(_get_pools()), 1)
+            self.assertEqual(len(device_object_paths), len(devnodes))
+
+        self._lb_mgr.unplug(device_tokens)
+        _wait_for_udev(id_fs_type_param, [])
+
+        with _ServiceContextManager():
+            self.assertEqual(len(_get_pools()), 0)
+
+            indices = list(range(num_devices))
+            random.shuffle(indices)
+
+            tokens_up = []
+            for index in indices[:-1]:
+                tokens_up.append(device_tokens[index])
+                self._lb_mgr.hotplug([tokens_up[-1]])
+                _wait_for_udev(id_fs_type_param, self._lb_mgr.device_files(tokens_up))
+                self.assertEqual(len(_get_pools()), 0)
+
+            tokens_up.append(device_tokens[indices[-1]])
+            self._lb_mgr.hotplug([tokens_up[-1]])
+            _wait_for_udev(id_fs_type_param, self._lb_mgr.device_files(tokens_up))
+            self.assertEqual(len(_get_pools()), 1)
+
+    @unittest.expectedFailure
+    def test_encryption_simple_event(self):
+        """
+        See documentation for _simple_event_test.
+        """
+        with _KernelKey("test_key") as key_description:
+            self._simple_event_test(key_description=key_description)
+
+    def test_simple_event(self):
+        """
+        See documentation for _simple_event_test.
+        """
+        self._simple_event_test()
 
     def test_duplicate_pool_name(self):
         """
@@ -588,11 +655,9 @@ class UdevAdd(unittest.TestCase):
             with _ServiceContextManager():
                 _create_pool(pool_name, devnodes)
 
-            _wait_for_udev("stratis", devnodes)
-
             self._lb_mgr.unplug(this_pool)
 
-            _wait_for_udev("stratis", [])
+            _wait_for_udev(_STRATIS_FS_TYPE, [])
 
         all_tokens = [dev for sublist in pool_tokens for dev in sublist]
 
@@ -602,7 +667,7 @@ class UdevAdd(unittest.TestCase):
             for i in range(num_pools):
                 self._lb_mgr.hotplug(pool_tokens[i])
 
-            _wait_for_udev("stratis", self._lb_mgr.device_files(all_tokens))
+            _wait_for_udev(_STRATIS_FS_TYPE, self._lb_mgr.device_files(all_tokens))
 
             # The number of pools should never exceed one, since all the pools
             # previously formed in the test have the same name.

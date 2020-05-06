@@ -441,7 +441,14 @@ impl LiminalDevices {
         event: &libudev::Event,
     ) -> Option<(PoolUuid, Name, StratPool)> {
         identify_block_device(event.device()).and_then(move |info| match info {
-            DeviceInfo::Luks(_) => None,
+            DeviceInfo::Luks(info) => {
+                // FIXME: This isn't really info worthy.
+                info!(
+                    "LUKS block device with {} discovered, then ignored",
+                    info
+                );
+                None
+            },
             DeviceInfo::Stratis(info) => {
                 let pool_uuid = info.identifiers.pool_uuid;
                 if pools.contains_uuid(pool_uuid) {

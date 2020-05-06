@@ -17,11 +17,11 @@ use crate::{
         event::get_engine_listener_list,
         shared::create_pool_idempotent_or_err,
         strat_engine::{
-            backstore::find_all,
+            backstore::{find_all, StratisIdentifiers, StratisInfo},
             cmd::verify_binaries,
             devlinks,
             dm::{get_dm, get_dm_init},
-            liminal::LiminalDevices,
+            liminal::{LInfo, LStratisInfo, LiminalDevices},
             names::validate_name,
             pool::StratPool,
         },
@@ -73,7 +73,26 @@ impl StratEngine {
 
         let mut liminal_devices = LiminalDevices::new();
         let mut pools = Table::default();
-        for (pool_uuid, devices) in find_all()? {
+        for (pool_uuid, mut devices) in find_all()? {
+            let devices = devices
+                .drain()
+                .map(|(n, (u, d))| {
+                    (
+                        u,
+                        LInfo::Stratis(LStratisInfo {
+                            ids: StratisInfo {
+                                identifiers: StratisIdentifiers {
+                                    pool_uuid,
+                                    device_uuid: u,
+                                },
+                                device_number: n,
+                                devnode: d,
+                            },
+                            luks: None,
+                        }),
+                    )
+                })
+                .collect();
             if let Some((pool_name, pool)) =
                 liminal_devices.try_setup_pool(&pools, pool_uuid, devices)
             {

@@ -19,8 +19,8 @@ mod udev;
 pub use self::{
     backstore::Backstore,
     blockdev::StratBlockDev,
-    identify::{find_all, identify_block_device, DeviceInfo},
-    metadata::{MDADataSize, BDA},
+    identify::{find_all, identify_block_device, DeviceInfo, StratisInfo},
+    metadata::{MDADataSize, StratisIdentifiers, BDA},
     shared::BlockDevPath,
 };
 

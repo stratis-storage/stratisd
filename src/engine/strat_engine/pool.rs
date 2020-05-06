@@ -576,7 +576,7 @@ mod tests {
     use crate::engine::{
         strat_engine::{
             devlinks,
-            liminal::{add_bdas, get_blockdevs, get_metadata},
+            liminal::{get_bdas, get_blockdevs, get_metadata},
             tests::{loopbacked, real},
         },
         types::{EngineAction, PoolExtendState, PoolState, Redundancy},
@@ -628,22 +628,22 @@ mod tests {
             .map(|(device_uuid, blockdev)| (*blockdev.device(), (*device_uuid, blockdev.devnode())))
             .collect();
 
-        let infos1 = add_bdas(uuid1, &devnodes1).unwrap();
-        let infos2 = add_bdas(uuid2, &devnodes2).unwrap();
+        let bdas1 = get_bdas(uuid1, &devnodes1).unwrap();
+        let bdas2 = get_bdas(uuid2, &devnodes2).unwrap();
 
-        let (_, pool_save1) = get_metadata(&infos1).unwrap().unwrap();
-        let (_, pool_save2) = get_metadata(&infos2).unwrap().unwrap();
+        let (_, pool_save1) = get_metadata(&devnodes1, &bdas1).unwrap().unwrap();
+        let (_, pool_save2) = get_metadata(&devnodes2, &bdas2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
         assert_eq!(pool_save2, metadata2);
 
         pool1.teardown().unwrap();
         pool2.teardown().unwrap();
 
-        let infos1 = add_bdas(uuid1, &devnodes1).unwrap();
-        let infos2 = add_bdas(uuid2, &devnodes2).unwrap();
+        let bdas1 = get_bdas(uuid1, &devnodes1).unwrap();
+        let bdas2 = get_bdas(uuid2, &devnodes2).unwrap();
 
-        let (_, pool_save1) = get_metadata(&infos1).unwrap().unwrap();
-        let (_, pool_save2) = get_metadata(&infos2).unwrap().unwrap();
+        let (_, pool_save1) = get_metadata(&devnodes1, &bdas1).unwrap().unwrap();
+        let (_, pool_save2) = get_metadata(&devnodes2, &bdas2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
         assert_eq!(pool_save2, metadata2);
     }
@@ -763,9 +763,9 @@ mod tests {
 
         pool.teardown().unwrap();
 
-        let infos = add_bdas(uuid, &devices).unwrap();
-        let (timestamp, metadata) = get_metadata(&infos).unwrap().unwrap();
-        let (datadevs, cachedevs) = get_blockdevs(&metadata.backstore, infos).unwrap();
+        let bdas = get_bdas(uuid, &devices).unwrap();
+        let (timestamp, metadata) = get_metadata(&devices, &bdas).unwrap().unwrap();
+        let (datadevs, cachedevs) = get_blockdevs(&metadata.backstore, &devices, bdas).unwrap();
 
         let (name, pool) =
             StratPool::setup(uuid, datadevs, cachedevs, timestamp, &metadata).unwrap();

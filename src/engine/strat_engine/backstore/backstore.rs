@@ -641,7 +641,7 @@ impl Recordable<BackstoreSave> for Backstore {
 
 #[cfg(test)]
 mod tests {
-    use std::fs::OpenOptions;
+    use std::{collections::HashMap, fs::OpenOptions};
 
     use uuid::Uuid;
 
@@ -650,9 +650,12 @@ mod tests {
     use crate::engine::{
         engine::BlockDev,
         strat_engine::{
-            backstore::metadata::device_identifiers,
+            backstore::{
+                identify::StratisInfo,
+                metadata::{device_identifiers, StratisIdentifiers},
+            },
             cmd,
-            liminal::{add_bdas, get_blockdevs},
+            liminal::{get_bdas, get_blockdevs, LStratisInfo},
             tests::{loopbacked, real},
         },
     };
@@ -906,15 +909,30 @@ mod tests {
                     .blockdevs()
                     .iter()
                     .map(|(device_uuid, blockdev)| {
-                        (*blockdev.device(), (*device_uuid, blockdev.devnode()))
+                        (
+                            *device_uuid,
+                            LStratisInfo {
+                                ids: StratisInfo {
+                                    identifiers: StratisIdentifiers {
+                                        pool_uuid,
+                                        device_uuid: *device_uuid,
+                                    },
+                                    devnode: blockdev.devnode(),
+                                    device_number: *blockdev.device(),
+                                },
+                                luks: None,
+                            },
+                        )
                     })
-                    .collect(),
+                    .collect::<HashMap<DevUuid, LStratisInfo>>(),
             )
         };
 
         {
-            let infos = add_bdas(pool_uuid, &devices).unwrap();
-            let (datadevs, cachedevs) = get_blockdevs(&backstore_save, infos).unwrap();
+            let devices: HashMap<DevUuid, &LStratisInfo> =
+                devices.iter().map(|(u, v)| (*u, v)).collect();
+            let bdas = get_bdas(pool_uuid, &devices).unwrap();
+            let (datadevs, cachedevs) = get_blockdevs(&backstore_save, &devices, bdas).unwrap();
             let mut backstore =
                 Backstore::setup(pool_uuid, &backstore_save, datadevs, cachedevs, Utc::now())
                     .unwrap();
@@ -928,8 +946,10 @@ mod tests {
         }
 
         {
-            let infos = add_bdas(pool_uuid, &devices).unwrap();
-            let (datadevs, cachedevs) = get_blockdevs(&backstore_save, infos).unwrap();
+            let devices: HashMap<DevUuid, &LStratisInfo> =
+                devices.iter().map(|(u, v)| (*u, v)).collect();
+            let bdas = get_bdas(pool_uuid, &devices).unwrap();
+            let (datadevs, cachedevs) = get_blockdevs(&backstore_save, &devices, bdas).unwrap();
             let mut backstore =
                 Backstore::setup(pool_uuid, &backstore_save, datadevs, cachedevs, Utc::now())
                     .unwrap();

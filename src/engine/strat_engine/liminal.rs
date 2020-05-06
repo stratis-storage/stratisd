@@ -7,7 +7,7 @@
 use std::{
     collections::{HashMap, HashSet},
     fs::OpenOptions,
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 use chrono::{DateTime, Utc};
@@ -18,7 +18,9 @@ use devicemapper::{Device, Sectors};
 use crate::{
     engine::{
         strat_engine::{
-            backstore::{identify_block_device, BlockDevPath, DeviceInfo, StratBlockDev, BDA},
+            backstore::{
+                identify_block_device, BlockDevPath, DeviceInfo, StratBlockDev, StratisInfo, BDA,
+            },
             device::blkdev_size,
             devlinks::setup_pool_devlinks,
             pool::StratPool,
@@ -38,36 +40,28 @@ use crate::{
 /// already known. It is also an error if the BDA can not be read at all
 /// as that BDA may belong to the device with the most recently written
 /// metadata.
-pub fn add_bdas(
+pub fn get_bdas(
     pool_uuid: PoolUuid,
-    devnodes: &HashMap<Device, (DevUuid, PathBuf)>,
-) -> StratisResult<HashMap<Device, (DevUuid, PathBuf, BDA)>> {
-    let mut infos = HashMap::new();
-    for (device, (device_uuid, devnode)) in devnodes.iter() {
-        let bda = BDA::load(&mut OpenOptions::new()
-                            .read(true)
-                            .open(devnode)?)?
-            .ok_or_else(||
-                        StratisError::Error(format!(
-                                "Failed to read BDA from device {} with devnode {} which has previously been identified as a Stratis device with pool UUID {} and device UUID {}",
-                                device,
-                                devnode.display(),
-                                pool_uuid.to_simple_ref(),
-                                device_uuid.to_simple_ref())))?;
-        if bda.pool_uuid() != pool_uuid || bda.dev_uuid() != *device_uuid {
+    infos: &HashMap<DevUuid, &LStratisInfo>,
+) -> StratisResult<HashMap<DevUuid, BDA>> {
+    let mut result = HashMap::new();
+    for (dev_uuid, info) in infos.iter() {
+        let bda = BDA::load(&mut OpenOptions::new().read(true).open(&info.ids.devnode)?)?
+            .ok_or_else(|| {
+                StratisError::Error(format!("Failed to read BDA from device: {}", info.ids))
+            })?;
+        if bda.pool_uuid() != pool_uuid || bda.dev_uuid() != info.ids.identifiers.device_uuid {
             return Err(StratisError::Error(format!(
-                        "BDA identifiers (pool UUID: {}, device UUID: {}) for device {} with devnode {} do not agree with previously read identifiers (pool UUID: {}, device UUID: {})",
+                        "BDA identifiers (pool UUID: {}, device UUID: {}) for device {} do not agree with previously read identifiers",
                         bda.pool_uuid().to_simple_ref(),
                         bda.dev_uuid().to_simple_ref(),
-                        device,
-                        devnode.display(),
-                        pool_uuid.to_simple_ref(),
-                        device_uuid.to_simple_ref()
-                        )));
+                        info.ids,
+                ))
+            );
         };
-        infos.insert(*device, (pool_uuid, devnode.to_owned(), bda));
+        result.insert(*dev_uuid, bda);
     }
-    Ok(infos)
+    Ok(result)
 }
 
 /// Get the most recent metadata from a set of devices.
@@ -77,15 +71,16 @@ pub fn add_bdas(
 /// Returns an error if there is a last update time, but no metadata could
 /// be obtained from any of the devices.
 pub fn get_metadata(
-    devnodes: &HashMap<Device, (DevUuid, PathBuf, BDA)>,
+    infos: &HashMap<DevUuid, &LStratisInfo>,
+    bdas: &HashMap<DevUuid, BDA>,
 ) -> StratisResult<Option<(DateTime<Utc>, PoolSave)>> {
     // Most recent time should never be None if this was a properly
     // created pool; this allows for the method to be called in other
     // circumstances.
     let most_recent_time = {
-        match devnodes
+        match bdas
             .iter()
-            .filter_map(|(_, (_, _, ref bda))| bda.last_update_time())
+            .filter_map(|(_, bda)| bda.last_update_time())
             .max()
         {
             Some(time) => time,
@@ -96,13 +91,12 @@ pub fn get_metadata(
     // Try to read from all available devnodes that could contain most
     // recent metadata. In the event of errors, continue to try until all are
     // exhausted.
-    devnodes
-        .iter()
-        .filter_map(|(_, (_, devnode, ref bda))| {
+    bdas.iter()
+        .filter_map(|(uuid, bda)| {
             if bda.last_update_time() == Some(most_recent_time) {
                 OpenOptions::new()
                     .read(true)
-                    .open(devnode)
+                    .open(&infos.get(uuid).expect("").ids.devnode)
                     .ok()
                     .and_then(|mut f| bda.load_state(&mut f).unwrap_or(None))
                     .and_then(|data| serde_json::from_slice(&data).ok())
@@ -130,7 +124,8 @@ pub fn get_metadata(
 /// belong to one pool; all BDAs agree on their pool UUID.
 pub fn get_blockdevs(
     backstore_save: &BackstoreSave,
-    devnodes: HashMap<Device, (DevUuid, PathBuf, BDA)>,
+    infos: &HashMap<DevUuid, &LStratisInfo>,
+    mut bdas: HashMap<DevUuid, BDA>,
 ) -> StratisResult<(Vec<StratBlockDev>, Vec<StratBlockDev>)> {
     let recorded_data_map: HashMap<DevUuid, (usize, &BaseBlockDevSave)> = backstore_save
         .data_tier
@@ -250,11 +245,11 @@ pub fn get_blockdevs(
     }
 
     let (mut datadevs, mut cachedevs): (Vec<StratBlockDev>, Vec<StratBlockDev>) = (vec![], vec![]);
-    for (device, (_, devnode, bda)) in devnodes {
+    for (dev_uuid, info) in infos {
         get_blockdev(
-            device,
-            &devnode,
-            bda,
+            info.ids.device_number,
+            &info.ids.devnode,
+            bdas.remove(dev_uuid).expect(""),
             &recorded_data_map,
             &recorded_cache_map,
             &segment_table,
@@ -316,17 +311,45 @@ pub fn get_blockdevs(
     Ok((datadevs, cachedevs))
 }
 
+// Info for a discovered Luks Device belonging to Stratis.
+#[derive(Debug)]
+pub struct LLuksInfo {
+    pub ids: StratisInfo,
+    pub key_description: String,
+}
+
+// Info for a Stratis device.
+#[derive(Debug)]
+pub struct LStratisInfo {
+    pub ids: StratisInfo,
+    pub luks: Option<LLuksInfo>,
+}
+
+// Info for either type of device.
+#[derive(Debug)]
+pub enum LInfo {
+    #[allow(dead_code)]
+    Luks(LLuksInfo),
+    Stratis(LStratisInfo),
+}
+
 /// Devices which stratisd has discovered but which have not been assembled
 /// into pools.
 #[derive(Debug)]
 pub struct LiminalDevices {
-    errored_pool_devices: HashMap<PoolUuid, HashMap<Device, (DevUuid, PathBuf)>>,
+    // sets of devices which have not been assembled into a pool but which
+    // may be able to be assembled later.
+    errored_pool_devices: HashMap<PoolUuid, HashMap<DevUuid, LInfo>>,
+    // sets of devices which have some inconsistency which makes it impossible
+    // to assemble them into pools.
+    hopeless_pool_devices: HashMap<PoolUuid, Vec<LInfo>>,
 }
 
 impl LiminalDevices {
     pub fn new() -> LiminalDevices {
         LiminalDevices {
             errored_pool_devices: HashMap::new(),
+            hopeless_pool_devices: HashMap::new(),
         }
     }
 
@@ -341,7 +364,7 @@ impl LiminalDevices {
         &mut self,
         pools: &Table<StratPool>,
         pool_uuid: PoolUuid,
-        devices: HashMap<Device, (DevUuid, PathBuf)>,
+        devices: HashMap<DevUuid, LInfo>,
     ) -> Option<(Name, StratPool)> {
         assert!(pools.get_by_uuid(pool_uuid).is_none());
         assert!(self.errored_pool_devices.get(&pool_uuid).is_none());
@@ -360,16 +383,16 @@ impl LiminalDevices {
         fn setup_pool(
             pools: &Table<StratPool>,
             pool_uuid: PoolUuid,
-            devices: &HashMap<Device, (DevUuid, PathBuf)>,
+            infos: &HashMap<DevUuid, &LStratisInfo>,
         ) -> Result<Option<(Name, StratPool)>, String> {
-            let infos = match add_bdas(pool_uuid, devices) {
+            let bdas = match get_bdas(pool_uuid, infos) {
                 Err(err) => return Err(format!(
                         "There was an error encountered when reading the BDAs for the devices found for pool with UUID {}: {}",
                         pool_uuid.to_simple_ref(),
                         err)),
                 Ok(infos) => infos,
             };
-            let (timestamp, metadata) = match get_metadata(&infos) {
+            let (timestamp, metadata) = match get_metadata(infos, &bdas) {
                 Err(err) => return Err(format!(
                         "There was an error encountered when reading the metadata for the devices found for pool with UUID {}: {}",
                         pool_uuid.to_simple_ref(),
@@ -386,7 +409,7 @@ impl LiminalDevices {
                         uuid.to_simple_ref()));
             }
 
-            let (datadevs, cachedevs) = match get_blockdevs(&metadata.backstore, infos) {
+            let (datadevs, cachedevs) = match get_blockdevs(&metadata.backstore, infos, bdas) {
                 Err(err) => return Err(format!(
                         "There was an error encountered when calculating the block devices for pool with UUID {} and name {}: {}",
                         pool_uuid.to_simple_ref(),
@@ -406,27 +429,35 @@ impl LiminalDevices {
                 .map(Some)
         }
 
-        let result = setup_pool(pools, pool_uuid, &devices);
+        if devices.iter().all(|(_, v)| match v {
+            LInfo::Stratis(_) => true,
+            _ => false,
+        }) {
+            let devices = devices
+                .iter()
+                .map(|(u, v)| match v {
+                    LInfo::Stratis(info) => (*u, info),
+                    LInfo::Luks(_) => unreachable!(),
+                })
+                .collect();
+            let result = setup_pool(pools, pool_uuid, &devices);
 
-        if let Err(err) = &result {
-            warn!("{}", err);
-        }
+            if let Err(err) = &result {
+                warn!("{}", err);
+            }
 
-        match result {
-            Ok(Some((pool_name, pool))) => {
+            if let Ok(Some((pool_name, pool))) = result {
                 setup_pool_devlinks(&pool_name, &pool);
                 info!(
                     "Pool with name \"{}\" and UUID \"{}\" set up",
                     pool_name,
                     pool_uuid.to_simple_ref()
                 );
-                Some((pool_name, pool))
-            }
-            _ => {
-                self.errored_pool_devices.insert(pool_uuid, devices);
-                None
+                return Some((pool_name, pool));
             }
         }
+        self.errored_pool_devices.insert(pool_uuid, devices);
+        None
     }
 
     /// Given some information gathered about a single Stratis device, determine
@@ -461,16 +492,21 @@ impl LiminalDevices {
                         .remove(&pool_uuid)
                         .unwrap_or_else(HashMap::new);
 
+                    // FIXME: check for matching LUKS devices
+                    let device_uuid = info.identifiers.device_uuid;
                     if devices
                         .insert(
-                            info.device_number,
-                            (info.identifiers.device_uuid, info.devnode.to_owned()),
+                            device_uuid,
+                            LInfo::Stratis(LStratisInfo{ ids: info, luks: None})
                         )
                         .is_none()
                     {
                         info!(
                             "Stratis block device with {} discovered, i.e., identified for the first time during this execution of stratisd",
-                            info
+                            match devices.get(&device_uuid).expect("") {
+                                LInfo::Stratis(info) => &info.ids,
+                                _ => unreachable!()
+                            }
                         );
                     }
 
@@ -494,11 +530,25 @@ impl LiminalDevices {
     /// Generate a JSON report giving some information about the internals
     /// of these devices.
     pub fn report(&self) -> Value {
-        Value::Array(self.errored_pool_devices.iter().map(|(uuid, map)| {
-            json!({
-                "pool_uuid": uuid.to_simple_ref().to_string(),
-                "devices": Value::Array(map.values().map(|(_, p)| Value::from(p.display().to_string())).collect()),
-            })
-        }).collect())
+        Value::Array(
+            self.errored_pool_devices
+                .iter()
+                .map(|(uuid, map)| {
+                    let devices = map
+                        .values()
+                        .map(|info| {
+                            Value::from(match info {
+                                LInfo::Luks(info) => info.ids.devnode.display().to_string(),
+                                LInfo::Stratis(info) => info.ids.devnode.display().to_string(),
+                            })
+                        })
+                        .collect();
+                    json!({
+                        "pool_uuid": uuid.to_simple_ref().to_string(),
+                        "devices": Value::Array(devices),
+                    })
+                })
+                .collect(),
+        )
     }
 }

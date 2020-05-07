@@ -395,7 +395,7 @@ impl LiminalDevices {
                 Ok((datadevs, cachedevs)) => (datadevs, cachedevs),
             };
 
-            StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata)
+            StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata, None)
                 .map_err(|err| {
                     format!(
                         "An attempt to set up pool with UUID {} from the assembled devices failed: {}",

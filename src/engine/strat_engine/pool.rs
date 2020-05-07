@@ -188,17 +188,31 @@ impl StratPool {
     /// Precondition: every device in devnodes has already been determined
     /// to belong to the pool with the specified uuid.
     /// Precondition: A metadata verification step has already been run.
+    ///
+    /// Precondition:
+    ///   * key_description.is_some() -> every StratBlockDev in datadevs has a
+    ///   key description and that key description == key_description
+    ///   *key_description.is_none() -> no StratBlockDev in datadevs has a
+    ///   key description.
+    ///   * no StratBlockDev in cachdevs has a key description
     pub fn setup(
         uuid: PoolUuid,
         datadevs: Vec<StratBlockDev>,
         cachedevs: Vec<StratBlockDev>,
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
+        key_description: Option<&KeyDescription>,
     ) -> StratisResult<(Name, StratPool)> {
         check_metadata(metadata)?;
 
-        let mut backstore =
-            Backstore::setup(uuid, &metadata.backstore, datadevs, cachedevs, timestamp)?;
+        let mut backstore = Backstore::setup(
+            uuid,
+            &metadata.backstore,
+            datadevs,
+            cachedevs,
+            timestamp,
+            key_description,
+        )?;
         let mut thinpool = ThinPool::setup(
             uuid,
             &metadata.thinpool_dev,
@@ -818,7 +832,7 @@ mod tests {
         let (datadevs, cachedevs) = get_blockdevs(&metadata.backstore, infos).unwrap();
 
         let (name, pool) =
-            StratPool::setup(uuid, datadevs, cachedevs, timestamp, &metadata).unwrap();
+            StratPool::setup(uuid, datadevs, cachedevs, timestamp, &metadata, None).unwrap();
         invariant(&pool, &name);
 
         let mut buf = [0u8; 10];

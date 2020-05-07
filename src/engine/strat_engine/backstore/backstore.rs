@@ -906,7 +906,10 @@ mod tests {
                     .blockdevs()
                     .iter()
                     .map(|(device_uuid, blockdev)| {
-                        (*blockdev.device(), (*device_uuid, blockdev.devnode()))
+                        (
+                            *blockdev.device(),
+                            (*device_uuid, blockdev.devnode().physical_path().to_owned()),
+                        )
                     })
                     .collect(),
             )

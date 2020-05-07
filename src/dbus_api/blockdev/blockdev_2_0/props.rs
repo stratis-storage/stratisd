@@ -36,7 +36,9 @@ pub fn get_blockdev_devnode(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    get_blockdev_property(i, p, |_, p| Ok(format!("{}", p.devnode().display())))
+    get_blockdev_property(i, p, |_, p| {
+        Ok(format!("{}", p.devnode().user_path().display()))
+    })
 }
 
 pub fn get_blockdev_hardware_info(

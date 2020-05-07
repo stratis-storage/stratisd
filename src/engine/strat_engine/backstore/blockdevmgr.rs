@@ -16,6 +16,7 @@ use devicemapper::{Bytes, Device, LinearDevTargetParams, LinearTargetParams, Sec
 
 use crate::{
     engine::{
+        engine::BlockDev,
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
@@ -161,6 +162,7 @@ impl BlockDevMgr {
                 .iter()
                 .next()
                 .expect("Must have at least one blockdev")
+                .devnode()
                 .physical_path(),
         )
     }

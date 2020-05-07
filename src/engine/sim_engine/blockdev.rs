@@ -2,11 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{
-    cell::RefCell,
-    path::{Path, PathBuf},
-    rc::Rc,
-};
+use std::{cell::RefCell, path::Path, rc::Rc};
 
 use chrono::{DateTime, TimeZone, Utc};
 use uuid::Uuid;
@@ -14,13 +10,14 @@ use uuid::Uuid;
 use devicemapper::{Bytes, Sectors, IEC};
 
 use crate::engine::{
-    engine::BlockDev, sim_engine::randomization::Randomizer, types::MaybeDbusPath,
+    engine::BlockDev, sim_engine::randomization::Randomizer, types::BlockDevPath,
+    types::MaybeDbusPath,
 };
 
 #[derive(Debug)]
 /// A simulated device.
 pub struct SimDev {
-    devnode: PathBuf,
+    devnode: BlockDevPath,
     rdm: Rc<RefCell<Randomizer>>,
     user_info: Option<String>,
     hardware_info: Option<String>,
@@ -30,8 +27,8 @@ pub struct SimDev {
 }
 
 impl BlockDev for SimDev {
-    fn devnode(&self) -> PathBuf {
-        self.devnode.clone()
+    fn devnode(&self) -> &BlockDevPath {
+        &self.devnode
     }
 
     fn user_info(&self) -> Option<&str> {
@@ -73,7 +70,7 @@ impl SimDev {
         (
             Uuid::new_v4(),
             SimDev {
-                devnode: devnode.to_owned(),
+                devnode: BlockDevPath::physical_device_path(devnode),
                 rdm,
                 user_info: None,
                 hardware_info: None,

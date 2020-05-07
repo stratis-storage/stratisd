@@ -4,10 +4,7 @@
 
 // Code to handle a single block device.
 
-use std::{
-    fs::OpenOptions,
-    path::{Path, PathBuf},
-};
+use std::fs::OpenOptions;
 
 use chrono::{DateTime, TimeZone, Utc};
 
@@ -21,11 +18,10 @@ use crate::{
                 crypt::CryptHandle,
                 metadata::{disown_device, BDAExtendedSize, BlockdevSize, MDADataSize, BDA},
                 range_alloc::RangeAllocator,
-                shared::BlockDevPath,
             },
             serde_structs::{BaseBlockDevSave, Recordable},
         },
-        types::{DevUuid, MaybeDbusPath},
+        types::{BlockDevPath, DevUuid, MaybeDbusPath},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -89,12 +85,6 @@ impl StratBlockDev {
     /// Returns the blockdev's Device
     pub fn device(&self) -> &Device {
         &self.dev
-    }
-
-    /// Return the path to the physical device on which data is stored either
-    /// encrypted or unencrypted.
-    pub fn physical_path(&self) -> &Path {
-        self.devnode.physical_path()
     }
 
     /// Remove information that identifies this device as belonging to Stratis
@@ -186,8 +176,8 @@ impl StratBlockDev {
 }
 
 impl BlockDev for StratBlockDev {
-    fn devnode(&self) -> PathBuf {
-        self.devnode.metadata_path().to_owned()
+    fn devnode(&self) -> &BlockDevPath {
+        &self.devnode
     }
 
     fn user_info(&self) -> Option<&str> {

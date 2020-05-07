@@ -7,13 +7,12 @@
 use std::{
     collections::{HashMap, HashSet},
     fs::OpenOptions,
-    path::Path,
 };
 
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 
-use devicemapper::{Device, Sectors};
+use devicemapper::Sectors;
 
 use crate::{
     engine::{
@@ -40,29 +39,34 @@ use crate::{
 /// already known. It is also an error if the BDA can not be read at all
 /// as that BDA may belong to the device with the most recently written
 /// metadata.
+///
+/// Postconditions: keys in result are equal to keys in infos OR an error
+/// is returned.
 pub fn get_bdas(
     pool_uuid: PoolUuid,
     infos: &HashMap<DevUuid, &LStratisInfo>,
 ) -> StratisResult<HashMap<DevUuid, BDA>> {
-    let mut result = HashMap::new();
-    for (dev_uuid, info) in infos.iter() {
+    fn read_bda(pool_uuid: PoolUuid, info: &LStratisInfo) -> StratisResult<BDA> {
         let bda = BDA::load(&mut OpenOptions::new().read(true).open(&info.ids.devnode)?)?
             .ok_or_else(|| {
                 StratisError::Error(format!("Failed to read BDA from device: {}", info.ids))
-            })
-        .and_then(|bda| {
+            })?;
         if bda.pool_uuid() != pool_uuid || bda.dev_uuid() != info.ids.identifiers.device_uuid {
             Err(StratisError::Error(format!(
-                        "BDA identifiers (pool UUID: {}, device UUID: {}) for device {} do not agree with previously read identifiers",
-                        bda.pool_uuid().to_simple_ref(),
-                        bda.dev_uuid().to_simple_ref(),
-                        info.ids,
-                ))
-            )
-        } else { Ok(bda) }})?;
-        result.insert(*dev_uuid, bda);
+                    "BDA identifiers (pool UUID: {}, device UUID: {}) for device {} do not agree with previously read identifiers",
+                    bda.pool_uuid().to_simple_ref(),
+                    bda.dev_uuid().to_simple_ref(),
+                    info.ids,
+            )))
+        } else {
+            Ok(bda)
+        }
     }
-    Ok(result)
+
+    infos
+        .iter()
+        .map(|(dev_uuid, info)| read_bda(pool_uuid, info).map(|bda| (*dev_uuid, bda)))
+        .collect()
 }
 
 /// Get the most recent metadata from a set of devices.
@@ -71,6 +75,8 @@ pub fn get_bdas(
 /// metadata could be written.
 /// Returns an error if there is a last update time, but no metadata could
 /// be obtained from any of the devices.
+///
+/// Precondition: infos and bdas have identical sets of keys
 pub fn get_metadata(
     infos: &HashMap<DevUuid, &LStratisInfo>,
     bdas: &HashMap<DevUuid, BDA>,
@@ -97,7 +103,13 @@ pub fn get_metadata(
             if bda.last_update_time() == Some(most_recent_time) {
                 OpenOptions::new()
                     .read(true)
-                    .open(&infos.get(uuid).expect("").ids.devnode)
+                    .open(
+                        &infos
+                            .get(uuid)
+                            .expect("equal sets of UUID keys")
+                            .ids
+                            .devnode,
+                    )
                     .ok()
                     .and_then(|mut f| bda.load_state(&mut f).unwrap_or(None))
                     .and_then(|data| serde_json::from_slice(&data).ok())
@@ -121,8 +133,9 @@ pub fn get_metadata(
 /// Returns an error if the blockdevs obtained do not match the metadata.
 /// Returns a tuple, of which the first are the data devs, and the second
 /// are the devs that support the cache tier.
-/// Precondition: Every device in devnodes has already been determined to
-/// belong to one pool; all BDAs agree on their pool UUID.
+/// Precondition: Every device in infos has already been determined to
+/// belong to one pool; all BDAs agree on their pool UUID, set of keys in
+/// infos and bdas are identical.
 pub fn get_blockdevs(
     backstore_save: &BackstoreSave,
     infos: &HashMap<DevUuid, &LStratisInfo>,
@@ -172,8 +185,7 @@ pub fn get_blockdevs(
     // or it is impossible to set up the device because the recorded
     // allocation information is impossible.
     fn get_blockdev(
-        device: Device,
-        devnode: &Path,
+        info: &LStratisInfo,
         bda: BDA,
         data_map: &HashMap<DevUuid, (usize, &BaseBlockDevSave)>,
         cache_map: &HashMap<DevUuid, (usize, &BaseBlockDevSave)>,
@@ -182,24 +194,23 @@ pub fn get_blockdevs(
         // Return an error if apparent size of Stratis block device appears to
         // have decreased since metadata was recorded or if size of block
         // device could not be obtained.
-        blkdev_size(&OpenOptions::new().read(true).open(devnode)?).and_then(|actual_size| {
-            let actual_size_sectors = actual_size.sectors();
-            let recorded_size = bda.dev_size().sectors();
-            if actual_size_sectors < recorded_size {
-                let err_msg = format!(
-                    "Stratis device with device number {}, devnode {}, pool UUID {} and device UUID {} had recorded size {}, but actual size is less at {}",
-                    device,
-                    devnode.display(),
-                    bda.pool_uuid().to_simple_ref(),
-                    bda.dev_uuid().to_simple_ref(),
+        blkdev_size(&OpenOptions::new().read(true).open(&info.ids.devnode)?).and_then(
+            |actual_size| {
+                let actual_size_sectors = actual_size.sectors();
+                let recorded_size = bda.dev_size().sectors();
+                if actual_size_sectors < recorded_size {
+                    let err_msg = format!(
+                    "Stratis device with {} had recorded size {}, but actual size is less at {}",
+                    info.ids,
                     recorded_size,
                     actual_size_sectors
                 );
-                Err(StratisError::Engine(ErrorEnum::Error, err_msg))
-            } else {
-                Ok(())
-            }
-        })?;
+                    Err(StratisError::Engine(ErrorEnum::Error, err_msg))
+                } else {
+                    Ok(())
+                }
+            },
+        )?;
 
         let dev_uuid = bda.dev_uuid();
 
@@ -215,12 +226,9 @@ pub fn get_blockdevs(
             })
             .ok_or_else(|| {
                 let err_msg = format!(
-                        "Stratis device with device number {}, devnode {}, pool UUID {} and device UUID {} had no record in pool metadata",
-                        device,
-                        devnode.display(),
-                        bda.pool_uuid().to_simple_ref(),
-                        bda.dev_uuid().to_simple_ref()
-                    );
+                    "Stratis device with {} had no record in pool metadata",
+                    info.ids
+                );
                 StratisError::Engine(ErrorEnum::NotFound, err_msg)
             })?;
 
@@ -229,18 +237,26 @@ pub fn get_blockdevs(
         // available to be allocated. If this fails, the most likely
         // conclusion is metadata corruption.
         let segments = segment_table.get(&dev_uuid);
+        let (path, key_description) = match &info.luks {
+            Some(luks) => (
+                BlockDevPath::Encrypted {
+                    physical: luks.ids.devnode.to_owned(),
+                    logical: info.ids.devnode.to_owned(),
+                },
+                Some(luks.key_description.to_owned()),
+            ),
+            None => (BlockDevPath::Unencrypted(info.ids.devnode.to_owned()), None),
+        };
         Ok((
             tier,
             StratBlockDev::new(
-                device,
-                // FIXME: This block device could represent an encrypted or
-                // an unencrypted device.
-                BlockDevPath::Unencrypted(devnode.to_owned()),
+                info.ids.device_number,
+                path,
                 bda,
                 segments.unwrap_or(&vec![]),
                 bd_save.user_info.clone(),
                 bd_save.hardware_info.clone(),
-                None,
+                key_description,
             )?,
         ))
     }
@@ -248,9 +264,9 @@ pub fn get_blockdevs(
     let (mut datadevs, mut cachedevs): (Vec<StratBlockDev>, Vec<StratBlockDev>) = (vec![], vec![]);
     for (dev_uuid, info) in infos {
         get_blockdev(
-            info.ids.device_number,
-            &info.ids.devnode,
-            bdas.remove(dev_uuid).expect(""),
+            &info,
+            bdas.remove(dev_uuid)
+                .expect("sets of keys in bdas and infos are identical"),
             &recorded_data_map,
             &recorded_cache_map,
             &segment_table,

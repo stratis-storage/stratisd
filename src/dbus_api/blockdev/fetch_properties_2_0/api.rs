@@ -2,10 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus::{
-    self,
-    tree::{Factory, MTFn, Method},
-};
+use dbus::tree::{Factory, MTFn, Method};
 
 use crate::dbus_api::{
     blockdev::fetch_properties_2_0::methods::{get_all_properties, get_properties},

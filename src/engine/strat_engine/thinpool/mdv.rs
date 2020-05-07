@@ -11,10 +11,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use nix::{
-    self,
-    mount::{mount, umount, MsFlags},
-};
+use nix::mount::{mount, umount, MsFlags};
 
 use devicemapper::{DmDevice, LinearDev, LinearDevTargetParams, TargetLine};
 

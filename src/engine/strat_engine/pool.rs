@@ -188,17 +188,31 @@ impl StratPool {
     /// Precondition: every device in devnodes has already been determined
     /// to belong to the pool with the specified uuid.
     /// Precondition: A metadata verification step has already been run.
+    ///
+    /// Precondition:
+    ///   * key_description.is_some() -> every StratBlockDev in datadevs has a
+    ///   key description and that key description == key_description
+    ///   * key_description.is_none() -> no StratBlockDev in datadevs has a
+    ///   key description.
+    ///   * no StratBlockDev in cachdevs has a key description
     pub fn setup(
         uuid: PoolUuid,
         datadevs: Vec<StratBlockDev>,
         cachedevs: Vec<StratBlockDev>,
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
+        key_description: Option<&KeyDescription>,
     ) -> StratisResult<(Name, StratPool)> {
         check_metadata(metadata)?;
 
-        let mut backstore =
-            Backstore::setup(uuid, &metadata.backstore, datadevs, cachedevs, timestamp)?;
+        let mut backstore = Backstore::setup(
+            uuid,
+            &metadata.backstore,
+            datadevs,
+            cachedevs,
+            timestamp,
+            key_description,
+        )?;
         let mut thinpool = ThinPool::setup(
             uuid,
             &metadata.thinpool_dev,
@@ -610,8 +624,9 @@ mod tests {
 
     use crate::engine::{
         strat_engine::{
+            backstore::{StratisIdentifiers, StratisInfo},
             devlinks,
-            liminal::{add_bdas, get_blockdevs, get_metadata},
+            liminal::{get_bdas, get_blockdevs, get_metadata, LStratisInfo},
             tests::{loopbacked, real},
         },
         types::{EngineAction, PoolExtendState, PoolState, Redundancy},
@@ -649,46 +664,62 @@ mod tests {
 
         let metadata2 = pool2.record(name2);
 
-        let devnodes1 = pool1
+        let infos1: HashMap<DevUuid, LStratisInfo> = pool1
             .backstore
             .blockdevs()
             .iter()
             .map(|(device_uuid, blockdev)| {
                 (
-                    *blockdev.device(),
-                    (*device_uuid, blockdev.devnode().metadata_path().to_owned()),
+                    *device_uuid,
+                    StratisInfo {
+                        identifiers: StratisIdentifiers {
+                            pool_uuid: uuid1,
+                            device_uuid: *device_uuid,
+                        },
+                        device_number: *blockdev.device(),
+                        devnode: blockdev.devnode().metadata_path().to_owned(),
+                    }
+                    .into(),
                 )
             })
             .collect();
 
-        let devnodes2 = pool2
+        let infos2: HashMap<DevUuid, LStratisInfo> = pool2
             .backstore
             .blockdevs()
             .iter()
             .map(|(device_uuid, blockdev)| {
                 (
-                    *blockdev.device(),
-                    (*device_uuid, blockdev.devnode().metadata_path().to_owned()),
+                    *device_uuid,
+                    StratisInfo {
+                        identifiers: StratisIdentifiers {
+                            pool_uuid: uuid2,
+                            device_uuid: *device_uuid,
+                        },
+                        device_number: *blockdev.device(),
+                        devnode: blockdev.devnode().metadata_path().to_owned(),
+                    }
+                    .into(),
                 )
             })
             .collect();
 
-        let infos1 = add_bdas(uuid1, &devnodes1).unwrap();
-        let infos2 = add_bdas(uuid2, &devnodes2).unwrap();
+        let bdas1 = get_bdas(&infos1).unwrap();
+        let bdas2 = get_bdas(&infos2).unwrap();
 
-        let (_, pool_save1) = get_metadata(&infos1).unwrap().unwrap();
-        let (_, pool_save2) = get_metadata(&infos2).unwrap().unwrap();
+        let (_, pool_save1) = get_metadata(&infos1, &bdas1).unwrap().unwrap();
+        let (_, pool_save2) = get_metadata(&infos2, &bdas2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
         assert_eq!(pool_save2, metadata2);
 
         pool1.teardown().unwrap();
         pool2.teardown().unwrap();
 
-        let infos1 = add_bdas(uuid1, &devnodes1).unwrap();
-        let infos2 = add_bdas(uuid2, &devnodes2).unwrap();
+        let bdas1 = get_bdas(&infos1).unwrap();
+        let bdas2 = get_bdas(&infos2).unwrap();
 
-        let (_, pool_save1) = get_metadata(&infos1).unwrap().unwrap();
-        let (_, pool_save2) = get_metadata(&infos2).unwrap().unwrap();
+        let (_, pool_save1) = get_metadata(&infos1, &bdas1).unwrap().unwrap();
+        let (_, pool_save2) = get_metadata(&infos2, &bdas2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
         assert_eq!(pool_save2, metadata2);
     }
@@ -799,26 +830,34 @@ mod tests {
 
         umount(tmp_dir.path()).unwrap();
 
-        let devices = pool
+        let infos: HashMap<DevUuid, LStratisInfo> = pool
             .backstore
             .blockdevs()
             .iter()
             .map(|(device_uuid, blockdev)| {
                 (
-                    *blockdev.device(),
-                    (*device_uuid, blockdev.devnode().metadata_path().to_owned()),
+                    *device_uuid,
+                    StratisInfo {
+                        identifiers: StratisIdentifiers {
+                            pool_uuid: uuid,
+                            device_uuid: *device_uuid,
+                        },
+                        device_number: *blockdev.device(),
+                        devnode: blockdev.devnode().metadata_path().to_owned(),
+                    }
+                    .into(),
                 )
             })
             .collect();
 
         pool.teardown().unwrap();
 
-        let infos = add_bdas(uuid, &devices).unwrap();
-        let (timestamp, metadata) = get_metadata(&infos).unwrap().unwrap();
-        let (datadevs, cachedevs) = get_blockdevs(&metadata.backstore, infos).unwrap();
+        let bdas = get_bdas(&infos).unwrap();
+        let (timestamp, metadata) = get_metadata(&infos, &bdas).unwrap().unwrap();
+        let (datadevs, cachedevs) = get_blockdevs(&metadata.backstore, &infos, bdas).unwrap();
 
         let (name, pool) =
-            StratPool::setup(uuid, datadevs, cachedevs, timestamp, &metadata).unwrap();
+            StratPool::setup(uuid, datadevs, cachedevs, timestamp, &metadata, None).unwrap();
         invariant(&pool, &name);
 
         let mut buf = [0u8; 10];

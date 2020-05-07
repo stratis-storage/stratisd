@@ -10,6 +10,7 @@ use std::{
 
 use byteorder::{ByteOrder, LittleEndian};
 use crc::crc32;
+use serde_json::Value;
 use uuid::Uuid;
 
 use devicemapper::{Sectors, IEC, SECTOR_SIZE};
@@ -40,7 +41,7 @@ pub enum MetadataLocation {
     Second,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub struct StratisIdentifiers {
     pub pool_uuid: PoolUuid,
     pub device_uuid: DevUuid,
@@ -63,6 +64,15 @@ impl fmt::Display for StratisIdentifiers {
             self.pool_uuid.to_simple_ref(),
             self.device_uuid.to_simple_ref()
         )
+    }
+}
+
+impl<'a> Into<Value> for &'a StratisIdentifiers {
+    fn into(self) -> Value {
+        json!({
+            "pool_uuid": Value::from(self.pool_uuid.to_simple_ref().to_string()),
+            "device_uuid": Value::from(self.device_uuid.to_simple_ref().to_string())
+        })
     }
 }
 

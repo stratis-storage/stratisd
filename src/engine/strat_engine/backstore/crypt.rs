@@ -482,11 +482,12 @@ impl CryptHandle {
         Ok(name)
     }
 
-    /// Query the Stratis metadata for the device activation name.
+    /// Query the Stratis metadata for the key description used to unlock the
+    /// physical device.
     fn key_desc_from_metadata(device: &mut CryptDevice) -> Result<String> {
         let key_desc = log_on_failure!(
             device.token_handle().luks2_keyring_get(LUKS2_TOKEN_ID),
-            "Failed to get Stratis JSON token from LUKS2 metadata"
+            "Failed to get key description from LUKS2 keyring metadata"
         );
         Ok(key_desc)
     }
@@ -587,7 +588,7 @@ fn is_encrypted_stratis_device(device: &mut CryptDevice) -> bool {
         .map_err(|e| {
             warn!(
                 "Operations querying device to determine if it is a Stratis device \
-            failed with an error: {}; reporting as not a Stratis device.",
+                failed with an error: {}; reporting as not a Stratis device.",
                 e
             );
         })

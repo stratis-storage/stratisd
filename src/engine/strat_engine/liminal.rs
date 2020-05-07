@@ -455,15 +455,13 @@ impl LiminalDevices {
                 if devices
                     .insert(
                         info.device_number,
-                        (info.identifiers.device_uuid, info.devnode),
+                        (info.identifiers.device_uuid, info.devnode.to_owned()),
                     )
                     .is_none()
                 {
                     info!(
-                        "Stratis block device with device number \"{}\", pool UUID \"{}\", and device UUID \"{}\" discovered, i.e., identified for the first time during this execution of stratisd",
-                        info.device_number,
-                        info.identifiers.pool_uuid.to_simple_ref(),
-                        info.identifiers.device_uuid.to_simple_ref(),
+                        "Stratis block device with {} discovered, i.e., identified for the first time during this execution of stratisd",
+                        info
                     );
                 }
 

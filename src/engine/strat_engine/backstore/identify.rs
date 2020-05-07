@@ -40,6 +40,7 @@
 
 use std::{
     collections::HashMap,
+    fmt,
     fs::OpenOptions,
     path::{Path, PathBuf},
 };
@@ -61,6 +62,18 @@ pub struct StratisInfo {
     pub identifiers: StratisIdentifiers,
     pub device_number: Device,
     pub devnode: PathBuf,
+}
+
+impl fmt::Display for StratisInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}, device number: \"{}\", devnode: \"{}\"",
+            self.identifiers,
+            self.device_number,
+            self.devnode.display()
+        )
+    }
 }
 
 // A wrapper for obtaining the device number as a devicemapper Device
@@ -188,11 +201,8 @@ fn identify_stratis_device(dev: &libudev::Device) -> Option<StratisInfo> {
         },
     }
     .map(|info| {
-        info!("Stratis block device with device number \"{}\", device node \"{}\", pool UUID \"{}\", and device UUID \"{}\" discovered during initial search",
-              info.device_number,
-              info.devnode.display(),
-              info.identifiers.pool_uuid.to_simple_ref(),
-              info.identifiers.device_uuid.to_simple_ref()
+        info!("Stratis block device with {} discovered during initial search",
+              info,
         );
         info
     })
@@ -222,12 +232,7 @@ pub fn identify_block_device(dev: &libudev::Device) -> Option<StratisInfo> {
         },
     }
     .map(|info| {
-        debug!("Stratis block device with device number \"{}\", device node \"{}\", pool UUID \"{}\", and device UUID \"{}\" identified",
-              info.device_number,
-              info.devnode.display(),
-              info.identifiers.pool_uuid.to_simple_ref(),
-              info.identifiers.device_uuid.to_simple_ref()
-        );
+        debug!("Stratis block device with {} identified", info);
         info
     })
 }

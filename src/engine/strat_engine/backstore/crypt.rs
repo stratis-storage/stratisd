@@ -18,9 +18,10 @@ use libcryptsetup_rs::{
     CryptVolumeKeyFlags, CryptWipePattern, EncryptionFormat, LibcryptErr, SafeMemHandle,
 };
 
-#[cfg(test)]
-use crate::engine::strat_engine::backstore::metadata::StratisIdentifiers;
-use crate::engine::{strat_engine::names::format_crypt_name, DevUuid, PoolUuid};
+use crate::engine::{
+    strat_engine::{backstore::metadata::StratisIdentifiers, names::format_crypt_name},
+    DevUuid, PoolUuid,
+};
 
 type Result<T> = std::result::Result<T, LibcryptErr>;
 
@@ -83,14 +84,12 @@ impl AsRef<[u8]> for SizedKeyMemory {
 /// Handle for initialization actions on a physical device.
 pub struct CryptInitializer {
     physical_path: PathBuf,
-    pool_uuid: PoolUuid,
-    dev_uuid: DevUuid,
+    identifiers: StratisIdentifiers,
 }
 
 struct StratisLuks2Token {
     devname: String,
-    pool_uuid: PoolUuid,
-    dev_uuid: DevUuid,
+    identifiers: StratisIdentifiers,
 }
 
 impl Into<Value> for StratisLuks2Token {
@@ -99,8 +98,8 @@ impl Into<Value> for StratisLuks2Token {
             TOKEN_TYPE_KEY: STRATIS_TOKEN_TYPE,
             TOKEN_KEYSLOTS_KEY: [],
             STRATIS_TOKEN_DEVNAME_KEY: self.devname,
-            STRATIS_TOKEN_POOL_UUID_KEY: self.pool_uuid.to_simple_ref().to_string(),
-            STRATIS_TOKEN_DEV_UUID_KEY: self.dev_uuid.to_simple_ref().to_string(),
+            STRATIS_TOKEN_POOL_UUID_KEY: self.identifiers.pool_uuid.to_simple_ref().to_string(),
+            STRATIS_TOKEN_DEV_UUID_KEY: self.identifiers.device_uuid.to_simple_ref().to_string(),
         })
     }
 }
@@ -190,8 +189,7 @@ impl<'a> TryFrom<&'a Value> for StratisLuks2Token {
         );
         Ok(StratisLuks2Token {
             devname,
-            pool_uuid,
-            dev_uuid,
+            identifiers: StratisIdentifiers::new(pool_uuid, dev_uuid),
         })
     }
 }
@@ -200,14 +198,13 @@ impl CryptInitializer {
     pub fn new(physical_path: PathBuf, pool_uuid: PoolUuid, dev_uuid: DevUuid) -> CryptInitializer {
         CryptInitializer {
             physical_path,
-            pool_uuid,
-            dev_uuid,
+            identifiers: StratisIdentifiers::new(pool_uuid, dev_uuid),
         }
     }
 
     pub fn initialize(self, key_description: &str) -> Result<CryptHandle> {
         let physical_path = self.physical_path.clone();
-        let dev_uuid = self.dev_uuid;
+        let dev_uuid = self.identifiers.device_uuid;
         let device = log_on_failure!(
             CryptInit::init(physical_path.as_path()),
             "Failed to acquire context for device {} while initializing; \
@@ -268,7 +265,7 @@ impl CryptInitializer {
             "Failed to assign the LUKS2 keyring token to the Stratis keyslot"
         );
 
-        let activation_name = format_crypt_name(&self.dev_uuid);
+        let activation_name = format_crypt_name(&self.identifiers.device_uuid);
 
         // Initialize stratis token
         log_on_failure!(
@@ -276,8 +273,7 @@ impl CryptInitializer {
                 Some(STRATIS_TOKEN_ID),
                 &StratisLuks2Token {
                     devname: activation_name.clone(),
-                    pool_uuid: self.pool_uuid,
-                    dev_uuid: self.dev_uuid,
+                    identifiers: self.identifiers,
                 }
                 .into(),
             ),
@@ -293,12 +289,14 @@ impl CryptInitializer {
         mut device: CryptDevice,
         key_description: &str,
     ) -> std::result::Result<CryptHandle, CryptDevice> {
-        let dev_uuid = self.dev_uuid;
+        let dev_uuid = self.identifiers.device_uuid;
         let result = self.initialize_with_err(&mut device, key_description);
         match result {
             Ok(_) => Ok(CryptHandle::new(
                 device,
                 self.physical_path,
+                self.identifiers,
+                key_description.to_string(),
                 format_crypt_name(&dev_uuid),
             )),
             Err(e) => {
@@ -318,14 +316,24 @@ impl CryptInitializer {
 pub struct CryptHandle {
     device: CryptDevice,
     physical_path: PathBuf,
+    identifiers: StratisIdentifiers,
+    key_description: String,
     name: String,
 }
 
 impl CryptHandle {
-    pub(crate) fn new(device: CryptDevice, physical_path: PathBuf, name: String) -> CryptHandle {
+    pub(crate) fn new(
+        device: CryptDevice,
+        physical_path: PathBuf,
+        identifiers: StratisIdentifiers,
+        key_description: String,
+        name: String,
+    ) -> CryptHandle {
         CryptHandle {
             device,
             physical_path,
+            identifiers,
+            key_description,
             name,
         }
     }
@@ -378,6 +386,9 @@ impl CryptHandle {
             .unwrap_or(false)
     }
 
+    /// Query the device metadata to reconstruct a handle for performing operations
+    /// on an existing encrypted device.
+    ///
     /// This method will check that the metadata on the given device is
     /// for the LUKS2 format and that the LUKS2 metadata is formatted
     /// properly as a Stratis encrypted device. If it is properly
@@ -390,38 +401,6 @@ impl CryptHandle {
     /// * is a LUKS2 device
     /// * has a valid Stratis LUKS2 token
     /// * has a token of the proper type for LUKS2 keyring unlocking
-    // TODO: Remove #[cfg(test)] when device discovery is implemented. This method
-    // will be useful for device discovery.
-    #[cfg(test)]
-    pub fn can_setup(physical_path: &Path) -> Option<StratisIdentifiers> {
-        fn can_setup_with_failures(physical_path: &Path) -> Result<Option<StratisIdentifiers>> {
-            let device_result = CryptHandle::device_from_physical_path(physical_path);
-            match device_result {
-                Ok(Some(mut dev)) => {
-                    if is_encrypted_stratis_device(&mut dev) {
-                        CryptHandle::identifiers_from_metadata(&mut dev).map(Some)
-                    } else {
-                        Ok(None)
-                    }
-                }
-                _ => Ok(None),
-            }
-        }
-
-        can_setup_with_failures(physical_path)
-            .map_err(|e| {
-                warn!(
-                    "Failed to check if device {} is a compatible encrypted Stratis \
-                    device: {}; Reporting as not a Stratis device.",
-                    physical_path.display(),
-                    e
-                );
-            })
-            .unwrap_or(None)
-    }
-
-    /// Query the device metadata to reconstruct a handle for performing operations
-    /// on an existing encrypted device.
     pub fn setup(physical_path: &Path) -> Result<Option<CryptHandle>> {
         let device_result = CryptHandle::device_from_physical_path(physical_path);
         let mut device = match device_result {
@@ -436,10 +415,14 @@ impl CryptHandle {
             Err(e) => return Err(e),
         };
 
+        let identifiers = CryptHandle::identifiers_from_metadata(&mut device)?;
+        let key_description = CryptHandle::key_desc_from_metadata(&mut device)?;
         let name = CryptHandle::name_from_metadata(&mut device)?;
         Ok(Some(CryptHandle {
             device,
             physical_path: physical_path.to_owned(),
+            identifiers,
+            key_description,
             name,
         }))
     }
@@ -467,6 +450,18 @@ impl CryptHandle {
         }
     }
 
+    /// Get the Stratis device identifiers for a given encrypted device.
+    #[allow(dead_code)]
+    pub fn device_identifiers(&self) -> &StratisIdentifiers {
+        &self.identifiers
+    }
+
+    /// Get the key description for a given encrypted device.
+    #[allow(dead_code)]
+    pub fn key_description(&self) -> &str {
+        &self.key_description
+    }
+
     /// Query the Stratis metadata for the device activation name.
     fn name_from_metadata(device: &mut CryptDevice) -> Result<String> {
         let json = log_on_failure!(
@@ -487,8 +482,17 @@ impl CryptHandle {
         Ok(name)
     }
 
+    /// Query the Stratis metadata for the key description used to unlock the
+    /// physical device.
+    fn key_desc_from_metadata(device: &mut CryptDevice) -> Result<String> {
+        let key_desc = log_on_failure!(
+            device.token_handle().luks2_keyring_get(LUKS2_TOKEN_ID),
+            "Failed to get key description from LUKS2 keyring metadata"
+        );
+        Ok(key_desc)
+    }
+
     /// Query the Stratis metadata for the device identifiers.
-    #[cfg(test)]
     fn identifiers_from_metadata(device: &mut CryptDevice) -> Result<StratisIdentifiers> {
         let json = log_on_failure!(
             device.token_handle().json_get(STRATIS_TOKEN_ID),
@@ -584,7 +588,7 @@ fn is_encrypted_stratis_device(device: &mut CryptDevice) -> bool {
         .map_err(|e| {
             warn!(
                 "Operations querying device to determine if it is a Stratis device \
-            failed with an error: {}; reporting as not a Stratis device.",
+                failed with an error: {}; reporting as not a Stratis device.",
                 e
             );
         })
@@ -911,7 +915,7 @@ mod tests {
         // Initialization cannot occur with a non-existent key
         assert!(result.is_err());
 
-        assert!(CryptHandle::can_setup(path).is_none());
+        assert!(CryptHandle::setup(path).unwrap().is_none());
 
         // TODO: Check actual superblock with libblkid
     }

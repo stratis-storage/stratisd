@@ -823,7 +823,7 @@ mod tests {
 
         for path in paths {
             if key_description.is_some() {
-                if CryptHandle::can_setup(path).is_some() {
+                if CryptHandle::setup(path)?.is_some() {
                     return Err(Box::new(StratisError::Error(
                         "LUKS2 metadata on Stratis devices was not successfully wiped".to_string(),
                     )));
@@ -990,7 +990,7 @@ mod tests {
         // identifiers as all the other paths that were initialized.
         for path in paths {
             if key_desc.is_some() {
-                if CryptHandle::can_setup(path).is_some() {
+                if CryptHandle::setup(path)?.is_some() {
                     return Err(Box::new(StratisError::Error(format!(
                         "Device {} should have no LUKS2 metadata",
                         path.display()

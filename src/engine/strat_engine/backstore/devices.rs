@@ -18,7 +18,6 @@ use devicemapper::{Bytes, Device, Sectors, IEC};
 
 use crate::{
     engine::{
-        engine::BlockDev,
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
@@ -675,12 +674,9 @@ mod tests {
 
     use uuid::Uuid;
 
-    use crate::engine::{
-        engine::BlockDev,
-        strat_engine::{
-            backstore::{crypt::CryptHandle, metadata::device_identifiers},
-            tests::{crypt, loopbacked, real},
-        },
+    use crate::engine::strat_engine::{
+        backstore::{crypt::CryptHandle, metadata::device_identifiers},
+        tests::{crypt, loopbacked, real},
     };
 
     use super::*;

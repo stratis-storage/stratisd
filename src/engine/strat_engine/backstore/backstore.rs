@@ -647,14 +647,11 @@ mod tests {
 
     use devicemapper::{CacheDevStatus, DataBlocks, IEC};
 
-    use crate::engine::{
-        engine::BlockDev,
-        strat_engine::{
-            backstore::metadata::device_identifiers,
-            cmd,
-            liminal::{add_bdas, get_blockdevs},
-            tests::{loopbacked, real},
-        },
+    use crate::engine::strat_engine::{
+        backstore::metadata::device_identifiers,
+        cmd,
+        liminal::{add_bdas, get_blockdevs},
+        tests::{loopbacked, real},
     };
 
     use super::*;

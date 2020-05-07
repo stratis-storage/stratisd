@@ -26,9 +26,16 @@ pub struct SimDev {
     key_description: Option<String>,
 }
 
+impl SimDev {
+    /// Access a structure containing the simulated device path
+    pub fn devnode(&self) -> &BlockDevPath {
+        &self.devnode
+    }
+}
+
 impl BlockDev for SimDev {
     fn devnode(&self) -> &BlockDevPath {
-        &self.devnode
+        self.devnode()
     }
 
     fn user_info(&self) -> Option<&str> {

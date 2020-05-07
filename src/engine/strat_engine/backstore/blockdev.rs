@@ -173,11 +173,17 @@ impl StratBlockDev {
     pub fn set_user_info(&mut self, user_info: Option<&str>) -> bool {
         set_blockdev_user_info!(self; user_info)
     }
+
+    /// Get the structure containing paths (such as physical and logical device
+    /// paths) for the device.
+    pub fn devnode(&self) -> &BlockDevPath {
+        &self.devnode
+    }
 }
 
 impl BlockDev for StratBlockDev {
     fn devnode(&self) -> &BlockDevPath {
-        &self.devnode
+        self.devnode()
     }
 
     fn user_info(&self) -> Option<&str> {

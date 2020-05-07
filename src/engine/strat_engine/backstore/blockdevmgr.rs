@@ -16,7 +16,6 @@ use devicemapper::{Bytes, Device, LinearDevTargetParams, LinearTargetParams, Sec
 
 use crate::{
     engine::{
-        engine::BlockDev,
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,

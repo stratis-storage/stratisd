@@ -32,7 +32,7 @@ use crate::{
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
-/// Augment the devnodes structure with the BDA read from the device.
+/// Given infos for each device, read and store the BDA.
 ///
 /// Precondition: All devices represented by devnodes have been already
 /// identified as having the given pool UUID and their associated device
@@ -49,16 +49,17 @@ pub fn get_bdas(
         let bda = BDA::load(&mut OpenOptions::new().read(true).open(&info.ids.devnode)?)?
             .ok_or_else(|| {
                 StratisError::Error(format!("Failed to read BDA from device: {}", info.ids))
-            })?;
+            })
+        .and_then(|bda| {
         if bda.pool_uuid() != pool_uuid || bda.dev_uuid() != info.ids.identifiers.device_uuid {
-            return Err(StratisError::Error(format!(
+            Err(StratisError::Error(format!(
                         "BDA identifiers (pool UUID: {}, device UUID: {}) for device {} do not agree with previously read identifiers",
                         bda.pool_uuid().to_simple_ref(),
                         bda.dev_uuid().to_simple_ref(),
                         info.ids,
                 ))
-            );
-        };
+            )
+        } else { Ok(bda) }})?;
         result.insert(*dev_uuid, bda);
     }
     Ok(result)

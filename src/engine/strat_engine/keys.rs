@@ -126,10 +126,10 @@ pub fn read_key(
     }
 }
 
-/// Update the key attached to the provided key description if the new key data
+/// Reset the key data attached to the provided key description if the new key data
 /// is different from the old key data.
 // Precondition: The key description is already present in the keyring.
-fn update_key(
+fn reset_key(
     key_id: KeySerial,
     old_key_data: SizedKeyMemory,
     new_key_data: SizedKeyMemory,
@@ -157,7 +157,7 @@ fn update_key(
 
 /// Add the key to the given keyring under with the provided key description.
 // Precondition: The key description was not already present.
-fn add_key(
+fn set_key(
     key_desc: &KeyDescription,
     key_data: SizedKeyMemory,
     keyring_id: KeySerial,
@@ -194,13 +194,13 @@ fn add_key(
 /// * `Ok(CreateAction::Created(false)`: The key was newly added to the keyring.
 /// * `Ok(CreateAction::Created(true)`: The key description was already present
 /// in the keyring but the key data was updated.
-fn add_key_idem(
+fn set_key_idem(
     key_desc: &KeyDescription,
     key_data: SizedKeyMemory,
 ) -> StratisResult<CreateAction<bool>> {
     match read_key(key_desc) {
         Ok((Some((key_id, old_key_data)), _)) => {
-            let changed = update_key(key_id, old_key_data, key_data)?;
+            let changed = reset_key(key_id, old_key_data, key_data)?;
             if changed {
                 Ok(CreateAction::Created(true))
             } else {
@@ -208,7 +208,7 @@ fn add_key_idem(
             }
         }
         Ok((None, keyring_id)) => {
-            add_key(key_desc, key_data, keyring_id)?;
+            set_key(key_desc, key_data, keyring_id)?;
             Ok(CreateAction::Created(false))
         }
         Err(e) => Err(e),
@@ -336,8 +336,8 @@ impl KeyIdList {
     }
 }
 
-/// Delete the key with ID `key_id` from the root peristent keyring.
-fn delete_key(key_id: KeySerial) -> StratisResult<()> {
+/// Unset the key with ID `key_id` in the root peristent keyring.
+fn unset_key(key_id: KeySerial) -> StratisResult<()> {
     let keyring_id = get_persistent_keyring()?;
 
     match unsafe { syscall(SYS_keyctl, libc::KEYCTL_UNLINK, key_id, keyring_id) } {
@@ -352,12 +352,12 @@ pub struct StratKeyActions;
 
 #[cfg(test)]
 impl StratKeyActions {
-    pub fn add_no_fd(
+    pub fn set_no_fd(
         &mut self,
         key_desc: &str,
         key: SizedKeyMemory,
     ) -> StratisResult<CreateAction<bool>> {
-        Ok(add_key_idem(
+        Ok(set_key_idem(
             &KeyDescription::from(key_desc.to_string()),
             key,
         )?)
@@ -365,7 +365,7 @@ impl StratKeyActions {
 }
 
 impl KeyActions for StratKeyActions {
-    fn add(
+    fn set(
         &mut self,
         key_desc: &str,
         key_fd: RawFd,
@@ -400,7 +400,7 @@ impl KeyActions for StratKeyActions {
         }
         let sized_memory = SizedKeyMemory::new(memory, pos);
 
-        Ok(add_key_idem(
+        Ok(set_key_idem(
             &KeyDescription::from(key_desc.to_string()),
             sized_memory,
         )?)
@@ -416,11 +416,11 @@ impl KeyActions for StratKeyActions {
         read_key(&KeyDescription::from(key_description.to_string())).map(|(opt, _)| opt)
     }
 
-    fn delete(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>> {
+    fn unset(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>> {
         let keyring_id = get_persistent_keyring()?;
 
         if let Some(key_id) = search_key(keyring_id, &KeyDescription::from(key_desc.to_string()))? {
-            delete_key(key_id).map(|_| DeleteAction::Deleted(()))
+            unset_key(key_id).map(|_| DeleteAction::Deleted(()))
         } else {
             Ok(DeleteAction::Identity)
         }

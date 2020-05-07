@@ -88,7 +88,7 @@ SPECS = {
 <arg name="return_code" type="q" direction="out"/>
 <arg name="return_string" type="s" direction="out"/>
 </method>
-<method name="AddKey">
+<method name="SetKey">
 <arg name="key_desc" type="s" direction="in"/>
 <arg name="key_fd" type="h" direction="in"/>
 <arg name="interactive" type="b" direction="in"/>
@@ -96,7 +96,7 @@ SPECS = {
 <arg name="return_code" type="q" direction="out"/>
 <arg name="return_string" type="s" direction="out"/>
 </method>
-<method name="DeleteKey">
+<method name="UnsetKey">
 <arg name="key_desc" type="s" direction="in"/>
 <arg name="result" type="b" direction="out"/>
 <arg name="return_code" type="q" direction="out"/>

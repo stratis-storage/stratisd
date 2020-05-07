@@ -129,7 +129,9 @@ impl Pool for SimPool {
         } else {
             init_cache_idempotent_or_err(
                 blockdevs,
-                self.cache_devs.iter().map(|(_, bd)| bd.devnode()),
+                self.cache_devs
+                    .iter()
+                    .map(|(_, bd)| bd.devnode().physical_path().to_owned()),
             )
         }
     }
@@ -195,10 +197,13 @@ impl Pool for SimPool {
             BlockDevTier::Data => &mut self.block_devs,
         };
 
-        let filter: Vec<_> = the_vec.values().map(|d| d.devnode()).collect();
+        let filter: Vec<_> = the_vec
+            .values()
+            .map(|d| d.devnode().physical_path())
+            .collect();
         let filtered_device_pairs: Vec<_> = device_pairs
             .into_iter()
-            .filter(|(_, sd)| !filter.contains(&sd.devnode()))
+            .filter(|(_, sd)| !filter.contains(&sd.devnode().physical_path()))
             .collect();
 
         let ret_uuids = filtered_device_pairs

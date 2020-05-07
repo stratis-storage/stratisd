@@ -18,14 +18,14 @@ use devicemapper::{Device, Sectors};
 use crate::{
     engine::{
         strat_engine::{
-            backstore::{identify_block_device, BlockDevPath, StratBlockDev, BDA},
+            backstore::{identify_block_device, StratBlockDev, BDA},
             device::blkdev_size,
             devlinks::setup_pool_devlinks,
             pool::StratPool,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
         },
         structures::Table,
-        types::{BlockDevTier, DevUuid, Name, PoolUuid},
+        types::{BlockDevPath, BlockDevTier, DevUuid, Name, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -239,7 +239,7 @@ pub fn get_blockdevs(
                 device,
                 // FIXME: This block device could represent an encrypted or
                 // an unencrypted device.
-                BlockDevPath::Unencrypted(devnode.to_owned()),
+                BlockDevPath::physical_device_path(devnode),
                 bda,
                 segments.unwrap_or(&vec![]),
                 bd_save.user_info.clone(),

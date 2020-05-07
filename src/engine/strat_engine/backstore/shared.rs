@@ -4,10 +4,7 @@
 
 // Methods that are shared by the cache tier and the data tier.
 
-use std::{
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
+use std::collections::HashMap;
 
 use devicemapper::Device;
 
@@ -21,28 +18,6 @@ use crate::{
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
-
-#[derive(Clone, Debug)]
-pub enum BlockDevPath {
-    Encrypted { physical: PathBuf, logical: PathBuf },
-    Unencrypted(PathBuf),
-}
-
-impl BlockDevPath {
-    pub fn physical_path(&self) -> &Path {
-        match *self {
-            BlockDevPath::Encrypted { ref physical, .. } => physical,
-            BlockDevPath::Unencrypted(ref path) => path,
-        }
-    }
-
-    pub fn metadata_path(&self) -> &Path {
-        match *self {
-            BlockDevPath::Encrypted { ref logical, .. } => logical,
-            BlockDevPath::Unencrypted(ref path) => path,
-        }
-    }
-}
 
 /// Given a function that translates a Stratis UUID to a device
 /// number, and some metadata that describes a particular segment within

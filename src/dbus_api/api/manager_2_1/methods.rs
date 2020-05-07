@@ -35,7 +35,7 @@ pub fn add_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = (false, false);
     let return_message = message.method_return();
 
-    let msg = match dbus_context.engine.borrow_mut().get_key_handler_mut().add(
+    let msg = match dbus_context.engine.borrow_mut().get_key_handler_mut().set(
         key_desc,
         key_fd.as_raw_fd(),
         interactive,
@@ -69,7 +69,7 @@ pub fn delete_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .engine
         .borrow_mut()
         .get_key_handler_mut()
-        .delete(key_desc)
+        .unset(key_desc)
     {
         Ok(idem_resp) => {
             let return_value = match idem_resp {

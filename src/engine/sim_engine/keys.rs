@@ -29,7 +29,7 @@ impl SimKeyActions {
 }
 
 impl KeyActions for SimKeyActions {
-    fn add(
+    fn set(
         &mut self,
         key_desc: &str,
         key_fd: RawFd,
@@ -96,7 +96,7 @@ impl KeyActions for SimKeyActions {
         }
     }
 
-    fn delete(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>> {
+    fn unset(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>> {
         match self.0.remove(key_desc) {
             Some(_) => Ok(DeleteAction::Deleted(())),
             None => Ok(DeleteAction::Identity),

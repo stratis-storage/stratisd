@@ -28,7 +28,7 @@ pub const DEV_PATH: &str = "/stratis";
 pub const MAX_STRATIS_PASS_SIZE: usize = 512 / 8;
 
 pub trait KeyActions {
-    /// Add a key to the kernel keyring. The output is an idempotent return type
+    /// Set a key in the kernel keyring. The output is an idempotent return type
     /// containing a `bool` which indicates whether a key with the requested
     /// key description was in the keyring and the key data was updated.
     ///
@@ -41,7 +41,7 @@ pub trait KeyActions {
     /// * `Ok(CreateAction::Created(false)`: The key was newly added to the keyring.
     /// * `Ok(CreateAction::Created(true)`: The key description was already present
     /// in the keyring but the key data was updated.
-    fn add(
+    fn set(
         &mut self,
         key_desc: &str,
         key_fd: RawFd,
@@ -57,9 +57,9 @@ pub trait KeyActions {
     /// key contents. If the key does not exist, return `Ok(None)`.
     fn read(&self, key_desc: &str) -> StratisResult<Option<(KeySerial, SizedKeyMemory)>>;
 
-    /// Delete a key with the given key description in the root persistent kernel
+    /// Unset a key with the given key description in the root persistent kernel
     /// keyring.
-    fn delete(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>>;
+    fn unset(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>>;
 }
 
 /// An interface for reporting internal engine state.

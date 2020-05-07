@@ -4,7 +4,8 @@
 
 use libcryptsetup_rs::SafeMemHandle;
 
-/// Key serial ID type.
+/// A type corresponding to key IDs in the kernel keyring. In `libkeyutils`,
+/// this is represented as the C type `key_serial_t`.
 pub type KeySerial = u32;
 
 /// A handle for memory designed to safely handle Stratis passphrases. It can

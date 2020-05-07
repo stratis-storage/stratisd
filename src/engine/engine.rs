@@ -47,13 +47,16 @@ pub trait KeyActions {
         key_fd: RawFd,
         interactive: bool,
     ) -> StratisResult<CreateAction<bool>>;
+
     /// Return a list of all key descriptions of keys added to the keyring by
     /// Stratis that are still valid.
     fn list(&self) -> StratisResult<Vec<String>>;
+
     /// If a key is present in the kernel keyring with the given description,
-    /// read the contents into a chunk of memory memory and return the key ID and the
+    /// read the contents into a chunk of memory and return the key ID and the
     /// key contents. If the key does not exist, return `Ok(None)`.
     fn read(&self, key_desc: &str) -> StratisResult<Option<(KeySerial, SizedKeyMemory)>>;
+
     /// Delete a key with the given key description in the root persistent kernel
     /// keyring.
     fn delete(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>>;

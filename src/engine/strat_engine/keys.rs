@@ -25,10 +25,9 @@ use crate::{
 };
 
 /// This value indicates the maximum number of keys that can be listed at one time.
-/// The value is up for debate.
-const MAX_LISTABLE_KEYS: usize = 4096;
-/// This value indicates the maximum accepted length of a `KEYCTL_DESCRIBE` string
-/// returned when querying the kernel. The value is up for debate.
+const MAX_NUM_KEY_IDS: usize = 4096;
+/// This value indicates the maximum accepted length in bytes of a `KEYCTL_DESCRIBE`
+/// string returned when querying the kernel.
 const MAX_KEYCTL_DESCRIBE_STRING_LEN: usize = 4096;
 
 /// Get the ID of the persistent root user keyring and attach it to
@@ -234,7 +233,7 @@ fn parse_keyctl_describe_string(key_str: &str) -> StratisResult<String> {
 /// allocated as the maximum allowable size before it is coerced down to
 /// a pointer to use it in a syscall.
 struct KeyIdList {
-    key_ids: [KeySerial; MAX_LISTABLE_KEYS],
+    key_ids: [KeySerial; MAX_NUM_KEY_IDS],
     num_key_ids: usize,
 }
 
@@ -242,7 +241,7 @@ impl KeyIdList {
     /// Create a new list of key IDs.
     fn new() -> KeyIdList {
         KeyIdList {
-            key_ids: [0; MAX_LISTABLE_KEYS],
+            key_ids: [0; MAX_NUM_KEY_IDS],
             num_key_ids: 0,
         }
     }
@@ -264,13 +263,13 @@ impl KeyIdList {
             i if i < 0 => return Err(io::Error::last_os_error().into()),
             i => {
                 let ret = i as usize;
-                let num_key_ids = if ret > MAX_LISTABLE_KEYS {
+                let num_key_ids = if ret > MAX_NUM_KEY_IDS {
                     warn!(
                         "Some key entries were truncated. Stratis can only list \
                         a maximum of {} keys.",
-                        MAX_LISTABLE_KEYS
+                        MAX_NUM_KEY_IDS
                     );
-                    MAX_LISTABLE_KEYS
+                    MAX_NUM_KEY_IDS
                 } else {
                     ret
                 };

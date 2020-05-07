@@ -18,7 +18,8 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::{
-                identify_block_device, BlockDevPath, DeviceInfo, StratBlockDev, StratisInfo, BDA,
+                identify_block_device, BlockDevPath, DeviceInfo, StratBlockDev, StratisIdentifiers,
+                StratisInfo, BDA,
             },
             device::blkdev_size,
             devlinks::setup_pool_devlinks,
@@ -35,37 +36,20 @@ use crate::{
 ///
 /// Precondition: All devices represented by devnodes have been already
 /// identified as having the given pool UUID and their associated device
-/// UUID. Thus, it is an error if the BDA's information does not match that
-/// already known. It is also an error if the BDA can not be read at all
-/// as that BDA may belong to the device with the most recently written
-/// metadata.
+/// UUID.
 ///
 /// Postconditions: keys in result are equal to keys in infos OR an error
 /// is returned.
-pub fn get_bdas(
-    pool_uuid: PoolUuid,
-    infos: &HashMap<DevUuid, &LStratisInfo>,
-) -> StratisResult<HashMap<DevUuid, BDA>> {
-    fn read_bda(pool_uuid: PoolUuid, info: &LStratisInfo) -> StratisResult<BDA> {
-        let bda = BDA::load(&mut OpenOptions::new().read(true).open(&info.ids.devnode)?)?
-            .ok_or_else(|| {
-                StratisError::Error(format!("Failed to read BDA from device: {}", info.ids))
-            })?;
-        if bda.pool_uuid() != pool_uuid || bda.dev_uuid() != info.ids.identifiers.device_uuid {
-            Err(StratisError::Error(format!(
-                    "BDA identifiers (pool UUID: {}, device UUID: {}) for device {} do not agree with previously read identifiers",
-                    bda.pool_uuid().to_simple_ref(),
-                    bda.dev_uuid().to_simple_ref(),
-                    info.ids,
-            )))
-        } else {
-            Ok(bda)
-        }
+pub fn get_bdas(infos: &HashMap<DevUuid, &LStratisInfo>) -> StratisResult<HashMap<DevUuid, BDA>> {
+    fn read_bda(info: &LStratisInfo) -> StratisResult<BDA> {
+        BDA::load(&mut OpenOptions::new().read(true).open(&info.ids.devnode)?)?.ok_or_else(|| {
+            StratisError::Error(format!("Failed to read BDA from device: {}", info.ids))
+        })
     }
 
     infos
         .iter()
-        .map(|(dev_uuid, info)| read_bda(pool_uuid, info).map(|bda| (*dev_uuid, bda)))
+        .map(|(dev_uuid, info)| read_bda(info).map(|bda| (*dev_uuid, bda)))
         .collect()
 }
 
@@ -402,13 +386,24 @@ impl LiminalDevices {
             pool_uuid: PoolUuid,
             infos: &HashMap<DevUuid, &LStratisInfo>,
         ) -> Result<Option<(Name, StratPool)>, String> {
-            let bdas = match get_bdas(pool_uuid, infos) {
-                Err(err) => return Err(format!(
+            let bdas = match get_bdas(infos) {
+                Err(err) => Err(format!(
                         "There was an error encountered when reading the BDAs for the devices found for pool with UUID {}: {}",
                         pool_uuid.to_simple_ref(),
                         err)),
-                Ok(infos) => infos,
-            };
+                Ok(infos) => Ok(infos),
+            }?;
+
+            if let Some((dev_uuid, bda)) = bdas.iter().find(|(dev_uuid, bda)| {
+                **dev_uuid != bda.dev_uuid() || pool_uuid != bda.pool_uuid()
+            }) {
+                return Err(format!(
+                        "Mismatch between Stratis identifiers previously read and those found on some BDA: {} != {}",
+                        StratisIdentifiers::new(pool_uuid, *dev_uuid),
+                        StratisIdentifiers::new(bda.pool_uuid(), bda.dev_uuid())
+                        ));
+            }
+
             let (timestamp, metadata) = match get_metadata(infos, &bdas) {
                 Err(err) => return Err(format!(
                         "There was an error encountered when reading the metadata for the devices found for pool with UUID {}: {}",
@@ -454,8 +449,8 @@ impl LiminalDevices {
             })
             .collect();
 
-        if let Some(devices) = strat_devices {
-            let result = setup_pool(pools, pool_uuid, &devices);
+        if let Some(strat_devices) = strat_devices {
+            let result = setup_pool(pools, pool_uuid, &strat_devices);
 
             if let Err(err) = &result {
                 warn!("{}", err);

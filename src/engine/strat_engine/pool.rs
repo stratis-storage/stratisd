@@ -628,8 +628,8 @@ mod tests {
             .map(|(device_uuid, blockdev)| (*blockdev.device(), (*device_uuid, blockdev.devnode())))
             .collect();
 
-        let bdas1 = get_bdas(uuid1, &devnodes1).unwrap();
-        let bdas2 = get_bdas(uuid2, &devnodes2).unwrap();
+        let bdas1 = get_bdas(&devnodes1).unwrap();
+        let bdas2 = get_bdas(&devnodes2).unwrap();
 
         let (_, pool_save1) = get_metadata(&devnodes1, &bdas1).unwrap().unwrap();
         let (_, pool_save2) = get_metadata(&devnodes2, &bdas2).unwrap().unwrap();
@@ -639,8 +639,8 @@ mod tests {
         pool1.teardown().unwrap();
         pool2.teardown().unwrap();
 
-        let bdas1 = get_bdas(uuid1, &devnodes1).unwrap();
-        let bdas2 = get_bdas(uuid2, &devnodes2).unwrap();
+        let bdas1 = get_bdas(&devnodes1).unwrap();
+        let bdas2 = get_bdas(&devnodes2).unwrap();
 
         let (_, pool_save1) = get_metadata(&devnodes1, &bdas1).unwrap().unwrap();
         let (_, pool_save2) = get_metadata(&devnodes2, &bdas2).unwrap().unwrap();
@@ -763,7 +763,7 @@ mod tests {
 
         pool.teardown().unwrap();
 
-        let bdas = get_bdas(uuid, &devices).unwrap();
+        let bdas = get_bdas(&devices).unwrap();
         let (timestamp, metadata) = get_metadata(&devices, &bdas).unwrap().unwrap();
         let (datadevs, cachedevs) = get_blockdevs(&metadata.backstore, &devices, bdas).unwrap();
 

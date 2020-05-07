@@ -931,7 +931,7 @@ mod tests {
         {
             let devices: HashMap<DevUuid, &LStratisInfo> =
                 devices.iter().map(|(u, v)| (*u, v)).collect();
-            let bdas = get_bdas(pool_uuid, &devices).unwrap();
+            let bdas = get_bdas(&devices).unwrap();
             let (datadevs, cachedevs) = get_blockdevs(&backstore_save, &devices, bdas).unwrap();
             let mut backstore =
                 Backstore::setup(pool_uuid, &backstore_save, datadevs, cachedevs, Utc::now())
@@ -948,7 +948,7 @@ mod tests {
         {
             let devices: HashMap<DevUuid, &LStratisInfo> =
                 devices.iter().map(|(u, v)| (*u, v)).collect();
-            let bdas = get_bdas(pool_uuid, &devices).unwrap();
+            let bdas = get_bdas(&devices).unwrap();
             let (datadevs, cachedevs) = get_blockdevs(&backstore_save, &devices, bdas).unwrap();
             let mut backstore =
                 Backstore::setup(pool_uuid, &backstore_save, datadevs, cachedevs, Utc::now())

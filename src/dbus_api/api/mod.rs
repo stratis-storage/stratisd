@@ -2,10 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus::{
-    self,
-    tree::{Factory, MTFn, Tree},
-};
+use dbus::tree::{Factory, MTFn, Tree};
 
 use crate::dbus_api::{
     consts,

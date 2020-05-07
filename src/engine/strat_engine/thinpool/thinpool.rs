@@ -5,7 +5,6 @@
 // Code to handle management of a pool's thinpool device.
 
 use std::{
-    self,
     cmp::{max, min},
     thread::sleep,
     time::Duration,

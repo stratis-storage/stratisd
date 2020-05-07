@@ -5,7 +5,6 @@
 use std::{cell::RefCell, rc::Rc, vec::Vec};
 
 use dbus::{
-    self,
     ffidisp::{BusType, Connection, ConnectionItem, NameFlag, WatchEvent},
     tree::{MTFn, Tree},
 };

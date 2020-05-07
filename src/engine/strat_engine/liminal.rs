@@ -264,7 +264,7 @@ pub fn get_blockdevs(
     let (mut datadevs, mut cachedevs): (Vec<StratBlockDev>, Vec<StratBlockDev>) = (vec![], vec![]);
     for (dev_uuid, info) in infos {
         get_blockdev(
-            &info,
+            info,
             bdas.remove(dev_uuid)
                 .expect("sets of keys in bdas and infos are identical"),
             &recorded_data_map,
@@ -446,17 +446,15 @@ impl LiminalDevices {
                 .map(Some)
         }
 
-        if devices.iter().all(|(_, v)| match v {
-            LInfo::Stratis(_) => true,
-            _ => false,
-        }) {
-            let devices = devices
-                .iter()
-                .map(|(u, v)| match v {
-                    LInfo::Stratis(info) => (*u, info),
-                    LInfo::Luks(_) => unreachable!(),
-                })
-                .collect();
+        let strat_devices: Option<HashMap<DevUuid, &LStratisInfo>> = devices
+            .iter()
+            .map(|(u, v)| match v {
+                LInfo::Stratis(info) => Some((*u, info)),
+                LInfo::Luks(_) => None,
+            })
+            .collect();
+
+        if let Some(devices) = strat_devices {
             let result = setup_pool(pools, pool_uuid, &devices);
 
             if let Err(err) = &result {

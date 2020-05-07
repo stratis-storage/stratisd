@@ -23,7 +23,7 @@ pub fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     create_pool_shared(m, true)
 }
 
-pub fn add_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn set_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -55,7 +55,7 @@ pub fn add_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-pub fn delete_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn unset_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 

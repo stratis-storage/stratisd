@@ -161,6 +161,7 @@ impl BlockDevMgr {
                 .iter()
                 .next()
                 .expect("Must have at least one blockdev")
+                .devnode()
                 .physical_path(),
         )
     }

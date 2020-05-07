@@ -21,7 +21,6 @@ pub use self::{
     blockdev::StratBlockDev,
     identify::{find_all, identify_block_device},
     metadata::{MDADataSize, BDA},
-    shared::BlockDevPath,
 };
 
 #[cfg(test)]

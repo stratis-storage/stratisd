@@ -16,8 +16,8 @@ use devicemapper::{Bytes, Sectors};
 
 use crate::{
     engine::types::{
-        BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid, MaybeDbusPath, Name,
-        PoolUuid, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
+        BlockDevPath, BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid,
+        MaybeDbusPath, Name, PoolUuid, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
     },
     stratis::StratisResult,
 };
@@ -50,9 +50,8 @@ pub trait Filesystem: Debug {
 }
 
 pub trait BlockDev: Debug {
-    /// Get the path of the device node for writing Stratis metadata to this
-    /// device.
-    fn devnode(&self) -> PathBuf;
+    /// Get the structure representing block device paths.
+    fn devnode(&self) -> &BlockDevPath;
 
     /// Get the user-settable string associated with this blockdev.
     fn user_info(&self) -> Option<&str>;

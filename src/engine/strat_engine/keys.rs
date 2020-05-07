@@ -25,6 +25,8 @@ use crate::{
 };
 
 /// This value indicates the maximum number of keys that can be listed at one time.
+/// This is an implementation decision and can be increased if the ability to list
+/// more keys is desired.
 const MAX_NUM_KEY_IDS: usize = 4096;
 /// This value indicates the maximum accepted length in bytes of a `KEYCTL_DESCRIBE`
 /// string returned when querying the kernel.

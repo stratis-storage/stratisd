@@ -5,7 +5,7 @@
 use dbus::tree::{Factory, MTFn, Method};
 
 use crate::dbus_api::{
-    api::manager_2_1::methods::{add_key, create_pool, delete_key},
+    api::manager_2_1::methods::{create_pool, set_key, unset_key},
     types::TData,
 };
 
@@ -31,8 +31,8 @@ pub fn create_pool_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>
         .out_arg(("return_string", "s"))
 }
 
-pub fn add_key_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
-    f.method("AddKey", (), add_key)
+pub fn set_key_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+    f.method("SetKey", (), set_key)
         .in_arg(("key_desc", "s"))
         .in_arg(("key_fd", "h"))
         .in_arg(("interactive", "b"))
@@ -46,10 +46,10 @@ pub fn add_key_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TD
         .out_arg(("return_string", "s"))
 }
 
-pub fn delete_key_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
-    f.method("DeleteKey", (), delete_key)
+pub fn unset_key_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+    f.method("UnsetKey", (), unset_key)
         .in_arg(("key_desc", "s"))
-        // b: true if the key was deleted from the keyring. false if the key
+        // b: true if the key was unset from the keyring. false if the key
         //    was not present in the keyring before the operation.
         //
         // Rust representation: bool

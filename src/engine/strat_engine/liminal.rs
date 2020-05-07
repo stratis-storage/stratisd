@@ -18,7 +18,7 @@ use devicemapper::{Device, Sectors};
 use crate::{
     engine::{
         strat_engine::{
-            backstore::{identify_block_device, StratBlockDev, BDA},
+            backstore::{identify_block_device, StratBlockDev, StratisInfo, BDA},
             device::blkdev_size,
             devlinks::setup_pool_devlinks,
             pool::StratPool,
@@ -314,6 +314,38 @@ pub fn get_blockdevs(
     let cachedevs = check_and_sort_devs(cachedevs, &recorded_cache_map)?;
 
     Ok((datadevs, cachedevs))
+}
+
+/// Info for a discovered Luks Device belonging to Stratis.
+#[derive(Debug, Eq, PartialEq)]
+pub struct LLuksInfo {
+    /// Generic information + Stratis identifiers
+    pub ids: StratisInfo,
+    pub key_description: String,
+}
+
+/// Info for a Stratis device.
+#[derive(Debug, Eq, PartialEq)]
+pub struct LStratisInfo {
+    /// Generic information + Stratis identifiers
+    pub ids: StratisInfo,
+    /// Luks information. The information will be set if this is a Stratis
+    /// device which is an activated encrypted device, and will be
+    /// information about that physical device.
+    pub luks: Option<LLuksInfo>,
+}
+
+impl LStratisInfo {
+    #[allow(dead_code)]
+    fn invariant(&self) {
+        assert!(match &self.luks {
+            None => true,
+            Some(luks) =>
+                luks.ids.identifiers == self.ids.identifiers
+                    && luks.ids.devnode != self.ids.devnode
+                    && luks.ids.device_number != self.ids.device_number,
+        });
+    }
 }
 
 /// Devices which stratisd has discovered but which have not been assembled

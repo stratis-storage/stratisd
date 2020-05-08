@@ -54,15 +54,6 @@ jobs:
         - rustup component add clippy
       env: TASK=clippy
 
-    # MANDATORY TESTING USING LOWEST SUPPORTED COMPILER
-    - name: "run Rust unit tests on lowest supported toolchain"
-      rust: 1.41.0
-      env: TASK=test
-    - name: "build release on lowest supported toolchain"
-      rust: 1.41.0
-      env: TASK=release
-
-
     # MANDATORY TESTING ON STABLE
     - name: "build using stable toolchain"
       rust: stable

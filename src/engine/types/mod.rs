@@ -187,7 +187,8 @@ impl BlockDevPath {
         &self.physical_path
     }
 
-    /// Path to the physical or logical device where the metadata should be written.
+    /// Path to the physical or logical device where the Stratis metadata should
+    /// be written.
     pub fn metadata_path(&self) -> &Path {
         if let Some((ref path, _)) = self.logical_path {
             path

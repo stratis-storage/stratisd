@@ -678,17 +678,20 @@ impl Recordable<BackstoreSave> for Backstore {
 
 #[cfg(test)]
 mod tests {
-    use std::fs::OpenOptions;
+    use std::{collections::HashMap, fs::OpenOptions, path::PathBuf};
 
     use uuid::Uuid;
 
     use devicemapper::{CacheDevStatus, DataBlocks, IEC};
 
-    use crate::engine::strat_engine::{
-        backstore::metadata::device_identifiers,
-        cmd,
-        liminal::{add_bdas, get_blockdevs},
-        tests::{loopbacked, real},
+    use crate::engine::{
+        strat_engine::{
+            backstore::metadata::device_identifiers,
+            cmd,
+            liminal::{convert_to_infos, get_bdas, get_blockdevs},
+            tests::{loopbacked, real},
+        },
+        types::DevUuid,
     };
 
     use super::*;
@@ -895,7 +898,7 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
 
-        let (backstore_save, devices) = {
+        let (backstore_save, devices): (_, HashMap<Device, (DevUuid, PathBuf)>) = {
             let mut backstore =
                 Backstore::initialize(pool_uuid, paths1, MDADataSize::default(), None).unwrap();
 
@@ -950,8 +953,9 @@ mod tests {
         };
 
         {
-            let infos = add_bdas(pool_uuid, &devices).unwrap();
-            let (datadevs, cachedevs) = get_blockdevs(&backstore_save, infos).unwrap();
+            let infos = convert_to_infos(pool_uuid, &devices);
+            let bdas = get_bdas(&infos).unwrap();
+            let (datadevs, cachedevs) = get_blockdevs(&backstore_save, &infos, bdas).unwrap();
             let mut backstore = Backstore::setup(
                 pool_uuid,
                 &backstore_save,
@@ -971,8 +975,9 @@ mod tests {
         }
 
         {
-            let infos = add_bdas(pool_uuid, &devices).unwrap();
-            let (datadevs, cachedevs) = get_blockdevs(&backstore_save, infos).unwrap();
+            let infos = convert_to_infos(pool_uuid, &devices);
+            let bdas = get_bdas(&infos).unwrap();
+            let (datadevs, cachedevs) = get_blockdevs(&backstore_save, &infos, bdas).unwrap();
             let mut backstore = Backstore::setup(
                 pool_uuid,
                 &backstore_save,

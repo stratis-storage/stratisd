@@ -21,5 +21,5 @@ pub use self::{
     blockdev::StratBlockDev,
     crypt::CryptHandle,
     identify::{find_all, identify_block_device, StratisInfo},
-    metadata::{MDADataSize, BDA},
+    metadata::{MDADataSize, StratisIdentifiers, BDA},
 };

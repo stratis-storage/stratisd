@@ -5,7 +5,7 @@
 mod backstore;
 mod cmd;
 mod device;
-//mod devlinks;
+mod devlinks;
 mod dm;
 mod engine;
 mod keys;

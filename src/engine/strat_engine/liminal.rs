@@ -439,6 +439,22 @@ pub enum LInfo {
     Luks(LLuksInfo),
 }
 
+/// On an error, whether this set of devices is hopeless or just errored
+#[derive(Debug)]
+enum Destination {
+    Hopeless(String),
+    Errored(String),
+}
+
+impl fmt::Display for Destination {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Destination::Hopeless(val) => write!(f, "{}", val),
+            Destination::Errored(val) => write!(f, "{}", val),
+        }
+    }
+}
+
 /// Devices which stratisd has discovered but which have not been assembled
 /// into pools.
 #[derive(Debug)]
@@ -524,58 +540,64 @@ impl LiminalDevices {
             pools: &Table<StratPool>,
             pool_uuid: PoolUuid,
             infos: HashMap<DevUuid, LStratisInfo>,
-        ) -> Result<Option<(Name, StratPool)>, String> {
+        ) -> Result<Option<(Name, StratPool)>, Destination> {
             let bdas = match get_bdas(&infos) {
-                Err(err) => Err(format!(
+                Err(err) => Err(
+                    Destination::Errored(format!(
                         "There was an error encountered when reading the BDAs for the devices found for pool with UUID {}: {}",
                         pool_uuid.to_simple_ref(),
-                        err)),
+                        err))),
                 Ok(infos) => Ok(infos),
             }?;
 
             if let Some((dev_uuid, bda)) = bdas.iter().find(|(dev_uuid, bda)| {
                 **dev_uuid != bda.dev_uuid() || pool_uuid != bda.pool_uuid()
             }) {
-                return Err(format!(
+                return Err(
+                    Destination::Hopeless(format!(
                         "Mismatch between Stratis identifiers previously read and those found on some BDA: {} != {}",
                         StratisIdentifiers::new(pool_uuid, *dev_uuid),
                         StratisIdentifiers::new(bda.pool_uuid(), bda.dev_uuid())
-                        ));
+                        )));
             }
 
             let (timestamp, metadata) = match get_metadata(&infos, &bdas) {
-                Err(err) => return Err(format!(
+                Err(err) => return Err(
+                    Destination::Errored(format!(
                         "There was an error encountered when reading the metadata for the devices found for pool with UUID {}: {}",
                         pool_uuid.to_simple_ref(),
-                        err)),
+                        err))),
                 Ok(None) => return Ok(None),
                 Ok(Some((timestamp, metadata))) => (timestamp, metadata),
             };
 
             if let Some((uuid, _)) = pools.get_by_name(&metadata.name) {
-                return Err(format!(
+                return Err(
+                    Destination::Errored(format!(
                         "There is a pool name conflict. The devices currently being processed have been identified as belonging to the pool with UUID {} and name {}, but a pool with the same name and UUID {} is already active",
                         pool_uuid.to_simple_ref(),
                         &metadata.name,
-                        uuid.to_simple_ref()));
+                        uuid.to_simple_ref())));
             }
 
             let (datadevs, cachedevs) = match get_blockdevs(&metadata.backstore, &infos, bdas) {
-                Err(err) => return Err(format!(
+                Err(err) => return Err(
+                    Destination::Errored(format!(
                         "There was an error encountered when calculating the block devices for pool with UUID {} and name {}: {}",
                         pool_uuid.to_simple_ref(),
                         &metadata.name,
-                        err)),
+                        err))),
                 Ok((datadevs, cachedevs)) => (datadevs, cachedevs),
             };
 
             StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata, None)
                 .map_err(|err| {
+                    Destination::Errored(
                     format!(
                         "An attempt to set up pool with UUID {} from the assembled devices failed: {}",
                         pool_uuid.to_simple_ref(),
                         err
-                    )
+                    ))
                 })
                 .map(Some)
         }
@@ -596,7 +618,27 @@ impl LiminalDevices {
                 );
                 Some((pool_name, pool))
             }
-            _ => {
+            Err(Destination::Hopeless(_)) => {
+                let infos = devices
+                    .iter()
+                    .map(|(n, (u, d))| {
+                        LInfo::Stratis(LStratisInfo {
+                            ids: StratisInfo {
+                                identifiers: StratisIdentifiers {
+                                    pool_uuid,
+                                    device_uuid: *u,
+                                },
+                                device_number: *n,
+                                devnode: d.to_path_buf(),
+                            },
+                            luks: None,
+                        })
+                    })
+                    .collect();
+                self.hopeless_device_sets.insert(pool_uuid, infos);
+                None
+            }
+            Err(Destination::Errored(_)) | Ok(None) => {
                 self.errored_pool_devices.insert(pool_uuid, devices);
                 None
             }

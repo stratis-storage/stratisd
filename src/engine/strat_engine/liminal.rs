@@ -480,6 +480,16 @@ impl LiminalDevices {
             .is_none());
     }
 
+    /// This method is a temporary shim invoked from engine.
+    pub fn setup_pool(
+        &mut self,
+        pools: &Table<StratPool>,
+        pool_uuid: PoolUuid,
+        devices: HashMap<Device, (DevUuid, PathBuf)>,
+    ) -> Option<(Name, StratPool)> {
+        self.try_setup_pool(pools, pool_uuid, devices)
+    }
+
     /// Given a set of devices, try to set up a pool. If the setup fails,
     /// insert the devices into errored_pool_devices. Otherwise, return the pool.
     /// If there is a name conflict between the set of devices in devices
@@ -487,7 +497,10 @@ impl LiminalDevices {
     ///
     /// Precondition: pools.get_by_uuid(pool_uuid).is_none() &&
     ///               self.errored_pool_devices.get(pool_uuid).is_none()
-    pub fn try_setup_pool(
+    ///
+    /// Precondition: all devices have already been identified as Stratis
+    /// devices. Any encrypted devices have already been unlocked.
+    fn try_setup_pool(
         &mut self,
         pools: &Table<StratPool>,
         pool_uuid: PoolUuid,

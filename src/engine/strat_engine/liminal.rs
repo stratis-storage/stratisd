@@ -24,7 +24,6 @@ use crate::{
                 StratisIdentifiers, StratisInfo, BDA,
             },
             device::blkdev_size,
-            //devlinks::setup_pool_devlinks,
             pool::StratPool,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
         },
@@ -875,7 +874,6 @@ impl LiminalDevices {
 
         match result {
             Ok((pool_name, pool)) => {
-                //setup_pool_devlinks(&pool_name, &pool);
                 info!(
                     "Pool with name \"{}\" and UUID \"{}\" set up",
                     pool_name,

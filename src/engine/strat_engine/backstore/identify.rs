@@ -57,7 +57,7 @@ use crate::engine::{
 
 /// A miscellaneous group of identifiers found when identifying a Stratis
 /// device.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, Hash, PartialEq)]
 pub struct StratisInfo {
     pub identifiers: StratisIdentifiers,
     pub device_number: Device,

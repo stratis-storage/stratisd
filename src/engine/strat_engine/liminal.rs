@@ -372,7 +372,7 @@ pub fn activate(infos: &HashMap<DevUuid, LInfo>) {
 }
 
 /// Info for a discovered Luks Device belonging to Stratis.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, Hash, PartialEq)]
 pub struct LLuksInfo {
     /// Generic information + Stratis identifiers
     pub ids: StratisInfo,
@@ -391,7 +391,7 @@ impl fmt::Display for LLuksInfo {
 }
 
 /// Info for a Stratis device.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, Hash, PartialEq)]
 pub struct LStratisInfo {
     /// Generic information + Stratis identifiers
     pub ids: StratisInfo,
@@ -429,6 +429,7 @@ impl LStratisInfo {
 }
 
 /// A unifying Info struct for Stratis or Luks devices
+#[derive(Debug, Eq, Hash, PartialEq)]
 pub enum LInfo {
     /// A Stratis device, which may be an encrypted device
     #[allow(dead_code)]
@@ -442,14 +443,41 @@ pub enum LInfo {
 /// into pools.
 #[derive(Debug)]
 pub struct LiminalDevices {
+    /// Sets of devices which have not been promoted to pools, but which
+    /// may still have a chance.
     errored_pool_devices: HashMap<PoolUuid, HashMap<Device, (DevUuid, PathBuf)>>,
+    /// Sets of devices which possess some internal contradiction which makes
+    /// it impossible for them to be made into sensible pools ever.
+    /// Use a HashSet to store the infos for each pool, as the problem that
+    /// makes the set hopeless may be duplicate device UUIDs, so that a
+    /// map with device UUID keys would not be able to manage all the devices.
+    hopeless_device_sets: HashMap<PoolUuid, HashSet<LInfo>>,
 }
 
 impl LiminalDevices {
     pub fn new() -> LiminalDevices {
         LiminalDevices {
             errored_pool_devices: HashMap::new(),
+            hopeless_device_sets: HashMap::new(),
         }
+    }
+
+    #[allow(dead_code)]
+    fn invariant(&self) {
+        assert!(self
+            .errored_pool_devices
+            .keys()
+            .cloned()
+            .collect::<HashSet<PoolUuid>>()
+            .intersection(
+                &self
+                    .hopeless_device_sets
+                    .keys()
+                    .cloned()
+                    .collect::<HashSet<PoolUuid>>()
+            )
+            .next()
+            .is_none());
     }
 
     /// Given a set of devices, try to set up a pool. If the setup fails,
@@ -578,6 +606,10 @@ impl LiminalDevices {
             if pools.contains_uuid(pool_uuid) {
                 // FIXME: There is the possibilty of an error condition here,
                 // if the device found is not in the already set up pool.
+                None
+            } else if let Some(mut set) = self.hopeless_device_sets.remove(&pool_uuid) {
+                set.insert(LInfo::Stratis(LStratisInfo {ids: info, luks: None}));
+                self.hopeless_device_sets.insert(pool_uuid, set);
                 None
             } else {
                 let mut devices = self

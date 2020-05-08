@@ -40,7 +40,7 @@ pub enum MetadataLocation {
     Second,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub struct StratisIdentifiers {
     pub pool_uuid: PoolUuid,
     pub device_uuid: DevUuid,

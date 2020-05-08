@@ -482,10 +482,8 @@ impl LiminalDevices {
         fn setup_pool(
             pools: &Table<StratPool>,
             pool_uuid: PoolUuid,
-            devices: &HashMap<Device, (DevUuid, PathBuf)>,
+            infos: HashMap<DevUuid, LStratisInfo>,
         ) -> Result<Option<(Name, StratPool)>, String> {
-            let infos = convert_to_infos(pool_uuid, devices);
-
             let bdas = match get_bdas(&infos) {
                 Err(err) => Err(format!(
                         "There was an error encountered when reading the BDAs for the devices found for pool with UUID {}: {}",
@@ -541,7 +539,7 @@ impl LiminalDevices {
                 .map(Some)
         }
 
-        let result = setup_pool(pools, pool_uuid, &devices);
+        let result = setup_pool(pools, pool_uuid, convert_to_infos(pool_uuid, &devices));
 
         if let Err(err) = &result {
             warn!("{}", err);

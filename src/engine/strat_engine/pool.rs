@@ -313,7 +313,7 @@ impl Pool for StratPool {
                 self.backstore
                     .cachedevs()
                     .into_iter()
-                    .map(|(_, bd)| bd.devnode()),
+                    .map(|(_, bd)| bd.devnode().physical_path().to_owned()),
             )
         }
     }
@@ -618,14 +618,24 @@ mod tests {
             .backstore
             .blockdevs()
             .iter()
-            .map(|(device_uuid, blockdev)| (*blockdev.device(), (*device_uuid, blockdev.devnode())))
+            .map(|(device_uuid, blockdev)| {
+                (
+                    *blockdev.device(),
+                    (*device_uuid, blockdev.devnode().metadata_path().to_owned()),
+                )
+            })
             .collect();
 
         let devnodes2 = pool2
             .backstore
             .blockdevs()
             .iter()
-            .map(|(device_uuid, blockdev)| (*blockdev.device(), (*device_uuid, blockdev.devnode())))
+            .map(|(device_uuid, blockdev)| {
+                (
+                    *blockdev.device(),
+                    (*device_uuid, blockdev.devnode().metadata_path().to_owned()),
+                )
+            })
             .collect();
 
         let infos1 = add_bdas(uuid1, &devnodes1).unwrap();
@@ -758,7 +768,12 @@ mod tests {
             .backstore
             .blockdevs()
             .iter()
-            .map(|(device_uuid, blockdev)| (*blockdev.device(), (*device_uuid, blockdev.devnode())))
+            .map(|(device_uuid, blockdev)| {
+                (
+                    *blockdev.device(),
+                    (*device_uuid, blockdev.devnode().metadata_path().to_owned()),
+                )
+            })
             .collect();
 
         pool.teardown().unwrap();

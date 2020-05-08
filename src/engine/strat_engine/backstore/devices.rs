@@ -26,12 +26,11 @@ use crate::{
                     device_identifiers, disown_device, BlockdevSize, MDADataSize,
                     StratisIdentifiers, BDA,
                 },
-                shared::BlockDevPath,
                 udev::{block_device_apply, decide_ownership, get_udev_property, UdevOwnership},
             },
             device::blkdev_size,
         },
-        types::{DevUuid, PoolUuid},
+        types::{BlockDevPath, DevUuid, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -262,10 +261,10 @@ impl MaybeEncrypted {
     fn to_blockdev_path(&self) -> StratisResult<BlockDevPath> {
         match *self {
             MaybeEncrypted::Unencrypted(ref path, _) => {
-                Ok(BlockDevPath::Unencrypted(path.to_owned()))
+                Ok(BlockDevPath::physical_device_path(path))
             }
             MaybeEncrypted::Encrypted(ref handle) => {
-                let physical = handle.physical_device_path().to_owned();
+                let physical = handle.physical_device_path();
                 let logical = handle.logical_device_path().ok_or_else(|| {
                     StratisError::Error(
                         "Path required for writing Stratis metadata on an \
@@ -273,7 +272,7 @@ impl MaybeEncrypted {
                             .to_string(),
                     )
                 })?;
-                Ok(BlockDevPath::Encrypted { logical, physical })
+                Ok(BlockDevPath::mapped_device_path(physical, &logical)?)
             }
         }
     }
@@ -653,7 +652,7 @@ pub fn wipe_blockdevs(blockdevs: &[StratBlockDev]) -> StratisResult<()> {
     let unerased_devnodes: Vec<_> = blockdevs
         .iter()
         .filter_map(|bd| match bd.disown() {
-            Err(_) => Some(bd.physical_path()),
+            Err(_) => Some(bd.devnode().physical_path()),
             _ => None,
         })
         .collect();
@@ -675,12 +674,9 @@ mod tests {
 
     use uuid::Uuid;
 
-    use crate::engine::{
-        engine::BlockDev,
-        strat_engine::{
-            backstore::{crypt::CryptHandle, metadata::device_identifiers},
-            tests::{crypt, loopbacked, real},
-        },
+    use crate::engine::strat_engine::{
+        backstore::{crypt::CryptHandle, metadata::device_identifiers},
+        tests::{crypt, loopbacked, real},
     };
 
     use super::*;
@@ -722,7 +718,10 @@ mod tests {
             )));
         }
 
-        let stratis_devnodes: Vec<PathBuf> = blockdevs.iter().map(|bd| bd.devnode()).collect();
+        let stratis_devnodes: Vec<PathBuf> = blockdevs
+            .iter()
+            .map(|bd| bd.devnode().metadata_path().to_owned())
+            .collect();
 
         let stratis_identifiers: Vec<Option<StratisIdentifiers>> = stratis_devnodes
             .iter()

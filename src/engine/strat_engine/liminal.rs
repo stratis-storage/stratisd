@@ -6,6 +6,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
+    fmt,
     fs::OpenOptions,
     path::{Path, PathBuf},
 };
@@ -18,7 +19,7 @@ use devicemapper::{Device, Sectors};
 use crate::{
     engine::{
         strat_engine::{
-            backstore::{identify_block_device, StratBlockDev, StratisInfo, BDA},
+            backstore::{identify_block_device, CryptHandle, StratBlockDev, StratisInfo, BDA},
             device::blkdev_size,
             devlinks::setup_pool_devlinks,
             pool::StratPool,
@@ -316,12 +317,51 @@ pub fn get_blockdevs(
     Ok((datadevs, cachedevs))
 }
 
+/// Process each element in infos. If the info represents a LUKS device,
+/// activate the device. If there is an activation failure, log a warning.
+#[allow(dead_code)]
+pub fn activate(infos: &HashMap<DevUuid, LInfo>) {
+    for (_, info) in infos.iter() {
+        if let LInfo::Luks(luks_info) = info {
+            let handle = CryptHandle::setup(&luks_info.ids.devnode);
+            match handle {
+                Err(_) | Ok(None) => {
+                    warn!(
+                        "Expected device with {} to be a Stratis owned LUKS device but failed to read LUKS metadata for Stratis",
+                        luks_info
+                    );
+                }
+                Ok(Some(mut handle)) => {
+                    let path = handle.activate();
+                    match path {
+                        Err(err) => {
+                            warn!(
+                                "Could not activate Stratis device with {}: {}",
+                                luks_info, err
+                            );
+                        }
+                        Ok(_) => {
+                            info!("Activated LUKS device with {}", luks_info);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Info for a discovered Luks Device belonging to Stratis.
 #[derive(Debug, Eq, PartialEq)]
 pub struct LLuksInfo {
     /// Generic information + Stratis identifiers
     pub ids: StratisInfo,
     pub key_description: String,
+}
+
+impl fmt::Display for LLuksInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}, key description: {}", self.ids, self.key_description)
+    }
 }
 
 /// Info for a Stratis device.
@@ -335,6 +375,20 @@ pub struct LStratisInfo {
     pub luks: Option<LLuksInfo>,
 }
 
+impl fmt::Display for LStratisInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if let Some(info) = &self.luks {
+            write!(
+                f,
+                "logical device with {} and physical device with {}",
+                self.ids, info
+            )
+        } else {
+            write!(f, "{}", self.ids)
+        }
+    }
+}
+
 impl LStratisInfo {
     #[allow(dead_code)]
     fn invariant(&self) {
@@ -346,6 +400,16 @@ impl LStratisInfo {
                     && luks.ids.device_number != self.ids.device_number,
         });
     }
+}
+
+/// A unifying Info struct for Stratis or Luks devices
+pub enum LInfo {
+    /// A Stratis device, which may be an encrypted device
+    #[allow(dead_code)]
+    Stratis(LStratisInfo),
+    /// A LUKS device
+    #[allow(dead_code)]
+    Luks(LLuksInfo),
 }
 
 /// Devices which stratisd has discovered but which have not been assembled

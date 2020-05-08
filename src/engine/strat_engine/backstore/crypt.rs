@@ -523,7 +523,6 @@ impl CryptHandle {
 
     /// Activate encrypted Stratis device using the name stored in the
     /// Stratis token
-    #[cfg(test)]
     pub fn activate(&mut self) -> Result<()> {
         activate_and_check_device_path(&mut self.device, &self.name.to_owned())
     }

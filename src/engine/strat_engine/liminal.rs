@@ -15,6 +15,8 @@ use serde_json::Value;
 
 use devicemapper::Sectors;
 
+#[cfg(test)]
+use crate::engine::strat_engine::devlinks;
 use crate::{
     engine::{
         engine::Pool,
@@ -874,6 +876,8 @@ impl LiminalDevices {
 
         match result {
             Ok((pool_name, pool)) => {
+                #[cfg(test)]
+                devlinks::setup_pool_devlinks(&pool_name, &pool);
                 info!(
                     "Pool with name \"{}\" and UUID \"{}\" set up",
                     pool_name,

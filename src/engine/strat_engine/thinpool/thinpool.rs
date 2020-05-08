@@ -854,6 +854,8 @@ impl ThinPool {
             }
             return Err(err);
         }
+        #[cfg(test)]
+        devlinks::filesystem_added(_pool_name, &name, &new_filesystem.devnode());
         self.filesystems.insert(name, fs_uuid, new_filesystem);
 
         Ok(fs_uuid)
@@ -892,6 +894,8 @@ impl ThinPool {
         let new_fs_name = Name::new(snapshot_name.to_owned());
         self.mdv
             .save_fs(&new_fs_name, snapshot_fs_uuid, &new_filesystem)?;
+        #[cfg(test)]
+        devlinks::filesystem_added(_pool_name, &new_fs_name, &new_filesystem.devnode());
         self.filesystems
             .insert(new_fs_name, snapshot_fs_uuid, new_filesystem);
         Ok((
@@ -925,6 +929,8 @@ impl ThinPool {
                                pool_name,
                                err);
                     }
+                    #[cfg(test)]
+                    devlinks::filesystem_removed(pool_name, &fs_name);
                     Ok(Some(uuid))
                 }
                 Err(err) => {
@@ -973,10 +979,8 @@ impl ThinPool {
                 from: &*old_name,
                 to: &*new_name,
             });
-
-            devlinks::fs_renamed(pool_name, &old_name)?;
-
             self.filesystems.insert(new_name.clone(), uuid, filesystem);
+            devlinks::filesystem_renamed(pool_name, &old_name, &new_name);
             Ok(Some(uuid))
         }
     }
@@ -1206,7 +1210,6 @@ mod tests {
     use crate::engine::strat_engine::{
         backstore::MDADataSize,
         device::SyncAll,
-        devlinks,
         tests::{loopbacked, real},
     };
 

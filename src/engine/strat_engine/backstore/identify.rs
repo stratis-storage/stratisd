@@ -52,8 +52,29 @@ use crate::engine::{
         metadata::{device_identifiers, StratisIdentifiers},
         udev::{block_enumerator, decide_ownership, UdevOwnership, FS_TYPE_KEY, STRATIS_FS_TYPE},
     },
-    types::{DevUuid, PoolUuid},
+    types::{DevUuid, KeyDescription, PoolUuid},
 };
+
+/// A miscellaneous group of identifiers found when identifying a LUKS
+/// device which belongs to Stratis.
+#[derive(Debug, Eq, Hash, PartialEq)]
+pub struct LuksInfo {
+    /// All the usual StratisInfo
+    pub info: StratisInfo,
+    /// The key description, obtained from the LUKS keyring token
+    pub key_description: KeyDescription,
+}
+
+impl fmt::Display for LuksInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}, key description: \"{}\"",
+            self.info,
+            self.key_description.as_application_str()
+        )
+    }
+}
 
 /// A miscellaneous group of identifiers found when identifying a Stratis
 /// device.
@@ -73,6 +94,25 @@ impl fmt::Display for StratisInfo {
             self.device_number,
             self.devnode.display()
         )
+    }
+}
+
+/// An enum type to distinguish between LUKS devices belong to Sratis and
+/// Stratis devices.
+#[derive(Debug, Eq, Hash, PartialEq)]
+pub enum DeviceInfo {
+    #[allow(dead_code)]
+    Luks(LuksInfo),
+    #[allow(dead_code)]
+    Stratis(StratisInfo),
+}
+
+impl fmt::Display for DeviceInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            DeviceInfo::Luks(info) => write!(f, "LUKS device description: {}", info),
+            DeviceInfo::Stratis(info) => write!(f, "Stratis device description: {}", info),
+        }
     }
 }
 

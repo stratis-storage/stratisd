@@ -20,8 +20,8 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::{
-                identify_block_device, CryptHandle, StratBlockDev, StratisIdentifiers, StratisInfo,
-                BDA,
+                identify_block_device, CryptHandle, DeviceInfo, LuksInfo, StratBlockDev,
+                StratisIdentifiers, StratisInfo, BDA,
             },
             device::blkdev_size,
             devlinks::setup_pool_devlinks,
@@ -389,6 +389,15 @@ impl fmt::Display for LLuksInfo {
     }
 }
 
+impl From<LuksInfo> for LLuksInfo {
+    fn from(info: LuksInfo) -> LLuksInfo {
+        LLuksInfo {
+            ids: info.info,
+            key_description: info.key_description,
+        }
+    }
+}
+
 /// Info for a Stratis device.
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub struct LStratisInfo {
@@ -414,6 +423,15 @@ impl fmt::Display for LStratisInfo {
     }
 }
 
+impl From<StratisInfo> for LStratisInfo {
+    fn from(info: StratisInfo) -> LStratisInfo {
+        LStratisInfo {
+            ids: info,
+            luks: None,
+        }
+    }
+}
+
 impl LStratisInfo {
     #[allow(dead_code)]
     fn invariant(&self) {
@@ -433,7 +451,6 @@ pub enum LInfo {
     /// A Stratis device, which may be an encrypted device
     Stratis(LStratisInfo),
     /// A LUKS device
-    #[allow(dead_code)]
     Luks(LLuksInfo),
 }
 
@@ -442,6 +459,15 @@ impl fmt::Display for LInfo {
         match self {
             LInfo::Stratis(info) => write!(f, "Stratis device with {}", info),
             LInfo::Luks(info) => write!(f, "LUKS device belonging to Stratis with {}", info),
+        }
+    }
+}
+
+impl From<DeviceInfo> for LInfo {
+    fn from(info: DeviceInfo) -> LInfo {
+        match info {
+            DeviceInfo::Luks(info) => LInfo::Luks(info.into()),
+            DeviceInfo::Stratis(info) => LInfo::Stratis(info.into()),
         }
     }
 }

@@ -432,11 +432,19 @@ impl LStratisInfo {
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub enum LInfo {
     /// A Stratis device, which may be an encrypted device
-    #[allow(dead_code)]
     Stratis(LStratisInfo),
     /// A LUKS device
     #[allow(dead_code)]
     Luks(LLuksInfo),
+}
+
+impl fmt::Display for LInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            LInfo::Stratis(info) => write!(f, "Stratis device with {}", info),
+            LInfo::Luks(info) => write!(f, "LUKS device belonging to Stratis with {}", info),
+        }
+    }
 }
 
 /// On an error, whether this set of devices is hopeless or just errored
@@ -461,7 +469,7 @@ impl fmt::Display for Destination {
 pub struct LiminalDevices {
     /// Sets of devices which have not been promoted to pools, but which
     /// may still have a chance.
-    errored_pool_devices: HashMap<PoolUuid, HashMap<Device, (DevUuid, PathBuf)>>,
+    errored_pool_devices: HashMap<PoolUuid, HashMap<DevUuid, LInfo>>,
     /// Sets of devices which possess some internal contradiction which makes
     /// it impossible for them to be made into sensible pools ever.
     /// Use a HashSet to store the infos for each pool, as the problem that
@@ -503,7 +511,7 @@ impl LiminalDevices {
         pool_uuid: PoolUuid,
         devices: HashMap<Device, (DevUuid, PathBuf)>,
     ) -> Option<(Name, StratPool)> {
-        self.try_setup_pool(pools, pool_uuid, devices)
+        self.try_setup_pool(pools, pool_uuid, convert_to_infos(pool_uuid, &devices))
     }
 
     /// Given a set of devices, try to set up a pool. If the setup fails,
@@ -520,7 +528,7 @@ impl LiminalDevices {
         &mut self,
         pools: &Table<StratPool>,
         pool_uuid: PoolUuid,
-        devices: HashMap<Device, (DevUuid, PathBuf)>,
+        mut infos: HashMap<DevUuid, LStratisInfo>,
     ) -> Option<(Name, StratPool)> {
         assert!(pools.get_by_uuid(pool_uuid).is_none());
         assert!(self.errored_pool_devices.get(&pool_uuid).is_none());
@@ -539,9 +547,9 @@ impl LiminalDevices {
         fn setup_pool(
             pools: &Table<StratPool>,
             pool_uuid: PoolUuid,
-            infos: HashMap<DevUuid, LStratisInfo>,
+            infos: &HashMap<DevUuid, LStratisInfo>,
         ) -> Result<Option<(Name, StratPool)>, Destination> {
-            let bdas = match get_bdas(&infos) {
+            let bdas = match get_bdas(infos) {
                 Err(err) => Err(
                     Destination::Errored(format!(
                         "There was an error encountered when reading the BDAs for the devices found for pool with UUID {}: {}",
@@ -561,7 +569,7 @@ impl LiminalDevices {
                         )));
             }
 
-            let (timestamp, metadata) = match get_metadata(&infos, &bdas) {
+            let (timestamp, metadata) = match get_metadata(infos, &bdas) {
                 Err(err) => return Err(
                     Destination::Errored(format!(
                         "There was an error encountered when reading the metadata for the devices found for pool with UUID {}: {}",
@@ -580,7 +588,7 @@ impl LiminalDevices {
                         uuid.to_simple_ref())));
             }
 
-            let (datadevs, cachedevs) = match get_blockdevs(&metadata.backstore, &infos, bdas) {
+            let (datadevs, cachedevs) = match get_blockdevs(&metadata.backstore, infos, bdas) {
                 Err(err) => return Err(
                     Destination::Errored(format!(
                         "There was an error encountered when calculating the block devices for pool with UUID {} and name {}: {}",
@@ -602,7 +610,7 @@ impl LiminalDevices {
                 .map(Some)
         }
 
-        let result = setup_pool(pools, pool_uuid, convert_to_infos(pool_uuid, &devices));
+        let result = setup_pool(pools, pool_uuid, &infos);
 
         if let Err(err) = &result {
             warn!("{}", err);
@@ -619,27 +627,23 @@ impl LiminalDevices {
                 Some((pool_name, pool))
             }
             Err(Destination::Hopeless(_)) => {
-                let infos = devices
-                    .iter()
-                    .map(|(n, (u, d))| {
-                        LInfo::Stratis(LStratisInfo {
-                            ids: StratisInfo {
-                                identifiers: StratisIdentifiers {
-                                    pool_uuid,
-                                    device_uuid: *u,
-                                },
-                                device_number: *n,
-                                devnode: d.to_path_buf(),
-                            },
-                            luks: None,
-                        })
-                    })
-                    .collect();
-                self.hopeless_device_sets.insert(pool_uuid, infos);
+                self.hopeless_device_sets.insert(
+                    pool_uuid,
+                    infos
+                        .drain()
+                        .map(|(_, info)| LInfo::Stratis(info))
+                        .collect(),
+                );
                 None
             }
             Err(Destination::Errored(_)) | Ok(None) => {
-                self.errored_pool_devices.insert(pool_uuid, devices);
+                self.errored_pool_devices.insert(
+                    pool_uuid,
+                    infos
+                        .drain()
+                        .map(|(pool_uuid, info)| (pool_uuid, LInfo::Stratis(info)))
+                        .collect(),
+                );
                 None
             }
         }
@@ -672,17 +676,27 @@ impl LiminalDevices {
                     .remove(&pool_uuid)
                     .unwrap_or_else(HashMap::new);
 
-                if devices
+                let device_uuid = info.identifiers.device_uuid;
+                let displaced = devices
                     .insert(
-                        info.device_number,
-                        (info.identifiers.device_uuid, info.devnode.to_owned()),
-                    )
-                    .is_none()
-                {
-                    info!(
-                        "Stratis block device with {} discovered, i.e., identified for the first time during this execution of stratisd",
-                        info
+                        device_uuid,
+                        LInfo::Stratis(LStratisInfo { ids: info, luks: None })
                     );
+
+                if displaced.is_none() {
+                    info!(
+                        "{} discovered, i.e., identified for the first time during this execution of stratisd",
+                        devices.get(&device_uuid).expect("inserted in previous line")
+                    );
+                }
+
+                if devices.iter().any(|(_, info)|
+                                      match info {
+                                          LInfo::Luks(_) => true,
+                                          LInfo::Stratis(_) => false
+                                      }) {
+                    self.errored_pool_devices.insert(pool_uuid, devices);
+                    return None;
                 }
 
                 // FIXME: An attempt to set up the pool is made, even if no
@@ -694,7 +708,10 @@ impl LiminalDevices {
                 // leave a pool that could be set up in limbo forever. An
                 // alternative, where the user can explicitly ask to try to
                 // set up an incomplete pool would be a better choice.
-                self.try_setup_pool(pools, pool_uuid, devices).map(|(name, pool)| (pool_uuid, name, pool))
+                self.try_setup_pool(pools, pool_uuid, devices.drain().map(|(pool_uuid, info)| match info {
+                    LInfo::Luks(_) => unreachable!("otherwise, returned in line above"),
+                    LInfo::Stratis(info) => (pool_uuid, info),
+                }).collect()).map(|(name, pool)| (pool_uuid, name, pool))
             }
         })
     }
@@ -702,11 +719,25 @@ impl LiminalDevices {
     /// Generate a JSON report giving some information about the internals
     /// of these devices.
     pub fn report(&self) -> Value {
-        Value::Array(self.errored_pool_devices.iter().map(|(uuid, map)| {
-            json!({
-                "pool_uuid": uuid.to_simple_ref().to_string(),
-                "devices": Value::Array(map.values().map(|(_, p)| Value::from(p.display().to_string())).collect()),
-            })
-        }).collect())
+        Value::Array(
+            self.errored_pool_devices
+                .iter()
+                .map(|(uuid, map)| {
+                    let devices = map
+                        .values()
+                        .map(|info| {
+                            Value::from(match info {
+                                LInfo::Luks(info) => info.ids.devnode.display().to_string(),
+                                LInfo::Stratis(info) => info.ids.devnode.display().to_string(),
+                            })
+                        })
+                        .collect();
+                    json!({
+                        "pool_uuid": uuid.to_simple_ref().to_string(),
+                        "devices": Value::Array(devices),
+                    })
+                })
+                .collect(),
+        )
     }
 }

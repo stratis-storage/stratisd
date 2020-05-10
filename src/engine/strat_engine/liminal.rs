@@ -338,6 +338,109 @@ pub fn get_blockdevs(
     Ok((datadevs, cachedevs))
 }
 
+/// Combine two devices which have identical pool and device UUIDs
+fn combine_two_devices(info_1: LInfo, info_2: LInfo) -> StratisResult<LInfo> {
+    // Combine two descriptions of LUKS devices.
+    // Return an error if the device numbers do not agree. It would seem
+    // that that would indicate duplicate devices.
+    // Return an error if the key descriptions do not agree.
+    //
+    // Precondition: The Stratis identifiers of the devices are the same.
+    fn combine_luks_and_luks(info_1: LLuksInfo, info_2: LLuksInfo) -> StratisResult<LLuksInfo> {
+        assert!(info_1.ids.identifiers == info_2.ids.identifiers);
+
+        if info_1.ids.device_number != info_2.ids.device_number {
+            Err(StratisError::Error(format!(
+                            "Duplicate devices found: device with description {} has different device number from device with description {}",
+                                info_1,
+                                info_2,
+                                )))
+        } else if info_1.key_description != info_2.key_description {
+            Err(StratisError::Error(format!(
+                            "device with description {} has different key description from device with description {}",
+                                info_1,
+                                info_2,
+                                )))
+        } else {
+            Ok(info_1)
+        }
+    }
+
+    // Combine two descriptions of Stratis devices.
+    // Give precedence to one that contains the LUKS description.
+    // Return an error if the device numbers do not agree. It would seem
+    // that that would indicate duplicate devices.
+    //
+    // Precondition: The Stratis identifiers of the devices are the same.
+    fn combine_stratis_and_stratis(
+        info_1: LStratisInfo,
+        info_2: LStratisInfo,
+    ) -> StratisResult<LStratisInfo> {
+        assert!(info_1.ids.identifiers == info_2.ids.identifiers);
+
+        let (primary, secondary) = if info_1.luks.is_some() {
+            (info_1, info_2)
+        } else {
+            (info_2, info_1)
+        };
+
+        if primary.ids.device_number != secondary.ids.device_number {
+            Err(StratisError::Error(format!(
+                            "Duplicate devices found: device with description {} has different device number from device with description {}",
+                                primary,
+                                secondary
+                                )))
+        } else {
+            Ok(primary)
+        }
+    }
+
+    // Combine a description of a LUKS device and a Stratis device into
+    // a single Stratis device description. Return an error if the two
+    // are incompatible.
+    //
+    // Precondition: The Stratis identifiers of the devices are the same.
+    fn combine_luks_and_stratis(
+        luks_info: LLuksInfo,
+        strat_info: LStratisInfo,
+    ) -> StratisResult<LStratisInfo> {
+        assert!(luks_info.ids.identifiers == strat_info.ids.identifiers);
+
+        match strat_info.luks {
+            Some(ref recorded_luks_info) => {
+                if &luks_info == recorded_luks_info {
+                    Ok(strat_info)
+                } else {
+                    Err(StratisError::Error(format!(
+                            "LUKS info just read, {},  and LUKS info, {}, for Stratis device with {} do not match",
+                            luks_info,
+                            recorded_luks_info,
+                            strat_info.ids
+                            )))
+                }
+            }
+            None => Ok(LStratisInfo {
+                ids: strat_info.ids,
+                luks: Some(luks_info),
+            }),
+        }
+    }
+
+    match (info_1, info_2) {
+        (LInfo::Luks(luks_info), LInfo::Stratis(strat_info)) => {
+            combine_luks_and_stratis(luks_info, strat_info).map(LInfo::Stratis)
+        }
+        (LInfo::Stratis(strat_info), LInfo::Luks(luks_info)) => {
+            combine_luks_and_stratis(luks_info, strat_info).map(LInfo::Stratis)
+        }
+        (LInfo::Luks(info_1), LInfo::Luks(info_2)) => {
+            combine_luks_and_luks(info_1, info_2).map(LInfo::Luks)
+        }
+        (LInfo::Stratis(info_1), LInfo::Stratis(info_2)) => {
+            combine_stratis_and_stratis(info_1, info_2).map(LInfo::Stratis)
+        }
+    }
+}
 /// Process each element in infos. If the info represents a LUKS device,
 /// activate the device. If there is an activation failure, log a warning.
 fn activate(infos: &HashMap<DevUuid, LInfo>) {
@@ -712,14 +815,36 @@ impl LiminalDevices {
                     .unwrap_or_else(HashMap::new);
 
                 let device_uuid = info.ids.identifiers.device_uuid;
-                let displaced = devices.insert(device_uuid, LInfo::Stratis(info));
 
-                if displaced.is_none() {
-                    info!(
-                        "{} discovered, i.e., identified for the first time during this execution of stratisd",
-                        devices.get(&device_uuid).expect("inserted in previous line")
-                    );
+                match devices.remove(&device_uuid) {
+                    None => {
+                        info!(
+                            "{} discovered, i.e., identified for the first time during this execution of stratisd",
+                            info
+                        );
+                        devices.insert(device_uuid, LInfo::Stratis(info));
+                    }
+                    Some(removed) => {
+                        match combine_two_devices(removed, LInfo::Stratis(info)) {
+                            Err(err) => {
+                                warn!(
+                                    "Moving set of devices that share pool UUID {} to hopeless designation: {}",
+                                    pool_uuid.to_simple_ref(),
+                                    err);
+                                self
+                                    .hopeless_device_sets
+                                    .insert(
+                                        pool_uuid,
+                                        devices .drain().map(|(_, info)| info).collect());
+                                return None;
+                            }
+                            Ok(info) => {
+                                devices.insert(device_uuid, info);
+                            }
+                        }
+                    }
                 }
+
 
                 if devices.iter().any(|(_, info)|
                                       match info {

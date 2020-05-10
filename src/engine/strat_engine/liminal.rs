@@ -610,14 +610,24 @@ impl LiminalDevices {
             .is_none());
     }
 
-    /// This method is a temporary shim invoked from engine.
-    pub fn setup_pool(
+    /// Take a map of pool UUIDs to sets of devices and return a list of
+    /// information about created pools.
+    ///
+    /// Precondition: No pools have yet been set up, i.e., it is unnecessary
+    /// to check for membership in any of the existing categories of device
+    /// sets.
+    pub fn setup_pools(
         &mut self,
-        pools: &Table<StratPool>,
-        pool_uuid: PoolUuid,
-        devices: HashMap<Device, (DevUuid, PathBuf)>,
-    ) -> Option<(Name, StratPool)> {
-        self.try_setup_pool(pools, pool_uuid, convert_to_infos(pool_uuid, &devices))
+        mut all_devices: HashMap<PoolUuid, HashMap<Device, (DevUuid, PathBuf)>>,
+    ) -> Vec<(Name, PoolUuid, StratPool)> {
+        let table = Table::default();
+        all_devices
+            .drain()
+            .filter_map(|(pool_uuid, devices)| {
+                self.try_setup_pool(&table, pool_uuid, convert_to_infos(pool_uuid, &devices))
+                    .map(|(pool_name, pool)| (pool_name, pool_uuid, pool))
+            })
+            .collect()
     }
 
     /// Given a set of devices, try to set up a pool. If the setup fails,

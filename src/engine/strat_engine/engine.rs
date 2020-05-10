@@ -77,11 +77,8 @@ impl StratEngine {
 
         let mut liminal_devices = LiminalDevices::new();
         let mut pools = Table::default();
-        for (pool_uuid, devices) in find_all()? {
-            if let Some((pool_name, pool)) = liminal_devices.setup_pool(&pools, pool_uuid, devices)
-            {
-                pools.insert(pool_name, pool_uuid, pool);
-            }
+        for (pool_name, pool_uuid, pool) in liminal_devices.setup_pools(find_all()?) {
+            pools.insert(pool_name, pool_uuid, pool);
         }
 
         devlinks::cleanup_devlinks(pools.iter());

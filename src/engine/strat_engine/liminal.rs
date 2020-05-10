@@ -340,8 +340,7 @@ pub fn get_blockdevs(
 
 /// Process each element in infos. If the info represents a LUKS device,
 /// activate the device. If there is an activation failure, log a warning.
-#[allow(dead_code)]
-pub fn activate(infos: &HashMap<DevUuid, LInfo>) {
+fn activate(infos: &HashMap<DevUuid, LInfo>) {
     for (_, info) in infos.iter() {
         if let LInfo::Luks(luks_info) = info {
             let handle = CryptHandle::setup(&luks_info.ids.devnode);
@@ -502,6 +501,15 @@ impl LiminalDevices {
             )
             .next()
             .is_none());
+    }
+
+    /// Activate all LUKS devices in device sets that look like they might
+    /// have a chance to become pools.
+    #[allow(dead_code)]
+    pub fn activate_all(&self) {
+        for (_, infos) in self.errored_pool_devices.iter() {
+            activate(infos);
+        }
     }
 
     /// This method is a temporary shim invoked from engine.

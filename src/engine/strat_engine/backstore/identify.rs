@@ -40,6 +40,7 @@
 
 use std::{
     collections::HashMap,
+    convert::TryFrom,
     fmt,
     fs::OpenOptions,
     path::{Path, PathBuf},
@@ -49,6 +50,7 @@ use devicemapper::Device;
 
 use crate::engine::{
     strat_engine::backstore::{
+        crypt::CryptHandle,
         metadata::{device_identifiers, StratisIdentifiers},
         udev::{block_enumerator, decide_ownership, UdevOwnership, FS_TYPE_KEY, STRATIS_FS_TYPE},
     },
@@ -101,7 +103,6 @@ impl fmt::Display for StratisInfo {
 /// Stratis devices.
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub enum DeviceInfo {
-    #[allow(dead_code)]
     Luks(LuksInfo),
     Stratis(StratisInfo),
 }
@@ -155,6 +156,57 @@ fn device_identifiers_wrapper(
                 )
             })
         })
+}
+
+/// Process a device which udev information indicates is a LUKS device.
+fn process_luks_device(dev: &libudev::Device) -> Option<LuksInfo> {
+    match dev.devnode() {
+        Some(devnode) => match device_to_devno_wrapper(dev) {
+            Err(err) => {
+                warn!(
+                    "udev identified device {} as a Stratis device but {}, disregarding the device",
+                    devnode.display(),
+                    err
+                );
+                None
+            }
+            Ok(device_number) => match CryptHandle::setup(devnode) {
+                Ok(None) => None,
+                Err(err) => {
+                    warn!(
+                            "udev identified device {} as a LUKS device, but could not read LUKS header from the device, disregarding the device: {}",
+                            devnode.display(),
+                            err,
+                            );
+                    None
+                }
+                Ok(Some(handle)) => {
+                    let key_description = handle.key_description();
+                    match KeyDescription::try_from(key_description.to_string()) {
+                        Ok(key_description) => Some(LuksInfo {
+                            info: StratisInfo {
+                                identifiers: *handle.device_identifiers(),
+                                device_number,
+                                devnode: handle.physical_device_path().to_path_buf(),
+                            },
+                            key_description,
+                        }),
+                        Err(err) => {
+                            warn!("invalid key description {} read from LUKS metadata on device {}, disregarding the device: {}",
+                                  key_description,
+                                  devnode.display(),
+                                  err);
+                            None
+                        }
+                    }
+                }
+            },
+        },
+        None => {
+            warn!("udev identified a device as a LUKS2 device, but the udev entry for the device had no device node, disregarding device");
+            None
+        }
+    }
 }
 
 /// Process a device which udev information indicates is a Stratis device.
@@ -267,6 +319,7 @@ pub fn identify_block_device(dev: &libudev::Device) -> Option<DeviceInfo> {
         }
         Ok(ownership) => match ownership {
             UdevOwnership::Stratis => process_stratis_device(dev).map(DeviceInfo::Stratis),
+            UdevOwnership::Luks => process_luks_device(dev).map(DeviceInfo::Luks),
             _ => None,
         },
     }
@@ -338,6 +391,13 @@ mod tests {
                 .unwrap();
             assert_eq!(info.identifiers.pool_uuid, pool_uuid);
             assert_eq!(&&info.devnode, path);
+
+            assert_eq!(
+                block_device_apply(path, |dev| process_luks_device(dev))
+                    .unwrap()
+                    .unwrap(),
+                None
+            );
         }
     }
 
@@ -383,12 +443,24 @@ mod tests {
                     .unwrap(),
                 None
             );
+            assert_eq!(
+                block_device_apply(path, |dev| process_luks_device(dev))
+                    .unwrap()
+                    .unwrap(),
+                None
+            );
         }
 
         for path in paths {
             create_fs(path, None).unwrap();
             assert_eq!(
                 block_device_apply(path, |dev| process_stratis_device(dev))
+                    .unwrap()
+                    .unwrap(),
+                None
+            );
+            assert_eq!(
+                block_device_apply(path, |dev| process_luks_device(dev))
                     .unwrap()
                     .unwrap(),
                 None

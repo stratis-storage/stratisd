@@ -447,13 +447,11 @@ impl CryptHandle {
     }
 
     /// Get the Stratis device identifiers for a given encrypted device.
-    #[allow(dead_code)]
     pub fn device_identifiers(&self) -> &StratisIdentifiers {
         &self.identifiers
     }
 
     /// Get the key description for a given encrypted device.
-    #[allow(dead_code)]
     pub fn key_description(&self) -> &str {
         &self.key_description
     }

@@ -695,13 +695,14 @@ impl LiminalDevices {
         event: &libudev::Event,
     ) -> Option<(PoolUuid, Name, StratPool)> {
         identify_block_device(event.device()).and_then(move |info| {
-            let pool_uuid = info.identifiers.pool_uuid;
+            let info: LStratisInfo = info.into();
+            let pool_uuid = info.ids.identifiers.pool_uuid;
             if pools.contains_uuid(pool_uuid) {
                 // FIXME: There is the possibilty of an error condition here,
                 // if the device found is not in the already set up pool.
                 None
             } else if let Some(mut set) = self.hopeless_device_sets.remove(&pool_uuid) {
-                set.insert(LInfo::Stratis(LStratisInfo {ids: info, luks: None}));
+                set.insert(LInfo::Stratis(info));
                 self.hopeless_device_sets.insert(pool_uuid, set);
                 None
             } else {
@@ -710,12 +711,8 @@ impl LiminalDevices {
                     .remove(&pool_uuid)
                     .unwrap_or_else(HashMap::new);
 
-                let device_uuid = info.identifiers.device_uuid;
-                let displaced = devices
-                    .insert(
-                        device_uuid,
-                        LInfo::Stratis(LStratisInfo { ids: info, luks: None })
-                    );
+                let device_uuid = info.ids.identifiers.device_uuid;
+                let displaced = devices.insert(device_uuid, LInfo::Stratis(info));
 
                 if displaced.is_none() {
                     info!(

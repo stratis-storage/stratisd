@@ -575,6 +575,15 @@ impl From<DeviceInfo> for LInfo {
     }
 }
 
+impl LInfo {
+    fn stratis_identifiers(&self) -> StratisIdentifiers {
+        match self {
+            LInfo::Luks(info) => info.ids.identifiers,
+            LInfo::Stratis(info) => info.ids.identifiers,
+        }
+    }
+}
+
 /// On an error, whether this set of devices is hopeless or just errored
 #[derive(Debug)]
 enum Destination {
@@ -798,14 +807,14 @@ impl LiminalDevices {
         event: &libudev::Event,
     ) -> Option<(PoolUuid, Name, StratPool)> {
         identify_block_device(event.device()).and_then(move |info| {
-            let info: LStratisInfo = info.into();
-            let pool_uuid = info.ids.identifiers.pool_uuid;
+            let info: LInfo = info.into();
+            let pool_uuid = info.stratis_identifiers().pool_uuid;
             if pools.contains_uuid(pool_uuid) {
                 // FIXME: There is the possibilty of an error condition here,
                 // if the device found is not in the already set up pool.
                 None
             } else if let Some(mut set) = self.hopeless_device_sets.remove(&pool_uuid) {
-                set.insert(LInfo::Stratis(info));
+                set.insert(info);
                 self.hopeless_device_sets.insert(pool_uuid, set);
                 None
             } else {
@@ -814,7 +823,7 @@ impl LiminalDevices {
                     .remove(&pool_uuid)
                     .unwrap_or_else(HashMap::new);
 
-                let device_uuid = info.ids.identifiers.device_uuid;
+                let device_uuid = info.stratis_identifiers().device_uuid;
 
                 match devices.remove(&device_uuid) {
                     None => {
@@ -822,10 +831,10 @@ impl LiminalDevices {
                             "{} discovered, i.e., identified for the first time during this execution of stratisd",
                             info
                         );
-                        devices.insert(device_uuid, LInfo::Stratis(info));
+                        devices.insert(device_uuid, info);
                     }
                     Some(removed) => {
-                        match combine_two_devices(removed, LInfo::Stratis(info)) {
+                        match combine_two_devices(removed, info) {
                             Err(err) => {
                                 warn!(
                                     "Moving set of devices that share pool UUID {} to hopeless designation: {}",

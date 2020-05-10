@@ -103,7 +103,6 @@ impl fmt::Display for StratisInfo {
 pub enum DeviceInfo {
     #[allow(dead_code)]
     Luks(LuksInfo),
-    #[allow(dead_code)]
     Stratis(StratisInfo),
 }
 
@@ -251,7 +250,7 @@ fn identify_stratis_device(dev: &libudev::Device) -> Option<StratisInfo> {
 /// Identify a block device in the context where a udev event has been
 /// captured for some block device. Return None if the device does not
 /// appear to be a Stratis device. Log at an appropriate level on all errors.
-pub fn identify_block_device(dev: &libudev::Device) -> Option<StratisInfo> {
+pub fn identify_block_device(dev: &libudev::Device) -> Option<DeviceInfo> {
     let initialized = dev.is_initialized();
     if !initialized {
         debug!("Found a udev entry for a device identified as a block device, but udev also identified it as uninitialized, disregarding the device");
@@ -267,7 +266,7 @@ pub fn identify_block_device(dev: &libudev::Device) -> Option<StratisInfo> {
             None
         }
         Ok(ownership) => match ownership {
-            UdevOwnership::Stratis => process_stratis_device(dev),
+            UdevOwnership::Stratis => process_stratis_device(dev).map(DeviceInfo::Stratis),
             _ => None,
         },
     }

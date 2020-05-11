@@ -16,7 +16,7 @@ use crate::{
         types::TData,
         util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
     },
-    engine::{CreateAction, DeleteAction},
+    engine::{DeleteAction, MappingCreateAction},
 };
 
 pub fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -42,8 +42,9 @@ pub fn set_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     ) {
         Ok(idem_resp) => {
             let return_value = match idem_resp {
-                CreateAction::Created(is_changed) => (true, is_changed),
-                _ => (false, false),
+                MappingCreateAction::Created(()) => (true, false),
+                MappingCreateAction::ValueChanged => (true, true),
+                MappingCreateAction::Identity => (false, false),
             };
             return_message.append3(return_value, msg_code_ok(), msg_string_ok())
         }

@@ -19,7 +19,7 @@ use crate::{
     engine::{
         engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
         strat_engine::names::KeyDescription,
-        types::{CreateAction, DeleteAction, KeySerial, SizedKeyMemory},
+        types::{DeleteAction, KeySerial, MappingCreateAction, SizedKeyMemory},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -189,27 +189,27 @@ fn set_key(
 /// Perform an idempotent add of the given key data with the given key description.
 ///
 /// Successful return values:
-/// * `Ok(CreateAction::Identity)`: The key was already in the keyring with the
+/// * `Ok(MappingCreateAction::Identity)`: The key was already in the keyring with the
 /// appropriate key description and key data.
-/// * `Ok(CreateAction::Created(false)`: The key was newly added to the keyring.
-/// * `Ok(CreateAction::Created(true)`: The key description was already present
+/// * `Ok(MappingCreateAction::Created(()))`: The key was newly added to the keyring.
+/// * `Ok(MappingCreateAction::Changed)`: The key description was already present
 /// in the keyring but the key data was updated.
 fn set_key_idem(
     key_desc: &KeyDescription,
     key_data: SizedKeyMemory,
-) -> StratisResult<CreateAction<bool>> {
+) -> StratisResult<MappingCreateAction<()>> {
     match read_key(key_desc) {
         Ok((Some((key_id, old_key_data)), _)) => {
             let changed = reset_key(key_id, old_key_data, key_data)?;
             if changed {
-                Ok(CreateAction::Created(true))
+                Ok(MappingCreateAction::ValueChanged)
             } else {
-                Ok(CreateAction::Identity)
+                Ok(MappingCreateAction::Identity)
             }
         }
         Ok((None, keyring_id)) => {
             set_key(key_desc, key_data, keyring_id)?;
-            Ok(CreateAction::Created(false))
+            Ok(MappingCreateAction::Created(()))
         }
         Err(e) => Err(e),
     }
@@ -361,7 +361,7 @@ impl StratKeyActions {
         &mut self,
         key_desc: &str,
         key: SizedKeyMemory,
-    ) -> StratisResult<CreateAction<bool>> {
+    ) -> StratisResult<MappingCreateAction<()>> {
         Ok(set_key_idem(
             &KeyDescription::from(key_desc.to_string()),
             key,
@@ -375,7 +375,7 @@ impl KeyActions for StratKeyActions {
         key_desc: &str,
         key_fd: RawFd,
         interactive: bool,
-    ) -> StratisResult<CreateAction<bool>> {
+    ) -> StratisResult<MappingCreateAction<()>> {
         let key_file = unsafe { File::from_raw_fd(key_fd) };
         let mut memory = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
         let mut pos = 0;

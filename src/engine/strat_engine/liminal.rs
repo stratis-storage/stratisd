@@ -604,11 +604,8 @@ impl LiminalDevices {
                     devices
                         .drain(..)
                         .map(|info| {
-                            let info: LStratisInfo = match info {
-                                DeviceInfo::Luks(_) => unreachable!(),
-                                DeviceInfo::Stratis(info) => info.into(),
-                            };
-                            (info.ids.identifiers.device_uuid, info)
+                            let info: LInfo = info.into();
+                            (info.stratis_identifiers().device_uuid, info)
                         })
                         .collect(),
                 )
@@ -617,24 +614,26 @@ impl LiminalDevices {
             .collect()
     }
 
-    /// Given a set of devices, try to set up a pool. If the setup fails,
-    /// insert the devices into errored_pool_devices. Otherwise, return the pool.
+    /// Given a set of devices, try to set up a pool.
+    /// Return the pool information if a pool is set up. Otherwise, distribute
+    /// the pool information to the appropriate data structure.
+    /// Do not attempt setup if the pool contains any unopened devices.
+    ///
     /// If there is a name conflict between the set of devices in devices
     /// and some existing pool, return an error.
     ///
     /// Precondition: pools.get_by_uuid(pool_uuid).is_none() &&
-    ///               self.errored_pool_devices.get(pool_uuid).is_none()
-    ///
-    /// Precondition: all devices have already been identified as Stratis
-    /// devices. Any encrypted devices have already been unlocked.
+    ///               self.errored_pool_devices.get(pool_uuid).is_none() &&
+    ///               self.hopeless_device_sets.get(pool_uuid).is_none()
     fn try_setup_pool(
         &mut self,
         pools: &Table<StratPool>,
         pool_uuid: PoolUuid,
-        mut infos: HashMap<DevUuid, LStratisInfo>,
+        mut infos: HashMap<DevUuid, LInfo>,
     ) -> Option<(Name, StratPool)> {
         assert!(pools.get_by_uuid(pool_uuid).is_none());
         assert!(self.errored_pool_devices.get(&pool_uuid).is_none());
+        assert!(self.hopeless_device_sets.get(&pool_uuid).is_none());
 
         // Setup a pool from constituent devices in the context of some already
         // setup pools.
@@ -712,6 +711,22 @@ impl LiminalDevices {
                 })
                 .map(Some)
         }
+
+        if infos.iter().any(|(_, info)| match info {
+            LInfo::Luks(_) => true,
+            LInfo::Stratis(_) => false,
+        }) {
+            self.errored_pool_devices.insert(pool_uuid, infos);
+            return None;
+        }
+
+        let mut infos = infos
+            .drain()
+            .map(|(pool_uuid, info)| match info {
+                LInfo::Luks(_) => unreachable!("otherwise, returned in line above"),
+                LInfo::Stratis(info) => (pool_uuid, info),
+            })
+            .collect();
 
         let result = setup_pool(pools, pool_uuid, &infos);
 
@@ -811,16 +826,6 @@ impl LiminalDevices {
                     }
                 }
 
-
-                if devices.iter().any(|(_, info)|
-                                      match info {
-                                          LInfo::Luks(_) => true,
-                                          LInfo::Stratis(_) => false
-                                      }) {
-                    self.errored_pool_devices.insert(pool_uuid, devices);
-                    return None;
-                }
-
                 // FIXME: An attempt to set up the pool is made, even if no
                 // new device has been added to the set of devices that appear
                 // to belong to the pool. The reason for this is that there
@@ -830,10 +835,7 @@ impl LiminalDevices {
                 // leave a pool that could be set up in limbo forever. An
                 // alternative, where the user can explicitly ask to try to
                 // set up an incomplete pool would be a better choice.
-                self.try_setup_pool(pools, pool_uuid, devices.drain().map(|(pool_uuid, info)| match info {
-                    LInfo::Luks(_) => unreachable!("otherwise, returned in line above"),
-                    LInfo::Stratis(info) => (pool_uuid, info),
-                }).collect()).map(|(name, pool)| (pool_uuid, name, pool))
+                self.try_setup_pool(pools, pool_uuid, devices).map(|(name, pool)| (pool_uuid, name, pool))
             }
         })
     }

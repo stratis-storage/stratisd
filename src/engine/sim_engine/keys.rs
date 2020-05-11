@@ -14,7 +14,7 @@ use libcryptsetup_rs::SafeMemHandle;
 use crate::{
     engine::{
         engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
-        types::{CreateAction, DeleteAction, KeySerial, SizedKeyMemory},
+        types::{DeleteAction, KeySerial, MappingCreateAction, SizedKeyMemory},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -34,7 +34,7 @@ impl KeyActions for SimKeyActions {
         key_desc: &str,
         key_fd: RawFd,
         interactive: bool,
-    ) -> StratisResult<CreateAction<bool>> {
+    ) -> StratisResult<MappingCreateAction<()>> {
         let key_file = unsafe { File::from_raw_fd(key_fd) };
         let new_key_data = &mut [0u8; MAX_STRATIS_PASS_SIZE];
         let mut pos = 0;
@@ -66,15 +66,15 @@ impl KeyActions for SimKeyActions {
         match self.read(key_desc) {
             Ok(Some((_, key_data))) => {
                 if key_data.as_ref() == new_key_data as &[u8] {
-                    Ok(CreateAction::Identity)
+                    Ok(MappingCreateAction::Identity)
                 } else {
                     self.0.insert(key_desc.to_string(), new_key_data.to_vec());
-                    Ok(CreateAction::Created(true))
+                    Ok(MappingCreateAction::ValueChanged)
                 }
             }
             Ok(None) => {
                 self.0.insert(key_desc.to_string(), new_key_data.to_vec());
-                Ok(CreateAction::Created(false))
+                Ok(MappingCreateAction::Created(()))
             }
             Err(e) => Err(e),
         }

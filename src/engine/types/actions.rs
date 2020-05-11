@@ -48,6 +48,33 @@ impl<T> EngineAction for CreateAction<T> {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+pub enum MappingCreateAction<T> {
+    Created(T),
+    Identity,
+    ValueChanged,
+}
+
+impl<T> EngineAction for MappingCreateAction<T> {
+    type Return = T;
+
+    fn is_changed(&self) -> bool {
+        if let MappingCreateAction::Created(_) = *self {
+            true
+        } else {
+            false
+        }
+    }
+
+    fn changed(self) -> Option<T> {
+        if let MappingCreateAction::Created(t) = self {
+            Some(t)
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
 /// An action which may create multiple things.
 pub struct SetCreateAction<T> {
     changed: Vec<T>,

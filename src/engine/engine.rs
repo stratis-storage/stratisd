@@ -17,8 +17,8 @@ use devicemapper::{Bytes, Sectors};
 use crate::{
     engine::types::{
         BlockDevPath, BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid, KeySerial,
-        MaybeDbusPath, Name, PoolUuid, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
-        SizedKeyMemory,
+        MappingCreateAction, MaybeDbusPath, Name, PoolUuid, RenameAction, ReportType,
+        SetCreateAction, SetDeleteAction, SizedKeyMemory,
     },
     stratis::StratisResult,
 };
@@ -36,17 +36,18 @@ pub trait KeyActions {
     /// by a newline.
     ///
     /// Successful return values:
-    /// * `Ok(CreateAction::Identity)`: The key was already in the keyring with the
-    /// appropriate key description and key data.
-    /// * `Ok(CreateAction::Created(false)`: The key was newly added to the keyring.
-    /// * `Ok(CreateAction::Created(true)`: The key description was already present
+    /// * `Ok(MappingCreateAction::Identity)`: The key was already in the keyring
+    /// with the appropriate key description and key data.
+    /// * `Ok(MappingCreateAction::Created(()))`: The key was newly added to the
+    /// keyring.
+    /// * `Ok(MappingCreateAction::Changed)`: The key description was already present
     /// in the keyring but the key data was updated.
     fn set(
         &mut self,
         key_desc: &str,
         key_fd: RawFd,
         interactive: bool,
-    ) -> StratisResult<CreateAction<bool>>;
+    ) -> StratisResult<MappingCreateAction<()>>;
 
     /// Return a list of all key descriptions of keys added to the keyring by
     /// Stratis that are still valid.

@@ -17,7 +17,7 @@ mod pool;
 mod serde_structs;
 mod thinpool;
 
-pub use self::{engine::StratEngine, keys::StratKeyActions};
+pub use self::engine::StratEngine;
 
 #[cfg(test)]
 mod tests;

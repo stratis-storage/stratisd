@@ -774,6 +774,48 @@ impl LiminalDevices {
         }
     }
 
+    /// Process a device for inclusion in a set of devices. Return false if
+    /// there is no point in proceeding because the set of devices has been
+    /// moved to a different category. Return true if processing should
+    /// continue.
+    fn process_info(&mut self, devices: &mut HashMap<DevUuid, LInfo>, info: LInfo) -> bool {
+        let stratis_identifiers = info.stratis_identifiers();
+        let device_uuid = stratis_identifiers.device_uuid;
+
+        match devices.remove(&device_uuid) {
+            None => {
+                info!(
+                    "{} discovered, i.e., identified for the first time during this execution of stratisd",
+                    info);
+                devices.insert(device_uuid, info);
+                true
+            }
+            Some(removed) => match combine_two_devices(removed, info) {
+                Err((err, removed, info)) => {
+                    let pool_uuid = stratis_identifiers.pool_uuid;
+                    warn!(
+                        "Moving set of devices that share pool UUID {} to hopeless designation: {}",
+                        pool_uuid.to_simple_ref(),
+                        err
+                    );
+
+                    let mut hopeless: HashSet<LInfo> =
+                        devices.drain().map(|(_, info)| info).collect();
+                    hopeless.insert(removed);
+                    hopeless.insert(info);
+
+                    self.hopeless_device_sets.insert(pool_uuid, hopeless);
+
+                    false
+                }
+                Ok(info) => {
+                    devices.insert(device_uuid, info);
+                    true
+                }
+            },
+        }
+    }
+
     /// Given some information gathered about a single Stratis device, determine
     /// whether or not a pool can be constructed, and if it can, construct the
     /// pool and return the newly constructed pool. If the device appears to
@@ -802,40 +844,8 @@ impl LiminalDevices {
                     .remove(&pool_uuid)
                     .unwrap_or_else(HashMap::new);
 
-                let device_uuid = info.stratis_identifiers().device_uuid;
-
-                match devices.remove(&device_uuid) {
-                    None => {
-                        info!(
-                            "{} discovered, i.e., identified for the first time during this execution of stratisd",
-                            info
-                        );
-                        devices.insert(device_uuid, info);
-                    }
-                    Some(removed) => {
-                        match combine_two_devices(removed, info) {
-                            Err((err, removed, info)) => {
-                                warn!(
-                                    "Moving set of devices that share pool UUID {} to hopeless designation: {}",
-                                    pool_uuid.to_simple_ref(),
-                                    err);
-
-                                let mut hopeless: HashSet<LInfo> = devices
-                                    .drain()
-                                    .map(|(_, info)| info)
-                                    .collect();
-                                hopeless.insert(removed);
-                                hopeless.insert(info);
-
-                                self.hopeless_device_sets.insert(pool_uuid, hopeless);
-
-                                return None;
-                            }
-                            Ok(info) => {
-                                devices.insert(device_uuid, info);
-                            }
-                        }
-                    }
+                if !self.process_info(&mut devices, info) {
+                    return None;
                 }
 
                 // FIXME: An attempt to set up the pool is made, even if no
@@ -847,7 +857,8 @@ impl LiminalDevices {
                 // leave a pool that could be set up in limbo forever. An
                 // alternative, where the user can explicitly ask to try to
                 // set up an incomplete pool would be a better choice.
-                self.try_setup_pool(pools, pool_uuid, devices).map(|(name, pool)| (pool_uuid, name, pool))
+                self.try_setup_pool(pools, pool_uuid, devices)
+                    .map(|(name, pool)| (pool_uuid, name, pool))
             }
         })
     }

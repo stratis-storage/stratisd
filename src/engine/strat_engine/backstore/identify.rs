@@ -50,7 +50,7 @@ use devicemapper::Device;
 use crate::engine::{
     strat_engine::backstore::{
         metadata::{device_identifiers, StratisIdentifiers},
-        udev::{block_enumerator, decide_ownership, UdevOwnership},
+        udev::{block_enumerator, decide_ownership, UdevOwnership, FS_TYPE_KEY, STRATIS_FS_TYPE},
     },
     types::{DevUuid, PoolUuid},
 };
@@ -157,7 +157,7 @@ fn find_all_stratis_devices(
 ) -> libudev::Result<HashMap<PoolUuid, HashMap<Device, (DevUuid, PathBuf)>>> {
     let context = libudev::Context::new()?;
     let mut enumerator = block_enumerator(&context)?;
-    enumerator.match_property("ID_FS_TYPE", "stratis")?;
+    enumerator.match_property(FS_TYPE_KEY, STRATIS_FS_TYPE)?;
 
     let pool_map = enumerator
         .scan_devices()?

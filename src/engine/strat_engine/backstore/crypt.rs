@@ -227,14 +227,14 @@ impl CryptInitializer {
         let key_option = log_on_failure!(
             read_key(key_description),
             "Failed to read key with key description {} from keyring",
-            key_description
+            key_description.to_system_string()
         );
         let key = if let Some(key) = key_option {
             key
         } else {
             return Err(LibcryptErr::Other(format!(
                 "Key with key description {} was not found in the kernel keyring",
-                key_description,
+                key_description.to_system_string(),
             )));
         };
 
@@ -252,7 +252,7 @@ impl CryptInitializer {
         log_on_failure!(
             device
                 .token_handle()
-                .luks2_keyring_set(Some(LUKS2_TOKEN_ID), &key_description.to_string()),
+                .luks2_keyring_set(Some(LUKS2_TOKEN_ID), &key_description.to_system_string()),
             "Failed to initialize the LUKS2 token for driving keyring activation operations"
         );
         log_on_failure!(
@@ -293,7 +293,7 @@ impl CryptInitializer {
                 device,
                 self.physical_path,
                 self.identifiers,
-                key_description.to_string(),
+                key_description.to_system_string(),
                 format_crypt_name(&dev_uuid),
             )),
             Err(e) => {
@@ -819,7 +819,7 @@ fn read_key(key_description: &KeyDescription) -> Result<Option<SizedKeyMemory>> 
         warn!(
             "Failed to read the key with key description {} from the keyring; \
             encryption cannot continue",
-            key_description
+            key_description.to_system_string(),
         );
     }
     read_key_result

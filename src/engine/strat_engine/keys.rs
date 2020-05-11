@@ -55,7 +55,7 @@ fn search_key(
     keyring_id: KeySerial,
     key_desc: &KeyDescription,
 ) -> StratisResult<Option<KeySerial>> {
-    let key_desc_cstring = CString::new(key_desc.to_string()).map_err(|_| {
+    let key_desc_cstring = CString::new(key_desc.to_system_string()).map_err(|_| {
         StratisError::Engine(
             ErrorEnum::Invalid,
             "Invalid key description provided".to_string(),
@@ -155,14 +155,14 @@ fn reset_key(
     }
 }
 
-/// Add the key to the given keyring under with the provided key description.
+/// Add the key to the given keyring attaching it to the provided key description.
 // Precondition: The key description was not already present.
 fn set_key(
     key_desc: &KeyDescription,
     key_data: SizedKeyMemory,
     keyring_id: KeySerial,
 ) -> StratisResult<()> {
-    let key_desc_cstring = CString::new(key_desc.to_string()).map_err(|_| {
+    let key_desc_cstring = CString::new(key_desc.to_system_string()).map_err(|_| {
         StratisError::Engine(
             ErrorEnum::Invalid,
             "Invalid key description provided".to_string(),
@@ -352,6 +352,11 @@ pub struct StratKeyActions;
 
 #[cfg(test)]
 impl StratKeyActions {
+    /// Method used in testing to bypass the need to provide a file descriptor
+    /// when setting the key. This method allows passing memory to the engine API
+    /// for adding keys and removes the need for a backing file or interactive entry
+    /// of the key. This method is only useful for testing stratisd internally. It
+    /// is not useful for testing using D-Bus.
     pub fn set_no_fd(
         &mut self,
         key_desc: &str,

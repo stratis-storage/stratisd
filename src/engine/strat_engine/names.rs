@@ -51,11 +51,14 @@ impl KeyDescription {
     pub fn as_application_str(&self) -> &str {
         &self.0
     }
-}
 
-impl Display for KeyDescription {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}{}", key_description_prefix(), self.0)
+    /// Return the key description as it will be registered on the system,
+    /// not as it will be displayed in Stratis. The only difference between
+    /// this and the application representation is the addition of a prefix
+    /// that stratisd uses internally for keeping track of which keys belong
+    /// to Stratis.
+    pub fn to_system_string(&self) -> String {
+        format!("{}{}", key_description_prefix(), self.0)
     }
 }
 

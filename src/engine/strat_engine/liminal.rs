@@ -20,8 +20,8 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::{
-                identify_block_device, CryptHandle, DeviceInfo, LuksInfo, StratBlockDev,
-                StratisIdentifiers, StratisInfo, BDA,
+                identify_block_device, DeviceInfo, LuksInfo, StratBlockDev, StratisIdentifiers,
+                StratisInfo, BDA,
             },
             device::blkdev_size,
             devlinks::setup_pool_devlinks,
@@ -441,37 +441,6 @@ fn combine_two_devices(info_1: LInfo, info_2: LInfo) -> StratisResult<LInfo> {
         }
     }
 }
-/// Process each element in infos. If the info represents a LUKS device,
-/// activate the device. If there is an activation failure, log a warning.
-fn activate(infos: &HashMap<DevUuid, LInfo>) {
-    for (_, info) in infos.iter() {
-        if let LInfo::Luks(luks_info) = info {
-            let handle = CryptHandle::setup(&luks_info.ids.devnode);
-            match handle {
-                Err(_) | Ok(None) => {
-                    warn!(
-                        "Expected device with {} to be a Stratis owned LUKS device but failed to read LUKS metadata for Stratis",
-                        luks_info
-                    );
-                }
-                Ok(Some(mut handle)) => {
-                    let path = handle.activate();
-                    match path {
-                        Err(err) => {
-                            warn!(
-                                "Could not activate Stratis device with {}: {}",
-                                luks_info, err
-                            );
-                        }
-                        Ok(_) => {
-                            info!("Activated LUKS device with {}", luks_info);
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 /// Info for a discovered Luks Device belonging to Stratis.
 #[derive(Debug, Eq, Hash, PartialEq)]
@@ -639,15 +608,6 @@ impl LiminalDevices {
             )
             .next()
             .is_none());
-    }
-
-    /// Activate all LUKS devices in device sets that look like they might
-    /// have a chance to become pools.
-    #[allow(dead_code)]
-    pub fn activate_all(&self) {
-        for (_, infos) in self.errored_pool_devices.iter() {
-            activate(infos);
-        }
     }
 
     /// This method is a temporary shim invoked from engine.

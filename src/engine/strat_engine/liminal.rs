@@ -604,19 +604,31 @@ impl LiminalDevices {
         let table = Table::default();
         all_devices
             .drain()
-            .filter_map(|(pool_uuid, mut devices)| {
-                self.try_setup_pool(
-                    &table,
-                    pool_uuid,
-                    devices
-                        .drain(..)
-                        .map(|info| {
-                            let info: LInfo = info.into();
-                            (info.stratis_identifiers().device_uuid, info)
-                        })
-                        .collect(),
-                )
-                .map(|(pool_name, pool)| (pool_name, pool_uuid, pool))
+            .filter_map(|(pool_uuid, mut infos)| {
+                let mut info_map = HashMap::new();
+                let mut continue_to_process = true;
+
+                while !infos.is_empty() && continue_to_process {
+                    let info: LInfo = infos.pop().expect("!infos.is_empty()").into();
+                    continue_to_process = self.process_info(&mut info_map, info);
+                }
+
+                if !infos.is_empty() {
+                    let hopeless = self
+                        .hopeless_device_sets
+                        .get_mut(&pool_uuid)
+                        .expect("must have been inserted by process_info() in previous loop");
+                    for info in infos.drain(..) {
+                        hopeless.insert(info.into());
+                    }
+                }
+
+                if !continue_to_process {
+                    return None;
+                }
+
+                self.try_setup_pool(&table, pool_uuid, info_map)
+                    .map(|(pool_name, pool)| (pool_name, pool_uuid, pool))
             })
             .collect()
     }

@@ -37,7 +37,7 @@ from stratisd_client_dbus import (
     Blockdev,
     ManagerR1,
     MOBlockDev,
-    MOPool,
+    MOPoolR1,
     ObjectManager,
     PoolR1,
     StratisdErrors,
@@ -110,14 +110,14 @@ def _get_pools(name=None):
     :param name: filter for pool name
     :type name: str or NoneType
     :return: list of pool information found
-    :rtype: list of (str * MOPool)
+    :rtype: list of (str * MOPoolR1)
     """
     managed_objects = ObjectManager.Methods.GetManagedObjects(
         get_object(TOP_OBJECT), {}
     )
 
     return [
-        (op, MOPool(info))
+        (op, MOPoolR1(info))
         for op, info in pools(props={} if name is None else {"Name": name}).search(
             managed_objects
         )

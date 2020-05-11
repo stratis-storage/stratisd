@@ -598,8 +598,18 @@ class UdevAdd(unittest.TestCase):
             (_, (_, device_object_paths)) = _create_pool(
                 random_string(5), devnodes, key_description=key_description
             )
-            self.assertEqual(len(_get_pools()), 1)
+
+            pool_list = _get_pools()
+            self.assertEqual(len(pool_list), 1)
+
+            _, this_pool = pool_list[0]
+            if key_description is None:
+                self.assertFalse(this_pool.Encrypted())
+            else:
+                self.assertTrue(this_pool.Encrypted())
+
             self.assertEqual(len(device_object_paths), len(devnodes))
+
             _wait_for_udev(_STRATIS_FS_TYPE, _get_devnodes(device_object_paths))
 
         with _ServiceContextManager():

@@ -579,6 +579,47 @@ class UdevAdd(unittest.TestCase):
         with _KernelKey("test_key") as key_description:
             self._single_pool(1, key_description=key_description)
 
+    def _simple_initial_discovery_test(self, *, key_description=None):
+        """
+        A simple test of discovery on start up.
+
+        * Create just one pool
+        * Stop the daemon
+        * Restart the daemon and verify that the pool is found
+        """
+        num_devices = 3
+        device_tokens = self._lb_mgr.create_devices(num_devices)
+        devnodes = self._lb_mgr.device_files(device_tokens)
+
+        _settle()
+
+        with _ServiceContextManager():
+            self.assertEqual(len(_get_pools()), 0)
+            (_, (_, device_object_paths)) = _create_pool(
+                random_string(5), devnodes, key_description=key_description
+            )
+            self.assertEqual(len(_get_pools()), 1)
+            self.assertEqual(len(device_object_paths), len(devnodes))
+            _wait_for_udev(_STRATIS_FS_TYPE, _get_devnodes(device_object_paths))
+
+        with _ServiceContextManager():
+            self.assertEqual(len(_get_pools()), 1)
+
+        _remove_stratis_dm_devices()
+
+    def test_encryption_simple_initial_discovery(self):
+        """
+        See documentation for _simple_initial_discovery_test.
+        """
+        with _KernelKey("test_key") as key_description:
+            self._simple_initial_discovery_test(key_description=key_description)
+
+    def test_simple_initial_discovery(self):
+        """
+        See documentation for _simple_initial_discovery_test.
+        """
+        self._simple_initial_discovery_test()
+
     def _simple_event_test(self, *, key_description=None):
         """
         A simple test of event-based discovery.

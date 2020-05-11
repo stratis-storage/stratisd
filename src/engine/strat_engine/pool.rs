@@ -616,17 +616,17 @@ mod tests {
     use std::{
         fs::OpenOptions,
         io::{BufWriter, Read, Write},
-        path::PathBuf,
     };
 
     use nix::mount::{mount, umount, MsFlags};
 
-    use devicemapper::{Bytes, Device, IEC, SECTOR_SIZE};
+    use devicemapper::{Bytes, IEC, SECTOR_SIZE};
 
     use crate::engine::{
         strat_engine::{
+            backstore::{StratisIdentifiers, StratisInfo},
             devlinks,
-            liminal::{convert_to_infos, get_bdas, get_blockdevs, get_metadata},
+            liminal::{get_bdas, get_blockdevs, get_metadata, LStratisInfo},
             tests::{loopbacked, real},
         },
         types::{EngineAction, PoolExtendState, PoolState, Redundancy},
@@ -664,32 +664,49 @@ mod tests {
 
         let metadata2 = pool2.record(name2);
 
-        let devnodes1: HashMap<Device, (DevUuid, PathBuf)> = pool1
+        let infos1: HashMap<DevUuid, LStratisInfo> = pool1
             .backstore
             .blockdevs()
             .iter()
             .map(|(device_uuid, blockdev)| {
                 (
-                    *blockdev.device(),
-                    (*device_uuid, blockdev.devnode().metadata_path().to_owned()),
+                    *device_uuid,
+                    LStratisInfo {
+                        ids: StratisInfo {
+                            identifiers: StratisIdentifiers {
+                                pool_uuid: uuid1,
+                                device_uuid: *device_uuid,
+                            },
+                            device_number: *blockdev.device(),
+                            devnode: blockdev.devnode().metadata_path().to_owned(),
+                        },
+                        luks: None,
+                    },
                 )
             })
             .collect();
 
-        let devnodes2: HashMap<Device, (DevUuid, PathBuf)> = pool2
+        let infos2: HashMap<DevUuid, LStratisInfo> = pool2
             .backstore
             .blockdevs()
             .iter()
             .map(|(device_uuid, blockdev)| {
                 (
-                    *blockdev.device(),
-                    (*device_uuid, blockdev.devnode().metadata_path().to_owned()),
+                    *device_uuid,
+                    LStratisInfo {
+                        ids: StratisInfo {
+                            identifiers: StratisIdentifiers {
+                                pool_uuid: uuid2,
+                                device_uuid: *device_uuid,
+                            },
+                            device_number: *blockdev.device(),
+                            devnode: blockdev.devnode().metadata_path().to_owned(),
+                        },
+                        luks: None,
+                    },
                 )
             })
             .collect();
-
-        let infos1 = convert_to_infos(uuid1, &devnodes1);
-        let infos2 = convert_to_infos(uuid2, &devnodes2);
 
         let bdas1 = get_bdas(&infos1).unwrap();
         let bdas2 = get_bdas(&infos2).unwrap();
@@ -817,19 +834,27 @@ mod tests {
 
         umount(tmp_dir.path()).unwrap();
 
-        let devices: HashMap<Device, (DevUuid, PathBuf)> = pool
+        let infos: HashMap<DevUuid, LStratisInfo> = pool
             .backstore
             .blockdevs()
             .iter()
             .map(|(device_uuid, blockdev)| {
                 (
-                    *blockdev.device(),
-                    (*device_uuid, blockdev.devnode().metadata_path().to_owned()),
+                    *device_uuid,
+                    LStratisInfo {
+                        ids: StratisInfo {
+                            identifiers: StratisIdentifiers {
+                                pool_uuid: uuid,
+                                device_uuid: *device_uuid,
+                            },
+                            device_number: *blockdev.device(),
+                            devnode: blockdev.devnode().metadata_path().to_owned(),
+                        },
+                        luks: None,
+                    },
                 )
             })
             .collect();
-
-        let infos = convert_to_infos(uuid, &devices);
 
         pool.teardown().unwrap();
 

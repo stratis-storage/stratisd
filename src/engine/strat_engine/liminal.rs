@@ -8,13 +8,12 @@ use std::{
     collections::{HashMap, HashSet},
     fmt,
     fs::OpenOptions,
-    path::PathBuf,
 };
 
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 
-use devicemapper::{Device, Sectors};
+use devicemapper::Sectors;
 
 use crate::{
     engine::{
@@ -33,31 +32,6 @@ use crate::{
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
-
-pub fn convert_to_infos(
-    pool_uuid: PoolUuid,
-    devnodes: &HashMap<Device, (DevUuid, PathBuf)>,
-) -> HashMap<DevUuid, LStratisInfo> {
-    devnodes
-        .iter()
-        .map(|(n, (u, d))| {
-            (
-                *u,
-                LStratisInfo {
-                    ids: StratisInfo {
-                        identifiers: StratisIdentifiers {
-                            pool_uuid,
-                            device_uuid: *u,
-                        },
-                        device_number: *n,
-                        devnode: d.to_path_buf(),
-                    },
-                    luks: None,
-                },
-            )
-        })
-        .collect()
-}
 
 /// Given infos for each device, read and store the BDA.
 ///
@@ -618,14 +592,27 @@ impl LiminalDevices {
     /// sets.
     pub fn setup_pools(
         &mut self,
-        mut all_devices: HashMap<PoolUuid, HashMap<Device, (DevUuid, PathBuf)>>,
+        mut all_devices: HashMap<PoolUuid, Vec<DeviceInfo>>,
     ) -> Vec<(Name, PoolUuid, StratPool)> {
         let table = Table::default();
         all_devices
             .drain()
-            .filter_map(|(pool_uuid, devices)| {
-                self.try_setup_pool(&table, pool_uuid, convert_to_infos(pool_uuid, &devices))
-                    .map(|(pool_name, pool)| (pool_name, pool_uuid, pool))
+            .filter_map(|(pool_uuid, mut devices)| {
+                self.try_setup_pool(
+                    &table,
+                    pool_uuid,
+                    devices
+                        .drain(..)
+                        .map(|info| {
+                            let info: LStratisInfo = match info {
+                                DeviceInfo::Luks(_) => unreachable!(),
+                                DeviceInfo::Stratis(info) => info.into(),
+                            };
+                            (info.ids.identifiers.device_uuid, info)
+                        })
+                        .collect(),
+                )
+                .map(|(pool_name, pool)| (pool_name, pool_uuid, pool))
             })
             .collect()
     }

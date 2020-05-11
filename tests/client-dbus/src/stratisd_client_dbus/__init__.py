@@ -25,6 +25,7 @@ from ._implementation import (
     ManagerR1,
     MOBlockDev,
     MOPool,
+    MOPoolR1,
     ObjectManager,
     Pool,
     PoolR1,

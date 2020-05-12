@@ -30,17 +30,10 @@ use nix::{
     },
     unistd::getpid,
 };
-use uuid::Uuid;
-
-#[cfg(feature = "dbus_enabled")]
-use libstratis::{
-    dbus_api::{DbusConnectionData, EventHandler},
-    engine::get_engine_listener_list_mut,
-};
 
 use libstratis::{
-    engine::{Engine, Pool, SimEngine, StratEngine},
-    stratis::{buff_log, StratisError, StratisResult, VERSION},
+    engine::{Engine, SimEngine, StratEngine},
+    stratis::{buff_log, MaybeDbusSupport, StratisError, StratisResult, VERSION},
 };
 
 const STRATISD_PID_PATH: &str = "/run/stratisd.pid";
@@ -125,106 +118,6 @@ fn trylock_pid_file() -> StratisResult<File> {
                 pid_str
             )))
         }
-    }
-}
-
-// Conditionally compiled support for a D-Bus interface.
-struct MaybeDbusSupport {
-    #[cfg(feature = "dbus_enabled")]
-    handle: Option<libstratis::dbus_api::DbusConnectionData>,
-}
-
-// If D-Bus compiled out, do very little.
-#[cfg(not(feature = "dbus_enabled"))]
-impl MaybeDbusSupport {
-    fn new() -> MaybeDbusSupport {
-        MaybeDbusSupport {}
-    }
-
-    fn process(
-        &mut self,
-        _engine: &Rc<RefCell<dyn Engine>>,
-        _fds: &mut Vec<libc::pollfd>,
-        _dbus_client_index_start: usize,
-    ) {
-    }
-
-    fn register_pool(&mut self, _pool_uuid: Uuid, _pool: &mut dyn Pool) {}
-
-    fn poll_timeout(&self) -> i32 {
-        // Non-DBus timeout is infinite
-        -1
-    }
-}
-
-#[cfg(feature = "dbus_enabled")]
-impl MaybeDbusSupport {
-    fn new() -> MaybeDbusSupport {
-        MaybeDbusSupport { handle: None }
-    }
-
-    /// Connect to D-Bus and register pools, if not already connected.
-    /// Return the connection, if made or already existing, otherwise, None.
-    fn setup_connection(
-        &mut self,
-        engine: &Rc<RefCell<dyn Engine>>,
-    ) -> Option<&mut DbusConnectionData> {
-        if self.handle.is_none() {
-            match libstratis::dbus_api::DbusConnectionData::connect(Rc::clone(engine)) {
-                Err(err) => {
-                    warn!("D-Bus API is not available: {}", err);
-                }
-                Ok(mut handle) => {
-                    info!("D-Bus API is available");
-                    let event_handler = Box::new(EventHandler::new(Rc::clone(&handle.connection)));
-                    get_engine_listener_list_mut().register_listener(event_handler);
-                    // Register all the pools with dbus
-                    for (_, pool_uuid, pool) in engine.borrow_mut().pools_mut() {
-                        handle.register_pool(pool_uuid, pool)
-                    }
-                    self.handle = Some(handle);
-                }
-            }
-        };
-        self.handle.as_mut()
-    }
-
-    /// Handle any client dbus requests.
-    fn process(
-        &mut self,
-        engine: &Rc<RefCell<dyn Engine>>,
-        fds: &mut Vec<libc::pollfd>,
-        dbus_client_index_start: usize,
-    ) {
-        if let Some(handle) = self.setup_connection(engine) {
-            handle.handle(&fds[dbus_client_index_start..]);
-
-            // Refresh list of dbus fds to poll for. This can change as
-            // D-Bus clients come and go.
-            fds.truncate(dbus_client_index_start);
-            fds.extend(
-                handle
-                    .connection
-                    .borrow()
-                    .watch_fds()
-                    .iter()
-                    .map(|w| w.to_pollfd()),
-            );
-        }
-    }
-
-    fn register_pool(&mut self, pool_uuid: Uuid, pool: &mut dyn Pool) {
-        if let Some(h) = self.handle.as_mut() {
-            h.register_pool(pool_uuid, pool)
-        }
-    }
-
-    fn poll_timeout(&self) -> i32 {
-        // If there is no D-Bus connection set timeout to 1 sec (1000 ms), so
-        // that stratisd can periodically attempt to set up a connection.
-        // If the connection is up, set the timeout to infinite; there is no
-        // need to poll as events will be received.
-        self.handle.as_ref().map_or(1000, |_| -1)
     }
 }
 

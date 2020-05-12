@@ -52,7 +52,10 @@ use crate::engine::{
     strat_engine::backstore::{
         crypt::CryptHandle,
         metadata::{device_identifiers, StratisIdentifiers},
-        udev::{block_enumerator, decide_ownership, UdevOwnership, FS_TYPE_KEY, STRATIS_FS_TYPE},
+        udev::{
+            block_enumerator, decide_ownership, UdevOwnership, CRYPTO_FS_TYPE, FS_TYPE_KEY,
+            STRATIS_FS_TYPE,
+        },
     },
     types::{KeyDescription, PoolUuid},
 };
@@ -112,15 +115,6 @@ impl fmt::Display for DeviceInfo {
         match self {
             DeviceInfo::Luks(info) => write!(f, "LUKS device description: {}", info),
             DeviceInfo::Stratis(info) => write!(f, "Stratis device description: {}", info),
-        }
-    }
-}
-
-impl DeviceInfo {
-    fn stratis_identifiers(&self) -> StratisIdentifiers {
-        match self {
-            DeviceInfo::Luks(info) => info.info.identifiers,
-            DeviceInfo::Stratis(info) => info.identifiers,
         }
     }
 }
@@ -251,22 +245,74 @@ fn process_stratis_device(dev: &libudev::Device) -> Option<StratisInfo> {
     }
 }
 
+// Find all devices identified by udev and cryptsetup as LUKS devices
+// belonging to Stratis.
+fn find_all_luks_devices() -> libudev::Result<HashMap<PoolUuid, Vec<LuksInfo>>> {
+    let context = libudev::Context::new()?;
+    let mut enumerator = block_enumerator(&context)?;
+    enumerator.match_property(FS_TYPE_KEY, CRYPTO_FS_TYPE)?;
+
+    let pool_map = enumerator
+        .scan_devices()?
+        .filter_map(|dev| identify_luks_device(&dev))
+        .fold(HashMap::new(), |mut acc, info| {
+            acc.entry(info.info.identifiers.pool_uuid)
+                .or_insert_with(Vec::new)
+                .push(info);
+            acc
+        });
+    Ok(pool_map)
+}
 // Find all devices identified by udev as Stratis devices.
-fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, Vec<DeviceInfo>>> {
+fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, Vec<StratisInfo>>> {
     let context = libudev::Context::new()?;
     let mut enumerator = block_enumerator(&context)?;
     enumerator.match_property(FS_TYPE_KEY, STRATIS_FS_TYPE)?;
 
     let pool_map = enumerator
         .scan_devices()?
-        .filter_map(|dev| identify_stratis_device(&dev).map(DeviceInfo::Stratis))
+        .filter_map(|dev| identify_stratis_device(&dev))
         .fold(HashMap::new(), |mut acc, info| {
-            acc.entry(info.stratis_identifiers().pool_uuid)
+            acc.entry(info.identifiers.pool_uuid)
                 .or_insert_with(Vec::new)
                 .push(info);
             acc
         });
     Ok(pool_map)
+}
+
+// Identify a device that udev enumeration has already picked up as a LUKS
+// device. Return None if the device does not, after all, appear to be a LUKS
+// device belonging to Stratis. Log anything unusual at an appropriate level.
+fn identify_luks_device(dev: &libudev::Device) -> Option<LuksInfo> {
+    let initialized = dev.is_initialized();
+    if !initialized {
+        warn!("Found a udev entry for a device identified as a Stratis device, but udev also identified it as uninitialized, disregarding the device");
+        return None;
+    };
+
+    match decide_ownership(dev) {
+        Err(err) => {
+            warn!("Could not determine ownership of a block device identified as a LUKS device by udev, disregarding the device: {}",
+                  err);
+            None
+        }
+        Ok(ownership) => match ownership {
+            UdevOwnership::Luks => process_luks_device(dev),
+            UdevOwnership::MultipathMember => None,
+            _ => {
+                warn!("udev enumeration identified this device as a LUKS block device but on further examination udev identifies it as a {}",
+                      ownership);
+                None
+            }
+        },
+    }
+    .map(|info| {
+        info!("LUKS block device belonging to Stratis with {} discovered during initial search",
+              info,
+        );
+        info
+    })
 }
 
 // Identify a device that udev enumeration has already picked up as a Stratis
@@ -348,9 +394,14 @@ pub fn identify_block_device(dev: &libudev::Device) -> Option<DeviceInfo> {
 /// enumerator.
 ///
 /// Returns a map of pool uuids to a map of devices to devnodes for each pool.
-pub fn find_all() -> libudev::Result<HashMap<PoolUuid, Vec<DeviceInfo>>> {
+#[allow(clippy::type_complexity)]
+pub fn find_all() -> libudev::Result<(
+    HashMap<PoolUuid, Vec<LuksInfo>>,
+    HashMap<PoolUuid, Vec<StratisInfo>>,
+)> {
     info!("Beginning initial search for Stratis block devices");
-    find_all_stratis_devices()
+    find_all_luks_devices()
+        .and_then(|luks| find_all_stratis_devices().and_then(|stratis| Ok((luks, stratis))))
 }
 
 #[cfg(test)]

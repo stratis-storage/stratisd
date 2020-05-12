@@ -591,7 +591,7 @@ impl LiminalDevices {
             .is_none());
     }
 
-    /// Take a map of pool UUIDs to sets of devices and return a list of
+    /// Take maps of pool UUIDs to sets of devices and return a list of
     /// information about created pools.
     ///
     /// Precondition: No pools have yet been set up, i.e., it is unnecessary
@@ -599,27 +599,54 @@ impl LiminalDevices {
     /// sets.
     pub fn setup_pools(
         &mut self,
-        mut all_devices: HashMap<PoolUuid, Vec<DeviceInfo>>,
+        all_devices: (
+            HashMap<PoolUuid, Vec<LuksInfo>>,
+            HashMap<PoolUuid, Vec<StratisInfo>>,
+        ),
     ) -> Vec<(Name, PoolUuid, StratPool)> {
         let table = Table::default();
-        all_devices
-            .drain()
-            .filter_map(|(pool_uuid, mut infos)| {
+        let (mut luks_devices, mut stratis_devices) = all_devices;
+
+        let pool_uuids: HashSet<PoolUuid> = luks_devices
+            .keys()
+            .cloned()
+            .collect::<HashSet<PoolUuid>>()
+            .union(&stratis_devices.keys().cloned().collect())
+            .cloned()
+            .collect();
+
+        pool_uuids
+            .iter()
+            .filter_map(|pool_uuid| {
                 let mut info_map = HashMap::new();
+                let luks_infos = luks_devices.remove(pool_uuid);
+                let stratis_infos = stratis_devices.remove(pool_uuid);
+                let mut infos: Vec<LInfo> = stratis_infos
+                    .unwrap_or_else(Vec::new)
+                    .drain(..)
+                    .map(|info| LInfo::Stratis(info.into()))
+                    .chain(
+                        luks_infos
+                            .unwrap_or_else(Vec::new)
+                            .drain(..)
+                            .map(|info| LInfo::Luks(info.into())),
+                    )
+                    .collect();
+
                 let mut continue_to_process = true;
 
                 while !infos.is_empty() && continue_to_process {
-                    let info: LInfo = infos.pop().expect("!infos.is_empty()").into();
+                    let info: LInfo = infos.pop().expect("!infos.is_empty()");
                     continue_to_process = self.process_info(&mut info_map, info);
                 }
 
                 if !infos.is_empty() {
                     let hopeless = self
                         .hopeless_device_sets
-                        .get_mut(&pool_uuid)
+                        .get_mut(pool_uuid)
                         .expect("must have been inserted by process_info() in previous loop");
                     for info in infos.drain(..) {
-                        hopeless.insert(info.into());
+                        hopeless.insert(info);
                     }
                 }
 
@@ -627,10 +654,10 @@ impl LiminalDevices {
                     return None;
                 }
 
-                self.try_setup_pool(&table, pool_uuid, info_map)
-                    .map(|(pool_name, pool)| (pool_name, pool_uuid, pool))
+                self.try_setup_pool(&table, *pool_uuid, info_map)
+                    .map(|(pool_name, pool)| (pool_name, *pool_uuid, pool))
             })
-            .collect()
+            .collect::<Vec<(Name, PoolUuid, StratPool)>>()
     }
 
     /// Given a set of devices, try to set up a pool.

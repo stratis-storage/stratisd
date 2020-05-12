@@ -12,7 +12,7 @@ use std::{
     env,
     fs::{File, OpenOptions},
     io::{Read, Write},
-    os::unix::io::{AsRawFd, RawFd},
+    os::unix::io::AsRawFd,
     process::exit,
     rc::Rc,
 };
@@ -33,7 +33,7 @@ use nix::{
 
 use libstratis::{
     engine::{Engine, SimEngine, StratEngine},
-    stratis::{buff_log, MaybeDbusSupport, StratisError, StratisResult, VERSION},
+    stratis::{buff_log, MaybeDbusSupport, StratisError, StratisResult, UdevMonitor, VERSION},
 };
 
 const STRATISD_PID_PATH: &str = "/run/stratisd.pid";
@@ -117,38 +117,6 @@ fn trylock_pid_file() -> StratisResult<File> {
                 "Daemon already running with pid: {}",
                 pid_str
             )))
-        }
-    }
-}
-
-// A facility for listening for and handling udev events that stratisd
-// considers interesting.
-struct UdevMonitor<'a> {
-    socket: libudev::MonitorSocket<'a>,
-}
-
-impl<'a> UdevMonitor<'a> {
-    fn create(context: &'a libudev::Context) -> StratisResult<UdevMonitor<'a>> {
-        let mut monitor = libudev::Monitor::new(context)?;
-        monitor.match_subsystem("block")?;
-
-        Ok(UdevMonitor {
-            socket: monitor.listen()?,
-        })
-    }
-
-    fn as_raw_fd(&mut self) -> RawFd {
-        self.socket.as_raw_fd()
-    }
-
-    /// Handle udev events.
-    /// Check if a pool can be constructed and update engine and D-Bus layer
-    /// data structures if so.
-    fn handle_events(&mut self, engine: &mut dyn Engine, dbus_support: &mut MaybeDbusSupport) {
-        while let Some(event) = self.socket.receive_event() {
-            if let Some((pool_uuid, pool)) = engine.handle_event(&event) {
-                dbus_support.register_pool(pool_uuid, pool);
-            }
         }
     }
 }

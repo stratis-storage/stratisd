@@ -746,6 +746,43 @@ impl LiminalDevices {
                 Ok((datadevs, cachedevs)) => (datadevs, cachedevs),
             };
 
+            let num_with_luks = datadevs
+                .iter()
+                .filter_map(|sbd| sbd.key_description())
+                .count();
+
+            if num_with_luks != 0 && num_with_luks != datadevs.len() {
+                // NOTE: This is not actually a hopeless situation. It may be
+                // that a LUKS device owned by Stratis corresponding to a
+                // Stratis device has just not been discovered yet. If it
+                // is, the appropriate info will be updated, and setup may
+                // yet succeed.
+                return Err(
+                    Destination::Errored(format!(
+                            "Some data devices in the set belonging to pool with UUID {} and name {} appear to be encrypted devices managed by Stratis, and some do not",
+                            pool_uuid.to_simple_ref(),
+                            &metadata.name)));
+            }
+
+            if num_with_luks != 0 {
+                let num_key_descriptions = datadevs
+                    .iter()
+                    .map(|sbd| {
+                        sbd.key_description()
+                            .expect("num_with_luks != 0 -> num_with_luks == datadevs.len()")
+                    })
+                    .collect::<HashSet<&KeyDescription>>()
+                    .iter()
+                    .count();
+                if num_key_descriptions != 1 {
+                    return Err(
+                        Destination::Hopeless(format!(
+                            "Data devices in the set belonging to pool with UUID {} and name {} do not agree on their key description",
+                            pool_uuid.to_simple_ref(),
+                            &metadata.name)));
+                }
+            }
+
             StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata, None)
                 .map_err(|err| {
                     Destination::Errored(

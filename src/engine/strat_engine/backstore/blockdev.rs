@@ -180,6 +180,10 @@ impl StratBlockDev {
     pub fn devnode(&self) -> &BlockDevPath {
         &self.devnode
     }
+
+    pub fn key_description(&self) -> Option<&KeyDescription> {
+        self.key_description.as_ref()
+    }
 }
 
 impl BlockDev for StratBlockDev {

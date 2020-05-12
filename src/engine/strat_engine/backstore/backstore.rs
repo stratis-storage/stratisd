@@ -948,17 +948,15 @@ mod tests {
                     .map(|(device_uuid, blockdev)| {
                         (
                             *device_uuid,
-                            LStratisInfo {
-                                ids: StratisInfo {
-                                    identifiers: StratisIdentifiers {
-                                        pool_uuid,
-                                        device_uuid: *device_uuid,
-                                    },
-                                    device_number: *blockdev.device(),
-                                    devnode: blockdev.devnode().metadata_path().to_owned(),
+                            StratisInfo {
+                                identifiers: StratisIdentifiers {
+                                    pool_uuid,
+                                    device_uuid: *device_uuid,
                                 },
-                                luks: None,
-                            },
+                                device_number: *blockdev.device(),
+                                devnode: blockdev.devnode().metadata_path().to_owned(),
+                            }
+                            .into(),
                         )
                     })
                     .collect(),

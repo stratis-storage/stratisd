@@ -7,11 +7,21 @@ use std::{ffi::OsStr, fmt, path::Path};
 
 use crate::stratis::{StratisError, StratisResult};
 
+/// Key for a udev property
+pub const FS_TYPE_KEY: &str = "ID_FS_TYPE";
+
+/// Possible values for the "ID_FS_TYPE" udev property
+pub const STRATIS_FS_TYPE: &str = "stratis";
+pub const CRYPTO_FS_TYPE: &str = "crypto_LUKS";
+
+/// Possible value for a udev subsystem designation
+pub const SUBSYSTEM_BLOCK: &str = "block";
+
 /// Make an enumerator for enumerating block devices. Return an error if there
 /// was any udev-related error.
 pub fn block_enumerator(context: &libudev::Context) -> libudev::Result<libudev::Enumerator> {
     let mut enumerator = libudev::Enumerator::new(context)?;
-    enumerator.match_subsystem("block")?;
+    enumerator.match_subsystem(SUBSYSTEM_BLOCK)?;
     Ok(enumerator)
 }
 
@@ -64,9 +74,9 @@ fn is_unclaimed(device: &libudev::Device) -> bool {
 /// Return true if the device is identified by udev as belonging to Stratis.
 /// Return an error if a udev property value could not be converted.
 fn is_stratis(device: &libudev::Device) -> StratisResult<bool> {
-    match get_udev_property(device, "ID_FS_TYPE") {
+    match get_udev_property(device, FS_TYPE_KEY) {
         None => Ok(false),
-        Some(Ok(value)) => Ok(value == "stratis"),
+        Some(Ok(value)) => Ok(value == STRATIS_FS_TYPE),
         Some(Err(err)) => Err(err),
     }
 }
@@ -74,9 +84,9 @@ fn is_stratis(device: &libudev::Device) -> StratisResult<bool> {
 /// Return true if the device is identified by udev as being an encrypted
 /// LUKS device. Return an error if a udev property could not be converted.
 fn is_luks(device: &libudev::Device) -> StratisResult<bool> {
-    match get_udev_property(device, "ID_FS_TYPE") {
+    match get_udev_property(device, FS_TYPE_KEY) {
         None => Ok(false),
-        Some(Ok(value)) => Ok(value == "crypto_LUKS"),
+        Some(Ok(value)) => Ok(value == CRYPTO_FS_TYPE),
         Some(Err(err)) => Err(err),
     }
 }

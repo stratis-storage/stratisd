@@ -407,21 +407,139 @@ pub fn find_all() -> libudev::Result<(
 #[cfg(test)]
 mod tests {
 
-    use std::collections::HashSet;
+    use std::{collections::HashSet, error::Error};
 
     use uuid::Uuid;
 
-    use crate::engine::strat_engine::{
-        backstore::{
-            devices::{initialize_devices, process_and_verify_devices},
-            metadata::MDADataSize,
-            udev::block_device_apply,
+    use crate::{
+        engine::strat_engine::{
+            backstore::{
+                devices::{initialize_devices, process_and_verify_devices},
+                metadata::MDADataSize,
+                udev::block_device_apply,
+            },
+            cmd::create_fs,
+            tests::{crypt, loopbacked, real},
         },
-        cmd::create_fs,
-        tests::{loopbacked, real},
+        stratis::StratisError,
     };
 
     use super::*;
+
+    /// Test that an encrypted device initialized by stratisd is properly
+    /// recognized.
+    ///
+    /// * Verify that the physical paths are recognized as LUKS devices
+    /// belonging to Stratis.
+    /// * Verify that the physical paths are not recognized as Stratis devices.
+    /// * Verify that the metadata paths are recognized as Stratis devices.
+    fn test_process_luks_device_initialized(paths: &[&Path]) {
+        assert!(!paths.is_empty());
+
+        fn luks_device_test(
+            paths: &[&Path],
+            key_description: &KeyDescription,
+            _: Option<()>,
+        ) -> Result<(), Box<dyn Error>> {
+            let pool_uuid = Uuid::new_v4();
+
+            let devices = initialize_devices(
+                process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?,
+                pool_uuid,
+                MDADataSize::default(),
+                Some(key_description),
+            )?;
+
+            for devnode in devices.iter().map(|sbd| sbd.devnode()) {
+                let info =
+                    block_device_apply(devnode.physical_path(), |dev| process_luks_device(dev))?
+                        .ok_or_else(|| {
+                            StratisError::Error(
+                                "No device with specified devnode found in udev database".into(),
+                            )
+                        })?
+                        .ok_or_else(|| {
+                            StratisError::Error(
+                                "No LUKS information for Stratis found on specified device".into(),
+                            )
+                        })?;
+
+                if info.info.identifiers.pool_uuid != pool_uuid
+                    || info.info.devnode != devnode.physical_path()
+                    || &info.key_description != key_description
+                {
+                    return Err(Box::new(StratisError::Error(
+                        "Wrong identifiers, devnode, and key description found for encrypted block device"
+                            .to_string(),
+                    )));
+                }
+
+                let info =
+                    block_device_apply(devnode.physical_path(), |dev| process_stratis_device(dev))?
+                        .ok_or_else(|| {
+                            StratisError::Error(
+                                "No device with specified devnode found in udev database".into(),
+                            )
+                        })?;
+                if info.is_some() {
+                    return Err(Box::new(StratisError::Error(
+                        "Encrypted block device was incorrectly identified as a Stratis device"
+                            .to_string(),
+                    )));
+                }
+
+                let info =
+                    block_device_apply(devnode.user_path(), |dev| process_stratis_device(dev))?
+                        .ok_or_else(|| {
+                            StratisError::Error(
+                                "No device with specified devnode found in udev database".into(),
+                            )
+                        })?
+                        .ok_or_else(|| {
+                            StratisError::Error(
+                                "No Stratis metadata found on specified device".into(),
+                            )
+                        })?;
+
+                if info.identifiers.pool_uuid != pool_uuid || info.devnode != devnode.user_path() {
+                    return Err(Box::new(StratisError::Error(format!(
+                        "Wrong identifiers and devnode found on Stratis block device: found: pool UUID: {}, device node; {} != expected: pool UUID: {}, device node: {}",
+                        info.identifiers.pool_uuid.to_simple_ref(),
+                        info.devnode.display(),
+                        pool_uuid,
+                        devnode.metadata_path().display()),
+                    )));
+                }
+            }
+            Ok(())
+        }
+
+        crypt::insert_and_cleanup_key(paths, luks_device_test);
+    }
+
+    #[test]
+    fn loop_test_process_luks_device_initialized() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(1, None),
+            test_process_luks_device_initialized,
+        );
+    }
+
+    #[test]
+    fn real_test_process_luks_device_initialized() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(1, None, None),
+            test_process_luks_device_initialized,
+        );
+    }
+
+    #[test]
+    fn travis_test_process_luks_device_initialized() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(1, None),
+            test_process_luks_device_initialized,
+        );
+    }
 
     /// Test that the process_*_device methods return the expected
     /// pool UUID and device node for initialized paths.

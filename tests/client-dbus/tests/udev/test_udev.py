@@ -252,7 +252,30 @@ class UdevTest3(UdevTest):
     daemon, brings it up again, and allows it to discover the existing pool.
     """
 
-    def _simple_initial_discovery_test(self, *, key_description=None):
+    def _simple_initial_discovery_test_shared(self, devnodes, *, key_description=None):
+        """
+        Code for testing initial discovery in both an encrypted and unencrypted
+        context.
+        """
+        self.assertEqual(len(_get_pools()), 0)
+        (_, (_, device_object_paths)) = _create_pool(
+            random_string(5), devnodes, key_description=key_description
+        )
+
+        pool_list = _get_pools()
+        self.assertEqual(len(pool_list), 1)
+
+        _, this_pool = pool_list[0]
+        if key_description is None:
+            self.assertFalse(this_pool.Encrypted())
+        else:
+            self.assertTrue(this_pool.Encrypted())
+
+        self.assertEqual(len(device_object_paths), len(devnodes))
+
+        _wait_for_udev(_STRATIS_FS_TYPE, _get_devnodes(device_object_paths))
+
+    def _simple_initial_discovery_test(self, *, key_data=None):
         """
         A simple test of discovery on start up.
 

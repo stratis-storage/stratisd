@@ -27,7 +27,6 @@ from stratisd_client_dbus import PoolR1, get_object
 
 from ._loopback import LoopBackDevices
 from ._utils import (
-    CRYPTO_LUKS_FS_TYPE,
     STRATIS_FS_TYPE,
     KernelKey,
     ServiceContextManager,
@@ -162,10 +161,10 @@ class UdevTest1(UdevTest):
 
 class UdevTest2(UdevTest):
     """
-    Exercise a single pool, either with or without encryption.
+    Exercise a single pool.
     """
 
-    def _single_pool(self, num_devices, *, key_description=None, num_hotplugs=0):
+    def _single_pool(self, num_devices, *, num_hotplugs=0):
         """
         Creates a single pool with specified number of devices.
 
@@ -183,8 +182,6 @@ class UdevTest2(UdevTest):
         no further effect, i.e., no additional pools suddenly appear.
 
         :param int num_devices: Number of devices to use for pool
-        :param key_description: the key description if encrypting the pool
-        :type key_description: str or NoneType
         :param int num_hotplugs: Number of synthetic udev "add" event per device
         :return: None
         """
@@ -195,9 +192,7 @@ class UdevTest2(UdevTest):
 
         with ServiceContextManager():
             self.assertEqual(len(get_pools()), 0)
-            (_, (_, device_object_paths)) = create_pool(
-                random_string(5), devnodes, key_description=key_description
-            )
+            (_, (_, device_object_paths)) = create_pool(random_string(5), devnodes)
             self.assertEqual(len(get_pools()), 1)
 
             self.assertEqual(len(device_object_paths), len(devnodes))
@@ -219,10 +214,7 @@ class UdevTest2(UdevTest):
 
             self._lb_mgr.hotplug(device_tokens)
 
-            wait_for_udev(
-                STRATIS_FS_TYPE if key_description is None else CRYPTO_LUKS_FS_TYPE,
-                devnodes,
-            )
+            wait_for_udev(STRATIS_FS_TYPE, devnodes)
 
             self.assertEqual(len(get_pools()), 1)
 
@@ -252,14 +244,6 @@ class UdevTest2(UdevTest):
         See documentation for _single_pool.
         """
         self._single_pool(1, num_hotplugs=1)
-
-    @unittest.expectedFailure
-    def test_encryption_single_pool(self):
-        """
-        See documentation for _single_pool.
-        """
-        with KernelKey("test_key") as key_description:
-            self._single_pool(1, key_description=key_description)
 
 
 class UdevTest3(UdevTest):
@@ -322,19 +306,16 @@ class UdevTest3(UdevTest):
 
 class UdevTest4(UdevTest):
     """
-    A test that verifies successful discovery of devices via udev events,
-    with or without encryption.
+    A test that verifies successful discovery of devices via udev events.
 
     A pool is created. Then the daemon is brought down and all Stratis
-    devicemapper devices are destroyed.
+    devicemapper devices are destroyed and the devices are unplugged.
 
-    Then the daemon is brought back up again. It must discover the existing
-    encrypted devices via their Stratis token information, activate those
-    devices using the appropriate key if encrypted, and then recreate the
-    pool.
+    Then the daemon is brought back up again. The devices are plugged back
+    in, and it is verified that the daemon has recreated the pool.
     """
 
-    def _simple_event_test(self, *, key_description=None):
+    def _simple_event_test(self):
         """
         A simple test of event-based discovery.
 
@@ -345,9 +326,6 @@ class UdevTest4(UdevTest):
         * Plug the devices in one by one. The pool should come up when the last
         device is plugged in.
         """
-        id_fs_type_param = (
-            STRATIS_FS_TYPE if key_description is None else CRYPTO_LUKS_FS_TYPE
-        )
         num_devices = 3
         device_tokens = self._lb_mgr.create_devices(num_devices)
         devnodes = self._lb_mgr.device_files(device_tokens)
@@ -356,16 +334,14 @@ class UdevTest4(UdevTest):
 
         with ServiceContextManager():
             self.assertEqual(len(get_pools()), 0)
-            (_, (_, device_object_paths)) = create_pool(
-                random_string(5), devnodes, key_description=key_description
-            )
+            (_, (_, device_object_paths)) = create_pool(random_string(5), devnodes)
             self.assertEqual(len(get_pools()), 1)
             self.assertEqual(len(device_object_paths), len(devnodes))
 
         remove_stratis_dm_devices()
 
         self._lb_mgr.unplug(device_tokens)
-        wait_for_udev(id_fs_type_param, [])
+        wait_for_udev(STRATIS_FS_TYPE, [])
 
         with ServiceContextManager():
             self.assertEqual(len(get_pools()), 0)
@@ -377,23 +353,15 @@ class UdevTest4(UdevTest):
             for index in indices[:-1]:
                 tokens_up.append(device_tokens[index])
                 self._lb_mgr.hotplug([tokens_up[-1]])
-                wait_for_udev(id_fs_type_param, self._lb_mgr.device_files(tokens_up))
+                wait_for_udev(STRATIS_FS_TYPE, self._lb_mgr.device_files(tokens_up))
                 self.assertEqual(len(get_pools()), 0)
 
             tokens_up.append(device_tokens[indices[-1]])
             self._lb_mgr.hotplug([tokens_up[-1]])
-            wait_for_udev(id_fs_type_param, self._lb_mgr.device_files(tokens_up))
+            wait_for_udev(STRATIS_FS_TYPE, self._lb_mgr.device_files(tokens_up))
             self.assertEqual(len(get_pools()), 1)
 
         remove_stratis_dm_devices()
-
-    @unittest.expectedFailure
-    def test_encryption_simple_event(self):
-        """
-        See documentation for _simple_event_test.
-        """
-        with KernelKey("test_key") as key_description:
-            self._simple_event_test(key_description=key_description)
 
     def test_simple_event(self):
         """

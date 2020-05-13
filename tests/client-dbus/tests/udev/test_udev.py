@@ -42,7 +42,7 @@ from ._utils import (
 )
 
 
-class UdevAdd(unittest.TestCase):
+class UdevTest(unittest.TestCase):
     """
     Test udev add event support.
     """
@@ -63,6 +63,12 @@ class UdevAdd(unittest.TestCase):
 
         remove_stratis_dm_devices()
         self._lb_mgr.destroy_all()
+
+
+class UdevTest1(UdevTest):
+    """
+    See description of test in _test_driver method.
+    """
 
     def _test_driver(self, number_of_pools, dev_count_pool):
         """
@@ -152,6 +158,12 @@ class UdevAdd(unittest.TestCase):
         See _test_driver for description.
         """
         self._test_driver(2, 4)
+
+
+class UdevTest2(UdevTest):
+    """
+    Exercise a single pool, either with or without encryption.
+    """
 
     def _single_pool(self, num_devices, *, key_description=None, num_hotplugs=0):
         """
@@ -249,6 +261,13 @@ class UdevAdd(unittest.TestCase):
         with KernelKey("test_key") as key_description:
             self._single_pool(1, key_description=key_description)
 
+
+class UdevTest3(UdevTest):
+    """
+    A very simple test that just creates a pool, and then brings down the
+    daemon, brings it up again, and allows it to discover the existing pool.
+    """
+
     def _simple_initial_discovery_test(self, *, key_description=None):
         """
         A simple test of discovery on start up.
@@ -299,6 +318,21 @@ class UdevAdd(unittest.TestCase):
         See documentation for _simple_initial_discovery_test.
         """
         self._simple_initial_discovery_test()
+
+
+class UdevTest4(UdevTest):
+    """
+    A test that verifies successful discovery of devices via udev events,
+    with or without encryption.
+
+    A pool is created. Then the daemon is brought down and all Stratis
+    devicemapper devices are destroyed.
+
+    Then the daemon is brought back up again. It must discover the existing
+    encrypted devices via their Stratis token information, activate those
+    devices using the appropriate key if encrypted, and then recreate the
+    pool.
+    """
 
     def _simple_event_test(self, *, key_description=None):
         """
@@ -366,6 +400,25 @@ class UdevAdd(unittest.TestCase):
         See documentation for _simple_event_test.
         """
         self._simple_event_test()
+
+
+class UdevTest5(UdevTest):
+    """
+    Test correct handling of pools with duplicate pool names.
+
+    This test creates multiple pools with the same name but different UUIDs.
+    It is possible to do this by repeatedly bringing up the daemon, creating
+    a pool, bringing the daemon down again, and then unplugging the devices
+    belonging to that pool. When the daemon comes up again, the previously
+    created pool is invisible, and so another of the same name can be created.
+
+    Next, the daemon is brought up and all the previously created devices
+    are made visible. Only one pool is set up, the others must all be placed
+    in the set of liminal devices, because they represent pools with the same
+    name. Then all existing pools are renamed. Then, all devices receive
+    synthetic events, which should cause another pool to be discovered, and
+    so forth. Eventually, all pools should have been set up.
+    """
 
     def test_duplicate_pool_name(self):
         """

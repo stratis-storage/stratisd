@@ -288,14 +288,14 @@ impl<'a> Into<Value> for &'a StratPool {
                 map.into_iter()
             } else {
                 unreachable!("ThinPool conversion returns a JSON object")
-            }
+            },
         );
         map.extend(
             if let Value::Object(map) = <&Backstore as Into<Value>>::into(&self.backstore) {
                 map.into_iter()
             } else {
                 unreachable!("Backstore conversion returns a JSON object")
-            }
+            },
         );
         Value::from(map)
     }

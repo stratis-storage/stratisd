@@ -19,12 +19,12 @@ Support for testing udev device discovery.
 import base64
 import os
 import random
-import shutil
 import signal
 import string
 import subprocess
 import sys
 import time
+from tempfile import NamedTemporaryFile
 
 # isort: THIRDPARTY
 import dbus
@@ -278,48 +278,55 @@ class KernelKey:  # pylint: disable=attribute-defined-outside-init
         """
         Initialize a key with the provided key data (passphrase).
         :param bytes key_data: The desired key contents
-        :raises RuntimeError: if the keyctl command is not found in $PATH
-                              or a keyctl command returns a non-zero exit code
         """
-        if shutil.which("keyctl") is None:
-            raise RuntimeError("Executable keyctl was not found in $PATH")
-
-        self.key_data = key_data
+        self._key_data = key_data
 
     def __enter__(self):
         """
         This method allows KernelKey to be used with the "with" keyword.
         :return: The key description that can be used to access the
                  provided key data in __init__.
-        :raises subprocess.CalledProcessError:
+        :raises RuntimeError: if setting the key in the keyring through stratisd
+                              fails
         """
         with open("/dev/urandom", "rb") as urandom_f:
-            key_desc = base64.b64encode(urandom_f.read(16)).decode("utf-8")
+            self._key_desc = base64.b64encode(urandom_f.read(16)).decode("utf-8")
 
-        args = ["keyctl", "get_persistent", "@s", "0"]
-        exit_values = subprocess.run(
-            args,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            universal_newlines=True,
-            check=True,
-        )
+        with NamedTemporaryFile(mode="w") as temp_file:
+            temp_file.write(self._key_data)
+            temp_file.flush()
 
-        self.persistent_id = exit_values.stdout.strip()
+            with open(temp_file.name, "r") as fd_for_dbus:
+                (_, return_code, message) = ManagerR1.Methods.SetKey(
+                    get_object(TOP_OBJECT),
+                    {
+                        "key_desc": self._key_desc,
+                        "key_fd": fd_for_dbus.fileno(),
+                        "interactive": False,
+                    },
+                )
 
-        args = ["keyctl", "add", "user", key_desc, self.key_data, self.persistent_id]
-        subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True)
+        if return_code != StratisdErrors.OK:
+            raise RuntimeError(
+                "Setting the key using stratisd failed with an error: %s" % message
+            )
 
-        return key_desc
+        return self._key_desc
 
     def __exit__(self, exception_type, exception_value, traceback):
+        message = None
         try:
-            args = ["keyctl", "clear", self.persistent_id]
-            subprocess.run(args, check=True)
+            (_, return_code, message) = ManagerR1.Methods.UnsetKey(
+                get_object(TOP_OBJECT), {"key_desc": self._key_desc}
+            )
 
-            args = ["keyctl", "clear", "@s"]
-            subprocess.run(args, check=True)
-        except (RuntimeError, subprocess.CalledProcessError) as rexc:
+            if return_code != StratisdErrors.OK:
+                raise RuntimeError(
+                    "Unsetting the key using stratisd failed with an error: %s"
+                    % message
+                )
+
+        except RuntimeError as rexc:
             if exception_value is None:
                 raise rexc
             raise rexc from exception_value

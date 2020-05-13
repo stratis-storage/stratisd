@@ -27,18 +27,18 @@ from stratisd_client_dbus import PoolR1, get_object
 
 from ._loopback import LoopBackDevices
 from ._utils import (
-    _CRYPTO_LUKS_FS_TYPE,
-    _STRATIS_FS_TYPE,
-    _create_pool,
-    _get_devnodes,
-    _get_pools,
-    _processes,
-    _KernelKey,
-    _remove_stratis_dm_devices,
-    _ServiceContextManager,
-    _settle,
-    _wait_for_udev,
+    CRYPTO_LUKS_FS_TYPE,
+    STRATIS_FS_TYPE,
+    KernelKey,
+    ServiceContextManager,
+    create_pool,
+    get_devnodes,
+    get_pools,
+    processes,
     random_string,
+    remove_stratis_dm_devices,
+    settle,
+    wait_for_udev,
 )
 
 
@@ -56,12 +56,12 @@ class UdevAdd(unittest.TestCase):
         Cleans up the test environment
         :return: None
         """
-        stratisds = list(_processes("stratisd"))
+        stratisds = list(processes("stratisd"))
         for process in stratisds:
             process.terminate()
         psutil.wait_procs(stratisds)
 
-        _remove_stratis_dm_devices()
+        remove_stratis_dm_devices()
         self._lb_mgr.destroy_all()
 
     def _test_driver(self, number_of_pools, dev_count_pool):
@@ -89,38 +89,38 @@ class UdevAdd(unittest.TestCase):
         """
 
         pool_data = {}
-        with _ServiceContextManager():
+        with ServiceContextManager():
             for _ in range(number_of_pools):
                 device_tokens = self._lb_mgr.create_devices(dev_count_pool)
 
-                _settle()
+                settle()
 
                 pool_name = random_string(5)
 
-                _create_pool(pool_name, self._lb_mgr.device_files(device_tokens))
+                create_pool(pool_name, self._lb_mgr.device_files(device_tokens))
                 pool_data[pool_name] = device_tokens
 
-        _remove_stratis_dm_devices()
+        remove_stratis_dm_devices()
 
         all_tokens = [
             dev for device_tokens in pool_data.values() for dev in device_tokens
         ]
         all_devnodes = self._lb_mgr.device_files(all_tokens)
 
-        _wait_for_udev(_STRATIS_FS_TYPE, all_devnodes)
+        wait_for_udev(STRATIS_FS_TYPE, all_devnodes)
 
-        with _ServiceContextManager():
-            self.assertEqual(len(_get_pools()), number_of_pools)
+        with ServiceContextManager():
+            self.assertEqual(len(get_pools()), number_of_pools)
 
-        _remove_stratis_dm_devices()
+        remove_stratis_dm_devices()
 
         self._lb_mgr.unplug(all_tokens)
 
-        _wait_for_udev(_STRATIS_FS_TYPE, [])
+        wait_for_udev(STRATIS_FS_TYPE, [])
 
         last_index = dev_count_pool - 1
-        with _ServiceContextManager():
-            self.assertEqual(len(_get_pools()), 0)
+        with ServiceContextManager():
+            self.assertEqual(len(get_pools()), 0)
 
             # Add all but the last device for each pool
             tokens_to_add = [
@@ -129,23 +129,23 @@ class UdevAdd(unittest.TestCase):
                 for tok in device_tokens[:last_index]
             ]
             self._lb_mgr.hotplug(tokens_to_add)
-            _wait_for_udev(_STRATIS_FS_TYPE, self._lb_mgr.device_files(tokens_to_add))
+            wait_for_udev(STRATIS_FS_TYPE, self._lb_mgr.device_files(tokens_to_add))
 
-            self.assertEqual(len(_get_pools()), 0)
+            self.assertEqual(len(get_pools()), 0)
 
             # Add the last device that makes each pool complete
             self._lb_mgr.hotplug(
                 [device_tokens[last_index] for device_tokens in pool_data.values()]
             )
 
-            _wait_for_udev(_STRATIS_FS_TYPE, all_devnodes)
+            wait_for_udev(STRATIS_FS_TYPE, all_devnodes)
 
-            self.assertEqual(len(_get_pools()), number_of_pools)
+            self.assertEqual(len(get_pools()), number_of_pools)
 
             for name in pool_data:
-                self.assertEqual(len(_get_pools(name)), 1)
+                self.assertEqual(len(get_pools(name)), 1)
 
-        _remove_stratis_dm_devices()
+        remove_stratis_dm_devices()
 
     def test_generic(self):
         """
@@ -179,49 +179,49 @@ class UdevAdd(unittest.TestCase):
         device_tokens = self._lb_mgr.create_devices(num_devices)
         devnodes = self._lb_mgr.device_files(device_tokens)
 
-        _settle()
+        settle()
 
-        with _ServiceContextManager():
-            self.assertEqual(len(_get_pools()), 0)
-            (_, (_, device_object_paths)) = _create_pool(
+        with ServiceContextManager():
+            self.assertEqual(len(get_pools()), 0)
+            (_, (_, device_object_paths)) = create_pool(
                 random_string(5), devnodes, key_description=key_description
             )
-            self.assertEqual(len(_get_pools()), 1)
+            self.assertEqual(len(get_pools()), 1)
 
             self.assertEqual(len(device_object_paths), len(devnodes))
-            _wait_for_udev(_STRATIS_FS_TYPE, _get_devnodes(device_object_paths))
+            wait_for_udev(STRATIS_FS_TYPE, get_devnodes(device_object_paths))
 
-        _remove_stratis_dm_devices()
+        remove_stratis_dm_devices()
 
-        with _ServiceContextManager():
-            self.assertEqual(len(_get_pools()), 1)
+        with ServiceContextManager():
+            self.assertEqual(len(get_pools()), 1)
 
-        _remove_stratis_dm_devices()
+        remove_stratis_dm_devices()
 
         self._lb_mgr.unplug(device_tokens)
 
-        _wait_for_udev(_STRATIS_FS_TYPE, [])
+        wait_for_udev(STRATIS_FS_TYPE, [])
 
-        with _ServiceContextManager():
-            self.assertEqual(len(_get_pools()), 0)
+        with ServiceContextManager():
+            self.assertEqual(len(get_pools()), 0)
 
             self._lb_mgr.hotplug(device_tokens)
 
-            _wait_for_udev(
-                _STRATIS_FS_TYPE if key_description is None else _CRYPTO_LUKS_FS_TYPE,
+            wait_for_udev(
+                STRATIS_FS_TYPE if key_description is None else CRYPTO_LUKS_FS_TYPE,
                 devnodes,
             )
 
-            self.assertEqual(len(_get_pools()), 1)
+            self.assertEqual(len(get_pools()), 1)
 
             for _ in range(num_hotplugs):
                 self._lb_mgr.generate_udev_add_events(device_tokens)
 
-            _settle()
+            settle()
 
-            self.assertEqual(len(_get_pools()), 1)
+            self.assertEqual(len(get_pools()), 1)
 
-        _remove_stratis_dm_devices()
+        remove_stratis_dm_devices()
 
     def test_simultaneous(self):
         """
@@ -246,7 +246,7 @@ class UdevAdd(unittest.TestCase):
         """
         See documentation for _single_pool.
         """
-        with _KernelKey("test_key") as key_description:
+        with KernelKey("test_key") as key_description:
             self._single_pool(1, key_description=key_description)
 
     def _simple_initial_discovery_test(self, *, key_description=None):
@@ -261,15 +261,15 @@ class UdevAdd(unittest.TestCase):
         device_tokens = self._lb_mgr.create_devices(num_devices)
         devnodes = self._lb_mgr.device_files(device_tokens)
 
-        _settle()
+        settle()
 
-        with _ServiceContextManager():
-            self.assertEqual(len(_get_pools()), 0)
-            (_, (_, device_object_paths)) = _create_pool(
+        with ServiceContextManager():
+            self.assertEqual(len(get_pools()), 0)
+            (_, (_, device_object_paths)) = create_pool(
                 random_string(5), devnodes, key_description=key_description
             )
 
-            pool_list = _get_pools()
+            pool_list = get_pools()
             self.assertEqual(len(pool_list), 1)
 
             _, this_pool = pool_list[0]
@@ -280,18 +280,18 @@ class UdevAdd(unittest.TestCase):
 
             self.assertEqual(len(device_object_paths), len(devnodes))
 
-            _wait_for_udev(_STRATIS_FS_TYPE, _get_devnodes(device_object_paths))
+            wait_for_udev(STRATIS_FS_TYPE, get_devnodes(device_object_paths))
 
-        with _ServiceContextManager():
-            self.assertEqual(len(_get_pools()), 1)
+        with ServiceContextManager():
+            self.assertEqual(len(get_pools()), 1)
 
-        _remove_stratis_dm_devices()
+        remove_stratis_dm_devices()
 
     def test_encryption_simple_initial_discovery(self):
         """
         See documentation for _simple_initial_discovery_test.
         """
-        with _KernelKey("test_key") as key_description:
+        with KernelKey("test_key") as key_description:
             self._simple_initial_discovery_test(key_description=key_description)
 
     def test_simple_initial_discovery(self):
@@ -312,29 +312,29 @@ class UdevAdd(unittest.TestCase):
         device is plugged in.
         """
         id_fs_type_param = (
-            _STRATIS_FS_TYPE if key_description is None else _CRYPTO_LUKS_FS_TYPE
+            STRATIS_FS_TYPE if key_description is None else CRYPTO_LUKS_FS_TYPE
         )
         num_devices = 3
         device_tokens = self._lb_mgr.create_devices(num_devices)
         devnodes = self._lb_mgr.device_files(device_tokens)
 
-        _settle()
+        settle()
 
-        with _ServiceContextManager():
-            self.assertEqual(len(_get_pools()), 0)
-            (_, (_, device_object_paths)) = _create_pool(
+        with ServiceContextManager():
+            self.assertEqual(len(get_pools()), 0)
+            (_, (_, device_object_paths)) = create_pool(
                 random_string(5), devnodes, key_description=key_description
             )
-            self.assertEqual(len(_get_pools()), 1)
+            self.assertEqual(len(get_pools()), 1)
             self.assertEqual(len(device_object_paths), len(devnodes))
 
-        _remove_stratis_dm_devices()
+        remove_stratis_dm_devices()
 
         self._lb_mgr.unplug(device_tokens)
-        _wait_for_udev(id_fs_type_param, [])
+        wait_for_udev(id_fs_type_param, [])
 
-        with _ServiceContextManager():
-            self.assertEqual(len(_get_pools()), 0)
+        with ServiceContextManager():
+            self.assertEqual(len(get_pools()), 0)
 
             indices = list(range(num_devices))
             random.shuffle(indices)
@@ -343,22 +343,22 @@ class UdevAdd(unittest.TestCase):
             for index in indices[:-1]:
                 tokens_up.append(device_tokens[index])
                 self._lb_mgr.hotplug([tokens_up[-1]])
-                _wait_for_udev(id_fs_type_param, self._lb_mgr.device_files(tokens_up))
-                self.assertEqual(len(_get_pools()), 0)
+                wait_for_udev(id_fs_type_param, self._lb_mgr.device_files(tokens_up))
+                self.assertEqual(len(get_pools()), 0)
 
             tokens_up.append(device_tokens[indices[-1]])
             self._lb_mgr.hotplug([tokens_up[-1]])
-            _wait_for_udev(id_fs_type_param, self._lb_mgr.device_files(tokens_up))
-            self.assertEqual(len(_get_pools()), 1)
+            wait_for_udev(id_fs_type_param, self._lb_mgr.device_files(tokens_up))
+            self.assertEqual(len(get_pools()), 1)
 
-        _remove_stratis_dm_devices()
+        remove_stratis_dm_devices()
 
     @unittest.expectedFailure
     def test_encryption_simple_event(self):
         """
         See documentation for _simple_event_test.
         """
-        with _KernelKey("test_key") as key_description:
+        with KernelKey("test_key") as key_description:
             self._simple_event_test(key_description=key_description)
 
     def test_simple_event(self):
@@ -379,39 +379,39 @@ class UdevAdd(unittest.TestCase):
         # Create some pools with duplicate names
         for i in range(num_pools):
             this_pool = self._lb_mgr.create_devices(i + 1)
-            _settle()
+            settle()
 
             pool_tokens.append(this_pool)
 
             devnodes = self._lb_mgr.device_files(this_pool)
-            with _ServiceContextManager():
-                _create_pool(pool_name, devnodes)
+            with ServiceContextManager():
+                create_pool(pool_name, devnodes)
 
-            _remove_stratis_dm_devices()
+            remove_stratis_dm_devices()
 
             self._lb_mgr.unplug(this_pool)
 
-            _wait_for_udev(_STRATIS_FS_TYPE, [])
+            wait_for_udev(STRATIS_FS_TYPE, [])
 
         all_tokens = [dev for sublist in pool_tokens for dev in sublist]
 
-        with _ServiceContextManager():
+        with ServiceContextManager():
             # Hot plug activate each pool in sequence and force a duplicate name
             # error.
             for i in range(num_pools):
                 self._lb_mgr.hotplug(pool_tokens[i])
 
-            _wait_for_udev(_STRATIS_FS_TYPE, self._lb_mgr.device_files(all_tokens))
+            wait_for_udev(STRATIS_FS_TYPE, self._lb_mgr.device_files(all_tokens))
 
             # The number of pools should never exceed one, since all the pools
             # previously formed in the test have the same name.
-            self.assertEqual(len(_get_pools()), 1)
+            self.assertEqual(len(get_pools()), 1)
 
             # Dynamically rename all active pools to a randomly chosen name,
             # then generate synthetic add events for every loopbacked device.
             # After num_pools - 1 iterations, all pools should have been set up.
             for _ in range(num_pools - 1):
-                current_pools = _get_pools()
+                current_pools = get_pools()
 
                 # Rename all active pools to a randomly selected new name
                 for object_path, _ in current_pools:
@@ -424,10 +424,10 @@ class UdevAdd(unittest.TestCase):
                     [dev for sublist in pool_tokens for dev in sublist]
                 )
 
-                _settle()
+                settle()
 
-                self.assertEqual(len(_get_pools()), len(current_pools) + 1)
+                self.assertEqual(len(get_pools()), len(current_pools) + 1)
 
-            self.assertEqual(len(_get_pools()), num_pools)
+            self.assertEqual(len(get_pools()), num_pools)
 
-        _remove_stratis_dm_devices()
+        remove_stratis_dm_devices()

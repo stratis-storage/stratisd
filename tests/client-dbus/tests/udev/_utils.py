@@ -35,11 +35,9 @@ import pyudev
 from stratisd_client_dbus import (
     Blockdev,
     ManagerR1,
-    MOBlockDev,
     MOPoolR1,
     ObjectManager,
     StratisdErrors,
-    blockdevs,
     get_object,
     pools,
 )
@@ -49,8 +47,8 @@ from ._dm import _get_stratis_devices, remove_stratis_setup
 
 _STRATISD = os.environ["STRATISD"]
 
-_CRYPTO_LUKS_FS_TYPE = "crypto_LUKS"
-_STRATIS_FS_TYPE = "stratis"
+CRYPTO_LUKS_FS_TYPE = "crypto_LUKS"
+STRATIS_FS_TYPE = "stratis"
 
 
 def random_string(length):
@@ -64,7 +62,7 @@ def random_string(length):
     )
 
 
-def _create_pool(name, devices, *, key_description=None):
+def create_pool(name, devices, *, key_description=None):
     """
     Creates a stratis pool. Tries three times before giving up.
     :param name:    Name of pool
@@ -100,7 +98,7 @@ def _create_pool(name, devices, *, key_description=None):
     )
 
 
-def _get_pools(name=None):
+def get_pools(name=None):
     """
     Returns a list of all pools found by GetManagedObjects, or a list
     of pools with names matching the specified name, if passed.
@@ -121,26 +119,7 @@ def _get_pools(name=None):
     ]
 
 
-def _get_blockdevs_for_pool(pool_object_path):
-    """
-    Get a list of the blockdevs that belong to this pool.
-    :param str pool_object_path: D-Bus object path for this pool
-    :return: a list of blockdevs representing devices in the pool
-    :rtype: list of (str * MOBlockDev)
-    """
-    managed_objects = ObjectManager.Methods.GetManagedObjects(
-        get_object(TOP_OBJECT), {}
-    )
-
-    return [
-        (op, MOBlockDev(info))
-        for op, info in blockdevs(props={"Pool": pool_object_path}).search(
-            managed_objects
-        )
-    ]
-
-
-def _get_devnodes(device_object_paths):
+def get_devnodes(device_object_paths):
     """
     Get the device nodes belonging to these object paths.
 
@@ -154,7 +133,7 @@ def _get_devnodes(device_object_paths):
     ]
 
 
-def _settle():
+def settle():
     """
     Wait some amount and then call udevadm settle.
     :return: None
@@ -163,7 +142,7 @@ def _settle():
     subprocess.check_call(["udevadm", "settle"])
 
 
-def _wait_for_udev(fs_type, expected_paths):
+def wait_for_udev(fs_type, expected_paths):
     """
     Look for devices with ID_FS_TYPE=fs_type. Check as many times as can be
     done in 10 seconds or until the devices found are equal to the devices
@@ -196,7 +175,7 @@ def _wait_for_udev(fs_type, expected_paths):
         )
 
 
-def _processes(name):
+def processes(name):
     """
     Find all process matching the given name.
     :param str name: name of process to check
@@ -210,7 +189,7 @@ def _processes(name):
             pass
 
 
-def _remove_stratis_dm_devices():
+def remove_stratis_dm_devices():
     """
     Remove Stratis device mapper devices, fail with a runtime error if
     some have been missed.
@@ -233,9 +212,9 @@ class _Service:
         the D-Bus service is available.
         """
 
-        _settle()
+        settle()
 
-        if list(_processes("stratisd")) != []:
+        if list(processes("stratisd")) != []:
             raise RuntimeError("A stratisd process is already running")
 
         service = subprocess.Popen(
@@ -282,13 +261,13 @@ class _Service:
         """
         self._service.send_signal(signal.SIGINT)
         output = self._service.communicate()
-        if list(_processes("stratisd")) != []:
+        if list(processes("stratisd")) != []:
             raise RuntimeError("Failed to stop stratisd service")
 
         return output
 
 
-class _KernelKey:  # pylint: disable=attribute-defined-outside-init
+class KernelKey:  # pylint: disable=attribute-defined-outside-init
     """
     A handle for operating on keys in the kernel keyring. The specified key will
     be available for the lifetime of the test when used with the Python with
@@ -309,7 +288,7 @@ class _KernelKey:  # pylint: disable=attribute-defined-outside-init
 
     def __enter__(self):
         """
-        This method allows _KernelKey to be used with the "with" keyword.
+        This method allows KernelKey to be used with the "with" keyword.
         :return: The key description that can be used to access the
                  provided key data in __init__.
         :raises subprocess.CalledProcessError:
@@ -346,7 +325,7 @@ class _KernelKey:  # pylint: disable=attribute-defined-outside-init
             raise rexc from exception_value
 
 
-class _ServiceContextManager:  # pylint: disable=too-few-public-methods
+class ServiceContextManager:  # pylint: disable=too-few-public-methods
     """
     A context manager for starting and stopping the daemon.
     """

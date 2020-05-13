@@ -32,23 +32,7 @@ pub struct SimEngine {
 impl Report for SimEngine {
     fn get_report(&self, report_type: ReportType) -> Value {
         match report_type {
-            ReportType::ErroredPoolDevices => json!([
-                {
-                    "pool_uuid": "0123456789abcdef0123456789abcdef",
-                    "devices": [
-                        "/dev/an/example/device",
-                        "/dev/another/example/device",
-                    ],
-                },
-                {
-                    "pool_uuid": "fedcba9876543210fedcba9876543210",
-                    "devices": [
-                        "/dev/more/example/devices",
-                        "/dev/yet/another/example/device",
-                        "/dev/last/example/device",
-                    ],
-                },
-            ]),
+            ReportType::ErroredPoolDevices => json!([]),
         }
     }
 }

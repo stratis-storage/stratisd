@@ -353,3 +353,32 @@ class ServiceContextManager:  # pylint: disable=too-few-public-methods
         print(stderrdata, file=sys.stdout, flush=True)
 
         return False
+
+
+class OptionalKeyServiceContextManager:
+    """
+    A service context manager that accepts an optional key
+    """
+
+    def __init__(self, key_data=None):
+        """
+        Initialize a context manager with an optional key.
+        :param key_data: Key data for the kernel key to be added
+        :type key_data: str or NoneType
+        """
+        self._ctxt_manager = ServiceContextManager()
+        self._key = None if key_data is None else KernelKey(key_data)
+
+    def __enter__(self):
+        """
+        Chain ServiceContextManager and KernelKey __enter__ methods
+        :return: key description or None if no key data was provided
+        :rtype: str or NoneType
+        """
+        self._ctxt_manager.__enter__()
+        return None if self._key is None else self._key.__enter__()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self._key is not None:
+            self._key.__exit__(exc_type, exc_val, exc_tb)
+        self._ctxt_manager.__exit__(exc_type, exc_val, exc_tb)

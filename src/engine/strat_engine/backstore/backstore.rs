@@ -116,7 +116,7 @@ impl Backstore {
     ///   key description and that key description == key_description
     ///   *key_description.is_none() -> no StratBlockDev in datadevs has a
     ///   key description.
-    ///   * no StratBlockDev in cachdevs has a key description
+    ///   * no StratBlockDev in cachedevs has a key description
     ///
     /// Postcondition:
     /// self.linear.is_some() XOR self.cache.is_some()

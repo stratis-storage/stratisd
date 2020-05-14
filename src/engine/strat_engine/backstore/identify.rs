@@ -102,7 +102,7 @@ impl fmt::Display for StratisInfo {
     }
 }
 
-/// An enum type to distinguish between LUKS devices belong to Sratis and
+/// An enum type to distinguish between LUKS devices belong to Stratis and
 /// Stratis devices.
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub enum DeviceInfo {

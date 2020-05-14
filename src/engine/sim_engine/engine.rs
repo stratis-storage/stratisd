@@ -30,15 +30,23 @@ pub struct SimEngine {
 }
 
 impl<'a> Into<Value> for &'a SimEngine {
+    // Precondition: SimPool Into<Value> impl return value always pattern matches
+    // Value::Object(_)
     fn into(self) -> Value {
         json!({
             "pools": Value::Array(
-                // FIXME: Add reporting for devices in pools
-                self.pools.iter().map(|(name, uuid, _)| {
-                    json!({
+                self.pools.iter().map(|(name, uuid, pool)| {
+                    let json = json!({
                         "pool_uuid": uuid.to_simple_ref().to_string(),
                         "name": name.to_string(),
-                    })
+                    });
+                    let pool_json = pool.into();
+                    if let (Value::Object(mut map), Value::Object(submap)) = (json, pool_json) {
+                        map.extend(submap.into_iter());
+                        Value::Object(map)
+                    } else {
+                        unreachable!("json!() output is always JSON object");
+                    }
                 })
                 .collect()
             ),

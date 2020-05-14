@@ -28,7 +28,7 @@ from stratisd_client_dbus import PoolR1, get_object
 from ._loopback import LoopBackDevices
 from ._utils import (
     STRATIS_FS_TYPE,
-    KernelKey,
+    OptionalKeyServiceContextManager,
     ServiceContextManager,
     create_pool,
     get_devnodes,
@@ -252,7 +252,7 @@ class UdevTest3(UdevTest):
     daemon, brings it up again, and allows it to discover the existing pool.
     """
 
-    def _simple_initial_discovery_test(self, *, key_description=None):
+    def _simple_initial_discovery_test(self, *, key_data=None):
         """
         A simple test of discovery on start up.
 
@@ -266,7 +266,7 @@ class UdevTest3(UdevTest):
 
         settle()
 
-        with ServiceContextManager():
+        with OptionalKeyServiceContextManager(key_data) as key_description:
             self.assertEqual(len(get_pools()), 0)
             (_, (_, device_object_paths)) = create_pool(
                 random_string(5), devnodes, key_description=key_description
@@ -294,8 +294,7 @@ class UdevTest3(UdevTest):
         """
         See documentation for _simple_initial_discovery_test.
         """
-        with KernelKey("test_key") as key_description:
-            self._simple_initial_discovery_test(key_description=key_description)
+        self._simple_initial_discovery_test(key_data="test_key")
 
     def test_simple_initial_discovery(self):
         """

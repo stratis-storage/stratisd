@@ -417,10 +417,6 @@ impl KeyActions for StratKeyActions {
         key_ids.to_key_descs()
     }
 
-    fn read(&self, key_description: &str) -> StratisResult<Option<(KeySerial, SizedKeyMemory)>> {
-        read_key(&KeyDescription::from(key_description.to_string())).map(|(opt, _)| opt)
-    }
-
     fn unset(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>> {
         let keyring_id = get_persistent_keyring()?;
 

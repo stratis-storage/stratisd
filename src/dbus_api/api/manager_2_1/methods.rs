@@ -43,7 +43,7 @@ pub fn set_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(idem_resp) => {
             let return_value = match idem_resp {
                 MappingCreateAction::Created(()) => (true, false),
-                MappingCreateAction::ValueChanged => (true, true),
+                MappingCreateAction::ValueChanged(()) => (true, true),
                 MappingCreateAction::Identity => (false, false),
             };
             return_message.append3(return_value, msg_code_ok(), msg_string_ok())

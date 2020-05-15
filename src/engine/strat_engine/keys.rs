@@ -188,11 +188,16 @@ fn set_key(
 
 /// Perform an idempotent add of the given key data with the given key description.
 ///
+/// The unit type is returned as the inner type for `MappingCreateAction` as no
+/// new external data (like a UUID) can be returned when setting a key. Keys
+/// are identified by their key descriptions only unlike resources like pools
+/// that have a name and a UUID.
+///
 /// Successful return values:
 /// * `Ok(MappingCreateAction::Identity)`: The key was already in the keyring with the
 /// appropriate key description and key data.
 /// * `Ok(MappingCreateAction::Created(()))`: The key was newly added to the keyring.
-/// * `Ok(MappingCreateAction::Changed)`: The key description was already present
+/// * `Ok(MappingCreateAction::ValueChanged(()))`: The key description was already present
 /// in the keyring but the key data was updated.
 fn set_key_idem(
     key_desc: &KeyDescription,
@@ -202,7 +207,7 @@ fn set_key_idem(
         Ok((Some((key_id, old_key_data)), _)) => {
             let changed = reset_key(key_id, old_key_data, key_data)?;
             if changed {
-                Ok(MappingCreateAction::ValueChanged)
+                Ok(MappingCreateAction::ValueChanged(()))
             } else {
                 Ok(MappingCreateAction::Identity)
             }
@@ -415,10 +420,6 @@ impl KeyActions for StratKeyActions {
         let mut key_ids = KeyIdList::new();
         key_ids.populate()?;
         key_ids.to_key_descs()
-    }
-
-    fn read(&self, key_description: &str) -> StratisResult<Option<(KeySerial, SizedKeyMemory)>> {
-        read_key(&KeyDescription::from(key_description.to_string())).map(|(opt, _)| opt)
     }
 
     fn unset(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>> {

@@ -16,7 +16,6 @@ Support for testing udev device discovery.
 """
 
 # isort: STDLIB
-import base64
 import os
 import random
 import signal
@@ -274,11 +273,13 @@ class KernelKey:  # pylint: disable=attribute-defined-outside-init
     keyword and will be cleaned up at the end of the scope of the with block.
     """
 
-    def __init__(self, key_data):
+    def __init__(self, key_desc, key_data):
         """
-        Initialize a key with the provided key data (passphrase).
+        Initialize a key with the provided key description and key data (passphrase).
+        :param str key_desc: The desired key description
         :param bytes key_data: The desired key contents
         """
+        self._key_desc = key_desc
         self._key_data = key_data
 
     def __enter__(self):
@@ -289,9 +290,6 @@ class KernelKey:  # pylint: disable=attribute-defined-outside-init
         :raises RuntimeError: if setting the key in the keyring through stratisd
                               fails
         """
-        with open("/dev/urandom", "rb") as urandom_f:
-            self._key_desc = base64.b64encode(urandom_f.read(16)).decode("utf-8")
-
         with NamedTemporaryFile(mode="w") as temp_file:
             temp_file.write(self._key_data)
             temp_file.flush()
@@ -360,14 +358,14 @@ class OptionalKeyServiceContextManager:
     A service context manager that accepts an optional key
     """
 
-    def __init__(self, key_data=None):
+    def __init__(self, key_spec=None):
         """
         Initialize a context manager with an optional key.
-        :param key_data: Key data for the kernel key to be added
-        :type key_data: str or NoneType
+        :param key_spec: Key description and key data for the kernel key to be added
+        :type key_spec: (str, bytes) or NoneType
         """
         self._ctxt_manager = ServiceContextManager()
-        self._key = None if key_data is None else KernelKey(key_data)
+        self._key = None if key_spec is None else KernelKey(key_spec[0], key_spec[1])
 
     def __enter__(self):
         """

@@ -26,6 +26,20 @@ impl SimKeyActions {
     pub fn contains_key(&self, key_desc: &str) -> bool {
         self.0.contains_key(key_desc)
     }
+
+    /// Read the contents of a key from the simulated keyring or return `None`
+    /// if no key with the given key description exists.
+    fn read(&self, key_desc: &str) -> StratisResult<Option<(KeySerial, SizedKeyMemory)>> {
+        match self.0.get(key_desc) {
+            Some(key) => {
+                let mut mem = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
+                mem.as_mut().write_all(key)?;
+                let key = SizedKeyMemory::new(mem, key.len());
+                Ok(Some((0xdead_beef, key)))
+            }
+            None => Ok(None),
+        }
+    }
 }
 
 impl KeyActions for SimKeyActions {
@@ -69,7 +83,7 @@ impl KeyActions for SimKeyActions {
                     Ok(MappingCreateAction::Identity)
                 } else {
                     self.0.insert(key_desc.to_string(), new_key_data.to_vec());
-                    Ok(MappingCreateAction::ValueChanged)
+                    Ok(MappingCreateAction::ValueChanged(()))
                 }
             }
             Ok(None) => {
@@ -82,18 +96,6 @@ impl KeyActions for SimKeyActions {
 
     fn list(&self) -> StratisResult<Vec<String>> {
         Ok(self.0.keys().cloned().collect())
-    }
-
-    fn read(&self, key_desc: &str) -> StratisResult<Option<(KeySerial, SizedKeyMemory)>> {
-        match self.0.get(key_desc) {
-            Some(key) => {
-                let mut mem = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
-                mem.as_mut().write_all(key)?;
-                let key = SizedKeyMemory::new(mem, key.len());
-                Ok(Some((0xdead_beef, key)))
-            }
-            None => Ok(None),
-        }
     }
 
     fn unset(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>> {

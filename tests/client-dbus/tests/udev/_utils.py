@@ -358,7 +358,7 @@ class OptionalKeyServiceContextManager:
     A service context manager that accepts an optional key
     """
 
-    def __init__(self, key_spec=None):
+    def __init__(self, *, key_spec=None):
         """
         Initialize a context manager with an optional key.
         :param key_spec: Key description and key data for the kernel key to be added

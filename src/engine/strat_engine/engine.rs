@@ -23,7 +23,7 @@ use crate::{
             dm::{get_dm, get_dm_init},
             keys::StratKeyActions,
             liminal::LiminalDevices,
-            names::validate_name,
+            names::{validate_name, KeyDescription},
             pool::StratPool,
         },
         structures::Table,
@@ -185,8 +185,13 @@ impl Engine for StratEngine {
                         "At least one blockdev is required to create a pool.".to_string(),
                     ))
                 } else {
-                    let (uuid, pool) =
-                        StratPool::initialize(name, blockdev_paths, redundancy, key_desc)?;
+                    let key_description = key_desc.map(KeyDescription::from);
+                    let (uuid, pool) = StratPool::initialize(
+                        name,
+                        blockdev_paths,
+                        redundancy,
+                        key_description.as_ref(),
+                    )?;
 
                     let name = Name::new(name.to_owned());
                     devlinks::pool_added(&name);

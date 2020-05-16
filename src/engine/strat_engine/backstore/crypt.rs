@@ -186,8 +186,7 @@ impl CryptInitializer {
         }
     }
 
-    pub fn initialize(self, key_description: &str) -> Result<CryptHandle> {
-        let key_desc = KeyDescription::from(key_description.to_string());
+    pub fn initialize(self, key_description: &KeyDescription) -> Result<CryptHandle> {
         let physical_path = self.physical_path.clone();
         let dev_uuid = self.identifiers.device_uuid;
         let device = log_on_failure!(
@@ -196,7 +195,7 @@ impl CryptInitializer {
             nothing to clean up",
             physical_path.display()
         );
-        let result = self.initialize_no_cleanup(device, &key_desc);
+        let result = self.initialize_no_cleanup(device, key_description);
         result.map_err(|device| {
             if let Err(e) =
                 CryptInitializer::rollback(device, physical_path, format_crypt_name(&dev_uuid))
@@ -854,13 +853,13 @@ mod tests {
         assert_eq!(paths.len(), 1);
 
         let path = paths.get(0).expect("There must be exactly one path");
-        let key_description = "I am not a key";
+        let key_description = KeyDescription::from("I am not a key".to_string());
 
         let pool_uuid = Uuid::new_v4();
         let dev_uuid = Uuid::new_v4();
 
         let result = CryptInitializer::new((*path).to_owned(), pool_uuid, dev_uuid)
-            .initialize(key_description);
+            .initialize(&key_description);
 
         // Initialization cannot occur with a non-existent key
         assert!(result.is_err());
@@ -899,7 +898,7 @@ mod tests {
     fn test_can_unlock(paths: &[&Path]) {
         fn crypt_test(
             paths: &[&Path],
-            key_desc: &str,
+            key_desc: &KeyDescription,
             _: Option<()>,
         ) -> std::result::Result<(), Box<dyn Error>> {
             let mut handles = vec![];
@@ -991,7 +990,7 @@ mod tests {
     fn test_crypt_device_ops(paths: &[&Path]) {
         fn crypt_test(
             paths: &[&Path],
-            key_desc: &str,
+            key_desc: &KeyDescription,
             _: Option<()>,
         ) -> std::result::Result<(), Box<dyn Error>> {
             let path = paths.get(0).ok_or_else(|| {

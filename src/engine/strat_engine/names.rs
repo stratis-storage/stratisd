@@ -25,7 +25,7 @@ fn key_description_prefix() -> String {
 }
 
 /// A data type respresenting a key description of a key added by stratisd.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct KeyDescription(String);
 
 impl KeyDescription {

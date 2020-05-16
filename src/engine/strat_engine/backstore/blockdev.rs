@@ -19,6 +19,7 @@ use crate::{
                 metadata::{disown_device, BDAExtendedSize, BlockdevSize, MDADataSize, BDA},
                 range_alloc::RangeAllocator,
             },
+            names::KeyDescription,
             serde_structs::{BaseBlockDevSave, Recordable},
         },
         types::{BlockDevPath, DevUuid, MaybeDbusPath},
@@ -35,7 +36,7 @@ pub struct StratBlockDev {
     user_info: Option<String>,
     hardware_info: Option<String>,
     dbus_path: MaybeDbusPath,
-    key_description: Option<String>,
+    key_description: Option<KeyDescription>,
 }
 
 impl StratBlockDev {
@@ -64,7 +65,7 @@ impl StratBlockDev {
         upper_segments: &[(Sectors, Sectors)],
         user_info: Option<String>,
         hardware_info: Option<String>,
-        key_description: Option<String>,
+        key_description: Option<&KeyDescription>,
     ) -> StratisResult<StratBlockDev> {
         let mut segments = vec![(Sectors(0), bda.extended_size().sectors())];
         segments.extend(upper_segments);
@@ -78,7 +79,7 @@ impl StratBlockDev {
             user_info,
             hardware_info,
             dbus_path: MaybeDbusPath(None),
-            key_description,
+            key_description: key_description.cloned(),
         })
     }
 

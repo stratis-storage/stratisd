@@ -8,7 +8,7 @@ use libcryptsetup_rs::SafeMemHandle;
 
 use crate::engine::{
     engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
-    strat_engine::keys::StratKeyActions,
+    strat_engine::{keys::StratKeyActions, names::KeyDescription},
     types::SizedKeyMemory,
 };
 
@@ -24,10 +24,11 @@ fn insert_and_cleanup_key_shared<F, I, O>(
     input: I,
 ) -> Result<O, Box<dyn Error>>
 where
-    F: Fn(&[&Path], &str, I) -> std::result::Result<O, Box<dyn Error>>,
+    F: Fn(&[&Path], &KeyDescription, I) -> std::result::Result<O, Box<dyn Error>>,
 {
     let mut key_handle = StratKeyActions;
     let desc_str = "test-description-for-stratisd";
+    let key_description = KeyDescription::from(desc_str.to_string());
     let mut mem = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
     File::open("/dev/urandom")
         .unwrap()
@@ -37,7 +38,7 @@ where
 
     key_handle.set_no_fd(desc_str, key_data)?;
 
-    let result = test(physical_paths, desc_str, input);
+    let result = test(physical_paths, &key_description, input);
 
     key_handle.unset(desc_str)?;
 
@@ -47,7 +48,7 @@ where
 /// Insert and clean up a single key for the lifetime of the test.
 pub fn insert_and_cleanup_key<F>(physical_paths: &[&Path], test: F)
 where
-    F: Fn(&[&Path], &str, Option<()>) -> std::result::Result<(), Box<dyn Error>>,
+    F: Fn(&[&Path], &KeyDescription, Option<()>) -> std::result::Result<(), Box<dyn Error>>,
 {
     insert_and_cleanup_key_shared::<F, Option<()>, ()>(physical_paths, test, Option::<()>::None)
         .unwrap();
@@ -58,8 +59,8 @@ where
 /// into a bad state.
 pub fn insert_and_cleanup_two_keys<FR, F, R>(physical_paths: &[&Path], test_one: FR, test_two: F)
 where
-    FR: Fn(&[&Path], &str, Option<()>) -> Result<R, Box<dyn Error>>,
-    F: Fn(&[&Path], &str, R) -> Result<(), Box<dyn Error>>,
+    FR: Fn(&[&Path], &KeyDescription, Option<()>) -> Result<R, Box<dyn Error>>,
+    F: Fn(&[&Path], &KeyDescription, R) -> Result<(), Box<dyn Error>>,
 {
     let return_value =
         insert_and_cleanup_key_shared::<FR, Option<()>, R>(physical_paths, test_one, None).unwrap();

@@ -26,14 +26,6 @@ use crate::{
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
-/// This value indicates the maximum number of keys that can be listed at one time.
-/// This is an implementation decision and can be increased if the ability to list
-/// more keys is desired.
-const MAX_NUM_KEY_IDS: usize = 4096;
-/// This value indicates the maximum accepted length in bytes of a `KEYCTL_DESCRIBE`
-/// string returned when querying the kernel.
-const MAX_KEYCTL_DESCRIBE_STRING_LEN: usize = 4096;
-
 /// Get the ID of the persistent root user keyring and attach it to
 /// the session keyring.
 fn get_persistent_keyring() -> StratisResult<KeySerial> {
@@ -238,19 +230,20 @@ fn parse_keyctl_describe_string(key_str: &str) -> StratisResult<String> {
 
 /// A list of key IDs that were read from the persistent root keyring.
 ///
-/// This list must keep track of the size externally because the buffer must be
-/// allocated as the maximum allowable size before it is coerced down to
-/// a pointer to use it in a syscall.
+/// This list must keep track of the size externally to the Vec, because the
+/// elements in the Vec are allocated by means of a syscall which fills the
+/// Vec's internal buffer, rather than by Vec operations, so key_ids.len()
+/// will always be 0.
 struct KeyIdList {
-    key_ids: [KeySerial; MAX_NUM_KEY_IDS],
+    key_ids: Vec<KeySerial>,
     num_key_ids: usize,
 }
 
 impl KeyIdList {
-    /// Create a new list of key IDs.
+    /// Create a new list of key IDs, with initial capacity of 4096
     fn new() -> KeyIdList {
         KeyIdList {
-            key_ids: [0; MAX_NUM_KEY_IDS],
+            key_ids: Vec::with_capacity(4096),
             num_key_ids: 0,
         }
     }
@@ -260,31 +253,29 @@ impl KeyIdList {
         let keyring_id = get_persistent_keyring()?;
 
         // Read list of keys in the persistent keyring.
-        match unsafe {
-            syscall(
-                SYS_keyctl,
-                libc::KEYCTL_READ,
-                keyring_id,
-                self.key_ids.as_mut_ptr(),
-                self.key_ids.len(),
-            )
-        } {
-            i if i < 0 => return Err(io::Error::last_os_error().into()),
-            i => {
-                let ret = i as usize;
-                let num_key_ids = if ret > MAX_NUM_KEY_IDS {
-                    warn!(
-                        "Some key entries were truncated. Stratis can only list \
-                        a maximum of {} keys.",
-                        MAX_NUM_KEY_IDS
-                    );
-                    MAX_NUM_KEY_IDS
-                } else {
-                    ret
-                };
+        let mut done = false;
+        while !done {
+            let num_key_ids = match unsafe {
+                syscall(
+                    SYS_keyctl,
+                    libc::KEYCTL_READ,
+                    keyring_id,
+                    self.key_ids.as_mut_ptr(),
+                    self.key_ids.capacity(),
+                )
+            } {
+                i if i < 0 => return Err(io::Error::last_os_error().into()),
+                i => i as usize,
+            };
+
+            if num_key_ids > self.key_ids.capacity() {
+                self.key_ids.reserve(num_key_ids - self.key_ids.capacity());
+            } else {
                 self.num_key_ids = num_key_ids;
+                done = true;
             }
-        };
+        }
+
         Ok(())
     }
 
@@ -303,38 +294,48 @@ impl KeyIdList {
     /// them as belonging to Stratis.
     fn to_key_descs(&self) -> StratisResult<Vec<String>> {
         let mut key_descs = Vec::new();
-        let mut keyctl_buffer = [0u8; MAX_KEYCTL_DESCRIBE_STRING_LEN];
-        for id in self.iter() {
-            let len = match unsafe {
-                syscall(
-                    SYS_keyctl,
-                    libc::KEYCTL_DESCRIBE,
-                    id,
-                    keyctl_buffer.as_mut_ptr(),
-                    keyctl_buffer.len(),
-                )
-            } {
-                i if i < 0 => return Err(io::Error::last_os_error().into()),
-                i => {
-                    let len = i as usize;
-                    if len > MAX_KEYCTL_DESCRIBE_STRING_LEN {
-                        warn!(
-                            "Discarding key description data for key ID {}. The \
-                            provided buffer is not large enough to contain the data.",
-                            id,
-                        );
-                        continue;
-                    }
-                    len
-                }
-            };
 
-            let keyctl_str = str::from_utf8(&keyctl_buffer[..len - 1]).map_err(|e| {
-                StratisError::Engine(
-                    ErrorEnum::Invalid,
-                    format!("Kernel key description was not valid UTF8: {}", e),
-                )
-            })?;
+        for id in self.iter() {
+            let mut keyctl_buffer: Vec<u8> = Vec::with_capacity(4096);
+
+            let mut description_length = None;
+            while description_length.is_none() {
+                let len = match unsafe {
+                    syscall(
+                        SYS_keyctl,
+                        libc::KEYCTL_DESCRIBE,
+                        id,
+                        keyctl_buffer.as_mut_ptr(),
+                        keyctl_buffer.len(),
+                    )
+                } {
+                    i if i < 0 => return Err(io::Error::last_os_error().into()),
+                    i => i as usize,
+                };
+
+                if len > keyctl_buffer.capacity() {
+                    keyctl_buffer.reserve(len - keyctl_buffer.capacity());
+                } else {
+                    description_length = Some(len);
+                }
+            }
+
+            let description_length = description_length.expect("must be Some to exit loop");
+
+            if description_length == 0 {
+                return Err(StratisError::Error(format!(
+                    "Kernel key description for key {} appeared to be entirely empty",
+                    id
+                )));
+            }
+
+            let keyctl_str =
+                str::from_utf8(&keyctl_buffer[..description_length - 1]).map_err(|e| {
+                    StratisError::Engine(
+                        ErrorEnum::Invalid,
+                        format!("Kernel key description was not valid UTF8: {}", e),
+                    )
+                })?;
             let parsed_string = parse_keyctl_describe_string(keyctl_str)?;
             if let Some(kd) = KeyDescription::from_system_key_desc(&parsed_string) {
                 key_descs.push(kd.as_application_str().to_string());

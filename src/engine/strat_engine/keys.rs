@@ -299,6 +299,8 @@ impl KeyIdList {
     }
 
     /// Get the list of key descriptions corresponding to the kernel key IDs.
+    /// Return the subset of key descriptions that have a prefix that identify
+    /// them as belonging to Stratis.
     fn to_key_descs(&self) -> StratisResult<Vec<String>> {
         let mut key_descs = Vec::new();
         let mut keyctl_buffer = [0u8; MAX_KEYCTL_DESCRIBE_STRING_LEN];

@@ -295,8 +295,7 @@ impl KeyIdList {
 
     /// Iterate through the key IDs.
     fn iter(&self) -> Take<Iter<KeySerial>> {
-        let len = self.len();
-        self.key_ids.iter().take(len)
+        self.key_ids.iter().take(self.len())
     }
 
     /// Get the list of key descriptions corresponding to the kernel key IDs.

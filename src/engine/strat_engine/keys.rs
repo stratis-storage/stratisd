@@ -13,6 +13,8 @@ use std::{
 };
 
 use libc::{syscall, SYS_add_key, SYS_keyctl};
+
+use devicemapper::Bytes;
 use libcryptsetup_rs::SafeMemHandle;
 
 use crate::{
@@ -383,21 +385,13 @@ impl KeyActions for StratKeyActions {
     ) -> StratisResult<MappingCreateAction<()>> {
         let key_file = unsafe { File::from_raw_fd(key_fd) };
         let mut memory = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
-        let mut pos = 0;
         let mut bytes_iter = key_file.bytes();
-        loop {
+
+        let mut pos = 0;
+        while pos < MAX_STRATIS_PASS_SIZE {
             match bytes_iter.next() {
                 Some(Ok(b)) => {
                     if interactive && b as char == '\n' {
-                        break;
-                    }
-                    if pos == MAX_STRATIS_PASS_SIZE {
-                        if bytes_iter.next().is_some() {
-                            return Err(StratisError::Engine(
-                                ErrorEnum::Invalid,
-                                "Provided key was too long".to_string(),
-                            ));
-                        }
                         break;
                     }
 
@@ -408,6 +402,16 @@ impl KeyActions for StratKeyActions {
                 None => break,
             }
         }
+        if pos == MAX_STRATIS_PASS_SIZE && bytes_iter.next().is_some() {
+            return Err(StratisError::Engine(
+                ErrorEnum::Invalid,
+                format!(
+                    "Provided key exceeded maximum allow length of {}",
+                    Bytes(MAX_STRATIS_PASS_SIZE as u64)
+                ),
+            ));
+        }
+
         let sized_memory = SizedKeyMemory::new(memory, pos);
 
         Ok(set_key_idem(

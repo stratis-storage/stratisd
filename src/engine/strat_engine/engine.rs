@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{clone::Clone, collections::HashMap, path::Path};
+use std::{clone::Clone, collections::HashMap, convert::TryFrom, path::Path};
 
 use serde_json::Value;
 
@@ -185,7 +185,11 @@ impl Engine for StratEngine {
                         "At least one blockdev is required to create a pool.".to_string(),
                     ))
                 } else {
-                    let key_description = key_desc.map(KeyDescription::from);
+                    let key_description = match key_desc {
+                        Some(desc) => Some(KeyDescription::try_from(desc)?),
+                        None => None,
+                    };
+
                     let (uuid, pool) = StratPool::initialize(
                         name,
                         blockdev_paths,

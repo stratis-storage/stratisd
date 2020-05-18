@@ -5,6 +5,7 @@
 // Functions for dealing with stratis and device mapper names.
 
 use std::{
+    convert::TryFrom,
     fmt::{self, Display},
     path::Path,
 };
@@ -62,9 +63,21 @@ impl KeyDescription {
     }
 }
 
-impl From<String> for KeyDescription {
-    fn from(s: String) -> KeyDescription {
-        KeyDescription(s)
+// Key descriptions with ';'s are disallowed because a key description
+// containing a ';' will not be able to be correctly parsed from the kernel's
+// describe string, which uses ';'s as field delimiters.
+impl TryFrom<String> for KeyDescription {
+    type Error = StratisError;
+
+    fn try_from(s: String) -> StratisResult<KeyDescription> {
+        if s.contains(';') {
+            Err(StratisError::Engine(
+                ErrorEnum::Invalid,
+                format!("Key description {} contains a ';'", s),
+            ))
+        } else {
+            Ok(KeyDescription(s))
+        }
     }
 }
 
@@ -315,11 +328,11 @@ mod tests {
         assert!(KeyDescription::from_system_key_desc("not-prefix-stratis-1-key-").is_none());
         assert_eq!(
             KeyDescription::from_system_key_desc("stratis-1-key-key_desc"),
-            Some(KeyDescription::from("key_desc".to_string()))
+            Some(KeyDescription::try_from("key_desc".to_string()).expect("no semi-colons"))
         );
         assert_eq!(
             KeyDescription::from_system_key_desc("stratis-1-key-stratis-1-key"),
-            Some(KeyDescription::from("stratis-1-key".to_string()))
+            Some(KeyDescription::try_from("stratis-1-key".to_string()).expect("no semi-colons"))
         );
     }
 

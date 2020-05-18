@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{error::Error, fs::File, io::Read, path::Path};
+use std::{convert::TryFrom, error::Error, fs::File, io::Read, path::Path};
 
 use libcryptsetup_rs::SafeMemHandle;
 
@@ -28,7 +28,7 @@ where
 {
     let mut key_handle = StratKeyActions;
     let desc_str = "test-description-for-stratisd";
-    let key_description = KeyDescription::from(desc_str.to_string());
+    let key_description = KeyDescription::try_from(desc_str.to_string()).expect("no semi-colons");
     let mut mem = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
     File::open("/dev/urandom")
         .unwrap()

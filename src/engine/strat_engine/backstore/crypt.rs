@@ -853,7 +853,8 @@ mod tests {
         assert_eq!(paths.len(), 1);
 
         let path = paths.get(0).expect("There must be exactly one path");
-        let key_description = KeyDescription::from("I am not a key".to_string());
+        let key_description =
+            KeyDescription::try_from("I am not a key".to_string()).expect("no semi-colons");
 
         let pool_uuid = Uuid::new_v4();
         let dev_uuid = Uuid::new_v4();

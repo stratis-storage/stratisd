@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
+    convert::TryFrom,
     ffi::CString,
     fs::File,
     io::{self, Read},
@@ -372,7 +373,7 @@ impl StratKeyActions {
         key: SizedKeyMemory,
     ) -> StratisResult<MappingCreateAction<()>> {
         Ok(set_key_idem(
-            &KeyDescription::from(key_desc.to_string()),
+            &KeyDescription::try_from(key_desc.to_string())?,
             key,
         )?)
     }
@@ -417,7 +418,7 @@ impl KeyActions for StratKeyActions {
         let sized_memory = SizedKeyMemory::new(memory, pos);
 
         Ok(set_key_idem(
-            &KeyDescription::from(key_desc.to_string()),
+            &KeyDescription::try_from(key_desc.to_string())?,
             sized_memory,
         )?)
     }
@@ -431,7 +432,9 @@ impl KeyActions for StratKeyActions {
     fn unset(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>> {
         let keyring_id = get_persistent_keyring()?;
 
-        if let Some(key_id) = search_key(keyring_id, &KeyDescription::from(key_desc.to_string()))? {
+        if let Some(key_id) =
+            search_key(keyring_id, &KeyDescription::try_from(key_desc.to_string())?)?
+        {
             unset_key(key_id).map(|_| DeleteAction::Deleted(()))
         } else {
             Ok(DeleteAction::Identity)

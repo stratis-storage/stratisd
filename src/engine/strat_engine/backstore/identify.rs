@@ -464,14 +464,28 @@ mod tests {
                             )
                         })?;
 
-                if info.info.identifiers.pool_uuid != pool_uuid
-                    || info.info.devnode != devnode.physical_path()
-                    || &info.key_description != key_description
-                {
-                    return Err(Box::new(StratisError::Error(
-                        "Wrong identifiers, devnode, and key description found for encrypted block device"
-                            .to_string(),
-                    )));
+                if info.info.identifiers.pool_uuid != pool_uuid {
+                    return Err(Box::new(StratisError::Error(format!(
+                        "Discovered pool UUID {} != expected pool UUID {}",
+                        info.info.identifiers.pool_uuid.to_simple_ref(),
+                        pool_uuid.to_simple_ref()
+                    ))));
+                }
+
+                if info.info.devnode != devnode.physical_path() {
+                    return Err(Box::new(StratisError::Error(format!(
+                        "Discovered device node {} != expected device node {}",
+                        info.info.devnode.display(),
+                        devnode.physical_path().display()
+                    ))));
+                }
+
+                if &info.key_description != key_description {
+                    return Err(Box::new(StratisError::Error(format!(
+                        "Discovered key description {} != expected key description {}",
+                        info.key_description.as_application_str(),
+                        key_description.as_application_str()
+                    ))));
                 }
 
                 let info =

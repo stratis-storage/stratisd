@@ -23,6 +23,7 @@ use crate::{
                 devices::{initialize_devices, process_and_verify_devices, wipe_blockdevs},
                 metadata::MDADataSize,
             },
+            names::KeyDescription,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
         },
         types::{DevUuid, PoolUuid},
@@ -111,7 +112,7 @@ pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<TargetLine<LinearDevTargetParam
 pub struct BlockDevMgr {
     block_devs: Vec<StratBlockDev>,
     last_update_time: Option<DateTime<Utc>>,
-    key_desc: Option<String>,
+    key_desc: Option<KeyDescription>,
 }
 
 impl BlockDevMgr {
@@ -119,12 +120,12 @@ impl BlockDevMgr {
     pub fn new(
         block_devs: Vec<StratBlockDev>,
         last_update_time: Option<DateTime<Utc>>,
-        key_desc: Option<String>,
+        key_desc: Option<&KeyDescription>,
     ) -> BlockDevMgr {
         BlockDevMgr {
             block_devs,
             last_update_time,
-            key_desc,
+            key_desc: key_desc.cloned(),
         }
     }
 
@@ -133,12 +134,12 @@ impl BlockDevMgr {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         mda_data_size: MDADataSize,
-        key_desc: Option<String>,
+        key_desc: Option<&KeyDescription>,
     ) -> StratisResult<BlockDevMgr> {
         let devices = process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?;
 
         Ok(BlockDevMgr::new(
-            initialize_devices(devices, pool_uuid, mda_data_size, key_desc.as_deref())?,
+            initialize_devices(devices, pool_uuid, mda_data_size, key_desc)?,
             None,
             key_desc,
         ))
@@ -196,7 +197,7 @@ impl BlockDevMgr {
             devices,
             pool_uuid,
             MDADataSize::default(),
-            self.key_desc.as_deref(),
+            self.key_desc.as_ref(),
         )?;
         let bdev_uuids = bds.iter().map(|bd| bd.uuid()).collect();
         self.block_devs.extend(bds);
@@ -376,8 +377,8 @@ impl BlockDevMgr {
             .sum()
     }
 
-    pub fn key_desc(&self) -> Option<&str> {
-        self.key_desc.as_deref()
+    pub fn key_desc(&self) -> Option<&KeyDescription> {
+        self.key_desc.as_ref()
     }
 
     pub fn is_encrypted(&self) -> bool {
@@ -450,7 +451,7 @@ mod tests {
     fn test_blockdevmgr_same_key(paths: &[&Path]) {
         fn test_with_key(
             paths: &[&Path],
-            key_desc: &str,
+            key_desc: &KeyDescription,
             _: Option<()>,
         ) -> Result<(), Box<dyn Error>> {
             let pool_uuid = Uuid::new_v4();
@@ -458,7 +459,7 @@ mod tests {
                 pool_uuid,
                 &paths[..2],
                 MDADataSize::default(),
-                Some(key_desc.to_string()),
+                Some(key_desc),
             )?;
 
             if bdm.add(pool_uuid, &paths[2..3]).is_err() {
@@ -504,7 +505,7 @@ mod tests {
     fn test_blockdevmgr_changed_key(paths: &[&Path]) {
         fn test_with_first_key(
             paths: &[&Path],
-            key_desc: &str,
+            key_desc: &KeyDescription,
             _: Option<()>,
         ) -> Result<(PoolUuid, BlockDevMgr), Box<dyn Error>> {
             let pool_uuid = Uuid::new_v4();
@@ -512,14 +513,14 @@ mod tests {
                 pool_uuid,
                 &paths[..2],
                 MDADataSize::default(),
-                Some(key_desc.to_string()),
+                Some(key_desc),
             )?;
             Ok((pool_uuid, bdm))
         }
 
         fn test_with_second_key(
             paths: &[&Path],
-            _: &str,
+            _: &KeyDescription,
             data: (PoolUuid, BlockDevMgr),
         ) -> Result<(), Box<dyn Error>> {
             let (pool_uuid, mut bdm) = data;

@@ -29,6 +29,7 @@ use crate::{
                 udev::{block_device_apply, decide_ownership, get_udev_property, UdevOwnership},
             },
             device::blkdev_size,
+            names::KeyDescription,
         },
         types::{BlockDevPath, DevUuid, PoolUuid},
     },
@@ -434,7 +435,7 @@ pub fn initialize_devices(
     devices: Vec<DeviceInfo>,
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
-    key_description: Option<&str>,
+    key_description: Option<&KeyDescription>,
 ) -> StratisResult<Vec<StratBlockDev>> {
     /// Map a major/minor device number of a physical device
     /// to the corresponding major/minor number of the encrypted
@@ -455,7 +456,7 @@ pub fn initialize_devices(
         physical_path: &Path,
         pool_uuid: PoolUuid,
         dev_uuid: DevUuid,
-        key_description: &str,
+        key_description: &KeyDescription,
     ) -> StratisResult<(CryptHandle, Device, Sectors)> {
         let mut handle = CryptInitializer::new(physical_path.to_owned(), pool_uuid, dev_uuid)
             .initialize(key_description)?;
@@ -476,7 +477,7 @@ pub fn initialize_devices(
         dev_uuid: DevUuid,
         sizes: (MDADataSize, BlockdevSize),
         id_wwn: &Option<StratisResult<String>>,
-        key_description: Option<&str>,
+        key_description: Option<&KeyDescription>,
     ) -> StratisResult<StratBlockDev> {
         let (mda_data_size, data_size) = sizes;
         let mut f = OpenOptions::new().write(true).open(path.metadata_path())?;
@@ -512,7 +513,7 @@ pub fn initialize_devices(
                 &[],
                 None,
                 hw_id,
-                key_description.map(|s| s.to_owned()),
+                key_description,
             )
         })
     }
@@ -567,7 +568,7 @@ pub fn initialize_devices(
         dev_info: &DeviceInfo,
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
-        key_description: Option<&str>,
+        key_description: Option<&KeyDescription>,
     ) -> StratisResult<StratBlockDev> {
         let dev_uuid = Uuid::new_v4();
         let (maybe_encrypted, devno, blockdev_size) = match key_description {
@@ -686,7 +687,7 @@ mod tests {
     /// rejected or filtered as appropriate.
     fn test_ownership(
         paths: &[&Path],
-        key_description: Option<&str>,
+        key_description: Option<&KeyDescription>,
     ) -> Result<(), Box<dyn Error>> {
         let pool_uuid = Uuid::new_v4();
         let infos: Vec<_> = process_devices(paths)?;
@@ -840,7 +841,7 @@ mod tests {
     fn test_ownership_crypt(paths: &[&Path]) {
         fn call_crypt_test(
             paths: &[&Path],
-            key_description: &str,
+            key_description: &KeyDescription,
             _: Option<()>,
         ) -> Result<(), Box<dyn Error>> {
             test_ownership(paths, Some(key_description))
@@ -939,7 +940,10 @@ mod tests {
     // Verify that if the last device in a list of devices to initialize
     // can not be initialized, all the devices previously initialized are
     // properly cleaned up.
-    fn test_failure_cleanup(paths: &[&Path], key_desc: Option<&str>) -> Result<(), Box<dyn Error>> {
+    fn test_failure_cleanup(
+        paths: &[&Path],
+        key_desc: Option<&KeyDescription>,
+    ) -> Result<(), Box<dyn Error>> {
         if paths.len() <= 1 {
             return Err(Box::new(StratisError::Error(
                 "Test requires more than one device".to_string(),
@@ -1015,7 +1019,7 @@ mod tests {
     fn test_failure_cleanup_crypt(paths: &[&Path]) {
         fn failure_cleanup_crypt(
             paths: &[&Path],
-            key_desc: &str,
+            key_desc: &KeyDescription,
             _: Option<()>,
         ) -> Result<(), Box<dyn Error>> {
             test_failure_cleanup(paths, Some(key_desc))

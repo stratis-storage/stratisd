@@ -22,6 +22,3 @@ pub use self::{
     identify::{find_all, identify_block_device},
     metadata::{MDADataSize, BDA},
 };
-
-#[cfg(test)]
-pub use self::crypt::MAX_STRATIS_PASS_SIZE;

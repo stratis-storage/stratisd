@@ -12,6 +12,7 @@ use std::{
 
 use devicemapper::{DmNameBuf, DmUuidBuf};
 
+pub use crate::engine::types::KeyDescription;
 use crate::{
     engine::types::{DevUuid, FilesystemUuid, PoolUuid},
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -25,14 +26,10 @@ fn key_description_prefix() -> String {
     format!("stratis-{}-key-", FORMAT_VERSION)
 }
 
-/// A data type respresenting a key description of a key added by stratisd.
-#[derive(Clone, Debug, PartialEq)]
-pub struct KeyDescription(String);
-
 impl KeyDescription {
     /// Check if the system key description has the Stratis prefix. If so,
     /// return `Some` with the prefix stripped. If not, return `None`.
-    pub fn from_system_key_desc(raw_key_desc: &str) -> Option<KeyDescription> {
+    pub fn from_system_key_desc(raw_key_desc: &str) -> Option<StratisResult<KeyDescription>> {
         let mut key_desc = raw_key_desc.to_string();
         let prefix = key_description_prefix();
         if key_desc.starts_with(prefix.as_str()) {
@@ -40,17 +37,11 @@ impl KeyDescription {
             if key_desc.is_empty() {
                 None
             } else {
-                Some(KeyDescription(key_desc))
+                Some(KeyDescription::try_from(key_desc))
             }
         } else {
             None
         }
-    }
-
-    /// Return the application-level key description (the key description with no
-    /// Stratis prefix added).
-    pub fn as_application_str(&self) -> &str {
-        &self.0
     }
 
     /// Return the key description as it will be registered on the system,
@@ -59,25 +50,7 @@ impl KeyDescription {
     /// that stratisd uses internally for keeping track of which keys belong
     /// to Stratis.
     pub fn to_system_string(&self) -> String {
-        format!("{}{}", key_description_prefix(), self.0)
-    }
-}
-
-// Key descriptions with ';'s are disallowed because a key description
-// containing a ';' will not be able to be correctly parsed from the kernel's
-// describe string, which uses ';'s as field delimiters.
-impl TryFrom<String> for KeyDescription {
-    type Error = StratisError;
-
-    fn try_from(s: String) -> StratisResult<KeyDescription> {
-        if s.contains(';') {
-            Err(StratisError::Engine(
-                ErrorEnum::Invalid,
-                format!("Key description {} contains a ';'", s),
-            ))
-        } else {
-            Ok(KeyDescription(s))
-        }
+        format!("{}{}", key_description_prefix(), self.as_application_str())
     }
 }
 
@@ -320,6 +293,8 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
 
 #[cfg(test)]
 mod tests {
+    use std::convert::TryFrom;
+
     use super::*;
 
     #[test]
@@ -327,11 +302,13 @@ mod tests {
         assert!(KeyDescription::from_system_key_desc("stratis-1-key-").is_none());
         assert!(KeyDescription::from_system_key_desc("not-prefix-stratis-1-key-").is_none());
         assert_eq!(
-            KeyDescription::from_system_key_desc("stratis-1-key-key_desc"),
+            KeyDescription::from_system_key_desc("stratis-1-key-key_desc")
+                .map(|k| k.expect("no semi-colons")),
             Some(KeyDescription::try_from("key_desc".to_string()).expect("no semi-colons"))
         );
         assert_eq!(
-            KeyDescription::from_system_key_desc("stratis-1-key-stratis-1-key"),
+            KeyDescription::from_system_key_desc("stratis-1-key-stratis-1-key")
+                .map(|k| k.expect("no semi-colons")),
             Some(KeyDescription::try_from("stratis-1-key".to_string()).expect("no semi-colons"))
         );
     }

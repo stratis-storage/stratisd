@@ -10,8 +10,9 @@ use uuid::Uuid;
 use devicemapper::{Bytes, Sectors, IEC};
 
 use crate::engine::{
-    engine::BlockDev, sim_engine::randomization::Randomizer, types::BlockDevPath,
-    types::MaybeDbusPath,
+    engine::BlockDev,
+    sim_engine::randomization::Randomizer,
+    types::{BlockDevPath, KeyDescription, MaybeDbusPath},
 };
 
 #[derive(Debug)]
@@ -23,7 +24,7 @@ pub struct SimDev {
     hardware_info: Option<String>,
     initialization_time: u64,
     dbus_path: MaybeDbusPath,
-    key_description: Option<String>,
+    key_description: Option<KeyDescription>,
 }
 
 impl SimDev {
@@ -72,7 +73,7 @@ impl SimDev {
     pub fn new(
         rdm: Rc<RefCell<Randomizer>>,
         devnode: &Path,
-        key_description: Option<String>,
+        key_description: Option<&KeyDescription>,
     ) -> (Uuid, SimDev) {
         (
             Uuid::new_v4(),
@@ -83,7 +84,7 @@ impl SimDev {
                 hardware_info: None,
                 initialization_time: Utc::now().timestamp() as u64,
                 dbus_path: MaybeDbusPath(None),
-                key_description,
+                key_description: key_description.cloned(),
             },
         )
     }

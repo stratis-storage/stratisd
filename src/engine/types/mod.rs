@@ -19,7 +19,7 @@ pub use crate::engine::types::{
         CreateAction, DeleteAction, EngineAction, MappingCreateAction, RenameAction,
         SetCreateAction, SetDeleteAction,
     },
-    keys::{KeySerial, SizedKeyMemory},
+    keys::{KeyDescription, KeySerial, SizedKeyMemory},
 };
 use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 

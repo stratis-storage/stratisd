@@ -4,6 +4,7 @@
 
 use std::{
     collections::HashMap,
+    convert::TryFrom,
     fs::File,
     io::{Read, Write},
     os::unix::io::{FromRawFd, RawFd},
@@ -15,22 +16,25 @@ use libcryptsetup_rs::SafeMemHandle;
 use crate::{
     engine::{
         engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
-        types::{DeleteAction, KeySerial, MappingCreateAction, SizedKeyMemory},
+        types::{DeleteAction, KeyDescription, KeySerial, MappingCreateAction, SizedKeyMemory},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
 #[derive(Debug, Default)]
-pub struct SimKeyActions(HashMap<String, Vec<u8>>);
+pub struct SimKeyActions(HashMap<KeyDescription, Vec<u8>>);
 
 impl SimKeyActions {
-    pub fn contains_key(&self, key_desc: &str) -> bool {
+    pub fn contains_key(&self, key_desc: &KeyDescription) -> bool {
         self.0.contains_key(key_desc)
     }
 
     /// Read the contents of a key from the simulated keyring or return `None`
     /// if no key with the given key description exists.
-    fn read(&self, key_desc: &str) -> StratisResult<Option<(KeySerial, SizedKeyMemory)>> {
+    fn read(
+        &self,
+        key_desc: &KeyDescription,
+    ) -> StratisResult<Option<(KeySerial, SizedKeyMemory)>> {
         match self.0.get(key_desc) {
             Some(key) => {
                 let mut mem = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
@@ -79,17 +83,20 @@ impl KeyActions for SimKeyActions {
             ));
         }
 
-        match self.read(key_desc) {
+        let key_description = KeyDescription::try_from(key_desc.to_string())?;
+        match self.read(&key_description) {
             Ok(Some((_, key_data))) => {
                 if key_data.as_ref() == new_key_data as &[u8] {
                     Ok(MappingCreateAction::Identity)
                 } else {
-                    self.0.insert(key_desc.to_string(), new_key_data.to_vec());
+                    self.0
+                        .insert(key_description.clone(), new_key_data.to_vec());
                     Ok(MappingCreateAction::ValueChanged(()))
                 }
             }
             Ok(None) => {
-                self.0.insert(key_desc.to_string(), new_key_data.to_vec());
+                self.0
+                    .insert(key_description.clone(), new_key_data.to_vec());
                 Ok(MappingCreateAction::Created(()))
             }
             Err(e) => Err(e),
@@ -97,11 +104,16 @@ impl KeyActions for SimKeyActions {
     }
 
     fn list(&self) -> StratisResult<Vec<String>> {
-        Ok(self.0.keys().cloned().collect())
+        Ok(self
+            .0
+            .keys()
+            .map(|k| k.as_application_str().to_string())
+            .collect())
     }
 
     fn unset(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>> {
-        match self.0.remove(key_desc) {
+        let key_description = KeyDescription::try_from(key_desc.to_string())?;
+        match self.0.remove(&key_description) {
             Some(_) => Ok(DeleteAction::Deleted(())),
             None => Ok(DeleteAction::Identity),
         }

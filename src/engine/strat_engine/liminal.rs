@@ -903,40 +903,45 @@ impl LiminalDevices {
         pools: &Table<StratPool>,
         event: &libudev::Event,
     ) -> Option<(PoolUuid, Name, StratPool)> {
-        identify_block_device(event.device()).and_then(move |info| {
-            let info: LInfo = info.into();
-            let pool_uuid = info.stratis_identifiers().pool_uuid;
-            if pools.contains_uuid(pool_uuid) {
-                // FIXME: There is the possibilty of an error condition here,
-                // if the device found is not in the already set up pool.
-                None
-            } else if let Some(mut set) = self.hopeless_device_sets.remove(&pool_uuid) {
-                set.insert(info);
-                self.hopeless_device_sets.insert(pool_uuid, set);
-                None
-            } else {
-                let mut devices = self
-                    .errored_pool_devices
-                    .remove(&pool_uuid)
-                    .unwrap_or_else(HashMap::new);
+        let event_type = event.event_type();
+        if event_type == libudev::EventType::Add || event_type == libudev::EventType::Change {
+            identify_block_device(event.device()).and_then(move |info| {
+                let info: LInfo = info.into();
+                let pool_uuid = info.stratis_identifiers().pool_uuid;
+                if pools.contains_uuid(pool_uuid) {
+                    // FIXME: There is the possibilty of an error condition here,
+                    // if the device found is not in the already set up pool.
+                    None
+                } else if let Some(mut set) = self.hopeless_device_sets.remove(&pool_uuid) {
+                    set.insert(info);
+                    self.hopeless_device_sets.insert(pool_uuid, set);
+                    None
+                } else {
+                    let mut devices = self
+                        .errored_pool_devices
+                        .remove(&pool_uuid)
+                        .unwrap_or_else(HashMap::new);
 
-                if !self.process_info(&mut devices, info) {
-                    return None;
+                    if !self.process_info(&mut devices, info) {
+                        return None;
+                    }
+
+                    // FIXME: An attempt to set up the pool is made, even if no
+                    // new device has been added to the set of devices that appear
+                    // to belong to the pool. The reason for this is that there
+                    // may be many causes of failure to set up a pool, and that
+                    // it may be worth another try. If an attempt to setup the
+                    // pool is only made on discovery of a new device that may
+                    // leave a pool that could be set up in limbo forever. An
+                    // alternative, where the user can explicitly ask to try to
+                    // set up an incomplete pool would be a better choice.
+                    self.try_setup_pool(pools, pool_uuid, devices)
+                        .map(|(name, pool)| (pool_uuid, name, pool))
                 }
-
-                // FIXME: An attempt to set up the pool is made, even if no
-                // new device has been added to the set of devices that appear
-                // to belong to the pool. The reason for this is that there
-                // may be many causes of failure to set up a pool, and that
-                // it may be worth another try. If an attempt to setup the
-                // pool is only made on discovery of a new device that may
-                // leave a pool that could be set up in limbo forever. An
-                // alternative, where the user can explicitly ask to try to
-                // set up an incomplete pool would be a better choice.
-                self.try_setup_pool(pools, pool_uuid, devices)
-                    .map(|(name, pool)| (pool_uuid, name, pool))
-            }
-        })
+            })
+        } else {
+            None
+        }
     }
 
     /// Generate a JSON report giving some information about the internals

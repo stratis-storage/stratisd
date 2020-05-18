@@ -7,9 +7,7 @@ use std::{
     ffi::CString,
     fs::File,
     io::{self, Read},
-    iter::Take,
     os::unix::io::{FromRawFd, RawFd},
-    slice::Iter,
     str,
 };
 
@@ -230,14 +228,8 @@ fn parse_keyctl_describe_string(key_str: &str) -> StratisResult<String> {
 }
 
 /// A list of key IDs that were read from the persistent root keyring.
-///
-/// This list must keep track of the size externally to the Vec, because the
-/// elements in the Vec are allocated by means of a syscall which fills the
-/// Vec's internal buffer, rather than by Vec operations, so key_ids.len()
-/// will always be 0.
 struct KeyIdList {
     key_ids: Vec<KeySerial>,
-    num_key_ids: usize,
 }
 
 impl KeyIdList {
@@ -245,7 +237,6 @@ impl KeyIdList {
     fn new() -> KeyIdList {
         KeyIdList {
             key_ids: Vec::with_capacity(4096),
-            num_key_ids: 0,
         }
     }
 
@@ -269,25 +260,14 @@ impl KeyIdList {
                 i => i as usize,
             };
 
-            if num_key_ids > self.key_ids.capacity() {
-                self.key_ids.reserve(num_key_ids - self.key_ids.capacity());
-            } else {
-                self.num_key_ids = num_key_ids;
+            if num_key_ids <= self.key_ids.capacity() {
                 done = true;
             }
+
+            self.key_ids.resize(num_key_ids, 0);
         }
 
         Ok(())
-    }
-
-    /// Get the number of key IDs currently stored in this list.
-    fn len(&self) -> usize {
-        self.num_key_ids
-    }
-
-    /// Iterate through the key IDs.
-    fn iter(&self) -> Take<Iter<KeySerial>> {
-        self.key_ids.iter().take(self.len())
     }
 
     /// Get the list of key descriptions corresponding to the kernel key IDs.
@@ -296,11 +276,11 @@ impl KeyIdList {
     fn to_key_descs(&self) -> StratisResult<Vec<String>> {
         let mut key_descs = Vec::new();
 
-        for id in self.iter() {
+        for id in self.key_ids.iter() {
             let mut keyctl_buffer: Vec<u8> = Vec::with_capacity(4096);
 
-            let mut description_length = None;
-            while description_length.is_none() {
+            let mut done = false;
+            while !done {
                 let len = match unsafe {
                     syscall(
                         SYS_keyctl,
@@ -314,16 +294,14 @@ impl KeyIdList {
                     i => i as usize,
                 };
 
-                if len > keyctl_buffer.capacity() {
-                    keyctl_buffer.reserve(len - keyctl_buffer.capacity());
-                } else {
-                    description_length = Some(len);
+                if len <= keyctl_buffer.capacity() {
+                    done = true;
                 }
+
+                keyctl_buffer.resize(len, 0);
             }
 
-            let description_length = description_length.expect("must be Some to exit loop");
-
-            if description_length == 0 {
+            if keyctl_buffer.is_empty() {
                 return Err(StratisError::Error(format!(
                     "Kernel key description for key {} appeared to be entirely empty",
                     id
@@ -331,7 +309,7 @@ impl KeyIdList {
             }
 
             let keyctl_str =
-                str::from_utf8(&keyctl_buffer[..description_length - 1]).map_err(|e| {
+                str::from_utf8(&keyctl_buffer[..keyctl_buffer.len() - 1]).map_err(|e| {
                     StratisError::Engine(
                         ErrorEnum::Invalid,
                         format!("Kernel key description was not valid UTF8: {}", e),

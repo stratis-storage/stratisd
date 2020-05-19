@@ -40,7 +40,6 @@
 
 use std::{
     collections::HashMap,
-    convert::TryFrom,
     fmt,
     fs::OpenOptions,
     path::{Path, PathBuf},
@@ -184,9 +183,8 @@ fn process_luks_device(dev: &libudev::Device) -> Option<LuksInfo> {
                     None
                 }
                 Ok(Some(handle)) => {
-                    let key_description = handle.key_description();
-                    match KeyDescription::try_from(key_description.to_string()) {
-                        Ok(key_description) => Some(LuksInfo {
+                    match KeyDescription::from_system_key_desc(handle.key_description()) {
+                        Some(Ok(key_description)) => Some(LuksInfo {
                             info: StratisInfo {
                                 identifiers: *handle.device_identifiers(),
                                 device_number,
@@ -194,11 +192,10 @@ fn process_luks_device(dev: &libudev::Device) -> Option<LuksInfo> {
                             },
                             key_description,
                         }),
-                        Err(err) => {
-                            warn!("invalid key description {} read from LUKS metadata on device {}, disregarding the device: {}",
-                                  key_description,
-                                  devnode.display(),
-                                  err);
+                        _ => {
+                            warn!("Could not obtain valid Stratis key description from LUKS metadata on device {}",
+                              devnode.display());
+
                             None
                         }
                     }

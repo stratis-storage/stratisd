@@ -278,6 +278,17 @@ impl StratPool {
     fn datadevs_encrypted(&self) -> bool {
         self.backstore.data_tier_is_encrypted()
     }
+
+    pub fn get_strat_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &StratBlockDev)> {
+        self.backstore.get_blockdev_by_uuid(uuid)
+    }
+
+    pub fn get_mut_strat_blockdev(
+        &mut self,
+        uuid: DevUuid,
+    ) -> Option<(BlockDevTier, &mut StratBlockDev)> {
+        self.backstore.get_mut_blockdev_by_uuid(uuid)
+    }
 }
 
 impl<'a> Into<Value> for &'a StratPool {
@@ -536,14 +547,12 @@ impl Pool for StratPool {
     }
 
     fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &dyn BlockDev)> {
-        self.backstore
-            .get_blockdev_by_uuid(uuid)
+        self.get_strat_blockdev(uuid)
             .map(|(t, b)| (t, b as &dyn BlockDev))
     }
 
     fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut dyn BlockDev)> {
-        self.backstore
-            .get_mut_blockdev_by_uuid(uuid)
+        self.get_mut_strat_blockdev(uuid)
             .map(|(t, b)| (t, b as &mut dyn BlockDev))
     }
 

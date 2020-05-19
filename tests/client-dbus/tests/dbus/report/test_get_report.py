@@ -46,10 +46,9 @@ class GetReportTestCase(SimTestCase):
         """
         Test that errored_pool_report returns a valid JSON response.
         """
-        ((is_some, json_str), return_code, _) = ReportR1.Methods.GetReport(
+        (json_str, return_code, _) = ReportR1.Methods.GetReport(
             self._proxy, {"name": "errored_pool_report"}
         )
-        self.assertEqual(is_some, True)
         self.assertEqual(return_code, 0)
         # Test that JSON is valid - will raise ValueError if not
         json.loads(json_str)
@@ -58,8 +57,8 @@ class GetReportTestCase(SimTestCase):
         """
         Test that an invalid report name returns an error.
         """
-        ((is_some, _), return_code, _) = ReportR1.Methods.GetReport(
+        (json_str, return_code, _) = ReportR1.Methods.GetReport(
             self._proxy, {"name": "nonexistent_report"}
         )
-        self.assertEqual(is_some, False)
+        self.assertEqual(json_str, "")
         self.assertNotEqual(return_code, 0)

@@ -777,10 +777,17 @@ impl LiminalDevices {
         if event_type == libudev::EventType::Add || event_type == libudev::EventType::Change {
             identify_block_device(event.device()).and_then(move |info| {
                 let info: LInfo = info.into();
-                let pool_uuid = info.stratis_identifiers().pool_uuid;
-                if pools.contains_uuid(pool_uuid) {
-                    // FIXME: There is the possibilty of an error condition here,
-                    // if the device found is not in the already set up pool.
+                let stratis_identifiers = info.stratis_identifiers();
+                let pool_uuid = stratis_identifiers.pool_uuid;
+                let device_uuid = stratis_identifiers.device_uuid;
+                if let Some((_, pool)) = pools.get_by_uuid(pool_uuid) {
+                    if pool.get_strat_blockdev(device_uuid).is_none() {
+                        warn!("Found a device with {} that identifies itself as belonging to pool with UUID {}, but that pool is already up and running and does not appear to contain the device",
+                              info,
+                              pool_uuid.to_simple_ref());
+                    }
+                    // FIXME: There might be something to check if the device is
+                    // included in the pool, but that is less clear.
                     None
                 } else if let Some(mut set) = self.hopeless_device_sets.remove(&pool_uuid) {
                     set.insert(info);

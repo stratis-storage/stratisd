@@ -11,12 +11,10 @@ pub fn get_report_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>,
         .in_arg(("name", "s"))
         // The report is a JSON object.
         //
-        // b: boolean that is false if the default value is being returned in the case
-        //    of an error
         // s: string representation of a JSON object containing the report
         //
-        // Rust representation: (bool, serde_json::Value)
-        .out_arg(("result", "(bs)"))
+        // Rust representation: serde_json::Value
+        .out_arg(("result", "s"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"))
 }

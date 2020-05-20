@@ -819,7 +819,9 @@ impl LiminalDevices {
     fn process_info_remove(&mut self, devices: &mut HashMap<DevUuid, LInfo>, info: LInfo) {
         // Combine two devices which have identical pool and device UUIDs.
         // The first argument is the existing information, the second is the
-        // information about the removed device.
+        // information about the removed device, where "removed" means there
+        // was a udev "remove" event and this info has been found out about the
+        // device attached to the event.
         fn combine_remove_devices(info_1: LInfo, info_2: LInfo) -> Option<LInfo> {
             match (info_1, info_2) {
                 (LInfo::Luks(luks_info), LInfo::Stratis(_)) => Some(LInfo::Luks(luks_info)),
@@ -829,7 +831,28 @@ impl LiminalDevices {
                         luks: None,
                     }))
                 }
-                (_, _) => None,
+                (LInfo::Stratis(info_1), LInfo::Stratis(info_2)) => {
+                    if info_1.ids.device_number != info_2.ids.device_number {
+                        warn!("Received udev remove event on a device with {} that stratisd does not know about; retaining duplicate device {} among the set of devices known to belong to pool with UUID {}",
+                              info_2,
+                              info_1,
+                              info_1.ids.identifiers.pool_uuid);
+                        Some(LInfo::Stratis(info_1))
+                    } else {
+                        None
+                    }
+                }
+                (LInfo::Luks(info_1), LInfo::Luks(info_2)) => {
+                    if info_1.ids.device_number != info_2.ids.device_number {
+                        warn!("Received udev remove event on a device with {} that stratisd does not know about; retaining duplicate device {} among the set of devices known to belong to pool with UUID {}",
+                              info_2,
+                              info_1,
+                              info_1.ids.identifiers.pool_uuid);
+                        Some(LInfo::Luks(info_1))
+                    } else {
+                        None
+                    }
+                }
             }
         }
 

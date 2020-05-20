@@ -114,7 +114,7 @@ impl Backstore {
     /// Precondition:
     ///   * key_description.is_some() -> every StratBlockDev in datadevs has a
     ///   key description and that key description == key_description
-    ///   *key_description.is_none() -> no StratBlockDev in datadevs has a
+    ///   * key_description.is_none() -> no StratBlockDev in datadevs has a
     ///   key description.
     ///   * no StratBlockDev in cachedevs has a key description
     ///

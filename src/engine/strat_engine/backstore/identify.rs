@@ -45,6 +45,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use serde_json::Value;
+
 use devicemapper::Device;
 
 use crate::engine::{
@@ -98,6 +100,32 @@ impl fmt::Display for StratisInfo {
             self.device_number,
             self.devnode.display()
         )
+    }
+}
+
+impl<'a> Into<Value> for &'a StratisInfo {
+    // Precondition: (&StratisIdentifiers).into() pattern matches
+    // Value::Object()
+    fn into(self) -> Value {
+        let mut json = json!({
+            "major": Value::from(self.device_number.major),
+            "minor": Value::from(self.device_number.minor),
+            "devnode": Value::from(self.devnode.display().to_string())
+        });
+        if let Value::Object(ref mut map) = json {
+            map.extend(
+                if let Value::Object(map) =
+                    <&StratisIdentifiers as Into<Value>>::into(&self.identifiers)
+                {
+                    map.into_iter()
+                } else {
+                    unreachable!("StratisIdentifiers conversion returns a JSON object");
+                },
+            );
+        } else {
+            unreachable!("json!() always creates a JSON object")
+        };
+        json
     }
 }
 

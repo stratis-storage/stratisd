@@ -340,6 +340,27 @@ impl From<LuksInfo> for LLuksInfo {
     }
 }
 
+impl<'a> Into<Value> for &'a LLuksInfo {
+    // Precondition: (&StratisInfo).into() pattern matches Value::Object()
+    fn into(self) -> Value {
+        let mut json = json!({
+            "key_description": Value::from(self.key_description.to_system_string())
+        });
+        if let Value::Object(ref mut map) = json {
+            map.extend(
+                if let Value::Object(map) = <&StratisInfo as Into<Value>>::into(&self.ids) {
+                    map.into_iter()
+                } else {
+                    unreachable!("StratisInfo conversion returns a JSON object");
+                },
+            );
+        } else {
+            unreachable!("json!() always creates a JSON object");
+        };
+        json
+    }
+}
+
 /// Info for a Stratis device.
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub struct LStratisInfo {
@@ -371,6 +392,30 @@ impl From<StratisInfo> for LStratisInfo {
             ids: info,
             luks: None,
         }
+    }
+}
+
+impl<'a> Into<Value> for &'a LStratisInfo {
+    // Precondition: (&StratisInfo).into() pattern matches Value::Object()
+    // Precondition: (&LLuksInfo).into() pattern matches Value::Object()
+    fn into(self) -> Value {
+        let mut json = self
+            .luks
+            .as_ref()
+            .map(|luks| json!({ "luks": <&LLuksInfo as Into<Value>>::into(luks) }))
+            .unwrap_or_else(|| json!({}));
+        if let Value::Object(ref mut map) = json {
+            map.extend(
+                if let Value::Object(map) = <&StratisInfo as Into<Value>>::into(&self.ids) {
+                    map.into_iter()
+                } else {
+                    unreachable!("StratisInfo conversion returns a JSON object");
+                },
+            );
+        } else {
+            unreachable!("json!() always creates a JSON object");
+        };
+        json
     }
 }
 
@@ -410,6 +455,17 @@ impl From<DeviceInfo> for LInfo {
         match info {
             DeviceInfo::Luks(info) => LInfo::Luks(info.into()),
             DeviceInfo::Stratis(info) => LInfo::Stratis(info.into()),
+        }
+    }
+}
+
+impl<'a> Into<Value> for &'a LInfo {
+    // Precondition: (&LStratisInfo).into() pattern matches Value::Object()
+    // Precondition: (&LLuksInfo).into() pattern matches Value::Object()
+    fn into(self) -> Value {
+        match self {
+            LInfo::Stratis(info) => info.into(),
+            LInfo::Luks(info) => info.into(),
         }
     }
 }
@@ -880,18 +936,9 @@ impl<'a> Into<Value> for &'a LiminalDevices {
             self.errored_pool_devices
                 .iter()
                 .map(|(uuid, map)| {
-                    let devices = map
-                        .values()
-                        .map(|info| {
-                            Value::from(match info {
-                                LInfo::Luks(info) => info.ids.devnode.display().to_string(),
-                                LInfo::Stratis(info) => info.ids.devnode.display().to_string(),
-                            })
-                        })
-                        .collect();
                     json!({
                         "pool_uuid": uuid.to_simple_ref().to_string(),
-                        "devices": Value::Array(devices),
+                        "devices": Value::Array(map.values().map(|info| info.into()).collect()),
                     })
                 })
                 .collect(),

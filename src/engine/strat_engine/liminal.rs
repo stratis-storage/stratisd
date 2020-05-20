@@ -312,41 +312,6 @@ pub fn get_blockdevs(
     Ok((datadevs, cachedevs))
 }
 
-/// Combine two devices which have identical pool and device UUIDs.
-/// The first argument is the older information, the second the newer.
-/// Allow the newer information to supplant the older.
-fn combine_two_devices(info_1: LInfo, info_2: LInfo) -> LInfo {
-    match (info_1, info_2) {
-        (LInfo::Luks(luks_info), LInfo::Stratis(strat_info)) => LInfo::Stratis(LStratisInfo {
-            ids: strat_info.ids,
-            luks: Some(luks_info),
-        }),
-        (LInfo::Stratis(strat_info), LInfo::Luks(luks_info)) => LInfo::Stratis(LStratisInfo {
-            ids: strat_info.ids,
-            luks: Some(luks_info),
-        }),
-        (LInfo::Luks(_), LInfo::Luks(info_2)) => LInfo::Luks(info_2),
-        (LInfo::Stratis(info_1), LInfo::Stratis(info_2)) => LInfo::Stratis(LStratisInfo {
-            ids: info_2.ids,
-            luks: info_2.luks.or(info_1.luks),
-        }),
-    }
-}
-
-/// Combine two devices which have identical pool and device UUIDs.
-/// The first argument is the existing information, the second is the
-/// information about the removed device.
-fn combine_remove_devices(info_1: LInfo, info_2: LInfo) -> Option<LInfo> {
-    match (info_1, info_2) {
-        (LInfo::Luks(luks_info), LInfo::Stratis(_)) => Some(LInfo::Luks(luks_info)),
-        (LInfo::Stratis(strat_info), LInfo::Luks(_)) => Some(LInfo::Stratis(LStratisInfo {
-            ids: strat_info.ids,
-            luks: None,
-        })),
-        (_, _) => None,
-    }
-}
-
 /// Info for a discovered Luks Device belonging to Stratis.
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub struct LLuksInfo {
@@ -760,6 +725,31 @@ impl LiminalDevices {
 
     /// Process a device for inclusion in a set of devices.
     fn process_info(&mut self, devices: &mut HashMap<DevUuid, LInfo>, info: LInfo) {
+        // Combine two devices which have identical pool and device UUIDs.
+        // The first argument is the older information, the second the newer.
+        // Allow the newer information to supplant the older.
+        fn combine_two_devices(info_1: LInfo, info_2: LInfo) -> LInfo {
+            match (info_1, info_2) {
+                (LInfo::Luks(luks_info), LInfo::Stratis(strat_info)) => {
+                    LInfo::Stratis(LStratisInfo {
+                        ids: strat_info.ids,
+                        luks: Some(luks_info),
+                    })
+                }
+                (LInfo::Stratis(strat_info), LInfo::Luks(luks_info)) => {
+                    LInfo::Stratis(LStratisInfo {
+                        ids: strat_info.ids,
+                        luks: Some(luks_info),
+                    })
+                }
+                (LInfo::Luks(_), LInfo::Luks(info_2)) => LInfo::Luks(info_2),
+                (LInfo::Stratis(info_1), LInfo::Stratis(info_2)) => LInfo::Stratis(LStratisInfo {
+                    ids: info_2.ids,
+                    luks: info_2.luks.or(info_1.luks),
+                }),
+            }
+        }
+
         let stratis_identifiers = info.stratis_identifiers();
         let device_uuid = stratis_identifiers.device_uuid;
 
@@ -778,6 +768,22 @@ impl LiminalDevices {
 
     /// Process a device for removal from a set of devices.
     fn process_info_remove(&mut self, devices: &mut HashMap<DevUuid, LInfo>, info: LInfo) {
+        // Combine two devices which have identical pool and device UUIDs.
+        // The first argument is the existing information, the second is the
+        // information about the removed device.
+        fn combine_remove_devices(info_1: LInfo, info_2: LInfo) -> Option<LInfo> {
+            match (info_1, info_2) {
+                (LInfo::Luks(luks_info), LInfo::Stratis(_)) => Some(LInfo::Luks(luks_info)),
+                (LInfo::Stratis(strat_info), LInfo::Luks(_)) => {
+                    Some(LInfo::Stratis(LStratisInfo {
+                        ids: strat_info.ids,
+                        luks: None,
+                    }))
+                }
+                (_, _) => None,
+            }
+        }
+
         let stratis_identifiers = info.stratis_identifiers();
         let device_uuid = stratis_identifiers.device_uuid;
 

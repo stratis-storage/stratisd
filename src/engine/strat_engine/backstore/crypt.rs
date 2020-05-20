@@ -523,13 +523,13 @@ impl CryptHandle {
 
     /// Activate encrypted Stratis device using the name stored in the
     /// Stratis token
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn activate(&mut self) -> Result<()> {
         activate_and_check_device_path(&mut self.device, &self.name.to_owned())
     }
 
     /// Deactivate the device referenced by the current device handle.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn deactivate(&mut self) -> Result<()> {
         let name = self.name.to_owned();
         ensure_inactive(&mut self.device, &name)

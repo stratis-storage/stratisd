@@ -333,6 +333,20 @@ fn combine_two_devices(info_1: LInfo, info_2: LInfo) -> LInfo {
     }
 }
 
+/// Combine two devices which have identical pool and device UUIDs.
+/// The first argument is the existing information, the second is the
+/// information about the removed device.
+fn combine_remove_devices(info_1: LInfo, info_2: LInfo) -> Option<LInfo> {
+    match (info_1, info_2) {
+        (LInfo::Luks(luks_info), LInfo::Stratis(_)) => Some(LInfo::Luks(luks_info)),
+        (LInfo::Stratis(strat_info), LInfo::Luks(_)) => Some(LInfo::Stratis(LStratisInfo {
+            ids: strat_info.ids,
+            luks: None,
+        })),
+        (_, _) => None,
+    }
+}
+
 /// Info for a discovered Luks Device belonging to Stratis.
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub struct LLuksInfo {
@@ -762,6 +776,18 @@ impl LiminalDevices {
         }
     }
 
+    /// Process a device for removal from a set of devices.
+    fn process_info_remove(&mut self, devices: &mut HashMap<DevUuid, LInfo>, info: LInfo) {
+        let stratis_identifiers = info.stratis_identifiers();
+        let device_uuid = stratis_identifiers.device_uuid;
+
+        if let Some(removed) = devices.remove(&device_uuid) {
+            if let Some(info) = combine_remove_devices(removed, info) {
+                devices.insert(device_uuid, info);
+            }
+        }
+    }
+
     /// Given some information gathered about a single Stratis device, determine
     /// whether or not a pool can be constructed, and if it can, construct the
     /// pool and return the newly constructed pool. If the device appears to
@@ -810,6 +836,35 @@ impl LiminalDevices {
                     // leave a pool that could be set up in limbo forever. An
                     // alternative, where the user can explicitly ask to try to
                     // set up an incomplete pool would be a better choice.
+                    self.try_setup_pool(pools, pool_uuid, devices)
+                        .map(|(name, pool)| (pool_uuid, name, pool))
+                }
+            })
+        } else if event_type == libudev::EventType::Remove {
+            identify_block_device(event.device()).and_then(move |info| {
+                let info: LInfo = info.into();
+                let stratis_identifiers = info.stratis_identifiers();
+                let pool_uuid = stratis_identifiers.pool_uuid;
+                let device_uuid = stratis_identifiers.device_uuid;
+                if let Some((_, pool)) = pools.get_by_uuid(pool_uuid) {
+                    if pool.get_strat_blockdev(device_uuid).is_some() {
+                        warn!("udev reports that a device with {} that appears to belong to a pool with UUID {} has just been removed; this is likely to result in data loss",
+                              info,
+                              pool_uuid.to_simple_ref());
+                    }
+                    None
+                } else if let Some(mut set) = self.hopeless_device_sets.remove(&pool_uuid) {
+                    set.remove(&info);
+                    self.hopeless_device_sets.insert(pool_uuid, set);
+                    None
+                } else {
+                    let mut devices = self
+                        .errored_pool_devices
+                        .remove(&pool_uuid)
+                        .unwrap_or_else(HashMap::new);
+
+                    self.process_info_remove(&mut devices, info);
+
                     self.try_setup_pool(pools, pool_uuid, devices)
                         .map(|(name, pool)| (pool_uuid, name, pool))
                 }

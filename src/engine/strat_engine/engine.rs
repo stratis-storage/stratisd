@@ -124,7 +124,7 @@ impl<'a> Into<Value> for &'a StratEngine {
                     })
                     .collect()
             ),
-            "errored_pools": self.liminal_devices.report(),
+            "errored_pools": <&LiminalDevices as Into<Value>>::into(&self.liminal_devices),
         })
     }
 }
@@ -132,7 +132,7 @@ impl<'a> Into<Value> for &'a StratEngine {
 impl Report for StratEngine {
     fn get_report(&self, report_type: ReportType) -> Value {
         match report_type {
-            ReportType::ErroredPoolDevices => self.liminal_devices.report(),
+            ReportType::ErroredPoolDevices => (&self.liminal_devices).into(),
             ReportType::EngineState => self.into(),
         }
     }

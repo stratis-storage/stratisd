@@ -872,10 +872,10 @@ impl LiminalDevices {
             None
         }
     }
+}
 
-    /// Generate a JSON report giving some information about the internals
-    /// of these devices.
-    pub fn report(&self) -> Value {
+impl<'a> Into<Value> for &'a LiminalDevices {
+    fn into(self) -> Value {
         Value::Array(
             self.errored_pool_devices
                 .iter()

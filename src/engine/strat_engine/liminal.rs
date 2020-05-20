@@ -556,7 +556,6 @@ impl LiminalDevices {
         pool_uuids
             .iter()
             .filter_map(|pool_uuid| {
-                let mut info_map = HashMap::new();
                 let luks_infos = luks_devices.remove(pool_uuid);
                 let stratis_infos = stratis_devices.remove(pool_uuid);
                 let mut infos: Vec<LInfo> = stratis_infos
@@ -571,13 +570,26 @@ impl LiminalDevices {
                     )
                     .collect();
 
-                while !infos.is_empty() {
+                let mut info_map = Some(HashMap::new());
+                while !infos.is_empty() && info_map.is_some() {
                     let info: LInfo = infos.pop().expect("!infos.is_empty()");
-                    self.process_info(&mut info_map, info);
+                    info_map = match self.process_info_add(info_map.expect("loop condition"), info)
+                    {
+                        Err(mut hopeless) => {
+                            hopeless.extend(infos.drain(..));
+                            self.hopeless_device_sets.insert(*pool_uuid, hopeless);
+                            None
+                        }
+                        Ok(info_map) => Some(info_map),
+                    }
                 }
 
-                self.try_setup_pool(&table, *pool_uuid, info_map)
-                    .map(|(pool_name, pool)| (pool_name, *pool_uuid, pool))
+                match info_map {
+                    Some(info_map) => self
+                        .try_setup_pool(&table, *pool_uuid, info_map)
+                        .map(|(pool_name, pool)| (pool_name, *pool_uuid, pool)),
+                    None => None,
+                }
             })
             .collect::<Vec<(Name, PoolUuid, StratPool)>>()
     }
@@ -773,29 +785,99 @@ impl LiminalDevices {
     }
 
     /// Process a device for inclusion in a set of devices.
-    fn process_info(&mut self, devices: &mut HashMap<DevUuid, LInfo>, info: LInfo) {
+    /// If processing was succesful, return the original set, modified.
+    /// If unsuccesful, return the new set to be added to the hopeless
+    /// category.
+    fn process_info_add(
+        &mut self,
+        mut devices: HashMap<DevUuid, LInfo>,
+        info: LInfo,
+    ) -> Result<HashMap<DevUuid, LInfo>, HashSet<LInfo>> {
+        // Returns true if the information found via udev for two devices is
+        // compatible, otherwise false.
+        // Precondition: Stratis identifiers of devices are the same
+        fn luks_luks_compatible(info_1: &LLuksInfo, info_2: &LLuksInfo) -> bool {
+            assert_eq!(info_1.ids.identifiers, info_2.ids.identifiers);
+            info_1.ids.device_number == info_2.ids.device_number
+                && info_1.key_description == info_2.key_description
+        }
+
+        // Returns true if the information found via udev for two devices is
+        // compatible, otherwise false.
+        // Precondition: Stratis identifiers of devices are the same
+        fn stratis_stratis_compatible(info_1: &LStratisInfo, info_2: &LStratisInfo) -> bool {
+            assert_eq!(info_1.ids.identifiers, info_2.ids.identifiers);
+            info_1.ids.device_number == info_2.ids.device_number
+                && match (info_1.luks.as_ref(), info_2.luks.as_ref()) {
+                    (Some(luks_1), Some(luks_2)) => luks_luks_compatible(luks_1, luks_2),
+                    _ => true,
+                }
+        }
+
         // Combine two devices which have identical pool and device UUIDs.
         // The first argument is the older information, the second the newer.
         // Allow the newer information to supplant the older.
-        fn combine_two_devices(info_1: LInfo, info_2: LInfo) -> LInfo {
+        // Precondition: the newer information must always represent a single
+        // device, so the luks field of a newly discovered Stratis device
+        // must always be None.
+        fn combine_two_devices(
+            info_1: LInfo,
+            info_2: LInfo,
+        ) -> Result<LInfo, (String, LInfo, LInfo)> {
             match (info_1, info_2) {
                 (LInfo::Luks(luks_info), LInfo::Stratis(strat_info)) => {
-                    LInfo::Stratis(LStratisInfo {
+                    assert_eq!(strat_info.luks, None);
+                    Ok(LInfo::Stratis(LStratisInfo {
                         ids: strat_info.ids,
                         luks: Some(luks_info),
-                    })
+                    }))
                 }
                 (LInfo::Stratis(strat_info), LInfo::Luks(luks_info)) => {
-                    LInfo::Stratis(LStratisInfo {
+                    if let Some(luks) = strat_info.luks.as_ref() {
+                        if !luks_luks_compatible(luks, &luks_info) {
+                            let (info_1, info_2) =
+                                (LInfo::Stratis(strat_info), LInfo::Luks(luks_info));
+                            let err_msg = format!(
+                                "Information about previously discovered device {} incompatible with information about newly discovered device {}",
+                                info_1,
+                                info_2);
+
+                            return Err((err_msg, info_1, info_2));
+                        }
+                    }
+                    Ok(LInfo::Stratis(LStratisInfo {
                         ids: strat_info.ids,
                         luks: Some(luks_info),
-                    })
+                    }))
                 }
-                (LInfo::Luks(_), LInfo::Luks(info_2)) => LInfo::Luks(info_2),
-                (LInfo::Stratis(info_1), LInfo::Stratis(info_2)) => LInfo::Stratis(LStratisInfo {
-                    ids: info_2.ids,
-                    luks: info_2.luks.or(info_1.luks),
-                }),
+                (LInfo::Luks(luks_info_1), LInfo::Luks(luks_info_2)) => {
+                    if !luks_luks_compatible(&luks_info_1, &luks_info_2) {
+                        let (info_1, info_2) = (LInfo::Luks(luks_info_1), LInfo::Luks(luks_info_2));
+                        let err_msg = format!(
+                            "Information about previously discovered device {} incompatible with information about newly discovered device {}",
+                            info_1,
+                            info_2);
+                        Err((err_msg, info_1, info_2))
+                    } else {
+                        Ok(LInfo::Luks(luks_info_2))
+                    }
+                }
+                (LInfo::Stratis(strat_info_1), LInfo::Stratis(strat_info_2)) => {
+                    if !stratis_stratis_compatible(&strat_info_1, &strat_info_2) {
+                        let (info_1, info_2) =
+                            (LInfo::Stratis(strat_info_1), LInfo::Stratis(strat_info_2));
+                        let err_msg = format!(
+                            "Information about previously discovered device {} incompatible with information about newly discovered device {}",
+                            info_1,
+                            info_2);
+                        Err((err_msg, info_1, info_2))
+                    } else {
+                        Ok(LInfo::Stratis(LStratisInfo {
+                            ids: strat_info_2.ids,
+                            luks: strat_info_2.luks.or(strat_info_1.luks),
+                        }))
+                    }
+                }
             }
         }
 
@@ -808,10 +890,25 @@ impl LiminalDevices {
                     "device with Stratis identifiers {} discovered, i.e., identified for the first time during this execution of stratisd",
                     stratis_identifiers);
                 devices.insert(device_uuid, info);
+                Ok(devices)
             }
-            Some(removed) => {
-                devices.insert(device_uuid, combine_two_devices(removed, info));
-            }
+            Some(removed) => match combine_two_devices(removed, info) {
+                Err((err, removed, info)) => {
+                    warn!(
+                        "Moving set of devices with pool UUID {} to hopeless sets because {}",
+                        stratis_identifiers.pool_uuid, err
+                    );
+                    let mut hopeless: HashSet<LInfo> =
+                        devices.drain().map(|(_, info)| info).collect();
+                    hopeless.insert(removed);
+                    hopeless.insert(info);
+                    Err(hopeless)
+                }
+                Ok(info) => {
+                    devices.insert(device_uuid, info);
+                    Ok(devices)
+                }
+            },
         }
     }
 
@@ -898,12 +995,18 @@ impl LiminalDevices {
                     self.hopeless_device_sets.insert(pool_uuid, set);
                     None
                 } else {
-                    let mut devices = self
+                    let devices = self
                         .errored_pool_devices
                         .remove(&pool_uuid)
                         .unwrap_or_else(HashMap::new);
 
-                    self.process_info(&mut devices, info);
+                    let devices = match self.process_info_add(devices, info) {
+                        Err(hopeless) => {
+                            self.hopeless_device_sets.insert(pool_uuid, hopeless);
+                            return None
+                        }
+                        Ok(devices) => devices,
+                    };
 
                     // FIXME: An attempt to set up the pool is made, even if no
                     // new device has been added to the set of devices that appear

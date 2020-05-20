@@ -49,7 +49,7 @@ def device_name_list(min_devices=0, max_devices=10):
 
 class _Service:
     """
-    Handle starting and stopping the Rust service.
+    Handle starting and stopping the stratisd daemon.
     """
 
     def setup(self):

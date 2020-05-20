@@ -406,6 +406,7 @@ mod test {
 
         assert!(engine.get_pool(uuid1).is_some());
         assert!(engine.get_pool(uuid2).is_some());
+        assert_eq!(engine.liminal_devices, LiminalDevices::default());
 
         engine.teardown().unwrap();
         remove_dir_all(DEV_PATH).unwrap();
@@ -414,6 +415,7 @@ mod test {
 
         assert!(engine.get_pool(uuid1).is_some());
         assert!(engine.get_pool(uuid2).is_some());
+        assert_eq!(engine.liminal_devices, LiminalDevices::default());
 
         engine.teardown().unwrap();
     }

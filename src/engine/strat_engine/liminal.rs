@@ -441,7 +441,7 @@ impl fmt::Display for Destination {
 
 /// Devices which stratisd has discovered but which have not been assembled
 /// into pools.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Eq, PartialEq)]
 pub struct LiminalDevices {
     /// Sets of devices which have not been promoted to pools, but which
     /// may still have a chance.

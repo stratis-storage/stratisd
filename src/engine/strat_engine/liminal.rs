@@ -441,7 +441,7 @@ impl fmt::Display for Destination {
 
 /// Devices which stratisd has discovered but which have not been assembled
 /// into pools.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct LiminalDevices {
     /// Sets of devices which have not been promoted to pools, but which
     /// may still have a chance.
@@ -455,13 +455,6 @@ pub struct LiminalDevices {
 }
 
 impl LiminalDevices {
-    pub fn new() -> LiminalDevices {
-        LiminalDevices {
-            errored_pool_devices: HashMap::new(),
-            hopeless_device_sets: HashMap::new(),
-        }
-    }
-
     #[allow(dead_code)]
     fn invariant(&self) {
         assert!(self

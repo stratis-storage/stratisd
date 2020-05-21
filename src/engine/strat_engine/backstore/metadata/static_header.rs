@@ -70,8 +70,8 @@ impl fmt::Display for StratisIdentifiers {
 impl<'a> Into<Value> for &'a StratisIdentifiers {
     fn into(self) -> Value {
         json!({
-            "pool_UUID": Value::from(self.pool_uuid.to_simple_ref().to_string()),
-            "device_UUID": Value::from(self.device_uuid.to_simple_ref().to_string())
+            "pool_uuid": Value::from(self.pool_uuid.to_simple_ref().to_string()),
+            "device_uuid": Value::from(self.device_uuid.to_simple_ref().to_string())
         })
     }
 }

@@ -292,7 +292,7 @@ impl CryptInitializer {
                 device,
                 self.physical_path,
                 self.identifiers,
-                key_description.to_system_string(),
+                key_description.clone(),
                 format_crypt_name(&dev_uuid),
             )),
             Err(e) => {
@@ -313,7 +313,7 @@ pub struct CryptHandle {
     device: CryptDevice,
     physical_path: PathBuf,
     identifiers: StratisIdentifiers,
-    key_description: String,
+    key_description: KeyDescription,
     name: String,
 }
 
@@ -322,7 +322,7 @@ impl CryptHandle {
         device: CryptDevice,
         physical_path: PathBuf,
         identifiers: StratisIdentifiers,
-        key_description: String,
+        key_description: KeyDescription,
         name: String,
     ) -> CryptHandle {
         CryptHandle {
@@ -413,6 +413,16 @@ impl CryptHandle {
 
         let identifiers = CryptHandle::identifiers_from_metadata(&mut device)?;
         let key_description = CryptHandle::key_desc_from_metadata(&mut device)?;
+        let key_description = match KeyDescription::from_system_key_desc(&key_description) {
+            Some(Ok(description)) => description,
+            _ => {
+                return Err(LibcryptErr::Other(format!(
+                    "key description {} found on devnode {} is not a valid Stratis key description",
+                    key_description,
+                    physical_path.display()
+                )));
+            }
+        };
         let name = CryptHandle::name_from_metadata(&mut device)?;
         Ok(Some(CryptHandle {
             device,
@@ -452,7 +462,7 @@ impl CryptHandle {
     }
 
     /// Get the key description for a given encrypted device.
-    pub fn key_description(&self) -> &str {
+    pub fn key_description(&self) -> &KeyDescription {
         &self.key_description
     }
 

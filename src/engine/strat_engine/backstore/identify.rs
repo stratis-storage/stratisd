@@ -210,24 +210,14 @@ fn process_luks_device(dev: &libudev::Device) -> Option<LuksInfo> {
                             );
                     None
                 }
-                Ok(Some(handle)) => {
-                    match KeyDescription::from_system_key_desc(handle.key_description()) {
-                        Some(Ok(key_description)) => Some(LuksInfo {
-                            info: StratisInfo {
-                                identifiers: *handle.device_identifiers(),
-                                device_number,
-                                devnode: handle.physical_device_path().to_path_buf(),
-                            },
-                            key_description,
-                        }),
-                        _ => {
-                            warn!("Could not obtain valid Stratis key description from LUKS metadata on device {}",
-                              devnode.display());
-
-                            None
-                        }
-                    }
-                }
+                Ok(Some(handle)) => Some(LuksInfo {
+                    info: StratisInfo {
+                        identifiers: *handle.device_identifiers(),
+                        device_number,
+                        devnode: handle.physical_device_path().to_path_buf(),
+                    },
+                    key_description: handle.key_description().clone(),
+                }),
             },
         },
         None => {

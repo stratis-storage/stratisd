@@ -75,14 +75,10 @@ impl StratEngine {
 
         devlinks::setup_dev_path()?;
 
-        let mut liminal_devices = LiminalDevices::new();
+        let mut liminal_devices = LiminalDevices::default();
         let mut pools = Table::default();
-        for (pool_uuid, devices) in find_all()? {
-            if let Some((pool_name, pool)) =
-                liminal_devices.try_setup_pool(&pools, pool_uuid, devices)
-            {
-                pools.insert(pool_name, pool_uuid, pool);
-            }
+        for (pool_name, pool_uuid, pool) in liminal_devices.setup_pools(find_all()?) {
+            pools.insert(pool_name, pool_uuid, pool);
         }
 
         devlinks::cleanup_devlinks(pools.iter());
@@ -128,7 +124,7 @@ impl<'a> Into<Value> for &'a StratEngine {
                     })
                     .collect()
             ),
-            "errored_pools": self.liminal_devices.report(),
+            "errored_pools": <&LiminalDevices as Into<Value>>::into(&self.liminal_devices),
         })
     }
 }
@@ -136,7 +132,7 @@ impl<'a> Into<Value> for &'a StratEngine {
 impl Report for StratEngine {
     fn get_report(&self, report_type: ReportType) -> Value {
         match report_type {
-            ReportType::ErroredPoolDevices => self.liminal_devices.report(),
+            ReportType::ErroredPoolDevices => (&self.liminal_devices).into(),
             ReportType::EngineState => self.into(),
         }
     }
@@ -144,22 +140,17 @@ impl Report for StratEngine {
 
 impl Engine for StratEngine {
     fn handle_event(&mut self, event: &libudev::Event) -> Option<(PoolUuid, &mut dyn Pool)> {
-        let event_type = event.event_type();
-        if event_type == libudev::EventType::Add || event_type == libudev::EventType::Change {
-            if let Some((pool_uuid, pool_name, pool)) =
-                self.liminal_devices.block_evaluate(&self.pools, event)
-            {
-                self.pools.insert(pool_name, pool_uuid, pool);
-                Some((
-                    pool_uuid,
-                    self.pools
-                        .get_mut_by_uuid(pool_uuid)
-                        .expect("just_inserted")
-                        .1 as &mut dyn Pool,
-                ))
-            } else {
-                None
-            }
+        if let Some((pool_uuid, pool_name, pool)) =
+            self.liminal_devices.block_evaluate(&self.pools, event)
+        {
+            self.pools.insert(pool_name, pool_uuid, pool);
+            Some((
+                pool_uuid,
+                self.pools
+                    .get_mut_by_uuid(pool_uuid)
+                    .expect("just_inserted")
+                    .1 as &mut dyn Pool,
+            ))
         } else {
             None
         }
@@ -415,6 +406,7 @@ mod test {
 
         assert!(engine.get_pool(uuid1).is_some());
         assert!(engine.get_pool(uuid2).is_some());
+        assert_eq!(engine.liminal_devices, LiminalDevices::default());
 
         engine.teardown().unwrap();
         remove_dir_all(DEV_PATH).unwrap();
@@ -423,6 +415,7 @@ mod test {
 
         assert!(engine.get_pool(uuid1).is_some());
         assert!(engine.get_pool(uuid2).is_some());
+        assert_eq!(engine.liminal_devices, LiminalDevices::default());
 
         engine.teardown().unwrap();
     }

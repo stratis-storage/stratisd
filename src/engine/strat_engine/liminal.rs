@@ -344,7 +344,7 @@ impl<'a> Into<Value> for &'a LLuksInfo {
     // Precondition: (&StratisInfo).into() pattern matches Value::Object()
     fn into(self) -> Value {
         let mut json = json!({
-            "key_description": Value::from(self.key_description.to_system_string())
+            "key_description": Value::from(self.key_description.as_application_str())
         });
         if let Value::Object(ref mut map) = json {
             map.extend(

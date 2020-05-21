@@ -922,11 +922,19 @@ impl LiminalDevices {
         fn combine_remove_devices(info_1: LInfo, info_2: LInfo) -> Option<LInfo> {
             match (info_1, info_2) {
                 (LInfo::Luks(luks_info), LInfo::Stratis(_)) => Some(LInfo::Luks(luks_info)),
-                (LInfo::Stratis(strat_info), LInfo::Luks(_)) => {
-                    Some(LInfo::Stratis(LStratisInfo {
-                        ids: strat_info.ids,
-                        luks: None,
-                    }))
+                (LInfo::Stratis(strat_info), LInfo::Luks(luks_info)) => {
+                    if let Some(luks) = &strat_info.luks {
+                        if luks.ids.device_number != luks_info.ids.device_number {
+                            warn!("Received udev remove event on a device with {} that stratisd does not know about; retaining logical device with {} among the set of devices known to belong to pool with UUID {}",
+                                luks_info,
+                                strat_info,
+                                strat_info.ids.identifiers.pool_uuid);
+                        } else {
+                            warn!("Received udev remove event on a device with {} that appeared to belong to Stratis, but the logical device information is still present; retaining the logical device with the original encryption information",
+                                  luks_info);
+                        }
+                    }
+                    Some(LInfo::Stratis(strat_info))
                 }
                 (LInfo::Stratis(info_1), LInfo::Stratis(info_2)) => {
                     if info_1.ids.device_number != info_2.ids.device_number {

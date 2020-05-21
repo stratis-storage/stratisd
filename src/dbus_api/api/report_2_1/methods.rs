@@ -23,7 +23,7 @@ pub fn get_report(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let report_name: &str = get_next_arg(&mut iter, 0)?;
 
     let return_message = message.method_return();
-    let default_return = (false, String::new());
+    let default_return = String::new();
 
     let report_type = match ReportType::try_from(report_name) {
         Ok(rt) => rt,
@@ -37,7 +37,7 @@ pub fn get_report(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let engine = dbus_context.engine.borrow();
 
     let msg = match serde_json::to_string(&engine.get_report(report_type)) {
-        Ok(string) => return_message.append3((true, string), msg_code_ok(), msg_string_ok()),
+        Ok(string) => return_message.append3(string, msg_code_ok(), msg_string_ok()),
         Err(e) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e.into());
             return_message.append3(default_return, rc, rs)

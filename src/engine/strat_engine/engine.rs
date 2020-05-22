@@ -17,17 +17,17 @@ use crate::{
         event::get_engine_listener_list,
         shared::create_pool_idempotent_or_err,
         strat_engine::{
-            backstore::find_all,
+            backstore::{find_all, CryptHandle},
             cmd::verify_binaries,
             devlinks,
             dm::{get_dm, get_dm_init},
             keys::StratKeyActions,
-            liminal::LiminalDevices,
+            liminal::{LInfo, LLuksInfo, LiminalDevices},
             names::{validate_name, KeyDescription},
             pool::StratPool,
         },
         structures::Table,
-        types::{CreateAction, DeleteAction, RenameAction, ReportType},
+        types::{CreateAction, DeleteAction, DevUuid, RenameAction, ReportType, SetUnlockAction},
         Engine, EngineEvent, Name, Pool, PoolUuid, Report,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -260,6 +260,65 @@ impl Engine for StratEngine {
             devlinks::pool_renamed(&old_name, &new_name);
             Ok(RenameAction::Renamed(uuid))
         }
+    }
+
+    fn unlock_all(&mut self) -> SetUnlockAction<DevUuid> {
+        fn handle_luks(luks_info: &LLuksInfo) -> bool {
+            if let Ok(Some(mut handle)) = CryptHandle::setup(&luks_info.ids.devnode) {
+                if let Err(e) = handle.activate() {
+                    debug!(
+                        "Failed to open device with path {}, UUID {}. This is \
+                        probably due to a missing key: {}",
+                        luks_info.ids.devnode.display(),
+                        luks_info.ids.identifiers.device_uuid.to_simple_ref(),
+                        e,
+                    );
+                    false
+                } else {
+                    true
+                }
+            } else {
+                warn!(
+                    "Failed to read metadata from device with path {}, UUID {}. \
+                    Check that this device is properly formatted.",
+                    luks_info.ids.devnode.display(),
+                    luks_info.ids.identifiers.device_uuid.to_simple_ref(),
+                );
+                false
+            }
+        }
+
+        let (unlocked, still_locked) = self
+            .liminal_devices
+            .iter()
+            .map(|(_, map)| {
+                map.iter().fold(
+                    (Vec::new(), Vec::new()),
+                    |(mut unlocked, mut still_locked), (dev_uuid, info)| {
+                        match info {
+                            LInfo::Stratis(_) => (),
+                            LInfo::Luks(ref luks_info) => {
+                                if handle_luks(luks_info) {
+                                    unlocked.push(dev_uuid);
+                                } else {
+                                    still_locked.push(dev_uuid);
+                                }
+                            }
+                        };
+                        (unlocked, still_locked)
+                    },
+                )
+            })
+            .fold(
+                (Vec::new(), Vec::new()),
+                |(mut unlocked_acc, mut still_locked_acc), (unlocked, still_locked)| {
+                    unlocked_acc.extend(unlocked.into_iter());
+                    still_locked_acc.extend(still_locked.into_iter());
+                    (unlocked_acc, still_locked_acc)
+                },
+            );
+
+        SetUnlockAction::new(unlocked, still_locked)
     }
 
     fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)> {

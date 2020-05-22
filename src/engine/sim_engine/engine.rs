@@ -20,7 +20,8 @@ use crate::{
         sim_engine::{keys::SimKeyActions, pool::SimPool, randomization::Randomizer},
         structures::Table,
         types::{
-            CreateAction, DeleteAction, KeyDescription, Name, PoolUuid, RenameAction, ReportType,
+            CreateAction, DeleteAction, DevUuid, KeyDescription, Name, PoolUuid, RenameAction,
+            ReportType, SetUnlockAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -169,6 +170,10 @@ impl Engine for SimEngine {
         self.pools
             .insert(Name::new(new_name.to_owned()), uuid, pool);
         Ok(RenameAction::Renamed(uuid))
+    }
+
+    fn unlock_all(&mut self) -> SetUnlockAction<DevUuid> {
+        SetUnlockAction::unchanged(None)
     }
 
     fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)> {

@@ -76,6 +76,56 @@ impl<T> EngineAction for MappingCreateAction<T> {
     }
 }
 
+/// A type for the return type of idempotent unlocking actions.
+pub struct SetUnlockAction<T> {
+    unlocked: Vec<T>,
+    still_locked: Vec<T>,
+}
+
+impl<T> SetUnlockAction<T> {
+    /// Create a new return type with newly unlocked resources and resources that
+    /// are still locked.
+    pub fn new(unlocked: Vec<T>, still_locked: Vec<T>) -> SetUnlockAction<T> {
+        SetUnlockAction {
+            unlocked,
+            still_locked,
+        }
+    }
+
+    /// Create a new return type where no newly unlocked resources are reported.
+    pub fn unchanged(still_locked: Option<Vec<T>>) -> SetUnlockAction<T> {
+        SetUnlockAction {
+            unlocked: Vec::new(),
+            still_locked: still_locked.unwrap_or_default(),
+        }
+    }
+
+    /// Access a list of the resources that are still locked.
+    pub fn still_locked(&self) -> Option<&Vec<T>> {
+        if self.still_locked.is_empty() {
+            None
+        } else {
+            Some(&self.still_locked)
+        }
+    }
+}
+
+impl<T> EngineAction for SetUnlockAction<T> {
+    type Return = Vec<T>;
+
+    fn is_changed(&self) -> bool {
+        !self.unlocked.is_empty()
+    }
+
+    fn changed(self) -> Option<Vec<T>> {
+        if self.unlocked.is_empty() {
+            None
+        } else {
+            Some(self.unlocked)
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 /// An action which may create multiple things.
 pub struct SetCreateAction<T> {

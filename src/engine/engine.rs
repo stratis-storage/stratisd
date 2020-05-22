@@ -18,7 +18,7 @@ use crate::{
     engine::types::{
         BlockDevPath, BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid,
         MappingCreateAction, MaybeDbusPath, Name, PoolUuid, RenameAction, ReportType,
-        SetCreateAction, SetDeleteAction,
+        SetCreateAction, SetDeleteAction, SetUnlockAction,
     },
     stratis::StratisResult,
 };
@@ -294,6 +294,17 @@ pub trait Engine: Debug + Report {
         uuid: PoolUuid,
         new_name: &str,
     ) -> StratisResult<RenameAction<PoolUuid>>;
+
+    /// Unlock all encrypted devices that can be unlocked given the current state
+    /// of the keys in the keyring. Reports a tuple of `Vec<DevUuid>`. The first
+    /// entry is devices that were newly unlocked. The second entry is devices
+    /// that could not be unlocked with the given keys and are still locked.
+    ///
+    /// This device does not return an error type because it attempts to unlock
+    /// all devices simultaneously. It is not necessarily an error if not all
+    /// keys are present in the keyring; some devices may still be able to be
+    /// unlocked.
+    fn unlock_all(&mut self) -> SetUnlockAction<DevUuid>;
 
     /// Find the pool designated by uuid.
     fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)>;

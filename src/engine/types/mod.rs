@@ -17,7 +17,7 @@ mod keys;
 pub use crate::engine::types::{
     actions::{
         CreateAction, DeleteAction, EngineAction, MappingCreateAction, RenameAction,
-        SetCreateAction, SetDeleteAction,
+        SetCreateAction, SetDeleteAction, SetUnlockAction,
     },
     keys::{KeyDescription, KeySerial, SizedKeyMemory},
 };

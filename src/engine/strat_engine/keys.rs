@@ -7,6 +7,7 @@ use std::{
     ffi::CString,
     fs::File,
     io::{self, Read},
+    mem::size_of,
     os::unix::io::{FromRawFd, RawFd},
     str,
 };
@@ -247,7 +248,7 @@ impl KeyIdList {
         // Read list of keys in the persistent keyring.
         let mut done = false;
         while !done {
-            let num_key_ids = match unsafe {
+            let num_bytes_read = match unsafe {
                 syscall(
                     SYS_keyctl,
                     libc::KEYCTL_READ,
@@ -260,11 +261,16 @@ impl KeyIdList {
                 i => i as usize,
             };
 
-            if num_key_ids <= self.key_ids.capacity() {
-                done = true;
-            }
+            let num_key_ids = num_bytes_read / size_of::<KeySerial>();
 
-            self.key_ids.resize(num_key_ids, 0);
+            if num_key_ids <= self.key_ids.capacity() {
+                unsafe {
+                    self.key_ids.set_len(num_key_ids);
+                }
+                done = true;
+            } else {
+                self.key_ids.resize(num_key_ids, 0);
+            }
         }
 
         Ok(())
@@ -285,9 +291,9 @@ impl KeyIdList {
                     syscall(
                         SYS_keyctl,
                         libc::KEYCTL_DESCRIBE,
-                        id,
+                        *id,
                         keyctl_buffer.as_mut_ptr(),
-                        keyctl_buffer.len(),
+                        keyctl_buffer.capacity(),
                     )
                 } {
                     i if i < 0 => return Err(io::Error::last_os_error().into()),
@@ -295,10 +301,13 @@ impl KeyIdList {
                 };
 
                 if len <= keyctl_buffer.capacity() {
+                    unsafe {
+                        keyctl_buffer.set_len(len);
+                    }
                     done = true;
+                } else {
+                    keyctl_buffer.resize(len, 0);
                 }
-
-                keyctl_buffer.resize(len, 0);
             }
 
             if keyctl_buffer.is_empty() {

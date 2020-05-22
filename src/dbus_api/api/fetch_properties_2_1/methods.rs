@@ -11,9 +11,14 @@ use dbus::{
 };
 use itertools::Itertools;
 
-use crate::dbus_api::{api::shared::list_keys, consts, types::TData, util::result_to_tuple};
+use crate::dbus_api::{
+    api::shared::{list_keys, locked_pool_uuids},
+    consts,
+    types::TData,
+    util::result_to_tuple,
+};
 
-const ALL_PROPERTIES: [&str; 1] = [consts::KEY_LIST_PROP];
+const ALL_PROPERTIES: [&str; 2] = [consts::KEY_LIST_PROP, consts::LOCKED_POOL_UUIDS];
 
 fn get_properties_shared(
     m: &MethodInfo<MTFn<TData>, TData>,
@@ -27,6 +32,7 @@ fn get_properties_shared(
         .unique()
         .filter_map(|prop| match prop.as_str() {
             consts::KEY_LIST_PROP => Some((prop, result_to_tuple(list_keys(m)))),
+            consts::LOCKED_POOL_UUIDS => Some((prop, result_to_tuple(locked_pool_uuids(m)))),
             _ => None,
         })
         .collect();

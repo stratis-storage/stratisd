@@ -20,7 +20,8 @@ use crate::{
         sim_engine::{keys::SimKeyActions, pool::SimPool, randomization::Randomizer},
         structures::Table,
         types::{
-            CreateAction, DeleteAction, KeyDescription, Name, PoolUuid, RenameAction, ReportType,
+            CreateAction, DeleteAction, DevUuid, KeyDescription, Name, PoolUuid, RenameAction,
+            ReportType, SetUnlockAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -171,12 +172,20 @@ impl Engine for SimEngine {
         Ok(RenameAction::Renamed(uuid))
     }
 
+    fn unlock_pool(&mut self, _pool_uuid: PoolUuid) -> StratisResult<SetUnlockAction<DevUuid>> {
+        Ok(SetUnlockAction::empty())
+    }
+
     fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)> {
         get_pool!(self; uuid)
     }
 
     fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut dyn Pool)> {
         get_mut_pool!(self; uuid)
+    }
+
+    fn locked_pool_uuids(&self) -> Vec<PoolUuid> {
+        Vec::new()
     }
 
     /// Set properties of the simulator

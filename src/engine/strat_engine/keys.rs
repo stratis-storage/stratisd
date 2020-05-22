@@ -274,9 +274,8 @@ impl KeyIdList {
     /// Return the subset of key descriptions that have a prefix that identify
     /// them as belonging to Stratis.
     fn to_key_descs(&self) -> StratisResult<Vec<String>> {
-        let mut key_descs = Vec::new();
-
-        for id in self.key_ids.iter() {
+        // Read the description for a given key id
+        fn get_description(id: KeySerial) -> StratisResult<Vec<u8>> {
             let mut keyctl_buffer: Vec<u8> = Vec::with_capacity(4096);
 
             let mut done = false;
@@ -300,6 +299,22 @@ impl KeyIdList {
 
                 keyctl_buffer.resize(len, 0);
             }
+            Ok(keyctl_buffer)
+        }
+
+        let mut key_descs = Vec::new();
+
+        for id in self.key_ids.iter() {
+            let keyctl_buffer = match get_description(*id) {
+                Ok(buffer) => buffer,
+                Err(err) => {
+                    // Continue rather than return an error. Likely as not
+                    // the keyring dropped the key at some time after the
+                    // list of key ids was returned and that is the reason
+                    // the key description was not read.
+                    continue;
+                }
+            };
 
             if keyctl_buffer.is_empty() {
                 return Err(StratisError::Error(format!(

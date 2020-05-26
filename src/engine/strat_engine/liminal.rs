@@ -574,6 +574,29 @@ impl LiminalDevices {
         Ok(unlocked)
     }
 
+    /// Get a list of pool UUIDs from all of the LUKS2 devices that are currently
+    /// locked in the set of pools that are not yet set up.
+    pub fn locked_pool_uuids(&self) -> Vec<PoolUuid> {
+        self.errored_pool_devices
+            .iter()
+            .filter_map(|(pool_uuid, map)| {
+                let has_locked = map.iter().fold(false, |has_locked, (_, info)| {
+                    has_locked
+                        || if let LInfo::Luks(_) = info {
+                            true
+                        } else {
+                            false
+                        }
+                });
+                if has_locked {
+                    Some(*pool_uuid)
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
     /// Take maps of pool UUIDs to sets of devices and return a list of
     /// information about created pools.
     ///

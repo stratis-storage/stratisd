@@ -275,6 +275,10 @@ impl Engine for StratEngine {
         get_mut_pool!(self; uuid)
     }
 
+    fn locked_pool_uuids(&self) -> Vec<PoolUuid> {
+        self.liminal_devices.locked_pool_uuids()
+    }
+
     fn configure_simulator(&mut self, _denominator: u32) -> StratisResult<()> {
         Ok(()) // we're not the simulator and not configurable, so just say ok
     }

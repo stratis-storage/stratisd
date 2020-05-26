@@ -309,6 +309,10 @@ pub trait Engine: Debug + Report {
     /// Get a mutable referent to the pool designated by uuid.
     fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut dyn Pool)>;
 
+    /// Get a list of encrypted pool UUIDs for pools that have not yet been set up
+    /// and need to be unlocked.
+    fn locked_pool_uuids(&self) -> Vec<PoolUuid>;
+
     /// Configure the simulator, for the real engine, this is a null op.
     /// denominator: the probably of failure is 1/denominator.
     fn configure_simulator(&mut self, denominator: u32) -> StratisResult<()>;

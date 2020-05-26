@@ -17,12 +17,12 @@ use crate::{
         event::get_engine_listener_list,
         shared::create_pool_idempotent_or_err,
         strat_engine::{
-            backstore::{find_all, CryptHandle},
+            backstore::find_all,
             cmd::verify_binaries,
             devlinks,
             dm::{get_dm, get_dm_init},
             keys::StratKeyActions,
-            liminal::{LInfo, LLuksInfo, LiminalDevices},
+            liminal::LiminalDevices,
             names::{validate_name, KeyDescription},
             pool::StratPool,
         },
@@ -263,46 +263,7 @@ impl Engine for StratEngine {
     }
 
     fn unlock_pool(&mut self, pool_uuid: PoolUuid) -> StratisResult<SetUnlockAction<DevUuid>> {
-        fn handle_luks(luks_info: &LLuksInfo) -> StratisResult<()> {
-            if let Some(mut handle) = CryptHandle::setup(&luks_info.ids.devnode)? {
-                handle.activate()?;
-                Ok(())
-            } else {
-                Err(StratisError::Engine(
-                    ErrorEnum::Invalid,
-                    format!(
-                        "Block device {} does not appear to be formatted with
-                        the proper Stratis LUKS2 metadata.",
-                        luks_info.ids.devnode.display(),
-                    ),
-                ))
-            }
-        }
-
-        let unlocked = match self.liminal_devices.get_by_uuid(&pool_uuid) {
-            Some(map) => {
-                let mut unlocked = Vec::new();
-                for (dev_uuid, info) in map.iter() {
-                    match info {
-                        LInfo::Stratis(_) => (),
-                        LInfo::Luks(ref luks_info) => {
-                            match handle_luks(luks_info) {
-                                Ok(()) => unlocked.push(*dev_uuid),
-                                Err(e) => return Err(e),
-                            };
-                        }
-                    };
-                }
-                unlocked
-            }
-            None => {
-                return Err(StratisError::Engine(
-                    ErrorEnum::Error,
-                    format!("No pool with UUID {} exists", pool_uuid.to_simple_ref()),
-                ))
-            }
-        };
-
+        let unlocked = self.liminal_devices.unlock_pool(pool_uuid)?;
         Ok(SetUnlockAction::new(unlocked))
     }
 

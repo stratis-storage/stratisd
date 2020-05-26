@@ -19,8 +19,8 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::{
-                identify_block_device, DeviceInfo, LuksInfo, StratBlockDev, StratisIdentifiers,
-                StratisInfo, BDA,
+                identify_block_device, CryptHandle, DeviceInfo, LuksInfo, StratBlockDev,
+                StratisIdentifiers, StratisInfo, BDA,
             },
             device::blkdev_size,
             devlinks::setup_pool_devlinks,
@@ -529,10 +529,49 @@ impl LiminalDevices {
             .is_none());
     }
 
-    /// Get a subset of errored devices associated with the given pool UUID.
-    /// If this pool UUID is not yet registered with Stratis, return `None`.
-    pub fn get_by_uuid(&self, pool_uuid: &PoolUuid) -> Option<&HashMap<DevUuid, LInfo>> {
-        self.errored_pool_devices.get(pool_uuid)
+    /// Unlock the liminal encrypted devices that correspond to the given pool UUID.
+    pub fn unlock_pool(&mut self, pool_uuid: PoolUuid) -> StratisResult<Vec<DevUuid>> {
+        fn handle_luks(luks_info: &LLuksInfo) -> StratisResult<()> {
+            if let Some(mut handle) = CryptHandle::setup(&luks_info.ids.devnode)? {
+                handle.activate()?;
+                Ok(())
+            } else {
+                Err(StratisError::Engine(
+                    ErrorEnum::Invalid,
+                    format!(
+                        "Block device {} does not appear to be formatted with
+                        the proper Stratis LUKS2 metadata.",
+                        luks_info.ids.devnode.display(),
+                    ),
+                ))
+            }
+        }
+
+        let unlocked = match self.errored_pool_devices.get(&pool_uuid) {
+            Some(map) => {
+                let mut unlocked = Vec::new();
+                for (dev_uuid, info) in map.iter() {
+                    match info {
+                        LInfo::Stratis(_) => (),
+                        LInfo::Luks(ref luks_info) => {
+                            match handle_luks(luks_info) {
+                                Ok(()) => unlocked.push(*dev_uuid),
+                                Err(e) => return Err(e),
+                            };
+                        }
+                    };
+                }
+                unlocked
+            }
+            None => {
+                return Err(StratisError::Engine(
+                    ErrorEnum::Error,
+                    format!("No pool with UUID {} exists", pool_uuid.to_simple_ref()),
+                ))
+            }
+        };
+
+        Ok(unlocked)
     }
 
     /// Take maps of pool UUIDs to sets of devices and return a list of

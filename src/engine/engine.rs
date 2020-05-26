@@ -295,16 +295,13 @@ pub trait Engine: Debug + Report {
         new_name: &str,
     ) -> StratisResult<RenameAction<PoolUuid>>;
 
-    /// Unlock all encrypted devices that can be unlocked given the current state
-    /// of the keys in the keyring. Reports a tuple of `Vec<DevUuid>`. The first
-    /// entry is devices that were newly unlocked. The second entry is devices
-    /// that could not be unlocked with the given keys and are still locked.
-    ///
-    /// This device does not return an error type because it attempts to unlock
-    /// all devices simultaneously. It is not necessarily an error if not all
-    /// keys are present in the keyring; some devices may still be able to be
-    /// unlocked.
-    fn unlock_all(&mut self) -> SetUnlockAction<DevUuid>;
+    /// Unlock all encrypted devices registered under a given pool UUID.
+    /// This method returns a `Vec<DevUuid>`. This `Vec` will contain UUIDs of
+    /// devices that were newly unlocked while ignoring devices that are already
+    /// in the unlocked state. If some devices are able to be unlocked
+    /// and some fail, an error is returned as all devices should be able to
+    /// be unlocked if the necessary key is in the keyring.
+    fn unlock_pool(&mut self, uuid: PoolUuid) -> StratisResult<SetUnlockAction<DevUuid>>;
 
     /// Find the pool designated by uuid.
     fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)>;

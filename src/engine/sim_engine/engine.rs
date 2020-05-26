@@ -172,8 +172,8 @@ impl Engine for SimEngine {
         Ok(RenameAction::Renamed(uuid))
     }
 
-    fn unlock_all(&mut self) -> SetUnlockAction<DevUuid> {
-        SetUnlockAction::unchanged(None)
+    fn unlock_pool(&mut self, _pool_uuid: PoolUuid) -> StratisResult<SetUnlockAction<DevUuid>> {
+        Ok(SetUnlockAction::empty())
     }
 
     fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)> {

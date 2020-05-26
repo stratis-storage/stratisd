@@ -262,63 +262,48 @@ impl Engine for StratEngine {
         }
     }
 
-    fn unlock_all(&mut self) -> SetUnlockAction<DevUuid> {
-        fn handle_luks(luks_info: &LLuksInfo) -> bool {
-            if let Ok(Some(mut handle)) = CryptHandle::setup(&luks_info.ids.devnode) {
-                if let Err(e) = handle.activate() {
-                    debug!(
-                        "Failed to open device with path {}, UUID {}. This is \
-                        probably due to a missing key: {}",
-                        luks_info.ids.devnode.display(),
-                        luks_info.ids.identifiers.device_uuid.to_simple_ref(),
-                        e,
-                    );
-                    false
-                } else {
-                    true
-                }
+    fn unlock_pool(&mut self, pool_uuid: PoolUuid) -> StratisResult<SetUnlockAction<DevUuid>> {
+        fn handle_luks(luks_info: &LLuksInfo) -> StratisResult<()> {
+            if let Some(mut handle) = CryptHandle::setup(&luks_info.ids.devnode)? {
+                handle.activate()?;
+                Ok(())
             } else {
-                warn!(
-                    "Failed to read metadata from device with path {}, UUID {}. \
-                    Check that this device is properly formatted.",
-                    luks_info.ids.devnode.display(),
-                    luks_info.ids.identifiers.device_uuid.to_simple_ref(),
-                );
-                false
+                Err(StratisError::Engine(
+                    ErrorEnum::Invalid,
+                    format!(
+                        "Block device {} does not appear to be formatted with
+                        the proper Stratis LUKS2 metadata.",
+                        luks_info.ids.devnode.display(),
+                    ),
+                ))
             }
         }
 
-        let (unlocked, still_locked) = self
-            .liminal_devices
-            .iter()
-            .map(|(_, map)| {
-                map.iter().fold(
-                    (Vec::new(), Vec::new()),
-                    |(mut unlocked, mut still_locked), (dev_uuid, info)| {
-                        match info {
-                            LInfo::Stratis(_) => (),
-                            LInfo::Luks(ref luks_info) => {
-                                if handle_luks(luks_info) {
-                                    unlocked.push(dev_uuid);
-                                } else {
-                                    still_locked.push(dev_uuid);
-                                }
-                            }
-                        };
-                        (unlocked, still_locked)
-                    },
-                )
-            })
-            .fold(
-                (Vec::new(), Vec::new()),
-                |(mut unlocked_acc, mut still_locked_acc), (unlocked, still_locked)| {
-                    unlocked_acc.extend(unlocked.into_iter());
-                    still_locked_acc.extend(still_locked.into_iter());
-                    (unlocked_acc, still_locked_acc)
-                },
-            );
+        let unlocked = match self.liminal_devices.get_by_uuid(&pool_uuid) {
+            Some(map) => {
+                let mut unlocked = Vec::new();
+                for (dev_uuid, info) in map.iter() {
+                    match info {
+                        LInfo::Stratis(_) => (),
+                        LInfo::Luks(ref luks_info) => {
+                            match handle_luks(luks_info) {
+                                Ok(()) => unlocked.push(*dev_uuid),
+                                Err(e) => return Err(e),
+                            };
+                        }
+                    };
+                }
+                unlocked
+            }
+            None => {
+                return Err(StratisError::Engine(
+                    ErrorEnum::Error,
+                    format!("No pool with UUID {} exists", pool_uuid.to_simple_ref()),
+                ))
+            }
+        };
 
-        SetUnlockAction::new(unlocked, still_locked)
+        Ok(SetUnlockAction::new(unlocked))
     }
 
     fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)> {

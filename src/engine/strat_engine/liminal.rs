@@ -5,7 +5,7 @@
 //! Management of devices which are known to stratisd but not in a pool.
 
 use std::{
-    collections::{hash_map::Iter, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     fmt,
     fs::OpenOptions,
 };
@@ -529,10 +529,10 @@ impl LiminalDevices {
             .is_none());
     }
 
-    /// Iterate through devices that may be able to be set up as pools later but
-    /// currently cannot be.
-    pub fn iter(&self) -> Iter<PoolUuid, HashMap<DevUuid, LInfo>> {
-        self.errored_pool_devices.iter()
+    /// Get a subset of errored devices associated with the given pool UUID.
+    /// If this pool UUID is not yet registered with Stratis, return `None`.
+    pub fn get_by_uuid(&self, pool_uuid: &PoolUuid) -> Option<&HashMap<DevUuid, LInfo>> {
+        self.errored_pool_devices.get(pool_uuid)
     }
 
     /// Take maps of pool UUIDs to sets of devices and return a list of

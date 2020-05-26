@@ -184,6 +184,10 @@ impl Engine for SimEngine {
         get_mut_pool!(self; uuid)
     }
 
+    fn locked_pool_uuids(&self) -> Vec<PoolUuid> {
+        Vec::new()
+    }
+
     /// Set properties of the simulator
     fn configure_simulator(&mut self, denominator: u32) -> StratisResult<()> {
         self.rdm.borrow_mut().set_probability(denominator);

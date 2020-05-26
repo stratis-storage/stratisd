@@ -14,6 +14,8 @@ pub const PROPERTY_FETCH_INTERFACE_NAME_2_1: &str = "org.storage.stratis2.FetchP
 
 pub const KEY_LIST_PROP: &str = "KeyList";
 
+pub const LOCKED_POOL_UUIDS: &str = "LockedPoolUuids";
+
 pub const POOL_INTERFACE_NAME: &str = "org.storage.stratis2.pool";
 pub const POOL_INTERFACE_NAME_2_1: &str = "org.storage.stratis2.pool.r1";
 pub const POOL_NAME_PROP: &str = "Name";

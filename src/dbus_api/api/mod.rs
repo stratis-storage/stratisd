@@ -36,6 +36,7 @@ pub fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>
                 .add_m(manager_2_1::create_pool_method(&f))
                 .add_m(manager_2_1::set_key_method(&f))
                 .add_m(manager_2_1::unset_key_method(&f))
+                .add_m(manager_2_1::unlock_pool_method(&f))
                 .add_m(manager_2_0::destroy_pool_method(&f))
                 .add_m(manager_2_0::configure_simulator_method(&f))
                 .add_p(manager_2_0::version_property(&f)),

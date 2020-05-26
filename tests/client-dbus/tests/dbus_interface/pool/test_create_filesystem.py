@@ -15,9 +15,6 @@
 Test creating a filesystem in a pool.
 """
 
-# isort: STDLIB
-import unittest
-
 # isort: LOCAL
 from stratisd_client_dbus import (
     Manager,
@@ -76,29 +73,6 @@ class CreateFSTestCase(SimTestCase):
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         )
         self.assertEqual(len(list(result)), 0)
-
-    @unittest.skip("skip until creating multiple filesystems is supported")
-    def test_duplicate_specs(self):
-        """
-        Test calling with duplicate specification for same filesystem name.
-        """
-        new_name = "name"
-
-        ((is_some, result), return_code, _) = Pool.Methods.CreateFilesystems(
-            self._pool_object, {"specs": [new_name, new_name]}
-        )
-
-        self.assertTrue(is_some)
-        self.assertEqual(len(result), 1)
-        self.assertEqual(return_code, StratisdErrors.OK)
-
-        (_, fs_name) = result[0]
-        self.assertEqual(fs_name, new_name)
-
-        result = filesystems().search(
-            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        )
-        self.assertEqual(len(list(result)), 1)
 
 
 class CreateFSTestCase1(SimTestCase):
@@ -168,27 +142,6 @@ class CreateFSTestCase1(SimTestCase):
             ObjectManager.Methods.GetManagedObjects(self._proxy, {})
         )
         self.assertEqual(len(list(result)), 2)
-
-    @unittest.skip("skip until creating multiple filesystems is supported")
-    def test_create_with_conflict(self):
-        """
-        Test calling by specifying several volumes. Because there is already
-        a volume with the given name, only the new volumes should be created
-        and the command should succeed.
-        """
-        ((is_some, result), return_code, _) = Pool.Methods.CreateFilesystems(
-            self._pool_object, {"specs": [self._FSNAME, "newname"]}
-        )
-
-        self.assertEqual(return_code, StratisdErrors.OK)
-        self.assertTrue(is_some)
-        self.assertEqual(len(result), 0)
-        self.assertEqual(result[0][1], "newname")
-
-        result = filesystems().search(
-            ObjectManager.Methods.GetManagedObjects(self._proxy, {})
-        )
-        self.assertEqual(len(list(result)), 1)
 
     def test_create_multiple(self):
         """

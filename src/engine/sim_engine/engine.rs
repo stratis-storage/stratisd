@@ -55,6 +55,7 @@ impl<'a> Into<Value> for &'a SimEngine {
                 .collect()
             ),
             "errored_pools": json!([]),
+            "hopeless_devices": json!([]),
         })
     }
 }
@@ -62,7 +63,10 @@ impl<'a> Into<Value> for &'a SimEngine {
 impl Report for SimEngine {
     fn get_report(&self, report_type: ReportType) -> Value {
         match report_type {
-            ReportType::ErroredPoolDevices => json!([]),
+            ReportType::ErroredPoolDevices => json!({
+                "errored_pools": json!([]),
+                "hopeless_devices": json!([]),
+            }),
             ReportType::EngineState => self.into(),
         }
     }

@@ -944,7 +944,7 @@ impl LiminalDevices {
                               info_1.ids.identifiers.pool_uuid);
                         Some(LInfo::Stratis(info_1))
                     } else {
-                        None
+                        info_1.luks.map(LInfo::Luks)
                     }
                 }
                 (LInfo::Luks(info_1), LInfo::Luks(info_2)) => {

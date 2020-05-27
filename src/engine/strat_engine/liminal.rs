@@ -1066,16 +1066,29 @@ impl LiminalDevices {
 
 impl<'a> Into<Value> for &'a LiminalDevices {
     fn into(self) -> Value {
-        Value::Array(
-            self.errored_pool_devices
-                .iter()
-                .map(|(uuid, map)| {
-                    json!({
-                        "pool_uuid": uuid.to_simple_ref().to_string(),
-                        "devices": Value::Array(map.values().map(|info| info.into()).collect()),
+        json!({
+            "errored_pools": Value::Array(
+                self.errored_pool_devices
+                    .iter()
+                    .map(|(uuid, map)| {
+                        json!({
+                            "pool_uuid": uuid.to_simple_ref().to_string(),
+                            "devices": Value::Array(map.values().map(|info| info.into()).collect()),
+                        })
                     })
-                })
-                .collect(),
-        )
+                    .collect(),
+            ),
+            "hopeless_devices": Value::Array(
+                self.hopeless_device_sets
+                    .iter()
+                    .map(|(uuid, set)| {
+                        json!({
+                            "pool_uuid": uuid.to_simple_ref().to_string(),
+                            "devices": Value::Array(set.iter().map(|info| info.into()).collect()),
+                        })
+                    })
+                    .collect()
+            )
+        })
     }
 }

@@ -100,8 +100,9 @@ impl StratEngine {
 
 impl<'a> Into<Value> for &'a StratEngine {
     // Precondition: (&StratPool).into() pattern matches Value::Object(_)
+    // Precondition: (&LiminalDevices).into() pattern matches Value::Object(_)
     fn into(self) -> Value {
-        json!({
+        let json = json!({
             "pools": Value::Array(
                 self.pools.iter()
                     .map(|(name, uuid, pool)| {
@@ -124,8 +125,16 @@ impl<'a> Into<Value> for &'a StratEngine {
                     })
                     .collect()
             ),
-            "errored_pools": <&LiminalDevices as Into<Value>>::into(&self.liminal_devices),
-        })
+        });
+        if let (Value::Object(mut j), Value::Object(map)) = (
+            json,
+            <&LiminalDevices as Into<Value>>::into(&self.liminal_devices),
+        ) {
+            j.extend(map.into_iter());
+            Value::Object(j)
+        } else {
+            unreachable!("json!() and LiminalDevices::into() always return JSON object");
+        }
     }
 }
 

@@ -23,10 +23,12 @@ import unittest
 import psutil
 
 # isort: LOCAL
-from stratisd_client_dbus import PoolR1, get_object
+from stratisd_client_dbus import ManagerR1, PoolR1, StratisdErrors, get_object
+from stratisd_client_dbus._constants import TOP_OBJECT
 
 from ._loopback import UDEV_ADD_EVENT, LoopBackDevices
 from ._utils import (
+    CRYPTO_LUKS_FS_TYPE,
     STRATIS_FS_TYPE,
     OptionalKeyServiceContextManager,
     ServiceContextManager,
@@ -38,6 +40,7 @@ from ._utils import (
     remove_stratis_dm_devices,
     settle,
     wait_for_udev,
+    wait_for_udev_count,
 )
 
 
@@ -314,7 +317,7 @@ class UdevTest4(UdevTest):
     in, and it is verified that the daemon has recreated the pool.
     """
 
-    def _simple_event_test(self):
+    def _simple_event_test(self, *, key_spec=None):  # pylint: disable=too-many-locals
         """
         A simple test of event-based discovery.
 
@@ -324,23 +327,31 @@ class UdevTest4(UdevTest):
         * Start the daemon.
         * Plug the devices in one by one. The pool should come up when the last
         device is plugged in.
+
+        :param key_spec: specification for a key to be inserted into the kernel
+                         keyring consisting of the key description and key data
+        :type key_spec: (str, bytes) or NoneType
         """
         num_devices = 3
+        udev_wait_type = STRATIS_FS_TYPE if key_spec is None else CRYPTO_LUKS_FS_TYPE
         device_tokens = self._lb_mgr.create_devices(num_devices)
         devnodes = self._lb_mgr.device_files(device_tokens)
 
-        with ServiceContextManager():
+        with OptionalKeyServiceContextManager(key_spec=key_spec) as key_description:
             self.assertEqual(len(get_pools()), 0)
-            (_, (_, device_object_paths)) = create_pool(random_string(5), devnodes)
+            (_, (pool_object_path, _)) = create_pool(
+                random_string(5), devnodes, key_description=key_description
+            )
+            pool_uuid = PoolR1.Properties.Uuid.Get(get_object(pool_object_path))
+
             self.assertEqual(len(get_pools()), 1)
-            self.assertEqual(len(device_object_paths), len(devnodes))
 
         remove_stratis_dm_devices()
 
         self._lb_mgr.unplug(device_tokens)
-        wait_for_udev(STRATIS_FS_TYPE, [])
+        wait_for_udev(udev_wait_type, [])
 
-        with ServiceContextManager():
+        with OptionalKeyServiceContextManager(key_spec=key_spec):
             self.assertEqual(len(get_pools()), 0)
 
             indices = list(range(num_devices))
@@ -350,12 +361,42 @@ class UdevTest4(UdevTest):
             for index in indices[:-1]:
                 tokens_up.append(device_tokens[index])
                 self._lb_mgr.hotplug([tokens_up[-1]])
-                wait_for_udev(STRATIS_FS_TYPE, self._lb_mgr.device_files(tokens_up))
+                wait_for_udev(udev_wait_type, self._lb_mgr.device_files(tokens_up))
                 self.assertEqual(len(get_pools()), 0)
+
+            ((option, unlock_uuids), exit_code, _) = ManagerR1.Methods.UnlockPool(
+                get_object(TOP_OBJECT), {"pool_uuid": pool_uuid}
+            )
+            if key_spec is None:
+                self.assertEqual(exit_code, StratisdErrors.OK)
+                self.assertEqual(option, True)
+                self.assertEqual(len(unlock_uuids), 0)
+            else:
+                self.assertEqual(exit_code, StratisdErrors.OK)
+                self.assertEqual(option, True)
+                self.assertEqual(len(unlock_uuids), num_devices - 1)
+
+            self.assertEqual(len(get_pools()), 0)
 
             tokens_up.append(device_tokens[indices[-1]])
             self._lb_mgr.hotplug([tokens_up[-1]])
-            wait_for_udev(STRATIS_FS_TYPE, self._lb_mgr.device_files(tokens_up))
+
+            wait_for_udev(udev_wait_type, self._lb_mgr.device_files(tokens_up))
+
+            ((option, unlock_uuids), exit_code, _) = ManagerR1.Methods.UnlockPool(
+                get_object(TOP_OBJECT), {"pool_uuid": pool_uuid}
+            )
+
+            if key_spec is None:
+                self.assertNotEqual(exit_code, StratisdErrors.OK)
+                self.assertEqual(option, False)
+            else:
+                self.assertEqual(exit_code, StratisdErrors.OK)
+                self.assertEqual(option, True)
+                self.assertEqual(len(unlock_uuids), 1)
+
+            wait_for_udev_count(num_devices)
+
             self.assertEqual(len(get_pools()), 1)
 
         remove_stratis_dm_devices()
@@ -365,6 +406,12 @@ class UdevTest4(UdevTest):
         See documentation for _simple_event_test.
         """
         self._simple_event_test()
+
+    def test_encryption_simple_event(self):
+        """
+        See documentation for _simple_event_test.
+        """
+        self._simple_event_test(key_spec=("test_key_desc", "test_key"))
 
 
 class UdevTest5(UdevTest):

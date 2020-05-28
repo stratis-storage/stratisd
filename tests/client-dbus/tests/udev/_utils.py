@@ -137,6 +137,44 @@ def settle():
     subprocess.check_call(["udevadm", "settle"])
 
 
+def wait_for_udev_count(expected_num):
+    """
+    Look for devices with ID_FS_TYPE=stratis. Check as many times as can be
+    done in 10 seconds or until the number of devices found is equal to the
+    number of devices expected. Always get the result of at least 1 enumeration.
+
+    This method should be used only when it is very hard to figure the device
+    nodes corresponding to the Stratis block devices.
+
+    :param int expected_num: the number of expected Stratis devices
+    :return: None
+    :raises RuntimeError: if unexpected number of device nodes is found
+    """
+    found_num = None
+
+    context = pyudev.Context()
+    end_time = time.time() + 10.0
+
+    while time.time() < end_time and not expected_num == found_num:
+        found_num = len(
+            frozenset(
+                [
+                    x.device_node
+                    for x in context.list_devices(
+                        subsystem="block", ID_FS_TYPE=STRATIS_FS_TYPE
+                    )
+                ]
+            )
+        )
+        time.sleep(1)
+
+    if expected_num != found_num:
+        raise RuntimeError(
+            "Found unexpected number of devnodes: expected number: %s != found number: %s"
+            % (expected_num, found_num)
+        )
+
+
 def wait_for_udev(fs_type, expected_paths):
     """
     Look for devices with ID_FS_TYPE=fs_type. Check as many times as can be

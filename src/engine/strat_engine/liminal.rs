@@ -747,10 +747,6 @@ impl LiminalDevices {
 
         let result = setup_pool(pools, pool_uuid, &infos);
 
-        if let Err(err) = &result {
-            warn!("{}", err);
-        }
-
         match result {
             Ok(Some((pool_name, pool))) => {
                 setup_pool_devlinks(&pool_name, &pool);
@@ -761,7 +757,11 @@ impl LiminalDevices {
                 );
                 Some((pool_name, pool))
             }
-            Err(Destination::Hopeless(_)) => {
+            Err(Destination::Hopeless(err)) => {
+                warn!(
+                    "Attempt to set up pool failed, moving to hopeless devices: {}",
+                    err
+                );
                 self.hopeless_device_sets.insert(
                     pool_uuid,
                     infos
@@ -771,7 +771,22 @@ impl LiminalDevices {
                 );
                 None
             }
-            Err(Destination::Errored(_)) | Ok(None) => {
+            Err(Destination::Errored(err)) => {
+                info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {}", err);
+                self.errored_pool_devices.insert(
+                    pool_uuid,
+                    infos
+                        .drain()
+                        .map(|(pool_uuid, info)| (pool_uuid, LInfo::Stratis(info)))
+                        .collect(),
+                );
+                None
+            }
+            Ok(None) => {
+                info!(
+                    "Pool with UUID {} not set up for a normally occurring reason",
+                    pool_uuid.to_simple_ref()
+                );
                 self.errored_pool_devices.insert(
                     pool_uuid,
                     infos

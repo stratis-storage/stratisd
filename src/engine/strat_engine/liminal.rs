@@ -630,7 +630,7 @@ impl LiminalDevices {
             pools: &Table<StratPool>,
             pool_uuid: PoolUuid,
             infos: &HashMap<DevUuid, LStratisInfo>,
-        ) -> Result<Option<(Name, StratPool)>, Destination> {
+        ) -> Result<(Name, StratPool), Destination> {
             let bdas = match get_bdas(infos) {
                 Err(err) => Err(
                     Destination::Errored(format!(
@@ -657,7 +657,10 @@ impl LiminalDevices {
                         "There was an error encountered when reading the metadata for the devices found for pool with UUID {}: {}",
                         pool_uuid.to_simple_ref(),
                         err))),
-                Ok(None) => return Ok(None),
+                Ok(None) => return Err(
+                    Destination::Errored(format!(
+                        "No metadata found on devices associated with pool UUID {}",
+                        pool_uuid.to_simple_ref()))),
                 Ok(Some((timestamp, metadata))) => (timestamp, metadata),
             };
 
@@ -726,7 +729,6 @@ impl LiminalDevices {
                         err
                     ))
                 })
-                .map(Some)
         }
 
         if infos.iter().any(|(_, info)| match info {
@@ -748,7 +750,7 @@ impl LiminalDevices {
         let result = setup_pool(pools, pool_uuid, &infos);
 
         match result {
-            Ok(Some((pool_name, pool))) => {
+            Ok((pool_name, pool)) => {
                 setup_pool_devlinks(&pool_name, &pool);
                 info!(
                     "Pool with name \"{}\" and UUID \"{}\" set up",
@@ -773,20 +775,6 @@ impl LiminalDevices {
             }
             Err(Destination::Errored(err)) => {
                 info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {}", err);
-                self.errored_pool_devices.insert(
-                    pool_uuid,
-                    infos
-                        .drain()
-                        .map(|(pool_uuid, info)| (pool_uuid, LInfo::Stratis(info)))
-                        .collect(),
-                );
-                None
-            }
-            Ok(None) => {
-                info!(
-                    "Pool with UUID {} not set up for a normally occurring reason",
-                    pool_uuid.to_simple_ref()
-                );
                 self.errored_pool_devices.insert(
                     pool_uuid,
                     infos

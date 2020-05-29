@@ -908,26 +908,34 @@ impl LiminalDevices {
                 devices.insert(device_uuid, info);
                 Ok(devices)
             }
-            Some(removed) => match combine_two_devices(removed, info) {
-                Err((err, removed, info)) => {
-                    warn!(
-                        "Moving set of devices with pool UUID {} to hopeless sets because {}",
-                        stratis_identifiers.pool_uuid, err
-                    );
-                    let mut hopeless: HashSet<LInfo> =
-                        devices.drain().map(|(_, info)| info).collect();
-                    hopeless.insert(removed);
-                    hopeless.insert(info);
-                    Err(hopeless)
-                }
-                Ok(info) => {
-                    info!(
-                        "Device information {} replaces previous device information for the same device UUID in the set for its pool UUID",
-                        info);
+            Some(removed) => {
+                if removed == info {
                     devices.insert(device_uuid, info);
                     Ok(devices)
+                } else {
+                    match combine_two_devices(removed, info) {
+                        Err((err, removed, info)) => {
+                            warn!(
+                                "Moving set of devices with pool UUID {} to hopeless sets because {}",
+                                stratis_identifiers.pool_uuid,
+                                err
+                            );
+                            let mut hopeless: HashSet<LInfo> =
+                                devices.drain().map(|(_, info)| info).collect();
+                            hopeless.insert(removed);
+                            hopeless.insert(info);
+                            Err(hopeless)
+                        }
+                        Ok(info) => {
+                            info!(
+                                "Device information {} replaces previous device information for the same device UUID in the set for its pool UUID",
+                                info);
+                            devices.insert(device_uuid, info);
+                            Ok(devices)
+                        }
+                    }
                 }
-            },
+            }
         }
     }
 

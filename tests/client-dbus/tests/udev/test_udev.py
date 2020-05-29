@@ -253,7 +253,9 @@ class UdevTest3(UdevTest):
     daemon, brings it up again, and allows it to discover the existing pool.
     """
 
-    def _simple_initial_discovery_test(self, *, key_spec=None):
+    def _simple_initial_discovery_test(  # pylint: disable=bad-continuation
+        self, *, key_spec=None, take_down_dm=False
+    ):  # pylint: disable=too-many-locals
         """
         A simple test of discovery on start up.
 
@@ -264,6 +266,8 @@ class UdevTest3(UdevTest):
         :param key_spec: specification for a key to be inserted into the kernel
                          keyring consisting of the key description and key data
         :type key_spec: (str, bytes) or NoneType
+        :param bool take_down_dm: if True take down all Stratis devicemapper
+        devices once stratisd is shut down
         """
         num_devices = 3
         device_tokens = self._lb_mgr.create_devices(num_devices)
@@ -271,24 +275,33 @@ class UdevTest3(UdevTest):
 
         with OptionalKeyServiceContextManager(key_spec=key_spec) as key_description:
             self.assertEqual(len(get_pools()), 0)
-            (_, (_, device_object_paths)) = create_pool(
+            (_, (pool_object_path, device_object_paths)) = create_pool(
                 random_string(5), devnodes, key_description=key_description
             )
+            pool_uuid = PoolR1.Properties.Uuid.Get(get_object(pool_object_path))
 
             pool_list = get_pools()
             self.assertEqual(len(pool_list), 1)
 
-            _, this_pool = pool_list[0]
-            if key_description is None:
-                self.assertFalse(this_pool.Encrypted())
-            else:
-                self.assertTrue(this_pool.Encrypted())
-
-            self.assertEqual(len(device_object_paths), len(devnodes))
-
             wait_for_udev(STRATIS_FS_TYPE, get_devnodes(device_object_paths))
 
+        if take_down_dm:
+            remove_stratis_dm_devices()
+
         with OptionalKeyServiceContextManager(key_spec=key_spec):
+            ((option, unlock_uuids), exit_code, _) = ManagerR1.Methods.UnlockPool(
+                get_object(TOP_OBJECT), {"pool_uuid": pool_uuid}
+            )
+            if key_spec is None:
+                self.assertNotEqual(exit_code, StratisdErrors.OK)
+                self.assertEqual(option, False)
+            else:
+                self.assertEqual(exit_code, StratisdErrors.OK)
+                self.assertEqual(option, True)
+                self.assertEqual(len(unlock_uuids), num_devices if take_down_dm else 0)
+
+            wait_for_udev_count(num_devices)
+
             self.assertEqual(len(get_pools()), 1)
 
         remove_stratis_dm_devices()
@@ -304,6 +317,14 @@ class UdevTest3(UdevTest):
         See documentation for _simple_initial_discovery_test.
         """
         self._simple_initial_discovery_test()
+
+    def test_encryption_simple_initial_discovery_with_takedown(self):
+        """
+        See documentation for _simple_initial_discovery_test.
+        """
+        self._simple_initial_discovery_test(
+            key_spec=("test_key_desc", "test_key"), take_down_dm=True
+        )
 
 
 class UdevTest4(UdevTest):

@@ -887,8 +887,9 @@ impl LiminalDevices {
         match devices.remove(&device_uuid) {
             None => {
                 info!(
-                    "device with Stratis identifiers {} discovered, i.e., identified for the first time during this execution of stratisd",
-                    stratis_identifiers);
+                    "Device information {} discovered and inserted into the set for its pool UUID",
+                    info
+                );
                 devices.insert(device_uuid, info);
                 Ok(devices)
             }
@@ -905,6 +906,9 @@ impl LiminalDevices {
                     Err(hopeless)
                 }
                 Ok(info) => {
+                    info!(
+                        "Device information {} replaces previous device information for the same device UUID in the set for its pool UUID",
+                        info);
                     devices.insert(device_uuid, info);
                     Ok(devices)
                 }

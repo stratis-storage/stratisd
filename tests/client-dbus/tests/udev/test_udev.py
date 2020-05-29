@@ -420,10 +420,9 @@ class UdevTest5(UdevTest):
         all_tokens = [dev for sublist in pool_tokens for dev in sublist]
 
         with ServiceContextManager():
-            # Hot plug activate each pool in sequence and force a duplicate name
-            # error.
-            for i in range(num_pools):
-                self._lb_mgr.hotplug(pool_tokens[i])
+            temp_tokens = all_tokens[:]
+            random.shuffle(temp_tokens)
+            self._lb_mgr.hotplug(temp_tokens)
 
             wait_for_udev(STRATIS_FS_TYPE, self._lb_mgr.device_files(all_tokens))
 

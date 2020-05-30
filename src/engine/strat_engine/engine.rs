@@ -263,7 +263,7 @@ impl Engine for StratEngine {
     }
 
     fn unlock_pool(&mut self, pool_uuid: PoolUuid) -> StratisResult<SetUnlockAction<DevUuid>> {
-        let unlocked = self.liminal_devices.unlock_pool(pool_uuid)?;
+        let unlocked = self.liminal_devices.unlock_pool(&self.pools, pool_uuid)?;
         Ok(SetUnlockAction::new(unlocked))
     }
 

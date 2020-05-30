@@ -26,6 +26,7 @@ import uuid
 import pyudev
 
 UDEV_ADD_EVENT = "add"
+UDEV_REMOVE_EVENT = "remove"
 
 _LOSETUP_BIN = os.getenv("STRATIS_LOSETUP_BIN", "/usr/sbin/losetup")
 
@@ -120,6 +121,7 @@ class LoopBackDevices:
             tokens.append(token)
 
         self._wait_for_udev(tokens)
+        self.generate_synthetic_udev_events(tokens, UDEV_ADD_EVENT)
         return tokens
 
     def unplug(self, tokens):
@@ -131,10 +133,14 @@ class LoopBackDevices:
         :raises: RuntimeError if any token not found
         """
         self._check_tokens(tokens)
+        device_files = self.device_files(tokens)
+
         for token in tokens:
             (device, backing_file) = self.devices[token]
             subprocess.check_call([_LOSETUP_BIN, "-d", device])
             self.devices[token] = (None, backing_file)
+
+        _generate_synthetic_udev_events(device_files, UDEV_REMOVE_EVENT)
 
     def generate_synthetic_udev_events(self, tokens, event):
         """

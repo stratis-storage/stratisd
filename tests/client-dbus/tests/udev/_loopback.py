@@ -131,12 +131,7 @@ class LoopBackDevices:
         :raises RuntimeError: if any token not found or missing device node
         """
         self._check_tokens(tokens)
-        for token in tokens:
-            (device, _) = self.devices[token]
-
-            if device is None:
-                raise RuntimeError("Device node is missing")
-
+        for device in self.device_files(tokens):
             device_name = os.path.split(device)[-1]
             ufile = os.path.join("/sys/block", device_name, "uevent")
             with open(ufile, "w") as uevent:

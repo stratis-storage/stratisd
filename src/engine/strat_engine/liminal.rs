@@ -17,6 +17,7 @@ use devicemapper::Sectors;
 
 use crate::{
     engine::{
+        engine::Pool,
         strat_engine::{
             backstore::{
                 identify_block_device, CryptHandle, DeviceInfo, LuksInfo, StratBlockDev,
@@ -530,7 +531,11 @@ impl LiminalDevices {
     }
 
     /// Unlock the liminal encrypted devices that correspond to the given pool UUID.
-    pub fn unlock_pool(&mut self, pool_uuid: PoolUuid) -> StratisResult<Vec<DevUuid>> {
+    pub fn unlock_pool(
+        &mut self,
+        pools: &Table<StratPool>,
+        pool_uuid: PoolUuid,
+    ) -> StratisResult<Vec<DevUuid>> {
         fn handle_luks(luks_info: &LLuksInfo) -> StratisResult<()> {
             if let Some(mut handle) = CryptHandle::setup(&luks_info.ids.devnode)? {
                 handle.activate()?;
@@ -563,12 +568,30 @@ impl LiminalDevices {
                 }
                 unlocked
             }
-            None => {
-                return Err(StratisError::Engine(
-                    ErrorEnum::Error,
-                    format!("No pool with UUID {} exists", pool_uuid.to_simple_ref()),
-                ))
-            }
+            None => match pools.get_by_uuid(pool_uuid) {
+                Some((_, pool)) => {
+                    if pool.is_encrypted() {
+                        vec![]
+                    } else {
+                        return Err(StratisError::Engine(
+                            ErrorEnum::Error,
+                            format!(
+                                "Pool with UUID {} is not encrypted and cannot be unlocked.",
+                                pool_uuid.to_simple_ref().to_string()
+                            ),
+                        ));
+                    }
+                }
+                None => {
+                    return Err(StratisError::Engine(
+                        ErrorEnum::Error,
+                        format!(
+                            "No devices with UUID {} have been registered with stratisd.",
+                            pool_uuid.to_simple_ref(),
+                        ),
+                    ))
+                }
+            },
         };
 
         Ok(unlocked)

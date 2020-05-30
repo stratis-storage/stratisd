@@ -25,7 +25,7 @@ import psutil
 # isort: LOCAL
 from stratisd_client_dbus import PoolR1, get_object
 
-from ._loopback import LoopBackDevices
+from ._loopback import UDEV_ADD_EVENT, LoopBackDevices
 from ._utils import (
     STRATIS_FS_TYPE,
     OptionalKeyServiceContextManager,
@@ -215,7 +215,9 @@ class UdevTest2(UdevTest):
             self.assertEqual(len(get_pools()), 1)
 
             for _ in range(num_hotplugs):
-                self._lb_mgr.generate_udev_add_events(device_tokens)
+                self._lb_mgr.generate_synthetic_udev_events(
+                    device_tokens, UDEV_ADD_EVENT
+                )
 
             settle()
 
@@ -434,8 +436,8 @@ class UdevTest5(UdevTest):
                     )
 
                 # Generate synthetic add events for every loop backed device
-                self._lb_mgr.generate_udev_add_events(
-                    [dev for sublist in pool_tokens for dev in sublist]
+                self._lb_mgr.generate_synthetic_udev_events(
+                    [dev for sublist in pool_tokens for dev in sublist], UDEV_ADD_EVENT
                 )
 
                 settle()

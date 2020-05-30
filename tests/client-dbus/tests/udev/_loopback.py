@@ -25,6 +25,8 @@ import uuid
 # isort: THIRDPARTY
 import pyudev
 
+UDEV_ADD_EVENT = "add"
+
 _LOSETUP_BIN = os.getenv("STRATIS_LOSETUP_BIN", "/usr/sbin/losetup")
 
 _SIZE_OF_DEVICE = 1024 ** 4  # 1 TiB
@@ -119,11 +121,12 @@ class LoopBackDevices:
             subprocess.check_call([_LOSETUP_BIN, "-d", device])
             self.devices[token] = (None, backing_file)
 
-    def generate_udev_add_events(self, tokens):
+    def generate_synthetic_udev_events(self, tokens, event):
         """
-        Synthetically create "add" udev event for specified loop back devices
+        Synthetically create udev event for specified loop back devices
         :param tokens: Opaque representation of some loop back devices
         :type tokens: list of uuid.UUID
+        :param str event: the event to generate, "add", "remove", "change"
         :return: None
         :raises RuntimeError: if any token not found or missing device node
         """
@@ -136,8 +139,8 @@ class LoopBackDevices:
 
             device_name = os.path.split(device)[-1]
             ufile = os.path.join("/sys/block", device_name, "uevent")
-            with open(ufile, "w") as event:
-                event.write("add")
+            with open(ufile, "w") as uevent:
+                uevent.write(event)
 
     def hotplug(self, tokens):
         """
@@ -158,7 +161,7 @@ class LoopBackDevices:
             )
             self.devices[token] = (device, backing_file)
 
-        self.generate_udev_add_events(tokens)
+        self.generate_synthetic_udev_events(tokens, UDEV_ADD_EVENT)
 
     def device_files(self, tokens):
         """

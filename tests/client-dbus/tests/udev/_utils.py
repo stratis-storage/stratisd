@@ -63,37 +63,33 @@ def random_string(length):
 
 def create_pool(name, devices, *, key_description=None):
     """
-    Creates a stratis pool. Tries three times before giving up.
+    Creates a stratis pool.
     :param name:    Name of pool
     :param devices:  Devices to use for pool
     :param key_description: optional key description
     :type key_description: str or NoneType
     :return: result of the CreatePool D-Bus method call if it succeeds
     :rtype: bool * str * list of str
-    :raises RuntimeError: if pool is not created after three tries
+    :raises RuntimeError: if pool is not created
     """
-    error_reasons = []
-    for _ in range(3):
-        (result, exit_code, error_str) = ManagerR1.Methods.CreatePool(
-            get_object(TOP_OBJECT),
-            {
-                "name": name,
-                "redundancy": (True, 0),
-                "devices": devices,
-                # pylint: disable=bad-continuation
-                "key_desc": (False, "")
-                if key_description is None
-                else (True, key_description),
-            },
-        )
-        if exit_code == StratisdErrors.OK:
-            return result
+    (result, exit_code, error_str) = ManagerR1.Methods.CreatePool(
+        get_object(TOP_OBJECT),
+        {
+            "name": name,
+            "redundancy": (True, 0),
+            "devices": devices,
+            # pylint: disable=bad-continuation
+            "key_desc": (False, "")
+            if key_description is None
+            else (True, key_description),
+        },
+    )
 
-        error_reasons.append(error_str)
-        time.sleep(1)
+    if exit_code == StratisdErrors.OK:
+        return result
 
     raise RuntimeError(
-        "Unable to create a pool %s %s reasons: %s" % (name, devices, error_reasons)
+        "Unable to create a pool %s with devices %s: %s" % (name, devices, error_str)
     )
 
 

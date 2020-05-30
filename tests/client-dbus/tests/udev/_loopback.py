@@ -32,6 +32,21 @@ _LOSETUP_BIN = os.getenv("STRATIS_LOSETUP_BIN", "/usr/sbin/losetup")
 _SIZE_OF_DEVICE = 1024 ** 4  # 1 TiB
 
 
+def _generate_synthetic_udev_events(devnodes, event):
+    """
+    Generate synthetic uevents for the given devnodes
+
+    :param devnodes: list of device nodes
+    :type devnodes: list of str
+    :param str event: the event to generate, "add", "change", "remove"
+    """
+    for device in devnodes:
+        device_name = os.path.split(device)[-1]
+        ufile = os.path.join("/sys/block", device_name, "uevent")
+        with open(ufile, "w") as uevent:
+            uevent.write(event)
+
+
 class LoopBackDevices:
     """
     Class for creating and managing loop back devices which are needed for
@@ -131,11 +146,7 @@ class LoopBackDevices:
         :raises RuntimeError: if any token not found or missing device node
         """
         self._check_tokens(tokens)
-        for device in self.device_files(tokens):
-            device_name = os.path.split(device)[-1]
-            ufile = os.path.join("/sys/block", device_name, "uevent")
-            with open(ufile, "w") as uevent:
-                uevent.write(event)
+        _generate_synthetic_udev_events(self.device_files(tokens), event)
 
     def hotplug(self, tokens):
         """

@@ -49,6 +49,30 @@ class LoopBackDevices:
         if any(token not in self.devices for token in tokens):
             raise RuntimeError("One of the specified tokens is unknown to this manager")
 
+    def _wait_for_udev(self, tokens):
+        """
+        Waits for udev to detect the specified devices.
+
+        :param tokens: identifies devices to wait for
+        :type tokens: list of uuid.UUID
+        :raises RuntimeError: if devices not detected in allowed time
+        """
+        expected_device_files = frozenset(self.device_files(tokens))
+
+        context = pyudev.Context()
+        for _ in range(10):
+            if expected_device_files <= frozenset(
+                # pylint: disable=bad-continuation
+                [x.device_node for x in context.list_devices(subsystem="block")]
+            ):
+                return
+            time.sleep(1)
+
+        raise RuntimeError(
+            'Loopbacked devices "%s" were created, but udev does not seem to be able to find them'
+            % ", ".join(expected_device_files)
+        )
+
     def create_devices(self, number):
         """
         Create new loop back devices.
@@ -78,21 +102,8 @@ class LoopBackDevices:
             self.devices[token] = (device, backing_file)
             tokens.append(token)
 
-        expected_device_files = frozenset(self.device_files(tokens))
-
-        context = pyudev.Context()
-        for _ in range(10):
-            if expected_device_files <= frozenset(
-                # pylint: disable=bad-continuation
-                [x.device_node for x in context.list_devices(subsystem="block")]
-            ):
-                return tokens
-            time.sleep(1)
-
-        raise RuntimeError(
-            'Loopbacked devices "%s" were created, but udev does not seem to be able to find them'
-            % ", ".join(expected_device_files)
-        )
+        self._wait_for_udev(tokens)
+        return tokens
 
     def unplug(self, tokens):
         """

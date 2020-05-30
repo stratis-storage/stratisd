@@ -98,8 +98,6 @@ class UdevTest1(UdevTest):
             for _ in range(number_of_pools):
                 device_tokens = self._lb_mgr.create_devices(dev_count_pool)
 
-                settle()
-
                 pool_name = random_string(5)
 
                 create_pool(pool_name, self._lb_mgr.device_files(device_tokens))
@@ -188,8 +186,6 @@ class UdevTest2(UdevTest):
         device_tokens = self._lb_mgr.create_devices(num_devices)
         devnodes = self._lb_mgr.device_files(device_tokens)
 
-        settle()
-
         with ServiceContextManager():
             self.assertEqual(len(get_pools()), 0)
             (_, (_, device_object_paths)) = create_pool(random_string(5), devnodes)
@@ -268,8 +264,6 @@ class UdevTest3(UdevTest):
         device_tokens = self._lb_mgr.create_devices(num_devices)
         devnodes = self._lb_mgr.device_files(device_tokens)
 
-        settle()
-
         with OptionalKeyServiceContextManager(key_spec=key_spec) as key_description:
             self.assertEqual(len(get_pools()), 0)
             (_, (_, device_object_paths)) = create_pool(
@@ -332,8 +326,6 @@ class UdevTest4(UdevTest):
         num_devices = 3
         device_tokens = self._lb_mgr.create_devices(num_devices)
         devnodes = self._lb_mgr.device_files(device_tokens)
-
-        settle()
 
         with ServiceContextManager():
             self.assertEqual(len(get_pools()), 0)
@@ -403,7 +395,6 @@ class UdevTest5(UdevTest):
         # Create some pools with duplicate names
         for i in range(num_pools):
             this_pool = self._lb_mgr.create_devices(i + 1)
-            settle()
 
             pool_tokens.append(this_pool)
 

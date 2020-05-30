@@ -19,7 +19,11 @@ Class to handle loop back devices.
 import os
 import subprocess
 import tempfile
+import time
 import uuid
+
+# isort: THIRDPARTY
+import pyudev
 
 _LOSETUP_BIN = os.getenv("STRATIS_LOSETUP_BIN", "/usr/sbin/losetup")
 
@@ -74,7 +78,21 @@ class LoopBackDevices:
             self.devices[token] = (device, backing_file)
             tokens.append(token)
 
-        return tokens
+        expected_device_files = frozenset(self.device_files(tokens))
+
+        context = pyudev.Context()
+        for _ in range(10):
+            if expected_device_files <= frozenset(
+                # pylint: disable=bad-continuation
+                [x.device_node for x in context.list_devices(subsystem="block")]
+            ):
+                return tokens
+            time.sleep(1)
+
+        raise RuntimeError(
+            'Loopbacked devices "%s" were created, but udev does not seem to be able to find them'
+            % ", ".join(expected_device_files)
+        )
 
     def unplug(self, tokens):
         """

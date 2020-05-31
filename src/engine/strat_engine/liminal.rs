@@ -723,15 +723,9 @@ impl LiminalDevices {
 
         // Setup a pool from constituent devices in the context of some already
         // setup pools.
-        // Return None if the pool's metadata was not found. This is a
-        // legitimate non-error condition, which may result if only a subset
-        // of the pool's devices are in the set of devices being used.
-        // Return an error on all other errors. Note that any one of these
-        // errors could represent a temporary condition, that could be changed
-        // by finding another device. So it is reasonable to treat them all
-        // as loggable at the warning level, but not at the error level.
-        // Precondition: every device in devices has already been determined to belong
-        // to the pool with pool_uuid.
+        //
+        // Precondition: every device represented by an item in infos has
+        // already been determined to belong to the pool with pool_uuid.
         fn setup_pool(
             pools: &Table<StratPool>,
             pool_uuid: PoolUuid,

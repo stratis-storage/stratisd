@@ -554,6 +554,22 @@ impl LiminalDevices {
 
         let unlocked = match self.errored_pool_devices.get(&pool_uuid) {
             Some(map) => {
+                // This pattern, a bunch of Stratis devices, none of which
+                // has a LUKS device, should characterize a set of devices
+                // belonging to a pool which is unencrypted.
+                if map.iter().all(|(_, info)| match info {
+                    LInfo::Stratis(info) => info.luks.is_none(),
+                    LInfo::Luks(_) => false,
+                }) {
+                    return Err(StratisError::Engine(
+                        ErrorEnum::Error,
+                        format!(
+                            "Attempted to unlock set of devices belonging to an unencrypted pool with UUID {}",
+                            pool_uuid.to_simple_ref(),
+                        ),
+                    ));
+                }
+
                 let mut unlocked = Vec::new();
                 for (dev_uuid, info) in map.iter() {
                     match info {

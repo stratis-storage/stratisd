@@ -701,34 +701,41 @@ impl LiminalDevices {
                             &metadata.name)));
             }
 
-            if num_with_luks != 0 {
-                let num_key_descriptions = datadevs
+            let key_description = if num_with_luks != 0 {
+                let key_descriptions = datadevs
                     .iter()
                     .map(|sbd| {
                         sbd.key_description()
                             .expect("num_with_luks != 0 -> num_with_luks == datadevs.len()")
                     })
-                    .collect::<HashSet<&KeyDescription>>()
-                    .iter()
-                    .count();
-                if num_key_descriptions != 1 {
+                    .collect::<HashSet<&KeyDescription>>();
+                if key_descriptions.iter().count() != 1 {
                     return Err(
                         Destination::Hopeless(format!(
                             "Data devices in the set belonging to pool with UUID {} and name {} do not agree on their key description",
                             pool_uuid.to_simple_ref(),
                             &metadata.name)));
                 }
-            }
+                key_descriptions.into_iter().next().cloned()
+            } else {
+                None
+            };
 
-            StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata, None)
-                .map_err(|err| {
-                    Destination::Errored(
-                    format!(
-                        "An attempt to set up pool with UUID {} from the assembled devices failed: {}",
-                        pool_uuid.to_simple_ref(),
-                        err
-                    ))
-                })
+            StratPool::setup(
+                pool_uuid,
+                datadevs,
+                cachedevs,
+                timestamp,
+                &metadata,
+                key_description.as_ref(),
+            )
+            .map_err(|err| {
+                Destination::Errored(format!(
+                    "An attempt to set up pool with UUID {} from the assembled devices failed: {}",
+                    pool_uuid.to_simple_ref(),
+                    err
+                ))
+            })
         }
 
         if infos.iter().any(|(_, info)| match info {

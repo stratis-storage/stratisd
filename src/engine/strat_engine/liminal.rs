@@ -577,7 +577,7 @@ impl LiminalDevices {
                             ErrorEnum::Error,
                             format!(
                                 "Pool with UUID {} is not encrypted and cannot be unlocked.",
-                                pool_uuid.to_simple_ref().to_string()
+                                pool_uuid.to_simple_ref()
                             ),
                         ));
                     }

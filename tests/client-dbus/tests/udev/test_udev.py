@@ -389,9 +389,8 @@ class UdevTest4(UdevTest):
                 get_object(TOP_OBJECT), {"pool_uuid": pool_uuid}
             )
             if key_spec is None:
-                self.assertEqual(exit_code, StratisdErrors.OK)
-                self.assertEqual(option, True)
-                self.assertEqual(len(unlock_uuids), 0)
+                self.assertNotEqual(exit_code, StratisdErrors.OK)
+                self.assertEqual(option, False)
             else:
                 self.assertEqual(exit_code, StratisdErrors.OK)
                 self.assertEqual(option, True)

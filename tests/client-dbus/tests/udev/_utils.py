@@ -262,7 +262,7 @@ class _Service:
         return output
 
 
-class KernelKey:  # pylint: disable=attribute-defined-outside-init
+class KernelKey:
     """
     A handle for operating on keys in the kernel keyring. The specified key will
     be available for the lifetime of the test when used with the Python with
@@ -326,7 +326,7 @@ class KernelKey:  # pylint: disable=attribute-defined-outside-init
             raise rexc from exception_value
 
 
-class ServiceContextManager:  # pylint: disable=too-few-public-methods
+class ServiceContextManager:
     """
     A context manager for starting and stopping the daemon.
     """

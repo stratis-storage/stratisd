@@ -25,9 +25,27 @@ import uuid
 # isort: THIRDPARTY
 import pyudev
 
+UDEV_ADD_EVENT = "add"
+UDEV_REMOVE_EVENT = "remove"
+
 _LOSETUP_BIN = os.getenv("STRATIS_LOSETUP_BIN", "/usr/sbin/losetup")
 
 _SIZE_OF_DEVICE = 1024 ** 4  # 1 TiB
+
+
+def _generate_synthetic_udev_events(devnodes, event):
+    """
+    Generate synthetic uevents for the given devnodes
+
+    :param devnodes: list of device nodes
+    :type devnodes: list of str
+    :param str event: the event to generate, "add", "change", "remove"
+    """
+    for device in devnodes:
+        device_name = os.path.split(device)[-1]
+        ufile = os.path.join("/sys/block", device_name, "uevent")
+        with open(ufile, "w") as uevent:
+            uevent.write(event)
 
 
 class LoopBackDevices:
@@ -48,6 +66,30 @@ class LoopBackDevices:
     def _check_tokens(self, tokens):
         if any(token not in self.devices for token in tokens):
             raise RuntimeError("One of the specified tokens is unknown to this manager")
+
+    def _wait_for_udev(self, tokens):
+        """
+        Waits for udev to detect the specified devices.
+
+        :param tokens: identifies devices to wait for
+        :type tokens: list of uuid.UUID
+        :raises RuntimeError: if devices not detected in allowed time
+        """
+        expected_device_files = frozenset(self.device_files(tokens))
+
+        context = pyudev.Context()
+        for _ in range(10):
+            if expected_device_files <= frozenset(
+                # pylint: disable=bad-continuation
+                [x.device_node for x in context.list_devices(subsystem="block")]
+            ):
+                return
+            time.sleep(1)
+
+        raise RuntimeError(
+            'Loopbacked devices "%s" were created, but udev does not seem to be able to find them'
+            % ", ".join(expected_device_files)
+        )
 
     def create_devices(self, number):
         """
@@ -78,21 +120,9 @@ class LoopBackDevices:
             self.devices[token] = (device, backing_file)
             tokens.append(token)
 
-        expected_device_files = frozenset(self.device_files(tokens))
-
-        context = pyudev.Context()
-        for _ in range(10):
-            if expected_device_files <= frozenset(
-                # pylint: disable=bad-continuation
-                [x.device_node for x in context.list_devices(subsystem="block")]
-            ):
-                return tokens
-            time.sleep(1)
-
-        raise RuntimeError(
-            'Loopbacked devices "%s" were created, but udev does not seem to be able to find them'
-            % ", ".join(expected_device_files)
-        )
+        self._wait_for_udev(tokens)
+        self.generate_synthetic_udev_events(tokens, UDEV_ADD_EVENT)
+        return tokens
 
     def unplug(self, tokens):
         """
@@ -103,30 +133,26 @@ class LoopBackDevices:
         :raises: RuntimeError if any token not found
         """
         self._check_tokens(tokens)
+        device_files = self.device_files(tokens)
+
         for token in tokens:
             (device, backing_file) = self.devices[token]
             subprocess.check_call([_LOSETUP_BIN, "-d", device])
             self.devices[token] = (None, backing_file)
 
-    def generate_udev_add_events(self, tokens):
+        _generate_synthetic_udev_events(device_files, UDEV_REMOVE_EVENT)
+
+    def generate_synthetic_udev_events(self, tokens, event):
         """
-        Synthetically create "add" udev event for specified loop back devices
+        Synthetically create udev event for specified loop back devices
         :param tokens: Opaque representation of some loop back devices
         :type tokens: list of uuid.UUID
+        :param str event: the event to generate, "add", "remove", "change"
         :return: None
         :raises RuntimeError: if any token not found or missing device node
         """
         self._check_tokens(tokens)
-        for token in tokens:
-            (device, _) = self.devices[token]
-
-            if device is None:
-                raise RuntimeError("Device node is missing")
-
-            device_name = os.path.split(device)[-1]
-            ufile = os.path.join("/sys/block", device_name, "uevent")
-            with open(ufile, "w") as event:
-                event.write("add")
+        _generate_synthetic_udev_events(self.device_files(tokens), event)
 
     def hotplug(self, tokens):
         """
@@ -147,7 +173,7 @@ class LoopBackDevices:
             )
             self.devices[token] = (device, backing_file)
 
-        self.generate_udev_add_events(tokens)
+        self.generate_synthetic_udev_events(tokens, UDEV_ADD_EVENT)
 
     def device_files(self, tokens):
         """

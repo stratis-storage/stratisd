@@ -329,7 +329,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "libcryptsetup-rs"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "either 1.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -395,7 +395,7 @@ dependencies = [
  "itertools 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.68 (registry+https://github.com/rust-lang/crates.io-index)",
- "libcryptsetup-rs 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libcryptsetup-rs 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libmount 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "libudev 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1015,7 +1015,7 @@ dependencies = [
 "checksum lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 "checksum lazycell 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b294d6fa9ee409a054354afc4352b0b9ef7ca222c69b8812cbea9e7d2bf3783f"
 "checksum libc 0.2.68 (registry+https://github.com/rust-lang/crates.io-index)" = "dea0c0405123bba743ee3f91f49b1c7cfb684eef0da0a50110f758ccf24cdff0"
-"checksum libcryptsetup-rs 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "51505221e9bbcf1447980f01ea1db0ea3059bbed3a53d9a0cff6c384240498c8"
+"checksum libcryptsetup-rs 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "286a440a894fafd96c841b61c73e2053ff5b4d456820b3e04f7e88c4e8636a6b"
 "checksum libcryptsetup-rs-sys 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "0c605998e81e2a99c1f4c5d0be45ea1df6f1dc45dc64f5ca2847b0dbebf49ae7"
 "checksum libdbus-sys 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "dc12a3bc971424edbbf7edaf6e5740483444db63aa8e23d3751ff12a30f306f0"
 "checksum libloading 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "f2b111a074963af1d37a139918ac6d49ad1d0d5e47f72fd55388619691a7d753"

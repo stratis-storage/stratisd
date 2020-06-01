@@ -349,7 +349,7 @@ impl CryptHandle {
         );
         if device
             .context_handle()
-            .load::<()>(EncryptionFormat::Luks2, None)
+            .load::<()>(Some(EncryptionFormat::Luks2), None)
             .is_err()
         {
             Ok(None)

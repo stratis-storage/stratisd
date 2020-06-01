@@ -272,8 +272,11 @@ class UdevTest3(UdevTest):
         num_devices = 3
         device_tokens = self._lb_mgr.create_devices(num_devices)
         devnodes = self._lb_mgr.device_files(device_tokens)
+        key_spec = None if key_spec is None else [key_spec]
 
-        with OptionalKeyServiceContextManager(key_spec=key_spec) as key_description:
+        with OptionalKeyServiceContextManager(key_spec=key_spec) as key_descriptions:
+            key_description = None if key_spec is None else key_descriptions[0]
+
             self.assertEqual(len(get_pools()), 0)
             (_, (pool_object_path, device_object_paths)) = create_pool(
                 random_string(5), devnodes, key_description=key_description
@@ -357,8 +360,11 @@ class UdevTest4(UdevTest):
         udev_wait_type = STRATIS_FS_TYPE if key_spec is None else CRYPTO_LUKS_FS_TYPE
         device_tokens = self._lb_mgr.create_devices(num_devices)
         devnodes = self._lb_mgr.device_files(device_tokens)
+        key_spec = None if key_spec is None else [key_spec]
 
-        with OptionalKeyServiceContextManager(key_spec=key_spec) as key_description:
+        with OptionalKeyServiceContextManager(key_spec=key_spec) as key_descriptions:
+            key_description = None if key_spec is None else key_descriptions[0]
+
             self.assertEqual(len(get_pools()), 0)
             (_, (pool_object_path, _)) = create_pool(
                 random_string(5), devnodes, key_description=key_description

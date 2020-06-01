@@ -23,7 +23,13 @@ import unittest
 import psutil
 
 # isort: LOCAL
-from stratisd_client_dbus import ManagerR1, PoolR1, StratisdErrors, get_object
+from stratisd_client_dbus import (
+    FetchPropertiesR1,
+    ManagerR1,
+    PoolR1,
+    StratisdErrors,
+    get_object,
+)
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from ._loopback import UDEV_ADD_EVENT, LoopBackDevices
@@ -42,6 +48,8 @@ from ._utils import (
     wait_for_udev,
     wait_for_udev_count,
 )
+
+LOCKED_POOL_UUIDS_PROP_NAME = "LockedPoolUuids"
 
 
 class UdevTest(unittest.TestCase):
@@ -458,24 +466,40 @@ class UdevTest5(UdevTest):
     so forth. Eventually, all pools should have been set up.
     """
 
-    def test_duplicate_pool_name(self):
+    def test_duplicate_pool_name(self):  # pylint: disable=too-many-locals
         """
         Create more than one pool with the same name, then dynamically fix it
         :return: None
         """
         pool_name = random_string(12)
         pool_tokens = []
+        encrypted_indices = []
+        unencrypted_indices = []
         num_pools = 3
+        keys = [
+            ("key_desc_1", "key_data_1"),
+            ("key_desc_2", "key_data_2"),
+            ("key_desc_3", "key_data_3"),
+        ]
 
         # Create some pools with duplicate names
         for i in range(num_pools):
             this_pool = self._lb_mgr.create_devices(i + 1)
+            devnodes = self._lb_mgr.device_files(this_pool)
+
+            with OptionalKeyServiceContextManager(key_spec=keys) as key_descriptions:
+                key_description = (
+                    key_descriptions[random.randint(0, len(key_descriptions) - 1)]
+                    if random.choice([True, False])
+                    else None
+                )
+                create_pool(pool_name, devnodes, key_description=key_description)
+                if key_description is None:
+                    unencrypted_indices.append(i)
+                else:
+                    encrypted_indices.append(i)
 
             pool_tokens.append(this_pool)
-
-            devnodes = self._lb_mgr.device_files(this_pool)
-            with ServiceContextManager():
-                create_pool(pool_name, devnodes)
 
             remove_stratis_dm_devices()
 
@@ -484,13 +508,41 @@ class UdevTest5(UdevTest):
             wait_for_udev(STRATIS_FS_TYPE, [])
 
         all_tokens = [dev for sublist in pool_tokens for dev in sublist]
+        random.shuffle(all_tokens)
 
-        with ServiceContextManager():
-            temp_tokens = all_tokens[:]
-            random.shuffle(temp_tokens)
-            self._lb_mgr.hotplug(temp_tokens)
+        with OptionalKeyServiceContextManager(key_spec=keys):
+            self._lb_mgr.hotplug(all_tokens)
 
-            wait_for_udev(STRATIS_FS_TYPE, self._lb_mgr.device_files(all_tokens))
+            (luks_tokens, non_luks_tokens) = (
+                [
+                    dev
+                    for sublist in (pool_tokens[i] for i in encrypted_indices)
+                    for dev in sublist
+                ],
+                [
+                    dev
+                    for sublist in (pool_tokens[i] for i in unencrypted_indices)
+                    for dev in sublist
+                ],
+            )
+
+            wait_for_udev(CRYPTO_LUKS_FS_TYPE, self._lb_mgr.device_files(luks_tokens))
+            wait_for_udev(STRATIS_FS_TYPE, self._lb_mgr.device_files(non_luks_tokens))
+
+            (valid, variant_pool_uuids) = FetchPropertiesR1.Methods.GetProperties(
+                get_object(TOP_OBJECT), {"properties": [LOCKED_POOL_UUIDS_PROP_NAME]}
+            )[LOCKED_POOL_UUIDS_PROP_NAME]
+
+            self.assertTrue(valid)
+
+            for pool_uuid in variant_pool_uuids:
+                ((option, _), exit_code, _) = ManagerR1.Methods.UnlockPool(
+                    get_object(TOP_OBJECT), {"pool_uuid": pool_uuid}
+                )
+                self.assertEqual(exit_code, StratisdErrors.OK)
+                self.assertEqual(option, True)
+
+            wait_for_udev_count(len(all_tokens))
 
             # The number of pools should never exceed one, since all the pools
             # previously formed in the test have the same name.
@@ -508,10 +560,7 @@ class UdevTest5(UdevTest):
                         get_object(object_path), {"name": random_string(10)}
                     )
 
-                # Generate synthetic add events for every loop backed device
-                self._lb_mgr.generate_synthetic_udev_events(
-                    [dev for sublist in pool_tokens for dev in sublist], UDEV_ADD_EVENT
-                )
+                self._lb_mgr.generate_synthetic_udev_events(all_tokens, UDEV_ADD_EVENT)
 
                 settle()
 

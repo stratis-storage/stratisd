@@ -13,7 +13,7 @@ use serde_json::Value;
 use devicemapper::Sectors;
 use libcryptsetup_rs::{
     c_uint, CryptActivateFlags, CryptDeactivateFlags, CryptDevice, CryptInit, CryptStatusInfo,
-    CryptVolumeKeyFlags, CryptWipePattern, EncryptionFormat, LibcryptErr,
+    CryptVolumeKeyFlags, CryptWipePattern, EncryptionFormat, LibcryptErr, TokenInput,
 };
 
 use crate::engine::{
@@ -265,14 +265,14 @@ impl CryptInitializer {
 
         // Initialize stratis token
         log_on_failure!(
-            device.token_handle().json_set(
-                Some(STRATIS_TOKEN_ID),
+            device.token_handle().json_set(TokenInput::ReplaceToken(
+                STRATIS_TOKEN_ID,
                 &StratisLuks2Token {
                     devname: activation_name.clone(),
                     identifiers: self.identifiers,
                 }
                 .into(),
-            ),
+            )),
             "Failed to create the Stratis token"
         );
 
@@ -349,7 +349,7 @@ impl CryptHandle {
         );
         if device
             .context_handle()
-            .load::<()>(EncryptionFormat::Luks2, None)
+            .load::<()>(Some(EncryptionFormat::Luks2), None)
             .is_err()
         {
             Ok(None)

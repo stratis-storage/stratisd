@@ -5,7 +5,7 @@
 use dbus::tree::{Factory, MTFn, Method};
 
 use crate::dbus_api::{
-    api::manager_2_1::methods::{create_pool, set_key, unset_key},
+    api::manager_2_1::methods::{create_pool, set_key, unlock_pool, unset_key},
     types::TData,
 };
 
@@ -54,6 +54,19 @@ pub fn unset_key_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, 
         //
         // Rust representation: bool
         .out_arg(("result", "b"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"))
+}
+
+pub fn unlock_pool_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+    f.method("UnlockPool", (), unlock_pool)
+        .in_arg(("pool_uuid", "s"))
+        // b: true if some encrypted devices were newly opened.
+        // as: array of device UUIDs converted to Strings of all of the newly opened
+        //     devices.
+        //
+        // Rust representation: (bool, Vec<DevUuid>)
+        .out_arg(("result", "(bas)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"))
 }

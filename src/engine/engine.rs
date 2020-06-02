@@ -18,7 +18,7 @@ use crate::{
     engine::types::{
         BlockDevPath, BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid,
         MappingCreateAction, MaybeDbusPath, Name, PoolUuid, RenameAction, ReportType,
-        SetCreateAction, SetDeleteAction,
+        SetCreateAction, SetDeleteAction, SetUnlockAction,
     },
     stratis::StratisResult,
 };
@@ -295,11 +295,23 @@ pub trait Engine: Debug + Report {
         new_name: &str,
     ) -> StratisResult<RenameAction<PoolUuid>>;
 
+    /// Unlock all encrypted devices registered under a given pool UUID.
+    /// This method returns a `Vec<DevUuid>`. This `Vec` will contain UUIDs of
+    /// devices that were newly unlocked while ignoring devices that are already
+    /// in the unlocked state. If some devices are able to be unlocked
+    /// and some fail, an error is returned as all devices should be able to
+    /// be unlocked if the necessary key is in the keyring.
+    fn unlock_pool(&mut self, uuid: PoolUuid) -> StratisResult<SetUnlockAction<DevUuid>>;
+
     /// Find the pool designated by uuid.
     fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)>;
 
     /// Get a mutable referent to the pool designated by uuid.
     fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut dyn Pool)>;
+
+    /// Get a list of encrypted pool UUIDs for pools that have not yet been set up
+    /// and need to be unlocked.
+    fn locked_pool_uuids(&self) -> Vec<PoolUuid>;
 
     /// Configure the simulator, for the real engine, this is a null op.
     /// denominator: the probably of failure is 1/denominator.

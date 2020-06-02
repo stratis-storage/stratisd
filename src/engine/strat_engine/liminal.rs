@@ -17,10 +17,11 @@ use devicemapper::Sectors;
 
 use crate::{
     engine::{
+        engine::Pool,
         strat_engine::{
             backstore::{
-                identify_block_device, DeviceInfo, LuksInfo, StratBlockDev, StratisIdentifiers,
-                StratisInfo, BDA,
+                identify_block_device, CryptHandle, DeviceInfo, LuksInfo, StratBlockDev,
+                StratisIdentifiers, StratisInfo, BDA,
             },
             device::blkdev_size,
             devlinks::setup_pool_devlinks,
@@ -527,6 +528,111 @@ impl LiminalDevices {
             )
             .next()
             .is_none());
+    }
+
+    /// Unlock the liminal encrypted devices that correspond to the given pool UUID.
+    pub fn unlock_pool(
+        &mut self,
+        pools: &Table<StratPool>,
+        pool_uuid: PoolUuid,
+    ) -> StratisResult<Vec<DevUuid>> {
+        fn handle_luks(luks_info: &LLuksInfo) -> StratisResult<()> {
+            if let Some(mut handle) = CryptHandle::setup(&luks_info.ids.devnode)? {
+                handle.activate()?;
+                Ok(())
+            } else {
+                Err(StratisError::Engine(
+                    ErrorEnum::Invalid,
+                    format!(
+                        "Block device {} does not appear to be formatted with
+                        the proper Stratis LUKS2 metadata.",
+                        luks_info.ids.devnode.display(),
+                    ),
+                ))
+            }
+        }
+
+        let unlocked = match self.errored_pool_devices.get(&pool_uuid) {
+            Some(map) => {
+                // This pattern, a bunch of Stratis devices, none of which
+                // has a LUKS device, should characterize a set of devices
+                // belonging to a pool which is unencrypted.
+                if map.iter().all(|(_, info)| match info {
+                    LInfo::Stratis(info) => info.luks.is_none(),
+                    LInfo::Luks(_) => false,
+                }) {
+                    return Err(StratisError::Engine(
+                        ErrorEnum::Error,
+                        format!(
+                            "Attempted to unlock set of devices belonging to an unencrypted pool with UUID {}",
+                            pool_uuid.to_simple_ref(),
+                        ),
+                    ));
+                }
+
+                let mut unlocked = Vec::new();
+                for (dev_uuid, info) in map.iter() {
+                    match info {
+                        LInfo::Stratis(_) => (),
+                        LInfo::Luks(ref luks_info) => {
+                            match handle_luks(luks_info) {
+                                Ok(()) => unlocked.push(*dev_uuid),
+                                Err(e) => return Err(e),
+                            };
+                        }
+                    };
+                }
+                unlocked
+            }
+            None => match pools.get_by_uuid(pool_uuid) {
+                Some((_, pool)) => {
+                    if pool.is_encrypted() {
+                        vec![]
+                    } else {
+                        return Err(StratisError::Engine(
+                            ErrorEnum::Error,
+                            format!(
+                                "Pool with UUID {} is not encrypted and cannot be unlocked.",
+                                pool_uuid.to_simple_ref()
+                            ),
+                        ));
+                    }
+                }
+                None => {
+                    return Err(StratisError::Engine(
+                        ErrorEnum::Error,
+                        format!(
+                            "No devices with UUID {} have been registered with stratisd.",
+                            pool_uuid.to_simple_ref(),
+                        ),
+                    ))
+                }
+            },
+        };
+
+        Ok(unlocked)
+    }
+
+    /// Get a list of pool UUIDs from all of the LUKS2 devices that are currently
+    /// locked in the set of pools that are not yet set up.
+    pub fn locked_pool_uuids(&self) -> Vec<PoolUuid> {
+        self.errored_pool_devices
+            .iter()
+            .filter_map(|(pool_uuid, map)| {
+                let has_locked = map.iter().any(|(_, info)| {
+                    if let LInfo::Luks(_) = info {
+                        true
+                    } else {
+                        false
+                    }
+                });
+                if has_locked {
+                    Some(*pool_uuid)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     /// Take maps of pool UUIDs to sets of devices and return a list of

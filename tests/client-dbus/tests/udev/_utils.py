@@ -137,6 +137,44 @@ def settle():
     subprocess.check_call(["udevadm", "settle"])
 
 
+def wait_for_udev_count(expected_num):
+    """
+    Look for devices with ID_FS_TYPE=stratis. Check as many times as can be
+    done in 10 seconds or until the number of devices found is equal to the
+    number of devices expected. Always get the result of at least 1 enumeration.
+
+    This method should be used only when it is very hard to figure the device
+    nodes corresponding to the Stratis block devices.
+
+    :param int expected_num: the number of expected Stratis devices
+    :return: None
+    :raises RuntimeError: if unexpected number of device nodes is found
+    """
+    found_num = None
+
+    context = pyudev.Context()
+    end_time = time.time() + 10.0
+
+    while time.time() < end_time and not expected_num == found_num:
+        found_num = len(
+            frozenset(
+                [
+                    x.device_node
+                    for x in context.list_devices(
+                        subsystem="block", ID_FS_TYPE=STRATIS_FS_TYPE
+                    )
+                ]
+            )
+        )
+        time.sleep(1)
+
+    if expected_num != found_num:
+        raise RuntimeError(
+            "Found unexpected number of devnodes: expected number: %s != found number: %s"
+            % (expected_num, found_num)
+        )
+
+
 def wait_for_udev(fs_type, expected_paths):
     """
     Look for devices with ID_FS_TYPE=fs_type. Check as many times as can be
@@ -264,61 +302,63 @@ class _Service:
 
 class KernelKey:
     """
-    A handle for operating on keys in the kernel keyring. The specified key will
-    be available for the lifetime of the test when used with the Python with
-    keyword and will be cleaned up at the end of the scope of the with block.
+    A handle for operating on keys in the kernel keyring. The specified keys
+    will be available for the lifetime of the test when used with the Python
+    with keyword and will be cleaned up at the end of the scope of the with
+    block.
     """
 
-    def __init__(self, key_desc, key_data):
+    def __init__(self, key_descs):
         """
         Initialize a key with the provided key description and key data (passphrase).
-        :param str key_desc: The desired key description
-        :param bytes key_data: The desired key contents
+        :param key_descs: list of key descriptions, may be empty
+        :type key_descs: list of (str * bytes)
         """
-        self._key_desc = key_desc
-        self._key_data = key_data
+        self._key_descs = key_descs
 
     def __enter__(self):
         """
         This method allows KernelKey to be used with the "with" keyword.
-        :return: The key description that can be used to access the
+        :return: The key descriptions that can be used to access the
                  provided key data in __init__.
-        :raises RuntimeError: if setting the key in the keyring through stratisd
+        :raises RuntimeError: if setting a key in the keyring through stratisd
                               fails
         """
-        with NamedTemporaryFile(mode="w") as temp_file:
-            temp_file.write(self._key_data)
-            temp_file.flush()
+        for (key_desc, key_data) in self._key_descs:
+            with NamedTemporaryFile(mode="w") as temp_file:
+                temp_file.write(key_data)
+                temp_file.flush()
 
-            with open(temp_file.name, "r") as fd_for_dbus:
-                (_, return_code, message) = ManagerR1.Methods.SetKey(
-                    get_object(TOP_OBJECT),
-                    {
-                        "key_desc": self._key_desc,
-                        "key_fd": fd_for_dbus.fileno(),
-                        "interactive": False,
-                    },
-                )
+                with open(temp_file.name, "r") as fd_for_dbus:
+                    (_, return_code, message) = ManagerR1.Methods.SetKey(
+                        get_object(TOP_OBJECT),
+                        {
+                            "key_desc": key_desc,
+                            "key_fd": fd_for_dbus.fileno(),
+                            "interactive": False,
+                        },
+                    )
 
-        if return_code != StratisdErrors.OK:
-            raise RuntimeError(
-                "Setting the key using stratisd failed with an error: %s" % message
-            )
+                if return_code != StratisdErrors.OK:
+                    raise RuntimeError(
+                        "Setting a key using stratisd failed with an error: %s"
+                        % message
+                    )
 
-        return self._key_desc
+        return [desc for (desc, _) in self._key_descs]
 
     def __exit__(self, exception_type, exception_value, traceback):
-        message = None
         try:
-            (_, return_code, message) = ManagerR1.Methods.UnsetKey(
-                get_object(TOP_OBJECT), {"key_desc": self._key_desc}
-            )
-
-            if return_code != StratisdErrors.OK:
-                raise RuntimeError(
-                    "Unsetting the key using stratisd failed with an error: %s"
-                    % message
+            for (key_desc, _) in reversed(self._key_descs):
+                (_, return_code, message) = ManagerR1.Methods.UnsetKey(
+                    get_object(TOP_OBJECT), {"key_desc": key_desc}
                 )
+
+                if return_code != StratisdErrors.OK:
+                    raise RuntimeError(
+                        "Unsetting the key using stratisd failed with an error: %s"
+                        % message
+                    )
 
         except RuntimeError as rexc:
             if exception_value is None:
@@ -356,23 +396,22 @@ class OptionalKeyServiceContextManager:
 
     def __init__(self, *, key_spec=None):
         """
-        Initialize a context manager with an optional key.
-        :param key_spec: Key description and key data for the kernel key to be added
-        :type key_spec: (str, bytes) or NoneType
+        Initialize a context manager with an optional list of keys
+        :param key_spec: Key description and data for kernel keys to be added
+        :type key_spec: list of (str, bytes) or NoneType
         """
         self._ctxt_manager = ServiceContextManager()
-        self._key = None if key_spec is None else KernelKey(key_spec[0], key_spec[1])
+        self._keys = KernelKey([]) if key_spec is None else KernelKey(key_spec)
 
     def __enter__(self):
         """
         Chain ServiceContextManager and KernelKey __enter__ methods
-        :return: key description or None if no key data was provided
-        :rtype: str or NoneType
+        :return: list of key descriptions
+        :rtype: list of str
         """
         self._ctxt_manager.__enter__()
-        return None if self._key is None else self._key.__enter__()
+        return self._keys.__enter__()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if self._key is not None:
-            self._key.__exit__(exc_type, exc_val, exc_tb)
+        self._keys.__exit__(exc_type, exc_val, exc_tb)
         self._ctxt_manager.__exit__(exc_type, exc_val, exc_tb)

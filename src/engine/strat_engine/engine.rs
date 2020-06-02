@@ -27,7 +27,7 @@ use crate::{
             pool::StratPool,
         },
         structures::Table,
-        types::{CreateAction, DeleteAction, RenameAction, ReportType},
+        types::{CreateAction, DeleteAction, DevUuid, RenameAction, ReportType, SetUnlockAction},
         Engine, EngineEvent, Name, Pool, PoolUuid, Report,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -262,12 +262,21 @@ impl Engine for StratEngine {
         }
     }
 
+    fn unlock_pool(&mut self, pool_uuid: PoolUuid) -> StratisResult<SetUnlockAction<DevUuid>> {
+        let unlocked = self.liminal_devices.unlock_pool(&self.pools, pool_uuid)?;
+        Ok(SetUnlockAction::new(unlocked))
+    }
+
     fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)> {
         get_pool!(self; uuid)
     }
 
     fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut dyn Pool)> {
         get_mut_pool!(self; uuid)
+    }
+
+    fn locked_pool_uuids(&self) -> Vec<PoolUuid> {
+        self.liminal_devices.locked_pool_uuids()
     }
 
     fn configure_simulator(&mut self, _denominator: u32) -> StratisResult<()> {

@@ -60,7 +60,7 @@ impl fmt::Display for StratisIdentifiers {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "Stratis pool UUID: {}, Stratis device UUID: {}",
+            "Stratis pool UUID: \"{}\", Stratis device UUID: \"{}\"",
             self.pool_uuid.to_simple_ref(),
             self.device_uuid.to_simple_ref()
         )

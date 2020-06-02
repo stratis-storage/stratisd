@@ -325,7 +325,7 @@ impl fmt::Display for LLuksInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "{}, key description: {}",
+            "{}, key description: \"{}\"",
             self.ids,
             self.key_description.as_application_str()
         )

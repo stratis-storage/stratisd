@@ -533,7 +533,7 @@ impl LiminalDevices {
     /// Unlock the liminal encrypted devices that correspond to the given pool UUID.
     pub fn unlock_pool(
         &mut self,
-        pools: &Table<StratPool>,
+        pools: &Table<PoolUuid, StratPool>,
         pool_uuid: PoolUuid,
     ) -> StratisResult<Vec<DevUuid>> {
         fn handle_luks(luks_info: &LLuksInfo) -> StratisResult<()> {

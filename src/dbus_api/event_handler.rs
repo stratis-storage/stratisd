@@ -4,7 +4,7 @@
 
 use std::{cell::RefCell, rc::Rc};
 
-use dbus::Connection;
+use dbus::ffidisp::Connection;
 
 use crate::{
     dbus_api::{consts, util::prop_changed_dispatch},

@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus::{self, tree::Factory};
+use dbus::tree::Factory;
 
 use crate::{
     dbus_api::{
@@ -41,6 +41,11 @@ pub fn create_dbus_filesystem<'a>(
         )
         .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME, ())
+                .add_m(fetch_properties_2_0::get_all_properties_method(&f))
+                .add_m(fetch_properties_2_0::get_properties_method(&f)),
+        )
+        .add(
+            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_1, ())
                 .add_m(fetch_properties_2_0::get_all_properties_method(&f))
                 .add_m(fetch_properties_2_0::get_properties_method(&f)),
         );

@@ -16,6 +16,7 @@ use crate::{
                 blockdevmgr::{BlkDevSegment, BlockDevMgr},
                 shared::{coalesce_blkdevsegs, metadata_to_segment},
             },
+            names::KeyDescription,
             serde_structs::{BaseDevSave, BlockDevSave, DataTierSave, Recordable},
         },
         types::{BlockDevTier, DevUuid, PoolUuid},
@@ -151,6 +152,16 @@ impl DataTier {
     pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut StratBlockDev)> {
         self.block_mgr.blockdevs_mut()
     }
+
+    /// Data tier is encrypted
+    pub fn is_encrypted(&self) -> bool {
+        self.block_mgr.is_encrypted()
+    }
+
+    /// Data tier key description
+    pub fn key_desc(&self) -> Option<&KeyDescription> {
+        self.block_mgr.key_desc()
+    }
 }
 
 impl Recordable<DataTierSave> for DataTier {
@@ -185,7 +196,7 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
 
-        let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MDADataSize::default()).unwrap();
+        let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MDADataSize::default(), None).unwrap();
 
         let mut data_tier = DataTier::new(mgr);
 
@@ -226,7 +237,7 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_add_and_alloc() {
+    fn loop_test_add_and_alloc() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(2, 3, None),
             test_add_and_alloc,
@@ -234,7 +245,7 @@ mod tests {
     }
 
     #[test]
-    pub fn real_test_add_and_alloc() {
+    fn real_test_add_and_alloc() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(2, None, None),
             test_add_and_alloc,
@@ -242,7 +253,7 @@ mod tests {
     }
 
     #[test]
-    pub fn travis_test_add_and_alloc() {
+    fn travis_test_add_and_alloc() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(2, 3, None),
             test_add_and_alloc,

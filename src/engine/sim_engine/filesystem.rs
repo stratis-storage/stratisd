@@ -4,8 +4,6 @@
 
 use chrono::{DateTime, Utc};
 
-use rand;
-
 use std::path::PathBuf;
 
 use devicemapper::Bytes;

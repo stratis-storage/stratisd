@@ -23,6 +23,9 @@ extern crate matches;
 #[macro_use]
 extern crate lazy_static;
 
+#[macro_use]
+extern crate serde_json;
+
 pub mod engine;
 
 #[cfg(feature = "dbus_enabled")]

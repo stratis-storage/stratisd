@@ -112,7 +112,7 @@ macro_rules! set_blockdev_user_info {
     };
 }
 
-macro_rules! create_pool_check_num {
+macro_rules! device_list_check_num {
     ($vec:ident, ($is_one:tt, $is_many:tt)) => {{
         let joined_string = $vec.join(", ");
         if $vec.len() == 1 {
@@ -132,7 +132,7 @@ macro_rules! create_pool_generate_error_string {
              the existing pool named {} and the input requesting creation \
              of a pool by the same name{}{}",
             $pool_name,
-            create_pool_check_num!(
+            device_list_check_num!(
                 $input,
                 (
                     " - the input requests blockdev {} \
@@ -141,13 +141,49 @@ macro_rules! create_pool_generate_error_string {
                      which do not exist in the current pool"
                 )
             ),
-            create_pool_check_num!(
+            device_list_check_num!(
                 $exists,
                 (
                     " - the existing pool contains blockdev {} which was \
                      not requested by the input",
                     " - the existing pool contains blockdevs {} which were \
                      not requested by the input"
+                )
+            ),
+        )
+    };
+}
+
+#[cfg(test)]
+macro_rules! strs_to_paths {
+    ($slice:expr) => {
+        &$slice.iter().map(Path::new).collect::<Vec<_>>()
+    };
+}
+
+macro_rules! init_cache_generate_error_string {
+    ($input:ident, $exists:ident) => {
+        format!(
+            "The input requests initialization of a cache with different block devices \
+             from the block devices in the existing cache{}{} ; to \
+             resolve this error, the block devices requested in the input should be the \
+             same as the block devices in the existing cache.",
+            device_list_check_num!(
+                $input,
+                (
+                    "; the existing cache contains \
+                     the block device {} which the input did not include",
+                    "; the existing cache contains \
+                     the block devices {} which the input did not include"
+                )
+            ),
+            device_list_check_num!(
+                $exists,
+                (
+                    "; the input requested block device {} which does not exist in the already \
+                     initialized cache",
+                    "; the input requested block devices {} which do not exist in the already \
+                     initialized cache"
                 )
             ),
         )

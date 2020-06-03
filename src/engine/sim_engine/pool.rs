@@ -11,6 +11,7 @@ use std::{
     vec::Vec,
 };
 
+use serde_json::Value;
 use uuid::Uuid;
 
 use devicemapper::{Sectors, IEC};
@@ -18,21 +19,28 @@ use devicemapper::{Sectors, IEC};
 use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
+        shared::init_cache_idempotent_or_err,
         sim_engine::{blockdev::SimDev, filesystem::SimFilesystem, randomization::Randomizer},
         structures::Table,
         types::{
-            BlockDevTier, CreateAction, DevUuid, FilesystemUuid, FreeSpaceState, MaybeDbusPath,
-            Name, PoolExtendState, PoolState, PoolUuid, Redundancy, RenameAction, SetCreateAction,
-            SetDeleteAction,
+            BlockDevTier, CreateAction, DevUuid, FilesystemUuid, FreeSpaceState, KeyDescription,
+            MaybeDbusPath, Name, PoolExtendState, PoolState, PoolUuid, Redundancy, RenameAction,
+            SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
+// NOTE: There are currently two separate key descriptions which currently must be the
+// same and as a result are functionally equivalent at the moment. The reason for this
+// separation is to allow ease in future development if separate key descriptions are ever
+// needed for data devices and cache devices.
 #[derive(Debug)]
 pub struct SimPool {
     block_devs: HashMap<DevUuid, SimDev>,
+    block_devs_key_desc: Option<KeyDescription>,
     cache_devs: HashMap<DevUuid, SimDev>,
+    cache_devs_key_desc: Option<KeyDescription>,
     filesystems: Table<SimFilesystem>,
     redundancy: Redundancy,
     rdm: Rc<RefCell<Randomizer>>,
@@ -47,14 +55,19 @@ impl SimPool {
         rdm: &Rc<RefCell<Randomizer>>,
         paths: &[&Path],
         redundancy: Redundancy,
+        key_desc: Option<&KeyDescription>,
     ) -> (PoolUuid, SimPool) {
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
-        let device_pairs = devices.iter().map(|p| SimDev::new(Rc::clone(rdm), p));
+        let device_pairs = devices
+            .iter()
+            .map(|p| SimDev::new(Rc::clone(rdm), p, key_desc));
         (
             Uuid::new_v4(),
             SimPool {
                 block_devs: HashMap::from_iter(device_pairs),
+                block_devs_key_desc: key_desc.cloned(),
                 cache_devs: HashMap::new(),
+                cache_devs_key_desc: key_desc.cloned(),
                 filesystems: Table::default(),
                 redundancy,
                 rdm: Rc::clone(rdm),
@@ -81,9 +94,82 @@ impl SimPool {
                     .map(|bd| (BlockDevTier::Cache, bd))
             })
     }
+
+    fn datadevs_encrypted(&self) -> bool {
+        self.block_devs_key_desc.is_some()
+    }
+}
+
+impl<'a> Into<Value> for &'a SimPool {
+    fn into(self) -> Value {
+        json!({
+            "filesystems": Value::Array(
+                self.filesystems.iter()
+                    .map(|(name, uuid, _)| json!({
+                        "name": name.to_string(),
+                        "uuid": uuid.to_simple_ref().to_string(),
+                    }))
+                    .collect()
+            ),
+            "blockdevs": {
+                "datadevs": Value::Array(
+                    self.block_devs.iter()
+                        .map(|(uuid, dev)| json!({
+                            "uuid": uuid.to_simple_ref().to_string(),
+                            "path": dev.devnode().physical_path(),
+                        }))
+                        .collect()
+                ),
+                "cachedevs": Value::Array(
+                    self.cache_devs.iter()
+                        .map(|(uuid, dev)| json!({
+                            "uuid": uuid.to_simple_ref().to_string(),
+                            "path": dev.devnode().physical_path(),
+                        }))
+                        .collect()
+                ),
+            },
+        })
+    }
 }
 
 impl Pool for SimPool {
+    fn init_cache(
+        &mut self,
+        _pool_uuid: PoolUuid,
+        _pool_name: &str,
+        blockdevs: &[&Path],
+    ) -> StratisResult<SetCreateAction<DevUuid>> {
+        if self.is_encrypted() {
+            return Err(StratisError::Engine(
+                ErrorEnum::Invalid,
+                "Use of a cache is not supported with an encrypted pool".to_string(),
+            ));
+        }
+        if !self.has_cache() {
+            if blockdevs.is_empty() {
+                return Err(StratisError::Engine(
+                    ErrorEnum::Invalid,
+                    "At least one blockdev path is required to initialize a cache.".to_string(),
+                ));
+            }
+            let blockdev_pairs: Vec<_> = blockdevs
+                .iter()
+                .map(|p| SimDev::new(Rc::clone(&self.rdm), p, None))
+                .collect();
+            let blockdev_uuids: Vec<_> = blockdev_pairs.iter().map(|(uuid, _)| *uuid).collect();
+            self.cache_devs.extend(blockdev_pairs);
+            Ok(SetCreateAction::new(blockdev_uuids))
+        } else {
+            init_cache_idempotent_or_err(
+                blockdevs,
+                self.cache_devs
+                    .iter()
+                    .map(|(_, bd)| bd.devnode().physical_path().to_owned()),
+            )
+        }
+    }
+
     fn create_filesystems<'a, 'b>(
         &'a mut self,
         _pool_uuid: PoolUuid,
@@ -112,11 +198,32 @@ impl Pool for SimPool {
         paths: &[&Path],
         tier: BlockDevTier,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
+        if tier == BlockDevTier::Cache && !self.has_cache() {
+            return Err(StratisError::Engine(
+                    ErrorEnum::Invalid,
+                    "The cache has not been initialized; you must use init_cache first to initialize the cache.".to_string(),
+                ));
+        }
+
+        if paths.is_empty() {
+            // Treat adding no new blockdev as the empty set.
+            return Ok(SetCreateAction::new(vec![]));
+        }
+
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
 
         let device_pairs: Vec<_> = devices
             .iter()
-            .map(|p| SimDev::new(Rc::clone(&self.rdm), p))
+            .map(|p| {
+                SimDev::new(
+                    Rc::clone(&self.rdm),
+                    p,
+                    match tier {
+                        BlockDevTier::Data => self.block_devs_key_desc.as_ref(),
+                        BlockDevTier::Cache => self.cache_devs_key_desc.as_ref(),
+                    },
+                )
+            })
             .collect();
 
         let the_vec = match tier {
@@ -124,10 +231,13 @@ impl Pool for SimPool {
             BlockDevTier::Data => &mut self.block_devs,
         };
 
-        let filter: Vec<_> = the_vec.values().map(|d| d.devnode()).collect();
+        let filter: Vec<_> = the_vec
+            .values()
+            .map(|d| d.devnode().physical_path())
+            .collect();
         let filtered_device_pairs: Vec<_> = device_pairs
             .into_iter()
-            .filter(|(_, sd)| !filter.contains(&sd.devnode()))
+            .filter(|(_, sd)| !filter.contains(&sd.devnode().physical_path()))
             .collect();
 
         let ret_uuids = filtered_device_pairs
@@ -301,6 +411,20 @@ impl Pool for SimPool {
     fn get_dbus_path(&self) -> &MaybeDbusPath {
         &self.dbus_path
     }
+
+    fn has_cache(&self) -> bool {
+        !self.cache_devs.is_empty()
+    }
+
+    fn is_encrypted(&self) -> bool {
+        self.datadevs_encrypted()
+    }
+
+    fn key_desc(&self) -> Option<&str> {
+        self.block_devs_key_desc
+            .as_ref()
+            .map(|k| k.as_application_str())
+    }
 }
 
 #[cfg(test)]
@@ -324,7 +448,12 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, &[], None)
+            .create_pool(
+                pool_name,
+                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                None,
+                None,
+            )
             .unwrap()
             .changed()
             .unwrap();
@@ -343,7 +472,12 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, &[], None)
+            .create_pool(
+                pool_name,
+                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                None,
+                None,
+            )
             .unwrap()
             .changed()
             .unwrap();
@@ -368,7 +502,12 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, &[], None)
+            .create_pool(
+                pool_name,
+                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                None,
+                None,
+            )
             .unwrap()
             .changed()
             .unwrap();
@@ -394,7 +533,12 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, &[], None)
+            .create_pool(
+                pool_name,
+                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                None,
+                None,
+            )
             .unwrap()
             .changed()
             .unwrap();
@@ -413,7 +557,12 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, &[], None)
+            .create_pool(
+                pool_name,
+                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                None,
+                None,
+            )
             .unwrap()
             .changed()
             .unwrap();
@@ -430,7 +579,12 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, &[], None)
+            .create_pool(
+                pool_name,
+                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                None,
+                None,
+            )
             .unwrap()
             .changed()
             .unwrap();
@@ -447,7 +601,12 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, &[], None)
+            .create_pool(
+                pool_name,
+                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                None,
+                None,
+            )
             .unwrap()
             .changed()
             .unwrap();
@@ -470,7 +629,12 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, &[], None)
+            .create_pool(
+                pool_name,
+                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                None,
+                None,
+            )
             .unwrap()
             .changed()
             .unwrap();
@@ -485,7 +649,12 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, &[], None)
+            .create_pool(
+                pool_name,
+                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                None,
+                None,
+            )
             .unwrap()
             .changed()
             .unwrap();
@@ -507,7 +676,12 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, &[], None)
+            .create_pool(
+                pool_name,
+                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                None,
+                None,
+            )
             .unwrap()
             .changed()
             .unwrap();
@@ -527,7 +701,12 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, &[], None)
+            .create_pool(
+                pool_name,
+                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                None,
+                None,
+            )
             .unwrap()
             .changed()
             .unwrap();
@@ -547,7 +726,12 @@ mod tests {
     fn add_device_empty() {
         let mut engine = SimEngine::default();
         let uuid = engine
-            .create_pool("pool_name", &[], None)
+            .create_pool(
+                "pool_name",
+                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+                None,
+                None,
+            )
             .unwrap()
             .changed()
             .unwrap();

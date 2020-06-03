@@ -9,19 +9,59 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
+use serde_json::Value;
 use uuid::Uuid;
 
 use devicemapper::{Bytes, Sectors};
 
 use crate::{
     engine::types::{
-        BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid, MaybeDbusPath, Name,
-        PoolUuid, RenameAction, SetCreateAction, SetDeleteAction,
+        BlockDevPath, BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid,
+        MappingCreateAction, MaybeDbusPath, Name, PoolUuid, RenameAction, ReportType,
+        SetCreateAction, SetDeleteAction, SetUnlockAction,
     },
     stratis::StratisResult,
 };
 
 pub const DEV_PATH: &str = "/stratis";
+/// The maximum size of pool passphrases stored in the kernel keyring
+pub const MAX_STRATIS_PASS_SIZE: usize = 512 / 8;
+
+pub trait KeyActions {
+    /// Set a key in the kernel keyring. The output is an idempotent return type
+    /// containing a `bool` which indicates whether a key with the requested
+    /// key description was in the keyring and the key data was updated.
+    ///
+    /// If `interactive` is `true`, the end of a passphrase should be delimited
+    /// by a newline.
+    ///
+    /// Successful return values:
+    /// * `Ok(MappingCreateAction::Identity)`: The key was already in the keyring
+    /// with the appropriate key description and key data.
+    /// * `Ok(MappingCreateAction::Created(()))`: The key was newly added to the
+    /// keyring.
+    /// * `Ok(MappingCreateAction::Changed)`: The key description was already present
+    /// in the keyring but the key data was updated.
+    fn set(
+        &mut self,
+        key_desc: &str,
+        key_fd: RawFd,
+        interactive: bool,
+    ) -> StratisResult<MappingCreateAction<()>>;
+
+    /// Return a list of all key descriptions of keys added to the keyring by
+    /// Stratis that are still valid.
+    fn list(&self) -> StratisResult<Vec<String>>;
+
+    /// Unset a key with the given key description in the root persistent kernel
+    /// keyring.
+    fn unset(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>>;
+}
+
+/// An interface for reporting internal engine state.
+pub trait Report {
+    fn get_report(&self, report_type: ReportType) -> Value;
+}
 
 pub trait Filesystem: Debug {
     /// path of the device node
@@ -37,15 +77,15 @@ pub trait Filesystem: Debug {
     fn used(&self) -> StratisResult<Bytes>;
 
     /// Set dbus path associated with the Pool.
-    fn set_dbus_path(&mut self, path: MaybeDbusPath) -> ();
+    fn set_dbus_path(&mut self, path: MaybeDbusPath);
 
     /// Get dbus path associated with the Pool.
     fn get_dbus_path(&self) -> &MaybeDbusPath;
 }
 
 pub trait BlockDev: Debug {
-    /// Get the path of the device node for this device.
-    fn devnode(&self) -> PathBuf;
+    /// Get the structure representing block device paths.
+    fn devnode(&self) -> &BlockDevPath;
 
     /// Get the user-settable string associated with this blockdev.
     fn user_info(&self) -> Option<&str>;
@@ -61,13 +101,37 @@ pub trait BlockDev: Debug {
     fn size(&self) -> Sectors;
 
     /// Set dbus path associated with the BlockDev.
-    fn set_dbus_path(&mut self, path: MaybeDbusPath) -> ();
+    fn set_dbus_path(&mut self, path: MaybeDbusPath);
 
     /// Get dbus path associated with the BlockDev.
     fn get_dbus_path(&self) -> &MaybeDbusPath;
+
+    /// Get the status of whether a block device is encrypted or not.
+    fn is_encrypted(&self) -> bool;
 }
 
 pub trait Pool: Debug {
+    /// Initialize the cache with the provided cache block devices.
+    /// Returns a list of the the block devices that were actually added as cache
+    /// devices. In practice, this will have three types of return values:
+    /// * An error if the cache has already been initialized with a different set
+    /// of block devices.
+    /// * `SetCreateAction::Identity` if the cache has already been initialized with
+    /// the same set of block devices.
+    /// * `SetCreateAction::Created` containing all provided block devices if the
+    /// cache has not yet been initialized.
+    ///
+    /// This ensures the contract of providing a truly idempotent API as the cache
+    /// can only be initialized once and if an attempt is made to initialize it
+    /// twice with different sets of block devices, the user should be notified
+    /// of their error.
+    fn init_cache(
+        &mut self,
+        pool_uuid: PoolUuid,
+        pool_name: &str,
+        blockdevs: &[&Path],
+    ) -> StratisResult<SetCreateAction<DevUuid>>;
+
     /// Creates the filesystems specified by specs.
     /// Returns a list of the names of filesystems actually created.
     /// Returns an error if any of the specified names are already in use
@@ -84,6 +148,8 @@ pub trait Pool: Debug {
     /// Returns a list of uuids corresponding to devices actually added.
     /// Returns an error if a blockdev can not be added because it is owned
     /// or there was an error while reading or writing a blockdev.
+    /// Also return an error if the tier specified is Cache, and the cache
+    /// is not yet initialized.
     fn add_blockdevs(
         &mut self,
         pool_uuid: PoolUuid,
@@ -178,13 +244,23 @@ pub trait Pool: Debug {
     ) -> StratisResult<RenameAction<DevUuid>>;
 
     /// Set dbus path associated with the Pool.
-    fn set_dbus_path(&mut self, path: MaybeDbusPath) -> ();
+    fn set_dbus_path(&mut self, path: MaybeDbusPath);
 
     /// Get dbus path associated with the Pool.
     fn get_dbus_path(&self) -> &MaybeDbusPath;
+
+    /// true if the pool has a cache, otherwise false
+    fn has_cache(&self) -> bool;
+
+    /// Determine if the pool's data is encrypted
+    fn is_encrypted(&self) -> bool;
+
+    /// Get key description for the key in the kernel keyring used for encryption
+    /// if it is encrypted
+    fn key_desc(&self) -> Option<&str>;
 }
 
-pub trait Engine: Debug {
+pub trait Engine: Debug + Report {
     /// Create a Stratis pool.
     /// Returns the UUID of the newly created pool.
     /// Returns an error if the redundancy code does not correspond to a
@@ -194,6 +270,7 @@ pub trait Engine: Debug {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
+        key_desc: Option<String>,
     ) -> StratisResult<CreateAction<PoolUuid>>;
 
     /// Handle a libudev event.
@@ -218,11 +295,23 @@ pub trait Engine: Debug {
         new_name: &str,
     ) -> StratisResult<RenameAction<PoolUuid>>;
 
+    /// Unlock all encrypted devices registered under a given pool UUID.
+    /// This method returns a `Vec<DevUuid>`. This `Vec` will contain UUIDs of
+    /// devices that were newly unlocked while ignoring devices that are already
+    /// in the unlocked state. If some devices are able to be unlocked
+    /// and some fail, an error is returned as all devices should be able to
+    /// be unlocked if the necessary key is in the keyring.
+    fn unlock_pool(&mut self, uuid: PoolUuid) -> StratisResult<SetUnlockAction<DevUuid>>;
+
     /// Find the pool designated by uuid.
     fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)>;
 
     /// Get a mutable referent to the pool designated by uuid.
     fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut dyn Pool)>;
+
+    /// Get a list of encrypted pool UUIDs for pools that have not yet been set up
+    /// and need to be unlocked.
+    fn locked_pool_uuids(&self) -> Vec<PoolUuid>;
 
     /// Configure the simulator, for the real engine, this is a null op.
     /// denominator: the probably of failure is 1/denominator.
@@ -240,6 +329,12 @@ pub trait Engine: Debug {
 
     /// Notify the engine that an event has occurred on the Eventable.
     fn evented(&mut self) -> StratisResult<()>;
+
+    /// Get the handler for kernel keyring operations.
+    fn get_key_handler(&self) -> &dyn KeyActions;
+
+    /// Get the handler for kernel keyring operations mutably.
+    fn get_key_handler_mut(&mut self) -> &mut dyn KeyActions;
 }
 
 /// Allows an Engine to include a fd in the event loop. See

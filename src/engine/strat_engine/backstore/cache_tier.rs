@@ -246,7 +246,7 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
 
-        let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MDADataSize::default()).unwrap();
+        let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MDADataSize::default(), None).unwrap();
 
         let mut cache_tier = CacheTier::new(mgr).unwrap();
 
@@ -291,17 +291,17 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_cache_test_add() {
+    fn loop_cache_test_add() {
         loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(2, 3, None), cache_test_add);
     }
 
     #[test]
-    pub fn real_cache_test_add() {
+    fn real_cache_test_add() {
         real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), cache_test_add);
     }
 
     #[test]
-    pub fn travis_cache_test_add() {
+    fn travis_cache_test_add() {
         loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(2, 3, None), cache_test_add);
     }
 }

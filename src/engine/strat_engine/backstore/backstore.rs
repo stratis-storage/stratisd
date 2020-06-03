@@ -4,13 +4,10 @@
 
 // Code to handle the backing store of a pool.
 
-use std::{
-    cmp,
-    collections::HashMap,
-    path::{Path, PathBuf},
-};
+use std::{cmp, path::Path};
 
 use chrono::{DateTime, Utc};
+use serde_json::Value;
 
 use devicemapper::{CacheDev, Device, DmDevice, LinearDev, Sectors};
 
@@ -23,11 +20,10 @@ use crate::{
                 cache_tier::CacheTier,
                 data_tier::DataTier,
                 metadata::MDADataSize,
-                setup::get_blockdevs,
             },
             device::wipe_sectors,
             dm::get_dm,
-            names::{format_backstore_ids, CacheRole},
+            names::{format_backstore_ids, CacheRole, KeyDescription},
             serde_structs::{BackstoreSave, CapSave, Recordable},
         },
         BlockDevTier, DevUuid, PoolUuid,
@@ -104,25 +100,36 @@ pub struct Backstore {
 
 impl Backstore {
     /// Make a Backstore object from blockdevs that already belong to Stratis.
-    /// Precondition: every device in devnodes has already been determined to
-    /// belong to the pool with the specified pool_uuid.
+    /// Precondition: every device in datadevs and cachedevs has already been
+    /// determined to belong to the pool with the specified pool_uuid.
+    ///
     /// Precondition: backstore_save.cap.allocs[0].length <=
     ///       the sum of the lengths of the segments allocated
     /// to the data tier cap device.
+    ///
     /// Precondition: backstore_save.data_segments is not empty. This is a
     /// consequence of the fact that metadata is saved by the pool, and if
     /// a pool exists, data has been allocated to the cap device.
+    ///
+    /// Precondition:
+    ///   * key_description.is_some() -> every StratBlockDev in datadevs has a
+    ///   key description and that key description == key_description
+    ///   * key_description.is_none() -> no StratBlockDev in datadevs has a
+    ///   key description.
+    ///   * no StratBlockDev in cachedevs has a key description
+    ///
     /// Postcondition:
     /// self.linear.is_some() XOR self.cache.is_some()
     /// self.cache.is_some() <=> self.cache_tier.is_some()
     pub fn setup(
         pool_uuid: PoolUuid,
         backstore_save: &BackstoreSave,
-        devnodes: &HashMap<Device, PathBuf>,
+        datadevs: Vec<StratBlockDev>,
+        cachedevs: Vec<StratBlockDev>,
         last_update_time: DateTime<Utc>,
+        key_description: Option<&KeyDescription>,
     ) -> StratisResult<Backstore> {
-        let (datadevs, cachedevs) = get_blockdevs(pool_uuid, backstore_save, devnodes)?;
-        let block_mgr = BlockDevMgr::new(datadevs, Some(last_update_time));
+        let block_mgr = BlockDevMgr::new(datadevs, Some(last_update_time), key_description);
         let data_tier = DataTier::setup(block_mgr, &backstore_save.data_tier)?;
         let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
         let origin = LinearDev::setup(
@@ -133,7 +140,7 @@ impl Backstore {
         )?;
 
         let (cache_tier, cache, origin) = if !cachedevs.is_empty() {
-            let block_mgr = BlockDevMgr::new(cachedevs, Some(last_update_time));
+            let block_mgr = BlockDevMgr::new(cachedevs, Some(last_update_time), None);
             match backstore_save.cache_tier {
                 Some(ref cache_tier_save) => {
                     let cache_tier = CacheTier::setup(block_mgr, cache_tier_save)?;
@@ -169,8 +176,14 @@ impl Backstore {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         mda_data_size: MDADataSize,
+        key_desc: Option<&KeyDescription>,
     ) -> StratisResult<Backstore> {
-        let data_tier = DataTier::new(BlockDevMgr::initialize(pool_uuid, paths, mda_data_size)?);
+        let data_tier = DataTier::new(BlockDevMgr::initialize(
+            pool_uuid,
+            paths,
+            mda_data_size,
+            key_desc,
+        )?);
 
         Ok(Backstore {
             data_tier,
@@ -181,9 +194,62 @@ impl Backstore {
         })
     }
 
+    /// Initialize the cache tier and add cachedevs to the backstore.
+    ///
+    /// Returns all `DevUuid`s of devices that were added to the cache on initialization.
+    ///
+    /// Precondition: Must be invoked only after some space has been allocated
+    /// from the backstore. This ensures that there is certainly a cap device.
+    // Precondition: self.cache.is_none() && self.linear.is_some()
+    // Postcondition: self.cache.is_some() && self.linear.is_none()
+    pub fn init_cache(
+        &mut self,
+        pool_uuid: PoolUuid,
+        paths: &[&Path],
+    ) -> StratisResult<Vec<DevUuid>> {
+        match self.cache_tier {
+            Some(_) => unreachable!("self.cache.is_none()"),
+            None => {
+                if paths.is_empty() {
+                    return Err(StratisError::Engine(
+                        ErrorEnum::Invalid,
+                        "Must initialize cache with at least one blockdev.".to_string(),
+                    ));
+                }
+
+                // Note that variable length metadata is not stored on the
+                // cachedevs, so the mda_size can always be the minimum.
+                // If it is desired to change a cache dev to a data dev, it
+                // should be removed and then re-added in order to ensure
+                // that the MDA region is set to the correct size.
+                let bdm = BlockDevMgr::initialize(pool_uuid, paths, MDADataSize::default(), None)?;
+
+                let cache_tier = CacheTier::new(bdm)?;
+
+                let linear = self.linear
+                    .take()
+                    .expect("some space has already been allocated from the backstore => (cache_tier.is_none() <=> self.linear.is_some())");
+
+                let cache = make_cache(pool_uuid, &cache_tier, linear, true)?;
+
+                self.cache = Some(cache);
+
+                let uuids = cache_tier
+                    .block_mgr
+                    .blockdevs()
+                    .iter()
+                    .map(|&(uuid, _)| uuid)
+                    .collect::<Vec<_>>();
+
+                self.cache_tier = Some(cache_tier);
+
+                Ok(uuids)
+            }
+        }
+    }
+
     /// Add cachedevs to the backstore.
     ///
-    /// If the cache tier does not already exist, create it.
     /// If the addition of the cache devs would result in a cache with a
     /// cache sub-device size greater than 32 TiB return an error.
     /// FIXME: This restriction on the size of the cache sub-device is
@@ -191,8 +257,9 @@ impl Backstore {
     ///
     /// Precondition: Must be invoked only after some space has been allocated
     /// from the backstore. This ensures that there is certainly a cap device.
-    // Precondition: self.linear.is_some() XOR self.cache.is_some()
-    // Postcondition: self.cache.is_some() && self.linear.is_none()
+    // Precondition: self.linear.is_none() && self.cache.is_some()
+    // Precondition: self.cache_key_desc has the desired key description
+    // Precondition: self.cache.is_some() && self.linear.is_none()
     pub fn add_cachedevs(
         &mut self,
         pool_uuid: PoolUuid,
@@ -223,35 +290,7 @@ impl Backstore {
 
                 Ok(uuids)
             }
-            None => {
-                // Note that variable length metadata is not stored on the
-                // cachedevs, so the mda_size can always be the minimum.
-                // If it is desired to change a cache dev to a data dev, it
-                // should be removed and then re-added in order to ensure
-                // that the MDA region is set to the correct size.
-                let bdm = BlockDevMgr::initialize(pool_uuid, paths, MDADataSize::default())?;
-
-                let cache_tier = CacheTier::new(bdm)?;
-
-                let linear = self.linear
-                    .take()
-                    .expect("some space has already been allocated from the backstore => (cache_tier.is_none() <=> self.linear.is_some())");
-
-                let cache = make_cache(pool_uuid, &cache_tier, linear, true)?;
-
-                self.cache = Some(cache);
-
-                let uuids = cache_tier
-                    .block_mgr
-                    .blockdevs()
-                    .iter()
-                    .map(|&(uuid, _)| uuid)
-                    .collect::<Vec<_>>();
-
-                self.cache_tier = Some(cache_tier);
-
-                Ok(uuids)
-            }
+            None => unreachable!("self.cache.is_some()"),
         }
     }
 
@@ -396,19 +435,27 @@ impl Backstore {
         }
     }
 
+    /// Get only the datadevs in the pool.
+    pub fn datadevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
+        self.data_tier.blockdevs().to_vec()
+    }
+
+    /// Get only the cachdevs in the pool.
+    pub fn cachedevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
+        match self.cache_tier {
+            Some(ref cache) => cache.blockdevs().to_vec(),
+            None => Vec::new(),
+        }
+    }
+
     /// Return a reference to all the blockdevs that this pool has ownership
     /// of. The blockdevs may be returned in any order. It is unsafe to assume
     /// that they are grouped by tier or any other organization.
     pub fn blockdevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
-        match self.cache_tier {
-            Some(ref cache) => cache
-                .blockdevs()
-                .iter()
-                .chain(self.data_tier.blockdevs().iter())
-                .cloned()
-                .collect(),
-            None => self.data_tier.blockdevs(),
-        }
+        self.datadevs()
+            .into_iter()
+            .chain(self.cachedevs().into_iter())
+            .collect()
     }
 
     pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut StratBlockDev)> {
@@ -578,6 +625,43 @@ impl Backstore {
             },
         )
     }
+
+    pub fn data_key_desc(&self) -> Option<&KeyDescription> {
+        self.data_tier.key_desc()
+    }
+
+    pub fn data_tier_is_encrypted(&self) -> bool {
+        self.data_tier.is_encrypted()
+    }
+
+    pub fn has_cache(&self) -> bool {
+        self.cache_tier.is_some()
+    }
+}
+
+impl<'a> Into<Value> for &'a Backstore {
+    fn into(self) -> Value {
+        json!({
+            "blockdevs": {
+                "datadevs": Value::Array(
+                    self.datadevs().iter().map(|(uuid, dev)| {
+                        json!({
+                            "uuid": uuid.to_simple_ref().to_string(),
+                            "path": dev.devnode().physical_path(),
+                        })
+                    }).collect()
+                ),
+                "cachedevs": Value::Array(
+                    self.cachedevs().iter().map(|(uuid, dev)| {
+                        json!({
+                            "uuid": uuid.to_simple_ref().to_string(),
+                            "path": dev.devnode().physical_path(),
+                        })
+                    }).collect()
+                ),
+            }
+        })
+    }
 }
 
 impl Recordable<BackstoreSave> for Backstore {
@@ -594,16 +678,23 @@ impl Recordable<BackstoreSave> for Backstore {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
+    use std::{collections::HashMap, fs::OpenOptions};
 
     use uuid::Uuid;
 
     use devicemapper::{CacheDevStatus, DataBlocks, IEC};
 
-    use crate::engine::strat_engine::{
-        backstore::find_all,
-        cmd,
-        tests::{loopbacked, real},
+    use crate::engine::{
+        strat_engine::{
+            backstore::{
+                identify::StratisInfo,
+                metadata::{device_identifiers, StratisIdentifiers},
+            },
+            cmd,
+            liminal::{get_bdas, get_blockdevs, LStratisInfo},
+            tests::{loopbacked, real},
+        },
+        types::DevUuid,
     };
 
     use super::*;
@@ -651,7 +742,7 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
         let mut backstore =
-            Backstore::initialize(pool_uuid, initdatapaths, MDADataSize::default()).unwrap();
+            Backstore::initialize(pool_uuid, initdatapaths, MDADataSize::default(), None).unwrap();
 
         invariant(&backstore);
 
@@ -660,7 +751,7 @@ mod tests {
             .alloc(pool_uuid, &[INITIAL_BACKSTORE_ALLOCATION])
             .unwrap();
 
-        let cache_uuids = backstore.add_cachedevs(pool_uuid, initcachepaths).unwrap();
+        let cache_uuids = backstore.init_cache(pool_uuid, initcachepaths).unwrap();
 
         invariant(&backstore);
 
@@ -713,7 +804,7 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_add_cache_devs() {
+    fn loop_test_add_cache_devs() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(4, 5, None),
             test_add_cache_devs,
@@ -721,7 +812,7 @@ mod tests {
     }
 
     #[test]
-    pub fn real_test_add_cache_devs() {
+    fn real_test_add_cache_devs() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(4, None, None),
             test_add_cache_devs,
@@ -729,7 +820,7 @@ mod tests {
     }
 
     #[test]
-    pub fn travis_test_add_cache_devs() {
+    fn travis_test_add_cache_devs() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(4, 5, None),
             test_add_cache_devs,
@@ -746,7 +837,7 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default()).unwrap();
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
 
         assert_matches!(
             backstore
@@ -782,17 +873,17 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_request() {
+    fn loop_test_request() {
         loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_request);
     }
 
     #[test]
-    pub fn real_test_request() {
+    fn real_test_request() {
         real::test_with_spec(&real::DeviceLimits::AtLeast(1, None, None), test_request);
     }
 
     #[test]
-    pub fn travis_test_request() {
+    fn travis_test_request() {
         loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_request);
     }
 
@@ -810,73 +901,123 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
 
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths1, MDADataSize::default()).unwrap();
-        invariant(&backstore);
+        let (backstore_save, infos): (_, HashMap<DevUuid, LStratisInfo>) = {
+            let mut backstore =
+                Backstore::initialize(pool_uuid, paths1, MDADataSize::default(), None).unwrap();
 
-        // Allocate space from the backstore so that the cap device is made.
-        backstore
-            .alloc(pool_uuid, &[INITIAL_BACKSTORE_ALLOCATION])
+            for path in paths1 {
+                assert_eq!(
+                    pool_uuid,
+                    device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
+                        .unwrap()
+                        .unwrap()
+                        .pool_uuid
+                );
+            }
+
+            invariant(&backstore);
+
+            // Allocate space from the backstore so that the cap device is made.
+            backstore
+                .alloc(pool_uuid, &[INITIAL_BACKSTORE_ALLOCATION])
+                .unwrap();
+
+            let old_device = backstore.device();
+
+            backstore.init_cache(pool_uuid, paths2).unwrap();
+
+            for path in paths2 {
+                assert_eq!(
+                    pool_uuid,
+                    device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
+                        .unwrap()
+                        .unwrap()
+                        .pool_uuid
+                );
+            }
+
+            invariant(&backstore);
+
+            assert_ne!(backstore.device(), old_device);
+
+            (
+                backstore.record(),
+                backstore
+                    .blockdevs()
+                    .iter()
+                    .map(|(device_uuid, blockdev)| {
+                        (
+                            *device_uuid,
+                            StratisInfo {
+                                identifiers: StratisIdentifiers {
+                                    pool_uuid,
+                                    device_uuid: *device_uuid,
+                                },
+                                device_number: *blockdev.device(),
+                                devnode: blockdev.devnode().metadata_path().to_owned(),
+                            }
+                            .into(),
+                        )
+                    })
+                    .collect(),
+            )
+        };
+
+        {
+            let bdas = get_bdas(&infos).unwrap();
+            let (datadevs, cachedevs) = get_blockdevs(&backstore_save, &infos, bdas).unwrap();
+            let mut backstore = Backstore::setup(
+                pool_uuid,
+                &backstore_save,
+                datadevs,
+                cachedevs,
+                Utc::now(),
+                None,
+            )
             .unwrap();
+            invariant(&backstore);
 
-        let old_device = backstore.device();
+            let backstore_save2 = backstore.record();
+            assert_eq!(backstore_save.cache_tier, backstore_save2.cache_tier);
+            assert_eq!(backstore_save.data_tier, backstore_save2.data_tier);
 
-        backstore.add_cachedevs(pool_uuid, paths2).unwrap();
-        invariant(&backstore);
+            backstore.teardown().unwrap();
+        }
 
-        assert_ne!(backstore.device(), old_device);
+        {
+            let bdas = get_bdas(&infos).unwrap();
+            let (datadevs, cachedevs) = get_blockdevs(&backstore_save, &infos, bdas).unwrap();
+            let mut backstore = Backstore::setup(
+                pool_uuid,
+                &backstore_save,
+                datadevs,
+                cachedevs,
+                Utc::now(),
+                None,
+            )
+            .unwrap();
+            invariant(&backstore);
 
-        let backstore_save = backstore.record();
+            let backstore_save2 = backstore.record();
+            assert_eq!(backstore_save.cache_tier, backstore_save2.cache_tier);
+            assert_eq!(backstore_save.data_tier, backstore_save2.data_tier);
 
-        cmd::udev_settle().unwrap();
-
-        let map = find_all().unwrap();
-        assert_eq!(
-            map.keys().collect::<HashSet<&PoolUuid>>(),
-            vec![pool_uuid].iter().collect::<HashSet<&PoolUuid>>()
-        );
-
-        let mut backstore =
-            Backstore::setup(pool_uuid, &backstore_save, &map[&pool_uuid], Utc::now()).unwrap();
-        invariant(&backstore);
-
-        let backstore_save2 = backstore.record();
-        assert_eq!(backstore_save.cache_tier, backstore_save2.cache_tier);
-        assert_eq!(backstore_save.data_tier, backstore_save2.data_tier);
-
-        backstore.teardown().unwrap();
-
-        cmd::udev_settle().unwrap();
-
-        let map = find_all().unwrap();
-        assert_eq!(
-            map.keys().collect::<HashSet<&PoolUuid>>(),
-            vec![pool_uuid].iter().collect::<HashSet<&PoolUuid>>()
-        );
-
-        let mut backstore =
-            Backstore::setup(pool_uuid, &backstore_save, &map[&pool_uuid], Utc::now()).unwrap();
-        invariant(&backstore);
-
-        let backstore_save2 = backstore.record();
-        assert_eq!(backstore_save.cache_tier, backstore_save2.cache_tier);
-        assert_eq!(backstore_save.data_tier, backstore_save2.data_tier);
-
-        backstore.destroy().unwrap();
+            backstore.destroy().unwrap();
+        }
     }
 
     #[test]
-    pub fn loop_test_setup() {
+    fn loop_test_setup() {
         loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(2, 3, None), test_setup);
     }
 
     #[test]
-    pub fn real_test_setup() {
+    fn real_test_setup() {
         real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_setup);
     }
 
     #[test]
-    pub fn travis_test_setup() {
+    fn travis_test_setup() {
         loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(2, 3, None), test_setup);
     }
 }

@@ -4,7 +4,6 @@
 
 use chrono::SecondsFormat;
 use dbus::{
-    self,
     arg::IterAppend,
     tree::{MTFn, MethodErr, PropInfo},
 };

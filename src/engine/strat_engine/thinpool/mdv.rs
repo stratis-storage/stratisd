@@ -11,11 +11,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use nix::{
-    self,
-    mount::{mount, umount, MsFlags},
-};
-use serde_json;
+use nix::mount::{mount, umount, MsFlags};
 
 use devicemapper::{DmDevice, LinearDev, LinearDevTargetParams, TargetLine};
 
@@ -139,7 +135,7 @@ impl MetadataVol {
             .join(uuid.to_simple_ref().to_string())
             .with_extension("json");
 
-        let temp_path = path.clone().with_extension("temp");
+        let temp_path = path.with_extension("temp");
 
         let _mount = MountedMDV::mount(self)?;
 

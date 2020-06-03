@@ -5,12 +5,12 @@
 // Code to handle management of a pool's thinpool device.
 
 use std::{
-    self,
     cmp::{max, min},
     thread::sleep,
     time::Duration,
 };
 
+use serde_json::Value;
 use uuid::Uuid;
 
 use devicemapper::{
@@ -1143,6 +1143,21 @@ impl ThinPool {
     }
 }
 
+impl<'a> Into<Value> for &'a ThinPool {
+    fn into(self) -> Value {
+        json!({
+            "filesystems": Value::Array(
+                self.filesystems.iter()
+                    .map(|(name, uuid, _)| json!({
+                        "name": name.to_string(),
+                        "uuid": uuid.to_simple_ref().to_string(),
+                    }))
+                    .collect()
+            )
+        })
+    }
+}
+
 impl Recordable<FlexDevsSave> for Segments {
     fn record(&self) -> FlexDevsSave {
         FlexDevsSave {
@@ -1238,7 +1253,6 @@ mod tests {
     };
 
     use nix::mount::{mount, umount, MsFlags};
-    use tempfile;
     use uuid::Uuid;
 
     use devicemapper::{Bytes, SECTOR_SIZE};
@@ -1267,7 +1281,7 @@ mod tests {
         devlinks::cleanup_devlinks(Vec::new().into_iter());
 
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default()).unwrap();
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
 
         let mut pool = ThinPool::new(
             pool_uuid,
@@ -1288,7 +1302,7 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_greedy_allocation() {
+    fn loop_test_greedy_allocation() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(2, 3, None),
             test_greedy_allocation,
@@ -1296,7 +1310,7 @@ mod tests {
     }
 
     #[test]
-    pub fn real_test_greedy_allocation() {
+    fn real_test_greedy_allocation() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(2, None, None),
             test_greedy_allocation,
@@ -1310,7 +1324,7 @@ mod tests {
         devlinks::cleanup_devlinks(Vec::new().into_iter());
         let (first_path, remaining_paths) = paths.split_at(1);
         let mut backstore =
-            Backstore::initialize(pool_uuid, first_path, MDADataSize::default()).unwrap();
+            Backstore::initialize(pool_uuid, first_path, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1393,7 +1407,7 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_full_pool() {
+    fn loop_test_full_pool() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Exactly(2, Some(Bytes(IEC::Gi).sectors())),
             test_full_pool,
@@ -1401,7 +1415,7 @@ mod tests {
     }
 
     #[test]
-    pub fn real_test_full_pool() {
+    fn real_test_full_pool() {
         real::test_with_spec(
             &real::DeviceLimits::Exactly(
                 2,
@@ -1417,7 +1431,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default()).unwrap();
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1506,7 +1520,7 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_filesystem_snapshot() {
+    fn loop_test_filesystem_snapshot() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(2, 3, None),
             test_filesystem_snapshot,
@@ -1514,7 +1528,7 @@ mod tests {
     }
 
     #[test]
-    pub fn real_test_filesystem_snapshot() {
+    fn real_test_filesystem_snapshot() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(2, None, None),
             test_filesystem_snapshot,
@@ -1530,7 +1544,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default()).unwrap();
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1557,7 +1571,7 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_filesystem_rename() {
+    fn loop_test_filesystem_rename() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(1, 3, None),
             test_filesystem_rename,
@@ -1565,7 +1579,7 @@ mod tests {
     }
 
     #[test]
-    pub fn real_test_filesystem_rename() {
+    fn real_test_filesystem_rename() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(1, None, None),
             test_filesystem_rename,
@@ -1579,7 +1593,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default()).unwrap();
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1628,7 +1642,7 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_pool_setup() {
+    fn loop_test_pool_setup() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(1, 3, None),
             test_pool_setup,
@@ -1636,7 +1650,7 @@ mod tests {
     }
 
     #[test]
-    pub fn real_test_pool_setup() {
+    fn real_test_pool_setup() {
         real::test_with_spec(&real::DeviceLimits::AtLeast(1, None, None), test_pool_setup);
     }
     /// Verify that destroy_filesystems actually deallocates the space
@@ -1646,7 +1660,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default()).unwrap();
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1674,7 +1688,7 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_thindev_destroy() {
+    fn loop_test_thindev_destroy() {
         // This test requires more than 1 GiB.
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(2, 3, None),
@@ -1683,7 +1697,7 @@ mod tests {
     }
 
     #[test]
-    pub fn real_test_thindev_destroy() {
+    fn real_test_thindev_destroy() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(1, None, None),
             test_thindev_destroy,
@@ -1701,7 +1715,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default()).unwrap();
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1772,7 +1786,7 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_thindev_expand() {
+    fn loop_test_thindev_expand() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(1, 3, None),
             test_thindev_expand,
@@ -1780,7 +1794,7 @@ mod tests {
     }
 
     #[test]
-    pub fn real_test_thindev_expand() {
+    fn real_test_thindev_expand() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(1, None, None),
             test_thindev_expand,
@@ -1794,7 +1808,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default()).unwrap();
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1815,7 +1829,7 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_suspend_resume() {
+    fn loop_test_suspend_resume() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(1, 3, None),
             test_suspend_resume,
@@ -1823,7 +1837,7 @@ mod tests {
     }
 
     #[test]
-    pub fn real_test_suspend_resume() {
+    fn real_test_suspend_resume() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(1, None, None),
             test_suspend_resume,
@@ -1842,7 +1856,7 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         devlinks::cleanup_devlinks(Vec::new().into_iter());
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths2, MDADataSize::default()).unwrap();
+            Backstore::initialize(pool_uuid, paths2, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1895,7 +1909,7 @@ mod tests {
         let old_device = backstore
             .device()
             .expect("Space already allocated from backstore, backstore must have device");
-        backstore.add_cachedevs(pool_uuid, paths1).unwrap();
+        backstore.init_cache(pool_uuid, paths1).unwrap();
         let new_device = backstore
             .device()
             .expect("Space already allocated from backstore, backstore must have device");
@@ -1926,7 +1940,7 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_set_device() {
+    fn loop_test_set_device() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(2, 3, None),
             test_set_device,
@@ -1934,7 +1948,7 @@ mod tests {
     }
 
     #[test]
-    pub fn real_test_set_device() {
+    fn real_test_set_device() {
         real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_set_device);
     }
 }

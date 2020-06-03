@@ -47,6 +47,71 @@ impl<T> EngineAction for CreateAction<T> {
     }
 }
 
+/// Idempotent type representing a create action for a mapping from a key to a value
+#[derive(Debug, PartialEq, Eq)]
+pub enum MappingCreateAction<T> {
+    /// The key did not exist and the key and value are newly created.
+    Created(T),
+    /// The key and the value were not changed.
+    Identity,
+    /// The key existed and the value was updated.
+    ValueChanged(T),
+}
+
+impl<T> EngineAction for MappingCreateAction<T> {
+    type Return = T;
+
+    fn is_changed(&self) -> bool {
+        match *self {
+            MappingCreateAction::Created(_) | MappingCreateAction::ValueChanged(_) => true,
+            _ => false,
+        }
+    }
+
+    fn changed(self) -> Option<T> {
+        match self {
+            MappingCreateAction::Created(t) | MappingCreateAction::ValueChanged(t) => Some(t),
+            _ => None,
+        }
+    }
+}
+
+/// A type for the return type of idempotent unlocking actions.
+pub struct SetUnlockAction<T> {
+    unlocked: Vec<T>,
+}
+
+impl<T> SetUnlockAction<T> {
+    /// Create a new return type with newly unlocked resources and resources that
+    /// are still locked.
+    pub fn new(unlocked: Vec<T>) -> SetUnlockAction<T> {
+        SetUnlockAction { unlocked }
+    }
+
+    /// Create a new return type where no newly unlocked resources are reported.
+    pub fn empty() -> SetUnlockAction<T> {
+        SetUnlockAction {
+            unlocked: Vec::new(),
+        }
+    }
+}
+
+impl<T> EngineAction for SetUnlockAction<T> {
+    type Return = Vec<T>;
+
+    fn is_changed(&self) -> bool {
+        !self.unlocked.is_empty()
+    }
+
+    fn changed(self) -> Option<Vec<T>> {
+        if self.unlocked.is_empty() {
+            None
+        } else {
+            Some(self.unlocked)
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 /// An action which may create multiple things.
 pub struct SetCreateAction<T> {
@@ -56,6 +121,10 @@ pub struct SetCreateAction<T> {
 impl<T> SetCreateAction<T> {
     pub fn new(changed: Vec<T>) -> Self {
         SetCreateAction { changed }
+    }
+
+    pub fn empty() -> Self {
+        SetCreateAction { changed: vec![] }
     }
 }
 

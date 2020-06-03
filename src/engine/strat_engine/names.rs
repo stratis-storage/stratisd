@@ -5,18 +5,73 @@
 // Functions for dealing with stratis and device mapper names.
 
 use std::{
+    convert::TryFrom,
     fmt::{self, Display},
     path::Path,
 };
 
 use devicemapper::{DmNameBuf, DmUuidBuf};
 
+pub use crate::engine::types::KeyDescription;
 use crate::{
-    engine::types::{FilesystemUuid, PoolUuid},
+    engine::types::{DevUuid, FilesystemUuid, PoolUuid},
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
 const FORMAT_VERSION: u16 = 1;
+
+/// Prefix for the key descriptions added into the kernel keyring to indicate
+/// that they were added by Stratis.
+fn key_description_prefix() -> String {
+    format!("stratis-{}-key-", FORMAT_VERSION)
+}
+
+impl KeyDescription {
+    /// Check if the system key description has the Stratis prefix. If so,
+    /// return `Some` with the prefix stripped. If not, return `None`.
+    pub fn from_system_key_desc(raw_key_desc: &str) -> Option<StratisResult<KeyDescription>> {
+        let mut key_desc = raw_key_desc.to_string();
+        let prefix = key_description_prefix();
+        if key_desc.starts_with(prefix.as_str()) {
+            key_desc.replace_range(..prefix.len(), "");
+            if key_desc.is_empty() {
+                None
+            } else {
+                Some(KeyDescription::try_from(key_desc))
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Return the key description as it will be registered on the system,
+    /// not as it will be displayed in Stratis. The only difference between
+    /// this and the application representation is the addition of a prefix
+    /// that stratisd uses internally for keeping track of which keys belong
+    /// to Stratis.
+    pub fn to_system_string(&self) -> String {
+        format!("{}{}", key_description_prefix(), self.as_application_str())
+    }
+}
+
+/// Get a devicemapper name from the device UUID.
+///
+/// Prerequisite: len(format!("{}", FORMAT_VERSION)
+///             + len("stratis")                         7
+///             + len("private")                         7
+///             + len("crypt")                           5
+///             + num_dashes                             4
+///             + len(dev uuid)                          32
+///             < 128
+///
+/// which is equivalent to len(format!("{}", FORMAT_VERSION) < 73
+pub fn format_crypt_name(dev_uuid: &DevUuid) -> String {
+    format!(
+        "stratis-{}-private-{}-crypt",
+        FORMAT_VERSION,
+        dev_uuid.to_simple_ref()
+    )
+}
 
 #[derive(Clone, Copy)]
 pub enum FlexRole {
@@ -238,12 +293,29 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
 
 #[cfg(test)]
 mod tests {
+    use std::convert::TryFrom;
 
     use super::*;
 
     #[test]
+    fn test_key_desc() {
+        assert!(KeyDescription::from_system_key_desc("stratis-1-key-").is_none());
+        assert!(KeyDescription::from_system_key_desc("not-prefix-stratis-1-key-").is_none());
+        assert_eq!(
+            KeyDescription::from_system_key_desc("stratis-1-key-key_desc")
+                .map(|k| k.expect("no semi-colons")),
+            Some(KeyDescription::try_from("key_desc".to_string()).expect("no semi-colons"))
+        );
+        assert_eq!(
+            KeyDescription::from_system_key_desc("stratis-1-key-stratis-1-key")
+                .map(|k| k.expect("no semi-colons")),
+            Some(KeyDescription::try_from("stratis-1-key".to_string()).expect("no semi-colons"))
+        );
+    }
+
+    #[test]
     #[allow(clippy::cognitive_complexity)]
-    pub fn test_validate_name() {
+    fn test_validate_name() {
         assert_matches!(validate_name(&'\u{0}'.to_string()), Err(_));
         assert_matches!(validate_name("./some"), Err(_));
         assert_matches!(validate_name("../../root"), Err(_));

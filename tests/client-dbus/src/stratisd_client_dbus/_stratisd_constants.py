@@ -31,3 +31,12 @@ class StratisdErrors(IntEnum):
     BUSY = 3
     INTERNAL_ERROR = 4
     NOT_FOUND = 5
+
+
+class BlockDevTiers(IntEnum):
+    """
+    Tier to which a blockdev device belongs.
+    """
+
+    Data = 0
+    Cache = 1

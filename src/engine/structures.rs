@@ -206,9 +206,9 @@ impl<T> Table<T> {
 
     /// Removes the item corresponding to the uuid if there is one.
     pub fn remove_by_uuid(&mut self, uuid: Uuid) -> Option<(Name, T)> {
-        self.items.remove(&uuid).and_then(|(name, item)| {
+        self.items.remove(&uuid).map(|(name, item)| {
             self.name_to_uuid.remove(&name);
-            Some((name, item))
+            (name, item)
         })
     }
 
@@ -267,7 +267,6 @@ impl<T> Table<T> {
 #[cfg(test)]
 mod tests {
 
-    use rand;
     use uuid::Uuid;
 
     use crate::engine::Name;

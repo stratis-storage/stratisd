@@ -2,10 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::fmt;
-
 use rand::{thread_rng, Rng, ThreadRng};
 
+#[derive(Debug)]
 pub struct Randomizer {
     rng: ThreadRng,
     denominator: u32,
@@ -17,14 +16,6 @@ impl Default for Randomizer {
             rng: thread_rng(),
             denominator: 0u32,
         }
-    }
-}
-
-/// Implement Debug explicitly as ThreadRng does not derive it.
-/// See: https://github.com/rust-lang-nursery/rand/issues/118
-impl fmt::Debug for Randomizer {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{Randomizer {:?}", self.denominator)
     }
 }
 

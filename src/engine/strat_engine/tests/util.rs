@@ -4,7 +4,6 @@
 
 use std::{fs::File, io::Read, path::PathBuf};
 
-use libmount;
 use nix::mount::{umount2, MntFlags};
 
 use devicemapper::{DevId, DmOptions};
@@ -18,9 +17,6 @@ mod cleanup_errors {
     // FIXME: It should be possible to remove this allow when the next
     // version of error_chain is released.
     #![allow(deprecated)]
-    use libmount;
-    use nix;
-    use std;
 
     error_chain! {
         foreign_links {

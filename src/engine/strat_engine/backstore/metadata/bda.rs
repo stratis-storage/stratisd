@@ -5,7 +5,6 @@
 use std::io::{Read, Seek};
 
 use chrono::{DateTime, Utc};
-use uuid::Uuid;
 
 use crate::{
     engine::{
@@ -13,7 +12,7 @@ use crate::{
             backstore::metadata::{
                 mda,
                 sizes::{BDAExtendedSize, BlockdevSize, MDADataSize, STATIC_HEADER_SIZE},
-                static_header::{MetadataLocation, StaticHeader},
+                static_header::{MetadataLocation, StaticHeader, StratisIdentifiers},
             },
             device::SyncAll,
         },
@@ -32,8 +31,7 @@ impl BDA {
     /// Initialize a blockdev with a Stratis BDA.
     pub fn initialize<F>(
         f: &mut F,
-        pool_uuid: Uuid,
-        dev_uuid: Uuid,
+        identifiers: StratisIdentifiers,
         mda_data_size: MDADataSize,
         blkdev_size: BlockdevSize,
         initialization_time: u64,
@@ -42,8 +40,7 @@ impl BDA {
         F: Seek + SyncAll,
     {
         let header = StaticHeader::new(
-            pool_uuid,
-            dev_uuid,
+            identifiers,
             mda_data_size.region_size().mda_size(),
             blkdev_size,
             initialization_time,
@@ -111,12 +108,12 @@ impl BDA {
 
     /// The UUID of the device.
     pub fn dev_uuid(&self) -> DevUuid {
-        self.header.dev_uuid
+        self.header.identifiers.device_uuid
     }
 
     /// The UUID of the device's pool.
     pub fn pool_uuid(&self) -> PoolUuid {
-        self.header.pool_uuid
+        self.header.identifiers.pool_uuid
     }
 
     /// The size of the device.
@@ -142,13 +139,12 @@ impl BDA {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
+    use std::{io::Cursor, thread, time};
 
     use proptest::{collection::vec, num};
 
-    use crate::engine::strat_engine::backstore::metadata::{
-        sizes::static_header_size,
-        static_header::{tests::random_static_header, tests::static_header_strategy},
+    use crate::engine::strat_engine::backstore::metadata::static_header::{
+        tests::random_static_header, tests::static_header_strategy,
     };
 
     use super::*;
@@ -159,12 +155,11 @@ mod tests {
         /// Initialize a BDA.
         /// Verify that the last update time is None.
         fn empty_bda(ref sh in static_header_strategy()) {
-            let buf_size = *sh.mda_size.sectors().bytes() as usize + bytes!(static_header_size::STATIC_HEADER_SECTORS);
+            let buf_size = *sh.mda_size.bda_size().sectors().bytes() as usize;
             let mut buf = Cursor::new(vec![0; buf_size]);
             let bda = BDA::initialize(
                 &mut buf,
-                sh.pool_uuid,
-                sh.dev_uuid,
+                sh.identifiers,
                 sh.mda_size.region_size().data_size(),
                 sh.blkdev_size,
                 Utc::now().timestamp() as u64,
@@ -178,14 +173,14 @@ mod tests {
     /// of saved data is older than timestamp of most recently written data.
     fn test_early_times_err() {
         let data = [0u8; 3];
+        let sleep_time = time::Duration::from_secs(1);
 
         // Construct a BDA.
         let sh = random_static_header(0, 0);
         let mut buf = Cursor::new(vec![0; *sh.blkdev_size.sectors().bytes() as usize]);
         let mut bda = BDA::initialize(
             &mut buf,
-            sh.pool_uuid,
-            sh.dev_uuid,
+            sh.identifiers,
             sh.mda_size.region_size().data_size(),
             sh.blkdev_size,
             Utc::now().timestamp() as u64,
@@ -193,8 +188,8 @@ mod tests {
         .unwrap();
 
         let timestamp0 = Utc::now();
+        thread::sleep(sleep_time);
         let timestamp1 = Utc::now();
-        assert_ne!(timestamp0, timestamp1);
 
         let mut buf = Cursor::new(vec![0; *sh.blkdev_size.sectors().bytes() as usize]);
         bda.save_state(&timestamp1, &data, &mut buf).unwrap();
@@ -203,8 +198,8 @@ mod tests {
         assert_matches!(bda.save_state(&timestamp0, &data, &mut buf), Err(_));
 
         let timestamp2 = Utc::now();
+        thread::sleep(sleep_time);
         let timestamp3 = Utc::now();
-        assert_ne!(timestamp2, timestamp3);
 
         bda.save_state(&timestamp3, &data, &mut buf).unwrap();
 
@@ -225,12 +220,11 @@ mod tests {
             ref state in vec(num::u8::ANY, 1..100),
             ref next_state in vec(num::u8::ANY, 1..100)
         ) {
-            let buf_size = *sh.mda_size.sectors().bytes() as usize + bytes!(static_header_size::STATIC_HEADER_SECTORS);
+            let buf_size = *sh.mda_size.bda_size().sectors().bytes() as usize;
             let mut buf = Cursor::new(vec![0; buf_size]);
             let mut bda = BDA::initialize(
                 &mut buf,
-                sh.pool_uuid,
-                sh.dev_uuid,
+                sh.identifiers,
                 sh.mda_size.region_size().data_size(),
                 sh.blkdev_size,
                 Utc::now().timestamp() as u64,

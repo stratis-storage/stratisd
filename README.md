@@ -50,47 +50,25 @@ mailing list, if preferred.
 ### Setting up for development
 
 #### Development Compiler
-The version of the compiler recommended for development is 1.40. Other
+The version of the compiler recommended for development is 1.43. Other
 versions of the compiler may disagree with the CI tasks on some points,
 so should be avoided.
 
 #### Building
-Stratisd requires Rust 1.39+ and Cargo to build. These may be available via
+Stratisd requires Rust 1.43+ and Cargo to build. These may be available via
 your distribution's package manager. If not, [Rustup](https://www.rustup.rs/)
 is available to install and update the Rust toolchain.
 Once toolchain and other dependencies are in place, run `make build` to build, and then run the
-`stratisd` executable in `./target/x86_64-unknown-linux-gnu/debug` as root.
-Pass the `--help` option for more information on additional developer options.
+`stratisd` executable as root.
 
 ##### Building tests
 The Makefile provides a target, `build-tests` which allows compiling the
 tests without running any of them, as a convenience to developers.
 
 ##### Secondary dependencies
-The rust library dbus-rs has an external dependency on the C dbus library
-[dbus development library](https://www.freedesktop.org/wiki/Software/dbus/).
-Please check with your distributions package manager to locate the needed
-package.
-
-The files needed to build dbus-rs include, but are not limited to:
-
-```
-/usr/include/dbus-1.0/dbus/dbus*.h
-/usr/lib64/libdbus-1.so
-/usr/lib64/pkgconfig/dbus-1.pc
-```
-
-Also, the rust library libudev-sys has a dependency on the C libudev library.
-Please check with your distributions package manager to locate the needed
-package (e.g libudev-dev for Debian-based, systemd-devel for Fedora RPM-based
-Linux distributions).
-
-At least, you need to include:
-
-```
-/usr/lib64/pkgconfig/libudev.pc
-```
-
+The [Stratis ci repo](https://github.com/stratis-storage/ci) includes a
+script, `dependencies_fedora.sh`, which installs all the development
+dependencies for stratisd and its CLI on Fedora.
 
 #### Formatting
 Stratisd makes use of `rustfmt` to enforce consistent formatting in Rust

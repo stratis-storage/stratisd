@@ -1,4 +1,4 @@
-PYTEST_OPTS = --verbose
+UNITTEST_OPTS = --verbose
 
 .PHONY: lint
 lint:
@@ -7,11 +7,11 @@ lint:
 
 .PHONY: dbus-tests
 dbus-tests:
-	py.test-3 ${PYTEST_OPTS} ./tests/dbus
+	python3 -m unittest discover ${UNITTEST_OPTS} --top-level-directory ./tests --start-directory ./tests/dbus_interface
 
 .PHONY: misc-tests
 misc-tests:
-	py.test-3 ${PYTEST_OPTS} ./tests/misc
+	python3 -m unittest ${UNITTEST_OPTS} tests.misc.test_startup.TestUniqueInstance.test_unique_instance
 
 .PHONY: fmt
 fmt:
@@ -25,7 +25,7 @@ fmt-travis:
 
 .PHONY: udev-tests
 udev-tests:
-	py.test-3 ${PYTEST_OPTS} ./tests/udev
+	python3 -m unittest ${UNITTEST_OPTS} tests.udev.test_udev
 
 .PHONY: tests
 tests: dbus-tests misc-tests udev-tests

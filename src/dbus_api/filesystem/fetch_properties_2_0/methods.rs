@@ -5,7 +5,6 @@
 use std::collections::HashMap;
 
 use dbus::{
-    self,
     arg::{RefArg, Variant},
     tree::{MTFn, MethodInfo, MethodResult},
     Message,

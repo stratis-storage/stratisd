@@ -34,6 +34,27 @@ SPECS = {
 </method>
 </interface>
 """,
+    "org.storage.stratis2.FetchProperties.r1": """
+<interface name="org.storage.stratis2.FetchProperties.r1">
+<method name="GetAllProperties">
+<arg name="property_hash" type="a{s(bv)}" direction="out"/>
+</method>
+<method name="GetProperties">
+<arg name="properties" type="as" direction="in"/>
+<arg name="property_hash" type="a{s(bv)}" direction="out"/>
+</method>
+</interface>
+""",
+    "org.storage.stratis2.Report.r1": """
+<interface name="org.storage.stratis2.Report.r1">
+<method name="GetReport">
+<arg name="name" type="s" direction="in"/>
+<arg name="result" type="s" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+</interface>
+""",
     "org.storage.stratis2.Manager": """
 <interface name="org.storage.stratis2.Manager">
 <method name="ConfigureSimulator">
@@ -45,6 +66,53 @@ SPECS = {
 <arg name="name" type="s" direction="in"/>
 <arg name="redundancy" type="(bq)" direction="in"/>
 <arg name="devices" type="as" direction="in"/>
+<arg name="result" type="(b(oao))" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<method name="DestroyPool">
+<arg name="pool" type="o" direction="in"/>
+<arg name="result" type="(bs)" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<property name="Version" type="s" access="read">
+<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
+</property>
+</interface>
+""",
+    "org.storage.stratis2.Manager.r1": """
+<interface name="org.storage.stratis2.Manager.r1">
+<method name="ConfigureSimulator">
+<arg name="denominator" type="u" direction="in"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<method name="SetKey">
+<arg name="key_desc" type="s" direction="in"/>
+<arg name="key_fd" type="h" direction="in"/>
+<arg name="interactive" type="b" direction="in"/>
+<arg name="result" type="(bb)" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<method name="UnsetKey">
+<arg name="key_desc" type="s" direction="in"/>
+<arg name="result" type="b" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<method name="UnlockPool">
+<arg name="pool_uuid" type="s" direction="in"/>
+<arg name="result" type="(bas)" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<method name="CreatePool">
+<arg name="name" type="s" direction="in"/>
+<arg name="redundancy" type="(bq)" direction="in"/>
+<arg name="devices" type="as" direction="in"/>
+<arg name="key_desc" type="(bs)" direction="in"/>
 <arg name="result" type="(b(oao))" direction="out"/>
 <arg name="return_code" type="q" direction="out"/>
 <arg name="return_string" type="s" direction="out"/>
@@ -103,6 +171,62 @@ SPECS = {
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="true"/>
 </property>
 <property name="Uuid" type="s" access="read">
+<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
+</property>
+</interface>
+""",
+    "org.storage.stratis2.pool.r1": """
+<interface name="org.storage.stratis2.pool.r1">
+<method name="InitCache">
+<arg name="devices" type="as" direction="in"/>
+<arg name="results" type="(bao)" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<method name="AddCacheDevs">
+<arg name="devices" type="as" direction="in"/>
+<arg name="results" type="(bao)" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<method name="AddDataDevs">
+<arg name="devices" type="as" direction="in"/>
+<arg name="results" type="(bao)" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<method name="CreateFilesystems">
+<arg name="specs" type="as" direction="in"/>
+<arg name="results" type="(ba(os))" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<method name="DestroyFilesystems">
+<arg name="filesystems" type="ao" direction="in"/>
+<arg name="results" type="(bas)" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<method name="SetName">
+<arg name="name" type="s" direction="in"/>
+<arg name="result" type="(bs)" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<method name="SnapshotFilesystem">
+<arg name="origin" type="o" direction="in"/>
+<arg name="snapshot_name" type="s" direction="in"/>
+<arg name="result" type="(bo)" direction="out"/>
+<arg name="return_code" type="q" direction="out"/>
+<arg name="return_string" type="s" direction="out"/>
+</method>
+<property name="Name" type="s" access="read">
+<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="true"/>
+</property>
+<property name="Uuid" type="s" access="read">
+<annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
+</property>
+<property name="Encrypted" type="b" access="read">
 <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const"/>
 </property>
 </interface>

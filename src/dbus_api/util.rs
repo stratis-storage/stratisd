@@ -3,11 +3,10 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use dbus::{
-    self,
     arg::{ArgType, Iter, IterAppend, RefArg, Variant},
-    stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged,
+    ffidisp::{stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged, Connection},
+    message::SignalArgs,
     tree::{MTFn, MethodErr, PropInfo},
-    Connection, SignalArgs,
 };
 
 use devicemapper::DmError;
@@ -26,6 +25,14 @@ pub fn tuple_to_option<T>(value: (bool, T)) -> Option<T> {
         Some(value.1)
     } else {
         None
+    }
+}
+
+/// Convert an option type to a tuple as option
+pub fn option_to_tuple<T>(value: Option<T>, default: T) -> (bool, T) {
+    match value {
+        Some(v) => (true, v),
+        None => (false, default),
     }
 }
 
@@ -87,7 +94,8 @@ pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
         | StratisError::Serde(_)
         | StratisError::DM(_)
         | StratisError::Dbus(_)
-        | StratisError::Udev(_) => DbusErrorEnum::ERROR,
+        | StratisError::Udev(_)
+        | StratisError::Crypt(_) => DbusErrorEnum::ERROR,
     };
     let description = match *err {
         StratisError::DM(DmError::Core(ref err)) => err.to_string(),

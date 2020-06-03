@@ -2,25 +2,22 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{
-    collections::HashMap,
-    iter::FromIterator,
-    path::{Path, PathBuf},
-    vec::Vec,
-};
+use std::{collections::HashMap, iter::FromIterator, path::Path, vec::Vec};
 
 use chrono::{DateTime, Utc};
-use serde_json;
+use serde_json::{Map, Value};
 use uuid::Uuid;
 
-use devicemapper::{Device, DmName, DmNameBuf, Sectors};
+use devicemapper::{DmName, DmNameBuf, Sectors};
 
 use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
+        shared::init_cache_idempotent_or_err,
         strat_engine::{
-            backstore::{Backstore, MDADataSize},
+            backstore::{Backstore, MDADataSize, StratBlockDev},
             names::validate_name,
+            names::KeyDescription,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
@@ -148,13 +145,15 @@ impl StratPool {
         name: &str,
         paths: &[&Path],
         redundancy: Redundancy,
+        key_desc: Option<&KeyDescription>,
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = Uuid::new_v4();
 
         // FIXME: Initializing with the minimum MDA size is not necessarily
         // enough. If there are enough devices specified, more space will be
         // required.
-        let mut backstore = Backstore::initialize(pool_uuid, paths, MDADataSize::default())?;
+        let mut backstore =
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), key_desc)?;
 
         let thinpool = ThinPool::new(
             pool_uuid,
@@ -189,15 +188,31 @@ impl StratPool {
     /// Precondition: every device in devnodes has already been determined
     /// to belong to the pool with the specified uuid.
     /// Precondition: A metadata verification step has already been run.
+    ///
+    /// Precondition:
+    ///   * key_description.is_some() -> every StratBlockDev in datadevs has a
+    ///   key description and that key description == key_description
+    ///   * key_description.is_none() -> no StratBlockDev in datadevs has a
+    ///   key description.
+    ///   * no StratBlockDev in cachdevs has a key description
     pub fn setup(
         uuid: PoolUuid,
-        devnodes: &HashMap<Device, PathBuf>,
+        datadevs: Vec<StratBlockDev>,
+        cachedevs: Vec<StratBlockDev>,
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
+        key_description: Option<&KeyDescription>,
     ) -> StratisResult<(Name, StratPool)> {
         check_metadata(metadata)?;
 
-        let mut backstore = Backstore::setup(uuid, &metadata.backstore, devnodes, timestamp)?;
+        let mut backstore = Backstore::setup(
+            uuid,
+            &metadata.backstore,
+            datadevs,
+            cachedevs,
+            timestamp,
+            key_description,
+        )?;
         let mut thinpool = ThinPool::setup(
             uuid,
             &metadata.thinpool_dev,
@@ -273,9 +288,85 @@ impl StratPool {
             thinpool_dev: self.thin_pool.record(),
         }
     }
+
+    fn datadevs_encrypted(&self) -> bool {
+        self.backstore.data_tier_is_encrypted()
+    }
+
+    pub fn get_strat_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &StratBlockDev)> {
+        self.backstore.get_blockdev_by_uuid(uuid)
+    }
+
+    pub fn get_mut_strat_blockdev(
+        &mut self,
+        uuid: DevUuid,
+    ) -> Option<(BlockDevTier, &mut StratBlockDev)> {
+        self.backstore.get_mut_blockdev_by_uuid(uuid)
+    }
+}
+
+impl<'a> Into<Value> for &'a StratPool {
+    // Precondition: (&ThinPool).into() pattern matches Value::Object(_)
+    // Precondition: (&Backstore).into() pattern matches Value::Object(_)
+    fn into(self) -> Value {
+        let mut map = Map::from_iter(
+            if let Value::Object(map) = <&ThinPool as Into<Value>>::into(&self.thin_pool) {
+                map.into_iter()
+            } else {
+                unreachable!("ThinPool conversion returns a JSON object")
+            },
+        );
+        map.extend(
+            if let Value::Object(map) = <&Backstore as Into<Value>>::into(&self.backstore) {
+                map.into_iter()
+            } else {
+                unreachable!("Backstore conversion returns a JSON object")
+            },
+        );
+        Value::from(map)
+    }
 }
 
 impl Pool for StratPool {
+    fn init_cache(
+        &mut self,
+        pool_uuid: PoolUuid,
+        pool_name: &str,
+        blockdevs: &[&Path],
+    ) -> StratisResult<SetCreateAction<DevUuid>> {
+        if self.is_encrypted() {
+            return Err(StratisError::Engine(
+                ErrorEnum::Invalid,
+                "Use of a cache is not supported with an encrypted pool".to_string(),
+            ));
+        }
+        if !self.has_cache() {
+            if blockdevs.is_empty() {
+                return Err(StratisError::Engine(
+                    ErrorEnum::Invalid,
+                    "At least one blockdev path is required to initialize a cache.".to_string(),
+                ));
+            }
+
+            // If adding cache devices, must suspend the pool, since the cache
+            // must be augmented with the new devices.
+            self.thin_pool.suspend()?;
+            let devices_result = self.backstore.init_cache(pool_uuid, blockdevs);
+            self.thin_pool.resume()?;
+            let devices = devices_result?;
+            self.write_metadata(pool_name)?;
+            Ok(SetCreateAction::new(devices))
+        } else {
+            init_cache_idempotent_or_err(
+                blockdevs,
+                self.backstore
+                    .cachedevs()
+                    .into_iter()
+                    .map(|(_, bd)| bd.devnode().physical_path().to_owned()),
+            )
+        }
+    }
+
     fn create_filesystems<'a, 'b>(
         &'a mut self,
         pool_uuid: PoolUuid,
@@ -309,9 +400,18 @@ impl Pool for StratPool {
         paths: &[&Path],
         tier: BlockDevTier,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
-        let bdev_info = if tier == BlockDevTier::Cache {
-            // If adding cache devices, must suspend the pool, since the cache
-            // must be augmeneted with the new devices.
+        let bdev_info = if tier == BlockDevTier::Cache && !self.has_cache() {
+            return Err(StratisError::Error(format!(
+                            "No cache has been initialized for pool with UUID {} and name {}; it is therefore impossible to add additional devices to the cache",
+                            pool_uuid.to_simple_ref(),
+                            pool_name)
+                ));
+        } else if paths.is_empty() {
+            //TODO: Substitute is_empty check with process_and_verify_devices
+            return Ok(SetCreateAction::new(vec![]));
+        } else if tier == BlockDevTier::Cache {
+            // If adding cache devices, must suspend the pool; the cache
+            // must be augmented with the new devices.
             self.thin_pool.suspend()?;
             let bdev_info_res = self
                 .backstore
@@ -461,14 +561,12 @@ impl Pool for StratPool {
     }
 
     fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &dyn BlockDev)> {
-        self.backstore
-            .get_blockdev_by_uuid(uuid)
+        self.get_strat_blockdev(uuid)
             .map(|(t, b)| (t, b as &dyn BlockDev))
     }
 
     fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut dyn BlockDev)> {
-        self.backstore
-            .get_mut_blockdev_by_uuid(uuid)
+        self.get_mut_strat_blockdev(uuid)
             .map(|(t, b)| (t, b as &mut dyn BlockDev))
     }
 
@@ -497,6 +595,20 @@ impl Pool for StratPool {
     fn get_dbus_path(&self) -> &MaybeDbusPath {
         &self.dbus_path
     }
+
+    fn has_cache(&self) -> bool {
+        self.backstore.has_cache()
+    }
+
+    fn is_encrypted(&self) -> bool {
+        self.datadevs_encrypted()
+    }
+
+    fn key_desc(&self) -> Option<&str> {
+        self.backstore
+            .data_key_desc()
+            .map(|k| k.as_application_str())
+    }
 }
 
 #[cfg(test)]
@@ -507,14 +619,14 @@ mod tests {
     };
 
     use nix::mount::{mount, umount, MsFlags};
-    use tempfile;
 
     use devicemapper::{Bytes, IEC, SECTOR_SIZE};
 
     use crate::engine::{
         strat_engine::{
-            backstore::{find_all, get_metadata},
-            cmd, devlinks,
+            backstore::{StratisIdentifiers, StratisInfo},
+            devlinks,
+            liminal::{get_bdas, get_blockdevs, get_metadata, LStratisInfo},
             tests::{loopbacked, real},
         },
         types::{EngineAction, PoolExtendState, PoolState, Redundancy},
@@ -524,58 +636,96 @@ mod tests {
 
     fn invariant(pool: &StratPool, pool_name: &str) {
         check_metadata(&pool.record(&Name::new(pool_name.into()))).unwrap();
+        assert!(!(pool.is_encrypted() && pool.backstore.has_cache()));
     }
 
     /// Verify that metadata can be read from pools.
     /// 1. Split paths into two separate sets.
     /// 2. Create pools from the two sets.
-    /// 3. Use find_all() to get the devices in the pool.
-    /// 4. Use get_metadata to find metadata for each pool and verify
+    /// 3. Use get_metadata to find metadata for each pool and verify
     /// correctness.
-    /// 5. Teardown the engine and repeat.
+    /// 4. Teardown the engine and repeat.
     fn test_basic_metadata(paths: &[&Path]) {
         assert!(paths.len() > 1);
 
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let name1 = "name1";
-        let (uuid1, mut pool1) = StratPool::initialize(name1, paths1, Redundancy::NONE).unwrap();
+        let (uuid1, mut pool1) =
+            StratPool::initialize(name1, paths1, Redundancy::NONE, None).unwrap();
         invariant(&pool1, name1);
 
         let metadata1 = pool1.record(name1);
 
         let name2 = "name2";
-        let (uuid2, mut pool2) = StratPool::initialize(name2, paths2, Redundancy::NONE).unwrap();
+        let (uuid2, mut pool2) =
+            StratPool::initialize(name2, paths2, Redundancy::NONE, None).unwrap();
         invariant(&pool2, name2);
 
         let metadata2 = pool2.record(name2);
 
-        cmd::udev_settle().unwrap();
-        let pools = find_all().unwrap();
-        assert_eq!(pools.len(), 2);
-        let devnodes1 = &pools[&uuid1];
-        let devnodes2 = &pools[&uuid2];
-        let (_, pool_save1) = get_metadata(uuid1, devnodes1).unwrap().unwrap();
-        let (_, pool_save2) = get_metadata(uuid2, devnodes2).unwrap().unwrap();
+        let infos1: HashMap<DevUuid, LStratisInfo> = pool1
+            .backstore
+            .blockdevs()
+            .iter()
+            .map(|(device_uuid, blockdev)| {
+                (
+                    *device_uuid,
+                    StratisInfo {
+                        identifiers: StratisIdentifiers {
+                            pool_uuid: uuid1,
+                            device_uuid: *device_uuid,
+                        },
+                        device_number: *blockdev.device(),
+                        devnode: blockdev.devnode().metadata_path().to_owned(),
+                    }
+                    .into(),
+                )
+            })
+            .collect();
+
+        let infos2: HashMap<DevUuid, LStratisInfo> = pool2
+            .backstore
+            .blockdevs()
+            .iter()
+            .map(|(device_uuid, blockdev)| {
+                (
+                    *device_uuid,
+                    StratisInfo {
+                        identifiers: StratisIdentifiers {
+                            pool_uuid: uuid2,
+                            device_uuid: *device_uuid,
+                        },
+                        device_number: *blockdev.device(),
+                        devnode: blockdev.devnode().metadata_path().to_owned(),
+                    }
+                    .into(),
+                )
+            })
+            .collect();
+
+        let bdas1 = get_bdas(&infos1).unwrap();
+        let bdas2 = get_bdas(&infos2).unwrap();
+
+        let (_, pool_save1) = get_metadata(&infos1, &bdas1).unwrap().unwrap();
+        let (_, pool_save2) = get_metadata(&infos2, &bdas2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
         assert_eq!(pool_save2, metadata2);
 
         pool1.teardown().unwrap();
         pool2.teardown().unwrap();
 
-        cmd::udev_settle().unwrap();
-        let pools = find_all().unwrap();
-        assert_eq!(pools.len(), 2);
-        let devnodes1 = &pools[&uuid1];
-        let devnodes2 = &pools[&uuid2];
-        let (_, pool_save1) = get_metadata(uuid1, devnodes1).unwrap().unwrap();
-        let (_, pool_save2) = get_metadata(uuid2, devnodes2).unwrap().unwrap();
+        let bdas1 = get_bdas(&infos1).unwrap();
+        let bdas2 = get_bdas(&infos2).unwrap();
+
+        let (_, pool_save1) = get_metadata(&infos1, &bdas1).unwrap().unwrap();
+        let (_, pool_save2) = get_metadata(&infos2, &bdas2).unwrap().unwrap();
         assert_eq!(pool_save1, metadata1);
         assert_eq!(pool_save2, metadata2);
     }
 
     #[test]
-    pub fn loop_test_basic_metadata() {
+    fn loop_test_basic_metadata() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(2, 3, None),
             test_basic_metadata,
@@ -583,7 +733,7 @@ mod tests {
     }
 
     #[test]
-    pub fn real_test_basic_metadata() {
+    fn real_test_basic_metadata() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(2, None, None),
             test_basic_metadata,
@@ -595,18 +745,18 @@ mod tests {
     fn test_empty_pool(paths: &[&Path]) {
         assert_eq!(paths.len(), 0);
         assert_matches!(
-            StratPool::initialize("stratis_test_pool", paths, Redundancy::NONE),
+            StratPool::initialize("stratis_test_pool", paths, Redundancy::NONE, None),
             Err(_)
         );
     }
 
     #[test]
-    pub fn loop_test_empty_pool() {
+    fn loop_test_empty_pool() {
         loopbacked::test_with_spec(&loopbacked::DeviceLimits::Exactly(0, None), test_empty_pool);
     }
 
     #[test]
-    pub fn real_test_empty_pool() {
+    fn real_test_empty_pool() {
         real::test_with_spec(&real::DeviceLimits::Exactly(0, None, None), test_empty_pool);
     }
 
@@ -621,7 +771,7 @@ mod tests {
 
         let name = "stratis-test-pool";
         devlinks::cleanup_devlinks(Vec::new().into_iter());
-        let (uuid, mut pool) = StratPool::initialize(name, paths2, Redundancy::NONE).unwrap();
+        let (uuid, mut pool) = StratPool::initialize(name, paths2, Redundancy::NONE, None).unwrap();
         devlinks::pool_added(name);
         invariant(&pool, name);
 
@@ -661,8 +811,7 @@ mod tests {
                 .unwrap();
         }
 
-        pool.add_blockdevs(uuid, name, paths1, BlockDevTier::Cache)
-            .unwrap();
+        pool.init_cache(uuid, name, paths1).unwrap();
         invariant(&pool, name);
 
         let metadata2 = pool.record(name);
@@ -681,15 +830,34 @@ mod tests {
 
         umount(tmp_dir.path()).unwrap();
 
+        let infos: HashMap<DevUuid, LStratisInfo> = pool
+            .backstore
+            .blockdevs()
+            .iter()
+            .map(|(device_uuid, blockdev)| {
+                (
+                    *device_uuid,
+                    StratisInfo {
+                        identifiers: StratisIdentifiers {
+                            pool_uuid: uuid,
+                            device_uuid: *device_uuid,
+                        },
+                        device_number: *blockdev.device(),
+                        devnode: blockdev.devnode().metadata_path().to_owned(),
+                    }
+                    .into(),
+                )
+            })
+            .collect();
+
         pool.teardown().unwrap();
 
-        cmd::udev_settle().unwrap();
-        let pools = find_all().unwrap();
-        assert_eq!(pools.len(), 1);
-        let devices = &pools[&uuid];
+        let bdas = get_bdas(&infos).unwrap();
+        let (timestamp, metadata) = get_metadata(&infos, &bdas).unwrap().unwrap();
+        let (datadevs, cachedevs) = get_blockdevs(&metadata.backstore, &infos, bdas).unwrap();
 
-        let (timestamp, metadata) = get_metadata(uuid, devices).unwrap().unwrap();
-        let (name, pool) = StratPool::setup(uuid, devices, timestamp, &metadata).unwrap();
+        let (name, pool) =
+            StratPool::setup(uuid, datadevs, cachedevs, timestamp, &metadata, None).unwrap();
         invariant(&pool, &name);
 
         let mut buf = [0u8; 10];
@@ -715,7 +883,7 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_add_cachedevs() {
+    fn loop_test_add_cachedevs() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(2, 3, None),
             test_add_cachedevs,
@@ -723,7 +891,7 @@ mod tests {
     }
 
     #[test]
-    pub fn real_test_add_cachedevs() {
+    fn real_test_add_cachedevs() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(2, None, None),
             test_add_cachedevs,
@@ -739,7 +907,8 @@ mod tests {
 
         let name = "stratis-test-pool";
         devlinks::cleanup_devlinks(Vec::new().into_iter());
-        let (pool_uuid, mut pool) = StratPool::initialize(name, paths1, Redundancy::NONE).unwrap();
+        let (pool_uuid, mut pool) =
+            StratPool::initialize(name, paths1, Redundancy::NONE, None).unwrap();
         devlinks::pool_added(name);
         invariant(&pool, name);
 
@@ -787,7 +956,7 @@ mod tests {
     }
 
     #[test]
-    pub fn loop_test_add_datadevs() {
+    fn loop_test_add_datadevs() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(2, 3, Some((4u64 * Bytes(IEC::Gi)).sectors())),
             test_add_datadevs,
@@ -795,7 +964,7 @@ mod tests {
     }
 
     #[test]
-    pub fn real_test_add_datadevs() {
+    fn real_test_add_datadevs() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(
                 2,

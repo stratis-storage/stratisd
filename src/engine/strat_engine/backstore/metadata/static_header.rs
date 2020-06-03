@@ -10,6 +10,7 @@ use std::{
 
 use byteorder::{ByteOrder, LittleEndian};
 use crc::crc32;
+use serde_json::Value;
 use uuid::Uuid;
 
 use devicemapper::{Sectors, IEC, SECTOR_SIZE};
@@ -40,14 +41,49 @@ pub enum MetadataLocation {
     Second,
 }
 
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub struct StratisIdentifiers {
+    pub pool_uuid: PoolUuid,
+    pub device_uuid: DevUuid,
+}
+
+impl StratisIdentifiers {
+    pub fn new(pool_uuid: PoolUuid, device_uuid: DevUuid) -> StratisIdentifiers {
+        StratisIdentifiers {
+            pool_uuid,
+            device_uuid,
+        }
+    }
+}
+
+impl fmt::Display for StratisIdentifiers {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "Stratis pool UUID: \"{}\", Stratis device UUID: \"{}\"",
+            self.pool_uuid.to_simple_ref(),
+            self.device_uuid.to_simple_ref()
+        )
+    }
+}
+
+impl<'a> Into<Value> for &'a StratisIdentifiers {
+    fn into(self) -> Value {
+        json!({
+            "pool_uuid": Value::from(self.pool_uuid.to_simple_ref().to_string()),
+            "device_uuid": Value::from(self.device_uuid.to_simple_ref().to_string())
+        })
+    }
+}
+
 /// Get a Stratis pool UUID and device UUID from any device.
 /// If there is an error while obtaining these values return the error.
 /// If the device does not appear to be a Stratis device, return None.
-pub fn device_identifiers<F>(f: &mut F) -> StratisResult<Option<(PoolUuid, DevUuid)>>
+pub fn device_identifiers<F>(f: &mut F) -> StratisResult<Option<StratisIdentifiers>>
 where
     F: Read + Seek + SyncAll,
 {
-    StaticHeader::setup(f).map(|sh| sh.map(|sh| (sh.pool_uuid, sh.dev_uuid)))
+    StaticHeader::setup(f).map(|sh| sh.map(|sh| sh.identifiers))
 }
 
 /// Remove Stratis identifying information from device.
@@ -58,11 +94,10 @@ where
     StaticHeader::wipe(f)
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct StaticHeader {
     pub blkdev_size: BlockdevSize,
-    pub pool_uuid: PoolUuid,
-    pub dev_uuid: DevUuid,
+    pub identifiers: StratisIdentifiers,
     pub mda_size: MDASize,
     pub reserved_size: ReservedSize,
     pub flags: u64,
@@ -72,16 +107,14 @@ pub struct StaticHeader {
 
 impl StaticHeader {
     pub fn new(
-        pool_uuid: PoolUuid,
-        dev_uuid: DevUuid,
+        identifiers: StratisIdentifiers,
         mda_size: MDASize,
         blkdev_size: BlockdevSize,
         initialization_time: u64,
     ) -> StaticHeader {
         StaticHeader {
             blkdev_size,
-            pool_uuid,
-            dev_uuid,
+            identifiers,
             mda_size,
             reserved_size: ReservedSize::new(RESERVED_SECTORS),
             flags: 0,
@@ -205,12 +238,39 @@ impl StaticHeader {
             repair_location: MetadataLocation,
         ) -> StratisResult<Option<StaticHeader>>
         where
-            F: Read + Seek + SyncAll,
+            F: Seek + SyncAll,
         {
             if let Some(sh) = maybe_sh {
                 write_header(f, sh, repair_location)
             } else {
                 Err(sh_error)
+            }
+        }
+
+        // Action taken when both sigblock locations are analyzed without encountering an error.
+        //
+        // If both sigblocks are interpreted as a Stratis headers,
+        // compare contents of static headers.
+        //
+        // If only a single sigblock is interpreted as a Stratis header,
+        // overwrite the other sigblock with the contents of the valid
+        // Stratis header sigblock.
+        //
+        // If neither sigblock is a valid Stratis header,
+        // return Ok(None)
+        fn ok_ok_static_header_handling<F>(
+            f: &mut F,
+            maybe_sh1: Option<StaticHeader>,
+            maybe_sh2: Option<StaticHeader>,
+        ) -> StratisResult<Option<StaticHeader>>
+        where
+            F: Seek + SyncAll,
+        {
+            match (maybe_sh1, maybe_sh2) {
+                (Some(loc_1), Some(loc_2)) => compare_headers(f, loc_1, loc_2),
+                (None, None) => Ok(None),
+                (Some(loc_1), None) => write_header(f, loc_1, MetadataLocation::Second),
+                (None, Some(loc_2)) => write_header(f, loc_2, MetadataLocation::First),
             }
         }
 
@@ -228,7 +288,7 @@ impl StaticHeader {
             repair_location: MetadataLocation,
         ) -> StratisResult<Option<StaticHeader>>
         where
-            F: Read + Seek + SyncAll,
+            F: Seek + SyncAll,
         {
             match maybe_sh {
                 Ok(loc) => {
@@ -241,13 +301,42 @@ impl StaticHeader {
             }
         }
 
+        // Action taken when both signature blocks are interpreted as valid
+        // Stratis headers.
+        //
+        // If the contents of the signature blocks are equivalent,
+        // return valid static header result.
+        //
+        // If the contents of the signature blocks are not equivalent,
+        // overwrite the older block with the contents of the newer one,
+        // or return an error if the blocks have the same initialization time.
+        fn compare_headers<F>(
+            f: &mut F,
+            sh_1: StaticHeader,
+            sh_2: StaticHeader,
+        ) -> StratisResult<Option<StaticHeader>>
+        where
+            F: Seek + SyncAll,
+        {
+            if sh_1 == sh_2 {
+                Ok(Some(sh_1))
+            } else if sh_1.initialization_time == sh_2.initialization_time {
+                let err_str = "Appeared to be a Stratis device, but signature blocks disagree.";
+                Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
+            } else if sh_1.initialization_time > sh_2.initialization_time {
+                write_header(f, sh_1, MetadataLocation::Second)
+            } else {
+                write_header(f, sh_2, MetadataLocation::First)
+            }
+        }
+
         fn write_header<F>(
             f: &mut F,
             sh: StaticHeader,
             repair_location: MetadataLocation,
         ) -> StratisResult<Option<StaticHeader>>
         where
-            F: Read + Seek + SyncAll,
+            F: Seek + SyncAll,
         {
             sh.write(f, repair_location)?;
             Ok(Some(sh))
@@ -258,31 +347,8 @@ impl StaticHeader {
             maybe_buf_1.map(|buf| StaticHeader::sigblock_from_buf(&buf)),
             maybe_buf_2.map(|buf| StaticHeader::sigblock_from_buf(&buf)),
         ) {
-            // We read both copies without an IO error.
             (Ok(buf_loc_1), Ok(buf_loc_2)) => match (buf_loc_1, buf_loc_2) {
-                (Ok(loc_1), Ok(loc_2)) => match (loc_1, loc_2) {
-                    (Some(loc_1), Some(loc_2)) => {
-                        if loc_1 == loc_2 {
-                            Ok(Some(loc_1))
-                        } else if loc_1.initialization_time == loc_2.initialization_time {
-                            // Inexplicable disagreement among static headers
-                            let err_str =
-                                "Appeared to be a Stratis device, but signature blocks disagree.";
-                            Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
-                        } else if loc_1.initialization_time > loc_2.initialization_time {
-                            // If the first header block is newer, overwrite second with
-                            // contents of first.
-                            write_header(f, loc_1, MetadataLocation::Second)
-                        } else {
-                            // The second header block must be newer, so overwrite first
-                            // with contents of second.
-                            write_header(f, loc_2, MetadataLocation::First)
-                        }
-                    }
-                    (None, None) => Ok(None),
-                    (Some(loc_1), None) => write_header(f, loc_1, MetadataLocation::Second),
-                    (None, Some(loc_2)) => write_header(f, loc_2, MetadataLocation::First),
-                },
+                (Ok(loc_1), Ok(loc_2)) => ok_ok_static_header_handling(f, loc_1, loc_2),
                 (Ok(loc_1), Err(loc_2)) => {
                     ok_err_static_header_handling(f, loc_1, loc_2, MetadataLocation::Second)
                 }
@@ -294,12 +360,9 @@ impl StaticHeader {
                     Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
                 }
             },
-            // Copy 1 read OK, 2 resulted in an IO error
             (Ok(buf_loc_1), Err(_)) => copy_ok_err_handling(f, buf_loc_1, MetadataLocation::Second),
-            // Copy 2 read OK, 1 resulted in IO Error
             (Err(_), Ok(buf_loc_2)) => copy_ok_err_handling(f, buf_loc_2, MetadataLocation::First),
             (Err(_), Err(_)) => {
-                // Unable to read the device at all.
                 let err_str = "Unable to read data at sigblock locations.";
                 Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
             }
@@ -312,8 +375,20 @@ impl StaticHeader {
         buf[4..20].clone_from_slice(STRAT_MAGIC);
         LittleEndian::write_u64(&mut buf[20..28], *self.blkdev_size.sectors());
         buf[28] = STRAT_SIGBLOCK_VERSION;
-        buf[32..64].clone_from_slice(self.pool_uuid.to_simple_ref().to_string().as_bytes());
-        buf[64..96].clone_from_slice(self.dev_uuid.to_simple_ref().to_string().as_bytes());
+        buf[32..64].clone_from_slice(
+            self.identifiers
+                .pool_uuid
+                .to_simple_ref()
+                .to_string()
+                .as_bytes(),
+        );
+        buf[64..96].clone_from_slice(
+            self.identifiers
+                .device_uuid
+                .to_simple_ref()
+                .to_string()
+                .as_bytes(),
+        );
         LittleEndian::write_u64(&mut buf[96..104], *self.mda_size.sectors());
         LittleEndian::write_u64(&mut buf[104..112], *self.reserved_size.sectors());
         LittleEndian::write_u64(&mut buf[120..128], self.initialization_time);
@@ -360,8 +435,7 @@ impl StaticHeader {
         let mda_size = MDASize(Sectors(LittleEndian::read_u64(&buf[96..104])));
 
         Ok(Some(StaticHeader {
-            pool_uuid,
-            dev_uuid,
+            identifiers: StratisIdentifiers::new(pool_uuid, dev_uuid),
             blkdev_size,
             mda_size,
             reserved_size: ReservedSize::new(Sectors(LittleEndian::read_u64(&buf[104..112]))),
@@ -380,20 +454,6 @@ impl StaticHeader {
         f.write_all(&zeroed)?;
         f.sync_all()?;
         Ok(())
-    }
-}
-
-impl fmt::Debug for StaticHeader {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("StaticHeader")
-            .field("blkdev_size", &self.blkdev_size)
-            .field("pool_uuid", &self.pool_uuid.to_simple_ref())
-            .field("dev_uuid", &self.dev_uuid.to_simple_ref())
-            .field("mda_size", &self.mda_size)
-            .field("reserved_size", &self.reserved_size)
-            .field("flags", &self.flags)
-            .field("initialization_time", &self.initialization_time)
-            .finish()
     }
 }
 
@@ -423,7 +483,7 @@ pub mod tests {
         /// Wipe the static header.
         /// Verify that the buffer is again unowned.
         fn test_ownership(ref sh in static_header_strategy()) {
-            let buf_size = *sh.mda_size.sectors().bytes() as usize + bytes!(static_header_size::STATIC_HEADER_SECTORS);
+            let buf_size = bytes!(static_header_size::STATIC_HEADER_SECTORS);
             let mut buf = Cursor::new(vec![0; buf_size]);
             prop_assert!(StaticHeader::setup(&mut buf).unwrap().is_none());
 
@@ -431,7 +491,7 @@ pub mod tests {
 
             prop_assert!(StaticHeader::setup(&mut buf)
                          .unwrap()
-                         .map(|new_sh| new_sh.pool_uuid == sh.pool_uuid && new_sh.dev_uuid == sh.dev_uuid)
+                         .map(|new_sh| new_sh.identifiers == sh.identifiers)
                          .unwrap_or(false));
 
             StaticHeader::wipe(&mut buf).unwrap();
@@ -451,8 +511,7 @@ pub mod tests {
         .mda_size();
         let blkdev_size = (Bytes(IEC::Mi) + Sectors(blkdev_size).bytes()).sectors();
         StaticHeader::new(
-            pool_uuid,
-            dev_uuid,
+            StratisIdentifiers::new(pool_uuid, dev_uuid),
             mda_size,
             BlockdevSize::new(blkdev_size),
             Utc::now().timestamp() as u64,
@@ -554,8 +613,7 @@ pub mod tests {
         fn static_header(ref sh1 in static_header_strategy()) {
             let buf = sh1.sigblock_to_buf();
             let sh2 = StaticHeader::sigblock_from_buf(&buf).unwrap().unwrap();
-            prop_assert_eq!(sh1.pool_uuid, sh2.pool_uuid);
-            prop_assert_eq!(sh1.dev_uuid, sh2.dev_uuid);
+            prop_assert_eq!(sh1.identifiers, sh2.identifiers);
             prop_assert_eq!(sh1.blkdev_size, sh2.blkdev_size);
             prop_assert_eq!(sh1.mda_size, sh2.mda_size);
             prop_assert_eq!(sh1.reserved_size, sh2.reserved_size);
@@ -572,15 +630,8 @@ pub mod tests {
         let sh = random_static_header(10000, 4);
 
         let ts = Utc::now().timestamp() as u64;
-        let sh_older =
-            StaticHeader::new(sh.pool_uuid, sh.dev_uuid, sh.mda_size, sh.blkdev_size, ts);
-        let sh_newer = StaticHeader::new(
-            sh.pool_uuid,
-            sh.dev_uuid,
-            sh.mda_size,
-            sh.blkdev_size,
-            ts + 1,
-        );
+        let sh_older = StaticHeader::new(sh.identifiers, sh.mda_size, sh.blkdev_size, ts);
+        let sh_newer = StaticHeader::new(sh.identifiers, sh.mda_size, sh.blkdev_size, ts + 1);
         assert_ne!(sh_older, sh_newer);
 
         let buf_size = bytes!(static_header_size::STATIC_HEADER_SECTORS);

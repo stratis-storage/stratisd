@@ -10,8 +10,6 @@ use std::{
 };
 
 use loopdev::{LoopControl, LoopDevice};
-use nix;
-use tempfile;
 
 use devicemapper::{Bytes, Sectors, IEC};
 
@@ -25,7 +23,7 @@ pub enum DeviceLimits {
     /// Require exactly the number of devices specified.
     /// Specify their size in Sectors.
     Exactly(usize, Option<Sectors>),
-    /// Required exactly the number of devices specified in the first and
+    /// Specify a minimum and maximum number of devices in the first and
     /// second argument to the constructors. Specify their size in Sectors.
     Range(usize, usize, Option<Sectors>),
 }
@@ -90,7 +88,7 @@ fn get_devices(count: usize, size: Option<Sectors>, dir: &tempfile::TempDir) -> 
 /// Run the designated tests according to the specification.
 pub fn test_with_spec<F>(limits: &DeviceLimits, test: F)
 where
-    F: Fn(&[&Path]) -> () + panic::RefUnwindSafe,
+    F: Fn(&[&Path]) + panic::RefUnwindSafe,
 {
     let counts = get_device_counts(limits);
 

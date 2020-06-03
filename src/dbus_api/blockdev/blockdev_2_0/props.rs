@@ -3,7 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use dbus::{
-    self,
     arg::IterAppend,
     tree::{MTFn, MethodErr, PropInfo},
 };
@@ -37,7 +36,9 @@ pub fn get_blockdev_devnode(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    get_blockdev_property(i, p, |_, p| Ok(format!("{}", p.devnode().display())))
+    get_blockdev_property(i, p, |_, p| {
+        Ok(format!("{}", p.devnode().user_path().display()))
+    })
 }
 
 pub fn get_blockdev_hardware_info(

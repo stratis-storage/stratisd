@@ -158,6 +158,7 @@ New minimum Python package requirement (for testing):
   https://github.com/stratis-storage/stratisd/pull/1917
 
 - Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/2074
   https://github.com/stratis-storage/stratisd/pull/2072
   https://github.com/stratis-storage/stratisd/pull/2070
   https://github.com/stratis-storage/stratisd/pull/2068

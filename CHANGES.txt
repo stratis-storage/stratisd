@@ -16,7 +16,7 @@ New minimum dependency requirement:
 New minimum Rust crate requirement:
   - dbus: 0.8
   - libc: 0.2.68
-  - libcryptset-rs: 0.4.0
+  - libcryptsetup-rs: 0.4.0
   - proptest: 0.9.6
 
 New minimum Python package requirement (for testing):
@@ -78,7 +78,7 @@ New minimum Python package requirement (for testing):
   https://github.com/stratis-storage/stratisd/pull/1910
   https://github.com/stratis-storage/stratisd/pull/1841
 
-- Require libcryptseup bindings:
+- Require libcryptsetup bindings:
   https://github.com/stratis-storage/stratisd/pull/1846
   https://github.com/stratis-storage/stratisd/pull/1843
   https://github.com/stratis-storage/stratisd/pull/1815
@@ -102,7 +102,7 @@ New minimum Python package requirement (for testing):
   https://github.com/stratis-storage/stratisd/pull/2028
   https://github.com/stratis-storage/stratisd/pull/1980
 
-- Require at least one blockdev for intialization actions:
+- Require at least one blockdev for initialization actions:
   https://github.com/stratis-storage/stratisd/pull/1828
 
 - Do not dump debug representation of engine state to logs:

@@ -416,7 +416,7 @@ pub fn find_all() -> libudev::Result<(
 )> {
     info!("Beginning initial search for Stratis block devices");
     find_all_luks_devices()
-        .and_then(|luks| find_all_stratis_devices().and_then(|stratis| Ok((luks, stratis))))
+        .and_then(|luks| find_all_stratis_devices().map(|stratis| (luks, stratis)))
 }
 
 #[cfg(test)]

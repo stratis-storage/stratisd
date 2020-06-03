@@ -191,7 +191,7 @@ fn make_linear_test_dev(devnode: &Path, start: Sectors, length: Sectors) -> Line
 /// devices.
 pub fn test_with_spec<F>(limits: &DeviceLimits, test: F)
 where
-    F: Fn(&[&Path]) -> () + panic::RefUnwindSafe,
+    F: Fn(&[&Path]) + panic::RefUnwindSafe,
 {
     let file = OpenOptions::new()
         .read(true)

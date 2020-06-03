@@ -85,7 +85,7 @@ fn udev_info(
     })
     .and_then(|(ownership, devnum, id_wwn)| {
         ownership
-            .and_then(|ownership| Ok((ownership, devnum, id_wwn)))
+            .map(|ownership| (ownership, devnum, id_wwn))
             .map_err(|err| {
                 StratisError::Error(format!(
                     "Could not obtain ownership information for device {} using udev: {}",

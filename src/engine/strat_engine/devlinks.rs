@@ -46,7 +46,7 @@ pub fn setup_pool_devlinks(pool_name: &str, pool: &StratPool) {
 
         let mut existing_files = fs::read_dir(pool_path)?
             .map(|dir_e| {
-                dir_e.and_then(|d| Ok(d.file_name().into_string().expect("Unix is utf-8")))
+                dir_e.map(|d| d.file_name().into_string().expect("Unix is utf-8"))
             })
             .collect::<Result<HashSet<_>, _>>()?;
 
@@ -76,7 +76,7 @@ pub fn cleanup_devlinks<'a, I: Iterator<Item = (&'a Name, &'a PoolUuid, &'a Stra
     if let Err(err) = || -> StratisResult<()> {
         let mut existing_dirs = fs::read_dir(DEV_PATH)?
             .map(|dir_e| {
-                dir_e.and_then(|d| Ok(d.file_name().into_string().expect("Unix is utf-8")))
+                dir_e.map(|d| d.file_name().into_string().expect("Unix is utf-8"))
             })
             .collect::<Result<HashSet<_>, _>>()?;
 

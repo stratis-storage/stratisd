@@ -179,5 +179,6 @@ jobs:
 branches:
   only:
     - master
+    - develop-2.1.0
 
 script: make -f Makefile $TASK

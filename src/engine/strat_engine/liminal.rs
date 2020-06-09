@@ -307,8 +307,25 @@ pub fn get_blockdevs(
         Ok(devs)
     }
 
-    let datadevs = check_and_sort_devs(datadevs, &recorded_data_map)?;
-    let cachedevs = check_and_sort_devs(cachedevs, &recorded_cache_map)?;
+    let datadevs = check_and_sort_devs(datadevs, &recorded_data_map).map_err(|err| {
+        StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!(
+                "Data devices did not appear congruent with metadata: {}",
+                err
+            ),
+        )
+    })?;
+
+    let cachedevs = check_and_sort_devs(cachedevs, &recorded_cache_map).map_err(|err| {
+        StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!(
+                "Cache devices did not appear congruent with metadata: {}",
+                err
+            ),
+        )
+    })?;
 
     Ok((datadevs, cachedevs))
 }

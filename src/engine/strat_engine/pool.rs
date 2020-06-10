@@ -303,6 +303,15 @@ impl StratPool {
     ) -> Option<(BlockDevTier, &mut StratBlockDev)> {
         self.backstore.get_mut_blockdev_by_uuid(uuid)
     }
+
+    /// Destroy the pool.
+    /// Precondition: All filesystems belonging to this pool must be
+    /// unmounted.
+    pub fn destroy(&mut self) -> StratisResult<()> {
+        self.thin_pool.teardown()?;
+        self.backstore.destroy()?;
+        Ok(())
+    }
 }
 
 impl<'a> Into<Value> for &'a StratPool {
@@ -443,12 +452,6 @@ impl Pool for StratPool {
         };
         self.write_metadata(pool_name)?;
         bdev_info
-    }
-
-    fn destroy(&mut self) -> StratisResult<()> {
-        self.thin_pool.teardown()?;
-        self.backstore.destroy()?;
-        Ok(())
     }
 
     fn destroy_filesystems<'a>(

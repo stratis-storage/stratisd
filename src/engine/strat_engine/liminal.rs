@@ -1012,7 +1012,7 @@ impl LiminalDevices {
                         Err((err, removed, info)) => {
                             warn!(
                                 "Moving set of devices with pool UUID {} to hopeless sets because {}",
-                                stratis_identifiers.pool_uuid,
+                                stratis_identifiers.pool_uuid.to_simple_ref(),
                                 err
                             );
                             let mut hopeless: HashSet<LInfo> =

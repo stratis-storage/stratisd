@@ -311,7 +311,7 @@ pub fn get_blockdevs(
         StratisError::Engine(
             ErrorEnum::Invalid,
             format!(
-                "Data devices did not appear congruent with metadata: {}",
+                "Data devices did not appear consistent with metadata: {}",
                 err
             ),
         )
@@ -321,7 +321,7 @@ pub fn get_blockdevs(
         StratisError::Engine(
             ErrorEnum::Invalid,
             format!(
-                "Cache devices did not appear congruent with metadata: {}",
+                "Cache devices did not appear consistent with metadata: {}",
                 err
             ),
         )

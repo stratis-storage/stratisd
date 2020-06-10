@@ -265,7 +265,7 @@ pub fn get_blockdevs(
         })?;
     }
 
-    // Verify that devices located are congruent with the metadata recorded
+    // Verify that devices located are consistent with the metadata recorded
     // and generally consistent with expectations. If all seems correct,
     // sort the devices according to their order in the metadata.
     fn check_and_sort_devs(

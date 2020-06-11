@@ -8,9 +8,6 @@ use serde_json::Value;
 
 use devicemapper::DmNameBuf;
 
-#[cfg(test)]
-use crate::engine::strat_engine::cleanup::teardown_pools;
-
 use crate::{
     engine::{
         engine::{Eventable, KeyActions},
@@ -91,10 +88,24 @@ impl StratEngine {
         })
     }
 
-    /// Teardown Stratis, preparatory to a shutdown.
+    /// Recursively remove all devicemapper devices in all pools.
+    /// Do not remove the dm-crypt devices that comprise the backstore.
     #[cfg(test)]
     pub fn teardown(self) -> StratisResult<()> {
-        teardown_pools(self.pools)
+        let mut untorndown_pools = Vec::new();
+        for (_, uuid, mut pool) in self.pools {
+            pool.teardown()
+                .unwrap_or_else(|_| untorndown_pools.push(uuid));
+        }
+        if untorndown_pools.is_empty() {
+            Ok(())
+        } else {
+            let err_msg = format!(
+                "Failed to teardown already set up pools: {:?}",
+                untorndown_pools
+            );
+            Err(StratisError::Engine(ErrorEnum::Error, err_msg))
+        }
     }
 }
 

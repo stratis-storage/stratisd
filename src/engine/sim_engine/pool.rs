@@ -98,6 +98,10 @@ impl SimPool {
     fn datadevs_encrypted(&self) -> bool {
         self.block_devs_key_desc.is_some()
     }
+
+    pub fn destroy(&mut self) -> StratisResult<()> {
+        Ok(())
+    }
 }
 
 impl<'a> Into<Value> for &'a SimPool {
@@ -246,11 +250,6 @@ impl Pool for SimPool {
             .collect();
         the_vec.extend(filtered_device_pairs);
         Ok(SetCreateAction::new(ret_uuids))
-    }
-
-    fn destroy(&mut self) -> StratisResult<()> {
-        // Nothing to do here.
-        Ok(())
     }
 
     fn destroy_filesystems<'a>(

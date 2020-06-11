@@ -158,11 +158,6 @@ pub trait Pool: Debug {
         tier: BlockDevTier,
     ) -> StratisResult<SetCreateAction<DevUuid>>;
 
-    /// Destroy the pool.
-    /// Precondition: All filesystems belonging to this pool must be
-    /// unmounted.
-    fn destroy(&mut self) -> StratisResult<()>;
-
     /// Ensures that all designated filesystems are gone from pool.
     /// Returns a list of the filesystems found, and actually destroyed.
     /// This list will be a subset of the uuids passed in fs_uuids.

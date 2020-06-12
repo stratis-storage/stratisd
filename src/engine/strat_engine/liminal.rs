@@ -265,7 +265,7 @@ pub fn get_blockdevs(
         })?;
     }
 
-    // Verify that devices located are congruent with the metadata recorded
+    // Verify that devices located are consistent with the metadata recorded
     // and generally consistent with expectations. If all seems correct,
     // sort the devices according to their order in the metadata.
     fn check_and_sort_devs(
@@ -307,8 +307,25 @@ pub fn get_blockdevs(
         Ok(devs)
     }
 
-    let datadevs = check_and_sort_devs(datadevs, &recorded_data_map)?;
-    let cachedevs = check_and_sort_devs(cachedevs, &recorded_cache_map)?;
+    let datadevs = check_and_sort_devs(datadevs, &recorded_data_map).map_err(|err| {
+        StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!(
+                "Data devices did not appear consistent with metadata: {}",
+                err
+            ),
+        )
+    })?;
+
+    let cachedevs = check_and_sort_devs(cachedevs, &recorded_cache_map).map_err(|err| {
+        StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!(
+                "Cache devices did not appear consistent with metadata: {}",
+                err
+            ),
+        )
+    })?;
 
     Ok((datadevs, cachedevs))
 }

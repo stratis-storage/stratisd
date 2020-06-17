@@ -3,15 +3,15 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 pub use self::{
-    dbus_support::MaybeDbusSupport,
     errors::{ErrorEnum, StratisError, StratisResult},
+    run::run,
     stratis::VERSION,
-    udev_monitor::UdevMonitor,
 };
 
 pub mod buff_log;
 mod dbus_support;
 mod errors;
+mod run;
 #[allow(clippy::module_inception)]
 mod stratis;
 mod udev_monitor;

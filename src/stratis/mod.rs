@@ -8,7 +8,6 @@ pub use self::{
     stratis::VERSION,
 };
 
-pub mod buff_log;
 mod dbus_support;
 mod errors;
 mod run;

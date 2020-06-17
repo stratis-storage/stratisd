@@ -11,7 +11,6 @@ use nix::sys::signalfd::{signal, SfdFlags, SigSet, SignalFd};
 use crate::{
     engine::{Engine, SimEngine, StratEngine},
     stratis::{
-        buff_log,
         dbus_support::MaybeDbusSupport,
         errors::{StratisError, StratisResult},
         stratis::VERSION,
@@ -21,24 +20,13 @@ use crate::{
 
 // Process any pending signals, return true if SIGINT received.
 // Return an error if there was an error reading the signal.
-fn process_signal(
-    sfd: &mut SignalFd,
-    buff_log: &buff_log::Handle<env_logger::Logger>,
-) -> StratisResult<bool> {
+fn process_signal(sfd: &mut SignalFd) -> StratisResult<bool> {
     match sfd.read_signal() {
         // This is an unsafe conversion, but in this context that is
         // mostly harmless. A negative converted value, which is
         // virtually impossible, will not match any of the masked
         // values, and stratisd will panic and exit.
         Ok(Some(sig)) => match sig.ssi_signo as i32 {
-            nix::libc::SIGUSR1 => {
-                info!(
-                    "SIGUSR1 received, dumping {} buffered log entries",
-                    buff_log.buffered_count()
-                );
-                buff_log.dump();
-                Ok(false)
-            }
             nix::libc::SIGINT => {
                 info!("SIGINT received, exiting");
                 Ok(true)
@@ -76,10 +64,7 @@ fn process_poll(poll_timeout: i32, fds: &mut Vec<libc::pollfd>) -> StratisResult
 /// or a fatal error is encountered. Dump log entries on specified signal
 /// via buff_log.
 /// If sim is true, start the sim engine rather than the real engine.
-pub fn run(sim: bool, buff_log: &buff_log::Handle<env_logger::Logger>) -> StratisResult<()> {
-    // Ensure that the debug log is output when we leave this function.
-    let _guard = buff_log.to_guard();
-
+pub fn run(sim: bool) -> StratisResult<()> {
     let mut dbus_support = MaybeDbusSupport::new();
 
     // Setup a udev listener before initializing the engine. A device may
@@ -171,7 +156,7 @@ pub fn run(sim: bool, buff_log: &buff_log::Handle<env_logger::Logger>) -> Strati
         }
 
         if fds[FD_INDEX_SIGNALFD].revents != 0 {
-            match process_signal(&mut sfd, buff_log) {
+            match process_signal(&mut sfd) {
                 Ok(should_exit) => {
                     if should_exit {
                         return Ok(());

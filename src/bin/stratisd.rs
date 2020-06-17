@@ -12,7 +12,6 @@ use std::{
     process::exit,
 };
 
-use chrono::Duration;
 use clap::{App, Arg};
 use env_logger::Builder;
 use log::LevelFilter;
@@ -21,48 +20,24 @@ use nix::{
     unistd::getpid,
 };
 
-use libstratis::stratis::{buff_log, run, StratisError, StratisResult, VERSION};
+use libstratis::stratis::{run, StratisError, StratisResult, VERSION};
 
 const STRATISD_PID_PATH: &str = "/run/stratisd.pid";
-
-/// Number of minutes to buffer log entries.
-const DEFAULT_LOG_HOLD_MINUTES: i64 = 30;
-
-/// Configure the env_logger as necessary in order to allow the buffered
-/// logger to work correctly. Return a Handle to the underlying env_logger.
-pub fn from_env_logger(
-    mut builder: env_logger::Builder,
-    pass_through: bool,
-    hold_time: Option<Duration>,
-) -> buff_log::Handle<env_logger::Logger> {
-    // Do not have the env_logger set the timestamp. Because the entries are
-    // buffered, the timestamp set by the env_logger will correspond to the
-    // time at which the entry was dumped, not the time of its origination.
-    builder.default_format_timestamp(false);
-    buff_log::Logger::new(builder.build(), pass_through, hold_time).init()
-}
 
 /// Configure and initialize the logger.
 /// If debug is true, log at debug level. Otherwise read log configuration
 /// parameters from the environment if RUST_LOG is set. Otherwise, just
 /// accept the default configuration.
-fn initialize_log(debug: bool) -> buff_log::Handle<env_logger::Logger> {
+fn initialize_log(debug: bool) {
     let mut builder = Builder::new();
     if debug {
         builder.filter(Some("stratisd"), LevelFilter::Debug);
         builder.filter(Some("libstratis"), LevelFilter::Debug);
-        from_env_logger(builder, true, None)
-    } else {
-        builder.filter_level(LevelFilter::Trace);
-        if let Ok(s) = env::var("RUST_LOG") {
-            builder.parse(&s);
-        }
-        from_env_logger(
-            builder,
-            false,
-            Some(Duration::minutes(DEFAULT_LOG_HOLD_MINUTES)),
-        )
-    }
+    } else if let Ok(s) = env::var("RUST_LOG") {
+        builder.parse(&s);
+    };
+
+    builder.init()
 }
 
 /// To ensure only one instance of stratisd runs at a time, acquire an
@@ -123,8 +98,8 @@ fn main() {
         match lock_file {
             Err(err) => Err(err),
             Ok(_) => {
-                let log_handle = initialize_log(matches.is_present("debug"));
-                run(matches.is_present("sim"), &log_handle)
+                initialize_log(matches.is_present("debug"));
+                run(matches.is_present("sim"))
             }
         }
     };

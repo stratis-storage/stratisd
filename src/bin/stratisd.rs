@@ -124,7 +124,7 @@ fn main() {
             Err(err) => Err(err),
             Ok(_) => {
                 let log_handle = initialize_log(matches.is_present("debug"));
-                run(&matches, &log_handle)
+                run(matches.is_present("sim"), &log_handle)
             }
         }
     };

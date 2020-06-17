@@ -6,7 +6,6 @@
 
 use std::{cell::RefCell, os::unix::io::AsRawFd, rc::Rc};
 
-use clap::ArgMatches;
 use nix::sys::signalfd::{signal, SfdFlags, SigSet, SignalFd};
 
 use crate::{
@@ -76,10 +75,8 @@ fn process_poll(poll_timeout: i32, fds: &mut Vec<libc::pollfd>) -> StratisResult
 /// Initialize the engine and keep it running until a signal is received
 /// or a fatal error is encountered. Dump log entries on specified signal
 /// via buff_log.
-pub fn run(
-    matches: &ArgMatches,
-    buff_log: &buff_log::Handle<env_logger::Logger>,
-) -> StratisResult<()> {
+/// If sim is true, start the sim engine rather than the real engine.
+pub fn run(sim: bool, buff_log: &buff_log::Handle<env_logger::Logger>) -> StratisResult<()> {
     // Ensure that the debug log is output when we leave this function.
     let _guard = buff_log.to_guard();
 
@@ -95,7 +92,7 @@ pub fn run(
 
     let engine: Rc<RefCell<dyn Engine>> = {
         info!("stratis daemon version {} started", VERSION);
-        if matches.is_present("sim") {
+        if sim {
             info!("Using SimEngine");
             Rc::new(RefCell::new(SimEngine::default()))
         } else {

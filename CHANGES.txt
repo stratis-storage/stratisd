@@ -1,3 +1,108 @@
+stratisd 2.2.0 (UNRELEASED)
+===========================
+Recommended Rust toolchain version: 1.45.0
+Lowest supported Rust toolchain version: 1.43
+
+Recommended Python interpreter: 3.7.7
+Lowest supported Python interpreter: 3.6.8
+Python linter: pylint (2.4.4)
+Python auto-formatter: black (19.10b0)
+Python import sorter: isort (4.3.21)
+
+YAML linter: yamllint (1.23.0)
+
+
+- Set filesystem symlinks in /dev/stratis instead of /stratis:
+  https://github.com/stratis-storage/stratisd/issues/704
+  https://github.com/stratis-storage/stratisd/issues/2162
+  https://github.com/stratis-storage/stratisd/pull/2166
+  https://github.com/stratis-storage/stratisd/pull/2153
+  https://github.com/stratis-storage/stratisd/pull/2147
+
+- Remove --debug option, add --log-level option with different semantics:
+  https://github.com/stratis-storage/stratisd/pull/2095
+
+- Export InterfacesAdded and InterfacesRemoved signals on the D-Bus:
+  https://github.com/stratis-storage/stratisd/issues/1377
+  https://github.com/stratis-storage/stratisd/pull/2170
+
+- No longer catch SIGUSR1 signal:
+  https://github.com/stratis-storage/stratisd/pull/2161
+
+- Fix a bug where, under certain conditions, idempotency might be violated
+  when creating a new pool:
+  https://github.com/stratis-storage/stratisd/issues/2150
+  https://github.com/stratis-storage/stratisd/pull/2151
+
+- Add script to read the Stratis metadata on a device:
+  https://github.com/stratis-storage/stratisd/issues/2157
+  https://github.com/stratis-storage/stratisd/issues/2097
+  https://github.com/stratis-storage/stratisd/pull/2159
+  https://github.com/stratis-storage/stratisd/pull/2137
+  https://github.com/stratis-storage/stratisd/pull/2135
+  https://github.com/stratis-storage/stratisd/pull/2132
+
+- Return a more precise error message if a device unlocking action fails
+  because a key is not present:
+  https://github.com/stratis-storage/stratisd/issues/2114
+  https://github.com/stratis-storage/stratisd/pull/2126
+
+- Extend engine state report to include information about blockdevs:
+  https://github.com/stratis-storage/stratisd/issues/2125
+  https://github.com/stratis-storage/stratisd/pull/2129
+
+- Logging improvements:
+  https://github.com/stratis-storage/stratisd/pull/2112
+  https://github.com/stratis-storage/stratisd/pull/2088
+
+- Make sim engine signals for D-Bus properties consistent with real engine:
+  https://github.com/stratis-storage/stratisd/pull/2138
+
+- Enable pedantic numeric lints:
+  https://github.com/stratis-storage/stratisd/pull/2142
+  https://github.com/stratis-storage/stratisd/pull/2140
+
+- Improvements to implementation of thinpool abstraction:
+  https://github.com/stratis-storage/stratisd/pull/2113
+  https://github.com/stratis-storage/stratisd/pull/2107
+  https://github.com/stratis-storage/stratisd/pull/2103
+
+- Remove some dead code in filesystem abstraction:
+  https://github.com/stratis-storage/stratisd/issues/512
+  https://github.com/stratis-storage/stratisd/pull/2171
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/2173
+  https://github.com/stratis-storage/stratisd/pull/2168
+  https://github.com/stratis-storage/stratisd/pull/2167
+  https://github.com/stratis-storage/stratisd/pull/2165
+  https://github.com/stratis-storage/stratisd/pull/2164
+  https://github.com/stratis-storage/stratisd/pull/2149
+  https://github.com/stratis-storage/stratisd/pull/2145
+  https://github.com/stratis-storage/stratisd/pull/2143
+  https://github.com/stratis-storage/stratisd/pull/2141
+  https://github.com/stratis-storage/stratisd/pull/2131
+  https://github.com/stratis-storage/stratisd/pull/2128
+  https://github.com/stratis-storage/stratisd/pull/2124
+  https://github.com/stratis-storage/stratisd/pull/2119
+  https://github.com/stratis-storage/stratisd/pull/2118
+  https://github.com/stratis-storage/stratisd/pull/2115
+  https://github.com/stratis-storage/stratisd/pull/2110
+  https://github.com/stratis-storage/stratisd/pull/2109
+  https://github.com/stratis-storage/stratisd/pull/2105
+  https://github.com/stratis-storage/stratisd/pull/2102
+  https://github.com/stratis-storage/stratisd/pull/2099
+  https://github.com/stratis-storage/stratisd/pull/2096
+  https://github.com/stratis-storage/stratisd/pull/2094
+  https://github.com/stratis-storage/stratisd/pull/2093
+  https://github.com/stratis-storage/stratisd/pull/2092
+  https://github.com/stratis-storage/stratisd/pull/2084
+  https://github.com/stratis-storage/stratisd/pull/2083
+  https://github.com/stratis-storage/stratisd/pull/2082
+  https://github.com/stratis-storage/stratisd/pull/2079
+  https://github.com/stratis-storage/stratisd/pull/2077
+
+
 stratisd 2.1.0
 ==============
 Recommended Rust toolchain version: 1.43

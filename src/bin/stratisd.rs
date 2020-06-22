@@ -112,8 +112,7 @@ fn trylock_pid_file() -> StratisResult<File> {
         Err(_) => {
             let mut buf = String::new();
             f.read_to_string(&mut buf)?;
-            // pidfile is supposed to contain pid of holder. But you never
-            // know so be paranoid.
+
             let pid_str = buf
                 .split_whitespace()
                 .next()

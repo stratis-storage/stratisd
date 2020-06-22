@@ -14,7 +14,6 @@ use std::{
 
 use clap::{App, Arg};
 use env_logger::Builder;
-use log::LevelFilter;
 use nix::{
     fcntl::{flock, FlockArg},
     unistd::getpid,
@@ -25,15 +24,11 @@ use libstratis::stratis::{run, StratisError, StratisResult, VERSION};
 const STRATISD_PID_PATH: &str = "/run/stratisd.pid";
 
 /// Configure and initialize the logger.
-/// If debug is true, log at debug level. Otherwise read log configuration
-/// parameters from the environment if RUST_LOG is set. Otherwise, just
-/// accept the default configuration.
-fn initialize_log(debug: bool) {
+/// Read log configuration parameters from the environment if RUST_LOG is
+/// set. Otherwise, just accept the default configuration.
+fn initialize_log() {
     let mut builder = Builder::new();
-    if debug {
-        builder.filter(Some("stratisd"), LevelFilter::Debug);
-        builder.filter(Some("libstratis"), LevelFilter::Debug);
-    } else if let Ok(s) = env::var("RUST_LOG") {
+    if let Ok(s) = env::var("RUST_LOG") {
         builder.parse(&s);
     };
 
@@ -79,11 +74,6 @@ fn main() {
         .version(VERSION)
         .about("Stratis storage management")
         .arg(
-            Arg::with_name("debug")
-                .long("debug")
-                .help("Print additional output for debugging"),
-        )
-        .arg(
             Arg::with_name("sim")
                 .long("sim")
                 .help("Use simulator engine"),
@@ -98,7 +88,7 @@ fn main() {
         match lock_file {
             Err(err) => Err(err),
             Ok(_) => {
-                initialize_log(matches.is_present("debug"));
+                initialize_log();
                 run(matches.is_present("sim"))
             }
         }

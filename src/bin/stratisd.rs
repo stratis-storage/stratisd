@@ -20,7 +20,6 @@ use std::{
 use chrono::Duration;
 use clap::{App, Arg, ArgMatches};
 use env_logger::Builder;
-use libc::pid_t;
 use log::LevelFilter;
 use nix::{
     fcntl::{flock, FlockArg},
@@ -106,22 +105,16 @@ fn trylock_pid_file() -> StratisResult<File> {
         })?;
     match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
         Ok(_) => {
-            f.write_all(format!("{}\n", getpid()).as_bytes())?;
+            f.write_all(getpid().to_string().as_bytes())?;
             Ok(f)
         }
         Err(_) => {
             let mut buf = String::new();
             f.read_to_string(&mut buf)?;
 
-            let pid_str = buf
-                .split_whitespace()
-                .next()
-                .and_then(|s| s.parse::<pid_t>().ok())
-                .map(|pid| format!("{}", pid))
-                .unwrap_or_else(|| "<unknown>".into());
             Err(StratisError::Error(format!(
-                "Daemon already running with pid: {}",
-                pid_str
+                "Daemon already running with supposed pid: {}",
+                buf
             )))
         }
     }

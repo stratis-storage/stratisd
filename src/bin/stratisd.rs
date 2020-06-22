@@ -105,7 +105,10 @@ fn trylock_pid_file() -> StratisResult<File> {
         }
         Err(_) => {
             let mut buf = String::new();
-            f.read_to_string(&mut buf)?;
+
+            if f.read_to_string(&mut buf).is_err() {
+                buf = "<unreadable>".to_string();
+            }
 
             Err(StratisError::Error(format!(
                 "Daemon already running with supposed pid: {}",

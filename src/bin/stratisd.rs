@@ -47,11 +47,6 @@ const STRATISD_PID_PATH: &str = "/run/stratisd.pid";
 /// Number of minutes to buffer log entries.
 const DEFAULT_LOG_HOLD_MINUTES: i64 = 30;
 
-/// If writing a program error to stderr fails, panic.
-fn print_err(err: &StratisError) {
-    eprintln!("{}", err);
-}
-
 /// Configure the env_logger as necessary in order to allow the buffered
 /// logger to work correctly. Return a Handle to the underlying env_logger.
 pub fn from_env_logger(
@@ -457,7 +452,7 @@ fn main() {
     };
 
     if let Err(err) = result {
-        print_err(&err);
+        eprintln!("{}", err);
         exit(1);
     } else {
         exit(0);

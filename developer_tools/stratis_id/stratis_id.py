@@ -45,12 +45,12 @@ def _valid_stratis_sb(buf):
         if crc(buf[MAGIC_OFFSET:BS]) == struct.unpack_from("<L", buf, 0)[0]:
             super_block = namedtuple(
                 "StratisSuperblock",
-                "CRC32C MAGIC SECTORS RESERVED POOL_UUID "
-                "DEV_UUID, MDA_SIZE, RESERVED_SIZE, FLAGS, "
-                "INITIALIZATION_TIME",
+                "CRC32C STRATIS_MAGIC_NUMBER BLKDEV_SIZE_SECTORS "
+                "SIGBLOCK_VERSION UNUSED POOL_UUID DEV_UUID MDA_SIZE_SECTORS "
+                "RESERVED_SIZE_SECTORS FLAGS INITIALIZATION_TIME_SECONDS",
             )
 
-            return super_block._make(struct.unpack_from("<L16sQ4s32s32sQQQQ", buf))
+            return super_block._make(struct.unpack_from("<L16sQc3s32s32sQQQQ", buf))
     return None
 
 

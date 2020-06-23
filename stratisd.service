@@ -6,8 +6,7 @@ DefaultDependencies=no
 
 [Service]
 Environment="RUST_BACKTRACE=1"
-Environment="RUST_LOG=libstratis=debug,stratisd=debug"
-ExecStart=/usr/libexec/stratisd
+ExecStart=/usr/libexec/stratisd --log-level debug
 KillSignal=SIGINT
 Restart=on-abort
 StandardOutput=syslog

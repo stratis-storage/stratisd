@@ -10,10 +10,12 @@ use std::{
     io::{Read, Write},
     os::unix::io::AsRawFd,
     process::exit,
+    str::FromStr,
 };
 
 use clap::{App, Arg};
 use env_logger::Builder;
+use log::LevelFilter;
 use nix::{
     fcntl::{flock, FlockArg},
     unistd::getpid,
@@ -24,13 +26,28 @@ use libstratis::stratis::{run, StratisError, StratisResult, VERSION};
 const STRATISD_PID_PATH: &str = "/run/stratisd.pid";
 
 /// Configure and initialize the logger.
-/// Read log configuration parameters from the environment if RUST_LOG is
-/// set. Otherwise, just accept the default configuration.
-fn initialize_log() {
+/// If optional log_level argument is set, use that to set the log level
+/// for both stratisd and libstratis. Otherwise, read log configuration
+/// parameters from the environment if RUST_LOG is set. Otherwise, just
+/// accept the default configuration, which is to log at the severity of
+/// error only.
+fn initialize_log(log_level: Option<&str>) {
     let mut builder = Builder::new();
-    if let Ok(s) = env::var("RUST_LOG") {
+
+    if let Some(log_level) = log_level {
+        builder.filter(
+            Some("stratisd"),
+            LevelFilter::from_str(log_level.into())
+                .expect("argument parser only accepts valid log levels"),
+        );
+        builder.filter(
+            Some("libstratis"),
+            LevelFilter::from_str(log_level.into())
+                .expect("argument parser only accepts valid log levels"),
+        );
+    } else if let Ok(s) = env::var("RUST_LOG") {
         builder.parse(&s);
-    };
+    }
 
     builder.init()
 }
@@ -78,6 +95,13 @@ fn main() {
                 .long("sim")
                 .help("Use simulator engine"),
         )
+        .arg(
+            Arg::with_name("log-level")
+                .empty_values(false)
+                .long("log-level")
+                .possible_values(&["trace", "debug", "info", "warn", "error"])
+                .help("Sets level for generation of log messages."),
+        )
         .get_matches();
 
     // Using a let-expression here so that the scope of the lock file
@@ -88,7 +112,7 @@ fn main() {
         match lock_file {
             Err(err) => Err(err),
             Ok(_) => {
-                initialize_log();
+                initialize_log(matches.value_of("log-level"));
                 run(matches.is_present("sim"))
             }
         }

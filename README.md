@@ -90,6 +90,15 @@ order to work properly, a D-Bus conf file must exist to grant access, either
 installed by distribution packaging; or manually, by copying `stratisd.conf`
 to `/etc/dbus-1/system.d/`.
 
+#### Setting Log Levels
+The command-line option, `--log-level`, may be used to set the stratisd log
+level. This option sets the level for the stratisd components only.
+
+For finer-grained control over the log level of any stratisd component or
+dependency use the `RUST_LOG` environment variable. Please consult the
+documentation for the `env_logger` crate for additional information on the use
+of `RUST_LOG`.
+
 #### Testing
 
 Stratisd is tested in two ways. The first way makes use of the Rust test

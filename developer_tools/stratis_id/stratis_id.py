@@ -45,12 +45,12 @@ def _valid_stratis_sb(buf):
         if crc(buf[MAGIC_OFFSET:BS]) == struct.unpack_from("<L", buf, 0)[0]:
             super_block = namedtuple(
                 "StratisSuperblock",
-                "CRC32C MAGIC SECTORS RESERVED POOL_UUID "
-                "DEV_UUID, MDA_SIZE, RESERVED_SIZE, FLAGS, "
-                "INITIALIZATION_TIME",
+                "CRC32C STRATIS_MAGIC_NUMBER BLKDEV_SIZE_SECTORS "
+                "SIGBLOCK_VERSION UNUSED POOL_UUID DEV_UUID MDA_SIZE_SECTORS "
+                "RESERVED_SIZE_SECTORS FLAGS INITIALIZATION_TIME_SECONDS",
             )
 
-            return super_block._make(struct.unpack_from("<L16sQ4s32s32sQQQQ", buf))
+            return super_block._make(struct.unpack_from("<L16sQc3s32s32sQQQQ", buf))
     return None
 
 
@@ -72,50 +72,6 @@ def stratis_signature(block_device):
     )
 
 
-def _hex_dump(data):
-    """
-    Hex dump a data array
-    :param data:  Data to dump
-    :return: None
-    """
-    full = len(data) // 16
-    remain = len(data) % 16
-    slc_index = 0
-    for _ in range(full):
-        slc = data[slc_index : slc_index + 16]
-        print(
-            "0x%08x: %-47s  %s"
-            % (slc_index, " ".join(format(x, "02x") for x in slc), str(slc))
-        )
-        slc_index += 16
-
-    if remain > 0:
-        slc = data[slc_index:]
-        print(
-            "0x%08x: %-47s  %s"
-            % (slc_index, " ".join(format(x, "02x") for x in slc), str(slc))
-        )
-
-
-def dump_stratis_signature_area(block_device):
-    """
-    Dumps stratis signature space!
-    :param block_device:
-    :return: None if not Stratis, else named tuple
-    """
-    try:
-        with open(block_device, "r+b") as header:
-            buf = header.read(SB_AREA_SIZE)
-            print("Stratis superblock area for %s" % block_device)
-            _hex_dump(buf)
-    # pylint: disable=broad-except
-    except BaseException as exception:
-        print(
-            "Error reading up the super block area on %s reason: %s"
-            % (block_device, str(exception))
-        )
-
-
 def main():
     """
     The main method
@@ -123,8 +79,6 @@ def main():
     if len(sys.argv) != 2:
         print("syntax: stratis_signature.py <block device>")
         sys.exit(2)
-
-    dump_stratis_signature_area(sys.argv[1])
 
     sig = stratis_signature(sys.argv[1])
     if not sig:

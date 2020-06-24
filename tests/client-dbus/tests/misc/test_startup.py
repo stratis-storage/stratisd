@@ -37,7 +37,7 @@ class TestUniqueInstance(unittest.TestCase):
         terminate it once started.
         """
         process = subprocess.Popen(
-            [_STRATISD, "--sim", "--debug"],
+            [_STRATISD, "--sim"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             close_fds=True,
@@ -55,7 +55,7 @@ class TestUniqueInstance(unittest.TestCase):
         Verify that a second stratisd instance can not be started.
         """
         process = subprocess.Popen(
-            [_STRATISD, "--sim", "--debug"],
+            [_STRATISD, "--sim"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             universal_newlines=True,

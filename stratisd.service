@@ -6,7 +6,7 @@ DefaultDependencies=no
 
 [Service]
 Environment="RUST_BACKTRACE=1"
-ExecStart=/usr/libexec/stratisd --debug
+ExecStart=/usr/libexec/stratisd --log-level debug
 KillSignal=SIGINT
 Restart=on-abort
 StandardOutput=syslog

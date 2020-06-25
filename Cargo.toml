@@ -5,6 +5,11 @@ authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.com>"]
 edition = "2018"
 build = "build.rs"
 
+[[bin]]
+path = "src/bin/stratis_uuids_to_names.rs"
+name = "stratis_uuids_to_names"
+required-features = ["dbus_enabled"]
+
 [dependencies]
 dbus = {version = "0.8", optional = true}
 clap = "2"

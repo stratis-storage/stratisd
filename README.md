@@ -12,12 +12,9 @@ collections of block devices, and exports a D-Bus API. Stratis-cli's `stratis`
 provides a command-line tool which itself uses the D-Bus API to communicate
 with `stratisd`.
 
-## Documentation
+## Website
 
-https://stratis-storage.github.io/ currently has links to the
-[main internal design doc](https://stratis-storage.github.io/StratisSoftwareDesign.pdf),
-the [D-Bus API Reference manual](https://stratis-storage.github.io/DBusAPIReference.pdf),
-and [some coding style guidelines](https://stratis-storage.github.io/StratisStyleGuidelines.pdf).
+See [https://stratis-storage.github.io/](https://stratis-storage.github.io/).
 
 ## Getting involved
 

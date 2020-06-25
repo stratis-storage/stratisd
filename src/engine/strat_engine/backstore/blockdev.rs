@@ -46,7 +46,7 @@ impl StratBlockDev {
     /// - devnode: for encrypted devices, the logical and physical
     ///            paths; for unencrypted devices, the physical path
     /// - bda: the device's BDA
-    /// - other_segments: segments claimed for non-Stratis metadata use
+    /// - other_segments: segments allocated outside Stratis metadata region
     /// - user_info: user settable identifying information
     /// - hardware_info: identifying information in the hardware
     /// - key_description: optional argument enabling encryption using
@@ -58,17 +58,21 @@ impl StratBlockDev {
     /// on the device is simply invisible to the blockdev. Consequently, it
     /// is invisible to the engine, and is not part of the total size value
     /// reported on the D-Bus.
+    ///
+    /// Precondition: segments in other_segments do not overlap with Stratis
+    /// metadata region.
     pub fn new(
         dev: Device,
         devnode: BlockDevPath,
         bda: BDA,
-        upper_segments: &[(Sectors, Sectors)],
+        other_segments: &[(Sectors, Sectors)],
         user_info: Option<String>,
         hardware_info: Option<String>,
         key_description: Option<&KeyDescription>,
     ) -> StratisResult<StratBlockDev> {
         let mut segments = vec![(Sectors(0), bda.extended_size().sectors())];
-        segments.extend(upper_segments);
+        segments.extend(other_segments);
+
         let allocator = RangeAllocator::new(bda.dev_size(), &segments)?;
 
         Ok(StratBlockDev {

@@ -69,7 +69,7 @@ mod real_methods {
 
     pub fn filesystem_renamed(pool_name: &str, fs_name: &str, _: &str) {
         fn trigger_udev(pool_name: &str, fs_name: &str) -> StratisResult<()> {
-            let path: PathBuf = [DEV_PATH, pool_name, fs_name].iter().collect();
+            let path = filesystem_mount_path(pool_name, fs_name);
 
             let dm_path = path.canonicalize()?;
             let file_name = dm_path

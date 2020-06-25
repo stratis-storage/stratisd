@@ -9,6 +9,10 @@ build = "build.rs"
 name = "stratis_dumpmetadata"
 required-features = ["extras"]
 
+[[bin]]
+name = "stratis_uuids_to_names"
+required-features = ["dbus_enabled"]
+
 [dependencies]
 dbus = {version = "0.8", optional = true}
 clap = "2"

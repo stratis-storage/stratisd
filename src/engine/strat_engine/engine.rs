@@ -70,17 +70,11 @@ impl StratEngine {
             return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
         }
 
-        #[cfg(test)]
-        devlinks::setup_dev_path()?;
-
         let mut liminal_devices = LiminalDevices::default();
         let mut pools = Table::default();
         for (pool_name, pool_uuid, pool) in liminal_devices.setup_pools(find_all()?) {
             pools.insert(pool_name, pool_uuid, pool);
         }
-
-        #[cfg(test)]
-        devlinks::cleanup_devlinks(pools.iter());
 
         Ok(StratEngine {
             pools,
@@ -211,8 +205,6 @@ impl Engine for StratEngine {
                     )?;
 
                     let name = Name::new(name.to_owned());
-                    #[cfg(test)]
-                    devlinks::pool_added(&name);
                     self.pools.insert(name, uuid, pool);
                     Ok(CreateAction::Created(uuid))
                 }
@@ -241,8 +233,6 @@ impl Engine for StratEngine {
             self.pools.insert(pool_name, uuid, pool);
             Err(err)
         } else {
-            #[cfg(test)]
-            devlinks::pool_removed(&pool_name);
             Ok(DeleteAction::Deleted(uuid))
         }
     }
@@ -352,10 +342,6 @@ impl Engine for StratEngine {
 
 #[cfg(test)]
 mod test {
-    use std::fs::remove_dir_all;
-
-    use crate::engine::engine::DEV_PATH;
-
     use crate::engine::strat_engine::tests::{loopbacked, real};
 
     use crate::engine::types::EngineAction;
@@ -442,7 +428,6 @@ mod test {
         assert_eq!(engine.liminal_devices, LiminalDevices::default());
 
         engine.teardown().unwrap();
-        remove_dir_all(DEV_PATH).unwrap();
 
         let engine = StratEngine::initialize().unwrap();
 

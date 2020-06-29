@@ -15,6 +15,7 @@ mod pool;
 mod serde_structs;
 mod thinpool;
 
+pub use self::backstore::BDA;
 pub use self::engine::StratEngine;
 
 #[cfg(test)]

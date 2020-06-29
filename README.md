@@ -12,12 +12,9 @@ collections of block devices, and exports a D-Bus API. Stratis-cli's `stratis`
 provides a command-line tool which itself uses the D-Bus API to communicate
 with `stratisd`.
 
-## Documentation
+## Website
 
-https://stratis-storage.github.io/ currently has links to the
-[main internal design doc](https://stratis-storage.github.io/StratisSoftwareDesign.pdf),
-the [D-Bus API Reference manual](https://stratis-storage.github.io/DBusAPIReference.pdf),
-and [some coding style guidelines](https://stratis-storage.github.io/StratisStyleGuidelines.pdf).
+See [https://stratis-storage.github.io/](https://stratis-storage.github.io/).
 
 ## Getting involved
 
@@ -122,6 +119,18 @@ run them, see [`tests/README.md`](tests/README.md).
 ##### Test that interact with stratisd via the D-Bus
 For a description of the D-Bus-based tests see
 [`tests/client-dbus/README.rst`](tests/client-dbus/README.rst).
+
+## Allowed Bugs
+`stratisd` has some bugs; most of these we intend to address in due course.
+
+There is one bug that we have chosen not to fix. This is a bug in our D-Bus
+layer that will allow incorrect un-marshalling of certain D-Bus values if
+a D-Bus method is invoked with arguments that do not conform to the expected
+signature of the method.  See
+[the GitHub issue](https://github.com/stratis-storage/project/issues/11) for
+additional details about this bug. Behavior of `stratisd` is undefined if a
+method is called under the particular circumstances that allow the bug to
+manifest.
 
 ## Licensing
 

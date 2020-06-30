@@ -621,8 +621,7 @@ impl ThinPool {
         self.free_space_state = new_state;
     }
 
-    /// Possibly transition to a new FreeSpaceState based on usage, and invoke
-    /// policies (suspension) accordingly.
+    /// Possibly transition to a new FreeSpaceState based on usage.
     /// used is the number of data blocks that the thin pool reports as used.
     /// total is the total number of data blocks that could be used.
     fn free_space_check(
@@ -657,26 +656,6 @@ impl ThinPool {
         };
 
         self.set_free_space_state(new_state);
-
-        match (self.free_space_state, new_state) {
-            (FreeSpaceState::Good, FreeSpaceState::Crit)
-            | (FreeSpaceState::Warn, FreeSpaceState::Crit) => {
-                for (_, _, fs) in &mut self.filesystems {
-                    fs.suspend(true)?;
-                }
-            }
-            (FreeSpaceState::Crit, FreeSpaceState::Good)
-            | (FreeSpaceState::Crit, FreeSpaceState::Warn) => {
-                for (_, _, fs) in &mut self.filesystems {
-                    fs.resume()?;
-                }
-            }
-            (FreeSpaceState::Good, FreeSpaceState::Warn)
-            | (FreeSpaceState::Warn, FreeSpaceState::Good) => {}
-
-            // These all represent no change in the state, so nothing is done.
-            (old, new) => assert_eq!(old, new),
-        };
 
         Ok(new_state)
     }

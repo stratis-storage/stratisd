@@ -508,13 +508,19 @@ impl ThinPool {
             ThinPoolStatus::Working(ref status) => {
                 match status.summary {
                     ThinPoolStatusSummary::Good => {}
-                    // If a pool is in ReadOnly mode it is due to either meta data full or
-                    // the pool requires repair.
                     ThinPoolStatusSummary::ReadOnly => {
-                        error!("Thinpool read only! -> ReadOnly");
+                        warn!(
+                            "The thinpool device {} belonging to pool with UUID {} is in a read-only state",
+                            self.thin_pool.device(),
+                            pool_uuid.to_simple_ref()
+                        );
                     }
                     ThinPoolStatusSummary::OutOfSpace => {
-                        error!("Thinpool out of space! -> OutOfSpace");
+                        warn!(
+                            "The thinpool device {} belonging to pool with UUID {} is out of space",
+                            self.thin_pool.device(),
+                            pool_uuid.to_simple_ref()
+                        );
                     }
                 }
 
@@ -569,11 +575,13 @@ impl ThinPool {
                 warn!(
                     "Devicemapper could not obtain the status for devicemapper thinpool device {} belonging to pool with UUID {}",
                     self.thin_pool.device(),
-                    pool_uuid
+                    pool_uuid.to_simple_ref()
                 );
             }
             ThinPoolStatus::Fail => {
-                error!("Thinpool status is fail -> Failed");
+                warn!("Devicemapper indicates that the thinpool device {} belonging to pool with UUID {} has failed",
+                      self.thin_pool.device(),
+                      pool_uuid.to_simple_ref());
             }
         }
 

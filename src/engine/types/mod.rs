@@ -29,24 +29,6 @@ pub type DevUuid = Uuid;
 pub type FilesystemUuid = Uuid;
 pub type PoolUuid = Uuid;
 
-/// A DM pool operates in 4 modes.  See drivers/md/dm-thin.c (enum pool_mode).
-/// The 4 modes map to Running, OutOfDataSpace, ReadOnly and Failed - in degrading
-/// order.  Stratis adds 2 additional modes - Initializing and Stopping.  The Stratis
-/// specific modes are used to represent the state when Stratis is either constructing
-/// the pool components or tearing them down.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum PoolState {
-    Initializing = 1,   // Startup in progress
-    Running = 2,        // PM_WRITE - pool ok
-    OutOfDataSpace = 4, // Meta
-    ReadOnly = 3,       // The kernel reports PM_OUT_OF_META_SPACE or PM_READ_ONLY as the
-    // same state. PM_OUT_OF_META_SPACE may switch back to PM_WRITE when
-    // the meta data device is expanded.  PM_READ_ONLY requires user
-    // intervention to switch back to PM_WRITE mode.
-    Failed = 5,   // All I/O fails
-    Stopping = 6, // Teardown in progress
-}
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PoolExtendState {
     Initializing = 1,

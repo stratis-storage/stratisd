@@ -229,7 +229,6 @@ pub struct ThinPool {
     backstore_device: Device,
     pool_state: PoolState,
     pool_extend_state: PoolExtendState,
-    free_space_state: FreeSpaceState,
     dbus_path: MaybeDbusPath,
 }
 
@@ -339,7 +338,6 @@ impl ThinPool {
             backstore_device,
             pool_state: PoolState::Initializing,
             pool_extend_state: PoolExtendState::Initializing,
-            free_space_state: FreeSpaceState::Good,
             dbus_path: MaybeDbusPath(None),
         })
     }
@@ -451,7 +449,6 @@ impl ThinPool {
             backstore_device,
             pool_state: PoolState::Initializing,
             pool_extend_state: PoolExtendState::Initializing,
-            free_space_state: FreeSpaceState::Good,
             dbus_path: MaybeDbusPath(None),
         })
     }
@@ -617,10 +614,6 @@ impl ThinPool {
         self.pool_extend_state = new_state;
     }
 
-    fn set_free_space_state(&mut self, new_state: FreeSpaceState) {
-        self.free_space_state = new_state;
-    }
-
     /// Possibly transition to a new FreeSpaceState based on usage.
     /// used is the number of data blocks that the thin pool reports as used.
     /// total is the total number of data blocks that could be used.
@@ -654,8 +647,6 @@ impl ThinPool {
         } else {
             FreeSpaceState::Crit
         };
-
-        self.set_free_space_state(new_state);
 
         Ok(new_state)
     }

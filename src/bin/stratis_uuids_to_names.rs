@@ -27,12 +27,14 @@ use dbus::{
 };
 use lazy_static::lazy_static;
 use regex::Regex;
+use systemd::journal::print;
 use uuid::Uuid;
 
 pub const STRATIS_BUS_NAME: &str = "org.storage.stratis2";
 pub const STRATIS_MANAGER_OBJECT: &str = "/org/storage/stratis2";
 pub const STRATIS_POOL_IFACE: &str = "org.storage.stratis2.pool.r1";
 pub const STRATIS_FS_IFACE: &str = "org.storage.stratis2.filesystem";
+pub const DBUS_OM_IFACE: &str = "org.freedesktop.DBus.ObjectManager";
 lazy_static! {
     static ref TIMEOUT: Duration = Duration::new(5, 0);
 }
@@ -59,7 +61,7 @@ where
 
 impl Debug for StratisUdevError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Could not convert stratis UUIDs to names. {}", self.0)
+        write!(f, "Could not convert Stratis UUIDs to names. {}", self.0)
     }
 }
 
@@ -70,24 +72,21 @@ fn get_managed_objects() -> Result<GMORet, StratisUdevError> {
     let connection = Connection::new_system()?;
     let proxy = connection.with_proxy(STRATIS_BUS_NAME, STRATIS_MANAGER_OBJECT, *TIMEOUT);
     Ok(proxy
-        .method_call(
-            "org.freedesktop.DBus.ObjectManager",
-            "GetManagedObjects",
-            (),
-        )
+        .method_call(DBUS_OM_IFACE, "GetManagedObjects", ())
         .map(|r: (GMORet,)| r.0)?)
 }
 
 fn udev_name_to_uuids(dm_name: &str) -> Result<Option<(Uuid, Uuid)>, StratisUdevError> {
-    let regex = Regex::new("stratis-1-([0-9a-f]{32})-thin-fs-([0-9a-f]{32})")?;
-    let mut captures_iter = regex.captures_iter(dm_name);
-    let pool_uuid = captures_iter
-        .next()
-        .and_then(|cap| cap.get(0))
+    let regex = Regex::new("stratis-1-(?P<pool>[0-9a-f]{32})-thin-fs-(?P<fs>[0-9a-f]{32})")?;
+    let captures = match regex.captures(dm_name) {
+        Some(cap) => cap,
+        None => return Ok(None),
+    };
+    let pool_uuid = captures
+        .name("pool")
         .map(|pu| Uuid::parse_str(pu.as_str()).expect("Format validated by regex"));
-    let fs_uuid = captures_iter
-        .next()
-        .and_then(|cap| cap.get(0))
+    let fs_uuid = captures
+        .name("fs")
         .map(|pu| Uuid::parse_str(pu.as_str()).expect("Format validated by regex"));
     Ok(pool_uuid.and_then(|pu| fs_uuid.map(|fu| (pu, fu))))
 }
@@ -96,28 +95,38 @@ fn uuid_to_stratis_name(
     managed_objects: &GMORet,
     iface_name: &'static str,
     uuid: Uuid,
-) -> Option<String> {
-    managed_objects.values().fold(None, |acc, map| {
-        if map.contains_key(iface_name)
-            && map
-                .get(iface_name)
-                .and_then(|submap| submap.get("Uuid").and_then(|uuid| uuid.as_str()))
-                == Some(&uuid.to_simple_ref().to_string())
-        {
-            acc.and_then(|_| {
+) -> Result<Option<String>, StratisUdevError> {
+    let mut names: Vec<_> = managed_objects
+        .values()
+        .filter_map(|map| {
+            if map.contains_key(iface_name)
+                && map
+                    .get(iface_name)
+                    .and_then(|submap| submap.get("Uuid").and_then(|uuid| uuid.as_str()))
+                    == Some(&uuid.to_simple_ref().to_string())
+            {
                 map.get(iface_name).and_then(|submap| {
                     submap
                         .get("Name")
                         .and_then(|name| name.as_str().map(|n| n.to_string()))
                 })
-            })
-        } else {
-            None
-        }
-    })
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    if names.len() > 1 {
+        Err(StratisUdevError::new(format!(
+            "More than one device has the UUID {}",
+            uuid.to_simple_ref()
+        )))
+    } else {
+        Ok(names.pop())
+    }
 }
 
-fn main() -> Result<(), StratisUdevError> {
+fn main_report_error() -> Result<(), StratisUdevError> {
     let dm_name = match args().nth(1) {
         Some(dm_name) => dm_name,
         None => {
@@ -130,12 +139,21 @@ fn main() -> Result<(), StratisUdevError> {
     let managed_objects = get_managed_objects()?;
 
     if let Some((pool_uuid, fs_uuid)) = udev_name_to_uuids(&dm_name)? {
-        let pool_name = uuid_to_stratis_name(&managed_objects, STRATIS_POOL_IFACE, pool_uuid)
+        let pool_name = uuid_to_stratis_name(&managed_objects, STRATIS_POOL_IFACE, pool_uuid)?
             .ok_or_else(|| StratisUdevError::new("Could not get pool name from UUID."))?;
-        let fs_name = uuid_to_stratis_name(&managed_objects, STRATIS_FS_IFACE, fs_uuid)
+        let fs_name = uuid_to_stratis_name(&managed_objects, STRATIS_FS_IFACE, fs_uuid)?
             .ok_or_else(|| StratisUdevError::new("Could not get filesystem name from UUID."))?;
         println!("{} {}", pool_name, fs_name);
     }
 
     Ok(())
+}
+
+fn main() -> Result<(), StratisUdevError> {
+    if let Err(e) = main_report_error() {
+        print(3, format!("{:?}", e).as_str());
+        Err(StratisUdevError::new(""))
+    } else {
+        Ok(())
+    }
 }

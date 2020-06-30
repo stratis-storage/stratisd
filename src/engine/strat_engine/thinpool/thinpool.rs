@@ -41,7 +41,7 @@ use crate::{
             },
         },
         structures::Table,
-        types::{FilesystemUuid, MaybeDbusPath, Name, PoolState, PoolUuid},
+        types::{FilesystemUuid, MaybeDbusPath, Name, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -253,7 +253,7 @@ pub struct ThinPool {
     /// layer. All DM components obtain their storage from this layer.
     /// The device will change if the backstore adds or removes a cache.
     backstore_device: Device,
-    pool_state: PoolState,
+    thin_pool_status: Option<ThinPoolStatus>,
     extend_state: ExtendState,
     dbus_path: MaybeDbusPath,
 }
@@ -362,7 +362,7 @@ impl ThinPool {
             filesystems: Table::default(),
             mdv,
             backstore_device,
-            pool_state: PoolState::Initializing,
+            thin_pool_status: None,
             extend_state: ExtendState::default(),
             dbus_path: MaybeDbusPath(None),
         })
@@ -473,7 +473,7 @@ impl ThinPool {
             filesystems: fs_table,
             mdv,
             backstore_device,
-            pool_state: PoolState::Initializing,
+            thin_pool_status: None,
             extend_state: ExtendState::default(),
             dbus_path: MaybeDbusPath(None),
         })
@@ -503,21 +503,18 @@ impl ThinPool {
         );
 
         let mut should_save: bool = false;
-        match self.thin_pool.status(get_dm())? {
+        let thin_pool_status = self.thin_pool.status(get_dm())?;
+        match thin_pool_status {
             ThinPoolStatus::Working(ref status) => {
                 match status.summary {
-                    ThinPoolStatusSummary::Good => {
-                        self.set_state(PoolState::Running);
-                    }
+                    ThinPoolStatusSummary::Good => {}
                     // If a pool is in ReadOnly mode it is due to either meta data full or
                     // the pool requires repair.
                     ThinPoolStatusSummary::ReadOnly => {
                         error!("Thinpool read only! -> ReadOnly");
-                        self.set_state(PoolState::ReadOnly);
                     }
                     ThinPoolStatusSummary::OutOfSpace => {
                         error!("Thinpool out of space! -> OutOfSpace");
-                        self.set_state(PoolState::OutOfDataSpace);
                     }
                 }
 
@@ -569,7 +566,6 @@ impl ThinPool {
                 self.resume()?;
             }
             ThinPoolStatus::Error => {
-                // Do not set the state, because it is unknown.
                 warn!(
                     "Devicemapper could not obtain the status for devicemapper thinpool device {} belonging to pool with UUID {}",
                     self.thin_pool.device(),
@@ -578,11 +574,10 @@ impl ThinPool {
             }
             ThinPoolStatus::Fail => {
                 error!("Thinpool status is fail -> Failed");
-                self.set_state(PoolState::Failed);
-                // TODO: Take pool offline?
-                // TODO: Run thin_check
             }
         }
+
+        self.thin_pool_status = Some(thin_pool_status);
 
         for (name, uuid, fs) in self.filesystems.iter_mut() {
             let (fs_status, save_mdv) = fs.check()?;
@@ -599,14 +594,9 @@ impl ThinPool {
         Ok(should_save)
     }
 
-    fn set_state(&mut self, new_state: PoolState) {
-        self.pool_state = new_state;
-    }
-
     /// Tear down the components managed here: filesystems, the MDV,
     /// and the actual thinpool device itself.
     pub fn teardown(&mut self) -> StratisResult<()> {
-        self.set_state(PoolState::Stopping);
         // Must succeed in tearing down all filesystems before the
         // thinpool..
         for (_, _, ref mut fs) in &mut self.filesystems {
@@ -910,8 +900,8 @@ impl ThinPool {
     }
 
     #[cfg(test)]
-    pub fn state(&self) -> PoolState {
-        self.pool_state
+    pub fn state(&self) -> Option<&ThinPoolStatus> {
+        self.thin_pool_status.as_ref()
     }
 
     #[cfg(test)]

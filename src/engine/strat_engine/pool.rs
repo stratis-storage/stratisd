@@ -623,7 +623,7 @@ mod tests {
 
     use nix::mount::{mount, umount, MsFlags};
 
-    use devicemapper::{Bytes, IEC, SECTOR_SIZE};
+    use devicemapper::{Bytes, ThinPoolStatus, ThinPoolStatusSummary, IEC, SECTOR_SIZE};
 
     use crate::engine::{
         strat_engine::{
@@ -633,7 +633,7 @@ mod tests {
             tests::{loopbacked, real},
             thinpool::ExtendState,
         },
-        types::{EngineAction, PoolState, Redundancy},
+        types::{EngineAction, Redundancy},
     };
 
     use super::*;
@@ -937,9 +937,7 @@ mod tests {
 
             let mut amount_written = Sectors(0);
             let buffer_length = Bytes(buffer_length).sectors();
-            while pool.thin_pool.extend_state() == ExtendState::default()
-                && pool.thin_pool.state() == PoolState::Running
-            {
+            while pool.thin_pool.extend_state() == ExtendState::default() {
                 f.write_all(buf).unwrap();
                 amount_written += Sectors(1);
                 // Run check roughly every time the buffer is cleared.
@@ -955,7 +953,13 @@ mod tests {
             pool.add_blockdevs(pool_uuid, name, paths2, BlockDevTier::Data)
                 .unwrap();
             assert_eq!(pool.thin_pool.extend_state(), ExtendState::default());
-            assert_matches!(pool.thin_pool.state(), PoolState::Running);
+
+            match pool.thin_pool.state() {
+                Some(ThinPoolStatus::Working(working)) => {
+                    assert_eq!(working.summary, ThinPoolStatusSummary::Good)
+                }
+                _ => panic!("thin pool status should be back to working"),
+            }
         }
     }
 

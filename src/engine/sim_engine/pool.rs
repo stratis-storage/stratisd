@@ -24,7 +24,7 @@ use crate::{
         structures::Table,
         types::{
             BlockDevTier, CreateAction, DevUuid, FilesystemUuid, KeyDescription, MaybeDbusPath,
-            Name, PoolState, PoolUuid, Redundancy, RenameAction, SetCreateAction, SetDeleteAction,
+            Name, PoolUuid, Redundancy, RenameAction, SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -43,7 +43,6 @@ pub struct SimPool {
     filesystems: Table<SimFilesystem>,
     redundancy: Redundancy,
     rdm: Rc<RefCell<Randomizer>>,
-    pool_state: PoolState,
     dbus_path: MaybeDbusPath,
 }
 
@@ -68,7 +67,6 @@ impl SimPool {
                 filesystems: Table::default(),
                 redundancy,
                 rdm: Rc::clone(rdm),
-                pool_state: PoolState::Initializing,
                 dbus_path: MaybeDbusPath(None),
             },
         )

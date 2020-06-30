@@ -310,7 +310,7 @@ impl ThinPool {
 
         let (dm_name, dm_uuid) = format_thinpool_ids(pool_uuid, ThinPoolRole::Pool);
 
-        let (free_space_state, data_dev_size) = (FreeSpaceState::Good, data_dev.size());
+        let data_dev_size = data_dev.size();
         let thinpool_dev = ThinPoolDev::new(
             get_dm(),
             &dm_name,
@@ -339,7 +339,7 @@ impl ThinPool {
             backstore_device,
             pool_state: PoolState::Initializing,
             pool_extend_state: PoolExtendState::Initializing,
-            free_space_state,
+            free_space_state: FreeSpaceState::Good,
             dbus_path: MaybeDbusPath(None),
         })
     }
@@ -381,7 +381,7 @@ impl ThinPool {
             segs_to_table(backstore_device, &data_segments),
         )?;
 
-        let (free_space_state, data_dev_size) = (FreeSpaceState::Good, data_dev.size());
+        let data_dev_size = data_dev.size();
         let thinpool_dev = ThinPoolDev::setup(
             get_dm(),
             &thinpool_name,
@@ -451,7 +451,7 @@ impl ThinPool {
             backstore_device,
             pool_state: PoolState::Initializing,
             pool_extend_state: PoolExtendState::Initializing,
-            free_space_state,
+            free_space_state: FreeSpaceState::Good,
             dbus_path: MaybeDbusPath(None),
         })
     }

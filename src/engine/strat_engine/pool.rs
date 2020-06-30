@@ -631,8 +631,9 @@ mod tests {
             devlinks,
             liminal::{get_bdas, get_blockdevs, get_metadata, LStratisInfo},
             tests::{loopbacked, real},
+            thinpool::ExtendState,
         },
-        types::{EngineAction, PoolExtendState, PoolState, Redundancy},
+        types::{EngineAction, PoolState, Redundancy},
     };
 
     use super::*;
@@ -936,7 +937,7 @@ mod tests {
 
             let mut amount_written = Sectors(0);
             let buffer_length = Bytes(buffer_length).sectors();
-            while pool.thin_pool.extend_state() == PoolExtendState::Good
+            while pool.thin_pool.extend_state() == ExtendState::default()
                 && pool.thin_pool.state() == PoolState::Running
             {
                 f.write_all(buf).unwrap();
@@ -953,7 +954,7 @@ mod tests {
 
             pool.add_blockdevs(pool_uuid, name, paths2, BlockDevTier::Data)
                 .unwrap();
-            assert_matches!(pool.thin_pool.extend_state(), PoolExtendState::Good);
+            assert_eq!(pool.thin_pool.extend_state(), ExtendState::default());
             assert_matches!(pool.thin_pool.state(), PoolState::Running);
         }
     }

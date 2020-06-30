@@ -41,7 +41,7 @@ use crate::{
             },
         },
         structures::Table,
-        types::{FilesystemUuid, MaybeDbusPath, Name, PoolExtendState, PoolState, PoolUuid},
+        types::{FilesystemUuid, MaybeDbusPath, Name, PoolState, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -178,6 +178,36 @@ struct Segments {
     mdv_segments: Vec<(Sectors, Sectors)>,
 }
 
+/// Indicates the success or failure of the most recent action taken to
+/// extend a thinpool data or metadata device.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct ExtendState {
+    data: bool,
+    meta: bool,
+}
+
+/// The default is true for both fields. If no extension has yet been
+/// attempted it can not have failed.
+impl Default for ExtendState {
+    fn default() -> ExtendState {
+        ExtendState {
+            data: true,
+            meta: true,
+        }
+    }
+}
+
+#[cfg(test)]
+impl ExtendState {
+    pub fn data(&self) -> bool {
+        self.data
+    }
+
+    pub fn meta(&self) -> bool {
+        self.meta
+    }
+}
+
 pub struct ThinPoolSizeParams {
     meta_size: MetaBlocks,
     data_size: DataBlocks,
@@ -224,7 +254,7 @@ pub struct ThinPool {
     /// The device will change if the backstore adds or removes a cache.
     backstore_device: Device,
     pool_state: PoolState,
-    pool_extend_state: PoolExtendState,
+    extend_state: ExtendState,
     dbus_path: MaybeDbusPath,
 }
 
@@ -333,7 +363,7 @@ impl ThinPool {
             mdv,
             backstore_device,
             pool_state: PoolState::Initializing,
-            pool_extend_state: PoolExtendState::Initializing,
+            extend_state: ExtendState::default(),
             dbus_path: MaybeDbusPath(None),
         })
     }
@@ -444,7 +474,7 @@ impl ThinPool {
             mdv,
             backstore_device,
             pool_state: PoolState::Initializing,
-            pool_extend_state: PoolExtendState::Initializing,
+            extend_state: ExtendState::default(),
             dbus_path: MaybeDbusPath(None),
         })
     }
@@ -475,8 +505,6 @@ impl ThinPool {
         let mut should_save: bool = false;
         match self.thin_pool.status(get_dm())? {
             ThinPoolStatus::Working(ref status) => {
-                let mut meta_extend_failed = false;
-                let mut data_extend_failed = false;
                 match status.summary {
                     ThinPoolStatusSummary::Good => {
                         self.set_state(PoolState::Running);
@@ -502,15 +530,15 @@ impl ThinPool {
                     let meta_request = target_meta_size - usage.total_meta;
 
                     if meta_request > MIN_META_SEGMENT_SIZE {
-                        meta_extend_failed = match self.extend_thin_meta_device(
+                        self.extend_state.meta = match self.extend_thin_meta_device(
                             pool_uuid,
                             backstore,
                             meta_request.sectors(),
                         ) {
-                            Ok(extend_size) => extend_size == Sectors(0),
-                            Err(_) => true,
+                            Ok(extend_size) => extend_size != Sectors(0),
+                            Err(_) => false,
                         };
-                        should_save |= !meta_extend_failed;
+                        should_save |= self.extend_state.meta
                     }
                 }
 
@@ -524,8 +552,8 @@ impl ThinPool {
                             Ok(extend_size) => extend_size,
                             Err(_) => Sectors(0),
                         };
-                    data_extend_failed = amount_allocated == Sectors(0);
-                    should_save |= !data_extend_failed;
+                    self.extend_state.data = amount_allocated != Sectors(0);
+                    should_save |= self.extend_state.data;
                     sectors_to_datablocks(amount_allocated)
                 };
 
@@ -539,7 +567,6 @@ impl ThinPool {
 
                 self.thin_pool.set_low_water_mark(get_dm(), lowater)?;
                 self.resume()?;
-                self.set_extend_state(data_extend_failed, meta_extend_failed);
             }
             ThinPoolStatus::Error => {
                 // Do not set the state, because it is unknown.
@@ -574,18 +601,6 @@ impl ThinPool {
 
     fn set_state(&mut self, new_state: PoolState) {
         self.pool_state = new_state;
-    }
-
-    fn set_extend_state(&mut self, data_extend_failed: bool, meta_extend_failed: bool) {
-        let mut new_state = PoolExtendState::Good;
-        if data_extend_failed && meta_extend_failed {
-            new_state = PoolExtendState::MetaAndDataFailed
-        } else if data_extend_failed {
-            new_state = PoolExtendState::DataFailed;
-        } else if meta_extend_failed {
-            new_state = PoolExtendState::MetaFailed;
-        }
-        self.pool_extend_state = new_state;
     }
 
     /// Tear down the components managed here: filesystems, the MDV,
@@ -900,8 +915,8 @@ impl ThinPool {
     }
 
     #[cfg(test)]
-    pub fn extend_state(&self) -> PoolExtendState {
-        self.pool_extend_state
+    pub fn extend_state(&self) -> ExtendState {
+        self.extend_state
     }
 
     /// Rename a filesystem within the thin pool.

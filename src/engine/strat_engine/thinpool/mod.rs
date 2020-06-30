@@ -8,4 +8,4 @@ mod thinids;
 #[allow(clippy::module_inception)]
 mod thinpool;
 
-pub use self::thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE};
+pub use self::thinpool::{ExtendState, ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE};

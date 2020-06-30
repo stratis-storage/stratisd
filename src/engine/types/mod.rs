@@ -47,15 +47,6 @@ pub enum PoolState {
     Stopping = 6, // Teardown in progress
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum PoolExtendState {
-    Initializing = 1,
-    Good = 2,
-    DataFailed = 3,
-    MetaFailed = 4,
-    MetaAndDataFailed = 5,
-}
-
 /// See Design Doc section 10.2.1 for more details.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BlockDevState {

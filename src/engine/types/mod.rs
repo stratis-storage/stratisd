@@ -56,13 +56,6 @@ pub enum PoolExtendState {
     MetaAndDataFailed = 5,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum FreeSpaceState {
-    Good = 1,
-    Warn = 2,
-    Crit = 3,
-}
-
 /// See Design Doc section 10.2.1 for more details.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BlockDevState {

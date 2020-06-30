@@ -41,10 +41,7 @@ use crate::{
             },
         },
         structures::Table,
-        types::{
-            FilesystemUuid, FreeSpaceState, MaybeDbusPath, Name, PoolExtendState, PoolState,
-            PoolUuid,
-        },
+        types::{FilesystemUuid, MaybeDbusPath, Name, PoolExtendState, PoolState, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -58,7 +55,6 @@ const MIN_META_SEGMENT_SIZE: MetaBlocks = MetaBlocks(4 * IEC::Ki);
 const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768);
 const INITIAL_MDV_SIZE: Sectors = Sectors(32 * IEC::Ki); // 16 MiB
 
-const SPACE_WARN_PCT: u8 = 90;
 const SPACE_CRIT_PCT: u8 = 95;
 
 fn sectors_to_datablocks(sectors: Sectors) -> DataBlocks {
@@ -535,28 +531,6 @@ impl ThinPool {
 
                 let current_total = usage.total_data + total_extended;
 
-                // Update pool space state
-                self.free_space_check(
-                    usage.used_data,
-                    // FIXME: current_total is a reliable amount, calculated
-                    // from information obtained from devicemapper.
-                    // However, it is not the correct amount, since it entirely
-                    // ignores the amount allocated to the metadata device,
-                    // which is also allocated from the data tier.
-                    // So it really underestimates the amount actually used.
-                    // Moreover, the value obtained from available_in_backstore
-                    // is just the difference between the blocks available
-                    // on all the data devices that the pool owns and the
-                    // number of blocks allocated from those devices.
-                    // Since stratisd currently has very few layers, all
-                    // blocks allocated from these devices are given to the
-                    // thinpool, either to its data or metadata device.
-                    // In future, as more layers are added to stratisd, this
-                    // value could either underestimate or overestimate the
-                    // space available to a very great extent.
-                    current_total + sectors_to_datablocks(backstore.available_in_backstore()),
-                )?;
-
                 let lowater = calc_lowater(
                     usage.used_data,
                     current_total,
@@ -612,43 +586,6 @@ impl ThinPool {
             new_state = PoolExtendState::MetaFailed;
         }
         self.pool_extend_state = new_state;
-    }
-
-    /// Possibly transition to a new FreeSpaceState based on usage.
-    /// used is the number of data blocks that the thin pool reports as used.
-    /// total is the total number of data blocks that could be used.
-    fn free_space_check(
-        &mut self,
-        used: DataBlocks,
-        total: DataBlocks,
-    ) -> StratisResult<FreeSpaceState> {
-        // Return a value from 0 to 100 that is the percentage that "used"
-        // makes up in "total".
-        fn used_pct(used: u64, total: u64) -> u8 {
-            assert!(total >= used);
-            let mut val = (used * 100) / total;
-            if (used * 100) % total != 0 {
-                val += 1; // round up
-            }
-            assert!(val <= 100);
-            val as u8
-        }
-
-        let overall_used_pct = used_pct(*used, *total);
-        trace!("The data device belonging to thin pool device {} with name {} is currently using approximately {}% of the total space available.",
-               self.thin_pool.device(),
-               self.thin_pool.name(),
-               overall_used_pct);
-
-        let new_state = if overall_used_pct < SPACE_WARN_PCT {
-            FreeSpaceState::Good
-        } else if overall_used_pct < SPACE_CRIT_PCT {
-            FreeSpaceState::Warn
-        } else {
-            FreeSpaceState::Crit
-        };
-
-        Ok(new_state)
     }
 
     /// Tear down the components managed here: filesystems, the MDV,

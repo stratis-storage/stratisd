@@ -17,6 +17,7 @@ use std::{
     env::args,
     error::Error,
     fmt::{self, Debug, Display},
+    os::unix::net::UnixDatagram,
     time::Duration,
 };
 
@@ -27,9 +28,11 @@ use dbus::{
 };
 use lazy_static::lazy_static;
 use regex::Regex;
-use systemd::journal::print;
 use uuid::Uuid;
 
+pub const DEV_LOG: &str = "/dev/log";
+pub const SYSTEM_DAEMON_INFO: &str = "<30>";
+pub const SYSTEM_DAEMON_ERROR: &str = "<27>";
 pub const STRATIS_BUS_NAME: &str = "org.storage.stratis2";
 pub const STRATIS_MANAGER_OBJECT: &str = "/org/storage/stratis2";
 pub const STRATIS_POOL_IFACE: &str = "org.storage.stratis2.pool.r1";
@@ -39,14 +42,18 @@ lazy_static! {
     static ref TIMEOUT: Duration = Duration::new(5, 0);
 }
 
-struct StratisUdevError(String);
+struct StratisUdevError(Option<String>);
 
 impl StratisUdevError {
+    fn empty() -> StratisUdevError {
+        StratisUdevError(None)
+    }
+
     fn new<D>(display: D) -> StratisUdevError
     where
         D: Display,
     {
-        StratisUdevError(display.to_string())
+        StratisUdevError(Some(display.to_string()))
     }
 }
 
@@ -61,7 +68,12 @@ where
 
 impl Debug for StratisUdevError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Could not convert Stratis UUIDs to names. {}", self.0)
+        write!(f, "Could not convert Stratis UUIDs to names.")?;
+        if let Some(ref msg) = self.0 {
+            write!(f, " {}", msg)
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -126,13 +138,24 @@ fn uuid_to_stratis_name(
     }
 }
 
-fn main_report_error() -> Result<(), StratisUdevError> {
-    let dm_name = match args().nth(1) {
+fn main_report_error() -> Result<Option<(String, String)>, StratisUdevError> {
+    let mut args = args();
+    let dm_name = match args.nth(1) {
         Some(dm_name) => dm_name,
         None => {
             return Err(StratisUdevError::new(
                 "Thinly provisioned filesystem devicemapper name required as argument.",
             ));
+        }
+    };
+    match args.next().as_deref() {
+        Some(action) => {
+            if action == "remove" {
+                return Ok(None);
+            }
+        }
+        None => {
+            return Err(StratisUdevError::new("udev action required as argument."));
         }
     };
 
@@ -144,16 +167,35 @@ fn main_report_error() -> Result<(), StratisUdevError> {
         let fs_name = uuid_to_stratis_name(&managed_objects, STRATIS_FS_IFACE, fs_uuid)?
             .ok_or_else(|| StratisUdevError::new("Could not get filesystem name from UUID."))?;
         println!("{} {}", pool_name, fs_name);
+        Ok(Some((pool_name, fs_name)))
+    } else {
+        Ok(None)
     }
-
-    Ok(())
 }
 
 fn main() -> Result<(), StratisUdevError> {
-    if let Err(e) = main_report_error() {
-        print(3, format!("{:?}", e).as_str());
-        Err(StratisUdevError::new(""))
-    } else {
-        Ok(())
+    let sock = UnixDatagram::unbound().map_err(StratisUdevError::new)?;
+    match main_report_error() {
+        Ok(Some((pool_name, fs_name))) => {
+            sock.send_to(
+                format!(
+                    "{}Symlink /dev/stratis/{}/{} succesfully created.",
+                    SYSTEM_DAEMON_INFO, pool_name, fs_name,
+                )
+                .as_bytes(),
+                DEV_LOG,
+            )
+            .map_err(StratisUdevError::new)?;
+            Ok(())
+        }
+        Ok(None) => Ok(()),
+        Err(e) => {
+            sock.send_to(
+                format!("{}{:?}", SYSTEM_DAEMON_ERROR, e,).as_bytes(),
+                DEV_LOG,
+            )
+            .map_err(StratisUdevError::new)?;
+            Err(StratisUdevError::empty())
+        }
     }
 }

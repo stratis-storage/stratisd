@@ -24,7 +24,7 @@ use crate::{
         structures::Table,
         types::{
             BlockDevTier, CreateAction, DevUuid, FilesystemUuid, KeyDescription, MaybeDbusPath,
-            Name, PoolExtendState, PoolState, PoolUuid, Redundancy, RenameAction, SetCreateAction,
+            Name, PoolExtendState, PoolUuid, Redundancy, RenameAction, SetCreateAction,
             SetDeleteAction,
         },
     },
@@ -44,7 +44,6 @@ pub struct SimPool {
     filesystems: Table<SimFilesystem>,
     redundancy: Redundancy,
     rdm: Rc<RefCell<Randomizer>>,
-    pool_state: PoolState,
     pool_extend_state: PoolExtendState,
     dbus_path: MaybeDbusPath,
 }
@@ -70,7 +69,6 @@ impl SimPool {
                 filesystems: Table::default(),
                 redundancy,
                 rdm: Rc::clone(rdm),
-                pool_state: PoolState::Initializing,
                 pool_extend_state: PoolExtendState::Good,
                 dbus_path: MaybeDbusPath(None),
             },

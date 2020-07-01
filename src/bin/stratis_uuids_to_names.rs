@@ -191,7 +191,7 @@ fn main() -> Result<(), StratisUdevError> {
         Ok(None) => Ok(()),
         Err(e) => {
             sock.send_to(
-                format!("{}{:?}", SYSTEM_DAEMON_ERROR, e,).as_bytes(),
+                format!("{}{:?}", SYSTEM_DAEMON_ERROR, e).as_bytes(),
                 DEV_LOG,
             )
             .map_err(StratisUdevError::new)?;

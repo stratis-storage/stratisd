@@ -708,23 +708,32 @@ impl ThinPool {
     /// metadata spare, and all sectors actually in use by the thinpool DM
     /// device, either for the metadata device or for the data device.
     pub fn total_physical_used(&self) -> StratisResult<Sectors> {
-        let (data_dev_used, meta_dev_used) = match self.thin_pool.status(get_dm())? {
-            ThinPoolStatus::Working(ref status) => (
-                datablocks_to_sectors(status.usage.used_data),
-                status.usage.used_meta.sectors(),
-            ),
-            ThinPoolStatus::Error => {
+        let (data_dev_used, meta_dev_used) = match &self.thin_pool_status {
+            None => {
                 let err_msg = format!(
-                    "Devicemapper could not obtain status for devicemapper thin
- pool device {}",
-                    self.thin_pool.device(),
+                    "Unknown status for thin pool device {}",
+                    self.thin_pool.device()
                 );
                 return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
             }
-            ThinPoolStatus::Fail => {
-                let err_msg = "thin pool failed, could not obtain usage";
-                return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
-            }
+            Some(status) => match status {
+                ThinPoolStatus::Working(status) => (
+                    datablocks_to_sectors(status.usage.used_data),
+                    status.usage.used_meta.sectors(),
+                ),
+                ThinPoolStatus::Error => {
+                    let err_msg = format!(
+                        "Devicemapper could not obtain status for devicemapper thin pool device {}",
+                        self.thin_pool.device(),
+                    );
+                    return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
+                }
+                ThinPoolStatus::Fail => {
+                    let err_msg =
+                        format!("The thinpool device {} has failed", self.thin_pool.device());
+                    return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
+                }
+            },
         };
 
         let spare_total = self.segments.meta_spare_segments.iter().map(|s| s.1).sum();

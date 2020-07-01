@@ -6,6 +6,7 @@
 
 use std::{
     cmp::{max, min},
+    fmt,
     thread::sleep,
     time::Duration,
 };
@@ -176,6 +177,48 @@ struct Segments {
     meta_spare_segments: Vec<(Sectors, Sectors)>,
     data_segments: Vec<(Sectors, Sectors)>,
     mdv_segments: Vec<(Sectors, Sectors)>,
+}
+
+/// A way of digesting the status reported on the thinpool into a value
+/// that can be checked for equality. This way, two statuses,
+/// collected at different times can be checked to determine whether their
+/// gross, as opposed to fine, differences are significant.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ThinPoolStatusDigest {
+    Fail,
+    Error,
+    Good,
+    ReadOnly,
+    OutOfSpace,
+}
+
+impl From<&ThinPoolStatus> for ThinPoolStatusDigest {
+    fn from(status: &ThinPoolStatus) -> ThinPoolStatusDigest {
+        match status {
+            ThinPoolStatus::Working(status) => match status.summary {
+                ThinPoolStatusSummary::Good => ThinPoolStatusDigest::Good,
+                ThinPoolStatusSummary::ReadOnly => ThinPoolStatusDigest::ReadOnly,
+                ThinPoolStatusSummary::OutOfSpace => ThinPoolStatusDigest::OutOfSpace,
+            },
+            ThinPoolStatus::Fail => ThinPoolStatusDigest::Fail,
+            ThinPoolStatus::Error => ThinPoolStatusDigest::Error,
+        }
+    }
+}
+
+/// In this implementation convert the status designations to strings which
+/// match those strings that the kernel uses to identify the different states
+/// in the ioctl result.
+impl fmt::Display for ThinPoolStatusDigest {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ThinPoolStatusDigest::Good => write!(f, "rw"),
+            ThinPoolStatusDigest::ReadOnly => write!(f, "ro"),
+            ThinPoolStatusDigest::OutOfSpace => write!(f, "out_of_data_space"),
+            ThinPoolStatusDigest::Fail => write!(f, "Fail"),
+            ThinPoolStatusDigest::Error => write!(f, "Error"),
+        }
+    }
 }
 
 pub struct ThinPoolSizeParams {
@@ -474,83 +517,60 @@ impl ThinPool {
 
         let mut should_save: bool = false;
         let thin_pool_status = self.thin_pool.status(get_dm())?;
-        match thin_pool_status {
-            ThinPoolStatus::Working(ref status) => {
-                let mut meta_extend_failed = false;
-                let mut data_extend_failed = false;
-                match status.summary {
-                    ThinPoolStatusSummary::Good => {}
-                    // If a pool is in ReadOnly mode it is due to either meta data full or
-                    // the pool requires repair.
-                    ThinPoolStatusSummary::ReadOnly => {
-                        error!("Thinpool read only! -> ReadOnly");
-                    }
-                    ThinPoolStatusSummary::OutOfSpace => {
-                        error!("Thinpool out of space! -> OutOfSpace");
-                    }
+
+        if let ThinPoolStatus::Working(status) = &thin_pool_status {
+            let mut meta_extend_failed = false;
+            let mut data_extend_failed = false;
+            let usage = &status.usage;
+
+            // Ensure meta subdevice is approx. 1/1000th of total usable
+            // size
+            let target_meta_size = (backstore.datatier_usable_size() / 1000u16).metablocks();
+            if usage.total_meta < target_meta_size {
+                let meta_request = target_meta_size - usage.total_meta;
+
+                if meta_request > MIN_META_SEGMENT_SIZE {
+                    meta_extend_failed = match self.extend_thin_meta_device(
+                        pool_uuid,
+                        backstore,
+                        meta_request.sectors(),
+                    ) {
+                        Ok(extend_size) => extend_size == Sectors(0),
+                        Err(_) => true,
+                    };
+                    should_save |= !meta_extend_failed;
                 }
-
-                let usage = &status.usage;
-
-                // Ensure meta subdevice is approx. 1/1000th of total usable
-                // size
-                let target_meta_size = (backstore.datatier_usable_size() / 1000u16).metablocks();
-                if usage.total_meta < target_meta_size {
-                    let meta_request = target_meta_size - usage.total_meta;
-
-                    if meta_request > MIN_META_SEGMENT_SIZE {
-                        meta_extend_failed = match self.extend_thin_meta_device(
-                            pool_uuid,
-                            backstore,
-                            meta_request.sectors(),
-                        ) {
-                            Ok(extend_size) => extend_size == Sectors(0),
-                            Err(_) => true,
-                        };
-                        should_save |= !meta_extend_failed;
-                    }
-                }
-
-                // Expand data blocks to fill all available remaining space
-                let free_space = backstore.available_in_backstore();
-                let total_extended = if free_space < DATA_BLOCK_SIZE {
-                    DataBlocks(0)
-                } else {
-                    let amount_allocated =
-                        match self.extend_thin_data_device(pool_uuid, backstore, free_space) {
-                            Ok(extend_size) => extend_size,
-                            Err(_) => Sectors(0),
-                        };
-                    data_extend_failed = amount_allocated == Sectors(0);
-                    should_save |= !data_extend_failed;
-                    sectors_to_datablocks(amount_allocated)
-                };
-
-                let current_total = usage.total_data + total_extended;
-
-                let lowater = calc_lowater(
-                    usage.used_data,
-                    current_total,
-                    sectors_to_datablocks(backstore.available_in_backstore()),
-                );
-
-                self.thin_pool.set_low_water_mark(get_dm(), lowater)?;
-                self.resume()?;
-                self.set_extend_state(data_extend_failed, meta_extend_failed);
             }
-            ThinPoolStatus::Error => {
-                warn!(
-                    "Devicemapper could not obtain the status for devicemapper thinpool device {} belonging to pool with UUID {}",
-                    self.thin_pool.device(),
-                    pool_uuid
-                );
-            }
-            ThinPoolStatus::Fail => {
-                error!("Thinpool status is fail -> Failed");
-            }
+
+            // Expand data blocks to fill all available remaining space
+            let free_space = backstore.available_in_backstore();
+            let total_extended = if free_space < DATA_BLOCK_SIZE {
+                DataBlocks(0)
+            } else {
+                let amount_allocated =
+                    match self.extend_thin_data_device(pool_uuid, backstore, free_space) {
+                        Ok(extend_size) => extend_size,
+                        Err(_) => Sectors(0),
+                    };
+                data_extend_failed = amount_allocated == Sectors(0);
+                should_save |= !data_extend_failed;
+                sectors_to_datablocks(amount_allocated)
+            };
+
+            let current_total = usage.total_data + total_extended;
+
+            let lowater = calc_lowater(
+                usage.used_data,
+                current_total,
+                sectors_to_datablocks(backstore.available_in_backstore()),
+            );
+
+            self.thin_pool.set_low_water_mark(get_dm(), lowater)?;
+            self.resume()?;
+            self.set_extend_state(data_extend_failed, meta_extend_failed);
         }
 
-        self.thin_pool_status = Some(thin_pool_status);
+        self.set_state(thin_pool_status);
 
         for (name, uuid, fs) in self.filesystems.iter_mut() {
             let (fs_status, save_mdv) = fs.check()?;
@@ -565,6 +585,39 @@ impl ThinPool {
             }
         }
         Ok(should_save)
+    }
+
+    /// Set the current status of the thin_pool device to thin_pool_status.
+    /// If there has been a change, log that change at the info or warn level
+    /// as appropriate.
+    fn set_state(&mut self, thin_pool_status: ThinPoolStatus) {
+        let current_status: Option<ThinPoolStatusDigest> =
+            self.thin_pool_status.as_ref().map(|x| x.into());
+        let new_status: ThinPoolStatusDigest = (&thin_pool_status).into();
+
+        if current_status != Some(new_status) {
+            let current_status_str = current_status
+                .map(|x| x.to_string())
+                .unwrap_or_else(|| "none".to_string());
+
+            if new_status != ThinPoolStatusDigest::Good {
+                warn!(
+                    "Status of thinpool device \"{}\" changed from \"{}\" to \"{}\"",
+                    self.thin_pool.device(),
+                    current_status_str,
+                    new_status,
+                );
+            } else {
+                info!(
+                    "Status of thinpool device \"{}\" changed from \"{}\" to \"{}\"",
+                    self.thin_pool.device(),
+                    current_status_str,
+                    new_status,
+                );
+            }
+        }
+
+        self.thin_pool_status = Some(thin_pool_status);
     }
 
     fn set_extend_state(&mut self, data_extend_failed: bool, meta_extend_failed: bool) {

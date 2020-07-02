@@ -9,9 +9,6 @@ RUST_2018_IDIOMS = -D bare-trait-objects \
 
 DENY = -D warnings -D future-incompatible -D unused ${RUST_2018_IDIOMS}
 
-${HOME}/.cargo/bin/cargo-tree:
-	cargo install cargo-tree
-
 ${HOME}/.cargo/bin/cargo-outdated:
 	cargo install cargo-outdated
 
@@ -23,9 +20,6 @@ ${HOME}/.cargo/bin/cargo-bloat:
 
 ${HOME}/.cargo/bin/cargo-audit:
 	cargo install cargo-audit
-
-tree: ${HOME}/.cargo/bin/cargo-tree
-	PATH=${HOME}/.cargo/bin:${PATH} cargo tree
 
 outdated: ${HOME}/.cargo/bin/cargo-outdated
 	PATH=${HOME}/.cargo/bin:${PATH} cargo outdated
@@ -112,5 +106,4 @@ clippy:
 	test-loop
 	test-real
 	test-travis
-	tree
 	yamllint

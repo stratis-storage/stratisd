@@ -576,7 +576,7 @@ impl ThinPool {
             let (fs_status, save_mdv) = fs.check()?;
             if save_mdv {
                 if let Err(e) = self.mdv.save_fs(name, *uuid, fs) {
-                    error!("Could not save MDV for fs with UUID {} and name {} belonging to pool with UUID {}, reason: {:?}", 
+                    error!("Could not save MDV for fs with UUID {} and name {} belonging to pool with UUID {}, reason: {:?}",
                                 uuid, name, pool_uuid, e);
                 }
             }

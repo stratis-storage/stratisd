@@ -42,7 +42,7 @@ use crate::{
             },
         },
         structures::Table,
-        types::{FilesystemUuid, MaybeDbusPath, Name, PoolExtendState, PoolUuid},
+        types::{FilesystemUuid, MaybeDbusPath, Name, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -188,6 +188,15 @@ struct Segments {
     meta_spare_segments: Vec<(Sectors, Sectors)>,
     data_segments: Vec<(Sectors, Sectors)>,
     mdv_segments: Vec<(Sectors, Sectors)>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum PoolExtendState {
+    Initializing = 1,
+    Good = 2,
+    DataFailed = 3,
+    MetaFailed = 4,
+    MetaAndDataFailed = 5,
 }
 
 /// A way of digesting the status reported on the thinpool into a value

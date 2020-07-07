@@ -631,8 +631,9 @@ mod tests {
             devlinks,
             liminal::{get_bdas, get_blockdevs, get_metadata, LStratisInfo},
             tests::{loopbacked, real},
+            thinpool::PoolExtendState,
         },
-        types::{EngineAction, PoolExtendState, Redundancy},
+        types::{EngineAction, Redundancy},
     };
 
     use super::*;

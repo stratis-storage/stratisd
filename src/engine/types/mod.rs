@@ -29,15 +29,6 @@ pub type DevUuid = Uuid;
 pub type FilesystemUuid = Uuid;
 pub type PoolUuid = Uuid;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum PoolExtendState {
-    Initializing = 1,
-    Good = 2,
-    DataFailed = 3,
-    MetaFailed = 4,
-    MetaAndDataFailed = 5,
-}
-
 /// See Design Doc section 10.2.1 for more details.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BlockDevState {

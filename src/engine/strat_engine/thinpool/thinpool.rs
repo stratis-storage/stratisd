@@ -191,7 +191,7 @@ struct Segments {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum PoolExtendState {
+enum PoolExtendState {
     Initializing = 1,
     Good = 2,
     DataFailed = 3,
@@ -971,11 +971,6 @@ impl ThinPool {
     #[cfg(test)]
     pub fn state(&self) -> Option<&ThinPoolStatus> {
         self.thin_pool_status.as_ref()
-    }
-
-    #[cfg(test)]
-    pub fn extend_state(&self) -> PoolExtendState {
-        self.pool_extend_state
     }
 
     /// Rename a filesystem within the thin pool.

@@ -631,7 +631,6 @@ mod tests {
             devlinks,
             liminal::{get_bdas, get_blockdevs, get_metadata, LStratisInfo},
             tests::{loopbacked, real},
-            thinpool::PoolExtendState,
         },
         types::{EngineAction, Redundancy},
     };
@@ -937,14 +936,12 @@ mod tests {
 
             let mut amount_written = Sectors(0);
             let buffer_length = Bytes(buffer_length).sectors();
-            while pool.thin_pool.extend_state() == PoolExtendState::Good
-                && match pool.thin_pool.state() {
-                    Some(ThinPoolStatus::Working(working)) => {
-                        working.summary == ThinPoolStatusSummary::Good
-                    }
-                    _ => false,
+            while match pool.thin_pool.state() {
+                Some(ThinPoolStatus::Working(working)) => {
+                    working.summary == ThinPoolStatusSummary::Good
                 }
-            {
+                _ => false,
+            } {
                 f.write_all(buf).unwrap();
                 amount_written += Sectors(1);
                 // Run check roughly every time the buffer is cleared.
@@ -959,7 +956,6 @@ mod tests {
 
             pool.add_blockdevs(pool_uuid, name, paths2, BlockDevTier::Data)
                 .unwrap();
-            assert_matches!(pool.thin_pool.extend_state(), PoolExtendState::Good);
 
             match pool.thin_pool.state() {
                 Some(ThinPoolStatus::Working(working)) => {

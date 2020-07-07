@@ -536,15 +536,14 @@ impl ThinPool {
                 let meta_request = target_meta_size - usage.total_meta;
 
                 if meta_request > MIN_META_SEGMENT_SIZE {
-                    let meta_extend_failed = match self.extend_thin_meta_device(
+                    should_save |= match self.extend_thin_meta_device(
                         pool_uuid,
                         backstore,
                         meta_request.sectors(),
                     ) {
-                        Ok(extend_size) => extend_size == Sectors(0),
-                        Err(_) => true,
+                        Ok(extend_size) => extend_size != Sectors(0),
+                        Err(_) => false,
                     };
-                    should_save |= !meta_extend_failed;
                 }
             }
 
@@ -558,8 +557,7 @@ impl ThinPool {
                         Ok(extend_size) => extend_size,
                         Err(_) => Sectors(0),
                     };
-                let data_extend_failed = amount_allocated == Sectors(0);
-                should_save |= !data_extend_failed;
+                should_save |= amount_allocated != Sectors(0);
                 sectors_to_datablocks(amount_allocated)
             };
 

@@ -42,7 +42,7 @@ use crate::{
             },
         },
         structures::Table,
-        types::{FilesystemUuid, MaybeDbusPath, Name, PoolExtendState, PoolUuid},
+        types::{FilesystemUuid, MaybeDbusPath, Name, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -277,7 +277,6 @@ pub struct ThinPool {
     /// layer. All DM components obtain their storage from this layer.
     /// The device will change if the backstore adds or removes a cache.
     backstore_device: Device,
-    pool_extend_state: PoolExtendState,
     thin_pool_status: Option<ThinPoolStatus>,
     dbus_path: MaybeDbusPath,
 }
@@ -386,7 +385,6 @@ impl ThinPool {
             filesystems: Table::default(),
             mdv,
             backstore_device,
-            pool_extend_state: PoolExtendState::Initializing,
             thin_pool_status: None,
             dbus_path: MaybeDbusPath(None),
         })
@@ -497,7 +495,6 @@ impl ThinPool {
             filesystems: fs_table,
             mdv,
             backstore_device,
-            pool_extend_state: PoolExtendState::Initializing,
             thin_pool_status: None,
             dbus_path: MaybeDbusPath(None),
         })
@@ -530,8 +527,6 @@ impl ThinPool {
         let thin_pool_status = self.thin_pool.status(get_dm())?;
 
         if let ThinPoolStatus::Working(status) = &thin_pool_status {
-            let mut meta_extend_failed = false;
-            let mut data_extend_failed = false;
             let usage = &status.usage;
 
             // Ensure meta subdevice is approx. 1/1000th of total usable
@@ -541,15 +536,14 @@ impl ThinPool {
                 let meta_request = target_meta_size - usage.total_meta;
 
                 if meta_request > MIN_META_SEGMENT_SIZE {
-                    meta_extend_failed = match self.extend_thin_meta_device(
+                    should_save |= match self.extend_thin_meta_device(
                         pool_uuid,
                         backstore,
                         meta_request.sectors(),
                     ) {
-                        Ok(extend_size) => extend_size == Sectors(0),
-                        Err(_) => true,
+                        Ok(extend_size) => extend_size != Sectors(0),
+                        Err(_) => false,
                     };
-                    should_save |= !meta_extend_failed;
                 }
             }
 
@@ -563,8 +557,7 @@ impl ThinPool {
                         Ok(extend_size) => extend_size,
                         Err(_) => Sectors(0),
                     };
-                data_extend_failed = amount_allocated == Sectors(0);
-                should_save |= !data_extend_failed;
+                should_save |= amount_allocated != Sectors(0);
                 sectors_to_datablocks(amount_allocated)
             };
 
@@ -578,7 +571,6 @@ impl ThinPool {
 
             self.thin_pool.set_low_water_mark(get_dm(), lowater)?;
             self.resume()?;
-            self.set_extend_state(data_extend_failed, meta_extend_failed);
         }
 
         self.set_state(thin_pool_status);
@@ -629,18 +621,6 @@ impl ThinPool {
         }
 
         self.thin_pool_status = Some(thin_pool_status);
-    }
-
-    fn set_extend_state(&mut self, data_extend_failed: bool, meta_extend_failed: bool) {
-        let mut new_state = PoolExtendState::Good;
-        if data_extend_failed && meta_extend_failed {
-            new_state = PoolExtendState::MetaAndDataFailed
-        } else if data_extend_failed {
-            new_state = PoolExtendState::DataFailed;
-        } else if meta_extend_failed {
-            new_state = PoolExtendState::MetaFailed;
-        }
-        self.pool_extend_state = new_state;
     }
 
     /// Tear down the components managed here: filesystems, the MDV,
@@ -962,11 +942,6 @@ impl ThinPool {
     #[cfg(test)]
     pub fn state(&self) -> Option<&ThinPoolStatus> {
         self.thin_pool_status.as_ref()
-    }
-
-    #[cfg(test)]
-    pub fn extend_state(&self) -> PoolExtendState {
-        self.pool_extend_state
     }
 
     /// Rename a filesystem within the thin pool.

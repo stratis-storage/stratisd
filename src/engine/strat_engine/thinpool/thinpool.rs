@@ -66,6 +66,17 @@ fn datablocks_to_sectors(data_blocks: DataBlocks) -> Sectors {
     *data_blocks * DATA_BLOCK_SIZE
 }
 
+// Return all the useful identifying information for a particular thinpool
+// device mapper device that is available.
+fn thin_pool_identifiers(thin_pool: &ThinPoolDev) -> String {
+    format!(
+        "devicemapper name: {}, device number: {}, device node: {}",
+        thin_pool.name(),
+        thin_pool.device(),
+        thin_pool.devnode().display()
+    )
+}
+
 /// Transform a list of segments belonging to a single device into a
 /// list of target lines for a linear device.
 fn segs_to_table(
@@ -602,15 +613,15 @@ impl ThinPool {
 
             if new_status != ThinPoolStatusDigest::Good {
                 warn!(
-                    "Status of thinpool device \"{}\" changed from \"{}\" to \"{}\"",
-                    self.thin_pool.device(),
+                    "Status of thinpool device with \"{}\" changed from \"{}\" to \"{}\"",
+                    thin_pool_identifiers(&self.thin_pool),
                     current_status_str,
                     new_status,
                 );
             } else {
                 info!(
-                    "Status of thinpool device \"{}\" changed from \"{}\" to \"{}\"",
-                    self.thin_pool.device(),
+                    "Status of thinpool device with \"{}\" changed from \"{}\" to \"{}\"",
+                    thin_pool_identifiers(&self.thin_pool),
                     current_status_str,
                     new_status,
                 );
@@ -764,8 +775,8 @@ impl ThinPool {
         let (data_dev_used, meta_dev_used) = match &self.thin_pool_status {
             None => {
                 let err_msg = format!(
-                    "Unknown status for thin pool device {}",
-                    self.thin_pool.device()
+                    "Unknown status for thin pool device with \"{}\"",
+                    thin_pool_identifiers(&self.thin_pool)
                 );
                 return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
             }
@@ -776,14 +787,16 @@ impl ThinPool {
                 ),
                 ThinPoolStatus::Error => {
                     let err_msg = format!(
-                        "Devicemapper could not obtain status for devicemapper thin pool device {}",
-                        self.thin_pool.device(),
+                        "Devicemapper could not obtain status for devicemapper thin pool device with \"{}\"",
+                        thin_pool_identifiers(&self.thin_pool)
                     );
                     return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
                 }
                 ThinPoolStatus::Fail => {
-                    let err_msg =
-                        format!("The thinpool device {} has failed", self.thin_pool.device());
+                    let err_msg = format!(
+                        "The thinpool device with \"{}\" has failed",
+                        thin_pool_identifiers(&self.thin_pool)
+                    );
                     return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
                 }
             },

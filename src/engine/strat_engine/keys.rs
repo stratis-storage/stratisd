@@ -35,7 +35,7 @@ pub(super) fn search_key_persistent(key_desc: &KeyDescription) -> StratisResult<
 /// Read a key from the persistent keyring with the given key description.
 pub(super) fn read_key_persistent(
     key_desc: &KeyDescription,
-) -> StratisResult<(Option<(KeySerial, SizedKeyMemory)>, KeySerial)> {
+) -> StratisResult<Option<(KeySerial, SizedKeyMemory)>> {
     let keyring_id = get_persistent_keyring()?;
     read_key(keyring_id, key_desc)
 }
@@ -101,12 +101,12 @@ fn search_key(
 fn read_key(
     keyring_id: KeySerial,
     key_desc: &KeyDescription,
-) -> StratisResult<(Option<(KeySerial, SizedKeyMemory)>, KeySerial)> {
+) -> StratisResult<Option<(KeySerial, SizedKeyMemory)>> {
     let key_id_option = search_key(keyring_id, key_desc)?;
     let key_id = if let Some(ki) = key_id_option {
         ki
     } else {
-        return Ok((None, keyring_id));
+        return Ok(None);
     };
 
     let mut key_buffer = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
@@ -123,13 +123,10 @@ fn read_key(
         )
     } {
         i if i < 0 => Err(io::Error::last_os_error().into()),
-        i => Ok((
-            Some((
-                key_id as KeySerial,
-                SizedKeyMemory::new(key_buffer, i as usize),
-            )),
-            keyring_id,
-        )),
+        i => Ok(Some((
+            key_id as KeySerial,
+            SizedKeyMemory::new(key_buffer, i as usize),
+        ))),
     }
 }
 
@@ -212,7 +209,7 @@ fn set_key_idem(
 ) -> StratisResult<MappingCreateAction<()>> {
     let keyring_id = get_persistent_keyring()?;
     match read_key(keyring_id, key_desc) {
-        Ok((Some((key_id, old_key_data)), _)) => {
+        Ok(Some((key_id, old_key_data))) => {
             let changed = reset_key(key_id, old_key_data, key_data)?;
             if changed {
                 Ok(MappingCreateAction::ValueChanged(()))
@@ -220,7 +217,7 @@ fn set_key_idem(
                 Ok(MappingCreateAction::Identity)
             }
         }
-        Ok((None, keyring_id)) => {
+        Ok(None) => {
             set_key(key_desc, key_data, keyring_id)?;
             Ok(MappingCreateAction::Created(()))
         }

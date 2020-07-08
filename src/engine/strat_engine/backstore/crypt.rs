@@ -853,7 +853,7 @@ fn read_key(key_description: &KeyDescription) -> Result<Option<SizedKeyMemory>> 
         );
     }
     read_key_result
-        .map(|(opt, _)| opt.map(|(_, mem)| mem))
+        .map(|opt| opt.map(|(_, mem)| mem))
         .map_err(|e| LibcryptErr::Other(e.to_string()))
 }
 

@@ -625,8 +625,7 @@ fn activate_and_check_device_path(
             key_desc.as_application_str()
         );
         return Err(LibcryptErr::Other(format!(
-            "The key description \"{}\" is not currently set. Set a key with \
-            the given key description to proceed.",
+            "The key description \"{}\" is not currently set.",
             key_desc.as_application_str(),
         )));
     }

@@ -127,10 +127,10 @@ jobs:
           (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
 
     # VERIFICATION OF TEST INFRASTRUCTURE
-    - name: "run yamllint 1.20.0 on .travis.yml"
+    - name: "run yamllint 1.23.0 on .travis.yml"
       language: python
       python: "3.7.6"
-      install: pip install yamllint==1.20.0
+      install: pip install yamllint==1.23.0
       env: TASK=yamllint
 
     # INTERMITTENTLY ALLOWED FAILURES

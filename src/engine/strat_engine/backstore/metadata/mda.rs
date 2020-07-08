@@ -405,11 +405,6 @@ impl MDAHeader {
         // This cast could fail if running on a 32-bit machine and
         // size of metadata is greater than 2^32 - 1 bytes, which is
         // unlikely.
-        //
-        // This comparison seems absurd when compiled in an environment
-        // where usize is u64, which is usual. It is not absurd when
-        // compiled in an environment where usize is u32.
-        #![allow(clippy::absurd_extreme_comparisons)]
         assert!(*self.used.bytes() as u64 <= std::usize::MAX as u64);
         let mut data_buf = vec![0u8; *self.used.bytes() as usize];
 

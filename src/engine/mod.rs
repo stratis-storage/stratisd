@@ -22,6 +22,6 @@ mod engine;
 mod event;
 mod shared;
 mod sim_engine;
-mod strat_engine;
+pub mod strat_engine;
 mod structures;
 mod types;

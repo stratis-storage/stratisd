@@ -11,7 +11,7 @@ mod crypt;
 mod data_tier;
 mod devices;
 mod identify;
-mod metadata;
+pub mod metadata;
 mod range_alloc;
 mod shared;
 mod udev;

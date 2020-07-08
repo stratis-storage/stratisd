@@ -1,8 +1,9 @@
-use std::env;
-
-use std::fs::OpenOptions;
-use std::io::{Seek, SeekFrom};
-use std::vec::Vec;
+use std::{
+    env,
+    fs::OpenOptions,
+    io::{Seek, SeekFrom},
+    vec::Vec,
+};
 
 use serde_json::Value;
 

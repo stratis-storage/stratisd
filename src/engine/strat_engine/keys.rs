@@ -26,6 +26,20 @@ use crate::{
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
+/// Search the persistent keyring for the given key description.
+pub(super) fn search_key_persistent(key_desc: &KeyDescription) -> StratisResult<Option<KeySerial>> {
+    let keyring_id = get_persistent_keyring()?;
+    search_key(keyring_id, key_desc)
+}
+
+/// Read a key from the persistent keyring with the given key description.
+pub(super) fn read_key_persistent(
+    key_desc: &KeyDescription,
+) -> StratisResult<(Option<(KeySerial, SizedKeyMemory)>, KeySerial)> {
+    let keyring_id = get_persistent_keyring()?;
+    read_key(keyring_id, key_desc)
+}
+
 /// Get the ID of the persistent root user keyring and attach it to
 /// the session keyring.
 fn get_persistent_keyring() -> StratisResult<KeySerial> {
@@ -84,11 +98,10 @@ fn search_key(
 /// type will be `Some` if the key was found in the keyring and will contain
 /// the key ID and the key contents. If no key was found with the provided
 /// key description, `None` will be returned.
-pub fn read_key(
+fn read_key(
+    keyring_id: KeySerial,
     key_desc: &KeyDescription,
 ) -> StratisResult<(Option<(KeySerial, SizedKeyMemory)>, KeySerial)> {
-    let keyring_id = get_persistent_keyring()?;
-
     let key_id_option = search_key(keyring_id, key_desc)?;
     let key_id = if let Some(ki) = key_id_option {
         ki
@@ -197,7 +210,8 @@ fn set_key_idem(
     key_desc: &KeyDescription,
     key_data: SizedKeyMemory,
 ) -> StratisResult<MappingCreateAction<()>> {
-    match read_key(key_desc) {
+    let keyring_id = get_persistent_keyring()?;
+    match read_key(keyring_id, key_desc) {
         Ok((Some((key_id, old_key_data)), _)) => {
             let changed = reset_key(key_id, old_key_data, key_data)?;
             if changed {
@@ -279,7 +293,7 @@ impl KeyIdList {
     /// Get the list of key descriptions corresponding to the kernel key IDs.
     /// Return the subset of key descriptions that have a prefix that identify
     /// them as belonging to Stratis.
-    fn to_key_descs(&self) -> StratisResult<Vec<String>> {
+    fn to_key_descs(&self) -> StratisResult<Vec<KeyDescription>> {
         let mut key_descs = Vec::new();
 
         for id in self.key_ids.iter() {
@@ -326,7 +340,7 @@ impl KeyIdList {
                 })?;
             let parsed_string = parse_keyctl_describe_string(keyctl_str)?;
             if let Some(kd) = KeyDescription::from_system_key_desc(&parsed_string).map(|k| k.expect("parse_keyctl_desribe_string() ensures the key description can not have semi-colons in it")) {
-                key_descs.push(kd.as_application_str().to_string());
+                key_descs.push(kd);
             }
         }
         Ok(key_descs)
@@ -410,7 +424,7 @@ impl KeyActions for StratKeyActions {
         )?)
     }
 
-    fn list(&self) -> StratisResult<Vec<String>> {
+    fn list(&self) -> StratisResult<Vec<KeyDescription>> {
         let mut key_ids = KeyIdList::new();
         key_ids.populate()?;
         key_ids.to_key_descs()

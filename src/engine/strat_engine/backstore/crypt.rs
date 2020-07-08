@@ -17,12 +17,8 @@ use libcryptsetup_rs::{
 };
 
 use crate::engine::{
-    strat_engine::{
-        backstore::metadata::StratisIdentifiers,
-        keys,
-        names::{format_crypt_name, KeyDescription},
-    },
-    types::SizedKeyMemory,
+    strat_engine::{backstore::metadata::StratisIdentifiers, keys, names::format_crypt_name},
+    types::{KeyDescription, SizedKeyMemory},
     DevUuid, PoolUuid,
 };
 
@@ -276,7 +272,7 @@ impl CryptInitializer {
             "Failed to create the Stratis token"
         );
 
-        activate_and_check_device_path(device, &activation_name)
+        activate_and_check_device_path(device, key_description, &activation_name)
     }
 
     /// Lay down properly configured LUKS2 metadata on a new physical device
@@ -532,7 +528,11 @@ impl CryptHandle {
     /// Activate encrypted Stratis device using the name stored in the
     /// Stratis token
     pub fn activate(&mut self) -> Result<()> {
-        activate_and_check_device_path(&mut self.device, &self.name.to_owned())
+        activate_and_check_device_path(
+            &mut self.device,
+            &self.key_description,
+            &self.name.to_owned(),
+        )
     }
 
     /// Deactivate the device referenced by the current device handle.
@@ -606,7 +606,30 @@ fn device_is_active(device: &mut CryptDevice, device_name: &str) -> bool {
 
 /// Activate device by token then check that the logical path exists corresponding
 /// to the activation name passed into this method.
-fn activate_and_check_device_path(crypt_device: &mut CryptDevice, name: &str) -> Result<()> {
+fn activate_and_check_device_path(
+    crypt_device: &mut CryptDevice,
+    key_desc: &KeyDescription,
+    name: &str,
+) -> Result<()> {
+    let key_description_missing = keys::search_key_persistent(key_desc)
+        .map_err(|_| {
+            LibcryptErr::Other(format!(
+                "Searching the persistent keyring for the key description {} failed.",
+                key_desc.as_application_str(),
+            ))
+        })?
+        .is_none();
+    if key_description_missing {
+        warn!(
+            "Key description {} was not found in the keyring",
+            key_desc.as_application_str()
+        );
+        return Err(LibcryptErr::Other(format!(
+            "The key description \"{}\" is not currently set.",
+            key_desc.as_application_str(),
+        )));
+    }
+
     // Activate by token
     log_on_failure!(
         crypt_device.token_handle().activate_by_token::<()>(
@@ -820,7 +843,7 @@ fn stratis_token_is_valid(json: &Value) -> bool {
 ///
 /// Requires cryptsetup 2.3
 fn read_key(key_description: &KeyDescription) -> Result<Option<SizedKeyMemory>> {
-    let read_key_result = keys::read_key(key_description);
+    let read_key_result = keys::read_key_persistent(key_description);
     if read_key_result.is_err() {
         warn!(
             "Failed to read the key with key description {} from the keyring; \
@@ -829,7 +852,7 @@ fn read_key(key_description: &KeyDescription) -> Result<Option<SizedKeyMemory>> 
         );
     }
     read_key_result
-        .map(|(opt, _)| opt.map(|(_, mem)| mem))
+        .map(|opt| opt.map(|(_, mem)| mem))
         .map_err(|e| LibcryptErr::Other(e.to_string()))
 }
 

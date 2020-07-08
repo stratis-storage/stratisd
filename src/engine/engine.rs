@@ -17,8 +17,8 @@ use devicemapper::{Bytes, Sectors};
 use crate::{
     engine::types::{
         BlockDevPath, BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid,
-        MappingCreateAction, MaybeDbusPath, Name, PoolUuid, RenameAction, ReportType,
-        SetCreateAction, SetDeleteAction, SetUnlockAction,
+        KeyDescription, MappingCreateAction, MaybeDbusPath, Name, PoolUuid, RenameAction,
+        ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction,
     },
     stratis::StratisResult,
 };
@@ -51,7 +51,7 @@ pub trait KeyActions {
 
     /// Return a list of all key descriptions of keys added to the keyring by
     /// Stratis that are still valid.
-    fn list(&self) -> StratisResult<Vec<String>>;
+    fn list(&self) -> StratisResult<Vec<KeyDescription>>;
 
     /// Unset a key with the given key description in the root persistent kernel
     /// keyring.

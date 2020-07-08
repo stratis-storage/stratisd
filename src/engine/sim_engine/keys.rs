@@ -103,12 +103,8 @@ impl KeyActions for SimKeyActions {
         }
     }
 
-    fn list(&self) -> StratisResult<Vec<String>> {
-        Ok(self
-            .0
-            .keys()
-            .map(|k| k.as_application_str().to_string())
-            .collect())
+    fn list(&self) -> StratisResult<Vec<KeyDescription>> {
+        Ok(self.0.keys().cloned().collect())
     }
 
     fn unset(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>> {

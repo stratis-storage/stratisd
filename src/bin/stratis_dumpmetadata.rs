@@ -20,7 +20,6 @@ fn main() {
 
     devfile.seek(SeekFrom::Start(0)).unwrap();
 
-    //let mut buf: Vec<u8> = Vec::new();
     let loaded_state = bda.load_state(&mut devfile).unwrap();
     println!("State JSON data:");
     let state_json: Value = serde_json::from_slice(&loaded_state.unwrap()).unwrap();

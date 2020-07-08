@@ -6,7 +6,7 @@ pub use self::{
     engine::{BlockDev, Engine, Filesystem, KeyActions, Pool, Report},
     event::{get_engine_listener_list_mut, EngineEvent, EngineListener},
     sim_engine::SimEngine,
-    strat_engine::StratEngine,
+    strat_engine::{StratEngine, BDA},
     types::{
         BlockDevState, BlockDevTier, CreateAction, DeleteAction, DevUuid, EngineAction,
         FilesystemUuid, MappingCreateAction, MaybeDbusPath, Name, PoolUuid, Redundancy,
@@ -22,6 +22,6 @@ mod engine;
 mod event;
 mod shared;
 mod sim_engine;
-pub mod strat_engine;
+mod strat_engine;
 mod structures;
 mod types;

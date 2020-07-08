@@ -7,7 +7,7 @@ use std::{
 
 use serde_json::Value;
 
-use libstratis::engine::strat_engine::backstore::metadata::BDA;
+use libstratis::engine::BDA;
 
 fn main() {
     let args: Vec<String> = env::args().collect();

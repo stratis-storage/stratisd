@@ -1,5 +1,3 @@
-#![allow(clippy::doc_markdown)]
-
 #[macro_use]
 extern crate nix;
 

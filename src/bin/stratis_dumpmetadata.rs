@@ -10,14 +10,7 @@ use serde_json::Value;
 
 use libstratis::engine::BDA;
 
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        println!("Usage: stratis_dumpmetadata <device>");
-        process::exit(1);
-    }
-    let devpath = args[1].clone();
-
+fn run(devpath: String) {
     let mut devfile = OpenOptions::new().read(true).open(&devpath).unwrap();
 
     let bda = BDA::load(&mut devfile).unwrap().unwrap();
@@ -30,4 +23,15 @@ fn main() {
     let state_json: Value = serde_json::from_slice(&loaded_state.unwrap()).unwrap();
     let state_json_pretty: String = serde_json::to_string_pretty(&state_json).unwrap();
     println!("{}", state_json_pretty);
+}
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 2 {
+        println!("Usage: stratis_dumpmetadata <device>");
+        process::exit(1);
+    }
+    let devpath = args[1].clone();
+
+    run(devpath);
 }

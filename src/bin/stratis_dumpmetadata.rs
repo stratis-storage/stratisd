@@ -36,6 +36,9 @@ fn main() {
 
     match run(devpath) {
         Ok(()) => {}
-        Err(_e) => println!("Error encountered"),
+        Err(_e) => {
+            eprintln!("Error encountered");
+            process::exit(2);
+        }
     }
 }

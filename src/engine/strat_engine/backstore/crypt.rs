@@ -611,7 +611,7 @@ fn activate_and_check_device_path(
     key_desc: &KeyDescription,
     name: &str,
 ) -> Result<()> {
-    let key_description_exists = keys::search_key_persistent(key_desc)
+    let key_description_missing = keys::search_key_persistent(key_desc)
         .map_err(|_| {
             LibcryptErr::Other(format!(
                 "Searching the persistent keyring for the key description {} failed.",
@@ -619,7 +619,7 @@ fn activate_and_check_device_path(
             ))
         })?
         .is_none();
-    if key_description_exists {
+    if key_description_missing {
         warn!(
             "Key description {} was not found in the keyring",
             key_desc.as_application_str()

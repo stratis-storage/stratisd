@@ -2,6 +2,7 @@ use std::{
     env,
     fs::OpenOptions,
     io::{Seek, SeekFrom},
+    process,
     vec::Vec,
 };
 
@@ -11,6 +12,10 @@ use libstratis::engine::BDA;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
+    if args.len() < 2 {
+        println!("Usage: stratis_dumpmetadata <device>");
+        process::exit(1);
+    }
     let devpath = args[1].clone();
 
     let mut devfile = OpenOptions::new().read(true).open(&devpath).unwrap();

@@ -11,7 +11,7 @@ use std::{
     vec::Vec,
 };
 
-use serde_json::Value;
+use serde_json::{Map, Value};
 use uuid::Uuid;
 
 use devicemapper::{Sectors, IEC};
@@ -97,6 +97,7 @@ impl SimPool {
     }
 }
 
+// Precondition: SimDev::into() always returns a value that matches Value::Object(_).
 impl<'a> Into<Value> for &'a SimPool {
     fn into(self) -> Value {
         json!({
@@ -111,18 +112,30 @@ impl<'a> Into<Value> for &'a SimPool {
             "blockdevs": {
                 "datadevs": Value::Array(
                     self.block_devs.iter()
-                        .map(|(uuid, dev)| json!({
-                            "uuid": uuid.to_simple_ref().to_string(),
-                            "path": dev.devnode().physical_path(),
-                        }))
+                        .map(|(uuid, dev)| {
+                            let mut json = Map::new();
+                            json.insert("uuid".to_string(), Value::from(uuid.to_simple_ref().to_string()));
+                            if let Value::Object(map) = dev.into() {
+                                json.extend(map.into_iter());
+                            } else {
+                                panic!("SimDev::into() always returns JSON object")
+                            }
+                            Value::from(json)
+                        })
                         .collect()
                 ),
                 "cachedevs": Value::Array(
                     self.cache_devs.iter()
-                        .map(|(uuid, dev)| json!({
-                            "uuid": uuid.to_simple_ref().to_string(),
-                            "path": dev.devnode().physical_path(),
-                        }))
+                        .map(|(uuid, dev)| {
+                            let mut json = Map::new();
+                            json.insert("uuid".to_string(), Value::from(uuid.to_simple_ref().to_string()));
+                            if let Value::Object(map) = dev.into() {
+                                json.extend(map.into_iter());
+                            } else {
+                                panic!("SimDev::into() always returns JSON object")
+                            }
+                            Value::from(json)
+                        })
                         .collect()
                 ),
             },

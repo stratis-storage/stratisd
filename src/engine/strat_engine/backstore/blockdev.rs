@@ -7,6 +7,7 @@
 use std::fs::OpenOptions;
 
 use chrono::{DateTime, TimeZone, Utc};
+use serde_json::Value;
 
 use devicemapper::{Device, Sectors};
 
@@ -187,6 +188,24 @@ impl StratBlockDev {
 
     pub fn key_description(&self) -> Option<&KeyDescription> {
         self.key_description.as_ref()
+    }
+}
+
+impl<'a> Into<Value> for &'a StratBlockDev {
+    fn into(self) -> Value {
+        let mut json = json!({
+            "path": self.devnode.physical_path(),
+            "uuid": self.bda.dev_uuid().to_simple_ref().to_string(),
+        });
+        if let Some(ref key_desc) = self.key_description {
+            json.as_object_mut()
+                .expect("Created a JSON object above")
+                .insert(
+                    "key_description".to_string(),
+                    Value::from(key_desc.as_application_str().to_string()),
+                );
+        }
+        json
     }
 }
 

@@ -18,7 +18,7 @@ fn run(devpath: String) -> Result<(), String> {
 
     let bda = BDA::load(&mut devfile)
         .unwrap()
-        .ok_or_else(|| format!("No Stratis BDA metadata found"))?;
+        .ok_or_else(|| "No Stratis BDA metadata found".to_string())?;
     println!("{:#?}", bda);
 
     devfile.seek(SeekFrom::Start(0)).unwrap();

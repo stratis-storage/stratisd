@@ -16,7 +16,9 @@ fn run(devpath: String) -> Result<(), String> {
         .open(&devpath)
         .map_err(|_the_io_error| format!("Error opening device: {}", _the_io_error))?;
 
-    let bda = BDA::load(&mut devfile).unwrap().unwrap();
+    let bda = BDA::load(&mut devfile)
+        .unwrap()
+        .ok_or_else(|| format!("No Stratis BDA metadata found"))?;
     println!("{:#?}", bda);
 
     devfile.seek(SeekFrom::Start(0)).unwrap();

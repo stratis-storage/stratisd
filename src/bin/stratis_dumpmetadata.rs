@@ -11,7 +11,10 @@ use serde_json::Value;
 use libstratis::engine::BDA;
 
 fn run(devpath: String) -> Result<(), String> {
-    let mut devfile = OpenOptions::new().read(true).open(&devpath).unwrap();
+    let mut devfile = OpenOptions::new()
+        .read(true)
+        .open(&devpath)
+        .map_err(|_the_io_error| "Error opening device")?;
 
     let bda = BDA::load(&mut devfile).unwrap().unwrap();
     println!("{:#?}", bda);
@@ -36,8 +39,8 @@ fn main() {
 
     match run(devpath) {
         Ok(()) => {}
-        Err(_e) => {
-            eprintln!("Error encountered");
+        Err(e) => {
+            eprintln!("Error encountered: {}", e);
             process::exit(2);
         }
     }

@@ -199,7 +199,7 @@ impl<'a> Into<Value> for &'a StratBlockDev {
         });
         if let Some(ref key_desc) = self.key_description {
             json.as_object_mut()
-                .expect("Created an object json value above")
+                .expect("Created a JSON object above")
                 .insert(
                     "key_description".to_string(),
                     Value::from(key_desc.as_application_str().to_string()),

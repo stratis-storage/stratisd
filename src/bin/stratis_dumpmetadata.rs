@@ -41,7 +41,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
         eprintln!("Usage: stratis_dumpmetadata <device>");
-        process::exit(1);
+        process::exit(2);
     }
     let devpath = &args[1];
 
@@ -49,7 +49,7 @@ fn main() {
         Ok(()) => {}
         Err(e) => {
             eprintln!("Error encountered: {}", e);
-            process::exit(2);
+            process::exit(1);
         }
     }
 }

@@ -27,11 +27,13 @@ fn run(devpath: &str) -> Result<(), String> {
         .load_state(&mut devfile)
         .map_err(|stateload_err| format!("Error during load state: {}", stateload_err))?;
     println!("State JSON data:");
+
     let state_json: Value = serde_json::from_slice(&loaded_state.unwrap())
         .map_err(|extract_err| format!("Error during state JSON extract: {}", extract_err))?;
     let state_json_pretty: String = serde_json::to_string_pretty(&state_json)
         .map_err(|parse_err| format!("Error during state JSON parse: {}", parse_err))?;
     println!("{}", state_json_pretty);
+
     Ok(())
 }
 

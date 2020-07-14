@@ -10,7 +10,7 @@ use serde_json::Value;
 
 use libstratis::engine::BDA;
 
-fn run(devpath: String) -> Result<(), String> {
+fn run(devpath: &str) -> Result<(), String> {
     let mut devfile = OpenOptions::new()
         .read(true)
         .open(&devpath)
@@ -41,7 +41,7 @@ fn main() {
         eprintln!("Usage: stratis_dumpmetadata <device>");
         process::exit(1);
     }
-    let devpath = args[1].clone();
+    let devpath = &args[1];
 
     match run(devpath) {
         Ok(()) => {}

@@ -7,9 +7,9 @@
 use std::fs::OpenOptions;
 
 use chrono::{DateTime, TimeZone, Utc};
+use serde_json::Value;
 
 use devicemapper::{Device, Sectors};
-use serde_json::Value;
 
 use crate::{
     engine::{

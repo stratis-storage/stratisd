@@ -38,7 +38,7 @@ fn run(devpath: String) -> Result<(), String> {
 fn main() {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
-        println!("Usage: stratis_dumpmetadata <device>");
+        eprintln!("Usage: stratis_dumpmetadata <device>");
         process::exit(1);
     }
     let devpath = args[1].clone();

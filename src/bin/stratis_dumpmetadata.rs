@@ -21,7 +21,13 @@ fn run(devpath: &str) -> Result<(), String> {
         .ok_or_else(|| "No Stratis BDA metadata found".to_string())?;
     println!("{:#?}", bda);
 
-    devfile.seek(SeekFrom::Start(0)).unwrap();
+    match devfile.seek(SeekFrom::Start(0)) {
+        Ok(_result) => {}
+        Err(e) => {
+            eprintln!("Error during seek: {}", e);
+            process::exit(1);
+        }
+    }
 
     let loaded_state = bda
         .load_state(&mut devfile)

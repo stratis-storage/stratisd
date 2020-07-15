@@ -644,19 +644,13 @@ impl<'a> Into<Value> for &'a Backstore {
         json!({
             "blockdevs": {
                 "datadevs": Value::Array(
-                    self.datadevs().iter().map(|(uuid, dev)| {
-                        json!({
-                            "uuid": uuid.to_simple_ref().to_string(),
-                            "path": dev.devnode().physical_path(),
-                        })
+                    self.datadevs().into_iter().map(|(_, dev)| {
+                        dev.into()
                     }).collect()
                 ),
                 "cachedevs": Value::Array(
-                    self.cachedevs().iter().map(|(uuid, dev)| {
-                        json!({
-                            "uuid": uuid.to_simple_ref().to_string(),
-                            "path": dev.devnode().physical_path(),
-                        })
+                    self.cachedevs().into_iter().map(|(_, dev)| {
+                        dev.into()
                     }).collect()
                 ),
             }

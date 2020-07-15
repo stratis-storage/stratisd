@@ -5,6 +5,7 @@
 use std::{cell::RefCell, path::Path, rc::Rc};
 
 use chrono::{DateTime, TimeZone, Utc};
+use serde_json::{Map, Value};
 use uuid::Uuid;
 
 use devicemapper::{Bytes, Sectors, IEC};
@@ -94,5 +95,22 @@ impl SimDev {
     /// Returns true if the user info was changed, otherwise false.
     pub fn set_user_info(&mut self, user_info: Option<&str>) -> bool {
         set_blockdev_user_info!(self; user_info)
+    }
+}
+
+impl<'a> Into<Value> for &'a SimDev {
+    fn into(self) -> Value {
+        let mut json = Map::new();
+        json.insert(
+            "path".to_string(),
+            Value::from(self.devnode.physical_path().display().to_string()),
+        );
+        if let Some(ref key_desc) = self.key_description {
+            json.insert(
+                "key_description".to_string(),
+                Value::from(key_desc.as_application_str()),
+            );
+        }
+        Value::from(json)
     }
 }

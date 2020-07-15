@@ -25,7 +25,9 @@ pub fn filesystem_mount_path<T: AsRef<str>>(pool_name: T, fs_name: T) -> PathBuf
         .collect()
 }
 
-pub fn pool_renamed(pool_name: &str, _: &str) {
+/// Triggers a udev event for every filesystem in the pool to cause a rename for
+/// the pool directory by moving all filesystem symlinks to the new pool directory.
+pub fn pool_renamed(pool_name: &str) {
     fn trigger_udev(pool_name: &str) -> StratisResult<()> {
         let pool_dir: PathBuf = [DEV_PATH, pool_name].iter().collect();
 
@@ -46,7 +48,7 @@ pub fn pool_renamed(pool_name: &str, _: &str) {
                         ),
                     )
                 })?;
-            filesystem_renamed(pool_name, file_name, file_name);
+            filesystem_renamed(pool_name, file_name);
         }
 
         Ok(())
@@ -61,7 +63,9 @@ pub fn pool_renamed(pool_name: &str, _: &str) {
     }
 }
 
-pub fn filesystem_renamed(pool_name: &str, fs_name: &str, _: &str) {
+/// Trigger a udev event to pick up the new name of the filesystem as registered
+/// with stratisd and rename the symlink.
+pub fn filesystem_renamed(pool_name: &str, fs_name: &str) {
     fn trigger_udev(pool_name: &str, fs_name: &str) -> StratisResult<()> {
         let path = filesystem_mount_path(pool_name, fs_name);
 

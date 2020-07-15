@@ -974,7 +974,7 @@ impl ThinPool {
                 to: &*new_name,
             });
             self.filesystems.insert(new_name.clone(), uuid, filesystem);
-            devlinks::filesystem_renamed(pool_name, &old_name, &new_name);
+            devlinks::filesystem_renamed(pool_name, &old_name);
             Ok(Some(uuid))
         }
     }

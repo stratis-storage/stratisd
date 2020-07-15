@@ -14,7 +14,6 @@ name = "stratis_uuids_to_names"
 required-features = ["dbus_enabled"]
 
 [dependencies]
-dbus = {version = "0.8", optional = true}
 clap = "2"
 nix = "0.14"
 devicemapper = "0.28.0"
@@ -35,6 +34,10 @@ lazy_static = "1.4.0"
 timerfd = "1.0.0"
 itertools = "0.8.0"
 libcryptsetup-rs = "0.4.0"
+
+[dependencies.dbus]
+version = "0.8"
+optional = true
 
 [dependencies.regex]
 version = "1.3"

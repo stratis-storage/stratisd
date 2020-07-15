@@ -262,7 +262,7 @@ impl Engine for StratEngine {
             });
 
             self.pools.insert(new_name.clone(), uuid, pool);
-            devlinks::pool_renamed(&old_name, &new_name);
+            devlinks::pool_renamed(&old_name);
             Ok(RenameAction::Renamed(uuid))
         }
     }

@@ -27,10 +27,11 @@ fn run(devpath: &str) -> Result<(), String> {
 
     let loaded_state = bda
         .load_state(&mut devfile)
-        .map_err(|stateload_err| format!("Error during load state: {}", stateload_err))?;
+        .map_err(|stateload_err| format!("Error during load state: {}", stateload_err))?
+        .ok_or_else(|| "No BDA state found".to_string())?;
     println!("State JSON data:");
 
-    let state_json: Value = serde_json::from_slice(&loaded_state.unwrap())
+    let state_json: Value = serde_json::from_slice(&loaded_state)
         .map_err(|extract_err| format!("Error during state JSON extract: {}", extract_err))?;
     let state_json_pretty: String = serde_json::to_string_pretty(&state_json)
         .map_err(|parse_err| format!("Error during state JSON parse: {}", parse_err))?;

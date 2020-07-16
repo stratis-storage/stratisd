@@ -159,8 +159,7 @@ impl BlockDevMgr {
     pub fn has_valid_passphrase(&self) -> bool {
         CryptHandle::can_unlock(
             self.block_devs
-                .iter()
-                .next()
+                .get(0)
                 .expect("Must have at least one blockdev")
                 .devnode()
                 .physical_path(),

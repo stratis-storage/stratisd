@@ -45,11 +45,10 @@ pub fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
     let mut engine = dbus_context.engine.borrow_mut();
-    let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let (_, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
     let result = pool.create_filesystems(
         pool_uuid,
-        &pool_name,
         &filesystems
             .map(|x| (x, None))
             .collect::<Vec<(&str, Option<Sectors>)>>(),
@@ -186,9 +185,9 @@ pub fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     };
 
     let mut engine = dbus_context.engine.borrow_mut();
-    let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let (_, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-    let msg = match pool.snapshot_filesystem(pool_uuid, &pool_name, fs_uuid, snapshot_name) {
+    let msg = match pool.snapshot_filesystem(pool_uuid, fs_uuid, snapshot_name) {
         Ok(CreateAction::Created((uuid, fs))) => {
             let fs_object_path: dbus::Path =
                 create_dbus_filesystem(dbus_context, object_path.clone(), uuid, fs);

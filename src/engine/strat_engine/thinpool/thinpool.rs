@@ -834,7 +834,6 @@ impl ThinPool {
     pub fn create_filesystem(
         &mut self,
         pool_uuid: PoolUuid,
-        _pool_name: &str,
         name: &str,
         size: Option<Sectors>,
     ) -> StratisResult<FilesystemUuid> {
@@ -864,7 +863,6 @@ impl ThinPool {
     pub fn snapshot_filesystem(
         &mut self,
         pool_uuid: PoolUuid,
-        _pool_name: &str,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
     ) -> StratisResult<(FilesystemUuid, &mut dyn Filesystem)> {
@@ -1274,9 +1272,8 @@ mod tests {
         )
         .unwrap();
 
-        let pool_name = "stratis_test_pool";
         let fs_uuid = pool
-            .create_filesystem(pool_uuid, pool_name, "stratis_test_filesystem", None)
+            .create_filesystem(pool_uuid, "stratis_test_filesystem", None)
             .unwrap();
         let write_buf = &[8u8; BYTES_PER_WRITE];
         let source_tmp_dir = tempfile::Builder::new()
@@ -1379,9 +1376,8 @@ mod tests {
         )
         .unwrap();
 
-        let pool_name = "stratis_test_pool";
         let fs_uuid = pool
-            .create_filesystem(pool_uuid, pool_name, "stratis_test_filesystem", None)
+            .create_filesystem(pool_uuid, "stratis_test_filesystem", None)
             .unwrap();
 
         let write_buf = &[8u8; SECTOR_SIZE];
@@ -1430,7 +1426,7 @@ mod tests {
         .unwrap();
 
         let (_, snapshot_filesystem) = pool
-            .snapshot_filesystem(pool_uuid, pool_name, fs_uuid, "test_snapshot")
+            .snapshot_filesystem(pool_uuid, fs_uuid, "test_snapshot")
             .unwrap();
         let mut read_buf = [0u8; SECTOR_SIZE];
         let snapshot_tmp_dir = tempfile::Builder::new()
@@ -1491,9 +1487,7 @@ mod tests {
         .unwrap();
 
         let pool_name = "stratis_test_pool";
-        let fs_uuid = pool
-            .create_filesystem(pool_uuid, pool_name, name1, None)
-            .unwrap();
+        let fs_uuid = pool.create_filesystem(pool_uuid, name1, None).unwrap();
 
         let action = pool.rename_filesystem(pool_name, fs_uuid, name2).unwrap();
         assert_matches!(action, Some(_));
@@ -1537,10 +1531,7 @@ mod tests {
         )
         .unwrap();
 
-        let pool_name = "stratis_test_pool";
-        let fs_uuid = pool
-            .create_filesystem(pool_uuid, pool_name, "fsname", None)
-            .unwrap();
+        let fs_uuid = pool.create_filesystem(pool_uuid, "fsname", None).unwrap();
 
         let tmp_dir = tempfile::Builder::new()
             .prefix("stratis_testing")
@@ -1603,9 +1594,7 @@ mod tests {
         .unwrap();
         let pool_name = "stratis_test_pool";
         let fs_name = "stratis_test_filesystem";
-        let fs_uuid = pool
-            .create_filesystem(pool_uuid, pool_name, fs_name, None)
-            .unwrap();
+        let fs_uuid = pool.create_filesystem(pool_uuid, fs_name, None).unwrap();
         pool.destroy_filesystem(pool_name, fs_uuid).unwrap();
         let flexdevs: FlexDevsSave = pool.record();
         let thinpooldevsave: ThinPoolDevSave = pool.record();
@@ -1659,10 +1648,9 @@ mod tests {
         // the low water mark.
         let fs_size = FILESYSTEM_LOWATER + Bytes(IEC::Mi).sectors();
 
-        let pool_name = "stratis_test_pool";
         let fs_name = "stratis_test_filesystem";
         let fs_uuid = pool
-            .create_filesystem(pool_uuid, pool_name, fs_name, Some(fs_size))
+            .create_filesystem(pool_uuid, fs_name, Some(fs_size))
             .unwrap();
         let tmp_dir = tempfile::Builder::new()
             .prefix("stratis_testing")
@@ -1746,8 +1734,7 @@ mod tests {
         )
         .unwrap();
 
-        let pool_name = "stratis_test_pool";
-        pool.create_filesystem(pool_uuid, pool_name, "stratis_test_filesystem", None)
+        pool.create_filesystem(pool_uuid, "stratis_test_filesystem", None)
             .unwrap();
 
         pool.suspend().unwrap();
@@ -1792,9 +1779,8 @@ mod tests {
         )
         .unwrap();
 
-        let pool_name = "stratis_test_pool";
         let fs_uuid = pool
-            .create_filesystem(pool_uuid, pool_name, "stratis_test_filesystem", None)
+            .create_filesystem(pool_uuid, "stratis_test_filesystem", None)
             .unwrap();
 
         let tmp_dir = tempfile::Builder::new()

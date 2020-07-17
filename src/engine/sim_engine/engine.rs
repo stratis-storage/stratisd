@@ -315,8 +315,7 @@ mod tests {
             .unwrap();
         {
             let pool = engine.get_mut_pool(uuid).unwrap().1;
-            pool.create_filesystems(uuid, pool_name, &[("test", None)])
-                .unwrap();
+            pool.create_filesystems(uuid, &[("test", None)]).unwrap();
         }
         assert_matches!(engine.destroy_pool(uuid), Err(_));
     }

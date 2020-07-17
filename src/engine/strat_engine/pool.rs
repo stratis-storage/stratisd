@@ -379,7 +379,6 @@ impl Pool for StratPool {
     fn create_filesystems<'a, 'b>(
         &'a mut self,
         pool_uuid: PoolUuid,
-        pool_name: &str,
         specs: &[(&'b str, Option<Sectors>)],
     ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid)>> {
         let names: HashMap<_, _> = HashMap::from_iter(specs.iter().map(|&tup| (tup.0, tup.1)));
@@ -392,9 +391,7 @@ impl Pool for StratPool {
         let mut result = Vec::new();
         for (name, size) in names {
             if self.thin_pool.get_mut_filesystem_by_name(name).is_none() {
-                let fs_uuid = self
-                    .thin_pool
-                    .create_filesystem(pool_uuid, pool_name, name, size)?;
+                let fs_uuid = self.thin_pool.create_filesystem(pool_uuid, name, size)?;
                 result.push((name, fs_uuid));
             }
         }
@@ -492,7 +489,6 @@ impl Pool for StratPool {
     fn snapshot_filesystem(
         &mut self,
         pool_uuid: PoolUuid,
-        pool_name: &str,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
     ) -> StratisResult<CreateAction<(FilesystemUuid, &mut dyn Filesystem)>> {
@@ -507,7 +503,7 @@ impl Pool for StratPool {
         }
 
         self.thin_pool
-            .snapshot_filesystem(pool_uuid, pool_name, origin_uuid, snapshot_name)
+            .snapshot_filesystem(pool_uuid, origin_uuid, snapshot_name)
             .map(CreateAction::Created)
     }
 
@@ -779,7 +775,7 @@ mod tests {
         assert_matches!(metadata1.backstore.cache_tier, None);
 
         let (_, fs_uuid) = pool
-            .create_filesystems(uuid, name, &[("stratis-filesystem", None)])
+            .create_filesystems(uuid, &[("stratis-filesystem", None)])
             .unwrap()
             .changed()
             .and_then(|mut fs| fs.pop())
@@ -912,7 +908,7 @@ mod tests {
 
         let fs_name = "stratis_test_filesystem";
         let (_, fs_uuid) = pool
-            .create_filesystems(pool_uuid, name, &[(fs_name, None)])
+            .create_filesystems(pool_uuid, &[(fs_name, None)])
             .unwrap()
             .changed()
             .and_then(|mut fs| fs.pop())

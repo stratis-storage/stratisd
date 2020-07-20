@@ -16,6 +16,7 @@ use serde_json::{json, Value};
 use crate::{
     engine::{
         engine::{Engine, Eventable, KeyActions, Pool, Report},
+        event::get_engine_listener_list,
         shared::create_pool_idempotent_or_err,
         sim_engine::{keys::SimKeyActions, pool::SimPool, randomization::Randomizer},
         structures::Table,
@@ -23,6 +24,7 @@ use crate::{
             CreateAction, DeleteAction, DevUuid, KeyDescription, Name, PoolUuid, RenameAction,
             ReportType, SetUnlockAction,
         },
+        EngineEvent,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -160,12 +162,18 @@ impl Engine for SimEngine {
         uuid: PoolUuid,
         new_name: &str,
     ) -> StratisResult<RenameAction<PoolUuid>> {
-        rename_pool_pre_idem!(self; uuid; new_name);
+        let old_name = rename_pool_pre_idem!(self; uuid; new_name);
 
         let (_, pool) = self
             .pools
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
+
+        get_engine_listener_list().notify(&EngineEvent::PoolRenamed {
+            dbus_path: pool.get_dbus_path(),
+            from: &*old_name,
+            to: &*new_name,
+        });
 
         self.pools
             .insert(Name::new(new_name.to_owned()), uuid, pool);

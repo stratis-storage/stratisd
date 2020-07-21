@@ -2,7 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{fs::File, io, os::unix::io::AsRawFd};
+use std::{
+    fs::File,
+    io,
+    os::unix::io::{AsRawFd, RawFd},
+};
 
 use clap::{App, Arg, ArgGroup, SubCommand};
 use termios::Termios;
@@ -45,18 +49,13 @@ fn key_set(key_desc: &str, keyfile_path: Option<&str>) -> StratisResult<()> {
         }
         None => {
             let stdin_fd = io::stdin().as_raw_fd();
-            let mut new_attrs = Termios::from_fd(stdin_fd)?;
-            new_attrs.c_lflag &= !(termios::ICANON | termios::ECHO);
-            new_attrs.c_cc[termios::VMIN] = 1;
-            new_attrs.c_cc[termios::VTIME] = 0;
-            termios::tcsetattr(stdin_fd, termios::TCSANOW, &new_attrs)?;
             println!("Enter key data followed by return:");
             StratKeyActions.set(key_desc, stdin_fd, Some(true))?
         }
     };
     match ret {
         MappingCreateAction::Identity => Err(StratisError::Error(format!(
-            "Key {} was unchanged by the set action",
+            "Key with key description {} was unchanged by the set action",
             key_desc
         ))),
         MappingCreateAction::Created(()) => Ok(()),

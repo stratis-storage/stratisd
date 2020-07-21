@@ -19,6 +19,7 @@ use devicemapper::{Sectors, IEC};
 use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
+        event::get_engine_listener_list,
         shared::init_cache_idempotent_or_err,
         sim_engine::{blockdev::SimDev, filesystem::SimFilesystem, randomization::Randomizer},
         structures::Table,
@@ -26,6 +27,7 @@ use crate::{
             BlockDevTier, CreateAction, DevUuid, FilesystemUuid, KeyDescription, MaybeDbusPath,
             Name, PoolUuid, Redundancy, RenameAction, SetCreateAction, SetDeleteAction,
         },
+        EngineEvent,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -278,12 +280,18 @@ impl Pool for SimPool {
         uuid: FilesystemUuid,
         new_name: &str,
     ) -> StratisResult<RenameAction<FilesystemUuid>> {
-        rename_filesystem_pre_idem!(self; uuid; new_name);
+        let old_name = rename_filesystem_pre_idem!(self; uuid; new_name);
 
         let (_, filesystem) = self
             .filesystems
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.filesystems.get_by_uuid() returned a value");
+
+        get_engine_listener_list().notify(&EngineEvent::FilesystemRenamed {
+            dbus_path: filesystem.get_dbus_path(),
+            from: &*old_name,
+            to: &*new_name,
+        });
 
         self.filesystems
             .insert(Name::new(new_name.to_owned()), uuid, filesystem);

@@ -928,7 +928,7 @@ mod tests {
         {
             let buffer_length = IEC::Mi;
             let mut f = BufWriter::with_capacity(
-                buffer_length as usize,
+                convert_test!(buffer_length, u64, usize),
                 OpenOptions::new().write(true).open(devnode).unwrap(),
             );
 

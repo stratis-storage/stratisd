@@ -406,7 +406,7 @@ impl MDAHeader {
         // size of metadata is greater than 2^32 - 1 bytes, which is
         // unlikely.
         assert!(*self.used.bytes() as u64 <= std::usize::MAX as u64);
-        let mut data_buf = vec![0u8; *self.used.bytes() as usize];
+        let mut data_buf = vec![0u8; convert_int!(*self.used.bytes(), u64, usize)];
 
         f.read_exact(&mut data_buf)?;
 
@@ -452,7 +452,8 @@ mod tests {
     /// initialized.
     fn test_reading_mda_regions() {
         let offset = Bytes(100);
-        let buf_length = *(offset + MDASize::default().sectors().bytes()) as usize;
+        let buf_length =
+            convert_test!(*(offset + MDASize::default().sectors().bytes()), u64, usize);
         let mut buf = Cursor::new(vec![0; buf_length]);
         assert_matches!(
             MDARegions::load(offset, MDASize::default(), &mut buf),

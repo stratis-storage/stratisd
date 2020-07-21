@@ -92,7 +92,7 @@ stratisd.8.gz: stratisd.8
 	gzip --stdout docs/stratisd.8 > docs/stratisd.8.gz
 
 clippy:
-	cargo clippy --all-targets --all-features -- -D warnings -D clippy::needless_borrow -D clippy::cast_lossless
+	cargo clippy --all-targets --all-features -- -D warnings -D clippy::needless_borrow -D clippy::cast_lossless -D clippy::cast_possible_truncation
 
 .PHONY:
 	audit

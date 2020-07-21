@@ -1214,6 +1214,7 @@ mod tests {
 
     use super::*;
 
+    #[allow(clippy::cast_possible_truncation)]
     const BYTES_PER_WRITE: usize = 2 * IEC::Ki as usize * SECTOR_SIZE as usize;
 
     /// Test greedy allocation.
@@ -1303,7 +1304,7 @@ mod tests {
             .unwrap();
             let file_path = source_tmp_dir.path().join("stratis_test.txt");
             let mut f = BufWriter::with_capacity(
-                IEC::Mi as usize,
+                convert_test!(IEC::Mi, u64, usize),
                 OpenOptions::new()
                     .create(true)
                     .write(true)
@@ -1414,7 +1415,7 @@ mod tests {
             for i in 0..file_count {
                 let file_path = source_tmp_dir.path().join(format!("stratis_test{}.txt", i));
                 let mut f = BufWriter::with_capacity(
-                    IEC::Mi as usize,
+                    convert_test!(IEC::Mi, u64, usize),
                     OpenOptions::new()
                         .create(true)
                         .write(true)

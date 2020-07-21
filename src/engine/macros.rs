@@ -189,3 +189,29 @@ macro_rules! init_cache_generate_error_string {
         )
     };
 }
+
+macro_rules! convert_int {
+    ($expr:expr, $from_type:ty, $to_type:ty) => {
+        <$to_type as std::convert::TryFrom<$from_type>>::try_from($expr).map_err(|_| {
+            StratisError::Error(format!(
+                "Failed to convert from {} to {}",
+                stringify!($from_type),
+                stringify!($to_type)
+            ))
+        })?
+    };
+}
+
+macro_rules! convert_const {
+    ($expr:expr, $from_type:ty, $to_type:ty) => {
+        <$to_type as std::convert::TryFrom<$from_type>>::try_from($expr)
+            .expect(format!("{} is a constant", stringify!($expr)).as_str())
+    };
+}
+
+#[cfg(test)]
+macro_rules! convert_test {
+    ($expr:expr, $from_type:ty, $to_type:ty) => {
+        <$to_type as std::convert::TryFrom<$from_type>>::try_from($expr).unwrap()
+    };
+}

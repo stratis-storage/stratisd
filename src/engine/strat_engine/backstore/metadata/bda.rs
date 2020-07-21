@@ -155,7 +155,7 @@ mod tests {
         /// Initialize a BDA.
         /// Verify that the last update time is None.
         fn empty_bda(ref sh in static_header_strategy()) {
-            let buf_size = *sh.mda_size.bda_size().sectors().bytes() as usize;
+            let buf_size = convert_test!(*sh.mda_size.bda_size().sectors().bytes(), u64, usize);
             let mut buf = Cursor::new(vec![0; buf_size]);
             let bda = BDA::initialize(
                 &mut buf,
@@ -177,7 +177,14 @@ mod tests {
 
         // Construct a BDA.
         let sh = random_static_header(0, 0);
-        let mut buf = Cursor::new(vec![0; *sh.blkdev_size.sectors().bytes() as usize]);
+        let mut buf = Cursor::new(vec![
+            0;
+            convert_test!(
+                *sh.blkdev_size.sectors().bytes(),
+                u64,
+                usize
+            )
+        ]);
         let mut bda = BDA::initialize(
             &mut buf,
             sh.identifiers,
@@ -191,7 +198,14 @@ mod tests {
         thread::sleep(sleep_time);
         let timestamp1 = Utc::now();
 
-        let mut buf = Cursor::new(vec![0; *sh.blkdev_size.sectors().bytes() as usize]);
+        let mut buf = Cursor::new(vec![
+            0;
+            convert_test!(
+                *sh.blkdev_size.sectors().bytes(),
+                u64,
+                usize
+            )
+        ]);
         bda.save_state(&timestamp1, &data, &mut buf).unwrap();
 
         // Error, because current timestamp is older than written to newer.
@@ -220,7 +234,7 @@ mod tests {
             ref state in vec(num::u8::ANY, 1..100),
             ref next_state in vec(num::u8::ANY, 1..100)
         ) {
-            let buf_size = *sh.mda_size.bda_size().sectors().bytes() as usize;
+            let buf_size = convert_test!(*sh.mda_size.bda_size().sectors().bytes(), u64, usize);
             let mut buf = Cursor::new(vec![0; buf_size]);
             let mut bda = BDA::initialize(
                 &mut buf,

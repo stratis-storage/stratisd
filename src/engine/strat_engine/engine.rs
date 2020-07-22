@@ -262,7 +262,9 @@ impl Engine for StratEngine {
             });
 
             self.pools.insert(new_name.clone(), uuid, pool);
-            devlinks::pool_renamed(&old_name);
+            if let Err(e) = devlinks::pool_renamed(&old_name) {
+                warn!("Pool rename symlink action failed: {}", e)
+            };
             Ok(RenameAction::Renamed(uuid))
         }
     }

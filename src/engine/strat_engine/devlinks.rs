@@ -27,77 +27,57 @@ pub fn filesystem_mount_path<T: AsRef<str>>(pool_name: T, fs_name: T) -> PathBuf
 
 /// Triggers a udev event for every filesystem in the pool to cause a rename for
 /// the pool directory by moving all filesystem symlinks to the new pool directory.
-pub fn pool_renamed(pool_name: &str) {
-    fn trigger_udev(pool_name: &str) -> StratisResult<()> {
-        let pool_dir: PathBuf = [DEV_PATH, pool_name].iter().collect();
+pub fn pool_renamed(pool_name: &str) -> StratisResult<()> {
+    let pool_dir: PathBuf = [DEV_PATH, pool_name].iter().collect();
 
-        for file_result in fs::read_dir(&pool_dir)? {
-            let file = file_result?;
-            let file_path = file.path();
-            let file_name = file_path
-                .file_name()
-                .and_then(|s| s.to_str())
-                .ok_or_else(|| {
-                    StratisError::Engine(
-                        ErrorEnum::Invalid,
-                        format!(
-                            "Failure while attempting to generate uevents for all \
-                            of the devices contained in directory {} to make /dev/stratis \
-                            symlinks consistent with internal pool state.",
-                            pool_dir.display(),
-                        ),
-                    )
-                })?;
-            filesystem_renamed(pool_name, file_name);
-        }
-
-        Ok(())
-    }
-
-    if let Err(e) = trigger_udev(pool_name) {
-        warn!(
-            "Synthetic udev events were not able to be triggered: {}. Migration of \
-            filesystem links associated with renamed pool {} failed",
-            e, pool_name,
-        );
-    }
-}
-
-/// Trigger a udev event to pick up the new name of the filesystem as registered
-/// with stratisd and rename the symlink.
-pub fn filesystem_renamed(pool_name: &str, fs_name: &str) {
-    fn trigger_udev(pool_name: &str, fs_name: &str) -> StratisResult<()> {
-        let path = filesystem_mount_path(pool_name, fs_name);
-
-        let dm_path = path.canonicalize()?;
-        let file_name = dm_path
+    for file_result in fs::read_dir(&pool_dir)? {
+        let file = file_result?;
+        let file_path = file.path();
+        let file_name = file_path
             .file_name()
             .and_then(|s| s.to_str())
             .ok_or_else(|| {
                 StratisError::Engine(
-                    ErrorEnum::NotFound,
+                    ErrorEnum::Error,
                     format!(
-                        "Failed to generate a change uevent for {} to \
-                        make /dev/stratis symlinks consistent with internal pool \
-                        state",
-                        dm_path.display()
+                        "Failure while attempting to generate uevents for all \
+                        of the devices contained in directory {} to make /dev/stratis \
+                        symlinks consistent with internal pool state.",
+                        pool_dir.display(),
                     ),
                 )
             })?;
-
-        let uevent_path: PathBuf = [UEVENT_PATH, file_name, "uevent"].iter().collect();
-
-        let mut uevent_file = OpenOptions::new().write(true).open(&uevent_path)?;
-        uevent_file.write_all(UEVENT_CHANGE_EVENT)?;
-
-        Ok(())
+        filesystem_renamed(pool_name, file_name)?;
     }
 
-    if let Err(e) = trigger_udev(pool_name, fs_name) {
-        warn!(
-            "Synthetic udev event was not able to be triggered: {}. Rename of \
-            filesystem link {} failed",
-            e, fs_name,
-        );
-    }
+    Ok(())
+}
+
+/// Trigger a udev event to pick up the new name of the filesystem as registered
+/// with stratisd and rename the symlink.
+pub fn filesystem_renamed(pool_name: &str, fs_name: &str) -> StratisResult<()> {
+    let path = filesystem_mount_path(pool_name, fs_name);
+
+    let dm_path = path.canonicalize()?;
+    let file_name = dm_path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .ok_or_else(|| {
+            StratisError::Engine(
+                ErrorEnum::Error,
+                format!(
+                    "Failed to generate a change uevent for {} to \
+                    make /dev/stratis symlinks consistent with internal filesystem \
+                    state",
+                    dm_path.display()
+                ),
+            )
+        })?;
+
+    let uevent_path: PathBuf = [UEVENT_PATH, file_name, "uevent"].iter().collect();
+
+    let mut uevent_file = OpenOptions::new().write(true).open(&uevent_path)?;
+    uevent_file.write_all(UEVENT_CHANGE_EVENT)?;
+
+    Ok(())
 }

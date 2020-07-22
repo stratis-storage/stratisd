@@ -10,9 +10,9 @@ RUST_2018_IDIOMS = -D bare-trait-objects \
 DENY = -D warnings -D future-incompatible -D unused ${RUST_2018_IDIOMS}
 
 CLIPPY_DENY = -D clippy::cast_lossless \
-	      -D clippy::cast_possible_truncation \
-	      -D clippy::needless_borrow \
-	      -D warnings
+              -D clippy::cast_possible_truncation \
+              -D clippy::needless_borrow \
+              -D warnings
 
 ${HOME}/.cargo/bin/cargo-outdated:
 	cargo install cargo-outdated

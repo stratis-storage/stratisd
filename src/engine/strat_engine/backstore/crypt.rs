@@ -1064,7 +1064,7 @@ mod tests {
             if fstat_result < 0 {
                 return Err(Box::new(io::Error::last_os_error()));
             }
-            let device_size = convert_int!(unsafe { stat.assume_init() }.st_size, i64, usize);
+            let device_size = convert_int!(unsafe { stat.assume_init() }.st_size, i64, usize)?;
             let mapped_ptr = unsafe {
                 libc::mmap(
                     ptr::null_mut(),

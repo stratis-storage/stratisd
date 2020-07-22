@@ -402,11 +402,7 @@ impl MDAHeader {
     where
         F: Read,
     {
-        // This cast could fail if running on a 32-bit machine and
-        // size of metadata is greater than 2^32 - 1 bytes, which is
-        // unlikely.
-        assert!(*self.used.bytes() as u64 <= std::usize::MAX as u64);
-        let mut data_buf = vec![0u8; convert_int!(*self.used.bytes(), u64, usize)];
+        let mut data_buf = vec![0u8; convert_int!(*self.used.bytes(), u64, usize)?];
 
         f.read_exact(&mut data_buf)?;
 

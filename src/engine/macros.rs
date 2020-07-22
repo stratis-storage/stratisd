@@ -191,15 +191,17 @@ macro_rules! init_cache_generate_error_string {
 }
 
 macro_rules! convert_int {
-    ($expr:expr, $from_type:ty, $to_type:ty) => {
-        <$to_type as std::convert::TryFrom<$from_type>>::try_from($expr).map_err(|_| {
+    ($expr:expr, $from_type:ty, $to_type:ty) => {{
+        let expr = $expr;
+        <$to_type as std::convert::TryFrom<$from_type>>::try_from(expr).map_err(|_| {
             StratisError::Error(format!(
-                "Failed to convert from {} to {}",
+                "Failed to convert integer {} from {} to {}",
+                expr,
                 stringify!($from_type),
                 stringify!($to_type)
             ))
-        })?
-    };
+        })
+    }};
 }
 
 macro_rules! convert_const {

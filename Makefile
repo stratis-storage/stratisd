@@ -9,6 +9,11 @@ RUST_2018_IDIOMS = -D bare-trait-objects \
 
 DENY = -D warnings -D future-incompatible -D unused ${RUST_2018_IDIOMS}
 
+CLIPPY_DENY = -D clippy::cast_lossless \
+	      -D clippy::cast_possible_truncation \
+	      -D clippy::needless_borrow \
+	      -D warnings
+
 ${HOME}/.cargo/bin/cargo-outdated:
 	cargo install cargo-outdated
 
@@ -92,7 +97,7 @@ stratisd.8.gz: stratisd.8
 	gzip --stdout docs/stratisd.8 > docs/stratisd.8.gz
 
 clippy:
-	cargo clippy --all-targets --all-features -- -D warnings -D clippy::needless_borrow -D clippy::cast_lossless -D clippy::cast_possible_truncation
+	cargo clippy --all-targets --all-features -- ${CLIPPY_DENY}
 
 .PHONY:
 	audit

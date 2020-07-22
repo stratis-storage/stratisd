@@ -262,7 +262,15 @@ impl Engine for StratEngine {
             });
 
             self.pools.insert(new_name.clone(), uuid, pool);
-            devlinks::pool_renamed(&old_name);
+            devlinks::pool_renamed(&old_name).unwrap_or_else(|e| {
+                warn!(
+                    "Synthetic udev events were not able to be triggered: {}. \
+                    Migration of filesystem links associated with pool renamed \
+                    from {} to {} failed",
+                    e, old_name, new_name
+                )
+            });
+
             Ok(RenameAction::Renamed(uuid))
         }
     }

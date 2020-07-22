@@ -693,17 +693,16 @@ fn get_keyslot_number(device: &mut CryptDevice) -> Result<Vec<c_uint>> {
                 Some(s) => s,
                 None => return None,
             };
-            let as_u64 = s.parse::<u64>();
-            if let Err(ref e) = as_u64 {
+            let as_c_uint = s.parse::<c_uint>();
+            if let Err(ref e) = as_c_uint {
                 warn!(
                     "Discarding invalid value in LUKS2 token keyslot array: {}; \
                     failed to convert it to an integer: {}",
                     s, e,
                 );
             }
-            as_u64.ok()
+            as_c_uint.ok()
         })
-        .map(|int| int as c_uint)
         .collect::<Vec<_>>())
 }
 
@@ -779,7 +778,7 @@ fn ensure_wiped(device: &mut CryptDevice, physical_path: &Path, name: &str) -> R
             CryptWipePattern::Zero,
             0,
             total_luks2_metadata_size,
-            SECTOR_SIZE as usize,
+            convert_const!(SECTOR_SIZE, u64, usize),
             false,
             None,
             None,
@@ -1065,7 +1064,7 @@ mod tests {
             if fstat_result < 0 {
                 return Err(Box::new(io::Error::last_os_error()));
             }
-            let device_size = unsafe { stat.assume_init() }.st_size as usize;
+            let device_size = convert_int!(unsafe { stat.assume_init() }.st_size, i64, usize)?;
             let mapped_ptr = unsafe {
                 libc::mmap(
                     ptr::null_mut(),

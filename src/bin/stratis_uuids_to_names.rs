@@ -31,7 +31,11 @@ use regex::Regex;
 use uuid::Uuid;
 
 pub const DEV_LOG: &str = "/dev/log";
+/// Syslog priority syntax
+/// (3 (SYSTEM) << 3) | 6 (INFO)
 pub const SYSTEM_DAEMON_INFO: &str = "<30>";
+/// Syslog priority syntax
+/// (3 (SYSTEM) << 3) | 3 (ERROR)
 pub const SYSTEM_DAEMON_ERROR: &str = "<27>";
 pub const STRATIS_BUS_NAME: &str = "org.storage.stratis2";
 pub const STRATIS_MANAGER_OBJECT: &str = "/org/storage/stratis2";
@@ -150,7 +154,7 @@ fn main_report_error() -> Result<Option<(String, String)>, StratisUdevError> {
     };
     match args.next().as_deref() {
         Some(action) => {
-            if action == "remove" {
+            if action != "change" && action != "add" {
                 return Ok(None);
             }
         }
@@ -166,7 +170,6 @@ fn main_report_error() -> Result<Option<(String, String)>, StratisUdevError> {
             .ok_or_else(|| StratisUdevError::new("Could not get pool name from UUID."))?;
         let fs_name = uuid_to_stratis_name(&managed_objects, STRATIS_FS_IFACE, fs_uuid)?
             .ok_or_else(|| StratisUdevError::new("Could not get filesystem name from UUID."))?;
-        println!("{} {}", pool_name, fs_name);
         Ok(Some((pool_name, fs_name)))
     } else {
         Ok(None)
@@ -179,13 +182,15 @@ fn main() -> Result<(), StratisUdevError> {
         Ok(Some((pool_name, fs_name))) => {
             sock.send_to(
                 format!(
-                    "{}Symlink /dev/stratis/{}/{} succesfully created.",
+                    "{}Symlink /dev/stratis/{}/{} created.",
                     SYSTEM_DAEMON_INFO, pool_name, fs_name,
                 )
                 .as_bytes(),
                 DEV_LOG,
             )
             .map_err(StratisUdevError::new)?;
+
+            println!("{} {}", pool_name, fs_name);
             Ok(())
         }
         Ok(None) => Ok(()),

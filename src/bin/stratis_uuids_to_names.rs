@@ -49,10 +49,6 @@ lazy_static! {
 struct StratisUdevError(Option<String>);
 
 impl StratisUdevError {
-    fn empty() -> StratisUdevError {
-        StratisUdevError(None)
-    }
-
     fn new<D>(display: D) -> StratisUdevError
     where
         D: Display,
@@ -200,7 +196,7 @@ fn main() -> Result<(), StratisUdevError> {
                 DEV_LOG,
             )
             .map_err(StratisUdevError::new)?;
-            Err(StratisUdevError::empty())
+            Err(e)
         }
     }
 }

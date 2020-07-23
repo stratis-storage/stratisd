@@ -404,7 +404,7 @@ mod test {
     /// 5. Verify that pools can be found again.
     /// 6. Teardown the engine and remove "/stratis".
     /// 7. Initialize the engine one more time.
-    /// 8. Verify that both pools are found and that there are no incomplete pools.
+    /// 8. Verify that both pools are found.
     fn test_setup(paths: &[&Path]) {
         assert!(paths.len() > 1);
 
@@ -435,7 +435,6 @@ mod test {
 
         assert!(engine.get_pool(uuid1).is_some());
         assert!(engine.get_pool(uuid2).is_some());
-        assert_eq!(engine.liminal_devices, LiminalDevices::default());
 
         engine.teardown().unwrap();
         remove_dir_all(DEV_PATH).unwrap();
@@ -444,7 +443,6 @@ mod test {
 
         assert!(engine.get_pool(uuid1).is_some());
         assert!(engine.get_pool(uuid2).is_some());
-        assert_eq!(engine.liminal_devices, LiminalDevices::default());
 
         engine.teardown().unwrap();
     }

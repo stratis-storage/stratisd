@@ -111,20 +111,17 @@ fn uuid_to_stratis_name(
     let mut names: Vec<_> = managed_objects
         .values()
         .filter_map(|map| {
-            if map.contains_key(iface_name)
-                && map
-                    .get(iface_name)
-                    .and_then(|submap| submap.get("Uuid").and_then(|uuid| uuid.as_str()))
-                    == Some(&uuid.to_simple_ref().to_string())
-            {
-                map.get(iface_name).and_then(|submap| {
-                    submap
-                        .get("Name")
-                        .and_then(|name| name.as_str().map(|n| n.to_string()))
+            map.get(iface_name).and_then(|submap| {
+                submap.get("Uuid").and_then(|u| {
+                    if u.as_str() == Some(&uuid.to_simple_ref().to_string()) {
+                        submap
+                            .get("Name")
+                            .and_then(|name| name.as_str().map(|n| n.to_string()))
+                    } else {
+                        None
+                    }
                 })
-            } else {
-                None
-            }
+            })
         })
         .collect();
 

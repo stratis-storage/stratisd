@@ -111,15 +111,14 @@ fn uuid_to_stratis_name(
     managed_objects: &GMORet,
     iface_name: &'static str,
     uuid: Uuid,
-) -> Result<Option<String>, StratisUdevError> {
+) -> Result<String, StratisUdevError> {
     let mut names: Vec<_> = managed_objects
         .values()
         .filter_map(|map| {
-            if map.contains_key(iface_name)
-                && map
-                    .get(iface_name)
-                    .and_then(|submap| submap.get("Uuid").and_then(|uuid| uuid.as_str()))
-                    == Some(&uuid.to_simple_ref().to_string())
+            if map
+                .get(iface_name)
+                .and_then(|submap| submap.get("Uuid").and_then(|uuid| uuid.as_str()))
+                == Some(&uuid.to_simple_ref().to_string())
             {
                 map.get(iface_name).and_then(|submap| {
                     submap
@@ -134,11 +133,17 @@ fn uuid_to_stratis_name(
 
     if names.len() > 1 {
         Err(StratisUdevError::new(format!(
-            "More than one device has the UUID {}",
-            uuid.to_simple_ref()
+            "More than one name found for UUID {}: {:?}",
+            uuid.to_simple_ref(),
+            names,
         )))
     } else {
-        Ok(names.pop())
+        names.pop().ok_or_else(|| {
+            StratisUdevError::new(format!(
+                "UUID {} has no associated name.",
+                uuid.to_simple_ref()
+            ))
+        })
     }
 }
 
@@ -166,10 +171,8 @@ fn main_report_error() -> Result<Option<(String, String)>, StratisUdevError> {
     let managed_objects = get_managed_objects()?;
 
     if let Some((pool_uuid, fs_uuid)) = udev_name_to_uuids(&dm_name)? {
-        let pool_name = uuid_to_stratis_name(&managed_objects, STRATIS_POOL_IFACE, pool_uuid)?
-            .ok_or_else(|| StratisUdevError::new("Could not get pool name from UUID."))?;
-        let fs_name = uuid_to_stratis_name(&managed_objects, STRATIS_FS_IFACE, fs_uuid)?
-            .ok_or_else(|| StratisUdevError::new("Could not get filesystem name from UUID."))?;
+        let pool_name = uuid_to_stratis_name(&managed_objects, STRATIS_POOL_IFACE, pool_uuid)?;
+        let fs_name = uuid_to_stratis_name(&managed_objects, STRATIS_FS_IFACE, fs_uuid)?;
         Ok(Some((pool_name, fs_name)))
     } else {
         Ok(None)

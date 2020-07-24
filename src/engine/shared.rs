@@ -31,7 +31,7 @@ pub fn create_pool_idempotent_or_err(
     let existing_paths: HashSet<PathBuf, _> = pool
         .blockdevs()
         .iter()
-        .map(|(_, bd)| bd.devnode().physical_path().to_owned())
+        .map(|(_, _, bd)| bd.devnode().physical_path().to_owned())
         .collect();
 
     if input_devices == existing_paths {

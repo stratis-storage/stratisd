@@ -216,10 +216,10 @@ pub trait Pool: Debug {
 
     /// Get _all_ the blockdevs that belong to this pool.
     /// All really means all. For example, it does not exclude cache blockdevs.
-    fn blockdevs(&self) -> Vec<(Uuid, &dyn BlockDev)>;
+    fn blockdevs(&self) -> Vec<(Uuid, BlockDevTier, &dyn BlockDev)>;
 
     /// Get all the blockdevs belonging to this pool as mutable references.
-    fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut dyn BlockDev)>;
+    fn blockdevs_mut(&mut self) -> Vec<(DevUuid, BlockDevTier, &mut dyn BlockDev)>;
 
     /// Get the blockdev in this pool with this UUID.
     fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &dyn BlockDev)>;
@@ -271,7 +271,7 @@ pub trait Engine: Debug + Report {
     /// and its UUID.
     ///
     /// Precondition: the subsystem of the device evented on is "block".
-    fn handle_event(&mut self, event: &libudev::Event) -> Option<(PoolUuid, &mut dyn Pool)>;
+    fn handle_event(&mut self, event: &libudev::Event) -> Option<(Name, PoolUuid, &mut dyn Pool)>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.

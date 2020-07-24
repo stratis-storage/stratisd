@@ -365,19 +365,29 @@ impl Pool for SimPool {
             .map(|(name, p)| (name, p as &mut dyn Filesystem))
     }
 
-    fn blockdevs(&self) -> Vec<(DevUuid, &dyn BlockDev)> {
+    fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &dyn BlockDev)> {
         self.block_devs
             .iter()
-            .chain(self.cache_devs.iter())
-            .map(|(uuid, bd)| (*uuid, bd as &dyn BlockDev))
+            .map(|(uuid, dev)| (uuid, BlockDevTier::Data, dev))
+            .chain(
+                self.cache_devs
+                    .iter()
+                    .map(|(uuid, dev)| (uuid, BlockDevTier::Cache, dev)),
+            )
+            .map(|(uuid, tier, bd)| (*uuid, tier, bd as &dyn BlockDev))
             .collect()
     }
 
-    fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut dyn BlockDev)> {
+    fn blockdevs_mut(&mut self) -> Vec<(DevUuid, BlockDevTier, &mut dyn BlockDev)> {
         self.block_devs
             .iter_mut()
-            .chain(self.cache_devs.iter_mut())
-            .map(|(uuid, b)| (*uuid, b as &mut dyn BlockDev))
+            .map(|(uuid, dev)| (uuid, BlockDevTier::Data, dev))
+            .chain(
+                self.cache_devs
+                    .iter_mut()
+                    .map(|(uuid, dev)| (uuid, BlockDevTier::Cache, dev)),
+            )
+            .map(|(uuid, tier, b)| (*uuid, tier, b as &mut dyn BlockDev))
             .collect()
     }
 

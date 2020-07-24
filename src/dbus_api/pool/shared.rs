@@ -145,6 +145,10 @@ pub fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, op: BlockDevOp) -> Meth
                         dbus_context,
                         object_path.clone(),
                         *uuid,
+                        match op {
+                            BlockDevOp::AddData => BlockDevTier::Data,
+                            _ => BlockDevTier::Cache,
+                        },
                         pool.get_mut_blockdev(*uuid)
                             .expect("just inserted by add_blockdevs")
                             .1,
@@ -180,4 +184,16 @@ where
         pool_operation(p.tree, p.path.get_name(), getter).map_err(|ref e| MethodErr::failed(e))?,
     );
     Ok(())
+}
+
+/// Generate D-Bus representation of name property.
+#[inline]
+pub fn pool_name_prop(name: &Name) -> String {
+    name.to_owned()
+}
+
+/// Generate D-Bus representation of encrypted property.
+#[inline]
+pub fn pool_enc_prop(pool: &dyn Pool) -> bool {
+    pool.is_encrypted()
 }

@@ -98,7 +98,7 @@ pub fn name_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, T
 }
 
 pub fn uuid_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {
-    f.property::<&str, _>("Uuid", ())
+    f.property::<&str, _>(consts::POOL_UUID_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_uuid)

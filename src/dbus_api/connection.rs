@@ -2,10 +2,18 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{cell::RefCell, rc::Rc, vec::Vec};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, vec::Vec};
 
 use dbus::{
-    ffidisp::{BusType, Connection, ConnectionItem, NameFlag, WatchEvent},
+    arg::{RefArg, Variant},
+    ffidisp::{
+        stdintf::org_freedesktop_dbus::{
+            ObjectManagerInterfacesAdded, ObjectManagerInterfacesRemoved,
+        },
+        BusType, Connection, ConnectionItem, NameFlag, WatchEvent,
+    },
+    message::SignalArgs,
+    strings::Path,
     tree::{MTFn, Tree},
 };
 
@@ -104,5 +112,41 @@ impl DbusConnectionData {
                 }
             }
         }
+    }
+
+    /// Send an InterfacesAdded signal on the D-Bus
+    pub fn added_object_signal(
+        &mut self,
+        object: Path<'static>,
+        interfaces: HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>,
+    ) -> Result<(), dbus::Error> {
+        self.connection
+            .borrow()
+            .send(
+                ObjectManagerInterfacesAdded { object, interfaces }
+                    .to_emit_message(&Path::from(consts::STRATIS_BASE_PATH)),
+            )
+            .map(|_| ())
+            .map_err(|_| {
+                dbus::Error::new_failed("Failed to send the requested signal on the D-Bus.")
+            })
+    }
+
+    /// Send an InterfacesRemoved signal on the D-Bus
+    pub fn removed_object_signal(
+        &mut self,
+        object: Path<'static>,
+        interfaces: Vec<String>,
+    ) -> Result<(), dbus::Error> {
+        self.connection
+            .borrow()
+            .send(
+                ObjectManagerInterfacesRemoved { object, interfaces }
+                    .to_emit_message(&Path::from(consts::STRATIS_BASE_PATH)),
+            )
+            .map(|_| ())
+            .map_err(|_| {
+                dbus::Error::new_failed("Failed to send the requested signal on the D-Bus.")
+            })
     }
 }

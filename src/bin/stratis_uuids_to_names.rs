@@ -49,10 +49,6 @@ lazy_static! {
 struct StratisUdevError(Option<String>);
 
 impl StratisUdevError {
-    fn empty() -> StratisUdevError {
-        StratisUdevError(None)
-    }
-
     fn new<D>(display: D) -> StratisUdevError
     where
         D: Display,
@@ -115,20 +111,17 @@ fn uuid_to_stratis_name(
     let mut names: Vec<_> = managed_objects
         .values()
         .filter_map(|map| {
-            if map.contains_key(iface_name)
-                && map
-                    .get(iface_name)
-                    .and_then(|submap| submap.get("Uuid").and_then(|uuid| uuid.as_str()))
+            map.get(iface_name).and_then(|submap| {
+                if submap.get("Uuid").and_then(|uuid_val| uuid_val.as_str())
                     == Some(&uuid.to_simple_ref().to_string())
-            {
-                map.get(iface_name).and_then(|submap| {
+                {
                     submap
                         .get("Name")
                         .and_then(|name| name.as_str().map(|n| n.to_string()))
-                })
-            } else {
-                None
-            }
+                } else {
+                    None
+                }
+            })
         })
         .collect();
 
@@ -200,7 +193,7 @@ fn main() -> Result<(), StratisUdevError> {
                 DEV_LOG,
             )
             .map_err(StratisUdevError::new)?;
-            Err(StratisUdevError::empty())
+            Err(e)
         }
     }
 }

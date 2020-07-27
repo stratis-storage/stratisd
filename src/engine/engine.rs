@@ -23,7 +23,7 @@ use crate::{
     stratis::StratisResult,
 };
 
-pub const DEV_PATH: &str = "/stratis";
+pub const DEV_PATH: &str = "/dev/stratis";
 /// The maximum size of pool passphrases stored in the kernel keyring
 pub const MAX_STRATIS_PASS_SIZE: usize = 512 / 8;
 
@@ -140,7 +140,6 @@ pub trait Pool: Debug {
     fn create_filesystems<'a, 'b>(
         &'a mut self,
         pool_uuid: PoolUuid,
-        pool_name: &str,
         specs: &[(&'b str, Option<Sectors>)],
     ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid)>>;
 
@@ -185,7 +184,6 @@ pub trait Pool: Debug {
     fn snapshot_filesystem(
         &mut self,
         pool_uuid: PoolUuid,
-        pool_name: &str,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
     ) -> StratisResult<CreateAction<(FilesystemUuid, &mut dyn Filesystem)>>;

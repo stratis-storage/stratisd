@@ -44,12 +44,12 @@ jobs:
 
     # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
     - name: "format Rust source using current development toolchain"
-      rust: 1.44.1
+      rust: 1.45.0
       before_script:
         - rustup component add rustfmt
       env: TASK=fmt-travis
     - name: "lint Rust source using current development toolchain"
-      rust: 1.44.1
+      rust: 1.45.0
       before_script:
         - rustup component add clippy
       env: TASK=clippy

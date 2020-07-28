@@ -63,8 +63,6 @@ fn is_multipath_member(device: &libudev::Device) -> StratisResult<bool> {
 
 /// If the expression is true, then it seems that no other system is
 /// known to udev to claim this device.
-/// Note from mulhern: I have no idea myself why this particular expression
-/// should be correct. I was told that the original source was dlehman.
 fn is_unclaimed(device: &libudev::Device) -> bool {
     (get_udev_property(device, "ID_PART_TABLE_TYPE").is_none()
         || get_udev_property(device, "ID_PART_ENTRY_DISK").is_some())

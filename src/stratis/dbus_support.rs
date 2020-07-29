@@ -11,12 +11,12 @@
 
 use std::{cell::RefCell, rc::Rc};
 
-use crate::engine::{Engine, Pool, PoolUuid};
+use crate::engine::{Engine, Name, Pool, PoolUuid};
 
 #[cfg(feature = "dbus_enabled")]
 use crate::{
     dbus_api::{DbusConnectionData, EventHandler},
-    engine::{get_engine_listener_list_mut, Name},
+    engine::get_engine_listener_list_mut,
 };
 
 pub struct MaybeDbusSupport {

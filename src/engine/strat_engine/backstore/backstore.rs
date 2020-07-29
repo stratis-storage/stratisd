@@ -437,13 +437,13 @@ impl Backstore {
 
     /// Get only the datadevs in the pool.
     pub fn datadevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
-        self.data_tier.blockdevs().to_vec()
+        self.data_tier.blockdevs()
     }
 
     /// Get only the cachdevs in the pool.
     pub fn cachedevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
         match self.cache_tier {
-            Some(ref cache) => cache.blockdevs().to_vec(),
+            Some(ref cache) => cache.blockdevs(),
             None => Vec::new(),
         }
     }
@@ -451,21 +451,37 @@ impl Backstore {
     /// Return a reference to all the blockdevs that this pool has ownership
     /// of. The blockdevs may be returned in any order. It is unsafe to assume
     /// that they are grouped by tier or any other organization.
-    pub fn blockdevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
+    pub fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &StratBlockDev)> {
         self.datadevs()
             .into_iter()
-            .chain(self.cachedevs().into_iter())
+            .map(|(uuid, dev)| (uuid, BlockDevTier::Data, dev))
+            .chain(
+                self.cachedevs()
+                    .into_iter()
+                    .map(|(uuid, dev)| (uuid, BlockDevTier::Cache, dev)),
+            )
             .collect()
     }
 
-    pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut StratBlockDev)> {
+    pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, BlockDevTier, &mut StratBlockDev)> {
         match self.cache_tier {
             Some(ref mut cache) => cache
                 .blockdevs_mut()
                 .into_iter()
-                .chain(self.data_tier.blockdevs_mut().into_iter())
+                .map(|(uuid, dev)| (uuid, BlockDevTier::Cache, dev))
+                .chain(
+                    self.data_tier
+                        .blockdevs_mut()
+                        .into_iter()
+                        .map(|(uuid, dev)| (uuid, BlockDevTier::Data, dev)),
+                )
                 .collect(),
-            None => self.data_tier.blockdevs_mut(),
+            None => self
+                .data_tier
+                .blockdevs_mut()
+                .into_iter()
+                .map(|(uuid, dev)| (uuid, BlockDevTier::Data, dev))
+                .collect(),
         }
     }
 
@@ -939,7 +955,7 @@ mod tests {
                 backstore
                     .blockdevs()
                     .iter()
-                    .map(|(device_uuid, blockdev)| {
+                    .map(|(device_uuid, _, blockdev)| {
                         (
                             *device_uuid,
                             StratisInfo {

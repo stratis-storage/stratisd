@@ -4,18 +4,22 @@
 
 use std::{
     cell::{Cell, RefCell},
-    collections::vec_deque::{Drain, VecDeque},
+    collections::{
+        vec_deque::{Drain, VecDeque},
+        HashMap,
+    },
     rc::Rc,
 };
 
 use dbus::{
+    arg::{RefArg, Variant},
     tree::{DataType, MTFn, ObjectPath, Tree},
     Path,
 };
 
 use uuid::Uuid;
 
-use crate::engine::Engine;
+use crate::{dbus_api::consts, engine::Engine};
 
 #[derive(Clone, Copy, Debug)]
 #[allow(non_camel_case_types)]
@@ -44,8 +48,19 @@ impl DbusErrorEnum {
 
 #[derive(Debug)]
 pub enum DeferredAction {
-    Add(ObjectPath<MTFn<TData>, TData>),
-    Remove(Path<'static>),
+    Add(
+        ObjectPath<MTFn<TData>, TData>,
+        HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>,
+    ),
+    Remove(Path<'static>, Vec<String>),
+}
+
+/// Indicates the type of object pointed to by the object path.
+#[derive(Debug)]
+pub enum ObjectPathType {
+    Pool,
+    Filesystem,
+    Blockdev,
 }
 
 /// Context for an object path.
@@ -55,11 +70,16 @@ pub enum DeferredAction {
 pub struct OPContext {
     pub(super) parent: Path<'static>,
     pub(super) uuid: Uuid,
+    pub(super) op_type: ObjectPathType,
 }
 
 impl OPContext {
-    pub fn new(parent: Path<'static>, uuid: Uuid) -> OPContext {
-        OPContext { parent, uuid }
+    pub fn new(parent: Path<'static>, uuid: Uuid, op_type: ObjectPathType) -> OPContext {
+        OPContext {
+            parent,
+            uuid,
+            op_type,
+        }
     }
 }
 
@@ -110,26 +130,48 @@ pub struct ActionQueue {
 
 impl ActionQueue {
     /// Push an Add action onto the back of the queue.
-    pub fn push_add(&mut self, object_path: ObjectPath<MTFn<TData>, TData>) {
-        self.queue.push_back(DeferredAction::Add(object_path))
+    pub fn push_add(
+        &mut self,
+        object_path: ObjectPath<MTFn<TData>, TData>,
+        interfaces: HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>,
+    ) {
+        self.queue
+            .push_back(DeferredAction::Add(object_path, interfaces))
     }
 
     /// Push Remove actions for a path and its immediate descendants. Not
     /// recursive, since no multi-level parent-child relationships currently
     /// exist.
     // Note: Path x is a child of path y if x's context's parent field is y.
-    pub fn push_remove(&mut self, item: &Path<'static>, tree: &Tree<MTFn<TData>, TData>) {
+    pub fn push_remove(
+        &mut self,
+        item: &Path<'static>,
+        tree: &Tree<MTFn<TData>, TData>,
+        interfaces: Vec<String>,
+    ) {
         for opath in tree.iter().filter(|opath| {
             opath
                 .get_data()
                 .as_ref()
                 .map_or(false, |op_cxt| op_cxt.parent == *item)
         }) {
-            self.queue
-                .push_back(DeferredAction::Remove(opath.get_name().clone()))
+            self.queue.push_back(DeferredAction::Remove(
+                opath.get_name().clone(),
+                match opath
+                    .get_data()
+                    .as_ref()
+                    .expect("all objects with parents have data")
+                    .op_type
+                {
+                    ObjectPathType::Pool => consts::pool_interface_list(),
+                    ObjectPathType::Filesystem => consts::filesystem_interface_list(),
+                    ObjectPathType::Blockdev => consts::blockdev_interface_list(),
+                },
+            ))
         }
 
-        self.queue.push_back(DeferredAction::Remove(item.clone()))
+        self.queue
+            .push_back(DeferredAction::Remove(item.clone(), interfaces))
     }
 
     /// Drain the queue.

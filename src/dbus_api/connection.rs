@@ -26,7 +26,7 @@ use crate::{
         pool::create_dbus_pool,
         types::{DbusContext, DeferredAction, TData},
     },
-    engine::{Engine, Pool, PoolUuid},
+    engine::{Engine, Name, Pool, PoolUuid},
 };
 
 /// Returned data from when you connect a stratis engine to dbus.
@@ -57,13 +57,26 @@ impl DbusConnectionData {
     }
 
     /// Given the UUID of a pool, register all the pertinent information with dbus.
-    pub fn register_pool(&mut self, pool_uuid: PoolUuid, pool: &mut dyn Pool) {
-        let pool_path = create_dbus_pool(&self.context, self.path.clone(), pool_uuid, pool);
-        for (_, fs_uuid, fs) in pool.filesystems_mut() {
-            create_dbus_filesystem(&self.context, pool_path.clone(), fs_uuid, fs);
+    pub fn register_pool(&mut self, pool_name: Name, pool_uuid: PoolUuid, pool: &mut dyn Pool) {
+        let pool_path = create_dbus_pool(
+            &self.context,
+            self.path.clone(),
+            &pool_name,
+            pool_uuid,
+            pool,
+        );
+        for (fs_name, fs_uuid, fs) in pool.filesystems_mut() {
+            create_dbus_filesystem(
+                &self.context,
+                pool_path.clone(),
+                &pool_name,
+                &fs_name,
+                fs_uuid,
+                fs,
+            );
         }
-        for (uuid, bd) in pool.blockdevs_mut() {
-            create_dbus_blockdev(&self.context, pool_path.clone(), uuid, bd);
+        for (uuid, tier, bd) in pool.blockdevs_mut() {
+            create_dbus_blockdev(&self.context, pool_path.clone(), uuid, tier, bd);
         }
 
         self.process_deferred_actions()
@@ -74,16 +87,23 @@ impl DbusConnectionData {
         let mut actions = self.context.actions.borrow_mut();
         for action in actions.drain() {
             match action {
-                DeferredAction::Add(path) => {
+                DeferredAction::Add(path, interfaces) => {
+                    let path_name = path.get_name().clone();
                     self.connection
                         .borrow_mut()
-                        .register_object_path(path.get_name())
+                        .register_object_path(&path_name)
                         .expect("Must succeed since object paths are unique");
                     self.tree.insert(path);
+                    if let Err(e) = self.added_object_signal(path_name, interfaces) {
+                        warn!("Failed to send a signal on D-Bus object addition: {}", e);
+                    }
                 }
-                DeferredAction::Remove(path) => {
+                DeferredAction::Remove(path, interfaces) => {
                     self.connection.borrow_mut().unregister_object_path(&path);
                     self.tree.remove(&path);
+                    if let Err(e) = self.removed_object_signal(path, interfaces) {
+                        warn!("Failed to send a signal on D-Bus object removal: {}", e);
+                    }
                 }
             }
         }
@@ -116,7 +136,7 @@ impl DbusConnectionData {
 
     /// Send an InterfacesAdded signal on the D-Bus
     pub fn added_object_signal(
-        &mut self,
+        &self,
         object: Path<'static>,
         interfaces: HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>,
     ) -> Result<(), dbus::Error> {
@@ -134,7 +154,7 @@ impl DbusConnectionData {
 
     /// Send an InterfacesRemoved signal on the D-Bus
     pub fn removed_object_signal(
-        &mut self,
+        &self,
         object: Path<'static>,
         interfaces: Vec<String>,
     ) -> Result<(), dbus::Error> {

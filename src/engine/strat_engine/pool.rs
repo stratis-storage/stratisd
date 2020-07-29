@@ -543,19 +543,19 @@ impl Pool for StratPool {
             .map(|(name, fs)| (name, fs as &mut dyn Filesystem))
     }
 
-    fn blockdevs(&self) -> Vec<(DevUuid, &dyn BlockDev)> {
+    fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &dyn BlockDev)> {
         self.backstore
             .blockdevs()
             .iter()
-            .map(|&(u, b)| (u, b as &dyn BlockDev))
+            .map(|&(u, t, b)| (u, t, b as &dyn BlockDev))
             .collect()
     }
 
-    fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut dyn BlockDev)> {
+    fn blockdevs_mut(&mut self) -> Vec<(DevUuid, BlockDevTier, &mut dyn BlockDev)> {
         self.backstore
             .blockdevs_mut()
             .into_iter()
-            .map(|(u, b)| (u, b as &mut dyn BlockDev))
+            .map(|(u, t, b)| (u, t, b as &mut dyn BlockDev))
             .collect()
     }
 
@@ -666,7 +666,7 @@ mod tests {
             .backstore
             .blockdevs()
             .iter()
-            .map(|(device_uuid, blockdev)| {
+            .map(|(device_uuid, _, blockdev)| {
                 (
                     *device_uuid,
                     StratisInfo {
@@ -686,7 +686,7 @@ mod tests {
             .backstore
             .blockdevs()
             .iter()
-            .map(|(device_uuid, blockdev)| {
+            .map(|(device_uuid, _, blockdev)| {
                 (
                     *device_uuid,
                     StratisInfo {
@@ -830,7 +830,7 @@ mod tests {
             .backstore
             .blockdevs()
             .iter()
-            .map(|(device_uuid, blockdev)| {
+            .map(|(device_uuid, _, blockdev)| {
                 (
                     *device_uuid,
                     StratisInfo {

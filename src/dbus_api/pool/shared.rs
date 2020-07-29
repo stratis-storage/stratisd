@@ -145,6 +145,10 @@ pub fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, op: BlockDevOp) -> Meth
                         dbus_context,
                         object_path.clone(),
                         *uuid,
+                        match op {
+                            BlockDevOp::AddData => BlockDevTier::Data,
+                            _ => BlockDevTier::Cache,
+                        },
                         pool.get_mut_blockdev(*uuid)
                             .expect("just inserted by add_blockdevs")
                             .1,

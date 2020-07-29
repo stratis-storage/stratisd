@@ -11,7 +11,7 @@ use std::{
 use crate::{
     engine::{
         engine::Pool,
-        types::{CreateAction, DevUuid, PoolUuid, SetCreateAction},
+        types::{BlockDevTier, CreateAction, DevUuid, PoolUuid, SetCreateAction},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -31,7 +31,13 @@ pub fn create_pool_idempotent_or_err(
     let existing_paths: HashSet<PathBuf, _> = pool
         .blockdevs()
         .iter()
-        .map(|(_, _, bd)| bd.devnode().physical_path().to_owned())
+        .filter_map(|(_, tier, bd)| {
+            if *tier == BlockDevTier::Data {
+                Some(bd.devnode().physical_path().to_owned())
+            } else {
+                None
+            }
+        })
         .collect();
 
     if input_devices == existing_paths {

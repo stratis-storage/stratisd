@@ -46,7 +46,7 @@ pub fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
     let mut engine = dbus_context.engine.borrow_mut();
-    let (_, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
     let result = pool.create_filesystems(
         pool_uuid,
@@ -192,7 +192,7 @@ pub fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     };
 
     let mut engine = dbus_context.engine.borrow_mut();
-    let (_, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
     let msg = match pool.snapshot_filesystem(pool_uuid, fs_uuid, snapshot_name) {
         Ok(CreateAction::Created((uuid, fs))) => {

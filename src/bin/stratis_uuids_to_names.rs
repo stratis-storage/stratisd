@@ -32,8 +32,8 @@ use uuid::Uuid;
 
 pub const DEV_LOG: &str = "/dev/log";
 /// Syslog priority syntax
-/// (3 (SYSTEM) << 3) | 6 (INFO)
-pub const SYSTEM_DAEMON_INFO: &str = "<30>";
+/// (3 (SYSTEM) << 3) | 7 (DEBUG)
+pub const SYSTEM_DAEMON_DEBUG: &str = "<31>";
 /// Syslog priority syntax
 /// (3 (SYSTEM) << 3) | 3 (ERROR)
 pub const SYSTEM_DAEMON_ERROR: &str = "<27>";
@@ -176,7 +176,7 @@ fn main() -> Result<(), StratisUdevError> {
             sock.send_to(
                 format!(
                     "{}Symlink /dev/stratis/{}/{} created.",
-                    SYSTEM_DAEMON_INFO, pool_name, fs_name,
+                    SYSTEM_DAEMON_DEBUG, pool_name, fs_name,
                 )
                 .as_bytes(),
                 DEV_LOG,

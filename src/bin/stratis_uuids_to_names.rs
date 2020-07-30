@@ -175,7 +175,7 @@ fn main() -> Result<(), StratisUdevError> {
         Ok(Some((pool_name, fs_name))) => {
             sock.send_to(
                 format!(
-                    "{}Symlink /dev/stratis/{}/{} created.",
+                    "{}stratisd reported pool name {} and filesystem name {} to udev for given Stratis filesystem.",
                     SYSTEM_DAEMON_DEBUG, pool_name, fs_name,
                 )
                 .as_bytes(),

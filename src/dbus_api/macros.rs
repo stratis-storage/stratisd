@@ -113,20 +113,11 @@ macro_rules! initial_properties {
                 .map(|(s, v): (&str, dbus::arg::Variant<Box<dyn dbus::arg::RefArg>>)| {
                     (s.to_string(), v)
                 })
-                .collect::<std::collections::HashMap<
-                    String,
-                    dbus::arg::Variant<Box<dyn dbus::arg::RefArg>>
-                >>()),
+                .collect()),
             )*
         ]
         .into_iter()
         .map(|(s, v)| (s.to_string(), v))
-        .collect::<std::collections::HashMap<
-            String,
-            std::collections::HashMap<
-                String,
-                dbus::arg::Variant<Box<dyn dbus::arg::RefArg>>
-            >
-        >>()
+        .collect::<$crate::dbus_api::types::InterfacesAdded>()
     };
 }

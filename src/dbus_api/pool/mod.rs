@@ -2,17 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::collections::HashMap;
-
-use dbus::{
-    arg::{RefArg, Variant},
-    tree::Factory,
-};
+use dbus::{arg::Variant, tree::Factory};
 
 use crate::{
     dbus_api::{
         consts,
-        types::{DbusContext, OPContext, ObjectPathType},
+        types::{DbusContext, InterfacesAdded, OPContext, ObjectPathType},
         util::make_object_path,
     },
     engine::{MaybeDbusPath, Name, Pool, PoolUuid},
@@ -91,7 +86,7 @@ pub fn get_inital_properties(
     pool_name: &Name,
     pool_uuid: PoolUuid,
     pool: &dyn Pool,
-) -> HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>> {
+) -> InterfacesAdded {
     initial_properties! {
         consts::POOL_INTERFACE_NAME => {
             consts::POOL_NAME_PROP => shared::pool_name_prop(pool_name),

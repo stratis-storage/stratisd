@@ -21,6 +21,11 @@ use uuid::Uuid;
 
 use crate::{dbus_api::consts, engine::Engine};
 
+/// Type for interfaces parameter for `ObjectManagerInterfacesAdded`.
+pub type InterfacesAdded = HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>;
+/// Type for interfaces parameter for `ObjectManagerInterfacesRemoved`.
+pub type InterfacesRemoved = Vec<String>;
+
 #[derive(Clone, Copy, Debug)]
 #[allow(non_camel_case_types)]
 pub enum DbusErrorEnum {
@@ -48,11 +53,8 @@ impl DbusErrorEnum {
 
 #[derive(Debug)]
 pub enum DeferredAction {
-    Add(
-        ObjectPath<MTFn<TData>, TData>,
-        HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>,
-    ),
-    Remove(Path<'static>, Vec<String>),
+    Add(ObjectPath<MTFn<TData>, TData>, InterfacesAdded),
+    Remove(Path<'static>, InterfacesRemoved),
 }
 
 /// Indicates the type of object pointed to by the object path.
@@ -133,7 +135,7 @@ impl ActionQueue {
     pub fn push_add(
         &mut self,
         object_path: ObjectPath<MTFn<TData>, TData>,
-        interfaces: HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>,
+        interfaces: InterfacesAdded,
     ) {
         self.queue
             .push_back(DeferredAction::Add(object_path, interfaces))
@@ -147,7 +149,7 @@ impl ActionQueue {
         &mut self,
         item: &Path<'static>,
         tree: &Tree<MTFn<TData>, TData>,
-        interfaces: Vec<String>,
+        interfaces: InterfacesRemoved,
     ) {
         for opath in tree.iter().filter(|opath| {
             opath

@@ -2,10 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{cell::RefCell, collections::HashMap, rc::Rc, vec::Vec};
+use std::{cell::RefCell, rc::Rc};
 
 use dbus::{
-    arg::{RefArg, Variant},
     ffidisp::{
         stdintf::org_freedesktop_dbus::{
             ObjectManagerInterfacesAdded, ObjectManagerInterfacesRemoved,
@@ -24,7 +23,7 @@ use crate::{
         consts,
         filesystem::create_dbus_filesystem,
         pool::create_dbus_pool,
-        types::{DbusContext, DeferredAction, TData},
+        types::{DbusContext, DeferredAction, InterfacesAdded, InterfacesRemoved, TData},
     },
     engine::{Engine, Name, Pool, PoolUuid},
 };
@@ -133,7 +132,7 @@ impl DbusConnectionData {
     pub fn added_object_signal(
         &self,
         object: Path<'static>,
-        interfaces: HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>,
+        interfaces: InterfacesAdded,
     ) -> Result<(), dbus::Error> {
         self.connection
             .borrow()
@@ -151,7 +150,7 @@ impl DbusConnectionData {
     pub fn removed_object_signal(
         &self,
         object: Path<'static>,
-        interfaces: Vec<String>,
+        interfaces: InterfacesRemoved,
     ) -> Result<(), dbus::Error> {
         self.connection
             .borrow()

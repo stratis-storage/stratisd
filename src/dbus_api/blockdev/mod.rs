@@ -2,18 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::collections::HashMap;
-
-use dbus::{
-    arg::{RefArg, Variant},
-    tree::Factory,
-};
+use dbus::{arg::Variant, tree::Factory};
 use uuid::Uuid;
 
 use crate::{
     dbus_api::{
         consts,
-        types::{DbusContext, OPContext, ObjectPathType},
+        types::{DbusContext, InterfacesAdded, OPContext, ObjectPathType},
         util::make_object_path,
     },
     engine::{BlockDev, BlockDevTier, DevUuid, MaybeDbusPath},
@@ -82,7 +77,7 @@ pub fn get_inital_properties(
     dev_uuid: DevUuid,
     tier: BlockDevTier,
     dev: &dyn BlockDev,
-) -> HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>> {
+) -> InterfacesAdded {
     initial_properties! {
         consts::BLOCKDEV_INTERFACE_NAME => {
             consts::BLOCKDEV_DEVNODE_PROP => shared::blockdev_devnode_prop(dev),

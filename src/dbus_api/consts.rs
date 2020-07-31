@@ -2,6 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use crate::dbus_api::types::InterfacesRemoved;
+
 pub const STRATIS_BASE_PATH: &str = "/org/storage/stratis2";
 pub const STRATIS_BASE_SERVICE: &str = "org.storage.stratis2";
 
@@ -45,7 +47,7 @@ pub const BLOCKDEV_TIER_PROP: &str = "Tier";
 pub const BLOCKDEV_TOTAL_SIZE_PROP: &str = "TotalPhysicalSize";
 
 /// Get a list of all interfaces supported by a pool object.
-pub fn pool_interface_list() -> Vec<String> {
+pub fn pool_interface_list() -> InterfacesRemoved {
     [
         POOL_INTERFACE_NAME,
         POOL_INTERFACE_NAME_2_1,
@@ -58,7 +60,7 @@ pub fn pool_interface_list() -> Vec<String> {
 }
 
 /// Get a list of all interfaces supported by a filesystem object.
-pub fn filesystem_interface_list() -> Vec<String> {
+pub fn filesystem_interface_list() -> InterfacesRemoved {
     [
         FILESYSTEM_INTERFACE_NAME,
         PROPERTY_FETCH_INTERFACE_NAME,
@@ -70,7 +72,7 @@ pub fn filesystem_interface_list() -> Vec<String> {
 }
 
 /// Get a list of all interfaces supported by a blockdev object.
-pub fn blockdev_interface_list() -> Vec<String> {
+pub fn blockdev_interface_list() -> InterfacesRemoved {
     [
         BLOCKDEV_INTERFACE_NAME,
         PROPERTY_FETCH_INTERFACE_NAME,

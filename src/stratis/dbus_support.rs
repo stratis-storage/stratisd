@@ -40,7 +40,8 @@ impl MaybeDbusSupport {
     ) {
     }
 
-    pub fn register_pool(&mut self, _pool_name: Name, _pool_uuid: PoolUuid, _pool: &mut dyn Pool) {}
+    pub fn register_pool(&mut self, _pool_name: &Name, _pool_uuid: PoolUuid, _pool: &mut dyn Pool) {
+    }
 
     pub fn poll_timeout(&self) -> i32 {
         // Non-DBus timeout is infinite

@@ -97,3 +97,36 @@ macro_rules! properties_footer {
         }
     };
 }
+
+macro_rules! initial_properties {
+    ($($iface:expr => { $($prop:expr => $val:expr),* }),*) => {
+        vec![
+            $(
+                ($iface, vec![
+                    $(
+                        ($prop, Variant(
+                            Box::new($val) as Box<dyn dbus::arg::RefArg>
+                        )),
+                    )*
+                ]
+                .into_iter()
+                .map(|(s, v): (&str, dbus::arg::Variant<Box<dyn dbus::arg::RefArg>>)| {
+                    (s.to_string(), v)
+                })
+                .collect::<std::collections::HashMap<
+                    String,
+                    dbus::arg::Variant<Box<dyn dbus::arg::RefArg>>
+                >>()),
+            )*
+        ]
+        .into_iter()
+        .map(|(s, v)| (s.to_string(), v))
+        .collect::<std::collections::HashMap<
+            String,
+            std::collections::HashMap<
+                String,
+                dbus::arg::Variant<Box<dyn dbus::arg::RefArg>>
+            >
+        >>()
+    };
+}

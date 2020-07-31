@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, iter::FromIterator};
+use std::collections::HashMap;
 
 use dbus::{
     arg::{RefArg, Variant},
@@ -92,48 +92,17 @@ pub fn get_inital_properties(
     pool_uuid: PoolUuid,
     pool: &dyn Pool,
 ) -> HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>> {
-    let pool_iface_map = HashMap::from_iter(
-        vec![
-            (
-                consts::POOL_NAME_PROP,
-                Variant(Box::new(pool_name.to_string()) as Box<dyn RefArg>),
-            ),
-            (
-                consts::POOL_UUID_PROP,
-                Variant(Box::new(pool_uuid.to_simple_ref().to_string()) as Box<dyn RefArg>),
-            ),
-        ]
-        .into_iter()
-        .map(|(key, val)| (key.to_string(), val)),
-    );
-
-    let pool_2_1_iface_map = HashMap::from_iter(
-        vec![
-            (
-                consts::POOL_NAME_PROP,
-                Variant(Box::new(pool_name.to_string()) as Box<dyn RefArg>),
-            ),
-            (
-                consts::POOL_UUID_PROP,
-                Variant(Box::new(pool_uuid.to_simple_ref().to_string()) as Box<dyn RefArg>),
-            ),
-            (
-                consts::POOL_UUID_PROP,
-                Variant(Box::new(pool.is_encrypted()) as Box<dyn RefArg>),
-            ),
-        ]
-        .into_iter()
-        .map(|(key, val)| (key.to_string(), val)),
-    );
-
-    HashMap::from_iter(
-        vec![
-            (consts::POOL_INTERFACE_NAME, pool_iface_map),
-            (consts::POOL_INTERFACE_NAME_2_1, pool_2_1_iface_map),
-            (consts::PROPERTY_FETCH_INTERFACE_NAME, HashMap::new()),
-            (consts::PROPERTY_FETCH_INTERFACE_NAME_2_1, HashMap::new()),
-        ]
-        .into_iter()
-        .map(|(key, val)| (key.to_string(), val)),
-    )
+    initial_properties! {
+        consts::POOL_INTERFACE_NAME => {
+            consts::POOL_NAME_PROP => pool_name.to_string(),
+            consts::POOL_UUID_PROP => pool_uuid.to_simple_ref().to_string()
+        },
+        consts::POOL_INTERFACE_NAME_2_1 => {
+            consts::POOL_NAME_PROP => pool_name.to_string(),
+            consts::POOL_UUID_PROP => pool_uuid.to_simple_ref().to_string(),
+            consts::POOL_UUID_PROP => pool.is_encrypted()
+        },
+        consts::PROPERTY_FETCH_INTERFACE_NAME => {},
+        consts::PROPERTY_FETCH_INTERFACE_NAME_2_1 => {}
+    }
 }

@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, iter::FromIterator};
+use std::collections::HashMap;
 
 use chrono::SecondsFormat;
 use dbus::{
@@ -83,47 +83,17 @@ pub fn get_inital_properties(
     fs_uuid: FilesystemUuid,
     fs: &dyn Filesystem,
 ) -> HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>> {
-    let fs_iface_map = HashMap::from_iter(
-        vec![
-            (
-                consts::FILESYSTEM_NAME_PROP,
-                Variant(Box::new(fs_name.to_string()) as Box<dyn RefArg>),
-            ),
-            (
-                consts::FILESYSTEM_UUID_PROP,
-                Variant(Box::new(fs_uuid.to_simple_ref().to_string()) as Box<dyn RefArg>),
-            ),
-            (
-                consts::FILESYSTEM_DEVNODE_PROP,
-                Variant(Box::new(
-                    fs.path_to_mount_filesystem(pool_name, fs_name)
-                        .display()
-                        .to_string(),
-                ) as Box<dyn RefArg>),
-            ),
-            (
-                consts::FILESYSTEM_POOL_PROP,
-                Variant(Box::new(parent) as Box<dyn RefArg>),
-            ),
-            (
-                consts::FILESYSTEM_CREATED_PROP,
-                Variant(
-                    Box::new(fs.created().to_rfc3339_opts(SecondsFormat::Secs, true))
-                        as Box<dyn RefArg>,
-                ),
-            ),
-        ]
-        .into_iter()
-        .map(|(key, val)| (key.to_string(), val)),
-    );
-
-    HashMap::from_iter(
-        vec![
-            (consts::FILESYSTEM_INTERFACE_NAME, fs_iface_map),
-            (consts::PROPERTY_FETCH_INTERFACE_NAME, HashMap::new()),
-            (consts::PROPERTY_FETCH_INTERFACE_NAME_2_1, HashMap::new()),
-        ]
-        .into_iter()
-        .map(|(key, val)| (key.to_string(), val)),
-    )
+    initial_properties! {
+        consts::FILESYSTEM_INTERFACE_NAME => {
+            consts::FILESYSTEM_NAME_PROP => fs_name.to_string(),
+            consts::FILESYSTEM_UUID_PROP => fs_uuid.to_simple_ref().to_string(),
+            consts::FILESYSTEM_DEVNODE_PROP => fs.path_to_mount_filesystem(pool_name, fs_name)
+                .display()
+                .to_string(),
+            consts::FILESYSTEM_POOL_PROP => parent,
+            consts::FILESYSTEM_CREATED_PROP => fs.created().to_rfc3339_opts(SecondsFormat::Secs, true)
+        },
+        consts::PROPERTY_FETCH_INTERFACE_NAME => {},
+        consts::PROPERTY_FETCH_INTERFACE_NAME_2_1 => {}
+    }
 }

@@ -53,3 +53,35 @@ where
         .ok_or_else(|| format!("no blockdev with uuid {}", blockdev_data.uuid))?;
     closure(tier, blockdev)
 }
+
+/// Generate D-Bus representation of devnode property.
+#[inline]
+pub fn blockdev_devnode_prop(dev: &dyn BlockDev) -> String {
+    dev.devnode().user_path().display().to_string()
+}
+
+/// Generate D-Bus representation of hardware info property.
+#[inline]
+pub fn blockdev_hardware_info_prop(dev: &dyn BlockDev) -> (bool, String) {
+    dev.hardware_info()
+        .map_or_else(|| (false, "".to_owned()), |val| (true, val.to_owned()))
+}
+
+/// Generate D-Bus representation of user info property.
+#[inline]
+pub fn blockdev_user_info_prop(dev: &dyn BlockDev) -> (bool, String) {
+    dev.user_info()
+        .map_or_else(|| (false, "".to_owned()), |val| (true, val.to_owned()))
+}
+
+/// Generate D-Bus representation of initialization time property.
+#[inline]
+pub fn blockdev_init_time_prop(dev: &dyn BlockDev) -> u64 {
+    dev.initialization_time().timestamp() as u64
+}
+
+/// Generate D-Bus representation of tier property.
+#[inline]
+pub fn blockdev_tier_prop(tier: BlockDevTier) -> u16 {
+    tier as u16
+}

@@ -4,7 +4,6 @@
 
 use std::collections::HashMap;
 
-use chrono::SecondsFormat;
 use dbus::{
     arg::{RefArg, Variant},
     tree::Factory,
@@ -85,13 +84,11 @@ pub fn get_inital_properties(
 ) -> HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>> {
     initial_properties! {
         consts::FILESYSTEM_INTERFACE_NAME => {
-            consts::FILESYSTEM_NAME_PROP => fs_name.to_string(),
-            consts::FILESYSTEM_UUID_PROP => fs_uuid.to_simple_ref().to_string(),
-            consts::FILESYSTEM_DEVNODE_PROP => fs.path_to_mount_filesystem(pool_name, fs_name)
-                .display()
-                .to_string(),
+            consts::FILESYSTEM_NAME_PROP => shared::fs_name_prop(fs_name),
+            consts::FILESYSTEM_UUID_PROP => uuid_to_string!(fs_uuid),
+            consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop(fs, pool_name, fs_name),
             consts::FILESYSTEM_POOL_PROP => parent,
-            consts::FILESYSTEM_CREATED_PROP => fs.created().to_rfc3339_opts(SecondsFormat::Secs, true)
+            consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop(fs)
         },
         consts::PROPERTY_FETCH_INTERFACE_NAME => {},
         consts::PROPERTY_FETCH_INTERFACE_NAME_2_1 => {}

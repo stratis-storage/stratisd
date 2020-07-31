@@ -85,19 +85,13 @@ pub fn get_inital_properties(
 ) -> HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>> {
     initial_properties! {
         consts::BLOCKDEV_INTERFACE_NAME => {
-            consts::BLOCKDEV_DEVNODE_PROP => dev.devnode().user_path().display().to_string(),
-            consts::BLOCKDEV_HARDWARE_INFO_PROP => dev
-                .hardware_info()
-                .map_or_else(|| (false, "".to_owned()), |val| (true, val.to_owned())),
-            consts::BLOCKDEV_USER_INFO_PROP => dev
-                .user_info()
-                .map_or_else(|| (false, "".to_owned()), |val| (true, val.to_owned())),
-            consts::BLOCKDEV_INIT_TIME_PROP => dev
-                .initialization_time()
-                .timestamp() as u64,
+            consts::BLOCKDEV_DEVNODE_PROP => shared::blockdev_devnode_prop(dev),
+            consts::BLOCKDEV_HARDWARE_INFO_PROP => shared::blockdev_hardware_info_prop(dev),
+            consts::BLOCKDEV_USER_INFO_PROP => shared::blockdev_user_info_prop(dev),
+            consts::BLOCKDEV_INIT_TIME_PROP => shared::blockdev_init_time_prop(dev),
             consts::BLOCKDEV_POOL_PROP => parent,
-            consts::BLOCKDEV_UUID_PROP => dev_uuid.to_simple_ref().to_string(),
-            consts::BLOCKDEV_TIER_PROP => tier as u16
+            consts::BLOCKDEV_UUID_PROP => uuid_to_string!(dev_uuid),
+            consts::BLOCKDEV_TIER_PROP => shared::blockdev_tier_prop(tier)
         },
         consts::PROPERTY_FETCH_INTERFACE_NAME => {},
         consts::PROPERTY_FETCH_INTERFACE_NAME_2_1 => {}

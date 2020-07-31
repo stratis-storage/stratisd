@@ -192,7 +192,7 @@ pub fn pool_name_prop(name: &Name) -> String {
     name.to_owned()
 }
 
-/// Generate D-Bus representation of name property.
+/// Generate D-Bus representation of encrypted property.
 #[inline]
 pub fn pool_enc_prop(pool: &dyn Pool) -> bool {
     pool.is_encrypted()

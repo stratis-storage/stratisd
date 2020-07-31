@@ -57,19 +57,14 @@ impl DbusConnectionData {
     }
 
     /// Given the UUID of a pool, register all the pertinent information with dbus.
-    pub fn register_pool(&mut self, pool_name: Name, pool_uuid: PoolUuid, pool: &mut dyn Pool) {
-        let pool_path = create_dbus_pool(
-            &self.context,
-            self.path.clone(),
-            &pool_name,
-            pool_uuid,
-            pool,
-        );
+    pub fn register_pool(&mut self, pool_name: &Name, pool_uuid: PoolUuid, pool: &mut dyn Pool) {
+        let pool_path =
+            create_dbus_pool(&self.context, self.path.clone(), pool_name, pool_uuid, pool);
         for (fs_name, fs_uuid, fs) in pool.filesystems_mut() {
             create_dbus_filesystem(
                 &self.context,
                 pool_path.clone(),
-                &pool_name,
+                pool_name,
                 &fs_name,
                 fs_uuid,
                 fs,

@@ -37,7 +37,7 @@ impl<'a> UdevMonitor<'a> {
     pub fn handle_events(&mut self, engine: &mut dyn Engine, dbus_support: &mut MaybeDbusSupport) {
         while let Some(event) = self.socket.receive_event() {
             if let Some((pool_name, pool_uuid, pool)) = engine.handle_event(&event) {
-                dbus_support.register_pool(pool_name, pool_uuid, pool);
+                dbus_support.register_pool(&pool_name, pool_uuid, pool);
             }
         }
     }

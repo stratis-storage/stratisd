@@ -2,14 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{
-    fs::File,
-    io,
-    os::unix::io::{AsRawFd, RawFd},
-};
+use std::{fs::File, io, os::unix::io::AsRawFd};
 
 use clap::{App, Arg, ArgGroup, SubCommand};
-use termios::Termios;
 
 use libstratis::{
     engine::{DeleteAction, KeyActions, MappingCreateAction, StratKeyActions},
@@ -49,7 +44,7 @@ fn key_set(key_desc: &str, keyfile_path: Option<&str>) -> StratisResult<()> {
         }
         None => {
             let stdin_fd = io::stdin().as_raw_fd();
-            println!("Enter key data followed by return:");
+            println!("Enter desired key data followed by the return key:");
             StratKeyActions.set(key_desc, stdin_fd, Some(true))?
         }
     };
@@ -83,7 +78,10 @@ fn key_list() -> StratisResult<()> {
 }
 
 fn main() -> Result<(), String> {
-    let app = parse_args();
+    let mut app = parse_args();
+    let mut help = Vec::new();
+    app.write_long_help(&mut help).map_err(|e| e.to_string())?;
+    let help = String::from_utf8(help).map_err(|e| e.to_string())?;
     let args = app.get_matches();
     if let Some(subcommand) = args.subcommand_matches("key") {
         if let Some(args) = subcommand.subcommand_matches("set") {
@@ -98,7 +96,7 @@ fn main() -> Result<(), String> {
             key_list().map_err(|e| e.to_string())
         }
     } else {
-        println!("{}", args.usage());
+        println!("{}", help);
         Ok(())
     }
 }

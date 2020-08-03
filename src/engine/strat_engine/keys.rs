@@ -438,4 +438,8 @@ impl KeyActions for StratKeyActions {
             Ok(DeleteAction::Identity)
         }
     }
+
+    fn expiration(&self) -> StratisResult<String> {
+        Ok("Dummy expiration".to_string())
+    }
 }

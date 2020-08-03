@@ -110,3 +110,13 @@ pub fn locked_pool_uuids(info: &MethodInfo<MTFn<TData>, TData>) -> Result<Vec<St
         .map(|u| u.to_simple_ref().to_string())
         .collect())
 }
+
+pub fn keyring_expiration(info: &MethodInfo<MTFn<TData>, TData>) -> Result<String, String> {
+    let dbus_context = info.tree.get_data();
+
+    let engine = dbus_context.engine.borrow();
+    engine
+        .get_key_handler()
+        .expiration()
+        .map_err(|e| e.to_string())
+}

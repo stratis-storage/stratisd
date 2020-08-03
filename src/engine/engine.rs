@@ -64,6 +64,9 @@ pub trait KeyActions {
     /// Unset a key with the given key description in the root persistent kernel
     /// keyring.
     fn unset(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>>;
+
+    /// Get the keyring expiration.
+    fn expiration(&self) -> StratisResult<String>;
 }
 
 /// An interface for reporting internal engine state.

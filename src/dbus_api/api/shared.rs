@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{os::unix::io::AsRawFd, path::Path, vec::Vec};
+use std::{collections::HashMap, os::unix::io::AsRawFd, path::Path, vec::Vec};
 
 use dbus::{
     arg::{Array, OwnedFd},
@@ -156,4 +156,32 @@ pub fn locked_pool_uuids(info: &MethodInfo<MTFn<TData>, TData>) -> Result<Vec<St
         .into_iter()
         .map(|(u, _)| u.to_simple_ref().to_string())
         .collect())
+}
+
+pub fn locked_pools(
+    info: &MethodInfo<MTFn<TData>, TData>,
+) -> Result<HashMap<String, String>, String> {
+    let dbus_context = info.tree.get_data();
+
+    let engine = dbus_context.engine.borrow();
+    Ok(engine
+        .locked_pools()
+        .into_iter()
+        .map(|(u, kd)| {
+            (
+                u.to_simple_ref().to_string(),
+                kd.as_application_str().to_string(),
+            )
+        })
+        .collect())
+}
+
+pub fn keyring_expiration(info: &MethodInfo<MTFn<TData>, TData>) -> Result<String, String> {
+    let dbus_context = info.tree.get_data();
+
+    let engine = dbus_context.engine.borrow();
+    engine
+        .get_key_handler()
+        .expiration()
+        .map_err(|e| e.to_string())
 }

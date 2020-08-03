@@ -15,8 +15,10 @@ pub const REPORT_INTERFACE_NAME_2_1: &str = "org.storage.stratis2.Report.r1";
 pub const PROPERTY_FETCH_INTERFACE_NAME: &str = "org.storage.stratis2.FetchProperties";
 pub const PROPERTY_FETCH_INTERFACE_NAME_2_1: &str = "org.storage.stratis2.FetchProperties.r1";
 pub const PROPERTY_FETCH_INTERFACE_NAME_2_2: &str = "org.storage.stratis2.FetchProperties.r2";
+pub const PROPERTY_FETCH_INTERFACE_NAME_2_3: &str = "org.storage.stratis2.FetchProperties.r3";
 
 pub const KEY_LIST_PROP: &str = "KeyList";
+pub const KEYRING_EXPIRATION_PROP: &str = "KeyringExpiration";
 
 pub const LOCKED_POOL_UUIDS: &str = "LockedPoolUuids";
 pub const LOCKED_POOLS: &str = "LockedPools";
@@ -58,6 +60,7 @@ pub fn fetch_properties_interfaces() -> Vec<String> {
         PROPERTY_FETCH_INTERFACE_NAME,
         PROPERTY_FETCH_INTERFACE_NAME_2_1,
         PROPERTY_FETCH_INTERFACE_NAME_2_2,
+        PROPERTY_FETCH_INTERFACE_NAME_2_3,
     ]
     .iter()
     .map(|s| (*s).to_string())

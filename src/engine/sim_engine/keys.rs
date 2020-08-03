@@ -75,4 +75,8 @@ impl KeyActions for SimKeyActions {
             None => Ok(DeleteAction::Identity),
         }
     }
+
+    fn expiration(&self) -> StratisResult<String> {
+        Ok("No expiration".to_string())
+    }
 }

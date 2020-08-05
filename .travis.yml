@@ -61,6 +61,9 @@ jobs:
     - name: "build without defaults using stable toolchain"
       rust: stable
       env: TASK=build-no-default
+    - name: "build extras using stable toolchain"
+      rust: stable
+      env: TASK=build-extras
     - name: "build Rust docs using stable toolchain"
       rust: stable
       env: TASK=docs-travis

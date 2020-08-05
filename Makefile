@@ -60,6 +60,11 @@ build-no-default:
 	RUSTFLAGS="${DENY}" \
 	cargo build --no-default-features ${TARGET_ARGS}
 
+build-extras:
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY}" \
+	cargo build --features extras ${TARGET_ARGS}
+
 stratis-dumpmetadata:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \

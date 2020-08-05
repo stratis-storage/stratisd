@@ -142,6 +142,7 @@ clippy:
 	license
 	outdated
 	release
+	stratis-min
 	test
 	test-loop
 	test-real

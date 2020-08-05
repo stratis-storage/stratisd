@@ -15,6 +15,7 @@ use libstratis::{
 /// settings and settings such as `NOECHO` are not set. This option should be
 /// used carefully as it will cause the password to be echoed on the screen if
 /// invoked interactively.
+// stratis-min key set
 pub fn key_set(key_desc: &str, keyfile_path: Option<&str>, no_tty: bool) -> StratisResult<()> {
     let ret = match keyfile_path {
         Some(kp) => {
@@ -37,6 +38,7 @@ pub fn key_set(key_desc: &str, keyfile_path: Option<&str>, no_tty: bool) -> Stra
     }
 }
 
+// stratis-min key unset
 pub fn key_unset(key_desc: &str) -> StratisResult<()> {
     match StratKeyActions.unset(key_desc)? {
         DeleteAction::Deleted(()) => Ok(()),
@@ -47,6 +49,7 @@ pub fn key_unset(key_desc: &str) -> StratisResult<()> {
     }
 }
 
+// stratis-min key [list]
 pub fn key_list() -> StratisResult<()> {
     let keys = StratKeyActions.list()?;
     println!("Key description");

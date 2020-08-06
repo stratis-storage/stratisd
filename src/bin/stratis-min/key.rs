@@ -9,6 +9,8 @@ use libstratis::{
     stratis::{StratisError, StratisResult},
 };
 
+use crate::print_table;
+
 /// This method sets a key in the kernel keyring. It accepts an optional keyfile path
 /// and if this is not provided, the user is prompted for a passphrase. When `no_tty`
 /// is true, this command assumes that no TTY is available for setting terminal
@@ -51,10 +53,14 @@ pub fn key_unset(key_desc: &str) -> StratisResult<()> {
 
 // stratis-min key [list]
 pub fn key_list() -> StratisResult<()> {
-    let keys = StratKeyActions.list()?;
-    println!("Key description");
-    for key in keys.iter() {
-        println!("{}", key.as_application_str());
-    }
+    print_table!(
+        "Key Description",
+        StratKeyActions
+            .list()?
+            .into_iter()
+            .map(|kd| kd.as_application_str().to_string())
+            .collect::<Vec<_>>(),
+        "<"
+    );
     Ok(())
 }

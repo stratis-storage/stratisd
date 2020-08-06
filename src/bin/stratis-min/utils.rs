@@ -1,6 +1,32 @@
 #[macro_export]
+macro_rules! left_align {
+    ($string:expr, $max_length:expr) => {{
+        let len = $string.len();
+        $string + vec![" "; $max_length - len + 3].join("").as_str()
+    }};
+}
+
+#[macro_export]
+macro_rules! right_align {
+    ($string:expr, $max_length:expr) => {
+        vec![" "; $max_length - $string.len() + 3].join("") + $string.as_str()
+    };
+}
+
+#[macro_export]
+macro_rules! align {
+    ($string:expr, $max_length:expr, $align:tt) => {
+        if $align == ">" {
+            $crate::right_align!($string, $max_length)
+        } else {
+            $crate::left_align!($string, $max_length)
+        }
+    };
+}
+
+#[macro_export]
 macro_rules! print_table {
-    ($($heading:expr, $values:expr);*) => {{
+    ($($heading:expr, $values:expr, $align:tt);*) => {{
         let (lengths_same, lengths) = vec![$($values.len()),*]
             .into_iter()
             .fold((true, None), |(is_same, len_opt), len| {
@@ -27,13 +53,10 @@ macro_rules! print_table {
                     }
                 });
             if let Some(string) = output.get_mut(0) {
-                string.push_str(($heading.to_string() + vec![" "; max_length - $heading.len() + 4].join("").as_str()).as_str());
+                string.push_str($crate::align!($heading.to_string(), max_length, $align).as_str());
             }
             for (index, row_seg) in $values.into_iter()
-                .map(|s| {
-                    let len = s.len();
-                    s + vec![" "; max_length - len + 4].join("").as_str()
-                })
+                .map(|s| $crate::align!(s, max_length, $align))
                 .enumerate()
             {
                 if let Some(string) = output.get_mut(index + 1) {

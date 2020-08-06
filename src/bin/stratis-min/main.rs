@@ -8,6 +8,7 @@ use clap::{App, Arg, ArgGroup, SubCommand};
 
 mod key;
 mod pool;
+#[macro_use]
 mod utils;
 
 fn parse_args() -> App<'static, 'static> {
@@ -50,6 +51,10 @@ fn parse_args() -> App<'static, 'static> {
                         .long("--key-desc")
                         .takes_value(true),
                 ),
+            SubCommand::with_name("init-cache")
+                .arg(Arg::with_name("name").required(true))
+                .arg(Arg::with_name("blockdevs").multiple(true).required(true)),
+            SubCommand::with_name("destroy").arg(Arg::with_name("name").required(true)),
         ]),
     ])
 }
@@ -88,6 +93,16 @@ fn main() -> Result<(), String> {
                 args.value_of("key_desc").map(|s| s.to_owned()),
             )
             .map_err(|e| e.to_string())
+        } else if let Some(args) = subcommand.subcommand_matches("destroy") {
+            pool::pool_destroy(args.value_of("name").expect("required")).map_err(|e| e.to_string())
+        } else if let Some(args) = subcommand.subcommand_matches("init-cache") {
+            let paths = args
+                .values_of("blockdevs")
+                .expect("required")
+                .map(|s| Path::new(s))
+                .collect::<Vec<_>>();
+            pool::pool_init_cache(args.value_of("name").expect("required"), paths.as_slice())
+                .map_err(|e| e.to_string())
         } else {
             pool::pool_list().map_err(|e| e.to_string())
         }

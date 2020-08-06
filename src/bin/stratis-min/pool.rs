@@ -7,11 +7,21 @@ use std::path::Path;
 use libudev::{Context, Monitor};
 
 use libstratis::{
-    engine::{Engine, StratEngine},
+    engine::{Engine, Pool, StratEngine},
     stratis::StratisResult,
 };
 
 use crate::print_table;
+
+const SUFFIXES: &[(u64, &str)] = &[
+    (60, "EiB"),
+    (50, "PiB"),
+    (40, "TiB"),
+    (30, "GiB"),
+    (20, "MiB"),
+    (10, "KiB"),
+    (1, "B"),
+];
 
 // stratis-min pool setup
 pub fn pool_setup() -> StratisResult<()> {
@@ -43,24 +53,60 @@ pub fn pool_create(
     Ok(())
 }
 
+fn to_suffix(size: u64) -> String {
+    SUFFIXES.iter().fold(String::new(), |acc, (div, suffix)| {
+        let div_shifted = 1 << div;
+        if acc.is_empty() && size / div_shifted >= 1 {
+            format!(
+                "{:.2} {}",
+                (size / div_shifted) as f64 + ((size % div_shifted) as f64 / div_shifted as f64),
+                suffix
+            )
+        } else {
+            acc
+        }
+    })
+}
+
+fn size_string(p: &dyn Pool) -> String {
+    let size = p.total_physical_size().bytes();
+    let used = p.total_physical_used().ok().map(|u| u.bytes());
+    let free = used.map(|u| size - u);
+    format!(
+        "{} / {} / {}",
+        to_suffix(*size),
+        match used {
+            Some(u) => to_suffix(*u),
+            None => "FAILURE".to_string(),
+        },
+        match free {
+            Some(f) => to_suffix(*f),
+            None => "FAILURE".to_string(),
+        }
+    )
+}
+
+fn properties_string(p: &dyn Pool) -> String {
+    let ca = if p.has_cache() { " Ca" } else { "~Ca" };
+    let cr = if p.is_encrypted() { " Cr" } else { "~Cr" };
+    vec![ca, cr].join(",")
+}
+
 // stratis-min pool [list]
 pub fn pool_list() -> StratisResult<()> {
     let engine = StratEngine::initialize()?;
 
     let pools = engine.pools();
     let name_col: Vec<_> = pools.iter().map(|(n, _, _)| n.to_string()).collect();
-    let uuid_col: Vec<_> = pools
+    let physical_col: Vec<_> = pools.iter().map(|(_, _, p)| size_string(*p)).collect();
+    let properties_col: Vec<_> = pools
         .iter()
-        .map(|(_, u, _)| u.to_simple_ref().to_string())
-        .collect();
-    let encrypted_col: Vec<_> = pools
-        .iter()
-        .map(|(_, _, p)| p.is_encrypted().to_string())
+        .map(|(_, _, p)| properties_string(*p))
         .collect();
     print_table!(
-        "Pool name", name_col;
-        "UUID", uuid_col;
-        "Encrypted", encrypted_col
+        "Name", name_col, "<";
+        "Total Physical", physical_col, ">";
+        "Properties", properties_col, ">"
     );
 
     Ok(())

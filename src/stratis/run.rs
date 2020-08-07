@@ -123,7 +123,6 @@ pub fn run(sim: bool) -> StratisResult<()> {
     let mut sfd = {
         let mut mask = SigSet::empty();
         mask.add(signal::SIGINT);
-        mask.add(signal::SIGUSR1);
         mask.thread_block()?;
         SignalFd::with_flags(&mask, SfdFlags::SFD_NONBLOCK)?
     };

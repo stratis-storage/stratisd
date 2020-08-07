@@ -4,7 +4,7 @@
 
 use std::path::Path;
 
-use clap::{App, Arg, ArgGroup, SubCommand};
+use clap::{App, Arg, ArgGroup, ArgMatches, SubCommand};
 
 mod key;
 mod pool;
@@ -54,9 +54,22 @@ fn parse_args() -> App<'static, 'static> {
             SubCommand::with_name("init-cache")
                 .arg(Arg::with_name("name").required(true))
                 .arg(Arg::with_name("blockdevs").multiple(true).required(true)),
+            SubCommand::with_name("rename")
+                .arg(Arg::with_name("current_name").required(true))
+                .arg(Arg::with_name("new_name").required(true)),
+            SubCommand::with_name("add-data")
+                .arg(Arg::with_name("name").required(true))
+                .arg(Arg::with_name("blockdevs").multiple(true).required(true)),
             SubCommand::with_name("destroy").arg(Arg::with_name("name").required(true)),
         ]),
     ])
+}
+
+fn get_paths_from_args<'a>(args: &'a ArgMatches<'a>) -> Vec<&'a Path> {
+    args.values_of("blockdevs")
+        .expect("required")
+        .map(|s| Path::new(s))
+        .collect::<Vec<_>>()
 }
 
 fn main() -> Result<(), String> {
@@ -82,11 +95,7 @@ fn main() -> Result<(), String> {
         if let Some("setup") = subcommand.subcommand_name() {
             pool::pool_setup().map_err(|e| e.to_string())
         } else if let Some(args) = subcommand.subcommand_matches("create") {
-            let paths = args
-                .values_of("blockdevs")
-                .expect("required")
-                .map(|s| Path::new(s))
-                .collect::<Vec<_>>();
+            let paths = get_paths_from_args(args);
             pool::pool_create(
                 args.value_of("name").expect("required"),
                 paths.as_slice(),
@@ -96,12 +105,22 @@ fn main() -> Result<(), String> {
         } else if let Some(args) = subcommand.subcommand_matches("destroy") {
             pool::pool_destroy(args.value_of("name").expect("required")).map_err(|e| e.to_string())
         } else if let Some(args) = subcommand.subcommand_matches("init-cache") {
-            let paths = args
-                .values_of("blockdevs")
-                .expect("required")
-                .map(|s| Path::new(s))
-                .collect::<Vec<_>>();
+            let paths = get_paths_from_args(args);
             pool::pool_init_cache(args.value_of("name").expect("required"), paths.as_slice())
+                .map_err(|e| e.to_string())
+        } else if let Some(args) = subcommand.subcommand_matches("rename") {
+            pool::pool_rename(
+                args.value_of("current_name").expect("required"),
+                args.value_of("new_name").expect("required"),
+            )
+            .map_err(|e| e.to_string())
+        } else if let Some(args) = subcommand.subcommand_matches("add-data") {
+            let paths = get_paths_from_args(args);
+            pool::pool_add_data(args.value_of("name").expect("required"), paths.as_slice())
+                .map_err(|e| e.to_string())
+        } else if let Some(args) = subcommand.subcommand_matches("add-cache") {
+            let paths = get_paths_from_args(args);
+            pool::pool_add_cache(args.value_of("name").expect("required"), paths.as_slice())
                 .map_err(|e| e.to_string())
         } else {
             pool::pool_list().map_err(|e| e.to_string())

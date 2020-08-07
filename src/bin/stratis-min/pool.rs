@@ -8,7 +8,10 @@ use libudev::{Context, Monitor};
 use uuid::Uuid;
 
 use libstratis::{
-    engine::{CreateAction, DeleteAction, Engine, Pool, StratEngine},
+    engine::{
+        BlockDevTier, CreateAction, DeleteAction, Engine, EngineAction, Pool, RenameAction,
+        StratEngine,
+    },
     stratis::{StratisError, StratisResult},
 };
 
@@ -66,7 +69,93 @@ pub fn pool_create(
     }
 }
 
-fn to_suffix(size: u64) -> String {
+/// Convert a string representing the name of a pool to the UUID and stratisd
+/// data structure representing the pool state.
+fn name_to_uuid_and_pool<'a>(
+    engine: &'a mut StratEngine,
+    name: &str,
+) -> Option<(Uuid, &'a mut dyn Pool)> {
+    let mut uuids_pools_for_name = engine
+        .pools_mut()
+        .into_iter()
+        .filter_map(|(n, u, p)| if &*n == name { Some((u, p)) } else { None })
+        .collect::<Vec<_>>();
+    assert!(uuids_pools_for_name.len() <= 1);
+    uuids_pools_for_name.pop()
+}
+
+// stratis-min pool destroy
+pub fn pool_destroy(name: &str) -> StratisResult<()> {
+    let mut engine = StratEngine::initialize()?;
+    let (uuid, _) = name_to_uuid_and_pool(&mut engine, name)
+        .ok_or_else(|| StratisError::Error(format!("No pool found with name {}", name)))?;
+    if let DeleteAction::Identity = engine.destroy_pool(uuid)? {
+        Err(StratisError::Error(format!(
+            "Pool with name {} does not exist to be deleted.",
+            name
+        )))
+    } else {
+        Ok(())
+    }
+}
+
+// stratis-min pool init-cache
+pub fn pool_init_cache(name: &str, paths: &[&Path]) -> StratisResult<()> {
+    let mut engine = StratEngine::initialize()?;
+    let (uuid, pool) = name_to_uuid_and_pool(&mut engine, name)
+        .ok_or_else(|| StratisError::Error(format!("No pool found with name {}", name)))?;
+    if pool.init_cache(uuid, name, paths)?.is_changed() {
+        Ok(())
+    } else {
+        Err(StratisError::Error(
+            "The cache has already been initialized as requested.".to_string(),
+        ))
+    }
+}
+
+// stratis-min pool rename
+pub fn pool_rename(current_name: &str, new_name: &str) -> StratisResult<()> {
+    let mut engine = StratEngine::initialize()?;
+    let (uuid, _) = name_to_uuid_and_pool(&mut engine, current_name)
+        .ok_or_else(|| StratisError::Error(format!("No pool found with name {}", current_name)))?;
+    match engine.rename_pool(uuid, new_name)? {
+        RenameAction::Identity => Err(StratisError::Error(format!(
+            "The selected pool is already named {}",
+            current_name
+        ))),
+        RenameAction::NoSource => unreachable!(),
+        _ => Ok(()),
+    }
+}
+
+// stratis-min pool add-data
+pub fn pool_add_data(name: &str, blockdevs: &[&Path]) -> StratisResult<()> {
+    add_blockdevs(name, blockdevs, BlockDevTier::Data)
+}
+
+// stratis-min pool add-cache
+pub fn pool_add_cache(name: &str, blockdevs: &[&Path]) -> StratisResult<()> {
+    add_blockdevs(name, blockdevs, BlockDevTier::Cache)
+}
+
+fn add_blockdevs(name: &str, blockdevs: &[&Path], tier: BlockDevTier) -> StratisResult<()> {
+    let mut engine = StratEngine::initialize()?;
+    let (uuid, pool) = name_to_uuid_and_pool(&mut engine, name)
+        .ok_or_else(|| StratisError::Error(format!("No pool found with name {}", name)))?;
+    if pool
+        .add_blockdevs(uuid, name, blockdevs, tier)?
+        .is_changed()
+    {
+        Ok(())
+    } else {
+        Err(StratisError::Error(format!(
+            "Pool {} already contains the given block devices",
+            name
+        )))
+    }
+}
+
+fn to_suffix_repr(size: u64) -> String {
     SUFFIXES.iter().fold(String::new(), |acc, (div, suffix)| {
         let div_shifted = 1 << div;
         if acc.is_empty() && size / div_shifted >= 1 {
@@ -81,56 +170,19 @@ fn to_suffix(size: u64) -> String {
     })
 }
 
-fn name_to_uuid_and_pool<'a>(
-    engine: &'a mut StratEngine,
-    name: &str,
-) -> StratisResult<(Uuid, &'a mut dyn Pool)> {
-    let mut uuids_pools_for_name = engine
-        .pools_mut()
-        .into_iter()
-        .filter_map(|(n, u, p)| if &*n == name { Some((u, p)) } else { None })
-        .collect::<Vec<_>>();
-    assert!(uuids_pools_for_name.len() <= 1);
-    let (uuid, pool) = uuids_pools_for_name
-        .pop()
-        .ok_or_else(|| StratisError::Error("No UUID found for the given name.".to_string()))?;
-    Ok((uuid, pool))
-}
-
-// stratis-min pool destroy
-pub fn pool_destroy(name: &str) -> StratisResult<()> {
-    let mut engine = StratEngine::initialize()?;
-    let (uuid, _) = name_to_uuid_and_pool(&mut engine, name)?;
-    match engine.destroy_pool(uuid)? {
-        DeleteAction::Identity => Err(StratisError::Error(format!(
-            "Pool with name {} does not exist to be deleted.",
-            name
-        ))),
-        _ => Ok(()),
-    }
-}
-
-// stratis-min pool init-cache
-pub fn pool_init_cache(name: &str, paths: &[&Path]) -> StratisResult<()> {
-    let mut engine = StratEngine::initialize()?;
-    let (uuid, pool) = name_to_uuid_and_pool(&mut engine, name)?;
-    pool.init_cache(uuid, name, paths)?;
-    Ok(())
-}
-
 fn size_string(p: &dyn Pool) -> String {
     let size = p.total_physical_size().bytes();
     let used = p.total_physical_used().ok().map(|u| u.bytes());
     let free = used.map(|u| size - u);
     format!(
         "{} / {} / {}",
-        to_suffix(*size),
+        to_suffix_repr(*size),
         match used {
-            Some(u) => to_suffix(*u),
+            Some(u) => to_suffix_repr(*u),
             None => "FAILURE".to_string(),
         },
         match free {
-            Some(f) => to_suffix(*f),
+            Some(f) => to_suffix_repr(*f),
             None => "FAILURE".to_string(),
         }
     )

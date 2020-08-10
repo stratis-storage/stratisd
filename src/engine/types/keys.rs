@@ -42,7 +42,7 @@ impl AsRef<[u8]> for SizedKeyMemory {
 }
 
 /// A data type respresenting a key description for the kernel keyring
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct KeyDescription(String);
 
 impl KeyDescription {

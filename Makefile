@@ -89,6 +89,12 @@ build-extras:
 	RUSTFLAGS="${DENY}" \
 	cargo build --features extras ${TARGET_ARGS}
 
+build-min:
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY}" \
+	cargo build --bin=stratis-min --bin=stratisd-min --no-default-features \
+	--features min ${TARGET_ARGS}
+
 stratis-dumpmetadata:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
@@ -97,7 +103,12 @@ stratis-dumpmetadata:
 stratis-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build --bin=stratis-min --features extras ${TARGET_ARGS}
+	cargo build --bin=stratis-min --features min ${TARGET_ARGS}
+
+stratisd-min:
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY}" \
+	cargo build --bin=stratisd-min --features min ${TARGET_ARGS}
 
 release:
 	RUSTFLAGS="${DENY}" cargo build --release
@@ -146,6 +157,7 @@ clippy:
 	license
 	outdated
 	release
+	build-min
 	test
 	test-loop
 	test-real

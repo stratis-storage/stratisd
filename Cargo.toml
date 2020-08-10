@@ -17,6 +17,10 @@ required-features = ["dbus_enabled"]
 name = "stratis_dbusquery_version"
 required-features = ["dbus_enabled"]
 
+[[bin]]
+name = "stratis-min"
+required-features = ["extras"]
+
 [dependencies]
 clap = "2"
 nix = "0.14"

@@ -17,7 +17,7 @@ mod serde_structs;
 mod thinpool;
 mod writing;
 
-pub use self::{engine::StratEngine, metadata::BDA};
+pub use self::{engine::StratEngine, keys::StratKeyActions, metadata::BDA};
 
 #[cfg(test)]
 mod tests;

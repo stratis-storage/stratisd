@@ -2,27 +2,21 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{
-    collections::HashMap,
-    convert::TryFrom,
-    fs::File,
-    io::{Read, Write},
-    os::unix::io::{FromRawFd, RawFd},
-};
+use std::{collections::HashMap, convert::TryFrom, io::Write, os::unix::io::RawFd};
 
-use devicemapper::Bytes;
 use libcryptsetup_rs::SafeMemHandle;
 
 use crate::{
     engine::{
         engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
+        shared,
         types::{DeleteAction, KeyDescription, KeySerial, MappingCreateAction, SizedKeyMemory},
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::StratisResult,
 };
 
 #[derive(Debug, Default)]
-pub struct SimKeyActions(HashMap<KeyDescription, Vec<u8>>);
+pub struct SimKeyActions(HashMap<KeyDescription, SizedKeyMemory>);
 
 impl SimKeyActions {
     pub fn contains_key(&self, key_desc: &KeyDescription) -> bool {
@@ -37,10 +31,9 @@ impl SimKeyActions {
     ) -> StratisResult<Option<(KeySerial, SizedKeyMemory)>> {
         match self.0.get(key_desc) {
             Some(key) => {
-                let mut mem = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
-                mem.as_mut().write_all(key)?;
-                let key = SizedKeyMemory::new(mem, key.len());
-                Ok(Some((0xdead_beef, key)))
+                let mut key_clone = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
+                let size = key_clone.as_mut().write(key.as_ref())?;
+                Ok(Some((0xdead_beef, SizedKeyMemory::new(key_clone, size))))
             }
             None => Ok(None),
         }
@@ -52,51 +45,22 @@ impl KeyActions for SimKeyActions {
         &mut self,
         key_desc: &str,
         key_fd: RawFd,
-        interactive: bool,
+        interactive: Option<bool>,
     ) -> StratisResult<MappingCreateAction<()>> {
-        let key_file = unsafe { File::from_raw_fd(key_fd) };
-        let new_key_data = &mut [0u8; MAX_STRATIS_PASS_SIZE];
-        let mut bytes_iter = key_file.bytes();
-
-        let mut pos = 0;
-        while pos < MAX_STRATIS_PASS_SIZE {
-            match bytes_iter.next() {
-                Some(Ok(b)) => {
-                    if interactive && b as char == '\n' {
-                        break;
-                    }
-
-                    new_key_data[pos] = b;
-                    pos += 1;
-                }
-                Some(Err(e)) => return Err(e.into()),
-                None => break,
-            }
-        }
-        if pos == MAX_STRATIS_PASS_SIZE && bytes_iter.next().is_some() {
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
-                format!(
-                    "Provided key exceeded maximum allow length of {}",
-                    Bytes(MAX_STRATIS_PASS_SIZE as u64)
-                ),
-            ));
-        }
+        let memory = shared::set_key_shared(key_fd, interactive)?;
 
         let key_description = KeyDescription::try_from(key_desc.to_string())?;
         match self.read(&key_description) {
             Ok(Some((_, key_data))) => {
-                if key_data.as_ref() == new_key_data as &[u8] {
+                if key_data.as_ref() == memory.as_ref() {
                     Ok(MappingCreateAction::Identity)
                 } else {
-                    self.0
-                        .insert(key_description.clone(), new_key_data.to_vec());
+                    self.0.insert(key_description.clone(), memory);
                     Ok(MappingCreateAction::ValueChanged(()))
                 }
             }
             Ok(None) => {
-                self.0
-                    .insert(key_description.clone(), new_key_data.to_vec());
+                self.0.insert(key_description.clone(), memory);
                 Ok(MappingCreateAction::Created(()))
             }
             Err(e) => Err(e),

@@ -2,24 +2,16 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{
-    convert::TryFrom,
-    ffi::CString,
-    fs::File,
-    io::{self, Read},
-    mem::size_of,
-    os::unix::io::{FromRawFd, RawFd},
-    str,
-};
+use std::{convert::TryFrom, ffi::CString, io, mem::size_of, os::unix::io::RawFd, str};
 
 use libc::{syscall, SYS_add_key, SYS_keyctl};
 
-use devicemapper::Bytes;
 use libcryptsetup_rs::SafeMemHandle;
 
 use crate::{
     engine::{
         engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
+        shared,
         strat_engine::names::KeyDescription,
         types::{DeleteAction, KeySerial, MappingCreateAction, SizedKeyMemory},
     },
@@ -382,42 +374,13 @@ impl KeyActions for StratKeyActions {
         &mut self,
         key_desc: &str,
         key_fd: RawFd,
-        interactive: bool,
+        interactive: Option<bool>,
     ) -> StratisResult<MappingCreateAction<()>> {
-        let key_file = unsafe { File::from_raw_fd(key_fd) };
-        let mut memory = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
-        let mut bytes_iter = key_file.bytes();
-
-        let mut pos = 0;
-        while pos < MAX_STRATIS_PASS_SIZE {
-            match bytes_iter.next() {
-                Some(Ok(b)) => {
-                    if interactive && b as char == '\n' {
-                        break;
-                    }
-
-                    memory.as_mut()[pos] = b;
-                    pos += 1;
-                }
-                Some(Err(e)) => return Err(e.into()),
-                None => break,
-            }
-        }
-        if pos == MAX_STRATIS_PASS_SIZE && bytes_iter.next().is_some() {
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
-                format!(
-                    "Provided key exceeded maximum allow length of {}",
-                    Bytes(MAX_STRATIS_PASS_SIZE as u64)
-                ),
-            ));
-        }
-
-        let sized_memory = SizedKeyMemory::new(memory, pos);
+        let memory = shared::set_key_shared(key_fd, interactive)?;
 
         Ok(set_key_idem(
             &KeyDescription::try_from(key_desc.to_string())?,
-            sized_memory,
+            memory,
         )?)
     }
 

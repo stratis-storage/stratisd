@@ -4,14 +4,22 @@
 
 use std::{
     collections::{hash_map::RandomState, HashSet},
+    fs::File,
+    io::{self, Read},
     iter::FromIterator,
+    os::unix::io::{FromRawFd, RawFd},
     path::{Path, PathBuf},
 };
 
+use termios::Termios;
+
+use devicemapper::Bytes;
+use libcryptsetup_rs::SafeMemHandle;
+
 use crate::{
     engine::{
-        engine::Pool,
-        types::{BlockDevTier, CreateAction, DevUuid, PoolUuid, SetCreateAction},
+        engine::{Pool, MAX_STRATIS_PASS_SIZE},
+        types::{BlockDevTier, CreateAction, DevUuid, PoolUuid, SetCreateAction, SizedKeyMemory},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -87,4 +95,70 @@ where
             init_cache_generate_error_string!(in_input, in_pool),
         ))
     }
+}
+
+/// Shared implementation of setting keys in the keyring for both the strat_engine
+/// and sim_engine.
+pub fn set_key_shared(key_fd: RawFd, interactive: Option<bool>) -> StratisResult<SizedKeyMemory> {
+    fn read_loop(
+        bytes_iter: &mut io::Bytes<File>,
+        mem: &mut [u8],
+        interactive: bool,
+    ) -> StratisResult<usize> {
+        let mut pos = 0;
+        while pos < MAX_STRATIS_PASS_SIZE {
+            match bytes_iter.next() {
+                Some(Ok(b)) => {
+                    if interactive && b as char == '\n' {
+                        break;
+                    }
+
+                    mem[pos] = b;
+                    pos += 1;
+                }
+                Some(Err(e)) => return Err(e.into()),
+                None => break,
+            }
+        }
+        Ok(pos)
+    }
+
+    let key_file = unsafe { File::from_raw_fd(key_fd) };
+    let mut memory = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
+
+    let old_attrs = if let Some(true) = interactive {
+        let old_attrs = Termios::from_fd(key_fd)?;
+        let mut new_attrs = old_attrs;
+        new_attrs.c_lflag &= !(termios::ICANON | termios::ECHO);
+        new_attrs.c_cc[termios::VMIN] = 1;
+        new_attrs.c_cc[termios::VTIME] = 0;
+        termios::tcsetattr(key_fd, termios::TCSANOW, &new_attrs)?;
+        Some(old_attrs)
+    } else {
+        None
+    };
+
+    let mut bytes_iter = key_file.bytes();
+
+    let res = read_loop(&mut bytes_iter, memory.as_mut(), interactive.is_some());
+
+    if let Some(ref oa) = old_attrs {
+        termios::tcsetattr(key_fd, termios::TCSANOW, oa)?;
+    }
+
+    let pos = res?;
+
+    if pos == MAX_STRATIS_PASS_SIZE && bytes_iter.next().is_some() {
+        return Err(StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!(
+                "Provided key exceeded maximum allow length of {}",
+                Bytes(MAX_STRATIS_PASS_SIZE as u64)
+            ),
+        ));
+    }
+
+    let sized_memory = SizedKeyMemory::new(memory, pos);
+
+    Ok(sized_memory)
 }

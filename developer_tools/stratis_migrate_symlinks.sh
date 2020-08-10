@@ -10,6 +10,18 @@ then
 	exit 0
 fi
 
+if [ ! -x /usr/lib/udev/stratis_uuids_to_names ]
+then
+	echo "'stratis_uuids_to_names udev program does not exist."
+	exit 2
+fi
+
+if [ ! -f /usr/lib/udev/rules.d/99-stratisd.rules ]
+then
+	echo "stratisd udev rule file does not exist in /usr/lib/udev/rules.d"
+	exit 2
+fi
+
 for i in $(find /stratis)
 do
 	if [ -h $i ] && [ -b $i ]

@@ -5,6 +5,7 @@
 use std::{convert::TryFrom, ffi::CString, io, mem::size_of, os::unix::io::RawFd, str};
 
 use libc::{syscall, SYS_add_key, SYS_keyctl};
+use termios::Termios;
 
 use libcryptsetup_rs::SafeMemHandle;
 

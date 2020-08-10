@@ -143,8 +143,8 @@ mod tests {
 
     use proptest::{collection::vec, num};
 
-    use crate::engine::strat_engine::backstore::metadata::static_header::{
-        tests::random_static_header, tests::static_header_strategy,
+    use crate::engine::strat_engine::backstore::metadata::static_header::tests::{
+        random_static_header, static_header_strategy,
     };
 
     use super::*;

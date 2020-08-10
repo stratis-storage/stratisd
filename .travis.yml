@@ -98,6 +98,7 @@ jobs:
           dbus-python-client-gen==0.7
           psutil==5.6.7
           pyudev==0.22.0
+          requests==2.22.0
       script:
         - >
           (cd developer_tools; make -f Makefile lint) &&
@@ -124,6 +125,7 @@ jobs:
           dbus-python-client-gen==0.7
           psutil==5.4.3
           pyudev==0.22.0
+          requests==2.20.0
       script:
         - >
           (cd developer_tools; make -f Makefile lint) &&

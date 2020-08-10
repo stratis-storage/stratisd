@@ -10,7 +10,12 @@ arg_map = {
         "--reports=no",
         "--disable=I",
         "--msg-template='{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}'",
-    ]
+    ],
+    "update_cargo_crates.py": [
+        "--reports=no",
+        "--disable=I",
+        "--msg-template='{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}'",
+    ],
 }
 
 

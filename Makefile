@@ -12,6 +12,8 @@ DENY = -D warnings -D future-incompatible -D unused ${RUST_2018_IDIOMS}
 CLIPPY_DENY = -D clippy::cast_lossless \
               -D clippy::cast_possible_truncation \
               -D clippy::needless_borrow \
+              -D clippy::needless_continue \
+              -D clippy::option_option \
               -D warnings
 
 ${HOME}/.cargo/bin/cargo-outdated:

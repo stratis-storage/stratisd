@@ -86,7 +86,7 @@ jobs:
 
 
     # MANDATORY PYTHON CHECKS ON RECOMMENDED DEVELOPMENT INTERPRETER
-    - name: "lint Python code on future supported interpreter"
+    - name: "lint Python code on recommended development interpreter"
       language: python
       python: "3.7.7"
       install:
@@ -102,7 +102,7 @@ jobs:
         - >
           (cd developer_tools; make -f Makefile lint);
           (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
-    - name: "format Python code on future development interpreter"
+    - name: "format Python code on recommended development interpreter"
       language: python
       python: "3.7.7"
       install: pip install black==19.10b0 isort==4.3.21

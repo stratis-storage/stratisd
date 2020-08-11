@@ -16,8 +16,7 @@ use crate::{
         shared::init_cache_idempotent_or_err,
         strat_engine::{
             backstore::{Backstore, MDADataSize, StratBlockDev},
-            names::validate_name,
-            names::KeyDescription,
+            names::{validate_name, KeyDescription},
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },

@@ -145,16 +145,6 @@ fn main_report_error() -> Result<Option<(String, String)>, StratisUdevError> {
             ));
         }
     };
-    match args.next().as_deref() {
-        Some(action) => {
-            if action != "change" && action != "add" {
-                return Ok(None);
-            }
-        }
-        None => {
-            return Err(StratisUdevError::new("udev action required as argument."));
-        }
-    };
 
     let managed_objects = get_managed_objects()?;
 

@@ -8,7 +8,10 @@ use dbus::{
 };
 
 use crate::{
-    dbus_api::{blockdev::shared::blockdev_operation, types::TData},
+    dbus_api::{
+        blockdev::shared::{self, blockdev_operation},
+        types::TData,
+    },
     engine::{BlockDev, BlockDevTier},
 };
 
@@ -36,41 +39,33 @@ pub fn get_blockdev_devnode(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    get_blockdev_property(i, p, |_, p| {
-        Ok(format!("{}", p.devnode().user_path().display()))
-    })
+    get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_devnode_prop(p)))
 }
 
 pub fn get_blockdev_hardware_info(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    get_blockdev_property(i, p, |_, p| {
-        Ok(p.hardware_info()
-            .map_or_else(|| (false, "".to_owned()), |val| (true, val.to_owned())))
-    })
+    get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_hardware_info_prop(p)))
 }
 
 pub fn get_blockdev_user_info(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    get_blockdev_property(i, p, |_, p| {
-        Ok(p.user_info()
-            .map_or_else(|| (false, "".to_owned()), |val| (true, val.to_owned())))
-    })
+    get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_user_info_prop(p)))
 }
 
 pub fn get_blockdev_initialization_time(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    get_blockdev_property(i, p, |_, p| Ok(p.initialization_time().timestamp() as u64))
+    get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_init_time_prop(p)))
 }
 
 pub fn get_blockdev_tier(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    get_blockdev_property(i, p, |t, _| Ok(t as u16))
+    get_blockdev_property(i, p, |t, _| Ok(shared::blockdev_tier_prop(t)))
 }

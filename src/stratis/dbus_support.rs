@@ -11,7 +11,7 @@
 
 use std::{cell::RefCell, rc::Rc};
 
-use crate::engine::{Engine, Pool, PoolUuid};
+use crate::engine::{Engine, Name, Pool, PoolUuid};
 
 #[cfg(feature = "dbus_enabled")]
 use crate::{
@@ -40,7 +40,8 @@ impl MaybeDbusSupport {
     ) {
     }
 
-    pub fn register_pool(&mut self, _pool_uuid: PoolUuid, _pool: &mut dyn Pool) {}
+    pub fn register_pool(&mut self, _pool_name: &Name, _pool_uuid: PoolUuid, _pool: &mut dyn Pool) {
+    }
 
     pub fn poll_timeout(&self) -> i32 {
         // Non-DBus timeout is infinite
@@ -71,8 +72,8 @@ impl MaybeDbusSupport {
                     let event_handler = Box::new(EventHandler::new(Rc::clone(&handle.connection)));
                     get_engine_listener_list_mut().register_listener(event_handler);
                     // Register all the pools with dbus
-                    for (_, pool_uuid, pool) in engine.borrow_mut().pools_mut() {
-                        handle.register_pool(pool_uuid, pool)
+                    for (pool_name, pool_uuid, pool) in engine.borrow_mut().pools_mut() {
+                        handle.register_pool(&pool_name, pool_uuid, pool)
                     }
                     self.handle = Some(handle);
                 }
@@ -105,9 +106,9 @@ impl MaybeDbusSupport {
         }
     }
 
-    pub fn register_pool(&mut self, pool_uuid: PoolUuid, pool: &mut dyn Pool) {
+    pub fn register_pool(&mut self, pool_name: &Name, pool_uuid: PoolUuid, pool: &mut dyn Pool) {
         if let Some(h) = self.handle.as_mut() {
-            h.register_pool(pool_uuid, pool)
+            h.register_pool(pool_name, pool_uuid, pool)
         }
     }
 

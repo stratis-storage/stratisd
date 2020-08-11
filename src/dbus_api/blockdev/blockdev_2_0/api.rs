@@ -12,6 +12,7 @@ use crate::dbus_api::{
             get_blockdev_tier, get_blockdev_user_info,
         },
     },
+    consts,
     types::TData,
     util::{get_parent, get_uuid},
 };
@@ -29,21 +30,21 @@ pub fn set_userid_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>,
 }
 
 pub fn devnode_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {
-    f.property::<&str, _>("Devnode", ())
+    f.property::<&str, _>(consts::BLOCKDEV_DEVNODE_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_blockdev_devnode)
 }
 
 pub fn hardware_info_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {
-    f.property::<(bool, &str), _>("HardwareInfo", ())
+    f.property::<(bool, &str), _>(consts::BLOCKDEV_HARDWARE_INFO_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_blockdev_hardware_info)
 }
 
 pub fn user_info_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {
-    f.property::<(bool, &str), _>("UserInfo", ())
+    f.property::<(bool, &str), _>(consts::BLOCKDEV_USER_INFO_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_blockdev_user_info)
@@ -52,28 +53,28 @@ pub fn user_info_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TDat
 pub fn initialization_time_property(
     f: &Factory<MTFn<TData>, TData>,
 ) -> Property<MTFn<TData>, TData> {
-    f.property::<u64, _>("InitializationTime", ())
+    f.property::<u64, _>(consts::BLOCKDEV_INIT_TIME_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_blockdev_initialization_time)
 }
 
 pub fn pool_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {
-    f.property::<&dbus::Path, _>("Pool", ())
+    f.property::<&dbus::Path, _>(consts::BLOCKDEV_POOL_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_parent)
 }
 
 pub fn uuid_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {
-    f.property::<&str, _>("Uuid", ())
+    f.property::<&str, _>(consts::BLOCKDEV_UUID_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_uuid)
 }
 
 pub fn tier_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {
-    f.property::<u16, _>("Tier", ())
+    f.property::<u16, _>(consts::BLOCKDEV_TIER_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_blockdev_tier)

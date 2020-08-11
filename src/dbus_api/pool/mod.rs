@@ -2,15 +2,15 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus::tree::Factory;
+use dbus::{arg::Variant, tree::Factory};
 
 use crate::{
     dbus_api::{
         consts,
-        types::{DbusContext, OPContext},
+        types::{DbusContext, InterfacesAdded, OPContext, ObjectPathType},
         util::make_object_path,
     },
-    engine::{MaybeDbusPath, Pool, PoolUuid},
+    engine::{MaybeDbusPath, Name, Pool, PoolUuid},
 };
 
 mod fetch_properties_2_0;
@@ -22,6 +22,7 @@ mod shared;
 pub fn create_dbus_pool<'a>(
     dbus_context: &DbusContext,
     parent: dbus::Path<'static>,
+    name: &Name,
     uuid: PoolUuid,
     pool: &mut dyn Pool,
 ) -> dbus::Path<'a> {
@@ -30,7 +31,10 @@ pub fn create_dbus_pool<'a>(
     let object_name = make_object_path(dbus_context);
 
     let object_path = f
-        .object_path(object_name, Some(OPContext::new(parent, uuid)))
+        .object_path(
+            object_name,
+            Some(OPContext::new(parent, uuid, ObjectPathType::Pool)),
+        )
         .introspectable()
         .add(
             f.interface(consts::POOL_INTERFACE_NAME, ())
@@ -68,7 +72,32 @@ pub fn create_dbus_pool<'a>(
         );
 
     let path = object_path.get_name().to_owned();
-    dbus_context.actions.borrow_mut().push_add(object_path);
+    let interfaces = get_initial_properties(name, uuid, pool);
+    dbus_context
+        .actions
+        .borrow_mut()
+        .push_add(object_path, interfaces);
     pool.set_dbus_path(MaybeDbusPath(Some(path.clone())));
     path
+}
+
+/// Get the initial state of all properties associated with a pool object.
+pub fn get_initial_properties(
+    pool_name: &Name,
+    pool_uuid: PoolUuid,
+    pool: &dyn Pool,
+) -> InterfacesAdded {
+    initial_properties! {
+        consts::POOL_INTERFACE_NAME => {
+            consts::POOL_NAME_PROP => shared::pool_name_prop(pool_name),
+            consts::POOL_UUID_PROP => uuid_to_string!(pool_uuid)
+        },
+        consts::POOL_INTERFACE_NAME_2_1 => {
+            consts::POOL_NAME_PROP => shared::pool_name_prop(pool_name),
+            consts::POOL_UUID_PROP => uuid_to_string!(pool_uuid),
+            consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop(pool)
+        },
+        consts::PROPERTY_FETCH_INTERFACE_NAME => {},
+        consts::PROPERTY_FETCH_INTERFACE_NAME_2_1 => {}
+    }
 }

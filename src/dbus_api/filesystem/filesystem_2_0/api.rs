@@ -27,7 +27,7 @@ pub fn rename_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TDa
 }
 
 pub fn devnode_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {
-    f.property::<&str, _>("Devnode", ())
+    f.property::<&str, _>(consts::FILESYSTEM_DEVNODE_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_filesystem_devnode)
@@ -41,14 +41,14 @@ pub fn name_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, T
 }
 
 pub fn pool_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {
-    f.property::<&dbus::Path, _>("Pool", ())
+    f.property::<&dbus::Path, _>(consts::FILESYSTEM_POOL_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_parent)
 }
 
 pub fn uuid_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {
-    f.property::<&str, _>("Uuid", ())
+    f.property::<&str, _>(consts::FILESYSTEM_UUID_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_uuid)

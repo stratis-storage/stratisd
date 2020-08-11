@@ -10,6 +10,7 @@ use dbus::{
 use crate::{
     dbus_api::{
         api::shared::create_pool_shared,
+        consts,
         types::TData,
         util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
     },
@@ -49,10 +50,11 @@ pub fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let msg = match dbus_context.engine.borrow_mut().destroy_pool(pool_uuid) {
         Ok(DeleteAction::Deleted(uuid)) => {
-            dbus_context
-                .actions
-                .borrow_mut()
-                .push_remove(&pool_path, m.tree);
+            dbus_context.actions.borrow_mut().push_remove(
+                &pool_path,
+                m.tree,
+                consts::pool_interface_list(),
+            );
             return_message.append3(
                 (true, uuid_to_string!(uuid)),
                 msg_code_ok(),

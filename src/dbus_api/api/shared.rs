@@ -19,7 +19,7 @@ use crate::{
             engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok, tuple_to_option,
         },
     },
-    engine::CreateAction,
+    engine::{CreateAction, Name},
 };
 
 /// Shared code for the creation of pools using the D-Bus API without the option
@@ -61,14 +61,25 @@ pub fn create_pool_shared(m: &MethodInfo<MTFn<TData>, TData>, has_key_desc: bool
                 CreateAction::Created(uuid) => {
                     let (_, pool) = get_mut_pool!(engine; uuid; default_return; return_message);
 
-                    let pool_object_path: dbus::Path =
-                        create_dbus_pool(dbus_context, object_path.clone(), uuid, pool);
+                    let pool_object_path: dbus::Path = create_dbus_pool(
+                        dbus_context,
+                        object_path.clone(),
+                        &Name::new(name.to_string()),
+                        uuid,
+                        pool,
+                    );
 
                     let bd_paths = pool
                         .blockdevs_mut()
                         .into_iter()
-                        .map(|(uuid, bd)| {
-                            create_dbus_blockdev(dbus_context, pool_object_path.clone(), uuid, bd)
+                        .map(|(uuid, tier, bd)| {
+                            create_dbus_blockdev(
+                                dbus_context,
+                                pool_object_path.clone(),
+                                uuid,
+                                tier,
+                                bd,
+                            )
                         })
                         .collect::<Vec<_>>();
                     (true, (pool_object_path, bd_paths))

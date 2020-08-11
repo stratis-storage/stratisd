@@ -60,7 +60,7 @@ pub fn create_dbus_filesystem<'a>(
         );
 
     let path = object_path.get_name().to_owned();
-    let interfaces = get_inital_properties(parent, pool_name, name, uuid, filesystem);
+    let interfaces = get_initial_properties(parent, pool_name, name, uuid, filesystem);
     dbus_context
         .actions
         .borrow_mut()
@@ -70,7 +70,7 @@ pub fn create_dbus_filesystem<'a>(
 }
 
 /// Get the initial state of all properties associated with a filesystem object.
-pub fn get_inital_properties(
+pub fn get_initial_properties(
     parent: dbus::Path<'static>,
     pool_name: &Name,
     fs_name: &Name,

@@ -72,7 +72,7 @@ pub fn create_dbus_pool<'a>(
         );
 
     let path = object_path.get_name().to_owned();
-    let interfaces = get_inital_properties(name, uuid, pool);
+    let interfaces = get_initial_properties(name, uuid, pool);
     dbus_context
         .actions
         .borrow_mut()
@@ -82,7 +82,7 @@ pub fn create_dbus_pool<'a>(
 }
 
 /// Get the initial state of all properties associated with a pool object.
-pub fn get_inital_properties(
+pub fn get_initial_properties(
     pool_name: &Name,
     pool_uuid: PoolUuid,
     pool: &dyn Pool,

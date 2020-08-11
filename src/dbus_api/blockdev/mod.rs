@@ -62,7 +62,7 @@ pub fn create_dbus_blockdev<'a>(
         );
 
     let path = object_path.get_name().to_owned();
-    let interfaces = get_inital_properties(parent, uuid, tier, blockdev);
+    let interfaces = get_initial_properties(parent, uuid, tier, blockdev);
     dbus_context
         .actions
         .borrow_mut()
@@ -72,7 +72,7 @@ pub fn create_dbus_blockdev<'a>(
 }
 
 /// Get the initial state of all properties associated with a blockdev object.
-pub fn get_inital_properties(
+pub fn get_initial_properties(
     parent: dbus::Path<'static>,
     dev_uuid: DevUuid,
     tier: BlockDevTier,

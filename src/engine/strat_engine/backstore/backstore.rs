@@ -437,13 +437,13 @@ impl Backstore {
 
     /// Get only the datadevs in the pool.
     pub fn datadevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
-        self.data_tier.blockdevs().to_vec()
+        self.data_tier.blockdevs()
     }
 
     /// Get only the cachdevs in the pool.
     pub fn cachedevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
         match self.cache_tier {
-            Some(ref cache) => cache.blockdevs().to_vec(),
+            Some(ref cache) => cache.blockdevs(),
             None => Vec::new(),
         }
     }

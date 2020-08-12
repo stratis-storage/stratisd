@@ -100,7 +100,7 @@ jobs:
           pyudev==0.22.0
       script:
         - >
-          (cd developer_tools; make -f Makefile lint);
+          (cd developer_tools; make -f Makefile lint) &&
           (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
     - name: "format Python code on recommended development interpreter"
       language: python
@@ -108,7 +108,7 @@ jobs:
       install: pip install black==19.10b0 isort==4.3.21
       script:
         - >
-          (cd developer_tools; make fmt-travis);
+          (cd developer_tools; make fmt-travis) &&
           (cd tests/client-dbus; make fmt-travis)
 
     # MANDATORY PYTHON CHECKS ON LOWEST SUPPORTED INTERPRETER
@@ -126,7 +126,7 @@ jobs:
           pyudev==0.22.0
       script:
         - >
-          (cd developer_tools; make -f Makefile lint);
+          (cd developer_tools; make -f Makefile lint) &&
           (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
 
     # VERIFICATION OF TEST INFRASTRUCTURE

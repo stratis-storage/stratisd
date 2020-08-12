@@ -113,14 +113,11 @@ def main():
     packages = r.text
 
     # NOTE: re.findall call returns [('glibc32', '2.30')]
-    for line in packages.splitlines():
-        matches = re.findall(
-            "^toplink\/packages\/([^\/]*)\/([^\/]*)\/[^]*)]*", packages
-        )
-        key = matches[0][0]
-        value = matches[0][1]
-        # print("Got a match: "+ key + value)
-        koji_dict[key] = value
+    matches = re.findall("^toplink\/packages\/([^\/]*)\/([^\/]*)\/[^]*)]*", packages)
+    key = matches[0][0]
+    value = matches[0][1]
+    print("Got a match: "+ key + value)
+    koji_dict[key] = value
 
     # DEBUGGING
     print("\n\nNOW PRINTING KOJI DICT\n")
@@ -139,17 +136,24 @@ def main():
         if key == "Name" or key == "----":
             continue
 
-        if packages.find("/" + key + "/") != -1:
-            start_index = packages.index(key) + len(key) + 1
-            end_index = start_index + len(version)
-            if (packages[start_index:end_index] != version) or (
-                "rust-" + packages[start_index:end_index] != version
-            ):
+        if key in koji_dict.keys():
+            if "rust-" + koji_dict[key] != version:
                 print(
                     "    OUTDATED: The current key, "
                     + key
                     + " ~~~~~~~ because of comparison between:   "
-                    + packages[start_index:end_index]
+                    + "rust-" + koji_dict[key]
+                    + " and "
+                    + version
+                )
+
+                outdated.append(key)
+            elif koji_dict[key] != version:
+                print(
+                    "    OUTDATED: The current key, "
+                    + key
+                    + " ~~~~~~~ because of comparison between:   "
+                    + koji_dict[key]
                     + " and "
                     + version
                 )
@@ -159,7 +163,7 @@ def main():
                     "NOT OUTDATED: The current key, "
                     + key
                     + " ~~~~~~~ because of comparison between:   "
-                    + packages[start_index:end_index]
+                    + koji_dict[key]
                     + " and "
                     + version
                 )

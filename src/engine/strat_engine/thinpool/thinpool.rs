@@ -35,11 +35,7 @@ use crate::{
                 ThinRole,
             },
             serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave},
-            thinpool::{
-                filesystem::{FilesystemStatus, StratFilesystem},
-                mdv::MetadataVol,
-                thinids::ThinDevIdPool,
-            },
+            thinpool::{filesystem::StratFilesystem, mdv::MetadataVol, thinids::ThinDevIdPool},
         },
         structures::Table,
         types::{FilesystemUuid, MaybeDbusPath, Name, PoolUuid},
@@ -576,15 +572,12 @@ impl ThinPool {
         self.set_state(thin_pool_status);
 
         for (name, uuid, fs) in self.filesystems.iter_mut() {
-            let (fs_status, save_mdv) = fs.check()?;
+            let save_mdv = fs.check()?;
             if save_mdv {
                 if let Err(e) = self.mdv.save_fs(name, *uuid, fs) {
                     error!("Could not save MDV for fs with UUID {} and name {} belonging to pool with UUID {}, reason: {:?}",
                                 uuid, name, pool_uuid, e);
                 }
-            }
-            if let FilesystemStatus::Failed = fs_status {
-                // TODO: filesystem failed, how to recover?
             }
         }
         Ok(should_save)

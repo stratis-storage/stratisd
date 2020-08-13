@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 #
-# Copyright 2018 Red Hat, Inc.
+# Copyright 2020 Red Hat, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -138,12 +138,13 @@ def main():
     )
     packages = requests_var.text
 
-    my_reg_ex = re.compile("^toplink\/packages\/(rust-)?([^\/]*)\/([^\/]*)\/[^]*)]*")
+    pattern = r"^toplink/packages/(rust-)?([^\/]*?)/([^\/]*?)/[^]*)]*"
+    my_reg_ex = re.compile(pattern)
 
-    koji_dict = {
-        my_reg_ex.match(line)[i][0]: my_reg_ex.match(line)[i][1]
-        for i in packages.splitlines()
-    }
+    for line in packages.splitlines():
+        matches = my_reg_ex.match(line)
+        if matches.group(2) in cargo_outdated_output.keys():
+            koji_dict[matches.group(2)] = matches.group(3)
 
     # DEBUGGING
     print("\n\nNOW PRINTING KOJI DICT\n")

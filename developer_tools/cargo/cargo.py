@@ -112,12 +112,9 @@ def main():
     )
     packages = r.text
 
-    # NOTE: re.findall call returns [('glibc32', '2.30')]
-    matches = re.findall("^toplink\/packages\/([^\/]*)\/([^\/]*)\/[^]*)]*", packages)
-    key = matches[0][0]
-    value = matches[0][1]
-    print("Got a match: "+ key + value)
-    koji_dict[key] = value
+    my_reg_ex = re.compile(b"^toplink\/packages\/(rust-)?([^\/]*)\/([^\/]*)\/[^]*)]*")
+    
+    koji_dict = {my_reg_ex.match(line)[i][0]: my_reg_ex.match(line)[i][1] for i in packages.splitlines()}
 
     # DEBUGGING
     print("\n\nNOW PRINTING KOJI DICT\n")
@@ -137,18 +134,7 @@ def main():
             continue
 
         if key in koji_dict.keys():
-            if "rust-" + koji_dict[key] != version:
-                print(
-                    "    OUTDATED: The current key, "
-                    + key
-                    + " ~~~~~~~ because of comparison between:   "
-                    + "rust-" + koji_dict[key]
-                    + " and "
-                    + version
-                )
-
-                outdated.append(key)
-            elif koji_dict[key] != version:
+            if koji_dict[key] != version:
                 print(
                     "    OUTDATED: The current key, "
                     + key

@@ -8,6 +8,7 @@ use clap::{App, Arg, ArgGroup, ArgMatches, SubCommand};
 
 mod key;
 mod pool;
+mod report;
 #[macro_use]
 mod utils;
 
@@ -62,6 +63,7 @@ fn parse_args() -> App<'static, 'static> {
                 .arg(Arg::with_name("blockdevs").multiple(true).required(true)),
             SubCommand::with_name("destroy").arg(Arg::with_name("name").required(true)),
         ]),
+        SubCommand::with_name("report"),
     ])
 }
 
@@ -125,6 +127,8 @@ fn main() -> Result<(), String> {
         } else {
             pool::pool_list().map_err(|e| e.to_string())
         }
+    } else if let Some("report") = args.subcommand_name() {
+        report::report().map_err(|e| e.to_string())
     } else {
         println!("{}", help);
         Ok(())

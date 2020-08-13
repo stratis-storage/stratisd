@@ -40,6 +40,7 @@ pub fn set_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         key_desc,
         key_fd.as_raw_fd(),
         interactive,
+        true,
     ) {
         Ok(idem_resp) => {
             let return_value = match idem_resp {

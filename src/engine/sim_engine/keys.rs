@@ -10,6 +10,8 @@ use std::{
     os::unix::io::{FromRawFd, RawFd},
 };
 
+use termios::Termios;
+
 use devicemapper::Bytes;
 use libcryptsetup_rs::SafeMemHandle;
 
@@ -53,10 +55,23 @@ impl KeyActions for SimKeyActions {
         key_desc: &str,
         key_fd: RawFd,
         interactive: bool,
+        handle_term_settings: bool,
     ) -> StratisResult<MappingCreateAction<()>> {
         let key_file = unsafe { File::from_raw_fd(key_fd) };
         let new_key_data = &mut [0u8; MAX_STRATIS_PASS_SIZE];
         let mut bytes_iter = key_file.bytes();
+
+        let old_attrs = if handle_term_settings {
+            let old_attrs = Termios::from_fd(key_fd)?;
+            let mut new_attrs = old_attrs;
+            new_attrs.c_lflag &= !(termios::ICANON | termios::ECHO);
+            new_attrs.c_cc[termios::VMIN] = 1;
+            new_attrs.c_cc[termios::VTIME] = 0;
+            termios::tcsetattr(key_fd, termios::TCSANOW, &new_attrs)?;
+            Some(old_attrs)
+        } else {
+            None
+        };
 
         let mut pos = 0;
         while pos < MAX_STRATIS_PASS_SIZE {
@@ -73,6 +88,11 @@ impl KeyActions for SimKeyActions {
                 None => break,
             }
         }
+
+        if let Some(ref oa) = old_attrs {
+            termios::tcsetattr(key_fd, termios::TCSANOW, oa)?;
+        }
+
         if pos == MAX_STRATIS_PASS_SIZE && bytes_iter.next().is_some() {
             return Err(StratisError::Engine(
                 ErrorEnum::Invalid,

@@ -48,6 +48,7 @@ pub trait KeyActions {
         key_desc: &str,
         key_fd: RawFd,
         interactive: bool,
+        handle_term_settings: bool,
     ) -> StratisResult<MappingCreateAction<()>>;
 
     /// Return a list of all key descriptions of keys added to the keyring by

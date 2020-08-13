@@ -384,6 +384,7 @@ impl KeyActions for StratKeyActions {
         key_desc: &str,
         key_fd: RawFd,
         interactive: bool,
+        handle_term_settings: bool,
     ) -> StratisResult<MappingCreateAction<()>> {
         fn read_loop(
             bytes_iter: &mut io::Bytes<File>,
@@ -411,7 +412,7 @@ impl KeyActions for StratKeyActions {
         let key_file = unsafe { File::from_raw_fd(key_fd) };
         let mut memory = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
 
-        let old_attrs = if interactive {
+        let old_attrs = if handle_term_settings {
             let old_attrs = Termios::from_fd(key_fd)?;
             let mut new_attrs = old_attrs;
             new_attrs.c_lflag &= !(termios::ICANON | termios::ECHO);

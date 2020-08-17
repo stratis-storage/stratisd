@@ -35,6 +35,9 @@ before_install:
   # remove due to system dependencies
   - sudo dpkg --purge --force-all libcryptsetup12
 
+install:
+  - pip install requests
+
 jobs:
   fast_finish: true
   allow_failures:

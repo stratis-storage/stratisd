@@ -1,16 +1,16 @@
-use std::time::Duration;
 use dbus::{
-    arg::{RefArg, Variant},
     self,
+    arg::{RefArg, Variant},
     blocking::Connection,
 };
 use lazy_static::lazy_static;
+use std::time::Duration;
 
 pub const STRATIS_BUS_NAME: &str = "org.storage.stratis2";
 pub const STRATIS_MANAGER_OBJECT: &str = "/org/storage/stratis2";
 pub const STRATIS_MANAGER_IFACE: &str = "org.storage.stratis2.Manager.r1";
 lazy_static! {
-    static ref TIMEOUT: Duration = Duration::new(5,0);
+    static ref TIMEOUT: Duration = Duration::new(5, 0);
 }
 
 type GetVerRet = Variant<Box<dyn RefArg + 'static>>;

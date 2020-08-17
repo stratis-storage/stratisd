@@ -4,9 +4,8 @@ use dbus::{
     blocking::Connection,
 };
 use lazy_static::lazy_static;
-use std::time::Duration;
 use semver::Version;
-
+use std::time::Duration;
 
 const DBUS_PROPS_IFACE: &str = "org.freedesktop.DBus.Properties";
 const STRATIS_BUS_NAME: &str = "org.storage.stratis2";
@@ -16,7 +15,8 @@ lazy_static! {
     static ref TIMEOUT: Duration = Duration::new(5, 0);
 }
 lazy_static! {
-    static ref STRATIS_VER_UDEV_SYMLINK: Version = Version::parse("2.2.0").expect("version string is well-formed");
+    static ref STRATIS_VER_UDEV_SYMLINK: Version =
+        Version::parse("2.2.0").expect("version string is well-formed");
 }
 
 type GetVerRet = Variant<Box<dyn RefArg + 'static>>;

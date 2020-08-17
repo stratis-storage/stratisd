@@ -1,3 +1,5 @@
+use std::{process, time::Duration};
+
 use dbus::{
     self,
     arg::{RefArg, Variant},
@@ -5,7 +7,6 @@ use dbus::{
 };
 use lazy_static::lazy_static;
 use semver::Version;
-use std::{process, time::Duration};
 
 const DBUS_PROPS_IFACE: &str = "org.freedesktop.DBus.Properties";
 const STRATIS_BUS_NAME: &str = "org.storage.stratis2";

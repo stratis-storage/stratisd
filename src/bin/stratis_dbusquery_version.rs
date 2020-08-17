@@ -5,6 +5,8 @@ use dbus::{
 };
 use lazy_static::lazy_static;
 use std::time::Duration;
+use semver::Version;
+
 
 const DBUS_PROPS_IFACE: &str = "org.freedesktop.DBus.Properties";
 const STRATIS_BUS_NAME: &str = "org.storage.stratis2";
@@ -12,6 +14,9 @@ const STRATIS_MANAGER_OBJECT: &str = "/org/storage/stratis2";
 const STRATIS_MANAGER_IFACE: &str = "org.storage.stratis2.Manager.r1";
 lazy_static! {
     static ref TIMEOUT: Duration = Duration::new(5, 0);
+}
+lazy_static! {
+    static ref STRATIS_VER_UDEV_SYMLINK: Version = Version::parse("2.2.0").expect("version string is well-formed");
 }
 
 type GetVerRet = Variant<Box<dyn RefArg + 'static>>;
@@ -27,4 +32,8 @@ fn get_version() -> Result<GetVerRet, dbus::Error> {
 fn main() {
     let vertest = get_version();
     println!("{:#?}", vertest);
+    let verparse = (Version::parse(vertest.unwrap().as_str().unwrap())).unwrap();
+    println!("verparse: {:#?}", verparse);
+    println!("STRATIS_VER_UDEV_SYMLINK: {:#?}", *STRATIS_VER_UDEV_SYMLINK);
+    assert!(verparse >= *STRATIS_VER_UDEV_SYMLINK);
 }

@@ -30,18 +30,18 @@ use lazy_static::lazy_static;
 use regex::Regex;
 use uuid::Uuid;
 
-pub const DEV_LOG: &str = "/dev/log";
+const DEV_LOG: &str = "/dev/log";
 /// Syslog priority syntax
 /// (3 (SYSTEM) << 3) | 7 (DEBUG)
-pub const SYSTEM_DAEMON_DEBUG: &str = "<31>";
+const SYSTEM_DAEMON_DEBUG: &str = "<31>";
 /// Syslog priority syntax
 /// (3 (SYSTEM) << 3) | 3 (ERROR)
-pub const SYSTEM_DAEMON_ERROR: &str = "<27>";
-pub const STRATIS_BUS_NAME: &str = "org.storage.stratis2";
-pub const STRATIS_MANAGER_OBJECT: &str = "/org/storage/stratis2";
-pub const STRATIS_POOL_IFACE: &str = "org.storage.stratis2.pool.r1";
-pub const STRATIS_FS_IFACE: &str = "org.storage.stratis2.filesystem";
-pub const DBUS_OM_IFACE: &str = "org.freedesktop.DBus.ObjectManager";
+const SYSTEM_DAEMON_ERROR: &str = "<27>";
+const STRATIS_BUS_NAME: &str = "org.storage.stratis2";
+const STRATIS_MANAGER_OBJECT: &str = "/org/storage/stratis2";
+const STRATIS_POOL_IFACE: &str = "org.storage.stratis2.pool.r1";
+const STRATIS_FS_IFACE: &str = "org.storage.stratis2.filesystem";
+const DBUS_OM_IFACE: &str = "org.freedesktop.DBus.ObjectManager";
 lazy_static! {
     static ref TIMEOUT: Duration = Duration::new(5, 0);
 }

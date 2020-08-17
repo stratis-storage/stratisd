@@ -154,10 +154,7 @@ def main():
     print("\n\nNOW PRINTING KEY RESULTS\n")
 
     for key in cargo_outdated_output:
-        if key == "Name":
-            continue
-
-        if key == "----":
+        if key in ('Name', '----'):
             continue
 
         if key in koji_dict.keys():

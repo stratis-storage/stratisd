@@ -6,6 +6,7 @@ use dbus::{
 use lazy_static::lazy_static;
 use std::time::Duration;
 
+pub const DBUS_PROPS_IFACE: &str = "org.freedesktop.DBus.Properties";
 pub const STRATIS_BUS_NAME: &str = "org.storage.stratis2";
 pub const STRATIS_MANAGER_OBJECT: &str = "/org/storage/stratis2";
 pub const STRATIS_MANAGER_IFACE: &str = "org.storage.stratis2.Manager.r1";
@@ -19,7 +20,7 @@ fn get_version() -> Result<GetVerRet, dbus::Error> {
     let connection = Connection::new_system()?;
     let proxy = connection.with_proxy(STRATIS_BUS_NAME, STRATIS_MANAGER_OBJECT, *TIMEOUT);
     Ok(proxy
-        .method_call(STRATIS_MANAGER_IFACE, "Version", ())
+        .method_call(DBUS_PROPS_IFACE, "Get", (STRATIS_MANAGER_IFACE, "Version"))
         .map(|r: (GetVerRet,)| r.0)?)
 }
 

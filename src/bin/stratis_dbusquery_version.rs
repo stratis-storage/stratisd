@@ -5,7 +5,7 @@ use dbus::{
 };
 use lazy_static::lazy_static;
 use semver::Version;
-use std::time::Duration;
+use std::{process, time::Duration};
 
 const DBUS_PROPS_IFACE: &str = "org.freedesktop.DBus.Properties";
 const STRATIS_BUS_NAME: &str = "org.storage.stratis2";
@@ -35,5 +35,9 @@ fn main() {
     let verparse = (Version::parse(vertest.unwrap().as_str().unwrap())).unwrap();
     println!("verparse: {:#?}", verparse);
     println!("STRATIS_VER_UDEV_SYMLINK: {:#?}", *STRATIS_VER_UDEV_SYMLINK);
-    assert!(verparse >= *STRATIS_VER_UDEV_SYMLINK);
+
+    if verparse < *STRATIS_VER_UDEV_SYMLINK {
+        eprintln!("stratisd version does not support symlinks in /dev/stratis");
+        process::exit(1);
+    }
 }

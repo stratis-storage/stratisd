@@ -13,16 +13,23 @@ use itertools::Itertools;
 
 use crate::dbus_api::{api::shared::list_keys, consts, types::TData, util::result_to_tuple};
 
-const ALL_PROPERTIES: [&str; 2] = [consts::KEY_LIST_PROP, consts::LOCKED_POOL_UUIDS];
+const ALL_PROPERTIES: [&str; 2] = [consts::KEY_LIST_PROP, consts::LOCKED_POOLS];
 
-pub fn locked_pool_uuids(info: &MethodInfo<MTFn<TData>, TData>) -> Result<Vec<String>, String> {
+pub fn locked_pools(
+    info: &MethodInfo<MTFn<TData>, TData>,
+) -> Result<HashMap<String, String>, String> {
     let dbus_context = info.tree.get_data();
 
     let engine = dbus_context.engine.borrow();
     Ok(engine
         .locked_pools()
         .into_iter()
-        .map(|(u, _)| u.to_simple_ref().to_string())
+        .map(|(u, kd)| {
+            (
+                u.to_simple_ref().to_string(),
+                kd.as_application_str().to_string(),
+            )
+        })
         .collect())
 }
 
@@ -38,7 +45,7 @@ fn get_properties_shared(
         .unique()
         .filter_map(|prop| match prop.as_str() {
             consts::KEY_LIST_PROP => Some((prop, result_to_tuple(list_keys(m)))),
-            consts::LOCKED_POOL_UUIDS => Some((prop, result_to_tuple(locked_pool_uuids(m)))),
+            consts::LOCKED_POOLS => Some((prop, result_to_tuple(locked_pools(m)))),
             _ => None,
         })
         .collect();

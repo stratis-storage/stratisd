@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
+    collections::HashMap,
     fmt::Debug,
     os::unix::io::RawFd,
     path::{Path, PathBuf},
@@ -302,9 +303,9 @@ pub trait Engine: Debug + Report {
     /// Get a mutable referent to the pool designated by uuid.
     fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut dyn Pool)>;
 
-    /// Get a list of encrypted pool UUIDs for pools that have not yet been set up
-    /// and need to be unlocked.
-    fn locked_pool_uuids(&self) -> Vec<PoolUuid>;
+    /// Get a mapping of encrypted pool UUIDs for pools that have not yet been set up
+    /// and need to be unlocked to their key descriptions.
+    fn locked_pools(&self) -> HashMap<PoolUuid, KeyDescription>;
 
     /// Configure the simulator, for the real engine, this is a null op.
     /// denominator: the probably of failure is 1/denominator.

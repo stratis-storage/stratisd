@@ -4,7 +4,7 @@
 
 use std::{
     cell::RefCell,
-    collections::{hash_map::RandomState, HashSet},
+    collections::{hash_map::RandomState, HashMap, HashSet},
     convert::TryFrom,
     iter::FromIterator,
     path::Path,
@@ -192,8 +192,8 @@ impl Engine for SimEngine {
         get_mut_pool!(self; uuid)
     }
 
-    fn locked_pool_uuids(&self) -> Vec<PoolUuid> {
-        Vec::new()
+    fn locked_pools(&self) -> HashMap<PoolUuid, KeyDescription> {
+        HashMap::new()
     }
 
     /// Set properties of the simulator

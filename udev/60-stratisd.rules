@@ -1,1 +1,0 @@
-ACTION=="add|change", ENV{DM_NAME}=="stratis-1-[0-9a-f]*-thin-fs-[0-9a-f]*", PROGRAM="stratis_uuids_to_names $env{DM_NAME}", SYMLINK+="stratis/%c{1}/%c{2}", IMPORT{builtin}="blkid"

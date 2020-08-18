@@ -51,36 +51,33 @@ def main():
 
     while True:
 
-        line = proc.stdout.readline()
+        line_bo = proc.stdout.readline()
 
-        if not line:
+        if not line_bo:
             break
 
         # Convert byte object into string
-        line_str = line.decode("utf-8")
+        line_str = line_bo.decode("utf-8")
 
         # Extract dependencies, versions, and platforms and fill in data structure line by line
         line_split = line_str.split()
 
-        temp = line_split[0]
-        temp_split = temp.split("->")
-        dependency = temp_split[0]
-        version = line_split[1]
         platform = line_split[5]
 
-        # If the dependency is windows-specific, ignore it
         if "windows" in platform:
             continue
 
-        # If dependency is pulled in by another dependency, extract what the dependency it's pulled
-        # in by and add dict entry
-        if len(temp_split) > 1:
-            pulled_in_by = temp_split[1]
-            cargo_outdated_output[dependency] = (version, pulled_in_by, platform)
+        dependencies = line_split[0]
+        version = line_split[1]
 
-        # Otherwise add dict entry with None
-        else:
+        if "->" not in dependencies:
+            dependency = dependencies
             cargo_outdated_output[dependency] = (version, None, platform)
+        else:
+            dependencies_split = dependencies.split("->")
+            pulled_in_by = dependencies_split[0]
+            dependency = dependencies_split[1]
+            cargo_outdated_output[dependency] = (version, pulled_in_by, platform)
 
     # DEBUGGING
     print("NOW PRINTING UNMODIFIED DICT\n")
@@ -89,9 +86,10 @@ def main():
     print_var.pprint(cargo_outdated_output)
 
     # DEBUGGING
-    print("\n\nNOW PRINTING MODIFICATIONS TO DICT\n")
+    #    print("\n\nNOW PRINTING MODIFICATIONS TO DICT\n")
 
     # Remove keys such that the dependency is pulled in by a windows-specific dependency
+    """
     for key in cargo_outdated_output:
         new_key = cargo_outdated_output[key][1]
         if new_key is not None:
@@ -118,11 +116,12 @@ def main():
                         + "'s platform is "
                         + cargo_outdated_output[new_key][2]
                     )
+    """
 
     # DEBUGGING
-    print("\n\nNOW PRINTING MODIFIED DICT\n")
+    #    print("\n\nNOW PRINTING MODIFIED DICT\n")
 
-    print_var.pprint(cargo_outdated_output)
+    #    print_var.pprint(cargo_outdated_output)
 
     # Lists that categorized dependencies will be placed in
     outdated = []
@@ -152,46 +151,44 @@ def main():
 
     # DEBUGGING
     print("\n\nNOW PRINTING KEY RESULTS\n")
+    print("              koji:   car.out.:   dependency:\n")
 
     for key in cargo_outdated_output:
-        if key in ('Name', '----'):
+
+        version = cargo_outdated_output[key][0]
+
+        if key in ("Name", "----"):
             continue
 
         if key in koji_dict.keys():
             if koji_dict[key] != version:
                 print(
-                    "    OUTDATED: The current key, "
-                    + key
-                    + " ~~~~~~~ because of comparison between:   "
-                    + koji_dict[key]
-                    + " and "
-                    + version
+                    "    OUTDATED: " + koji_dict[key] + "    " + version + "    " + key
                 )
                 outdated.append(key)
             else:
                 print(
-                    "NOT OUTDATED: The current key, "
-                    + key
-                    + " ~~~~~~~ because of comparison between:   "
-                    + koji_dict[key]
-                    + " and "
-                    + version
+                    "NOT OUTDATED: " + koji_dict[key] + "    " + version + "    " + key
                 )
                 not_outdated.append(key)
         else:
-            print("   not found: The current key, " + key)
+            print("   not found:                   " + key)
             not_found.append(key)
 
     print("\n\nRESULTS")
 
-    print("\nThe following packages are outdated:")
+    print(
+        "\nThe following packages that were outputted by 'cargo outdated' are outdated according to the koji repo:"
+    )
     print(outdated)
 
-    print("\nThe following packages are not outdated:")
+    print(
+        "\nThe following packages that were outputted by 'cargo outdated' are not outdated according to the koji repo:"
+    )
     print(not_outdated)
 
     print(
-        "\nThe following packages from the 'Cargo Outdated' output were not found in the koji:"
+        "\nThe following packages that were outputted by 'cargo outdated' were not found in the koji repo:"
     )
     print(not_found)
 

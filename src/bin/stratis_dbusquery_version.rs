@@ -40,9 +40,16 @@ fn run() -> Result<Version, String> {
 }
 
 fn main() {
-    let verparse = run();
-    if verparse.unwrap() < *STRATIS_VER_UDEV_SYMLINK {
-        eprintln!("stratisd version does not support symlinks in /dev/stratis");
-        process::exit(1);
-    }
+    match run() {
+        Ok(version) => {
+            if version < *STRATIS_VER_UDEV_SYMLINK {
+                eprintln!("stratisd version does not support symlinks in /dev/stratis");
+                process::exit(1);
+            }
+        }
+        Err(e) => {
+            eprintln!("Could not obtain version from stratisd: {}", e);
+            process::exit(2);
+        }
+    };
 }

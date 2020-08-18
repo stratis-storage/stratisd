@@ -110,14 +110,3 @@ pub fn list_keys(info: &MethodInfo<MTFn<TData>, TData>) -> Result<Vec<String>, S
         })
         .map_err(|e| e.to_string())
 }
-
-pub fn locked_pool_uuids(info: &MethodInfo<MTFn<TData>, TData>) -> Result<Vec<String>, String> {
-    let dbus_context = info.tree.get_data();
-
-    let engine = dbus_context.engine.borrow();
-    Ok(engine
-        .locked_pool_uuids()
-        .into_iter()
-        .map(|u| u.to_simple_ref().to_string())
-        .collect())
-}

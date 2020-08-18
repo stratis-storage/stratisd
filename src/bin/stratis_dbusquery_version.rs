@@ -30,20 +30,19 @@ fn get_version() -> Result<GetVerRet, dbus::Error> {
         .map(|r: (GetVerRet,)| r.0)?)
 }
 
-fn run() {
-    unimplemented!()
-}
-
-fn main() {
+fn run() -> Result<Version, String> {
     let vertest = get_version();
     println!("{:#?}", vertest);
     let verparse = (Version::parse(vertest.unwrap().as_str().unwrap())).unwrap();
     println!("verparse: {:#?}", verparse);
     println!("STRATIS_VER_UDEV_SYMLINK: {:#?}", *STRATIS_VER_UDEV_SYMLINK);
+    Ok(verparse)
+}
 
-    if verparse < *STRATIS_VER_UDEV_SYMLINK {
+fn main() {
+    let verparse = run();
+    if verparse.unwrap() < *STRATIS_VER_UDEV_SYMLINK {
         eprintln!("stratisd version does not support symlinks in /dev/stratis");
         process::exit(1);
     }
-    run()
 }

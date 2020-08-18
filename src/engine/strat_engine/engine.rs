@@ -288,7 +288,11 @@ impl Engine for StratEngine {
     }
 
     fn locked_pool_uuids(&self) -> Vec<PoolUuid> {
-        self.liminal_devices.locked_pool_uuids()
+        self.liminal_devices
+            .locked_pools()
+            .keys()
+            .cloned()
+            .collect()
     }
 
     fn configure_simulator(&mut self, _denominator: u32) -> StratisResult<()> {

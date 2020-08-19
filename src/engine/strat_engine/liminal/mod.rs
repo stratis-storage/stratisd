@@ -8,9 +8,3 @@ mod liminal;
 mod setup;
 
 pub use self::liminal::LiminalDevices;
-
-#[cfg(test)]
-pub use self::{
-    device_info::LStratisInfo,
-    setup::{get_bdas, get_blockdevs, get_metadata},
-};

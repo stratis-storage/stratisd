@@ -1,7 +1,12 @@
 stratisd 2.2.0 (UNRELEASED)
 ===========================
-Recommended Rust toolchain version: 1.45.0
-Lowest supported Rust toolchain version: 1.43
+Recommended Rust toolchain version: 1.46.0
+Lowest supported Rust toolchain version: 1.45
+
+New D-Bus interfaces:
+org.storage.stratis2.FetchProperties.r2
+org.storage.stratis2.Manager.r2
+org.storage.stratis2.blockdev.r2
 
 Recommended Python interpreter: 3.7.7
 Lowest supported Python interpreter: 3.6.8
@@ -12,15 +17,42 @@ Python import sorter: isort (4.3.21)
 YAML linter: yamllint (1.23.0)
 
 
-- Set filesystem symlinks in /dev/stratis instead of /stratis:
+- Set filesystem symlinks in /dev/stratis instead of /stratis,
+  include script to migrate symlinks:
   https://github.com/stratis-storage/stratisd/issues/704
   https://github.com/stratis-storage/stratisd/issues/2162
+  https://github.com/stratis-storage/stratisd/issues/2175
+  https://github.com/stratis-storage/stratisd/pull/2199
+  https://github.com/stratis-storage/stratisd/pull/2197
+  https://github.com/stratis-storage/stratisd/pull/2192
+  https://github.com/stratis-storage/stratisd/pull/2190
+  https://github.com/stratis-storage/stratisd/pull/2186
+  https://github.com/stratis-storage/stratisd/pull/2177
   https://github.com/stratis-storage/stratisd/pull/2166
   https://github.com/stratis-storage/stratisd/pull/2153
   https://github.com/stratis-storage/stratisd/pull/2147
 
+- Put terminal settings functionality for key management in stratisd D-bus
+  layer:
+  https://github.com/stratis-storage/stratisd/pull/2214
+
+- Add PhysicalPath D-Bus property for blockdev interface:
+  https://github.com/stratis-storage/stratisd/issues/2191
+  https://github.com/stratis-storage/stratisd/pull/2209
+
+- Add new FetchProperties interface to Manager to support LockedPools property:
+  https://github.com/stratis-storage/stratisd/issues/2179
+  https://github.com/stratis-storage/stratisd/pull/2231
+  https://github.com/stratis-storage/stratisd/pull/2228
+  https://github.com/stratis-storage/stratisd/pull/2185
+
 - Remove --debug option, add --log-level option with different semantics:
   https://github.com/stratis-storage/stratisd/pull/2095
+
+- Fix a bug where filesystem Name property changed signal was being emitted for
+  only one of the appropriate interfaces:
+  https://github.com/stratis-storage/stratisd/issues/2215
+  https://github.com/stratis-storage/stratisd/pull/2221
 
 - Export InterfacesAdded and InterfacesRemoved signals on the D-Bus:
   https://github.com/stratis-storage/stratisd/issues/1377
@@ -33,6 +65,11 @@ YAML linter: yamllint (1.23.0)
   when creating a new pool:
   https://github.com/stratis-storage/stratisd/issues/2150
   https://github.com/stratis-storage/stratisd/pull/2151
+
+- Fix a bug where some region of a device was not being zeroed properly,
+  before creation of the meta device of a cache or thin pool, which can
+  cause creation of the device to fail:
+  https://github.com/stratis-storage/stratisd/pull/2206
 
 - Add script to read the Stratis metadata on a device:
   https://github.com/stratis-storage/stratisd/issues/2157
@@ -62,6 +99,12 @@ YAML linter: yamllint (1.23.0)
   https://github.com/stratis-storage/stratisd/pull/2142
   https://github.com/stratis-storage/stratisd/pull/2140
 
+- Deny all pedantic lints that the code base currently does not infringe:
+  https://github.com/stratis-storage/stratisd/pull/2201
+
+- Hoist metadata module up a level:
+  https://github.com/stratis-storage/stratisd/pull/2210
+
 - Improvements to implementation of thinpool abstraction:
   https://github.com/stratis-storage/stratisd/pull/2113
   https://github.com/stratis-storage/stratisd/pull/2107
@@ -71,7 +114,31 @@ YAML linter: yamllint (1.23.0)
   https://github.com/stratis-storage/stratisd/issues/512
   https://github.com/stratis-storage/stratisd/pull/2171
 
+- Refactor liminal module into distinct submodules, fix a minor bug:
+  https://github.com/stratis-storage/stratisd/pull/2187
+
+- Add a script for examining versions of dependencies:
+  https://github.com/stratis-storage/stratisd/pull/2196
+
+- Increase version to 2.2.0:
+  https://github.com/stratis-storage/stratisd/pull/2089
+
 - Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/2230
+  https://github.com/stratis-storage/stratisd/pull/2227
+  https://github.com/stratis-storage/stratisd/pull/2226
+  https://github.com/stratis-storage/stratisd/pull/2224
+  https://github.com/stratis-storage/stratisd/pull/2222
+  https://github.com/stratis-storage/stratisd/pull/2212
+  https://github.com/stratis-storage/stratisd/pull/2208
+  https://github.com/stratis-storage/stratisd/pull/2207
+  https://github.com/stratis-storage/stratisd/pull/2205
+  https://github.com/stratis-storage/stratisd/pull/2202
+  https://github.com/stratis-storage/stratisd/pull/2195
+  https://github.com/stratis-storage/stratisd/pull/2193
+  https://github.com/stratis-storage/stratisd/pull/2189
+  https://github.com/stratis-storage/stratisd/pull/2183
+  https://github.com/stratis-storage/stratisd/pull/2176
   https://github.com/stratis-storage/stratisd/pull/2173
   https://github.com/stratis-storage/stratisd/pull/2168
   https://github.com/stratis-storage/stratisd/pull/2167

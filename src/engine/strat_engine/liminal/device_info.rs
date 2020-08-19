@@ -178,4 +178,134 @@ impl LInfo {
             LInfo::Stratis(info) => info.ids.identifiers,
         }
     }
+
+    /// Combine two devices which have identical pool and device UUIDs.
+    /// The first argument is the existing information, the second is the
+    /// information about the removed device, where "removed" means there
+    /// was a udev "remove" event and this info has been found out about the
+    /// device attached to the event.
+    pub fn update_on_remove(info_1: LInfo, info_2: LInfo) -> Option<LInfo> {
+        match (info_1, info_2) {
+            (LInfo::Luks(luks_info), LInfo::Stratis(_)) => Some(LInfo::Luks(luks_info)),
+            (LInfo::Stratis(strat_info), LInfo::Luks(luks_info)) => {
+                if let Some(luks) = &strat_info.luks {
+                    if luks.ids.device_number != luks_info.ids.device_number {
+                        warn!("Received udev remove event on a device with {} that stratisd does not know about; retaining logical device with {} among the set of devices known to belong to pool with UUID {}",
+                                luks_info,
+                                strat_info,
+                                strat_info.ids.identifiers.pool_uuid);
+                    } else {
+                        warn!("Received udev remove event on a device with {} that appeared to belong to Stratis, but the logical device information is still present; retaining the logical device with the original encryption information",
+                                  luks_info);
+                    }
+                }
+                Some(LInfo::Stratis(strat_info))
+            }
+            (LInfo::Stratis(info_1), LInfo::Stratis(info_2)) => {
+                if info_1.ids.device_number != info_2.ids.device_number {
+                    warn!("Received udev remove event on a device with {} that stratisd does not know about; retaining duplicate device {} among the set of devices known to belong to pool with UUID {}",
+                              info_2,
+                              info_1,
+                              info_1.ids.identifiers.pool_uuid);
+                    Some(LInfo::Stratis(info_1))
+                } else {
+                    info_1.luks.map(LInfo::Luks)
+                }
+            }
+            (LInfo::Luks(info_1), LInfo::Luks(info_2)) => {
+                if info_1.ids.device_number != info_2.ids.device_number {
+                    warn!("Received udev remove event on a device with {} that stratisd does not know about; retaining duplicate device {} among the set of devices known to belong to pool with UUID {}",
+                              info_2,
+                              info_1,
+                              info_1.ids.identifiers.pool_uuid);
+                    Some(LInfo::Luks(info_1))
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    // Combine two devices which have identical pool and device UUIDs.
+    // The first argument is the older information, the second the newer.
+    // Allow the newer information to supplant the older.
+    // Precondition: the newer information must always represent a single
+    // device, so the luks field of a newly discovered Stratis device
+    // must always be None.
+    pub fn update(info_1: LInfo, info_2: LInfo) -> Result<LInfo, (String, LInfo, LInfo)> {
+        // Returns true if the information found via udev for two devices is
+        // compatible, otherwise false.
+        // Precondition: Stratis identifiers of devices are the same
+        fn luks_luks_compatible(info_1: &LLuksInfo, info_2: &LLuksInfo) -> bool {
+            assert_eq!(info_1.ids.identifiers, info_2.ids.identifiers);
+            info_1.ids.device_number == info_2.ids.device_number
+                && info_1.key_description == info_2.key_description
+        }
+
+        // Returns true if the information found via udev for two devices is
+        // compatible, otherwise false.
+        // Precondition: Stratis identifiers of devices are the same
+        fn stratis_stratis_compatible(info_1: &LStratisInfo, info_2: &LStratisInfo) -> bool {
+            assert_eq!(info_1.ids.identifiers, info_2.ids.identifiers);
+            info_1.ids.device_number == info_2.ids.device_number
+                && match (info_1.luks.as_ref(), info_2.luks.as_ref()) {
+                    (Some(luks_1), Some(luks_2)) => luks_luks_compatible(luks_1, luks_2),
+                    _ => true,
+                }
+        }
+        match (info_1, info_2) {
+            (LInfo::Luks(luks_info), LInfo::Stratis(strat_info)) => {
+                assert_eq!(strat_info.luks, None);
+                Ok(LInfo::Stratis(LStratisInfo {
+                    ids: strat_info.ids,
+                    luks: Some(luks_info),
+                }))
+            }
+            (LInfo::Stratis(strat_info), LInfo::Luks(luks_info)) => {
+                if let Some(luks) = strat_info.luks.as_ref() {
+                    if !luks_luks_compatible(luks, &luks_info) {
+                        let (info_1, info_2) = (LInfo::Stratis(strat_info), LInfo::Luks(luks_info));
+                        let err_msg = format!(
+                                "Information about previously discovered device {} incompatible with information about newly discovered device {}",
+                                info_1,
+                                info_2);
+
+                        return Err((err_msg, info_1, info_2));
+                    }
+                }
+                Ok(LInfo::Stratis(LStratisInfo {
+                    ids: strat_info.ids,
+                    luks: Some(luks_info),
+                }))
+            }
+            (LInfo::Luks(luks_info_1), LInfo::Luks(luks_info_2)) => {
+                if !luks_luks_compatible(&luks_info_1, &luks_info_2) {
+                    let (info_1, info_2) = (LInfo::Luks(luks_info_1), LInfo::Luks(luks_info_2));
+                    let err_msg = format!(
+                            "Information about previously discovered device {} incompatible with information about newly discovered device {}",
+                            info_1,
+                            info_2);
+                    Err((err_msg, info_1, info_2))
+                } else {
+                    Ok(LInfo::Luks(luks_info_2))
+                }
+            }
+            (LInfo::Stratis(strat_info_1), LInfo::Stratis(strat_info_2)) => {
+                if !stratis_stratis_compatible(&strat_info_1, &strat_info_2) {
+                    let (info_1, info_2) =
+                        (LInfo::Stratis(strat_info_1), LInfo::Stratis(strat_info_2));
+                    let err_msg = format!(
+                            "Information about previously discovered device {} incompatible with information about newly discovered device {}",
+                            info_1,
+                            info_2);
+                    Err((err_msg, info_1, info_2))
+                } else {
+                    Ok(LInfo::Stratis(LStratisInfo {
+                        ids: strat_info_2.ids,
+                        luks: strat_info_2.luks.or(strat_info_1.luks),
+                    }))
+                }
+            }
+        }
+    }
 }

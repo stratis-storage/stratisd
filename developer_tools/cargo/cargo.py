@@ -20,13 +20,76 @@ Check cargo dependencies' versions
 
 # isort: STDLIB
 #!/usr/bin/python
-import pprint
+# import pprint
 import re
 import subprocess
 import sys
 
 # isort: THIRDPARTY
 import requests
+
+
+def build_rustc_cfg_dict():
+    """
+    :returns: dict containing information from the output of `rustc --print cfg`
+    :rtype: dict
+    """
+    command = ["rustc", "--print", "cfg"]
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE)
+
+    rustc_cfg_dict = {}
+
+    pattern = r'target_([^\s]*)="([^\s]*)"'
+    my_reg_ex = re.compile(pattern)
+
+    while True:
+        # splitlines could avoid break
+        line_bo = proc.stdout.readline()
+
+        if not line_bo:
+            break
+
+        line_str = line_bo.decode("utf-8")
+        matches = my_reg_ex.match(line_str)
+
+        if matches is not None:
+            key = "target_" + matches.group(1)
+            value = matches.group(2)
+            rustc_cfg_dict[key] = value
+
+        elif matches != "debug_assertions":
+            rustc_cfg_dict["env"] = line_str.rstrip()
+
+    return rustc_cfg_dict
+
+
+def parse_platform(unparsed_platform):
+    """
+    :param unparsed_platform: platform to parse
+    :type unparsed_platform:
+    :returns: duple containing extracted information and whether or not it's a triple
+    :rtype: (str, bool)
+    """
+
+    pattern = r"cfg\(([^\)]+)\)"
+    my_reg_ex = re.compile(pattern)
+
+    matches = my_reg_ex.match(unparsed_platform)
+
+    if matches is not None:
+        extraction = matches.group(1)
+        is_triple = False
+
+    else:
+        is_triple = True
+        extraction = unparsed_platform
+
+    build_rustc_cfg_dict()
+
+    if is_triple:
+        pass
+
+    return extraction
 
 
 def build_cargo_outdated_dict():
@@ -43,33 +106,29 @@ def build_cargo_outdated_dict():
     # 2) the dependency the dependency is pulled in by, or none if the dependency is pinned in
     # Cargo.toml
     # 3) the platform
+
     cargo_outdated_output = {}
 
     # Run cargo-outdated
     command = ["cargo", "outdated"]
-
     proc = subprocess.Popen(command, stdout=subprocess.PIPE)
 
-    while True:
+    pattern = r"([^\s]*)\s*([^\s]*)\s*([^\s]*)\s*([^\s]*)\s*([^\s]*)\s*(.*)"
+    my_reg_ex = re.compile(pattern)
 
+    while True:
         line_bo = proc.stdout.readline()
 
         if not line_bo:
             break
 
-        # Convert byte object into string
         line_str = line_bo.decode("utf-8")
+        matches = my_reg_ex.match(line_str)
 
-        # Extract dependencies, versions, and platforms and fill in data structure l1ine by line
-        line_split = line_str.split()
+        platform = parse_platform(matches.group(6))
 
-        platform = line_split[5]
-
-        if "windows" in platform:
-            continue
-
-        dependencies = line_split[0]
-        version = line_split[1]
+        dependencies = matches.group(1)
+        version = matches.group(2)
 
         if "->" not in dependencies:
             dependency = dependencies
@@ -81,45 +140,8 @@ def build_cargo_outdated_dict():
             cargo_outdated_output[dependency] = (version, pulled_in_by, platform)
 
     # DEBUGGING
-    print("NOW PRINTING UNMODIFIED DICT\n")
-
-    print_var = pprint.PrettyPrinter(width=41, compact=True)
-    print_var.pprint(cargo_outdated_output)
-
-    # DEBUGGING
-    #    print("\n\nNOW PRINTING MODIFICATIONS TO DICT\n")
-
-    # Remove keys such that the dependency is pulled in by a windows-specific dependency
-    for key in cargo_outdated_output:
-        new_key = cargo_outdated_output[key][1]
-        if new_key is not None:
-            if new_key in cargo_outdated_output:
-                # needs regex
-                if "windows" in cargo_outdated_output[new_key][2]:
-                    cargo_outdated_output.pop(new_key)
-
-                    # DEBUGGING
-                    print(
-                        "removed "
-                        + new_key
-                        + "because"
-                        + new_key
-                        + "'s platform is "
-                        + cargo_outdated_output[new_key][2]
-                    )
-                else:
-                    print(
-                        "did NOT remove "
-                        + new_key
-                        + "because"
-                        + new_key
-                        + "'s platform is "
-                        + cargo_outdated_output[new_key][2]
-                    )
-
-    # DEBUGGING
-    #    print("\n\nNOW PRINTING MODIFIED DICT\n")
-
+    #    print("\n\nNOW PRINTING DICT\n")
+    #    print_var = pprint.PrettyPrinter(width=41, compact=True)
     #    print_var.pprint(cargo_outdated_output)
 
     return cargo_outdated_output
@@ -150,9 +172,9 @@ def build_koji_repo_dict(cargo_outdated_output):
             koji_dict[matches.group(2)] = matches.group(3)
 
     # DEBUGGING
-    print("\n\nNOW PRINTING KOJI DICT\n")
-    print_var = pprint.PrettyPrinter(width=41, compact=True)
-    print_var.pprint(koji_dict)
+    #    print("\n\nNOW PRINTING KOJI DICT\n")
+    #    print_var = pprint.PrettyPrinter(width=41, compact=True)
+    #    print_var.pprint(koji_dict)
 
     return koji_dict
 
@@ -166,7 +188,7 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
     """
     # DEBUGGING
     print("\n\nNOW PRINTING KEY RESULTS\n")
-    print("              koji:   car.out.:   dependency:\n")
+    print("\t\tkoji:\t\t\tcargo:\t\t\tdependency:\t\tplatform:\n")
     # Lists that categorized dependencies will be placed in
     outdated = []
     not_outdated = []
@@ -175,7 +197,7 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
     for key in cargo_outdated_dict:
 
         version = cargo_outdated_dict[key][0]
-
+        platform = cargo_outdated_dict[key][2]
         if key in ("Name", "----"):
             continue
 
@@ -183,25 +205,29 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
             if koji_repo_dict[key] != version:
                 print(
                     "    OUTDATED: "
-                    + koji_repo_dict[key]
-                    + "    "
-                    + version
-                    + "    "
                     + key
+                    + "\t\t\t"
+                    + koji_repo_dict[key]
+                    + "\t\t\t"
+                    + version
+                    + "\t\t\t"
+                    + platform
                 )
                 outdated.append(key)
             else:
                 print(
                     "NOT OUTDATED: "
-                    + koji_repo_dict[key]
-                    + "    "
-                    + version
-                    + "    "
                     + key
+                    + "\t\t\t"
+                    + koji_repo_dict[key]
+                    + "\t\t\t"
+                    + version
+                    + "\t\t\t"
+                    + platform
                 )
                 not_outdated.append(key)
         else:
-            print("   not found:                   " + key)
+            print("   not found: " + key + "\t\t\t\t\t\t\t" + platform)
             not_found.append(key)
     print("\n\nRESULTS")
 

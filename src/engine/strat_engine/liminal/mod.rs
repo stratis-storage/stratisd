@@ -2,10 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+mod device_info;
 #[allow(clippy::module_inception)]
 mod liminal;
 
-pub use self::liminal::{LiminalDevices};
+pub use self::liminal::LiminalDevices;
 
 #[cfg(test)]
-pub use self::liminal::{LStratisInfo, get_bdas, get_blockdevs, get_metadata};
+pub use self::liminal::{get_bdas, get_blockdevs, get_metadata};
+pub use self::device_info::LStratisInfo;

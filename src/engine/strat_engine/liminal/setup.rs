@@ -322,3 +322,137 @@ pub fn get_blockdevs(
 
     Ok((datadevs, cachedevs))
 }
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use uuid::Uuid;
+
+    use crate::engine::{
+        strat_engine::{
+            backstore::{Backstore, MDADataSize, StratisIdentifiers, StratisInfo},
+            serde_structs::Recordable,
+            tests::{loopbacked, real},
+        },
+        types::PoolUuid,
+    };
+
+    use super::*;
+
+    const CACHE_BLOCK_SIZE: Sectors = Sectors(2048); // 1024 KiB
+    const INITIAL_BACKSTORE_ALLOCATION: Sectors = CACHE_BLOCK_SIZE;
+
+    // Generate data that might be associated with this backstore while
+    // bringing up a pool assuming the pool is unencrypted.
+    fn unencrypted_blockdev_data(
+        backstore: &Backstore,
+        pool_uuid: PoolUuid,
+    ) -> HashMap<DevUuid, LStratisInfo> {
+        backstore
+            .blockdevs()
+            .iter()
+            .map(|(device_uuid, _, blockdev)| {
+                (
+                    *device_uuid,
+                    StratisInfo {
+                        identifiers: StratisIdentifiers {
+                            pool_uuid,
+                            device_uuid: *device_uuid,
+                        },
+                        device_number: *blockdev.device(),
+                        devnode: blockdev.devnode().metadata_path().to_owned(),
+                    }
+                    .into(),
+                )
+            })
+            .collect()
+    }
+
+    // Verify that get_bdas(), get_metadata(), get_blockdevs() discover the
+    // correct information to build a backstore object with the same metadata
+    // as when initialized and a cache added.
+    fn test_setup(paths: &[&Path]) {
+        assert!(paths.len() > 1);
+
+        let (paths1, paths2) = paths.split_at(paths.len() / 2);
+
+        let pool_uuid = Uuid::new_v4();
+
+        let (backstore_save, infos): (_, HashMap<DevUuid, LStratisInfo>) = {
+            let mut backstore =
+                Backstore::initialize(pool_uuid, paths1, MDADataSize::default(), None).unwrap();
+
+            // Allocate space from the backstore so that the cap device is made.
+            backstore
+                .alloc(pool_uuid, &[INITIAL_BACKSTORE_ALLOCATION])
+                .unwrap();
+
+            let old_device = backstore.device();
+
+            backstore.init_cache(pool_uuid, paths2).unwrap();
+
+            assert_ne!(backstore.device(), old_device);
+
+            (
+                backstore.record(),
+                unencrypted_blockdev_data(&backstore, pool_uuid),
+            )
+        };
+
+        {
+            let bdas = get_bdas(&infos).unwrap();
+            let (datadevs, cachedevs) = get_blockdevs(&backstore_save, &infos, bdas).unwrap();
+            let mut backstore = Backstore::setup(
+                pool_uuid,
+                &backstore_save,
+                datadevs,
+                cachedevs,
+                Utc::now(),
+                None,
+            )
+            .unwrap();
+
+            let backstore_save2 = backstore.record();
+            assert_eq!(backstore_save.cache_tier, backstore_save2.cache_tier);
+            assert_eq!(backstore_save.data_tier, backstore_save2.data_tier);
+
+            backstore.teardown().unwrap();
+        }
+
+        {
+            let bdas = get_bdas(&infos).unwrap();
+            let (datadevs, cachedevs) = get_blockdevs(&backstore_save, &infos, bdas).unwrap();
+            let mut backstore = Backstore::setup(
+                pool_uuid,
+                &backstore_save,
+                datadevs,
+                cachedevs,
+                Utc::now(),
+                None,
+            )
+            .unwrap();
+
+            let backstore_save2 = backstore.record();
+            assert_eq!(backstore_save.cache_tier, backstore_save2.cache_tier);
+            assert_eq!(backstore_save.data_tier, backstore_save2.data_tier);
+
+            backstore.destroy().unwrap();
+        }
+    }
+
+    #[test]
+    fn loop_test_setup() {
+        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(2, 3, None), test_setup);
+    }
+
+    #[test]
+    fn real_test_setup() {
+        real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_setup);
+    }
+
+    #[test]
+    fn travis_test_setup() {
+        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(2, 3, None), test_setup);
+    }
+}

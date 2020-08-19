@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-check cargo dependencies' versions
+Check cargo dependencies' versions
 """
 
 
@@ -29,9 +29,10 @@ import sys
 import requests
 
 
-def main():
+def build_cargo_outdated_dict():
     """
-    The main method
+    :returns: cargo outdated information
+    :rtype: dict
     """
     # The versions are stored in a dictionary (for constant lookup).
     # Key type: a string
@@ -59,7 +60,7 @@ def main():
         # Convert byte object into string
         line_str = line_bo.decode("utf-8")
 
-        # Extract dependencies, versions, and platforms and fill in data structure line by line
+        # Extract dependencies, versions, and platforms and fill in data structure l1ine by line
         line_split = line_str.split()
 
         platform = line_split[5]
@@ -89,7 +90,6 @@ def main():
     #    print("\n\nNOW PRINTING MODIFICATIONS TO DICT\n")
 
     # Remove keys such that the dependency is pulled in by a windows-specific dependency
-    """
     for key in cargo_outdated_output:
         new_key = cargo_outdated_output[key][1]
         if new_key is not None:
@@ -116,18 +116,22 @@ def main():
                         + "'s platform is "
                         + cargo_outdated_output[new_key][2]
                     )
-    """
 
     # DEBUGGING
     #    print("\n\nNOW PRINTING MODIFIED DICT\n")
 
     #    print_var.pprint(cargo_outdated_output)
 
-    # Lists that categorized dependencies will be placed in
-    outdated = []
-    not_outdated = []
-    not_found = []
+    return cargo_outdated_output
 
+
+def build_koji_repo_dict(cargo_outdated_output):
+    """
+    :param cargo_outdated_output: cargo outdated information
+    :type cargo_outdated_output: dict
+    :returns: koji repo information
+    :rtype: dict
+    """
     # Populate with dependency -> version
     koji_dict = {}
 
@@ -147,52 +151,88 @@ def main():
 
     # DEBUGGING
     print("\n\nNOW PRINTING KOJI DICT\n")
+    print_var = pprint.PrettyPrinter(width=41, compact=True)
     print_var.pprint(koji_dict)
 
+    return koji_dict
+
+
+def print_results(cargo_outdated_dict, koji_repo_dict):
+    """
+    :param cargo_outdated_dict: cargo outdated information
+    :type cargo_outdated_dict: dict
+    :param koji_repo_dict: koji repo information
+    :type koji_repo_dict: dict
+    """
     # DEBUGGING
     print("\n\nNOW PRINTING KEY RESULTS\n")
     print("              koji:   car.out.:   dependency:\n")
+    # Lists that categorized dependencies will be placed in
+    outdated = []
+    not_outdated = []
+    not_found = []
 
-    for key in cargo_outdated_output:
+    for key in cargo_outdated_dict:
 
-        version = cargo_outdated_output[key][0]
+        version = cargo_outdated_dict[key][0]
 
         if key in ("Name", "----"):
             continue
 
-        if key in koji_dict.keys():
-            if koji_dict[key] != version:
+        if key in koji_repo_dict.keys():
+            if koji_repo_dict[key] != version:
                 print(
-                    "    OUTDATED: " + koji_dict[key] + "    " + version + "    " + key
+                    "    OUTDATED: "
+                    + koji_repo_dict[key]
+                    + "    "
+                    + version
+                    + "    "
+                    + key
                 )
                 outdated.append(key)
             else:
                 print(
-                    "NOT OUTDATED: " + koji_dict[key] + "    " + version + "    " + key
+                    "NOT OUTDATED: "
+                    + koji_repo_dict[key]
+                    + "    "
+                    + version
+                    + "    "
+                    + key
                 )
                 not_outdated.append(key)
         else:
             print("   not found:                   " + key)
             not_found.append(key)
-
     print("\n\nRESULTS")
 
     print(
-        "\nThe following packages that were outputted by 'cargo outdated' are outdated according to the koji repo:"
+        "\nThe following packages that were outputted by 'cargo outdated' are outdated"
+        + " with respect to the koji repo:"
     )
     print(outdated)
 
     print(
-        "\nThe following packages that were outputted by 'cargo outdated' are not outdated according to the koji repo:"
+        "\nThe following packages that were outputted by 'cargo outdated' are not outdated"
+        + " with respect to the koji repo:"
     )
     print(not_outdated)
 
     print(
-        "\nThe following packages that were outputted by 'cargo outdated' were not found in the koji repo:"
+        "\nThe following packages that were outputted by 'cargo outdated' were not found"
+        " in the koji repo:"
     )
     print(not_found)
 
     print("\n")
+
+
+def main():
+    """
+    The main method
+    """
+    cargo_outdated_dict = build_cargo_outdated_dict()
+    koji_repo_dict = build_koji_repo_dict(cargo_outdated_dict)
+    print_results(cargo_outdated_dict, koji_repo_dict)
 
 
 if __name__ == "__main__":

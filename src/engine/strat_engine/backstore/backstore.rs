@@ -688,23 +688,16 @@ impl Recordable<BackstoreSave> for Backstore {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, fs::OpenOptions};
+    use std::fs::OpenOptions;
 
     use uuid::Uuid;
 
     use devicemapper::{CacheDevStatus, DataBlocks, IEC};
 
-    use crate::engine::{
-        strat_engine::{
-            backstore::{
-                identify::StratisInfo,
-                metadata::{device_identifiers, StratisIdentifiers},
-            },
-            cmd,
-            liminal::{get_bdas, get_blockdevs, LStratisInfo},
-            tests::{loopbacked, real},
-        },
-        types::DevUuid,
+    use crate::engine::strat_engine::{
+        backstore::metadata::device_identifiers,
+        cmd,
+        tests::{loopbacked, real},
     };
 
     use super::*;
@@ -897,13 +890,9 @@ mod tests {
         loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_request);
     }
 
-    /// Create a backstore with a cache.
-    /// Setup the same backstore, should succeed.
-    /// Verify that blockdev metadatas are the same for the backstores.
-    /// Tear down the backstore.
-    /// Setup the same backstore again.
-    /// Verify blockdev metadata again.
-    /// Destroy all.
+    /// Create a backstore.
+    /// Initialize a cache and verify that there is a new device representing
+    /// the cache.
     fn test_setup(paths: &[&Path]) {
         assert!(paths.len() > 1);
 
@@ -911,109 +900,45 @@ mod tests {
 
         let pool_uuid = Uuid::new_v4();
 
-        let (backstore_save, infos): (_, HashMap<DevUuid, LStratisInfo>) = {
-            let mut backstore =
-                Backstore::initialize(pool_uuid, paths1, MDADataSize::default(), None).unwrap();
+        let mut backstore =
+            Backstore::initialize(pool_uuid, paths1, MDADataSize::default(), None).unwrap();
 
-            for path in paths1 {
-                assert_eq!(
-                    pool_uuid,
-                    device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
-                        .unwrap()
-                        .unwrap()
-                        .pool_uuid
-                );
-            }
-
-            invariant(&backstore);
-
-            // Allocate space from the backstore so that the cap device is made.
-            backstore
-                .alloc(pool_uuid, &[INITIAL_BACKSTORE_ALLOCATION])
-                .unwrap();
-
-            let old_device = backstore.device();
-
-            backstore.init_cache(pool_uuid, paths2).unwrap();
-
-            for path in paths2 {
-                assert_eq!(
-                    pool_uuid,
-                    device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
-                        .unwrap()
-                        .unwrap()
-                        .pool_uuid
-                );
-            }
-
-            invariant(&backstore);
-
-            assert_ne!(backstore.device(), old_device);
-
-            (
-                backstore.record(),
-                backstore
-                    .blockdevs()
-                    .iter()
-                    .map(|(device_uuid, _, blockdev)| {
-                        (
-                            *device_uuid,
-                            StratisInfo {
-                                identifiers: StratisIdentifiers {
-                                    pool_uuid,
-                                    device_uuid: *device_uuid,
-                                },
-                                device_number: *blockdev.device(),
-                                devnode: blockdev.devnode().metadata_path().to_owned(),
-                            }
-                            .into(),
-                        )
-                    })
-                    .collect(),
-            )
-        };
-
-        {
-            let bdas = get_bdas(&infos).unwrap();
-            let (datadevs, cachedevs) = get_blockdevs(&backstore_save, &infos, bdas).unwrap();
-            let mut backstore = Backstore::setup(
+        for path in paths1 {
+            assert_eq!(
                 pool_uuid,
-                &backstore_save,
-                datadevs,
-                cachedevs,
-                Utc::now(),
-                None,
-            )
-            .unwrap();
-            invariant(&backstore);
-
-            let backstore_save2 = backstore.record();
-            assert_eq!(backstore_save.cache_tier, backstore_save2.cache_tier);
-            assert_eq!(backstore_save.data_tier, backstore_save2.data_tier);
-
-            backstore.teardown().unwrap();
+                device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
+                    .unwrap()
+                    .unwrap()
+                    .pool_uuid
+            );
         }
 
-        {
-            let bdas = get_bdas(&infos).unwrap();
-            let (datadevs, cachedevs) = get_blockdevs(&backstore_save, &infos, bdas).unwrap();
-            let mut backstore = Backstore::setup(
-                pool_uuid,
-                &backstore_save,
-                datadevs,
-                cachedevs,
-                Utc::now(),
-                None,
-            )
+        invariant(&backstore);
+
+        // Allocate space from the backstore so that the cap device is made.
+        backstore
+            .alloc(pool_uuid, &[INITIAL_BACKSTORE_ALLOCATION])
             .unwrap();
-            invariant(&backstore);
 
-            let backstore_save2 = backstore.record();
-            assert_eq!(backstore_save.cache_tier, backstore_save2.cache_tier);
-            assert_eq!(backstore_save.data_tier, backstore_save2.data_tier);
+        let old_device = backstore.device();
 
-            backstore.destroy().unwrap();
+        backstore.init_cache(pool_uuid, paths2).unwrap();
+
+        for path in paths2 {
+            assert_eq!(
+                pool_uuid,
+                device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
+                    .unwrap()
+                    .unwrap()
+                    .pool_uuid
+            );
         }
+
+        invariant(&backstore);
+
+        assert_ne!(backstore.device(), old_device);
+
+        backstore.destroy().unwrap();
     }
 
     #[test]

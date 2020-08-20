@@ -32,15 +32,12 @@ fn get_version() -> Result<GetVerRet, dbus::Error> {
 
 fn run() -> Result<Version, String> {
     let vertest = get_version().map_err(|vertest_err| format!("vertest_err: {}", vertest_err))?;
-    println!("{:#?}", vertest);
     let verparse = Version::parse(
         vertest
             .as_str()
             .ok_or_else(|| "Unable to convert version to string".to_string())?,
     )
     .map_err(|verparse_err| format!("malformed version string found: {}", verparse_err))?;
-    println!("verparse: {:#?}", verparse);
-    println!("STRATIS_VER_UDEV_SYMLINK: {:#?}", *STRATIS_VER_UDEV_SYMLINK);
     Ok(verparse)
 }
 

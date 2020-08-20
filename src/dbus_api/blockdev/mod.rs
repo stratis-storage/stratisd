@@ -87,8 +87,6 @@ pub fn get_initial_properties(
             consts::BLOCKDEV_POOL_PROP => parent,
             consts::BLOCKDEV_UUID_PROP => uuid_to_string!(dev_uuid),
             consts::BLOCKDEV_TIER_PROP => shared::blockdev_tier_prop(tier)
-        },
-        consts::PROPERTY_FETCH_INTERFACE_NAME => {},
-        consts::PROPERTY_FETCH_INTERFACE_NAME_2_1 => {}
+        }
     }
 }

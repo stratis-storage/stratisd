@@ -84,8 +84,6 @@ pub fn get_initial_properties(
             consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop(fs, pool_name, fs_name),
             consts::FILESYSTEM_POOL_PROP => parent,
             consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop(fs)
-        },
-        consts::PROPERTY_FETCH_INTERFACE_NAME => {},
-        consts::PROPERTY_FETCH_INTERFACE_NAME_2_1 => {}
+        }
     }
 }

@@ -36,9 +36,9 @@ fn run() -> Result<Version, String> {
     let verparse = Version::parse(
         vertest
             .as_str()
-            .ok_or_else(|| "no version info".to_string())?,
+            .ok_or_else(|| "Unable to convert version to string".to_string())?,
     )
-    .map_err(|verparse_err| format!("verparse_err: {}", verparse_err))?;
+    .map_err(|verparse_err| format!("malformed version string found: {}", verparse_err))?;
     println!("verparse: {:#?}", verparse);
     println!("STRATIS_VER_UDEV_SYMLINK: {:#?}", *STRATIS_VER_UDEV_SYMLINK);
     Ok(verparse)

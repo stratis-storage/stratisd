@@ -186,7 +186,7 @@ impl LInfo {
     /// device attached to the event.
     pub fn update_on_remove(info_1: LInfo, info_2: LInfo) -> Option<LInfo> {
         match (info_1, info_2) {
-            (LInfo::Luks(luks_info), LInfo::Stratis(_)) => Some(LInfo::Luks(luks_info)),
+            (luks_info @ LInfo::Luks(_), LInfo::Stratis(_)) => Some(luks_info),
             (LInfo::Stratis(strat_info), LInfo::Luks(luks_info)) => {
                 if let Some(luks) = &strat_info.luks {
                     if luks.ids.device_number != luks_info.ids.device_number {

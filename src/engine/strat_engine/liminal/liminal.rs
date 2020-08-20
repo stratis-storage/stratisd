@@ -498,10 +498,11 @@ impl LiminalDevices {
         let stratis_identifiers = info.stratis_identifiers();
         let device_uuid = stratis_identifiers.device_uuid;
 
-        if let Some(removed) = devices.remove(&device_uuid) {
-            if let Some(info) = LInfo::update_on_remove(removed, info) {
-                devices.insert(device_uuid, info);
-            }
+        if let Some(new_info) = devices
+            .remove(&device_uuid)
+            .and_then(|removed| LInfo::update_on_remove(removed, info))
+        {
+            devices.insert(device_uuid, new_info);
         }
     }
 

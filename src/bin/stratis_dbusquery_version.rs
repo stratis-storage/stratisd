@@ -31,7 +31,12 @@ fn get_version() -> Result<GetVerRet, dbus::Error> {
 }
 
 fn run() -> Result<Version, String> {
-    let vertest = get_version().map_err(|vertest_err| format!("vertest_err: {}", vertest_err))?;
+    let vertest = get_version().map_err(|vertest_err| {
+        format!(
+            "could not obtain version from stratisd D-Bus interface: {}",
+            vertest_err
+        )
+    })?;
     let verparse = Version::parse(
         vertest
             .as_str()

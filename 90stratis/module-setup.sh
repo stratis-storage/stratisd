@@ -22,5 +22,6 @@ install() {
     inst_multiple stratis-min thin_check thin_repair mkfs.xfs xfs_admin xfs_growfs
 
     inst_hook init-queue/settled 25 "$moddir/stratis-encrypted-rootfs.sh"
+    inst_rules "$moddir/11-stratisd.rules"
 }
 

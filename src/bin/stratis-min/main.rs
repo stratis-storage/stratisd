@@ -9,6 +9,7 @@ use clap::{App, Arg, ArgGroup, ArgMatches, SubCommand};
 mod key;
 mod pool;
 mod report;
+mod udev;
 #[macro_use]
 mod utils;
 
@@ -64,6 +65,7 @@ fn parse_args() -> App<'static, 'static> {
             SubCommand::with_name("destroy").arg(Arg::with_name("name").required(true)),
         ]),
         SubCommand::with_name("report"),
+        SubCommand::with_name("udev").arg(Arg::with_name("dm_name").required(true)),
     ])
 }
 
@@ -129,6 +131,8 @@ fn main() -> Result<(), String> {
         }
     } else if let Some("report") = args.subcommand_name() {
         report::report().map_err(|e| e.to_string())
+    } else if let Some(args) = args.subcommand_matches("udev") {
+        udev::udev(args.value_of("dm_name").expect("required"))
     } else {
         println!("{}", help);
         Ok(())

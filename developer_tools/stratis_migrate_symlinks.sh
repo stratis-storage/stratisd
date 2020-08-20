@@ -12,13 +12,27 @@ fi
 
 if [ ! -x /usr/lib/udev/stratis_uuids_to_names ]
 then
-	echo "'stratis_uuids_to_names udev program does not exist."
+	echo "stratis_uuids_to_names' udev program does not exist."
 	exit 2
 fi
 
-if [ ! -f /usr/lib/udev/rules.d/99-stratisd.rules ]
+if [ ! -x /usr/bin/stratis_dbusquery_version ]
+then
+	echo "'stratis_dbusquery_version' program does not exist."
+	exit 2
+fi
+
+if [ ! -f /usr/lib/udev/rules.d/60-stratisd.rules ]
 then
 	echo "stratisd udev rule file does not exist in /usr/lib/udev/rules.d"
+	exit 2
+fi
+
+/usr/bin/stratis_dbusquery_version
+RC_DBUSQUERY=$?
+if [ ! $RC_DBUSQUERY == 0 ]
+then
+	echo "Attempt to query stratisd version over dbus failed."
 	exit 2
 fi
 
@@ -45,11 +59,10 @@ do
 			then
 				echo "Targets do not match; sending change event to re-synchronize..."
 				udevadm test --action=change /sys/class/block/$tgtbase 1>/dev/null 2>&1
-				rm -fv $devname
 			else
 				echo "Targets match"
-				rm -fv $devname
 			fi
+			rm -fv $devname
 		else
 			echo "No future link found; sending change event..."
 			udevadm test --action=change /sys/class/block/$tgtbase 1>/dev/null 2>&1

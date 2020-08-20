@@ -46,39 +46,43 @@ pub const BLOCKDEV_UUID_PROP: &str = "Uuid";
 pub const BLOCKDEV_TIER_PROP: &str = "Tier";
 pub const BLOCKDEV_TOTAL_SIZE_PROP: &str = "TotalPhysicalSize";
 
-/// Get a list of all interfaces supported by a pool object.
-pub fn pool_interface_list() -> InterfacesRemoved {
+/// Get a list of all the FetchProperties interfaces
+pub fn fetch_properties_interfaces() -> Vec<String> {
     [
-        POOL_INTERFACE_NAME,
-        POOL_INTERFACE_NAME_2_1,
         PROPERTY_FETCH_INTERFACE_NAME,
         PROPERTY_FETCH_INTERFACE_NAME_2_1,
     ]
     .iter()
     .map(|s| (*s).to_string())
     .collect()
+}
+
+/// Get a list of all interfaces supported by a pool object.
+pub fn pool_interface_list() -> InterfacesRemoved {
+    let mut interfaces = [POOL_INTERFACE_NAME, POOL_INTERFACE_NAME_2_1]
+        .iter()
+        .map(|s| (*s).to_string())
+        .collect::<InterfacesRemoved>();
+    interfaces.extend(fetch_properties_interfaces());
+    interfaces
 }
 
 /// Get a list of all interfaces supported by a filesystem object.
 pub fn filesystem_interface_list() -> InterfacesRemoved {
-    [
-        FILESYSTEM_INTERFACE_NAME,
-        PROPERTY_FETCH_INTERFACE_NAME,
-        PROPERTY_FETCH_INTERFACE_NAME_2_1,
-    ]
-    .iter()
-    .map(|s| (*s).to_string())
-    .collect()
+    let mut interfaces = [FILESYSTEM_INTERFACE_NAME]
+        .iter()
+        .map(|s| (*s).to_string())
+        .collect::<InterfacesRemoved>();
+    interfaces.extend(fetch_properties_interfaces());
+    interfaces
 }
 
 /// Get a list of all interfaces supported by a blockdev object.
 pub fn blockdev_interface_list() -> InterfacesRemoved {
-    [
-        BLOCKDEV_INTERFACE_NAME,
-        PROPERTY_FETCH_INTERFACE_NAME,
-        PROPERTY_FETCH_INTERFACE_NAME_2_1,
-    ]
-    .iter()
-    .map(|s| (*s).to_string())
-    .collect()
+    let mut interfaces = [BLOCKDEV_INTERFACE_NAME]
+        .iter()
+        .map(|s| (*s).to_string())
+        .collect::<InterfacesRemoved>();
+    interfaces.extend(fetch_properties_interfaces());
+    interfaces
 }

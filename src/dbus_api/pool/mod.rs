@@ -96,8 +96,6 @@ pub fn get_initial_properties(
             consts::POOL_NAME_PROP => shared::pool_name_prop(pool_name),
             consts::POOL_UUID_PROP => uuid_to_string!(pool_uuid),
             consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop(pool)
-        },
-        consts::PROPERTY_FETCH_INTERFACE_NAME => {},
-        consts::PROPERTY_FETCH_INTERFACE_NAME_2_1 => {}
+        }
     }
 }

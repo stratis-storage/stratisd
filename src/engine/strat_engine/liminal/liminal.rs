@@ -333,7 +333,7 @@ impl LiminalDevices {
                 Ok((datadevs, cachedevs)) => (datadevs, cachedevs),
             };
 
-            if datadevs.iter().next().is_none() {
+            if datadevs.get(0).is_none() {
                 return Err(Destination::Hopeless(format!(
                     "There do not appear to be any data devices in the set with pool UUID {}",
                     pool_uuid.to_simple_ref()
@@ -361,8 +361,7 @@ impl LiminalDevices {
             // Either all the devices have a key description or none do;
             // so only the first device needs to be accessed.
             let key_description = datadevs
-                .iter()
-                .next()
+                .get(0)
                 .expect("returned with error above if datadevs empty")
                 .key_description()
                 .cloned();

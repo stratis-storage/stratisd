@@ -331,6 +331,13 @@ impl LiminalDevices {
                 Ok((datadevs, cachedevs)) => (datadevs, cachedevs),
             };
 
+            if datadevs.get(0).is_none() {
+                return Err(Destination::Hopeless(format!(
+                    "There do not appear to be any data devices in the set with pool UUID {}",
+                    pool_uuid.to_simple_ref()
+                )));
+            }
+
             let num_with_luks = datadevs
                 .iter()
                 .filter_map(|sbd| sbd.key_description())
@@ -349,25 +356,13 @@ impl LiminalDevices {
                             &metadata.name)));
             }
 
-            let key_description = if num_with_luks != 0 {
-                let key_descriptions = datadevs
-                    .iter()
-                    .map(|sbd| {
-                        sbd.key_description()
-                            .expect("num_with_luks != 0 -> num_with_luks == datadevs.len()")
-                    })
-                    .collect::<HashSet<&KeyDescription>>();
-                if key_descriptions.iter().count() != 1 {
-                    return Err(
-                        Destination::Hopeless(format!(
-                            "Data devices in the set belonging to pool with UUID {} and name {} do not agree on their key description",
-                            pool_uuid.to_simple_ref(),
-                            &metadata.name)));
-                }
-                key_descriptions.into_iter().next().cloned()
-            } else {
-                None
-            };
+            // Either all the devices have a key description or none do;
+            // so only the first device needs to be accessed.
+            let key_description = datadevs
+                .get(0)
+                .expect("returned with error above if datadevs empty")
+                .key_description()
+                .cloned();
 
             StratPool::setup(
                 pool_uuid,
@@ -384,6 +379,25 @@ impl LiminalDevices {
                     err
                 ))
             })
+        }
+
+        // If any key descriptions are different, give up promptly.
+        // Even if the key description is overwritten to be correct no change
+        // will be observed by udev so the information stratisd possesses
+        // can not be corrected until functionality is introduced to reload
+        // pools.
+        let key_descriptions = infos
+            .iter()
+            .filter_map(|(_, info)| info.key_desc())
+            .collect::<HashSet<&KeyDescription>>();
+        if key_descriptions.len() > 1 {
+            warn!(
+                "Moving set of devices with pool UUID {} to hopeless sets because some devices reported different key descriptions",
+                pool_uuid.to_simple_ref(),
+            );
+            self.hopeless_device_sets
+                .insert(pool_uuid, infos.drain().map(|(_, info)| info).collect());
+            return None;
         }
 
         if infos.iter().any(|(_, info)| match info {

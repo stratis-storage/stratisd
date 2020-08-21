@@ -173,7 +173,7 @@ fn main() -> Result<(), StratisUdevError> {
             )
             .map_err(StratisUdevError::new)?;
 
-            println!("{} {}", pool_name, fs_name);
+            println!("STRATIS_SYMLINK=stratis/{}/{}", pool_name, fs_name);
             Ok(())
         }
         Ok(None) => Ok(()),

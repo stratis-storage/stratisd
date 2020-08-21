@@ -23,7 +23,6 @@ pub fn locked_pools(
     let engine = dbus_context.engine.borrow();
     Ok(engine
         .locked_pools()
-        .map_err(|e| e.to_string())?
         .into_iter()
         .map(|(u, kd)| {
             (

@@ -11,7 +11,6 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use itertools::Itertools;
 use serde_json::Value;
 
 use devicemapper::Sectors;
@@ -630,81 +629,27 @@ impl LiminalDevices {
         Ok(unlocked)
     }
 
-    /// Use the provided closures to process devices that may or may not be encrypted.
-    /// Returns a value including the status of whether the device is encrypted or not.
-    ///
-    /// Return Some(_) if the device has encryption enabled.
-    /// Return None if the device is not encrypted.
-    fn process_maybe_encrypted<T, F1, F2>(info: &LInfo, locked: F1, unlocked: F2) -> Option<T>
-    where
-        F1: Fn(&LLuksInfo) -> Option<T>,
-        F2: Fn(&LStratisInfo) -> Option<T>,
-    {
-        if let LInfo::Luks(i) = info {
-            locked(i)
-        } else if let LInfo::Stratis(i) = info {
-            unlocked(i)
-        } else {
-            None
-        }
-    }
-
-    /// Get locked pool UUIDs.
-    pub fn locked_pool_uuids(&self) -> Vec<PoolUuid> {
+    /// Get a mapping of pool UUIDs from all of the LUKS2 devices that are currently
+    /// locked to their key descriptions in the set of pools that are not yet set up.
+    // Precondition: All devices for a given errored pool have been determined to have
+    // the same key description.
+    pub fn locked_pools(&self) -> HashMap<PoolUuid, KeyDescription> {
         self.errored_pool_devices
             .iter()
             .filter_map(|(pool_uuid, map)| {
-                let has_encrypted = map.iter().any(|(_, info)| {
-                    Self::process_maybe_encrypted(
-                        info,
-                        |_| Some(()),
-                        |i| i.luks.as_ref().map(|_| ()),
-                    )
-                    .is_some()
-                });
-                if has_encrypted {
-                    Some(*pool_uuid)
-                } else {
-                    None
-                }
+                map.iter().next().and_then(|(_, info)| {
+                    if let LInfo::Luks(i) = info {
+                        Some((*pool_uuid, i.key_description.clone()))
+                    } else if let LInfo::Stratis(i) = info {
+                        i.luks
+                            .as_ref()
+                            .map(|li| (*pool_uuid, li.key_description.clone()))
+                    } else {
+                        None
+                    }
+                })
             })
             .collect()
-    }
-
-    /// Get a mapping of pool UUIDs from all of the LUKS2 pools that are currently
-    /// partially or fully locked to their key descriptions.
-    pub fn locked_pools(&self) -> StratisResult<HashMap<PoolUuid, KeyDescription>> {
-        let mut locked_pools = HashMap::new();
-        for (pool_uuid, map) in self.errored_pool_devices.iter() {
-            let mut key_descs: Vec<_> = map
-                .iter()
-                .map(|(_, info)| {
-                    LiminalDevices::process_maybe_encrypted(
-                        info,
-                        |i| Some(i.key_description.clone()),
-                        |i| i.luks.as_ref().map(|li| li.key_description.clone()),
-                    )
-                })
-                .unique()
-                .collect();
-
-            if key_descs.len() > 1 {
-                return Err(StratisError::Error(format!(
-                    "Found mismatching key descriptions for pool with UUID {} \
-                        in metadata: {:?}",
-                    pool_uuid.to_simple_ref(),
-                    key_descs
-                        .into_iter()
-                        .map(|kd_opt| kd_opt.map(|kd| kd.as_application_str().to_string()))
-                        .collect::<Vec<_>>(),
-                )));
-            }
-
-            if let Some(key_desc) = key_descs.pop().and_then(|kd_opt| kd_opt) {
-                locked_pools.insert(*pool_uuid, key_desc);
-            }
-        }
-        Ok(locked_pools)
     }
 
     /// Take maps of pool UUIDs to sets of devices and return a list of

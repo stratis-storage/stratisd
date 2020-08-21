@@ -11,6 +11,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
+use itertools::Itertools;
 use serde_json::Value;
 
 use devicemapper::Sectors;
@@ -494,6 +495,13 @@ impl LInfo {
             LInfo::Stratis(info) => info.ids.identifiers,
         }
     }
+
+    fn key_desc(&self) -> Option<&KeyDescription> {
+        match self {
+            LInfo::Luks(info) => Some(&info.key_description),
+            LInfo::Stratis(info) => info.luks.as_ref().map(|i| &i.key_description),
+        }
+    }
 }
 
 /// On an error, whether this set of devices is hopeless or just errored
@@ -637,17 +645,13 @@ impl LiminalDevices {
         self.errored_pool_devices
             .iter()
             .filter_map(|(pool_uuid, map)| {
-                map.iter().next().and_then(|(_, info)| {
-                    if let LInfo::Luks(i) = info {
-                        Some((*pool_uuid, i.key_description.clone()))
-                    } else if let LInfo::Stratis(i) = info {
-                        i.luks
-                            .as_ref()
-                            .map(|li| (*pool_uuid, li.key_description.clone()))
-                    } else {
-                        None
-                    }
-                })
+                assert_eq!(
+                    map.iter().map(|(_, info)| info.key_desc()).unique().count(),
+                    1
+                );
+                map.iter()
+                    .next()
+                    .and_then(|(_, info)| info.key_desc().map(|kd| (*pool_uuid, kd.clone())))
             })
             .collect()
     }

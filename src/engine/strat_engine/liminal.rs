@@ -11,6 +11,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
+use itertools::Itertools;
 use serde_json::Value;
 
 use devicemapper::Sectors;
@@ -494,6 +495,13 @@ impl LInfo {
             LInfo::Stratis(info) => info.ids.identifiers,
         }
     }
+
+    fn key_desc(&self) -> Option<&KeyDescription> {
+        match self {
+            LInfo::Luks(info) => Some(&info.key_description),
+            LInfo::Stratis(info) => info.luks.as_ref().map(|i| &i.key_description),
+        }
+    }
 }
 
 /// On an error, whether this set of devices is hopeless or just errored
@@ -629,24 +637,21 @@ impl LiminalDevices {
         Ok(unlocked)
     }
 
-    /// Get a list of pool UUIDs from all of the LUKS2 devices that are currently
-    /// locked in the set of pools that are not yet set up.
-    pub fn locked_pool_uuids(&self) -> Vec<PoolUuid> {
+    /// Get a mapping of pool UUIDs from all of the LUKS2 devices that are currently
+    /// locked to their key descriptions in the set of pools that are not yet set up.
+    // Precondition: All devices for a given errored pool have been determined to have
+    // the same key description.
+    pub fn locked_pools(&self) -> HashMap<PoolUuid, KeyDescription> {
         self.errored_pool_devices
             .iter()
             .filter_map(|(pool_uuid, map)| {
-                let has_locked = map.iter().any(|(_, info)| {
-                    if let LInfo::Luks(_) = info {
-                        true
-                    } else {
-                        false
-                    }
-                });
-                if has_locked {
-                    Some(*pool_uuid)
-                } else {
-                    None
-                }
+                assert_eq!(
+                    map.iter().map(|(_, info)| info.key_desc()).unique().count(),
+                    1
+                );
+                map.iter()
+                    .next()
+                    .and_then(|(_, info)| info.key_desc().map(|kd| (*pool_uuid, kd.clone())))
             })
             .collect()
     }

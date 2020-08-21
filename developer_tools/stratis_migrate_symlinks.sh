@@ -62,12 +62,11 @@ do
 			else
 				echo "Targets match"
 			fi
-			rm -fv $devname
 		else
 			echo "No future link found; sending change event..."
 			udevadm test --action=change /sys/class/block/$tgtbase 1>/dev/null 2>&1
-			rm -fv $devname
 		fi
+		rm -fv $devname
 	fi	
 done
 

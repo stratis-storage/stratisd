@@ -27,69 +27,7 @@ import sys
 
 # isort: THIRDPARTY
 import requests
-
-
-def build_rustc_cfg_dict():
-    """
-    :returns: dict containing information from the output of `rustc --print cfg`
-    :rtype: dict
-    """
-    command = ["rustc", "--print", "cfg"]
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE)
-
-    rustc_cfg_dict = {}
-
-    pattern = r'target_([^\s]*)="([^\s]*)"'
-    my_reg_ex = re.compile(pattern)
-
-    while True:
-        # splitlines could avoid break
-        line_bo = proc.stdout.readline()
-
-        if not line_bo:
-            break
-
-        line_str = line_bo.decode("utf-8")
-        matches = my_reg_ex.match(line_str)
-
-        if matches is not None:
-            key = "target_" + matches.group(1)
-            value = matches.group(2)
-            rustc_cfg_dict[key] = value
-
-        elif matches != "debug_assertions":
-            rustc_cfg_dict["env"] = line_str.rstrip()
-
-    return rustc_cfg_dict
-
-
-def parse_platform(unparsed_platform):
-    """
-    :param unparsed_platform: platform to parse
-    :type unparsed_platform:
-    :returns: duple containing extracted information and whether or not it's a triple
-    :rtype: (str, bool)
-    """
-
-    pattern = r"cfg\(([^\)]+)\)"
-    my_reg_ex = re.compile(pattern)
-
-    matches = my_reg_ex.match(unparsed_platform)
-
-    if matches is not None:
-        extraction = matches.group(1)
-        is_triple = False
-
-    else:
-        is_triple = True
-        extraction = unparsed_platform
-
-    build_rustc_cfg_dict()
-
-    if is_triple:
-        pass
-
-    return extraction
+from platform_parser import parse_platform
 
 
 def build_cargo_outdated_dict():

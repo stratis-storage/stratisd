@@ -179,6 +179,13 @@ impl LInfo {
         }
     }
 
+    pub fn key_description(&self) -> Option<&KeyDescription> {
+        match self {
+            LInfo::Luks(info) => Some(&info.key_description),
+            LInfo::Stratis(info) => info.luks.as_ref().map(|luks| &luks.key_description),
+        }
+    }
+
     /// Combine two devices which have identical pool and device UUIDs.
     /// The first argument is the existing information, the second is the
     /// information about the removed device, where "removed" means there

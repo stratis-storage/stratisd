@@ -30,10 +30,17 @@ fi
 
 /usr/bin/stratis_dbusquery_version
 RC_DBUSQUERY=$?
-if [ ! $RC_DBUSQUERY == 0 ]
+
+if [ $RC_DBUSQUERY == 2 ]
 then
 	echo "Attempt to query stratisd version over dbus failed."
 	exit 2
+fi
+
+if [ $RC_DBUSQUERY == 1 ]
+then
+	echo "stratisd reported version is too old."
+	exit 1
 fi
 
 for i in $(find /stratis)

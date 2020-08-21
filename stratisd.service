@@ -1,7 +1,7 @@
 [Unit]
 Description=Stratis daemon
 Documentation=man:stratisd(8)
-Before=local-fs-pre.target
+After=dbus.socket
 DefaultDependencies=no
 
 [Service]

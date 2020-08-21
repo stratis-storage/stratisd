@@ -192,10 +192,6 @@ impl Engine for SimEngine {
         get_mut_pool!(self; uuid)
     }
 
-    fn locked_pool_uuids(&self) -> Vec<PoolUuid> {
-        Vec::new()
-    }
-
     fn locked_pools(&self) -> HashMap<PoolUuid, KeyDescription> {
         HashMap::new()
     }

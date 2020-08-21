@@ -20,9 +20,9 @@ pub fn locked_pool_uuids(info: &MethodInfo<MTFn<TData>, TData>) -> Result<Vec<St
 
     let engine = dbus_context.engine.borrow();
     Ok(engine
-        .locked_pool_uuids()
+        .locked_pools()
         .into_iter()
-        .map(|u| u.to_simple_ref().to_string())
+        .map(|(u, _)| u.to_simple_ref().to_string())
         .collect())
 }
 

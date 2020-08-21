@@ -196,8 +196,8 @@ impl Engine for SimEngine {
         Vec::new()
     }
 
-    fn locked_pools(&self) -> HashMap<PoolUuid, KeyDescription> {
-        HashMap::new()
+    fn locked_pools(&self) -> StratisResult<HashMap<PoolUuid, KeyDescription>> {
+        Ok(HashMap::new())
     }
 
     /// Set properties of the simulator

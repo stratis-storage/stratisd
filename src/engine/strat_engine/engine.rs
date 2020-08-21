@@ -283,16 +283,12 @@ impl Engine for StratEngine {
         get_mut_pool!(self; uuid)
     }
 
-    fn locked_pools(&self) -> HashMap<PoolUuid, KeyDescription> {
+    fn locked_pools(&self) -> StratisResult<HashMap<PoolUuid, KeyDescription>> {
         self.liminal_devices.locked_pools()
     }
 
     fn locked_pool_uuids(&self) -> Vec<PoolUuid> {
-        self.liminal_devices
-            .locked_pools()
-            .keys()
-            .cloned()
-            .collect()
+        self.liminal_devices.locked_pool_uuids()
     }
 
     fn configure_simulator(&mut self, _denominator: u32) -> StratisResult<()> {

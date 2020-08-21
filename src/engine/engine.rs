@@ -309,7 +309,7 @@ pub trait Engine: Debug + Report {
 
     /// Get a mapping of encrypted pool UUIDs for pools that have not yet been set up
     /// and need to be unlocked to their key descriptions.
-    fn locked_pools(&self) -> HashMap<PoolUuid, KeyDescription>;
+    fn locked_pools(&self) -> StratisResult<HashMap<PoolUuid, KeyDescription>>;
 
     /// Configure the simulator, for the real engine, this is a null op.
     /// denominator: the probably of failure is 1/denominator.

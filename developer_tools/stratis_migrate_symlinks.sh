@@ -22,7 +22,7 @@ then
 	exit 2
 fi
 
-if [ ! -f /usr/lib/udev/rules.d/60-stratisd.rules ]
+if [ ! -f /usr/lib/udev/rules.d/11-stratisd.rules ]
 then
 	echo "stratisd udev rule file does not exist in /usr/lib/udev/rules.d"
 	exit 2

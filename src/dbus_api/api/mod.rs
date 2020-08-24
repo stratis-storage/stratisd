@@ -44,7 +44,7 @@ pub fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>
                 .add_p(manager_2_0::version_property(&f)),
         )
         .add(
-            f.interface(consts::MANAGER_INTERFACE_NAME_2_1, ())
+            f.interface(consts::MANAGER_INTERFACE_NAME_2_2, ())
                 .add_m(manager_2_1::create_pool_method(&f))
                 .add_m(manager_2_2::set_key_method(&f))
                 .add_m(manager_2_1::unset_key_method(&f))

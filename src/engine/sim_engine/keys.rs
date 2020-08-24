@@ -6,7 +6,7 @@ use std::{
     collections::HashMap,
     convert::TryFrom,
     fs::File,
-    io::{Read, Write},
+    io::{self, Read, Write},
     os::unix::io::{FromRawFd, RawFd},
 };
 
@@ -54,14 +54,36 @@ impl KeyActions for SimKeyActions {
         &mut self,
         key_desc: &str,
         key_fd: RawFd,
-        interactive: bool,
-        handle_term_settings: bool,
+        interactive: Option<bool>,
     ) -> StratisResult<MappingCreateAction<()>> {
+        fn read_bytes_loop(
+            bytes: &mut io::Bytes<File>,
+            key_buffer: &mut [u8],
+            interactive: bool,
+        ) -> StratisResult<usize> {
+            let mut pos = 0;
+            while pos < MAX_STRATIS_PASS_SIZE {
+                match bytes.next() {
+                    Some(Ok(b)) => {
+                        if interactive && b as char == '\n' {
+                            break;
+                        }
+
+                        key_buffer[pos] = b;
+                        pos += 1;
+                    }
+                    Some(Err(e)) => return Err(e.into()),
+                    None => break,
+                }
+            }
+            Ok(pos)
+        }
+
         let key_file = unsafe { File::from_raw_fd(key_fd) };
         let new_key_data = &mut [0u8; MAX_STRATIS_PASS_SIZE];
         let mut bytes_iter = key_file.bytes();
 
-        let old_attrs = if handle_term_settings {
+        let old_attrs = if let Some(true) = interactive {
             let old_attrs = Termios::from_fd(key_fd)?;
             let mut new_attrs = old_attrs;
             new_attrs.c_lflag &= !(termios::ICANON | termios::ECHO);
@@ -73,25 +95,13 @@ impl KeyActions for SimKeyActions {
             None
         };
 
-        let mut pos = 0;
-        while pos < MAX_STRATIS_PASS_SIZE {
-            match bytes_iter.next() {
-                Some(Ok(b)) => {
-                    if interactive && b as char == '\n' {
-                        break;
-                    }
-
-                    new_key_data[pos] = b;
-                    pos += 1;
-                }
-                Some(Err(e)) => return Err(e.into()),
-                None => break,
-            }
-        }
+        let res = read_bytes_loop(&mut bytes_iter, new_key_data, interactive.is_some());
 
         if let Some(ref oa) = old_attrs {
             termios::tcsetattr(key_fd, termios::TCSANOW, oa)?;
         }
+
+        let pos = res?;
 
         if pos == MAX_STRATIS_PASS_SIZE && bytes_iter.next().is_some() {
             return Err(StratisError::Engine(

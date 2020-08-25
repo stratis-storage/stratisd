@@ -37,7 +37,7 @@ pub fn key_set(key_desc: &str, keyfile_path: Option<&str>) -> StratisResult<()> 
             let mut mem = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
             println!("Enter desired key data followed by the return key:");
             let i = stdin.read(mem.as_mut())?;
-            StratKeyActions.set_no_fd(key_desc, SizedKeyMemory::new(mem, i))?
+            StratKeyActions.set_no_fd(key_desc, SizedKeyMemory::new(mem, i - 1))?
         }
     };
     match ret {

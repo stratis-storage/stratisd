@@ -2,6 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#[cfg(feature = "extras")]
+pub use self::{engine::MAX_STRATIS_PASS_SIZE, types::SizedKeyMemory};
 pub use self::{
     engine::{BlockDev, Engine, Filesystem, KeyActions, Pool, Report},
     event::{get_engine_listener_list_mut, EngineEvent, EngineListener},

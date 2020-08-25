@@ -354,7 +354,7 @@ fn unset_key(key_id: KeySerial) -> StratisResult<()> {
 #[derive(Debug)]
 pub struct StratKeyActions;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "extras"))]
 impl StratKeyActions {
     /// Method used in testing to bypass the need to provide a file descriptor
     /// when setting the key. This method allows passing memory to the engine API

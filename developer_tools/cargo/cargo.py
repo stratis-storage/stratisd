@@ -14,7 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-Check cargo dependencies' versions
+This script leverages cargo-outdated to generate information about Rust
+dependencies' outdatedness status with respect to the Koji package list.
 """
 
 
@@ -44,12 +45,12 @@ def build_rustc_cfg_dict():
     my_reg_ex = re.compile(pattern)
 
     while True:
-        line_bo_2 = proc.stdout.readline()
+        line = proc.stdout.readline()
 
-        if not line_bo_2:
+        if line == b"":
             break
 
-        line_str = line_bo_2.decode("utf-8")
+        line_str = line.decode("utf-8")
         matches = my_reg_ex.match(line_str)
 
         if matches is not None:
@@ -302,12 +303,12 @@ def build_cargo_outdated_dict():
     my_reg_ex = re.compile(pattern)
 
     while True:
-        line_bo = proc.stdout.readline()
+        line = proc.stdout.readline()
 
-        if not line_bo:
+        if line == b"":
             break
 
-        line_str = line_bo.decode("utf-8")
+        line_str = line.decode("utf-8")
         matches = my_reg_ex.match(line_str)
 
         if matches.group(1) in ("Name", "----"):

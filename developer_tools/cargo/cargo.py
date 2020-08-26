@@ -452,7 +452,7 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
     )
     args = parser.parse_args()
 
-    outdated = []
+    outdated = {}
     not_outdated = []
     not_found = []
     not_included = []
@@ -484,7 +484,7 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
                         platform,
                     ]
                 )
-                outdated.append(key)
+                outdated[key] = koji_repo_dict[key]
 
             elif koji_repo_dict[key] == version and include:
                 table_data.append(
@@ -512,7 +512,7 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
 
     print(
         "\nThe following crates that were outputted by 'cargo outdated' are outdated"
-        " with respect to the koji repo:"
+        " with respect to the koji repo, and should be updated to the following versions:"
     )
     print(outdated)
 

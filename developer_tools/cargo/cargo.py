@@ -19,7 +19,6 @@ Check cargo dependencies' versions
 
 
 # isort: STDLIB
-# import pprint
 import re
 import subprocess
 import sys

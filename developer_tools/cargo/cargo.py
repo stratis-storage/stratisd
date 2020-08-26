@@ -26,6 +26,7 @@ import subprocess
 import sys
 
 # isort: THIRDPARTY
+# import pprint
 import requests
 
 
@@ -63,30 +64,23 @@ def build_rustc_cfg_dict():
     return rustc_cfg_dict
 
 
-# import cargo outdated script as a module, call method as a module in the parsing. interact with it
-
-
 def process_all(
     all_pattern_match, not_pattern_reg_ex, basic_pattern_reg_ex, rustc_cfg_dict
 ):
     """
     todo
     """
-    all_args = []
-    for i in range(1, len(all_pattern_match.groups())):
-        all_args.append(all_pattern_match.group(i))
-
+    all_args = all_pattern_match.group(1).split(", ")
+    print("...processing all")
     for all_arg in all_args:
         not_pattern_match = not_pattern_reg_ex.match(all_arg)
         if not_pattern_match is not None:
-            if (
-                process_not(not_pattern_match, basic_pattern_match, rustc_cfg_dict)
-                is True
-            ):
-                continue
-        else:
-            basic_pattern_match = basic_pattern_reg_ex.match(all_arg)
-            if process_basic(basic_pattern_match, rustc_cfg_dict) is False:
+            if not process_not(not_pattern_match, rustc_cfg_dict):
+                return False
+
+        basic_pattern_match = basic_pattern_reg_ex.match(all_arg)
+        if basic_pattern_match is not None:
+            if not process_basic(basic_pattern_match, rustc_cfg_dict):
                 return False
     return True
 
@@ -97,21 +91,17 @@ def process_any(
     """
     todo
     """
-    any_args = []
-    for i in range(1, any_pattern_match.groups):
-        any_args.append(any_pattern_match.group(i))
-
+    any_args = any_pattern_match.group(1).split(", ")
+    print("...processing any")
     for any_arg in any_args:
         not_pattern_match = not_pattern_reg_ex.match(any_arg)
         if not_pattern_match is not None:
-            if (
-                process_not(not_pattern_match, basic_pattern_match, rustc_cfg_dict)
-                is True
-            ):
+            if process_not(not_pattern_match, rustc_cfg_dict):
                 return True
-        else:
-            basic_pattern_match = basic_pattern_reg_ex.match(any_arg)
-            if process_basic(basic_pattern_match, rustc_cfg_dict) is True:
+
+        basic_pattern_match = basic_pattern_reg_ex.match(any_arg)
+        if basic_pattern_match is not None:
+            if process_basic(basic_pattern_match, rustc_cfg_dict):
                 return True
     return False
 
@@ -120,14 +110,36 @@ def process_basic(basic_pattern_match, rustc_cfg_dict):
     """
     todo
     """
-    return bool(rustc_cfg_dict[basic_pattern_match.group(1)] is basic_pattern_match.group(2))
+    key_value_pattern = r"\(([^-]*) = ([^-]*)\)"
+    key_value_reg_ex = re.compile(key_value_pattern)
+    key_value_match = key_value_reg_ex.match(basic_pattern_match.group(1))
+    print("...processing basic")
+    if key_value_match is not None:
+        print(
+            " PROCESSING KEY VALUE COMPARISON between: "
+            + rustc_cfg_dict[key_value_match.group(1)]
+            + " and "
+            + key_value_match.group(2)
+        )
+        # example: (key = dict_val) returns true
+        # example: (key = other_val) returns false
+        return bool(
+            rustc_cfg_dict[key_value_match.group(1)] == key_value_match.group(2)
+        )
+    print(" PROCESSING BASIC COMPARISON:")
+    print(rustc_cfg_dict["cfg"])
+    print(basic_pattern_match.group(1))
+    # example: (dict_val) returns true
+    # example: (other_val) returns false
+    return bool(rustc_cfg_dict["cfg"] == basic_pattern_match.group(1))
 
 
-def process_not(not_pattern_match, basic_pattern_match, rustc_cfg_dict):
+def process_not(not_pattern_match, rustc_cfg_dict):
     """
     todo
     """
-    return bool(rustc_cfg_dict[not_pattern_match.group(1)] is basic_pattern_match.group(2))
+    print("...processing not")
+    return not process_basic(not_pattern_match, rustc_cfg_dict)
 
 
 def build_reg_ex_info(to_parse):
@@ -136,21 +148,23 @@ def build_reg_ex_info(to_parse):
     """
 
     reg_ex_info = {}
-    
-    all_pattern = r"all(([^)]+), ([^)]+))"
-    any_pattern = r"any(([^)]+), ([^)]+))"
-    not_pattern = r"not([^)]+)"
-    basic_pattern = r'([^)]+) = "([^)]+)"'
 
-    reg_ex_info['all_pattern_reg_ex'] = re.compile(all_pattern)
-    reg_ex_info['any_pattern_reg_ex'] = re.compile(any_pattern)
-    reg_ex_info['not_pattern_reg_ex'] = re.compile(not_pattern)
-    reg_ex_info['basic_pattern_reg_ex'] = re.compile(basic_pattern)
+    all_pattern = r"all\(([^-]*)\)"
+    any_pattern = r"any\(([^-]*)\)"
+    not_pattern = r"not\(([^-]*)\)"
+    basic_pattern = r"([^-]*)"
 
-    reg_ex_info['all_pattern_match'] = reg_ex_info['all_pattern_reg_ex'].match(to_parse)
-    reg_ex_info['any_pattern_match'] = reg_ex_info['any_pattern_reg_ex'].match(to_parse)
-    reg_ex_info['not_pattern_match'] = reg_ex_info['not_pattern_reg_ex'].match(to_parse)
-    reg_ex_info['basic_pattern_match'] = reg_ex_info['basic_pattern_reg_ex'].match(to_parse)
+    reg_ex_info["all_pattern_reg_ex"] = re.compile(all_pattern)
+    reg_ex_info["any_pattern_reg_ex"] = re.compile(any_pattern)
+    reg_ex_info["not_pattern_reg_ex"] = re.compile(not_pattern)
+    reg_ex_info["basic_pattern_reg_ex"] = re.compile(basic_pattern)
+
+    reg_ex_info["all_pattern_match"] = reg_ex_info["all_pattern_reg_ex"].match(to_parse)
+    reg_ex_info["any_pattern_match"] = reg_ex_info["any_pattern_reg_ex"].match(to_parse)
+    reg_ex_info["not_pattern_match"] = reg_ex_info["not_pattern_reg_ex"].match(to_parse)
+    reg_ex_info["basic_pattern_match"] = reg_ex_info["basic_pattern_reg_ex"].match(
+        to_parse
+    )
 
     return reg_ex_info
 
@@ -163,33 +177,64 @@ def parse_platform(unparsed_platform):
     :rtype: bool
     """
 
-    cfg_pattern = r"cfg\(([^\)]+)\)"
+    cfg_pattern = r"cfg\(([^-]*)\)"
     cfg_reg_ex = re.compile(cfg_pattern)
     cfg_match = cfg_reg_ex.match(unparsed_platform)
 
+    rustc_cfg_dict = build_rustc_cfg_dict()
+
+    # cfg-style input
     if cfg_match is not None:
-        to_parse = cfg_match.group(1)
+        reg_ex_info = build_reg_ex_info(cfg_match.group(1))
 
-        reg_ex_info = build_reg_ex_info(to_parse)
-        rustc_cfg_dict = build_rustc_cfg_dict()
-
-        if reg_ex_info['all_pattern_match'] is not None:
-            return process_all(
-                reg_ex_info['all_pattern_match'], reg_ex_info['not_pattern_reg_ex'], reg_ex_info['basic_pattern_reg_ex'], rustc_cfg_dict
+        if reg_ex_info["all_pattern_match"] is not None:
+            return str(
+                process_all(
+                    reg_ex_info["all_pattern_match"],
+                    reg_ex_info["not_pattern_reg_ex"],
+                    reg_ex_info["basic_pattern_reg_ex"],
+                    rustc_cfg_dict,
+                )
             )
 
-        if reg_ex_info['any_pattern_match'] is not None:
-            return process_any(
-                reg_ex_info['any_pattern_match'], reg_ex_info['not_pattern_reg_ex'], reg_ex_info['basic_pattern_reg_ex'], rustc_cfg_dict
+        if reg_ex_info["any_pattern_match"] is not None:
+            return str(
+                process_any(
+                    reg_ex_info["any_pattern_match"],
+                    reg_ex_info["not_pattern_reg_ex"],
+                    reg_ex_info["basic_pattern_reg_ex"],
+                    rustc_cfg_dict,
+                )
             )
 
-        if reg_ex_info['not_pattern_match'] is not None:
-            return process_not(reg_ex_info['not_pattern_match'], reg_ex_info['basic_pattern_match'], rustc_cfg_dict)
+        if reg_ex_info["not_pattern_match"] is not None:
+            return str(process_not(reg_ex_info["not_pattern_match"], rustc_cfg_dict,))
 
-        if reg_ex_info['basic_pattern_match'] is not None:
-            return process_basic(reg_ex_info['basic_pattern_match'], rustc_cfg_dict)
+        if reg_ex_info["basic_pattern_match"] is not None:
+            return str(
+                process_basic(reg_ex_info["basic_pattern_match"], rustc_cfg_dict)
+            )
 
-    return False
+        print("OOPS!")
+        print(cfg_match.group(1))
+
+    # target-style input
+    else:
+        # empty words case - is it supposed to return true?
+        if unparsed_platform == "---":
+            return True
+
+        list_of_words = unparsed_platform.split("-")
+        if len(list_of_words) != 4:
+            return "ERROR"
+        if rustc_cfg_dict["target_arch"] != list_of_words[0]:
+            return False
+        if rustc_cfg_dict["target_vendor"] != list_of_words[1]:
+            return False
+        if rustc_cfg_dict["target_os"] != list_of_words[2]:
+            return False
+        if rustc_cfg_dict["target_env"] != list_of_words[3]:
+            return False
 
 
 def build_cargo_outdated_dict():
@@ -225,24 +270,32 @@ def build_cargo_outdated_dict():
         line_str = line_bo.decode("utf-8")
         matches = my_reg_ex.match(line_str)
 
-        platform = parse_platform(matches.group(6))
+        print("CURRENTLY PARSING PLATFORM: " + matches.group(6))
+
+        platform = matches.group(6)
+        include = parse_platform(platform)
 
         dependencies = matches.group(1)
         version = matches.group(2)
 
         if "->" not in dependencies:
             dependency = dependencies
-            cargo_outdated_output[dependency] = (version, None, platform)
+            cargo_outdated_output[dependency] = (version, None, platform, include)
         else:
             dependencies_split = dependencies.split("->")
             pulled_in_by = dependencies_split[0]
             dependency = dependencies_split[1]
-            cargo_outdated_output[dependency] = (version, pulled_in_by, platform)
+            cargo_outdated_output[dependency] = (
+                version,
+                pulled_in_by,
+                platform,
+                include,
+            )
 
     # DEBUGGING
-    #    print("\n\nNOW PRINTING DICT\n")
-    #    print_var = pprint.PrettyPrinter(width=41, compact=True)
-    #    print_var.pprint(cargo_outdated_output)
+    #        print("\n\nNOW PRINTING DICT\n")
+    #        print_var = pprint.PrettyPrinter(width=41, compact=True)
+    #        print_var.pprint(cargo_outdated_output)
 
     return cargo_outdated_output
 
@@ -288,7 +341,7 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
     """
     # DEBUGGING
     print("\n\nNOW PRINTING KEY RESULTS\n")
-    print("\t\tkoji:\t\t\tcargo:\t\t\tdependency:\t\tplatform:\n")
+    print("\t\tinclude?:\t\tplatform:\t\tkoji:\t\t\tcargo:\t\tdependency:\n")
     # Lists that categorized dependencies will be placed in
     outdated = []
     not_outdated = []
@@ -298,6 +351,7 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
 
         version = cargo_outdated_dict[key][0]
         platform = cargo_outdated_dict[key][2]
+        include = cargo_outdated_dict[key][3]
         if key in ("Name", "----"):
             continue
 
@@ -305,29 +359,40 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
             if koji_repo_dict[key] != version:
                 print(
                     "    OUTDATED: "
-                    + key
-                    + "\t\t\t"
-                    + koji_repo_dict[key]
-                    + "\t\t\t"
-                    + version
+                    + str(include)
                     + "\t\t\t"
                     + platform
+                    + "\t\t\t"
+                    + koji_repo_dict[key]
+                    + "\t\t"
+                    + version
+                    + "\t\t"
+                    + key
                 )
                 outdated.append(key)
             else:
                 print(
                     "NOT OUTDATED: "
-                    + key
-                    + "\t\t\t"
-                    + koji_repo_dict[key]
-                    + "\t\t\t"
-                    + version
+                    + str(include)
                     + "\t\t\t"
                     + platform
+                    + "\t\t\t"
+                    + koji_repo_dict[key]
+                    + "\t\t"
+                    + version
+                    + "\t\t"
+                    + key
                 )
                 not_outdated.append(key)
         else:
-            print("   not found: " + key + "\t\t\t\t\t\t\t" + platform)
+            print(
+                "   not found: "
+                + str(include)
+                + "\t\t\t"
+                + platform
+                + "\t\t\t\t\t\t"
+                + key
+            )
             not_found.append(key)
     print("\n\nRESULTS")
 

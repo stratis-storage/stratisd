@@ -33,6 +33,9 @@ import requests
 def build_rustc_cfg_dict():
     """
     :returns: dict containing information from the output of `rustc --print cfg`
+    the keys are the string representations of compilation environment identifers
+    the values are the string representations of the allowed compilation environment
+    identifer values
     :rtype: dict
     """
     command = ["rustc", "--print", "cfg"]
@@ -66,7 +69,18 @@ def build_rustc_cfg_dict():
 
 def process_all(all_match, not_re, basic_re, rustc_cfg_dict):
     """
-    todo
+    :param all_match: a match to the compiled "all" regular expression
+    :type all_match: re.Match
+    :param not_re: the compiled "not" regular expression
+    :type not_re: re.Pattern
+    :param basic_re: the compiled "basic" regular expression
+    :type basic_re: re.Pattern
+    :param rustc_cfg_dict: dict containing information from the output of
+    `rustc --print cfg`
+    :type rustc_cfg_dict: dict
+    :returns: a bool indicating whether or not this "all" argument should
+    be included based on the contents of rustc_cfg_dict
+    :rtype: bool
     """
     all_args = all_match.group(1).split(", ")
 
@@ -85,7 +99,18 @@ def process_all(all_match, not_re, basic_re, rustc_cfg_dict):
 
 def process_any(any_match, not_re, basic_re, rustc_cfg_dict):
     """
-    todo
+    :param any_match: a match to the compiled "all" regular expression
+    :type any_match: re.Match
+    :param not_re: the compiled "not" regular expression
+    :type not_re: re.Pattern
+    :param basic_re: the compiled "basic" regular expression
+    :type basic_re: re. Pattern
+    :param rustc_cfg_dict: dict containing information from the output of
+    `rustc --print cfg`
+    :type rustc_cfg_dict: dict
+    :returns: a bool indicating whether or not this "any" argument should
+    be included based on the contents of rustc_cfg_dict
+    :rtype: bool
     """
     any_args = any_match.group(1).split(", ")
     for any_arg in any_args:
@@ -103,7 +128,14 @@ def process_any(any_match, not_re, basic_re, rustc_cfg_dict):
 
 def process_basic(basic_match, rustc_cfg_dict):
     """
-    todo
+    :param basic_match: a match to the compiled "basic" regular expression
+    :type basic_match: re.Match
+    :param rustc_cfg_dict: dict containing information from the output of
+    `rustc --print cfg`
+    :type rustc_cfg_dict: dict
+    :returns: a bool indicating whether or not this "basic" argument should
+    be included based on the contents of rustc_cfg_dict
+    :rtype: bool
     """
     key_value_pattern = r"\(([^-]*) = ([^-]*)\)"
     key_value_re = re.compile(key_value_pattern)
@@ -119,14 +151,30 @@ def process_basic(basic_match, rustc_cfg_dict):
 
 def process_not(not_match, rustc_cfg_dict):
     """
-    todo
+    :param not_match: a match to the compiled "not" regular expression
+    :type not_match: re.Match
+    :param rustc_cfg_dict: dict containing information from the output of
+    `rustc --print cfg`
+    :type rustc_cfg_dict: dict
+    :returns: whether or not this "not" argument should be included based
+    on the contents of rustc_cfg_dict
+    :rtype: bool
     """
     return not process_basic(not_match, rustc_cfg_dict)
 
 
-def build_re_dict(to_parse):
+def build_re_dict(cargo_outdated_platform):
     """
-    todo
+    :param cargo_outdated_platform: the string representation of the
+    platform outputted by `cargo outdated`
+    :type cargo_outdated_platform: str
+    :returns: dict containing regular expression information surrounding
+    cargo_outdated_platform
+    the keys are the string descriptions of re.Pattern objects and of
+    re.Match or NoneType objects
+    the values are the re.Pattern objects and the re.Match or NoneType
+    objects described by the keys
+    :rtype: dict
     """
 
     re_dict = {}
@@ -141,19 +189,26 @@ def build_re_dict(to_parse):
     re_dict["not_re"] = re.compile(not_pattern)
     re_dict["basic_re"] = re.compile(basic_pattern)
 
-    re_dict["all_match"] = re_dict["all_re"].match(to_parse)
-    re_dict["any_match"] = re_dict["any_re"].match(to_parse)
-    re_dict["not_match"] = re_dict["not_re"].match(to_parse)
-    re_dict["basic_match"] = re_dict["basic_re"].match(to_parse)
+    re_dict["all_match"] = re_dict["all_re"].match(cargo_outdated_platform)
+    re_dict["any_match"] = re_dict["any_re"].match(cargo_outdated_platform)
+    re_dict["not_match"] = re_dict["not_re"].match(cargo_outdated_platform)
+    re_dict["basic_match"] = re_dict["basic_re"].match(cargo_outdated_platform)
 
     return re_dict
 
 
 def parse_cfg_format_platform(cfg_match, rustc_cfg_dict):
     """
-    todo
+    :param cfg_match: the re.Match representation of the "cfg"-format platform
+    to parse
+    :type cfg_match: re.Match
+    :param rustc_cfg_dict: dict containing information from the output of
+    `rustc --print cfg`
+    :type rustc_cfg_dict: dict
+    :returns: a bool indicating whether or not this "cfg"-format platform should
+    be included based on the contents of rustc_cfg_dict
+    :rtype: bool
     """
-
     re_dict = build_re_dict(cfg_match.group(1))
 
     if re_dict["all_match"] is not None:
@@ -182,9 +237,16 @@ def parse_cfg_format_platform(cfg_match, rustc_cfg_dict):
 
 def parse_target_format_platform(unparsed_platform, rustc_cfg_dict):
     """
-    todo
+    :param unparsed_platform: the string representation of the "target"-format
+    platform to parse
+    :type unparsed_platform: str
+    :param rustc_cfg_dict: dict containing information from the output of
+    `rustc --print cfg`
+    :type rustc_cfg_dict: dict
+    :returns: a bool indicating whether or not this "target"-format platform
+    should be included based on the contents of rustc_cfg_dict
+    :rtype: bool
     """
-
     # empty words case - is it supposed to return true?
     if unparsed_platform == "---":
         return True
@@ -201,9 +263,10 @@ def parse_target_format_platform(unparsed_platform, rustc_cfg_dict):
 
 def parse_platform(unparsed_platform):
     """
-    :param unparsed_platform: platform to parse
-    :type unparsed_platform:
-    :returns: duple containing extracted information and whether or not it's a triple
+    :param unparsed_platform: the string representation of the platform to parse
+    :type unparsed_platform: str
+    :returns: a bool indicating whether or not this platform should be included
+    based on the contents of rustc_cfg_dict
     :rtype: bool
     """
 
@@ -221,20 +284,21 @@ def parse_platform(unparsed_platform):
 
 def build_cargo_outdated_dict():
     """
-    :returns: cargo outdated information
+    :returns: a dictionary containing information from the output of `cargo
+    outdated`
+    the keys are the string representations of dependencies
+    the values are 4-tuples containing
+    1) the string represenation of the dependency's version (i.e. from the
+    "Project" column of the output of `cargo outdated`,
+    2) the string representation of the dependency the dependency is pulled in by
+    or None if the dependency is not pulled in by any dependency
+    3) the string representation of the dependency's platform information (i.e.
+    from the "Platform" column of the ouput of `cargo outdated`
+    4) a bool indicating whether or not the dependency should be "included", with
+    respect to the platform information
     :rtype: dict
     """
-    # The versions are stored in a dictionary (for constant lookup).
-    # Key type: a string
-    # Key represents: a dependency
-    # Value type: a list of 3-tuples containing 1) a string, 2) None or a string, and 3) a string
-    # Value represents:
-    # 1) the 'Project' version of the dependency
-    # 2) the dependency the dependency is pulled in by, or none if the dependency is pinned in
-    # Cargo.toml
-    # 3) the platform
-
-    cargo_outdated_output = {}
+    cargo_outdated_dict = {}
 
     # Run cargo-outdated
     command = ["cargo", "outdated"]
@@ -252,8 +316,6 @@ def build_cargo_outdated_dict():
         line_str = line_bo.decode("utf-8")
         matches = my_reg_ex.match(line_str)
 
-        print("CURRENTLY PARSING PLATFORM: " + matches.group(6))
-
         platform = matches.group(6)
         include = parse_platform(platform)
 
@@ -262,37 +324,43 @@ def build_cargo_outdated_dict():
 
         if "->" not in dependencies:
             dependency = dependencies
-            cargo_outdated_output[dependency] = (version, None, platform, include)
+            cargo_outdated_dict[dependency] = (version, None, platform, include)
         else:
             dependencies_split = dependencies.split("->")
             pulled_in_by = dependencies_split[0]
             dependency = dependencies_split[1]
-            cargo_outdated_output[dependency] = (
+            cargo_outdated_dict[dependency] = (
                 version,
                 pulled_in_by,
                 platform,
                 include,
             )
 
-    # DEBUGGING
-    #        print("\n\nNOW PRINTING DICT\n")
-    #        print_var = pprint.PrettyPrinter(width=41, compact=True)
-    #        print_var.pprint(cargo_outdated_output)
-
-    return cargo_outdated_output
+    return cargo_outdated_dict
 
 
-def build_koji_repo_dict(cargo_outdated_output):
+def build_koji_repo_dict(cargo_outdated_dict):
     """
-    :param cargo_outdated_output: cargo outdated information
-    :type cargo_outdated_output: dict
-    :returns: koji repo information
+    :param cargo_outdated_dict: a dictionary containing information from the
+    output of `cargo outdated`
+    the keys are the string representations of dependencies
+    the values are 4-tuples containing
+    1) the string represenation of the dependency's version (i.e. from the
+    "Project" column of the output of `cargo outdated`,
+    2) the string representation of the dependency the dependency is pulled in by
+    or None if the dependency is not pulled in by any dependency
+    3) the string representation of the dependency's platform information (i.e.
+    from the "Platform" column of the ouput of `cargo outdated`
+    4) a bool indicating whether or not the dependency should be "included", with
+    respect to the platform information
+    :type cargo_outdated_dict: dict
+    :returns: a dictioonary containing information from the koji repo webpage
+    the keys are the string representations of dependencies
+    the values are the string representations of versions of dependencies
     :rtype: dict
     """
-    # Populate with dependency -> version
-    koji_dict = {}
+    koji_repo_dict = {}
 
-    # Check dict contents against Koji packages list
     requests_var = requests.get(
         "https://kojipkgs.fedoraproject.org/repos/rawhide/latest/x86_64/pkglist"
     )
@@ -303,28 +371,33 @@ def build_koji_repo_dict(cargo_outdated_output):
 
     for line in packages.splitlines():
         matches = my_reg_ex.match(line)
-        if matches.group(2) in cargo_outdated_output.keys():
-            koji_dict[matches.group(2)] = matches.group(3)
+        if matches.group(2) in cargo_outdated_dict.keys():
+            koji_repo_dict[matches.group(2)] = matches.group(3)
 
-    # DEBUGGING
-    #    print("\n\nNOW PRINTING KOJI DICT\n")
-    #    print_var = pprint.PrettyPrinter(width=41, compact=True)
-    #    print_var.pprint(koji_dict)
-
-    return koji_dict
+    return koji_repo_dict
 
 
 def print_results(cargo_outdated_dict, koji_repo_dict):
     """
-    :param cargo_outdated_dict: cargo outdated information
+    :param cargo_outdated_dict: a dictionary containing information from the
+    output of `cargo outdated`
+    the keys are the string representations of dependencies
+    the values are 4-tuples containing
+    1) the string represenation of the dependency's version (i.e. from the
+    "Project" column of the output of `cargo outdated`,
+    2) the string representation of the dependency the dependency is pulled in by
+    or None if the dependency is not pulled in by any dependency
+    3) the string representation of the dependency's platform information (i.e.
+    from the "Platform" column of the ouput of `cargo outdated`
+    4) a bool indicating whether or not the dependency should be "included", with
+    respect to the platform information
     :type cargo_outdated_dict: dict
-    :param koji_repo_dict: koji repo information
+    :param koji_repo_dict: a dictioonary containing information from the koji repo webpage
+    the keys are the string representations of dependencies
+    the values are the string representations of versions of dependencies
     :type koji_repo_dict: dict
     """
-    # DEBUGGING
-    print("\n\nNOW PRINTING KEY RESULTS\n")
-    print("\t\tinclude?:\t\tplatform:\t\tkoji:\t\t\tcargo:\t\tdependency:\n")
-    # Lists that categorized dependencies will be placed in
+
     outdated = []
     not_outdated = []
     not_found = []

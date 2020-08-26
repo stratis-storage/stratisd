@@ -64,109 +64,139 @@ def build_rustc_cfg_dict():
     return rustc_cfg_dict
 
 
-def process_all(
-    all_pattern_match, not_pattern_reg_ex, basic_pattern_reg_ex, rustc_cfg_dict
-):
+def process_all(all_match, not_re, basic_re, rustc_cfg_dict):
     """
     todo
     """
-    all_args = all_pattern_match.group(1).split(", ")
-    print("...processing all")
+    all_args = all_match.group(1).split(", ")
+
     for all_arg in all_args:
-        not_pattern_match = not_pattern_reg_ex.match(all_arg)
-        if not_pattern_match is not None:
-            if not process_not(not_pattern_match, rustc_cfg_dict):
+        not_match = not_re.match(all_arg)
+        if not_match is not None:
+            if not process_not(not_match, rustc_cfg_dict):
                 return False
 
-        basic_pattern_match = basic_pattern_reg_ex.match(all_arg)
-        if basic_pattern_match is not None:
-            if not process_basic(basic_pattern_match, rustc_cfg_dict):
+        basic_match = basic_re.match(all_arg)
+        if basic_match is not None:
+            if not process_basic(basic_match, rustc_cfg_dict):
                 return False
     return True
 
 
-def process_any(
-    any_pattern_match, not_pattern_reg_ex, basic_pattern_reg_ex, rustc_cfg_dict
-):
+def process_any(any_match, not_re, basic_re, rustc_cfg_dict):
     """
     todo
     """
-    any_args = any_pattern_match.group(1).split(", ")
-    print("...processing any")
+    any_args = any_match.group(1).split(", ")
     for any_arg in any_args:
-        not_pattern_match = not_pattern_reg_ex.match(any_arg)
-        if not_pattern_match is not None:
-            if process_not(not_pattern_match, rustc_cfg_dict):
+        not_match = not_re.match(any_arg)
+        if not_match is not None:
+            if process_not(not_match, rustc_cfg_dict):
                 return True
 
-        basic_pattern_match = basic_pattern_reg_ex.match(any_arg)
-        if basic_pattern_match is not None:
-            if process_basic(basic_pattern_match, rustc_cfg_dict):
+        basic_match = basic_re.match(any_arg)
+        if basic_match is not None:
+            if process_basic(basic_match, rustc_cfg_dict):
                 return True
     return False
 
 
-def process_basic(basic_pattern_match, rustc_cfg_dict):
+def process_basic(basic_match, rustc_cfg_dict):
     """
     todo
     """
     key_value_pattern = r"\(([^-]*) = ([^-]*)\)"
-    key_value_reg_ex = re.compile(key_value_pattern)
-    key_value_match = key_value_reg_ex.match(basic_pattern_match.group(1))
-    print("...processing basic")
+    key_value_re = re.compile(key_value_pattern)
+    key_value_match = key_value_re.match(basic_match.group(1))
+
     if key_value_match is not None:
-        print(
-            " PROCESSING KEY VALUE COMPARISON between: "
-            + rustc_cfg_dict[key_value_match.group(1)]
-            + " and "
-            + key_value_match.group(2)
-        )
-        # example: (key = dict_val) returns true
-        # example: (key = other_val) returns false
         return bool(
             rustc_cfg_dict[key_value_match.group(1)] == key_value_match.group(2)
         )
-    print(" PROCESSING BASIC COMPARISON:")
-    print(rustc_cfg_dict["cfg"])
-    print(basic_pattern_match.group(1))
-    # example: (dict_val) returns true
-    # example: (other_val) returns false
-    return bool(rustc_cfg_dict["cfg"] == basic_pattern_match.group(1))
+
+    return bool(rustc_cfg_dict["cfg"] == basic_match.group(1))
 
 
-def process_not(not_pattern_match, rustc_cfg_dict):
+def process_not(not_match, rustc_cfg_dict):
     """
     todo
     """
-    print("...processing not")
-    return not process_basic(not_pattern_match, rustc_cfg_dict)
+    return not process_basic(not_match, rustc_cfg_dict)
 
 
-def build_reg_ex_info(to_parse):
+def build_re_dict(to_parse):
     """
     todo
     """
 
-    reg_ex_info = {}
+    re_dict = {}
 
     all_pattern = r"all\(([^-]*)\)"
     any_pattern = r"any\(([^-]*)\)"
     not_pattern = r"not\(([^-]*)\)"
     basic_pattern = r"([^-]*)"
 
-    reg_ex_info["all_pattern_reg_ex"] = re.compile(all_pattern)
-    reg_ex_info["any_pattern_reg_ex"] = re.compile(any_pattern)
-    reg_ex_info["not_pattern_reg_ex"] = re.compile(not_pattern)
-    reg_ex_info["basic_pattern_reg_ex"] = re.compile(basic_pattern)
+    re_dict["all_re"] = re.compile(all_pattern)
+    re_dict["any_re"] = re.compile(any_pattern)
+    re_dict["not_re"] = re.compile(not_pattern)
+    re_dict["basic_re"] = re.compile(basic_pattern)
 
-    reg_ex_info["all_pattern_match"] = reg_ex_info["all_pattern_reg_ex"].match(to_parse)
-    reg_ex_info["any_pattern_match"] = reg_ex_info["any_pattern_reg_ex"].match(to_parse)
-    reg_ex_info["not_pattern_match"] = reg_ex_info["not_pattern_reg_ex"].match(to_parse)
-    reg_ex_info["basic_pattern_match"] = reg_ex_info["basic_pattern_reg_ex"].match(
-        to_parse
+    re_dict["all_match"] = re_dict["all_re"].match(to_parse)
+    re_dict["any_match"] = re_dict["any_re"].match(to_parse)
+    re_dict["not_match"] = re_dict["not_re"].match(to_parse)
+    re_dict["basic_match"] = re_dict["basic_re"].match(to_parse)
+
+    return re_dict
+
+
+def parse_cfg_format_platform(cfg_match, rustc_cfg_dict):
+    """
+    todo
+    """
+
+    re_dict = build_re_dict(cfg_match.group(1))
+
+    if re_dict["all_match"] is not None:
+        return process_all(
+            re_dict["all_match"],
+            re_dict["not_re"],
+            re_dict["basic_re"],
+            rustc_cfg_dict,
+        )
+
+    if re_dict["any_match"] is not None:
+        return process_any(
+            re_dict["any_match"],
+            re_dict["not_re"],
+            re_dict["basic_re"],
+            rustc_cfg_dict,
+        )
+
+    if re_dict["not_match"] is not None:
+        return process_not(re_dict["not_match"], rustc_cfg_dict)
+
+    if re_dict["basic_match"] is not None:
+        return process_basic(re_dict["basic_match"], rustc_cfg_dict)
+    return False
+
+
+def parse_target_format_platform(unparsed_platform, rustc_cfg_dict):
+    """
+    todo
+    """
+
+    # empty words case - is it supposed to return true?
+    if unparsed_platform == "---":
+        return True
+
+    target_components = unparsed_platform.split("-")
+    return (
+        len(target_components) == 4
+        and rustc_cfg_dict["target_arch"] == target_components[0]
+        and rustc_cfg_dict["target_vendor"] == target_components[1]
+        and rustc_cfg_dict["target_os"] == target_components[2]
+        and rustc_cfg_dict["target_env"] == target_components[3]
     )
-
-    return reg_ex_info
 
 
 def parse_platform(unparsed_platform):
@@ -178,63 +208,15 @@ def parse_platform(unparsed_platform):
     """
 
     cfg_pattern = r"cfg\(([^-]*)\)"
-    cfg_reg_ex = re.compile(cfg_pattern)
-    cfg_match = cfg_reg_ex.match(unparsed_platform)
+    cfg_re = re.compile(cfg_pattern)
+    cfg_match = cfg_re.match(unparsed_platform)
 
     rustc_cfg_dict = build_rustc_cfg_dict()
 
-    # cfg-style input
     if cfg_match is not None:
-        reg_ex_info = build_reg_ex_info(cfg_match.group(1))
+        return parse_cfg_format_platform(cfg_match, rustc_cfg_dict)
 
-        if reg_ex_info["all_pattern_match"] is not None:
-            return str(
-                process_all(
-                    reg_ex_info["all_pattern_match"],
-                    reg_ex_info["not_pattern_reg_ex"],
-                    reg_ex_info["basic_pattern_reg_ex"],
-                    rustc_cfg_dict,
-                )
-            )
-
-        if reg_ex_info["any_pattern_match"] is not None:
-            return str(
-                process_any(
-                    reg_ex_info["any_pattern_match"],
-                    reg_ex_info["not_pattern_reg_ex"],
-                    reg_ex_info["basic_pattern_reg_ex"],
-                    rustc_cfg_dict,
-                )
-            )
-
-        if reg_ex_info["not_pattern_match"] is not None:
-            return str(process_not(reg_ex_info["not_pattern_match"], rustc_cfg_dict,))
-
-        if reg_ex_info["basic_pattern_match"] is not None:
-            return str(
-                process_basic(reg_ex_info["basic_pattern_match"], rustc_cfg_dict)
-            )
-
-        print("OOPS!")
-        print(cfg_match.group(1))
-
-    # target-style input
-    else:
-        # empty words case - is it supposed to return true?
-        if unparsed_platform == "---":
-            return True
-
-        list_of_words = unparsed_platform.split("-")
-        if len(list_of_words) != 4:
-            return "ERROR"
-        if rustc_cfg_dict["target_arch"] != list_of_words[0]:
-            return False
-        if rustc_cfg_dict["target_vendor"] != list_of_words[1]:
-            return False
-        if rustc_cfg_dict["target_os"] != list_of_words[2]:
-            return False
-        if rustc_cfg_dict["target_env"] != list_of_words[3]:
-            return False
+    return parse_target_format_platform(unparsed_platform, rustc_cfg_dict)
 
 
 def build_cargo_outdated_dict():

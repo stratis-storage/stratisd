@@ -362,25 +362,22 @@ def build_cargo_outdated_dict():
         if cargo_outdated_match.group(1) in ("Name", "----"):
             continue
 
+        dependencies = cargo_outdated_match.group(1)
+        dependencies_split = dependencies.split("->")
+
+        dependency = dependencies_split.pop(-1)
+
+        version = cargo_outdated_match.group(2)
+        pulled_in_by = None if dependencies_split == [] else dependencies_split[0]
         platform = cargo_outdated_match.group(6)
         include = parse_platform(platform)
 
-        dependencies = cargo_outdated_match.group(1)
-        version = cargo_outdated_match.group(2)
-
-        if "->" not in dependencies:
-            dependency = dependencies
-            cargo_outdated_dict[dependency] = (version, None, platform, include)
-        else:
-            dependencies_split = dependencies.split("->")
-            pulled_in_by = dependencies_split[0]
-            dependency = dependencies_split[1]
-            cargo_outdated_dict[dependency] = (
-                version,
-                pulled_in_by,
-                platform,
-                include,
-            )
+        cargo_outdated_dict[dependency] = (
+            version,
+            pulled_in_by,
+            platform,
+            include,
+        )
 
     return cargo_outdated_dict
 

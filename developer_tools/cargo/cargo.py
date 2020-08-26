@@ -41,8 +41,8 @@ def build_rustc_cfg_dict():
 
     rustc_cfg_dict = {}
 
-    pattern = r'target_([^\s]*)="([^\s]*)"'
-    my_reg_ex = re.compile(pattern)
+    rustc_cfg_pattern = r'target_([^\s]*)="([^\s]*)"'
+    rustc_cfg_re = re.compile(rustc_cfg_pattern)
 
     while True:
         line = proc.stdout.readline()
@@ -51,14 +51,14 @@ def build_rustc_cfg_dict():
             break
 
         line_str = line.decode("utf-8")
-        matches = my_reg_ex.match(line_str)
+        rustc_cfg_match = rustc_cfg_re.match(line_str)
 
-        if matches is not None:
-            key = "target_" + matches.group(1)
-            value = matches.group(2)
+        if rustc_cfg_match is not None:
+            key = "target_" + rustc_cfg_match.group(1)
+            value = rustc_cfg_match.group(2)
             rustc_cfg_dict[key] = value
 
-        elif matches != "debug_assertions":
+        elif rustc_cfg_match != "debug_assertions":
             rustc_cfg_dict["cfg"] = line_str.rstrip()
 
     return rustc_cfg_dict
@@ -299,8 +299,10 @@ def build_cargo_outdated_dict():
     command = ["cargo", "outdated"]
     proc = subprocess.Popen(command, stdout=subprocess.PIPE)
 
-    pattern = r"([^\s]*)\s*([^\s]*)\s*([^\s]*)\s*([^\s]*)\s*([^\s]*)\s*(.*)"
-    my_reg_ex = re.compile(pattern)
+    cargo_outdated_pattern = (
+        r"([^\s]*)\s*([^\s]*)\s*([^\s]*)\s*([^\s]*)\s*([^\s]*)\s*(.*)"
+    )
+    cargo_outdated_re = re.compile(cargo_outdated_pattern)
 
     while True:
         line = proc.stdout.readline()
@@ -309,16 +311,16 @@ def build_cargo_outdated_dict():
             break
 
         line_str = line.decode("utf-8")
-        matches = my_reg_ex.match(line_str)
+        cargo_outdated_match = cargo_outdated_re.match(line_str)
 
-        if matches.group(1) in ("Name", "----"):
+        if cargo_outdated_match.group(1) in ("Name", "----"):
             continue
 
-        platform = matches.group(6)
+        platform = cargo_outdated_match.group(6)
         include = parse_platform(platform)
 
-        dependencies = matches.group(1)
-        version = matches.group(2)
+        dependencies = cargo_outdated_match.group(1)
+        version = cargo_outdated_match.group(2)
 
         if "->" not in dependencies:
             dependency = dependencies

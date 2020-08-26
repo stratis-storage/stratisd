@@ -19,14 +19,12 @@ Check cargo dependencies' versions
 
 
 # isort: STDLIB
-#!/usr/bin/python
 # import pprint
 import re
 import subprocess
 import sys
 
 # isort: THIRDPARTY
-# import pprint
 import requests
 
 
@@ -463,25 +461,25 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
 
     print(
         "\nThe following crates that were outputted by 'cargo outdated' are outdated"
-        + " with respect to the koji repo:"
+        " with respect to the koji repo:"
     )
     print(outdated)
 
     print(
         "\nThe following crates that were outputted by 'cargo outdated' are not outdated"
-        + " with respect to the koji repo:"
+        " with respect to the koji repo:"
     )
     print(not_outdated)
 
     print(
         "\nThe following crates that were outputted by 'cargo outdated' were not found"
-        + " in the koji repo:"
+        " in the koji repo:"
     )
     print(not_found)
 
     print(
-        "\nThe following crates that were outputted by 'cargo outdated' may or may not be"
-        + " outdated and have an irrelevant platform:"
+        "\nThe following crates that were outputted by 'cargo outdated' have an irrelevant"
+        " platform and may or may not be outdated:"
     )
     print(not_included)
 

@@ -540,6 +540,14 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
         for row in table_data:
             print("{: <30} {: <15} {: <10} {: <10} {: <10} {: <30}".format(*row))
 
+    print("\n\nUSE THESE COMMANDS TO UPDATE PACKAGES\n")
+
+    command = ""
+    for key in outdated:
+        command += "cargo update -p {} --precise {}\n".format(key, outdated[key])
+
+    print(command)
+
 
 def main():
     """

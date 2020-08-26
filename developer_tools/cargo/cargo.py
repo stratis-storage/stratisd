@@ -47,7 +47,6 @@ def build_rustc_cfg_dict():
     my_reg_ex = re.compile(pattern)
 
     while True:
-        # splitlines could avoid break
         line_bo_2 = proc.stdout.readline()
 
         if not line_bo_2:
@@ -300,7 +299,6 @@ def build_cargo_outdated_dict():
     """
     cargo_outdated_dict = {}
 
-    # Run cargo-outdated
     command = ["cargo", "outdated"]
     proc = subprocess.Popen(command, stdout=subprocess.PIPE)
 
@@ -315,6 +313,9 @@ def build_cargo_outdated_dict():
 
         line_str = line_bo.decode("utf-8")
         matches = my_reg_ex.match(line_str)
+
+        if matches.group(1) in ("Name", "----"):
+            continue
 
         platform = matches.group(6)
         include = parse_platform(platform)
@@ -392,7 +393,7 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
     4) a bool indicating whether or not the dependency should be "included", with
     respect to the platform information
     :type cargo_outdated_dict: dict
-    :param koji_repo_dict: a dictioonary containing information from the koji repo webpage
+    :param koji_repo_dict: a dictionary containing information from the koji repo webpage
     the keys are the string representations of dependencies
     the values are the string representations of versions of dependencies
     :type koji_repo_dict: dict
@@ -407,8 +408,6 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
         version = cargo_outdated_dict[key][0]
         platform = cargo_outdated_dict[key][2]
         include = cargo_outdated_dict[key][3]
-        if key in ("Name", "----"):
-            continue
 
         if key in koji_repo_dict.keys():
             if koji_repo_dict[key] != version:

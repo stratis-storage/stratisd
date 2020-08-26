@@ -246,7 +246,6 @@ def parse_target_format_platform(unparsed_platform, rustc_cfg_dict):
     should be included based on the contents of rustc_cfg_dict
     :rtype: bool
     """
-    # empty words case - is it supposed to return true?
     if unparsed_platform == "---":
         return True
 
@@ -406,7 +405,7 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
     table_data = []
 
     table_data.append(
-        ["Crate", "Outdaded?", "Current", "Update To", "Include?", "Platform"]
+        ["Crate", "Outdated?", "Current", "Update To", "Include?", "Platform"]
     )
     table_data.append(
         ["-----", "---------", "-------", "---------", "--------", "--------"]

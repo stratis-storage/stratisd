@@ -98,7 +98,7 @@ def process_all(all_match, not_re, basic_re, rustc_cfg_dict):
 
 def process_any(any_match, not_re, basic_re, rustc_cfg_dict):
     """
-    :param any_match: a match to the compiled "all" regular expression
+    :param any_match: a match to the compiled "any" regular expression
     :type any_match: re.Match
     :param not_re: the compiled "not" regular expression
     :type not_re: re.Pattern
@@ -402,6 +402,13 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
     outdated = []
     not_outdated = []
     not_found = []
+    table_data = []
+    table_data.append(
+        ["Crate", "Outdaded?", "Current", "Update To", "Include?", "Platform"]
+    )
+    table_data.append(
+        ["-----", "---------", "-------", "---------", "--------", "--------"]
+    )
 
     for key in cargo_outdated_dict:
 
@@ -411,41 +418,32 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
 
         if key in koji_repo_dict.keys():
             if koji_repo_dict[key] != version:
-                print(
-                    "    OUTDATED: "
-                    + str(include)
-                    + "\t\t\t"
-                    + platform
-                    + "\t\t\t"
-                    + koji_repo_dict[key]
-                    + "\t\t"
-                    + version
-                    + "\t\t"
-                    + key
+                table_data.append(
+                    [
+                        key,
+                        "Outdated",
+                        version,
+                        koji_repo_dict[key],
+                        str(include),
+                        platform,
+                    ]
                 )
                 outdated.append(key)
             else:
-                print(
-                    "NOT OUTDATED: "
-                    + str(include)
-                    + "\t\t\t"
-                    + platform
-                    + "\t\t\t"
-                    + koji_repo_dict[key]
-                    + "\t\t"
-                    + version
-                    + "\t\t"
-                    + key
+                table_data.append(
+                    [
+                        key,
+                        "Not Outdated",
+                        version,
+                        koji_repo_dict[key],
+                        str(include),
+                        platform,
+                    ]
                 )
                 not_outdated.append(key)
         else:
-            print(
-                "   not found: "
-                + str(include)
-                + "\t\t\t"
-                + platform
-                + "\t\t\t\t\t\t"
-                + key
+            table_data.append(
+                [key, "Not Found", version, "---", str(include), platform]
             )
             not_found.append(key)
     print("\n\nRESULTS")
@@ -469,6 +467,9 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
     print(not_found)
 
     print("\n")
+
+    for row in table_data:
+        print("{: <30} {: <15} {: <10} {: <10} {: <10} {: <30}".format(*row))
 
 
 def main():

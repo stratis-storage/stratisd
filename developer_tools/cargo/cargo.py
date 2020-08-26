@@ -402,7 +402,9 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
     outdated = []
     not_outdated = []
     not_found = []
+    not_included = []
     table_data = []
+
     table_data.append(
         ["Crate", "Outdaded?", "Current", "Update To", "Include?", "Platform"]
     )
@@ -428,7 +430,11 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
                         platform,
                     ]
                 )
-                outdated.append(key)
+                if include:
+                    outdated.append(key)
+                else:
+                    not_included.append(key)
+
             else:
                 table_data.append(
                     [
@@ -440,33 +446,47 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
                         platform,
                     ]
                 )
-                not_outdated.append(key)
+                if include:
+                    not_outdated.append(key)
+                else:
+                    not_included.append(key)
+
         else:
             table_data.append(
                 [key, "Not Found", version, "---", str(include), platform]
             )
-            not_found.append(key)
+            if include:
+                not_found.append(key)
+            else:
+                not_included.append(key)
+
     print("\n\nRESULTS")
 
     print(
-        "\nThe following packages that were outputted by 'cargo outdated' are outdated"
+        "\nThe following crates that were outputted by 'cargo outdated' are outdated"
         + " with respect to the koji repo:"
     )
     print(outdated)
 
     print(
-        "\nThe following packages that were outputted by 'cargo outdated' are not outdated"
+        "\nThe following crates that were outputted by 'cargo outdated' are not outdated"
         + " with respect to the koji repo:"
     )
     print(not_outdated)
 
     print(
-        "\nThe following packages that were outputted by 'cargo outdated' were not found"
-        " in the koji repo:"
+        "\nThe following crates that were outputted by 'cargo outdated' were not found"
+        + " in the koji repo:"
     )
     print(not_found)
 
-    print("\n")
+    print(
+        "\nThe following crates that were outputted by 'cargo outdated' may or may not be"
+        + " outdated and have an irrelevant platform:"
+    )
+    print(not_included)
+
+    print("\n\nVERBOSE RESULTS\n")
 
     for row in table_data:
         print("{: <30} {: <15} {: <10} {: <10} {: <10} {: <30}".format(*row))

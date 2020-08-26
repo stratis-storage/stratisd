@@ -20,6 +20,7 @@ dependencies' outdatedness status with respect to the Koji package list.
 
 
 # isort: STDLIB
+import argparse
 import re
 import subprocess
 import sys
@@ -441,10 +442,21 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
     :type koji_repo_dict: dict
     """
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        help="print table with more detailed information",
+        dest="verbose",
+        action="store_true",
+    )
+    args = parser.parse_args()
+
     outdated = []
     not_outdated = []
     not_found = []
     not_included = []
+
     table_data = []
 
     table_data.append(
@@ -461,7 +473,7 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
         include = cargo_outdated_dict[key][3]
 
         if key in koji_repo_dict.keys():
-            if koji_repo_dict[key] != version:
+            if koji_repo_dict[key] != version and include:
                 table_data.append(
                     [
                         key,
@@ -472,32 +484,26 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
                         platform,
                     ]
                 )
-                if include:
-                    outdated.append(key)
-                else:
-                    not_included.append(key)
+                outdated.append(key)
 
-            else:
+            elif koji_repo_dict[key] == version and include:
                 table_data.append(
                     [
                         key,
-                        "Not Outdated",
+                        "Not outdated",
                         version,
                         koji_repo_dict[key],
                         str(include),
                         platform,
                     ]
                 )
-                if include:
-                    not_outdated.append(key)
-                else:
-                    not_included.append(key)
+                not_outdated.append(key)
 
         else:
-            table_data.append(
-                [key, "Not Found", version, "---", str(include), platform]
-            )
             if include:
+                table_data.append(
+                    [key, "Not found", version, "---", str(include), platform]
+                )
                 not_found.append(key)
             else:
                 not_included.append(key)
@@ -528,10 +534,11 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
     )
     print(not_included)
 
-    print("\n\nVERBOSE RESULTS\n")
+    if args.verbose:
+        print("\n\nVERBOSE RESULTS\n")
 
-    for row in table_data:
-        print("{: <30} {: <15} {: <10} {: <10} {: <10} {: <30}".format(*row))
+        for row in table_data:
+            print("{: <30} {: <15} {: <10} {: <10} {: <10} {: <30}".format(*row))
 
 
 def main():

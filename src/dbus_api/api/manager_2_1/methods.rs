@@ -74,10 +74,7 @@ pub fn unset_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .unset(key_desc)
     {
         Ok(idem_resp) => {
-            let return_value = match idem_resp {
-                DeleteAction::Deleted(()) => true,
-                _ => false,
-            };
+            let return_value = matches!(idem_resp, DeleteAction::Deleted(()));
             return_message.append3(return_value, msg_code_ok(), msg_string_ok())
         }
         Err(e) => {

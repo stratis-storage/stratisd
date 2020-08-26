@@ -479,12 +479,10 @@ mod tests {
             .changed()
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
-        assert!(
-            match pool.rename_filesystem(pool_name, Uuid::new_v4(), "new_name") {
-                Ok(RenameAction::NoSource) => true,
-                _ => false,
-            }
-        );
+        assert!(matches!(
+            pool.rename_filesystem(pool_name, Uuid::new_v4(), "new_name"),
+            Ok(RenameAction::NoSource)
+        ));
     }
 
     #[test]
@@ -539,12 +537,10 @@ mod tests {
             .changed()
             .unwrap();
         let old_uuid = results.iter().find(|x| x.0 == old_name).unwrap().1;
-        assert!(
-            match pool.rename_filesystem(pool_name, old_uuid, new_name) {
-                Err(StratisError::Engine(ErrorEnum::AlreadyExists, _)) => true,
-                _ => false,
-            }
-        );
+        assert!(matches!(
+            pool.rename_filesystem(pool_name, old_uuid, new_name),
+            Err(StratisError::Engine(ErrorEnum::AlreadyExists, _))
+        ));
     }
 
     #[test]
@@ -564,12 +560,10 @@ mod tests {
             .changed()
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
-        assert!(
-            match pool.rename_filesystem(pool_name, Uuid::new_v4(), new_name) {
-                Ok(RenameAction::NoSource) => true,
-                _ => false,
-            }
-        );
+        assert!(matches!(
+            pool.rename_filesystem(pool_name, Uuid::new_v4(), new_name),
+            Ok(RenameAction::NoSource)
+        ));
     }
 
     #[test]

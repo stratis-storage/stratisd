@@ -572,7 +572,7 @@ def build_results(cargo_outdated_dict, koji_repo_dict):
         if key not in koji_repo_dict.keys():
             not_found.append(key)
 
-            table_data.append([key, "-", version, "-", "N/A", platform])
+            table_data.append([key, "N/A", version, "-", "N/A", platform])
             continue
 
         overall_include = get_overall_include(cargo_outdated_dict, key)

@@ -368,6 +368,11 @@ def build_cargo_outdated_dict():
 
         dependency = dependencies_split.pop(-1)
 
+        # pylint: disable=fixme
+        # FIXME: This implementation records exactly one version for every given dependency.
+        # In reality, a dependency may be pulled in by multiple different packages and that
+        # dependency may have different versions each time.
+
         version = cargo_outdated_match.group(2)
         pulled_in_by = None if dependencies_split == [] else dependencies_split[0]
         platform = cargo_outdated_match.group(6)

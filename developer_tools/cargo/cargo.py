@@ -421,7 +421,80 @@ def build_koji_repo_dict(cargo_outdated_dict):
     return koji_repo_dict
 
 
-def print_results(cargo_outdated_dict, koji_repo_dict):
+def build_and_print_command(outdated_dict):
+    """
+    :param outdated_dict: the dictionary of the string representations
+    of outdated dependencies and the string representations of the
+    versions they ought to be updated to
+    :type outdated_dict: dict
+    """
+
+    command = ""
+    for key in outdated_dict:
+        command += "cargo update -p {} --precise {}\n".format(key, outdated_dict[key])
+
+    print("\n\nUSE THESE COMMANDS TO UPDATE PACKAGES\n")
+
+    print(command)
+
+
+def print_verbose_results(table_data):
+    """
+    :param table_data: the data to be printed out in a tablular format
+    :type table_data: list of lists
+    """
+    print("\n\nVERBOSE RESULTS\n")
+
+    for row in table_data:
+        print("{: <30} {: <15} {: <10} {: <10} {: <10} {: <30}".format(*row))
+
+
+def print_results(results):
+    """
+    :param results: a 5-tuple containing:
+    1) the dictionary of the string representations of outdated dependencies and the
+    string representations of the versions they ought to be updated to
+    2) the list of the string representations of the not-outdated dependencies
+    3) the list of the string representations of the not-found dependencies
+    4) the list of the string representations of the not-included dependencies
+    5) the list of the string representations of the dependencies that were pulled in
+    by not-included dependencies
+    :type results: 5-tuple of dict, list, list, list, list
+    """
+    print("\n\nRESULTS")
+
+    print(
+        "\nThe following crates that were outputted by 'cargo outdated' are outdated"
+        " with respect to the koji repo, and should be updated to the following versions:"
+    )
+    print(results[0])
+
+    print(
+        "\nThe following crates that were outputted by 'cargo outdated' are not outdated"
+        " with respect to the koji repo:"
+    )
+    print(results[1])
+
+    print(
+        "\nThe following crates that were outputted by 'cargo outdated' were not found"
+        " in the koji repo:"
+    )
+    print(results[2])
+
+    print(
+        "\nThe following crates that were outputted by 'cargo outdated' have an irrelevant"
+        " platform and may or may not be outdated:"
+    )
+    print(results[3])
+
+    print(
+        "\nThe following crates that were outputted by 'cargo outdated' were pulled in by"
+        "a crate which has an irrelevant platform may or may not be outdated:"
+    )
+    print(results[4])
+
+
+def build_results(cargo_outdated_dict, koji_repo_dict):
     """
     :param cargo_outdated_dict: a dictionary containing information from the
     output of `cargo outdated`
@@ -440,23 +513,15 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
     the keys are the string representations of dependencies
     the values are the string representations of versions of dependencies
     :type koji_repo_dict: dict
+    :returns: the results in the form of a tuple
+    :rtype: 2-tuple of tuple, list
     """
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        help="print table with more detailed information",
-        dest="verbose",
-        action="store_true",
-    )
-    args = parser.parse_args()
 
     outdated = {}
     not_outdated = []
     not_found = []
     not_included = []
-
+    pulled_in_by_not_included = []
     table_data = []
 
     table_data.append(
@@ -469,35 +534,40 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
     for key in cargo_outdated_dict:
 
         version = cargo_outdated_dict[key][0]
+        pulled_in_by = cargo_outdated_dict[key][1]
         platform = cargo_outdated_dict[key][2]
         include = cargo_outdated_dict[key][3]
 
         if key in koji_repo_dict.keys():
             if koji_repo_dict[key] != version and include:
-                table_data.append(
-                    [
-                        key,
-                        "Outdated",
-                        version,
-                        koji_repo_dict[key],
-                        str(include),
-                        platform,
-                    ]
-                )
-                outdated[key] = koji_repo_dict[key]
+                if pulled_in_by in cargo_outdated_dict:
+                    if cargo_outdated_dict[pulled_in_by][3]:
+                        table_data.append(
+                            [
+                                key,
+                                "Outdated",
+                                version,
+                                koji_repo_dict[key],
+                                str(include),
+                                platform,
+                            ]
+                        )
+                        outdated[key] = koji_repo_dict[key]
 
             elif koji_repo_dict[key] == version and include:
-                table_data.append(
-                    [
-                        key,
-                        "Not outdated",
-                        version,
-                        koji_repo_dict[key],
-                        str(include),
-                        platform,
-                    ]
-                )
-                not_outdated.append(key)
+                if pulled_in_by in cargo_outdated_dict:
+                    if cargo_outdated_dict[pulled_in_by][3]:
+                        table_data.append(
+                            [
+                                key,
+                                "Not outdated",
+                                version,
+                                koji_repo_dict[key],
+                                str(include),
+                                platform,
+                            ]
+                        )
+                        not_outdated.append(key)
 
         else:
             if include:
@@ -506,56 +576,49 @@ def print_results(cargo_outdated_dict, koji_repo_dict):
                 )
                 not_found.append(key)
             else:
-                not_included.append(key)
+                if pulled_in_by in cargo_outdated_dict:
+                    if cargo_outdated_dict[pulled_in_by][3]:
+                        pulled_in_by_not_included.append(key)
+                else:
+                    not_included.append(key)
 
-    print("\n\nRESULTS")
-
-    print(
-        "\nThe following crates that were outputted by 'cargo outdated' are outdated"
-        " with respect to the koji repo, and should be updated to the following versions:"
+    return (
+        (outdated, not_outdated, not_found, not_included, pulled_in_by_not_included),
+        table_data,
     )
-    print(outdated)
-
-    print(
-        "\nThe following crates that were outputted by 'cargo outdated' are not outdated"
-        " with respect to the koji repo:"
-    )
-    print(not_outdated)
-
-    print(
-        "\nThe following crates that were outputted by 'cargo outdated' were not found"
-        " in the koji repo:"
-    )
-    print(not_found)
-
-    print(
-        "\nThe following crates that were outputted by 'cargo outdated' have an irrelevant"
-        " platform and may or may not be outdated:"
-    )
-    print(not_included)
-
-    if args.verbose:
-        print("\n\nVERBOSE RESULTS\n")
-
-        for row in table_data:
-            print("{: <30} {: <15} {: <10} {: <10} {: <10} {: <30}".format(*row))
-
-    print("\n\nUSE THESE COMMANDS TO UPDATE PACKAGES\n")
-
-    command = ""
-    for key in outdated:
-        command += "cargo update -p {} --precise {}\n".format(key, outdated[key])
-
-    print(command)
 
 
 def main():
     """
     The main method
     """
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        help="print table with more detailed information",
+        dest="verbose",
+        action="store_true",
+    )
+    parser.add_argument(
+        "-c",
+        "--command",
+        help="print command(s) that would update crates as necessary",
+        dest="command",
+        action="store_true",
+    )
+    args = parser.parse_args()
+
     cargo_outdated_dict = build_cargo_outdated_dict()
     koji_repo_dict = build_koji_repo_dict(cargo_outdated_dict)
-    print_results(cargo_outdated_dict, koji_repo_dict)
+    results = build_results(cargo_outdated_dict, koji_repo_dict)
+    print_results(results[0])
+
+    if args.command:
+        build_and_print_command(results[0][0])
+
+    if args.verbose:
+        print_verbose_results(results[1])
 
 
 if __name__ == "__main__":

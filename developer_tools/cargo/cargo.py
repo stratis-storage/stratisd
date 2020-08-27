@@ -457,7 +457,7 @@ def print_results(results):
     2) the list of the string representations of the not-outdated dependencies
     3) the list of the string representations of the not-found dependencies
     4) the list of the string representations of the not-included dependencies
-    :type results: 5-tuple of dict, list, list, list, list
+    :type results: 4-tuple of dict, list, list, list
     """
     print("\n\nRESULTS")
 

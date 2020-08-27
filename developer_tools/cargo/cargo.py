@@ -505,6 +505,8 @@ def get_overall_include(cargo_outdated_dict, key):
     the keys are the string representations of dependencies
     the values are the string representations of versions of dependencies
     :type koji_repo_dict: dict
+    :param key: the crate for which the "overall include" boolean should be determined
+    :type key: str
     :returns: a bool indicating whether or not the key should be included with all the
     dependencies it depends on taken into account
     :rtype: bool

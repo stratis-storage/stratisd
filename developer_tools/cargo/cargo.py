@@ -446,19 +446,17 @@ def print_verbose_results(table_data):
     print("\n\nVERBOSE RESULTS\n")
 
     for row in table_data:
-        print("{: <30} {: <15} {: <10} {: <10} {: <10} {: <30}".format(*row))
+        print("{: <30} {: <10} {: <10} {: <10} {: <10} {: <30}".format(*row))
 
 
 def print_results(results):
     """
-    :param results: a 5-tuple containing:
+    :param results: a 4-tuple containing:
     1) the dictionary of the string representations of outdated dependencies and the
     string representations of the versions they ought to be updated to
     2) the list of the string representations of the not-outdated dependencies
     3) the list of the string representations of the not-found dependencies
     4) the list of the string representations of the not-included dependencies
-    5) the list of the string representations of the dependencies that were pulled in
-    by not-included dependencies
     :type results: 5-tuple of dict, list, list, list, list
     """
     print("\n\nRESULTS")
@@ -487,11 +485,45 @@ def print_results(results):
     )
     print(results[3])
 
-    print(
-        "\nThe following crates that were outputted by 'cargo outdated' were pulled in by"
-        "a crate which has an irrelevant platform may or may not be outdated:"
-    )
-    print(results[4])
+
+def get_overall_include(cargo_outdated_dict, key):
+    """
+    :param cargo_outdated_dict: a dictionary containing information from the
+    output of `cargo outdated`
+    the keys are the string representations of dependencies
+    the values are 4-tuples containing
+    1) the string represenation of the dependency's version (i.e. from the
+    "Project" column of the output of `cargo outdated`,
+    2) the string representation of the dependency the dependency is pulled in by
+    or None if the dependency is not pulled in by any dependency
+    3) the string representation of the dependency's platform information (i.e.
+    from the "Platform" column of the ouput of `cargo outdated`
+    4) a bool indicating whether or not the dependency should be "included", with
+    respect to the platform information
+    :type cargo_outdated_dict: dict
+    :param koji_repo_dict: a dictionary containing information from the koji repo webpage
+    the keys are the string representations of dependencies
+    the values are the string representations of versions of dependencies
+    :type koji_repo_dict: dict
+    :returns: a bool indicating whether or not the key should be included with all the
+    dependencies it depends on taken into account
+    :rtype: bool
+    """
+
+    current_key = key
+    pulled = cargo_outdated_dict[current_key][1]
+    include = cargo_outdated_dict[current_key][3]
+
+    if not include:
+        return False
+
+    while pulled in cargo_outdated_dict and cargo_outdated_dict[pulled] is not None:
+        if not cargo_outdated_dict[pulled][3]:
+            return False
+        current_key = pulled
+        pulled = cargo_outdated_dict[current_key][1]
+
+    return True
 
 
 def build_results(cargo_outdated_dict, koji_repo_dict):
@@ -521,14 +553,13 @@ def build_results(cargo_outdated_dict, koji_repo_dict):
     not_outdated = []
     not_found = []
     not_included = []
-    pulled_in_by_not_included = []
     table_data = []
 
     table_data.append(
-        ["Crate", "Outdated?", "Current", "Update To", "Include?", "Platform"]
+        ["Crate", "Outdated", "Current", "Update To", "Include", "Platform",]
     )
     table_data.append(
-        ["-----", "---------", "-------", "---------", "--------", "--------"]
+        ["-----", "--------", "-------", "---------", "-------", "--------",]
     )
 
     for key in cargo_outdated_dict:
@@ -536,54 +567,83 @@ def build_results(cargo_outdated_dict, koji_repo_dict):
         version = cargo_outdated_dict[key][0]
         pulled_in_by = cargo_outdated_dict[key][1]
         platform = cargo_outdated_dict[key][2]
-        include = cargo_outdated_dict[key][3]
 
-        if key in koji_repo_dict.keys():
-            if koji_repo_dict[key] != version and include:
-                if pulled_in_by in cargo_outdated_dict:
-                    if cargo_outdated_dict[pulled_in_by][3]:
-                        table_data.append(
-                            [
-                                key,
-                                "Outdated",
-                                version,
-                                koji_repo_dict[key],
-                                str(include),
-                                platform,
-                            ]
-                        )
-                        outdated[key] = koji_repo_dict[key]
+        # Key was not found.
+        if key not in koji_repo_dict.keys():
+            not_found.append(key)
 
-            elif koji_repo_dict[key] == version and include:
-                if pulled_in_by in cargo_outdated_dict:
-                    if cargo_outdated_dict[pulled_in_by][3]:
-                        table_data.append(
-                            [
-                                key,
-                                "Not outdated",
-                                version,
-                                koji_repo_dict[key],
-                                str(include),
-                                platform,
-                            ]
-                        )
-                        not_outdated.append(key)
+            table_data.append([key, "-", version, "-", "N/A", platform])
+            continue
 
+        overall_include = get_overall_include(cargo_outdated_dict, key)
+
+        if overall_include:
+            overall_include_str = "Yes"
         else:
-            if include:
-                table_data.append(
-                    [key, "Not found", version, "---", str(include), platform]
-                )
-                not_found.append(key)
-            else:
-                if pulled_in_by in cargo_outdated_dict:
-                    if cargo_outdated_dict[pulled_in_by][3]:
-                        pulled_in_by_not_included.append(key)
-                else:
+            overall_include_str = "No"
+
+        # Key is outdated.
+        if koji_repo_dict[key] != version:
+
+            if pulled_in_by in cargo_outdated_dict:
+                if cargo_outdated_dict[pulled_in_by][3] and overall_include:
+                    outdated[key] = koji_repo_dict[key]
+                    table_data.append(
+                        [
+                            key,
+                            "Yes",
+                            version,
+                            koji_repo_dict[key],
+                            overall_include_str,
+                            platform,
+                        ]
+                    )
+
+                if cargo_outdated_dict[pulled_in_by][3] and not overall_include:
                     not_included.append(key)
+                    table_data.append(
+                        [
+                            key,
+                            "Yes",
+                            version,
+                            koji_repo_dict[key],
+                            overall_include_str,
+                            platform,
+                        ]
+                    )
+
+        # Key is up-to-date.
+        if koji_repo_dict[key] == version:
+            if pulled_in_by in cargo_outdated_dict:
+
+                if cargo_outdated_dict[pulled_in_by][3] and overall_include:
+                    not_outdated.append(key)
+                    table_data.append(
+                        [
+                            key,
+                            "No",
+                            version,
+                            koji_repo_dict[key],
+                            overall_include_str,
+                            platform,
+                        ]
+                    )
+
+                if cargo_outdated_dict[pulled_in_by][3] and not overall_include:
+                    not_included.append(key)
+                    table_data.append(
+                        [
+                            key,
+                            "No",
+                            version,
+                            koji_repo_dict[key],
+                            overall_include_str,
+                            platform,
+                        ]
+                    )
 
     return (
-        (outdated, not_outdated, not_found, not_included, pulled_in_by_not_included),
+        (outdated, not_outdated, not_found, not_included),
         table_data,
     )
 

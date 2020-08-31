@@ -85,3 +85,9 @@ pub fn blockdev_init_time_prop(dev: &dyn BlockDev) -> u64 {
 pub fn blockdev_tier_prop(tier: BlockDevTier) -> u16 {
     tier as u16
 }
+
+// Generate a D-Bus representation of the physical path
+#[inline]
+pub fn blockdev_physical_path_prop(dev: &dyn BlockDev) -> String {
+    dev.devnode().physical_path().display().to_string()
+}

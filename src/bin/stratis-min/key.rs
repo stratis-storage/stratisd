@@ -11,8 +11,8 @@ use std::{
 use libcryptsetup_rs::SafeMemHandle;
 use libstratis::{
     engine::{
-        DeleteAction, KeyActions, MappingCreateAction, SizedKeyMemory, StratKeyActions,
-        MAX_STRATIS_PASS_SIZE,
+        DeleteAction, Engine, KeyActions, MappingCreateAction, PoolUuid, SizedKeyMemory,
+        StratEngine, StratKeyActions, MAX_STRATIS_PASS_SIZE,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -72,5 +72,15 @@ pub fn key_list() -> StratisResult<()> {
             .collect::<Vec<_>>(),
         "<"
     );
+    Ok(())
+}
+
+pub fn key_get_desc(uuid: &str) -> StratisResult<()> {
+    let pool_uuid = PoolUuid::parse_str(uuid)?;
+    let engine = StratEngine::initialize()?;
+    let locked_pools = engine.locked_pools();
+    if let Some(key_desc) = locked_pools.get(&pool_uuid) {
+        println!("{}", key_desc.as_application_str())
+    }
     Ok(())
 }

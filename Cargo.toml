@@ -21,6 +21,16 @@ required-features = ["dbus_enabled"]
 name = "stratis-min"
 required-features = ["extras"]
 
+[[bin]]
+name = "stratis-rootfs-prompt-generator"
+path = "src/bin/generators/stratis-rootfs-prompt-generator.rs"
+required-features = ["extras"]
+
+[[bin]]
+name = "stratis-setup-generator"
+path = "src/bin/generators/stratis-setup-generator.rs"
+required-features = ["extras"]
+
 [dependencies]
 clap = "2"
 nix = "0.14"

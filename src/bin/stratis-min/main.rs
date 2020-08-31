@@ -36,6 +36,7 @@ fn parse_args() -> App<'static, 'static> {
                 .arg(Arg::with_name("key_desc").required(true)),
             SubCommand::with_name("list"),
             SubCommand::with_name("unset").arg(Arg::with_name("key_desc").required(true)),
+            SubCommand::with_name("get-desc").arg(Arg::with_name("uuid").required(true)),
         ]),
         SubCommand::with_name("pool").subcommands(vec![
             SubCommand::with_name("setup"),
@@ -85,6 +86,8 @@ fn main() -> Result<(), String> {
             .map_err(|e| e.to_string())
         } else if let Some(args) = subcommand.subcommand_matches("unset") {
             key::key_unset(args.value_of("key_desc").expect("required")).map_err(|e| e.to_string())
+        } else if let Some(args) = subcommand.subcommand_matches("get-desc") {
+            key::key_get_desc(args.value_of("uuid").expect("required")).map_err(|e| e.to_string())
         } else {
             key::key_list().map_err(|e| e.to_string())
         }

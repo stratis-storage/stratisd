@@ -45,6 +45,10 @@ fi
 
 for i in $(find /stratis)
 do
+	if [ ! -d $i ]
+	then
+		echo "Checking file $i..."
+	fi
 	if [ -h $i ] && [ -b $i ]
 	then
 		devname=$i
@@ -73,7 +77,6 @@ do
 			echo "No future link found; sending change event..."
 			udevadm test --action=change /sys/class/block/$tgtbase 1>/dev/null 2>&1
 		fi
-		rm -fv $devname
 	fi	
 done
 

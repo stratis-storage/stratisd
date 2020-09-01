@@ -18,6 +18,8 @@ fn unit_template(uuids: Vec<Uuid>) -> String {
     format!(
         r"[Unit]
 Description=prompt for root filesystem password
+Requires=stratis-rootfs-prompt.service
+After=stratis-rootfs-prompt.service
 {}
 {}
 

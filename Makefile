@@ -8,11 +8,31 @@ RUST_2018_IDIOMS = -D bare-trait-objects \
 
 DENY = -D warnings -D future-incompatible -D unused ${RUST_2018_IDIOMS}
 
-CLIPPY_DENY = -D clippy::cast_lossless \
-              -D clippy::cast_possible_truncation \
-              -D clippy::needless_borrow \
-              -D clippy::needless_continue \
-              -D clippy::option_option
+CLIPPY_DENY = -D clippy::pedantic \
+              -A clippy::cast_possible_wrap \
+              -A clippy::cast_sign_loss \
+              -A clippy::default_trait_access \
+              -A clippy::doc_markdown \
+              -A clippy::explicit_iter_loop \
+              -A clippy::filter_map \
+              -A clippy::filter_map_next \
+              -A clippy::find_map \
+              -A clippy::if_not_else \
+              -A clippy::items_after_statements \
+              -A clippy::map_unwrap_or \
+              -A clippy::match_same_arms \
+              -A clippy::match_wildcard_for_single_variants \
+              -A clippy::missing_errors_doc \
+              -A clippy::must_use_candidate \
+              -A clippy::module_name_repetitions \
+              -A clippy::needless_pass_by_value \
+              -A clippy::non_ascii_literal \
+              -A clippy::redundant-closure-for-method-calls \
+              -A clippy::shadow_unrelated \
+              -A clippy::single_match_else \
+              -A clippy::too_many_lines \
+              -A clippy::unseparated_literal_suffix \
+              -A clippy::unused_self
 
 ${HOME}/.cargo/bin/cargo-outdated:
 	cargo install cargo-outdated

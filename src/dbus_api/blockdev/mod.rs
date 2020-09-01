@@ -15,7 +15,7 @@ use crate::{
 };
 
 mod blockdev_2_0;
-mod blockdev_2_1;
+mod blockdev_2_2;
 mod fetch_properties_2_0;
 mod shared;
 
@@ -52,7 +52,7 @@ pub fn create_dbus_blockdev<'a>(
                 .add_p(blockdev_2_0::uuid_property(&f)),
         )
         .add(
-            f.interface(consts::BLOCKDEV_INTERFACE_NAME_2_1, ())
+            f.interface(consts::BLOCKDEV_INTERFACE_NAME_2_2, ())
                 .add_m(blockdev_2_0::set_userid_method(&f))
                 .add_p(blockdev_2_0::devnode_property(&f))
                 .add_p(blockdev_2_0::hardware_info_property(&f))
@@ -61,7 +61,7 @@ pub fn create_dbus_blockdev<'a>(
                 .add_p(blockdev_2_0::tier_property(&f))
                 .add_p(blockdev_2_0::user_info_property(&f))
                 .add_p(blockdev_2_0::uuid_property(&f))
-                .add_p(blockdev_2_1::physical_path_property(&f)),
+                .add_p(blockdev_2_2::physical_path_property(&f)),
         )
         .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME, ())
@@ -69,7 +69,7 @@ pub fn create_dbus_blockdev<'a>(
                 .add_m(fetch_properties_2_0::get_properties_method(&f)),
         )
         .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_1, ())
+            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_2, ())
                 .add_m(fetch_properties_2_0::get_all_properties_method(&f))
                 .add_m(fetch_properties_2_0::get_properties_method(&f)),
         )
@@ -106,7 +106,7 @@ pub fn get_initial_properties(
             consts::BLOCKDEV_UUID_PROP => uuid_to_string!(dev_uuid),
             consts::BLOCKDEV_TIER_PROP => shared::blockdev_tier_prop(tier)
         },
-        consts::BLOCKDEV_INTERFACE_NAME_2_1 => {
+        consts::BLOCKDEV_INTERFACE_NAME_2_2 => {
             consts::BLOCKDEV_DEVNODE_PROP => shared::blockdev_devnode_prop(dev),
             consts::BLOCKDEV_HARDWARE_INFO_PROP => shared::blockdev_hardware_info_prop(dev),
             consts::BLOCKDEV_USER_INFO_PROP => shared::blockdev_user_info_prop(dev),

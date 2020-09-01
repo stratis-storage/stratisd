@@ -5,7 +5,7 @@
 use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, Property};
 
 use crate::dbus_api::{
-    blockdev::blockdev_2_1::props::get_blockdev_physical_path, consts, types::TData,
+    blockdev::blockdev_2_2::props::get_blockdev_physical_path, consts, types::TData,
 };
 
 pub fn physical_path_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {

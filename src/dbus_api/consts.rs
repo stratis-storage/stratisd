@@ -39,7 +39,7 @@ pub const FILESYSTEM_POOL_PROP: &str = "Pool";
 pub const FILESYSTEM_CREATED_PROP: &str = "Created";
 
 pub const BLOCKDEV_INTERFACE_NAME: &str = "org.storage.stratis2.blockdev";
-pub const BLOCKDEV_INTERFACE_NAME_2_1: &str = "org.storage.stratis2.blockdev.r1";
+pub const BLOCKDEV_INTERFACE_NAME_2_2: &str = "org.storage.stratis2.blockdev.r2";
 pub const BLOCKDEV_DEVNODE_PROP: &str = "Devnode";
 pub const BLOCKDEV_HARDWARE_INFO_PROP: &str = "HardwareInfo";
 pub const BLOCKDEV_USER_INFO_PROP: &str = "UserInfo";

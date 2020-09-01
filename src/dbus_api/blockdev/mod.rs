@@ -69,7 +69,7 @@ pub fn create_dbus_blockdev<'a>(
                 .add_m(fetch_properties_2_0::get_properties_method(&f)),
         )
         .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_2, ())
+            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_1, ())
                 .add_m(fetch_properties_2_0::get_all_properties_method(&f))
                 .add_m(fetch_properties_2_0::get_properties_method(&f)),
         )

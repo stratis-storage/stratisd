@@ -3,7 +3,8 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use dbus::{
-    tree::{MTFn, Tree},
+    arg::IterAppend,
+    tree::{MTFn, MethodErr, PropInfo, Tree},
     Path,
 };
 
@@ -52,6 +53,25 @@ where
         .get_blockdev(blockdev_data.uuid)
         .ok_or_else(|| format!("no blockdev with uuid {}", blockdev_data.uuid))?;
     closure(tier, blockdev)
+}
+
+/// Get a blockdev property and place it on the D-Bus. The property is
+/// found by means of the getter method which takes a reference to a
+/// blockdev and obtains the property from the blockdev.
+pub fn get_blockdev_property<F, R>(
+    i: &mut IterAppend,
+    p: &PropInfo<MTFn<TData>, TData>,
+    getter: F,
+) -> Result<(), MethodErr>
+where
+    F: Fn(BlockDevTier, &dyn BlockDev) -> Result<R, String>,
+    R: dbus::arg::Append,
+{
+    i.append(
+        blockdev_operation(p.tree, p.path.get_name(), getter)
+            .map_err(|ref e| MethodErr::failed(e))?,
+    );
+    Ok(())
 }
 
 /// Generate D-Bus representation of devnode property.

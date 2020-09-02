@@ -194,7 +194,7 @@ macro_rules! convert_int {
     ($expr:expr, $from_type:ty, $to_type:ty) => {{
         let expr = $expr;
         <$to_type as std::convert::TryFrom<$from_type>>::try_from(expr).map_err(|_| {
-            StratisError::Error(format!(
+            $crate::stratis::StratisError::Error(format!(
                 "Failed to convert integer {} from {} to {}",
                 expr,
                 stringify!($from_type),

@@ -16,13 +16,13 @@ use crate::{
     engine::{
         engine::Pool,
         strat_engine::{
-            backstore::{identify_block_device, CryptHandle, LuksInfo, StratisInfo},
             liminal::{
                 device_info::{LInfo, LLuksInfo, LStratisInfo},
                 setup::{get_bdas, get_blockdevs, get_metadata},
             },
             metadata::StratisIdentifiers,
             pool::StratPool,
+            raw_devices::{identify_block_device, CryptHandle, LuksInfo, StratisInfo},
         },
         structures::Table,
         types::{DevUuid, KeyDescription, Name, PoolUuid},

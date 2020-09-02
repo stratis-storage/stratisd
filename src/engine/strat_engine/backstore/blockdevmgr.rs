@@ -17,13 +17,12 @@ use devicemapper::{Bytes, Device, LinearDevTargetParams, LinearTargetParams, Sec
 use crate::{
     engine::{
         strat_engine::{
-            backstore::{
-                blockdev::StratBlockDev,
-                crypt::CryptHandle,
-                devices::{initialize_devices, process_and_verify_devices, wipe_blockdevs},
-            },
+            backstore::blockdev::StratBlockDev,
             metadata::MDADataSize,
             names::KeyDescription,
+            raw_devices::{
+                initialize_devices, process_and_verify_devices, wipe_blockdevs, CryptHandle,
+            },
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
         },
         types::{DevUuid, PoolUuid},

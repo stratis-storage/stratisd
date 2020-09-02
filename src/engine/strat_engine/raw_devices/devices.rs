@@ -19,17 +19,17 @@ use devicemapper::{Bytes, Device, Sectors, IEC};
 use crate::{
     engine::{
         strat_engine::{
-            backstore::{
-                blockdev::StratBlockDev,
-                crypt::{CryptHandle, CryptInitializer},
-                udev::{block_device_apply, decide_ownership, get_udev_property, UdevOwnership},
-            },
+            backstore::StratBlockDev,
             device::blkdev_size,
             metadata::{
                 device_identifiers, disown_device, BlockdevSize, MDADataSize, StratisIdentifiers,
                 BDA,
             },
             names::KeyDescription,
+            raw_devices::{
+                crypt::{CryptHandle, CryptInitializer},
+                udev::{block_device_apply, decide_ownership, get_udev_property, UdevOwnership},
+            },
         },
         types::{BlockDevPath, DevUuid, PoolUuid},
     },
@@ -676,8 +676,8 @@ mod tests {
     use uuid::Uuid;
 
     use crate::engine::strat_engine::{
-        backstore::crypt::CryptHandle,
         metadata::device_identifiers,
+        raw_devices::crypt::CryptHandle,
         tests::{crypt, loopbacked, real},
     };
 

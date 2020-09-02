@@ -14,6 +14,7 @@ mod names;
 mod pool;
 mod serde_structs;
 mod thinpool;
+mod writing;
 
 pub use self::{backstore::BDA, engine::StratEngine};
 

@@ -3,7 +3,7 @@
 KEY_DESC=$(stratis-min key get-desc $STRATIS_ROOTFS_UUID)
 
 if [ "$(ps -q $$ -o tty --no-headers)" = "?" ]; then
-	systemd-ask-password --no-tty | stratis-min key set --capture-key $KEY_DESC
+	systemd-ask-password --no-tty | stratis-min key set --no-tty --capture-key $KEY_DESC
 else
 	systemd-ask-password | stratis-min key set --capture-key $KEY_DESC
 fi

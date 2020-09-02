@@ -68,6 +68,7 @@ pub fn key_list() -> StratisResult<()> {
     Ok(())
 }
 
+/// stratis-min key get-desc
 pub fn key_get_desc(uuid: &str) -> StratisResult<()> {
     let pool_uuid = PoolUuid::parse_str(uuid)?;
     let engine = StratEngine::initialize()?;

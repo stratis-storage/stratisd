@@ -14,12 +14,11 @@ use crate::{
         event::get_engine_listener_list,
         shared::create_pool_idempotent_or_err,
         strat_engine::{
-            backstore::find_all,
             cmd::verify_binaries,
             devlinks,
             dm::{get_dm, get_dm_init},
             keys::StratKeyActions,
-            liminal::LiminalDevices,
+            liminal::{find_all, LiminalDevices},
             names::{validate_name, KeyDescription},
             pool::StratPool,
         },

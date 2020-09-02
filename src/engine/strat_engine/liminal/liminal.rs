@@ -87,7 +87,7 @@ impl LiminalDevices {
         pool_uuid: PoolUuid,
     ) -> StratisResult<Vec<DevUuid>> {
         fn handle_luks(luks_info: &LLuksInfo) -> StratisResult<()> {
-            if let Some(mut handle) = CryptHandle::setup(&luks_info.ids.devnode)? {
+            if let Some(mut handle) = CryptHandle::setup(&luks_info.ids.basic.devnode)? {
                 handle.activate()?;
                 Ok(())
             } else {
@@ -96,7 +96,7 @@ impl LiminalDevices {
                     format!(
                         "Block device {} does not appear to be formatted with
                         the proper Stratis LUKS2 metadata.",
-                        luks_info.ids.devnode.display(),
+                        luks_info.ids.basic,
                     ),
                 ))
             }

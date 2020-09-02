@@ -38,9 +38,12 @@ use crate::{
 /// is returned.
 pub fn get_bdas(infos: &HashMap<DevUuid, LStratisInfo>) -> StratisResult<HashMap<DevUuid, BDA>> {
     fn read_bda(info: &LStratisInfo) -> StratisResult<BDA> {
-        BDA::load(&mut OpenOptions::new().read(true).open(&info.ids.devnode)?)?.ok_or_else(|| {
-            StratisError::Error(format!("Failed to read BDA from device: {}", info.ids))
-        })
+        BDA::load(
+            &mut OpenOptions::new()
+                .read(true)
+                .open(&info.ids.basic.devnode)?,
+        )?
+        .ok_or_else(|| StratisError::Error(format!("Failed to read BDA from device: {}", info.ids)))
     }
 
     infos
@@ -88,6 +91,7 @@ pub fn get_metadata(
                             .get(uuid)
                             .expect("equal sets of UUID keys")
                             .ids
+                            .basic
                             .devnode,
                     )
                     .ok()
@@ -174,23 +178,24 @@ pub fn get_blockdevs(
         // Return an error if apparent size of Stratis block device appears to
         // have decreased since metadata was recorded or if size of block
         // device could not be obtained.
-        blkdev_size(&OpenOptions::new().read(true).open(&info.ids.devnode)?).and_then(
-            |actual_size| {
-                let actual_size_sectors = actual_size.sectors();
-                let recorded_size = bda.dev_size().sectors();
-                if actual_size_sectors < recorded_size {
-                    let err_msg = format!(
+        blkdev_size(
+            &OpenOptions::new()
+                .read(true)
+                .open(&info.ids.basic.devnode)?,
+        )
+        .and_then(|actual_size| {
+            let actual_size_sectors = actual_size.sectors();
+            let recorded_size = bda.dev_size().sectors();
+            if actual_size_sectors < recorded_size {
+                let err_msg = format!(
                     "Stratis device with {} had recorded size {}, but actual size is less at {}",
-                    info.ids,
-                    recorded_size,
-                    actual_size_sectors
+                    info.ids, recorded_size, actual_size_sectors
                 );
-                    Err(StratisError::Engine(ErrorEnum::Error, err_msg))
-                } else {
-                    Ok(())
-                }
-            },
-        )?;
+                Err(StratisError::Engine(ErrorEnum::Error, err_msg))
+            } else {
+                Ok(())
+            }
+        })?;
 
         let dev_uuid = bda.dev_uuid();
 
@@ -220,16 +225,19 @@ pub fn get_blockdevs(
 
         let (path, key_description) = match &info.luks {
             Some(luks) => (
-                BlockDevPath::mapped_device_path(&luks.ids.devnode, &info.ids.devnode)?,
+                BlockDevPath::mapped_device_path(&luks.ids.basic.devnode, &info.ids.basic.devnode)?,
                 Some(&luks.key_description),
             ),
-            None => (BlockDevPath::physical_device_path(&info.ids.devnode), None),
+            None => (
+                BlockDevPath::physical_device_path(&info.ids.basic.devnode),
+                None,
+            ),
         };
 
         Ok((
             tier,
             StratBlockDev::new(
-                info.ids.device_number,
+                info.ids.basic.device_number,
                 path,
                 bda,
                 segments.unwrap_or(&vec![]),
@@ -334,7 +342,7 @@ mod tests {
 
     use crate::engine::{
         strat_engine::{
-            backstore::{Backstore, LuksInfo, StratisInfo},
+            backstore::{Backstore, BasicInfo, LuksInfo, StratisInfo},
             liminal::device_info::{LInfo, LLuksInfo},
             metadata::{MDADataSize, StratisIdentifiers},
             serde_structs::Recordable,
@@ -365,8 +373,10 @@ mod tests {
                     pool_uuid,
                     device_uuid,
                 },
-                device_number,
-                devnode: devnode.to_owned(),
+                basic: BasicInfo {
+                    device_number,
+                    devnode: devnode.to_owned(),
+                },
             }
         }
 

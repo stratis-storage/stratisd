@@ -19,5 +19,5 @@ pub use self::{
     backstore::Backstore,
     blockdev::StratBlockDev,
     crypt::CryptHandle,
-    identify::{find_all, identify_block_device, DeviceInfo, LuksInfo, StratisInfo},
+    identify::{find_all, identify_block_device, BasicInfo, DeviceInfo, LuksInfo, StratisInfo},
 };

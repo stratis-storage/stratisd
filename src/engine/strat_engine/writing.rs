@@ -46,6 +46,7 @@ where
     T: SyncAll,
 {
     fn sync_all(&mut self) -> io::Result<()> {
+        self.flush()?;
         self.get_mut().sync_all()
     }
 }

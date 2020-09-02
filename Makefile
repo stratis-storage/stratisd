@@ -12,8 +12,7 @@ CLIPPY_DENY = -D clippy::cast_lossless \
               -D clippy::cast_possible_truncation \
               -D clippy::needless_borrow \
               -D clippy::needless_continue \
-              -D clippy::option_option \
-              -D warnings
+              -D clippy::option_option
 
 ${HOME}/.cargo/bin/cargo-outdated:
 	cargo install cargo-outdated
@@ -103,7 +102,7 @@ stratisd.8.gz: stratisd.8
 	gzip --stdout docs/stratisd.8 > docs/stratisd.8.gz
 
 clippy:
-	cargo clippy --all-targets --all-features -- ${CLIPPY_DENY}
+	cargo clippy --all-targets --all-features -- ${DENY} ${CLIPPY_DENY}
 
 .PHONY:
 	audit

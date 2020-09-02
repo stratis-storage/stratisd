@@ -3,11 +3,31 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
+    collections::HashMap,
     env,
     fs::OpenOptions,
-    io::{self, Write},
+    io::{self, Read, Write},
     path::Path,
 };
+
+pub fn get_kernel_cmdline() -> Result<HashMap<String, Option<String>>, io::Error> {
+    let mut cmdline = OpenOptions::new().read(true).open("/proc/cmdline")?;
+    let mut cmdline_contents = String::new();
+    cmdline.read_to_string(&mut cmdline_contents)?;
+
+    Ok(cmdline_contents
+        .split_whitespace()
+        .map(|s| {
+            let mut name_value = s.splitn(2, '=');
+            let name = name_value
+                .next()
+                .expect("Format must contain value")
+                .to_string();
+            let value = name_value.next().map(|s| s.to_string());
+            (name, value)
+        })
+        .collect())
+}
 
 pub fn get_generator_args() -> Result<(String, String, String), String> {
     let mut args = env::args();

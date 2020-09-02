@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{env, path::PathBuf};
+use std::path::PathBuf;
 
 use uuid::Uuid;
 
@@ -37,9 +37,18 @@ WantedBy=initrd.target
 
 fn main() -> Result<(), String> {
     let (_, early_dir, _) = lib::get_generator_args()?;
+    let kernel_cmdline = lib::get_kernel_cmdline().map_err(|e| e.to_string())?;
 
-    let rootfs_uuids = env::var("STRATIS_ROOTFS_UUIDS").map_err(|e| e.to_string())?;
-    let pool_uuid = env::var("STRATIS_ROOTFS_POOL_UUID").map_err(|e| e.to_string())?;
+    let rootfs_uuids = kernel_cmdline
+        .get("stratis.rootfs.uuids")
+        .and_then(|opt_s| opt_s.as_ref().map(|s| s.to_string()))
+        .ok_or_else(|| "Missing kernel command line parameter stratis.rootfs.uuids".to_string())?;
+    let pool_uuid = kernel_cmdline
+        .get("stratis.rootfs.pool_uuid")
+        .and_then(|opt_s| opt_s.as_ref().map(|s| s.to_string()))
+        .ok_or_else(|| {
+            "Missing kernel command line parameter stratis.rootfs.pool_uuid".to_string()
+        })?;
     let parsed_rootfs_uuids: Vec<_> = rootfs_uuids
         .split(',')
         .filter_map(|string| Uuid::parse_str(string).ok())

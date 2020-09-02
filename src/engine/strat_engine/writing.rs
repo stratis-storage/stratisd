@@ -4,9 +4,11 @@
 
 //! Functions to unify writing to devices
 
+#[cfg(test)]
+use std::io::Cursor;
 use std::{
     fs::{File, OpenOptions},
-    io::{self, BufWriter, Cursor, Seek, SeekFrom, Write},
+    io::{self, BufWriter, Seek, SeekFrom, Write},
     path::Path,
 };
 
@@ -15,9 +17,7 @@ use devicemapper::{Sectors, IEC, SECTOR_SIZE};
 use crate::stratis::StratisResult;
 
 /// The SyncAll trait unifies the File type with other types that do
-/// not implement sync_all(). The purpose is to allow testing of methods
-/// that sync to a File using other structs that also implement Write, but
-/// do not implement sync_all, e.g., the Cursor type.
+/// not implement sync_all().
 pub trait SyncAll: Write {
     fn sync_all(&mut self) -> io::Result<()>;
 }
@@ -29,6 +29,7 @@ impl SyncAll for File {
     }
 }
 
+#[cfg(test)]
 impl<T> SyncAll for Cursor<T>
 where
     Cursor<T>: Write,
@@ -50,7 +51,7 @@ where
 }
 
 /// Write buf at offset length times.
-pub fn write_sectors<P: AsRef<Path>>(
+fn write_sectors<P: AsRef<Path>>(
     path: P,
     offset: Sectors,
     length: Sectors,
@@ -71,6 +72,8 @@ pub fn write_sectors<P: AsRef<Path>>(
 }
 
 /// Zero sectors at the given offset for length sectors.
+/// Note that this method buffers the zeros and syncs only when all are
+/// written.
 pub fn wipe_sectors<P: AsRef<Path>>(
     path: P,
     offset: Sectors,

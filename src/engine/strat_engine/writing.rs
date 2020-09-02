@@ -7,6 +7,7 @@
 #[cfg(test)]
 use std::io::Cursor;
 use std::{
+    cmp::min,
     fs::{File, OpenOptions},
     io::{self, BufWriter, Seek, SeekFrom, Write},
     path::Path,
@@ -59,7 +60,7 @@ fn write_sectors<P: AsRef<Path>>(
     buf: &[u8; SECTOR_SIZE],
 ) -> StratisResult<()> {
     let mut f = BufWriter::with_capacity(
-        convert_const!(IEC::Mi, u64, usize),
+        convert_const!(min(IEC::Mi, *(length.bytes())), u64, usize),
         OpenOptions::new().write(true).open(path)?,
     );
 

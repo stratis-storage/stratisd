@@ -21,7 +21,7 @@ use crate::{
             backstore::metadata::sizes::{
                 static_header_size, BDAExtendedSize, BlockdevSize, MDASize, ReservedSize,
             },
-            device::SyncAll,
+            writing::SyncAll,
         },
         types::{DevUuid, PoolUuid},
     },

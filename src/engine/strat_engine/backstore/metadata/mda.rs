@@ -16,7 +16,7 @@ use devicemapper::Bytes;
 use crate::{
     engine::strat_engine::{
         backstore::metadata::sizes::{mda_size, MDADataSize, MDARegionSize, MDASize},
-        device::SyncAll,
+        writing::SyncAll,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };

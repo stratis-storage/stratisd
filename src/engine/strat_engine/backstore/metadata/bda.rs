@@ -14,7 +14,7 @@ use crate::{
                 sizes::{BDAExtendedSize, BlockdevSize, MDADataSize, STATIC_HEADER_SIZE},
                 static_header::{MetadataLocation, StaticHeader, StratisIdentifiers},
             },
-            device::SyncAll,
+            writing::SyncAll,
         },
         types::{DevUuid, PoolUuid},
     },

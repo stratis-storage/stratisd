@@ -27,7 +27,6 @@ use crate::{
         strat_engine::{
             backstore::Backstore,
             cmd::{thin_check, thin_repair, udev_settle},
-            device::wipe_sectors,
             devlinks,
             dm::get_dm,
             names::{
@@ -36,6 +35,7 @@ use crate::{
             },
             serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave},
             thinpool::{filesystem::StratFilesystem, mdv::MetadataVol, thinids::ThinDevIdPool},
+            writing::wipe_sectors,
         },
         structures::Table,
         types::{FilesystemUuid, MaybeDbusPath, Name, PoolUuid},
@@ -1196,8 +1196,8 @@ mod tests {
 
     use crate::engine::strat_engine::{
         backstore::MDADataSize,
-        device::SyncAll,
         tests::{loopbacked, real},
+        writing::SyncAll,
     };
 
     use crate::engine::strat_engine::thinpool::filesystem::{fs_usage, FILESYSTEM_LOWATER};

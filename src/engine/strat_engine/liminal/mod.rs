@@ -3,8 +3,9 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 mod device_info;
+mod identify;
 #[allow(clippy::module_inception)]
 mod liminal;
 mod setup;
 
-pub use self::liminal::LiminalDevices;
+pub use self::{identify::find_all, liminal::LiminalDevices};

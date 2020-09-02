@@ -51,14 +51,12 @@ use devicemapper::Device;
 
 use crate::engine::{
     strat_engine::{
-        backstore::{
-            crypt::CryptHandle,
-            udev::{
-                block_enumerator, decide_ownership, UdevOwnership, CRYPTO_FS_TYPE, FS_TYPE_KEY,
-                STRATIS_FS_TYPE,
-            },
-        },
+        crypt::CryptHandle,
         metadata::{device_identifiers, StratisIdentifiers},
+        udev::{
+            block_enumerator, decide_ownership, UdevOwnership, CRYPTO_FS_TYPE, FS_TYPE_KEY,
+            STRATIS_FS_TYPE,
+        },
     },
     types::{KeyDescription, PoolUuid},
 };
@@ -430,13 +428,11 @@ mod tests {
 
     use crate::{
         engine::strat_engine::{
-            backstore::{
-                devices::{initialize_devices, process_and_verify_devices},
-                udev::block_device_apply,
-            },
+            backstore::{initialize_devices, process_and_verify_devices},
             cmd::create_fs,
             metadata::MDADataSize,
             tests::{crypt, loopbacked, real},
+            udev::block_device_apply,
         },
         stratis::StratisError,
     };

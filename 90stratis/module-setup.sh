@@ -20,8 +20,8 @@ installkernel() {
 # called by dracut
 install() {
     inst_multiple stratis-min thin_check thin_repair mkfs.xfs xfs_admin xfs_growfs
-    inst_multiple $systemdutildir/systemd-generators/stratis-rootfs-prompt-generator \
-	    $systemdutildir/systemd-generators/stratis-setup-generator \
+    inst_multiple $systemdutildir/system-generators/stratis-rootfs-prompt-generator \
+	    $systemdutildir/system-generators/stratis-setup-generator \
 	    $systemdutildir/stratis-key-set \
 	    systemd-ask-password
 

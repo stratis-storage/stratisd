@@ -2,17 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{
-    fs::File,
-    io::{self, Read},
-    os::unix::io::AsRawFd,
-};
+use std::{fs::File, io, os::unix::io::AsRawFd};
 
-use libcryptsetup_rs::SafeMemHandle;
 use libstratis::{
     engine::{
-        DeleteAction, Engine, KeyActions, MappingCreateAction, PoolUuid, SizedKeyMemory,
-        StratEngine, StratKeyActions, MAX_STRATIS_PASS_SIZE,
+        DeleteAction, Engine, KeyActions, MappingCreateAction, PoolUuid, StratEngine,
+        StratKeyActions,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -26,18 +21,16 @@ use crate::print_table;
 /// used carefully as it will cause the password to be echoed on the screen if
 /// invoked interactively.
 // stratis-min key set
-pub fn key_set(key_desc: &str, keyfile_path: Option<&str>) -> StratisResult<()> {
+pub fn key_set(key_desc: &str, keyfile_path: Option<&str>, no_tty: bool) -> StratisResult<()> {
     let ret = match keyfile_path {
         Some(kp) => {
             let file = File::open(kp)?;
             StratKeyActions.set(key_desc, file.as_raw_fd(), None)?
         }
         None => {
-            let mut stdin = io::stdin();
-            let mut mem = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
+            let stdin_fd = io::stdin().as_raw_fd();
             println!("Enter desired key data followed by the return key:");
-            let i = stdin.read(mem.as_mut())?;
-            StratKeyActions.set_no_fd(key_desc, SizedKeyMemory::new(mem, i - 1))?
+            StratKeyActions.set(key_desc, stdin_fd, Some(!no_tty))?
         }
     };
     match ret {

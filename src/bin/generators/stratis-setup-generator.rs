@@ -4,16 +4,12 @@
 
 use std::path::PathBuf;
 
-use uuid::Uuid;
-
 mod lib;
 
-fn unit_template(uuids: Vec<Uuid>) -> String {
+fn unit_template(uuids: Vec<PathBuf>) -> String {
     let devices: Vec<_> = uuids
         .into_iter()
-        .map(|uuid| {
-            lib::encode_path_to_device_unit(&PathBuf::from(format!("/dev/disk/by-uuid/{}", uuid)))
-        })
+        .map(|uuid_path| lib::encode_path_to_device_unit(&uuid_path))
         .collect();
     format!(
         r"[Unit]
@@ -39,15 +35,13 @@ fn main() -> Result<(), String> {
     let (_, early_dir, _) = lib::get_generator_args()?;
     let kernel_cmdline = lib::get_kernel_cmdline().map_err(|e| e.to_string())?;
 
-    let rootfs_uuids = kernel_cmdline
-        .get("stratis.rootfs.uuids")
+    let rootfs_uuid_paths = kernel_cmdline
+        .get("stratis.rootfs.uuid_paths")
         .and_then(|opt_s| opt_s.as_ref().map(|s| s.to_string()))
         .ok_or_else(|| "Missing kernel command line parameter stratis.rootfs.uuids".to_string())?;
-    let parsed_rootfs_uuids: Vec<_> = rootfs_uuids
-        .split(',')
-        .filter_map(|string| Uuid::parse_str(string).ok())
-        .collect();
-    let file_contents = unit_template(parsed_rootfs_uuids);
+    let parsed_rootfs_uuid_paths: Vec<_> =
+        rootfs_uuid_paths.split(',').map(PathBuf::from).collect();
+    let file_contents = unit_template(parsed_rootfs_uuid_paths);
     let mut path = PathBuf::from(early_dir);
     path.push("stratis-setup.service");
     lib::write_unit_file(&path, file_contents).map_err(|e| e.to_string())

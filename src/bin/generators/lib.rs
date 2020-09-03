@@ -8,7 +8,7 @@ use std::{
     fs::{create_dir_all, OpenOptions},
     io::{self, Read, Write},
     os::unix::fs::symlink,
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 const WANTED_BY_INITRD_PATH: &str = "/run/systemd/system/initrd.target.wants";
@@ -75,7 +75,15 @@ pub fn make_wanted_by_initrd(unit_path: &Path) -> Result<(), io::Error> {
     if !initrd_target_wants_path.exists() {
         create_dir_all(initrd_target_wants_path)?;
     }
-    symlink(unit_path, initrd_target_wants_path)?;
+    symlink(
+        unit_path,
+        [
+            initrd_target_wants_path,
+            &Path::new(unit_path.file_name().expect("Is unit file")),
+        ]
+        .iter()
+        .collect::<PathBuf>(),
+    )?;
     Ok(())
 }
 

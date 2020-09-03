@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# /run/cryptsetup required for any operation that invokes libcryptsetup or else
+# libcryptsetup prints a warning which will be captured in KEY_DESC below the first
+# time stratis-min is run.
+if [ ! -d /run/cryptsetup ]; then
+	mkdir -p /run/cryptsetup
+fi
+
 KEY_DESC=$(stratis-min key get-desc $STRATIS_ROOTFS_UUID)
 if [ $? != 0 ]; then
 	echo "Failed to get key description for given UUID $STRATIS_ROOTFS_UUID"

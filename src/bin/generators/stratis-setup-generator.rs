@@ -13,7 +13,7 @@ fn unit_template(uuids: Vec<PathBuf>) -> String {
         .collect();
     format!(
         r"[Unit]
-Description=prompt for root filesystem password
+Description=setup for Stratis root filesystem
 Requires=stratis-rootfs-prompt.service
 After=stratis-rootfs-prompt.service
 {}

@@ -25,7 +25,6 @@ install() {
 	    $systemdutildir/stratis-key-set \
 	    $systemdutildir/system/systemd-ask-password-plymouth.service \
 	    $systemdutildir/system/systemd-ask-password-plymouth.path \
-	    $systemdutildir/system/plymouth-start.service \
 	    systemd-ask-password \
 	    systemd-tty-ask-password-agent
 

@@ -17,7 +17,7 @@ fn unit_template(uuids: Vec<PathBuf>, pool_uuid: Uuid) -> String {
         r"[Unit]
 Description=prompt for root filesystem password
 Requires=plymouth-start.service
-After=plymouth-start.service
+After=systemd-ask-password-plymouth.path
 {}
 {}
 

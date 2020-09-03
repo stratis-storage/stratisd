@@ -1,6 +1,11 @@
 #!/bin/bash
 
 KEY_DESC=$(stratis-min key get-desc $STRATIS_ROOTFS_UUID)
+if [ $? != 0]; then
+	echo "Failed to get key description for given UUID $STRATIS_ROOTFS_UUID"
+	echo $KEY_DESC
+	exit 1
+fi
 
 if [ -n "$KEY_DESC" ]; then
 	systemd-ask-password --no-tty | stratis-min key set --no-tty --capture-key $KEY_DESC

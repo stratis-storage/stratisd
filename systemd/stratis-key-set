@@ -15,5 +15,5 @@ if [ $? != 0 ]; then
 fi
 
 if [ -n "$KEY_DESC" ]; then
-	systemd-ask-password --no-tty | stratis-min key set --no-tty --capture-key $KEY_DESC
+	systemd-ask-password | stratis-min key set --no-tty --capture-key $KEY_DESC
 fi

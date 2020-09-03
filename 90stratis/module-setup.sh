@@ -24,6 +24,7 @@ install() {
 	    $systemdutildir/system-generators/stratis-setup-generator \
 	    $systemdutildir/stratis-key-set \
 	    $systemdutildir/system/systemd-ask-password-console.service \
+	    $systemdutildir/system/systemd-ask-password-console.path \
 	    systemd-ask-password \
 	    systemd-tty-ask-password-agent
 

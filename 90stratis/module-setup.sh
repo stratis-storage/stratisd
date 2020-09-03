@@ -23,7 +23,9 @@ install() {
     inst_multiple $systemdutildir/system-generators/stratis-rootfs-prompt-generator \
 	    $systemdutildir/system-generators/stratis-setup-generator \
 	    $systemdutildir/stratis-key-set \
-	    systemd-ask-password
+	    $systemdutildir/system/systemd-ask-password-console.service \
+	    systemd-ask-password \
+	    systemd-tty-ask-password-agent
 
     inst_rules "$moddir/11-stratisd.rules"
 }

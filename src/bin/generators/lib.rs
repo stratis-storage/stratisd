@@ -5,10 +5,13 @@
 use std::{
     collections::HashMap,
     env,
-    fs::OpenOptions,
+    fs::{create_dir_all, OpenOptions},
     io::{self, Read, Write},
+    os::unix::fs::symlink,
     path::Path,
 };
+
+const WANTED_BY_INITRD_PATH: &str = "/run/systemd/system/initrd.target.wants";
 
 pub fn get_kernel_cmdline() -> Result<HashMap<String, Option<String>>, io::Error> {
     let mut cmdline = OpenOptions::new().read(true).open("/proc/cmdline")?;
@@ -65,6 +68,15 @@ pub fn encode_path_to_device_unit(path: &Path) -> String {
             });
     encoded_path += ".device";
     encoded_path
+}
+
+pub fn make_wanted_by_initrd(unit_path: &Path) -> Result<(), io::Error> {
+    let initrd_target_wants_path = &Path::new(WANTED_BY_INITRD_PATH);
+    if !initrd_target_wants_path.exists() {
+        create_dir_all(initrd_target_wants_path)?;
+    }
+    symlink(unit_path, initrd_target_wants_path)?;
+    Ok(())
 }
 
 pub fn write_unit_file(dest: &Path, file_contents: String) -> Result<(), io::Error> {

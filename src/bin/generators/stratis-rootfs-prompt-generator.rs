@@ -25,9 +25,6 @@ After=systemd-ask-password-console.service
 Type=oneshot
 Environment='STRATIS_ROOTFS_UUID={}'
 ExecStart=/usr/lib/systemd/stratis-key-set
-
-[Install]
-WantedBy=initrd.target
 ",
         format!("Requires={}", devices.join(" ")),
         format!("After={}", devices.join(" ")),
@@ -55,5 +52,6 @@ fn main() -> Result<(), String> {
     let file_contents = unit_template(parsed_rootfs_uuid_paths, parsed_pool_uuid);
     let mut path = PathBuf::from(early_dir);
     path.push("stratis-rootfs-prompt.service");
-    lib::write_unit_file(&path, file_contents).map_err(|e| e.to_string())
+    lib::write_unit_file(&path, file_contents).map_err(|e| e.to_string())?;
+    lib::make_wanted_by_initrd(&path).map_err(|e| e.to_string())
 }

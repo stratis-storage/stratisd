@@ -22,9 +22,6 @@ After=stratis-rootfs-prompt.service
 [Service]
 Type=oneshot
 ExecStart=/usr/bin/stratis-min pool setup
-
-[Install]
-WantedBy=initrd.target
 ",
         format!("Requires={}", devices.join(" ")),
         format!("After={}", devices.join(" ")),
@@ -44,5 +41,6 @@ fn main() -> Result<(), String> {
     let file_contents = unit_template(parsed_rootfs_uuid_paths);
     let mut path = PathBuf::from(early_dir);
     path.push("stratis-setup.service");
-    lib::write_unit_file(&path, file_contents).map_err(|e| e.to_string())
+    lib::write_unit_file(&path, file_contents).map_err(|e| e.to_string())?;
+    lib::make_wanted_by_initrd(&path).map_err(|e| e.to_string())
 }

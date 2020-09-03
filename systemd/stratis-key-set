@@ -1,7 +1,7 @@
 #!/bin/bash
 
 KEY_DESC=$(stratis-min key get-desc $STRATIS_ROOTFS_UUID)
-if [ $? != 0]; then
+if [ $? != 0 ]; then
 	echo "Failed to get key description for given UUID $STRATIS_ROOTFS_UUID"
 	echo $KEY_DESC
 	exit 1

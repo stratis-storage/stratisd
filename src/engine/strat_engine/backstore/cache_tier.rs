@@ -230,7 +230,7 @@ mod tests {
     use uuid::Uuid;
 
     use crate::engine::strat_engine::{
-        backstore::MDADataSize,
+        metadata::MDADataSize,
         tests::{loopbacked, real},
     };
 

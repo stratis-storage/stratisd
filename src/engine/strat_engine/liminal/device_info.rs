@@ -9,7 +9,10 @@ use std::fmt;
 use serde_json::Value;
 
 use crate::engine::{
-    strat_engine::backstore::{DeviceInfo, LuksInfo, StratisIdentifiers, StratisInfo},
+    strat_engine::{
+        backstore::{DeviceInfo, LuksInfo, StratisInfo},
+        metadata::StratisIdentifiers,
+    },
     types::KeyDescription,
 };
 

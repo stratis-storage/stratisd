@@ -50,13 +50,15 @@ use serde_json::Value;
 use devicemapper::Device;
 
 use crate::engine::{
-    strat_engine::backstore::{
-        crypt::CryptHandle,
-        metadata::{device_identifiers, StratisIdentifiers},
-        udev::{
-            block_enumerator, decide_ownership, UdevOwnership, CRYPTO_FS_TYPE, FS_TYPE_KEY,
-            STRATIS_FS_TYPE,
+    strat_engine::{
+        backstore::{
+            crypt::CryptHandle,
+            udev::{
+                block_enumerator, decide_ownership, UdevOwnership, CRYPTO_FS_TYPE, FS_TYPE_KEY,
+                STRATIS_FS_TYPE,
+            },
         },
+        metadata::{device_identifiers, StratisIdentifiers},
     },
     types::{KeyDescription, PoolUuid},
 };
@@ -430,10 +432,10 @@ mod tests {
         engine::strat_engine::{
             backstore::{
                 devices::{initialize_devices, process_and_verify_devices},
-                metadata::MDADataSize,
                 udev::block_device_apply,
             },
             cmd::create_fs,
+            metadata::MDADataSize,
             tests::{crypt, loopbacked, real},
         },
         stratis::StratisError,

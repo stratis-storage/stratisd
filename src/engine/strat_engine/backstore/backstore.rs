@@ -19,9 +19,9 @@ use crate::{
                 blockdevmgr::{map_to_dm, BlockDevMgr},
                 cache_tier::CacheTier,
                 data_tier::DataTier,
-                metadata::MDADataSize,
             },
             dm::get_dm,
+            metadata::MDADataSize,
             names::{format_backstore_ids, CacheRole, KeyDescription},
             serde_structs::{BackstoreSave, CapSave, Recordable},
             writing::wipe_sectors,
@@ -695,8 +695,8 @@ mod tests {
     use devicemapper::{CacheDevStatus, DataBlocks, IEC};
 
     use crate::engine::strat_engine::{
-        backstore::metadata::device_identifiers,
         cmd,
+        metadata::device_identifiers,
         tests::{loopbacked, real},
     };
 

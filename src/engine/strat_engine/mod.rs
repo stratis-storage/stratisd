@@ -10,13 +10,14 @@ mod dm;
 mod engine;
 mod keys;
 mod liminal;
+mod metadata;
 mod names;
 mod pool;
 mod serde_structs;
 mod thinpool;
 mod writing;
 
-pub use self::{backstore::BDA, engine::StratEngine};
+pub use self::{engine::StratEngine, metadata::BDA};
 
 #[cfg(test)]
 mod tests;

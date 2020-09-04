@@ -18,7 +18,7 @@ use devicemapper::{Sectors, IEC, SECTOR_SIZE};
 use crate::{
     engine::{
         strat_engine::{
-            backstore::metadata::sizes::{
+            metadata::sizes::{
                 static_header_size, BDAExtendedSize, BlockdevSize, MDASize, ReservedSize,
             },
             writing::SyncAll,
@@ -468,9 +468,7 @@ pub mod tests {
 
     use devicemapper::{Bytes, Sectors, IEC};
 
-    use crate::engine::strat_engine::backstore::metadata::sizes::{
-        static_header_size, MDADataSize,
-    };
+    use crate::engine::strat_engine::metadata::sizes::{static_header_size, MDADataSize};
 
     use super::*;
 

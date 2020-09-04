@@ -22,11 +22,11 @@ use crate::{
             },
             dm::get_dm,
             metadata::MDADataSize,
-            names::{format_backstore_ids, CacheRole, KeyDescription},
+            names::{format_backstore_ids, CacheRole},
             serde_structs::{BackstoreSave, CapSave, Recordable},
             writing::wipe_sectors,
         },
-        BlockDevTier, DevUuid, PoolUuid,
+        types::{BlockDevTier, DevUuid, EncryptionInfo, KeyDescription, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -127,9 +127,8 @@ impl Backstore {
         datadevs: Vec<StratBlockDev>,
         cachedevs: Vec<StratBlockDev>,
         last_update_time: DateTime<Utc>,
-        key_description: Option<&KeyDescription>,
     ) -> StratisResult<Backstore> {
-        let block_mgr = BlockDevMgr::new(datadevs, Some(last_update_time), key_description);
+        let block_mgr = BlockDevMgr::new(datadevs, Some(last_update_time));
         let data_tier = DataTier::setup(block_mgr, &backstore_save.data_tier)?;
         let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
         let origin = LinearDev::setup(
@@ -140,7 +139,7 @@ impl Backstore {
         )?;
 
         let (cache_tier, cache, origin) = if !cachedevs.is_empty() {
-            let block_mgr = BlockDevMgr::new(cachedevs, Some(last_update_time), None);
+            let block_mgr = BlockDevMgr::new(cachedevs, Some(last_update_time));
             match backstore_save.cache_tier {
                 Some(ref cache_tier_save) => {
                     let cache_tier = CacheTier::setup(block_mgr, cache_tier_save)?;
@@ -170,6 +169,9 @@ impl Backstore {
     ///
     /// Immediately after initialization a backstore has no cap device, since
     /// no segments are allocated in the data tier.
+    ///
+    /// When the backstore is initialized it may be unencrypted, or it may
+    /// be encrypted only with a kernel keyring and without Clevis information.
     ///
     /// WARNING: metadata changing event
     pub fn initialize(
@@ -642,16 +644,24 @@ impl Backstore {
         )
     }
 
-    pub fn data_key_desc(&self) -> Option<&KeyDescription> {
-        self.data_tier.key_desc()
+    pub fn data_tier_is_encrypted(&self) -> bool {
+        self.data_tier.block_mgr.is_encrypted()
     }
 
-    pub fn data_tier_is_encrypted(&self) -> bool {
-        self.data_tier.is_encrypted()
+    pub fn data_tier_encryption_info(&self) -> Option<&EncryptionInfo> {
+        self.data_tier.block_mgr.encryption_info()
     }
 
     pub fn has_cache(&self) -> bool {
         self.cache_tier.is_some()
+    }
+
+    pub fn bind_clevis(&mut self, pin: String, clevis_info: Value) -> StratisResult<bool> {
+        self.data_tier.block_mgr.bind_clevis(pin, clevis_info)
+    }
+
+    pub fn unbind_clevis(&mut self) -> StratisResult<bool> {
+        self.data_tier.block_mgr.unbind_clevis()
     }
 }
 

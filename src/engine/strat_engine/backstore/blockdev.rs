@@ -17,10 +17,9 @@ use crate::{
         strat_engine::{
             backstore::{crypt::CryptHandle, range_alloc::RangeAllocator},
             metadata::{disown_device, BDAExtendedSize, BlockdevSize, MDADataSize, BDA},
-            names::KeyDescription,
             serde_structs::{BaseBlockDevSave, Recordable},
         },
-        types::{BlockDevPath, DevUuid, MaybeDbusPath},
+        types::{BlockDevPath, DevUuid, EncryptionInfo, MaybeDbusPath, PoolUuid},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -34,7 +33,7 @@ pub struct StratBlockDev {
     user_info: Option<String>,
     hardware_info: Option<String>,
     dbus_path: MaybeDbusPath,
-    key_description: Option<KeyDescription>,
+    encryption_info: Option<EncryptionInfo>,
 }
 
 impl StratBlockDev {
@@ -66,7 +65,7 @@ impl StratBlockDev {
         other_segments: &[(Sectors, Sectors)],
         user_info: Option<String>,
         hardware_info: Option<String>,
-        key_description: Option<&KeyDescription>,
+        encryption_info: Option<EncryptionInfo>,
     ) -> StratisResult<StratBlockDev> {
         let mut segments = vec![(Sectors(0), bda.extended_size().sectors())];
         segments.extend(other_segments);
@@ -81,7 +80,7 @@ impl StratBlockDev {
             user_info,
             hardware_info,
             dbus_path: MaybeDbusPath(None),
-            key_description: key_description.cloned(),
+            encryption_info,
         })
     }
 
@@ -131,6 +130,11 @@ impl StratBlockDev {
             .write(true)
             .open(self.devnode.metadata_path())?;
         self.bda.save_state(time, metadata, &mut f)
+    }
+
+    /// The pool's UUID.
+    pub fn pool_uuid(&self) -> PoolUuid {
+        self.bda.pool_uuid()
     }
 
     /// The device's UUID.
@@ -183,8 +187,41 @@ impl StratBlockDev {
         &self.devnode
     }
 
-    pub fn key_description(&self) -> Option<&KeyDescription> {
-        self.key_description.as_ref()
+    /// Get the encryption_info stored on the given encrypted blockdev.
+    ///
+    /// Returns Some(_) if it is encrypted.
+    /// Returns None if it is not encrypted.
+    pub fn encryption_info(&self) -> Option<&EncryptionInfo> {
+        self.encryption_info.as_ref()
+    }
+
+    /// Set the clevis config cached in the blockdev data structure to the given
+    /// values.
+    pub fn set_clevis_info(&mut self, pin: String, config: Value) -> StratisResult<()> {
+        match self.encryption_info {
+            Some(ref mut info) => {
+                info.clevis_info = Some((pin, config));
+                Ok(())
+            }
+            None => Err(StratisError::Error(format!(
+                "Block device {} is not encrypted",
+                self.devnode.physical_path().display(),
+            ))),
+        }
+    }
+
+    /// Unset the clevis config cached in the blockdev data structure.
+    pub fn unset_clevis_info(&mut self) -> StratisResult<()> {
+        match self.encryption_info {
+            Some(ref mut info) => {
+                info.clevis_info = None;
+                Ok(())
+            }
+            None => Err(StratisError::Error(format!(
+                "Block device {} is not encrypted",
+                self.devnode.physical_path().display(),
+            ))),
+        }
     }
 }
 
@@ -194,13 +231,14 @@ impl<'a> Into<Value> for &'a StratBlockDev {
             "path": self.devnode.physical_path(),
             "uuid": self.bda.dev_uuid().to_simple_ref().to_string(),
         });
-        if let Some(ref key_desc) = self.key_description {
-            json.as_object_mut()
-                .expect("Created a JSON object above")
-                .insert(
-                    "key_description".to_string(),
-                    Value::from(key_desc.as_application_str().to_string()),
-                );
+        let map = json.as_object_mut().expect("just created above");
+        if let Some(encryption_info) = &self.encryption_info {
+            if let Value::Object(enc_map) = <&EncryptionInfo as Into<Value>>::into(encryption_info)
+            {
+                map.extend(enc_map);
+            } else {
+                unreachable!("EncryptionInfo conversion returns a JSON object");
+            };
         }
         json
     }
@@ -238,7 +276,7 @@ impl BlockDev for StratBlockDev {
     }
 
     fn is_encrypted(&self) -> bool {
-        self.key_description.is_some()
+        self.encryption_info().is_some()
     }
 }
 

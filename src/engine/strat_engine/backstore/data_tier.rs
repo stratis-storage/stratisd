@@ -16,7 +16,6 @@ use crate::{
                 blockdevmgr::{BlkDevSegment, BlockDevMgr},
                 shared::{coalesce_blkdevsegs, metadata_to_segment},
             },
-            names::KeyDescription,
             serde_structs::{BaseDevSave, BlockDevSave, DataTierSave, Recordable},
         },
         types::{BlockDevTier, DevUuid, PoolUuid},
@@ -151,16 +150,6 @@ impl DataTier {
 
     pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut StratBlockDev)> {
         self.block_mgr.blockdevs_mut()
-    }
-
-    /// Data tier is encrypted
-    pub fn is_encrypted(&self) -> bool {
-        self.block_mgr.is_encrypted()
-    }
-
-    /// Data tier key description
-    pub fn key_desc(&self) -> Option<&KeyDescription> {
-        self.block_mgr.key_desc()
     }
 }
 

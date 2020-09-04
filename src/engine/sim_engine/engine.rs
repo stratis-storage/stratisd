@@ -20,8 +20,8 @@ use crate::{
         sim_engine::{keys::SimKeyActions, pool::SimPool, randomization::Randomizer},
         structures::Table,
         types::{
-            CreateAction, DeleteAction, DevUuid, KeyDescription, Name, PoolUuid, RenameAction,
-            ReportType, SetUnlockAction,
+            CreateAction, DeleteAction, DevUuid, EncryptionInfo, KeyDescription, Name, PoolUuid,
+            RenameAction, ReportType, SetUnlockAction, UnlockMethod,
         },
         EngineEvent,
     },
@@ -116,7 +116,10 @@ impl Engine for SimEngine {
                         &Rc::clone(&self.rdm),
                         &devices,
                         redundancy,
-                        key_desc.as_ref(),
+                        key_desc.map(|kd| EncryptionInfo {
+                            key_description: kd,
+                            clevis_info: None,
+                        }),
                     );
 
                     if self.rdm.borrow_mut().throw_die() {
@@ -178,7 +181,11 @@ impl Engine for SimEngine {
         Ok(RenameAction::Renamed(uuid))
     }
 
-    fn unlock_pool(&mut self, _pool_uuid: PoolUuid) -> StratisResult<SetUnlockAction<DevUuid>> {
+    fn unlock_pool(
+        &mut self,
+        _pool_uuid: PoolUuid,
+        _unlock_method: UnlockMethod,
+    ) -> StratisResult<SetUnlockAction<DevUuid>> {
         Ok(SetUnlockAction::empty())
     }
 
@@ -190,7 +197,7 @@ impl Engine for SimEngine {
         get_mut_pool!(self; uuid)
     }
 
-    fn locked_pools(&self) -> HashMap<PoolUuid, KeyDescription> {
+    fn locked_pools(&self) -> HashMap<PoolUuid, EncryptionInfo> {
         HashMap::new()
     }
 

@@ -16,7 +16,7 @@ Representing stratisd contants.
 """
 
 # isort: STDLIB
-from enum import IntEnum
+from enum import Enum, IntEnum
 
 
 class StratisdErrors(IntEnum):
@@ -40,3 +40,15 @@ class BlockDevTiers(IntEnum):
 
     Data = 0
     Cache = 1
+
+
+class EncryptionMethod(Enum):
+    """
+    Encryption method, used as argument to unlock.
+    """
+
+    KEYRING = "keyring"
+    CLEVIS = "clevis"
+
+    def __str__(self):
+        return self.value

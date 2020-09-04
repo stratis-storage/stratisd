@@ -1195,7 +1195,7 @@ mod tests {
     use devicemapper::{Bytes, SECTOR_SIZE};
 
     use crate::engine::strat_engine::{
-        backstore::MDADataSize,
+        metadata::MDADataSize,
         tests::{loopbacked, real},
         writing::SyncAll,
     };

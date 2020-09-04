@@ -9,7 +9,7 @@ use chrono::{DateTime, Utc};
 use crate::{
     engine::{
         strat_engine::{
-            backstore::metadata::{
+            metadata::{
                 mda,
                 sizes::{BDAExtendedSize, BlockdevSize, MDADataSize, STATIC_HEADER_SIZE},
                 static_header::{MetadataLocation, StaticHeader, StratisIdentifiers},
@@ -143,7 +143,7 @@ mod tests {
 
     use proptest::{collection::vec, num};
 
-    use crate::engine::strat_engine::backstore::metadata::static_header::tests::{
+    use crate::engine::strat_engine::metadata::static_header::tests::{
         random_static_header, static_header_strategy,
     };
 

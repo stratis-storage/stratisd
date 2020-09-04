@@ -7,7 +7,7 @@ use std::{cmp::min, collections::BTreeMap};
 use devicemapper::Sectors;
 
 use crate::{
-    engine::strat_engine::backstore::metadata::BlockdevSize,
+    engine::strat_engine::metadata::BlockdevSize,
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 

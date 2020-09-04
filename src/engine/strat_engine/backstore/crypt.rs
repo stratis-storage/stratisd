@@ -17,7 +17,7 @@ use libcryptsetup_rs::{
 };
 
 use crate::engine::{
-    strat_engine::{backstore::metadata::StratisIdentifiers, keys, names::format_crypt_name},
+    strat_engine::{keys, metadata::StratisIdentifiers, names::format_crypt_name},
     types::{KeyDescription, SizedKeyMemory},
     DevUuid, PoolUuid,
 };

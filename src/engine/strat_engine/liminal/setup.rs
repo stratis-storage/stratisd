@@ -17,9 +17,10 @@ use devicemapper::Sectors;
 use crate::{
     engine::{
         strat_engine::{
-            backstore::{StratBlockDev, BDA},
+            backstore::StratBlockDev,
             device::blkdev_size,
             liminal::device_info::LStratisInfo,
+            metadata::BDA,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
         },
         types::{BlockDevPath, BlockDevTier, DevUuid},
@@ -333,8 +334,9 @@ mod tests {
 
     use crate::engine::{
         strat_engine::{
-            backstore::{Backstore, LuksInfo, MDADataSize, StratisIdentifiers, StratisInfo},
+            backstore::{Backstore, LuksInfo, StratisInfo},
             liminal::device_info::{LInfo, LLuksInfo},
+            metadata::{MDADataSize, StratisIdentifiers},
             serde_structs::Recordable,
             tests::{crypt, loopbacked, real},
         },

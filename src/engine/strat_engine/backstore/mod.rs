@@ -11,7 +11,6 @@ mod crypt;
 mod data_tier;
 mod devices;
 mod identify;
-mod metadata;
 mod range_alloc;
 mod shared;
 mod udev;
@@ -21,5 +20,4 @@ pub use self::{
     blockdev::StratBlockDev,
     crypt::CryptHandle,
     identify::{find_all, identify_block_device, DeviceInfo, LuksInfo, StratisInfo},
-    metadata::{MDADataSize, StratisIdentifiers, BDA},
 };

@@ -433,7 +433,7 @@ mod tests {
             cmd::create_fs,
             metadata::MDADataSize,
             raw_devices::{
-                devices::{initialize_devices, process_and_verify_devices},
+                devices::process_and_verify_devices, initialize::initialize_devices,
                 udev::block_device_apply,
             },
             tests::{crypt, loopbacked, real},

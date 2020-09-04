@@ -19,7 +19,7 @@ use devicemapper::{Bytes, Device, Sectors, IEC};
 use crate::{
     engine::{
         strat_engine::{
-            backstore::StratBlockDev,
+            backstore::{wipe_blockdevs, StratBlockDev},
             device::blkdev_size,
             metadata::{
                 device_identifiers, disown_device, BlockdevSize, MDADataSize, StratisIdentifiers,
@@ -644,29 +644,6 @@ pub fn initialize_devices(
         }
     }
     Ok(initialized_blockdevs)
-}
-
-/// Wipe some blockdevs of their identifying headers.
-/// Return an error if any of the blockdevs could not be wiped.
-/// If an error occurs while wiping a blockdev, attempt to wipe all remaining.
-pub fn wipe_blockdevs(blockdevs: &[StratBlockDev]) -> StratisResult<()> {
-    let unerased_devnodes: Vec<_> = blockdevs
-        .iter()
-        .filter_map(|bd| match bd.disown() {
-            Err(_) => Some(bd.devnode().physical_path()),
-            _ => None,
-        })
-        .collect();
-
-    if unerased_devnodes.is_empty() {
-        Ok(())
-    } else {
-        let err_msg = format!(
-            "Failed to wipe already initialized devnodes: {:?}",
-            unerased_devnodes
-        );
-        Err(StratisError::Engine(ErrorEnum::Error, err_msg))
-    }
 }
 
 #[cfg(test)]

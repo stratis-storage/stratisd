@@ -11,4 +11,4 @@ mod data_tier;
 mod range_alloc;
 mod shared;
 
-pub use self::{backstore::Backstore, blockdev::StratBlockDev};
+pub use self::{backstore::Backstore, blockdev::StratBlockDev, blockdevmgr::wipe_blockdevs};

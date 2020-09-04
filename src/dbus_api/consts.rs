@@ -39,6 +39,7 @@ pub const FILESYSTEM_POOL_PROP: &str = "Pool";
 pub const FILESYSTEM_CREATED_PROP: &str = "Created";
 
 pub const BLOCKDEV_INTERFACE_NAME: &str = "org.storage.stratis2.blockdev";
+pub const BLOCKDEV_INTERFACE_NAME_2_2: &str = "org.storage.stratis2.blockdev.r2";
 pub const BLOCKDEV_DEVNODE_PROP: &str = "Devnode";
 pub const BLOCKDEV_HARDWARE_INFO_PROP: &str = "HardwareInfo";
 pub const BLOCKDEV_USER_INFO_PROP: &str = "UserInfo";
@@ -46,6 +47,8 @@ pub const BLOCKDEV_INIT_TIME_PROP: &str = "InitializationTime";
 pub const BLOCKDEV_POOL_PROP: &str = "Pool";
 pub const BLOCKDEV_UUID_PROP: &str = "Uuid";
 pub const BLOCKDEV_TIER_PROP: &str = "Tier";
+pub const BLOCKDEV_PHYSICAL_PATH_PROP: &str = "PhysicalPath";
+
 pub const BLOCKDEV_TOTAL_SIZE_PROP: &str = "TotalPhysicalSize";
 
 /// Get a list of all the FetchProperties interfaces

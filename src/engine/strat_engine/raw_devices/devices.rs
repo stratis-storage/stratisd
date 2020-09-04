@@ -150,7 +150,7 @@ fn dev_info(
 /// a device should be allowed to be initialized by Stratis or to be used
 /// when initializing a device.
 #[derive(Debug)]
-pub struct DeviceInfo {
+pub struct InitDeviceInfo {
     /// The device number
     pub devno: Device,
     /// The devnode
@@ -175,14 +175,14 @@ pub struct DeviceInfo {
 // device number.
 fn process_devices(
     paths: &[&Path],
-) -> StratisResult<Vec<(DeviceInfo, Option<StratisIdentifiers>)>> {
+) -> StratisResult<Vec<(InitDeviceInfo, Option<StratisIdentifiers>)>> {
     let infos = paths
         .iter()
         .unique()
         .map(|devnode| {
             dev_info(devnode).map(|(id_wwn, size, stratis_identifiers, devno)| {
                 (
-                    DeviceInfo {
+                    InitDeviceInfo {
                         devno,
                         devnode: devnode.to_path_buf(),
                         id_wwn,
@@ -192,7 +192,7 @@ fn process_devices(
                 )
             })
         })
-        .collect::<StratisResult<Vec<(DeviceInfo, Option<StratisIdentifiers>)>>>()
+        .collect::<StratisResult<Vec<(InitDeviceInfo, Option<StratisIdentifiers>)>>>()
         .map_err(|err| {
             let error_message = format!(
                 "At least one of the devices specified was unsuitable for initialization: {}",
@@ -258,8 +258,8 @@ fn process_devices(
 fn check_device_ids(
     pool_uuid: PoolUuid,
     current_uuids: &HashSet<DevUuid>,
-    mut devices: Vec<(DeviceInfo, Option<StratisIdentifiers>)>,
-) -> StratisResult<Vec<DeviceInfo>> {
+    mut devices: Vec<(InitDeviceInfo, Option<StratisIdentifiers>)>,
+) -> StratisResult<Vec<InitDeviceInfo>> {
     let (mut stratis_devices, mut non_stratis_devices) = (vec![], vec![]);
 
     for (info, ids) in devices.drain(..) {
@@ -269,17 +269,16 @@ fn check_device_ids(
         }
     }
 
-    let mut pools: HashMap<PoolUuid, Vec<(DevUuid, DeviceInfo)>> =
-        stratis_devices
-            .drain(..)
-            .fold(HashMap::new(), |mut acc, (info, identifiers)| {
-                acc.entry(identifiers.pool_uuid)
-                    .or_insert_with(Vec::new)
-                    .push((identifiers.device_uuid, info));
-                acc
-            });
+    let mut pools: HashMap<PoolUuid, Vec<(DevUuid, InitDeviceInfo)>> = stratis_devices
+        .drain(..)
+        .fold(HashMap::new(), |mut acc, (info, identifiers)| {
+            acc.entry(identifiers.pool_uuid)
+                .or_insert_with(Vec::new)
+                .push((identifiers.device_uuid, info));
+            acc
+        });
 
-    let this_pool: Option<Vec<(DevUuid, DeviceInfo)>> = pools.remove(&pool_uuid);
+    let this_pool: Option<Vec<(DevUuid, InitDeviceInfo)>> = pools.remove(&pool_uuid);
 
     if !pools.is_empty() {
         let error_string = pools
@@ -355,7 +354,7 @@ pub fn process_and_verify_devices(
     pool_uuid: PoolUuid,
     current_uuids: &HashSet<DevUuid>,
     paths: &[&Path],
-) -> StratisResult<Vec<DeviceInfo>> {
+) -> StratisResult<Vec<InitDeviceInfo>> {
     check_device_ids(pool_uuid, current_uuids, process_devices(paths)?)
         .and_then(|vec| {
             vec

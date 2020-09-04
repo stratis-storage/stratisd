@@ -22,7 +22,7 @@ use crate::{
             names::KeyDescription,
             raw_devices::{
                 crypt::{CryptHandle, CryptInitializer},
-                devices::DeviceInfo,
+                devices::InitDeviceInfo,
             },
         },
         types::{BlockDevPath, DevUuid, PoolUuid},
@@ -77,10 +77,10 @@ impl MaybeEncrypted {
 /// Precondition: All devices have been identified as ready to be initialized
 /// in a previous step.
 ///
-/// Precondition: Each device's DeviceInfo struct contains all necessary
+/// Precondition: Each device's InitDeviceInfo struct contains all necessary
 /// information about the device.
 pub fn initialize_devices(
-    devices: Vec<DeviceInfo>,
+    devices: Vec<InitDeviceInfo>,
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
     key_description: Option<&KeyDescription>,
@@ -213,7 +213,7 @@ pub fn initialize_devices(
     // will call out directly to destroy_encrypted_stratis_device() if it
     // fails before that.
     fn initialize_one(
-        dev_info: &DeviceInfo,
+        dev_info: &InitDeviceInfo,
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
         key_description: Option<&KeyDescription>,
@@ -527,11 +527,11 @@ mod tests {
         let pool_uuid = Uuid::new_v4();
         let mut infos: Vec<_> = process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?;
 
-        // Synthesize a DeviceInfo that will cause initialization to fail.
+        // Synthesize a InitDeviceInfo that will cause initialization to fail.
         {
             let old_info = infos.pop().expect("Must contain at least two devices");
 
-            let new_info = DeviceInfo {
+            let new_info = InitDeviceInfo {
                 devnode: PathBuf::from("/srk/cheese"),
                 devno: old_info.devno,
                 id_wwn: None,

@@ -5,12 +5,10 @@
 mod crypt;
 mod devices;
 mod identify;
-mod initialize;
 mod udev;
 
 pub use self::{
-    crypt::CryptHandle,
-    devices::process_and_verify_devices,
+    crypt::{CryptHandle, CryptInitializer},
+    devices::{process_and_verify_devices, InitDeviceInfo},
     identify::{find_all, identify_block_device, DeviceInfo, LuksInfo, StratisInfo},
-    initialize::initialize_devices,
 };

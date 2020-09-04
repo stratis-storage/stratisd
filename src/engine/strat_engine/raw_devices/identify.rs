@@ -430,12 +430,10 @@ mod tests {
 
     use crate::{
         engine::strat_engine::{
+            backstore::initialize_devices,
             cmd::create_fs,
             metadata::MDADataSize,
-            raw_devices::{
-                devices::process_and_verify_devices, initialize::initialize_devices,
-                udev::block_device_apply,
-            },
+            raw_devices::{devices::process_and_verify_devices, udev::block_device_apply},
             tests::{crypt, loopbacked, real},
         },
         stratis::StratisError,

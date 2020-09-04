@@ -8,7 +8,11 @@ mod blockdev;
 mod blockdevmgr;
 mod cache_tier;
 mod data_tier;
+mod initialize;
 mod range_alloc;
 mod shared;
 
-pub use self::{backstore::Backstore, blockdev::StratBlockDev, blockdevmgr::wipe_blockdevs};
+pub use self::{backstore::Backstore, blockdev::StratBlockDev};
+
+#[cfg(test)]
+pub use self::initialize::initialize_devices;

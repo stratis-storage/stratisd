@@ -17,10 +17,10 @@ use devicemapper::{Bytes, Device, LinearDevTargetParams, LinearTargetParams, Sec
 use crate::{
     engine::{
         strat_engine::{
-            backstore::blockdev::StratBlockDev,
+            backstore::{blockdev::StratBlockDev, initialize::initialize_devices},
             metadata::MDADataSize,
             names::KeyDescription,
-            raw_devices::{initialize_devices, process_and_verify_devices, CryptHandle},
+            raw_devices::{process_and_verify_devices, CryptHandle},
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
         },
         types::{DevUuid, PoolUuid},

@@ -17,13 +17,10 @@ use devicemapper::{Device, Sectors};
 use crate::{
     engine::{
         strat_engine::{
-            backstore::{wipe_blockdevs, StratBlockDev},
+            backstore::{blockdev::StratBlockDev, blockdevmgr::wipe_blockdevs},
             metadata::{disown_device, BlockdevSize, MDADataSize, StratisIdentifiers, BDA},
             names::KeyDescription,
-            raw_devices::{
-                crypt::{CryptHandle, CryptInitializer},
-                devices::InitDeviceInfo,
-            },
+            raw_devices::{CryptHandle, CryptInitializer, InitDeviceInfo},
         },
         types::{BlockDevPath, DevUuid, PoolUuid},
     },
@@ -302,7 +299,7 @@ mod tests {
 
     use crate::engine::strat_engine::{
         metadata::device_identifiers,
-        raw_devices::{crypt::CryptHandle, devices::process_and_verify_devices},
+        raw_devices::{process_and_verify_devices, CryptHandle},
         tests::{crypt, loopbacked, real},
     };
 

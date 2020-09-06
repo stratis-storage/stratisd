@@ -11,10 +11,6 @@ use libcryptsetup_rs::SafeMemHandle;
 
 use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
-/// A type corresponding to key IDs in the kernel keyring. In `libkeyutils`,
-/// this is represented as the C type `key_serial_t`.
-pub type KeySerial = u32;
-
 /// A handle for memory designed to safely handle Stratis passphrases. It can
 /// be coerced to a slice reference for use in read-only operations.
 pub struct SizedKeyMemory {

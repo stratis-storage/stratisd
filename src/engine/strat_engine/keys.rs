@@ -13,10 +13,14 @@ use crate::{
         engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
         shared,
         strat_engine::names::KeyDescription,
-        types::{DeleteAction, KeySerial, MappingCreateAction, SizedKeyMemory},
+        types::{DeleteAction, MappingCreateAction, SizedKeyMemory},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
+
+/// A type corresponding to key IDs in the kernel keyring. In `libkeyutils`,
+/// this is represented as the C type `key_serial_t`.
+type KeySerial = u32;
 
 /// Search the persistent keyring for the given key description.
 pub(super) fn search_key_persistent(key_desc: &KeyDescription) -> StratisResult<Option<KeySerial>> {

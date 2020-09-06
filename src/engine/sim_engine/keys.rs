@@ -10,7 +10,7 @@ use crate::{
     engine::{
         engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
         shared,
-        types::{DeleteAction, KeyDescription, KeySerial, MappingCreateAction, SizedKeyMemory},
+        types::{DeleteAction, KeyDescription, MappingCreateAction, SizedKeyMemory},
     },
     stratis::StratisResult,
 };
@@ -25,15 +25,12 @@ impl SimKeyActions {
 
     /// Read the contents of a key from the simulated keyring or return `None`
     /// if no key with the given key description exists.
-    fn read(
-        &self,
-        key_desc: &KeyDescription,
-    ) -> StratisResult<Option<(KeySerial, SizedKeyMemory)>> {
+    fn read(&self, key_desc: &KeyDescription) -> StratisResult<Option<SizedKeyMemory>> {
         match self.0.get(key_desc) {
             Some(key) => {
                 let mut key_clone = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
                 let size = key_clone.as_mut().write(key.as_ref())?;
-                Ok(Some((0xdead_beef, SizedKeyMemory::new(key_clone, size))))
+                Ok(Some(SizedKeyMemory::new(key_clone, size)))
             }
             None => Ok(None),
         }
@@ -51,7 +48,7 @@ impl KeyActions for SimKeyActions {
 
         let key_description = KeyDescription::try_from(key_desc.to_string())?;
         match self.read(&key_description) {
-            Ok(Some((_, key_data))) => {
+            Ok(Some(key_data)) => {
                 if key_data.as_ref() == memory.as_ref() {
                     Ok(MappingCreateAction::Identity)
                 } else {

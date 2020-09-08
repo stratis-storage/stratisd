@@ -148,13 +148,14 @@ pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Resul
     Ok(())
 }
 
-/// Place a property changed signal on the D-Bus.
+/// Place a property changed signal on the D-Bus for the given property name
+/// and value and for all interfaces specified.
 pub fn prop_changed_dispatch<T: 'static>(
     conn: &Connection,
     prop_name: &str,
     new_value: T,
     path: &dbus::Path,
-    interface: &str,
+    interfaces: &[String],
 ) -> Result<(), ()>
 where
     T: RefArg,
@@ -163,9 +164,11 @@ where
     prop_changed
         .changed_properties
         .insert(prop_name.into(), Variant(Box::new(new_value)));
-    prop_changed.interface_name = interface.to_owned();
 
-    conn.send(prop_changed.to_emit_message(path))?;
+    for interface in interfaces {
+        prop_changed.interface_name = interface.to_owned();
+        conn.send(prop_changed.to_emit_message(path))?;
+    }
 
     Ok(())
 }

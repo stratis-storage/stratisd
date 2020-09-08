@@ -4,7 +4,6 @@
 
 mod devices;
 mod identify;
-mod udev;
 
 pub use self::{
     devices::{process_and_verify_devices, InitDeviceInfo},

@@ -19,9 +19,7 @@ use crate::{
         strat_engine::{
             device::blkdev_size,
             metadata::{device_identifiers, StratisIdentifiers},
-            raw_devices::udev::{
-                block_device_apply, decide_ownership, get_udev_property, UdevOwnership,
-            },
+            udev::{block_device_apply, decide_ownership, get_udev_property, UdevOwnership},
         },
         types::{DevUuid, PoolUuid},
     },

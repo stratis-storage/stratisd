@@ -17,6 +17,7 @@ mod pool;
 mod raw_devices;
 mod serde_structs;
 mod thinpool;
+mod udev;
 mod writing;
 
 pub use self::{engine::StratEngine, metadata::BDA};

@@ -53,7 +53,7 @@ use crate::engine::{
     strat_engine::{
         crypt::CryptHandle,
         metadata::{device_identifiers, StratisIdentifiers},
-        raw_devices::udev::{
+        udev::{
             block_enumerator, decide_ownership, UdevOwnership, CRYPTO_FS_TYPE, FS_TYPE_KEY,
             STRATIS_FS_TYPE,
         },
@@ -431,8 +431,9 @@ mod tests {
             backstore::initialize_devices,
             cmd::create_fs,
             metadata::MDADataSize,
-            raw_devices::{devices::process_and_verify_devices, udev::block_device_apply},
+            raw_devices::devices::process_and_verify_devices,
             tests::{crypt, loopbacked, real},
+            udev::block_device_apply,
         },
         stratis::StratisError,
     };

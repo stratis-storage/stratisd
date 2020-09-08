@@ -16,9 +16,9 @@ use crate::{
         engine::BlockDev,
         strat_engine::{
             backstore::range_alloc::RangeAllocator,
+            crypt::CryptHandle,
             metadata::{disown_device, BDAExtendedSize, BlockdevSize, MDADataSize, BDA},
             names::KeyDescription,
-            raw_devices::CryptHandle,
             serde_structs::{BaseBlockDevSave, Recordable},
         },
         types::{BlockDevPath, DevUuid, MaybeDbusPath},

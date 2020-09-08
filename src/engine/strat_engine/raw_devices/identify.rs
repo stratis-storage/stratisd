@@ -51,13 +51,11 @@ use devicemapper::Device;
 
 use crate::engine::{
     strat_engine::{
+        crypt::CryptHandle,
         metadata::{device_identifiers, StratisIdentifiers},
-        raw_devices::{
-            crypt::CryptHandle,
-            udev::{
-                block_enumerator, decide_ownership, UdevOwnership, CRYPTO_FS_TYPE, FS_TYPE_KEY,
-                STRATIS_FS_TYPE,
-            },
+        raw_devices::udev::{
+            block_enumerator, decide_ownership, UdevOwnership, CRYPTO_FS_TYPE, FS_TYPE_KEY,
+            STRATIS_FS_TYPE,
         },
     },
     types::{KeyDescription, PoolUuid},

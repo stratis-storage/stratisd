@@ -18,9 +18,10 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::{blockdev::StratBlockDev, initialize::initialize_devices},
+            crypt::CryptHandle,
             metadata::MDADataSize,
             names::KeyDescription,
-            raw_devices::{process_and_verify_devices, CryptHandle},
+            raw_devices::process_and_verify_devices,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
         },
         types::{DevUuid, PoolUuid},

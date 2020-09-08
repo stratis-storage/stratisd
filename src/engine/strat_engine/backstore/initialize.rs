@@ -18,9 +18,10 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::{blockdev::StratBlockDev, blockdevmgr::wipe_blockdevs},
+            crypt::{CryptHandle, CryptInitializer},
             metadata::{disown_device, BlockdevSize, MDADataSize, StratisIdentifiers, BDA},
             names::KeyDescription,
-            raw_devices::{CryptHandle, CryptInitializer, InitDeviceInfo},
+            raw_devices::InitDeviceInfo,
         },
         types::{BlockDevPath, DevUuid, PoolUuid},
     },
@@ -298,8 +299,9 @@ mod tests {
     use uuid::Uuid;
 
     use crate::engine::strat_engine::{
+        crypt::CryptHandle,
         metadata::device_identifiers,
-        raw_devices::{process_and_verify_devices, CryptHandle},
+        raw_devices::process_and_verify_devices,
         tests::{crypt, loopbacked, real},
     };
 

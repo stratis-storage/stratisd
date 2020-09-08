@@ -4,6 +4,7 @@
 
 mod backstore;
 mod cmd;
+mod crypt;
 mod device;
 mod devlinks;
 mod dm;

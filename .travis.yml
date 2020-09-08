@@ -40,6 +40,8 @@ jobs:
   allow_failures:
     # Allow audit task to fail
     - env: TASK=audit
+    # Allow clippy task to fail
+    - env: TASK=clippy
   include:
 
     # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
@@ -48,11 +50,6 @@ jobs:
       before_script:
         - rustup component add rustfmt
       env: TASK=fmt-travis
-    - name: "lint Rust source using current development toolchain"
-      rust: 1.46.0
-      before_script:
-        - rustup component add clippy
-      env: TASK=clippy
 
     # MANDATORY TESTING ON STABLE
     - name: "build using stable toolchain"
@@ -141,8 +138,8 @@ jobs:
     # INTERMITTENTLY ALLOWED FAILURES
     # Allowed if a failure occurs after a new Rust release until the
     # failure is addressed.
-    - name: "lint Rust source using beta toolchain"
-      rust: beta
+    - name: "lint Rust source using current development toolchain"
+      rust: 1.46.0
       before_script:
         - rustup component add clippy
       env: TASK=clippy

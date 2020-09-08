@@ -104,11 +104,3 @@ pub fn get_initial_properties(
         }
     }
 }
-
-/// Pool interfaces on which to send signal when name changes
-pub fn signal_on_name_change_pool_interfaces() -> Vec<String> {
-    [consts::POOL_INTERFACE_NAME, consts::POOL_INTERFACE_NAME_2_1]
-        .iter()
-        .map(|s| (*s).to_string())
-        .collect()
-}

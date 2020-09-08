@@ -7,10 +7,7 @@ use std::{cell::RefCell, rc::Rc};
 use dbus::ffidisp::Connection;
 
 use crate::{
-    dbus_api::{
-        consts, filesystem::signal_on_name_change_filesystem_interfaces,
-        pool::signal_on_name_change_pool_interfaces, util::prop_changed_dispatch,
-    },
+    dbus_api::{consts, util::prop_changed_dispatch},
     engine::{EngineEvent, EngineListener, MaybeDbusPath},
 };
 
@@ -39,7 +36,7 @@ impl EngineListener for EventHandler {
                         consts::FILESYSTEM_NAME_PROP,
                         to.to_string(),
                         dbus_path,
-                        &signal_on_name_change_filesystem_interfaces(),
+                        &consts::standard_filesystem_interfaces(),
                     )
                     .unwrap_or_else(|()| {
                         warn!(
@@ -60,7 +57,7 @@ impl EngineListener for EventHandler {
                         consts::POOL_NAME_PROP,
                         to.to_string(),
                         dbus_path,
-                        &signal_on_name_change_pool_interfaces(),
+                        &consts::standard_pool_interfaces(),
                     )
                     .unwrap_or_else(|()| {
                         warn!(

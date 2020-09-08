@@ -41,7 +41,8 @@ jobs:
     # Allow audit task to fail
     - env: TASK=audit
     # Allow clippy task to fail
-    - env: TASK=clippy
+    - rust: stable
+      env: TASK=clippy
   include:
 
     # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER

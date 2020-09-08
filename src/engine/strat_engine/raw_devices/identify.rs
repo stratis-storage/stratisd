@@ -428,10 +428,9 @@ mod tests {
 
     use crate::{
         engine::strat_engine::{
-            backstore::initialize_devices,
+            backstore::{initialize_devices, process_and_verify_devices},
             cmd::create_fs,
             metadata::MDADataSize,
-            raw_devices::devices::process_and_verify_devices,
             tests::{crypt, loopbacked, real},
             udev::block_device_apply,
         },

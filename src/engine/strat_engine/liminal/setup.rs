@@ -335,9 +335,11 @@ mod tests {
     use crate::engine::{
         strat_engine::{
             backstore::Backstore,
-            liminal::device_info::{LInfo, LLuksInfo},
+            liminal::{
+                device_info::{LInfo, LLuksInfo},
+                identify::{LuksInfo, StratisInfo},
+            },
             metadata::{MDADataSize, StratisIdentifiers},
-            raw_devices::{LuksInfo, StratisInfo},
             serde_structs::Recordable,
             tests::{crypt, loopbacked, real},
         },

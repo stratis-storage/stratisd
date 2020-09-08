@@ -14,7 +14,6 @@ mod liminal;
 mod metadata;
 mod names;
 mod pool;
-mod raw_devices;
 mod serde_structs;
 mod thinpool;
 mod udev;

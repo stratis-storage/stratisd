@@ -19,11 +19,11 @@ use crate::{
             crypt::CryptHandle,
             liminal::{
                 device_info::{LInfo, LLuksInfo, LStratisInfo},
+                identify::{identify_block_device, LuksInfo, StratisInfo},
                 setup::{get_bdas, get_blockdevs, get_metadata},
             },
             metadata::StratisIdentifiers,
             pool::StratPool,
-            raw_devices::{identify_block_device, LuksInfo, StratisInfo},
         },
         structures::Table,
         types::{DevUuid, KeyDescription, Name, PoolUuid},

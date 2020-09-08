@@ -10,8 +10,8 @@ use serde_json::Value;
 
 use crate::engine::{
     strat_engine::{
+        liminal::identify::{DeviceInfo, LuksInfo, StratisInfo},
         metadata::StratisIdentifiers,
-        raw_devices::{DeviceInfo, LuksInfo, StratisInfo},
     },
     types::KeyDescription,
 };

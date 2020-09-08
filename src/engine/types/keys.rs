@@ -2,7 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::convert::TryFrom;
+use std::{
+    convert::TryFrom,
+    fmt::{self, Debug},
+};
 
 use libcryptsetup_rs::SafeMemHandle;
 
@@ -22,6 +25,12 @@ pub struct SizedKeyMemory {
 impl SizedKeyMemory {
     pub fn new(mem: SafeMemHandle, size: usize) -> SizedKeyMemory {
         SizedKeyMemory { mem, size }
+    }
+}
+
+impl Debug for SizedKeyMemory {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self.as_ref())
     }
 }
 

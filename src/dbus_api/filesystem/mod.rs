@@ -92,3 +92,10 @@ pub fn get_initial_properties(
         }
     }
 }
+
+pub fn signal_on_name_change_filesystem_interfaces() -> Vec<String> {
+    [consts::FILESYSTEM_INTERFACE_NAME]
+        .iter()
+        .map(|s| (*s).to_string())
+        .collect()
+}

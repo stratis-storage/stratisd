@@ -40,6 +40,9 @@ jobs:
   allow_failures:
     # Allow audit task to fail
     - env: TASK=audit
+    # Allow stable clippy task to fail
+    - rust: stable
+      env: TASK=clippy
   include:
 
     # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
@@ -138,15 +141,6 @@ jobs:
       install: pip install yamllint==1.23.0
       env: TASK=yamllint
 
-    # INTERMITTENTLY ALLOWED FAILURES
-    # Allowed if a failure occurs after a new Rust release until the
-    # failure is addressed.
-    - name: "lint Rust source using beta toolchain"
-      rust: beta
-      before_script:
-        - rustup component add clippy
-      env: TASK=clippy
-
     # ALLOWED FAILURES
     # Run audit on Rust stable.  Make it an allowed failure, because:
     # * It takes 9 minutes, the longest of any task.
@@ -154,6 +148,14 @@ jobs:
     - name: "run Rust audit task using stable toolchain"
       rust: stable
       env: TASK=audit
+
+    # Allowed because a failure may occur after a new Rust stable
+    # version is released.
+    - name: "lint Rust source using stable toolchain"
+      rust: stable
+      before_script:
+        - rustup component add clippy
+      env: TASK=clippy
 
 branches:
   only:

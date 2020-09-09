@@ -129,9 +129,7 @@ impl LStratisInfo {
         assert!(match &self.luks {
             None => true,
             Some(luks) =>
-                luks.ids.identifiers == self.ids.identifiers
-                    && luks.ids.devnode != self.ids.devnode
-                    && luks.ids.device_number != self.ids.device_number,
+                luks.ids.identifiers == self.ids.identifiers && luks.ids.basic != self.ids.basic,
         });
     }
 }
@@ -159,6 +157,7 @@ impl From<DeviceInfo> for LInfo {
         match info {
             DeviceInfo::Luks(info) => LInfo::Luks(info.into()),
             DeviceInfo::Stratis(info) => LInfo::Stratis(info.into()),
+            DeviceInfo::Unowned(_) => unimplemented!(),
         }
     }
 }
@@ -199,7 +198,7 @@ impl LInfo {
             (luks_info @ LInfo::Luks(_), LInfo::Stratis(_)) => Some(luks_info),
             (LInfo::Stratis(strat_info), LInfo::Luks(luks_info)) => {
                 if let Some(luks) = &strat_info.luks {
-                    if luks.ids.device_number != luks_info.ids.device_number {
+                    if luks.ids.basic.device_number != luks_info.ids.basic.device_number {
                         warn!("Received udev remove event on a device with {} that stratisd does not know about; retaining logical device with {} among the set of devices known to belong to pool with UUID {}",
                                 luks_info,
                                 strat_info,
@@ -212,7 +211,7 @@ impl LInfo {
                 Some(LInfo::Stratis(strat_info))
             }
             (LInfo::Stratis(info_1), LInfo::Stratis(info_2)) => {
-                if info_1.ids.device_number != info_2.ids.device_number {
+                if info_1.ids.basic.device_number != info_2.ids.basic.device_number {
                     warn!("Received udev remove event on a device with {} that stratisd does not know about; retaining duplicate device {} among the set of devices known to belong to pool with UUID {}",
                               info_2,
                               info_1,
@@ -223,7 +222,7 @@ impl LInfo {
                 }
             }
             (LInfo::Luks(info_1), LInfo::Luks(info_2)) => {
-                if info_1.ids.device_number != info_2.ids.device_number {
+                if info_1.ids.basic.device_number != info_2.ids.basic.device_number {
                     warn!("Received udev remove event on a device with {} that stratisd does not know about; retaining duplicate device {} among the set of devices known to belong to pool with UUID {}",
                               info_2,
                               info_1,
@@ -248,7 +247,7 @@ impl LInfo {
         // Precondition: Stratis identifiers of devices are the same
         fn luks_luks_compatible(info_1: &LLuksInfo, info_2: &LLuksInfo) -> bool {
             assert_eq!(info_1.ids.identifiers, info_2.ids.identifiers);
-            info_1.ids.device_number == info_2.ids.device_number
+            info_1.ids.basic.device_number == info_2.ids.basic.device_number
                 && info_1.key_description == info_2.key_description
         }
 
@@ -257,7 +256,7 @@ impl LInfo {
         // Precondition: Stratis identifiers of devices are the same
         fn stratis_stratis_compatible(info_1: &LStratisInfo, info_2: &LStratisInfo) -> bool {
             assert_eq!(info_1.ids.identifiers, info_2.ids.identifiers);
-            info_1.ids.device_number == info_2.ids.device_number
+            info_1.ids.basic.device_number == info_2.ids.basic.device_number
                 && match (info_1.luks.as_ref(), info_2.luks.as_ref()) {
                     (Some(luks_1), Some(luks_2)) => luks_luks_compatible(luks_1, luks_2),
                     _ => true,

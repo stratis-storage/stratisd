@@ -89,31 +89,21 @@ impl fmt::Display for LuksInfo {
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub struct StratisInfo {
     pub identifiers: StratisIdentifiers,
-    pub device_number: Device,
-    pub devnode: PathBuf,
+    pub basic: BasicInfo,
 }
 
 impl fmt::Display for StratisInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}, device number: \"{}\", devnode: \"{}\"",
-            self.identifiers,
-            self.device_number,
-            self.devnode.display()
-        )
+        write!(f, "{}, {}", self.identifiers, self.basic)
     }
 }
 
 impl<'a> Into<Value> for &'a StratisInfo {
     // Precondition: (&StratisIdentifiers).into() pattern matches
     // Value::Object()
+    // Precondition: (&BasicInfo).into() pattern matches Value::Object()
     fn into(self) -> Value {
-        let mut json = json!({
-            "major": Value::from(self.device_number.major),
-            "minor": Value::from(self.device_number.minor),
-            "devnode": Value::from(self.devnode.display().to_string())
-        });
+        let mut json = <&BasicInfo as Into<Value>>::into(&self.basic);
         if let Value::Object(ref mut map) = json {
             map.extend(
                 if let Value::Object(map) =
@@ -131,12 +121,41 @@ impl<'a> Into<Value> for &'a StratisInfo {
     }
 }
 
+/// Struct with extremely basic info about a device
+#[derive(Debug, Eq, Hash, PartialEq)]
+pub struct BasicInfo {
+    pub device_number: Device,
+    pub devnode: PathBuf,
+}
+
+impl fmt::Display for BasicInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "device number: \"{}\", devnode: \"{}\"",
+            self.device_number,
+            self.devnode.display()
+        )
+    }
+}
+
+impl<'a> Into<Value> for &'a BasicInfo {
+    fn into(self) -> Value {
+        json!({
+            "major": Value::from(self.device_number.major),
+            "minor": Value::from(self.device_number.minor),
+            "devnode": Value::from(self.devnode.display().to_string())
+        })
+    }
+}
+
 /// An enum type to distinguish between LUKS devices belong to Stratis and
 /// Stratis devices.
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub enum DeviceInfo {
     Luks(LuksInfo),
     Stratis(StratisInfo),
+    Unowned(BasicInfo),
 }
 
 impl fmt::Display for DeviceInfo {
@@ -144,6 +163,7 @@ impl fmt::Display for DeviceInfo {
         match self {
             DeviceInfo::Luks(info) => write!(f, "LUKS device description: {}", info),
             DeviceInfo::Stratis(info) => write!(f, "Stratis device description: {}", info),
+            DeviceInfo::Unowned(info) => write!(f, "unowned device data: {}", info),
         }
     }
 }
@@ -215,8 +235,10 @@ fn process_luks_device(dev: &libudev::Device) -> Option<LuksInfo> {
                 Ok(Some(handle)) => Some(LuksInfo {
                     info: StratisInfo {
                         identifiers: *handle.device_identifiers(),
-                        device_number,
-                        devnode: handle.physical_device_path().to_path_buf(),
+                        basic: BasicInfo {
+                            device_number,
+                            devnode: handle.physical_device_path().to_path_buf(),
+                        },
                     },
                     key_description: handle.key_description().clone(),
                 }),
@@ -250,8 +272,10 @@ fn process_stratis_device(dev: &libudev::Device) -> Option<StratisInfo> {
                 }
                 (Ok(device_number), Ok(Ok(Some(identifiers)))) => Some(StratisInfo {
                     identifiers,
-                    device_number,
-                    devnode: devnode.to_path_buf(),
+                    basic: BasicInfo {
+                        device_number,
+                        devnode: devnode.to_path_buf(),
+                    },
                 }),
             }
         }
@@ -489,10 +513,10 @@ mod tests {
                     ))));
                 }
 
-                if info.info.devnode != devnode.physical_path() {
+                if info.info.basic.devnode != devnode.physical_path() {
                     return Err(Box::new(StratisError::Error(format!(
                         "Discovered device node {} != expected device node {}",
-                        info.info.devnode.display(),
+                        info.info.basic.devnode.display(),
                         devnode.physical_path().display()
                     ))));
                 }
@@ -532,11 +556,13 @@ mod tests {
                             )
                         })?;
 
-                if info.identifiers.pool_uuid != pool_uuid || info.devnode != devnode.user_path() {
+                if info.identifiers.pool_uuid != pool_uuid
+                    || info.basic.devnode != devnode.user_path()
+                {
                     return Err(Box::new(StratisError::Error(format!(
                         "Wrong identifiers and devnode found on Stratis block device: found: pool UUID: {}, device node; {} != expected: pool UUID: {}, device node: {}",
                         info.identifiers.pool_uuid.to_simple_ref(),
-                        info.devnode.display(),
+                        info.basic.devnode.display(),
                         pool_uuid,
                         devnode.metadata_path().display()),
                     )));
@@ -593,7 +619,7 @@ mod tests {
                 .unwrap()
                 .unwrap();
             assert_eq!(info.identifiers.pool_uuid, pool_uuid);
-            assert_eq!(&&info.devnode, path);
+            assert_eq!(&&info.basic.devnode, path);
 
             assert_eq!(
                 block_device_apply(path, |dev| process_luks_device(dev))

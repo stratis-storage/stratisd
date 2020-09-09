@@ -429,7 +429,7 @@ pub fn identify_block_device(dev: &libudev::Device) -> Option<DeviceInfo> {
         },
     }
     .map(|info| {
-        debug!("Stratis block device with {} identified", info);
+        debug!("block device with {} identified", info);
         info
     })
 }

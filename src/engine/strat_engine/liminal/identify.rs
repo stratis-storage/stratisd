@@ -129,6 +129,21 @@ impl<'a> Into<Value> for &'a StratisInfo {
     }
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub enum DeviceInfo {
+    Owned(OwnedDeviceInfo),
+    Unowned,
+}
+
+impl fmt::Display for DeviceInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            DeviceInfo::Owned(info) => write!(f, "{}", info),
+            DeviceInfo::Unowned => write!(f, "unowned device"),
+        }
+    }
+}
+
 /// An enum type to distinguish between LUKS devices belong to Stratis and
 /// Stratis devices.
 #[derive(Debug, Eq, Hash, PartialEq)]
@@ -367,7 +382,7 @@ fn identify_stratis_device(dev: &libudev::Device) -> Option<StratisInfo> {
 /// Identify a block device in the context where a udev event has been
 /// captured for some block device. Return None if the device does not
 /// appear to be a Stratis device. Log at an appropriate level on all errors.
-pub fn identify_block_device(dev: &libudev::Device) -> Option<OwnedDeviceInfo> {
+pub fn identify_block_device(dev: &libudev::Device) -> Option<DeviceInfo> {
     let initialized = dev.is_initialized();
     if !initialized {
         debug!("Found a udev entry for a device identified as a block device, but udev also identified it as uninitialized, disregarding the device");
@@ -383,8 +398,12 @@ pub fn identify_block_device(dev: &libudev::Device) -> Option<OwnedDeviceInfo> {
             None
         }
         Ok(ownership) => match ownership {
-            UdevOwnership::Stratis => process_stratis_device(dev).map(OwnedDeviceInfo::Stratis),
-            UdevOwnership::Luks => process_luks_device(dev).map(OwnedDeviceInfo::Luks),
+            UdevOwnership::Stratis => process_stratis_device(dev)
+                .map(|info| DeviceInfo::Owned(OwnedDeviceInfo::Stratis(info))),
+            UdevOwnership::Luks => {
+                process_luks_device(dev).map(|info| DeviceInfo::Owned(OwnedDeviceInfo::Luks(info)))
+            }
+            UdevOwnership::Unowned => Some(DeviceInfo::Unowned),
             _ => None,
         },
     }

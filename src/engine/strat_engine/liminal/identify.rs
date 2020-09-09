@@ -129,6 +129,27 @@ impl<'a> Into<Value> for &'a StratisInfo {
     }
 }
 
+/// Non-Stratis info about a device
+#[derive(Debug, Eq, PartialEq)]
+pub struct RawInfo {
+    pub device_number: Device,
+    pub devnode: PathBuf,
+}
+
+impl fmt::Display for RawInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "device number: \"{}\", devnode: \"{}\"",
+            self.device_number,
+            self.devnode.display()
+        )
+    }
+}
+
+/// A very generic type, to distinguish between devices that have been
+/// identified as belonging in some way to Stratis and those that appear
+/// entirely unowned.
 #[derive(Debug, Eq, PartialEq)]
 pub enum DeviceInfo {
     Owned(OwnedDeviceInfo),

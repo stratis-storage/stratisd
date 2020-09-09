@@ -59,7 +59,7 @@ pub fn create_pool_shared(m: &MethodInfo<MTFn<TData>, TData>, has_key_desc: bool
         Ok(pool_uuid_action) => {
             let results = match pool_uuid_action {
                 CreateAction::Created(uuid) => {
-                    let (_, pool) = get_mut_pool!(engine; uuid; default_return; return_message);
+                    let (_, pool) = get_pool!(engine; uuid; default_return; return_message);
 
                     let pool_object_path: dbus::Path = create_dbus_pool(
                         dbus_context,
@@ -70,7 +70,7 @@ pub fn create_pool_shared(m: &MethodInfo<MTFn<TData>, TData>, has_key_desc: bool
                     );
 
                     let bd_paths = pool
-                        .blockdevs_mut()
+                        .blockdevs()
                         .into_iter()
                         .map(|(uuid, tier, bd)| {
                             create_dbus_blockdev(

@@ -30,7 +30,7 @@ use crate::{
 
 /// Returned data from when you connect a stratis engine to dbus.
 pub struct DbusConnectionData {
-    pub connection: Rc<RefCell<Connection>>,
+    pub connection: Connection,
     pub tree: Tree<MTFn<TData>, TData>,
     pub path: dbus::Path<'static>,
     pub context: DbusContext,
@@ -48,7 +48,7 @@ impl DbusConnectionData {
             NameFlag::ReplaceExisting as u32,
         )?;
         Ok(DbusConnectionData {
-            connection: Rc::new(RefCell::new(c)),
+            connection: c,
             tree,
             path: object_path,
             context: dbus_context,
@@ -56,10 +56,10 @@ impl DbusConnectionData {
     }
 
     /// Given the UUID of a pool, register all the pertinent information with dbus.
-    pub fn register_pool(&mut self, pool_name: &Name, pool_uuid: PoolUuid, pool: &mut dyn Pool) {
+    pub fn register_pool(&mut self, pool_name: &Name, pool_uuid: PoolUuid, pool: &dyn Pool) {
         let pool_path =
             create_dbus_pool(&self.context, self.path.clone(), pool_name, pool_uuid, pool);
-        for (fs_name, fs_uuid, fs) in pool.filesystems_mut() {
+        for (fs_name, fs_uuid, fs) in pool.filesystems() {
             create_dbus_filesystem(
                 &self.context,
                 pool_path.clone(),
@@ -69,7 +69,7 @@ impl DbusConnectionData {
                 fs,
             );
         }
-        for (uuid, tier, bd) in pool.blockdevs_mut() {
+        for (uuid, tier, bd) in pool.blockdevs() {
             create_dbus_blockdev(&self.context, pool_path.clone(), uuid, tier, bd);
         }
 
@@ -84,7 +84,6 @@ impl DbusConnectionData {
                 DeferredAction::Add(path, interfaces) => {
                     let path_name = path.get_name().clone();
                     self.connection
-                        .borrow_mut()
                         .register_object_path(&path_name)
                         .expect("Must succeed since object paths are unique");
                     self.tree.insert(path);
@@ -93,7 +92,7 @@ impl DbusConnectionData {
                     }
                 }
                 DeferredAction::Remove(path, interfaces) => {
-                    self.connection.borrow_mut().unregister_object_path(&path);
+                    self.connection.unregister_object_path(&path);
                     self.tree.remove(&path);
                     if let Err(e) = self.removed_object_signal(path, interfaces) {
                         warn!("Failed to send a signal on D-Bus object removal: {}", e);
@@ -108,7 +107,6 @@ impl DbusConnectionData {
         for pfd in fds.iter().filter(|pfd| pfd.revents != 0) {
             let items: Vec<ConnectionItem> = self
                 .connection
-                .borrow()
                 .watch_handle(pfd.fd, WatchEvent::from_revents(pfd.revents))
                 .collect();
 
@@ -118,7 +116,7 @@ impl DbusConnectionData {
                         // Probably the wisest is to ignore any send errors here -
                         // maybe the remote has disconnected during our processing.
                         for m in v {
-                            let _ = self.connection.borrow_mut().send(m);
+                            let _ = self.connection.send(m);
                         }
                     }
 
@@ -135,7 +133,6 @@ impl DbusConnectionData {
         interfaces: InterfacesAdded,
     ) -> Result<(), dbus::Error> {
         self.connection
-            .borrow()
             .send(
                 ObjectManagerInterfacesAdded { object, interfaces }
                     .to_emit_message(&Path::from(consts::STRATIS_BASE_PATH)),
@@ -153,7 +150,6 @@ impl DbusConnectionData {
         interfaces: InterfacesRemoved,
     ) -> Result<(), dbus::Error> {
         self.connection
-            .borrow()
             .send(
                 ObjectManagerInterfacesRemoved { object, interfaces }
                     .to_emit_message(&Path::from(consts::STRATIS_BASE_PATH)),

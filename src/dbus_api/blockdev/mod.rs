@@ -11,7 +11,7 @@ use crate::{
         types::{DbusContext, InterfacesAdded, OPContext, ObjectPathType},
         util::make_object_path,
     },
-    engine::{BlockDev, BlockDevTier, DevUuid, MaybeDbusPath},
+    engine::{BlockDev, BlockDevTier, DevUuid},
 };
 
 mod blockdev_2_0;
@@ -24,7 +24,7 @@ pub fn create_dbus_blockdev<'a>(
     parent: dbus::Path<'static>,
     uuid: Uuid,
     tier: BlockDevTier,
-    blockdev: &mut dyn BlockDev,
+    blockdev: &dyn BlockDev,
 ) -> dbus::Path<'a> {
     let f = Factory::new_fn();
 
@@ -85,7 +85,6 @@ pub fn create_dbus_blockdev<'a>(
         .actions
         .borrow_mut()
         .push_add(object_path, interfaces);
-    blockdev.set_dbus_path(MaybeDbusPath(Some(path.clone())));
     path
 }
 

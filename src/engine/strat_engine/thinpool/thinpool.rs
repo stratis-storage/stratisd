@@ -23,7 +23,6 @@ use devicemapper::{
 use crate::{
     engine::{
         engine::Filesystem,
-        event::{get_engine_listener_list, EngineEvent},
         strat_engine::{
             backstore::Backstore,
             cmd::{thin_check, thin_repair, udev_settle},
@@ -38,7 +37,7 @@ use crate::{
             writing::wipe_sectors,
         },
         structures::Table,
-        types::{FilesystemUuid, MaybeDbusPath, Name, PoolUuid},
+        types::{FilesystemUuid, Name, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -274,7 +273,6 @@ pub struct ThinPool {
     /// The device will change if the backstore adds or removes a cache.
     backstore_device: Device,
     thin_pool_status: Option<ThinPoolStatus>,
-    dbus_path: MaybeDbusPath,
 }
 
 impl ThinPool {
@@ -382,7 +380,6 @@ impl ThinPool {
             mdv,
             backstore_device,
             thin_pool_status: None,
-            dbus_path: MaybeDbusPath(None),
         })
     }
 
@@ -492,7 +489,6 @@ impl ThinPool {
             mdv,
             backstore_device,
             thin_pool_status: None,
-            dbus_path: MaybeDbusPath(None),
         })
     }
 
@@ -858,7 +854,7 @@ impl ThinPool {
         pool_uuid: PoolUuid,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<(FilesystemUuid, &mut dyn Filesystem)> {
+    ) -> StratisResult<(FilesystemUuid, &dyn Filesystem)> {
         let snapshot_fs_uuid = Uuid::new_v4();
         let (snapshot_dm_name, snapshot_dm_uuid) =
             format_thin_ids(pool_uuid, ThinRole::Filesystem(snapshot_fs_uuid));
@@ -888,7 +884,7 @@ impl ThinPool {
         Ok((
             snapshot_fs_uuid,
             self.filesystems
-                .get_mut_by_uuid(snapshot_fs_uuid)
+                .get_by_uuid(snapshot_fs_uuid)
                 .expect("just inserted")
                 .1,
         ))
@@ -959,12 +955,8 @@ impl ThinPool {
             self.filesystems.insert(old_name, uuid, filesystem);
             Err(err)
         } else {
-            get_engine_listener_list().notify(&EngineEvent::FilesystemRenamed {
-                dbus_path: filesystem.get_dbus_path(),
-                from: &*old_name,
-                to: &*new_name,
-            });
             self.filesystems.insert(new_name.clone(), uuid, filesystem);
+
             if let Err(e) = devlinks::filesystem_renamed(pool_name, &old_name) {
                 warn!("Filesystem rename symlink action failed: {}", e);
             };
@@ -1073,10 +1065,6 @@ impl ThinPool {
         self.backstore_device = backstore_device;
 
         Ok(true)
-    }
-
-    pub fn set_dbus_path(&mut self, path: MaybeDbusPath) {
-        self.dbus_path = path
     }
 }
 

@@ -33,7 +33,7 @@ use crate::{
             serde_structs::FilesystemSave,
             thinpool::{thinpool::DATA_LOWATER, DATA_BLOCK_SIZE},
         },
-        types::{FilesystemUuid, MaybeDbusPath, Name, PoolUuid},
+        types::{FilesystemUuid, Name, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -50,7 +50,6 @@ pub const FILESYSTEM_LOWATER: Sectors = Sectors(4 * (DATA_LOWATER.0 * DATA_BLOCK
 pub struct StratFilesystem {
     thin_dev: ThinDev,
     created: DateTime<Utc>,
-    dbus_path: MaybeDbusPath,
 }
 
 impl StratFilesystem {
@@ -95,7 +94,6 @@ impl StratFilesystem {
             StratFilesystem {
                 thin_dev,
                 created: Utc::now(),
-                dbus_path: MaybeDbusPath(None),
             },
         ))
     }
@@ -118,7 +116,6 @@ impl StratFilesystem {
         Ok(StratFilesystem {
             thin_dev,
             created: Utc.timestamp(fssave.created as i64, 0),
-            dbus_path: MaybeDbusPath(None),
         })
     }
 
@@ -176,7 +173,6 @@ impl StratFilesystem {
                 Ok(StratFilesystem {
                     thin_dev,
                     created: Utc::now(),
-                    dbus_path: MaybeDbusPath(None),
                 })
             }
             Err(e) => Err(StratisError::Engine(
@@ -323,14 +319,6 @@ impl Filesystem for StratFilesystem {
                 Err(StratisError::Engine(ErrorEnum::Error, error_msg))
             }
         }
-    }
-
-    fn set_dbus_path(&mut self, path: MaybeDbusPath) {
-        self.dbus_path = path
-    }
-
-    fn get_dbus_path(&self) -> &MaybeDbusPath {
-        &self.dbus_path
     }
 }
 

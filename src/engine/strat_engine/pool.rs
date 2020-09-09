@@ -22,8 +22,8 @@ use crate::{
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
         types::{
-            BlockDevTier, CreateAction, DevUuid, FilesystemUuid, MaybeDbusPath, Name, PoolUuid,
-            Redundancy, RenameAction, SetCreateAction, SetDeleteAction,
+            BlockDevTier, CreateAction, DevUuid, FilesystemUuid, Name, PoolUuid, Redundancy,
+            RenameAction, SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -134,7 +134,6 @@ pub struct StratPool {
     backstore: Backstore,
     redundancy: Redundancy,
     thin_pool: ThinPool,
-    dbus_path: MaybeDbusPath,
 }
 
 impl StratPool {
@@ -176,7 +175,6 @@ impl StratPool {
             backstore,
             redundancy,
             thin_pool: thinpool,
-            dbus_path: MaybeDbusPath(None),
         };
 
         pool.write_metadata(&Name::new(name.to_owned()))?;
@@ -226,7 +224,6 @@ impl StratPool {
             backstore,
             redundancy: Redundancy::NONE,
             thin_pool: thinpool,
-            dbus_path: MaybeDbusPath(None),
         };
 
         let pool_name = &metadata.name;
@@ -491,7 +488,7 @@ impl Pool for StratPool {
         pool_uuid: PoolUuid,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<CreateAction<(FilesystemUuid, &mut dyn Filesystem)>> {
+    ) -> StratisResult<CreateAction<(FilesystemUuid, &dyn Filesystem)>> {
         validate_name(snapshot_name)?;
 
         if self
@@ -584,15 +581,6 @@ impl Pool for StratPool {
             Ok(None) => Ok(RenameAction::Identity),
             Err(_) => Ok(RenameAction::NoSource),
         }
-    }
-
-    fn set_dbus_path(&mut self, path: MaybeDbusPath) {
-        self.thin_pool.set_dbus_path(path.clone());
-        self.dbus_path = path
-    }
-
-    fn get_dbus_path(&self) -> &MaybeDbusPath {
-        &self.dbus_path
     }
 
     fn has_cache(&self) -> bool {

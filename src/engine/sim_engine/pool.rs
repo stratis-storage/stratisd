@@ -19,15 +19,13 @@ use devicemapper::{Sectors, IEC};
 use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
-        event::get_engine_listener_list,
         shared::init_cache_idempotent_or_err,
         sim_engine::{blockdev::SimDev, filesystem::SimFilesystem, randomization::Randomizer},
         structures::Table,
         types::{
-            BlockDevTier, CreateAction, DevUuid, FilesystemUuid, KeyDescription, MaybeDbusPath,
-            Name, PoolUuid, Redundancy, RenameAction, SetCreateAction, SetDeleteAction,
+            BlockDevTier, CreateAction, DevUuid, FilesystemUuid, KeyDescription, Name, PoolUuid,
+            Redundancy, RenameAction, SetCreateAction, SetDeleteAction,
         },
-        EngineEvent,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -45,7 +43,6 @@ pub struct SimPool {
     filesystems: Table<SimFilesystem>,
     redundancy: Redundancy,
     rdm: Rc<RefCell<Randomizer>>,
-    dbus_path: MaybeDbusPath,
 }
 
 impl SimPool {
@@ -69,7 +66,6 @@ impl SimPool {
                 filesystems: Table::default(),
                 redundancy,
                 rdm: Rc::clone(rdm),
-                dbus_path: MaybeDbusPath(None),
             },
         )
     }
@@ -279,18 +275,12 @@ impl Pool for SimPool {
         uuid: FilesystemUuid,
         new_name: &str,
     ) -> StratisResult<RenameAction<FilesystemUuid>> {
-        let old_name = rename_filesystem_pre_idem!(self; uuid; new_name);
+        rename_filesystem_pre_idem!(self; uuid; new_name);
 
         let (_, filesystem) = self
             .filesystems
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.filesystems.get_by_uuid() returned a value");
-
-        get_engine_listener_list().notify(&EngineEvent::FilesystemRenamed {
-            dbus_path: filesystem.get_dbus_path(),
-            from: &*old_name,
-            to: &*new_name,
-        });
 
         self.filesystems
             .insert(Name::new(new_name.to_owned()), uuid, filesystem);
@@ -303,7 +293,7 @@ impl Pool for SimPool {
         _pool_uuid: PoolUuid,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<CreateAction<(FilesystemUuid, &mut dyn Filesystem)>> {
+    ) -> StratisResult<CreateAction<(FilesystemUuid, &dyn Filesystem)>> {
         if self.filesystems.contains_name(snapshot_name) {
             return Ok(CreateAction::Identity);
         }
@@ -322,10 +312,7 @@ impl Pool for SimPool {
             .insert(Name::new(snapshot_name.to_owned()), uuid, snapshot);
         Ok(CreateAction::Created((
             uuid,
-            self.filesystems
-                .get_mut_by_uuid(uuid)
-                .expect("just inserted")
-                .1,
+            self.filesystems.get_by_uuid(uuid).expect("just inserted").1,
         )))
     }
 
@@ -423,14 +410,6 @@ impl Pool for SimPool {
                 }
             },
         ))
-    }
-
-    fn set_dbus_path(&mut self, path: MaybeDbusPath) {
-        self.dbus_path = path
-    }
-
-    fn get_dbus_path(&self) -> &MaybeDbusPath {
-        &self.dbus_path
     }
 
     fn has_cache(&self) -> bool {

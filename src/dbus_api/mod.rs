@@ -9,10 +9,9 @@ mod api;
 mod blockdev;
 mod connection;
 mod consts;
-mod event_handler;
 mod filesystem;
 mod pool;
 mod types;
 mod util;
 
-pub use self::{connection::DbusConnectionData, event_handler::EventHandler};
+pub use self::connection::DbusConnectionData;

@@ -11,7 +11,6 @@ use devicemapper::DmNameBuf;
 use crate::{
     engine::{
         engine::{Eventable, KeyActions},
-        event::get_engine_listener_list,
         shared::create_pool_idempotent_or_err,
         strat_engine::{
             backstore::find_all,
@@ -25,7 +24,7 @@ use crate::{
         },
         structures::Table,
         types::{CreateAction, DeleteAction, DevUuid, RenameAction, ReportType, SetUnlockAction},
-        Engine, EngineEvent, Name, Pool, PoolUuid, Report,
+        Engine, Name, Pool, PoolUuid, Report,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -155,7 +154,7 @@ impl Report for StratEngine {
 }
 
 impl Engine for StratEngine {
-    fn handle_event(&mut self, event: &libudev::Event) -> Option<(Name, PoolUuid, &mut dyn Pool)> {
+    fn handle_event(&mut self, event: &libudev::Event) -> Option<(Name, PoolUuid, &dyn Pool)> {
         if let Some((pool_uuid, pool_name, pool)) =
             self.liminal_devices.block_evaluate(&self.pools, event)
         {
@@ -163,10 +162,7 @@ impl Engine for StratEngine {
             Some((
                 pool_name,
                 pool_uuid,
-                self.pools
-                    .get_mut_by_uuid(pool_uuid)
-                    .expect("just_inserted")
-                    .1 as &mut dyn Pool,
+                self.pools.get_by_uuid(pool_uuid).expect("just_inserted").1 as &dyn Pool,
             ))
         } else {
             None
@@ -256,13 +252,8 @@ impl Engine for StratEngine {
             self.pools.insert(old_name, uuid, pool);
             Err(err)
         } else {
-            get_engine_listener_list().notify(&EngineEvent::PoolRenamed {
-                dbus_path: pool.get_dbus_path(),
-                from: &*old_name,
-                to: &*new_name,
-            });
-
             self.pools.insert(new_name.clone(), uuid, pool);
+
             if let Err(e) = devlinks::pool_renamed(&old_name) {
                 warn!("Pool rename symlink action failed: {}", e)
             };

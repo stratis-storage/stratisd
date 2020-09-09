@@ -4,13 +4,12 @@
 
 pub use self::{
     engine::{BlockDev, Engine, Filesystem, KeyActions, Pool, Report},
-    event::{get_engine_listener_list_mut, EngineEvent, EngineListener},
     sim_engine::SimEngine,
     strat_engine::{StratEngine, BDA},
     types::{
         BlockDevState, BlockDevTier, CreateAction, DeleteAction, DevUuid, EngineAction,
-        FilesystemUuid, MappingCreateAction, MaybeDbusPath, Name, PoolUuid, Redundancy,
-        RenameAction, ReportType, SetCreateAction, SetDeleteAction,
+        FilesystemUuid, MappingCreateAction, Name, PoolUuid, Redundancy, RenameAction, ReportType,
+        SetCreateAction, SetDeleteAction,
     },
 };
 
@@ -19,7 +18,6 @@ mod macros;
 
 #[allow(clippy::module_inception)]
 mod engine;
-mod event;
 mod shared;
 mod sim_engine;
 mod strat_engine;

@@ -15,6 +15,7 @@ use crate::{
 
 mod fetch_properties_2_0;
 mod filesystem_2_0;
+mod filesystem_2_1;
 mod shared;
 
 pub fn create_dbus_filesystem<'a>(
@@ -43,6 +44,15 @@ pub fn create_dbus_filesystem<'a>(
             f.interface(consts::FILESYSTEM_INTERFACE_NAME, ())
                 .add_m(filesystem_2_0::rename_method(&f))
                 .add_p(filesystem_2_0::devnode_property(&f))
+                .add_p(filesystem_2_0::name_property(&f))
+                .add_p(filesystem_2_0::pool_property(&f))
+                .add_p(filesystem_2_0::uuid_property(&f))
+                .add_p(filesystem_2_0::created_property(&f)),
+        )
+        .add(
+            f.interface(consts::FILESYSTEM_INTERFACE_NAME_2_2, ())
+                .add_m(filesystem_2_0::rename_method(&f))
+                .add_p(filesystem_2_1::devnode_property(&f))
                 .add_p(filesystem_2_0::name_property(&f))
                 .add_p(filesystem_2_0::pool_property(&f))
                 .add_p(filesystem_2_0::uuid_property(&f))
@@ -83,6 +93,13 @@ pub fn get_initial_properties(
 ) -> InterfacesAdded {
     initial_properties! {
         consts::FILESYSTEM_INTERFACE_NAME => {
+            consts::FILESYSTEM_NAME_PROP => shared::fs_name_prop(fs_name),
+            consts::FILESYSTEM_UUID_PROP => uuid_to_string!(fs_uuid),
+            consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop(fs, pool_name, fs_name),
+            consts::FILESYSTEM_POOL_PROP => parent.to_owned(),
+            consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop(fs)
+        },
+        consts::FILESYSTEM_INTERFACE_NAME_2_2 => {
             consts::FILESYSTEM_NAME_PROP => shared::fs_name_prop(fs_name),
             consts::FILESYSTEM_UUID_PROP => uuid_to_string!(fs_uuid),
             consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop(fs, pool_name, fs_name),

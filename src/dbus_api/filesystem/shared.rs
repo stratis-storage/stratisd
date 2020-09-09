@@ -4,7 +4,8 @@
 
 use chrono::SecondsFormat;
 use dbus::{
-    tree::{MTFn, Tree},
+    arg::IterAppend,
+    tree::{MTFn, MethodErr, PropInfo, Tree},
     Path,
 };
 
@@ -54,6 +55,25 @@ where
         .get_filesystem(filesystem_uuid)
         .ok_or_else(|| format!("no name for filesystem with uuid {}", &filesystem_uuid))?;
     closure((pool_name, fs_name, fs))
+}
+
+/// Get a filesystem property and place it on the D-Bus. The property is
+/// found by means of the getter method which takes a reference to a
+/// Filesystem and obtains the property from the filesystem.
+pub fn get_filesystem_property<F, R>(
+    i: &mut IterAppend,
+    p: &PropInfo<MTFn<TData>, TData>,
+    getter: F,
+) -> Result<(), MethodErr>
+where
+    F: Fn((Name, Name, &dyn Filesystem)) -> Result<R, String>,
+    R: dbus::arg::Append,
+{
+    i.append(
+        filesystem_operation(p.tree, p.path.get_name(), getter)
+            .map_err(|ref e| MethodErr::failed(e))?,
+    );
+    Ok(())
 }
 
 /// Generate D-Bus representation of name property.

@@ -153,14 +153,14 @@ impl fmt::Display for RawInfo {
 #[derive(Debug, Eq, PartialEq)]
 pub enum DeviceInfo {
     Owned(OwnedDeviceInfo),
-    Unowned,
+    Unowned(RawInfo),
 }
 
 impl fmt::Display for DeviceInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             DeviceInfo::Owned(info) => write!(f, "{}", info),
-            DeviceInfo::Unowned => write!(f, "unowned device"),
+            DeviceInfo::Unowned(info) => write!(f, "unowned device with {}", info),
         }
     }
 }
@@ -222,6 +222,30 @@ fn device_identifiers_wrapper(
                 )
             })
         })
+}
+
+/// Process a device which udev information indicates is unowned
+fn process_unowned_device(dev: &libudev::Device) -> Option<RawInfo> {
+    match dev.devnode() {
+        Some(devnode) => match device_to_devno_wrapper(dev) {
+            Err(err) => {
+                warn!(
+                    "udev identified device {} as a Stratis device but {}, disregarding the device",
+                    devnode.display(),
+                    err
+                );
+                None
+            }
+            Ok(device_number) => Some(RawInfo {
+                device_number,
+                devnode: devnode.to_path_buf(),
+            }),
+        },
+        None => {
+            warn!("udev identified a device as an unowned device, but the udev entry for the device had no device node, disregarding device");
+            None
+        }
+    }
 }
 
 /// Process a device which udev information indicates is a LUKS device.
@@ -424,7 +448,7 @@ pub fn identify_block_device(dev: &libudev::Device) -> Option<DeviceInfo> {
             UdevOwnership::Luks => {
                 process_luks_device(dev).map(|info| DeviceInfo::Owned(OwnedDeviceInfo::Luks(info)))
             }
-            UdevOwnership::Unowned => Some(DeviceInfo::Unowned),
+            UdevOwnership::Unowned => process_unowned_device(dev).map(DeviceInfo::Unowned),
             _ => None,
         },
     }

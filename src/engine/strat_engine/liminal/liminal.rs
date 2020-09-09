@@ -536,7 +536,7 @@ impl LiminalDevices {
             identify_block_device(event.device()).and_then(move |info| {
                 let info = match info {
                     DeviceInfo::Owned(info) => info,
-                    DeviceInfo::Unowned => {
+                    DeviceInfo::Unowned(_) => {
                         if event_type == libudev::EventType::Change {
                             unimplemented!()
                         } else {
@@ -592,7 +592,7 @@ impl LiminalDevices {
             identify_block_device(event.device())
                 .and_then(|info| match info {
                     DeviceInfo::Owned(info) => Some(info),
-                    DeviceInfo::Unowned => None
+                    DeviceInfo::Unowned(_) => None
                 })
                 .and_then(move |info| {
                 let info: LInfo = info.into();

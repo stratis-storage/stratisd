@@ -10,7 +10,7 @@ use serde_json::Value;
 
 use crate::engine::{
     strat_engine::{
-        liminal::identify::{DeviceInfo, LuksInfo, StratisInfo},
+        liminal::identify::{LuksInfo, OwnedDeviceInfo, StratisInfo},
         metadata::StratisIdentifiers,
     },
     types::KeyDescription,
@@ -154,11 +154,11 @@ impl fmt::Display for LInfo {
     }
 }
 
-impl From<DeviceInfo> for LInfo {
-    fn from(info: DeviceInfo) -> LInfo {
+impl From<OwnedDeviceInfo> for LInfo {
+    fn from(info: OwnedDeviceInfo) -> LInfo {
         match info {
-            DeviceInfo::Luks(info) => LInfo::Luks(info.into()),
-            DeviceInfo::Stratis(info) => LInfo::Stratis(info.into()),
+            OwnedDeviceInfo::Luks(info) => LInfo::Luks(info.into()),
+            OwnedDeviceInfo::Stratis(info) => LInfo::Stratis(info.into()),
         }
     }
 }

@@ -132,16 +132,16 @@ impl<'a> Into<Value> for &'a StratisInfo {
 /// An enum type to distinguish between LUKS devices belong to Stratis and
 /// Stratis devices.
 #[derive(Debug, Eq, Hash, PartialEq)]
-pub enum DeviceInfo {
+pub enum OwnedDeviceInfo {
     Luks(LuksInfo),
     Stratis(StratisInfo),
 }
 
-impl fmt::Display for DeviceInfo {
+impl fmt::Display for OwnedDeviceInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            DeviceInfo::Luks(info) => write!(f, "LUKS device description: {}", info),
-            DeviceInfo::Stratis(info) => write!(f, "Stratis device description: {}", info),
+            OwnedDeviceInfo::Luks(info) => write!(f, "LUKS device description: {}", info),
+            OwnedDeviceInfo::Stratis(info) => write!(f, "Stratis device description: {}", info),
         }
     }
 }
@@ -367,7 +367,7 @@ fn identify_stratis_device(dev: &libudev::Device) -> Option<StratisInfo> {
 /// Identify a block device in the context where a udev event has been
 /// captured for some block device. Return None if the device does not
 /// appear to be a Stratis device. Log at an appropriate level on all errors.
-pub fn identify_block_device(dev: &libudev::Device) -> Option<DeviceInfo> {
+pub fn identify_block_device(dev: &libudev::Device) -> Option<OwnedDeviceInfo> {
     let initialized = dev.is_initialized();
     if !initialized {
         debug!("Found a udev entry for a device identified as a block device, but udev also identified it as uninitialized, disregarding the device");
@@ -383,8 +383,8 @@ pub fn identify_block_device(dev: &libudev::Device) -> Option<DeviceInfo> {
             None
         }
         Ok(ownership) => match ownership {
-            UdevOwnership::Stratis => process_stratis_device(dev).map(DeviceInfo::Stratis),
-            UdevOwnership::Luks => process_luks_device(dev).map(DeviceInfo::Luks),
+            UdevOwnership::Stratis => process_stratis_device(dev).map(OwnedDeviceInfo::Stratis),
+            UdevOwnership::Luks => process_luks_device(dev).map(OwnedDeviceInfo::Luks),
             _ => None,
         },
     }

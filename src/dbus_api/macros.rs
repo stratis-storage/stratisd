@@ -43,7 +43,10 @@ macro_rules! get_pool {
             pool
         } else {
             let message = format!("engine does not know about pool with uuid {}", $uuid);
-            let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, message);
+            let (rc, rs) = (
+                $crate::dbus_api::types::DbusErrorEnum::INTERNAL_ERROR as u16,
+                message,
+            );
             return Ok(vec![$message.append3($default, rc, rs)]);
         }
     };

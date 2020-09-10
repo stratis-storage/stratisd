@@ -9,10 +9,11 @@ use dbus::{
 
 use crate::{
     dbus_api::{
+        filesystem::shared::get_name_change_properties,
         types::{DbusErrorEnum, TData},
         util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
     },
-    engine::{FilesystemUuid, RenameAction},
+    engine::{FilesystemUuid, Name, RenameAction},
 };
 
 pub fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -50,11 +51,24 @@ pub fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(RenameAction::Identity) => {
             return_message.append3(default_return, msg_code_ok(), msg_string_ok())
         }
-        Ok(RenameAction::Renamed(uuid)) => return_message.append3(
-            (true, uuid_to_string!(uuid)),
-            msg_code_ok(),
-            msg_string_ok(),
-        ),
+        Ok(RenameAction::Renamed(uuid)) => {
+            let properties_changed = get_name_change_properties(
+                &pool_name,
+                &Name::new(new_name.to_string()),
+                pool.get_filesystem(filesystem_data.uuid)
+                    .expect("already found or could not have been renamed")
+                    .1,
+            );
+            dbus_context
+                .actions
+                .borrow_mut()
+                .push_change(object_path, properties_changed);
+            return_message.append3(
+                (true, uuid_to_string!(uuid)),
+                msg_code_ok(),
+                msg_string_ok(),
+            )
+        }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append3(default_return, rc, rs)

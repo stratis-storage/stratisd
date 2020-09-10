@@ -5,7 +5,8 @@
 use std::path::Path;
 
 use dbus::{
-    arg::{Array, IterAppend},
+    arg::{Array, IterAppend, Variant},
+    ffidisp::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged,
     tree::{MTFn, MethodErr, MethodInfo, MethodResult, PropInfo, Tree},
     Message,
 };
@@ -13,6 +14,7 @@ use dbus::{
 use crate::{
     dbus_api::{
         blockdev::create_dbus_blockdev,
+        consts,
         types::TData,
         util::{
             engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok, option_to_tuple,
@@ -196,4 +198,28 @@ pub fn pool_name_prop(name: &Name) -> String {
 #[inline]
 pub fn pool_enc_prop(pool: &dyn Pool) -> bool {
     pool.is_encrypted()
+}
+
+/// Get the property changed object that should be constructed if a pool name
+/// is changed.
+pub fn get_name_change_properties(pool_name: &Name) -> Vec<PropertiesPropertiesChanged> {
+    let mut properties_changed: Vec<PropertiesPropertiesChanged> = vec![];
+
+    let mut r0_properties = PropertiesPropertiesChanged::default();
+    r0_properties.changed_properties.insert(
+        consts::POOL_NAME_PROP.into(),
+        Variant(Box::new(pool_name_prop(pool_name))),
+    );
+    r0_properties.interface_name = consts::POOL_INTERFACE_NAME.into();
+    properties_changed.push(r0_properties);
+
+    let mut r1_properties = PropertiesPropertiesChanged::default();
+    r1_properties.changed_properties.insert(
+        consts::POOL_NAME_PROP.into(),
+        Variant(Box::new(pool_name_prop(pool_name))),
+    );
+    r1_properties.interface_name = consts::POOL_INTERFACE_NAME.into();
+    properties_changed.push(r1_properties);
+
+    properties_changed
 }

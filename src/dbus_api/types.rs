@@ -13,6 +13,7 @@ use std::{
 
 use dbus::{
     arg::{RefArg, Variant},
+    ffidisp::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged,
     tree::{DataType, MTFn, ObjectPath, Tree},
     Path,
 };
@@ -54,11 +55,12 @@ impl DbusErrorEnum {
 #[derive(Debug)]
 pub enum DeferredAction {
     Add(ObjectPath<MTFn<TData>, TData>, InterfacesAdded),
+    Change(Path<'static>, PropertiesPropertiesChanged),
     Remove(Path<'static>, InterfacesRemoved),
 }
 
 /// Indicates the type of object pointed to by the object path.
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum ObjectPathType {
     Pool,
     Filesystem,
@@ -139,6 +141,21 @@ impl ActionQueue {
     ) {
         self.queue
             .push_back(DeferredAction::Add(object_path, interfaces))
+    }
+
+    /// Push change events associated with a particular pool object path onto
+    /// the queue.
+    pub fn push_change(
+        &mut self,
+        item: &Path<'static>,
+        properties_changed: Vec<PropertiesPropertiesChanged>,
+    ) {
+        self.queue.append(
+            &mut properties_changed
+                .into_iter()
+                .map(|ppc| DeferredAction::Change(item.to_owned(), ppc))
+                .collect(),
+        )
     }
 
     /// Push Remove actions for a path and its immediate descendants. Not

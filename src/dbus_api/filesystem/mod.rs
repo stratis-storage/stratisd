@@ -108,3 +108,5 @@ pub fn get_initial_properties(
         }
     }
 }
+
+pub use shared::get_devnode_change_properties;

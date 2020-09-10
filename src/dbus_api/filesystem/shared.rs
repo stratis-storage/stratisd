@@ -4,13 +4,14 @@
 
 use chrono::SecondsFormat;
 use dbus::{
-    arg::IterAppend,
+    arg::{IterAppend, Variant},
+    ffidisp::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged,
     tree::{MTFn, MethodErr, PropInfo, Tree},
     Path,
 };
 
 use crate::{
-    dbus_api::types::TData,
+    dbus_api::{consts, types::TData},
     engine::{Filesystem, Name},
 };
 
@@ -94,4 +95,55 @@ pub fn fs_devnode_prop(fs: &dyn Filesystem, pool_name: &Name, fs_name: &Name) ->
 #[inline]
 pub fn fs_created_prop(fs: &dyn Filesystem) -> String {
     fs.created().to_rfc3339_opts(SecondsFormat::Secs, true)
+}
+
+/// Get the property changed object that should be constructed if a filesystem
+/// name is changed.
+pub fn get_name_change_properties(
+    pool_name: &Name,
+    fs_name: &Name,
+    fs: &dyn Filesystem,
+) -> Vec<PropertiesPropertiesChanged> {
+    let mut properties_changed: Vec<PropertiesPropertiesChanged> = vec![];
+    let mut r0_properties = PropertiesPropertiesChanged::default();
+    r0_properties.changed_properties.insert(
+        consts::FILESYSTEM_NAME_PROP.into(),
+        Variant(Box::new(fs_name_prop(fs_name))),
+    );
+    r0_properties.interface_name = consts::FILESYSTEM_INTERFACE_NAME.into();
+    properties_changed.push(r0_properties);
+
+    let mut r2_properties = PropertiesPropertiesChanged::default();
+    r2_properties.changed_properties.insert(
+        consts::FILESYSTEM_NAME_PROP.into(),
+        Variant(Box::new(fs_name_prop(fs_name))),
+    );
+    r2_properties.changed_properties.insert(
+        consts::FILESYSTEM_DEVNODE_PROP.into(),
+        Variant(Box::new(fs_devnode_prop(fs, pool_name, fs_name))),
+    );
+    r2_properties.interface_name = consts::FILESYSTEM_INTERFACE_NAME_2_2.into();
+    properties_changed.push(r2_properties);
+
+    properties_changed
+}
+
+/// Get the property changed object that should be constructed if a filesystem
+/// devnode is changed.
+pub fn get_devnode_change_properties(
+    pool_name: &Name,
+    fs_name: &Name,
+    fs: &dyn Filesystem,
+) -> Vec<PropertiesPropertiesChanged> {
+    let mut properties_changed: Vec<PropertiesPropertiesChanged> = vec![];
+
+    let mut r2_properties = PropertiesPropertiesChanged::default();
+    r2_properties.changed_properties.insert(
+        consts::FILESYSTEM_DEVNODE_PROP.into(),
+        Variant(Box::new(fs_devnode_prop(fs, pool_name, fs_name))),
+    );
+    r2_properties.interface_name = consts::FILESYSTEM_INTERFACE_NAME_2_2.into();
+    properties_changed.push(r2_properties);
+
+    properties_changed
 }

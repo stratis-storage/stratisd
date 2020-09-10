@@ -14,9 +14,9 @@ use devicemapper::Sectors;
 use crate::{
     dbus_api::{
         consts::filesystem_interface_list,
-        filesystem::create_dbus_filesystem,
-        pool::shared::{add_blockdevs, BlockDevOp},
-        types::{DbusErrorEnum, TData},
+        filesystem::{create_dbus_filesystem, get_devnode_change_properties},
+        pool::shared::{add_blockdevs, get_name_change_properties, BlockDevOp},
+        types::{DbusErrorEnum, ObjectPathType, TData},
         util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
     },
     engine::{CreateAction, EngineAction, FilesystemUuid, Name, PoolUuid, RenameAction},
@@ -273,11 +273,9 @@ pub fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .expect("implicit argument must be in tree");
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
-    let msg = match dbus_context
-        .engine
-        .borrow_mut()
-        .rename_pool(pool_uuid, new_name)
-    {
+    let mut borrowed_engine = dbus_context.engine.borrow_mut();
+
+    let msg = match borrowed_engine.rename_pool(pool_uuid, new_name) {
         Ok(RenameAction::NoSource) => {
             let error_message = format!("engine doesn't know about pool {}", pool_uuid);
             let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, error_message);
@@ -286,11 +284,44 @@ pub fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(RenameAction::Identity) => {
             return_message.append3(default_return, msg_code_ok(), msg_string_ok())
         }
-        Ok(RenameAction::Renamed(uuid)) => return_message.append3(
-            (true, uuid_to_string!(uuid)),
-            msg_code_ok(),
-            msg_string_ok(),
-        ),
+        Ok(RenameAction::Renamed(uuid)) => {
+            let (pool_name, pool) = borrowed_engine
+                .get_pool(pool_uuid)
+                .expect("pool renamed using pool_uuid above");
+
+            let properties_changed = get_name_change_properties(&pool_name);
+            dbus_context
+                .actions
+                .borrow_mut()
+                .push_change(object_path, properties_changed);
+
+            for opath in m.tree.iter().filter(|opath| {
+                opath.get_data().as_ref().map_or(false, |op_cxt| {
+                    op_cxt.parent == *object_path && op_cxt.op_type == ObjectPathType::Filesystem
+                })
+            }) {
+                let fs_uuid = opath
+                    .get_data()
+                    .as_ref()
+                    .expect("otherwise filtered above")
+                    .uuid;
+
+                let (fs_name, fs) = pool.get_filesystem(fs_uuid)
+                    .expect("any deferred actions resulting from a filesystem or pool removal have been processed already");
+
+                let properties_changed = get_devnode_change_properties(&pool_name, &fs_name, fs);
+                dbus_context
+                    .actions
+                    .borrow_mut()
+                    .push_change(opath.get_name(), properties_changed);
+            }
+
+            return_message.append3(
+                (true, uuid_to_string!(uuid)),
+                msg_code_ok(),
+                msg_string_ok(),
+            )
+        }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append3(default_return, rc, rs)

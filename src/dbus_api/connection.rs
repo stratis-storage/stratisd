@@ -8,6 +8,7 @@ use dbus::{
     ffidisp::{
         stdintf::org_freedesktop_dbus::{
             ObjectManagerInterfacesAdded, ObjectManagerInterfacesRemoved,
+            PropertiesPropertiesChanged,
         },
         BusType, Connection, ConnectionItem, NameFlag, WatchEvent,
     },
@@ -91,6 +92,11 @@ impl DbusConnectionData {
                         warn!("Failed to send a signal on D-Bus object addition: {}", e);
                     }
                 }
+                DeferredAction::Change(path, properties_changed) => {
+                    if let Err(e) = self.properties_changed_signal(path, properties_changed) {
+                        warn!("Failed to send a signal on D-Bus properties changed: {}", e);
+                    }
+                }
                 DeferredAction::Remove(path, interfaces) => {
                     self.connection.unregister_object_path(&path);
                     self.tree.remove(&path);
@@ -154,6 +160,20 @@ impl DbusConnectionData {
                 ObjectManagerInterfacesRemoved { object, interfaces }
                     .to_emit_message(&Path::from(consts::STRATIS_BASE_PATH)),
             )
+            .map(|_| ())
+            .map_err(|_| {
+                dbus::Error::new_failed("Failed to send the requested signal on the D-Bus.")
+            })
+    }
+
+    // Send a PropertiesChanged signal on the D-Bus
+    fn properties_changed_signal(
+        &self,
+        object: Path<'static>,
+        properties: PropertiesPropertiesChanged,
+    ) -> Result<(), dbus::Error> {
+        self.connection
+            .send(properties.to_emit_message(&object))
             .map(|_| ())
             .map_err(|_| {
                 dbus::Error::new_failed("Failed to send the requested signal on the D-Bus.")

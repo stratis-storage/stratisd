@@ -128,8 +128,8 @@ impl DbusConnectionData {
         }
     }
 
-    /// Send an InterfacesAdded signal on the D-Bus
-    pub fn added_object_signal(
+    // Send an InterfacesAdded signal on the D-Bus
+    fn added_object_signal(
         &self,
         object: Path<'static>,
         interfaces: InterfacesAdded,
@@ -146,8 +146,8 @@ impl DbusConnectionData {
             })
     }
 
-    /// Send an InterfacesRemoved signal on the D-Bus
-    pub fn removed_object_signal(
+    // Send an InterfacesRemoved signal on the D-Bus
+    fn removed_object_signal(
         &self,
         object: Path<'static>,
         interfaces: InterfacesRemoved,

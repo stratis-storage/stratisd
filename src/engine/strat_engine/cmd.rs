@@ -179,9 +179,3 @@ pub fn thin_repair(meta_dev: &Path, new_meta_dev: &Path) -> StratisResult<()> {
 pub fn udev_settle() -> StratisResult<()> {
     execute_cmd(Command::new(get_executable(UDEVADM).as_os_str()).arg("settle"))
 }
-
-#[cfg(test)]
-#[allow(dead_code)]
-pub fn xfs_repair(devnode: &Path) -> StratisResult<()> {
-    execute_cmd(Command::new("xfs_repair").arg("-n").arg(devnode))
-}

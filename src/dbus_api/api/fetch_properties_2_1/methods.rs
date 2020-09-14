@@ -11,20 +11,14 @@ use dbus::{
 };
 use itertools::Itertools;
 
-use crate::dbus_api::{api::shared::list_keys, consts, types::TData, util::result_to_tuple};
+use crate::dbus_api::{
+    api::shared::{list_keys, locked_pool_uuids},
+    consts,
+    types::TData,
+    util::result_to_tuple,
+};
 
 const ALL_PROPERTIES: [&str; 2] = [consts::KEY_LIST_PROP, consts::LOCKED_POOL_UUIDS];
-
-pub fn locked_pool_uuids(info: &MethodInfo<MTFn<TData>, TData>) -> Result<Vec<String>, String> {
-    let dbus_context = info.tree.get_data();
-
-    let engine = dbus_context.engine.borrow();
-    Ok(engine
-        .locked_pools()
-        .into_iter()
-        .map(|(u, _)| u.to_simple_ref().to_string())
-        .collect())
-}
 
 fn get_properties_shared(
     m: &MethodInfo<MTFn<TData>, TData>,

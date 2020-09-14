@@ -146,3 +146,14 @@ pub fn set_key_shared(
     };
     Ok(vec![msg])
 }
+
+pub fn locked_pool_uuids(info: &MethodInfo<MTFn<TData>, TData>) -> Result<Vec<String>, String> {
+    let dbus_context = info.tree.get_data();
+
+    let engine = dbus_context.engine.borrow();
+    Ok(engine
+        .locked_pools()
+        .into_iter()
+        .map(|(u, _)| u.to_simple_ref().to_string())
+        .collect())
+}

@@ -10,6 +10,7 @@ arg_map = {
         "--reports=no",
         "--disable=I",
         "--disable=invalid-name",
+        "--ignore=_data.py",  # ignore _data.py because it is auto-generated
         "--msg-template='{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}'",
     ],
     "tests": [

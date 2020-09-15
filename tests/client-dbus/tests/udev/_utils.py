@@ -33,8 +33,8 @@ import pyudev
 # isort: LOCAL
 from stratisd_client_dbus import (
     Blockdev,
-    ManagerR1,
-    MOPoolR1,
+    Manager,
+    MOPool,
     ObjectManager,
     StratisdErrors,
     get_object,
@@ -72,7 +72,7 @@ def create_pool(name, devices, *, key_description=None):
     :rtype: bool * str * list of str
     :raises RuntimeError: if pool is not created
     """
-    (result, exit_code, error_str) = ManagerR1.Methods.CreatePool(
+    (result, exit_code, error_str) = Manager.Methods.CreatePool(
         get_object(TOP_OBJECT),
         {
             "name": name,
@@ -100,14 +100,14 @@ def get_pools(name=None):
     :param name: filter for pool name
     :type name: str or NoneType
     :return: list of pool information found
-    :rtype: list of (str * MOPoolR1)
+    :rtype: list of (str * MOPool)
     """
     managed_objects = ObjectManager.Methods.GetManagedObjects(
         get_object(TOP_OBJECT), {}
     )
 
     return [
-        (op, MOPoolR1(info))
+        (op, MOPool(info))
         for op, info in pools(props={} if name is None else {"Name": name}).search(
             managed_objects
         )
@@ -330,7 +330,7 @@ class KernelKey:
                 temp_file.flush()
 
                 with open(temp_file.name, "r") as fd_for_dbus:
-                    (_, return_code, message) = ManagerR1.Methods.SetKey(
+                    (_, return_code, message) = Manager.Methods.SetKey(
                         get_object(TOP_OBJECT),
                         {
                             "key_desc": key_desc,
@@ -350,7 +350,7 @@ class KernelKey:
     def __exit__(self, exception_type, exception_value, traceback):
         try:
             for (key_desc, _) in reversed(self._key_descs):
-                (_, return_code, message) = ManagerR1.Methods.UnsetKey(
+                (_, return_code, message) = Manager.Methods.UnsetKey(
                     get_object(TOP_OBJECT), {"key_desc": key_desc}
                 )
 

@@ -6,7 +6,11 @@
 
 use std::{cell::RefCell, os::unix::io::AsRawFd, rc::Rc};
 
-use nix::sys::signalfd::{signal, SfdFlags, SigSet, SignalFd};
+use nix::{
+    mount::{mount, MsFlags},
+    sched::{unshare, CloneFlags},
+    sys::signalfd::{signal, SfdFlags, SigSet, SignalFd},
+};
 
 use crate::{
     engine::{Engine, SimEngine, StratEngine},
@@ -17,6 +21,19 @@ use crate::{
         udev_monitor::UdevMonitor,
     },
 };
+
+/// Allow Stratis to mount volumes in a private namespace.
+pub fn unshare_mount_namespace() -> StratisResult<()> {
+    unshare(CloneFlags::CLONE_NEWNS)?;
+    mount::<str, str, str, str>(
+        None,
+        "/run",
+        None,
+        MsFlags::MS_SLAVE | MsFlags::MS_REC,
+        None,
+    )?;
+    Ok(())
+}
 
 // Process any pending signals, return true if SIGINT received.
 // Return an error if there was an error reading the signal.
@@ -67,6 +84,14 @@ fn process_poll(fds: &mut Vec<libc::pollfd>) -> StratisResult<()> {
 /// via buff_log.
 /// If sim is true, start the sim engine rather than the real engine.
 pub fn run(sim: bool) -> StratisResult<()> {
+    if let Err(e) = unshare_mount_namespace() {
+        warn!("Failed to unshare mount namespace: {}", e);
+        warn!(
+            "This may result in internal stratisd mounts being visible \
+            on the host system."
+        );
+    }
+
     // Setup a udev listener before initializing the engine. A device may
     // appear after the engine has processed the udev db, but before it has
     // completed initialization. Unless the udev event has been recorded, the

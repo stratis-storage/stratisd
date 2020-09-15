@@ -14,16 +14,20 @@ use crate::{
         event::get_engine_listener_list,
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         strat_engine::{
+            backstore::CryptHandle,
             cmd::verify_binaries,
             devlinks,
             dm::{get_dm, get_dm_init},
-            keys::StratKeyActions,
+            keys::{MemoryFilesystem, MemoryPrivateFilesystem, StratKeyActions},
             liminal::{find_all, LiminalDevices},
             names::KeyDescription,
             pool::StratPool,
         },
         structures::Table,
-        types::{CreateAction, DeleteAction, DevUuid, RenameAction, ReportType, SetUnlockAction},
+        types::{
+            BlockDevTier, CreateAction, DeleteAction, DevUuid, RenameAction, ReportType,
+            SetUnlockAction, UnlockMethod,
+        },
         Engine, EngineEvent, Name, Pool, PoolUuid, Report,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -45,6 +49,11 @@ pub struct StratEngine {
 
     // Handler for key operations
     key_handler: StratKeyActions,
+
+    // TODO: Remove this code when Clevis supports reading keys from the
+    // kernel keyring.
+    // In memory filesystem for passing keys to Clevis.
+    key_fs: MemoryFilesystem,
 }
 
 impl StratEngine {
@@ -80,6 +89,7 @@ impl StratEngine {
             liminal_devices,
             watched_dev_last_event_nrs: HashMap::new(),
             key_handler: StratKeyActions,
+            key_fs: MemoryFilesystem::new()?,
         })
     }
 
@@ -262,9 +272,76 @@ impl Engine for StratEngine {
         }
     }
 
-    fn unlock_pool(&mut self, pool_uuid: PoolUuid) -> StratisResult<SetUnlockAction<DevUuid>> {
-        let unlocked = self.liminal_devices.unlock_pool(&self.pools, pool_uuid)?;
+    fn unlock_pool(
+        &mut self,
+        pool_uuid: PoolUuid,
+        unlock_method: UnlockMethod,
+    ) -> StratisResult<SetUnlockAction<DevUuid>> {
+        let unlocked = self
+            .liminal_devices
+            .unlock_pool(&self.pools, pool_uuid, unlock_method)?;
         Ok(SetUnlockAction::new(unlocked))
+    }
+
+    fn clevis_bind_pool(
+        &self,
+        pool_uuid: PoolUuid,
+        key_desc: &KeyDescription,
+        tang_url: &str,
+    ) -> StratisResult<()> {
+        if let Some((_, pool)) = self.get_pool(pool_uuid) {
+            let mut rollback_record = Vec::new();
+            let key_fs = MemoryPrivateFilesystem::new()?;
+            for (_uuid, tier, dev) in pool.blockdevs() {
+                if tier == BlockDevTier::Data {
+                    let result = key_fs.key_op(key_desc, |keyfile_path| {
+                        let path = dev.devnode().physical_path();
+                        if let Some(mut handle) = CryptHandle::setup(path)? {
+                            let res = handle
+                                .clevis_bind(keyfile_path, tang_url)
+                                .map_err(StratisError::Crypt);
+                            if res.is_ok() {
+                                rollback_record.push(path);
+                            }
+                            res
+                        } else {
+                            Err(StratisError::Error(format!(
+                                "Failed to acquire cryptsetup context for device {} \
+                                when attempting the clevis binding operation.",
+                                path.display(),
+                            )))
+                        }
+                    });
+                    if result.is_err() {
+                        rollback_record.into_iter().for_each(|path| {
+                            if let Ok(Some(mut handle)) = CryptHandle::setup(path) {
+                                if let Err(e) = handle.clevis_unbind() {
+                                    warn!(
+                                        "Failed to unbind device {} from clevis during \
+                                        rollback: {}",
+                                        path.display(),
+                                        e,
+                                    );
+                                }
+                            } else {
+                                warn!(
+                                    "Failed to acquire cryptsetup context for device {} \
+                                    when rolling back clevis binding operation.",
+                                    path.display(),
+                                );
+                            }
+                        });
+                        return result;
+                    }
+                }
+            }
+            Ok(())
+        } else {
+            Err(StratisError::Engine(
+                ErrorEnum::NotFound,
+                format!("Pool with UUID {} not found", pool_uuid.to_simple_ref()),
+            ))
+        }
     }
 
     fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)> {

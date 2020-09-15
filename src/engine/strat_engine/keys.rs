@@ -20,6 +20,7 @@ use nix::{
         stat::stat,
     },
 };
+use rand::{distributions::Standard, Rng};
 
 use libcryptsetup_rs::{SafeBorrowedMemZero, SafeMemHandle};
 
@@ -413,16 +414,14 @@ impl KeyActions for StratKeyActions {
     }
 }
 
-/// An in-memory filesystem that mounts a tmpfs that can house keyfiles so that they
-/// are never writen to disk. The interface aims to keep the keys in memory for as
-/// short of a period of time as possible (only for the duration of the operation
-/// that the keyfile is needed for).
+/// A top-level tmpfs that can be made a private recursive mount so that any tmpfs
+/// mounts inside of it will not be visible to any process but stratisd.
+#[derive(Debug)]
 pub struct MemoryFilesystem;
 
 impl MemoryFilesystem {
     const TMPFS_LOCATION: &'static str = "/run/stratisd/keyfiles";
 
-    #[allow(dead_code)]
     pub fn new() -> StratisResult<MemoryFilesystem> {
         let tmpfs_path = &Path::new(Self::TMPFS_LOCATION);
         if tmpfs_path.exists() {
@@ -450,33 +449,10 @@ impl MemoryFilesystem {
             Some("tmpfs"),
             Self::TMPFS_LOCATION,
             Some("tmpfs"),
-            MsFlags::MS_PRIVATE,
+            MsFlags::empty(),
             Some("size=1M"),
         )?;
         Ok(MemoryFilesystem)
-    }
-
-    #[allow(dead_code)]
-    pub fn key_op<F>(&mut self, key_desc: &KeyDescription, f: F) -> StratisResult<()>
-    where
-        F: Fn(MemoryMappedKeyfile) -> StratisResult<()>,
-    {
-        let persistent_id = get_persistent_keyring()?;
-        let key_data = if let Some((_, mem)) = read_key(persistent_id, key_desc)? {
-            mem
-        } else {
-            return Err(StratisError::Io(io::Error::new(
-                io::ErrorKind::NotFound,
-                format!(
-                    "Key with given key description {} was not found",
-                    key_desc.as_application_str()
-                ),
-            )));
-        };
-        let mut mem_file_path = PathBuf::from(Self::TMPFS_LOCATION);
-        mem_file_path.push(key_desc.as_application_str());
-        let mem_file = MemoryMappedKeyfile::new(&mem_file_path, key_data)?;
-        f(mem_file)
     }
 }
 
@@ -491,12 +467,112 @@ impl Drop for MemoryFilesystem {
     }
 }
 
+/// An in-memory filesystem that mounts a tmpfs that can house keyfiles so that they
+/// are never writen to disk. The interface aims to keep the keys in memory for as
+/// short of a period of time as possible (only for the duration of the operation
+/// that the keyfile is needed for).
+pub struct MemoryPrivateFilesystem(PathBuf);
+
+impl MemoryPrivateFilesystem {
+    pub fn new() -> StratisResult<MemoryPrivateFilesystem> {
+        let tmpfs_path = &Path::new(MemoryFilesystem::TMPFS_LOCATION);
+        if tmpfs_path.exists() {
+            if !tmpfs_path.is_dir() {
+                return Err(StratisError::Io(io::Error::new(
+                    io::ErrorKind::AlreadyExists,
+                    format!("{} exists and is not a directory", tmpfs_path.display()),
+                )));
+            } else {
+                let stat_info = stat(MemoryFilesystem::TMPFS_LOCATION)?;
+                let mut parent_path = PathBuf::from(MemoryFilesystem::TMPFS_LOCATION);
+                parent_path.push("..");
+                let parent_stat_info = stat(&parent_path)?;
+                if stat_info.st_dev == parent_stat_info.st_dev {
+                    return Err(StratisError::Io(io::Error::new(
+                        io::ErrorKind::NotFound,
+                        format!(
+                            "No mount found at {} which is required to proceed",
+                            tmpfs_path.display(),
+                        ),
+                    )));
+                }
+            }
+        } else {
+            return Err(StratisError::Io(io::Error::new(
+                io::ErrorKind::NotFound,
+                format!("Path {} does not exist", MemoryFilesystem::TMPFS_LOCATION,),
+            )));
+        };
+        let random_string: String = rand::thread_rng()
+            .sample_iter::<char, Standard>(Standard)
+            .take(16)
+            .collect();
+        let mut private_fs_path = PathBuf::from(MemoryFilesystem::TMPFS_LOCATION);
+        private_fs_path.push(random_string);
+        create_dir_all(&private_fs_path)?;
+
+        // Ensure that the original tmpfs mount point is private. This will work
+        // even if someone mounts their own volume at this mount point as the
+        // mount only needs to be private, it does not need to be tmpfs.
+        // The mount directly after this one will also be a tmpfs meaning that
+        // no keys will be written to disk even if this mount turns out to be
+        // a physical device.
+        mount::<str, str, str, str>(
+            None,
+            MemoryFilesystem::TMPFS_LOCATION,
+            None,
+            MsFlags::MS_PRIVATE | MsFlags::MS_REC,
+            None,
+        )?;
+        mount(
+            Some("tmpfs"),
+            &private_fs_path,
+            Some("tmpfs"),
+            MsFlags::empty(),
+            Some("size=1M"),
+        )?;
+        Ok(MemoryPrivateFilesystem(private_fs_path))
+    }
+
+    pub fn key_op<F>(&self, key_desc: &KeyDescription, mut f: F) -> StratisResult<()>
+    where
+        F: FnMut(&Path) -> StratisResult<()>,
+    {
+        let persistent_id = get_persistent_keyring()?;
+        let key_data = if let Some((_, mem)) = read_key(persistent_id, key_desc)? {
+            mem
+        } else {
+            return Err(StratisError::Io(io::Error::new(
+                io::ErrorKind::NotFound,
+                format!(
+                    "Key with given key description {} was not found",
+                    key_desc.as_application_str()
+                ),
+            )));
+        };
+        let mut mem_file_path = PathBuf::from(&self.0);
+        mem_file_path.push(key_desc.as_application_str());
+        let mem_file = MemoryMappedKeyfile::new(&mem_file_path, key_data)?;
+        f(mem_file.keyfile_path())
+    }
+}
+
+impl Drop for MemoryPrivateFilesystem {
+    fn drop(&mut self) {
+        if let Err(e) = umount(&self.0) {
+            warn!(
+                "Could not unmount temporary in memory storage for Clevis keyfiles: {}",
+                e
+            );
+        }
+    }
+}
+
 /// Keyfile integration with Clevis for keys so that they are never written to disk.
 /// This struct will handle memory mapping and locking internally to avoid disk usage.
-pub struct MemoryMappedKeyfile(*mut libc::c_void, usize);
+pub struct MemoryMappedKeyfile(*mut libc::c_void, usize, PathBuf);
 
 impl MemoryMappedKeyfile {
-    #[allow(dead_code)]
     pub fn new(file_path: &Path, key_data: SizedKeyMemory) -> StratisResult<MemoryMappedKeyfile> {
         if file_path.exists() {
             return Err(StratisError::Io(io::Error::new(
@@ -523,7 +599,15 @@ impl MemoryMappedKeyfile {
         }?;
         let mut slice = unsafe { slice::from_raw_parts_mut(mem as *mut u8, needed_keyfile_length) };
         slice.write_all(key_data.as_ref())?;
-        Ok(MemoryMappedKeyfile(mem, needed_keyfile_length))
+        Ok(MemoryMappedKeyfile(
+            mem,
+            needed_keyfile_length,
+            file_path.to_owned(),
+        ))
+    }
+
+    pub fn keyfile_path(&self) -> &Path {
+        &self.2
     }
 }
 

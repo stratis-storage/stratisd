@@ -13,7 +13,7 @@ use crate::{
         types::TData,
         util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
     },
-    engine::{DeleteAction, EngineAction, PoolUuid},
+    engine::{DeleteAction, EngineAction, PoolUuid, UnlockMethod},
     stratis::{ErrorEnum, StratisError},
 };
 
@@ -78,7 +78,7 @@ pub fn unlock_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let msg = match dbus_context
         .engine
         .borrow_mut()
-        .unlock_pool(pool_uuid)
+        .unlock_pool(pool_uuid, UnlockMethod::Keyring)
         .map(|v| v.changed())
     {
         Ok(Some(vec)) => {

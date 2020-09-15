@@ -19,7 +19,7 @@ use crate::{
     engine::types::{
         BlockDevPath, BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid,
         KeyDescription, MappingCreateAction, MaybeDbusPath, Name, PoolUuid, RenameAction,
-        ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction,
+        ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, UnlockMethod,
     },
     stratis::StratisResult,
 };
@@ -302,7 +302,20 @@ pub trait Engine: Debug + Report {
     /// in the unlocked state. If some devices are able to be unlocked
     /// and some fail, an error is returned as all devices should be able to
     /// be unlocked if the necessary key is in the keyring.
-    fn unlock_pool(&mut self, uuid: PoolUuid) -> StratisResult<SetUnlockAction<DevUuid>>;
+    fn unlock_pool(
+        &mut self,
+        uuid: PoolUuid,
+        unlock_method: UnlockMethod,
+    ) -> StratisResult<SetUnlockAction<DevUuid>>;
+
+    /// Bind all devices in the given pool to a tang server for automated unlocking
+    /// using clevis.
+    fn clevis_bind_pool(
+        &self,
+        pool_uuid: PoolUuid,
+        key_desc: &KeyDescription,
+        tang_url: &str,
+    ) -> StratisResult<()>;
 
     /// Find the pool designated by uuid.
     fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)>;

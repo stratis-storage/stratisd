@@ -24,6 +24,7 @@ use crate::{
                 crypt::{CryptHandle, CryptInitializer},
             },
             device::blkdev_size,
+            keys::MemoryPrivateFilesystem,
             metadata::{
                 device_identifiers, disown_device, BlockdevSize, MDADataSize, StratisIdentifiers,
                 BDA,
@@ -435,7 +436,7 @@ pub fn initialize_devices(
     devices: Vec<DeviceInfo>,
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
-    key_description: Option<&KeyDescription>,
+    encryption_info: Option<(&KeyDescription, Option<&String>)>,
 ) -> StratisResult<Vec<StratBlockDev>> {
     /// Map a major/minor device number of a physical device
     /// to the corresponding major/minor number of the encrypted
@@ -457,10 +458,20 @@ pub fn initialize_devices(
         pool_uuid: PoolUuid,
         dev_uuid: DevUuid,
         key_description: &KeyDescription,
+        enable_clevis: Option<&String>,
     ) -> StratisResult<(CryptHandle, Device, Sectors)> {
         let mut handle = CryptInitializer::new(physical_path.to_owned(), pool_uuid, dev_uuid)
             .initialize(key_description)?;
         let device_size = handle.logical_device_size()?;
+
+        if let Some(tang_info) = enable_clevis {
+            let mem_fs = MemoryPrivateFilesystem::new()?;
+            mem_fs.key_op(key_description, |key_path| {
+                handle
+                    .clevis_bind(key_path, tang_info)
+                    .map_err(|e| StratisError::Error(e.to_string()))
+            })?;
+        };
 
         map_device_nums(
             &handle
@@ -568,32 +579,33 @@ pub fn initialize_devices(
         dev_info: &DeviceInfo,
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
-        key_description: Option<&KeyDescription>,
+        encryption_info: Option<(&KeyDescription, Option<&String>)>,
     ) -> StratisResult<StratBlockDev> {
         let dev_uuid = Uuid::new_v4();
-        let (maybe_encrypted, devno, blockdev_size) = match key_description {
-            Some(desc) => initialize_encrypted(&dev_info.devnode, pool_uuid, dev_uuid, desc).map(
-                |(handle, devno, devsize)| {
-                    debug!(
-                        "Info on physical device {}, logical device {}",
-                        &dev_info.devnode.display(),
-                        handle
-                            .logical_device_path()
-                            .expect("Initialization must have succeeded")
-                            .display(),
-                    );
-                    debug!(
-                        "Physical device size: {}, logical device size: {}",
-                        dev_info.size,
-                        devsize.bytes(),
-                    );
-                    debug!(
-                        "Physical device numbers: {}, logical device numbers: {}",
-                        dev_info.devno, devno,
-                    );
-                    (MaybeEncrypted::Encrypted(handle), devno, devsize)
-                },
-            )?,
+        let (maybe_encrypted, devno, blockdev_size) = match encryption_info {
+            Some((desc, enable_clevis)) => {
+                initialize_encrypted(&dev_info.devnode, pool_uuid, dev_uuid, desc, enable_clevis)
+                    .map(|(handle, devno, devsize)| {
+                        debug!(
+                            "Info on physical device {}, logical device {}",
+                            &dev_info.devnode.display(),
+                            handle
+                                .logical_device_path()
+                                .expect("Initialization must have succeeded")
+                                .display(),
+                        );
+                        debug!(
+                            "Physical device size: {}, logical device size: {}",
+                            dev_info.size,
+                            devsize.bytes(),
+                        );
+                        debug!(
+                            "Physical device numbers: {}, logical device numbers: {}",
+                            dev_info.devno, devno,
+                        );
+                        (MaybeEncrypted::Encrypted(handle), devno, devsize)
+                    })?
+            }
             None => (
                 MaybeEncrypted::Unencrypted(dev_info.devnode.clone(), pool_uuid),
                 dev_info.devno,
@@ -615,7 +627,7 @@ pub fn initialize_devices(
             dev_uuid,
             (mda_data_size, BlockdevSize::new(blockdev_size)),
             &dev_info.id_wwn,
-            key_description,
+            encryption_info.map(|(kd, _)| kd),
         );
         if blockdev.is_err() {
             clean_up(maybe_encrypted);
@@ -625,12 +637,7 @@ pub fn initialize_devices(
 
     let mut initialized_blockdevs: Vec<StratBlockDev> = Vec::new();
     for dev_info in devices {
-        match initialize_one(
-            &dev_info,
-            pool_uuid,
-            mda_data_size,
-            key_description.as_deref(),
-        ) {
+        match initialize_one(&dev_info, pool_uuid, mda_data_size, encryption_info) {
             Ok(blockdev) => initialized_blockdevs.push(blockdev),
             Err(err) => {
                 if let Err(err) = wipe_blockdevs(&initialized_blockdevs) {
@@ -711,7 +718,7 @@ mod tests {
             dev_infos,
             pool_uuid,
             MDADataSize::default(),
-            key_description,
+            key_description.map(|kd| (kd, None)),
         )?;
 
         if blockdevs.len() != paths.len() {
@@ -982,7 +989,14 @@ mod tests {
             dev_infos.push(new_info);
         }
 
-        if initialize_devices(dev_infos, pool_uuid, MDADataSize::default(), key_desc).is_ok() {
+        if initialize_devices(
+            dev_infos,
+            pool_uuid,
+            MDADataSize::default(),
+            key_desc.map(|kd| (kd, None)),
+        )
+        .is_ok()
+        {
             return Err(Box::new(StratisError::Error(
                 "Initialization should not have succeeded".to_string(),
             )));

@@ -6,6 +6,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
+    fs::File,
     path::Path,
 };
 
@@ -22,7 +23,7 @@ use crate::{
                 crypt::CryptHandle,
                 devices::{initialize_devices, process_and_verify_devices, wipe_blockdevs},
             },
-            metadata::MDADataSize,
+            metadata::{device_identifiers, MDADataSize},
             names::KeyDescription,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
         },
@@ -134,14 +135,14 @@ impl BlockDevMgr {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         mda_data_size: MDADataSize,
-        key_desc: Option<&KeyDescription>,
+        encryption_info: Option<(&KeyDescription, Option<&String>)>,
     ) -> StratisResult<BlockDevMgr> {
         let devices = process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?;
 
         Ok(BlockDevMgr::new(
-            initialize_devices(devices, pool_uuid, mda_data_size, key_desc)?,
+            initialize_devices(devices, pool_uuid, mda_data_size, encryption_info)?,
             None,
-            key_desc,
+            encryption_info.map(|info| info.0),
         ))
     }
 
@@ -166,6 +167,61 @@ impl BlockDevMgr {
         )
     }
 
+    /// Return whether clevis has been enabled for a given pool.
+    ///
+    /// Returns Ok(Some(_)) containing the tang URL if clevis is enabled.
+    /// Returns Ok(None) if clevis is not enabled.
+    fn clevis_enabled(&self, pool_uuid: PoolUuid) -> StratisResult<Option<String>> {
+        // Clevis cannot be enabled on block devices that are not encrypted.
+        if self.key_desc.is_none() {
+            return Ok(None);
+        }
+
+        let mut clevis_info = String::new();
+        for bd in self.block_devs.iter() {
+            let metadata_path = bd.devnode().metadata_path();
+            let mut devnode_file = File::open(metadata_path)?;
+            let identifiers = device_identifiers(&mut devnode_file)?.ok_or_else(|| {
+                StratisError::Error(format!(
+                    "Device {} is not a Stratis device",
+                    metadata_path.display()
+                ))
+            })?;
+            if identifiers.pool_uuid == pool_uuid {
+                let physical_path = bd.devnode().physical_path();
+                if let Some(mut handle) = CryptHandle::setup(physical_path)? {
+                    let clevis_info_next = handle.clevis_info()?;
+                    if let Some(cin) = clevis_info_next {
+                        if clevis_info.is_empty() {
+                            clevis_info = cin;
+                        } else if cin != clevis_info {
+                            return Err(StratisError::Error(
+                                "Clevis metadata is inconsistent; not all devices \
+                                are pointing at the same tang server"
+                                    .to_string(),
+                            ));
+                        }
+                    } else if clevis_info_next.is_none() {
+                        return Err(StratisError::Error(
+                            "Clevis is not enabled on all devices".to_string(),
+                        ));
+                    }
+                } else {
+                    return Err(StratisError::Error(format!(
+                        "Device {} is not an encrypted Stratis device",
+                        physical_path.display(),
+                    )));
+                }
+            }
+        }
+
+        if clevis_info.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(clevis_info))
+        }
+    }
+
     /// Add paths to self.
     /// Return the uuids of all blockdevs corresponding to paths that were
     /// added.
@@ -188,6 +244,7 @@ impl BlockDevMgr {
             ));
         }
 
+        let clevis_enabled = self.clevis_enabled(pool_uuid)?;
         // FIXME: This is a bug. If new devices are added to a pool, and the
         // variable length metadata requires more than the minimum allocated,
         // then the necessary amount must be provided or the data can not be
@@ -196,7 +253,10 @@ impl BlockDevMgr {
             devices,
             pool_uuid,
             MDADataSize::default(),
-            self.key_desc.as_ref(),
+            match self.key_desc.as_ref() {
+                Some(kd) => Some((kd, clevis_enabled.as_ref())),
+                None => None,
+            },
         )?;
         let bdev_uuids = bds.iter().map(|bd| bd.uuid()).collect();
         self.block_devs.extend(bds);
@@ -458,7 +518,7 @@ mod tests {
                 pool_uuid,
                 &paths[..2],
                 MDADataSize::default(),
-                Some(key_desc),
+                Some((key_desc, None)),
             )?;
 
             if bdm.add(pool_uuid, &paths[2..3]).is_err() {
@@ -512,7 +572,7 @@ mod tests {
                 pool_uuid,
                 &paths[..2],
                 MDADataSize::default(),
-                Some(key_desc),
+                Some((key_desc, None)),
             )?;
             Ok((pool_uuid, bdm))
         }

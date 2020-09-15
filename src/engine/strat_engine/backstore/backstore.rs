@@ -176,13 +176,13 @@ impl Backstore {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         mda_data_size: MDADataSize,
-        key_desc: Option<&KeyDescription>,
+        encryption_info: Option<(&KeyDescription, Option<&String>)>,
     ) -> StratisResult<Backstore> {
         let data_tier = DataTier::new(BlockDevMgr::initialize(
             pool_uuid,
             paths,
             mda_data_size,
-            key_desc,
+            encryption_info,
         )?);
 
         Ok(Backstore {

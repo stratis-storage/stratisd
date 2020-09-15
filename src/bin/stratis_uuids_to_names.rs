@@ -14,6 +14,7 @@
 
 use std::{
     collections::HashMap,
+    convert::TryFrom,
     env::args,
     error::Error,
     fmt::{self, Debug, Display},
@@ -48,7 +49,8 @@ lazy_static! {
     // in a 32-bit signed int. -1, which is often used to indicate something
     // unbounded is interpreted by libdbus as a request for its default timeout,
     // which we consider unacceptably small.
-    static ref TIMEOUT: Duration = Duration::from_millis(0x7fff_ffff);
+    static ref TIMEOUT: Duration =
+        Duration::from_millis(TryFrom::try_from(std::i32::MAX).expect("statically verified"));
 }
 
 struct StratisUdevError(Option<String>);

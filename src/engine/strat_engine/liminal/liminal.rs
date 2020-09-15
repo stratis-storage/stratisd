@@ -25,7 +25,7 @@ use crate::{
             pool::StratPool,
         },
         structures::Table,
-        types::{DevUuid, KeyDescription, Name, PoolUuid},
+        types::{DevUuid, KeyDescription, Name, PoolUuid, UnlockMethod},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -82,10 +82,11 @@ impl LiminalDevices {
         &mut self,
         pools: &Table<StratPool>,
         pool_uuid: PoolUuid,
+        unlock_method: UnlockMethod,
     ) -> StratisResult<Vec<DevUuid>> {
-        fn handle_luks(luks_info: &LLuksInfo) -> StratisResult<()> {
+        fn handle_luks(luks_info: &LLuksInfo, unlock_method: UnlockMethod) -> StratisResult<()> {
             if let Some(mut handle) = CryptHandle::setup(&luks_info.ids.devnode)? {
-                handle.activate()?;
+                handle.activate(unlock_method)?;
                 Ok(())
             } else {
                 Err(StratisError::Engine(
@@ -115,7 +116,7 @@ impl LiminalDevices {
                 for (dev_uuid, info) in map.iter() {
                     match info {
                         LInfo::Stratis(_) => (),
-                        LInfo::Luks(ref luks_info) => match handle_luks(luks_info) {
+                        LInfo::Luks(ref luks_info) => match handle_luks(luks_info, unlock_method) {
                             Ok(()) => unlocked.push(*dev_uuid),
                             Err(e) => return Err(e),
                         },

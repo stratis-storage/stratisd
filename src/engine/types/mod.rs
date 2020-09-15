@@ -29,6 +29,13 @@ pub type DevUuid = Uuid;
 pub type FilesystemUuid = Uuid;
 pub type PoolUuid = Uuid;
 
+/// Use Clevis or keyring to unlock LUKS volume.
+#[derive(Clone, Copy)]
+pub enum UnlockMethod {
+    Clevis,
+    Keyring,
+}
+
 /// See Design Doc section 10.2.1 for more details.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BlockDevState {

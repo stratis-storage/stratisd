@@ -42,8 +42,10 @@ const STRATIS_MANAGER_OBJECT: &str = "/org/storage/stratis2";
 const STRATIS_POOL_IFACE: &str = "org.storage.stratis2.pool.r1";
 const STRATIS_FS_IFACE: &str = "org.storage.stratis2.filesystem";
 const DBUS_OM_IFACE: &str = "org.freedesktop.DBus.ObjectManager";
+
 lazy_static! {
-    static ref TIMEOUT: Duration = Duration::new(5, 0);
+    // The value chosen is the maximum timeout permitted for the Stratis CLI
+    static ref TIMEOUT: Duration = Duration::new(1_073_741, 823);
 }
 
 struct StratisUdevError(Option<String>);

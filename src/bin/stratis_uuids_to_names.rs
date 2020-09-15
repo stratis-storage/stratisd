@@ -44,8 +44,11 @@ const STRATIS_FS_IFACE: &str = "org.storage.stratis2.filesystem";
 const DBUS_OM_IFACE: &str = "org.freedesktop.DBus.ObjectManager";
 
 lazy_static! {
-    // The value chosen is the maximum timeout permitted for the Stratis CLI
-    static ref TIMEOUT: Duration = Duration::new(1_073_741, 823);
+    // The value is 2**31 - 1 millisecond, the largest representable value
+    // in a 32-bit signed int. -1, which is often used to indicate something
+    // unbounded is interpreted by libdbus as a request for its default timeout,
+    // which we consider unacceptably small.
+    static ref TIMEOUT: Duration = Duration::from_millis(0x7fff_ffff);
 }
 
 struct StratisUdevError(Option<String>);

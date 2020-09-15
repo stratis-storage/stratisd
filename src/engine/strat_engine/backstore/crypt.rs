@@ -17,8 +17,13 @@ use libcryptsetup_rs::{
 };
 
 use crate::engine::{
-    strat_engine::{keys, metadata::StratisIdentifiers, names::format_crypt_name},
-    types::{KeyDescription, SizedKeyMemory},
+    strat_engine::{
+        cmd::{clevis_luks_bind, clevis_luks_list, clevis_luks_unbind, clevis_luks_unlock},
+        keys,
+        metadata::StratisIdentifiers,
+        names::format_crypt_name,
+    },
+    types::{KeyDescription, SizedKeyMemory, UnlockMethod},
     DevUuid, PoolUuid,
 };
 
@@ -33,6 +38,13 @@ const STRATIS_TOKEN_DEV_UUID_KEY: &str = "device_uuid";
 
 const STRATIS_TOKEN_ID: c_uint = 0;
 const LUKS2_TOKEN_ID: c_uint = 1;
+/// NOTE: Only token IDs 0 and 1 will be used at the time of clevis bindings
+/// so until support for more clevis operations are added, this can be reliably
+/// depended upon as cryptsetup token import will use the next available token ID
+/// which, in this case, is 2.
+/// FIXME: Specify token ID when clevis adds support so that we can rely on this
+/// deterministically as we add other tokens.
+const CLEVIS_LUKS_TOKEN_ID: c_uint = 2;
 
 const LUKS2_TOKEN_TYPE: &str = "luks2-keyring";
 const STRATIS_TOKEN_TYPE: &str = "stratis";
@@ -271,7 +283,7 @@ impl CryptInitializer {
             "Failed to create the Stratis token"
         );
 
-        activate_and_check_device_path(device, key_description, &activation_name)
+        activate_and_check_device_path(device, key_description, &activation_name).map(|_| ())
     }
 
     /// Lay down properly configured LUKS2 metadata on a new physical device
@@ -461,14 +473,67 @@ impl CryptHandle {
         &self.key_description
     }
 
+    /// Get the keyslot associated with the given token ID.
+    pub fn keyslots(&mut self, token_id: c_uint) -> Result<Option<Vec<c_uint>>> {
+        get_keyslot_number(&mut self.device, token_id)
+    }
+
+    /// Get Tang server info for the clevis binding.
+    pub fn clevis_info(&mut self) -> Result<Option<String>> {
+        let mut keyslots = match self.keyslots(CLEVIS_LUKS_TOKEN_ID)? {
+            Some(ks) => ks,
+            None => return Ok(None),
+        };
+        if keyslots.len() != 1 {
+            return Err(LibcryptErr::Other(
+                "clevis token should only correspond to one keyslot".to_string(),
+            ));
+        }
+
+        let keyslot = keyslots.pop().expect("Checked that element exists above");
+        let keyslot_map =
+            clevis_luks_list(&self.physical_path).map_err(|e| LibcryptErr::Other(e.to_string()))?;
+        Ok(keyslot_map.get(&keyslot).map(|s| s.to_owned()))
+    }
+
     /// Activate encrypted Stratis device using the name stored in the
     /// Stratis token
-    pub fn activate(&mut self) -> Result<()> {
-        activate_and_check_device_path(
-            &mut self.device,
-            &self.key_description,
-            &self.name.to_owned(),
-        )
+    pub fn activate(&mut self, unlock_method: UnlockMethod) -> Result<()> {
+        match unlock_method {
+            UnlockMethod::Keyring => activate_and_check_device_path(
+                &mut self.device,
+                &self.key_description,
+                &self.name.to_owned(),
+            ),
+            UnlockMethod::Clevis => clevis_luks_unlock(&self.physical_path, &self.name)
+                .map_err(|e| LibcryptErr::Other(e.to_string())),
+        }
+    }
+
+    /// Bind the given device to a tang server using clevis.
+    pub fn clevis_bind(&mut self, keyfile_path: &Path, tang_url: &str) -> Result<()> {
+        clevis_luks_bind(&self.physical_path, keyfile_path, tang_url)
+            .map_err(|e| LibcryptErr::Other(e.to_string()))
+    }
+
+    /// Bind the given device to a tang server using clevis.
+    pub fn clevis_unbind(&mut self) -> Result<()> {
+        let keyslots = self.keyslots(CLEVIS_LUKS_TOKEN_ID)?.ok_or_else(|| {
+            LibcryptErr::Other(format!(
+                "Token slot {} appears to be empty; could not determine keyslots",
+                CLEVIS_LUKS_TOKEN_ID,
+            ))
+        })?;
+        for keyslot in keyslots {
+            if let Err(e) = clevis_luks_unbind(&self.physical_path, keyslot) {
+                warn!(
+                    "Failed to unbind device {} from Clevis: {}",
+                    self.physical_path.display(),
+                    e,
+                );
+            }
+        }
+        Ok(())
     }
 
     /// Deactivate the device referenced by the current device handle.
@@ -606,40 +671,41 @@ fn activate_and_check_device_path(
 /// Get a list of all keyslots associated with the LUKS2 token.
 /// This is necessary because attempting to destroy an uninitialized
 /// keyslot will result in an error.
-fn get_keyslot_number(device: &mut CryptDevice) -> Result<Vec<c_uint>> {
-    let json = log_on_failure!(
-        device.token_handle().json_get(LUKS2_TOKEN_ID),
-        "Failed to get the JSON LUKS2 keyring token from the assigned keyslot"
-    );
+fn get_keyslot_number(device: &mut CryptDevice, token_id: c_uint) -> Result<Option<Vec<c_uint>>> {
+    let json = match device.token_handle().json_get(token_id) {
+        Ok(j) => j,
+        Err(_) => return Ok(None),
+    };
     let vec = json
         .get(TOKEN_KEYSLOTS_KEY)
         .and_then(|k| k.as_array())
         .ok_or_else(|| LibcryptErr::Other("keyslots value was malformed".to_string()))?;
-    Ok(vec
-        .iter()
-        .filter_map(|int_val| {
-            let as_str = int_val.as_str();
-            if as_str.is_none() {
-                warn!(
-                    "Discarding invalid value in LUKS2 token keyslot array: {}",
-                    int_val
-                );
-            }
-            let s = match as_str {
-                Some(s) => s,
-                None => return None,
-            };
-            let as_c_uint = s.parse::<c_uint>();
-            if let Err(ref e) = as_c_uint {
-                warn!(
-                    "Discarding invalid value in LUKS2 token keyslot array: {}; \
+    Ok(Some(
+        vec.iter()
+            .filter_map(|int_val| {
+                let as_str = int_val.as_str();
+                if as_str.is_none() {
+                    warn!(
+                        "Discarding invalid value in LUKS2 token keyslot array: {}",
+                        int_val
+                    );
+                }
+                let s = match as_str {
+                    Some(s) => s,
+                    None => return None,
+                };
+                let as_c_uint = s.parse::<c_uint>();
+                if let Err(ref e) = as_c_uint {
+                    warn!(
+                        "Discarding invalid value in LUKS2 token keyslot array: {}; \
                     failed to convert it to an integer: {}",
-                    s, e,
-                );
-            }
-            as_c_uint.ok()
-        })
-        .collect::<Vec<_>>())
+                        s, e,
+                    );
+                }
+                as_c_uint.ok()
+            })
+            .collect::<Vec<_>>(),
+    ))
 }
 
 /// Deactivate an encrypted Stratis device but do not wipe it. This is not
@@ -678,9 +744,9 @@ fn ceiling_sector_size_alignment(bytes: u64) -> u64 {
 /// This method is idempotent and leaves the disk as wiped.
 fn ensure_wiped(device: &mut CryptDevice, physical_path: &Path, name: &str) -> Result<()> {
     ensure_inactive(device, name)?;
-    let keyslot_number = get_keyslot_number(device);
+    let keyslot_number = get_keyslot_number(device, LUKS2_TOKEN_ID);
     match keyslot_number {
-        Ok(nums) => {
+        Ok(Some(nums)) => {
             for i in nums.iter() {
                 log_on_failure!(
                     device.keyslot_handle().destroy(*i),
@@ -688,6 +754,11 @@ fn ensure_wiped(device: &mut CryptDevice, physical_path: &Path, name: &str) -> R
                     i
                 );
             }
+        }
+        Ok(None) => {
+            return Err(LibcryptErr::Other(
+                "Token ID for keyslots to be wiped appears to be empty".to_string(),
+            ))
         }
         Err(e) => {
             info!(
@@ -1126,7 +1197,7 @@ mod tests {
 
             handle.deactivate()?;
 
-            handle.activate()?;
+            handle.activate(UnlockMethod::Keyring)?;
             handle.wipe()?;
 
             Ok(())

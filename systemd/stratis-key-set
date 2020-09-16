@@ -15,5 +15,5 @@ if [ $? != 0 ]; then
 fi
 
 if [ -n "$KEY_DESC" ]; then
-	plymouth ask-for-password --command="stratis-min key set --no-tty --capture-key $KEY_DESC" --prompt="Enter root filesystem password"
+	systemd-ask-password --no-tty | stratis-min key set --no-tty --capture-key $KEY_DESC
 fi

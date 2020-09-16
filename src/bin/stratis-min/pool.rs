@@ -155,6 +155,7 @@ fn add_blockdevs(name: &str, blockdevs: &[&Path], tier: BlockDevTier) -> Stratis
     }
 }
 
+#[allow(clippy::cast_precision_loss)]
 fn to_suffix_repr(size: u64) -> String {
     SUFFIXES.iter().fold(String::new(), |acc, (div, suffix)| {
         let div_shifted = 1 << div;

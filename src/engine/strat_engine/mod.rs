@@ -8,6 +8,7 @@ mod device;
 mod devlinks;
 mod dm;
 mod engine;
+mod flock;
 mod keys;
 mod liminal;
 mod metadata;

@@ -23,8 +23,8 @@ install() {
     inst_multiple $systemdutildir/system-generators/stratis-rootfs-prompt-generator \
 	    $systemdutildir/system-generators/stratis-setup-generator \
 	    $systemdutildir/stratis-key-set \
-	    $systemdutildir/system/systemd-ask-password-plymouth.service \
-	    $systemdutildir/system/systemd-ask-password-plymouth.path \
+	    $systemdutildir/system/systemd-ask-password-console.service \
+	    $systemdutildir/system/systemd-ask-password-console.path \
 	    systemd-ask-password \
 	    systemd-tty-ask-password-agent
 

@@ -16,8 +16,10 @@ fn unit_template(uuids: Vec<PathBuf>, pool_uuid: Uuid) -> String {
     format!(
         r"[Unit]
 Description=prompt for root filesystem password
-Requires=plymouth-start.service
-After=plymouth-start.service
+DefaultDependencies=no
+Conflicts=shutdown.target
+After=paths.target systemd-ask-password-plymouth.service systemd-ask-password-console.service
+Before=initrd.target
 {}
 {}
 
@@ -25,6 +27,7 @@ After=plymouth-start.service
 Type=oneshot
 Environment='STRATIS_ROOTFS_UUID={}'
 ExecStart=/usr/lib/systemd/stratis-key-set
+RemainAfterExit=yes
 ",
         format!("Requires={}", devices.join(" ")),
         format!("After={}", devices.join(" ")),

@@ -4,7 +4,7 @@
 
 use std::{
     fs::File,
-    os::unix::io::AsRawFd,
+    os::unix::io::{AsRawFd, RawFd},
     path::{Path, PathBuf},
 };
 
@@ -14,39 +14,63 @@ use crate::stratis::StratisResult;
 
 #[allow(dead_code)]
 pub enum DevFlockFlags {
-    Ex,
-    ExNB,
-    Sh,
-    ShNB,
+    Exclusive,
+    ExclusiveNonblock,
+    Shared,
+    SharedNonblock,
 }
 
-pub struct DevFlock(File, PathBuf);
+enum MaybeFile {
+    File(File, PathBuf),
+    Fd(RawFd),
+}
+
+pub struct DevFlock(MaybeFile);
 
 impl DevFlock {
     #[allow(dead_code)]
     pub fn new(dev_path: &Path, flag: DevFlockFlags) -> StratisResult<DevFlock> {
         let file = File::open(dev_path)?;
-        flock(
-            file.as_raw_fd(),
+        DevFlock::flock(file.as_raw_fd(), flag)?;
+        Ok(DevFlock(MaybeFile::File(file, dev_path.to_owned())))
+    }
+
+    #[allow(dead_code)]
+    pub fn new_from_fd(fd: RawFd, flag: DevFlockFlags) -> StratisResult<DevFlock> {
+        DevFlock::flock(fd, flag)?;
+        Ok(DevFlock(MaybeFile::Fd(fd)))
+    }
+
+    fn flock(fd: RawFd, flag: DevFlockFlags) -> StratisResult<()> {
+        Ok(flock(
+            fd,
             match flag {
-                DevFlockFlags::Ex => FlockArg::LockExclusive,
-                DevFlockFlags::ExNB => FlockArg::LockExclusiveNonblock,
-                DevFlockFlags::Sh => FlockArg::LockShared,
-                DevFlockFlags::ShNB => FlockArg::LockSharedNonblock,
+                DevFlockFlags::Exclusive => FlockArg::LockExclusive,
+                DevFlockFlags::ExclusiveNonblock => FlockArg::LockExclusiveNonblock,
+                DevFlockFlags::Shared => FlockArg::LockShared,
+                DevFlockFlags::SharedNonblock => FlockArg::LockSharedNonblock,
             },
-        )?;
-        Ok(DevFlock(file, dev_path.to_owned()))
+        )?)
     }
 }
 
 impl Drop for DevFlock {
     fn drop(&mut self) {
-        if let Err(e) = flock(self.0.as_raw_fd(), FlockArg::Unlock) {
-            warn!(
-                "Failed to remove advisory lock on device {}: {}",
-                self.1.display(),
-                e,
-            );
+        if let MaybeFile::File(ref file, ref path) = self.0 {
+            if let Err(e) = flock(file.as_raw_fd(), FlockArg::Unlock) {
+                warn!(
+                    "Failed to remove advisory lock on device {}: {}",
+                    path.display(),
+                    e,
+                );
+            }
+        } else if let MaybeFile::Fd(fd) = self.0 {
+            if let Err(e) = flock(fd, FlockArg::Unlock) {
+                warn!(
+                    "Failed to remove advisory lock on file descriptor {}: {}",
+                    fd, e,
+                );
+            }
         }
     }
 }

@@ -14,7 +14,7 @@
 
 use std::{
     collections::HashMap,
-    convert::TryFrom,
+    convert::TryInto,
     env::args,
     error::Error,
     fmt::{self, Debug, Display},
@@ -28,6 +28,7 @@ use dbus::{
     Path,
 };
 use lazy_static::lazy_static;
+use libdbus_sys::DBUS_TIMEOUT_INFINITE;
 use regex::Regex;
 use uuid::Uuid;
 
@@ -45,12 +46,11 @@ const STRATIS_FS_IFACE: &str = "org.storage.stratis2.filesystem";
 const DBUS_OM_IFACE: &str = "org.freedesktop.DBus.ObjectManager";
 
 lazy_static! {
-    // The value is 2**31 - 1 millisecond, the largest representable value
-    // in a 32-bit signed int. -1, which is often used to indicate something
-    // unbounded is interpreted by libdbus as a request for its default timeout,
-    // which we consider unacceptably small.
-    static ref TIMEOUT: Duration =
-        Duration::from_millis(TryFrom::try_from(std::i32::MAX).expect("statically verified"));
+    static ref TIMEOUT: Duration = Duration::from_millis(
+        DBUS_TIMEOUT_INFINITE
+            .try_into()
+            .expect("statically verified")
+    );
 }
 
 struct StratisUdevError(Option<String>);

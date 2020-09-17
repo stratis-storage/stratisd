@@ -74,3 +74,38 @@ impl Drop for DevFlock {
         }
     }
 }
+
+#[allow(dead_code)]
+pub enum RecursiveFlock {
+    Flock {
+        lock: DevFlock,
+        sublock: Box<RecursiveFlock>,
+    },
+    Base,
+}
+
+impl RecursiveFlock {
+    #[allow(dead_code)]
+    fn new(
+        path: &Path,
+        sublock: RecursiveFlock,
+        flag: DevFlockFlags,
+    ) -> StratisResult<RecursiveFlock> {
+        Ok(RecursiveFlock::Flock {
+            lock: DevFlock::new(path, flag)?,
+            sublock: Box::new(sublock),
+        })
+    }
+
+    #[allow(dead_code)]
+    fn new_from_fd(
+        fd: RawFd,
+        sublock: RecursiveFlock,
+        flag: DevFlockFlags,
+    ) -> StratisResult<RecursiveFlock> {
+        Ok(RecursiveFlock::Flock {
+            lock: DevFlock::new_from_fd(fd, flag)?,
+            sublock: Box::new(sublock),
+        })
+    }
+}

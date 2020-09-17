@@ -14,6 +14,7 @@
 
 use std::{
     collections::HashMap,
+    convert::TryInto,
     env::args,
     error::Error,
     fmt::{self, Debug, Display},
@@ -27,6 +28,7 @@ use dbus::{
     Path,
 };
 use lazy_static::lazy_static;
+use libdbus_sys::DBUS_TIMEOUT_INFINITE;
 use regex::Regex;
 use uuid::Uuid;
 
@@ -42,8 +44,13 @@ const STRATIS_MANAGER_OBJECT: &str = "/org/storage/stratis2";
 const STRATIS_POOL_IFACE: &str = "org.storage.stratis2.pool.r1";
 const STRATIS_FS_IFACE: &str = "org.storage.stratis2.filesystem";
 const DBUS_OM_IFACE: &str = "org.freedesktop.DBus.ObjectManager";
+
 lazy_static! {
-    static ref TIMEOUT: Duration = Duration::new(5, 0);
+    static ref TIMEOUT: Duration = Duration::from_millis(
+        DBUS_TIMEOUT_INFINITE
+            .try_into()
+            .expect("statically verified")
+    );
 }
 
 struct StratisUdevError(Option<String>);

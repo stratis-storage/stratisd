@@ -164,6 +164,10 @@ pub trait Pool: Debug {
         tier: BlockDevTier,
     ) -> StratisResult<SetCreateAction<DevUuid>>;
 
+    /// Bind all devices in the given pool to a tang server for automated unlocking
+    /// using clevis.
+    fn clevis_bind(&self, key_desc: &KeyDescription, tang_url: &str) -> StratisResult<()>;
+
     /// Ensures that all designated filesystems are gone from pool.
     /// Returns a list of the filesystems found, and actually destroyed.
     /// This list will be a subset of the uuids passed in fs_uuids.
@@ -306,15 +310,6 @@ pub trait Engine: Debug + Report {
         uuid: PoolUuid,
         unlock_method: UnlockMethod,
     ) -> StratisResult<SetUnlockAction<DevUuid>>;
-
-    /// Bind all devices in the given pool to a tang server for automated unlocking
-    /// using clevis.
-    fn clevis_bind_pool(
-        &self,
-        pool_uuid: PoolUuid,
-        key_desc: &KeyDescription,
-        tang_url: &str,
-    ) -> StratisResult<()>;
 
     /// Find the pool designated by uuid.
     fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)>;

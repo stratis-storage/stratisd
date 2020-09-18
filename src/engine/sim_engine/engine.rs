@@ -186,15 +186,6 @@ impl Engine for SimEngine {
         Ok(SetUnlockAction::empty())
     }
 
-    fn clevis_bind_pool(
-        &self,
-        _pool_uuid: PoolUuid,
-        _key_desc: &KeyDescription,
-        _tang_url: &str,
-    ) -> StratisResult<()> {
-        Ok(())
-    }
-
     fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)> {
         get_pool!(self; uuid)
     }

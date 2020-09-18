@@ -430,6 +430,26 @@ impl Pool for StratPool {
         Ok(())
     }
 
+    fn clevis_unbind(&self) -> StratisResult<()> {
+        for (_uuid, tier, dev) in self.blockdevs() {
+            if tier == BlockDevTier::Data {
+                let path = dev.devnode().physical_path();
+                if let Some(mut handle) = CryptHandle::setup(path)? {
+                    let res = handle.clevis_unbind().map_err(StratisError::Crypt);
+                    if let Err(ref e) = res {
+                        warn!(
+                            "Failed to unbind from the tang server using clevis: {}. \
+                            This operation cannot be rolled back automatically.",
+                            e,
+                        );
+                    }
+                    res?
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn create_filesystems<'a, 'b>(
         &'a mut self,
         pool_uuid: PoolUuid,

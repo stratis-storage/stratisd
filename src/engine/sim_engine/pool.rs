@@ -272,6 +272,10 @@ impl Pool for SimPool {
         Ok(())
     }
 
+    fn clevis_unbind(&self) -> StratisResult<()> {
+        Ok(())
+    }
+
     fn destroy_filesystems<'a>(
         &'a mut self,
         _pool_name: &str,

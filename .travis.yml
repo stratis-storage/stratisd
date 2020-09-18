@@ -2,7 +2,7 @@
 os: linux
 # use most recent available distro to support installation of crypsetup 2.2.0
 # or above with as little fuss as possible.
-dist: bionic
+dist: focal
 
 addons:
   apt:
@@ -10,6 +10,7 @@ addons:
       - libdbus-1-dev
       - libudev-dev
       - libdbus-glib-1-dev
+      - libblkid-dev
 
 language: rust
 
@@ -23,7 +24,7 @@ before_install:
     "deb http://us.archive.ubuntu.com/ubuntu/ eoan main"
   - sudo apt-get -q update
   # Update to a more recent version of blkid
-  - sudo apt-get -y install util-linux libblkid-dev
+  - sudo apt-get -y install util-linux
   # cryptsetup-bin conflicts with custom built cryptsetup
   - sudo apt-get remove cryptsetup-bin
   - sudo apt-get install -y libargon2-0 libjson-c3

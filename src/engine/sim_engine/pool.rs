@@ -259,6 +259,10 @@ impl Pool for SimPool {
         Ok(SetCreateAction::new(ret_uuids))
     }
 
+    fn clevis_bind(&self, _key_desc: &KeyDescription, _tang_url: &str) -> StratisResult<()> {
+        Ok(())
+    }
+
     fn destroy_filesystems<'a>(
         &'a mut self,
         _pool_name: &str,

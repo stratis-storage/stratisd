@@ -15,7 +15,8 @@ use crate::{
         engine::{BlockDev, Filesystem, Pool},
         shared::init_cache_idempotent_or_err,
         strat_engine::{
-            backstore::{Backstore, StratBlockDev},
+            backstore::{Backstore, CryptHandle, StratBlockDev},
+            keys::MemoryPrivateFilesystem,
             metadata::MDADataSize,
             names::{validate_name, KeyDescription},
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
@@ -378,6 +379,55 @@ impl Pool for StratPool {
                     .map(|(_, bd)| bd.devnode().physical_path().to_owned()),
             )
         }
+    }
+
+    fn clevis_bind(&self, key_desc: &KeyDescription, tang_url: &str) -> StratisResult<()> {
+        let mut rollback_record = Vec::new();
+        let key_fs = MemoryPrivateFilesystem::new()?;
+        for (_uuid, tier, dev) in self.blockdevs() {
+            if tier == BlockDevTier::Data {
+                let result = key_fs.key_op(key_desc, |keyfile_path| {
+                    let path = dev.devnode().physical_path();
+                    if let Some(mut handle) = CryptHandle::setup(path)? {
+                        let res = handle
+                            .clevis_bind(keyfile_path, tang_url)
+                            .map_err(StratisError::Crypt);
+                        if res.is_ok() {
+                            rollback_record.push(path);
+                        }
+                        res
+                    } else {
+                        Err(StratisError::Error(format!(
+                            "Failed to acquire cryptsetup context for device {} \
+                            when attempting the clevis binding operation.",
+                            path.display(),
+                        )))
+                    }
+                });
+                if result.is_err() {
+                    rollback_record.into_iter().for_each(|path| {
+                        if let Ok(Some(mut handle)) = CryptHandle::setup(path) {
+                            if let Err(e) = handle.clevis_unbind() {
+                                warn!(
+                                    "Failed to unbind device {} from clevis during \
+                                    rollback: {}",
+                                    path.display(),
+                                    e,
+                                );
+                            }
+                        } else {
+                            warn!(
+                                "Failed to acquire cryptsetup context for device {} \
+                                when rolling back clevis binding operation.",
+                                path.display(),
+                            );
+                        }
+                    });
+                    return result;
+                }
+            }
+        }
+        Ok(())
     }
 
     fn create_filesystems<'a, 'b>(

@@ -66,6 +66,15 @@ pub trait KeyActions {
     fn unset(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>>;
 }
 
+/// An interface for reporting sets of devices that are not formed into pools.
+pub trait DeviceSet {
+    /// Set dbus path associated with the Pool.
+    fn set_dbus_path(&mut self, path: MaybeDbusPath);
+
+    /// Get dbus path associated with the Pool.
+    fn get_dbus_path(&self) -> &MaybeDbusPath;
+}
+
 /// An interface for reporting internal engine state.
 pub trait Report {
     fn get_report(&self, report_type: ReportType) -> Value;
@@ -323,6 +332,12 @@ pub trait Engine: Debug + Report {
 
     /// Get mutable references to all pools belonging to this engine.
     fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut dyn Pool)>;
+
+    /// Get all device sets belonging to this engine.
+    fn device_sets(&self) -> Vec<(PoolUuid, &dyn DeviceSet)>;
+
+    /// Get all device sets belonging to this engine.
+    fn device_sets_mut(&mut self) -> Vec<(PoolUuid, &mut dyn DeviceSet)>;
 
     /// If the engine would like to include an event in the message loop, it
     /// may return an Eventable from this method.

@@ -24,7 +24,7 @@ use crate::{
         },
         structures::Table,
         types::{CreateAction, DeleteAction, DevUuid, RenameAction, ReportType, SetUnlockAction},
-        Engine, EngineEvent, Name, Pool, PoolUuid, Report,
+        DeviceSet, Engine, EngineEvent, Name, Pool, PoolUuid, Report,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -302,6 +302,14 @@ impl Engine for StratEngine {
             .iter_mut()
             .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &mut dyn Pool))
             .collect()
+    }
+
+    fn device_sets(&self) -> Vec<(PoolUuid, &dyn DeviceSet)> {
+        vec![]
+    }
+
+    fn device_sets_mut(&mut self) -> Vec<(PoolUuid, &mut dyn DeviceSet)> {
+        vec![]
     }
 
     fn get_eventable(&self) -> Option<&'static dyn Eventable> {

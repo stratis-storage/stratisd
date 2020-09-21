@@ -38,6 +38,7 @@ impl<'a> UdevMonitor<'a> {
         while let Some(event) = self.socket.receive_event() {
             if let Some((pool_name, pool_uuid, pool)) = engine.handle_event(&event) {
                 dbus_support.register_pool(&pool_name, pool_uuid, pool);
+                // FIXME: also register device sets here, if any pop up
             }
         }
     }

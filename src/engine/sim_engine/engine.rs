@@ -15,7 +15,7 @@ use serde_json::{json, Value};
 
 use crate::{
     engine::{
-        engine::{Engine, Eventable, KeyActions, Pool, Report},
+        engine::{DeviceSet, Engine, Eventable, KeyActions, Pool, Report},
         event::get_engine_listener_list,
         shared::create_pool_idempotent_or_err,
         sim_engine::{keys::SimKeyActions, pool::SimPool, randomization::Randomizer},
@@ -214,6 +214,14 @@ impl Engine for SimEngine {
             .iter_mut()
             .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &mut dyn Pool))
             .collect()
+    }
+
+    fn device_sets(&self) -> Vec<(PoolUuid, &dyn DeviceSet)> {
+        vec![]
+    }
+
+    fn device_sets_mut(&mut self) -> Vec<(PoolUuid, &mut dyn DeviceSet)> {
+        vec![]
     }
 
     fn get_eventable(&self) -> Option<&'static dyn Eventable> {

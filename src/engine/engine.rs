@@ -285,10 +285,18 @@ pub trait Engine: Debug + Report {
 
     /// Handle a libudev event.
     /// If the handling action resulted in pool creation, return the pool
-    /// and its UUID.
+    /// and its UUID. If the handling action resulted in the creation of a
+    /// device set, return the device set and its UUID.
     ///
     /// Precondition: the subsystem of the device evented on is "block".
-    fn handle_event(&mut self, event: &libudev::Event) -> Option<(Name, PoolUuid, &mut dyn Pool)>;
+    #[allow(clippy::type_complexity)]
+    fn handle_event(
+        &mut self,
+        event: &libudev::Event,
+    ) -> (
+        Option<(Name, PoolUuid, &mut dyn Pool)>,
+        Option<(PoolUuid, &mut dyn DeviceSet)>,
+    );
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.

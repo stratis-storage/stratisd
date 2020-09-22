@@ -68,10 +68,10 @@ pub trait KeyActions {
 
 /// An interface for reporting sets of devices that are not formed into pools.
 pub trait DeviceSet {
-    /// Set dbus path associated with the Pool.
+    /// Set dbus path associated with the DeviceSet.
     fn set_dbus_path(&mut self, path: MaybeDbusPath);
 
-    /// Get dbus path associated with the Pool.
+    /// Get dbus path associated with the DeviceSet.
     fn get_dbus_path(&self) -> &MaybeDbusPath;
 }
 

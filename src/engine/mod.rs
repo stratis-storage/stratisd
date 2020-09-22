@@ -3,10 +3,10 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 pub use self::{
-    engine::{BlockDev, Engine, Filesystem, KeyActions, Pool, Report, StratKeyActions},
+    engine::{BlockDev, Engine, Filesystem, KeyActions, Pool, Report},
     event::{get_engine_listener_list_mut, EngineEvent, EngineListener},
     sim_engine::SimEngine,
-    strat_engine::{StratEngine, BDA},
+    strat_engine::{StratEngine, StratKeyActions, BDA},
     types::{
         BlockDevState, BlockDevTier, CreateAction, DeleteAction, DevUuid, EngineAction,
         FilesystemUuid, MappingCreateAction, MaybeDbusPath, Name, PoolUuid, Redundancy,

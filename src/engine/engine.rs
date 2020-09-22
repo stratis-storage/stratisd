@@ -15,7 +15,6 @@ use uuid::Uuid;
 
 use devicemapper::{Bytes, Sectors};
 
-pub use crate::engine::strat_engine::StratKeyActions;
 use crate::{
     engine::types::{
         BlockDevPath, BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid,

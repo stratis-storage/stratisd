@@ -9,6 +9,12 @@ use libstratis::{
     stratis::{StratisError, StratisResult},
 };
 
+/// This method sets a key in the kernel keyring. It accepts an optional keyfile path
+/// and if this is not provided, the user is prompted for a passphrase. When `no_tty`
+/// is true, this command assumes that no TTY is available for setting terminal
+/// settings and settings such as `NOECHO` are not set. This option should be
+/// used carefully as it will cause the password to be echoed on the screen if
+/// invoked interactively.
 pub fn key_set(key_desc: &str, keyfile_path: Option<&str>, no_tty: bool) -> StratisResult<()> {
     let ret = match keyfile_path {
         Some(kp) => {

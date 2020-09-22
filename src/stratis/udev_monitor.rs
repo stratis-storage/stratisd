@@ -36,9 +36,15 @@ impl<'a> UdevMonitor<'a> {
     /// data structures if so.
     pub fn handle_events(&mut self, engine: &mut dyn Engine, dbus_support: &mut MaybeDbusSupport) {
         while let Some(event) = self.socket.receive_event() {
-            if let Some((pool_name, pool_uuid, pool)) = engine.handle_event(&event) {
-                dbus_support.register_pool(&pool_name, pool_uuid, pool);
-                // FIXME: also register device sets here, if any pop up
+            match engine.handle_event(&event) {
+                (Some((pool_name, pool_uuid, pool)), None) => {
+                    dbus_support.register_pool(&pool_name, pool_uuid, pool);
+                }
+                (None, Some((pool_uuid, device_set))) => {
+                    dbus_support.register_device_set(pool_uuid, device_set);
+                }
+                (Some(_), Some(_)) => unreachable!("an event on one device should not result both in the creation of a new pool and the creation of a new device set"),
+                (None, None) => {}
             }
         }
     }

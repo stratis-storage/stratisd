@@ -39,7 +39,6 @@ impl MaybeDbusSupport {
     pub fn register_pool(&mut self, _pool_name: &Name, _pool_uuid: PoolUuid, _pool: &mut dyn Pool) {
     }
 
-    #[allow(dead_code)]
     pub fn register_device_set(&mut self, _pool_uuid: PoolUuid, _device_set: &mut dyn DeviceSet) {}
 }
 
@@ -80,7 +79,6 @@ impl MaybeDbusSupport {
         self.handle.register_pool(pool_name, pool_uuid, pool)
     }
 
-    #[allow(dead_code)]
     pub fn register_device_set(&mut self, pool_uuid: PoolUuid, device_set: &mut dyn DeviceSet) {
         self.handle.register_device_set(pool_uuid, device_set)
     }

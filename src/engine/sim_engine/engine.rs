@@ -134,8 +134,15 @@ impl Engine for SimEngine {
         }
     }
 
-    fn handle_event(&mut self, _event: &libudev::Event) -> Option<(Name, PoolUuid, &mut dyn Pool)> {
-        None
+    #[allow(clippy::type_complexity)]
+    fn handle_event(
+        &mut self,
+        _event: &libudev::Event,
+    ) -> (
+        Option<(Name, PoolUuid, &mut dyn Pool)>,
+        Option<(PoolUuid, &mut dyn DeviceSet)>,
+    ) {
+        (None, None)
     }
 
     fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {

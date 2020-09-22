@@ -24,8 +24,9 @@ use crate::{
         sim_engine::{blockdev::SimDev, filesystem::SimFilesystem, randomization::Randomizer},
         structures::Table,
         types::{
-            BlockDevTier, CreateAction, DevUuid, FilesystemUuid, KeyDescription, MaybeDbusPath,
-            Name, PoolUuid, Redundancy, RenameAction, SetCreateAction, SetDeleteAction,
+            BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid, KeyDescription,
+            MaybeDbusPath, Name, PoolUuid, Redundancy, RenameAction, SetCreateAction,
+            SetDeleteAction,
         },
         EngineEvent,
     },
@@ -259,12 +260,16 @@ impl Pool for SimPool {
         Ok(SetCreateAction::new(ret_uuids))
     }
 
-    fn clevis_bind(&self, _key_desc: &KeyDescription, _tang_url: &str) -> StratisResult<()> {
-        Ok(())
+    fn bind_clevis(
+        &self,
+        _key_desc: &KeyDescription,
+        _tang_url: &str,
+    ) -> StratisResult<CreateAction<()>> {
+        Ok(CreateAction::Identity)
     }
 
-    fn clevis_unbind(&self) -> StratisResult<()> {
-        Ok(())
+    fn unbind_clevis(&self) -> StratisResult<DeleteAction<()>> {
+        Ok(DeleteAction::Identity)
     }
 
     fn destroy_filesystems<'a>(

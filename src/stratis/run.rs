@@ -43,7 +43,9 @@ fn process_signal(sfd: &mut SignalFd) -> StratisResult<bool> {
 }
 
 /// Handle blocking the event loop
-fn process_poll(poll_timeout: i32, fds: &mut Vec<libc::pollfd>) -> StratisResult<()> {
+fn process_poll(fds: &mut Vec<libc::pollfd>) -> StratisResult<()> {
+    let poll_timeout = -1i32;
+
     let r = unsafe { libc::poll(fds.as_mut_ptr(), fds.len() as libc::c_ulong, poll_timeout) };
 
     // TODO: refine this behavior.
@@ -65,8 +67,6 @@ fn process_poll(poll_timeout: i32, fds: &mut Vec<libc::pollfd>) -> StratisResult
 /// via buff_log.
 /// If sim is true, start the sim engine rather than the real engine.
 pub fn run(sim: bool) -> StratisResult<()> {
-    let mut dbus_support = MaybeDbusSupport::new();
-
     // Setup a udev listener before initializing the engine. A device may
     // appear after the engine has processed the udev db, but before it has
     // completed initialization. Unless the udev event has been recorded, the
@@ -85,6 +85,8 @@ pub fn run(sim: bool) -> StratisResult<()> {
             Rc::new(RefCell::new(StratEngine::initialize()?))
         }
     };
+
+    let mut dbus_support = MaybeDbusSupport::setup(&engine)?;
 
     /*
     The file descriptor array indexes are:
@@ -172,8 +174,8 @@ pub fn run(sim: bool) -> StratisResult<()> {
             }
         }
 
-        dbus_support.process(&engine, &mut fds, dbus_client_index_start);
+        dbus_support.process(&mut fds, dbus_client_index_start);
 
-        process_poll(dbus_support.poll_timeout(), &mut fds)?;
+        process_poll(&mut fds)?;
     }
 }

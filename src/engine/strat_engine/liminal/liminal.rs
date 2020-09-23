@@ -9,16 +9,15 @@ use std::{
     fmt,
 };
 
-use itertools::Itertools;
 use serde_json::Value;
 
 use crate::{
     engine::{
         engine::Pool,
         strat_engine::{
-            backstore::{identify_block_device, CryptHandle, LuksInfo, StratisInfo},
+            backstore::{identify_block_device, DeviceInfo, LuksInfo, StratisInfo},
             liminal::{
-                device_info::{LInfo, LLuksInfo, LStratisInfo},
+                device_info::{DeviceBag, DeviceSet, LStratisInfo},
                 setup::{get_bdas, get_blockdevs, get_metadata},
             },
             metadata::StratisIdentifiers,
@@ -52,13 +51,10 @@ impl fmt::Display for Destination {
 pub struct LiminalDevices {
     /// Sets of devices which have not been promoted to pools, but which
     /// may still have a chance.
-    errored_pool_devices: HashMap<PoolUuid, HashMap<DevUuid, LInfo>>,
+    errored_pool_devices: HashMap<PoolUuid, DeviceSet>,
     /// Sets of devices which possess some internal contradiction which makes
     /// it impossible for them to be made into sensible pools ever.
-    /// Use a HashSet to store the infos for each pool, as the problem that
-    /// makes the set hopeless may be duplicate device UUIDs, so that a
-    /// map with device UUID keys would not be able to manage all the devices.
-    hopeless_device_sets: HashMap<PoolUuid, HashSet<LInfo>>,
+    hopeless_device_sets: HashMap<PoolUuid, DeviceBag>,
 }
 
 impl LiminalDevices {
@@ -86,31 +82,9 @@ impl LiminalDevices {
         pools: &Table<StratPool>,
         pool_uuid: PoolUuid,
     ) -> StratisResult<Vec<DevUuid>> {
-        fn handle_luks(luks_info: &LLuksInfo) -> StratisResult<()> {
-            if let Some(mut handle) = CryptHandle::setup(&luks_info.ids.devnode)? {
-                handle.activate()?;
-                Ok(())
-            } else {
-                Err(StratisError::Engine(
-                    ErrorEnum::Invalid,
-                    format!(
-                        "Block device {} does not appear to be formatted with
-                        the proper Stratis LUKS2 metadata.",
-                        luks_info.ids.devnode.display(),
-                    ),
-                ))
-            }
-        }
-
         let unlocked = match self.errored_pool_devices.get(&pool_uuid) {
             Some(map) => {
-                // This pattern, a bunch of Stratis devices, none of which
-                // has a LUKS device, should characterize a set of devices
-                // belonging to a pool which is unencrypted.
-                if map.iter().all(|(_, info)| match info {
-                    LInfo::Stratis(info) => info.luks.is_none(),
-                    LInfo::Luks(_) => false,
-                }) {
+                if map.all_unencrypted() {
                     return Err(StratisError::Engine(
                         ErrorEnum::Error,
                         format!(
@@ -120,19 +94,7 @@ impl LiminalDevices {
                     ));
                 }
 
-                let mut unlocked = Vec::new();
-                for (dev_uuid, info) in map.iter() {
-                    match info {
-                        LInfo::Stratis(_) => (),
-                        LInfo::Luks(ref luks_info) => {
-                            match handle_luks(luks_info) {
-                                Ok(()) => unlocked.push(*dev_uuid),
-                                Err(e) => return Err(e),
-                            };
-                        }
-                    };
-                }
-                unlocked
+                map.unlock()?
             }
             None => match pools.get_by_uuid(pool_uuid) {
                 Some((_, pool)) => {
@@ -170,15 +132,7 @@ impl LiminalDevices {
     pub fn locked_pools(&self) -> HashMap<PoolUuid, KeyDescription> {
         self.errored_pool_devices
             .iter()
-            .filter_map(|(pool_uuid, map)| {
-                assert_eq!(
-                    map.iter().map(|(_, info)| info.key_desc()).unique().count(),
-                    1
-                );
-                map.iter()
-                    .next()
-                    .and_then(|(_, info)| info.key_desc().map(|kd| (*pool_uuid, kd.clone())))
-            })
+            .filter_map(|(pool_uuid, map)| map.key_description().map(|kd| (*pool_uuid, kd.clone())))
             .collect()
     }
 
@@ -211,37 +165,32 @@ impl LiminalDevices {
             .filter_map(|pool_uuid| {
                 let luks_infos = luks_devices.remove(pool_uuid);
                 let stratis_infos = stratis_devices.remove(pool_uuid);
-                let mut infos: Vec<LInfo> = stratis_infos
+                let mut infos: Vec<DeviceInfo> = stratis_infos
                     .unwrap_or_else(Vec::new)
                     .drain(..)
-                    .map(|info| LInfo::Stratis(info.into()))
+                    .map(DeviceInfo::Stratis)
                     .chain(
                         luks_infos
                             .unwrap_or_else(Vec::new)
                             .drain(..)
-                            .map(|info| LInfo::Luks(info.into())),
+                            .map(DeviceInfo::Luks),
                     )
                     .collect();
 
-                let mut info_map = Some(HashMap::new());
-                while !infos.is_empty() && info_map.is_some() {
-                    let info: LInfo = infos.pop().expect("!infos.is_empty()");
-                    info_map = match self.process_info_add(info_map.expect("loop condition"), info)
-                    {
-                        Err(mut hopeless) => {
-                            hopeless.extend(infos.drain(..));
-                            self.hopeless_device_sets.insert(*pool_uuid, hopeless);
-                            None
-                        }
-                        Ok(info_map) => Some(info_map),
+                let mut info_map = DeviceSet::new();
+                while !infos.is_empty() && !self.hopeless_device_sets.contains_key(pool_uuid) {
+                    let info: DeviceInfo = infos.pop().expect("!infos.is_empty()");
+                    if let Err(mut hopeless) = info_map.process_info_add(info) {
+                        hopeless.extend(infos.drain(..).map(|x| x.into()));
+                        self.hopeless_device_sets.insert(*pool_uuid, hopeless);
                     }
                 }
 
-                match info_map {
-                    Some(info_map) => self
-                        .try_setup_pool(&table, *pool_uuid, info_map)
-                        .map(|(pool_name, pool)| (pool_name, *pool_uuid, pool)),
-                    None => None,
+                if !self.hopeless_device_sets.contains_key(pool_uuid) {
+                    self.try_setup_pool(&table, *pool_uuid, info_map)
+                        .map(|(pool_name, pool)| (pool_name, *pool_uuid, pool))
+                } else {
+                    None
                 }
             })
             .collect::<Vec<(Name, PoolUuid, StratPool)>>()
@@ -262,7 +211,7 @@ impl LiminalDevices {
         &mut self,
         pools: &Table<StratPool>,
         pool_uuid: PoolUuid,
-        mut infos: HashMap<DevUuid, LInfo>,
+        infos: DeviceSet,
     ) -> Option<(Name, StratPool)> {
         assert!(pools.get_by_uuid(pool_uuid).is_none());
         assert!(self.errored_pool_devices.get(&pool_uuid).is_none());
@@ -276,7 +225,7 @@ impl LiminalDevices {
         fn setup_pool(
             pools: &Table<StratPool>,
             pool_uuid: PoolUuid,
-            infos: &HashMap<DevUuid, LStratisInfo>,
+            infos: &HashMap<DevUuid, &LStratisInfo>,
         ) -> Result<(Name, StratPool), Destination> {
             let bdas = match get_bdas(infos) {
                 Err(err) => Err(
@@ -380,42 +329,15 @@ impl LiminalDevices {
             })
         }
 
-        // If any key descriptions are different, give up promptly.
-        // Even if the key description is overwritten to be correct no change
-        // will be observed by udev so the information stratisd possesses
-        // can not be corrected until functionality is introduced to reload
-        // pools.
-        let key_descriptions = infos
-            .iter()
-            .filter_map(|(_, info)| info.key_desc())
-            .collect::<HashSet<&KeyDescription>>();
-        if key_descriptions.len() > 1 {
-            warn!(
-                "Moving set of devices with pool UUID {} to hopeless sets because some devices reported different key descriptions",
-                pool_uuid.to_simple_ref(),
-            );
-            self.hopeless_device_sets
-                .insert(pool_uuid, infos.drain().map(|(_, info)| info).collect());
-            return None;
-        }
+        let opened = match infos.as_opened_set() {
+            Some(opened) => opened,
+            None => {
+                self.errored_pool_devices.insert(pool_uuid, infos);
+                return None;
+            }
+        };
 
-        if infos.iter().any(|(_, info)| match info {
-            LInfo::Luks(_) => true,
-            LInfo::Stratis(_) => false,
-        }) {
-            self.errored_pool_devices.insert(pool_uuid, infos);
-            return None;
-        }
-
-        let mut infos = infos
-            .drain()
-            .map(|(pool_uuid, info)| match info {
-                LInfo::Luks(_) => unreachable!("otherwise, returned in line above"),
-                LInfo::Stratis(info) => (pool_uuid, info),
-            })
-            .collect();
-
-        let result = setup_pool(pools, pool_uuid, &infos);
+        let result = setup_pool(pools, pool_uuid, &opened);
 
         match result {
             Ok((pool_name, pool)) => {
@@ -431,91 +353,15 @@ impl LiminalDevices {
                     "Attempt to set up pool failed, moving to hopeless devices: {}",
                     err
                 );
-                self.hopeless_device_sets.insert(
-                    pool_uuid,
-                    infos
-                        .drain()
-                        .map(|(_, info)| LInfo::Stratis(info))
-                        .collect(),
-                );
+                self.hopeless_device_sets
+                    .insert(pool_uuid, infos.into_bag());
                 None
             }
             Err(Destination::Errored(err)) => {
                 info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {}", err);
-                self.errored_pool_devices.insert(
-                    pool_uuid,
-                    infos
-                        .drain()
-                        .map(|(pool_uuid, info)| (pool_uuid, LInfo::Stratis(info)))
-                        .collect(),
-                );
+                self.errored_pool_devices.insert(pool_uuid, infos);
                 None
             }
-        }
-    }
-
-    /// Process a device for inclusion in a set of devices.
-    /// If processing was succesful, return the original set, modified.
-    /// If unsuccesful, return the new set to be added to the hopeless
-    /// category.
-    fn process_info_add(
-        &mut self,
-        mut devices: HashMap<DevUuid, LInfo>,
-        info: LInfo,
-    ) -> Result<HashMap<DevUuid, LInfo>, HashSet<LInfo>> {
-        let stratis_identifiers = info.stratis_identifiers();
-        let device_uuid = stratis_identifiers.device_uuid;
-
-        match devices.remove(&device_uuid) {
-            None => {
-                info!(
-                    "Device information {} discovered and inserted into the set for its pool UUID",
-                    info
-                );
-                devices.insert(device_uuid, info);
-                Ok(devices)
-            }
-            Some(removed) => {
-                if removed == info {
-                    devices.insert(device_uuid, info);
-                    Ok(devices)
-                } else {
-                    match LInfo::update(removed, info) {
-                        Err((err, removed, info)) => {
-                            warn!(
-                                "Moving set of devices with pool UUID {} to hopeless sets because {}",
-                                stratis_identifiers.pool_uuid.to_simple_ref(),
-                                err
-                            );
-                            let mut hopeless: HashSet<LInfo> =
-                                devices.drain().map(|(_, info)| info).collect();
-                            hopeless.insert(removed);
-                            hopeless.insert(info);
-                            Err(hopeless)
-                        }
-                        Ok(info) => {
-                            info!(
-                                "Device information {} replaces previous device information for the same device UUID in the set for its pool UUID",
-                                info);
-                            devices.insert(device_uuid, info);
-                            Ok(devices)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    /// Process a device for removal from a set of devices.
-    fn process_info_remove(&mut self, devices: &mut HashMap<DevUuid, LInfo>, info: LInfo) {
-        let stratis_identifiers = info.stratis_identifiers();
-        let device_uuid = stratis_identifiers.device_uuid;
-
-        if let Some(new_info) = devices
-            .remove(&device_uuid)
-            .and_then(|removed| LInfo::update_on_remove(removed, info))
-        {
-            devices.insert(device_uuid, new_info);
         }
     }
 
@@ -533,7 +379,6 @@ impl LiminalDevices {
         let event_type = event.event_type();
         if event_type == libudev::EventType::Add || event_type == libudev::EventType::Change {
             identify_block_device(event.device()).and_then(move |info| {
-                let info: LInfo = info.into();
                 let stratis_identifiers = info.stratis_identifiers();
                 let pool_uuid = stratis_identifiers.pool_uuid;
                 let device_uuid = stratis_identifiers.device_uuid;
@@ -547,22 +392,19 @@ impl LiminalDevices {
                     // included in the pool, but that is less clear.
                     None
                 } else if let Some(mut set) = self.hopeless_device_sets.remove(&pool_uuid) {
-                    set.insert(info);
+                    set.insert(info.into());
                     self.hopeless_device_sets.insert(pool_uuid, set);
                     None
                 } else {
-                    let devices = self
+                    let mut devices = self
                         .errored_pool_devices
                         .remove(&pool_uuid)
-                        .unwrap_or_else(HashMap::new);
+                        .unwrap_or_else(DeviceSet::new);
 
-                    let devices = match self.process_info_add(devices, info) {
-                        Err(hopeless) => {
-                            self.hopeless_device_sets.insert(pool_uuid, hopeless);
-                            return None
-                        }
-                        Ok(devices) => devices,
-                    };
+                    if let Err(hopeless) = devices.process_info_add(info) {
+                        self.hopeless_device_sets.insert(pool_uuid, hopeless);
+                        return None;
+                    }
 
                     // FIXME: An attempt to set up the pool is made, even if no
                     // new device has been added to the set of devices that appear
@@ -579,7 +421,6 @@ impl LiminalDevices {
             })
         } else if event_type == libudev::EventType::Remove {
             identify_block_device(event.device()).and_then(move |info| {
-                let info: LInfo = info.into();
                 let stratis_identifiers = info.stratis_identifiers();
                 let pool_uuid = stratis_identifiers.pool_uuid;
                 let device_uuid = stratis_identifiers.device_uuid;
@@ -591,16 +432,16 @@ impl LiminalDevices {
                     }
                     None
                 } else if let Some(mut set) = self.hopeless_device_sets.remove(&pool_uuid) {
-                    set.remove(&info);
+                    set.remove(&info.into());
                     self.hopeless_device_sets.insert(pool_uuid, set);
                     None
                 } else {
                     let mut devices = self
                         .errored_pool_devices
                         .remove(&pool_uuid)
-                        .unwrap_or_else(HashMap::new);
+                        .unwrap_or_else(DeviceSet::new);
 
-                    self.process_info_remove(&mut devices, info);
+                    devices.process_info_remove(info);
 
                     self.try_setup_pool(pools, pool_uuid, devices)
                         .map(|(name, pool)| (pool_uuid, name, pool))
@@ -621,7 +462,7 @@ impl<'a> Into<Value> for &'a LiminalDevices {
                     .map(|(uuid, map)| {
                         json!({
                             "pool_uuid": uuid.to_simple_ref().to_string(),
-                            "devices": Value::Array(map.values().map(|info| info.into()).collect()),
+                            "devices": <&DeviceSet as Into<Value>>::into(&map),
                         })
                     })
                     .collect(),
@@ -632,7 +473,7 @@ impl<'a> Into<Value> for &'a LiminalDevices {
                     .map(|(uuid, set)| {
                         json!({
                             "pool_uuid": uuid.to_simple_ref().to_string(),
-                            "devices": Value::Array(set.iter().map(|info| info.into()).collect()),
+                            "devices": <&DeviceBag as Into<Value>>::into(&set),
                         })
                     })
                     .collect()

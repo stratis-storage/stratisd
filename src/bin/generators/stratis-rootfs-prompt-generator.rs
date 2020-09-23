@@ -2,14 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use uuid::Uuid;
 
 mod lib;
-
-const SYSTEMD_ASK_PASSWORD_SERVICE_PATH: &str =
-    "/usr/lib/systemd/system/systemd-ask-password-console.service";
 
 fn unit_template(uuids: Vec<PathBuf>, pool_uuid: Uuid) -> String {
     let devices: Vec<_> = uuids
@@ -59,7 +56,5 @@ fn main() -> Result<(), String> {
     let mut path = PathBuf::from(early_dir);
     path.push("stratis-rootfs-prompt.service");
     lib::write_unit_file(&path, file_contents).map_err(|e| e.to_string())?;
-    lib::make_wanted_by_initrd(&path).map_err(|e| e.to_string())?;
-    lib::make_wanted_by_initrd(&Path::new(SYSTEMD_ASK_PASSWORD_SERVICE_PATH))
-        .map_err(|e| e.to_string())
+    lib::make_wanted_by_initrd(&path).map_err(|e| e.to_string())
 }

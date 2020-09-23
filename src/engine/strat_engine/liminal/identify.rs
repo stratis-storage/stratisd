@@ -51,14 +51,12 @@ use devicemapper::Device;
 
 use crate::engine::{
     strat_engine::{
-        backstore::{
-            crypt::CryptHandle,
-            udev::{
-                block_enumerator, decide_ownership, UdevOwnership, CRYPTO_FS_TYPE, FS_TYPE_KEY,
-                STRATIS_FS_TYPE,
-            },
-        },
+        crypt::CryptHandle,
         metadata::{device_identifiers, StratisIdentifiers},
+        udev::{
+            block_enumerator, decide_ownership, UdevOwnership, CRYPTO_FS_TYPE, FS_TYPE_KEY,
+            STRATIS_FS_TYPE,
+        },
     },
     types::{KeyDescription, PoolUuid},
 };
@@ -131,19 +129,55 @@ impl<'a> Into<Value> for &'a StratisInfo {
     }
 }
 
-/// An enum type to distinguish between LUKS devices belong to Stratis and
-/// Stratis devices.
-#[derive(Debug, Eq, Hash, PartialEq)]
+/// Non-Stratis info about a device
+#[derive(Debug, Eq, PartialEq)]
+pub struct RawInfo {
+    pub device_number: Device,
+    pub devnode: PathBuf,
+}
+
+impl fmt::Display for RawInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "device number: \"{}\", devnode: \"{}\"",
+            self.device_number,
+            self.devnode.display()
+        )
+    }
+}
+
+/// A very generic type, to distinguish between devices that have been
+/// identified as belonging in some way to Stratis and those that appear
+/// entirely unowned.
+#[derive(Debug, Eq, PartialEq)]
 pub enum DeviceInfo {
-    Luks(LuksInfo),
-    Stratis(StratisInfo),
+    Owned(OwnedDeviceInfo),
+    Unowned(RawInfo),
 }
 
 impl fmt::Display for DeviceInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            DeviceInfo::Luks(info) => write!(f, "LUKS device description: {}", info),
-            DeviceInfo::Stratis(info) => write!(f, "Stratis device description: {}", info),
+            DeviceInfo::Owned(info) => write!(f, "{}", info),
+            DeviceInfo::Unowned(info) => write!(f, "unowned device with {}", info),
+        }
+    }
+}
+
+/// An enum type to distinguish between LUKS devices belong to Stratis and
+/// Stratis devices.
+#[derive(Debug, Eq, Hash, PartialEq)]
+pub enum OwnedDeviceInfo {
+    Luks(LuksInfo),
+    Stratis(StratisInfo),
+}
+
+impl fmt::Display for OwnedDeviceInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            OwnedDeviceInfo::Luks(info) => write!(f, "LUKS device description: {}", info),
+            OwnedDeviceInfo::Stratis(info) => write!(f, "Stratis device description: {}", info),
         }
     }
 }
@@ -188,6 +222,30 @@ fn device_identifiers_wrapper(
                 )
             })
         })
+}
+
+/// Process a device which udev information indicates is unowned
+fn process_unowned_device(dev: &libudev::Device) -> Option<RawInfo> {
+    match dev.devnode() {
+        Some(devnode) => match device_to_devno_wrapper(dev) {
+            Err(err) => {
+                warn!(
+                    "udev identified device {} as a Stratis device but {}, disregarding the device",
+                    devnode.display(),
+                    err
+                );
+                None
+            }
+            Ok(device_number) => Some(RawInfo {
+                device_number,
+                devnode: devnode.to_path_buf(),
+            }),
+        },
+        None => {
+            warn!("udev identified a device as an unowned device, but the udev entry for the device had no device node, disregarding device");
+            None
+        }
+    }
 }
 
 /// Process a device which udev information indicates is a LUKS device.
@@ -385,13 +443,17 @@ pub fn identify_block_device(dev: &libudev::Device) -> Option<DeviceInfo> {
             None
         }
         Ok(ownership) => match ownership {
-            UdevOwnership::Stratis => process_stratis_device(dev).map(DeviceInfo::Stratis),
-            UdevOwnership::Luks => process_luks_device(dev).map(DeviceInfo::Luks),
+            UdevOwnership::Stratis => process_stratis_device(dev)
+                .map(|info| DeviceInfo::Owned(OwnedDeviceInfo::Stratis(info))),
+            UdevOwnership::Luks => {
+                process_luks_device(dev).map(|info| DeviceInfo::Owned(OwnedDeviceInfo::Luks(info)))
+            }
+            UdevOwnership::Unowned => process_unowned_device(dev).map(DeviceInfo::Unowned),
             _ => None,
         },
     }
     .map(|info| {
-        debug!("Stratis block device with {} identified", info);
+        debug!("block device with {} identified", info);
         info
     })
 }
@@ -430,13 +492,11 @@ mod tests {
 
     use crate::{
         engine::strat_engine::{
-            backstore::{
-                devices::{initialize_devices, process_and_verify_devices},
-                udev::block_device_apply,
-            },
+            backstore::{initialize_devices, process_and_verify_devices},
             cmd::create_fs,
             metadata::MDADataSize,
             tests::{crypt, loopbacked, real},
+            udev::block_device_apply,
         },
         stratis::StratisError,
     };

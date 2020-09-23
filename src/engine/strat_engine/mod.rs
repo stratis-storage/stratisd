@@ -4,6 +4,7 @@
 
 mod backstore;
 mod cmd;
+mod crypt;
 mod device;
 mod devlinks;
 mod dm;
@@ -15,6 +16,7 @@ mod names;
 mod pool;
 mod serde_structs;
 mod thinpool;
+mod udev;
 mod writing;
 
 pub use self::{engine::StratEngine, keys::StratKeyActions, metadata::BDA};

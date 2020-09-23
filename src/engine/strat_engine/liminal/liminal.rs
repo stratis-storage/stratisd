@@ -16,9 +16,10 @@ use crate::{
     engine::{
         engine::Pool,
         strat_engine::{
-            backstore::{identify_block_device, CryptHandle, LuksInfo, StratisInfo},
+            crypt::CryptHandle,
             liminal::{
                 device_info::{LInfo, LLuksInfo, LStratisInfo},
+                identify::{identify_block_device, DeviceInfo, LuksInfo, StratisInfo},
                 setup::{get_bdas, get_blockdevs, get_metadata},
             },
             metadata::StratisIdentifiers,
@@ -533,6 +534,17 @@ impl LiminalDevices {
         let event_type = event.event_type();
         if event_type == libudev::EventType::Add || event_type == libudev::EventType::Change {
             identify_block_device(event.device()).and_then(move |info| {
+                let info = match info {
+                    DeviceInfo::Owned(info) => info,
+                    DeviceInfo::Unowned(info) => {
+                        if event_type == libudev::EventType::Change {
+                            debug!("change event on {}", info);
+                            return None;
+                        } else {
+                            return None;
+                        }
+                    }
+                };
                 let info: LInfo = info.into();
                 let stratis_identifiers = info.stratis_identifiers();
                 let pool_uuid = stratis_identifiers.pool_uuid;
@@ -578,7 +590,12 @@ impl LiminalDevices {
                 }
             })
         } else if event_type == libudev::EventType::Remove {
-            identify_block_device(event.device()).and_then(move |info| {
+            identify_block_device(event.device())
+                .and_then(|info| match info {
+                    DeviceInfo::Owned(info) => Some(info),
+                    DeviceInfo::Unowned(_) => None
+                })
+                .and_then(move |info| {
                 let info: LInfo = info.into();
                 let stratis_identifiers = info.stratis_identifiers();
                 let pool_uuid = stratis_identifiers.pool_uuid;

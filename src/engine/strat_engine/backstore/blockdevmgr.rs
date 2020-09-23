@@ -18,10 +18,10 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::{
-                blockdev::StratBlockDev,
-                crypt::CryptHandle,
-                devices::{initialize_devices, process_and_verify_devices, wipe_blockdevs},
+                blockdev::StratBlockDev, devices::process_and_verify_devices,
+                initialize::initialize_devices,
             },
+            crypt::CryptHandle,
             metadata::MDADataSize,
             names::KeyDescription,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
@@ -106,6 +106,29 @@ pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<TargetLine<LinearDevTargetParam
     }
 
     table
+}
+
+/// Wipe some blockdevs of their identifying headers.
+/// Return an error if any of the blockdevs could not be wiped.
+/// If an error occurs while wiping a blockdev, attempt to wipe all remaining.
+pub fn wipe_blockdevs(blockdevs: &[StratBlockDev]) -> StratisResult<()> {
+    let unerased_devnodes: Vec<_> = blockdevs
+        .iter()
+        .filter_map(|bd| match bd.disown() {
+            Err(_) => Some(bd.devnode().physical_path()),
+            _ => None,
+        })
+        .collect();
+
+    if unerased_devnodes.is_empty() {
+        Ok(())
+    } else {
+        let err_msg = format!(
+            "Failed to wipe already initialized devnodes: {:?}",
+            unerased_devnodes
+        );
+        Err(StratisError::Engine(ErrorEnum::Error, err_msg))
+    }
 }
 
 #[derive(Debug)]

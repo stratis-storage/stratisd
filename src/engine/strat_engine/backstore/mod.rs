@@ -7,17 +7,13 @@ mod backstore;
 mod blockdev;
 mod blockdevmgr;
 mod cache_tier;
-mod crypt;
 mod data_tier;
 mod devices;
-mod identify;
+mod initialize;
 mod range_alloc;
 mod shared;
-mod udev;
 
-pub use self::{
-    backstore::Backstore,
-    blockdev::StratBlockDev,
-    crypt::CryptHandle,
-    identify::{find_all, identify_block_device, DeviceInfo, LuksInfo, StratisInfo},
-};
+pub use self::{backstore::Backstore, blockdev::StratBlockDev};
+
+#[cfg(test)]
+pub use self::{devices::process_and_verify_devices, initialize::initialize_devices};

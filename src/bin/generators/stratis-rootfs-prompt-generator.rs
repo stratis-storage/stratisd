@@ -9,7 +9,7 @@ use uuid::Uuid;
 mod lib;
 
 const SYSTEMD_ASK_PASSWORD_SERVICE_PATH: &str =
-    "/usr/lib/systemd/system/systemd-ask-password-plymouth.service";
+    "/usr/lib/systemd/system/systemd-ask-password-console.service";
 
 fn unit_template(uuids: Vec<PathBuf>, pool_uuid: Uuid) -> String {
     let devices: Vec<_> = uuids

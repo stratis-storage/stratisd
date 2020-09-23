@@ -11,7 +11,7 @@ use dbus::{
 
 use crate::{
     dbus_api::{
-        types::{DbusErrorEnum, TData},
+        types::TData,
         util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
     },
     engine::{CreateAction, DeleteAction, KeyDescription},
@@ -37,15 +37,11 @@ pub fn bind_clevis(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut engine = dbus_context.engine.borrow_mut();
     let (_, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-    let key_desc_typed = match KeyDescription::try_from(key_desc) {
+    let key_desc_typed = match KeyDescription::try_from(&key_desc) {
         Ok(kd) => kd,
         Err(e) => {
-            let msg = return_message.append3(
-                default_return,
-                DbusErrorEnum::ERROR as u16,
-                format!("Invalid key description provided: {}", e),
-            );
-            return Ok(vec![msg]);
+            let (rc, rs) = engine_to_dbus_err_tuple(&e);
+            return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };
     let msg = match pool.bind_clevis(&key_desc_typed, tang_info) {

@@ -18,7 +18,7 @@ fn unit_template(uuids: Vec<PathBuf>, pool_uuid: Uuid) -> String {
 Description=prompt for root filesystem password
 DefaultDependencies=no
 Conflicts=shutdown.target
-After=paths.target systemd-ask-password-plymouth.service systemd-ask-password-console.service
+After=paths.target plymouth-start.service
 Before=initrd.target
 {}
 {}

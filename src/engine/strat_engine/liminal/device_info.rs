@@ -17,7 +17,7 @@ use crate::engine::{
 };
 
 /// Info for a discovered Luks Device belonging to Stratis.
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct LLuksInfo {
     /// Generic information + Stratis identifiers
     pub ids: StratisInfo,
@@ -66,7 +66,7 @@ impl<'a> Into<Value> for &'a LLuksInfo {
 }
 
 /// Info for a Stratis device.
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct LStratisInfo {
     /// Generic information + Stratis identifiers
     pub ids: StratisInfo,

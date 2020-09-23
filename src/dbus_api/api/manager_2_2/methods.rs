@@ -4,8 +4,15 @@
 
 use dbus::tree::{MTFn, MethodInfo, MethodResult};
 
-use crate::dbus_api::{api::shared::set_key_shared, types::TData};
+use crate::dbus_api::{
+    api::shared::{set_key_shared, unlock_pool_shared},
+    types::TData,
+};
 
 pub fn set_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     set_key_shared(m, true)
+}
+
+pub fn unlock_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+    unlock_pool_shared(m, true)
 }

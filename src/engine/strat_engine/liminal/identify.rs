@@ -144,6 +144,13 @@ impl DeviceInfo {
             DeviceInfo::Stratis(info) => info.identifiers,
         }
     }
+
+    pub fn key_description(&self) -> Option<&KeyDescription> {
+        match self {
+            DeviceInfo::Luks(info) => Some(&info.key_description),
+            DeviceInfo::Stratis(_) => None,
+        }
+    }
 }
 
 impl fmt::Display for DeviceInfo {

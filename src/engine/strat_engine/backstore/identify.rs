@@ -139,6 +139,22 @@ pub enum DeviceInfo {
     Stratis(StratisInfo),
 }
 
+impl DeviceInfo {
+    pub fn stratis_identifiers(&self) -> StratisIdentifiers {
+        match self {
+            DeviceInfo::Luks(info) => info.info.identifiers,
+            DeviceInfo::Stratis(info) => info.identifiers,
+        }
+    }
+
+    pub fn key_description(&self) -> Option<&KeyDescription> {
+        match self {
+            DeviceInfo::Luks(info) => Some(&info.key_description),
+            DeviceInfo::Stratis(_) => None,
+        }
+    }
+}
+
 impl fmt::Display for DeviceInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {

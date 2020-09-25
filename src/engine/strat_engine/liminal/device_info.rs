@@ -11,15 +11,12 @@ use std::{
 
 use serde_json::Value;
 
-use crate::{
-    engine::{
-        strat_engine::{
-            backstore::{CryptHandle, DeviceInfo, LuksInfo, StratisInfo},
-            metadata::StratisIdentifiers,
-        },
-        types::{DevUuid, KeyDescription},
+use crate::engine::{
+    strat_engine::{
+        backstore::{DeviceInfo, LuksInfo, StratisInfo},
+        metadata::StratisIdentifiers,
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    types::{DevUuid, KeyDescription},
 };
 
 /// Info for a discovered Luks Device belonging to Stratis.
@@ -414,38 +411,6 @@ impl DeviceSet {
             .iter()
             .filter_map(|(_, info)| info.key_desc())
             .next()
-    }
-
-    /// Attempt to unlock all locked devices. Return the UUIDs of all devices
-    /// that were unlocked.
-    pub fn unlock(&self) -> StratisResult<Vec<DevUuid>> {
-        fn handle_luks(luks_info: &LLuksInfo) -> StratisResult<()> {
-            if let Some(mut handle) = CryptHandle::setup(&luks_info.ids.devnode)? {
-                handle.activate()?;
-                Ok(())
-            } else {
-                Err(StratisError::Engine(
-                    ErrorEnum::Invalid,
-                    format!(
-                        "Block device {} does not appear to be formatted with
-                        the proper Stratis LUKS2 metadata.",
-                        luks_info.ids.devnode.display(),
-                    ),
-                ))
-            }
-        }
-
-        let mut unlocked = Vec::new();
-        for (dev_uuid, info) in self.internal.iter() {
-            match info {
-                LInfo::Stratis(_) => (),
-                LInfo::Luks(ref luks_info) => match handle_luks(luks_info) {
-                    Ok(()) => unlocked.push(*dev_uuid),
-                    Err(e) => return Err(e),
-                },
-            }
-        }
-        Ok(unlocked)
     }
 
     /// Process the data from a remove udev event. Since remove events are

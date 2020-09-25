@@ -15,9 +15,9 @@ use crate::{
     engine::{
         engine::Pool,
         strat_engine::{
-            backstore::{identify_block_device, DeviceInfo, LuksInfo, StratisInfo},
+            backstore::{identify_block_device, CryptHandle, DeviceInfo, LuksInfo, StratisInfo},
             liminal::{
-                device_info::{DeviceBag, DeviceSet, LStratisInfo},
+                device_info::{DeviceBag, DeviceSet, LInfo, LLuksInfo, LStratisInfo},
                 setup::{get_bdas, get_blockdevs, get_metadata},
             },
             metadata::StratisIdentifiers,
@@ -82,6 +82,22 @@ impl LiminalDevices {
         pools: &Table<StratPool>,
         pool_uuid: PoolUuid,
     ) -> StratisResult<Vec<DevUuid>> {
+        fn handle_luks(luks_info: &LLuksInfo) -> StratisResult<()> {
+            if let Some(mut handle) = CryptHandle::setup(&luks_info.ids.devnode)? {
+                handle.activate()?;
+                Ok(())
+            } else {
+                Err(StratisError::Engine(
+                    ErrorEnum::Invalid,
+                    format!(
+                        "Block device {} does not appear to be formatted with
+                        the proper Stratis LUKS2 metadata.",
+                        luks_info.ids.devnode.display(),
+                    ),
+                ))
+            }
+        }
+
         let unlocked = match self.errored_pool_devices.get(&pool_uuid) {
             Some(map) => {
                 if map.all_unencrypted() {
@@ -94,7 +110,17 @@ impl LiminalDevices {
                     ));
                 }
 
-                map.unlock()?
+                let mut unlocked = Vec::new();
+                for (dev_uuid, info) in map.iter() {
+                    match info {
+                        LInfo::Stratis(_) => (),
+                        LInfo::Luks(ref luks_info) => match handle_luks(luks_info) {
+                            Ok(()) => unlocked.push(*dev_uuid),
+                            Err(e) => return Err(e),
+                        },
+                    }
+                }
+                unlocked
             }
             None => match pools.get_by_uuid(pool_uuid) {
                 Some((_, pool)) => {

@@ -51,11 +51,11 @@ fn unlock_all_pools(engine: &mut StratEngine) {
 }
 
 // stratis-min pool setup
-pub fn pool_setup(pool_uuid: Option<PoolUuid>) -> StratisResult<()> {
+pub fn pool_setup(pool_uuid: Option<PoolUuid>, no_tty: bool) -> StratisResult<()> {
     if let Some(uuid) = pool_uuid {
         let key_desc = key_get_desc(uuid)?;
         if let Some(ref kd) = key_desc {
-            key_set(kd, None, true)?;
+            key_set(kd, None, !no_tty)?;
         }
     }
 

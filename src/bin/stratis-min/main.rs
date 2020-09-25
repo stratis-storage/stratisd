@@ -46,12 +46,19 @@ fn parse_args() -> App<'static, 'static> {
             SubCommand::with_name("unset").arg(Arg::with_name("key_desc").required(true)),
         ]),
         SubCommand::with_name("pool").subcommands(vec![
-            SubCommand::with_name("setup").arg(
-                Arg::with_name("pool_uuid")
-                    .long("--pool-uuid")
-                    .takes_value(true)
-                    .required(false),
-            ),
+            SubCommand::with_name("setup")
+                .arg(
+                    Arg::with_name("pool_uuid")
+                        .long("--pool-uuid")
+                        .takes_value(true)
+                        .required(false),
+                )
+                .arg(
+                    Arg::with_name("no_tty")
+                        .long("--no-tty")
+                        .takes_value(false)
+                        .requires("pool_uuid"),
+                ),
             SubCommand::with_name("create")
                 .arg(Arg::with_name("name").required(true))
                 .arg(Arg::with_name("blockdevs").multiple(true).required(true))
@@ -110,7 +117,7 @@ fn main() -> Result<(), String> {
                 Some(u) => Some(PoolUuid::parse_str(u).map_err(|e| e.to_string())?),
                 None => None,
             };
-            pool::pool_setup(uuid).map_err(|e| e.to_string())
+            pool::pool_setup(uuid, args.is_present("no_tty")).map_err(|e| e.to_string())
         } else if let Some(args) = subcommand.subcommand_matches("create") {
             let paths = get_paths_from_args(args);
             pool::pool_create(

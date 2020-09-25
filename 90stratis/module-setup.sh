@@ -23,7 +23,6 @@ install() {
     inst_multiple stratis-min thin_check thin_repair mkfs.xfs xfs_admin xfs_growfs
     # Dracut dependencies
     inst_multiple $systemdutildir/system-generators/stratis-setup-generator \
-	    $systemdutildir/stratis-open-rootfs \
 	    $systemdutildir/stratis-rootfs-setup \
 	    plymouth
 

@@ -15,5 +15,9 @@ if [ $? != 0 ]; then
 fi
 
 if [ -n "$KEY_DESC" ]; then
-	plymouth ask-for-password --command="stratis-min key set --no-tty --capture-key $KEY_DESC" --prompt="Enter root filesystem password"
+	plymouth ask-for-password \
+		--command="/usr/lib/systemd/stratis-open-rootfs $KEY_DESC $STRATIS_ROOTFS_UUID" \
+		--prompt="Enter root filesystem password"
+else
+	stratis-min pool setup
 fi

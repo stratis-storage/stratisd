@@ -65,7 +65,7 @@ use crate::engine::{
 
 /// A miscellaneous group of identifiers found when identifying a LUKS
 /// device which belongs to Stratis.
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct LuksInfo {
     /// All the usual StratisInfo
     pub info: StratisInfo,
@@ -86,7 +86,7 @@ impl fmt::Display for LuksInfo {
 
 /// A miscellaneous group of identifiers found when identifying a Stratis
 /// device.
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct StratisInfo {
     pub identifiers: StratisIdentifiers,
     pub device_number: Device,
@@ -137,6 +137,22 @@ impl<'a> Into<Value> for &'a StratisInfo {
 pub enum DeviceInfo {
     Luks(LuksInfo),
     Stratis(StratisInfo),
+}
+
+impl DeviceInfo {
+    pub fn stratis_identifiers(&self) -> StratisIdentifiers {
+        match self {
+            DeviceInfo::Luks(info) => info.info.identifiers,
+            DeviceInfo::Stratis(info) => info.identifiers,
+        }
+    }
+
+    pub fn key_description(&self) -> Option<&KeyDescription> {
+        match self {
+            DeviceInfo::Luks(info) => Some(&info.key_description),
+            DeviceInfo::Stratis(_) => None,
+        }
+    }
 }
 
 impl fmt::Display for DeviceInfo {

@@ -36,7 +36,7 @@ use crate::{
 ///
 /// Postconditions: keys in result are equal to keys in infos OR an error
 /// is returned.
-pub fn get_bdas(infos: &HashMap<DevUuid, LStratisInfo>) -> StratisResult<HashMap<DevUuid, BDA>> {
+pub fn get_bdas(infos: &HashMap<DevUuid, &LStratisInfo>) -> StratisResult<HashMap<DevUuid, BDA>> {
     fn read_bda(info: &LStratisInfo) -> StratisResult<BDA> {
         BDA::load(&mut OpenOptions::new().read(true).open(&info.ids.devnode)?)?.ok_or_else(|| {
             StratisError::Error(format!("Failed to read BDA from device: {}", info.ids))
@@ -58,7 +58,7 @@ pub fn get_bdas(infos: &HashMap<DevUuid, LStratisInfo>) -> StratisResult<HashMap
 ///
 /// Precondition: infos and bdas have identical sets of keys
 pub fn get_metadata(
-    infos: &HashMap<DevUuid, LStratisInfo>,
+    infos: &HashMap<DevUuid, &LStratisInfo>,
     bdas: &HashMap<DevUuid, BDA>,
 ) -> StratisResult<Option<(DateTime<Utc>, PoolSave)>> {
     // Most recent time should never be None if this was a properly
@@ -118,7 +118,7 @@ pub fn get_metadata(
 /// infos and bdas are identical.
 pub fn get_blockdevs(
     backstore_save: &BackstoreSave,
-    infos: &HashMap<DevUuid, LStratisInfo>,
+    infos: &HashMap<DevUuid, &LStratisInfo>,
     mut bdas: HashMap<DevUuid, BDA>,
 ) -> StratisResult<(Vec<StratBlockDev>, Vec<StratBlockDev>)> {
     let recorded_data_map: HashMap<DevUuid, (usize, &BaseBlockDevSave)> = backstore_save
@@ -322,248 +322,4 @@ pub fn get_blockdevs(
     })?;
 
     Ok((datadevs, cachedevs))
-}
-
-#[cfg(test)]
-mod tests {
-    use std::{convert::TryFrom, error::Error, path::Path};
-
-    use uuid::Uuid;
-
-    use devicemapper::Device;
-
-    use crate::engine::{
-        strat_engine::{
-            backstore::{Backstore, LuksInfo, StratisInfo},
-            liminal::device_info::{LInfo, LLuksInfo},
-            metadata::{MDADataSize, StratisIdentifiers},
-            serde_structs::Recordable,
-            tests::{crypt, loopbacked, real},
-        },
-        types::{KeyDescription, PoolUuid},
-    };
-
-    use super::*;
-
-    const CACHE_BLOCK_SIZE: Sectors = Sectors(2048); // 1024 KiB
-    const INITIAL_BACKSTORE_ALLOCATION: Sectors = CACHE_BLOCK_SIZE;
-
-    // Generate data that might be associated with this backstore while
-    // bringing up a pool.
-    fn blockdev_data(
-        backstore: &Backstore,
-        pool_uuid: PoolUuid,
-    ) -> Result<HashMap<DevUuid, LStratisInfo>, nix::Error> {
-        fn stratis_info(
-            pool_uuid: PoolUuid,
-            device_uuid: DevUuid,
-            device_number: Device,
-            devnode: &Path,
-        ) -> StratisInfo {
-            StratisInfo {
-                identifiers: StratisIdentifiers {
-                    pool_uuid,
-                    device_uuid,
-                },
-                device_number,
-                devnode: devnode.to_owned(),
-            }
-        }
-
-        let encrypted = backstore.data_tier_is_encrypted();
-        let key_description = backstore.data_key_desc();
-        backstore
-            .blockdevs()
-            .iter()
-            .map(|(device_uuid, tier, blockdev)| {
-                if encrypted && *tier == BlockDevTier::Data {
-                    let luks_path = blockdev.devnode().physical_path();
-                    let luks_device_number =
-                        nix::sys::stat::stat(luks_path).map(|res| Device::from(res.st_rdev))?;
-                    let luks_info: LLuksInfo = LuksInfo {
-                        info: stratis_info(pool_uuid, *device_uuid, luks_device_number, luks_path),
-                        key_description: KeyDescription::try_from(
-                            key_description
-                                .as_ref()
-                                .expect("must exist, because encrypted")
-                                .as_application_str()
-                                .to_string(),
-                        )
-                        .expect("round trip"),
-                    }
-                    .into();
-                    if let LInfo::Stratis(info) = LInfo::update(
-                        LInfo::Luks(luks_info),
-                        LInfo::Stratis(
-                            stratis_info(
-                                pool_uuid,
-                                *device_uuid,
-                                *blockdev.device(),
-                                blockdev.devnode().metadata_path(),
-                            )
-                            .into(),
-                        ),
-                    )
-                    .expect("the two elements are compatible")
-                    {
-                        Ok(info)
-                    } else {
-                        unreachable!("if one of the elements is a Stratis info, the result must be")
-                    }
-                } else {
-                    Ok(stratis_info(
-                        pool_uuid,
-                        *device_uuid,
-                        *blockdev.device(),
-                        blockdev.devnode().metadata_path(),
-                    )
-                    .into())
-                }
-                .map(|info| (*device_uuid, info))
-            })
-            .collect()
-    }
-
-    // Verify that get_bdas(), get_metadata(), get_blockdevs() discover the
-    // correct information to build a backstore object with the same metadata
-    // as when initialized and a cache added.
-    fn test_setup(
-        paths: &[&Path],
-        key_description: Option<&KeyDescription>,
-    ) -> Result<(), Box<dyn Error>> {
-        if paths.len() < 2 {
-            return Err(Box::new(StratisError::Error(
-                "'paths' values does not have the number of elements required by the test"
-                    .to_string(),
-            )));
-        }
-
-        let (paths1, paths2) = paths.split_at(paths.len() / 2);
-
-        let pool_uuid = Uuid::new_v4();
-
-        let (backstore_save, infos): (_, HashMap<DevUuid, LStratisInfo>) = {
-            let mut backstore =
-                Backstore::initialize(pool_uuid, paths1, MDADataSize::default(), key_description)?;
-
-            // Allocate space from the backstore so that the cap device is made.
-            backstore.alloc(pool_uuid, &[INITIAL_BACKSTORE_ALLOCATION])?;
-
-            let old_device = backstore.device();
-
-            backstore.init_cache(pool_uuid, paths2)?;
-
-            if backstore.device() == old_device {
-                return Err(Box::new(StratisError::Error(
-                    "Backstore device is the same as the device before the cache was initialized"
-                        .to_string(),
-                )));
-            }
-
-            (backstore.record(), blockdev_data(&backstore, pool_uuid)?)
-        };
-
-        {
-            let bdas = get_bdas(&infos)?;
-            let (datadevs, cachedevs) = get_blockdevs(&backstore_save, &infos, bdas)?;
-            let mut backstore = Backstore::setup(
-                pool_uuid,
-                &backstore_save,
-                datadevs,
-                cachedevs,
-                Utc::now(),
-                key_description,
-            )?;
-
-            let backstore_save2 = backstore.record();
-            assert_eq!(backstore_save.cache_tier, backstore_save2.cache_tier);
-            assert_eq!(backstore_save.data_tier, backstore_save2.data_tier);
-
-            backstore.teardown()?;
-        }
-
-        {
-            let bdas = get_bdas(&infos).unwrap();
-            let (datadevs, cachedevs) = get_blockdevs(&backstore_save, &infos, bdas)?;
-            let mut backstore = Backstore::setup(
-                pool_uuid,
-                &backstore_save,
-                datadevs,
-                cachedevs,
-                Utc::now(),
-                key_description,
-            )?;
-
-            let backstore_save2 = backstore.record();
-            assert_eq!(backstore_save.cache_tier, backstore_save2.cache_tier);
-            assert_eq!(backstore_save.data_tier, backstore_save2.data_tier);
-
-            backstore.destroy()?;
-        }
-        Ok(())
-    }
-
-    fn test_setup_no_crypt(paths: &[&Path]) {
-        test_setup(paths, None).unwrap()
-    }
-
-    fn test_setup_crypt(paths: &[&Path]) {
-        fn call_crypt_test(
-            paths: &[&Path],
-            key_description: &KeyDescription,
-            _: Option<()>,
-        ) -> Result<(), Box<dyn Error>> {
-            test_setup(paths, Some(key_description))
-        }
-
-        crypt::insert_and_cleanup_key(paths, call_crypt_test)
-    }
-
-    #[test]
-    fn loop_test_setup() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, None),
-            test_setup_no_crypt,
-        );
-    }
-
-    #[test]
-    fn real_test_setup() {
-        real::test_with_spec(
-            &real::DeviceLimits::AtLeast(2, None, None),
-            test_setup_no_crypt,
-        );
-    }
-
-    #[test]
-    fn travis_test_setup() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, None),
-            test_setup_no_crypt,
-        );
-    }
-
-    #[test]
-    fn loop_test_crypt_setup() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, None),
-            test_setup_crypt,
-        );
-    }
-
-    #[test]
-    fn real_test_crypt_setup() {
-        real::test_with_spec(
-            &real::DeviceLimits::AtLeast(2, None, None),
-            test_setup_crypt,
-        );
-    }
-
-    #[test]
-    fn travis_test_crypt_setup() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, None),
-            test_setup_crypt,
-        );
-    }
 }

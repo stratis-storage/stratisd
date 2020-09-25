@@ -22,7 +22,6 @@ use crate::{
             backstore::{
                 blockdev::StratBlockDev,
                 crypt::{CryptHandle, CryptInitializer},
-                udev::{block_device_apply, decide_ownership, get_udev_property, UdevOwnership},
             },
             device::blkdev_size,
             metadata::{
@@ -30,6 +29,7 @@ use crate::{
                 BDA,
             },
             names::KeyDescription,
+            udev::{block_device_apply, decide_ownership, get_udev_property, UdevOwnership},
         },
         types::{BlockDevPath, DevUuid, PoolUuid},
     },

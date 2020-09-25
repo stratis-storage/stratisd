@@ -10,14 +10,10 @@ mod cache_tier;
 mod crypt;
 mod data_tier;
 mod devices;
-mod identify;
 mod range_alloc;
 mod shared;
-mod udev;
 
-pub use self::{
-    backstore::Backstore,
-    blockdev::StratBlockDev,
-    crypt::CryptHandle,
-    identify::{find_all, identify_block_device, DeviceInfo, LuksInfo, StratisInfo},
-};
+pub use self::{backstore::Backstore, blockdev::StratBlockDev, crypt::CryptHandle};
+
+#[cfg(test)]
+pub use self::devices::{initialize_devices, process_and_verify_devices};

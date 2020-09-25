@@ -10,7 +10,7 @@ fi
 IS_ENCRYPTED=$(stratis-min pool is-encrypted $STRATIS_ROOTFS_UUID)
 if [ x"$IS_ENCRYPTED" = x"true" ]; then
 	plymouth ask-for-password \
-		--command="stratis-min pool setup --pool-uuid=$STRATIS_ROOTFS_UUID" \
+		--command="stratis-min pool setup --no-tty --pool-uuid=$STRATIS_ROOTFS_UUID" \
 		--prompt="Enter root filesystem password" \
 		--number-of-tries=3
 else

@@ -15,9 +15,10 @@ use crate::{
     engine::{
         engine::Pool,
         strat_engine::{
-            backstore::{identify_block_device, CryptHandle, DeviceInfo, LuksInfo, StratisInfo},
+            backstore::CryptHandle,
             liminal::{
                 device_info::{DeviceBag, DeviceSet, LInfo, LLuksInfo, LStratisInfo},
+                identify::{identify_block_device, DeviceInfo, LuksInfo, StratisInfo},
                 setup::{get_bdas, get_blockdevs, get_metadata},
             },
             metadata::StratisIdentifiers,

@@ -5,12 +5,11 @@
 use std::path::Path;
 
 use libudev::{Context, Monitor};
-use uuid::Uuid;
 
 use libstratis::{
     engine::{
-        BlockDevTier, CreateAction, DeleteAction, Engine, EngineAction, Pool, RenameAction,
-        StratEngine,
+        BlockDevTier, CreateAction, DeleteAction, Engine, EngineAction, Pool, PoolUuid,
+        RenameAction, StratEngine,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -32,7 +31,7 @@ const SUFFIXES: &[(u64, &str)] = &[
 
 /// Unlock one specific pool and fail if the pool cannot be unlocked.
 #[inline]
-fn unlock_one_pool(engine: &mut StratEngine, pool_uuid: Uuid) -> StratisResult<()> {
+fn unlock_one_pool(engine: &mut StratEngine, pool_uuid: PoolUuid) -> StratisResult<()> {
     engine.unlock_pool(pool_uuid).map(|_| ())
 }
 
@@ -52,7 +51,7 @@ fn unlock_all_pools(engine: &mut StratEngine) {
 }
 
 // stratis-min pool setup
-pub fn pool_setup(pool_uuid: Option<Uuid>) -> StratisResult<()> {
+pub fn pool_setup(pool_uuid: Option<PoolUuid>) -> StratisResult<()> {
     if let Some(uuid) = pool_uuid {
         let key_desc = key_get_desc(uuid)?;
         if let Some(ref kd) = key_desc {
@@ -100,7 +99,7 @@ pub fn pool_create(
 fn name_to_uuid_and_pool<'a>(
     engine: &'a mut StratEngine,
     name: &str,
-) -> Option<(Uuid, &'a mut dyn Pool)> {
+) -> Option<(PoolUuid, &'a mut dyn Pool)> {
     let mut uuids_pools_for_name = engine
         .pools_mut()
         .into_iter()
@@ -239,4 +238,19 @@ pub fn pool_list() -> StratisResult<()> {
     );
 
     Ok(())
+}
+
+// stratis-min pool is-encrypted
+pub fn pool_is_encrypted(uuid: PoolUuid) -> StratisResult<bool> {
+    let engine = StratEngine::initialize()?;
+    if let Some((_, pool)) = engine.get_pool(uuid) {
+        Ok(pool.is_encrypted())
+    } else if engine.locked_pools().get(&uuid).is_some() {
+        Ok(true)
+    } else {
+        Err(StratisError::Error(format!(
+            "Pool with UUID {} not found",
+            uuid.to_simple_ref()
+        )))
+    }
 }

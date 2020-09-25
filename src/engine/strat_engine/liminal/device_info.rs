@@ -5,7 +5,7 @@
 //! Types representing known information about devices
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{hash_map, HashMap, HashSet},
     fmt,
 };
 
@@ -319,6 +319,20 @@ impl LInfo {
     }
 }
 
+/// An iterator for the DeviceSet
+pub struct Iter<'a> {
+    items: hash_map::Iter<'a, DevUuid, LInfo>,
+}
+
+impl<'a> Iterator for Iter<'a> {
+    type Item = (&'a DevUuid, &'a LInfo);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.items.next()
+    }
+}
+
 /// A set of devices, each distinguished by its unique device UUID.
 #[derive(Debug, Eq, PartialEq)]
 pub struct DeviceSet {
@@ -347,6 +361,13 @@ impl DeviceSet {
     pub fn new() -> DeviceSet {
         DeviceSet {
             internal: HashMap::new(),
+        }
+    }
+
+    /// An iterator over the elements in the set
+    pub fn iter(&self) -> Iter {
+        Iter {
+            items: self.internal.iter(),
         }
     }
 

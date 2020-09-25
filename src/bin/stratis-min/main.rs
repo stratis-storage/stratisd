@@ -49,6 +49,7 @@ fn parse_args() -> App<'static, 'static> {
             SubCommand::with_name("setup").arg(
                 Arg::with_name("pool_uuid")
                     .long("--pool-uuid")
+                    .takes_value(true)
                     .required(false),
             ),
             SubCommand::with_name("create")

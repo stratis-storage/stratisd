@@ -15,7 +15,10 @@ use libstratis::{
     stratis::{StratisError, StratisResult},
 };
 
-use crate::print_table;
+use crate::{
+    key::{key_get_desc, key_set},
+    print_table,
+};
 
 const SUFFIXES: &[(u64, &str)] = &[
     (60, "EiB"),
@@ -50,6 +53,13 @@ fn unlock_all_pools(engine: &mut StratEngine) {
 
 // stratis-min pool setup
 pub fn pool_setup(pool_uuid: Option<Uuid>) -> StratisResult<()> {
+    if let Some(uuid) = pool_uuid {
+        let key_desc = key_get_desc(uuid)?;
+        if let Some(ref kd) = key_desc {
+            key_set(kd, None, true)?;
+        }
+    }
+
     let mut engine = StratEngine::initialize()?;
 
     let ctxt = Context::new()?;

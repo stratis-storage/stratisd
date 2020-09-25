@@ -5,7 +5,8 @@
 use std::path::Path;
 
 use clap::{App, Arg, ArgGroup, ArgMatches, SubCommand};
-use uuid::Uuid;
+
+use libstratis::engine::PoolUuid;
 
 mod key;
 mod pool;
@@ -69,6 +70,7 @@ fn parse_args() -> App<'static, 'static> {
                 .arg(Arg::with_name("name").required(true))
                 .arg(Arg::with_name("blockdevs").multiple(true).required(true)),
             SubCommand::with_name("destroy").arg(Arg::with_name("name").required(true)),
+            SubCommand::with_name("is-encrypted").arg(Arg::with_name("pool_uuid").required(true)),
         ]),
         SubCommand::with_name("report"),
         SubCommand::with_name("udev").arg(Arg::with_name("dm_name").required(true)),
@@ -105,7 +107,7 @@ fn main() -> Result<(), String> {
         if let Some(args) = subcommand.subcommand_matches("setup") {
             let uuid_str = args.value_of("pool_uuid");
             let uuid = match uuid_str {
-                Some(u) => Some(Uuid::parse_str(u).map_err(|e| e.to_string())?),
+                Some(u) => Some(PoolUuid::parse_str(u).map_err(|e| e.to_string())?),
                 None => None,
             };
             pool::pool_setup(uuid).map_err(|e| e.to_string())
@@ -137,6 +139,14 @@ fn main() -> Result<(), String> {
             let paths = get_paths_from_args(args);
             pool::pool_add_cache(args.value_of("name").expect("required"), paths.as_slice())
                 .map_err(|e| e.to_string())
+        } else if let Some(args) = subcommand.subcommand_matches("is-encrypted") {
+            let uuid_str = args.value_of("pool_uuid").expect("required");
+            let uuid = PoolUuid::parse_str(uuid_str).map_err(|e| e.to_string())?;
+            println!(
+                "{}",
+                pool::pool_is_encrypted(uuid).map_err(|e| e.to_string())?,
+            );
+            Ok(())
         } else {
             pool::pool_list().map_err(|e| e.to_string())
         }

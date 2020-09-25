@@ -7,7 +7,8 @@ if [ ! -d /run/cryptsetup ]; then
 	mkdir -p /run/cryptsetup
 fi
 
-if [ -n "$KEY_DESC" ]; then
+IS_ENCRYPTED=$(stratis-min pool is-encrypted $STRATIS_ROOTFS_UUID)
+if [ x"$IS_ENCRYPTED" = x"true" ]; then
 	plymouth ask-for-password \
 		--command="stratis-min pool setup $STRATIS_ROOTFS_UUID" \
 		--prompt="Enter root filesystem password"

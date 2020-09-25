@@ -68,13 +68,12 @@ pub fn key_list() -> StratisResult<()> {
     Ok(())
 }
 
-/// stratis-min key get-desc
-pub fn key_get_desc(uuid: &str) -> StratisResult<()> {
-    let pool_uuid = PoolUuid::parse_str(uuid)?;
+pub fn key_get_desc(pool_uuid: PoolUuid) -> StratisResult<Option<String>> {
     let engine = StratEngine::initialize()?;
     let locked_pools = engine.locked_pools();
     if let Some(key_desc) = locked_pools.get(&pool_uuid) {
-        println!("{}", key_desc.as_application_str())
+        Ok(Some(key_desc.as_application_str().to_owned()))
+    } else {
+        Ok(None)
     }
-    Ok(())
 }

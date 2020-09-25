@@ -7,16 +7,9 @@ if [ ! -d /run/cryptsetup ]; then
 	mkdir -p /run/cryptsetup
 fi
 
-KEY_DESC=$(stratis-min key get-desc $STRATIS_ROOTFS_UUID)
-if [ $? != 0 ]; then
-	echo "Failed to get key description for given UUID $STRATIS_ROOTFS_UUID"
-	echo $KEY_DESC
-	exit 1
-fi
-
 if [ -n "$KEY_DESC" ]; then
 	plymouth ask-for-password \
-		--command="/usr/lib/systemd/stratis-open-rootfs $KEY_DESC $STRATIS_ROOTFS_UUID" \
+		--command="stratis-min pool setup $STRATIS_ROOTFS_UUID" \
 		--prompt="Enter root filesystem password"
 else
 	stratis-min pool setup

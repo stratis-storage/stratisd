@@ -5,6 +5,7 @@
 use std::path::Path;
 
 use clap::{App, Arg, ArgGroup, ArgMatches, SubCommand};
+use uuid::Uuid;
 
 mod key;
 mod pool;
@@ -45,7 +46,11 @@ fn parse_args() -> App<'static, 'static> {
             SubCommand::with_name("get-desc").arg(Arg::with_name("uuid").required(true)),
         ]),
         SubCommand::with_name("pool").subcommands(vec![
-            SubCommand::with_name("setup"),
+            SubCommand::with_name("setup").arg(
+                Arg::with_name("pool_uuid")
+                    .long("--pool-uuid")
+                    .required(false),
+            ),
             SubCommand::with_name("create")
                 .arg(Arg::with_name("name").required(true))
                 .arg(Arg::with_name("blockdevs").multiple(true).required(true))
@@ -99,8 +104,13 @@ fn main() -> Result<(), String> {
             key::key_list().map_err(|e| e.to_string())
         }
     } else if let Some(subcommand) = args.subcommand_matches("pool") {
-        if let Some("setup") = subcommand.subcommand_name() {
-            pool::pool_setup().map_err(|e| e.to_string())
+        if let Some(args) = subcommand.subcommand_matches("setup") {
+            let uuid_str = args.value_of("pool_uuid");
+            let uuid = match uuid_str {
+                Some(u) => Some(Uuid::parse_str(u).map_err(|e| e.to_string())?),
+                None => None,
+            };
+            pool::pool_setup(uuid).map_err(|e| e.to_string())
         } else if let Some(args) = subcommand.subcommand_matches("create") {
             let paths = get_paths_from_args(args);
             pool::pool_create(

@@ -1,0 +1,25 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+	echo "Key description required as first argument."
+	exit 1
+fi
+if [ -z "$2" ]; then
+	echo "Pool UUID required as second argument."
+	exit 1
+fi
+
+KEY_DESC=$1
+POOL_UUID=$2
+
+stratis-min key set --no-tty --capture-key $KEY_DESC
+if [ $? != 0 ]; then
+	echo "Failed to set the user provided key."
+	exit 1
+fi
+
+stratis-min pool setup $POOL_UUID
+if [ $? != 0 ]; then
+	echo "Failed to set up the requested Stratis pool."
+	exit 1
+fi

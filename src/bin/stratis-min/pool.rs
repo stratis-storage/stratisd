@@ -27,14 +27,16 @@ const SUFFIXES: &[(u64, &str)] = &[
     (1, "B"),
 ];
 
-// stratis-min pool setup
-pub fn pool_setup() -> StratisResult<()> {
-    let mut engine = StratEngine::initialize()?;
+/// Unlock one specific pool and fail if the pool cannot be unlocked.
+#[inline]
+fn unlock_one_pool(engine: &mut StratEngine, pool_uuid: Uuid) -> StratisResult<()> {
+    engine.unlock_pool(pool_uuid).map(|_| ())
+}
 
-    let ctxt = Context::new()?;
-    let mtr = Monitor::new(&ctxt)?;
-    let mut sock = mtr.listen()?;
-
+/// Attempt to unlock all locked pools and simply print a message if some pools fail to
+/// unlock.
+#[inline]
+fn unlock_all_pools(engine: &mut StratEngine) {
     for uuid in engine.locked_pools().keys() {
         if let Err(e) = engine.unlock_pool(*uuid) {
             println!(
@@ -43,6 +45,20 @@ pub fn pool_setup() -> StratisResult<()> {
                 e
             );
         }
+    }
+}
+
+// stratis-min pool setup
+pub fn pool_setup(pool_uuid: Option<Uuid>) -> StratisResult<()> {
+    let mut engine = StratEngine::initialize()?;
+
+    let ctxt = Context::new()?;
+    let mtr = Monitor::new(&ctxt)?;
+    let mut sock = mtr.listen()?;
+
+    match pool_uuid {
+        Some(uuid) => unlock_one_pool(&mut engine, uuid)?,
+        None => unlock_all_pools(&mut engine),
     }
 
     while let Some(event) = sock.receive_event() {

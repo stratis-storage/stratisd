@@ -201,7 +201,7 @@ impl BlockDevMgr {
                                     .to_string(),
                             ));
                         }
-                    } else if clevis_info_next.is_none() {
+                    } else if !clevis_info.is_empty() && clevis_info_next.is_none() {
                         return Err(StratisError::Error(
                             "Clevis is not enabled on all devices".to_string(),
                         ));

@@ -18,7 +18,11 @@ use crate::dbus_api::{
     util::result_to_tuple,
 };
 
-const ALL_PROPERTIES: [&str; 2] = [consts::KEY_LIST_PROP, consts::LOCKED_POOLS];
+const ALL_PROPERTIES: [&str; 3] = [
+    consts::KEY_LIST_PROP,
+    consts::LOCKED_POOLS,
+    consts::LOCKED_POOL_UUIDS,
+];
 
 pub fn locked_pools(
     info: &MethodInfo<MTFn<TData>, TData>,

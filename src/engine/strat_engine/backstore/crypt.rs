@@ -756,9 +756,10 @@ fn ensure_wiped(device: &mut CryptDevice, physical_path: &Path, name: &str) -> R
             }
         }
         Ok(None) => {
-            return Err(LibcryptErr::Other(
-                "Token ID for keyslots to be wiped appears to be empty".to_string(),
-            ))
+            info!(
+                "Token ID for keyslots to be wiped appears to be empty; the keyslot \
+                area will still be wiped in the next step."
+            );
         }
         Err(e) => {
             info!(

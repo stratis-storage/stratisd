@@ -15,6 +15,7 @@ use std::{
 use libc::{syscall, SYS_add_key, SYS_keyctl};
 use nix::{
     mount::{mount, umount, MsFlags},
+    sched::{unshare, CloneFlags},
     sys::{
         mman::{mmap, munmap, MapFlags, ProtFlags},
         stat::stat,
@@ -451,6 +452,15 @@ impl MemoryFilesystem {
             Some("tmpfs"),
             MsFlags::empty(),
             Some("size=1M"),
+        )?;
+
+        unshare(CloneFlags::CLONE_NEWNS)?;
+        mount::<str, str, str, str>(
+            None,
+            MemoryFilesystem::TMPFS_LOCATION,
+            None,
+            MsFlags::MS_SLAVE | MsFlags::MS_REC,
+            None,
         )?;
         Ok(MemoryFilesystem)
     }

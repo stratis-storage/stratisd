@@ -192,14 +192,13 @@ impl CryptInitializer {
             physical_path.display()
         );
         let result = self.initialize_no_cleanup(device, key_description);
-        result.map_err(|device| {
+        result.map_err(|(error, device)| {
             if let Err(e) =
                 CryptInitializer::rollback(device, physical_path, format_crypt_name(&dev_uuid))
             {
-                e
-            } else {
-                LibcryptErr::Other("Device initialization failed".to_string())
+                warn!("Rolling back failed initialization failed: {}", e);
             }
+            error
         })
     }
 
@@ -280,7 +279,7 @@ impl CryptInitializer {
         self,
         mut device: CryptDevice,
         key_description: &KeyDescription,
-    ) -> std::result::Result<CryptHandle, CryptDevice> {
+    ) -> std::result::Result<CryptHandle, (LibcryptErr, CryptDevice)> {
         let dev_uuid = self.identifiers.device_uuid;
         let result = self.initialize_with_err(&mut device, key_description);
         match result {
@@ -293,7 +292,7 @@ impl CryptInitializer {
             )),
             Err(e) => {
                 warn!("Initialization failed with error: {}; rolling back.", e);
-                Err(device)
+                Err((e, device))
             }
         }
     }

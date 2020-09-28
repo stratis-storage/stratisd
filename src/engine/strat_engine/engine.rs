@@ -4,10 +4,6 @@
 
 use std::{clone::Clone, collections::HashMap, path::Path};
 
-use nix::{
-    mount::{mount, MsFlags},
-    sched::{unshare, CloneFlags},
-};
 use serde_json::Value;
 
 use devicemapper::DmNameBuf;
@@ -59,19 +55,6 @@ pub struct StratEngine {
     key_fs: MemoryFilesystem,
 }
 
-/// Allow Stratis to mount volumes in a private namespace.
-pub fn unshare_mount_namespace() -> StratisResult<()> {
-    unshare(CloneFlags::CLONE_NEWNS)?;
-    mount::<str, str, str, str>(
-        None,
-        MemoryFilesystem::TMPFS_LOCATION,
-        None,
-        MsFlags::MS_SLAVE | MsFlags::MS_REC,
-        None,
-    )?;
-    Ok(())
-}
-
 impl StratEngine {
     /// Setup a StratEngine.
     /// 1. Verify the existence of Stratis /dev directory.
@@ -98,14 +81,6 @@ impl StratEngine {
         let mut pools = Table::default();
         for (pool_name, pool_uuid, pool) in liminal_devices.setup_pools(find_all()?) {
             pools.insert(pool_name, pool_uuid, pool);
-        }
-
-        if let Err(e) = unshare_mount_namespace() {
-            warn!("Failed to unshare mount namespace: {}", e);
-            warn!(
-                "This may result in internal stratisd mounts being visible \
-                on the host system."
-            );
         }
 
         Ok(StratEngine {

@@ -1,5 +1,5 @@
-stratisd 2.2.0 (UNRELEASED)
-===========================
+stratisd 2.2.0
+==============
 Recommended Rust toolchain version: 1.46.0
 Lowest supported Rust toolchain version: 1.45
 
@@ -138,6 +138,7 @@ YAML linter: yamllint (1.23.0)
 - Tidies and Maintenance:
   https://github.com/stratis-storage/stratisd/pull/2245
   https://github.com/stratis-storage/stratisd/pull/2243
+  https://github.com/stratis-storage/stratisd/pull/2234
   https://github.com/stratis-storage/stratisd/pull/2232
   https://github.com/stratis-storage/stratisd/pull/2230
   https://github.com/stratis-storage/stratisd/pull/2227

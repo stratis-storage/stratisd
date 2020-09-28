@@ -8,6 +8,9 @@ org.storage.stratis2.FetchProperties.r2
 org.storage.stratis2.Manager.r2
 org.storage.stratis2.blockdev.r2
 
+New minimum Rust crate requirement:
+  - proptest: 0.10.0
+
 Recommended Python interpreter: 3.7.7
 Lowest supported Python interpreter: 3.6.8
 Python linter: pylint (2.4.4)
@@ -22,6 +25,10 @@ YAML linter: yamllint (1.23.0)
   https://github.com/stratis-storage/stratisd/issues/704
   https://github.com/stratis-storage/stratisd/issues/2162
   https://github.com/stratis-storage/stratisd/issues/2175
+  https://github.com/stratis-storage/stratisd/issues/2198
+  https://github.com/stratis-storage/stratisd/issues/2220
+  https://github.com/stratis-storage/stratisd/pull/2238
+  https://github.com/stratis-storage/stratisd/pull/2235
   https://github.com/stratis-storage/stratisd/pull/2199
   https://github.com/stratis-storage/stratisd/pull/2197
   https://github.com/stratis-storage/stratisd/pull/2192
@@ -42,6 +49,7 @@ YAML linter: yamllint (1.23.0)
 
 - Add new FetchProperties interface to Manager to support LockedPools property:
   https://github.com/stratis-storage/stratisd/issues/2179
+  https://github.com/stratis-storage/stratisd/pull/2246
   https://github.com/stratis-storage/stratisd/pull/2231
   https://github.com/stratis-storage/stratisd/pull/2228
   https://github.com/stratis-storage/stratisd/pull/2185
@@ -71,7 +79,10 @@ YAML linter: yamllint (1.23.0)
   cause creation of the device to fail:
   https://github.com/stratis-storage/stratisd/pull/2206
 
-- Add script to read the Stratis metadata on a device:
+- Introduce the stratis-min CLI as an unsupported application:
+  https://github.com/stratis-storage/stratisd/pull/2239
+
+- Add unsupported script to read the Stratis metadata on a device:
   https://github.com/stratis-storage/stratisd/issues/2157
   https://github.com/stratis-storage/stratisd/issues/2097
   https://github.com/stratis-storage/stratisd/pull/2159
@@ -115,6 +126,7 @@ YAML linter: yamllint (1.23.0)
   https://github.com/stratis-storage/stratisd/pull/2171
 
 - Refactor liminal module into distinct submodules, fix a minor bug:
+  https://github.com/stratis-storage/stratisd/pull/2242
   https://github.com/stratis-storage/stratisd/pull/2187
 
 - Add a script for examining versions of dependencies:
@@ -124,6 +136,9 @@ YAML linter: yamllint (1.23.0)
   https://github.com/stratis-storage/stratisd/pull/2089
 
 - Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/2245
+  https://github.com/stratis-storage/stratisd/pull/2243
+  https://github.com/stratis-storage/stratisd/pull/2232
   https://github.com/stratis-storage/stratisd/pull/2230
   https://github.com/stratis-storage/stratisd/pull/2227
   https://github.com/stratis-storage/stratisd/pull/2226

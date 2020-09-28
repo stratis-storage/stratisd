@@ -421,7 +421,7 @@ impl KeyActions for StratKeyActions {
 pub struct MemoryFilesystem;
 
 impl MemoryFilesystem {
-    const TMPFS_LOCATION: &'static str = "/run/stratisd/keyfiles";
+    pub const TMPFS_LOCATION: &'static str = "/run/stratisd/keyfiles";
 
     pub fn new() -> StratisResult<MemoryFilesystem> {
         let tmpfs_path = &Path::new(Self::TMPFS_LOCATION);

@@ -68,7 +68,7 @@ pkg-config = "0.3"
 error-chain = "0.12.1"
 loopdev = "0.2"
 either = "1.1.0"
-proptest = "0.9.0"
+proptest = "0.10.0"
 matches = "0.1.8"
 
 [features]

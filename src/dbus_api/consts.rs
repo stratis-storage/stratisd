@@ -24,7 +24,7 @@ pub const LOCKED_POOLS: &str = "LockedPools";
 
 pub const POOL_INTERFACE_NAME: &str = "org.storage.stratis2.pool";
 pub const POOL_INTERFACE_NAME_2_1: &str = "org.storage.stratis2.pool.r1";
-pub const POOL_INTERFACE_NAME_2_2: &str = "org.storage.stratis2.pool.r2";
+pub const POOL_INTERFACE_NAME_2_3: &str = "org.storage.stratis2.pool.r2";
 pub const POOL_NAME_PROP: &str = "Name";
 pub const POOL_UUID_PROP: &str = "Uuid";
 pub const POOL_HAS_CACHE_PROP: &str = "HasCache";
@@ -72,7 +72,7 @@ pub fn standard_pool_interfaces() -> Vec<String> {
     [
         POOL_INTERFACE_NAME,
         POOL_INTERFACE_NAME_2_1,
-        POOL_INTERFACE_NAME_2_2,
+        POOL_INTERFACE_NAME_2_3,
     ]
     .iter()
     .map(|s| (*s).to_string())

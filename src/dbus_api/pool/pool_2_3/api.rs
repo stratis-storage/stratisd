@@ -5,7 +5,7 @@
 use dbus::tree::{Factory, MTFn, Method};
 
 use crate::dbus_api::{
-    pool::pool_2_2::methods::{bind_clevis, unbind_clevis},
+    pool::pool_2_3::methods::{bind_clevis, unbind_clevis},
     types::TData,
 };
 

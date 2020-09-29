@@ -24,9 +24,9 @@ import psutil
 
 # isort: LOCAL
 from stratisd_client_dbus import (
-    FetchPropertiesR1,
-    ManagerR1,
-    PoolR1,
+    FetchProperties,
+    Manager,
+    Pool,
     StratisdErrors,
     get_object,
 )
@@ -289,7 +289,7 @@ class UdevTest3(UdevTest):
             (_, (pool_object_path, device_object_paths)) = create_pool(
                 random_string(5), devnodes, key_description=key_description
             )
-            pool_uuid = PoolR1.Properties.Uuid.Get(get_object(pool_object_path))
+            pool_uuid = Pool.Properties.Uuid.Get(get_object(pool_object_path))
 
             pool_list = get_pools()
             self.assertEqual(len(pool_list), 1)
@@ -300,7 +300,7 @@ class UdevTest3(UdevTest):
             remove_stratis_dm_devices()
 
         with OptionalKeyServiceContextManager(key_spec=key_spec):
-            ((option, unlock_uuids), exit_code, _) = ManagerR1.Methods.UnlockPool(
+            ((option, unlock_uuids), exit_code, _) = Manager.Methods.UnlockPool(
                 get_object(TOP_OBJECT), {"pool_uuid": pool_uuid}
             )
             if key_spec is None:
@@ -377,7 +377,7 @@ class UdevTest4(UdevTest):
             (_, (pool_object_path, _)) = create_pool(
                 random_string(5), devnodes, key_description=key_description
             )
-            pool_uuid = PoolR1.Properties.Uuid.Get(get_object(pool_object_path))
+            pool_uuid = Pool.Properties.Uuid.Get(get_object(pool_object_path))
 
             self.assertEqual(len(get_pools()), 1)
 
@@ -399,7 +399,7 @@ class UdevTest4(UdevTest):
                 wait_for_udev(udev_wait_type, self._lb_mgr.device_files(tokens_up))
                 self.assertEqual(len(get_pools()), 0)
 
-            ((option, unlock_uuids), exit_code, _) = ManagerR1.Methods.UnlockPool(
+            ((option, unlock_uuids), exit_code, _) = Manager.Methods.UnlockPool(
                 get_object(TOP_OBJECT), {"pool_uuid": pool_uuid}
             )
             if key_spec is None:
@@ -417,7 +417,7 @@ class UdevTest4(UdevTest):
 
             wait_for_udev(udev_wait_type, self._lb_mgr.device_files(tokens_up))
 
-            ((option, unlock_uuids), exit_code, _) = ManagerR1.Methods.UnlockPool(
+            ((option, unlock_uuids), exit_code, _) = Manager.Methods.UnlockPool(
                 get_object(TOP_OBJECT), {"pool_uuid": pool_uuid}
             )
 
@@ -529,14 +529,14 @@ class UdevTest5(UdevTest):
             wait_for_udev(CRYPTO_LUKS_FS_TYPE, self._lb_mgr.device_files(luks_tokens))
             wait_for_udev(STRATIS_FS_TYPE, self._lb_mgr.device_files(non_luks_tokens))
 
-            (valid, variant_pool_uuids) = FetchPropertiesR1.Methods.GetProperties(
+            (valid, variant_pool_uuids) = FetchProperties.Methods.GetProperties(
                 get_object(TOP_OBJECT), {"properties": [LOCKED_POOL_UUIDS_PROP_NAME]}
             )[LOCKED_POOL_UUIDS_PROP_NAME]
 
             self.assertTrue(valid)
 
             for pool_uuid in variant_pool_uuids:
-                ((option, _), exit_code, _) = ManagerR1.Methods.UnlockPool(
+                ((option, _), exit_code, _) = Manager.Methods.UnlockPool(
                     get_object(TOP_OBJECT), {"pool_uuid": pool_uuid}
                 )
                 self.assertEqual(exit_code, StratisdErrors.OK)
@@ -556,7 +556,7 @@ class UdevTest5(UdevTest):
 
                 # Rename all active pools to a randomly selected new name
                 for object_path, _ in current_pools:
-                    PoolR1.Methods.SetName(
+                    Pool.Methods.SetName(
                         get_object(object_path), {"name": random_string(10)}
                     )
 

@@ -43,7 +43,10 @@ macro_rules! get_pool {
             pool
         } else {
             let message = format!("engine does not know about pool with uuid {}", $uuid);
-            let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, message);
+            let (rc, rs) = (
+                $crate::dbus_api::types::DbusErrorEnum::INTERNAL_ERROR as u16,
+                message,
+            );
             return Ok(vec![$message.append3($default, rc, rs)]);
         }
     };
@@ -96,4 +99,34 @@ macro_rules! properties_footer {
             get_properties_shared(m, &mut properties)
         }
     };
+}
+
+macro_rules! initial_properties {
+    ($($iface:expr => { $($prop:expr => $val:expr),* }),*) => {{
+        let mut interfaces = vec![
+            $(
+                ($iface, vec![
+                    $(
+                        ($prop, Variant(
+                            Box::new($val) as Box<dyn dbus::arg::RefArg>
+                        )),
+                    )*
+                ]
+                .into_iter()
+                .map(|(s, v): (&str, dbus::arg::Variant<Box<dyn dbus::arg::RefArg>>)| {
+                    (s.to_string(), v)
+                })
+                .collect()),
+            )*
+        ]
+        .into_iter()
+        .map(|(s, v)| (s.to_string(), v))
+        .collect::<$crate::dbus_api::types::InterfacesAdded>();
+        interfaces.extend(
+            $crate::dbus_api::consts::fetch_properties_interfaces()
+                .into_iter()
+                .map(|s| (s, std::collections::HashMap::new()))
+        );
+        interfaces
+    }};
 }

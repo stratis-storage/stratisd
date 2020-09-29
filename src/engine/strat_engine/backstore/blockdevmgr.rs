@@ -21,8 +21,8 @@ use crate::{
                 blockdev::StratBlockDev,
                 crypt::CryptHandle,
                 devices::{initialize_devices, process_and_verify_devices, wipe_blockdevs},
-                metadata::MDADataSize,
             },
+            metadata::MDADataSize,
             names::KeyDescription,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
         },
@@ -159,8 +159,7 @@ impl BlockDevMgr {
     pub fn has_valid_passphrase(&self) -> bool {
         CryptHandle::can_unlock(
             self.block_devs
-                .iter()
-                .next()
+                .get(0)
                 .expect("Must have at least one blockdev")
                 .devnode()
                 .physical_path(),

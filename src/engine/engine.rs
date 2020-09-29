@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
+    collections::HashMap,
     fmt::Debug,
     os::unix::io::RawFd,
     path::{Path, PathBuf},
@@ -17,13 +18,13 @@ use devicemapper::{Bytes, Sectors};
 use crate::{
     engine::types::{
         BlockDevPath, BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid,
-        MappingCreateAction, MaybeDbusPath, Name, PoolUuid, RenameAction, ReportType,
-        SetCreateAction, SetDeleteAction, SetUnlockAction,
+        KeyDescription, MappingCreateAction, MaybeDbusPath, Name, PoolUuid, RenameAction,
+        ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction,
     },
     stratis::StratisResult,
 };
 
-pub const DEV_PATH: &str = "/stratis";
+pub const DEV_PATH: &str = "/dev/stratis";
 /// The maximum size of pool passphrases stored in the kernel keyring
 pub const MAX_STRATIS_PASS_SIZE: usize = 512 / 8;
 
@@ -32,8 +33,15 @@ pub trait KeyActions {
     /// containing a `bool` which indicates whether a key with the requested
     /// key description was in the keyring and the key data was updated.
     ///
-    /// If `interactive` is `true`, the end of a passphrase should be delimited
+    /// If `interactive` is `Some(_)`, the end of a passphrase should be delimited
     /// by a newline.
+    ///
+    /// If `interactive` is `Some(true)`, stratisd will change the terminal settings
+    /// on the interactive file descriptor to prompt the user without echo and with
+    /// a few additional security measures. This requires that stdin is a terminal.
+    ///
+    /// If `interactive` is `Some(false)`, it is up to the user to remove the echo
+    /// property on the file descriptor and any other settings that they require.
     ///
     /// Successful return values:
     /// * `Ok(MappingCreateAction::Identity)`: The key was already in the keyring
@@ -46,12 +54,12 @@ pub trait KeyActions {
         &mut self,
         key_desc: &str,
         key_fd: RawFd,
-        interactive: bool,
+        interactive: Option<bool>,
     ) -> StratisResult<MappingCreateAction<()>>;
 
     /// Return a list of all key descriptions of keys added to the keyring by
     /// Stratis that are still valid.
-    fn list(&self) -> StratisResult<Vec<String>>;
+    fn list(&self) -> StratisResult<Vec<KeyDescription>>;
 
     /// Unset a key with the given key description in the root persistent kernel
     /// keyring.
@@ -140,7 +148,6 @@ pub trait Pool: Debug {
     fn create_filesystems<'a, 'b>(
         &'a mut self,
         pool_uuid: PoolUuid,
-        pool_name: &str,
         specs: &[(&'b str, Option<Sectors>)],
     ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid)>>;
 
@@ -157,11 +164,6 @@ pub trait Pool: Debug {
         paths: &[&Path],
         tier: BlockDevTier,
     ) -> StratisResult<SetCreateAction<DevUuid>>;
-
-    /// Destroy the pool.
-    /// Precondition: All filesystems belonging to this pool must be
-    /// unmounted.
-    fn destroy(&mut self) -> StratisResult<()>;
 
     /// Ensures that all designated filesystems are gone from pool.
     /// Returns a list of the filesystems found, and actually destroyed.
@@ -190,7 +192,6 @@ pub trait Pool: Debug {
     fn snapshot_filesystem(
         &mut self,
         pool_uuid: PoolUuid,
-        pool_name: &str,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
     ) -> StratisResult<CreateAction<(FilesystemUuid, &mut dyn Filesystem)>>;
@@ -223,10 +224,10 @@ pub trait Pool: Debug {
 
     /// Get _all_ the blockdevs that belong to this pool.
     /// All really means all. For example, it does not exclude cache blockdevs.
-    fn blockdevs(&self) -> Vec<(Uuid, &dyn BlockDev)>;
+    fn blockdevs(&self) -> Vec<(Uuid, BlockDevTier, &dyn BlockDev)>;
 
     /// Get all the blockdevs belonging to this pool as mutable references.
-    fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut dyn BlockDev)>;
+    fn blockdevs_mut(&mut self) -> Vec<(DevUuid, BlockDevTier, &mut dyn BlockDev)>;
 
     /// Get the blockdev in this pool with this UUID.
     fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &dyn BlockDev)>;
@@ -278,7 +279,7 @@ pub trait Engine: Debug + Report {
     /// and its UUID.
     ///
     /// Precondition: the subsystem of the device evented on is "block".
-    fn handle_event(&mut self, event: &libudev::Event) -> Option<(PoolUuid, &mut dyn Pool)>;
+    fn handle_event(&mut self, event: &libudev::Event) -> Option<(Name, PoolUuid, &mut dyn Pool)>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.
@@ -309,9 +310,9 @@ pub trait Engine: Debug + Report {
     /// Get a mutable referent to the pool designated by uuid.
     fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut dyn Pool)>;
 
-    /// Get a list of encrypted pool UUIDs for pools that have not yet been set up
-    /// and need to be unlocked.
-    fn locked_pool_uuids(&self) -> Vec<PoolUuid>;
+    /// Get a mapping of encrypted pool UUIDs for pools that have not yet been set up
+    /// and need to be unlocked to their key descriptions.
+    fn locked_pools(&self) -> HashMap<PoolUuid, KeyDescription>;
 
     /// Configure the simulator, for the real engine, this is a null op.
     /// denominator: the probably of failure is 1/denominator.

@@ -4,13 +4,35 @@ else
 endif
 
 RUST_2018_IDIOMS = -D bare-trait-objects \
-		   -D ellipsis-inclusive-range-patterns \
-		   -D unused-extern-crates
+                   -D ellipsis-inclusive-range-patterns
 
 DENY = -D warnings -D future-incompatible -D unused ${RUST_2018_IDIOMS}
 
-${HOME}/.cargo/bin/cargo-tree:
-	cargo install cargo-tree
+CLIPPY_DENY = -D clippy::pedantic \
+              -A clippy::cast_possible_wrap \
+              -A clippy::cast_sign_loss \
+              -A clippy::default_trait_access \
+              -A clippy::doc_markdown \
+              -A clippy::explicit_iter_loop \
+              -A clippy::filter_map \
+              -A clippy::filter_map_next \
+              -A clippy::find_map \
+              -A clippy::if_not_else \
+              -A clippy::items_after_statements \
+              -A clippy::map_unwrap_or \
+              -A clippy::match_same_arms \
+              -A clippy::match_wildcard_for_single_variants \
+              -A clippy::missing_errors_doc \
+              -A clippy::must_use_candidate \
+              -A clippy::module_name_repetitions \
+              -A clippy::needless_pass_by_value \
+              -A clippy::non_ascii_literal \
+              -A clippy::redundant-closure-for-method-calls \
+              -A clippy::shadow_unrelated \
+              -A clippy::single_match_else \
+              -A clippy::too_many_lines \
+              -A clippy::unseparated_literal_suffix \
+              -A clippy::unused_self
 
 ${HOME}/.cargo/bin/cargo-outdated:
 	cargo install cargo-outdated
@@ -23,9 +45,6 @@ ${HOME}/.cargo/bin/cargo-bloat:
 
 ${HOME}/.cargo/bin/cargo-audit:
 	cargo install cargo-audit
-
-tree: ${HOME}/.cargo/bin/cargo-tree
-	PATH=${HOME}/.cargo/bin:${PATH} cargo tree
 
 outdated: ${HOME}/.cargo/bin/cargo-outdated
 	PATH=${HOME}/.cargo/bin:${PATH} cargo outdated
@@ -61,6 +80,21 @@ build-no-default:
 	RUSTFLAGS="${DENY}" \
 	cargo build --no-default-features ${TARGET_ARGS}
 
+build-extras:
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY}" \
+	cargo build --features extras ${TARGET_ARGS}
+
+stratis-dumpmetadata:
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY}" \
+	cargo build --bin=stratis_dumpmetadata --features extras ${TARGET_ARGS}
+
+stratis-min:
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY}" \
+	cargo build --bin=stratis-min --features extras ${TARGET_ARGS}
+
 release:
 	RUSTFLAGS="${DENY}" cargo build --release
 
@@ -93,7 +127,7 @@ stratisd.8.gz: stratisd.8
 	gzip --stdout docs/stratisd.8 > docs/stratisd.8.gz
 
 clippy:
-	cargo clippy --all-targets --all-features -- -D warnings -D clippy::needless_borrow
+	cargo clippy --all-targets --all-features -- ${DENY} ${CLIPPY_DENY}
 
 .PHONY:
 	audit
@@ -112,5 +146,4 @@ clippy:
 	test-loop
 	test-real
 	test-travis
-	tree
 	yamllint

@@ -2,14 +2,16 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use chrono::SecondsFormat;
 use dbus::{
     arg::IterAppend,
     tree::{MTFn, MethodErr, PropInfo},
 };
 
 use crate::{
-    dbus_api::{filesystem::shared::filesystem_operation, types::TData},
+    dbus_api::{
+        filesystem::shared::{self, filesystem_operation},
+        types::TData,
+    },
     engine::{Filesystem, Name},
 };
 
@@ -38,10 +40,7 @@ pub fn get_filesystem_devnode(
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
     get_filesystem_property(i, p, |(pool_name, fs_name, fs)| {
-        Ok(fs
-            .path_to_mount_filesystem(&pool_name, &fs_name)
-            .display()
-            .to_string())
+        Ok(shared::fs_devnode_prop(fs, &pool_name, &fs_name))
     })
 }
 
@@ -49,7 +48,7 @@ pub fn get_filesystem_name(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    get_filesystem_property(i, p, |(_, fs_name, _)| Ok(fs_name.to_owned()))
+    get_filesystem_property(i, p, |(_, fs_name, _)| Ok(shared::fs_name_prop(&fs_name)))
 }
 
 /// Get the creation date and time in rfc3339 format.
@@ -57,7 +56,5 @@ pub fn get_filesystem_created(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    get_filesystem_property(i, p, |(_, _, fs)| {
-        Ok(fs.created().to_rfc3339_opts(SecondsFormat::Secs, true))
-    })
+    get_filesystem_property(i, p, |(_, _, fs)| Ok(shared::fs_created_prop(fs)))
 }

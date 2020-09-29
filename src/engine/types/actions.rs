@@ -33,10 +33,7 @@ impl<T> EngineAction for CreateAction<T> {
     type Return = T;
 
     fn is_changed(&self) -> bool {
-        match *self {
-            CreateAction::Identity => false,
-            _ => true,
-        }
+        !matches!(*self, CreateAction::Identity)
     }
 
     fn changed(self) -> Option<T> {
@@ -62,10 +59,7 @@ impl<T> EngineAction for MappingCreateAction<T> {
     type Return = T;
 
     fn is_changed(&self) -> bool {
-        match *self {
-            MappingCreateAction::Created(_) | MappingCreateAction::ValueChanged(_) => true,
-            _ => false,
-        }
+        matches!(*self, MappingCreateAction::Created(_) | MappingCreateAction::ValueChanged(_))
     }
 
     fn changed(self) -> Option<T> {
@@ -159,10 +153,7 @@ impl<T> EngineAction for RenameAction<T> {
     type Return = T;
 
     fn is_changed(&self) -> bool {
-        match *self {
-            RenameAction::Renamed(_) => true,
-            _ => false,
-        }
+        matches!(*self, RenameAction::Renamed(_))
     }
 
     fn changed(self) -> Option<T> {
@@ -186,10 +177,7 @@ impl<T> EngineAction for DeleteAction<T> {
     type Return = T;
 
     fn is_changed(&self) -> bool {
-        match *self {
-            DeleteAction::Deleted(_) => true,
-            _ => false,
-        }
+        matches!(*self, DeleteAction::Deleted(_))
     }
 
     fn changed(self) -> Option<T> {

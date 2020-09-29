@@ -1,12 +1,13 @@
 [Unit]
 Description=Stratis daemon
 Documentation=man:stratisd(8)
-Before=local-fs-pre.target
 DefaultDependencies=no
 
 [Service]
+BusName=org.storage.stratis2
+Type=dbus
 Environment="RUST_BACKTRACE=1"
-ExecStart=/usr/libexec/stratisd --debug
+ExecStart=/usr/libexec/stratisd --log-level debug
 KillSignal=SIGINT
 Restart=on-abort
 StandardOutput=syslog

@@ -13,12 +13,13 @@ use devicemapper::Sectors;
 
 use crate::{
     dbus_api::{
+        consts::filesystem_interface_list,
         filesystem::create_dbus_filesystem,
         pool::shared::{add_blockdevs, BlockDevOp},
         types::{DbusErrorEnum, TData},
         util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
     },
-    engine::{CreateAction, EngineAction, FilesystemUuid, PoolUuid, RenameAction},
+    engine::{CreateAction, EngineAction, FilesystemUuid, Name, PoolUuid, RenameAction},
 };
 
 pub fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -49,7 +50,6 @@ pub fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let result = pool.create_filesystems(
         pool_uuid,
-        &pool_name,
         &filesystems
             .map(|x| (x, None))
             .collect::<Vec<(&str, Option<Sectors>)>>(),
@@ -75,6 +75,8 @@ pub fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                         create_dbus_filesystem(
                             dbus_context,
                             object_path.clone(),
+                            &pool_name,
+                            &Name::new(name.to_string()),
                             uuid,
                             pool.get_mut_filesystem(uuid)
                                 .expect("just inserted by create_filesystems")
@@ -139,7 +141,11 @@ pub fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                     let op = filesystem_map
                         .get(uuid)
                         .expect("'uuids' is a subset of filesystem_map.keys()");
-                    dbus_context.actions.borrow_mut().push_remove(op, m.tree);
+                    dbus_context.actions.borrow_mut().push_remove(
+                        op,
+                        m.tree,
+                        filesystem_interface_list(),
+                    );
                 }
                 changed_uuids
                     .iter()
@@ -188,10 +194,16 @@ pub fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut engine = dbus_context.engine.borrow_mut();
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-    let msg = match pool.snapshot_filesystem(pool_uuid, &pool_name, fs_uuid, snapshot_name) {
+    let msg = match pool.snapshot_filesystem(pool_uuid, fs_uuid, snapshot_name) {
         Ok(CreateAction::Created((uuid, fs))) => {
-            let fs_object_path: dbus::Path =
-                create_dbus_filesystem(dbus_context, object_path.clone(), uuid, fs);
+            let fs_object_path: dbus::Path = create_dbus_filesystem(
+                dbus_context,
+                object_path.clone(),
+                &pool_name,
+                &Name::new(snapshot_name.to_string()),
+                uuid,
+                fs,
+            );
             return_message.append3((true, fs_object_path), msg_code_ok(), msg_string_ok())
         }
         Ok(CreateAction::Identity) => {

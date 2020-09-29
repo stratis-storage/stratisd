@@ -7,6 +7,7 @@
 use std::fs::OpenOptions;
 
 use chrono::{DateTime, TimeZone, Utc};
+use serde_json::Value;
 
 use devicemapper::{Device, Sectors};
 
@@ -14,11 +15,8 @@ use crate::{
     engine::{
         engine::BlockDev,
         strat_engine::{
-            backstore::{
-                crypt::CryptHandle,
-                metadata::{disown_device, BDAExtendedSize, BlockdevSize, MDADataSize, BDA},
-                range_alloc::RangeAllocator,
-            },
+            backstore::{crypt::CryptHandle, range_alloc::RangeAllocator},
+            metadata::{disown_device, BDAExtendedSize, BlockdevSize, MDADataSize, BDA},
             names::KeyDescription,
             serde_structs::{BaseBlockDevSave, Recordable},
         },
@@ -46,7 +44,7 @@ impl StratBlockDev {
     /// - devnode: for encrypted devices, the logical and physical
     ///            paths; for unencrypted devices, the physical path
     /// - bda: the device's BDA
-    /// - other_segments: segments claimed for non-Stratis metadata use
+    /// - other_segments: segments allocated outside Stratis metadata region
     /// - user_info: user settable identifying information
     /// - hardware_info: identifying information in the hardware
     /// - key_description: optional argument enabling encryption using
@@ -58,17 +56,21 @@ impl StratBlockDev {
     /// on the device is simply invisible to the blockdev. Consequently, it
     /// is invisible to the engine, and is not part of the total size value
     /// reported on the D-Bus.
+    ///
+    /// Precondition: segments in other_segments do not overlap with Stratis
+    /// metadata region.
     pub fn new(
         dev: Device,
         devnode: BlockDevPath,
         bda: BDA,
-        upper_segments: &[(Sectors, Sectors)],
+        other_segments: &[(Sectors, Sectors)],
         user_info: Option<String>,
         hardware_info: Option<String>,
         key_description: Option<&KeyDescription>,
     ) -> StratisResult<StratBlockDev> {
         let mut segments = vec![(Sectors(0), bda.extended_size().sectors())];
-        segments.extend(upper_segments);
+        segments.extend(other_segments);
+
         let allocator = RangeAllocator::new(bda.dev_size(), &segments)?;
 
         Ok(StratBlockDev {
@@ -183,6 +185,24 @@ impl StratBlockDev {
 
     pub fn key_description(&self) -> Option<&KeyDescription> {
         self.key_description.as_ref()
+    }
+}
+
+impl<'a> Into<Value> for &'a StratBlockDev {
+    fn into(self) -> Value {
+        let mut json = json!({
+            "path": self.devnode.physical_path(),
+            "uuid": self.bda.dev_uuid().to_simple_ref().to_string(),
+        });
+        if let Some(ref key_desc) = self.key_description {
+            json.as_object_mut()
+                .expect("Created a JSON object above")
+                .insert(
+                    "key_description".to_string(),
+                    Value::from(key_desc.as_application_str().to_string()),
+                );
+        }
+        json
     }
 }
 

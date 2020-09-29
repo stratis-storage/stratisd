@@ -10,8 +10,10 @@ use crate::dbus_api::{
 };
 
 mod fetch_properties_2_1;
+mod fetch_properties_2_2;
 mod manager_2_0;
 mod manager_2_1;
+mod manager_2_2;
 mod report_2_1;
 mod shared;
 
@@ -42,9 +44,24 @@ pub fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>
                 .add_p(manager_2_0::version_property(&f)),
         )
         .add(
+            f.interface(consts::MANAGER_INTERFACE_NAME_2_2, ())
+                .add_m(manager_2_1::create_pool_method(&f))
+                .add_m(manager_2_2::set_key_method(&f))
+                .add_m(manager_2_1::unset_key_method(&f))
+                .add_m(manager_2_1::unlock_pool_method(&f))
+                .add_m(manager_2_0::destroy_pool_method(&f))
+                .add_m(manager_2_0::configure_simulator_method(&f))
+                .add_p(manager_2_0::version_property(&f)),
+        )
+        .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_1, ())
                 .add_m(fetch_properties_2_1::get_all_properties_method(&f))
                 .add_m(fetch_properties_2_1::get_properties_method(&f)),
+        )
+        .add(
+            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_2, ())
+                .add_m(fetch_properties_2_2::get_all_properties_method(&f))
+                .add_m(fetch_properties_2_2::get_properties_method(&f)),
         )
         .add(
             f.interface(consts::REPORT_INTERFACE_NAME_2_1, ())

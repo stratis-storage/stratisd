@@ -12,12 +12,9 @@ collections of block devices, and exports a D-Bus API. Stratis-cli's `stratis`
 provides a command-line tool which itself uses the D-Bus API to communicate
 with `stratisd`.
 
-## Documentation
+## Website
 
-https://stratis-storage.github.io/ currently has links to the
-[main internal design doc](https://stratis-storage.github.io/StratisSoftwareDesign.pdf),
-the [D-Bus API Reference manual](https://stratis-storage.github.io/DBusAPIReference.pdf),
-and [some coding style guidelines](https://stratis-storage.github.io/StratisStyleGuidelines.pdf).
+See [https://stratis-storage.github.io/](https://stratis-storage.github.io/).
 
 ## Getting involved
 
@@ -50,12 +47,12 @@ mailing list, if preferred.
 ### Setting up for development
 
 #### Development Compiler
-The version of the compiler recommended for development is 1.43. Other
+The version of the compiler recommended for development is 1.46. Other
 versions of the compiler may disagree with the CI tasks on some points,
 so should be avoided.
 
 #### Building
-Stratisd requires Rust 1.43+ and Cargo to build. These may be available via
+Stratisd requires Rust and Cargo to build. These may be available via
 your distribution's package manager. If not, [Rustup](https://www.rustup.rs/)
 is available to install and update the Rust toolchain.
 Once toolchain and other dependencies are in place, run `make build` to build, and then run the
@@ -90,6 +87,15 @@ order to work properly, a D-Bus conf file must exist to grant access, either
 installed by distribution packaging; or manually, by copying `stratisd.conf`
 to `/etc/dbus-1/system.d/`.
 
+#### Setting Log Levels
+The command-line option, `--log-level`, may be used to set the stratisd log
+level. This option sets the level for the stratisd components only.
+
+For finer-grained control over the log level of any stratisd component or
+dependency use the `RUST_LOG` environment variable. Please consult the
+documentation for the `env_logger` crate for additional information on the use
+of `RUST_LOG`.
+
 #### Testing
 
 Stratisd is tested in two ways. The first way makes use of the Rust test
@@ -113,6 +119,18 @@ run them, see [`tests/README.md`](tests/README.md).
 ##### Test that interact with stratisd via the D-Bus
 For a description of the D-Bus-based tests see
 [`tests/client-dbus/README.rst`](tests/client-dbus/README.rst).
+
+## Allowed Bugs
+`stratisd` has some bugs; most of these we intend to address in due course.
+
+There is one bug that we have chosen not to fix. This is a bug in our D-Bus
+layer that will allow incorrect un-marshalling of certain D-Bus values if
+a D-Bus method is invoked with arguments that do not conform to the expected
+signature of the method.  See
+[the GitHub issue](https://github.com/stratis-storage/project/issues/11) for
+additional details about this bug. Behavior of `stratisd` is undefined if a
+method is called under the particular circumstances that allow the bug to
+manifest.
 
 ## Licensing
 

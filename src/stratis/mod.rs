@@ -4,10 +4,13 @@
 
 pub use self::{
     errors::{ErrorEnum, StratisError, StratisResult},
+    run::run,
     stratis::VERSION,
 };
 
-pub mod buff_log;
+mod dbus_support;
 mod errors;
+mod run;
 #[allow(clippy::module_inception)]
 mod stratis;
+mod udev_monitor;

@@ -8,21 +8,17 @@ use serde_json::Value;
 
 use devicemapper::DmNameBuf;
 
-#[cfg(test)]
-use crate::engine::strat_engine::cleanup::teardown_pools;
-
 use crate::{
     engine::{
         engine::{Eventable, KeyActions},
         event::get_engine_listener_list,
         shared::create_pool_idempotent_or_err,
         strat_engine::{
-            backstore::find_all,
             cmd::verify_binaries,
             devlinks,
             dm::{get_dm, get_dm_init},
             keys::StratKeyActions,
-            liminal::LiminalDevices,
+            liminal::{find_all, LiminalDevices},
             names::{validate_name, KeyDescription},
             pool::StratPool,
         },
@@ -73,15 +69,11 @@ impl StratEngine {
             return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
         }
 
-        devlinks::setup_dev_path()?;
-
         let mut liminal_devices = LiminalDevices::default();
         let mut pools = Table::default();
         for (pool_name, pool_uuid, pool) in liminal_devices.setup_pools(find_all()?) {
             pools.insert(pool_name, pool_uuid, pool);
         }
-
-        devlinks::cleanup_devlinks(pools.iter());
 
         Ok(StratEngine {
             pools,
@@ -91,10 +83,24 @@ impl StratEngine {
         })
     }
 
-    /// Teardown Stratis, preparatory to a shutdown.
+    /// Recursively remove all devicemapper devices in all pools.
+    /// Do not remove the dm-crypt devices that comprise the backstore.
     #[cfg(test)]
     pub fn teardown(self) -> StratisResult<()> {
-        teardown_pools(self.pools)
+        let mut untorndown_pools = Vec::new();
+        for (_, uuid, mut pool) in self.pools {
+            pool.teardown()
+                .unwrap_or_else(|_| untorndown_pools.push(uuid));
+        }
+        if untorndown_pools.is_empty() {
+            Ok(())
+        } else {
+            let err_msg = format!(
+                "Failed to teardown already set up pools: {:?}",
+                untorndown_pools
+            );
+            Err(StratisError::Engine(ErrorEnum::Error, err_msg))
+        }
     }
 }
 
@@ -148,12 +154,13 @@ impl Report for StratEngine {
 }
 
 impl Engine for StratEngine {
-    fn handle_event(&mut self, event: &libudev::Event) -> Option<(PoolUuid, &mut dyn Pool)> {
+    fn handle_event(&mut self, event: &libudev::Event) -> Option<(Name, PoolUuid, &mut dyn Pool)> {
         if let Some((pool_uuid, pool_name, pool)) =
             self.liminal_devices.block_evaluate(&self.pools, event)
         {
-            self.pools.insert(pool_name, pool_uuid, pool);
+            self.pools.insert(pool_name.clone(), pool_uuid, pool);
             Some((
+                pool_name,
                 pool_uuid,
                 self.pools
                     .get_mut_by_uuid(pool_uuid)
@@ -198,7 +205,6 @@ impl Engine for StratEngine {
                     )?;
 
                     let name = Name::new(name.to_owned());
-                    devlinks::pool_added(&name);
                     self.pools.insert(name, uuid, pool);
                     Ok(CreateAction::Created(uuid))
                 }
@@ -227,7 +233,6 @@ impl Engine for StratEngine {
             self.pools.insert(pool_name, uuid, pool);
             Err(err)
         } else {
-            devlinks::pool_removed(&pool_name);
             Ok(DeleteAction::Deleted(uuid))
         }
     }
@@ -257,7 +262,9 @@ impl Engine for StratEngine {
             });
 
             self.pools.insert(new_name.clone(), uuid, pool);
-            devlinks::pool_renamed(&old_name, &new_name);
+            if let Err(e) = devlinks::pool_renamed(&old_name) {
+                warn!("Pool rename symlink action failed: {}", e)
+            };
             Ok(RenameAction::Renamed(uuid))
         }
     }
@@ -275,8 +282,8 @@ impl Engine for StratEngine {
         get_mut_pool!(self; uuid)
     }
 
-    fn locked_pool_uuids(&self) -> Vec<PoolUuid> {
-        self.liminal_devices.locked_pool_uuids()
+    fn locked_pools(&self) -> HashMap<PoolUuid, KeyDescription> {
+        self.liminal_devices.locked_pools()
     }
 
     fn configure_simulator(&mut self, _denominator: u32) -> StratisResult<()> {
@@ -337,10 +344,6 @@ impl Engine for StratEngine {
 
 #[cfg(test)]
 mod test {
-    use std::fs::remove_dir_all;
-
-    use crate::engine::engine::DEV_PATH;
-
     use crate::engine::strat_engine::tests::{loopbacked, real};
 
     use crate::engine::types::EngineAction;
@@ -391,9 +394,9 @@ mod test {
     /// 3. Teardown the engine.
     /// 4. Initialize the engine.
     /// 5. Verify that pools can be found again.
-    /// 6. Teardown the engine and remove "/stratis".
+    /// 6. Teardown the engine
     /// 7. Initialize the engine one more time.
-    /// 8. Verify that both pools are found and that there are no incomplete pools.
+    /// 8. Verify that both pools are found.
     fn test_setup(paths: &[&Path]) {
         assert!(paths.len() > 1);
 
@@ -424,16 +427,13 @@ mod test {
 
         assert!(engine.get_pool(uuid1).is_some());
         assert!(engine.get_pool(uuid2).is_some());
-        assert_eq!(engine.liminal_devices, LiminalDevices::default());
 
         engine.teardown().unwrap();
-        remove_dir_all(DEV_PATH).unwrap();
 
         let engine = StratEngine::initialize().unwrap();
 
         assert!(engine.get_pool(uuid1).is_some());
         assert!(engine.get_pool(uuid2).is_some());
-        assert_eq!(engine.liminal_devices, LiminalDevices::default());
 
         engine.teardown().unwrap();
     }

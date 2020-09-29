@@ -7,11 +7,14 @@ use dbus::{
     tree::{MTFn, MethodErr, PropInfo},
 };
 
-use crate::dbus_api::{pool::shared::get_pool_property, types::TData};
+use crate::dbus_api::{
+    pool::shared::{self, get_pool_property},
+    types::TData,
+};
 
 pub fn get_pool_name(
     i: &mut IterAppend,
     p: &PropInfo<MTFn<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    get_pool_property(i, p, |(name, _, _)| Ok(name.to_owned()))
+    get_pool_property(i, p, |(name, _, _)| Ok(shared::pool_name_prop(&name)))
 }

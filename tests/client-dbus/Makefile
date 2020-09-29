@@ -5,10 +5,6 @@ lint:
 	./check.py src/stratisd_client_dbus
 	./check.py tests
 
-.PHONY: dbus-tests
-dbus-tests:
-	python3 -m unittest discover ${UNITTEST_OPTS} --top-level-directory ./tests --start-directory ./tests/dbus_interface
-
 .PHONY: misc-tests
 misc-tests:
 	python3 -m unittest ${UNITTEST_OPTS} tests.misc.test_startup.TestUniqueInstance.test_unique_instance
@@ -28,4 +24,4 @@ udev-tests:
 	python3 -m unittest ${UNITTEST_OPTS} tests.udev.test_udev
 
 .PHONY: tests
-tests: dbus-tests misc-tests udev-tests
+tests: misc-tests udev-tests

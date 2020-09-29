@@ -20,6 +20,7 @@ Test unique stratis instance.
 # isort: STDLIB
 import os
 import subprocess
+import sys
 import unittest
 
 _STRATISD = os.environ["STRATISD"]
@@ -35,28 +36,35 @@ class TestUniqueInstance(unittest.TestCase):
         Start the original stratisd instance. Register a cleanup function to
         terminate it once started.
         """
-        self.command_line = [_STRATISD, "--sim", "--debug"]
-        self.first_process = subprocess.Popen(
-            self.command_line,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+        process = subprocess.Popen(
+            [_STRATISD, "--sim"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
             close_fds=True,
             env=os.environ,
         )
 
-        self.addCleanup(self.first_process.terminate)
+        def cleanup():
+            process.terminate()
+            process.wait()
+
+        self.addCleanup(cleanup)
 
     def test_unique_instance(self):
         """
         Verify that a second stratisd instance can not be started.
         """
         process = subprocess.Popen(
-            self.command_line,
+            [_STRATISD, "--sim"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
+            universal_newlines=True,
             close_fds=True,
             env=os.environ,
         )
         (_, stderr) = process.communicate()
         self.assertEqual(process.returncode, 1)
         self.assertNotEqual(stderr, "")
+
+        print("Stderr from this invocation of stratisd:", file=sys.stdout, flush=True)
+        print(stderr, file=sys.stdout, flush=True)

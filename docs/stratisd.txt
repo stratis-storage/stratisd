@@ -21,11 +21,14 @@ Typically, Stratisd is not invoked by the user, but runs as a system service.
 
 GLOBAL OPTIONS
 --------------
---debug::
-	Output additional diagnostic information when running.
 --sim::
 	Run with a simulated engine that does not actually perform storage
 	configuration, instead of the default engine.
+--log-level::
+        Specify the log level for log messages. Only messages with severity
+        at or above the level specified will be emitted. If this option is
+        omitted, stratisd respects the RUST_LOG environment variable.
+        Otherwise, stratisd uses the default log level, which is error.
 --help, -h::
 	Show help.
 

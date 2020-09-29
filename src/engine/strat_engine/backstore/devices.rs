@@ -22,14 +22,14 @@ use crate::{
             backstore::{
                 blockdev::StratBlockDev,
                 crypt::{CryptHandle, CryptInitializer},
-                metadata::{
-                    device_identifiers, disown_device, BlockdevSize, MDADataSize,
-                    StratisIdentifiers, BDA,
-                },
-                udev::{block_device_apply, decide_ownership, get_udev_property, UdevOwnership},
             },
             device::blkdev_size,
+            metadata::{
+                device_identifiers, disown_device, BlockdevSize, MDADataSize, StratisIdentifiers,
+                BDA,
+            },
             names::KeyDescription,
+            udev::{block_device_apply, decide_ownership, get_udev_property, UdevOwnership},
         },
         types::{BlockDevPath, DevUuid, PoolUuid},
     },
@@ -676,7 +676,8 @@ mod tests {
     use uuid::Uuid;
 
     use crate::engine::strat_engine::{
-        backstore::{crypt::CryptHandle, metadata::device_identifiers},
+        backstore::crypt::CryptHandle,
+        metadata::device_identifiers,
         tests::{crypt, loopbacked, real},
     };
 

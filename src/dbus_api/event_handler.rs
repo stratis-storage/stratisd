@@ -36,7 +36,7 @@ impl EngineListener for EventHandler {
                         consts::FILESYSTEM_NAME_PROP,
                         to.to_string(),
                         dbus_path,
-                        consts::FILESYSTEM_INTERFACE_NAME,
+                        &consts::standard_filesystem_interfaces(),
                     )
                     .unwrap_or_else(|()| {
                         warn!(
@@ -57,7 +57,7 @@ impl EngineListener for EventHandler {
                         consts::POOL_NAME_PROP,
                         to.to_string(),
                         dbus_path,
-                        consts::POOL_INTERFACE_NAME,
+                        &consts::standard_pool_interfaces(),
                     )
                     .unwrap_or_else(|()| {
                         warn!(

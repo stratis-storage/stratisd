@@ -2,29 +2,39 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{
-    convert::TryFrom,
-    ffi::CString,
-    fs::File,
-    io::{self, Read},
-    mem::size_of,
-    os::unix::io::{FromRawFd, RawFd},
-    str,
-};
+use std::{convert::TryFrom, ffi::CString, io, mem::size_of, os::unix::io::RawFd, str};
 
 use libc::{syscall, SYS_add_key, SYS_keyctl};
 
-use devicemapper::Bytes;
 use libcryptsetup_rs::SafeMemHandle;
 
 use crate::{
     engine::{
         engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
+        shared,
         strat_engine::names::KeyDescription,
-        types::{DeleteAction, KeySerial, MappingCreateAction, SizedKeyMemory},
+        types::{DeleteAction, MappingCreateAction, SizedKeyMemory},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
+
+/// A type corresponding to key IDs in the kernel keyring. In `libkeyutils`,
+/// this is represented as the C type `key_serial_t`.
+type KeySerial = u32;
+
+/// Search the persistent keyring for the given key description.
+pub(super) fn search_key_persistent(key_desc: &KeyDescription) -> StratisResult<Option<KeySerial>> {
+    let keyring_id = get_persistent_keyring()?;
+    search_key(keyring_id, key_desc)
+}
+
+/// Read a key from the persistent keyring with the given key description.
+pub(super) fn read_key_persistent(
+    key_desc: &KeyDescription,
+) -> StratisResult<Option<(KeySerial, SizedKeyMemory)>> {
+    let keyring_id = get_persistent_keyring()?;
+    read_key(keyring_id, key_desc)
+}
 
 /// Get the ID of the persistent root user keyring and attach it to
 /// the session keyring.
@@ -39,7 +49,7 @@ fn get_persistent_keyring() -> StratisResult<KeySerial> {
         )
     } {
         i if i < 0 => Err(io::Error::last_os_error().into()),
-        i => Ok(i as KeySerial),
+        i => convert_int!(i, i64, KeySerial),
     }
 }
 
@@ -73,7 +83,7 @@ fn search_key(
             Err(io::Error::last_os_error().into())
         }
     } else {
-        Ok(Some(key_id as KeySerial))
+        convert_int!(key_id, i64, KeySerial).map(Some)
     }
 }
 
@@ -84,16 +94,15 @@ fn search_key(
 /// type will be `Some` if the key was found in the keyring and will contain
 /// the key ID and the key contents. If no key was found with the provided
 /// key description, `None` will be returned.
-pub fn read_key(
+fn read_key(
+    keyring_id: KeySerial,
     key_desc: &KeyDescription,
-) -> StratisResult<(Option<(KeySerial, SizedKeyMemory)>, KeySerial)> {
-    let keyring_id = get_persistent_keyring()?;
-
+) -> StratisResult<Option<(KeySerial, SizedKeyMemory)>> {
     let key_id_option = search_key(keyring_id, key_desc)?;
     let key_id = if let Some(ki) = key_id_option {
         ki
     } else {
-        return Ok((None, keyring_id));
+        return Ok(None);
     };
 
     let mut key_buffer = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
@@ -110,13 +119,10 @@ pub fn read_key(
         )
     } {
         i if i < 0 => Err(io::Error::last_os_error().into()),
-        i => Ok((
-            Some((
-                key_id as KeySerial,
-                SizedKeyMemory::new(key_buffer, i as usize),
-            )),
-            keyring_id,
-        )),
+        i => Ok(Some((
+            key_id as KeySerial,
+            SizedKeyMemory::new(key_buffer, convert_int!(i, i64, usize)?),
+        ))),
     }
 }
 
@@ -197,8 +203,9 @@ fn set_key_idem(
     key_desc: &KeyDescription,
     key_data: SizedKeyMemory,
 ) -> StratisResult<MappingCreateAction<()>> {
-    match read_key(key_desc) {
-        Ok((Some((key_id, old_key_data)), _)) => {
+    let keyring_id = get_persistent_keyring()?;
+    match read_key(keyring_id, key_desc) {
+        Ok(Some((key_id, old_key_data))) => {
             let changed = reset_key(key_id, old_key_data, key_data)?;
             if changed {
                 Ok(MappingCreateAction::ValueChanged(()))
@@ -206,7 +213,7 @@ fn set_key_idem(
                 Ok(MappingCreateAction::Identity)
             }
         }
-        Ok((None, keyring_id)) => {
+        Ok(None) => {
             set_key(key_desc, key_data, keyring_id)?;
             Ok(MappingCreateAction::Created(()))
         }
@@ -258,7 +265,7 @@ impl KeyIdList {
                 )
             } {
                 i if i < 0 => return Err(io::Error::last_os_error().into()),
-                i => i as usize,
+                i => convert_int!(i, i64, usize)?,
             };
 
             let num_key_ids = num_bytes_read / size_of::<KeySerial>();
@@ -279,7 +286,7 @@ impl KeyIdList {
     /// Get the list of key descriptions corresponding to the kernel key IDs.
     /// Return the subset of key descriptions that have a prefix that identify
     /// them as belonging to Stratis.
-    fn to_key_descs(&self) -> StratisResult<Vec<String>> {
+    fn to_key_descs(&self) -> StratisResult<Vec<KeyDescription>> {
         let mut key_descs = Vec::new();
 
         for id in self.key_ids.iter() {
@@ -297,7 +304,7 @@ impl KeyIdList {
                     )
                 } {
                     i if i < 0 => return Err(io::Error::last_os_error().into()),
-                    i => i as usize,
+                    i => convert_int!(i, i64, usize)?,
                 };
 
                 if len <= keyctl_buffer.capacity() {
@@ -326,7 +333,7 @@ impl KeyIdList {
                 })?;
             let parsed_string = parse_keyctl_describe_string(keyctl_str)?;
             if let Some(kd) = KeyDescription::from_system_key_desc(&parsed_string).map(|k| k.expect("parse_keyctl_desribe_string() ensures the key description can not have semi-colons in it")) {
-                key_descs.push(kd.as_application_str().to_string());
+                key_descs.push(kd);
             }
         }
         Ok(key_descs)
@@ -371,46 +378,17 @@ impl KeyActions for StratKeyActions {
         &mut self,
         key_desc: &str,
         key_fd: RawFd,
-        interactive: bool,
+        interactive: Option<bool>,
     ) -> StratisResult<MappingCreateAction<()>> {
-        let key_file = unsafe { File::from_raw_fd(key_fd) };
-        let mut memory = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
-        let mut bytes_iter = key_file.bytes();
-
-        let mut pos = 0;
-        while pos < MAX_STRATIS_PASS_SIZE {
-            match bytes_iter.next() {
-                Some(Ok(b)) => {
-                    if interactive && b as char == '\n' {
-                        break;
-                    }
-
-                    memory.as_mut()[pos] = b;
-                    pos += 1;
-                }
-                Some(Err(e)) => return Err(e.into()),
-                None => break,
-            }
-        }
-        if pos == MAX_STRATIS_PASS_SIZE && bytes_iter.next().is_some() {
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
-                format!(
-                    "Provided key exceeded maximum allow length of {}",
-                    Bytes(MAX_STRATIS_PASS_SIZE as u64)
-                ),
-            ));
-        }
-
-        let sized_memory = SizedKeyMemory::new(memory, pos);
+        let memory = shared::set_key_shared(key_fd, interactive)?;
 
         Ok(set_key_idem(
             &KeyDescription::try_from(key_desc.to_string())?,
-            sized_memory,
+            memory,
         )?)
     }
 
-    fn list(&self) -> StratisResult<Vec<String>> {
+    fn list(&self) -> StratisResult<Vec<KeyDescription>> {
         let mut key_ids = KeyIdList::new();
         key_ids.populate()?;
         key_ids.to_key_descs()

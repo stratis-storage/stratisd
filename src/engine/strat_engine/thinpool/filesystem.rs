@@ -53,13 +53,6 @@ pub struct StratFilesystem {
     dbus_path: MaybeDbusPath,
 }
 
-pub enum FilesystemStatus {
-    Good,
-    XfsGrowFailed,
-    ThinDevExtendFailed,
-    Failed,
-}
-
 impl StratFilesystem {
     /// Create a StratFilesystem on top of the given ThinDev.
     pub fn initialize(
@@ -198,7 +191,7 @@ impl StratFilesystem {
 
     /// check if filesystem is getting full and needs to be extended
     /// TODO: deal with the thindev in a Fail state.
-    pub fn check(&mut self) -> StratisResult<(FilesystemStatus, bool)> {
+    pub fn check(&mut self) -> StratisResult<bool> {
         match self.thin_dev.status(get_dm())? {
             ThinStatus::Working(_) => {
                 if let Some(mount_point) = self.mount_points()?.first() {
@@ -209,17 +202,15 @@ impl StratFilesystem {
                         table.length =
                             self.thin_dev.size() + self.extend_size(self.thin_dev.size());
                         if self.thin_dev.set_table(get_dm(), table).is_err() {
-                            return Ok((FilesystemStatus::ThinDevExtendFailed, false));
+                            return Ok(false);
                         }
                         if xfs_growfs(mount_point).is_err() {
-                            return Ok((FilesystemStatus::XfsGrowFailed, true));
+                            return Ok(true);
                         }
-                        return Ok((FilesystemStatus::Good, true));
+                        return Ok(true);
                     }
                 }
-                // TODO: do anything when filesystem is not mounted?
-                // TODO: periodically kick off fstrim?
-                Ok((FilesystemStatus::Good, false))
+                Ok(false)
             }
             ThinStatus::Error => {
                 let error_msg = format!(
@@ -228,7 +219,7 @@ impl StratFilesystem {
                 );
                 Err(StratisError::Engine(ErrorEnum::Error, error_msg))
             }
-            ThinStatus::Fail => Ok((FilesystemStatus::Failed, false)),
+            ThinStatus::Fail => Ok(false),
         }
     }
 

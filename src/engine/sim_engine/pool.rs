@@ -11,7 +11,7 @@ use std::{
     vec::Vec,
 };
 
-use serde_json::Value;
+use serde_json::{Map, Value};
 use uuid::Uuid;
 
 use devicemapper::{Sectors, IEC};
@@ -19,14 +19,15 @@ use devicemapper::{Sectors, IEC};
 use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
+        event::get_engine_listener_list,
         shared::init_cache_idempotent_or_err,
         sim_engine::{blockdev::SimDev, filesystem::SimFilesystem, randomization::Randomizer},
         structures::Table,
         types::{
-            BlockDevTier, CreateAction, DevUuid, FilesystemUuid, FreeSpaceState, KeyDescription,
-            MaybeDbusPath, Name, PoolExtendState, PoolState, PoolUuid, Redundancy, RenameAction,
-            SetCreateAction, SetDeleteAction,
+            BlockDevTier, CreateAction, DevUuid, FilesystemUuid, KeyDescription, MaybeDbusPath,
+            Name, PoolUuid, Redundancy, RenameAction, SetCreateAction, SetDeleteAction,
         },
+        EngineEvent,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -44,9 +45,6 @@ pub struct SimPool {
     filesystems: Table<SimFilesystem>,
     redundancy: Redundancy,
     rdm: Rc<RefCell<Randomizer>>,
-    pool_state: PoolState,
-    pool_extend_state: PoolExtendState,
-    free_space_state: FreeSpaceState,
     dbus_path: MaybeDbusPath,
 }
 
@@ -71,9 +69,6 @@ impl SimPool {
                 filesystems: Table::default(),
                 redundancy,
                 rdm: Rc::clone(rdm),
-                pool_state: PoolState::Initializing,
-                pool_extend_state: PoolExtendState::Good,
-                free_space_state: FreeSpaceState::Good,
                 dbus_path: MaybeDbusPath(None),
             },
         )
@@ -98,8 +93,13 @@ impl SimPool {
     fn datadevs_encrypted(&self) -> bool {
         self.block_devs_key_desc.is_some()
     }
+
+    pub fn destroy(&mut self) -> StratisResult<()> {
+        Ok(())
+    }
 }
 
+// Precondition: SimDev::into() always returns a value that matches Value::Object(_).
 impl<'a> Into<Value> for &'a SimPool {
     fn into(self) -> Value {
         json!({
@@ -114,18 +114,30 @@ impl<'a> Into<Value> for &'a SimPool {
             "blockdevs": {
                 "datadevs": Value::Array(
                     self.block_devs.iter()
-                        .map(|(uuid, dev)| json!({
-                            "uuid": uuid.to_simple_ref().to_string(),
-                            "path": dev.devnode().physical_path(),
-                        }))
+                        .map(|(uuid, dev)| {
+                            let mut json = Map::new();
+                            json.insert("uuid".to_string(), Value::from(uuid.to_simple_ref().to_string()));
+                            if let Value::Object(map) = dev.into() {
+                                json.extend(map.into_iter());
+                            } else {
+                                panic!("SimDev::into() always returns JSON object")
+                            }
+                            Value::from(json)
+                        })
                         .collect()
                 ),
                 "cachedevs": Value::Array(
                     self.cache_devs.iter()
-                        .map(|(uuid, dev)| json!({
-                            "uuid": uuid.to_simple_ref().to_string(),
-                            "path": dev.devnode().physical_path(),
-                        }))
+                        .map(|(uuid, dev)| {
+                            let mut json = Map::new();
+                            json.insert("uuid".to_string(), Value::from(uuid.to_simple_ref().to_string()));
+                            if let Value::Object(map) = dev.into() {
+                                json.extend(map.into_iter());
+                            } else {
+                                panic!("SimDev::into() always returns JSON object")
+                            }
+                            Value::from(json)
+                        })
                         .collect()
                 ),
             },
@@ -173,7 +185,6 @@ impl Pool for SimPool {
     fn create_filesystems<'a, 'b>(
         &'a mut self,
         _pool_uuid: PoolUuid,
-        _pool_name: &str,
         specs: &[(&'b str, Option<Sectors>)],
     ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid)>> {
         let names: HashMap<_, _> = HashMap::from_iter(specs.iter().map(|&tup| (tup.0, tup.1)));
@@ -248,11 +259,6 @@ impl Pool for SimPool {
         Ok(SetCreateAction::new(ret_uuids))
     }
 
-    fn destroy(&mut self) -> StratisResult<()> {
-        // Nothing to do here.
-        Ok(())
-    }
-
     fn destroy_filesystems<'a>(
         &'a mut self,
         _pool_name: &str,
@@ -273,12 +279,18 @@ impl Pool for SimPool {
         uuid: FilesystemUuid,
         new_name: &str,
     ) -> StratisResult<RenameAction<FilesystemUuid>> {
-        rename_filesystem_pre_idem!(self; uuid; new_name);
+        let old_name = rename_filesystem_pre_idem!(self; uuid; new_name);
 
         let (_, filesystem) = self
             .filesystems
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.filesystems.get_by_uuid() returned a value");
+
+        get_engine_listener_list().notify(&EngineEvent::FilesystemRenamed {
+            dbus_path: filesystem.get_dbus_path(),
+            from: &*old_name,
+            to: &*new_name,
+        });
 
         self.filesystems
             .insert(Name::new(new_name.to_owned()), uuid, filesystem);
@@ -289,7 +301,6 @@ impl Pool for SimPool {
     fn snapshot_filesystem(
         &mut self,
         _pool_uuid: PoolUuid,
-        _pool_name: &str,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
     ) -> StratisResult<CreateAction<(FilesystemUuid, &mut dyn Filesystem)>> {
@@ -354,19 +365,29 @@ impl Pool for SimPool {
             .map(|(name, p)| (name, p as &mut dyn Filesystem))
     }
 
-    fn blockdevs(&self) -> Vec<(DevUuid, &dyn BlockDev)> {
+    fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &dyn BlockDev)> {
         self.block_devs
             .iter()
-            .chain(self.cache_devs.iter())
-            .map(|(uuid, bd)| (*uuid, bd as &dyn BlockDev))
+            .map(|(uuid, dev)| (uuid, BlockDevTier::Data, dev))
+            .chain(
+                self.cache_devs
+                    .iter()
+                    .map(|(uuid, dev)| (uuid, BlockDevTier::Cache, dev)),
+            )
+            .map(|(uuid, tier, bd)| (*uuid, tier, bd as &dyn BlockDev))
             .collect()
     }
 
-    fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut dyn BlockDev)> {
+    fn blockdevs_mut(&mut self) -> Vec<(DevUuid, BlockDevTier, &mut dyn BlockDev)> {
         self.block_devs
             .iter_mut()
-            .chain(self.cache_devs.iter_mut())
-            .map(|(uuid, b)| (*uuid, b as &mut dyn BlockDev))
+            .map(|(uuid, dev)| (uuid, BlockDevTier::Data, dev))
+            .chain(
+                self.cache_devs
+                    .iter_mut()
+                    .map(|(uuid, dev)| (uuid, BlockDevTier::Cache, dev)),
+            )
+            .map(|(uuid, tier, b)| (*uuid, tier, b as &mut dyn BlockDev))
             .collect()
     }
 
@@ -458,11 +479,9 @@ mod tests {
             .changed()
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
-        assert!(
-            match pool.rename_filesystem(pool_name, Uuid::new_v4(), "new_name") {
-                Ok(RenameAction::NoSource) => true,
-                _ => false,
-            }
+        assert_matches!(
+            pool.rename_filesystem(pool_name, Uuid::new_v4(), "new_name"),
+            Ok(RenameAction::NoSource)
         );
     }
 
@@ -483,7 +502,7 @@ mod tests {
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         let infos = pool
-            .create_filesystems(uuid, pool_name, &[("old_name", None)])
+            .create_filesystems(uuid, &[("old_name", None)])
             .unwrap()
             .changed()
             .unwrap();
@@ -513,16 +532,14 @@ mod tests {
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         let results = pool
-            .create_filesystems(uuid, pool_name, &[(old_name, None), (new_name, None)])
+            .create_filesystems(uuid, &[(old_name, None), (new_name, None)])
             .unwrap()
             .changed()
             .unwrap();
         let old_uuid = results.iter().find(|x| x.0 == old_name).unwrap().1;
-        assert!(
-            match pool.rename_filesystem(pool_name, old_uuid, new_name) {
-                Err(StratisError::Engine(ErrorEnum::AlreadyExists, _)) => true,
-                _ => false,
-            }
+        assert_matches!(
+            pool.rename_filesystem(pool_name, old_uuid, new_name),
+            Err(StratisError::Engine(ErrorEnum::AlreadyExists, _))
         );
     }
 
@@ -543,11 +560,9 @@ mod tests {
             .changed()
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
-        assert!(
-            match pool.rename_filesystem(pool_name, Uuid::new_v4(), new_name) {
-                Ok(RenameAction::NoSource) => true,
-                _ => false,
-            }
+        assert_matches!(
+            pool.rename_filesystem(pool_name, Uuid::new_v4(), new_name),
+            Ok(RenameAction::NoSource)
         );
     }
 
@@ -612,7 +627,7 @@ mod tests {
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         let fs_results = pool
-            .create_filesystems(uuid, pool_name, &[("fs_name", None)])
+            .create_filesystems(uuid, &[("fs_name", None)])
             .unwrap()
             .changed()
             .unwrap();
@@ -639,7 +654,7 @@ mod tests {
             .changed()
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
-        let fs = pool.create_filesystems(uuid, pool_name, &[]).unwrap();
+        let fs = pool.create_filesystems(uuid, &[]).unwrap();
         assert!(!fs.is_changed())
     }
 
@@ -660,7 +675,7 @@ mod tests {
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         assert!(match pool
-            .create_filesystems(uuid, pool_name, &[("name", None)])
+            .create_filesystems(uuid, &[("name", None)])
             .ok()
             .and_then(|fs| fs.changed())
         {
@@ -686,11 +701,8 @@ mod tests {
             .changed()
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
-        pool.create_filesystems(uuid, pool_name, &[(fs_name, None)])
-            .unwrap();
-        let set_create_action = pool
-            .create_filesystems(uuid, pool_name, &[(fs_name, None)])
-            .unwrap();
+        pool.create_filesystems(uuid, &[(fs_name, None)]).unwrap();
+        let set_create_action = pool.create_filesystems(uuid, &[(fs_name, None)]).unwrap();
         assert!(!set_create_action.is_changed());
     }
 
@@ -712,7 +724,7 @@ mod tests {
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         assert!(match pool
-            .create_filesystems(uuid, pool_name, &[(fs_name, None), (fs_name, None)])
+            .create_filesystems(uuid, &[(fs_name, None), (fs_name, None)])
             .ok()
             .and_then(|fs| fs.changed())
         {

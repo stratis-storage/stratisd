@@ -19,9 +19,10 @@ use devicemapper::{
 };
 
 use crate::engine::strat_engine::{
-    device::{blkdev_size, wipe_sectors},
+    device::blkdev_size,
     dm::get_dm,
     tests::{logger::init_logger, util::clean_up},
+    writing::wipe_sectors,
 };
 
 pub struct RealTestDev {

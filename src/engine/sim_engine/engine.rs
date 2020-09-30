@@ -88,6 +88,13 @@ impl Engine for SimEngine {
 
         validate_paths(blockdev_paths)?;
 
+        if blockdev_paths.is_empty() {
+            return Err(StratisError::Engine(
+                ErrorEnum::Invalid,
+                "At least one blockdev is required to create a pool.".to_string(),
+            ));
+        }
+
         if let Some(ref key_desc) = key_desc {
             if !self.key_handler.contains_key(key_desc) {
                 return Err(StratisError::Engine(
@@ -103,31 +110,24 @@ impl Engine for SimEngine {
         match self.pools.get_by_name(name) {
             Some((_, pool)) => create_pool_idempotent_or_err(pool, name, blockdev_paths),
             None => {
-                if blockdev_paths.is_empty() {
-                    Err(StratisError::Engine(
-                        ErrorEnum::Invalid,
-                        "At least one blockdev is required to create a pool.".to_string(),
-                    ))
-                } else {
-                    let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
-                    let devices = device_set.into_iter().cloned().collect::<Vec<&Path>>();
+                let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
+                let devices = device_set.into_iter().cloned().collect::<Vec<&Path>>();
 
-                    let (pool_uuid, pool) = SimPool::new(
-                        &Rc::clone(&self.rdm),
-                        &devices,
-                        redundancy,
-                        key_desc.as_ref(),
-                    );
+                let (pool_uuid, pool) = SimPool::new(
+                    &Rc::clone(&self.rdm),
+                    &devices,
+                    redundancy,
+                    key_desc.as_ref(),
+                );
 
-                    if self.rdm.borrow_mut().throw_die() {
-                        return Err(StratisError::Engine(ErrorEnum::Error, "X".into()));
-                    }
-
-                    self.pools
-                        .insert(Name::new(name.to_owned()), pool_uuid, pool);
-
-                    Ok(CreateAction::Created(pool_uuid))
+                if self.rdm.borrow_mut().throw_die() {
+                    return Err(StratisError::Engine(ErrorEnum::Error, "X".into()));
                 }
+
+                self.pools
+                    .insert(Name::new(name.to_owned()), pool_uuid, pool);
+
+                Ok(CreateAction::Created(pool_uuid))
             }
         }
     }

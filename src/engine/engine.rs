@@ -10,6 +10,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
+use either::Either;
 use serde_json::Value;
 use uuid::Uuid;
 
@@ -293,10 +294,7 @@ pub trait Engine: Debug + Report {
     fn handle_event(
         &mut self,
         event: &libudev::Event,
-    ) -> (
-        Option<(Name, PoolUuid, &mut dyn Pool)>,
-        Option<(PoolUuid, &mut dyn DeviceSet)>,
-    );
+    ) -> Option<Either<(Name, PoolUuid, &mut dyn Pool), (PoolUuid, &mut dyn DeviceSet)>>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.

@@ -4,6 +4,7 @@
 
 use std::{clone::Clone, collections::HashMap, convert::TryFrom, path::Path};
 
+use either::Either;
 use serde_json::Value;
 
 use devicemapper::DmNameBuf;
@@ -158,27 +159,21 @@ impl Engine for StratEngine {
     fn handle_event(
         &mut self,
         event: &libudev::Event,
-    ) -> (
-        Option<(Name, PoolUuid, &mut dyn Pool)>,
-        Option<(PoolUuid, &mut dyn DeviceSet)>,
-    ) {
+    ) -> Option<Either<(Name, PoolUuid, &mut dyn Pool), (PoolUuid, &mut dyn DeviceSet)>> {
         if let Some((pool_uuid, pool_name, pool)) =
             self.liminal_devices.block_evaluate(&self.pools, event)
         {
             self.pools.insert(pool_name.clone(), pool_uuid, pool);
-            (
-                Some((
-                    pool_name,
-                    pool_uuid,
-                    self.pools
-                        .get_mut_by_uuid(pool_uuid)
-                        .expect("just_inserted")
-                        .1 as &mut dyn Pool,
-                )),
-                None,
-            )
+            Some(Either::Left((
+                pool_name,
+                pool_uuid,
+                self.pools
+                    .get_mut_by_uuid(pool_uuid)
+                    .expect("just_inserted")
+                    .1 as &mut dyn Pool,
+            )))
         } else {
-            (None, None)
+            None
         }
     }
 

@@ -6,6 +6,8 @@
 
 use std::os::unix::io::{AsRawFd, RawFd};
 
+use either::Either;
+
 use crate::{
     engine::Engine,
     stratis::{dbus_support::MaybeDbusSupport, errors::StratisResult},
@@ -37,14 +39,13 @@ impl<'a> UdevMonitor<'a> {
     pub fn handle_events(&mut self, engine: &mut dyn Engine, dbus_support: &mut MaybeDbusSupport) {
         while let Some(event) = self.socket.receive_event() {
             match engine.handle_event(&event) {
-                (Some((pool_name, pool_uuid, pool)), None) => {
+                Some(Either::Left((pool_name, pool_uuid, pool))) => {
                     dbus_support.register_pool(&pool_name, pool_uuid, pool);
                 }
-                (None, Some((pool_uuid, device_set))) => {
+                Some(Either::Right((pool_uuid, device_set))) => {
                     dbus_support.register_device_set(pool_uuid, device_set);
                 }
-                (Some(_), Some(_)) => unreachable!("an event on one device should not result both in the creation of a new pool and the creation of a new device set"),
-                (None, None) => {}
+                None => {}
             }
         }
     }

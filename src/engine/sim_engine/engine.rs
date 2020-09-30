@@ -11,6 +11,7 @@ use std::{
     rc::Rc,
 };
 
+use either::Either;
 use serde_json::{json, Value};
 
 use crate::{
@@ -138,11 +139,8 @@ impl Engine for SimEngine {
     fn handle_event(
         &mut self,
         _event: &libudev::Event,
-    ) -> (
-        Option<(Name, PoolUuid, &mut dyn Pool)>,
-        Option<(PoolUuid, &mut dyn DeviceSet)>,
-    ) {
-        (None, None)
+    ) -> Option<Either<(Name, PoolUuid, &mut dyn Pool), (PoolUuid, &mut dyn DeviceSet)>> {
+        None
     }
 
     fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {

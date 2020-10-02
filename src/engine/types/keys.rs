@@ -5,6 +5,7 @@
 use std::{
     convert::TryFrom,
     fmt::{self, Debug},
+    hash::Hash,
 };
 
 use libcryptsetup_rs::SafeMemHandle;
@@ -71,5 +72,19 @@ impl<'a> TryFrom<&'a String> for KeyDescription {
 
     fn try_from(s: &String) -> StratisResult<KeyDescription> {
         KeyDescription::try_from(s.to_owned())
+    }
+}
+
+/// A structure representing the Tang server information for a clevis binding.
+#[derive(PartialEq, Eq, Hash, Debug)]
+pub struct TangInfo {
+    pub tang_url: String,
+    pub tang_thp: String,
+}
+
+impl TangInfo {
+    /// Create a new set of tang parameters.
+    pub fn new(tang_url: String, tang_thp: String) -> TangInfo {
+        TangInfo { tang_url, tang_thp }
     }
 }

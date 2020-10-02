@@ -16,12 +16,10 @@
 
 use std::{
     collections::HashMap,
-    io::Write,
     path::{Path, PathBuf},
-    process::{Command, Output},
+    process::Command,
 };
 
-use regex::Regex;
 use uuid::Uuid;
 
 use crate::stratis::{StratisError, StratisResult};
@@ -92,26 +90,6 @@ pub fn verify_binaries() -> StratisResult<()> {
     }
 }
 
-fn handle_cmd_status(result: Output, cmd: &Command) -> StratisResult<()> {
-    if result.status.success() {
-        Ok(())
-    } else {
-        let exit_reason = result
-            .status
-            .code()
-            .map_or(String::from("process terminated by signal"), |ec| {
-                ec.to_string()
-            });
-        let std_out_txt = String::from_utf8_lossy(&result.stdout);
-        let std_err_txt = String::from_utf8_lossy(&result.stderr);
-        let err_msg = format!(
-            "Command failed: cmd: {:?}, exit reason: {} stdout: {} stderr: {}",
-            cmd, exit_reason, std_out_txt, std_err_txt
-        );
-        Err(StratisError::Error(err_msg))
-    }
-}
-
 /// Invoke the specified command. Return an error if invoking the command
 /// fails or if the command itself fails.
 fn execute_cmd(cmd: &mut Command) -> StratisResult<()> {
@@ -120,7 +98,25 @@ fn execute_cmd(cmd: &mut Command) -> StratisResult<()> {
             "Failed to execute command {:?}, err: {:?}",
             cmd, err
         ))),
-        Ok(result) => handle_cmd_status(result, cmd),
+        Ok(result) => {
+            if result.status.success() {
+                Ok(())
+            } else {
+                let exit_reason = result
+                    .status
+                    .code()
+                    .map_or(String::from("process terminated by signal"), |ec| {
+                        ec.to_string()
+                    });
+                let std_out_txt = String::from_utf8_lossy(&result.stdout);
+                let std_err_txt = String::from_utf8_lossy(&result.stderr);
+                let err_msg = format!(
+                    "Command failed: cmd: {:?}, exit reason: {} stdout: {} stderr: {}",
+                    cmd, exit_reason, std_out_txt, std_err_txt
+                );
+                Err(StratisError::Error(err_msg))
+            }
+        }
     }
 }
 
@@ -195,25 +191,25 @@ pub fn udev_settle() -> StratisResult<()> {
 }
 
 /// Bind a LUKS device to a tang server using clevis.
-pub fn clevis_luks_bind(dev_path: &Path, keyfile_path: &Path, tang_url: &str) -> StratisResult<()> {
-    let mut cmd = Command::new("/usr/bin/clevis");
-    cmd.arg("luks")
-        .arg("bind")
-        .arg("-d")
-        .arg(dev_path.display().to_string())
-        .arg("-k")
-        .arg(keyfile_path)
-        .arg("tang")
-        .arg(serde_json::to_string(&json!({ "url": tang_url }))?);
-    let mut child = cmd.spawn()?;
-    if let Some(ref mut stdin) = child.stdin {
-        stdin.write_all(b"y\n")?;
-    } else {
-        return Err(StratisError::Error(
-            "Could not communicate with child process running clevis luks bind".to_string(),
-        ));
-    }
-    handle_cmd_status(child.wait_with_output()?, &cmd)
+pub fn clevis_luks_bind(
+    dev_path: &Path,
+    keyfile_path: &Path,
+    tang_url: &str,
+    tang_thp: &str,
+) -> StratisResult<()> {
+    execute_cmd(
+        Command::new("/usr/bin/clevis")
+            .arg("luks")
+            .arg("bind")
+            .arg("-d")
+            .arg(dev_path.display().to_string())
+            .arg("-k")
+            .arg(keyfile_path)
+            .arg("tang")
+            .arg(serde_json::to_string(
+                &json!({ "url": tang_url, "thp": tang_thp }),
+            )?),
+    )
 }
 
 /// Unbind a LUKS device from a tang server using clevis.
@@ -241,36 +237,4 @@ pub fn clevis_luks_unlock(dev_path: &Path, dm_name: &str) -> StratisResult<()> {
             .arg("-n")
             .arg(dm_name),
     )
-}
-
-/// List clevis pins bound to the given LUKS2 device using the clevis CLI.
-pub fn clevis_luks_list(dev_path: &Path) -> StratisResult<HashMap<libc::c_uint, String>> {
-    let output = Command::new("/usr/bin/clevis")
-        .arg("luks")
-        .arg("list")
-        .arg("-d")
-        .arg(dev_path.display().to_string())
-        .output()?;
-    let output_string =
-        String::from_utf8(output.stdout).map_err(|e| StratisError::Error(e.to_string()))?;
-    let lines: Vec<_> = output_string.split('\n').collect();
-
-    let mut keyslot_map = HashMap::new();
-    for line in lines {
-        let regex =
-            Regex::new(r"([0-9]+): tang '(.*)'").map_err(|e| StratisError::Error(e.to_string()))?;
-        let captures = regex.captures(line).ok_or_else(|| {
-            StratisError::Error(
-                "Unexpected output received from clevis luks list command.".to_string(),
-            )
-        })?;
-        let keyslot = captures[1]
-            .parse::<libc::c_uint>()
-            .map_err(|e| StratisError::Error(e.to_string()))?;
-        let tang_cfg = &captures[1];
-
-        keyslot_map.insert(keyslot, tang_cfg.to_string());
-    }
-
-    Ok(keyslot_map)
 }

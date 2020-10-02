@@ -9,6 +9,7 @@ use std::{
 };
 
 use serde_json::Value;
+use sha1::{Digest, Sha1};
 
 use devicemapper::Sectors;
 use libcryptsetup_rs::{
@@ -18,12 +19,12 @@ use libcryptsetup_rs::{
 
 use crate::engine::{
     strat_engine::{
-        cmd::{clevis_luks_bind, clevis_luks_list, clevis_luks_unbind, clevis_luks_unlock},
+        cmd::{clevis_luks_bind, clevis_luks_unbind, clevis_luks_unlock},
         keys,
         metadata::StratisIdentifiers,
         names::format_crypt_name,
     },
-    types::{KeyDescription, SizedKeyMemory, UnlockMethod},
+    types::{KeyDescription, SizedKeyMemory, TangInfo, UnlockMethod},
     DevUuid, PoolUuid,
 };
 
@@ -478,22 +479,86 @@ impl CryptHandle {
         get_keyslot_number(&mut self.device, token_id)
     }
 
-    /// Get Tang server info for the clevis binding.
-    pub fn clevis_info(&mut self) -> Result<Option<String>> {
-        let mut keyslots = match self.keyslots(CLEVIS_LUKS_TOKEN_ID)? {
-            Some(ks) => ks,
+    /// Get the Tang server url and key thumbprint.
+    fn get_url_and_thp(&mut self) -> Result<Option<(String, String)>> {
+        let json = match self
+            .device
+            .token_handle()
+            .json_get(CLEVIS_LUKS_TOKEN_ID)
+            .ok()
+        {
+            Some(j) => j,
             None => return Ok(None),
         };
-        if keyslots.len() != 1 {
-            return Err(LibcryptErr::Other(
-                "clevis token should only correspond to one keyslot".to_string(),
-            ));
-        }
+        let json_b64 = match json
+            .get("jwe")
+            .and_then(|map| map.get("protected"))
+            .and_then(|string| string.as_str())
+        {
+            Some(s) => s.to_owned(),
+            None => return Ok(None),
+        };
+        let json_bytes = base64::decode(json_b64).map_err(|e| LibcryptErr::Other(e.to_string()))?;
 
-        let keyslot = keyslots.pop().expect("Checked that element exists above");
-        let keyslot_map =
-            clevis_luks_list(&self.physical_path).map_err(|e| LibcryptErr::Other(e.to_string()))?;
-        Ok(keyslot_map.get(&keyslot).map(|s| s.to_owned()))
+        let subjson: Value = serde_json::from_slice(json_bytes.as_slice())
+            .map_err(|e| LibcryptErr::Other(e.to_string()))?;
+
+        let url = subjson
+            .get("clevis")
+            .and_then(|map| map.get("tang"))
+            .and_then(|map| map.get("url"))
+            .and_then(|s| s.as_str())
+            .ok_or_else(|| {
+                LibcryptErr::Other("Expected a string for value of clevis.tang.url".to_string())
+            })?;
+
+        let keys = subjson
+            .get("clevis")
+            .and_then(|map| map.get("tang"))
+            .and_then(|map| map.get("adv"))
+            .and_then(|adv| adv.get("keys"))
+            .and_then(|keys| keys.as_array())
+            .ok_or_else(|| {
+                LibcryptErr::Other(
+                    "Expected an array for value of clevis.tang.adv.keys".to_string(),
+                )
+            })?;
+        let mut key = keys
+            .iter()
+            .cloned()
+            .find(|obj| obj.get("key_ops") == Some(&Value::Array(vec![Value::from("verify")])))
+            .ok_or_else(|| {
+                LibcryptErr::Other("Verification key not found in clevis metadata".to_string())
+            })?;
+
+        let map = if let Some(m) = key.as_object_mut() {
+            m
+        } else {
+            return Err(LibcryptErr::Other(
+                "Key value is not in JSON object format".to_string(),
+            ));
+        };
+        map.remove("key_ops");
+        map.remove("alg");
+
+        let thp = key.to_string();
+        let mut hasher = Sha1::new();
+        hasher.input(thp.as_bytes());
+        let array = hasher.result();
+        let thp = base64::encode(array);
+
+        Ok(Some((url.to_owned(), thp)))
+    }
+
+    /// Get Tang server info for the clevis binding.
+    pub fn clevis_info(&mut self) -> Result<Option<TangInfo>> {
+        match self.get_url_and_thp()? {
+            Some((url, thp)) => Ok(Some(TangInfo {
+                tang_url: url,
+                tang_thp: thp,
+            })),
+            None => Ok(None),
+        }
     }
 
     /// Activate encrypted Stratis device using the name stored in the
@@ -511,8 +576,13 @@ impl CryptHandle {
     }
 
     /// Bind the given device to a tang server using clevis.
-    pub fn clevis_bind(&mut self, keyfile_path: &Path, tang_url: &str) -> Result<()> {
-        clevis_luks_bind(&self.physical_path, keyfile_path, tang_url)
+    pub fn clevis_bind(
+        &mut self,
+        keyfile_path: &Path,
+        tang_url: &str,
+        tang_thp: &str,
+    ) -> Result<()> {
+        clevis_luks_bind(&self.physical_path, keyfile_path, tang_url, tang_thp)
             .map_err(|e| LibcryptErr::Other(e.to_string()))
     }
 

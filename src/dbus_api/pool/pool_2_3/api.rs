@@ -12,7 +12,8 @@ use crate::dbus_api::{
 pub fn bind_clevis_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
     f.method("BindClevis", (), bind_clevis)
         .in_arg(("key_desc", "s"))
-        .in_arg(("tang_info", "s"))
+        .in_arg(("tang_url", "s"))
+        .in_arg(("tang_thp", "s"))
         // b: Indicates if new clevis bindings were added
         //
         // Rust representation: bool

@@ -32,7 +32,7 @@ use crate::{
             names::KeyDescription,
             udev::{block_device_apply, decide_ownership, get_udev_property, UdevOwnership},
         },
-        types::{BlockDevPath, DevUuid, PoolUuid},
+        types::{BlockDevPath, DevUuid, PoolUuid, TangInfo},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -436,7 +436,7 @@ pub fn initialize_devices(
     devices: Vec<DeviceInfo>,
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
-    encryption_info: Option<(&KeyDescription, Option<&String>)>,
+    encryption_info: Option<(&KeyDescription, Option<&TangInfo>)>,
 ) -> StratisResult<Vec<StratBlockDev>> {
     /// Map a major/minor device number of a physical device
     /// to the corresponding major/minor number of the encrypted
@@ -458,7 +458,7 @@ pub fn initialize_devices(
         pool_uuid: PoolUuid,
         dev_uuid: DevUuid,
         key_description: &KeyDescription,
-        enable_clevis: Option<&String>,
+        enable_clevis: Option<&TangInfo>,
     ) -> StratisResult<(CryptHandle, Device, Sectors)> {
         let mut handle = CryptInitializer::new(physical_path.to_owned(), pool_uuid, dev_uuid)
             .initialize(key_description)?;
@@ -468,7 +468,7 @@ pub fn initialize_devices(
             let mem_fs = MemoryPrivateFilesystem::new()?;
             mem_fs.key_op(key_description, |key_path| {
                 handle
-                    .clevis_bind(key_path, tang_info)
+                    .clevis_bind(key_path, &tang_info.tang_url, &tang_info.tang_thp)
                     .map_err(|e| StratisError::Error(e.to_string()))
             })?;
         };
@@ -579,7 +579,7 @@ pub fn initialize_devices(
         dev_info: &DeviceInfo,
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
-        encryption_info: Option<(&KeyDescription, Option<&String>)>,
+        encryption_info: Option<(&KeyDescription, Option<&TangInfo>)>,
     ) -> StratisResult<StratBlockDev> {
         let dev_uuid = Uuid::new_v4();
         let (maybe_encrypted, devno, blockdev_size) = match encryption_info {

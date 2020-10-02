@@ -14,14 +14,15 @@ use crate::{
         types::TData,
         util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
     },
-    engine::{CreateAction, DeleteAction, KeyDescription},
+    engine::{CreateAction, DeleteAction, KeyDescription, TangInfo},
 };
 
 pub fn bind_clevis(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
     let key_desc: String = get_next_arg(&mut iter, 0)?;
-    let tang_info: &str = get_next_arg(&mut iter, 1)?;
+    let tang_url: String = get_next_arg(&mut iter, 1)?;
+    let tang_thp: String = get_next_arg(&mut iter, 2)?;
 
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
@@ -44,7 +45,7 @@ pub fn bind_clevis(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };
-    let msg = match pool.bind_clevis(&key_desc_typed, tang_info) {
+    let msg = match pool.bind_clevis(&key_desc_typed, TangInfo::new(tang_url, tang_thp)) {
         Ok(CreateAction::Identity) => return_message.append3(false, msg_code_ok(), msg_string_ok()),
         Ok(CreateAction::Created(_)) => {
             return_message.append3(true, msg_code_ok(), msg_string_ok())

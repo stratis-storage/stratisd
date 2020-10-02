@@ -26,6 +26,7 @@ use crate::{
             serde_structs::{BackstoreSave, CapSave, Recordable},
             writing::wipe_sectors,
         },
+        types::TangInfo,
         BlockDevTier, DevUuid, PoolUuid,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -176,7 +177,7 @@ impl Backstore {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         mda_data_size: MDADataSize,
-        encryption_info: Option<(&KeyDescription, Option<&String>)>,
+        encryption_info: Option<(&KeyDescription, Option<&TangInfo>)>,
     ) -> StratisResult<Backstore> {
         let data_tier = DataTier::new(BlockDevMgr::initialize(
             pool_uuid,

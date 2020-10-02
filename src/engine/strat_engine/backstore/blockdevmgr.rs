@@ -6,7 +6,6 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    fs::File,
     path::Path,
 };
 
@@ -23,11 +22,11 @@ use crate::{
                 crypt::CryptHandle,
                 devices::{initialize_devices, process_and_verify_devices, wipe_blockdevs},
             },
-            metadata::{device_identifiers, MDADataSize},
+            metadata::MDADataSize,
             names::KeyDescription,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
         },
-        types::{DevUuid, PoolUuid},
+        types::{DevUuid, PoolUuid, TangInfo},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -135,7 +134,7 @@ impl BlockDevMgr {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         mda_data_size: MDADataSize,
-        encryption_info: Option<(&KeyDescription, Option<&String>)>,
+        encryption_info: Option<(&KeyDescription, Option<&TangInfo>)>,
     ) -> StratisResult<BlockDevMgr> {
         let devices = process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?;
 
@@ -171,40 +170,48 @@ impl BlockDevMgr {
     ///
     /// Returns Ok(Some(_)) containing the tang URL if clevis is enabled.
     /// Returns Ok(None) if clevis is not enabled.
-    fn clevis_enabled(&self, pool_uuid: PoolUuid) -> StratisResult<Option<String>> {
+    fn clevis_enabled(&self, pool_uuid: PoolUuid) -> StratisResult<Option<TangInfo>> {
+        fn match_infos(
+            clevis_info: Option<TangInfo>,
+            clevis_info_next: Option<TangInfo>,
+        ) -> StratisResult<Option<TangInfo>> {
+            match (clevis_info, clevis_info_next) {
+                (Some(c), Some(cn)) => {
+                    if c != cn {
+                        Err(StratisError::Error(
+                            "Clevis metadata is inconsistent; not all \
+                            devices are using the same tang server"
+                                .to_string(),
+                        ))
+                    } else {
+                        Ok(Some(c))
+                    }
+                }
+                (None, Some(cn)) => Ok(Some(cn)),
+                (Some(_), None) => Err(StratisError::Error(
+                    "Clevis metadata is inconsistent; not all \
+                        devices have clevis enabled."
+                        .to_string(),
+                )),
+                (None, None) => Ok(None),
+            }
+        }
+
         // Clevis cannot be enabled on block devices that are not encrypted.
         if self.key_desc.is_none() {
             return Ok(None);
         }
 
-        let mut clevis_info = String::new();
+        let mut clevis_info: Option<Option<TangInfo>> = None;
         for bd in self.block_devs.iter() {
-            let metadata_path = bd.devnode().metadata_path();
-            let mut devnode_file = File::open(metadata_path)?;
-            let identifiers = device_identifiers(&mut devnode_file)?.ok_or_else(|| {
-                StratisError::Error(format!(
-                    "Device {} is not a Stratis device",
-                    metadata_path.display()
-                ))
-            })?;
-            if identifiers.pool_uuid == pool_uuid {
+            if bd.pool_uuid() == pool_uuid {
                 let physical_path = bd.devnode().physical_path();
                 if let Some(mut handle) = CryptHandle::setup(physical_path)? {
                     let clevis_info_next = handle.clevis_info()?;
-                    if let Some(cin) = clevis_info_next {
-                        if clevis_info.is_empty() {
-                            clevis_info = cin;
-                        } else if cin != clevis_info {
-                            return Err(StratisError::Error(
-                                "Clevis metadata is inconsistent; not all devices \
-                                are pointing at the same tang server"
-                                    .to_string(),
-                            ));
-                        }
-                    } else if !clevis_info.is_empty() && clevis_info_next.is_none() {
-                        return Err(StratisError::Error(
-                            "Clevis is not enabled on all devices".to_string(),
-                        ));
+                    if let Some(ci) = clevis_info {
+                        clevis_info = Some(match_infos(ci, clevis_info_next)?);
+                    } else {
+                        clevis_info = Some(clevis_info_next);
                     }
                 } else {
                     return Err(StratisError::Error(format!(
@@ -215,11 +222,7 @@ impl BlockDevMgr {
             }
         }
 
-        if clevis_info.is_empty() {
-            Ok(None)
-        } else {
-            Ok(Some(clevis_info))
-        }
+        Ok(clevis_info.and_then(|ci| ci))
     }
 
     /// Add paths to self.
@@ -244,7 +247,7 @@ impl BlockDevMgr {
             ));
         }
 
-        let clevis_enabled = self.clevis_enabled(pool_uuid)?;
+        let clevis_info = self.clevis_enabled(pool_uuid)?;
         // FIXME: This is a bug. If new devices are added to a pool, and the
         // variable length metadata requires more than the minimum allocated,
         // then the necessary amount must be provided or the data can not be
@@ -254,7 +257,7 @@ impl BlockDevMgr {
             pool_uuid,
             MDADataSize::default(),
             match self.key_desc.as_ref() {
-                Some(kd) => Some((kd, clevis_enabled.as_ref())),
+                Some(kd) => Some((kd, clevis_info.as_ref())),
                 None => None,
             },
         )?;

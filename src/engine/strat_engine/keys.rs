@@ -513,10 +513,13 @@ impl MemoryPrivateFilesystem {
                 format!("Path {} does not exist", MemoryFilesystem::TMPFS_LOCATION,),
             )));
         };
-        let random_string: String = rand::thread_rng()
-            .sample_iter::<char, Standard>(Standard)
-            .take(16)
-            .collect();
+        let mut random_string = String::new();
+        while random_string.len() < 16 {
+            let ch: char = rand::thread_rng().sample(Standard);
+            if ch.is_ascii_alphanumeric() {
+                random_string.push(ch);
+            }
+        }
         let mut private_fs_path = PathBuf::from(MemoryFilesystem::TMPFS_LOCATION);
         private_fs_path.push(random_string);
         create_dir_all(&private_fs_path)?;
@@ -531,7 +534,7 @@ impl MemoryPrivateFilesystem {
             None,
             MemoryFilesystem::TMPFS_LOCATION,
             None,
-            MsFlags::MS_PRIVATE | MsFlags::MS_REC,
+            MsFlags::MS_SLAVE | MsFlags::MS_REC,
             None,
         )?;
         mount(
@@ -592,6 +595,7 @@ impl MemoryMappedKeyfile {
         }
 
         let keyfile = OpenOptions::new()
+            .read(true)
             .write(true)
             .create(true)
             .open(file_path)?;

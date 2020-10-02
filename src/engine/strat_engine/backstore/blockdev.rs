@@ -20,7 +20,7 @@ use crate::{
             names::KeyDescription,
             serde_structs::{BaseBlockDevSave, Recordable},
         },
-        types::{BlockDevPath, DevUuid, MaybeDbusPath},
+        types::{BlockDevPath, DevUuid, MaybeDbusPath, PoolUuid},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -131,6 +131,11 @@ impl StratBlockDev {
             .write(true)
             .open(self.devnode.metadata_path())?;
         self.bda.save_state(time, metadata, &mut f)
+    }
+
+    /// The pool's UUID.
+    pub fn pool_uuid(&self) -> PoolUuid {
+        self.bda.pool_uuid()
     }
 
     /// The device's UUID.

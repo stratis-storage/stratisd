@@ -29,7 +29,7 @@ use crate::{
         },
         types::{
             BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid, MaybeDbusPath, Name,
-            PoolUuid, Redundancy, RenameAction, SetCreateAction, SetDeleteAction,
+            PoolUuid, Redundancy, RenameAction, SetCreateAction, SetDeleteAction, TangInfo,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -377,16 +377,16 @@ fn get_crypt_handles(blockdevs: &[&dyn BlockDev]) -> StratisResult<Vec<CryptHand
 }
 
 fn clevis_is_enabled(handles: &mut Vec<CryptHandle>) -> StratisResult<bool> {
-    let mut clevis_info = HashSet::new();
+    let mut clevis_infos = HashSet::new();
     for handle in handles.iter_mut() {
-        let opt = handle.clevis_info()?;
-        if let Some(info) = opt {
-            clevis_info.insert(info);
+        let clevis_info = handle.clevis_info()?;
+        if let Some(info) = clevis_info {
+            clevis_infos.insert(info);
         }
     }
-    if clevis_info.is_empty() {
+    if clevis_infos.is_empty() {
         Ok(false)
-    } else if clevis_info.len() == 1 {
+    } else if clevis_infos.len() == 1 {
         Ok(true)
     } else {
         Err(StratisError::Error(
@@ -442,19 +442,19 @@ impl Pool for StratPool {
     fn bind_clevis(
         &self,
         key_desc: &KeyDescription,
-        tang_url: &str,
+        tang_info: TangInfo,
     ) -> StratisResult<CreateAction<()>> {
         fn bind_clevis_loop<'a>(
             key_fs: &MemoryPrivateFilesystem,
             rollback_record: &'a mut Vec<CryptHandle>,
             handles: &'a mut Vec<CryptHandle>,
             key_desc: &KeyDescription,
-            tang_url: &str,
+            tang_info: TangInfo,
         ) -> StratisResult<()> {
             for mut crypt_handle in handles.drain(..) {
                 let res = key_fs.key_op(key_desc, |keyfile_path| {
                     crypt_handle
-                        .clevis_bind(keyfile_path, tang_url)
+                        .clevis_bind(keyfile_path, &tang_info.tang_url, &tang_info.tang_thp)
                         .map_err(StratisError::Crypt)
                 });
                 if res.is_ok() {
@@ -479,7 +479,7 @@ impl Pool for StratPool {
             &mut rollback_record,
             &mut crypt_handles,
             key_desc,
-            tang_url,
+            tang_info,
         );
 
         if result.is_err() {

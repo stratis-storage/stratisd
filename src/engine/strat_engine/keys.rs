@@ -49,7 +49,7 @@ fn get_persistent_keyring() -> StratisResult<KeySerial> {
         )
     } {
         i if i < 0 => Err(io::Error::last_os_error().into()),
-        i => convert_int!(i, i64, KeySerial),
+        i => convert_int!(i, libc::c_long, KeySerial),
     }
 }
 
@@ -83,7 +83,7 @@ fn search_key(
             Err(io::Error::last_os_error().into())
         }
     } else {
-        convert_int!(key_id, i64, KeySerial).map(Some)
+        convert_int!(key_id, libc::c_long, KeySerial).map(Some)
     }
 }
 
@@ -121,7 +121,7 @@ fn read_key(
         i if i < 0 => Err(io::Error::last_os_error().into()),
         i => Ok(Some((
             key_id as KeySerial,
-            SizedKeyMemory::new(key_buffer, convert_int!(i, i64, usize)?),
+            SizedKeyMemory::new(key_buffer, convert_int!(i, libc::c_long, usize)?),
         ))),
     }
 }
@@ -265,7 +265,7 @@ impl KeyIdList {
                 )
             } {
                 i if i < 0 => return Err(io::Error::last_os_error().into()),
-                i => convert_int!(i, i64, usize)?,
+                i => convert_int!(i, libc::c_long, usize)?,
             };
 
             let num_key_ids = num_bytes_read / size_of::<KeySerial>();
@@ -304,7 +304,7 @@ impl KeyIdList {
                     )
                 } {
                     i if i < 0 => return Err(io::Error::last_os_error().into()),
-                    i => convert_int!(i, i64, usize)?,
+                    i => convert_int!(i, libc::c_long, usize)?,
                 };
 
                 if len <= keyctl_buffer.capacity() {

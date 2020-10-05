@@ -459,7 +459,7 @@ pub fn initialize_devices(
         dev_uuid: DevUuid,
         key_description: &KeyDescription,
         enable_clevis: Option<&TangInfo>,
-    ) -> Result<(CryptHandle, Device, Sectors), (StratisError, Option<MaybeEncrypted>)> {
+    ) -> StratisResult<(CryptHandle, Device, Sectors)> {
         fn initialize_encrypted_with_err(
             handle: &mut CryptHandle,
             key_description: &KeyDescription,
@@ -485,11 +485,21 @@ pub fn initialize_devices(
         }
 
         let mut handle = CryptInitializer::new(physical_path.to_owned(), pool_uuid, dev_uuid)
-            .initialize(key_description)
-            .map_err(|e| (StratisError::Error(e.to_string()), None))?;
+            .initialize(key_description)?;
         match initialize_encrypted_with_err(&mut handle, key_description, enable_clevis) {
             Ok((devno, devsize)) => Ok((handle, devno, devsize)),
-            Err(e) => Err((e, Some(MaybeEncrypted::Encrypted(handle)))),
+            Err(error) => {
+                if let Err(e) = handle.wipe() {
+                    warn!(
+                        "Failed to clean up encrypted device {}; cleanup \
+                        was attempted because initialization of the device \
+                        failed: {}",
+                        handle.physical_device_path().display(),
+                        e
+                    );
+                }
+                Err(error)
+            }
         }
     }
 
@@ -594,7 +604,7 @@ pub fn initialize_devices(
         encryption_info: Option<(&KeyDescription, Option<&TangInfo>)>,
     ) -> StratisResult<StratBlockDev> {
         let dev_uuid = Uuid::new_v4();
-        let result = match encryption_info {
+        let (maybe_encrypted, devno, blockdev_size) = match encryption_info {
             Some((desc, enable_clevis)) => {
                 initialize_encrypted(&dev_info.devnode, pool_uuid, dev_uuid, desc, enable_clevis)
                     .map(|(handle, devno, devsize)| {
@@ -616,24 +626,15 @@ pub fn initialize_devices(
                             dev_info.devno, devno,
                         );
                         (MaybeEncrypted::Encrypted(handle), devno, devsize)
-                    })
+                    })?
             }
-            None => Ok((
+            None => (
                 MaybeEncrypted::Unencrypted(dev_info.devnode.clone(), pool_uuid),
                 dev_info.devno,
                 dev_info.size.sectors(),
-            )),
+            ),
         };
 
-        let (maybe_encrypted, devno, blockdev_size) = match result {
-            Ok(tuple) => tuple,
-            Err((e, maybe_encrypted)) => {
-                if let Some(me) = maybe_encrypted {
-                    clean_up(me);
-                }
-                return Err(e);
-            }
-        };
         let path = match maybe_encrypted.as_blockdev_path() {
             Ok(p) => p,
             Err(e) => {

@@ -240,9 +240,9 @@ impl BlockDevMgr {
             return Err(StratisError::Engine(
                 ErrorEnum::Invalid,
                 "The key associated with the current registered key description \
-                was not able to unlock an existing encrypted device. Check that \
+                was not able to unlock an existing encrypted device; check that \
                 the same key is in the keyring that was used to create the encrypted \
-                pool."
+                pool"
                     .to_string(),
             ));
         }

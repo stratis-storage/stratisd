@@ -8,6 +8,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use base64::{decode, encode_config, CharacterSet, Config};
 use serde_json::Value;
 use sha1::{Digest, Sha1};
 
@@ -498,7 +499,7 @@ impl CryptHandle {
             Some(s) => s.to_owned(),
             None => return Ok(None),
         };
-        let json_bytes = base64::decode(json_b64).map_err(|e| LibcryptErr::Other(e.to_string()))?;
+        let json_bytes = decode(json_b64).map_err(|e| LibcryptErr::Other(e.to_string()))?;
 
         let subjson: Value = serde_json::from_slice(json_bytes.as_slice())
             .map_err(|e| LibcryptErr::Other(e.to_string()))?;
@@ -545,7 +546,7 @@ impl CryptHandle {
         let mut hasher = Sha1::new();
         hasher.input(thp.as_bytes());
         let array = hasher.result();
-        let thp = base64::encode(array);
+        let thp = encode_config(array, Config::new(CharacterSet::UrlSafe, false));
 
         Ok(Some((url.to_owned(), thp)))
     }

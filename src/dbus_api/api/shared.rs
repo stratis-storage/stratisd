@@ -135,7 +135,7 @@ pub fn set_key_shared(
             let return_value = match idem_resp {
                 MappingCreateAction::Created(()) => (true, false),
                 MappingCreateAction::ValueChanged(()) => (true, true),
-                MappingCreateAction::Identity => (false, false),
+                MappingCreateAction::Identity => default_return,
             };
             return_message.append3(return_value, msg_code_ok(), msg_string_ok())
         }

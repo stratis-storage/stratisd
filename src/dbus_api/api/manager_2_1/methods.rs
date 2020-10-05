@@ -88,9 +88,7 @@ pub fn unlock_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                 .collect();
             return_message.append3((true, str_uuids), msg_code_ok(), msg_string_ok())
         }
-        Ok(_) => {
-            return_message.append3((true, Vec::<String>::new()), msg_code_ok(), msg_string_ok())
-        }
+        Ok(_) => return_message.append3(default_return, msg_code_ok(), msg_string_ok()),
         Err(e) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e);
             return_message.append3(default_return, rc, rs)

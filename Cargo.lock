@@ -459,6 +459,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
+ "syslog",
  "tempfile",
  "termios",
  "timerfd",
@@ -970,6 +971,18 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-xid",
+]
+
+[[package]]
+name = "syslog"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a5d8ef1b679c07976f3ee336a436453760c470f54b5e7237556728b8589515d"
+dependencies = [
+ "error-chain",
+ "libc",
+ "log",
+ "time",
 ]
 
 [[package]]

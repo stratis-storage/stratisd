@@ -59,6 +59,10 @@ optional = true
 version = "0.2"
 optional=true
 
+[dependencies.syslog]
+version = "5.0"
+optional = true
+
 [dependencies.uuid]
 version = "0.8"
 features = ["serde", "v4"]
@@ -76,4 +80,4 @@ matches = "0.1"
 [features]
 default = ["dbus_enabled"]
 dbus_enabled = ["dbus", "libdbus-sys"]
-extras = []
+extras = ["syslog"]

@@ -308,7 +308,7 @@ class UdevTest3(UdevTest):
                 self.assertEqual(option, False)
             else:
                 self.assertEqual(exit_code, StratisdErrors.OK)
-                self.assertEqual(option, True)
+                self.assertEqual(option, take_down_dm)
                 self.assertEqual(len(unlock_uuids), num_devices if take_down_dm else 0)
 
             wait_for_udev_count(num_devices)

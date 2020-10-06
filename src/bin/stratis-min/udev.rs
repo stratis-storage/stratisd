@@ -2,19 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::os::unix::net::UnixDatagram;
-
 use regex::Regex;
 
 use libstratis::{
     engine::{Engine, FilesystemUuid, PoolUuid, StratEngine},
     stratis::{StratisError, StratisResult},
 };
-
-const DEV_LOG: &str = "/dev/log";
-/// Syslog priority syntax
-/// (3 (SYSTEM) << 3) | 3 (ERROR)
-const SYSTEM_DAEMON_ERROR: &str = "<27>";
 
 pub fn udev_with_err(dm_name: &str) -> StratisResult<()> {
     let regex = Regex::new("stratis-1-([0-9a-f]{32})-thin-fs-([0-9a-f]{32})")
@@ -39,13 +32,6 @@ pub fn udev_with_err(dm_name: &str) -> StratisResult<()> {
 }
 
 pub fn udev(dm_name: &str) -> Result<(), String> {
-    if let Err(e) = udev_with_err(dm_name) {
-        let log = UnixDatagram::unbound().map_err(|e| e.to_string())?;
-        log.send_to(
-            format!("{}{}", SYSTEM_DAEMON_ERROR, e.to_string()).as_bytes(),
-            DEV_LOG,
-        )
-        .map_err(|e| e.to_string())?;
-    }
+    udev_with_err(dm_name).map_err(|e| e.to_string())?;
     Ok(())
 }

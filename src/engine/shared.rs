@@ -165,23 +165,10 @@ pub fn set_key_shared(key_fd: RawFd, interactive: Option<bool>) -> StratisResult
 
 /// Validate a str for use as a Pool or Filesystem name.
 pub fn validate_name(name: &str) -> StratisResult<()> {
-    let name_path = Path::new(name);
     if name.contains('\u{0}') {
         return Err(StratisError::Engine(
             ErrorEnum::Invalid,
             format!("Name contains NULL characters : {}", name),
-        ));
-    }
-    if name_path.components().count() != 1 {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name is a path with 0 or more than 1 components : {}", name),
-        ));
-    }
-    if name_path.is_absolute() {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name is an absolute path : {}", name),
         ));
     }
     if name == "." || name == ".." {
@@ -197,7 +184,6 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
             format!("Name has more than 255 bytes : {}", name),
         ));
     }
-
     if name.len() != name.trim().len() {
         return Err(StratisError::Engine(
             ErrorEnum::Invalid,
@@ -208,6 +194,20 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
         return Err(StratisError::Engine(
             ErrorEnum::Invalid,
             format!("Name contains control characters : {}", name),
+        ));
+    }
+
+    let name_path = Path::new(name);
+    if name_path.components().count() != 1 {
+        return Err(StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!("Name is a path with 0 or more than 1 components : {}", name),
+        ));
+    }
+    if name_path.is_absolute() {
+        return Err(StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!("Name is an absolute path : {}", name),
         ));
     }
     Ok(())

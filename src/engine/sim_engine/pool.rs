@@ -20,7 +20,7 @@ use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
         event::get_engine_listener_list,
-        shared::{init_cache_idempotent_or_err, validate_name},
+        shared::{init_cache_idempotent_or_err, validate_name, validate_paths},
         sim_engine::{blockdev::SimDev, filesystem::SimFilesystem, randomization::Randomizer},
         structures::Table,
         types::{
@@ -152,6 +152,8 @@ impl Pool for SimPool {
         _pool_name: &str,
         blockdevs: &[&Path],
     ) -> StratisResult<SetCreateAction<DevUuid>> {
+        validate_paths(blockdevs)?;
+
         if self.is_encrypted() {
             return Err(StratisError::Engine(
                 ErrorEnum::Invalid,
@@ -214,6 +216,8 @@ impl Pool for SimPool {
         paths: &[&Path],
         tier: BlockDevTier,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
+        validate_paths(paths)?;
+
         if tier == BlockDevTier::Cache && !self.has_cache() {
             return Err(StratisError::Engine(
                     ErrorEnum::Invalid,

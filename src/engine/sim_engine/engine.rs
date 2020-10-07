@@ -17,7 +17,7 @@ use crate::{
     engine::{
         engine::{Engine, Eventable, KeyActions, Pool, Report},
         event::get_engine_listener_list,
-        shared::{create_pool_idempotent_or_err, validate_name},
+        shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         sim_engine::{keys::SimKeyActions, pool::SimPool, randomization::Randomizer},
         structures::Table,
         types::{
@@ -86,6 +86,8 @@ impl Engine for SimEngine {
         let redundancy = calculate_redundancy!(redundancy);
 
         validate_name(name)?;
+
+        validate_paths(blockdev_paths)?;
 
         let key_description = match key_desc {
             Some(key_desc) => Some(KeyDescription::try_from(key_desc)?),

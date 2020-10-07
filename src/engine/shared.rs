@@ -213,6 +213,30 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
     Ok(())
 }
 
+/// Verify that all paths are absolute.
+pub fn validate_paths(paths: &[&Path]) -> StratisResult<()> {
+    let non_absolute_paths: Vec<&Path> = paths
+        .iter()
+        .filter(|path| !path.is_absolute())
+        .cloned()
+        .collect();
+    if non_absolute_paths.is_empty() {
+        Ok(())
+    } else {
+        Err(StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!(
+                "Paths{{{}}} are not absolute",
+                non_absolute_paths
+                    .iter()
+                    .map(|p| p.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

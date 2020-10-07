@@ -13,11 +13,11 @@ use devicemapper::{DmName, DmNameBuf, Sectors};
 use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
-        shared::init_cache_idempotent_or_err,
+        shared::{init_cache_idempotent_or_err, validate_name},
         strat_engine::{
             backstore::{Backstore, StratBlockDev},
             metadata::MDADataSize,
-            names::{validate_name, KeyDescription},
+            names::KeyDescription,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },

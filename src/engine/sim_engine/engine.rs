@@ -17,7 +17,7 @@ use crate::{
     engine::{
         engine::{Engine, Eventable, KeyActions, Pool, Report},
         event::get_engine_listener_list,
-        shared::create_pool_idempotent_or_err,
+        shared::{create_pool_idempotent_or_err, validate_name},
         sim_engine::{keys::SimKeyActions, pool::SimPool, randomization::Randomizer},
         structures::Table,
         types::{
@@ -84,6 +84,8 @@ impl Engine for SimEngine {
         key_desc: Option<String>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
         let redundancy = calculate_redundancy!(redundancy);
+
+        validate_name(name)?;
 
         let key_description = match key_desc {
             Some(key_desc) => Some(KeyDescription::try_from(key_desc)?),

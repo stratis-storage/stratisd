@@ -397,12 +397,9 @@ impl KeyActions for StratKeyActions {
     fn unset(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>> {
         let keyring_id = get_persistent_keyring()?;
 
-        if let Some(key_id) =
-            search_key(keyring_id, &KeyDescription::try_from(key_desc.to_string())?)?
-        {
-            unset_key(key_id).map(|_| DeleteAction::Deleted(()))
-        } else {
-            Ok(DeleteAction::Identity)
-        }
+        (search_key(keyring_id, &KeyDescription::try_from(key_desc.to_string())?)?)
+            .map_or(Ok(DeleteAction::Identity), |key_id| {
+                unset_key(key_id).map(|_| DeleteAction::Deleted(()))
+            })
     }
 }

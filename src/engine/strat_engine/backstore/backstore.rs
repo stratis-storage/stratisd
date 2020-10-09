@@ -556,13 +556,10 @@ impl Backstore {
     pub fn teardown(&mut self) -> StratisResult<()> {
         match self.cache {
             Some(ref mut cache) => cache.teardown(get_dm()),
-            None => {
-                if let Some(ref mut linear) = self.linear {
-                    linear.teardown(get_dm())
-                } else {
-                    Ok(())
-                }
-            }
+            None => self
+                .linear
+                .as_mut()
+                .map_or(Ok(()), |linear| linear.teardown(get_dm())),
         }
         .map_err(|e| e.into())
     }

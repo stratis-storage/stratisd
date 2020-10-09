@@ -240,11 +240,7 @@ impl StaticHeader {
         where
             F: Seek + SyncAll,
         {
-            if let Some(sh) = maybe_sh {
-                write_header(f, sh, repair_location)
-            } else {
-                Err(sh_error)
-            }
+            maybe_sh.map_or(Err(sh_error), |sh| write_header(f, sh, repair_location))
         }
 
         // Action taken when both sigblock locations are analyzed without encountering an error.

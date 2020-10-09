@@ -27,6 +27,7 @@ CLIPPY_DENY = -D clippy::pedantic \
               -A clippy::module_name_repetitions \
               -A clippy::needless_pass_by_value \
               -A clippy::non_ascii_literal \
+              -A clippy::option_if_let_else \
               -A clippy::redundant-closure-for-method-calls \
               -A clippy::shadow_unrelated \
               -A clippy::single_match_else \

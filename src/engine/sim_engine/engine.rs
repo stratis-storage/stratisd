@@ -95,21 +95,21 @@ impl Engine for SimEngine {
             ));
         }
 
-        if let Some(ref key_desc) = key_desc {
-            if !self.key_handler.contains_key(key_desc) {
-                return Err(StratisError::Engine(
-                    ErrorEnum::NotFound,
-                    format!(
-                        "Key {} was not found in the keyring",
-                        key_desc.as_application_str()
-                    ),
-                ));
-            }
-        }
-
         match self.pools.get_by_name(name) {
             Some((_, pool)) => create_pool_idempotent_or_err(pool, name, blockdev_paths),
             None => {
+                if let Some(ref key_description) = key_desc {
+                    if !self.key_handler.contains_key(key_description) {
+                        return Err(StratisError::Engine(
+                            ErrorEnum::NotFound,
+                            format!(
+                                "Key {} was not found in the keyring",
+                                key_description.as_application_str()
+                            ),
+                        ));
+                    }
+                }
+
                 let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
                 let devices = device_set.into_iter().cloned().collect::<Vec<&Path>>();
 

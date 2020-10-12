@@ -16,6 +16,8 @@ use termios::Termios;
 use devicemapper::Bytes;
 use libcryptsetup_rs::SafeMemHandle;
 
+use regex::Regex;
+
 use crate::{
     engine::{
         engine::{Pool, MAX_STRATIS_PASS_SIZE},
@@ -194,6 +196,13 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
         return Err(StratisError::Engine(
             ErrorEnum::Invalid,
             format!("Name contains control characters : {}", name),
+        ));
+    }
+    let name_udevregex = Regex::new(r"[\$!]").unwrap();
+    if name_udevregex.is_match(name) {
+        return Err(StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!("Name contains characters not allowed by udev : {}", name),
         ));
     }
 

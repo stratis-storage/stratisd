@@ -18,8 +18,8 @@ use libcryptsetup_rs::SafeMemHandle;
 
 use crate::{
     engine::{
-        engine::{Pool, MAX_STRATIS_PASS_SIZE},
-        types::{BlockDevTier, CreateAction, DevUuid, PoolUuid, SetCreateAction, SizedKeyMemory},
+        engine::MAX_STRATIS_PASS_SIZE,
+        types::{DevUuid, SetCreateAction, SizedKeyMemory},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -29,27 +29,13 @@ use crate::{
 /// pool differ from the specifications of the existing pool, otherwise
 /// returns Ok(CreateAction::Identity).
 pub fn create_pool_idempotent_or_err(
-    pool: &dyn Pool,
-    pool_name: &str,
+    existing_paths: &HashSet<PathBuf>,
     blockdev_paths: &[&Path],
-) -> StratisResult<CreateAction<PoolUuid>> {
-    let input_devices: HashSet<PathBuf, RandomState> =
-        blockdev_paths.iter().map(|p| p.to_path_buf()).collect();
+) -> StratisResult<()> {
+    let input_devices: HashSet<PathBuf> = blockdev_paths.iter().map(|p| p.to_path_buf()).collect();
 
-    let existing_paths: HashSet<PathBuf, _> = pool
-        .blockdevs()
-        .iter()
-        .filter_map(|(_, tier, bd)| {
-            if *tier == BlockDevTier::Data {
-                Some(bd.devnode().physical_path().to_owned())
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    if input_devices == existing_paths {
-        Ok(CreateAction::Identity)
+    if &input_devices == existing_paths {
+        Ok(())
     } else {
         let in_input = input_devices
             .difference(&existing_paths)
@@ -61,7 +47,7 @@ pub fn create_pool_idempotent_or_err(
             .collect::<Vec<_>>();
         Err(StratisError::Engine(
             ErrorEnum::Invalid,
-            create_pool_generate_error_string!(pool_name, in_input, in_pool),
+            create_pool_generate_error_string!(in_input, in_pool),
         ))
     }
 }

@@ -126,12 +126,11 @@ macro_rules! device_list_check_num {
 }
 
 macro_rules! create_pool_generate_error_string {
-    ($pool_name:ident, $input:ident, $exists:ident) => {
+    ($input:ident, $exists:ident) => {
         format!(
             "There was a difference in the blockdevs associated with \
-             the existing pool named {} and the input requesting creation \
+             an existing pool and the input requesting creation \
              of a pool by the same name{}{}",
-            $pool_name,
             device_list_check_num!(
                 $input,
                 (

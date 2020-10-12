@@ -12,7 +12,7 @@ use crate::{
     engine::{
         engine::{Eventable, KeyActions},
         event::get_engine_listener_list,
-        shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
+        shared::{validate_name, validate_paths},
         strat_engine::{
             cmd::verify_binaries,
             devlinks,
@@ -193,7 +193,9 @@ impl Engine for StratEngine {
         }
 
         match self.pools.get_by_name(name) {
-            Some((_, pool)) => create_pool_idempotent_or_err(pool, name, blockdev_paths),
+            Some((_, pool)) => pool
+                .idempotency_check(blockdev_paths)
+                .map(|_| CreateAction::Identity),
             None => {
                 let (uuid, pool) =
                     StratPool::initialize(name, blockdev_paths, redundancy, key_desc.as_ref())?;

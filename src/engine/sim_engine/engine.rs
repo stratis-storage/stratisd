@@ -16,7 +16,7 @@ use crate::{
     engine::{
         engine::{Engine, Eventable, KeyActions, Pool, Report},
         event::get_engine_listener_list,
-        shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
+        shared::{validate_name, validate_paths},
         sim_engine::{keys::SimKeyActions, pool::SimPool, randomization::Randomizer},
         structures::Table,
         types::{
@@ -96,7 +96,9 @@ impl Engine for SimEngine {
         }
 
         match self.pools.get_by_name(name) {
-            Some((_, pool)) => create_pool_idempotent_or_err(pool, name, blockdev_paths),
+            Some((_, pool)) => pool
+                .idempotency_check(blockdev_paths)
+                .map(|_| CreateAction::Identity),
             None => {
                 if let Some(ref key_description) = key_desc {
                     if !self.key_handler.contains_key(key_description) {

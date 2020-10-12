@@ -5,7 +5,6 @@
 use std::{
     cell::RefCell,
     collections::{hash_map::RandomState, HashMap, HashSet},
-    convert::TryFrom,
     iter::FromIterator,
     path::Path,
     rc::Rc,
@@ -81,7 +80,7 @@ impl Engine for SimEngine {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
-        key_desc: Option<String>,
+        key_desc: Option<KeyDescription>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
         let redundancy = calculate_redundancy!(redundancy);
 
@@ -89,18 +88,13 @@ impl Engine for SimEngine {
 
         validate_paths(blockdev_paths)?;
 
-        let key_description = match key_desc {
-            Some(key_desc) => Some(KeyDescription::try_from(key_desc)?),
-            None => None,
-        };
-
-        if let Some(ref key_description) = key_description {
-            if !self.key_handler.contains_key(key_description) {
+        if let Some(ref key_desc) = key_desc {
+            if !self.key_handler.contains_key(key_desc) {
                 return Err(StratisError::Engine(
                     ErrorEnum::NotFound,
                     format!(
                         "Key {} was not found in the keyring",
-                        key_description.as_application_str()
+                        key_desc.as_application_str()
                     ),
                 ));
             }
@@ -122,7 +116,7 @@ impl Engine for SimEngine {
                         &Rc::clone(&self.rdm),
                         &devices,
                         redundancy,
-                        key_description.as_ref(),
+                        key_desc.as_ref(),
                     );
 
                     if self.rdm.borrow_mut().throw_die() {

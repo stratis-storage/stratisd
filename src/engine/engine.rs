@@ -271,7 +271,7 @@ pub trait Engine: Debug + Report {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
-        key_desc: Option<String>,
+        key_desc: Option<KeyDescription>,
     ) -> StratisResult<CreateAction<PoolUuid>>;
 
     /// Handle a libudev event.

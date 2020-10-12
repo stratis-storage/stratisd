@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{os::unix::io::AsRawFd, path::Path, vec::Vec};
+use std::{convert::TryFrom, os::unix::io::AsRawFd, path::Path, vec::Vec};
 
 use dbus::{
     arg::{Array, OwnedFd},
@@ -19,7 +19,7 @@ use crate::{
             engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok, tuple_to_option,
         },
     },
-    engine::{CreateAction, MappingCreateAction, Name},
+    engine::{CreateAction, KeyDescription, MappingCreateAction, Name},
 };
 
 /// Shared code for the creation of pools using the D-Bus API without the option
@@ -38,6 +38,25 @@ pub fn create_pool_shared(m: &MethodInfo<MTFn<TData>, TData>, has_key_desc: bool
         None
     };
 
+    let return_message = message.method_return();
+
+    let default_return: (bool, (dbus::Path<'static>, Vec<dbus::Path<'static>>)) =
+        (false, (dbus::Path::default(), Vec::new()));
+
+    let key_desc = match key_desc_tuple
+        .and_then(tuple_to_option)
+        .map(|s| s.to_owned())
+    {
+        Some(kds) => match KeyDescription::try_from(kds) {
+            Ok(kd) => Some(kd),
+            Err(e) => {
+                let (rc, rs) = engine_to_dbus_err_tuple(&e);
+                return Ok(vec![return_message.append3(default_return, rc, rs)]);
+            }
+        },
+        None => None,
+    };
+
     let object_path = m.path.get_name();
     let dbus_context = m.tree.get_data();
     let mut engine = dbus_context.engine.borrow_mut();
@@ -45,15 +64,8 @@ pub fn create_pool_shared(m: &MethodInfo<MTFn<TData>, TData>, has_key_desc: bool
         name,
         &devs.map(|x| Path::new(x)).collect::<Vec<&Path>>(),
         tuple_to_option(redundancy_tuple),
-        key_desc_tuple
-            .and_then(tuple_to_option)
-            .map(|s| s.to_owned()),
+        key_desc,
     );
-
-    let return_message = message.method_return();
-
-    let default_return: (bool, (dbus::Path<'static>, Vec<dbus::Path<'static>>)) =
-        (false, (dbus::Path::default(), Vec::new()));
 
     let msg = match result {
         Ok(pool_uuid_action) => {

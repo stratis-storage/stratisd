@@ -9,8 +9,8 @@ pub use self::{
     strat_engine::{StratEngine, StratKeyActions, BDA},
     types::{
         BlockDevState, BlockDevTier, CreateAction, DeleteAction, DevUuid, EngineAction,
-        FilesystemUuid, MappingCreateAction, MaybeDbusPath, Name, PoolUuid, Redundancy,
-        RenameAction, ReportType, SetCreateAction, SetDeleteAction,
+        FilesystemUuid, KeyDescription, MappingCreateAction, MaybeDbusPath, Name, PoolUuid,
+        Redundancy, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
     },
 };
 

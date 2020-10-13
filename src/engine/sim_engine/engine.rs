@@ -97,7 +97,7 @@ impl Engine for SimEngine {
 
         match self.pools.get_by_name(name) {
             Some((_, pool)) => pool
-                .idempotency_check(blockdev_paths)
+                .idempotency_check(blockdev_paths, &key_desc)
                 .map(|_| CreateAction::Identity),
             None => {
                 if let Some(ref key_description) = key_desc {

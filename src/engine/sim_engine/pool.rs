@@ -105,7 +105,11 @@ impl SimPool {
         Ok(())
     }
 
-    pub fn idempotency_check(&self, blockdev_paths: &[&Path]) -> StratisResult<()> {
+    pub fn idempotency_check(
+        &self,
+        blockdev_paths: &[&Path],
+        key_description: &Option<KeyDescription>,
+    ) -> StratisResult<()> {
         create_pool_idempotent_or_err(
             &self
                 .datadevs()
@@ -113,7 +117,17 @@ impl SimPool {
                 .map(|(_, bd)| bd.devnode().physical_path().to_owned())
                 .collect(),
             blockdev_paths,
-        )
+        ).and_then(|_| {
+            if key_description != &self.block_devs_key_desc {
+                Err(StratisError::Engine(
+                        ErrorEnum::Invalid,
+                        format!("Key description of existing pool {} and requested key description {} do not match",
+                                self.block_devs_key_desc.as_ref().map_or("<no key>", |key| key.as_application_str()),
+                                key_description.as_ref().map_or("<no key>", |key| key.as_application_str()))))
+            } else {
+                Ok(())
+            }
+        })
     }
 }
 

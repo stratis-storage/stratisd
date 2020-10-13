@@ -194,7 +194,7 @@ impl Engine for StratEngine {
 
         match self.pools.get_by_name(name) {
             Some((_, pool)) => pool
-                .idempotency_check(blockdev_paths)
+                .idempotency_check(blockdev_paths, &key_desc)
                 .map(|_| CreateAction::Identity),
             None => {
                 let (uuid, pool) =

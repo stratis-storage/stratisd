@@ -198,7 +198,7 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
             format!("Name contains control characters : {}", name),
         ));
     }
-    let name_udevregex = Regex::new(r"^[0-9A-Za-z#+-.:=@_]*$")
+    let name_udevregex = Regex::new(r"^[0-9A-Za-z#+-.:=@_/]*$")
         .expect("regex is invalid");
     if !name_udevregex.is_match(name) {
         return Err(StratisError::Engine(

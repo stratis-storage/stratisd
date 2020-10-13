@@ -21,11 +21,12 @@ use crate::{
         api::get_base_tree,
         blockdev::create_dbus_blockdev,
         consts,
+        device_set::create_dbus_device_set,
         filesystem::create_dbus_filesystem,
         pool::create_dbus_pool,
         types::{DbusContext, DeferredAction, InterfacesAdded, InterfacesRemoved, TData},
     },
-    engine::{Engine, Name, Pool, PoolUuid},
+    engine::{DeviceSet, Engine, Name, Pool, PoolUuid},
 };
 
 /// Returned data from when you connect a stratis engine to dbus.
@@ -73,6 +74,12 @@ impl DbusConnectionData {
             create_dbus_blockdev(&self.context, pool_path.clone(), uuid, tier, bd);
         }
 
+        self.process_deferred_actions()
+    }
+
+    /// Register a device set with D-Bus
+    pub fn register_device_set(&mut self, pool_uuid: PoolUuid, device_set: &mut dyn DeviceSet) {
+        create_dbus_device_set(&self.context, self.path.clone(), pool_uuid, device_set);
         self.process_deferred_actions()
     }
 

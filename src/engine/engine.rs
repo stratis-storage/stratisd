@@ -10,6 +10,7 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
+use either::Either;
 use serde_json::Value;
 use uuid::Uuid;
 
@@ -64,6 +65,15 @@ pub trait KeyActions {
     /// Unset a key with the given key description in the root persistent kernel
     /// keyring.
     fn unset(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>>;
+}
+
+/// An interface for reporting sets of devices that are not formed into pools.
+pub trait DeviceSet {
+    /// Set dbus path associated with the DeviceSet.
+    fn set_dbus_path(&mut self, path: MaybeDbusPath);
+
+    /// Get dbus path associated with the DeviceSet.
+    fn get_dbus_path(&self) -> &MaybeDbusPath;
 }
 
 /// An interface for reporting internal engine state.
@@ -276,10 +286,15 @@ pub trait Engine: Debug + Report {
 
     /// Handle a libudev event.
     /// If the handling action resulted in pool creation, return the pool
-    /// and its UUID.
+    /// and its UUID. If the handling action resulted in the creation of a
+    /// device set, return the device set and its UUID.
     ///
     /// Precondition: the subsystem of the device evented on is "block".
-    fn handle_event(&mut self, event: &libudev::Event) -> Option<(Name, PoolUuid, &mut dyn Pool)>;
+    #[allow(clippy::type_complexity)]
+    fn handle_event(
+        &mut self,
+        event: &libudev::Event,
+    ) -> Option<Either<(Name, PoolUuid, &mut dyn Pool), (PoolUuid, &mut dyn DeviceSet)>>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.
@@ -323,6 +338,12 @@ pub trait Engine: Debug + Report {
 
     /// Get mutable references to all pools belonging to this engine.
     fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut dyn Pool)>;
+
+    /// Get all device sets belonging to this engine.
+    fn device_sets(&self) -> Vec<(PoolUuid, &dyn DeviceSet)>;
+
+    /// Get all device sets belonging to this engine.
+    fn device_sets_mut(&mut self) -> Vec<(PoolUuid, &mut dyn DeviceSet)>;
 
     /// If the engine would like to include an event in the message loop, it
     /// may return an Eventable from this method.

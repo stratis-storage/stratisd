@@ -9,6 +9,7 @@ mod api;
 mod blockdev;
 mod connection;
 mod consts;
+mod device_set;
 mod event_handler;
 mod filesystem;
 mod pool;

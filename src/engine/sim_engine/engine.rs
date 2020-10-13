@@ -10,11 +10,12 @@ use std::{
     rc::Rc,
 };
 
+use either::Either;
 use serde_json::{json, Value};
 
 use crate::{
     engine::{
-        engine::{Engine, Eventable, KeyActions, Pool, Report},
+        engine::{DeviceSet, Engine, Eventable, KeyActions, Pool, Report},
         event::get_engine_listener_list,
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         sim_engine::{keys::SimKeyActions, pool::SimPool, randomization::Randomizer},
@@ -132,7 +133,11 @@ impl Engine for SimEngine {
         }
     }
 
-    fn handle_event(&mut self, _event: &libudev::Event) -> Option<(Name, PoolUuid, &mut dyn Pool)> {
+    #[allow(clippy::type_complexity)]
+    fn handle_event(
+        &mut self,
+        _event: &libudev::Event,
+    ) -> Option<Either<(Name, PoolUuid, &mut dyn Pool), (PoolUuid, &mut dyn DeviceSet)>> {
         None
     }
 
@@ -212,6 +217,14 @@ impl Engine for SimEngine {
             .iter_mut()
             .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &mut dyn Pool))
             .collect()
+    }
+
+    fn device_sets(&self) -> Vec<(PoolUuid, &dyn DeviceSet)> {
+        vec![]
+    }
+
+    fn device_sets_mut(&mut self) -> Vec<(PoolUuid, &mut dyn DeviceSet)> {
+        vec![]
     }
 
     fn get_eventable(&self) -> Option<&'static dyn Eventable> {

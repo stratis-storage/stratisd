@@ -6,6 +6,8 @@
 
 use std::os::unix::io::{AsRawFd, RawFd};
 
+use either::Either;
+
 use crate::{
     engine::Engine,
     stratis::{dbus_support::MaybeDbusSupport, errors::StratisResult},
@@ -36,8 +38,14 @@ impl<'a> UdevMonitor<'a> {
     /// data structures if so.
     pub fn handle_events(&mut self, engine: &mut dyn Engine, dbus_support: &mut MaybeDbusSupport) {
         while let Some(event) = self.socket.receive_event() {
-            if let Some((pool_name, pool_uuid, pool)) = engine.handle_event(&event) {
-                dbus_support.register_pool(&pool_name, pool_uuid, pool);
+            match engine.handle_event(&event) {
+                Some(Either::Left((pool_name, pool_uuid, pool))) => {
+                    dbus_support.register_pool(&pool_name, pool_uuid, pool);
+                }
+                Some(Either::Right((pool_uuid, device_set))) => {
+                    dbus_support.register_device_set(pool_uuid, device_set);
+                }
+                None => {}
             }
         }
     }

@@ -4,6 +4,7 @@
 
 use std::{clone::Clone, collections::HashMap, path::Path};
 
+use either::Either;
 use serde_json::Value;
 
 use devicemapper::DmNameBuf;
@@ -24,7 +25,7 @@ use crate::{
         },
         structures::Table,
         types::{CreateAction, DeleteAction, DevUuid, RenameAction, ReportType, SetUnlockAction},
-        Engine, EngineEvent, Name, Pool, PoolUuid, Report,
+        DeviceSet, Engine, EngineEvent, Name, Pool, PoolUuid, Report,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -154,19 +155,23 @@ impl Report for StratEngine {
 }
 
 impl Engine for StratEngine {
-    fn handle_event(&mut self, event: &libudev::Event) -> Option<(Name, PoolUuid, &mut dyn Pool)> {
+    #[allow(clippy::type_complexity)]
+    fn handle_event(
+        &mut self,
+        event: &libudev::Event,
+    ) -> Option<Either<(Name, PoolUuid, &mut dyn Pool), (PoolUuid, &mut dyn DeviceSet)>> {
         if let Some((pool_uuid, pool_name, pool)) =
             self.liminal_devices.block_evaluate(&self.pools, event)
         {
             self.pools.insert(pool_name.clone(), pool_uuid, pool);
-            Some((
+            Some(Either::Left((
                 pool_name,
                 pool_uuid,
                 self.pools
                     .get_mut_by_uuid(pool_uuid)
                     .expect("just_inserted")
                     .1 as &mut dyn Pool,
-            ))
+            )))
         } else {
             None
         }
@@ -295,6 +300,14 @@ impl Engine for StratEngine {
             .iter_mut()
             .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &mut dyn Pool))
             .collect()
+    }
+
+    fn device_sets(&self) -> Vec<(PoolUuid, &dyn DeviceSet)> {
+        vec![]
+    }
+
+    fn device_sets_mut(&mut self) -> Vec<(PoolUuid, &mut dyn DeviceSet)> {
+        vec![]
     }
 
     fn get_eventable(&self) -> Option<&'static dyn Eventable> {

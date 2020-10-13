@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{clone::Clone, collections::HashMap, convert::TryFrom, path::Path};
+use std::{clone::Clone, collections::HashMap, path::Path};
 
 use serde_json::Value;
 
@@ -177,7 +177,7 @@ impl Engine for StratEngine {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
-        key_desc: Option<String>,
+        key_desc: Option<KeyDescription>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
         let redundancy = calculate_redundancy!(redundancy);
 
@@ -194,17 +194,8 @@ impl Engine for StratEngine {
                         "At least one blockdev is required to create a pool.".to_string(),
                     ))
                 } else {
-                    let key_description = match key_desc {
-                        Some(desc) => Some(KeyDescription::try_from(desc)?),
-                        None => None,
-                    };
-
-                    let (uuid, pool) = StratPool::initialize(
-                        name,
-                        blockdev_paths,
-                        redundancy,
-                        key_description.as_ref(),
-                    )?;
+                    let (uuid, pool) =
+                        StratPool::initialize(name, blockdev_paths, redundancy, key_desc.as_ref())?;
 
                     let name = Name::new(name.to_owned());
                     self.pools.insert(name, uuid, pool);

@@ -198,7 +198,7 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
             format!("Name contains control characters : {}", name),
         ));
     }
-    let name_udevregex = Regex::new(r"^[0-9A-Za-z#+-.:=@_/]*").expect("regex is valid");
+    let name_udevregex = Regex::new(r"^[0-9A-Za-z#+-.:=@_/]+").expect("regex is valid");
     if !name_udevregex.is_match(name) && !name.is_ascii() {
         return Err(StratisError::Engine(
             ErrorEnum::Invalid,
@@ -268,6 +268,8 @@ mod tests {
         assert_matches!(validate_name("trailing_space "), Err(_));
         assert_matches!(validate_name("\u{0}leading_null"), Err(_));
         assert_matches!(validate_name("trailing_null\u{0}"), Err(_));
+        assert_matches!(validate_name("exclamat!on"), Err(_));
+        assert_matches!(validate_name("dollar$ign"), Err(_));
         assert_matches!(validate_name("middle\u{0}_null"), Err(_));
         assert_matches!(validate_name("\u{0}multiple\u{0}_null\u{0}"), Err(_));
         assert_matches!(validate_name(&"𐌏".repeat(64)), Err(_));

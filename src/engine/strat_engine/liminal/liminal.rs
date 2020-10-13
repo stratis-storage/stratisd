@@ -7,6 +7,7 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt,
+    path::Path,
 };
 
 use serde_json::Value;
@@ -25,7 +26,7 @@ use crate::{
             pool::StratPool,
         },
         structures::Table,
-        types::{DevUuid, KeyDescription, Name, PoolUuid},
+        types::{DevUuid, KeyDescription, Name, PoolUuid, Redundancy},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -477,6 +478,27 @@ impl LiminalDevices {
             })
         } else {
             None
+        }
+    }
+
+    pub fn create_pool(
+        &mut self,
+        name: &str,
+        blockdev_paths: &[&Path],
+        redundancy: Redundancy,
+        key_desc: Option<KeyDescription>,
+    ) -> StratisResult<Option<PoolUuid>> {
+        match self.pools.get_by_name(name) {
+            Some((_, pool)) => pool
+                .idempotency_check(blockdev_paths, &key_desc)
+                .map(|_| None),
+            None => {
+                let (uuid, pool) =
+                    StratPool::initialize(name, blockdev_paths, redundancy, key_desc.as_ref())?;
+
+                self.pools.insert(Name::new(name.to_owned()), uuid, pool);
+                Ok(Some(uuid))
+            }
         }
     }
 }

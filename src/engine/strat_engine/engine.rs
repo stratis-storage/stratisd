@@ -192,19 +192,12 @@ impl Engine for StratEngine {
             ));
         }
 
-        match self.pools.get_by_name(name) {
-            Some((_, pool)) => pool
-                .idempotency_check(blockdev_paths, &key_desc)
-                .map(|_| CreateAction::Identity),
-            None => {
-                let (uuid, pool) =
-                    StratPool::initialize(name, blockdev_paths, redundancy, key_desc.as_ref())?;
-
-                let name = Name::new(name.to_owned());
-                self.pools.insert(name, uuid, pool);
-                Ok(CreateAction::Created(uuid))
-            }
-        }
+        self.liminal_devices
+            .create_pool(name, blockdev_paths, redundancy, key_desc)
+            .map(|res| match res {
+                Some(uuid) => CreateAction::Created(uuid),
+                None => CreateAction::Identity,
+            })
     }
 
     fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {

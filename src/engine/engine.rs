@@ -258,7 +258,7 @@ pub trait Pool: Debug {
 
     /// Get key description for the key in the kernel keyring used for encryption
     /// if it is encrypted
-    fn key_desc(&self) -> Option<&str>;
+    fn key_desc(&self) -> Option<&KeyDescription>;
 }
 
 pub trait Engine: Debug + Report {

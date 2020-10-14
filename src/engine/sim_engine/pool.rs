@@ -454,10 +454,8 @@ impl Pool for SimPool {
         self.datadevs_encrypted()
     }
 
-    fn key_desc(&self) -> Option<&str> {
-        self.block_devs_key_desc
-            .as_ref()
-            .map(|k| k.as_application_str())
+    fn key_desc(&self) -> Option<&KeyDescription> {
+        self.block_devs_key_desc.as_ref()
     }
 }
 

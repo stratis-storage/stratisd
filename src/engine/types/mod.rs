@@ -8,7 +8,6 @@ use std::{
     fmt, io,
     ops::Deref,
     path::{Path, PathBuf},
-    rc::Rc,
 };
 
 mod actions;
@@ -65,11 +64,11 @@ pub enum Redundancy {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub struct Name(Rc<String>);
+pub struct Name(String);
 
 impl Name {
     pub fn new(name: String) -> Name {
-        Name(Rc::new(name))
+        Name(name)
     }
 
     pub fn to_owned(&self) -> String {
@@ -93,7 +92,7 @@ impl Deref for Name {
 
 impl Borrow<str> for Name {
     fn borrow(&self) -> &str {
-        &**self.0
+        &self.0.as_str()
     }
 }
 

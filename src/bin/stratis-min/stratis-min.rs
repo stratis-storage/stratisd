@@ -2,20 +2,14 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::path::Path;
+use std::path::PathBuf;
 
 use clap::{App, Arg, ArgGroup, ArgMatches, SubCommand};
-use log::{error, LevelFilter};
-use syslog::{init_unix, Facility};
 
-use libstratis::engine::PoolUuid;
-
-mod key;
-mod pool;
-mod report;
-mod udev;
-#[macro_use]
-mod utils;
+use libstratis::{
+    engine::PoolUuid,
+    jsonrpc::client::{key, pool},
+};
 
 fn parse_args() -> App<'static, 'static> {
     App::new("stratis-min")
@@ -55,18 +49,14 @@ fn parse_args() -> App<'static, 'static> {
                 SubCommand::with_name("unset").arg(Arg::with_name("key_desc").required(true)),
             ]),
             SubCommand::with_name("pool").subcommands(vec![
-                SubCommand::with_name("setup")
-                    .arg(
-                        Arg::with_name("pool_uuid")
-                            .long("--pool-uuid")
-                            .takes_value(true)
-                            .required(false),
-                    )
+                SubCommand::with_name("unlock")
+                    .arg(Arg::with_name("pool_uuid").required(true))
+                    .arg(Arg::with_name("prompt").long("--prompt").takes_value(false))
                     .arg(
                         Arg::with_name("no_tty")
                             .long("--no-tty")
                             .takes_value(false)
-                            .requires("pool_uuid"),
+                            .requires("prompt"),
                     ),
                 SubCommand::with_name("create")
                     .arg(Arg::with_name("name").required(true))
@@ -94,25 +84,19 @@ fn parse_args() -> App<'static, 'static> {
         ])
 }
 
-fn get_paths_from_args<'a>(args: &'a ArgMatches<'a>) -> Vec<&'a Path> {
+fn get_paths_from_args<'a>(args: &'a ArgMatches<'a>) -> Vec<PathBuf> {
     args.values_of("blockdevs")
         .expect("required")
-        .map(|s| Path::new(s))
+        .map(PathBuf::from)
         .collect::<Vec<_>>()
 }
 
-fn main_with_err() -> Result<(), String> {
+fn main() -> Result<(), String> {
     let mut app = parse_args();
     let mut help = Vec::new();
     app.write_long_help(&mut help).map_err(|e| e.to_string())?;
     let help = String::from_utf8(help).map_err(|e| e.to_string())?;
     let args = app.get_matches();
-    let level = if args.is_present("debug") {
-        LevelFilter::Debug
-    } else {
-        LevelFilter::Warn
-    };
-    init_unix(Facility::LOG_DAEMON, level).map_err(|e| e.to_string())?;
     if let Some(subcommand) = args.subcommand_matches("key") {
         if let Some(args) = subcommand.subcommand_matches("set") {
             key::key_set(
@@ -128,12 +112,17 @@ fn main_with_err() -> Result<(), String> {
         }
     } else if let Some(subcommand) = args.subcommand_matches("pool") {
         if let Some(args) = subcommand.subcommand_matches("setup") {
-            let uuid_str = args.value_of("pool_uuid");
-            let uuid = match uuid_str {
-                Some(u) => Some(PoolUuid::parse_str(u).map_err(|e| e.to_string())?),
-                None => None,
-            };
-            pool::pool_setup(uuid, args.is_present("no_tty")).map_err(|e| e.to_string())
+            let uuid = PoolUuid::parse_str(args.value_of("pool_uuid").expect("required"))
+                .map_err(|e| e.to_string())?;
+            pool::pool_unlock(
+                uuid,
+                if args.is_present("prompt") {
+                    Some(args.is_present("no_tty"))
+                } else {
+                    None
+                },
+            )
+            .map_err(|e| e.to_string())
         } else if let Some(args) = subcommand.subcommand_matches("create") {
             let paths = get_paths_from_args(args);
             pool::pool_create(
@@ -173,21 +162,12 @@ fn main_with_err() -> Result<(), String> {
         } else {
             pool::pool_list().map_err(|e| e.to_string())
         }
-    } else if let Some("report") = args.subcommand_name() {
-        report::report().map_err(|e| e.to_string())
-    } else if let Some(args) = args.subcommand_matches("udev") {
-        udev::udev(args.value_of("dm_name").expect("required"))
+    //} else if let Some("report") = args.subcommand_name() {
+    //    report::report().map_err(|e| e.to_string())
+    //} else if let Some(args) = args.subcommand_matches("udev") {
+    //    udev::udev(args.value_of("dm_name").expect("required"))
     } else {
         println!("{}", help);
-        Ok(())
-    }
-}
-
-fn main() -> Result<(), String> {
-    if let Err(e) = main_with_err() {
-        error!("stratis-min failed with error: {}", e);
-        Err(e)
-    } else {
         Ok(())
     }
 }

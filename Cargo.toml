@@ -19,7 +19,13 @@ required-features = ["dbus_enabled"]
 
 [[bin]]
 name = "stratis-min"
-required-features = ["extras"]
+path = "src/bin/stratis-min/stratis-min.rs"
+required-features = ["min"]
+
+[[bin]]
+name = "stratisd-min"
+path = "src/bin/stratis-min/stratisd-min.rs"
+required-features = ["min"]
 
 [[bin]]
 name = "stratis-setup-generator"
@@ -59,8 +65,21 @@ optional = true
 version = "0.2"
 optional=true
 
-[dependencies.syslog]
-version = "5.0"
+[dependencies.jsonrpsee]
+version = "0.1.0"
+optional = true
+
+[dependencies.tokio]
+version = "0.2"
+features = ["uds"]
+optional = true
+
+[dependencies.async-std]
+version = "1.6"
+optional = true
+
+[dependencies.futures-util]
+version = "0.3"
 optional = true
 
 [dependencies.uuid]
@@ -80,4 +99,5 @@ matches = "0.1"
 [features]
 default = ["dbus_enabled"]
 dbus_enabled = ["dbus", "libdbus-sys"]
-extras = ["syslog"]
+extras = []
+min = ["jsonrpsee", "tokio", "async-std", "futures-util"]

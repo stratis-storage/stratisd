@@ -30,3 +30,6 @@ pub mod engine;
 pub mod dbus_api;
 
 pub mod stratis;
+
+#[cfg(feature = "min")]
+pub mod jsonrpc;

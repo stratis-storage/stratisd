@@ -32,7 +32,7 @@ pub fn create_pool_shared(m: &MethodInfo<MTFn<TData>, TData>, has_key_desc: bool
     let name: &str = get_next_arg(&mut iter, 0)?;
     let redundancy_tuple: (bool, u16) = get_next_arg(&mut iter, 1)?;
     let devs: Array<&str, _> = get_next_arg(&mut iter, 2)?;
-    let key_desc_tuple: Option<(bool, &str)> = if has_key_desc {
+    let key_desc_tuple: Option<(bool, String)> = if has_key_desc {
         Some(get_next_arg(&mut iter, 3)?)
     } else {
         None
@@ -43,10 +43,7 @@ pub fn create_pool_shared(m: &MethodInfo<MTFn<TData>, TData>, has_key_desc: bool
     let default_return: (bool, (dbus::Path<'static>, Vec<dbus::Path<'static>>)) =
         (false, (dbus::Path::default(), Vec::new()));
 
-    let key_desc = match key_desc_tuple
-        .and_then(tuple_to_option)
-        .map(|s| s.to_owned())
-    {
+    let key_desc = match key_desc_tuple.and_then(tuple_to_option) {
         Some(kds) => match KeyDescription::try_from(kds) {
             Ok(kd) => Some(kd),
             Err(e) => {
@@ -130,7 +127,7 @@ pub fn set_key_shared(
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let key_desc: &str = get_next_arg(&mut iter, 0)?;
+    let key_desc_str: String = get_next_arg(&mut iter, 0)?;
     let key_fd: OwnedFd = get_next_arg(&mut iter, 1)?;
     let interactive: bool = get_next_arg(&mut iter, 2)?;
 
@@ -139,7 +136,13 @@ pub fn set_key_shared(
     let return_message = message.method_return();
 
     let msg = match dbus_context.engine.borrow_mut().get_key_handler_mut().set(
-        key_desc,
+        &match KeyDescription::try_from(key_desc_str) {
+            Ok(kd) => kd,
+            Err(e) => {
+                let (rc, rs) = engine_to_dbus_err_tuple(&e);
+                return Ok(vec![return_message.append3(default_return, rc, rs)]);
+            }
+        },
         key_fd.as_raw_fd(),
         tuple_to_option((interactive, set_terminal_settings)),
     ) {

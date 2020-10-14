@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{convert::TryFrom, ffi::CString, io, mem::size_of, os::unix::io::RawFd, str};
+use std::{ffi::CString, io, mem::size_of, os::unix::io::RawFd, str};
 
 use libc::{syscall, SYS_add_key, SYS_keyctl};
 
@@ -363,29 +363,23 @@ impl StratKeyActions {
     /// is not useful for testing using D-Bus.
     pub fn set_no_fd(
         &mut self,
-        key_desc: &str,
+        key_desc: KeyDescription,
         key: SizedKeyMemory,
     ) -> StratisResult<MappingCreateAction<()>> {
-        Ok(set_key_idem(
-            &KeyDescription::try_from(key_desc.to_string())?,
-            key,
-        )?)
+        Ok(set_key_idem(&key_desc, key)?)
     }
 }
 
 impl KeyActions for StratKeyActions {
     fn set(
         &mut self,
-        key_desc: &str,
+        key_desc: KeyDescription,
         key_fd: RawFd,
         interactive: Option<bool>,
     ) -> StratisResult<MappingCreateAction<()>> {
         let memory = shared::set_key_shared(key_fd, interactive)?;
 
-        Ok(set_key_idem(
-            &KeyDescription::try_from(key_desc.to_string())?,
-            memory,
-        )?)
+        Ok(set_key_idem(&key_desc, memory)?)
     }
 
     fn list(&self) -> StratisResult<Vec<KeyDescription>> {
@@ -394,12 +388,10 @@ impl KeyActions for StratKeyActions {
         key_ids.to_key_descs()
     }
 
-    fn unset(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>> {
+    fn unset(&mut self, key_desc: KeyDescription) -> StratisResult<DeleteAction<()>> {
         let keyring_id = get_persistent_keyring()?;
 
-        if let Some(key_id) =
-            search_key(keyring_id, &KeyDescription::try_from(key_desc.to_string())?)?
-        {
+        if let Some(key_id) = search_key(keyring_id, &key_desc)? {
             unset_key(key_id).map(|_| DeleteAction::Deleted(()))
         } else {
             Ok(DeleteAction::Identity)

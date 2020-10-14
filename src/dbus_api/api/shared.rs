@@ -130,7 +130,7 @@ pub fn set_key_shared(
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let key_desc: &str = get_next_arg(&mut iter, 0)?;
+    let key_desc_str: &str = get_next_arg(&mut iter, 0)?;
     let key_fd: OwnedFd = get_next_arg(&mut iter, 1)?;
     let interactive: bool = get_next_arg(&mut iter, 2)?;
 
@@ -139,7 +139,13 @@ pub fn set_key_shared(
     let return_message = message.method_return();
 
     let msg = match dbus_context.engine.borrow_mut().get_key_handler_mut().set(
-        key_desc,
+        match KeyDescription::try_from(key_desc_str.to_owned()) {
+            Ok(kd) => kd,
+            Err(e) => {
+                let (rc, rs) = engine_to_dbus_err_tuple(&e);
+                return Ok(vec![return_message.append3(default_return, rc, rs)]);
+            }
+        },
         key_fd.as_raw_fd(),
         tuple_to_option((interactive, set_terminal_settings)),
     ) {

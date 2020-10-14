@@ -363,7 +363,7 @@ impl StratKeyActions {
     /// is not useful for testing using D-Bus.
     pub fn set_no_fd(
         &mut self,
-        key_desc: KeyDescription,
+        key_desc: &KeyDescription,
         key: SizedKeyMemory,
     ) -> StratisResult<MappingCreateAction<()>> {
         Ok(set_key_idem(&key_desc, key)?)
@@ -373,13 +373,13 @@ impl StratKeyActions {
 impl KeyActions for StratKeyActions {
     fn set(
         &mut self,
-        key_desc: KeyDescription,
+        key_desc: &KeyDescription,
         key_fd: RawFd,
         interactive: Option<bool>,
     ) -> StratisResult<MappingCreateAction<()>> {
         let memory = shared::set_key_shared(key_fd, interactive)?;
 
-        Ok(set_key_idem(&key_desc, memory)?)
+        Ok(set_key_idem(key_desc, memory)?)
     }
 
     fn list(&self) -> StratisResult<Vec<KeyDescription>> {
@@ -388,10 +388,10 @@ impl KeyActions for StratKeyActions {
         key_ids.to_key_descs()
     }
 
-    fn unset(&mut self, key_desc: KeyDescription) -> StratisResult<DeleteAction<()>> {
+    fn unset(&mut self, key_desc: &KeyDescription) -> StratisResult<DeleteAction<()>> {
         let keyring_id = get_persistent_keyring()?;
 
-        if let Some(key_id) = search_key(keyring_id, &key_desc)? {
+        if let Some(key_id) = search_key(keyring_id, key_desc)? {
             unset_key(key_id).map(|_| DeleteAction::Deleted(()))
         } else {
             Ok(DeleteAction::Identity)

@@ -52,7 +52,7 @@ pub trait KeyActions {
     /// in the keyring but the key data was updated.
     fn set(
         &mut self,
-        key_desc: KeyDescription,
+        key_desc: &KeyDescription,
         key_fd: RawFd,
         interactive: Option<bool>,
     ) -> StratisResult<MappingCreateAction<()>>;
@@ -63,7 +63,7 @@ pub trait KeyActions {
 
     /// Unset a key with the given key description in the root persistent kernel
     /// keyring.
-    fn unset(&mut self, key_desc: KeyDescription) -> StratisResult<DeleteAction<()>>;
+    fn unset(&mut self, key_desc: &KeyDescription) -> StratisResult<DeleteAction<()>>;
 }
 
 /// An interface for reporting internal engine state.

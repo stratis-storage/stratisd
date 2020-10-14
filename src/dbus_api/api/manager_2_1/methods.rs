@@ -41,7 +41,7 @@ pub fn unset_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .engine
         .borrow_mut()
         .get_key_handler_mut()
-        .unset(match KeyDescription::try_from(key_desc_str.to_owned()) {
+        .unset(&match KeyDescription::try_from(key_desc_str.to_owned()) {
             Ok(kd) => kd,
             Err(e) => {
                 let (rc, rs) = engine_to_dbus_err_tuple(&e);

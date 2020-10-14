@@ -40,23 +40,23 @@ impl SimKeyActions {
 impl KeyActions for SimKeyActions {
     fn set(
         &mut self,
-        key_desc: KeyDescription,
+        key_desc: &KeyDescription,
         key_fd: RawFd,
         interactive: Option<bool>,
     ) -> StratisResult<MappingCreateAction<()>> {
         let memory = shared::set_key_shared(key_fd, interactive)?;
 
-        match self.read(&key_desc) {
+        match self.read(key_desc) {
             Ok(Some(key_data)) => {
                 if key_data.as_ref() == memory.as_ref() {
                     Ok(MappingCreateAction::Identity)
                 } else {
-                    self.0.insert(key_desc.clone(), memory);
+                    self.0.insert((*key_desc).clone(), memory);
                     Ok(MappingCreateAction::ValueChanged(()))
                 }
             }
             Ok(None) => {
-                self.0.insert(key_desc.clone(), memory);
+                self.0.insert((*key_desc).clone(), memory);
                 Ok(MappingCreateAction::Created(()))
             }
             Err(e) => Err(e),
@@ -67,8 +67,8 @@ impl KeyActions for SimKeyActions {
         Ok(self.0.keys().cloned().collect())
     }
 
-    fn unset(&mut self, key_desc: KeyDescription) -> StratisResult<DeleteAction<()>> {
-        match self.0.remove(&key_desc) {
+    fn unset(&mut self, key_desc: &KeyDescription) -> StratisResult<DeleteAction<()>> {
+        match self.0.remove(key_desc) {
             Some(_) => Ok(DeleteAction::Deleted(())),
             None => Ok(DeleteAction::Identity),
         }

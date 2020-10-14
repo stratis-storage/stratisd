@@ -608,10 +608,8 @@ impl Pool for StratPool {
         self.datadevs_encrypted()
     }
 
-    fn key_desc(&self) -> Option<&str> {
-        self.backstore
-            .data_key_desc()
-            .map(|k| k.as_application_str())
+    fn key_desc(&self) -> Option<&KeyDescription> {
+        self.backstore.data_key_desc()
     }
 }
 

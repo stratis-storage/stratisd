@@ -6,7 +6,7 @@ use std::{env, str::FromStr};
 
 use clap::{App, Arg};
 use env_logger::Builder;
-use log::{error, LevelFilter};
+use log::LevelFilter;
 
 use libstratis::jsonrpc::run_server;
 
@@ -20,7 +20,7 @@ fn parse_args() -> App<'static, 'static> {
     )
 }
 
-fn main_with_err() -> Result<(), String> {
+fn main() -> Result<(), String> {
     let mut app = parse_args();
     let mut help = Vec::new();
     app.write_long_help(&mut help).map_err(|e| e.to_string())?;
@@ -49,15 +49,6 @@ fn main_with_err() -> Result<(), String> {
         Ok(())
     } else {
         run_server();
-        Ok(())
-    }
-}
-
-fn main() -> Result<(), String> {
-    if let Err(e) = main_with_err() {
-        error!("stratis-min failed with error: {}", e);
-        Err(e)
-    } else {
         Ok(())
     }
 }

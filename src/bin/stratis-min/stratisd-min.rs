@@ -10,8 +10,6 @@ use log::{error, LevelFilter};
 
 use libstratis::jsonrpc::run_server;
 
-mod daemon;
-
 fn parse_args() -> App<'static, 'static> {
     App::new("stratisd-min").arg(
         Arg::with_name("log_level")

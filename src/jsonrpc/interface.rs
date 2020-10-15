@@ -8,10 +8,12 @@
 use std::path::PathBuf;
 
 use jsonrpsee::rpc_api;
+use serde_json::Value;
 
 use crate::engine::PoolUuid;
 
 pub type PoolListType = (Vec<String>, Vec<(u64, Option<u64>)>, Vec<(bool, bool)>);
+pub type UdevType = (Option<(String, String)>, u16, String);
 
 rpc_api! {
     pub Stratis {
@@ -74,5 +76,11 @@ rpc_api! {
 
         #[rpc(method = "ListPools")]
         fn pool_list() -> PoolListType;
+
+        #[rpc(method = "Report")]
+        fn report() -> Value;
+
+        #[rpc(method = "Udev")]
+        fn udev(dm_name: String) -> UdevType;
     }
 }

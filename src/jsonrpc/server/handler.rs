@@ -4,7 +4,10 @@
 
 use crate::jsonrpc::consts::SOCKFD_ADDR;
 
-use std::{net::SocketAddr, os::unix::io::AsRawFd};
+use std::{
+    net::SocketAddr,
+    os::unix::io::{AsRawFd, RawFd},
+};
 
 use futures_util::stream::StreamExt;
 use jsonrpsee::{
@@ -24,14 +27,11 @@ use crate::{
     jsonrpc::{
         consts::RPC_SOCKADDR,
         interface::Stratis,
-        server::{
-            key, pool,
-            utils::{get_fd_from_sock, OwnedFd},
-        },
+        server::{key, pool, report, udev, utils::get_fd_from_sock},
     },
 };
 
-async fn server_loop(mut recv: Receiver<OwnedFd>) -> Result<(), String> {
+async fn server_loop(mut recv: Receiver<RawFd>) -> Result<(), String> {
     let transport = HttpTransportServer::bind(
         &RPC_SOCKADDR
             .parse::<SocketAddr>()
@@ -49,14 +49,14 @@ async fn server_loop(mut recv: Receiver<OwnedFd>) -> Result<(), String> {
                     key_desc,
                     interactive,
                 } => {
-                    if let Some(ownedfd) = recv.recv().await {
+                    if let Some(fd) = recv.recv().await {
                         default_handler!(
                             respond,
                             key::key_set,
                             &mut engine,
                             None,
                             key_desc,
-                            ownedfd.as_raw_fd(),
+                            fd,
                             interactive
                         )
                     } else {
@@ -156,14 +156,14 @@ async fn server_loop(mut recv: Receiver<OwnedFd>) -> Result<(), String> {
                     prompt,
                 } => {
                     if prompt.is_some() {
-                        if let Some(ownedfd) = recv.recv().await {
+                        if let Some(fd) = recv.recv().await {
                             default_handler!(
                                 respond,
                                 pool::pool_unlock,
                                 &mut engine,
                                 false,
                                 pool_uuid,
-                                prompt.map(|b| (ownedfd.as_raw_fd(), b))
+                                prompt.map(|b| (fd, b))
                             )
                         } else {
                             respond.err(Error::new(ErrorCode::InternalError)).await
@@ -187,12 +187,16 @@ async fn server_loop(mut recv: Receiver<OwnedFd>) -> Result<(), String> {
                     pool_uuid
                 ),
                 Stratis::PoolList { respond } => respond.ok(pool::pool_list(&mut engine)).await,
+                Stratis::Report { respond } => respond.ok(report::report(&engine)).await,
+                Stratis::Udev { respond, dm_name } => {
+                    default_handler!(respond, udev::udev, &mut engine, None, &dm_name)
+                }
             }
         }
     }
 }
 
-pub async fn file_descriptor_listener(mut sender: Sender<OwnedFd>) {
+pub async fn file_descriptor_listener(mut sender: Sender<RawFd>) {
     let _ = std::fs::remove_file(SOCKFD_ADDR);
     let mut listener = match UnixListener::bind(SOCKFD_ADDR) {
         Ok(l) => l,
@@ -205,7 +209,7 @@ pub async fn file_descriptor_listener(mut sender: Sender<OwnedFd>) {
         match listener.next().await {
             Some(Ok(stream)) => {
                 let fd = match get_fd_from_sock(stream.as_raw_fd()) {
-                    Ok(f) => OwnedFd::new(f),
+                    Ok(f) => f,
                     Err(e) => {
                         warn!("Could not get file descriptor sent from client: {}", e);
                         continue;

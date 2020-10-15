@@ -4,18 +4,17 @@
 
 use regex::Regex;
 
-use libstratis::{
+use crate::{
     engine::{Engine, FilesystemUuid, PoolUuid, StratEngine},
     stratis::{StratisError, StratisResult},
 };
 
-pub fn udev_with_err(dm_name: &str) -> StratisResult<()> {
+pub fn udev(engine: &mut StratEngine, dm_name: &str) -> StratisResult<Option<(String, String)>> {
     let regex = Regex::new("stratis-1-([0-9a-f]{32})-thin-fs-([0-9a-f]{32})")
         .map_err(|e| StratisError::Error(e.to_string()))?;
     if let Some(captures) = regex.captures(dm_name) {
         let pool_uuid = &captures[1];
         let fs_uuid = &captures[2];
-        let engine = StratEngine::initialize()?;
         let (pool_name, pool) = engine
             .get_pool(PoolUuid::parse_str(pool_uuid)?)
             .ok_or_else(|| {
@@ -26,12 +25,8 @@ pub fn udev_with_err(dm_name: &str) -> StratisResult<()> {
             .ok_or_else(|| {
                 StratisError::Error(format!("Filesystem with UUID {} not found", fs_uuid))
             })?;
-        println!("STRATIS_SYMLINK=stratis/{}/{}", pool_name, fs_name);
+        Ok(Some((pool_name.to_string(), fs_name.to_string())))
+    } else {
+        Ok(None)
     }
-    Ok(())
-}
-
-pub fn udev(dm_name: &str) -> Result<(), String> {
-    udev_with_err(dm_name).map_err(|e| e.to_string())?;
-    Ok(())
 }

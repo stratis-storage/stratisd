@@ -100,4 +100,4 @@ matches = "0.1"
 default = ["dbus_enabled"]
 dbus_enabled = ["dbus", "libdbus-sys"]
 extras = []
-min = ["jsonrpsee", "tokio", "async-std", "futures-util"]
+min = ["jsonrpsee", "tokio", "async-std", "futures-util", "regex"]

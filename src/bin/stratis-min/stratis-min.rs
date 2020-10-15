@@ -8,7 +8,7 @@ use clap::{App, Arg, ArgGroup, ArgMatches, SubCommand};
 
 use libstratis::{
     engine::PoolUuid,
-    jsonrpc::client::{key, pool},
+    jsonrpc::client::{key, pool, report, udev},
 };
 
 fn parse_args() -> App<'static, 'static> {
@@ -162,10 +162,20 @@ fn main() -> Result<(), String> {
         } else {
             pool::pool_list().map_err(|e| e.to_string())
         }
-    //} else if let Some("report") = args.subcommand_name() {
-    //    report::report().map_err(|e| e.to_string())
-    //} else if let Some(args) = args.subcommand_matches("udev") {
-    //    udev::udev(args.value_of("dm_name").expect("required"))
+    } else if let Some("report") = args.subcommand_name() {
+        report::report()
+            .and_then(|j| {
+                println!("{}", serde_json::to_string_pretty(&j)?);
+                Ok(())
+            })
+            .map_err(|e| e.to_string())
+    } else if let Some(args) = args.subcommand_matches("udev") {
+        if let Some((pool_name, fs_name)) =
+            udev::udev(args.value_of("dm_name").expect("required")).map_err(|e| e.to_string())?
+        {
+            println!("STRATIS_SYMLINK=stratis/{}/{}", pool_name, fs_name);
+        }
+        Ok(())
     } else {
         println!("{}", help);
         Ok(())

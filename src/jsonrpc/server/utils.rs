@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::unix::io::RawFd;
 
 use nix::{
     errno::Errno,
@@ -81,28 +81,6 @@ pub fn get_fd_from_sock(sock_fd: RawFd) -> Result<RawFd, nix::Error> {
                 }
             }
             _ => Err(nix::Error::from_errno(Errno::EINVAL)),
-        }
-    }
-}
-
-pub struct OwnedFd(RawFd);
-
-impl OwnedFd {
-    pub fn new(fd: RawFd) -> OwnedFd {
-        OwnedFd(fd)
-    }
-}
-
-impl AsRawFd for OwnedFd {
-    fn as_raw_fd(&self) -> RawFd {
-        self.0
-    }
-}
-
-impl Drop for OwnedFd {
-    fn drop(&mut self) {
-        if let Err(e) = close(self.0) {
-            warn!("Could not clean up file descriptor {}: {}", self.0, e);
         }
     }
 }

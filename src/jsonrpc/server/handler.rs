@@ -2,9 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use crate::jsonrpc::consts::SOCKFD_ADDR;
+use crate::jsonrpc::consts::{SOCKFD_ADDR, SOCKFD_ADDR_DIR};
 
 use std::{
+    fs::{create_dir_all, remove_file},
     net::SocketAddr,
     os::unix::io::{AsRawFd, RawFd},
 };
@@ -197,7 +198,10 @@ async fn server_loop(mut recv: Receiver<RawFd>) -> Result<(), String> {
 }
 
 pub async fn file_descriptor_listener(mut sender: Sender<RawFd>) {
-    let _ = std::fs::remove_file(SOCKFD_ADDR);
+    let _ = remove_file(SOCKFD_ADDR);
+    if let Err(e) = create_dir_all(SOCKFD_ADDR_DIR) {
+        warn!("{}", e);
+    }
     let mut listener = match UnixListener::bind(SOCKFD_ADDR) {
         Ok(l) => l,
         Err(e) => {

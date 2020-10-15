@@ -111,7 +111,7 @@ fn main() -> Result<(), String> {
             key::key_list().map_err(|e| e.to_string())
         }
     } else if let Some(subcommand) = args.subcommand_matches("pool") {
-        if let Some(args) = subcommand.subcommand_matches("setup") {
+        if let Some(args) = subcommand.subcommand_matches("unlock") {
             let uuid = PoolUuid::parse_str(args.value_of("pool_uuid").expect("required"))
                 .map_err(|e| e.to_string())?;
             pool::pool_unlock(

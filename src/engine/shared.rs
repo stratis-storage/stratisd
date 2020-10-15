@@ -11,12 +11,11 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use regex::Regex;
 use termios::Termios;
 
 use devicemapper::Bytes;
 use libcryptsetup_rs::SafeMemHandle;
-
-use regex::Regex;
 
 use crate::{
     engine::{

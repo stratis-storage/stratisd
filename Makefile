@@ -92,7 +92,8 @@ build-extras:
 build-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build --no-default-features --features min ${TARGET_ARGS}
+	cargo build --bin=stratis-min --bin=stratisd-min --no-default-features \
+	--features min ${TARGET_ARGS}
 
 stratis-dumpmetadata:
 	PKG_CONFIG_ALLOW_CROSS=1 \

@@ -198,8 +198,8 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
             format!("Name contains control characters : {}", name),
         ));
     }
-    let name_udevregex = Regex::new(r"^[0-9A-Za-z#+-.:=@_/]+").expect("regex is valid");
-    if !name_udevregex.is_match(name) && !name.is_ascii() {
+    let name_udevregex = Regex::new(r"[[:ascii:]&&[^0-9A-Za-z#+-.:=@_/]]+").expect("regex is valid");
+    if name_udevregex.is_match(name) {
         return Err(StratisError::Engine(
             ErrorEnum::Invalid,
             format!("Name contains characters not allowed by udev : {}", name),
@@ -276,11 +276,11 @@ mod tests {
 
         assert_matches!(validate_name(&"𐌏".repeat(63)), Ok(_));
         assert_matches!(validate_name(&'\u{10fff8}'.to_string()), Ok(_));
-        assert_matches!(validate_name("*< ? >"), Ok(_));
+        assert_matches!(validate_name("*< ? >"), Err(_));
         assert_matches!(validate_name("..."), Ok(_));
         assert_matches!(validate_name("ok.name"), Ok(_));
-        assert_matches!(validate_name("ok name with spaces"), Ok(_));
-        assert_matches!(validate_name("\\\\"), Ok(_));
+        assert_matches!(validate_name("ok name with spaces"), Err(_));
+        assert_matches!(validate_name("\\\\"), Err(_));
         assert_matches!(validate_name("\u{211D}"), Ok(_));
         assert_matches!(validate_name("☺"), Ok(_));
         assert_matches!(validate_name("ok_name"), Ok(_));

@@ -202,7 +202,10 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
     if name_udevregex.is_match(name) {
         return Err(StratisError::Engine(
             ErrorEnum::Invalid,
-            format!("Name contains characters not allowed by udev : {}", name),
+            format!(
+                "Name contains characters not allowed in udev symlinks : {}",
+                name
+            ),
         ));
     }
 

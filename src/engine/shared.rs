@@ -198,7 +198,8 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
             format!("Name contains control characters : {}", name),
         ));
     }
-    let name_udevregex = Regex::new(r"[[:ascii:]&&[^0-9A-Za-z#+-.:=@_/]]+").expect("regex is valid");
+    let name_udevregex =
+        Regex::new(r"[[:ascii:]&&[^0-9A-Za-z#+-.:=@_/]]+").expect("regex is valid");
     if name_udevregex.is_match(name) {
         return Err(StratisError::Engine(
             ErrorEnum::Invalid,

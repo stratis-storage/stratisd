@@ -284,5 +284,7 @@ mod tests {
         assert_matches!(validate_name("\u{211D}"), Ok(_));
         assert_matches!(validate_name("☺"), Ok(_));
         assert_matches!(validate_name("ok_name"), Ok(_));
+        assert_matches!(validate_name("ユニコード"), Ok(_));
+        assert_matches!(validate_name("ユニコード?"), Err(_));
     }
 }

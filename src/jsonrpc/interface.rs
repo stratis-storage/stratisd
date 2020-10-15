@@ -34,7 +34,7 @@ rpc_api! {
             name: String,
             blockdev_paths: Vec<PathBuf>,
             key_desc: Option<String>,
-        ) -> (Option<PoolUuid>, u16, String);
+        ) -> (bool, u16, String);
 
         #[rpc(method = "RenamePool")]
         fn pool_rename(

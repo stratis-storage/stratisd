@@ -2,84 +2,16 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::unix::io::RawFd;
 
-use nix::{
-    errno::Errno,
-    sys::{
-        socket::{recvmsg, sendmsg, ControlMessage, ControlMessageOwned, MsgFlags},
-        uio::IoVec,
-    },
-    unistd::close,
+use nix::sys::{
+    socket::{sendmsg, ControlMessage, MsgFlags},
+    uio::IoVec,
 };
-
-use crate::{jsonrpc::consts::OP_ERR, stratis::StratisError};
-
-pub fn stratis_error_to_return(e: StratisError) -> (u16, String) {
-    (OP_ERR, e.to_string())
-}
-
-pub fn send_fd_to_sock(unix_fd: RawFd, fd: RawFd) -> Result<(), nix::Error> {
-    sendmsg(
-        unix_fd,
-        &[IoVec::from_slice(&[0, 0, 0, 0])],
-        &[ControlMessage::ScmRights(&[fd])],
-        MsgFlags::empty(),
-        None,
-    )?;
-    Ok(())
-}
-
-pub fn get_fd_from_sock(sock_fd: RawFd) -> Result<RawFd, nix::Error> {
-    let mut cmsg_space = cmsg_space!([RawFd; 1]);
-    let r_msg = recvmsg(
-        sock_fd,
-        &[IoVec::from_mut_slice(&mut [0, 0, 0, 0])],
-        Some(&mut cmsg_space),
-        MsgFlags::empty(),
-    )?;
-    let mut cmsgs: Vec<_> = r_msg.cmsgs().collect();
-    if cmsgs.len() != 1 {
-        cmsgs
-            .into_iter()
-            .filter_map(|msg| {
-                if let ControlMessageOwned::ScmRights(vec) = msg {
-                    Some(vec)
-                } else {
-                    None
-                }
-            })
-            .for_each(|vec| {
-                for fd in vec {
-                    if let Err(e) = close(fd) {
-                        warn!("Failed to close file descriptor {}: {}", fd, e);
-                    }
-                }
-            });
-        Err(nix::Error::from_errno(Errno::EINVAL))
-    } else {
-        let c_msg = cmsgs.pop().expect("Length is 1");
-        match c_msg {
-            ControlMessageOwned::ScmRights(mut vec) => {
-                if vec.len() != 1 {
-                    for fd in vec {
-                        if let Err(e) = close(fd) {
-                            warn!("Failed to close file descriptor {}: {}", fd, e);
-                        }
-                    }
-                    Err(nix::Error::from_errno(Errno::EINVAL))
-                } else {
-                    Ok(vec.pop().expect("Length is 1"))
-                }
-            }
-            _ => Err(nix::Error::from_errno(Errno::EINVAL)),
-        }
-    }
-}
 
 #[macro_export]
 macro_rules! do_request {
-    ($fn:path $(, $args:expr)*) => {
+    ($fn:path $(, $args:expr)*) => {{
         match async_std::task::block_on(async {
             let transport = jsonrpsee::transport::http::HttpTransportClient::new($crate::jsonrpc::consts::RPC_CONNADDR);
             let mut client = jsonrpsee::raw::RawClient::new(transport);
@@ -90,7 +22,23 @@ macro_rules! do_request {
                 $crate::stratis::StratisError::Error(format!("Transport error: {}", e))
             ),
         }
-    }
+    }}
+}
+
+#[macro_export]
+macro_rules! do_request_standard {
+    ($fn:path $(, $args:expr)*) => {{
+        let (changed, rc, rs) = $crate::do_request!($fn $(, $args)*);
+        if rc != 0 {
+            Err(StratisError::Error(rs))
+        } else if !changed {
+            Err(StratisError::Error(
+                "The requested action had no effect".to_string(),
+            ))
+        } else {
+            Ok(())
+        }
+    }}
 }
 
 #[macro_export]
@@ -165,24 +113,13 @@ macro_rules! print_table {
     }};
 }
 
-pub struct OwnedFd(RawFd);
-
-impl OwnedFd {
-    pub fn new(fd: RawFd) -> OwnedFd {
-        OwnedFd(fd)
-    }
-}
-
-impl AsRawFd for OwnedFd {
-    fn as_raw_fd(&self) -> RawFd {
-        self.0
-    }
-}
-
-impl Drop for OwnedFd {
-    fn drop(&mut self) {
-        if let Err(e) = close(self.0) {
-            warn!("Could not clean up file descriptor {}: {}", self.0, e);
-        }
-    }
+pub fn send_fd_to_sock(unix_fd: RawFd, fd: RawFd) -> Result<(), nix::Error> {
+    sendmsg(
+        unix_fd,
+        &[IoVec::from_slice(&[0, 0, 0, 0])],
+        &[ControlMessage::ScmRights(&[fd])],
+        MsgFlags::empty(),
+        None,
+    )?;
+    Ok(())
 }

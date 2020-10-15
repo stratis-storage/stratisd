@@ -2,18 +2,16 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{os::unix::io::RawFd, path::Path};
+use std::{convert::TryFrom, os::unix::io::RawFd, path::Path};
 
 use crate::{
     engine::{
-        BlockDevTier, CreateAction, DeleteAction, Engine, EngineAction, Pool, PoolUuid,
-        RenameAction, StratEngine,
+        BlockDevTier, CreateAction, DeleteAction, Engine, EngineAction, KeyDescription, Pool,
+        PoolUuid, RenameAction, StratEngine,
     },
     jsonrpc::{
-        consts::{OP_ERR, OP_OK, OP_OK_STR},
         interface::PoolListType,
-        server::key::{key_get_desc, key_set_internal},
-        utils::stratis_error_to_return,
+        server::key::{key_get_desc, key_set},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -23,27 +21,12 @@ pub fn pool_unlock(
     engine: &mut StratEngine,
     pool_uuid: PoolUuid,
     prompt: Option<(RawFd, bool)>,
-) -> (bool, u16, String) {
-    let default_value = false;
-    if let Some((fd, no_tty)) = prompt {
-        if let Some(kd) = key_get_desc(engine, pool_uuid) {
-            if let Err(e) = key_set_internal(engine, kd, fd, Some(!no_tty)) {
-                let (rc, rs) = stratis_error_to_return(e);
-                return (default_value, rc, rs);
-            }
-        }
+) -> StratisResult<bool> {
+    if let (Some((fd, no_tty)), Some(kd)) = (prompt, key_get_desc(engine, pool_uuid)) {
+        key_set(engine, kd, fd, Some(!no_tty))?;
     }
 
-    match engine
-        .unlock_pool(pool_uuid)
-        .map(|ret| ret.changed().is_some())
-    {
-        Ok(changed) => (changed, OP_OK, OP_OK_STR.to_string()),
-        Err(e) => {
-            let (rc, rs) = stratis_error_to_return(e);
-            (default_value, rc, rs)
-        }
-    }
+    Ok(engine.unlock_pool(pool_uuid)?.changed().is_some())
 }
 
 // stratis-min pool create
@@ -52,31 +35,27 @@ pub fn pool_create(
     name: &str,
     blockdev_paths: &[&Path],
     key_desc: Option<String>,
-) -> (Option<PoolUuid>, u16, String) {
-    match engine.create_pool(name, blockdev_paths, None, key_desc) {
-        Ok(CreateAction::Created(uuid)) => (Some(uuid), OP_OK, OP_OK_STR.to_string()),
-        Ok(CreateAction::Identity) => (None, OP_OK, OP_OK_STR.to_string()),
-        Err(e) => {
-            let (rc, rs) = stratis_error_to_return(e);
-            (None, rc, rs)
-        }
-    }
+) -> StratisResult<bool> {
+    let key_desc_typed = match key_desc {
+        Some(kd) => Some(KeyDescription::try_from(kd)?),
+        None => None,
+    };
+    Ok(
+        match engine.create_pool(name, blockdev_paths, None, key_desc_typed)? {
+            CreateAction::Created(_) => true,
+            CreateAction::Identity => false,
+        },
+    )
 }
 
 // stratis-min pool destroy
-pub fn pool_destroy(engine: &mut StratEngine, name: &str) -> (bool, u16, String) {
-    let uuid = match name_to_uuid_and_pool(engine, name) {
-        Some((u, _)) => u,
-        None => return (false, OP_ERR, format!("No pool found with name {}", name)),
-    };
-    match engine.destroy_pool(uuid) {
-        Ok(DeleteAction::Deleted(_)) => (true, OP_OK, OP_OK_STR.to_string()),
-        Ok(DeleteAction::Identity) => (false, OP_OK, OP_OK_STR.to_string()),
-        Err(e) => {
-            let (rc, rs) = stratis_error_to_return(e);
-            (false, rc, rs)
-        }
-    }
+pub fn pool_destroy(engine: &mut StratEngine, name: &str) -> StratisResult<bool> {
+    let (uuid, _) = name_to_uuid_and_pool(engine, name)
+        .ok_or_else(|| StratisError::Error(format!("No pool found with name {}", name)))?;
+    Ok(match engine.destroy_pool(uuid)? {
+        DeleteAction::Deleted(_) => true,
+        DeleteAction::Identity => false,
+    })
 }
 
 /// Convert a string representing the name of a pool to the UUID and stratisd
@@ -99,24 +78,10 @@ pub fn pool_init_cache(
     engine: &mut StratEngine,
     name: &str,
     paths: &[&Path],
-) -> (bool, u16, String) {
-    let (uuid, pool) = match name_to_uuid_and_pool(engine, name) {
-        Some(up) => up,
-        None => {
-            let (rc, rs) = stratis_error_to_return(StratisError::Error(format!(
-                "No pool found with name {}",
-                name
-            )));
-            return (false, rc, rs);
-        }
-    };
-    match pool.init_cache(uuid, name, paths) {
-        Ok(ret) => (ret.is_changed(), OP_OK, OP_OK_STR.to_string()),
-        Err(e) => {
-            let (rc, rs) = stratis_error_to_return(e);
-            (false, rc, rs)
-        }
-    }
+) -> StratisResult<bool> {
+    let (uuid, pool) = name_to_uuid_and_pool(engine, name)
+        .ok_or_else(|| StratisError::Error(format!("No pool found with name {}", name)))?;
+    Ok(pool.init_cache(uuid, name, paths)?.is_changed())
 }
 
 // stratis-min pool rename
@@ -124,26 +89,14 @@ pub fn pool_rename(
     engine: &mut StratEngine,
     current_name: &str,
     new_name: &str,
-) -> (bool, u16, String) {
-    let uuid = match name_to_uuid_and_pool(engine, current_name) {
-        Some((u, _)) => u,
-        None => {
-            let (rc, rs) = stratis_error_to_return(StratisError::Error(format!(
-                "No pool found with name {}",
-                current_name
-            )));
-            return (false, rc, rs);
-        }
-    };
-    match engine.rename_pool(uuid, new_name) {
-        Ok(RenameAction::Identity) => (false, OP_OK, OP_OK_STR.to_string()),
-        Ok(RenameAction::Renamed(_)) => (true, OP_OK, OP_OK_STR.to_string()),
-        Ok(RenameAction::NoSource) => unreachable!(),
-        Err(e) => {
-            let (rc, rs) = stratis_error_to_return(e);
-            (false, rc, rs)
-        }
-    }
+) -> StratisResult<bool> {
+    let (uuid, _) = name_to_uuid_and_pool(engine, current_name)
+        .ok_or_else(|| StratisError::Error(format!("No pool found with name {}", current_name)))?;
+    Ok(match engine.rename_pool(uuid, new_name)? {
+        RenameAction::Identity => false,
+        RenameAction::Renamed(_) => true,
+        RenameAction::NoSource => unreachable!(),
+    })
 }
 
 // stratis-min pool add-data
@@ -151,14 +104,8 @@ pub fn pool_add_data(
     engine: &mut StratEngine,
     name: &str,
     blockdevs: &[&Path],
-) -> (bool, u16, String) {
-    match add_blockdevs(engine, name, blockdevs, BlockDevTier::Data) {
-        Ok(ret) => (ret, OP_OK, OP_OK_STR.to_string()),
-        Err(e) => {
-            let (rc, rs) = stratis_error_to_return(e);
-            (false, rc, rs)
-        }
-    }
+) -> StratisResult<bool> {
+    add_blockdevs(engine, name, blockdevs, BlockDevTier::Data)
 }
 
 // stratis-min pool add-cache
@@ -166,14 +113,8 @@ pub fn pool_add_cache(
     engine: &mut StratEngine,
     name: &str,
     blockdevs: &[&Path],
-) -> (bool, u16, String) {
-    match add_blockdevs(engine, name, blockdevs, BlockDevTier::Cache) {
-        Ok(ret) => (ret, OP_OK, OP_OK_STR.to_string()),
-        Err(e) => {
-            let (rc, rs) = stratis_error_to_return(e);
-            (false, rc, rs)
-        }
-    }
+) -> StratisResult<bool> {
+    add_blockdevs(engine, name, blockdevs, BlockDevTier::Cache)
 }
 
 fn add_blockdevs(
@@ -210,16 +151,15 @@ pub fn pool_list(engine: &mut StratEngine) -> PoolListType {
 }
 
 // stratis-min pool is-encrypted
-pub fn pool_is_encrypted(engine: &mut StratEngine, uuid: PoolUuid) -> (bool, u16, String) {
+pub fn pool_is_encrypted(engine: &mut StratEngine, uuid: PoolUuid) -> StratisResult<bool> {
     if let Some((_, pool)) = engine.get_pool(uuid) {
-        (pool.is_encrypted(), OP_OK, OP_OK_STR.to_string())
+        Ok(pool.is_encrypted())
     } else if engine.locked_pools().get(&uuid).is_some() {
-        (true, OP_OK, OP_OK_STR.to_string())
+        Ok(true)
     } else {
-        let (rc, rs) = stratis_error_to_return(StratisError::Error(format!(
+        Err(StratisError::Error(format!(
             "Pool with UUID {} not found",
             uuid.to_simple_ref()
-        )));
-        (false, rc, rs)
+        )))
     }
 }

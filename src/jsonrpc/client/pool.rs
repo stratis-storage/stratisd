@@ -9,9 +9,9 @@ use std::{
 };
 
 use crate::{
-    do_request,
+    do_request, do_request_standard,
     engine::PoolUuid,
-    jsonrpc::{consts::SOCKFD_ADDR, interface::Stratis, utils::send_fd_to_sock},
+    jsonrpc::{client::utils::send_fd_to_sock, consts::SOCKFD_ADDR, interface::Stratis},
     print_table,
     stratis::{StratisError, StratisResult},
 };
@@ -32,16 +32,7 @@ pub fn pool_create(
     blockdevs: &[PathBuf],
     key_desc: Option<String>,
 ) -> StratisResult<()> {
-    let (option, rc, rs) = do_request!(Stratis::pool_create, name, blockdevs, key_desc);
-    if rc != 0 {
-        Err(StratisError::Error(rs))
-    } else if option.is_none() {
-        Err(StratisError::Error(
-            "The requested action had no effect".to_string(),
-        ))
-    } else {
-        Ok(())
-    }
+    do_request_standard!(Stratis::pool_create, name, blockdevs, key_desc)
 }
 
 // stratis-min pool unlock
@@ -51,86 +42,32 @@ pub fn pool_unlock(uuid: PoolUuid, prompt: Option<bool>) -> StratisResult<()> {
         send_fd_to_sock(stream.as_raw_fd(), stdin().as_raw_fd())?;
         println!("Enter passphrase followed by return:");
     }
-    let (changed, rc, rs) = do_request!(Stratis::pool_unlock, uuid, prompt);
-    if rc != 0 {
-        Err(StratisError::Error(rs))
-    } else if !changed {
-        Err(StratisError::Error(
-            "The requested action had no effect".to_string(),
-        ))
-    } else {
-        Ok(())
-    }
+    do_request_standard!(Stratis::pool_unlock, uuid, prompt)
 }
 
 // stratis-min pool init-cache
 pub fn pool_init_cache(name: &str, paths: &[PathBuf]) -> StratisResult<()> {
-    let (changed, rc, rs) = do_request!(Stratis::pool_init_cache, name, paths);
-    if rc != 0 {
-        Err(StratisError::Error(rs))
-    } else if !changed {
-        Err(StratisError::Error(
-            "The requested action had no effect".to_string(),
-        ))
-    } else {
-        Ok(())
-    }
+    do_request_standard!(Stratis::pool_init_cache, name, paths)
 }
 
 // stratis-min pool init-cache
 pub fn pool_rename(name: &str, new_name: &str) -> StratisResult<()> {
-    let (changed, rc, rs) = do_request!(Stratis::pool_rename, name, new_name);
-    if rc != 0 {
-        Err(StratisError::Error(rs))
-    } else if !changed {
-        Err(StratisError::Error(
-            "The requested action had no effect".to_string(),
-        ))
-    } else {
-        Ok(())
-    }
+    do_request_standard!(Stratis::pool_rename, name, new_name)
 }
 
 // stratis-min pool add-data
 pub fn pool_add_data(name: &str, paths: &[PathBuf]) -> StratisResult<()> {
-    let (changed, rc, rs) = do_request!(Stratis::pool_add_data, name, paths);
-    if rc != 0 {
-        Err(StratisError::Error(rs))
-    } else if !changed {
-        Err(StratisError::Error(
-            "The requested action had no effect".to_string(),
-        ))
-    } else {
-        Ok(())
-    }
+    do_request_standard!(Stratis::pool_add_data, name, paths)
 }
 
 // stratis-min pool add-cache
 pub fn pool_add_cache(name: &str, paths: &[PathBuf]) -> StratisResult<()> {
-    let (changed, rc, rs) = do_request!(Stratis::pool_add_cache, name, paths);
-    if rc != 0 {
-        Err(StratisError::Error(rs))
-    } else if !changed {
-        Err(StratisError::Error(
-            "The requested action had no effect".to_string(),
-        ))
-    } else {
-        Ok(())
-    }
+    do_request_standard!(Stratis::pool_add_cache, name, paths)
 }
 
 // stratis-min pool destroy
 pub fn pool_destroy(name: &str) -> StratisResult<()> {
-    let (changed, rc, rs) = do_request!(Stratis::pool_destroy, name);
-    if rc != 0 {
-        Err(StratisError::Error(rs))
-    } else if !changed {
-        Err(StratisError::Error(
-            "The requested action had no effect".to_string(),
-        ))
-    } else {
-        Ok(())
-    }
+    do_request_standard!(Stratis::pool_destroy, name)
 }
 
 #[allow(clippy::cast_precision_loss)]

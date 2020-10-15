@@ -9,8 +9,8 @@ use std::{
 };
 
 use crate::{
-    do_request,
-    jsonrpc::{utils::send_fd_to_sock, Stratis, SOCKFD_ADDR},
+    do_request, do_request_standard,
+    jsonrpc::{client::utils::send_fd_to_sock, Stratis, SOCKFD_ADDR},
     print_table,
     stratis::{StratisError, StratisResult},
 };
@@ -48,16 +48,7 @@ pub fn key_set(key_desc: &str, keyfile_path: Option<&str>, no_tty: bool) -> Stra
 }
 
 pub fn key_unset(key_desc: &str) -> StratisResult<()> {
-    let (deleted, rc, rs): (bool, u16, String) = do_request!(Stratis::key_unset, key_desc);
-    if rc != 0 {
-        Err(StratisError::Error(rs))
-    } else if !deleted {
-        Err(StratisError::Error(
-            "The requested action had no effect".to_string(),
-        ))
-    } else {
-        Ok(())
-    }
+    do_request_standard!(Stratis::key_unset, key_desc)
 }
 
 pub fn key_list() -> StratisResult<()> {

@@ -19,12 +19,15 @@ use tokio::{
 };
 
 use crate::{
+    default_handler,
     engine::StratEngine,
     jsonrpc::{
         consts::RPC_SOCKADDR,
         interface::Stratis,
-        server::{key, pool},
-        utils::{get_fd_from_sock, OwnedFd},
+        server::{
+            key, pool,
+            utils::{get_fd_from_sock, OwnedFd},
+        },
     },
 };
 
@@ -47,103 +50,105 @@ async fn server_loop(mut recv: Receiver<OwnedFd>) -> Result<(), String> {
                     interactive,
                 } => {
                     if let Some(ownedfd) = recv.recv().await {
-                        respond
-                            .ok(key::key_set(
-                                &mut engine,
-                                key_desc,
-                                ownedfd.as_raw_fd(),
-                                interactive,
-                            ))
-                            .await
+                        default_handler!(
+                            respond,
+                            key::key_set,
+                            &mut engine,
+                            None,
+                            key_desc,
+                            ownedfd.as_raw_fd(),
+                            interactive
+                        )
                     } else {
                         respond.err(Error::new(ErrorCode::InternalError)).await
                     }
                 }
                 Stratis::KeyUnset { respond, key_desc } => {
-                    respond.ok(key::key_unset(&mut engine, key_desc)).await
+                    default_handler!(respond, key::key_unset, &mut engine, false, key_desc)
                 }
-                Stratis::KeyList { respond } => respond.ok(key::key_list(&mut engine)).await,
+                Stratis::KeyList { respond } => {
+                    default_handler!(respond, key::key_list, &mut engine, Vec::new())
+                }
                 Stratis::PoolCreate {
                     respond,
                     name,
                     blockdev_paths,
                     key_desc,
-                } => {
-                    respond
-                        .ok(pool::pool_create(
-                            &mut engine,
-                            &name,
-                            blockdev_paths
-                                .iter()
-                                .map(|p| p.as_path())
-                                .collect::<Vec<_>>()
-                                .as_slice(),
-                            key_desc,
-                        ))
-                        .await
-                }
+                } => default_handler!(
+                    respond,
+                    pool::pool_create,
+                    &mut engine,
+                    false,
+                    &name,
+                    blockdev_paths
+                        .iter()
+                        .map(|p| p.as_path())
+                        .collect::<Vec<_>>()
+                        .as_slice(),
+                    key_desc
+                ),
                 Stratis::PoolRename {
                     respond,
                     name,
                     new_name,
-                } => {
-                    respond
-                        .ok(pool::pool_rename(&mut engine, &name, &new_name))
-                        .await
-                }
+                } => default_handler!(
+                    respond,
+                    pool::pool_rename,
+                    &mut engine,
+                    false,
+                    &name,
+                    &new_name
+                ),
                 Stratis::PoolInitCache {
                     respond,
                     name,
                     blockdev_paths,
-                } => {
-                    respond
-                        .ok(pool::pool_init_cache(
-                            &mut engine,
-                            &name,
-                            blockdev_paths
-                                .iter()
-                                .map(|p| p.as_path())
-                                .collect::<Vec<_>>()
-                                .as_slice(),
-                        ))
-                        .await
-                }
+                } => default_handler!(
+                    respond,
+                    pool::pool_init_cache,
+                    &mut engine,
+                    false,
+                    &name,
+                    blockdev_paths
+                        .iter()
+                        .map(|p| p.as_path())
+                        .collect::<Vec<_>>()
+                        .as_slice()
+                ),
                 Stratis::PoolAddData {
                     respond,
                     name,
                     blockdev_paths,
-                } => {
-                    respond
-                        .ok(pool::pool_add_data(
-                            &mut engine,
-                            &name,
-                            blockdev_paths
-                                .iter()
-                                .map(|p| p.as_path())
-                                .collect::<Vec<_>>()
-                                .as_slice(),
-                        ))
-                        .await
-                }
+                } => default_handler!(
+                    respond,
+                    pool::pool_add_data,
+                    &mut engine,
+                    false,
+                    &name,
+                    blockdev_paths
+                        .iter()
+                        .map(|p| p.as_path())
+                        .collect::<Vec<_>>()
+                        .as_slice()
+                ),
                 Stratis::PoolAddCache {
                     respond,
                     name,
                     blockdev_paths,
-                } => {
-                    respond
-                        .ok(pool::pool_add_cache(
-                            &mut engine,
-                            &name,
-                            blockdev_paths
-                                .iter()
-                                .map(|p| p.as_path())
-                                .collect::<Vec<_>>()
-                                .as_slice(),
-                        ))
-                        .await
-                }
+                } => default_handler!(
+                    respond,
+                    pool::pool_add_cache,
+                    &mut engine,
+                    false,
+                    &name,
+                    blockdev_paths
+                        .iter()
+                        .map(|p| p.as_path())
+                        .collect::<Vec<_>>()
+                        .as_slice()
+                ),
                 Stratis::PoolDestroy { respond, name } => {
-                    respond.ok(pool::pool_destroy(&mut engine, &name)).await
+                    default_handler!(respond, pool::pool_destroy, &mut engine, false, &name)
                 }
                 Stratis::PoolUnlock {
                     respond,
@@ -152,27 +157,35 @@ async fn server_loop(mut recv: Receiver<OwnedFd>) -> Result<(), String> {
                 } => {
                     if prompt.is_some() {
                         if let Some(ownedfd) = recv.recv().await {
-                            respond
-                                .ok(pool::pool_unlock(
-                                    &mut engine,
-                                    pool_uuid,
-                                    prompt.map(|b| (ownedfd.as_raw_fd(), b)),
-                                ))
-                                .await
+                            default_handler!(
+                                respond,
+                                pool::pool_unlock,
+                                &mut engine,
+                                false,
+                                pool_uuid,
+                                prompt.map(|b| (ownedfd.as_raw_fd(), b))
+                            )
                         } else {
                             respond.err(Error::new(ErrorCode::InternalError)).await
                         }
                     } else {
-                        respond
-                            .ok(pool::pool_unlock(&mut engine, pool_uuid, None))
-                            .await
+                        default_handler!(
+                            respond,
+                            pool::pool_unlock,
+                            &mut engine,
+                            false,
+                            pool_uuid,
+                            None
+                        )
                     }
                 }
-                Stratis::PoolIsEncrypted { respond, pool_uuid } => {
-                    respond
-                        .ok(pool::pool_is_encrypted(&mut engine, pool_uuid))
-                        .await
-                }
+                Stratis::PoolIsEncrypted { respond, pool_uuid } => default_handler!(
+                    respond,
+                    pool::pool_is_encrypted,
+                    &mut engine,
+                    false,
+                    pool_uuid
+                ),
                 Stratis::PoolList { respond } => respond.ok(pool::pool_list(&mut engine)).await,
             }
         }

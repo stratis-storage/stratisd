@@ -6,23 +6,8 @@ use std::os::unix::io::RawFd;
 
 use crate::{
     engine::{DeleteAction, Engine, MappingCreateAction, PoolUuid, StratEngine},
-    jsonrpc::{
-        consts::{OP_OK, OP_OK_STR},
-        utils::stratis_error_to_return,
-    },
     stratis::StratisResult,
 };
-
-pub fn key_set_internal(
-    engine: &mut StratEngine,
-    key_desc: String,
-    key_fd: RawFd,
-    interactive: Option<bool>,
-) -> StratisResult<MappingCreateAction<()>> {
-    engine
-        .get_key_handler_mut()
-        .set(key_desc.as_str(), key_fd, interactive)
-}
 
 /// This method sets a key in the kernel keyring. It accepts an optional keyfile path
 /// and if this is not provided, the user is prompted for a passphrase. When `no_tty`
@@ -36,47 +21,35 @@ pub fn key_set(
     key_desc: String,
     key_fd: RawFd,
     interactive: Option<bool>,
-) -> (Option<bool>, u16, String) {
-    let default_return = None;
-
-    let val = match key_set_internal(engine, key_desc, key_fd, interactive) {
-        Ok(MappingCreateAction::Created(())) => Some(false),
-        Ok(MappingCreateAction::ValueChanged(())) => Some(true),
-        Ok(MappingCreateAction::Identity) => default_return,
-        Err(e) => {
-            let (rc, rs) = stratis_error_to_return(e);
-            return (default_return, rc, rs);
-        }
-    };
-    (val, OP_OK, OP_OK_STR.to_string())
+) -> StratisResult<Option<bool>> {
+    Ok(
+        match engine
+            .get_key_handler_mut()
+            .set(key_desc.as_str(), key_fd, interactive)?
+        {
+            MappingCreateAction::Created(()) => Some(false),
+            MappingCreateAction::ValueChanged(()) => Some(true),
+            MappingCreateAction::Identity => None,
+        },
+    )
 }
 
-pub fn key_unset(engine: &mut StratEngine, key_desc: String) -> (bool, u16, String) {
-    let default_return = false;
-
-    let val = match engine.get_key_handler_mut().unset(key_desc.as_str()) {
-        Ok(DeleteAction::Deleted(())) => true,
-        Ok(DeleteAction::Identity) => false,
-        Err(e) => {
-            let (rc, rs) = stratis_error_to_return(e);
-            return (default_return, rc, rs);
-        }
-    };
-    (val, OP_OK, OP_OK_STR.to_string())
+pub fn key_unset(engine: &mut StratEngine, key_desc: String) -> StratisResult<bool> {
+    Ok(
+        match engine.get_key_handler_mut().unset(key_desc.as_str())? {
+            DeleteAction::Deleted(()) => true,
+            DeleteAction::Identity => false,
+        },
+    )
 }
 
-pub fn key_list(engine: &mut StratEngine) -> (Vec<String>, u16, String) {
-    let val = match engine.get_key_handler_mut().list() {
-        Ok(list) => list
-            .into_iter()
-            .map(|kd| kd.as_application_str().to_string())
-            .collect(),
-        Err(e) => {
-            let (rc, rs) = stratis_error_to_return(e);
-            return (Vec::new(), rc, rs);
-        }
-    };
-    (val, OP_OK, OP_OK_STR.to_string())
+pub fn key_list(engine: &mut StratEngine) -> StratisResult<Vec<String>> {
+    Ok(engine
+        .get_key_handler_mut()
+        .list()?
+        .into_iter()
+        .map(|kd| kd.as_application_str().to_string())
+        .collect())
 }
 
 pub fn key_get_desc(engine: &mut StratEngine, pool_uuid: PoolUuid) -> Option<String> {

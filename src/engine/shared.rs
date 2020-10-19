@@ -11,6 +11,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use regex::Regex;
 use termios::Termios;
 
 use devicemapper::Bytes;
@@ -196,6 +197,19 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
             format!("Name contains control characters : {}", name),
         ));
     }
+    lazy_static! {
+        static ref NAME_UDEVREGEX: Regex =
+            Regex::new(r"[[:ascii:]&&[^0-9A-Za-z#+-.:=@_/]]+").expect("regex is valid");
+    }
+    if NAME_UDEVREGEX.is_match(name) {
+        return Err(StratisError::Engine(
+            ErrorEnum::Invalid,
+            format!(
+                "Name contains characters not allowed in udev symlinks : {}",
+                name
+            ),
+        ));
+    }
 
     let name_path = Path::new(name);
     if name_path.components().count() != 1 {
@@ -259,19 +273,23 @@ mod tests {
         assert_matches!(validate_name("trailing_space "), Err(_));
         assert_matches!(validate_name("\u{0}leading_null"), Err(_));
         assert_matches!(validate_name("trailing_null\u{0}"), Err(_));
+        assert_matches!(validate_name("exclamat!on"), Err(_));
+        assert_matches!(validate_name("dollar$ign"), Err(_));
         assert_matches!(validate_name("middle\u{0}_null"), Err(_));
         assert_matches!(validate_name("\u{0}multiple\u{0}_null\u{0}"), Err(_));
         assert_matches!(validate_name(&"𐌏".repeat(64)), Err(_));
 
         assert_matches!(validate_name(&"𐌏".repeat(63)), Ok(_));
         assert_matches!(validate_name(&'\u{10fff8}'.to_string()), Ok(_));
-        assert_matches!(validate_name("*< ? >"), Ok(_));
+        assert_matches!(validate_name("*< ? >"), Err(_));
         assert_matches!(validate_name("..."), Ok(_));
         assert_matches!(validate_name("ok.name"), Ok(_));
-        assert_matches!(validate_name("ok name with spaces"), Ok(_));
-        assert_matches!(validate_name("\\\\"), Ok(_));
+        assert_matches!(validate_name("ok name with spaces"), Err(_));
+        assert_matches!(validate_name("\\\\"), Err(_));
         assert_matches!(validate_name("\u{211D}"), Ok(_));
         assert_matches!(validate_name("☺"), Ok(_));
         assert_matches!(validate_name("ok_name"), Ok(_));
+        assert_matches!(validate_name("ユニコード"), Ok(_));
+        assert_matches!(validate_name("ユニコード?"), Err(_));
     }
 }

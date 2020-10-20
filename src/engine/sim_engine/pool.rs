@@ -26,7 +26,7 @@ use crate::{
         types::{
             BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid, KeyDescription,
             MaybeDbusPath, Name, PoolUuid, Redundancy, RenameAction, SetCreateAction,
-            SetDeleteAction, TangInfo,
+            SetDeleteAction,
         },
         EngineEvent,
     },
@@ -272,7 +272,8 @@ impl Pool for SimPool {
     fn bind_clevis(
         &self,
         _key_desc: &KeyDescription,
-        _tang_info: TangInfo,
+        _pin: &str,
+        _clevis_info: &Value,
     ) -> StratisResult<CreateAction<()>> {
         Ok(CreateAction::Identity)
     }

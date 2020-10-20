@@ -29,7 +29,7 @@ use crate::{
         },
         types::{
             BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid, MaybeDbusPath, Name,
-            PoolUuid, Redundancy, RenameAction, SetCreateAction, SetDeleteAction, TangInfo,
+            PoolUuid, Redundancy, RenameAction, SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -380,8 +380,8 @@ fn clevis_is_enabled(handles: &mut Vec<CryptHandle>) -> StratisResult<bool> {
     let mut clevis_infos = HashSet::new();
     for handle in handles.iter_mut() {
         let clevis_info = handle.clevis_info()?;
-        if let Some(info) = clevis_info {
-            clevis_infos.insert(info);
+        if let Some((pin, info)) = clevis_info {
+            clevis_infos.insert(json!({ pin: info }).to_string());
         }
     }
     if clevis_infos.is_empty() {
@@ -442,19 +442,21 @@ impl Pool for StratPool {
     fn bind_clevis(
         &self,
         key_desc: &KeyDescription,
-        tang_info: TangInfo,
+        pin: &str,
+        clevis_info: &Value,
     ) -> StratisResult<CreateAction<()>> {
         fn bind_clevis_loop<'a>(
             key_fs: &MemoryPrivateFilesystem,
             rollback_record: &'a mut Vec<CryptHandle>,
             handles: &'a mut Vec<CryptHandle>,
             key_desc: &KeyDescription,
-            tang_info: TangInfo,
+            pin: &str,
+            clevis_info: &Value,
         ) -> StratisResult<()> {
             for mut crypt_handle in handles.drain(..) {
                 let res = key_fs.key_op(key_desc, |keyfile_path| {
                     crypt_handle
-                        .clevis_bind(keyfile_path, &tang_info.tang_url, &tang_info.tang_thp)
+                        .clevis_bind(keyfile_path, pin, clevis_info)
                         .map_err(StratisError::Crypt)
                 });
                 if res.is_ok() {
@@ -479,7 +481,8 @@ impl Pool for StratPool {
             &mut rollback_record,
             &mut crypt_handles,
             key_desc,
-            tang_info,
+            pin,
+            clevis_info,
         );
 
         if result.is_err() {

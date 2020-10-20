@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use rand::{thread_rng, Rng, ThreadRng};
+use rand::{rngs::ThreadRng, thread_rng, Rng};
 
 #[derive(Debug)]
 pub struct Randomizer {
@@ -26,7 +26,7 @@ impl Randomizer {
         if self.denominator == 0 {
             false
         } else {
-            self.rng.gen_weighted_bool(self.denominator)
+            self.rng.gen_ratio(1, self.denominator)
         }
     }
 

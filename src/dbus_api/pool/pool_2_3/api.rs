@@ -10,10 +10,10 @@ use crate::dbus_api::{
 };
 
 pub fn bind_clevis_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
-    f.method("BindClevis", (), bind_clevis)
+    f.method("Bind", (), bind_clevis)
         .in_arg(("key_desc", "s"))
-        .in_arg(("tang_url", "s"))
-        .in_arg(("tang_thp", "s"))
+        .in_arg(("pin", "s"))
+        .in_arg(("json", "s"))
         // b: Indicates if new clevis bindings were added
         //
         // Rust representation: bool
@@ -23,7 +23,7 @@ pub fn bind_clevis_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>
 }
 
 pub fn unbind_clevis_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
-    f.method("UnbindClevis", (), unbind_clevis)
+    f.method("Unbind", (), unbind_clevis)
         // b: Indicates if clevis bindings were removed
         //
         // Rust representation: bool

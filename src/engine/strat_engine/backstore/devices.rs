@@ -12,6 +12,7 @@ use std::{
 
 use chrono::Utc;
 use itertools::Itertools;
+use serde_json::Value;
 use uuid::Uuid;
 
 use devicemapper::{Bytes, Device, Sectors, IEC};
@@ -32,7 +33,7 @@ use crate::{
             names::KeyDescription,
             udev::{block_device_apply, decide_ownership, get_udev_property, UdevOwnership},
         },
-        types::{BlockDevPath, DevUuid, PoolUuid, TangInfo},
+        types::{BlockDevPath, DevUuid, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -436,7 +437,7 @@ pub fn initialize_devices(
     devices: Vec<DeviceInfo>,
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
-    encryption_info: Option<(&KeyDescription, Option<&TangInfo>)>,
+    encryption_info: Option<(&KeyDescription, Option<(&str, &Value)>)>,
 ) -> StratisResult<Vec<StratBlockDev>> {
     /// Map a major/minor device number of a physical device
     /// to the corresponding major/minor number of the encrypted
@@ -458,20 +459,20 @@ pub fn initialize_devices(
         pool_uuid: PoolUuid,
         dev_uuid: DevUuid,
         key_description: &KeyDescription,
-        enable_clevis: Option<&TangInfo>,
+        enable_clevis: Option<(&str, &Value)>,
     ) -> StratisResult<(CryptHandle, Device, Sectors)> {
         fn initialize_encrypted_with_err(
             handle: &mut CryptHandle,
             key_description: &KeyDescription,
-            enable_clevis: Option<&TangInfo>,
+            enable_clevis: Option<(&str, &Value)>,
         ) -> StratisResult<(Device, Sectors)> {
             let device_size = handle.logical_device_size()?;
 
-            if let Some(tang_info) = enable_clevis {
+            if let Some((pin, json)) = enable_clevis {
                 let mem_fs = MemoryPrivateFilesystem::new()?;
                 mem_fs.key_op(key_description, |key_path| {
                     handle
-                        .clevis_bind(key_path, &tang_info.tang_url, &tang_info.tang_thp)
+                        .clevis_bind(key_path, pin, &json)
                         .map_err(|e| StratisError::Error(e.to_string()))
                 })?;
             };
@@ -601,7 +602,7 @@ pub fn initialize_devices(
         dev_info: &DeviceInfo,
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
-        encryption_info: Option<(&KeyDescription, Option<&TangInfo>)>,
+        encryption_info: Option<(&KeyDescription, Option<(&str, &Value)>)>,
     ) -> StratisResult<StratBlockDev> {
         let dev_uuid = Uuid::new_v4();
         let (maybe_encrypted, devno, blockdev_size) = match encryption_info {

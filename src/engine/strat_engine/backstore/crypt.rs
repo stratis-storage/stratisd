@@ -9,7 +9,7 @@ use std::{
 };
 
 use base64::{decode, encode_config, CharacterSet, Config};
-use serde_json::Value;
+use serde_json::{Map, Value};
 use sha1::{Digest, Sha1};
 
 use devicemapper::Sectors;
@@ -25,7 +25,7 @@ use crate::engine::{
         metadata::StratisIdentifiers,
         names::format_crypt_name,
     },
-    types::{KeyDescription, SizedKeyMemory, TangInfo, UnlockMethod},
+    types::{KeyDescription, SizedKeyMemory, UnlockMethod},
     DevUuid, PoolUuid,
 };
 
@@ -480,8 +480,8 @@ impl CryptHandle {
         get_keyslot_number(&mut self.device, token_id)
     }
 
-    /// Get the Tang server url and key thumbprint.
-    fn get_url_and_thp(&mut self) -> Result<Option<(String, String)>> {
+    /// Get info for the clevis binding.
+    pub fn clevis_info(&mut self) -> Result<Option<(String, Value)>> {
         let json = match self
             .device
             .token_handle()
@@ -504,62 +504,7 @@ impl CryptHandle {
         let subjson: Value = serde_json::from_slice(json_bytes.as_slice())
             .map_err(|e| LibcryptErr::Other(e.to_string()))?;
 
-        let url = subjson
-            .get("clevis")
-            .and_then(|map| map.get("tang"))
-            .and_then(|map| map.get("url"))
-            .and_then(|s| s.as_str())
-            .ok_or_else(|| {
-                LibcryptErr::Other("Expected a string for value of clevis.tang.url".to_string())
-            })?;
-
-        let keys = subjson
-            .get("clevis")
-            .and_then(|map| map.get("tang"))
-            .and_then(|map| map.get("adv"))
-            .and_then(|adv| adv.get("keys"))
-            .and_then(|keys| keys.as_array())
-            .ok_or_else(|| {
-                LibcryptErr::Other(
-                    "Expected an array for value of clevis.tang.adv.keys".to_string(),
-                )
-            })?;
-        let mut key = keys
-            .iter()
-            .cloned()
-            .find(|obj| obj.get("key_ops") == Some(&Value::Array(vec![Value::from("verify")])))
-            .ok_or_else(|| {
-                LibcryptErr::Other("Verification key not found in clevis metadata".to_string())
-            })?;
-
-        let map = if let Some(m) = key.as_object_mut() {
-            m
-        } else {
-            return Err(LibcryptErr::Other(
-                "Key value is not in JSON object format".to_string(),
-            ));
-        };
-        map.remove("key_ops");
-        map.remove("alg");
-
-        let thp = key.to_string();
-        let mut hasher = Sha1::new();
-        hasher.input(thp.as_bytes());
-        let array = hasher.result();
-        let thp = encode_config(array, Config::new(CharacterSet::UrlSafe, false));
-
-        Ok(Some((url.to_owned(), thp)))
-    }
-
-    /// Get Tang server info for the clevis binding.
-    pub fn clevis_info(&mut self) -> Result<Option<TangInfo>> {
-        match self.get_url_and_thp()? {
-            Some((url, thp)) => Ok(Some(TangInfo {
-                tang_url: url,
-                tang_thp: thp,
-            })),
-            None => Ok(None),
-        }
+        pin_dispatch(&subjson).map(Some)
     }
 
     /// Activate encrypted Stratis device using the name stored in the
@@ -577,13 +522,8 @@ impl CryptHandle {
     }
 
     /// Bind the given device to a tang server using clevis.
-    pub fn clevis_bind(
-        &mut self,
-        keyfile_path: &Path,
-        tang_url: &str,
-        tang_thp: &str,
-    ) -> Result<()> {
-        clevis_luks_bind(&self.physical_path, keyfile_path, tang_url, tang_thp)
+    pub fn clevis_bind(&mut self, keyfile_path: &Path, pin: &str, json: &Value) -> Result<()> {
+        clevis_luks_bind(&self.physical_path, keyfile_path, pin, json)
             .map_err(|e| LibcryptErr::Other(e.to_string()))
     }
 
@@ -630,6 +570,129 @@ impl CryptHandle {
             "Failed to get device size for encrypted logical device"
         );
         Ok(Sectors(active_device.size))
+    }
+}
+
+/// Generate tang JSON
+fn tang_dispatch(json: &Value) -> Result<Value> {
+    let object = json
+        .get("clevis")
+        .and_then(|map| map.get("tang"))
+        .and_then(|val| val.as_object())
+        .ok_or_else(|| {
+            LibcryptErr::Other("Expected an object for value of clevis.tang".to_string())
+        })?;
+    let url = object.get("url").and_then(|s| s.as_str()).ok_or_else(|| {
+        LibcryptErr::Other("Expected a string for value of clevis.tang.url".to_string())
+    })?;
+
+    let keys = object
+        .get("adv")
+        .and_then(|adv| adv.get("keys"))
+        .and_then(|keys| keys.as_array())
+        .ok_or_else(|| {
+            LibcryptErr::Other("Expected an array for value of clevis.tang.adv.keys".to_string())
+        })?;
+    let mut key = keys
+        .iter()
+        .cloned()
+        .find(|obj| obj.get("key_ops") == Some(&Value::Array(vec![Value::from("verify")])))
+        .ok_or_else(|| {
+            LibcryptErr::Other("Verification key not found in clevis metadata".to_string())
+        })?;
+
+    let map = if let Some(m) = key.as_object_mut() {
+        m
+    } else {
+        return Err(LibcryptErr::Other(
+            "Key value is not in JSON object format".to_string(),
+        ));
+    };
+    map.remove("key_ops");
+    map.remove("alg");
+
+    let thp = key.to_string();
+    let mut hasher = Sha1::new();
+    hasher.input(thp.as_bytes());
+    let array = hasher.result();
+    let thp = encode_config(array, Config::new(CharacterSet::UrlSafe, false));
+
+    Ok(json!({"url": url.to_owned(), "thp": thp}))
+}
+
+/// Generate Sharmir secret sharing JSON
+fn sss_dispatch(json: &Value) -> Result<Value> {
+    let object = json
+        .get("clevis")
+        .and_then(|map| map.get("sss"))
+        .and_then(|val| val.as_object())
+        .ok_or_else(|| {
+            LibcryptErr::Other("Expected an object for value of clevis.sss".to_string())
+        })?;
+
+    let threshold = json.get("t").and_then(|val| val.as_u64()).ok_or_else(|| {
+        LibcryptErr::Other("Expected an int for value of clevis.sss.t".to_string())
+    })?;
+    let jwes = object
+        .get("jwe")
+        .and_then(|val| val.as_array())
+        .ok_or_else(|| {
+            LibcryptErr::Other("Expected an array for value of clevis.sss.jwe".to_string())
+        })?;
+
+    let mut sss_map = Map::new();
+    sss_map.insert("t".to_string(), Value::from(threshold));
+
+    let mut pin_map = Map::new();
+    for jwe in jwes {
+        if let Value::String(ref s) = jwe {
+            let json_bytes = decode(s).map_err(|e| LibcryptErr::Other(e.to_string()))?;
+            let value: Value = serde_json::from_slice(&json_bytes)
+                .map_err(|e| LibcryptErr::Other(e.to_string()))?;
+            let (pin, value) = pin_dispatch(&value)?;
+            match pin_map.get_mut(&pin) {
+                Some(Value::Array(ref mut vec)) => vec.push(value),
+                None => {
+                    pin_map.insert(pin, Value::from(vec![value]));
+                }
+                _ => {
+                    return Err(LibcryptErr::Other(format!(
+                        "There appears to be a data type that is not an array in \
+                    the data structure being used to construct the sss JSON config
+                    under pin name {}",
+                        pin,
+                    )))
+                }
+            };
+        } else {
+            return Err(LibcryptErr::Other(
+                "Expected a string for each value in the array at clevis.sss.jwe".to_string(),
+            ));
+        }
+    }
+    sss_map.insert("pins".to_string(), Value::from(pin_map));
+
+    Ok(Value::from(sss_map))
+}
+
+/// TODO: Implement!
+fn tpm_dispatch(_json: &Value) -> Result<Value> {
+    unimplemented!()
+}
+
+/// Match pin for existing JWE
+fn pin_dispatch(decoded_jwe: &Value) -> Result<(String, Value)> {
+    let pin_value = decoded_jwe
+        .get("clevis")
+        .and_then(|map| map.get("pin"))
+        .ok_or_else(|| {
+            LibcryptErr::Other("Key .clevis.pin not found in clevis JSON token".to_string())
+        })?;
+    match pin_value.as_str() {
+        Some("tang") => tang_dispatch(decoded_jwe).map(|val| ("tang".to_owned(), val)),
+        Some("sss") => sss_dispatch(decoded_jwe).map(|val| ("sss".to_owned(), val)),
+        Some("tpm2") => tpm_dispatch(decoded_jwe).map(|val| ("tpm2".to_owned(), val)),
+        _ => Err(LibcryptErr::Other("Unsupported clevis pin".to_string())),
     }
 }
 

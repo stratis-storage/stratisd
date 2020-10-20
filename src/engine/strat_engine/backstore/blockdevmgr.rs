@@ -11,6 +11,7 @@ use std::{
 
 use chrono::{DateTime, Duration, Utc};
 use rand::{seq::IteratorRandom, thread_rng};
+use serde_json::Value;
 
 use devicemapper::{Bytes, Device, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine};
 
@@ -26,7 +27,7 @@ use crate::{
             names::KeyDescription,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
         },
-        types::{DevUuid, PoolUuid, TangInfo},
+        types::{DevUuid, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -134,7 +135,7 @@ impl BlockDevMgr {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         mda_data_size: MDADataSize,
-        encryption_info: Option<(&KeyDescription, Option<&TangInfo>)>,
+        encryption_info: Option<(&KeyDescription, Option<(&str, &Value)>)>,
     ) -> StratisResult<BlockDevMgr> {
         let devices = process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?;
 
@@ -170,11 +171,11 @@ impl BlockDevMgr {
     ///
     /// Returns Ok(Some(_)) containing the tang URL if clevis is enabled.
     /// Returns Ok(None) if clevis is not enabled.
-    fn clevis_enabled(&self, pool_uuid: PoolUuid) -> StratisResult<Option<TangInfo>> {
+    fn clevis_enabled(&self, pool_uuid: PoolUuid) -> StratisResult<Option<(String, Value)>> {
         fn match_infos(
-            clevis_info: Option<TangInfo>,
-            clevis_info_next: Option<TangInfo>,
-        ) -> StratisResult<Option<TangInfo>> {
+            clevis_info: Option<(String, Value)>,
+            clevis_info_next: Option<(String, Value)>,
+        ) -> StratisResult<Option<(String, Value)>> {
             match (clevis_info, clevis_info_next) {
                 (Some(c), Some(cn)) => {
                     if c != cn {
@@ -202,7 +203,7 @@ impl BlockDevMgr {
             return Ok(None);
         }
 
-        let mut clevis_info: Option<Option<TangInfo>> = None;
+        let mut clevis_info: Option<Option<(String, Value)>> = None;
         for bd in self.block_devs.iter() {
             if bd.pool_uuid() == pool_uuid {
                 let physical_path = bd.devnode().physical_path();
@@ -257,7 +258,10 @@ impl BlockDevMgr {
             pool_uuid,
             MDADataSize::default(),
             match self.key_desc.as_ref() {
-                Some(kd) => Some((kd, clevis_info.as_ref())),
+                Some(kd) => Some((
+                    kd,
+                    clevis_info.as_ref().map(|(pin, val)| (pin.as_str(), val)),
+                )),
                 None => None,
             },
         )?;

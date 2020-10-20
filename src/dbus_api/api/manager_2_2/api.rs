@@ -4,10 +4,7 @@
 
 use dbus::tree::{Factory, MTFn, Method};
 
-use crate::dbus_api::{
-    api::manager_2_2::methods::{set_key, unlock_pool},
-    types::TData,
-};
+use crate::dbus_api::{api::manager_2_2::methods::set_key, types::TData};
 
 pub fn set_key_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
     f.method("SetKey", (), set_key)
@@ -20,19 +17,6 @@ pub fn set_key_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TD
         //
         // Rust representation: (bool, bool)
         .out_arg(("result", "(bb)"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"))
-}
-
-pub fn unlock_pool_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
-    f.method("UnlockPool", (), unlock_pool)
-        .in_arg(("pool_uuid", "s"))
-        // b: true if some encrypted devices were newly opened.
-        // as: array of device UUIDs converted to Strings of all of the newly opened
-        //     devices.
-        //
-        // Rust representation: (bool, Vec<DevUuid>)
-        .out_arg(("result", "(bas)"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"))
 }

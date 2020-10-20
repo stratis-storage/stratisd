@@ -20,6 +20,7 @@ use std::{
     process::Command,
 };
 
+use serde_json::Value;
 use uuid::Uuid;
 
 use crate::stratis::{StratisError, StratisResult};
@@ -48,7 +49,6 @@ const UDEVADM: &str = "udevadm";
 const XFS_DB: &str = "xfs_db";
 const XFS_GROWFS: &str = "xfs_growfs";
 const CLEVIS: &str = "clevis";
-const CLEVIS_LIST: &str = "clevis-luks-list";
 const CLEVIS_BIND: &str = "clevis-luks-bind";
 const CLEVIS_UNBIND: &str = "clevis-luks-unbind";
 const CLEVIS_UNLOCK: &str = "clevis-luks-unlock";
@@ -62,7 +62,6 @@ lazy_static! {
         (XFS_DB.to_string(), find_binary(XFS_DB)),
         (XFS_GROWFS.to_string(), find_binary(XFS_GROWFS)),
         (CLEVIS.to_string(), find_binary(CLEVIS)),
-        (CLEVIS_LIST.to_string(), find_binary(CLEVIS_LIST)),
         (CLEVIS_BIND.to_string(), find_binary(CLEVIS_BIND)),
         (CLEVIS_UNBIND.to_string(), find_binary(CLEVIS_UNBIND)),
         (CLEVIS_UNLOCK.to_string(), find_binary(CLEVIS_UNLOCK)),
@@ -194,28 +193,26 @@ pub fn udev_settle() -> StratisResult<()> {
 pub fn clevis_luks_bind(
     dev_path: &Path,
     keyfile_path: &Path,
-    tang_url: &str,
-    tang_thp: &str,
+    pin: &str,
+    json: &Value,
 ) -> StratisResult<()> {
     execute_cmd(
-        Command::new("/usr/bin/clevis")
+        Command::new(CLEVIS)
             .arg("luks")
             .arg("bind")
             .arg("-d")
             .arg(dev_path.display().to_string())
             .arg("-k")
             .arg(keyfile_path)
-            .arg("tang")
-            .arg(serde_json::to_string(
-                &json!({ "url": tang_url, "thp": tang_thp }),
-            )?),
+            .arg(pin)
+            .arg(json.to_string()),
     )
 }
 
 /// Unbind a LUKS device from a tang server using clevis.
 pub fn clevis_luks_unbind(dev_path: &Path, keyslot: libc::c_uint) -> StratisResult<()> {
     execute_cmd(
-        Command::new("/usr/bin/clevis")
+        Command::new(CLEVIS)
             .arg("luks")
             .arg("unbind")
             .arg("-d")
@@ -229,7 +226,7 @@ pub fn clevis_luks_unbind(dev_path: &Path, keyslot: libc::c_uint) -> StratisResu
 /// Unlock a device using the clevis CLI.
 pub fn clevis_luks_unlock(dev_path: &Path, dm_name: &str) -> StratisResult<()> {
     execute_cmd(
-        Command::new("/usr/bin/clevis")
+        Command::new(CLEVIS)
             .arg("luks")
             .arg("unlock")
             .arg("-d")

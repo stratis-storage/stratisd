@@ -19,7 +19,7 @@ use crate::{
     engine::types::{
         BlockDevPath, BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid,
         KeyDescription, MappingCreateAction, MaybeDbusPath, Name, PoolUuid, RenameAction,
-        ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, TangInfo, UnlockMethod,
+        ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, UnlockMethod,
     },
     stratis::StratisResult,
 };
@@ -169,7 +169,8 @@ pub trait Pool: Debug {
     fn bind_clevis(
         &self,
         key_desc: &KeyDescription,
-        tang_info: TangInfo,
+        pin: &str,
+        clevis_info: &Value,
     ) -> StratisResult<CreateAction<()>>;
 
     /// Unbind all devices in the given pool from a tang server using clevis.

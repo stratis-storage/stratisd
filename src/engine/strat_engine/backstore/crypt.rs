@@ -689,11 +689,6 @@ fn sss_dispatch(json: &Value) -> Result<Value> {
     Ok(Value::from(sss_map))
 }
 
-/// TODO: Implement!
-fn tpm_dispatch(_json: &Value) -> Result<Value> {
-    unimplemented!()
-}
-
 /// Match pin for existing JWE
 fn pin_dispatch(decoded_jwe: &Value) -> Result<(String, Value)> {
     let pin_value = decoded_jwe
@@ -705,7 +700,7 @@ fn pin_dispatch(decoded_jwe: &Value) -> Result<(String, Value)> {
     match pin_value.as_str() {
         Some("tang") => tang_dispatch(decoded_jwe).map(|val| ("tang".to_owned(), val)),
         Some("sss") => sss_dispatch(decoded_jwe).map(|val| ("sss".to_owned(), val)),
-        Some("tpm2") => tpm_dispatch(decoded_jwe).map(|val| ("tpm2".to_owned(), val)),
+        Some("tpm2") => Ok(("tpm2".to_owned(), json!({}))),
         _ => Err(LibcryptErr::Other("Unsupported clevis pin".to_string())),
     }
 }

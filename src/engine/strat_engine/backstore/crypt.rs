@@ -630,9 +630,12 @@ fn sss_dispatch(json: &Value) -> Result<Value> {
             LibcryptErr::Other("Expected an object for value of clevis.sss".to_string())
         })?;
 
-    let threshold = json.get("t").and_then(|val| val.as_u64()).ok_or_else(|| {
-        LibcryptErr::Other("Expected an int for value of clevis.sss.t".to_string())
-    })?;
+    let threshold = object
+        .get("t")
+        .and_then(|val| val.as_u64())
+        .ok_or_else(|| {
+            LibcryptErr::Other("Expected an int for value of clevis.sss.t".to_string())
+        })?;
     let jwes = object
         .get("jwe")
         .and_then(|val| val.as_array())

@@ -649,7 +649,18 @@ fn sss_dispatch(json: &Value) -> Result<Value> {
     let mut pin_map = Map::new();
     for jwe in jwes {
         if let Value::String(ref s) = jwe {
-            let json_bytes = decode(s).map_err(|e| LibcryptErr::Other(e.to_string()))?;
+            // NOTE: Workaround for the on-disk format for Shamir secret sharing
+            // as written by clevis. The base64 encoded string delimits the end
+            // of the JSON blob with a period.
+            let json_s = s.splitn(2, '.').next().ok_or_else(|| {
+                LibcryptErr::Other(format!(
+                    "Splitting string {} on character '.' did not result in \
+                    at least one string segment.",
+                    s,
+                ))
+            })?;
+
+            let json_bytes = decode(json_s).map_err(|e| LibcryptErr::Other(e.to_string()))?;
             let value: Value = serde_json::from_slice(&json_bytes)
                 .map_err(|e| LibcryptErr::Other(e.to_string()))?;
             let (pin, value) = pin_dispatch(&value)?;

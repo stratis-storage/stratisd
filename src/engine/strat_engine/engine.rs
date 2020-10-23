@@ -24,7 +24,7 @@ use crate::{
         structures::Table,
         types::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, KeyDescription, RenameAction,
-            ReportType, SetUnlockAction, UnlockMethod,
+            ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
         },
         Engine, EngineEvent, Name, Pool, PoolUuid, Report,
     },
@@ -166,7 +166,7 @@ impl Report for StratEngine {
 }
 
 impl Engine for StratEngine {
-    fn handle_event(&mut self, event: &libudev::Event) -> Option<(Name, PoolUuid, &mut dyn Pool)> {
+    fn handle_event(&mut self, event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &mut dyn Pool)> {
         if let Some((pool_uuid, pool_name, pool)) =
             self.liminal_devices.block_evaluate(&self.pools, event)
         {

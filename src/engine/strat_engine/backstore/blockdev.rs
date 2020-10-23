@@ -44,6 +44,8 @@ pub struct StratBlockDev {
     crypt_handle: Option<CryptHandle>,
 }
 
+unsafe impl Send for StratBlockDev {}
+
 impl StratBlockDev {
     /// Make a new BlockDev from the parameters.
     /// Allocate space for the Stratis metadata on the device.

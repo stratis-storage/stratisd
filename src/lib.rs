@@ -35,3 +35,6 @@ pub mod dbus_api;
 pub mod stratis;
 
 mod async_fd;
+
+#[cfg(feature = "min")]
+pub mod jsonrpc;

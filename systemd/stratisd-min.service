@@ -1,0 +1,15 @@
+[Unit]
+Description=Stratis minimal daemon
+Documentation=man:stratisd(8)
+DefaultDependencies=no
+
+[Service]
+Environment="RUST_BACKTRACE=1"
+ExecStart=/usr/libexec/stratisd-min --log-level debug
+KillSignal=SIGINT
+Restart=on-abort
+StandardOutput=syslog
+StandardError=syslog
+
+[Install]
+WantedBy=initrd.target

@@ -38,6 +38,23 @@ impl<T> Default for Table<T> {
     }
 }
 
+impl<T> Extend<(Name, Uuid, T)> for Table<T> {
+    fn extend<I>(&mut self, iter: I)
+    where
+        I: IntoIterator<Item = (Name, Uuid, T)>,
+    {
+        for ((ntu_n, ntu_u), (i_u, i_t)) in iter
+            .into_iter()
+            .map(|(n, u, t)| ((n.clone(), u), (u, (n, t))))
+        {
+            if !self.contains_uuid(i_u) {
+                self.name_to_uuid.insert(ntu_n, ntu_u);
+                self.items.insert(i_u, i_t);
+            }
+        }
+    }
+}
+
 pub struct Iter<'a, T: 'a> {
     items: hash_map::Iter<'a, Uuid, (Name, T)>,
 }

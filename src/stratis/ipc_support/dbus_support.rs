@@ -41,13 +41,15 @@ pub async fn setup(
         .map_err(|err| -> StratisError { err.into() })?;
 
     let mut tree_handle = task::spawn(async move {
-        if let Err(e) = tree.process_dbus_actions().await {
-            error!(
-                "Failed to process D-Bus object path addition or removal: {}; \
-                exiting D-Bus thread",
-                e,
-            );
-            return;
+        loop {
+            if let Err(e) = tree.process_dbus_actions().await {
+                error!(
+                    "Failed to process D-Bus object path addition or removal: {}; \
+                    exiting D-Bus thread",
+                    e,
+                );
+                return;
+            }
         }
     });
     let mut conn_handle = task::spawn(async move { conn.process_dbus_requests().await });

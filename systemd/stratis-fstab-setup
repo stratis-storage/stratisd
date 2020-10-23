@@ -1,0 +1,19 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+	echo "Requires pool UUID to unlock as argument"
+	exit 1
+fi
+
+POOL_UUID=$1
+
+if $(stratis-min pool is-locked $POOL_UUID); then
+	if $(stratis-min pool is-bound $POOL_UUID); then
+		stratis-min pool unlock clevis $POOL_UUID
+	else
+		systemd-ask-password \
+			"Enter password for pool with pool UUID \
+			$POOL_UUID" \
+			| stratis-min pool unlock --prompt keyring $POOL_UUID
+	fi
+fi

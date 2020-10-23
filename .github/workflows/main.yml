@@ -48,7 +48,7 @@ jobs:
             toolchain: stable
             components: cargo
             image: ubuntu:groovy
-          - task: make -f Makefile build-no-default
+          - task: make -f Makefile build-min
             toolchain: stable
             components: cargo
             image: ubuntu:groovy
@@ -65,6 +65,10 @@ jobs:
             components: cargo
             image: ubuntu:groovy
           - task: make -f Makefile release
+            toolchain: stable
+            components: cargo
+            image: ubuntu:groovy
+          - task: make -f Makefile release-min
             toolchain: stable
             components: cargo
             image: ubuntu:groovy
@@ -72,7 +76,7 @@ jobs:
             toolchain: stable
             components: cargo
             image: fedora:32
-          - task: make -f Makefile build-no-default
+          - task: make -f Makefile build-min
             toolchain: stable
             components: cargo
             image: fedora:32
@@ -89,6 +93,10 @@ jobs:
             components: cargo
             image: fedora:32
           - task: make -f Makefile release
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+          - task: make -f Makefile release-min
             toolchain: stable
             components: cargo
             image: fedora:32
@@ -110,6 +118,7 @@ jobs:
           libblkid-dev
           libcryptsetup-dev
           libdbus-1-dev
+          libsystemd-dev
           libudev-dev
           make
         if: matrix.image == 'ubuntu:groovy'

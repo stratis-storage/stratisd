@@ -116,7 +116,7 @@ impl<'a> Into<Value> for &'a EncryptionInfo {
 }
 
 /// A data type respresenting a key description for the kernel keyring
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct KeyDescription(String);
 
 impl KeyDescription {

@@ -19,6 +19,17 @@ required-features = ["dbus_enabled"]
 
 [[bin]]
 name = "stratis-min"
+path = "src/bin/stratis-min/stratis-min.rs"
+required-features = ["min"]
+
+[[bin]]
+name = "stratisd-min"
+path = "src/bin/stratis-min/stratisd-min.rs"
+required-features = ["min"]
+
+[[bin]]
+name = "stratis-setup-generator"
+path = "src/bin/generators/stratis-setup-generator.rs"
 required-features = ["extras"]
 
 [dependencies]
@@ -52,7 +63,7 @@ async-std = "1"
 
 [dependencies.tokio]
 version = "0.3.2"
-features = ["stream", "sync", "macros", "rt", "rt-multi-thread", "signal", "net"]
+features = ["stream", "sync", "macros", "rt", "rt-multi-thread", "signal", "net", "io-util"]
 
 [dependencies.dbus]
 version = "0.8.4"
@@ -60,6 +71,10 @@ optional = true
 
 [dependencies.libdbus-sys]
 version = "0.2"
+optional = true
+
+[dependencies.jsonrpsee]
+version = "0.1.0"
 optional = true
 
 [dependencies.uuid]
@@ -80,3 +95,4 @@ matches = "0.1"
 default = ["dbus_enabled"]
 dbus_enabled = ["dbus", "libdbus-sys"]
 extras = []
+min = ["jsonrpsee"]

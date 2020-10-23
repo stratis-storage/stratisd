@@ -493,6 +493,21 @@ impl Pool for SimPool {
             .map(|(name, p)| (name, p as &mut dyn Filesystem))
     }
 
+    fn get_filesystem_by_name(&self, name: &Name) -> Option<(FilesystemUuid, &dyn Filesystem)> {
+        self.filesystems
+            .get_by_name(name)
+            .map(|(uuid, p)| (uuid, p as &dyn Filesystem))
+    }
+
+    fn get_mut_filesystem_by_name(
+        &mut self,
+        name: &Name,
+    ) -> Option<(FilesystemUuid, &mut dyn Filesystem)> {
+        self.filesystems
+            .get_mut_by_name(name)
+            .map(|(uuid, p)| (uuid, p as &mut dyn Filesystem))
+    }
+
     fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &dyn BlockDev)> {
         self.block_devs
             .iter()

@@ -2,11 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus::tree::{Factory, MTFn, Method};
+use dbus::tree::{Factory, MTSync, Method};
 
 use crate::dbus_api::{api::manager_2_2::methods::set_key, types::TData};
 
-pub fn set_key_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+pub fn set_key_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
     f.method("SetKey", (), set_key)
         .in_arg(("key_desc", "s"))
         .in_arg(("key_fd", "h"))

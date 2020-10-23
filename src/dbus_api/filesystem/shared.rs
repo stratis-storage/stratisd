@@ -4,7 +4,7 @@
 
 use chrono::SecondsFormat;
 use dbus::{
-    tree::{MTFn, Tree},
+    tree::{MTSync, Tree},
     Path,
 };
 
@@ -16,7 +16,7 @@ use crate::{
 /// Get execute a given closure providing a filesystem object and return
 /// the calculated value
 pub fn filesystem_operation<F, R>(
-    tree: &Tree<MTFn<TData>, TData>,
+    tree: &Tree<MTSync<TData>, TData>,
     object_path: &Path<'static>,
     closure: F,
 ) -> Result<R, String>
@@ -48,8 +48,8 @@ where
         Pool
     );
 
-    let engine = dbus_context.engine.borrow();
-    let (pool_name, pool) = engine
+    let mutex_lock = mutex_lock!(dbus_context.engine);
+    let (pool_name, pool) = mutex_lock
         .get_pool(pool_uuid)
         .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
     let filesystem_uuid = typed_uuid_string_err!(filesystem_data.uuid; Fs);

@@ -10,8 +10,6 @@ use std::{
 
 use serde_json::{json, Value};
 
-use devicemapper::DM;
-
 use crate::{
     engine::{
         engine::{Engine, KeyActions, Pool, Report},
@@ -21,7 +19,8 @@ use crate::{
         structures::Table,
         types::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, KeyDescription, LockedPoolInfo,
-            Name, PoolUuid, RenameAction, ReportType, SetUnlockAction, UnlockMethod,
+            Name, PoolUuid, RenameAction, ReportType, SetUnlockAction, UdevEngineEvent,
+            UnlockMethod,
         },
         EngineEvent,
     },
@@ -132,7 +131,10 @@ impl Engine for SimEngine {
         }
     }
 
-    fn handle_event(&mut self, _event: &libudev::Event) -> Option<(Name, PoolUuid, &mut dyn Pool)> {
+    fn handle_event(
+        &mut self,
+        _event: &UdevEngineEvent,
+    ) -> Option<(Name, PoolUuid, &mut dyn Pool)> {
         None
     }
 
@@ -210,10 +212,6 @@ impl Engine for SimEngine {
             .iter_mut()
             .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &mut dyn Pool))
             .collect()
-    }
-
-    fn get_dm_context(&self) -> Option<&'static DM> {
-        None
     }
 
     fn evented(&mut self) -> StratisResult<()> {

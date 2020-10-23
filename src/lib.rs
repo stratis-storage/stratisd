@@ -1,4 +1,7 @@
 #[macro_use]
+mod macros;
+
+#[macro_use]
 extern crate nix;
 
 #[macro_use]
@@ -30,3 +33,5 @@ pub mod engine;
 pub mod dbus_api;
 
 pub mod stratis;
+
+mod async_fd;

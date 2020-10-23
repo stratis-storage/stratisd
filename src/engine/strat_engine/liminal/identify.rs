@@ -58,7 +58,7 @@ use crate::engine::{
             STRATIS_FS_TYPE,
         },
     },
-    types::{EncryptionInfo, PoolUuid},
+    types::{EncryptionInfo, PoolUuid, UdevEngineDevice, UdevEngineEvent},
 };
 
 /// A miscellaneous group of identifiers found when identifying a LUKS
@@ -160,7 +160,7 @@ impl fmt::Display for DeviceInfo {
 // A wrapper for obtaining the device number as a devicemapper Device
 // which interprets absence of the value as an error, which it is in this
 // context.
-fn device_to_devno_wrapper(device: &libudev::Device) -> Result<Device, String> {
+fn device_to_devno_wrapper(device: &UdevEngineDevice) -> Result<Device, String> {
     device
         .devnum()
         .ok_or_else(|| "udev entry did not contain a device number".into())
@@ -200,7 +200,7 @@ fn device_identifiers_wrapper(
 }
 
 /// Process a device which udev information indicates is a LUKS device.
-fn process_luks_device(dev: &libudev::Device) -> Option<LuksInfo> {
+fn process_luks_device(dev: &UdevEngineDevice) -> Option<LuksInfo> {
     match dev.devnode() {
         Some(devnode) => match device_to_devno_wrapper(dev) {
             Err(err) => {
@@ -239,7 +239,7 @@ fn process_luks_device(dev: &libudev::Device) -> Option<LuksInfo> {
 }
 
 /// Process a device which udev information indicates is a Stratis device.
-fn process_stratis_device(dev: &libudev::Device) -> Option<StratisInfo> {
+fn process_stratis_device(dev: &UdevEngineDevice) -> Option<StratisInfo> {
     match dev.devnode() {
         Some(devnode) => {
             match (
@@ -280,7 +280,7 @@ fn find_all_luks_devices() -> libudev::Result<HashMap<PoolUuid, Vec<LuksInfo>>> 
 
     let pool_map = enumerator
         .scan_devices()?
-        .filter_map(|dev| identify_luks_device(&dev))
+        .filter_map(|dev| identify_luks_device(&UdevEngineDevice::from(&dev)))
         .fold(HashMap::new(), |mut acc, info| {
             acc.entry(info.info.identifiers.pool_uuid)
                 .or_insert_with(Vec::new)
@@ -297,7 +297,7 @@ fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, Vec<StratisIn
 
     let pool_map = enumerator
         .scan_devices()?
-        .filter_map(|dev| identify_stratis_device(&dev))
+        .filter_map(|dev| identify_stratis_device(&UdevEngineDevice::from(&dev)))
         .fold(HashMap::new(), |mut acc, info| {
             acc.entry(info.identifiers.pool_uuid)
                 .or_insert_with(Vec::new)
@@ -310,7 +310,7 @@ fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, Vec<StratisIn
 // Identify a device that udev enumeration has already picked up as a LUKS
 // device. Return None if the device does not, after all, appear to be a LUKS
 // device belonging to Stratis. Log anything unusual at an appropriate level.
-fn identify_luks_device(dev: &libudev::Device) -> Option<LuksInfo> {
+fn identify_luks_device(dev: &UdevEngineDevice) -> Option<LuksInfo> {
     let initialized = dev.is_initialized();
     if !initialized {
         warn!("Found a udev entry for a device identified as a Stratis device, but udev also identified it as uninitialized, disregarding the device");
@@ -344,7 +344,7 @@ fn identify_luks_device(dev: &libudev::Device) -> Option<LuksInfo> {
 // Identify a device that udev enumeration has already picked up as a Stratis
 // device. Return None if the device does not, after all, appear to be a Stratis
 // device. Log anything unusual at an appropriate level.
-fn identify_stratis_device(dev: &libudev::Device) -> Option<StratisInfo> {
+fn identify_stratis_device(dev: &UdevEngineDevice) -> Option<StratisInfo> {
     let initialized = dev.is_initialized();
     if !initialized {
         warn!("Found a udev entry for a device identified as a Stratis device, but udev also identified it as uninitialized, disregarding the device");
@@ -378,14 +378,14 @@ fn identify_stratis_device(dev: &libudev::Device) -> Option<StratisInfo> {
 /// Identify a block device in the context where a udev event has been
 /// captured for some block device. Return None if the device does not
 /// appear to be a Stratis device. Log at an appropriate level on all errors.
-pub fn identify_block_device(dev: &libudev::Device) -> Option<DeviceInfo> {
-    let initialized = dev.is_initialized();
+pub fn identify_block_device(event: &UdevEngineEvent) -> Option<DeviceInfo> {
+    let initialized = event.device().is_initialized();
     if !initialized {
         debug!("Found a udev entry for a device identified as a block device, but udev also identified it as uninitialized, disregarding the device");
         return None;
     };
 
-    match decide_ownership(dev) {
+    match decide_ownership(event.device()) {
         Err(err) => {
             warn!(
                 "Could not determine ownership of a udev block device, disregarding the device: {}",
@@ -394,8 +394,10 @@ pub fn identify_block_device(dev: &libudev::Device) -> Option<DeviceInfo> {
             None
         }
         Ok(ownership) => match ownership {
-            UdevOwnership::Stratis => process_stratis_device(dev).map(DeviceInfo::Stratis),
-            UdevOwnership::Luks => process_luks_device(dev).map(DeviceInfo::Luks),
+            UdevOwnership::Stratis => {
+                process_stratis_device(event.device()).map(DeviceInfo::Stratis)
+            }
+            UdevOwnership::Luks => process_luks_device(event.device()).map(DeviceInfo::Luks),
             _ => None,
         },
     }

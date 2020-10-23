@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use dbus::{
-    tree::{MTFn, MethodInfo, MethodResult},
+    tree::{MTSync, MethodInfo, MethodResult},
     Message,
 };
 
@@ -12,16 +12,16 @@ use crate::dbus_api::{
     util::{engine_to_dbus_err_tuple, msg_code_ok, msg_string_ok},
 };
 
-pub fn engine_state_report(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn engine_state_report(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
 
     let return_message = message.method_return();
     let default_return = String::new();
 
     let dbus_context = m.tree.get_data();
-    let engine = dbus_context.engine.borrow();
+    let lock = mutex_lock!(dbus_context.engine);
 
-    let msg = match serde_json::to_string(&engine.engine_state_report()) {
+    let msg = match serde_json::to_string(&lock.engine_state_report()) {
         Ok(string) => return_message.append3(string, msg_code_ok(), msg_string_ok()),
         Err(e) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e.into());

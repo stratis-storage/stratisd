@@ -6,7 +6,7 @@ use std::{convert::TryFrom, os::unix::io::AsRawFd, path::Path, vec::Vec};
 
 use dbus::{
     arg::{Array, OwnedFd},
-    tree::{MTFn, MethodInfo, MethodResult},
+    tree::{MTSync, MethodInfo, MethodResult},
     Message,
 };
 
@@ -29,7 +29,10 @@ use crate::{
 /// Shared code for the creation of pools using the D-Bus API without the option
 /// for a key description or with an optional key description in later versions of
 /// the interface.
-pub fn create_pool_shared(m: &MethodInfo<MTFn<TData>, TData>, has_key_desc: bool) -> MethodResult {
+pub fn create_pool_shared(
+    m: &MethodInfo<MTSync<TData>, TData>,
+    has_key_desc: bool,
+) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -60,8 +63,8 @@ pub fn create_pool_shared(m: &MethodInfo<MTFn<TData>, TData>, has_key_desc: bool
 
     let object_path = m.path.get_name();
     let dbus_context = m.tree.get_data();
-    let mut engine = dbus_context.engine.borrow_mut();
-    let result = log_action!(engine.create_pool(
+    let mut mutex_lock = mutex_lock!(dbus_context.engine);
+    let result = log_action!(mutex_lock.create_pool(
         name,
         &devs.map(|x| Path::new(x)).collect::<Vec<&Path>>(),
         tuple_to_option(redundancy_tuple),
@@ -72,7 +75,7 @@ pub fn create_pool_shared(m: &MethodInfo<MTFn<TData>, TData>, has_key_desc: bool
         Ok(pool_uuid_action) => {
             let results = match pool_uuid_action {
                 CreateAction::Created(uuid) => {
-                    let (_, pool) = get_mut_pool!(engine; uuid; default_return; return_message);
+                    let (_, pool) = get_mut_pool!(mutex_lock; uuid; default_return; return_message);
 
                     let pool_object_path: dbus::Path = create_dbus_pool(
                         dbus_context,
@@ -109,11 +112,11 @@ pub fn create_pool_shared(m: &MethodInfo<MTFn<TData>, TData>, has_key_desc: bool
     Ok(vec![msg])
 }
 
-pub fn list_keys(info: &MethodInfo<MTFn<TData>, TData>) -> Result<Vec<String>, String> {
+pub fn list_keys(info: &MethodInfo<MTSync<TData>, TData>) -> Result<Vec<String>, String> {
     let dbus_context = info.tree.get_data();
 
-    let engine = dbus_context.engine.borrow();
-    engine
+    let mutex_lock = mutex_lock!(dbus_context.engine);
+    mutex_lock
         .get_key_handler()
         .list()
         .map(|v| {
@@ -124,7 +127,7 @@ pub fn list_keys(info: &MethodInfo<MTFn<TData>, TData>) -> Result<Vec<String>, S
         .map_err(|e| e.to_string())
 }
 
-pub fn set_key_shared(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn set_key_shared(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -135,7 +138,7 @@ pub fn set_key_shared(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = (false, false);
     let return_message = message.method_return();
 
-    let msg = match log_action!(dbus_context.engine.borrow_mut().get_key_handler_mut().set(
+    let msg = match log_action!(mutex_lock!(dbus_context.engine).get_key_handler_mut().set(
         &match KeyDescription::try_from(key_desc_str) {
             Ok(kd) => kd,
             Err(e) => {
@@ -161,11 +164,11 @@ pub fn set_key_shared(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-pub fn locked_pool_uuids(info: &MethodInfo<MTFn<TData>, TData>) -> Result<Vec<String>, String> {
+pub fn locked_pool_uuids(info: &MethodInfo<MTSync<TData>, TData>) -> Result<Vec<String>, String> {
     let dbus_context = info.tree.get_data();
 
-    let engine = dbus_context.engine.borrow();
-    Ok(engine
+    let mutex_lock = mutex_lock!(dbus_context.engine);
+    Ok(mutex_lock
         .locked_pools()
         .into_iter()
         .map(|(u, _)| uuid_to_string!(u))
@@ -173,7 +176,7 @@ pub fn locked_pool_uuids(info: &MethodInfo<MTFn<TData>, TData>) -> Result<Vec<St
 }
 
 pub fn unlock_pool_shared(
-    m: &MethodInfo<MTFn<TData>, TData>,
+    m: &MethodInfo<MTSync<TData>, TData>,
     take_unlock_arg: bool,
 ) -> MethodResult {
     let message: &Message = m.msg;
@@ -209,22 +212,19 @@ pub fn unlock_pool_shared(
         UnlockMethod::Keyring
     };
 
-    let msg = match log_action!(dbus_context
-        .engine
-        .borrow_mut()
-        .unlock_pool(pool_uuid, unlock_method))
-    {
-        Ok(unlock_action) => match unlock_action.changed() {
-            Some(vec) => {
-                let str_uuids: Vec<_> = vec.into_iter().map(|u| uuid_to_string!(u)).collect();
-                return_message.append3((true, str_uuids), msg_code_ok(), msg_string_ok())
+    let msg =
+        match log_action!(mutex_lock!(dbus_context.engine).unlock_pool(pool_uuid, unlock_method)) {
+            Ok(unlock_action) => match unlock_action.changed() {
+                Some(vec) => {
+                    let str_uuids: Vec<_> = vec.into_iter().map(|u| uuid_to_string!(u)).collect();
+                    return_message.append3((true, str_uuids), msg_code_ok(), msg_string_ok())
+                }
+                None => return_message.append3(default_return, msg_code_ok(), msg_string_ok()),
+            },
+            Err(e) => {
+                let (rc, rs) = engine_to_dbus_err_tuple(&e);
+                return_message.append3(default_return, rc, rs)
             }
-            None => return_message.append3(default_return, msg_code_ok(), msg_string_ok()),
-        },
-        Err(e) => {
-            let (rc, rs) = engine_to_dbus_err_tuple(&e);
-            return_message.append3(default_return, rc, rs)
-        }
-    };
+        };
     Ok(vec![msg])
 }

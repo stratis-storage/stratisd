@@ -13,6 +13,12 @@ mod event_handler;
 mod filesystem;
 mod pool;
 mod types;
+mod udev;
 mod util;
 
-pub use self::{connection::DbusConnectionData, event_handler::EventHandler};
+pub use self::{
+    connection::{DbusConnectionHandler, DbusTreeHandler},
+    event_handler::EventHandler,
+    udev::DbusUdevHandler,
+    util::create_dbus_handlers,
+};

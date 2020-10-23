@@ -47,9 +47,15 @@ termios = "0.3"
 regex = "1"
 base64 = "0.13"
 sha-1 = "0.9"
+futures-util = "0.3"
+async-std = "1"
+
+[dependencies.tokio]
+version = "0.3.2"
+features = ["stream", "sync", "macros", "rt", "rt-multi-thread", "signal", "net"]
 
 [dependencies.dbus]
-version = "0.8"
+version = "0.8.4"
 optional = true
 
 [dependencies.libdbus-sys]

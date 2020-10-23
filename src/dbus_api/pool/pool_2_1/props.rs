@@ -4,7 +4,7 @@
 
 use dbus::{
     arg::IterAppend,
-    tree::{MTFn, MethodErr, PropInfo},
+    tree::{MTSync, MethodErr, PropInfo},
 };
 
 use crate::dbus_api::{
@@ -14,7 +14,7 @@ use crate::dbus_api::{
 
 pub fn get_pool_encrypted(
     i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
+    p: &PropInfo<MTSync<TData>, TData>,
 ) -> Result<(), MethodErr> {
     get_pool_property(i, p, |(_, _, pool)| Ok(shared::pool_enc_prop(pool)))
 }

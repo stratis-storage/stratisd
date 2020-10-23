@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 use dbus::{
     arg::Array,
-    tree::{MTFn, MethodInfo, MethodResult},
+    tree::{MTSync, MethodInfo, MethodResult},
     Message,
 };
 use devicemapper::Sectors;
@@ -22,7 +22,7 @@ use crate::{
     engine::{CreateAction, EngineAction, FilesystemUuid, Name, PoolUuid, RenameAction},
 };
 
-pub fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn create_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -50,8 +50,9 @@ pub fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let mut engine = dbus_context.engine.borrow_mut();
-    let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let mut mutex_lock = mutex_lock!(dbus_context.engine);
+    let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
+
     let result = log_action!(pool.create_filesystems(
         pool_uuid,
         &filesystems
@@ -102,7 +103,7 @@ pub fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     )])
 }
 
-pub fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn destroy_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -124,8 +125,8 @@ pub fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let mut engine = dbus_context.engine.borrow_mut();
-    let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let mut mutex_lock = mutex_lock!(dbus_context.engine);
+    let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
     let mut filesystem_map: HashMap<FilesystemUuid, dbus::Path<'static>> = HashMap::new();
     for path in filesystems {
@@ -152,11 +153,7 @@ pub fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                     let op = filesystem_map
                         .get(uuid)
                         .expect("'uuids' is a subset of filesystem_map.keys()");
-                    dbus_context.actions.borrow_mut().push_remove(
-                        op,
-                        m.tree,
-                        filesystem_interface_list(),
-                    );
+                    dbus_context.push_remove(op, m.tree, filesystem_interface_list());
                 }
                 changed_uuids
                     .iter()
@@ -175,7 +172,7 @@ pub fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-pub fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn snapshot_filesystem(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -212,8 +209,8 @@ pub fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         }
     };
 
-    let mut engine = dbus_context.engine.borrow_mut();
-    let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let mut mutex_lock = mutex_lock!(dbus_context.engine);
+    let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
     let msg = match log_action!(pool.snapshot_filesystem(pool_uuid, fs_uuid, snapshot_name)) {
         Ok(CreateAction::Created((uuid, fs))) => {
@@ -239,7 +236,7 @@ pub fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-pub fn add_datadevs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn add_datadevs(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     add_blockdevs(m, BlockDevOp::AddData)
 }
 
@@ -251,7 +248,7 @@ pub fn add_datadevs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 /// interface. For this reason, this method contains an extra step:
 /// it must determine whether or not the cache is already initialized in
 /// order to specify which Pool trait method must be invoked.
-pub fn add_cachedevs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn add_cachedevs(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let return_message = message.method_return();
     let object_path = m.path.get_name();
@@ -268,8 +265,8 @@ pub fn add_cachedevs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     );
     let cache_initialized = {
         let dbus_context = m.tree.get_data();
-        let engine = dbus_context.engine.borrow();
-        let (_, pool) = get_pool!(engine; pool_uuid; default_return; return_message);
+        let mutex_lock = mutex_lock!(dbus_context.engine);
+        let (_, pool) = get_pool!(mutex_lock; pool_uuid; default_return; return_message);
         pool.has_cache()
     };
     add_blockdevs(
@@ -282,7 +279,7 @@ pub fn add_cachedevs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     )
 }
 
-pub fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn rename_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -304,11 +301,7 @@ pub fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let msg = match log_action!(dbus_context
-        .engine
-        .borrow_mut()
-        .rename_pool(pool_uuid, new_name))
-    {
+    let msg = match log_action!(mutex_lock!(dbus_context.engine).rename_pool(pool_uuid, new_name)) {
         Ok(RenameAction::NoSource) => {
             let error_message = format!("engine doesn't know about pool {}", pool_uuid);
             let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, error_message);

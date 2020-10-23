@@ -25,7 +25,7 @@ pub fn create_dbus_filesystem<'a>(
     uuid: FilesystemUuid,
     filesystem: &mut dyn Filesystem,
 ) -> dbus::Path<'a> {
-    let f = Factory::new_fn();
+    let f = Factory::new_sync();
 
     let object_name = make_object_path(dbus_context);
 
@@ -71,10 +71,7 @@ pub fn create_dbus_filesystem<'a>(
 
     let path = object_path.get_name().to_owned();
     let interfaces = get_initial_properties(parent, pool_name, name, uuid, filesystem);
-    dbus_context
-        .actions
-        .borrow_mut()
-        .push_add(object_path, interfaces);
+    dbus_context.push_add(object_path, interfaces);
     filesystem.set_dbus_path(MaybeDbusPath(Some(path.clone())));
     path
 }

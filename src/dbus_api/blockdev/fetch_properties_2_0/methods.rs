@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 use dbus::{
     arg::{RefArg, Variant},
-    tree::{MTFn, MethodInfo, MethodResult},
+    tree::{MTSync, MethodInfo, MethodResult},
     Message,
 };
 use itertools::Itertools;
@@ -18,7 +18,7 @@ use crate::dbus_api::{
 const ALL_PROPERTIES: [&str; 1] = [consts::BLOCKDEV_TOTAL_SIZE_PROP];
 
 fn get_properties_shared(
-    m: &MethodInfo<MTFn<TData>, TData>,
+    m: &MethodInfo<MTSync<TData>, TData>,
     properties: &mut dyn Iterator<Item = String>,
 ) -> MethodResult {
     let message: &Message = m.msg;

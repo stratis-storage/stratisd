@@ -19,7 +19,7 @@ use crate::{
         structures::Table,
         types::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, KeyDescription, Name, PoolUuid,
-            RenameAction, ReportType, SetUnlockAction, UnlockMethod,
+            RenameAction, ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
         },
         EngineEvent,
     },
@@ -127,7 +127,10 @@ impl Engine for SimEngine {
         }
     }
 
-    fn handle_event(&mut self, _event: &libudev::Event) -> Option<(Name, PoolUuid, &mut dyn Pool)> {
+    fn handle_event(
+        &mut self,
+        _event: &UdevEngineEvent,
+    ) -> Option<(Name, PoolUuid, &mut dyn Pool)> {
         None
     }
 

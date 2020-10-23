@@ -10,7 +10,8 @@ pub use self::{
     types::{
         BlockDevState, BlockDevTier, CreateAction, DeleteAction, DevUuid, EngineAction,
         FilesystemUuid, KeyDescription, MappingCreateAction, MaybeDbusPath, Name, PoolUuid,
-        Redundancy, RenameAction, ReportType, SetCreateAction, SetDeleteAction, UnlockMethod,
+        Redundancy, RenameAction, ReportType, SetCreateAction, SetDeleteAction, UdevEngineEvent,
+        UnlockMethod,
     },
 };
 

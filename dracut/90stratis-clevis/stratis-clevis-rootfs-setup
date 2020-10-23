@@ -1,0 +1,10 @@
+#!/bin/bash
+
+if $(stratis-min pool is-locked $STRATIS_ROOTFS_UUID); then
+	if $(stratis-min pool is-bound $STRATIS_ROOTFS_UUID); then
+		if ! stratis-min pool unlock clevis $STRATIS_ROOTFS_UUID; then
+			echo Failed to unlock pool with UUID $STRATIS_ROOTFS_UUID using Clevis >&2
+			exit 1
+		fi
+	fi
+fi

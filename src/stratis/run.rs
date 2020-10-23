@@ -68,7 +68,7 @@ pub fn run(sim: bool) -> StratisResult<()> {
                     Ok(engine) => engine,
                     Err(e) => {
                         error!("Failed to start up stratisd engine: {}; exiting", e);
-                        return;
+                        return Err(e);
                     }
                 }))
             }
@@ -91,6 +91,7 @@ pub fn run(sim: bool) -> StratisResult<()> {
             res = join_udev => {
                 if let Ok(Err(e)) = res {
                     error!("The udev thread exited with an error: {}; shutting down stratisd...", e);
+                    return Err(e);
                 } else {
                     error!("The udev thread exited; shutting down stratisd...");
                 }
@@ -98,18 +99,21 @@ pub fn run(sim: bool) -> StratisResult<()> {
             res = join_ipc => {
                 if let Ok(Err(e)) = res {
                     error!("The IPC thread exited with an error: {}; shutting down stratisd...", e);
+                    return Err(e);
                 } else {
                     error!("The IPC thread exited; shutting down stratisd...");
                 }
             }
             Ok(Err(e)) = join_dm => {
                 error!("The devicemapper thread exited with an error: {}; shutting down stratisd...", e);
+                return Err(e);
             }
             _ = join_signal => {
                 info!("Caught SIGINT; exiting...");
             }
         }
         should_exit.store(true, Ordering::Relaxed);
-    });
+        Ok(())
+    })?;
     Ok(())
 }

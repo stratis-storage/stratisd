@@ -7,6 +7,7 @@ pub use self::{
     sim_engine::SimEngine,
     strat_engine::{
         blkdev_size, crypt_metadata_size, get_dm, get_dm_init, StratEngine, StratKeyActions, BDA,
+        CLEVIS_TANG_TRUST_URL,
     },
     types::{
         BlockDevState, BlockDevTier, CreateAction, DeleteAction, DevUuid, EncryptionInfo,

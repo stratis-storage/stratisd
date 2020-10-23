@@ -44,7 +44,7 @@ impl AsRef<[u8]> for SizedKeyMemory {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct EncryptionInfo {
     pub key_description: Option<KeyDescription>,
     pub clevis_info: Option<(String, Value)>,
@@ -116,7 +116,7 @@ impl<'a> Into<Value> for &'a EncryptionInfo {
 }
 
 /// A data type respresenting a key description for the kernel keyring
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct KeyDescription(String);
 
 impl KeyDescription {

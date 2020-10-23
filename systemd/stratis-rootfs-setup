@@ -1,0 +1,9 @@
+#!/bin/bash
+
+IS_ENCRYPTED=$(stratis-min pool is-encrypted $STRATIS_ROOTFS_UUID)
+if [ x"$IS_ENCRYPTED" = x"true" ]; then
+	plymouth ask-for-password \
+		--command="stratis-min pool unlock --prompt $STRATIS_ROOTFS_UUID" \
+		--prompt="Enter root filesystem password" \
+		--number-of-tries=3
+fi

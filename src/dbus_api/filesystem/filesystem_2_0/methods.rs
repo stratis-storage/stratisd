@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use dbus::{
-    tree::{MTFn, MethodInfo, MethodResult},
+    tree::{MTSync, MethodInfo, MethodResult},
     Message,
 };
 
@@ -15,7 +15,7 @@ use crate::{
     engine::{FilesystemUuid, RenameAction},
 };
 
-pub fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn rename_filesystem(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -40,8 +40,8 @@ pub fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let mut engine = dbus_context.engine.borrow_mut();
-    let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let mut mutex_lock = mutex_lock!(dbus_context.engine);
+    let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
     let uuid = typed_uuid!(filesystem_data.uuid; Fs; default_return; return_message);
     let msg = match log_action!(pool.rename_filesystem(&pool_name, uuid, new_name)) {

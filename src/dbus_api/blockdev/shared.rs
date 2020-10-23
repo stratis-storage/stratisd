@@ -4,7 +4,7 @@
 
 use dbus::{
     arg::IterAppend,
-    tree::{MTFn, MethodErr, PropInfo, Tree},
+    tree::{MTSync, MethodErr, PropInfo, Tree},
     Path,
 };
 
@@ -16,7 +16,7 @@ use crate::{
 /// Perform an operation on a `BlockDev` object for a given
 /// DBus implicit argument that is a block device
 pub fn blockdev_operation<F, R>(
-    tree: &Tree<MTFn<TData>, TData>,
+    tree: &Tree<MTSync<TData>, TData>,
     object_path: &Path<'static>,
     closure: F,
 ) -> Result<R, String>
@@ -49,8 +49,8 @@ where
         Pool
     );
 
-    let engine = dbus_context.engine.borrow();
-    let (_, pool) = engine
+    let mutex_lock = mutex_lock!(dbus_context.engine);
+    let (_, pool) = mutex_lock
         .get_pool(pool_uuid)
         .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
     let (tier, blockdev) = pool
@@ -64,7 +64,7 @@ where
 /// blockdev and obtains the property from the blockdev.
 pub fn get_blockdev_property<F, R>(
     i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
+    p: &PropInfo<MTSync<TData>, TData>,
     getter: F,
 ) -> Result<(), MethodErr>
 where

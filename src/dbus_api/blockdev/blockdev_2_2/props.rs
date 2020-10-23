@@ -4,7 +4,7 @@
 
 use dbus::{
     arg::IterAppend,
-    tree::{MTFn, MethodErr, PropInfo},
+    tree::{MTSync, MethodErr, PropInfo},
 };
 
 use crate::dbus_api::{
@@ -15,7 +15,7 @@ use crate::dbus_api::{
 /// Get the devnode for an object path.
 pub fn get_blockdev_physical_path(
     i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
+    p: &PropInfo<MTSync<TData>, TData>,
 ) -> Result<(), MethodErr> {
     get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_physical_path_prop(p)))
 }

@@ -1,4 +1,7 @@
 #[macro_use]
+mod macros;
+
+#[macro_use]
 extern crate nix;
 
 #[macro_use]

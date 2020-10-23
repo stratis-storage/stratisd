@@ -2,10 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus::{
-    tree::{MTFn, MethodInfo, MethodResult},
-    Message,
-};
+use dbus::Message;
+use dbus_tree::{MTSync, MethodInfo, MethodResult};
 
 use crate::{
     dbus_api::{
@@ -17,7 +15,7 @@ use crate::{
     engine::{DevUuid, RenameAction},
 };
 
-pub fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn set_user_info(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -42,8 +40,8 @@ pub fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let mut engine = dbus_context.engine.borrow_mut();
-    let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let mut mutex_lock = mutex_lock!(dbus_context.engine);
+    let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
     let blockdev_uuid = typed_uuid!(blockdev_data.uuid; Dev; default_return; return_message);
     let result =

@@ -6,17 +6,16 @@ use std::{clone::Clone, collections::HashMap, path::Path};
 
 use serde_json::Value;
 
-use devicemapper::{DmNameBuf, DM};
+use devicemapper::DmNameBuf;
 
 use crate::{
     engine::{
         engine::KeyActions,
-        event::get_engine_listener_list,
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         strat_engine::{
             cmd::verify_binaries,
             devlinks,
-            dm::{get_dm, get_dm_init},
+            dm::get_dm,
             keys::{MemoryFilesystem, StratKeyActions},
             liminal::{find_all, LiminalDevices},
             pool::StratPool,
@@ -24,14 +23,12 @@ use crate::{
         structures::Table,
         types::{
             CreateAction, DeleteAction, DevUuid, KeyDescription, LockedPoolInfo, RenameAction,
-            ReportType, SetUnlockAction, UnlockMethod,
+            ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
         },
-        Engine, EngineEvent, Name, Pool, PoolUuid, Report,
+        Engine, Name, Pool, PoolUuid, Report,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
-
-const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 
 #[derive(Debug)]
 pub struct StratEngine {
@@ -66,16 +63,7 @@ impl StratEngine {
     /// Returns an error if there was an error reading device nodes.
     /// Returns an error if the binaries on which it depends can not be found.
     pub fn initialize() -> StratisResult<StratEngine> {
-        let dm = get_dm_init()?;
         verify_binaries()?;
-        let minor_dm_version = dm.version()?.1;
-        if minor_dm_version < REQUIRED_DM_MINOR_VERSION {
-            let err_msg = format!(
-                "Requires DM minor version {} but kernel only supports {}",
-                REQUIRED_DM_MINOR_VERSION, minor_dm_version
-            );
-            return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
-        }
 
         let mut liminal_devices = LiminalDevices::default();
         let mut pools = Table::default();
@@ -166,7 +154,7 @@ impl Report for StratEngine {
 }
 
 impl Engine for StratEngine {
-    fn handle_event(&mut self, event: &libudev::Event) -> Option<(Name, PoolUuid, &mut dyn Pool)> {
+    fn handle_event(&mut self, event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &dyn Pool)> {
         if let Some((pool_uuid, pool_name, pool)) =
             self.liminal_devices.block_evaluate(&self.pools, event)
         {
@@ -260,12 +248,6 @@ impl Engine for StratEngine {
             self.pools.insert(old_name, uuid, pool);
             Err(err)
         } else {
-            get_engine_listener_list().notify(&EngineEvent::PoolRenamed {
-                dbus_path: pool.get_dbus_path(),
-                from: &*old_name,
-                to: &*new_name,
-            });
-
             let has_filesystems = pool.has_filesystems();
             self.pools.insert(new_name.clone(), uuid, pool);
             if has_filesystems {
@@ -312,10 +294,6 @@ impl Engine for StratEngine {
             .iter_mut()
             .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &mut dyn Pool))
             .collect()
-    }
-
-    fn get_dm_context(&self) -> Option<&'static DM> {
-        Some(get_dm())
     }
 
     fn evented(&mut self) -> StratisResult<()> {

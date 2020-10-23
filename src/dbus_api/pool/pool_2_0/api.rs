@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, Method, Property};
+use dbus_tree::{Access, EmitsChangedSignal, Factory, MTSync, Method, Property};
 
 use crate::dbus_api::{
     consts,
@@ -17,7 +17,9 @@ use crate::dbus_api::{
     util::get_uuid,
 };
 
-pub fn create_filesystems_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+pub fn create_filesystems_method(
+    f: &Factory<MTSync<TData>, TData>,
+) -> Method<MTSync<TData>, TData> {
     f.method("CreateFilesystems", (), create_filesystems)
         .in_arg(("specs", "as"))
         // b: true if filesystems were created
@@ -29,7 +31,9 @@ pub fn create_filesystems_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn
         .out_arg(("return_string", "s"))
 }
 
-pub fn destroy_filesystems_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+pub fn destroy_filesystems_method(
+    f: &Factory<MTSync<TData>, TData>,
+) -> Method<MTSync<TData>, TData> {
     f.method("DestroyFilesystems", (), destroy_filesystems)
         .in_arg(("filesystems", "ao"))
         // b: true if filesystems were destroyed
@@ -41,7 +45,9 @@ pub fn destroy_filesystems_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTF
         .out_arg(("return_string", "s"))
 }
 
-pub fn snapshot_filesystem_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+pub fn snapshot_filesystem_method(
+    f: &Factory<MTSync<TData>, TData>,
+) -> Method<MTSync<TData>, TData> {
     f.method("SnapshotFilesystem", (), snapshot_filesystem)
         .in_arg(("origin", "o"))
         .in_arg(("snapshot_name", "s"))
@@ -54,7 +60,7 @@ pub fn snapshot_filesystem_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTF
         .out_arg(("return_string", "s"))
 }
 
-pub fn add_blockdevs_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+pub fn add_blockdevs_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
     f.method("AddDataDevs", (), add_datadevs)
         .in_arg(("devices", "as"))
         // b: Indicates if any data devices were added
@@ -66,7 +72,7 @@ pub fn add_blockdevs_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TDat
         .out_arg(("return_string", "s"))
 }
 
-pub fn add_cachedevs_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+pub fn add_cachedevs_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
     f.method("AddCacheDevs", (), add_cachedevs)
         .in_arg(("devices", "as"))
         // b: Indicates if any cache devices were added
@@ -78,7 +84,7 @@ pub fn add_cachedevs_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TDat
         .out_arg(("return_string", "s"))
 }
 
-pub fn rename_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+pub fn rename_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
     f.method("SetName", (), rename_pool)
         .in_arg(("name", "s"))
         // b: false if no pool was renamed
@@ -90,14 +96,14 @@ pub fn rename_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TDa
         .out_arg(("return_string", "s"))
 }
 
-pub fn name_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {
+pub fn name_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
     f.property::<&str, _>(consts::POOL_NAME_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_pool_name)
 }
 
-pub fn uuid_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {
+pub fn uuid_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
     f.property::<&str, _>(consts::POOL_UUID_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)

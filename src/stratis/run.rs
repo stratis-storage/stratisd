@@ -4,177 +4,169 @@
 
 //! Main loop
 
-use std::{cell::RefCell, os::unix::io::AsRawFd, rc::Rc};
+use std::{
+    os::unix::io::AsRawFd,
+    sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        Arc,
+    },
+};
 
-use nix::sys::signalfd::{signal, SfdFlags, SigSet, SignalFd};
+use nix::poll::{poll, PollFd, PollFlags};
+use tokio::{
+    runtime::Builder,
+    select, signal,
+    sync::{
+        mpsc::{unbounded_channel, UnboundedSender},
+        Mutex,
+    },
+    task,
+};
+use tokio_stream::StreamExt;
 
 use crate::{
-    engine::{Engine, SimEngine, StratEngine},
+    engine::{Engine, SimEngine, StratEngine, UdevEngineEvent},
     stratis::{
-        dbus_support::MaybeDbusSupport,
-        errors::{StratisError, StratisResult},
-        stratis::VERSION,
+        dm::DmFd, errors::StratisResult, ipc_support::setup, stratis::VERSION,
         udev_monitor::UdevMonitor,
     },
 };
 
-// Process any pending signals, return true if SIGINT received.
-// Return an error if there was an error reading the signal.
-fn process_signal(sfd: &mut SignalFd) -> StratisResult<bool> {
-    match sfd.read_signal() {
-        // This is an unsafe conversion, but in this context that is
-        // mostly harmless. A negative converted value, which is
-        // virtually impossible, will not match any of the masked
-        // values, and stratisd will panic and exit.
-        Ok(Some(sig)) => match sig.ssi_signo as i32 {
-            nix::libc::SIGINT => {
-                info!("SIGINT received, exiting");
-                Ok(true)
-            }
-            signo => {
-                panic!("Caught an impossible signal {:?}", signo);
-            }
-        },
-        // No signals waiting (SFD_NONBLOCK flag is set)
-        Ok(None) => Ok(false),
+// Poll for udev events.
+// Check for exit condition and return if true.
+fn udev_thread(
+    sender: UnboundedSender<UdevEngineEvent>,
+    should_exit: Arc<AtomicBool>,
+) -> StratisResult<()> {
+    let context = libudev::Context::new()?;
+    let mut udev = UdevMonitor::create(&context)?;
 
-        Err(err) => Err(err.into()),
+    let mut pollers = [PollFd::new(udev.as_raw_fd(), PollFlags::POLLIN)];
+    loop {
+        match poll(&mut pollers, 100)? {
+            0 => {
+                if should_exit.load(Ordering::Relaxed) {
+                    info!("udev thread was notified to exit");
+                    return Ok(());
+                }
+            }
+            _ => {
+                if let Some(ref e) = udev.poll() {
+                    if let Err(e) = sender.send(UdevEngineEvent::from(e)) {
+                        warn!(
+                            "udev event could not be sent to engine thread: {}; the \
+                            engine was not notified of this udev event",
+                            e,
+                        );
+                    }
+                }
+            }
+        }
     }
 }
 
-/// Handle blocking the event loop
-fn process_poll(fds: &mut Vec<libc::pollfd>) -> StratisResult<()> {
-    let poll_timeout = -1i32;
-
-    let r = unsafe { libc::poll(fds.as_mut_ptr(), fds.len() as libc::c_ulong, poll_timeout) };
-
-    // TODO: refine this behavior.
-    // Different behaviors may be indicated, depending on the value of
-    // errno when return value is -1.
-    if r < 0 {
-        return Err(StratisError::Error(format!(
-            "poll command failed: number of fds: {}, timeout: {}",
-            fds.len(),
-            poll_timeout
-        )));
+// Waits for SIGINT. If received, sets should_exit to true.
+async fn signal_thread(should_exit: Arc<AtomicBool>) {
+    if let Err(e) = signal::ctrl_c().await {
+        error!("Failure while listening for signals: {}", e);
     }
-    Ok(())
+    should_exit.store(true, Ordering::Relaxed);
+}
+
+// Waits for devicemapper event. On devicemapper event, transfers control
+// to engine to handle event and waits until control is returned from engine.
+// Accepts None as an argument; this indicates that devicemapper events are
+// to be ignored.
+async fn dm_event_thread(engine: Option<Arc<Mutex<dyn Engine>>>) -> StratisResult<()> {
+    match engine {
+        Some(e) => {
+            let mut dm_fd = DmFd::new(e)?;
+            loop {
+                dm_fd.next().await;
+            }
+        }
+        None => Ok(()),
+    }
 }
 
 /// Set up all sorts of signal and event handling mechanisms.
 /// Initialize the engine and keep it running until a signal is received
 /// or a fatal error is encountered.
 /// If sim is true, start the sim engine rather than the real engine.
+/// Always check for devicemapper context.
 pub fn run(sim: bool) -> StratisResult<()> {
-    // Setup a udev listener before initializing the engine. A device may
-    // appear after the engine has processed the udev db, but before it has
-    // completed initialization. Unless the udev event has been recorded, the
-    // engine will miss the device.
-    // This is especially important since stratisd must run during early boot.
-    let context = libudev::Context::new()?;
-    let mut udev_monitor = UdevMonitor::create(&context)?;
-
-    let engine: Rc<RefCell<dyn Engine>> = {
-        info!("stratis daemon version {} started", VERSION);
-        if sim {
-            info!("Using SimEngine");
-            Rc::new(RefCell::new(SimEngine::default()))
-        } else {
-            info!("Using StratEngine");
-            Rc::new(RefCell::new(StratEngine::initialize()?))
-        }
-    };
-
-    let mut dbus_support = MaybeDbusSupport::setup(&engine)?;
-
-    /*
-    The file descriptor array indexes are:
-
-    0   == Always udev fd index
-    1   == SIGNAL FD index
-    2   == engine index if eventable
-    2/3 == Start of dbus client file descriptor(s)
-            * 2 if engine is not eventable
-            * else 3
-    */
-    const FD_INDEX_UDEV: usize = 0;
-    const FD_INDEX_SIGNALFD: usize = 1;
-    const FD_INDEX_ENGINE: usize = 2;
-
-    /*
-    fds is a Vec of libc::pollfd structs. Ideally, it would be possible
-    to use the higher level nix crate to handle polling. If this were possible,
-    then the Vec would be one of nix::poll::PollFds and this would be more
-    rustic. Unfortunately, the rust D-Bus library requires an explicit file
-    descriptor to be passed as an argument to Connection::watch_handle(),
-    and the explicit file descriptor can not be extracted from the PollFd
-    struct. So, at this time, sticking with libc is less complex than
-    converting to using nix, because if using nix, the file descriptor would
-    have to be maintained in the Vec as well as the PollFd struct.
-    */
-    let mut fds = Vec::new();
-
-    fds.push(libc::pollfd {
-        fd: udev_monitor.as_raw_fd(),
-        revents: 0,
-        events: libc::POLLIN,
-    });
-
-    // Signals can be queued up on this file descriptor
-    let mut sfd = {
-        let mut mask = SigSet::empty();
-        mask.add(signal::SIGINT);
-        mask.thread_block()?;
-        SignalFd::with_flags(&mask, SfdFlags::SFD_NONBLOCK)?
-    };
-
-    fds.push(libc::pollfd {
-        fd: sfd.as_raw_fd(),
-        revents: 0,
-        events: libc::POLLIN,
-    });
-
-    let eventable = engine.borrow().get_dm_context();
-
-    if let Some(evt) = eventable {
-        fds.push(libc::pollfd {
-            fd: evt.as_raw_fd(),
-            revents: 0,
-            events: libc::POLLIN,
-        });
-    };
-
-    let dbus_client_index_start = if eventable.is_some() {
-        FD_INDEX_ENGINE + 1
-    } else {
-        FD_INDEX_ENGINE
-    };
-
-    loop {
-        if fds[FD_INDEX_UDEV].revents != 0 {
-            udev_monitor.handle_events(&mut *engine.borrow_mut(), &mut dbus_support)
-        }
-
-        if fds[FD_INDEX_SIGNALFD].revents != 0 {
-            match process_signal(&mut sfd) {
-                Ok(should_exit) => {
-                    if should_exit {
-                        return Ok(());
+    let runtime = Builder::new_multi_thread()
+        .enable_all()
+        .thread_name_fn(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            format!("stratis-wt-{}", id)
+        })
+        .on_thread_start(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            debug!("{}: thread started", id)
+        })
+        .on_thread_stop(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            debug!("{}: thread finished", id)
+        })
+        .build()?;
+    runtime.block_on(async move {
+        let engine: Arc<Mutex<dyn Engine>> = {
+            info!("stratis daemon version {} started", VERSION);
+            if sim {
+                info!("Using SimEngine");
+                Arc::new(Mutex::new(SimEngine::default()))
+            } else {
+                info!("Using StratEngine");
+                Arc::new(Mutex::new(match StratEngine::initialize() {
+                    Ok(engine) => engine,
+                    Err(e) => {
+                        error!("Failed to start up stratisd engine: {}; exiting", e);
+                        return;
                     }
+                }))
+            }
+        };
+
+        let should_exit = Arc::new(AtomicBool::new(false));
+        let (sender, receiver) = unbounded_channel::<UdevEngineEvent>();
+
+        let udev_arc_clone = Arc::clone(&should_exit);
+        let join_udev = task::spawn_blocking(move || udev_thread(sender, udev_arc_clone));
+        let join_ipc = task::spawn(setup(Arc::clone(&engine), receiver));
+        let join_signal = task::spawn(signal_thread(Arc::clone(&should_exit)));
+        let join_dm = task::spawn(dm_event_thread(if sim {
+            None
+        } else {
+            Some(Arc::clone(&engine))
+        }));
+
+        select! {
+            res = join_udev => {
+                if let Ok(Err(e)) = res {
+                    error!("The udev thread exited with an error: {}; shutting down stratisd...", e);
+                } else {
+                    error!("The udev thread exited; shutting down stratisd...");
                 }
-                Err(e) => return Err(e),
+            }
+            res = join_ipc => {
+                if let Ok(Err(e)) = res {
+                    error!("The IPC thread exited with an error: {}; shutting down stratisd...", e);
+                } else {
+                    error!("The IPC thread exited; shutting down stratisd...");
+                }
+            }
+            Ok(Err(e)) = join_dm => {
+                error!("The devicemapper thread exited with an error: {}; shutting down stratisd...", e);
+            }
+            _ = join_signal => {
+                info!("Caught SIGINT; exiting...");
             }
         }
-
-        if let Some(evt) = eventable {
-            if fds[FD_INDEX_ENGINE].revents != 0 {
-                evt.arm_poll()?;
-                engine.borrow_mut().evented()?;
-            }
-        }
-
-        dbus_support.process(&mut fds, dbus_client_index_start);
-
-        process_poll(&mut fds)?;
-    }
+        should_exit.store(true, Ordering::Relaxed);
+    });
+    Ok(())
 }

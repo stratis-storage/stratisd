@@ -3,27 +3,26 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    cell::{Cell, RefCell},
-    collections::{
-        vec_deque::{Drain, VecDeque},
-        HashMap,
+    collections::HashMap,
+    fmt::{self, Debug},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
     },
-    rc::Rc,
 };
 
 use dbus::{
     arg::{RefArg, Variant},
-    tree::{DataType, MTFn, ObjectPath, Tree},
+    nonblock::SyncConnection,
     Path,
 };
+use dbus_tree::{DataType, MTSync, ObjectPath};
+use tokio::sync::{mpsc::UnboundedSender as TokioSender, Mutex};
 
-use crate::{
-    dbus_api::consts,
-    engine::{Engine, StratisUuid},
-};
+use crate::engine::{Engine, StratisUuid};
 
 /// Type for interfaces parameter for `ObjectManagerInterfacesAdded`.
-pub type InterfacesAdded = HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>;
+pub type InterfacesAdded = HashMap<String, HashMap<String, Variant<Box<dyn RefArg + Send + Sync>>>>;
 /// Type for interfaces parameter for `ObjectManagerInterfacesRemoved`.
 pub type InterfacesRemoved = Vec<String>;
 
@@ -53,17 +52,11 @@ impl DbusErrorEnum {
 }
 
 #[derive(Debug)]
-pub enum DeferredAction {
-    Add(ObjectPath<MTFn<TData>, TData>, InterfacesAdded),
+pub enum DbusAction {
+    Add(ObjectPath<MTSync<TData>, TData>, InterfacesAdded),
     Remove(Path<'static>, InterfacesRemoved),
-}
-
-/// Indicates the type of object pointed to by the object path.
-#[derive(Debug)]
-pub enum ObjectPathType {
-    Pool,
-    Filesystem,
-    Blockdev,
+    FsNameChange(Path<'static>, String),
+    PoolNameChange(Path<'static>, String),
 }
 
 /// Context for an object path.
@@ -73,32 +66,44 @@ pub enum ObjectPathType {
 pub struct OPContext {
     pub(super) parent: Path<'static>,
     pub(super) uuid: StratisUuid,
-    pub(super) op_type: ObjectPathType,
 }
 
 impl OPContext {
-    pub fn new(parent: Path<'static>, uuid: StratisUuid, op_type: ObjectPathType) -> OPContext {
-        OPContext {
-            parent,
-            uuid,
-            op_type,
-        }
+    pub fn new(parent: Path<'static>, uuid: StratisUuid) -> OPContext {
+        OPContext { parent, uuid }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DbusContext {
-    pub(super) next_index: Rc<Cell<u64>>,
-    pub(super) engine: Rc<RefCell<dyn Engine>>,
-    pub(super) actions: Rc<RefCell<ActionQueue>>,
+    next_index: Arc<AtomicU64>,
+    pub(super) engine: Arc<Mutex<dyn Engine>>,
+    pub(super) sender: TokioSender<DbusAction>,
+    connection: Arc<SyncConnection>,
+}
+
+impl Debug for DbusContext {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "DbusContext {{ next_index: {:?}, engine: Arc<Mutex<dyn Engine>>, \
+            sender: {:?} }}",
+            self.next_index, self.sender,
+        )
+    }
 }
 
 impl DbusContext {
-    pub fn new(engine: Rc<RefCell<dyn Engine>>) -> DbusContext {
+    pub fn new(
+        engine: Arc<Mutex<dyn Engine>>,
+        sender: TokioSender<DbusAction>,
+        connection: Arc<SyncConnection>,
+    ) -> DbusContext {
         DbusContext {
-            actions: Rc::new(RefCell::new(ActionQueue::default())),
             engine,
-            next_index: Rc::new(Cell::new(0)),
+            next_index: Arc::new(AtomicU64::new(0)),
+            sender,
+            connection,
         }
     }
 
@@ -107,8 +112,66 @@ impl DbusContext {
     /// more than 2^64 object paths. If it turns out that this is a bad
     /// assumption, the solution is to use unbounded integers.
     pub fn get_next_id(&self) -> u64 {
-        self.next_index.set(self.next_index.get() + 1);
-        self.next_index.get()
+        self.next_index.fetch_add(1, Ordering::SeqCst)
+    }
+
+    pub fn push_add(
+        &self,
+        object_path: ObjectPath<MTSync<TData>, TData>,
+        interfaces: InterfacesAdded,
+    ) {
+        let object_path_name = object_path.get_name().clone();
+        if let Err(e) = self.sender.send(DbusAction::Add(object_path, interfaces)) {
+            warn!(
+                "D-Bus add event could not be sent to the processing thread; the D-Bus \
+                server will not be aware of the D-Bus object with path {}: {}",
+                object_path_name, e,
+            )
+        }
+    }
+
+    pub fn push_remove(&self, item: &Path<'static>, interfaces: InterfacesRemoved) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::Remove(item.clone(), interfaces))
+        {
+            warn!(
+                "D-Bus remove event could not be sent to the processing thread; the D-Bus \
+                server will still expect the D-Bus object with path {} to be present: {}",
+                item, e,
+            )
+        }
+    }
+
+    /// Send changed signal for Name property and invalidated signal for
+    /// Devnode property.
+    pub fn push_filesystem_name_change(&self, item: &Path<'static>, new_name: &str) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::FsNameChange(item.clone(), new_name.to_string()))
+        {
+            warn!(
+                "D-Bus filesystem name change event could not be sent to the processing thread; \
+                no signal will be sent out for pool with path {}: {}",
+                item, e,
+            )
+        }
+    }
+
+    /// Send changed signal for pool Name property and invalidated signal for
+    /// all Devnode properties of child filesystems.
+    pub fn push_pool_name_change(&self, item: &Path<'static>, new_name: &str) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::FsNameChange(item.clone(), new_name.to_string()))
+        {
+            warn!(
+                "D-Bus pool name change event could not be sent to the processing thread; \
+                no signal will be sent out for the name change of pool with path {} or any \
+                of its child filesystems: {}",
+                item, e,
+            )
+        }
     }
 }
 
@@ -121,64 +184,4 @@ impl DataType for TData {
     type Interface = ();
     type Method = ();
     type Signal = ();
-}
-
-/// An action queue.
-/// Add and remove actions are pushed onto the queue.
-/// The queue can also be drained.
-#[derive(Debug, Default)]
-pub struct ActionQueue {
-    queue: VecDeque<DeferredAction>,
-}
-
-impl ActionQueue {
-    /// Push an Add action onto the back of the queue.
-    pub fn push_add(
-        &mut self,
-        object_path: ObjectPath<MTFn<TData>, TData>,
-        interfaces: InterfacesAdded,
-    ) {
-        self.queue
-            .push_back(DeferredAction::Add(object_path, interfaces))
-    }
-
-    /// Push Remove actions for a path and its immediate descendants. Not
-    /// recursive, since no multi-level parent-child relationships currently
-    /// exist.
-    // Note: Path x is a child of path y if x's context's parent field is y.
-    pub fn push_remove(
-        &mut self,
-        item: &Path<'static>,
-        tree: &Tree<MTFn<TData>, TData>,
-        interfaces: InterfacesRemoved,
-    ) {
-        for opath in tree.iter().filter(|opath| {
-            opath
-                .get_data()
-                .as_ref()
-                .map_or(false, |op_cxt| op_cxt.parent == *item)
-        }) {
-            self.queue.push_back(DeferredAction::Remove(
-                opath.get_name().clone(),
-                match opath
-                    .get_data()
-                    .as_ref()
-                    .expect("all objects with parents have data")
-                    .op_type
-                {
-                    ObjectPathType::Pool => consts::pool_interface_list(),
-                    ObjectPathType::Filesystem => consts::filesystem_interface_list(),
-                    ObjectPathType::Blockdev => consts::blockdev_interface_list(),
-                },
-            ))
-        }
-
-        self.queue
-            .push_back(DeferredAction::Remove(item.clone(), interfaces))
-    }
-
-    /// Drain the queue.
-    pub fn drain(&mut self) -> Drain<DeferredAction> {
-        self.queue.drain(..)
-    }
 }

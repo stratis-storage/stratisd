@@ -2,10 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus::{
-    tree::{MTFn, MethodInfo, MethodResult},
-    Message,
-};
+use dbus::Message;
+use dbus_tree::{MTSync, MethodInfo, MethodResult};
 use serde_json::Value;
 
 use crate::{
@@ -17,7 +15,7 @@ use crate::{
     stratis::StratisError,
 };
 
-pub fn bind_clevis(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn bind_clevis(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
     let pin: String = get_next_arg(&mut iter, 0)?;
@@ -39,8 +37,8 @@ pub fn bind_clevis(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let mut engine = dbus_context.engine.borrow_mut();
-    let (_, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let mut mutex_lock = mutex_lock!(dbus_context.engine);
+    let (_, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
     let json: Value = match serde_json::from_str(&json_string) {
         Ok(j) => j,
@@ -62,7 +60,7 @@ pub fn bind_clevis(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-pub fn unbind_clevis(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn unbind_clevis(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
 
     let dbus_context = m.tree.get_data();
@@ -81,8 +79,8 @@ pub fn unbind_clevis(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let mut engine = dbus_context.engine.borrow_mut();
-    let (_, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let mut mutex_lock = mutex_lock!(dbus_context.engine);
+    let (_, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
     let msg = match log_action!(pool.unbind_clevis()) {
         Ok(DeleteAction::Identity) => return_message.append3(false, msg_code_ok(), msg_string_ok()),

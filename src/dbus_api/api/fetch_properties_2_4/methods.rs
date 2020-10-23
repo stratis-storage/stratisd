@@ -6,9 +6,9 @@ use std::collections::HashMap;
 
 use dbus::{
     arg::{RefArg, Variant},
-    tree::{MTFn, MethodInfo, MethodResult},
     Message,
 };
+use dbus_tree::{MTSync, MethodInfo, MethodResult};
 use itertools::Itertools;
 
 use crate::dbus_api::{
@@ -28,11 +28,11 @@ const ALL_PROPERTIES: [&str; 4] = [
 type LockedPoolsWithDevs = HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>;
 
 pub fn locked_pools_with_devs(
-    info: &MethodInfo<MTFn<TData>, TData>,
+    info: &MethodInfo<MTSync<TData>, TData>,
 ) -> Result<LockedPoolsWithDevs, String> {
     let dbus_context = info.tree.get_data();
 
-    let engine = dbus_context.engine.borrow();
+    let engine = mutex_lock!(dbus_context.engine);
     Ok(engine
         .locked_pools()
         .into_iter()
@@ -75,7 +75,7 @@ pub fn locked_pools_with_devs(
 #[allow(clippy::unknown_clippy_lints)]
 #[allow(clippy::unnecessary_wraps)]
 fn get_properties_shared(
-    m: &MethodInfo<MTFn<TData>, TData>,
+    m: &MethodInfo<MTSync<TData>, TData>,
     properties: &mut dyn Iterator<Item = String>,
 ) -> MethodResult {
     let message: &Message = m.msg;

@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{error::Error, fmt, io, str};
+use std::{error::Error, fmt, io, str, sync};
 
 pub type StratisResult<T> = Result<T, StratisError>;
 
@@ -28,6 +28,7 @@ pub enum StratisError {
     Decode(base64::DecodeError),
     DM(devicemapper::DmError),
     Crypt(libcryptsetup_rs::LibcryptErr),
+    Recv(sync::mpsc::RecvError),
 
     #[cfg(feature = "dbus_enabled")]
     Dbus(dbus::Error),
@@ -47,6 +48,7 @@ impl fmt::Display for StratisError {
             StratisError::Decode(ref err) => write!(f, "base64 error: {}", err),
             StratisError::DM(ref err) => write!(f, "DM error: {}", err),
             StratisError::Crypt(ref err) => write!(f, "Cryptsetup error: {}", err),
+            StratisError::Recv(ref err) => write!(f, "Synchronization channel error: {}", err),
 
             #[cfg(feature = "dbus_enabled")]
             StratisError::Dbus(ref err) => {
@@ -69,6 +71,7 @@ impl Error for StratisError {
             StratisError::Decode(ref err) => Some(err),
             StratisError::DM(ref err) => Some(err),
             StratisError::Crypt(ref err) => Some(err),
+            StratisError::Recv(ref err) => Some(err),
 
             #[cfg(feature = "dbus_enabled")]
             StratisError::Dbus(ref err) => Some(err),
@@ -135,5 +138,17 @@ impl From<dbus::Error> for StratisError {
 impl From<libudev::Error> for StratisError {
     fn from(err: libudev::Error) -> StratisError {
         StratisError::Udev(err)
+    }
+}
+
+impl<T> From<sync::PoisonError<T>> for StratisError {
+    fn from(err: sync::PoisonError<T>) -> StratisError {
+        StratisError::Error(err.to_string())
+    }
+}
+
+impl From<sync::mpsc::RecvError> for StratisError {
+    fn from(err: sync::mpsc::RecvError) -> StratisError {
+        StratisError::Recv(err)
     }
 }

@@ -8,16 +8,12 @@ use std::path::PathBuf;
 
 use devicemapper::Bytes;
 
-use crate::{
-    engine::{types::MaybeDbusPath, Filesystem},
-    stratis::StratisResult,
-};
+use crate::{engine::Filesystem, stratis::StratisResult};
 
 #[derive(Debug)]
 pub struct SimFilesystem {
     rand: u32,
     created: DateTime<Utc>,
-    dbus_path: MaybeDbusPath,
 }
 
 impl SimFilesystem {
@@ -25,12 +21,15 @@ impl SimFilesystem {
         SimFilesystem {
             rand: rand::random::<u32>(),
             created: Utc::now(),
-            dbus_path: MaybeDbusPath(None),
         }
     }
 }
 
 impl Filesystem for SimFilesystem {
+    fn send_udev_change(&self) -> StratisResult<()> {
+        Ok(())
+    }
+
     fn devnode(&self) -> PathBuf {
         ["/stratis", &format!("random-{}", self.rand)]
             .iter()
@@ -47,13 +46,5 @@ impl Filesystem for SimFilesystem {
 
     fn used(&self) -> StratisResult<Bytes> {
         Ok(Bytes(12_345_678))
-    }
-
-    fn set_dbus_path(&mut self, path: MaybeDbusPath) {
-        self.dbus_path = path
-    }
-
-    fn get_dbus_path(&self) -> &MaybeDbusPath {
-        &self.dbus_path
     }
 }

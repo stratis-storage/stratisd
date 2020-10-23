@@ -216,7 +216,6 @@ impl CryptInitializer {
         let result = self.initialize_with_err(&mut device, key_description);
         match result {
             Ok(activated_path) => Ok(CryptHandle::new(
-                device,
                 self.physical_path,
                 activated_path,
                 self.identifiers,
@@ -377,7 +376,6 @@ impl CryptActivationHandle {
 /// * CryptActivationHandle requires the user to activate a device to yield a CryptHandle.
 /// * CryptHandle::setup() fails if the device is not active.
 pub struct CryptHandle {
-    device: CryptDevice,
     path: Arc<BlockDevPath>,
     identifiers: StratisIdentifiers,
     encryption_info: EncryptionInfo,
@@ -400,7 +398,6 @@ impl Debug for CryptHandle {
 
 impl CryptHandle {
     fn new(
-        device: CryptDevice,
         physical_path: PathBuf,
         activated_path: PathBuf,
         identifiers: StratisIdentifiers,
@@ -412,7 +409,6 @@ impl CryptHandle {
             vec![BlockDevPath::leaf(physical_path)],
         );
         CryptHandle {
-            device,
             path,
             identifiers,
             encryption_info,
@@ -420,9 +416,15 @@ impl CryptHandle {
         }
     }
 
-    #[cfg(test)]
-    fn as_crypt_device(&mut self) -> &mut CryptDevice {
-        &mut self.device
+    /// Acquire the crypt device handle for the physical path in this `CryptHandle`.
+    fn acquire_crypt_device(&self) -> StratisResult<CryptDevice> {
+        device_from_physical_path(self.luks2_device_path())?.ok_or_else(|| {
+            StratisError::Error(format!(
+                "Physical device {} underneath encrypted Stratis has been \
+                    determined not to be formatted as a LUKS2 Stratis device",
+                self.luks2_device_path().display(),
+            ))
+        })
     }
 
     /// Query the device metadata to reconstruct a handle for performing operations
@@ -483,12 +485,12 @@ impl CryptHandle {
 
     /// Get the keyslot associated with the given token ID.
     pub fn keyslots(&mut self, token_id: c_uint) -> StratisResult<Option<Vec<c_uint>>> {
-        get_keyslot_number(&mut self.device, token_id)
+        get_keyslot_number(&mut self.acquire_crypt_device()?, token_id)
     }
 
     /// Get info for the clevis binding.
     pub fn clevis_info(&mut self) -> StratisResult<Option<(String, Value)>> {
-        clevis_info_from_metadata(&mut self.device)
+        clevis_info_from_metadata(&mut self.acquire_crypt_device()?)
     }
 
     /// Bind the given device using clevis.
@@ -529,14 +531,14 @@ impl CryptHandle {
     #[cfg(test)]
     pub fn deactivate(&mut self) -> StratisResult<()> {
         let name = self.name.to_owned();
-        ensure_inactive(&mut self.device, &name)
+        ensure_inactive(&mut self.acquire_crypt_device()?, &name)
     }
 
     /// Wipe all LUKS2 metadata on the device safely using libcryptsetup.
     pub fn wipe(&mut self) -> StratisResult<()> {
         let path = self.luks2_device_path().to_owned();
         let name = self.name.to_owned();
-        ensure_wiped(&mut self.device, &path, &name)
+        ensure_wiped(&mut self.acquire_crypt_device()?, &path, &name)
     }
 
     /// Get the size of the logical device built on the underlying encrypted physical
@@ -544,7 +546,9 @@ impl CryptHandle {
     pub fn logical_device_size(&mut self) -> StratisResult<Sectors> {
         let name = self.name.clone();
         let active_device = log_on_failure!(
-            self.device.runtime_handle(&name).get_active_device(),
+            self.acquire_crypt_device()?
+                .runtime_handle(&name)
+                .get_active_device(),
             "Failed to get device size for encrypted logical device"
         );
         Ok(Sectors(active_device.size))
@@ -592,7 +596,6 @@ fn setup_crypt_handle(
     };
 
     Ok(Some(CryptHandle {
-        device,
         path: BlockDevPath::node_with_children(
             activated_path,
             vec![BlockDevPath::leaf(physical_path.to_owned())],
@@ -1437,7 +1440,10 @@ mod tests {
 
             let device_name = handle.name.clone();
             loop {
-                match libcryptsetup_rs::status(Some(handle.as_crypt_device()), &device_name) {
+                match libcryptsetup_rs::status(
+                    Some(&mut handle.acquire_crypt_device().unwrap()),
+                    &device_name,
+                ) {
                     Ok(CryptStatusInfo::Busy) => (),
                     Ok(CryptStatusInfo::Active) => break,
                     Ok(s) => {

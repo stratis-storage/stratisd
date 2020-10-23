@@ -2,15 +2,16 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus::{arg::Variant, tree::Factory};
+use dbus::arg::Variant;
+use dbus_tree::Factory;
 
 use crate::{
     dbus_api::{
         consts,
-        types::{DbusContext, InterfacesAdded, OPContext, ObjectPathType},
+        types::{DbusContext, InterfacesAdded, OPContext},
         util::make_object_path,
     },
-    engine::{MaybeDbusPath, Name, Pool, PoolUuid, StratisUuid},
+    engine::{Name, Pool, PoolUuid, StratisUuid},
 };
 
 mod fetch_properties_2_0;
@@ -26,20 +27,16 @@ pub fn create_dbus_pool<'a>(
     parent: dbus::Path<'static>,
     name: &Name,
     uuid: PoolUuid,
-    pool: &mut dyn Pool,
+    pool: &dyn Pool,
 ) -> dbus::Path<'a> {
-    let f = Factory::new_fn();
+    let f = Factory::new_sync();
 
     let object_name = make_object_path(dbus_context);
 
     let object_path = f
         .object_path(
             object_name,
-            Some(OPContext::new(
-                parent,
-                StratisUuid::Pool(uuid),
-                ObjectPathType::Pool,
-            )),
+            Some(OPContext::new(parent, StratisUuid::Pool(uuid))),
         )
         .introspectable()
         .add(
@@ -109,11 +106,7 @@ pub fn create_dbus_pool<'a>(
 
     let path = object_path.get_name().to_owned();
     let interfaces = get_initial_properties(name, uuid, pool);
-    dbus_context
-        .actions
-        .borrow_mut()
-        .push_add(object_path, interfaces);
-    pool.set_dbus_path(MaybeDbusPath(Some(path.clone())));
+    dbus_context.push_add(object_path, interfaces);
     path
 }
 

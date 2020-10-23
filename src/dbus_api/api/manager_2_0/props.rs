@@ -4,12 +4,15 @@
 
 use dbus::{
     arg::IterAppend,
-    tree::{MTFn, MethodErr, PropInfo},
+    tree::{MTSync, MethodErr, PropInfo},
 };
 
 use crate::{dbus_api::types::TData, stratis::VERSION};
 
-pub fn get_version(i: &mut IterAppend, _p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
+pub fn get_version(
+    i: &mut IterAppend,
+    _p: &PropInfo<MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
     i.append(VERSION);
     Ok(())
 }

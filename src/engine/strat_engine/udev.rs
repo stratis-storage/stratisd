@@ -5,7 +5,10 @@
 //! udev-related methods
 use std::{ffi::OsStr, fmt, path::Path};
 
-use crate::stratis::{StratisError, StratisResult};
+use crate::{
+    engine::types::UdevEngineDevice,
+    stratis::{StratisError, StratisResult},
+};
 
 /// Key for a udev property
 pub const FS_TYPE_KEY: &str = "ID_FS_TYPE";
@@ -30,7 +33,7 @@ pub fn block_enumerator(context: &libudev::Context) -> libudev::Result<libudev::
 /// Returns an error if the value of the property can not be converted to
 /// a string using the standard conversion for this OS.
 pub fn get_udev_property<T: AsRef<OsStr>>(
-    device: &libudev::Device,
+    device: &UdevEngineDevice,
     property_name: T,
 ) -> Option<StratisResult<String>>
 where
@@ -53,7 +56,7 @@ where
 /// Returns true if udev indicates that the device is a multipath member
 /// device, else false. Returns an error on a failure to interpret the
 /// value.
-fn is_multipath_member(device: &libudev::Device) -> StratisResult<bool> {
+fn is_multipath_member(device: &UdevEngineDevice) -> StratisResult<bool> {
     match get_udev_property(device, "DM_MULTIPATH_DEVICE_PATH") {
         None => Ok(false),
         Some(Ok(value)) => Ok(value == "1"),
@@ -63,7 +66,7 @@ fn is_multipath_member(device: &libudev::Device) -> StratisResult<bool> {
 
 /// If the expression is true, then it seems that no other system is
 /// known to udev to claim this device.
-fn is_unclaimed(device: &libudev::Device) -> bool {
+fn is_unclaimed(device: &UdevEngineDevice) -> bool {
     (get_udev_property(device, "ID_PART_TABLE_TYPE").is_none()
         || get_udev_property(device, "ID_PART_ENTRY_DISK").is_some())
         && get_udev_property(device, "ID_FS_USAGE").is_none()
@@ -71,7 +74,7 @@ fn is_unclaimed(device: &libudev::Device) -> bool {
 
 /// Return true if the device is identified by udev as belonging to Stratis.
 /// Return an error if a udev property value could not be converted.
-fn is_stratis(device: &libudev::Device) -> StratisResult<bool> {
+fn is_stratis(device: &UdevEngineDevice) -> StratisResult<bool> {
     match get_udev_property(device, FS_TYPE_KEY) {
         None => Ok(false),
         Some(Ok(value)) => Ok(value == STRATIS_FS_TYPE),
@@ -81,7 +84,7 @@ fn is_stratis(device: &libudev::Device) -> StratisResult<bool> {
 
 /// Return true if the device is identified by udev as being an encrypted
 /// LUKS device. Return an error if a udev property could not be converted.
-fn is_luks(device: &libudev::Device) -> StratisResult<bool> {
+fn is_luks(device: &UdevEngineDevice) -> StratisResult<bool> {
     match get_udev_property(device, FS_TYPE_KEY) {
         None => Ok(false),
         Some(Ok(value)) => Ok(value == CRYPTO_FS_TYPE),
@@ -121,7 +124,7 @@ impl fmt::Display for UdevOwnership {
 /// other entity is the default designation. This seems counterintuitive, but
 /// it is the unclaimed designation that has a boolean expression on udev
 /// properties associated with it.
-pub fn decide_ownership(device: &libudev::Device) -> StratisResult<UdevOwnership> {
+pub fn decide_ownership(device: &UdevEngineDevice) -> StratisResult<UdevOwnership> {
     || -> StratisResult<UdevOwnership> {
         // We believe that it is possible to be a multipath member and also to
         // be identified as a Stratis device. The designations are not mutually
@@ -159,7 +162,7 @@ pub fn decide_ownership(device: &libudev::Device) -> StratisResult<UdevOwnership
 /// database, so it is essentially linear in the number of block devices.
 pub fn block_device_apply<F, U>(devnode: &Path, f: F) -> StratisResult<Option<U>>
 where
-    F: FnOnce(&libudev::Device) -> U,
+    F: FnOnce(&UdevEngineDevice) -> U,
 {
     let canonical = devnode.canonicalize()?;
 
@@ -170,5 +173,5 @@ where
         .scan_devices()?
         .filter(|dev| dev.is_initialized())
         .find(|x| x.devnode().map_or(false, |d| canonical == d))
-        .map(|d| f(&d)))
+        .map(|ref d| f(&UdevEngineDevice::from(d))))
 }

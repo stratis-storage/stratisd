@@ -4,7 +4,7 @@
 
 use dbus::{
     arg::IterAppend,
-    tree::{MTFn, MethodErr, PropInfo},
+    tree::{MTSync, MethodErr, PropInfo},
 };
 
 use crate::dbus_api::{
@@ -15,35 +15,35 @@ use crate::dbus_api::{
 /// Get the devnode for an object path.
 pub fn get_blockdev_devnode(
     i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
+    p: &PropInfo<MTSync<TData>, TData>,
 ) -> Result<(), MethodErr> {
     get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_devnode_prop(p)))
 }
 
 pub fn get_blockdev_hardware_info(
     i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
+    p: &PropInfo<MTSync<TData>, TData>,
 ) -> Result<(), MethodErr> {
     get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_hardware_info_prop(p)))
 }
 
 pub fn get_blockdev_user_info(
     i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
+    p: &PropInfo<MTSync<TData>, TData>,
 ) -> Result<(), MethodErr> {
     get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_user_info_prop(p)))
 }
 
 pub fn get_blockdev_initialization_time(
     i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
+    p: &PropInfo<MTSync<TData>, TData>,
 ) -> Result<(), MethodErr> {
     get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_init_time_prop(p)))
 }
 
 pub fn get_blockdev_tier(
     i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
+    p: &PropInfo<MTSync<TData>, TData>,
 ) -> Result<(), MethodErr> {
     get_blockdev_property(i, p, |t, _| Ok(shared::blockdev_tier_prop(t)))
 }

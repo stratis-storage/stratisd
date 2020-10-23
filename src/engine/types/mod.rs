@@ -4,12 +4,16 @@
 
 use std::{
     borrow::Borrow,
+    collections::HashMap,
     convert::TryFrom,
+    ffi::OsStr,
     fmt, io,
+    iter::FromIterator,
     ops::Deref,
     path::{Path, PathBuf},
-    rc::Rc,
 };
+
+use libudev::EventType;
 
 mod actions;
 mod keys;
@@ -87,15 +91,15 @@ pub enum Redundancy {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub struct Name(Rc<String>);
+pub struct Name(String);
 
 impl Name {
     pub fn new(name: String) -> Name {
-        Name(Rc::new(name))
+        Name(name)
     }
 
     pub fn to_owned(&self) -> String {
-        self.0.deref().to_owned()
+        self.0.clone()
     }
 }
 
@@ -115,7 +119,7 @@ impl Deref for Name {
 
 impl Borrow<str> for Name {
     fn borrow(&self) -> &str {
-        &**self.0
+        &self.0
     }
 }
 
@@ -204,6 +208,78 @@ impl BlockDevPath {
             path
         } else {
             &self.physical_path
+        }
+    }
+}
+
+/// A sendable event with all of the necessary information for the engine
+/// to process a received udev event.
+pub struct UdevEngineEvent {
+    event_type: EventType,
+    device: UdevEngineDevice,
+}
+
+impl UdevEngineEvent {
+    pub fn event_type(&self) -> EventType {
+        self.event_type
+    }
+
+    pub fn device(&self) -> &UdevEngineDevice {
+        &self.device
+    }
+}
+
+impl<'a> From<&'a libudev::Event<'a>> for UdevEngineEvent {
+    fn from(e: &'a libudev::Event<'a>) -> UdevEngineEvent {
+        UdevEngineEvent {
+            event_type: e.event_type(),
+            device: UdevEngineDevice::from(e.device()),
+        }
+    }
+}
+
+/// A sendable device with all of the necessary information for the engine
+/// to process a received udev event.
+pub struct UdevEngineDevice {
+    is_initialized: bool,
+    devnode: Option<PathBuf>,
+    devnum: Option<libc::dev_t>,
+    properties: HashMap<Box<OsStr>, Box<OsStr>>,
+}
+
+impl UdevEngineDevice {
+    pub fn is_initialized(&self) -> bool {
+        self.is_initialized
+    }
+
+    pub fn devnode(&self) -> Option<&Path> {
+        self.devnode.as_deref()
+    }
+
+    pub fn devnum(&self) -> Option<libc::dev_t> {
+        self.devnum
+    }
+
+    pub fn property_value<T>(&self, property_name: T) -> Option<&OsStr>
+    where
+        T: AsRef<OsStr>,
+    {
+        self.properties
+            .get(property_name.as_ref())
+            .map(|prop| &**prop)
+    }
+}
+
+impl<'a> From<&'a libudev::Device<'a>> for UdevEngineDevice {
+    fn from(d: &'a libudev::Device<'a>) -> UdevEngineDevice {
+        UdevEngineDevice {
+            is_initialized: d.is_initialized(),
+            devnode: d.devnode().map(|p| p.to_owned()),
+            devnum: d.devnum(),
+            properties: HashMap::from_iter(
+                d.properties()
+                    .map(|prop| (Box::from(prop.name()), Box::from(prop.value()))),
+            ),
         }
     }
 }

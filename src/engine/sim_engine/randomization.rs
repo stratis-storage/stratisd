@@ -2,18 +2,18 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use rand::{rngs::ThreadRng, thread_rng, Rng};
+use rand::{rngs::OsRng, Rng};
 
 #[derive(Debug)]
 pub struct Randomizer {
-    rng: ThreadRng,
+    rng: OsRng,
     denominator: u32,
 }
 
 impl Default for Randomizer {
     fn default() -> Randomizer {
         Randomizer {
-            rng: thread_rng(),
+            rng: OsRng,
             denominator: 0u32,
         }
     }

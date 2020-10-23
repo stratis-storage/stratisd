@@ -3,11 +3,9 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    cell::RefCell,
     collections::{hash_map::RandomState, HashMap, HashSet},
     iter::FromIterator,
     path::Path,
-    rc::Rc,
     vec::Vec,
 };
 
@@ -39,21 +37,18 @@ pub struct SimPool {
     cache_devs: HashMap<DevUuid, SimDev>,
     filesystems: Table<SimFilesystem>,
     redundancy: Redundancy,
-    rdm: Rc<RefCell<Randomizer>>,
+    rdm: Randomizer,
     dbus_path: MaybeDbusPath,
 }
 
 impl SimPool {
     pub fn new(
-        rdm: &Rc<RefCell<Randomizer>>,
         paths: &[&Path],
         redundancy: Redundancy,
         enc_info: Option<EncryptionInfo>,
     ) -> (PoolUuid, SimPool) {
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
-        let device_pairs = devices
-            .iter()
-            .map(|p| SimDev::new(Rc::clone(rdm), p, enc_info.as_ref()));
+        let device_pairs = devices.iter().map(|p| SimDev::new(p, enc_info.as_ref()));
         (
             Uuid::new_v4(),
             SimPool {
@@ -61,7 +56,7 @@ impl SimPool {
                 cache_devs: HashMap::new(),
                 filesystems: Table::default(),
                 redundancy,
-                rdm: Rc::clone(rdm),
+                rdm: Randomizer::default(),
                 dbus_path: MaybeDbusPath(None),
             },
         )
@@ -179,10 +174,7 @@ impl Pool for SimPool {
                     "At least one blockdev path is required to initialize a cache.".to_string(),
                 ));
             }
-            let blockdev_pairs: Vec<_> = blockdevs
-                .iter()
-                .map(|p| SimDev::new(Rc::clone(&self.rdm), p, None))
-                .collect();
+            let blockdev_pairs: Vec<_> = blockdevs.iter().map(|p| SimDev::new(p, None)).collect();
             let blockdev_uuids: Vec<_> = blockdev_pairs.iter().map(|(uuid, _)| *uuid).collect();
             self.cache_devs.extend(blockdev_pairs);
             Ok(SetCreateAction::new(blockdev_uuids))
@@ -248,7 +240,6 @@ impl Pool for SimPool {
             .iter()
             .map(|p| {
                 SimDev::new(
-                    Rc::clone(&self.rdm),
                     p,
                     match tier {
                         BlockDevTier::Data => self.encryption_info(),

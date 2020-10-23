@@ -3,11 +3,9 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    cell::RefCell,
     collections::{hash_map::RandomState, HashMap, HashSet},
     iter::FromIterator,
     path::Path,
-    rc::Rc,
 };
 
 use serde_json::{json, Value};
@@ -21,7 +19,7 @@ use crate::{
         structures::Table,
         types::{
             CreateAction, DeleteAction, DevUuid, KeyDescription, Name, PoolUuid, RenameAction,
-            ReportType, SetUnlockAction,
+            ReportType, SetUnlockAction, UdevEngineEvent,
         },
         EngineEvent,
     },
@@ -31,7 +29,7 @@ use crate::{
 #[derive(Debug, Default)]
 pub struct SimEngine {
     pools: Table<SimPool>,
-    rdm: Rc<RefCell<Randomizer>>,
+    rdm: Randomizer,
     key_handler: SimKeyActions,
 }
 
@@ -112,14 +110,9 @@ impl Engine for SimEngine {
                     let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
                     let devices = device_set.into_iter().cloned().collect::<Vec<&Path>>();
 
-                    let (pool_uuid, pool) = SimPool::new(
-                        &Rc::clone(&self.rdm),
-                        &devices,
-                        redundancy,
-                        key_desc.as_ref(),
-                    );
+                    let (pool_uuid, pool) = SimPool::new(&devices, redundancy, key_desc.as_ref());
 
-                    if self.rdm.borrow_mut().throw_die() {
+                    if self.rdm.throw_die() {
                         return Err(StratisError::Engine(ErrorEnum::Error, "X".into()));
                     }
 
@@ -132,7 +125,10 @@ impl Engine for SimEngine {
         }
     }
 
-    fn handle_event(&mut self, _event: &libudev::Event) -> Option<(Name, PoolUuid, &mut dyn Pool)> {
+    fn handle_event(
+        &mut self,
+        _event: &UdevEngineEvent,
+    ) -> Option<(Name, PoolUuid, &mut dyn Pool)> {
         None
     }
 
@@ -196,7 +192,7 @@ impl Engine for SimEngine {
 
     /// Set properties of the simulator
     fn configure_simulator(&mut self, denominator: u32) -> StratisResult<()> {
-        self.rdm.borrow_mut().set_probability(denominator);
+        self.rdm.set_probability(denominator);
         Ok(())
     }
 

@@ -44,7 +44,12 @@ itertools = "0.9"
 libcryptsetup-rs = "0.4"
 semver = "0.11"
 termios = "0.3"
-regex = "1"
+regex = "1.3"
+mio = "0.6"
+
+[dependencies.tokio]
+version = "0.2"
+features = ["stream", "sync", "io-driver", "macros", "rt-core", "blocking", "signal"]
 
 [dependencies.dbus]
 version = "0.8"

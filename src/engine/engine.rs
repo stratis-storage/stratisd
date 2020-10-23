@@ -19,7 +19,7 @@ use crate::{
     engine::types::{
         BlockDevPath, BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid,
         KeyDescription, MappingCreateAction, MaybeDbusPath, Name, PoolUuid, RenameAction,
-        ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction,
+        ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, UdevEngineEvent,
     },
     stratis::StratisResult,
 };
@@ -261,7 +261,7 @@ pub trait Pool: Debug {
     fn key_desc(&self) -> Option<&KeyDescription>;
 }
 
-pub trait Engine: Debug + Report {
+pub trait Engine: Debug + Report + Send {
     /// Create a Stratis pool.
     /// Returns the UUID of the newly created pool.
     /// Returns an error if the redundancy code does not correspond to a
@@ -279,7 +279,7 @@ pub trait Engine: Debug + Report {
     /// and its UUID.
     ///
     /// Precondition: the subsystem of the device evented on is "block".
-    fn handle_event(&mut self, event: &libudev::Event) -> Option<(Name, PoolUuid, &mut dyn Pool)>;
+    fn handle_event(&mut self, event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &mut dyn Pool)>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.

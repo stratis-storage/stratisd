@@ -25,7 +25,7 @@ use crate::{
             pool::StratPool,
         },
         structures::Table,
-        types::{DevUuid, KeyDescription, Name, PoolUuid},
+        types::{DevUuid, KeyDescription, Name, PoolUuid, UdevEngineEvent},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -401,11 +401,11 @@ impl LiminalDevices {
     pub fn block_evaluate(
         &mut self,
         pools: &Table<StratPool>,
-        event: &libudev::Event,
+        event: &UdevEngineEvent,
     ) -> Option<(PoolUuid, Name, StratPool)> {
         let event_type = event.event_type();
         if event_type == libudev::EventType::Add || event_type == libudev::EventType::Change {
-            identify_block_device(event.device()).and_then(move |info| {
+            identify_block_device(event).and_then(move |info| {
                 let stratis_identifiers = info.stratis_identifiers();
                 let pool_uuid = stratis_identifiers.pool_uuid;
                 let device_uuid = stratis_identifiers.device_uuid;
@@ -447,7 +447,7 @@ impl LiminalDevices {
                 }
             })
         } else if event_type == libudev::EventType::Remove {
-            identify_block_device(event.device()).and_then(move |info| {
+            identify_block_device(event).and_then(move |info| {
                 let stratis_identifiers = info.stratis_identifiers();
                 let pool_uuid = stratis_identifiers.pool_uuid;
                 let device_uuid = stratis_identifiers.device_uuid;

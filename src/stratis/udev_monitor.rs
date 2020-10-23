@@ -6,39 +6,51 @@
 
 use std::os::unix::io::{AsRawFd, RawFd};
 
-use crate::{
-    engine::Engine,
-    stratis::{dbus_support::MaybeDbusSupport, errors::StratisResult},
-};
+use libudev::Event;
+use mio::{unix::EventedFd, Events, Poll, PollOpt, Ready, Token};
+
+use crate::stratis::errors::{StratisError, StratisResult};
 
 /// A facility for listening for and handling udev events that stratisd
 /// considers interesting.
 pub struct UdevMonitor<'a> {
     socket: libudev::MonitorSocket<'a>,
+    poll: Poll,
 }
 
 impl<'a> UdevMonitor<'a> {
     pub fn create(context: &'a libudev::Context) -> StratisResult<UdevMonitor<'a>> {
-        let mut monitor = libudev::Monitor::new(context)?;
+        let mut monitor = libudev::Monitor::new(&context)?;
         monitor.match_subsystem("block")?;
 
-        Ok(UdevMonitor {
-            socket: monitor.listen()?,
-        })
+        let socket = monitor.listen()?;
+        let poll = Poll::new()?;
+
+        Ok(UdevMonitor { socket, poll })
     }
 
-    pub fn as_raw_fd(&mut self) -> RawFd {
-        self.socket.as_raw_fd()
+    pub fn register<'b>(&mut self, evented_fd: &'b EventedFd<'b>) -> StratisResult<()> {
+        self.poll
+            .register(evented_fd, Token(0), Ready::readable(), PollOpt::level())?;
+        Ok(())
     }
 
-    /// Handle udev events.
-    /// Check if a pool can be constructed and update engine and D-Bus layer
-    /// data structures if so.
-    pub fn handle_events(&mut self, engine: &mut dyn Engine, dbus_support: &mut MaybeDbusSupport) {
-        while let Some(event) = self.socket.receive_event() {
-            if let Some((pool_name, pool_uuid, pool)) = engine.handle_event(&event) {
-                dbus_support.register_pool(&pool_name, pool_uuid, pool);
+    pub fn poll(&mut self) -> Option<StratisResult<Event<'a>>> {
+        let mut events = Events::with_capacity(1);
+        if let Err(e) = self.poll.poll(&mut events, None) {
+            return Some(Err(StratisError::from(e)));
+        }
+        for event in &events {
+            if event.token() == Token(0) && event.readiness() == Ready::readable() {
+                return self.socket.receive_event().map(Ok);
             }
         }
+        None
+    }
+}
+
+impl<'a> AsRawFd for UdevMonitor<'a> {
+    fn as_raw_fd(&self) -> RawFd {
+        self.socket.as_raw_fd()
     }
 }

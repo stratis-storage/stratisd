@@ -27,7 +27,7 @@ use crate::{
             metadata::{disown_device, BDAExtendedSize, BlockdevSize, MDADataSize, BDA},
             serde_structs::{BaseBlockDevSave, Recordable},
         },
-        types::{BlockDevPath, DevUuid, EncryptionInfo, MaybeDbusPath, PoolUuid},
+        types::{BlockDevPath, DevUuid, EncryptionInfo, PoolUuid},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -40,7 +40,6 @@ pub struct StratBlockDev {
     used: RangeAllocator,
     user_info: Option<String>,
     hardware_info: Option<String>,
-    dbus_path: MaybeDbusPath,
     crypt_handle: Option<CryptHandle>,
 }
 
@@ -90,7 +89,6 @@ impl StratBlockDev {
             used: allocator,
             user_info,
             hardware_info,
-            dbus_path: MaybeDbusPath(None),
             crypt_handle,
         })
     }
@@ -285,14 +283,6 @@ impl BlockDev for StratBlockDev {
 
     fn size(&self) -> Sectors {
         self.total_size().sectors()
-    }
-
-    fn set_dbus_path(&mut self, path: MaybeDbusPath) {
-        self.dbus_path = path
-    }
-
-    fn get_dbus_path(&self) -> &MaybeDbusPath {
-        &self.dbus_path
     }
 
     fn is_encrypted(&self) -> bool {

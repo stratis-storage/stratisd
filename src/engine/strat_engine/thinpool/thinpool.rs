@@ -22,7 +22,6 @@ use devicemapper::{
 use crate::{
     engine::{
         engine::Filesystem,
-        event::{get_engine_listener_list, EngineEvent},
         strat_engine::{
             backstore::Backstore,
             cmd::{thin_check, thin_repair, udev_settle},
@@ -37,7 +36,7 @@ use crate::{
             writing::wipe_sectors,
         },
         structures::Table,
-        types::{FilesystemUuid, MaybeDbusPath, Name, PoolUuid},
+        types::{FilesystemUuid, Name, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -276,7 +275,6 @@ pub struct ThinPool {
     /// The device will change if the backstore adds or removes a cache.
     backstore_device: Device,
     thin_pool_status: Option<ThinPoolStatus>,
-    dbus_path: MaybeDbusPath,
 }
 
 impl ThinPool {
@@ -384,7 +382,6 @@ impl ThinPool {
             mdv,
             backstore_device,
             thin_pool_status: None,
-            dbus_path: MaybeDbusPath(None),
         })
     }
 
@@ -494,7 +491,6 @@ impl ThinPool {
             mdv,
             backstore_device,
             thin_pool_status: None,
-            dbus_path: MaybeDbusPath(None),
         })
     }
 
@@ -963,11 +959,6 @@ impl ThinPool {
             self.filesystems.insert(old_name, uuid, filesystem);
             Err(err)
         } else {
-            get_engine_listener_list().notify(&EngineEvent::FilesystemRenamed {
-                dbus_path: filesystem.get_dbus_path(),
-                from: &*old_name,
-                to: &*new_name,
-            });
             self.filesystems.insert(new_name.clone(), uuid, filesystem);
             if let Err(e) = devlinks::filesystem_renamed(pool_name, &old_name) {
                 warn!("Filesystem rename symlink action failed: {}", e);
@@ -1077,10 +1068,6 @@ impl ThinPool {
         self.backstore_device = backstore_device;
 
         Ok(true)
-    }
-
-    pub fn set_dbus_path(&mut self, path: MaybeDbusPath) {
-        self.dbus_path = path
     }
 }
 

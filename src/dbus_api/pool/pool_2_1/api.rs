@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, Method, Property};
+use dbus_tree::{Access, EmitsChangedSignal, Factory, MTSync, Method, Property};
 
 use crate::dbus_api::{
     consts,
@@ -13,7 +13,7 @@ use crate::dbus_api::{
     types::TData,
 };
 
-pub fn init_cache_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+pub fn init_cache_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
     f.method("InitCache", (), init_cache)
         .in_arg(("devices", "as"))
         // b: Indicates if any cache devices were added
@@ -25,7 +25,7 @@ pub fn init_cache_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>,
         .out_arg(("return_string", "s"))
 }
 
-pub fn add_cachedevs_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+pub fn add_cachedevs_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
     f.method("AddCacheDevs", (), add_cachedevs)
         .in_arg(("devices", "as"))
         // b: Indicates if any cache devices were added
@@ -37,7 +37,7 @@ pub fn add_cachedevs_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TDat
         .out_arg(("return_string", "s"))
 }
 
-pub fn encrypted_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {
+pub fn encrypted_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
     f.property::<bool, _>(consts::POOL_ENCRYPTED_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)

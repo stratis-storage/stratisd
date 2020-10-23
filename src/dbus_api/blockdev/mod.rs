@@ -2,15 +2,16 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus::{arg::Variant, tree::Factory};
+use dbus::arg::Variant;
+use dbus_tree::Factory;
 
 use crate::{
     dbus_api::{
         consts,
-        types::{DbusContext, InterfacesAdded, OPContext, ObjectPathType},
+        types::{DbusContext, InterfacesAdded, OPContext},
         util::make_object_path,
     },
-    engine::{BlockDev, BlockDevTier, DevUuid, MaybeDbusPath, StratisUuid},
+    engine::{BlockDev, BlockDevTier, DevUuid, StratisUuid},
 };
 
 mod blockdev_2_0;
@@ -23,20 +24,16 @@ pub fn create_dbus_blockdev<'a>(
     parent: dbus::Path<'static>,
     uuid: DevUuid,
     tier: BlockDevTier,
-    blockdev: &mut dyn BlockDev,
+    blockdev: &dyn BlockDev,
 ) -> dbus::Path<'a> {
-    let f = Factory::new_fn();
+    let f = Factory::new_sync();
 
     let object_name = make_object_path(dbus_context);
 
     let object_path = f
         .object_path(
             object_name,
-            Some(OPContext::new(
-                parent.clone(),
-                StratisUuid::Dev(uuid),
-                ObjectPathType::Blockdev,
-            )),
+            Some(OPContext::new(parent.clone(), StratisUuid::Dev(uuid))),
         )
         .introspectable()
         .add(
@@ -90,11 +87,7 @@ pub fn create_dbus_blockdev<'a>(
 
     let path = object_path.get_name().to_owned();
     let interfaces = get_initial_properties(parent, uuid, tier, blockdev);
-    dbus_context
-        .actions
-        .borrow_mut()
-        .push_add(object_path, interfaces);
-    blockdev.set_dbus_path(MaybeDbusPath(Some(path.clone())));
+    dbus_context.push_add(object_path, interfaces);
     path
 }
 

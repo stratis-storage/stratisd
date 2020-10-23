@@ -2,10 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus::{
-    tree::{MTFn, MethodInfo, MethodResult},
-    Message,
-};
+use dbus::Message;
+use dbus_tree::{MTSync, MethodInfo, MethodResult};
 
 use crate::{
     dbus_api::{
@@ -15,7 +13,7 @@ use crate::{
     engine::{FilesystemUuid, RenameAction},
 };
 
-pub fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn rename_filesystem(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -40,8 +38,8 @@ pub fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let mut engine = dbus_context.engine.borrow_mut();
-    let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let mut mutex_lock = mutex_lock!(dbus_context.engine);
+    let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
     let uuid = typed_uuid!(filesystem_data.uuid; Fs; default_return; return_message);
     let msg = match log_action!(pool.rename_filesystem(&pool_name, uuid, new_name)) {
@@ -56,11 +54,14 @@ pub fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         Ok(RenameAction::Identity) => {
             return_message.append3(default_return, msg_code_ok(), msg_string_ok())
         }
-        Ok(RenameAction::Renamed(uuid)) => return_message.append3(
-            (true, uuid_to_string!(uuid)),
-            msg_code_ok(),
-            msg_string_ok(),
-        ),
+        Ok(RenameAction::Renamed(uuid)) => {
+            dbus_context.push_filesystem_name_change(object_path, new_name);
+            return_message.append3(
+                (true, uuid_to_string!(uuid)),
+                msg_code_ok(),
+                msg_string_ok(),
+            )
+        }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append3(default_return, rc, rs)

@@ -46,16 +46,34 @@ libudev = "0.2"
 lazy_static = "1"
 timerfd = "1"
 itertools = "0.9"
-libcryptsetup-rs = "0.4"
 semver = "0.11"
 termios = "0.3"
 regex = "1"
 base64 = "0.13"
 sha-1 = "0.9"
 either = "1"
+futures = "0.3"
+tokio-stream = "0.1"
+
+[dependencies.libcryptsetup-rs]
+version = "0.4.3"
+features = ["mutex"]
+
+[dependencies.tokio]
+version = "1.0"
+features = ["sync", "macros", "rt", "rt-multi-thread", "signal", "net"]
 
 [dependencies.dbus]
-version = "0.8"
+version = "0.9"
+features = ["futures"]
+optional = true
+
+[dependencies.dbus-tree]
+version = "0.9"
+optional = true
+
+[dependencies.dbus-tokio]
+version = "0.7"
 optional = true
 
 [dependencies.libdbus-sys]
@@ -77,5 +95,5 @@ matches = "0.1"
 
 [features]
 default = ["dbus_enabled"]
-dbus_enabled = ["dbus", "libdbus-sys"]
+dbus_enabled = ["dbus", "dbus-tree", "dbus-tokio", "libdbus-sys"]
 extras = []

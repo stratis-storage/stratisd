@@ -6,10 +6,9 @@
 
 use std::os::unix::io::{AsRawFd, RawFd};
 
-use crate::{
-    engine::Engine,
-    stratis::{dbus_support::MaybeDbusSupport, errors::StratisResult},
-};
+use libudev::Event;
+
+use crate::stratis::errors::StratisResult;
 
 /// A facility for listening for and handling udev events that stratisd
 /// considers interesting.
@@ -19,26 +18,21 @@ pub struct UdevMonitor<'a> {
 
 impl<'a> UdevMonitor<'a> {
     pub fn create(context: &'a libudev::Context) -> StratisResult<UdevMonitor<'a>> {
-        let mut monitor = libudev::Monitor::new(context)?;
+        let mut monitor = libudev::Monitor::new(&context)?;
         monitor.match_subsystem("block")?;
 
-        Ok(UdevMonitor {
-            socket: monitor.listen()?,
-        })
+        let socket = monitor.listen()?;
+
+        Ok(UdevMonitor { socket })
     }
 
-    pub fn as_raw_fd(&mut self) -> RawFd {
+    pub fn poll(&mut self) -> Option<Event<'a>> {
+        self.socket.receive_event()
+    }
+}
+
+impl<'a> AsRawFd for UdevMonitor<'a> {
+    fn as_raw_fd(&self) -> RawFd {
         self.socket.as_raw_fd()
-    }
-
-    /// Handle udev events.
-    /// Check if a pool can be constructed and update engine and D-Bus layer
-    /// data structures if so.
-    pub fn handle_events(&mut self, engine: &mut dyn Engine, dbus_support: &mut MaybeDbusSupport) {
-        while let Some(event) = self.socket.receive_event() {
-            if let Some((pool_name, pool_uuid, pool)) = engine.handle_event(&event) {
-                dbus_support.register_pool(&pool_name, pool_uuid, pool);
-            }
-        }
     }
 }

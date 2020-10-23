@@ -2,20 +2,32 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::sync::{atomic::AtomicBool, Arc};
+
 use dbus::{
     arg::{ArgType, Iter, IterAppend, RefArg, Variant},
-    ffidisp::{stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged, Connection},
+    blocking::SyncConnection,
+    channel::Sender,
+    ffidisp::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged,
     message::SignalArgs,
-    tree::{MTFn, MethodErr, PropInfo},
+    tree::{MTSync, MethodErr, PropInfo},
+};
+use tokio::sync::{
+    mpsc::{channel, Receiver},
+    Mutex, RwLock,
 };
 
 use devicemapper::DmError;
 
 use crate::{
     dbus_api::{
+        api::get_base_tree,
+        connection::{DbusConnectionHandler, DbusTreeHandler},
         consts,
         types::{DbusContext, DbusErrorEnum, TData},
+        udev::DbusUdevHandler,
     },
+    engine::{Engine, UdevEngineEvent},
     stratis::{ErrorEnum, StratisError},
 };
 
@@ -95,7 +107,8 @@ pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
         | StratisError::DM(_)
         | StratisError::Dbus(_)
         | StratisError::Udev(_)
-        | StratisError::Crypt(_) => DbusErrorEnum::ERROR,
+        | StratisError::Crypt(_)
+        | StratisError::Recv(_) => DbusErrorEnum::ERROR,
     };
     let description = match *err {
         StratisError::DM(DmError::Core(ref err)) => err.to_string(),
@@ -115,7 +128,7 @@ pub fn msg_string_ok() -> String {
 }
 
 /// Get the UUID for an object path.
-pub fn get_uuid(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
+pub fn get_uuid(i: &mut IterAppend, p: &PropInfo<MTSync<TData>, TData>) -> Result<(), MethodErr> {
     let object_path = p.path.get_name();
     let path = p
         .tree
@@ -132,7 +145,7 @@ pub fn get_uuid(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<
 }
 
 /// Get the parent object path for an object path.
-pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
+pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTSync<TData>, TData>) -> Result<(), MethodErr> {
     let object_path = p.path.get_name();
     let path = p
         .tree
@@ -151,7 +164,7 @@ pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Resul
 /// Place a property changed signal on the D-Bus for the given property name
 /// and value and for all interfaces specified.
 pub fn prop_changed_dispatch<T: 'static>(
-    conn: &Connection,
+    conn: &SyncConnection,
     prop_name: &str,
     new_value: T,
     path: &dbus::Path,
@@ -171,4 +184,33 @@ where
     }
 
     Ok(())
+}
+
+/// Create both ends of the D-Bus processing handlers.
+pub fn create_dbus_handlers(
+    engine: Arc<Mutex<dyn Engine>>,
+    udev_receiver: Receiver<UdevEngineEvent>,
+    should_exit: Arc<AtomicBool>,
+) -> Result<(DbusConnectionHandler, DbusUdevHandler, DbusTreeHandler), dbus::Error> {
+    let c = SyncConnection::new_system()?;
+    let (sender, receiver) = channel(1024);
+    let (tree, object_path) = get_base_tree(DbusContext::new(engine, sender));
+    let dbus_context = tree.get_data().clone();
+    c.request_name(consts::STRATIS_BASE_SERVICE, false, true, true)?;
+
+    let connection_arc = Arc::new(c);
+    let tree = Arc::new(RwLock::new(tree));
+    let connection =
+        DbusConnectionHandler::new(Arc::clone(&connection_arc), Arc::clone(&tree), should_exit);
+    let udev = DbusUdevHandler {
+        receiver: udev_receiver,
+        path: object_path,
+        dbus_context,
+    };
+    let tree = DbusTreeHandler {
+        connection: connection_arc,
+        receiver,
+        tree,
+    };
+    Ok((connection, udev, tree))
 }

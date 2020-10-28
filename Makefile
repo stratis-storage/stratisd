@@ -61,7 +61,7 @@ bloat: ${HOME}/.cargo/bin/cargo-bloat
 	PATH=${HOME}/.cargo/bin:${PATH} cargo bloat --release --crates
 
 audit: ${HOME}/.cargo/bin/cargo-audit
-	PATH=${HOME}/.cargo/bin:${PATH} cargo audit -D
+	PATH=${HOME}/.cargo/bin:${PATH} cargo audit -D warnings
 
 fmt:
 	cargo fmt

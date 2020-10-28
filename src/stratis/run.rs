@@ -7,17 +7,20 @@
 use std::{
     os::unix::io::AsRawFd,
     sync::{
-        mpsc::{channel, Receiver, Sender},
+        mpsc::{channel, Sender},
         Arc, Mutex,
     },
+    time::Duration,
 };
 
-use mio::unix::EventedFd;
+use mio::{unix::EventedFd, Events, Poll, PollOpt, Ready, Token};
 use tokio::{runtime::Runtime, select, signal, task};
 
 use crate::{
     engine::{Engine, SimEngine, StratEngine, UdevEngineEvent},
-    stratis::{errors::StratisResult, stratis::VERSION, udev_monitor::UdevMonitor},
+    stratis::{
+        errors::StratisResult, ipc_support::setup, stratis::VERSION, udev_monitor::UdevMonitor,
+    },
 };
 
 fn udev_thread(sender: Sender<UdevEngineEvent>) {
@@ -68,11 +71,42 @@ fn udev_thread(sender: Sender<UdevEngineEvent>) {
     }
 }
 
-fn ipc_thread(_engine: Arc<Mutex<dyn Engine>>, _receiver: Receiver<UdevEngineEvent>) {}
-
 async fn signal_thread() {
     if let Err(e) = signal::ctrl_c().await {
         error!("Failure while listening for signals: {}", e);
+    }
+}
+
+fn dm_event_thread(engine: Arc<Mutex<dyn Engine>>) {
+    fn dm_event_thread_res(engine: Arc<Mutex<dyn Engine>>) -> StratisResult<()> {
+        let fd = {
+            let lock = engine.lock()?;
+            match (*lock).get_eventable() {
+                Some(evt) => evt.get_pollable_fd(),
+                None => return Ok(()),
+            }
+        };
+        let evented_fd = EventedFd(&fd);
+        let poll = Poll::new()?;
+        poll.register(&evented_fd, Token(0), Ready::readable(), PollOpt::level())?;
+
+        let mut events = Events::with_capacity(1);
+        loop {
+            poll.poll(&mut events, None)?;
+            for event in &events {
+                if event.token() == Token(0) && event.readiness() == Ready::readable() {
+                    let mut lock = engine.lock()?;
+                    if let Some(evt) = (*lock).get_eventable() {
+                        evt.clear_event()?;
+                        (*lock).evented()?;
+                    }
+                }
+            }
+        }
+    }
+
+    if let Err(e) = dm_event_thread_res(engine) {
+        error!("devicemapper event thread failed: {}", e);
     }
 }
 
@@ -104,9 +138,9 @@ pub fn run(sim: bool) -> StratisResult<()> {
         let (sender, receiver) = channel::<UdevEngineEvent>();
 
         let mut join_udev = task::spawn_blocking(move || udev_thread(sender));
-        let engine_ref = Arc::clone(&engine);
-        let mut join_ipc = task::spawn_blocking(move || ipc_thread(engine_ref, receiver));
+        let mut join_ipc = task::spawn(setup(Arc::clone(&engine), receiver));
         let mut join_signal = task::spawn(signal_thread());
+        let mut join_dm = task::spawn_blocking(move || dm_event_thread(engine));
 
         select! {
             _ = &mut join_udev => {
@@ -115,62 +149,14 @@ pub fn run(sim: bool) -> StratisResult<()> {
             _ = &mut join_ipc => {
                 error!("The IPC thread exited; shutting down stratisd...");
             }
+            _ = &mut join_dm => {
+                error!("The devicemapper thread exiting; shutting down stratisd...");
+            }
             _ = &mut join_signal => {
                 info!("Caught SIGINT; exiting...");
             }
         }
     });
+    runtime.shutdown_timeout(Duration::from_secs(0));
     Ok(())
-
-    // /*
-    //fds is a Vec of libc::pollfd structs. Ideally, it would be possible
-    //to use the higher level nix crate to handle polling. If this were possible,
-    //then the Vec would be one of nix::poll::PollFds and this would be more
-    //rustic. Unfortunately, the rust D-Bus library requires an explicit file
-    //descriptor to be passed as an argument to Connection::watch_handle(),
-    //and the explicit file descriptor can not be extracted from the PollFd
-    //struct. So, at this time, sticking with libc is less complex than
-    //converting to using nix, because if using nix, the file descriptor would
-    //have to be maintained in the Vec as well as the PollFd struct.
-    // */
-    //let mut fds = Vec::new();
-
-    //fds.push(libc::pollfd {
-    //    fd: udev_monitor.as_raw_fd(),
-    //    revents: 0,
-    //    events: libc::POLLIN,
-    //});
-
-    //let eventable = engine.borrow().get_eventable();
-
-    //if let Some(evt) = eventable {
-    //    fds.push(libc::pollfd {
-    //        fd: evt.get_pollable_fd(),
-    //        revents: 0,
-    //        events: libc::POLLIN,
-    //    });
-    //};
-
-    //let dbus_client_index_start = if eventable.is_some() {
-    //    FD_INDEX_ENGINE + 1
-    //} else {
-    //    FD_INDEX_ENGINE
-    //};
-
-    //loop {
-    //    if fds[FD_INDEX_UDEV].revents != 0 {
-    //        udev_monitor.handle_events(&mut *engine.borrow_mut(), &mut dbus_support)
-    //    }
-
-    //    if let Some(evt) = eventable {
-    //        if fds[FD_INDEX_ENGINE].revents != 0 {
-    //            evt.clear_event()?;
-    //            engine.borrow_mut().evented()?;
-    //        }
-    //    }
-
-    //    dbus_support.process(&mut fds, dbus_client_index_start);
-
-    //    process_poll(&mut fds)?;
-    //}
 }

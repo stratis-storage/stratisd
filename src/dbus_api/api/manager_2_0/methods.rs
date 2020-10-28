@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use dbus::{
-    tree::{MTFn, MethodInfo, MethodResult},
+    tree::{MTSync, MethodInfo, MethodResult},
     Message,
 };
 
@@ -15,13 +15,14 @@ use crate::{
         util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
     },
     engine::{DeleteAction, PoolUuid},
+    stratis::StratisError,
 };
 
-pub fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn create_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     create_pool_shared(m, false)
 }
 
-pub fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn destroy_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -48,13 +49,11 @@ pub fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         }
     };
 
-    let msg = match dbus_context.engine.borrow_mut().destroy_pool(pool_uuid) {
+    let msg = match (*mutex_lock!(dbus_context.engine, default_return, return_message))
+        .destroy_pool(pool_uuid)
+    {
         Ok(DeleteAction::Deleted(uuid)) => {
-            dbus_context.actions.borrow_mut().push_remove(
-                &pool_path,
-                m.tree,
-                consts::pool_interface_list(),
-            );
+            dbus_context.push_remove(&pool_path, m.tree, consts::pool_interface_list());
             return_message.append3(
                 (true, uuid_to_string!(uuid)),
                 msg_code_ok(),
@@ -72,19 +71,23 @@ pub fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-pub fn configure_simulator(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn configure_simulator(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let message = m.msg;
     let mut iter = message.iter_init();
+
+    let return_message = message.method_return();
 
     let denominator: u32 = get_next_arg(&mut iter, 0)?;
 
     let dbus_context = m.tree.get_data();
-    let result = dbus_context
-        .engine
-        .borrow_mut()
-        .configure_simulator(denominator);
-
-    let return_message = message.method_return();
+    let mut mutex_lock = match dbus_context.engine.lock() {
+        Ok(lock) => lock,
+        Err(err) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&StratisError::from(err));
+            return Ok(vec![return_message.append2(rc, rs)]);
+        }
+    };
+    let result = (*mutex_lock).configure_simulator(denominator);
 
     let msg = match result {
         Ok(_) => return_message.append2(msg_code_ok(), msg_string_ok()),

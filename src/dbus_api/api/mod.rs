@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus::tree::{Factory, MTFn, Tree};
+use dbus::tree::{Factory, MTSync, Tree};
 
 use crate::dbus_api::{
     consts,
@@ -17,8 +17,10 @@ mod manager_2_2;
 mod report_2_1;
 mod shared;
 
-pub fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>, dbus::Path<'a>) {
-    let f = Factory::new_fn();
+pub fn get_base_tree<'a>(
+    dbus_context: DbusContext,
+) -> (Tree<MTSync<TData>, TData>, dbus::Path<'a>) {
+    let f = Factory::new_sync();
 
     let base_tree = f.tree(dbus_context);
 

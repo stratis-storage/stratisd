@@ -26,7 +26,7 @@ pub fn create_dbus_pool<'a>(
     uuid: PoolUuid,
     pool: &mut dyn Pool,
 ) -> dbus::Path<'a> {
-    let f = Factory::new_fn();
+    let f = Factory::new_sync();
 
     let object_name = make_object_path(dbus_context);
 
@@ -78,10 +78,7 @@ pub fn create_dbus_pool<'a>(
 
     let path = object_path.get_name().to_owned();
     let interfaces = get_initial_properties(name, uuid, pool);
-    dbus_context
-        .actions
-        .borrow_mut()
-        .push_add(object_path, interfaces);
+    dbus_context.push_add(object_path, interfaces);
     pool.set_dbus_path(MaybeDbusPath(Some(path.clone())));
     path
 }

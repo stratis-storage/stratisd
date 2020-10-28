@@ -11,34 +11,76 @@
 
 #![allow(dead_code)]
 
-use std::{cell::RefCell, rc::Rc};
+use std::sync::{mpsc::Receiver, Arc, Mutex};
+
+use tokio::{select, task};
 
 use crate::{
-    dbus_api::{DbusConnectionData, EventHandler},
-    engine::{get_engine_listener_list_mut, Engine, Name, Pool, PoolUuid},
-    stratis::StratisResult,
+    dbus_api::{create_dbus_handlers, EventHandler},
+    engine::{get_engine_listener_list_mut, Engine, UdevEngineEvent},
+    stratis::{StratisError, StratisResult},
 };
 
-pub struct IpcSupport {
-    handle: DbusConnectionData,
-}
+pub async fn setup(
+    engine: Arc<Mutex<dyn Engine>>,
+    receiver: Receiver<UdevEngineEvent>,
+) -> StratisResult<()> {
+    let (conn, mut udev, mut tree) = create_dbus_handlers(Arc::clone(&engine), receiver)
+        .map_err(|err| err.into())
+        .and_then(|(conn, udev, tree)| -> StratisResult<_> {
+            let event_handler = Box::new(EventHandler::new(conn.new_connection_ref()));
+            get_engine_listener_list_mut().register_listener(event_handler);
+            let mut mutex_lock = mutex_lock!(engine);
+            let engine_ref = &mut *mutex_lock;
+            for (pool_name, pool_uuid, pool) in engine_ref.pools_mut() {
+                udev.register_pool(&pool_name, pool_uuid, pool)
+            }
+            info!("D-Bus API is available");
+            Ok((conn, udev, tree))
+        })?;
 
-impl IpcSupport {
-    pub fn setup(engine: &Rc<RefCell<dyn Engine>>) -> StratisResult<IpcSupport> {
-        DbusConnectionData::connect(Rc::clone(engine))
-            .map(|mut handle| {
-                let event_handler = Box::new(EventHandler::new(Rc::clone(&handle.connection)));
-                get_engine_listener_list_mut().register_listener(event_handler);
-                for (pool_name, pool_uuid, pool) in engine.borrow_mut().pools_mut() {
-                    handle.register_pool(&pool_name, pool_uuid, pool)
-                }
-                info!("D-Bus API is available");
-                IpcSupport { handle }
-            })
-            .map_err(|err| err.into())
-    }
+    let mut tree_handle = task::spawn_blocking(move || loop {
+        if let Err(e) = tree.process_dbus_action() {
+            error!(
+                "Failed to process D-Bus object path addition or removal: {}; \
+                    exiting D-Bus thread",
+                e,
+            );
+            return;
+        }
+    });
+    let mut conn_handle = task::spawn_blocking(move || loop {
+        if let Err(e) = conn.process_dbus_request() {
+            error!(
+                "Failed to process D-Bus method call: {}; exiting D-Bus thread",
+                e,
+            );
+            return;
+        }
+    });
+    let mut udev_handle = task::spawn_blocking(move || loop {
+        if let Err(e) = udev.handle_udev_event() {
+            error!(
+                "Failed to process udev event in the D-Bus layer: {}; exiting D-Bus \
+                    thread",
+                e,
+            );
+            return;
+        }
+    });
 
-    pub fn register_pool(&mut self, pool_name: &Name, pool_uuid: PoolUuid, pool: &mut dyn Pool) {
-        self.handle.register_pool(pool_name, pool_uuid, pool)
+    select! {
+        res = &mut tree_handle => {
+            error!("The tree handling thread exited...");
+            res.map_err(|e| StratisError::Error(e.to_string()))
+        }
+        res = &mut conn_handle => {
+            error!("The D-Bus request thread exited...");
+            res.map_err(|e| StratisError::Error(e.to_string()))
+        }
+        res = &mut udev_handle => {
+            error!("The udev processing thread exited...");
+            res.map_err(|e| StratisError::Error(e.to_string()))
+        }
     }
 }

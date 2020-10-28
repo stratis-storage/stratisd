@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use dbus::{
-    tree::{MTFn, MethodInfo, MethodResult},
+    tree::{MTSync, MethodInfo, MethodResult},
     Message,
 };
 
@@ -17,7 +17,7 @@ use crate::{
     engine::{DevUuid, RenameAction},
 };
 
-pub fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn set_user_info(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -37,8 +37,8 @@ pub fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let pool_path = get_parent!(m; blockdev_data; default_return; return_message);
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
-    let mut engine = dbus_context.engine.borrow_mut();
-    let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let mut mutex_lock = mutex_lock!(dbus_context.engine, default_return, return_message);
+    let (pool_name, pool) = get_mut_pool!(*mutex_lock; pool_uuid; default_return; return_message);
 
     let result =
         pool.set_blockdev_user_info(&pool_name, blockdev_data.uuid, tuple_to_option(new_id_spec));

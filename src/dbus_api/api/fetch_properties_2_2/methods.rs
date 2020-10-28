@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 use dbus::{
     arg::{RefArg, Variant},
-    tree::{MTFn, MethodInfo, MethodResult},
+    tree::{MTSync, MethodInfo, MethodResult},
     Message,
 };
 use itertools::Itertools;
@@ -25,11 +25,11 @@ const ALL_PROPERTIES: [&str; 3] = [
 ];
 
 pub fn locked_pools(
-    info: &MethodInfo<MTFn<TData>, TData>,
+    info: &MethodInfo<MTSync<TData>, TData>,
 ) -> Result<HashMap<String, String>, String> {
     let dbus_context = info.tree.get_data();
 
-    let engine = dbus_context.engine.borrow();
+    let engine = mutex_lock!(dbus_context.engine, |e| e.to_string());
     Ok(engine
         .locked_pools()
         .into_iter()
@@ -43,7 +43,7 @@ pub fn locked_pools(
 }
 
 fn get_properties_shared(
-    m: &MethodInfo<MTFn<TData>, TData>,
+    m: &MethodInfo<MTSync<TData>, TData>,
     properties: &mut dyn Iterator<Item = String>,
 ) -> MethodResult {
     let message: &Message = m.msg;

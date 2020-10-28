@@ -5,7 +5,7 @@
 use std::convert::TryFrom;
 
 use dbus::{
-    tree::{MTFn, MethodInfo, MethodResult},
+    tree::{MTSync, MethodInfo, MethodResult},
     Message,
 };
 
@@ -19,15 +19,15 @@ use crate::{
     stratis::{ErrorEnum, StratisError},
 };
 
-pub fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn create_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     create_pool_shared(m, true)
 }
 
-pub fn set_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn set_key(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     set_key_shared(m, false)
 }
 
-pub fn unset_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn unset_key(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -37,9 +37,7 @@ pub fn unset_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = false;
     let return_message = message.method_return();
 
-    let msg = match dbus_context
-        .engine
-        .borrow_mut()
+    let msg = match (*mutex_lock!(dbus_context.engine, default_return, return_message))
         .get_key_handler_mut()
         .unset(&match KeyDescription::try_from(key_desc_str) {
             Ok(kd) => kd,
@@ -60,7 +58,7 @@ pub fn unset_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-pub fn unlock_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn unlock_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -82,9 +80,7 @@ pub fn unlock_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         }
     };
 
-    let msg = match dbus_context
-        .engine
-        .borrow_mut()
+    let msg = match (*mutex_lock!(dbus_context.engine, default_return, return_message))
         .unlock_pool(pool_uuid)
         .map(|v| v.changed())
     {

@@ -2,4 +2,4 @@
 mod dbus_support;
 
 #[cfg(feature = "dbus_enabled")]
-pub use dbus_support::IpcSupport;
+pub use dbus_support::setup;

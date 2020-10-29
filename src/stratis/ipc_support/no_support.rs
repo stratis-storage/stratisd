@@ -2,16 +2,16 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-pub struct IpcSupport;
+use std::sync::{mpsc::Receiver, Arc, Mutex};
 
-// If IPC is compiled out, do very little.
-impl IpcSupport {
-    pub fn setup(_engine: &Rc<RefCell<dyn Engine>>) -> StratisResult<IpcSupport> {
-        Ok(IpcSupport)
-    }
+use crate::{
+    engine::{Engine, UdevEngineEvent},
+    stratis::errors::StratisResult,
+};
 
-    pub fn process(&mut self, _fds: &mut Vec<libc::pollfd>, _dbus_client_index_start: usize) {}
-
-    pub fn register_pool(&mut self, _pool_name: &Name, _pool_uuid: PoolUuid, _pool: &mut dyn Pool) {
-    }
+pub async fn setup(
+    _engine: Arc<Mutex<dyn Engine>>,
+    _recv: Receiver<UdevEngineEvent>,
+) -> StratisResult<()> {
+    Ok(())
 }

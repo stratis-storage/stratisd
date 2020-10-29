@@ -1,3 +1,4 @@
+#[cfg(feature = "dbus_enabled")]
 macro_rules! mutex_lock {
     ($mutex:expr, $default_return:expr, $return_message:expr) => {
         match $mutex.lock() {

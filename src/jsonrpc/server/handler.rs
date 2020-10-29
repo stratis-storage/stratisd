@@ -7,7 +7,7 @@ use crate::jsonrpc::consts::{SOCKFD_ADDR, SOCKFD_ADDR_DIR};
 use std::{
     fs::{create_dir_all, remove_file},
     net::SocketAddr,
-    os::unix::io::{AsRawFd, RawFd},
+    os::unix::io::AsRawFd,
 };
 
 use futures_util::stream::StreamExt;
@@ -17,7 +17,6 @@ use jsonrpsee::{
     transport::http::HttpTransportServer,
 };
 use tokio::{
-    net::UnixListener,
     runtime::Runtime,
     sync::mpsc::{channel, Receiver, Sender},
 };
@@ -28,11 +27,14 @@ use crate::{
     jsonrpc::{
         consts::RPC_SOCKADDR,
         interface::Stratis,
-        server::{key, pool, report, udev, utils::get_fd_from_sock},
+        server::{
+            key, pool, report, udev,
+            utils::{FdRef, UnixListenerStream},
+        },
     },
 };
 
-async fn server_loop(mut recv: Receiver<RawFd>) -> Result<(), String> {
+async fn server_loop(mut recv: Receiver<FdRef>) -> Result<(), String> {
     let transport = HttpTransportServer::bind(
         &RPC_SOCKADDR
             .parse::<SocketAddr>()
@@ -57,7 +59,7 @@ async fn server_loop(mut recv: Receiver<RawFd>) -> Result<(), String> {
                             &mut engine,
                             None,
                             key_desc,
-                            fd,
+                            fd.as_raw_fd(),
                             interactive
                         )
                     } else {
@@ -157,14 +159,14 @@ async fn server_loop(mut recv: Receiver<RawFd>) -> Result<(), String> {
                     prompt,
                 } => {
                     if prompt.is_some() {
-                        if let Some(fd) = recv.recv().await {
+                        if let Some(ref fd) = recv.recv().await {
                             default_handler!(
                                 respond,
                                 pool::pool_unlock,
                                 &mut engine,
                                 false,
                                 pool_uuid,
-                                prompt.map(|b| (fd, b))
+                                prompt.map(|b| (fd.as_raw_fd(), b))
                             )
                         } else {
                             respond.err(Error::new(ErrorCode::InternalError)).await
@@ -197,12 +199,12 @@ async fn server_loop(mut recv: Receiver<RawFd>) -> Result<(), String> {
     }
 }
 
-pub async fn file_descriptor_listener(mut sender: Sender<RawFd>) {
+pub async fn file_descriptor_listener(sender: Sender<FdRef>) {
     let _ = remove_file(SOCKFD_ADDR);
     if let Err(e) = create_dir_all(SOCKFD_ADDR_DIR) {
         warn!("{}", e);
     }
-    let mut listener = match UnixListener::bind(SOCKFD_ADDR) {
+    let mut listener = match UnixListenerStream::bind(SOCKFD_ADDR) {
         Ok(l) => l,
         Err(e) => {
             warn!("{}", e);
@@ -212,7 +214,7 @@ pub async fn file_descriptor_listener(mut sender: Sender<RawFd>) {
     loop {
         match listener.next().await {
             Some(Ok(stream)) => {
-                let fd = match get_fd_from_sock(stream.as_raw_fd()) {
+                let fd = match stream.await {
                     Ok(f) => f,
                     Err(e) => {
                         warn!("Could not get file descriptor sent from client: {}", e);
@@ -231,7 +233,7 @@ pub async fn file_descriptor_listener(mut sender: Sender<RawFd>) {
 
 pub fn run_server() {
     let (send, recv) = channel(16);
-    let mut runtime = match Runtime::new() {
+    let runtime = match Runtime::new() {
         Ok(rt) => rt,
         Err(e) => {
             error!("{}", e);

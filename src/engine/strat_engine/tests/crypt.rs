@@ -36,11 +36,11 @@ where
         .unwrap();
     let key_data = SizedKeyMemory::new(mem, MAX_STRATIS_PASS_SIZE);
 
-    key_handle.set_no_fd(desc_str, key_data)?;
+    key_handle.set_no_fd(&key_description, key_data)?;
 
     let result = test(physical_paths, &key_description, input);
 
-    key_handle.unset(desc_str)?;
+    key_handle.unset(&key_description)?;
 
     result
 }

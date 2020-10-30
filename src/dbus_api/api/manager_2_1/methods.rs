@@ -24,7 +24,7 @@ pub fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 }
 
 pub fn set_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    set_key_shared(m, false)
+    set_key_shared(m)
 }
 
 pub fn unset_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {

@@ -42,9 +42,8 @@ impl KeyActions for SimKeyActions {
         &mut self,
         key_desc: &KeyDescription,
         key_fd: RawFd,
-        interactive: Option<bool>,
     ) -> StratisResult<MappingCreateAction<()>> {
-        let memory = shared::set_key_shared(key_fd, interactive)?;
+        let memory = shared::set_key_shared(key_fd)?;
 
         match self.read(key_desc) {
             Ok(Some(key_data)) => {

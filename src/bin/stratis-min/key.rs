@@ -15,20 +15,16 @@ use libstratis::{
 /// settings and settings such as `NOECHO` are not set. This option should be
 /// used carefully as it will cause the password to be echoed on the screen if
 /// invoked interactively.
-pub fn key_set(
-    key_desc: &KeyDescription,
-    keyfile_path: Option<&str>,
-    no_tty: bool,
-) -> StratisResult<()> {
+pub fn key_set(key_desc: &KeyDescription, keyfile_path: Option<&str>) -> StratisResult<()> {
     let ret = match keyfile_path {
         Some(kp) => {
             let file = File::open(kp)?;
-            StratKeyActions.set(key_desc, file.as_raw_fd(), None)?
+            StratKeyActions.set(key_desc, file.as_raw_fd())?
         }
         None => {
             let stdin_fd = io::stdin().as_raw_fd();
             println!("Enter desired key data followed by the return key:");
-            StratKeyActions.set(key_desc, stdin_fd, Some(!no_tty))?
+            StratKeyActions.set(key_desc, stdin_fd)?
         }
     };
     match ret {

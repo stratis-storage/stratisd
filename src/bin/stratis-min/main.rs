@@ -28,12 +28,6 @@ fn parse_args() -> App<'static, 'static> {
                     .long("--keyfile-path")
                     .takes_value(true),
             )
-            .arg(
-                Arg::with_name("no_tty")
-                    .long("--no-tty")
-                    .takes_value(false)
-                    .conflicts_with("keyfile_path"),
-            )
             .arg(Arg::with_name("key_desc").required(true)),
         SubCommand::with_name("list"),
         SubCommand::with_name("unset").arg(Arg::with_name("key_desc").required(true)),
@@ -52,7 +46,6 @@ fn main() -> Result<(), String> {
                 &KeyDescription::try_from(args.value_of("key_desc").expect("required").to_owned())
                     .map_err(|e| e.to_string())?,
                 args.value_of("keyfile_path"),
-                args.is_present("no_tty"),
             )
             .map_err(|e| e.to_string())
         } else if let Some(args) = subcommand.subcommand_matches("unset") {

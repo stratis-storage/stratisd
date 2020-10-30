@@ -120,16 +120,12 @@ pub fn list_keys(info: &MethodInfo<MTFn<TData>, TData>) -> Result<Vec<String>, S
         .map_err(|e| e.to_string())
 }
 
-pub fn set_key_shared(
-    m: &MethodInfo<MTFn<TData>, TData>,
-    set_terminal_settings: bool,
-) -> MethodResult {
+pub fn set_key_shared(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
     let key_desc_str: String = get_next_arg(&mut iter, 0)?;
     let key_fd: OwnedFd = get_next_arg(&mut iter, 1)?;
-    let interactive: bool = get_next_arg(&mut iter, 2)?;
 
     let dbus_context = m.tree.get_data();
     let default_return = (false, false);
@@ -144,7 +140,6 @@ pub fn set_key_shared(
             }
         },
         key_fd.as_raw_fd(),
-        tuple_to_option((interactive, set_terminal_settings)),
     ) {
         Ok(idem_resp) => {
             let return_value = match idem_resp {

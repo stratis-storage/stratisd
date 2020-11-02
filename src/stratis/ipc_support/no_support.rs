@@ -4,14 +4,10 @@
 
 use std::sync::{mpsc::Receiver, Arc, Mutex};
 
-use crate::{
-    engine::{Engine, UdevEngineEvent},
-    stratis::errors::StratisResult,
-};
+use futures_util::pending;
 
-pub async fn setup(
-    _engine: Arc<Mutex<dyn Engine>>,
-    _recv: Receiver<UdevEngineEvent>,
-) -> StratisResult<()> {
-    Ok(())
+use crate::engine::{Engine, UdevEngineEvent};
+
+pub async fn setup(_engine: Arc<Mutex<dyn Engine>>, _recv: Receiver<UdevEngineEvent>) {
+    pending!()
 }

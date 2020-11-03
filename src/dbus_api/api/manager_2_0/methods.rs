@@ -48,7 +48,6 @@ pub fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         }
     };
 
-    // let msg = match dbus_context.engine.borrow_mut().destroy_pool(pool_uuid) 
     let mut engine = dbus_context.engine.borrow_mut();
 
     let result = pool_op_logging!("preparing to destroy pool with uuid {}", pool_uuid.to_simple_ref(); "{}"; engine.destroy_pool(pool_uuid));

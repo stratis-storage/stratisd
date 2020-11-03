@@ -56,7 +56,6 @@ impl fmt::Display for CreateAction<PoolUuid> {
     }
 }
 
-
 /// Idempotent type representing a create action for a mapping from a key to a value
 #[derive(Debug, PartialEq, Eq)]
 pub enum MappingCreateAction<T> {
@@ -189,7 +188,6 @@ impl fmt::Display for RenameAction<PoolUuid> {
         }
     }
 }
-
 
 #[derive(Debug, PartialEq, Eq)]
 /// A single delete action.

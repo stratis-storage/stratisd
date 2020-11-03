@@ -59,7 +59,7 @@ pub fn create_pool_shared(
 
     let object_path = m.path.get_name();
     let dbus_context = m.tree.get_data();
-    let mut mutex_lock = mutex_lock!(dbus_context.engine, default_return, return_message);
+    let mut mutex_lock = mutex_lock!(dbus_context.engine);
     let result = (*mutex_lock).create_pool(
         name,
         &devs.map(|x| Path::new(x)).collect::<Vec<&Path>>(),
@@ -112,7 +112,7 @@ pub fn create_pool_shared(
 pub fn list_keys(info: &MethodInfo<MTSync<TData>, TData>) -> Result<Vec<String>, String> {
     let dbus_context = info.tree.get_data();
 
-    let mutex_lock = mutex_lock!(dbus_context.engine, |e| e.to_string());
+    let mutex_lock = mutex_lock!(dbus_context.engine);
     (*mutex_lock)
         .get_key_handler()
         .list()
@@ -139,7 +139,7 @@ pub fn set_key_shared(
     let default_return = (false, false);
     let return_message = message.method_return();
 
-    let msg = match (*mutex_lock!(dbus_context.engine, default_return, return_message))
+    let msg = match (*mutex_lock!(dbus_context.engine))
         .get_key_handler_mut()
         .set(
             &match KeyDescription::try_from(key_desc_str) {
@@ -171,7 +171,7 @@ pub fn set_key_shared(
 pub fn locked_pool_uuids(info: &MethodInfo<MTSync<TData>, TData>) -> Result<Vec<String>, String> {
     let dbus_context = info.tree.get_data();
 
-    let mutex_lock = mutex_lock!(dbus_context.engine, |e| e.to_string());
+    let mutex_lock = mutex_lock!(dbus_context.engine);
     Ok((*mutex_lock)
         .locked_pools()
         .into_iter()

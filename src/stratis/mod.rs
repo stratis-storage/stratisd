@@ -8,6 +8,7 @@ pub use self::{
     stratis::VERSION,
 };
 
+mod dm;
 mod errors;
 mod ipc_support;
 mod run;

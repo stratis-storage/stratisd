@@ -48,7 +48,7 @@ where
         .ok_or_else(|| format!("no data for object path {}", object_path))?
         .uuid;
 
-    let mutex_lock = mutex_lock!(dbus_context.engine, |e| e.to_string());
+    let mutex_lock = mutex_lock!(dbus_context.engine);
     let (pool_name, pool) = (*mutex_lock)
         .get_pool(pool_uuid)
         .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
@@ -119,7 +119,7 @@ pub fn add_blockdevs(m: &MethodInfo<MTSync<TData>, TData>, op: BlockDevOp) -> Me
         .expect("implicit argument must be in tree");
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
-    let mut mutex_lock = mutex_lock!(dbus_context.engine, default_return, return_message);
+    let mut mutex_lock = mutex_lock!(dbus_context.engine);
     let (pool_name, pool) = get_mut_pool!(*mutex_lock; pool_uuid; default_return; return_message);
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();

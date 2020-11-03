@@ -37,7 +37,7 @@ pub fn set_user_info(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let pool_path = get_parent!(m; blockdev_data; default_return; return_message);
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
-    let mut mutex_lock = mutex_lock!(dbus_context.engine, default_return, return_message);
+    let mut mutex_lock = mutex_lock!(dbus_context.engine);
     let (pool_name, pool) = get_mut_pool!(*mutex_lock; pool_uuid; default_return; return_message);
 
     let result =

@@ -45,15 +45,15 @@ libcryptsetup-rs = "0.4"
 semver = "0.11"
 termios = "0.3"
 regex = "1.3"
-mio = "0.6"
 futures-util = "0.3"
+async-std = "1.6"
 
 [dependencies.tokio]
-version = "0.2"
-features = ["stream", "sync", "io-driver", "macros", "rt-core", "blocking", "signal"]
+version = "0.3.2"
+features = ["stream", "sync", "macros", "rt", "rt-multi-thread", "signal", "net"]
 
 [dependencies.dbus]
-version = "0.8"
+version = "0.8.4"
 optional = true
 
 [dependencies.libdbus-sys]

@@ -29,7 +29,7 @@ pub fn locked_pools(
 ) -> Result<HashMap<String, String>, String> {
     let dbus_context = info.tree.get_data();
 
-    let engine = mutex_lock!(dbus_context.engine, |e| e.to_string());
+    let engine = mutex_lock!(dbus_context.engine);
     Ok(engine
         .locked_pools()
         .into_iter()

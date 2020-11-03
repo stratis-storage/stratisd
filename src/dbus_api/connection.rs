@@ -4,10 +4,14 @@
 
 use std::{
     collections::HashMap,
-    sync::{mpsc::Receiver, Arc, RwLock},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::Duration,
 };
 
+use async_std::task::block_on;
 use dbus::{
     arg::{RefArg, Variant},
     blocking::SyncConnection,
@@ -19,13 +23,14 @@ use dbus::{
     strings::Path,
     tree::{MTSync, Tree},
 };
+use tokio::sync::{mpsc::Receiver, RwLock};
 
 use crate::{
     dbus_api::{
         consts,
         types::{DbusAction, InterfacesAdded, InterfacesRemoved, TData},
     },
-    stratis::StratisResult,
+    stratis::{StratisError, StratisResult},
 };
 
 /// Handler for a D-Bus tree. This will be used to process add and remove requests from
@@ -38,20 +43,25 @@ pub struct DbusTreeHandler {
 
 impl DbusTreeHandler {
     /// Process a D-Bus action (add/remove) request.
-    pub fn process_dbus_action(&mut self) -> StratisResult<()> {
-        let action = self.receiver.recv()?;
+    pub async fn process_dbus_action(&mut self) -> StratisResult<()> {
+        let action = self.receiver.recv().await.ok_or_else(|| {
+            StratisError::Error(
+                "The channel from the D-Bus request handler to the D-Bus object handler was closed"
+                    .to_string(),
+            )
+        })?;
         match action {
             DbusAction::Add(path, interfaces) => {
                 let path_name = path.get_name().clone();
                 {
-                    let mut rwlock = self.tree.write()?;
+                    let mut rwlock = self.tree.write().await;
                     (*rwlock).insert(path);
                 }
                 self.added_object_signal(path_name, interfaces)?;
             }
             DbusAction::Remove(path, interfaces) => {
                 {
-                    let mut rwlock = self.tree.write()?;
+                    let mut rwlock = self.tree.write().await;
                     (*rwlock).remove(&path);
                 }
                 self.removed_object_signal(path, interfaces)?;
@@ -110,27 +120,20 @@ impl DbusTreeHandler {
 /// Handler for a D-Bus receiving connection.
 pub struct DbusConnectionHandler {
     connection: Arc<SyncConnection>,
+    should_exit: Arc<AtomicBool>,
 }
 
 impl DbusConnectionHandler {
     pub(super) fn new(
         connection: Arc<SyncConnection>,
         tree: Arc<RwLock<Tree<MTSync<TData>, TData>>>,
+        should_exit: Arc<AtomicBool>,
     ) -> DbusConnectionHandler {
         connection.start_receive(
             MatchRule::new_method_call(),
             Box::new(move |msg, conn_ref| {
-                let messages = match tree.read() {
-                    Ok(read_lock) => (*read_lock).handle(&msg),
-                    Err(e) => {
-                        error!(
-                            "Failed to acquire read lock on D-Bus tree: {}; no more \
-                            D-Bus requests will be handled",
-                            e,
-                        );
-                        return false;
-                    }
-                };
+                let read_lock = block_on(tree.read());
+                let messages = (*read_lock).handle(&msg);
                 if let Some(msgs) = messages {
                     for message in msgs {
                         if conn_ref.send(message).is_err() {
@@ -141,7 +144,10 @@ impl DbusConnectionHandler {
                 true
             }),
         );
-        DbusConnectionHandler { connection }
+        DbusConnectionHandler {
+            connection,
+            should_exit,
+        }
     }
 
     /// Create a new reference to the D-Bus connection.
@@ -150,10 +156,10 @@ impl DbusConnectionHandler {
     }
 
     /// Handle a D-Bus action passed from the udev handler.
-    pub fn process_dbus_request(&self) -> StratisResult<()> {
-        Ok(self
-            .connection
-            .process(Duration::from_secs(5))
-            .map(|_| ())?)
+    pub fn process_dbus_request(&self) -> StratisResult<bool> {
+        self.connection
+            .process(Duration::from_millis(100))
+            .map(|_| ())?;
+        Ok(self.should_exit.load(Ordering::Relaxed))
     }
 }

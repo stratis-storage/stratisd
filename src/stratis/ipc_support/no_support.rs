@@ -2,12 +2,17 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::sync::{mpsc::Receiver, Arc, Mutex};
+use std::sync::{atomic::AtomicBool, Arc};
 
 use futures_util::pending;
+use tokio::sync::{mpsc::Receiver, Mutex};
 
 use crate::engine::{Engine, UdevEngineEvent};
 
-pub async fn setup(_engine: Arc<Mutex<dyn Engine>>, _recv: Receiver<UdevEngineEvent>) {
+pub async fn setup(
+    _engine: Arc<Mutex<dyn Engine>>,
+    _recv: Receiver<UdevEngineEvent>,
+    _should_exit: Arc<AtomicBool>,
+) {
     pending!()
 }

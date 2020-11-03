@@ -34,7 +34,7 @@ pub fn get_report(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     };
 
     let dbus_context = m.tree.get_data();
-    let mutex_lock = mutex_lock!(dbus_context.engine, default_return, return_message);
+    let mutex_lock = mutex_lock!(dbus_context.engine);
 
     let msg = match serde_json::to_string(&(*mutex_lock).get_report(report_type)) {
         Ok(string) => return_message.append3(string, msg_code_ok(), msg_string_ok()),

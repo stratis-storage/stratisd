@@ -2,10 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::sync::{
-    mpsc::{sync_channel, Receiver},
-    Arc, Mutex, RwLock,
-};
+use std::sync::{atomic::AtomicBool, Arc};
 
 use dbus::{
     arg::{ArgType, Iter, IterAppend, RefArg, Variant},
@@ -14,6 +11,10 @@ use dbus::{
     ffidisp::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged,
     message::SignalArgs,
     tree::{MTSync, MethodErr, PropInfo},
+};
+use tokio::sync::{
+    mpsc::{channel, Receiver},
+    Mutex, RwLock,
 };
 
 use devicemapper::DmError;
@@ -189,16 +190,18 @@ where
 pub fn create_dbus_handlers(
     engine: Arc<Mutex<dyn Engine>>,
     udev_receiver: Receiver<UdevEngineEvent>,
+    should_exit: Arc<AtomicBool>,
 ) -> Result<(DbusConnectionHandler, DbusUdevHandler, DbusTreeHandler), dbus::Error> {
     let c = SyncConnection::new_system()?;
-    let (sender, receiver) = sync_channel(1024);
+    let (sender, receiver) = channel(1024);
     let (tree, object_path) = get_base_tree(DbusContext::new(engine, sender));
     let dbus_context = tree.get_data().clone();
     c.request_name(consts::STRATIS_BASE_SERVICE, false, true, true)?;
 
     let connection_arc = Arc::new(c);
     let tree = Arc::new(RwLock::new(tree));
-    let connection = DbusConnectionHandler::new(Arc::clone(&connection_arc), Arc::clone(&tree));
+    let connection =
+        DbusConnectionHandler::new(Arc::clone(&connection_arc), Arc::clone(&tree), should_exit);
     let udev = DbusUdevHandler {
         receiver: udev_receiver,
         path: object_path,

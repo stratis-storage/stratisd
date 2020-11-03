@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::sync::mpsc::Receiver;
+use tokio::sync::mpsc::Receiver;
 
 use crate::{
     dbus_api::{
@@ -10,7 +10,7 @@ use crate::{
         types::DbusContext,
     },
     engine::{Name, Pool, PoolUuid, UdevEngineEvent},
-    stratis::StratisResult,
+    stratis::{StratisError, StratisResult},
 };
 
 pub struct DbusUdevHandler {
@@ -21,9 +21,11 @@ pub struct DbusUdevHandler {
 
 impl DbusUdevHandler {
     /// Process udev events using D-Bus.
-    pub fn handle_udev_event(&mut self) -> StratisResult<()> {
-        let udev_event = self.receiver.recv()?;
-        let mut mutex_lock = self.dbus_context.engine.lock()?;
+    pub async fn handle_udev_event(&mut self) -> StratisResult<()> {
+        let udev_event = self.receiver.recv().await.ok_or_else(|| {
+            StratisError::Error("Channel from udev handler to D-Bus handler was shut".to_string())
+        })?;
+        let mut mutex_lock = self.dbus_context.engine.lock().await;
         let optional_pool_info = (*mutex_lock).handle_event(&udev_event);
 
         if let Some((pool_name, pool_uuid, pool)) = optional_pool_info {

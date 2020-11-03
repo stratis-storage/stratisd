@@ -101,6 +101,20 @@ macro_rules! properties_footer {
     };
 }
 
+macro_rules! pool_op_logging {
+    ($pre_oper:tt $(, $pre_args:expr)*; $post_oper:tt $(, $post_args:expr)*; $engine_op:expr) => {{
+        info!($pre_oper, $($pre_args),*);
+        let result = $engine_op;
+        match result {
+            Ok(ref action) => info!($post_oper, $($post_args,)* action),
+            Err(ref err) => {
+                warn!("pool operation failed with error: {}", err);
+            }
+        }
+        result
+    }};
+}
+
 macro_rules! initial_properties {
     ($($iface:expr => { $($prop:expr => $val:expr),* }),*) => {{
         let mut interfaces = vec![

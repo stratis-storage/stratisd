@@ -7,10 +7,11 @@ use std::{
     fs::File,
     io::Read,
     iter::FromIterator,
-    os::unix::io::{FromRawFd, RawFd},
+    os::unix::io::{AsRawFd, FromRawFd, RawFd},
     path::{Path, PathBuf},
 };
 
+use nix::poll::{poll, PollFd, PollFlags};
 use regex::Regex;
 
 use devicemapper::Bytes;
@@ -105,14 +106,18 @@ pub fn set_key_shared(key_fd: RawFd) -> StratisResult<SizedKeyMemory> {
 
     let bytes_read = key_file.read(memory.as_mut())?;
 
-    if bytes_read == MAX_STRATIS_PASS_SIZE && key_file.bytes().next().is_some() {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!(
-                "Provided key exceeded maximum allow length of {}",
-                Bytes(MAX_STRATIS_PASS_SIZE as u64)
-            ),
-        ));
+    if bytes_read == MAX_STRATIS_PASS_SIZE {
+        let mut pollers = [PollFd::new(key_file.as_raw_fd(), PollFlags::POLLIN)];
+        let num_events = poll(&mut pollers, 0)?;
+        if num_events > 0 {
+            return Err(StratisError::Engine(
+                ErrorEnum::Invalid,
+                format!(
+                    "Provided key exceeded maximum allow length of {}",
+                    Bytes(MAX_STRATIS_PASS_SIZE as u64)
+                ),
+            ));
+        }
     }
 
     let sized_memory = SizedKeyMemory::new(memory, bytes_read);

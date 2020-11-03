@@ -61,12 +61,12 @@ pub fn create_pool_shared(m: &MethodInfo<MTFn<TData>, TData>, has_key_desc: bool
     let object_path = m.path.get_name();
     let dbus_context = m.tree.get_data();
     let mut engine = dbus_context.engine.borrow_mut();
-    let result = engine.create_pool(
+    let result = pool_op_logging!("preparing to create pool with name {}", name; "pool with name {}, {}", name; engine.create_pool(
         name,
         &devs.map(|x| Path::new(x)).collect::<Vec<&Path>>(),
         tuple_to_option(redundancy_tuple),
         key_desc,
-    );
+    ));
 
     let msg = match result {
         Ok(pool_uuid_action) => {

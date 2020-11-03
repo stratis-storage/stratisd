@@ -406,8 +406,8 @@ impl CryptHandle {
             Err(e) => return Err(e),
         };
 
-        let identifiers = CryptHandle::identifiers_from_metadata(&mut device)?;
-        let key_description = CryptHandle::key_desc_from_metadata(&mut device)?;
+        let identifiers = identifiers_from_metadata(&mut device)?;
+        let key_description = key_desc_from_metadata(&mut device)?;
         let key_description = match KeyDescription::from_system_key_desc(&key_description) {
             Some(Ok(description)) => description,
             _ => {
@@ -418,7 +418,7 @@ impl CryptHandle {
                 )));
             }
         };
-        let name = CryptHandle::name_from_metadata(&mut device)?;
+        let name = name_from_metadata(&mut device)?;
         Ok(Some(CryptHandle {
             device,
             physical_path: physical_path.to_owned(),
@@ -459,69 +459,6 @@ impl CryptHandle {
     /// Get the key description for a given encrypted device.
     pub fn key_description(&self) -> &KeyDescription {
         &self.key_description
-    }
-
-    /// Query the Stratis metadata for the device activation name.
-    fn name_from_metadata(device: &mut CryptDevice) -> Result<String> {
-        let json = log_on_failure!(
-            device.token_handle().json_get(STRATIS_TOKEN_ID),
-            "Failed to get Stratis JSON token from LUKS2 metadata"
-        );
-        let name = log_on_failure!(
-            json.get(STRATIS_TOKEN_DEVNAME_KEY)
-                .and_then(|type_val| type_val.as_str())
-                .map(|type_str| type_str.to_string())
-                .ok_or_else(|| {
-                    LibcryptErr::Other(
-                        "Malformed or missing JSON value for activation_name".to_string(),
-                    )
-                }),
-            "Could not get value for key activation_name from Stratis JSON token"
-        );
-        Ok(name)
-    }
-
-    /// Query the Stratis metadata for the key description used to unlock the
-    /// physical device.
-    fn key_desc_from_metadata(device: &mut CryptDevice) -> Result<String> {
-        let key_desc = log_on_failure!(
-            device.token_handle().luks2_keyring_get(LUKS2_TOKEN_ID),
-            "Failed to get key description from LUKS2 keyring metadata"
-        );
-        Ok(key_desc)
-    }
-
-    /// Query the Stratis metadata for the device identifiers.
-    fn identifiers_from_metadata(device: &mut CryptDevice) -> Result<StratisIdentifiers> {
-        let json = log_on_failure!(
-            device.token_handle().json_get(STRATIS_TOKEN_ID),
-            "Failed to get Stratis JSON token from LUKS2 metadata"
-        );
-        let pool_uuid = log_on_failure!(
-            json.get(STRATIS_TOKEN_POOL_UUID_KEY)
-                .and_then(|type_val| type_val.as_str())
-                .and_then(|type_str| PoolUuid::parse_str(type_str).ok())
-                .ok_or_else(|| {
-                    LibcryptErr::Other(
-                        "Malformed or missing JSON value for activation_name".to_string(),
-                    )
-                }),
-            "Could not get value for key {} from Stratis JSON token",
-            STRATIS_TOKEN_POOL_UUID_KEY
-        );
-        let dev_uuid = log_on_failure!(
-            json.get(STRATIS_TOKEN_DEV_UUID_KEY)
-                .and_then(|type_val| type_val.as_str())
-                .and_then(|type_str| DevUuid::parse_str(type_str).ok())
-                .ok_or_else(|| {
-                    LibcryptErr::Other(
-                        "Malformed or missing JSON value for activation_name".to_string(),
-                    )
-                }),
-            "Could not get value for key {} from Stratis JSON token",
-            STRATIS_TOKEN_DEV_UUID_KEY
-        );
-        Ok(StratisIdentifiers::new(pool_uuid, dev_uuid))
     }
 
     /// Activate encrypted Stratis device using the name stored in the
@@ -852,6 +789,69 @@ fn read_key(key_description: &KeyDescription) -> Result<Option<SizedKeyMemory>> 
     read_key_result
         .map(|opt| opt.map(|(_, mem)| mem))
         .map_err(|e| LibcryptErr::Other(e.to_string()))
+}
+
+/// Query the Stratis metadata for the device activation name.
+fn name_from_metadata(device: &mut CryptDevice) -> Result<String> {
+    let json = log_on_failure!(
+        device.token_handle().json_get(STRATIS_TOKEN_ID),
+        "Failed to get Stratis JSON token from LUKS2 metadata"
+    );
+    let name = log_on_failure!(
+        json.get(STRATIS_TOKEN_DEVNAME_KEY)
+            .and_then(|type_val| type_val.as_str())
+            .map(|type_str| type_str.to_string())
+            .ok_or_else(|| {
+                LibcryptErr::Other(
+                    "Malformed or missing JSON value for activation_name".to_string(),
+                )
+            }),
+        "Could not get value for key activation_name from Stratis JSON token"
+    );
+    Ok(name)
+}
+
+/// Query the Stratis metadata for the key description used to unlock the
+/// physical device.
+fn key_desc_from_metadata(device: &mut CryptDevice) -> Result<String> {
+    let key_desc = log_on_failure!(
+        device.token_handle().luks2_keyring_get(LUKS2_TOKEN_ID),
+        "Failed to get key description from LUKS2 keyring metadata"
+    );
+    Ok(key_desc)
+}
+
+/// Query the Stratis metadata for the device identifiers.
+fn identifiers_from_metadata(device: &mut CryptDevice) -> Result<StratisIdentifiers> {
+    let json = log_on_failure!(
+        device.token_handle().json_get(STRATIS_TOKEN_ID),
+        "Failed to get Stratis JSON token from LUKS2 metadata"
+    );
+    let pool_uuid = log_on_failure!(
+        json.get(STRATIS_TOKEN_POOL_UUID_KEY)
+            .and_then(|type_val| type_val.as_str())
+            .and_then(|type_str| PoolUuid::parse_str(type_str).ok())
+            .ok_or_else(|| {
+                LibcryptErr::Other(
+                    "Malformed or missing JSON value for activation_name".to_string(),
+                )
+            }),
+        "Could not get value for key {} from Stratis JSON token",
+        STRATIS_TOKEN_POOL_UUID_KEY
+    );
+    let dev_uuid = log_on_failure!(
+        json.get(STRATIS_TOKEN_DEV_UUID_KEY)
+            .and_then(|type_val| type_val.as_str())
+            .and_then(|type_str| DevUuid::parse_str(type_str).ok())
+            .ok_or_else(|| {
+                LibcryptErr::Other(
+                    "Malformed or missing JSON value for activation_name".to_string(),
+                )
+            }),
+        "Could not get value for key {} from Stratis JSON token",
+        STRATIS_TOKEN_DEV_UUID_KEY
+    );
+    Ok(StratisIdentifiers::new(pool_uuid, dev_uuid))
 }
 
 #[cfg(test)]

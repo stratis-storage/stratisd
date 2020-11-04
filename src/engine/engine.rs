@@ -166,12 +166,7 @@ pub trait Pool: Debug {
 
     /// Bind all devices in the given pool to a tang server for automated unlocking
     /// using clevis.
-    fn bind_clevis(
-        &self,
-        key_desc: &KeyDescription,
-        pin: &str,
-        clevis_info: &Value,
-    ) -> StratisResult<CreateAction<()>>;
+    fn bind_clevis(&self, pin: &str, clevis_info: &Value) -> StratisResult<CreateAction<()>>;
 
     /// Unbind all devices in the given pool from a tang server using clevis.
     fn unbind_clevis(&self) -> StratisResult<DeleteAction<()>>;

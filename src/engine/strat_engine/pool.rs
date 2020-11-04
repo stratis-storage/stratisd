@@ -439,12 +439,7 @@ impl Pool for StratPool {
         }
     }
 
-    fn bind_clevis(
-        &self,
-        key_desc: &KeyDescription,
-        pin: &str,
-        clevis_info: &Value,
-    ) -> StratisResult<CreateAction<()>> {
+    fn bind_clevis(&self, pin: &str, clevis_info: &Value) -> StratisResult<CreateAction<()>> {
         fn bind_clevis_loop<'a>(
             key_fs: &MemoryPrivateFilesystem,
             rollback_record: &'a mut Vec<CryptHandle>,
@@ -467,6 +462,14 @@ impl Pool for StratPool {
             Ok(())
         }
 
+        let key_description = match self.backstore.key_description()? {
+            Some(kd) => kd,
+            None => {
+                return Err(StratisError::Error(
+                    "Requested pool does not appear to be encrypted".to_string(),
+                ))
+            }
+        };
         let key_fs = MemoryPrivateFilesystem::new()?;
         let blockdevs = get_data_devs(self.blockdevs());
 
@@ -480,7 +483,7 @@ impl Pool for StratPool {
             &key_fs,
             &mut rollback_record,
             &mut crypt_handles,
-            key_desc,
+            key_description,
             pin,
             clevis_info,
         );

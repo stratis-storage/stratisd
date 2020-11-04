@@ -24,7 +24,7 @@ from dbus_python_client_gen import make_class
 
 from ._data import SPECS
 
-_POOL_SPEC = ET.fromstring(SPECS["org.storage.stratis2.pool.r1"])
+_POOL_SPEC = ET.fromstring(SPECS["org.storage.stratis2.pool.r3"])
 _FILESYSTEM_SPEC = ET.fromstring(SPECS["org.storage.stratis2.filesystem"])
 _BLOCKDEV_SPEC = ET.fromstring(SPECS["org.storage.stratis2.blockdev.r2"])
 
@@ -46,7 +46,7 @@ Report = make_class(
     "Report", ET.fromstring(SPECS["org.storage.stratis2.Report.r1"]), TIME_OUT
 )
 Manager = make_class(
-    "Manager", ET.fromstring(SPECS["org.storage.stratis2.Manager.r2"]), TIME_OUT
+    "Manager", ET.fromstring(SPECS["org.storage.stratis2.Manager.r3"]), TIME_OUT
 )
 FetchProperties = make_class(
     "FetchProperties",

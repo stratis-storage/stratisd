@@ -301,7 +301,8 @@ class UdevTest3(UdevTest):
 
         with OptionalKeyServiceContextManager(key_spec=key_spec):
             ((option, unlock_uuids), exit_code, _) = Manager.Methods.UnlockPool(
-                get_object(TOP_OBJECT), {"pool_uuid": pool_uuid}
+                get_object(TOP_OBJECT),
+                {"pool_uuid": pool_uuid, "unlock_method": "keyring"},
             )
             if key_spec is None:
                 self.assertNotEqual(exit_code, StratisdErrors.OK)
@@ -400,7 +401,8 @@ class UdevTest4(UdevTest):
                 self.assertEqual(len(get_pools()), 0)
 
             ((option, unlock_uuids), exit_code, _) = Manager.Methods.UnlockPool(
-                get_object(TOP_OBJECT), {"pool_uuid": pool_uuid}
+                get_object(TOP_OBJECT),
+                {"pool_uuid": pool_uuid, "unlock_method": "keyring"},
             )
             if key_spec is None:
                 self.assertNotEqual(exit_code, StratisdErrors.OK)
@@ -418,7 +420,8 @@ class UdevTest4(UdevTest):
             wait_for_udev(udev_wait_type, self._lb_mgr.device_files(tokens_up))
 
             ((option, unlock_uuids), exit_code, _) = Manager.Methods.UnlockPool(
-                get_object(TOP_OBJECT), {"pool_uuid": pool_uuid}
+                get_object(TOP_OBJECT),
+                {"pool_uuid": pool_uuid, "unlock_method": "keyring"},
             )
 
             if key_spec is None:
@@ -537,7 +540,8 @@ class UdevTest5(UdevTest):
 
             for pool_uuid in variant_pool_uuids:
                 ((option, _), exit_code, _) = Manager.Methods.UnlockPool(
-                    get_object(TOP_OBJECT), {"pool_uuid": pool_uuid}
+                    get_object(TOP_OBJECT),
+                    {"pool_uuid": pool_uuid, "unlock_method": "keyring"},
                 )
                 self.assertEqual(exit_code, StratisdErrors.OK)
                 self.assertEqual(option, True)

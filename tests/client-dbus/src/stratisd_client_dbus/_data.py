@@ -18,7 +18,7 @@ SPECS = {
   </interface>
 """,
     "org.storage.stratis2.Manager.r3": """
-<interface name="org.storage.stratis2.Manager.r2">
+<interface name="org.storage.stratis2.Manager.r3">
     <method name="ConfigureSimulator">
       <arg direction="in" name="denominator" type="u" />
       <arg direction="out" name="return_code" type="q" />
@@ -133,7 +133,7 @@ SPECS = {
   </interface>
 """,
     "org.storage.stratis2.pool.r3": """
-<interface name="org.storage.stratis2.pool.r1">
+<interface name="org.storage.stratis2.pool.r3">
     <method name="AddCacheDevs">
       <arg direction="in" name="devices" type="as" />
       <arg direction="out" name="results" type="(bao)" />

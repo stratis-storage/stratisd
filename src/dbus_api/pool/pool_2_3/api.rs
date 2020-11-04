@@ -11,7 +11,6 @@ use crate::dbus_api::{
 
 pub fn bind_clevis_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
     f.method("Bind", (), bind_clevis)
-        .in_arg(("key_desc", "s"))
         .in_arg(("pin", "s"))
         .in_arg(("json", "s"))
         // b: Indicates if new clevis bindings were added

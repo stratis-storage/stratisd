@@ -269,12 +269,7 @@ impl Pool for SimPool {
         Ok(SetCreateAction::new(ret_uuids))
     }
 
-    fn bind_clevis(
-        &self,
-        _key_desc: &KeyDescription,
-        _pin: &str,
-        _clevis_info: &Value,
-    ) -> StratisResult<CreateAction<()>> {
+    fn bind_clevis(&self, _pin: &str, _clevis_info: &Value) -> StratisResult<CreateAction<()>> {
         Ok(CreateAction::Identity)
     }
 

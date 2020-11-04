@@ -147,7 +147,6 @@ SPECS = {
       <arg direction="out" name="return_string" type="s" />
     </method>
     <method name="Bind">
-      <arg direction="in" name="key_desc" type="s" />
       <arg direction="in" name="pin" type="s" />
       <arg direction="in" name="json" type="s" />
       <arg direction="out" name="results" type="b" />

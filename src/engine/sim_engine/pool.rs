@@ -24,8 +24,9 @@ use crate::{
         sim_engine::{blockdev::SimDev, filesystem::SimFilesystem, randomization::Randomizer},
         structures::Table,
         types::{
-            BlockDevTier, CreateAction, DevUuid, FilesystemUuid, KeyDescription, MaybeDbusPath,
-            Name, PoolUuid, Redundancy, RenameAction, SetCreateAction, SetDeleteAction,
+            BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid, KeyDescription,
+            MaybeDbusPath, Name, PoolUuid, Redundancy, RenameAction, SetCreateAction,
+            SetDeleteAction,
         },
         EngineEvent,
     },
@@ -266,6 +267,14 @@ impl Pool for SimPool {
             .collect();
         the_vec.extend(filtered_device_pairs);
         Ok(SetCreateAction::new(ret_uuids))
+    }
+
+    fn bind_clevis(&self, _pin: &str, _clevis_info: &Value) -> StratisResult<CreateAction<()>> {
+        Ok(CreateAction::Identity)
+    }
+
+    fn unbind_clevis(&self) -> StratisResult<DeleteAction<()>> {
+        Ok(DeleteAction::Identity)
     }
 
     fn destroy_filesystems<'a>(

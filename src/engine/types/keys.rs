@@ -5,6 +5,7 @@
 use std::{
     convert::TryFrom,
     fmt::{self, Debug},
+    hash::Hash,
 };
 
 use libcryptsetup_rs::SafeMemHandle;
@@ -63,5 +64,13 @@ impl TryFrom<String> for KeyDescription {
         } else {
             Ok(KeyDescription(s))
         }
+    }
+}
+
+impl<'a> TryFrom<&'a String> for KeyDescription {
+    type Error = StratisError;
+
+    fn try_from(s: &String) -> StratisResult<KeyDescription> {
+        KeyDescription::try_from(s.to_owned())
     }
 }

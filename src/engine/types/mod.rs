@@ -29,6 +29,28 @@ pub type DevUuid = Uuid;
 pub type FilesystemUuid = Uuid;
 pub type PoolUuid = Uuid;
 
+/// Use Clevis or keyring to unlock LUKS volume.
+#[derive(Clone, Copy)]
+pub enum UnlockMethod {
+    Clevis,
+    Keyring,
+}
+
+impl<'a> TryFrom<&'a str> for UnlockMethod {
+    type Error = StratisError;
+
+    fn try_from(s: &str) -> StratisResult<UnlockMethod> {
+        match s {
+            "keyring" => Ok(UnlockMethod::Keyring),
+            "clevis" => Ok(UnlockMethod::Clevis),
+            _ => Err(StratisError::Error(format!(
+                "{} is an invalid unlock method",
+                s
+            ))),
+        }
+    }
+}
+
 /// See Design Doc section 10.2.1 for more details.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum BlockDevState {

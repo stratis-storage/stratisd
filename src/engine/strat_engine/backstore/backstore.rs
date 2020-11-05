@@ -7,6 +7,7 @@
 use std::{cmp, path::Path};
 
 use chrono::{DateTime, Utc};
+use itertools::Itertools;
 use serde_json::Value;
 
 use devicemapper::{CacheDev, Device, DmDevice, LinearDev, Sectors};
@@ -176,13 +177,13 @@ impl Backstore {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         mda_data_size: MDADataSize,
-        key_desc: Option<&KeyDescription>,
+        encryption_info: Option<(&KeyDescription, Option<(&str, &Value)>)>,
     ) -> StratisResult<Backstore> {
         let data_tier = DataTier::new(BlockDevMgr::initialize(
             pool_uuid,
             paths,
             mda_data_size,
-            key_desc,
+            encryption_info,
         )?);
 
         Ok(Backstore {
@@ -432,6 +433,31 @@ impl Backstore {
         } else {
             self.next += internal_request;
             Ok(Some((self.next - internal_request, internal_request)))
+        }
+    }
+
+    /// Get the key description for all data devices in the given backstore.
+    ///
+    /// * Ok(Some(_)) is returned when the pool is encrypted and the metadata is
+    /// consistent.
+    /// * Ok(None) is returned when the pool is unencrypted.
+    /// * Err(_) is returned when the pool is encrypted and there is an inconsistency
+    /// in the metadata.
+    pub fn key_description(&self) -> StratisResult<Option<&KeyDescription>> {
+        let mut key_descs = self
+            .datadevs()
+            .into_iter()
+            .map(|(_, bd)| bd.key_description())
+            .unique()
+            .collect::<Vec<_>>();
+        if key_descs.len() > 1 {
+            Err(StratisError::Error(format!(
+                "Inconsistency detected in the pool encryption metadata; stratisd \
+                found the following key descriptions: {:?}",
+                key_descs,
+            )))
+        } else {
+            Ok(key_descs.pop().and_then(|kd| kd))
         }
     }
 

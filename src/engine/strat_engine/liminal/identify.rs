@@ -476,7 +476,7 @@ mod tests {
                 process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?,
                 pool_uuid,
                 MDADataSize::default(),
-                Some(key_description),
+                Some((key_description, None)),
             )?;
 
             for devnode in devices.iter().map(|sbd| sbd.devnode()) {

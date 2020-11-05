@@ -10,6 +10,7 @@ pub const STRATIS_BASE_SERVICE: &str = "org.storage.stratis2";
 pub const MANAGER_INTERFACE_NAME: &str = "org.storage.stratis2.Manager";
 pub const MANAGER_INTERFACE_NAME_2_1: &str = "org.storage.stratis2.Manager.r1";
 pub const MANAGER_INTERFACE_NAME_2_2: &str = "org.storage.stratis2.Manager.r2";
+pub const MANAGER_INTERFACE_NAME_2_3: &str = "org.storage.stratis2.Manager.r3";
 pub const REPORT_INTERFACE_NAME_2_1: &str = "org.storage.stratis2.Report.r1";
 
 pub const PROPERTY_FETCH_INTERFACE_NAME: &str = "org.storage.stratis2.FetchProperties";
@@ -23,6 +24,7 @@ pub const LOCKED_POOLS: &str = "LockedPools";
 
 pub const POOL_INTERFACE_NAME: &str = "org.storage.stratis2.pool";
 pub const POOL_INTERFACE_NAME_2_1: &str = "org.storage.stratis2.pool.r1";
+pub const POOL_INTERFACE_NAME_2_3: &str = "org.storage.stratis2.pool.r3";
 pub const POOL_NAME_PROP: &str = "Name";
 pub const POOL_UUID_PROP: &str = "Uuid";
 pub const POOL_HAS_CACHE_PROP: &str = "HasCache";
@@ -67,10 +69,14 @@ pub fn fetch_properties_interfaces() -> Vec<String> {
 /// Get a list of all the standard pool interfaces; i.e., all the revisions of
 /// org.storage.stratis2.pool.
 pub fn standard_pool_interfaces() -> Vec<String> {
-    [POOL_INTERFACE_NAME, POOL_INTERFACE_NAME_2_1]
-        .iter()
-        .map(|s| (*s).to_string())
-        .collect()
+    [
+        POOL_INTERFACE_NAME,
+        POOL_INTERFACE_NAME_2_1,
+        POOL_INTERFACE_NAME_2_3,
+    ]
+    .iter()
+    .map(|s| (*s).to_string())
+    .collect()
 }
 
 /// Get a list of all the standard filesystem interfaces; i.e., all the

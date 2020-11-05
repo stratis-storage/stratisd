@@ -8,7 +8,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use serde_json::Value;
+use base64::{decode, encode_config, CharacterSet, Config};
+use serde_json::{Map, Value};
+use sha1::{Digest, Sha1};
 
 use devicemapper::Sectors;
 use libcryptsetup_rs::{
@@ -17,8 +19,13 @@ use libcryptsetup_rs::{
 };
 
 use crate::engine::{
-    strat_engine::{keys, metadata::StratisIdentifiers, names::format_crypt_name},
-    types::{KeyDescription, SizedKeyMemory},
+    strat_engine::{
+        cmd::{clevis_luks_bind, clevis_luks_unbind, clevis_luks_unlock},
+        keys,
+        metadata::StratisIdentifiers,
+        names::format_crypt_name,
+    },
+    types::{KeyDescription, SizedKeyMemory, UnlockMethod},
     DevUuid, PoolUuid,
 };
 
@@ -33,6 +40,13 @@ const STRATIS_TOKEN_DEV_UUID_KEY: &str = "device_uuid";
 
 const STRATIS_TOKEN_ID: c_uint = 0;
 const LUKS2_TOKEN_ID: c_uint = 1;
+/// NOTE: Only token IDs 0 and 1 will be used at the time of clevis bindings
+/// so until support for more clevis operations are added, this can be reliably
+/// depended upon as cryptsetup token import will use the next available token ID
+/// which, in this case, is 2.
+/// FIXME: Specify token ID when clevis adds support so that we can rely on this
+/// deterministically as we add other tokens.
+const CLEVIS_LUKS_TOKEN_ID: c_uint = 2;
 
 const LUKS2_TOKEN_TYPE: &str = "luks2-keyring";
 const STRATIS_TOKEN_TYPE: &str = "stratis";
@@ -271,7 +285,7 @@ impl CryptInitializer {
             "Failed to create the Stratis token"
         );
 
-        activate_and_check_device_path(device, key_description, &activation_name)
+        activate_and_check_device_path(device, key_description, &activation_name).map(|_| ())
     }
 
     /// Lay down properly configured LUKS2 metadata on a new physical device
@@ -461,14 +475,76 @@ impl CryptHandle {
         &self.key_description
     }
 
+    /// Get the keyslot associated with the given token ID.
+    pub fn keyslots(&mut self, token_id: c_uint) -> Result<Option<Vec<c_uint>>> {
+        get_keyslot_number(&mut self.device, token_id)
+    }
+
+    /// Get info for the clevis binding.
+    pub fn clevis_info(&mut self) -> Result<Option<(String, Value)>> {
+        let json = match self
+            .device
+            .token_handle()
+            .json_get(CLEVIS_LUKS_TOKEN_ID)
+            .ok()
+        {
+            Some(j) => j,
+            None => return Ok(None),
+        };
+        let json_b64 = match json
+            .get("jwe")
+            .and_then(|map| map.get("protected"))
+            .and_then(|string| string.as_str())
+        {
+            Some(s) => s.to_owned(),
+            None => return Ok(None),
+        };
+        let json_bytes = decode(json_b64).map_err(|e| LibcryptErr::Other(e.to_string()))?;
+
+        let subjson: Value = serde_json::from_slice(json_bytes.as_slice())
+            .map_err(|e| LibcryptErr::Other(e.to_string()))?;
+
+        pin_dispatch(&subjson).map(Some)
+    }
+
     /// Activate encrypted Stratis device using the name stored in the
     /// Stratis token
-    pub fn activate(&mut self) -> Result<()> {
-        activate_and_check_device_path(
-            &mut self.device,
-            &self.key_description,
-            &self.name.to_owned(),
-        )
+    pub fn activate(&mut self, unlock_method: UnlockMethod) -> Result<()> {
+        match unlock_method {
+            UnlockMethod::Keyring => activate_and_check_device_path(
+                &mut self.device,
+                &self.key_description,
+                &self.name.to_owned(),
+            ),
+            UnlockMethod::Clevis => clevis_luks_unlock(&self.physical_path, &self.name)
+                .map_err(|e| LibcryptErr::Other(e.to_string())),
+        }
+    }
+
+    /// Bind the given device to a tang server using clevis.
+    pub fn clevis_bind(&mut self, keyfile_path: &Path, pin: &str, json: &Value) -> Result<()> {
+        clevis_luks_bind(&self.physical_path, keyfile_path, pin, json)
+            .map_err(|e| LibcryptErr::Other(e.to_string()))
+    }
+
+    /// Bind the given device to a tang server using clevis.
+    pub fn clevis_unbind(&mut self) -> Result<()> {
+        let keyslots = self.keyslots(CLEVIS_LUKS_TOKEN_ID)?.ok_or_else(|| {
+            LibcryptErr::Other(format!(
+                "Token slot {} appears to be empty; could not determine keyslots",
+                CLEVIS_LUKS_TOKEN_ID,
+            ))
+        })?;
+        for keyslot in keyslots {
+            if let Err(e) = clevis_luks_unbind(&self.physical_path, keyslot) {
+                warn!(
+                    "Failed to unbind device {} from Clevis: {}",
+                    self.physical_path.display(),
+                    e,
+                );
+            }
+        }
+        Ok(())
     }
 
     /// Deactivate the device referenced by the current device handle.
@@ -494,6 +570,138 @@ impl CryptHandle {
             "Failed to get device size for encrypted logical device"
         );
         Ok(Sectors(active_device.size))
+    }
+}
+
+/// Generate tang JSON
+fn tang_dispatch(json: &Value) -> Result<Value> {
+    let object = json
+        .get("clevis")
+        .and_then(|map| map.get("tang"))
+        .and_then(|val| val.as_object())
+        .ok_or_else(|| {
+            LibcryptErr::Other("Expected an object for value of clevis.tang".to_string())
+        })?;
+    let url = object.get("url").and_then(|s| s.as_str()).ok_or_else(|| {
+        LibcryptErr::Other("Expected a string for value of clevis.tang.url".to_string())
+    })?;
+
+    let keys = object
+        .get("adv")
+        .and_then(|adv| adv.get("keys"))
+        .and_then(|keys| keys.as_array())
+        .ok_or_else(|| {
+            LibcryptErr::Other("Expected an array for value of clevis.tang.adv.keys".to_string())
+        })?;
+    let mut key = keys
+        .iter()
+        .cloned()
+        .find(|obj| obj.get("key_ops") == Some(&Value::Array(vec![Value::from("verify")])))
+        .ok_or_else(|| {
+            LibcryptErr::Other("Verification key not found in clevis metadata".to_string())
+        })?;
+
+    let map = if let Some(m) = key.as_object_mut() {
+        m
+    } else {
+        return Err(LibcryptErr::Other(
+            "Key value is not in JSON object format".to_string(),
+        ));
+    };
+    map.remove("key_ops");
+    map.remove("alg");
+
+    let thp = key.to_string();
+    let mut hasher = Sha1::new();
+    hasher.input(thp.as_bytes());
+    let array = hasher.result();
+    let thp = encode_config(array, Config::new(CharacterSet::UrlSafe, false));
+
+    Ok(json!({"url": url.to_owned(), "thp": thp}))
+}
+
+/// Generate Sharmir secret sharing JSON
+fn sss_dispatch(json: &Value) -> Result<Value> {
+    let object = json
+        .get("clevis")
+        .and_then(|map| map.get("sss"))
+        .and_then(|val| val.as_object())
+        .ok_or_else(|| {
+            LibcryptErr::Other("Expected an object for value of clevis.sss".to_string())
+        })?;
+
+    let threshold = object
+        .get("t")
+        .and_then(|val| val.as_u64())
+        .ok_or_else(|| {
+            LibcryptErr::Other("Expected an int for value of clevis.sss.t".to_string())
+        })?;
+    let jwes = object
+        .get("jwe")
+        .and_then(|val| val.as_array())
+        .ok_or_else(|| {
+            LibcryptErr::Other("Expected an array for value of clevis.sss.jwe".to_string())
+        })?;
+
+    let mut sss_map = Map::new();
+    sss_map.insert("t".to_string(), Value::from(threshold));
+
+    let mut pin_map = Map::new();
+    for jwe in jwes {
+        if let Value::String(ref s) = jwe {
+            // NOTE: Workaround for the on-disk format for Shamir secret sharing
+            // as written by clevis. The base64 encoded string delimits the end
+            // of the JSON blob with a period.
+            let json_s = s.splitn(2, '.').next().ok_or_else(|| {
+                LibcryptErr::Other(format!(
+                    "Splitting string {} on character '.' did not result in \
+                    at least one string segment.",
+                    s,
+                ))
+            })?;
+
+            let json_bytes = decode(json_s).map_err(|e| LibcryptErr::Other(e.to_string()))?;
+            let value: Value = serde_json::from_slice(&json_bytes)
+                .map_err(|e| LibcryptErr::Other(e.to_string()))?;
+            let (pin, value) = pin_dispatch(&value)?;
+            match pin_map.get_mut(&pin) {
+                Some(Value::Array(ref mut vec)) => vec.push(value),
+                None => {
+                    pin_map.insert(pin, Value::from(vec![value]));
+                }
+                _ => {
+                    return Err(LibcryptErr::Other(format!(
+                        "There appears to be a data type that is not an array in \
+                    the data structure being used to construct the sss JSON config
+                    under pin name {}",
+                        pin,
+                    )))
+                }
+            };
+        } else {
+            return Err(LibcryptErr::Other(
+                "Expected a string for each value in the array at clevis.sss.jwe".to_string(),
+            ));
+        }
+    }
+    sss_map.insert("pins".to_string(), Value::from(pin_map));
+
+    Ok(Value::from(sss_map))
+}
+
+/// Match pin for existing JWE
+fn pin_dispatch(decoded_jwe: &Value) -> Result<(String, Value)> {
+    let pin_value = decoded_jwe
+        .get("clevis")
+        .and_then(|map| map.get("pin"))
+        .ok_or_else(|| {
+            LibcryptErr::Other("Key .clevis.pin not found in clevis JSON token".to_string())
+        })?;
+    match pin_value.as_str() {
+        Some("tang") => tang_dispatch(decoded_jwe).map(|val| ("tang".to_owned(), val)),
+        Some("sss") => sss_dispatch(decoded_jwe).map(|val| ("sss".to_owned(), val)),
+        Some("tpm2") => Ok(("tpm2".to_owned(), json!({}))),
+        _ => Err(LibcryptErr::Other("Unsupported clevis pin".to_string())),
     }
 }
 
@@ -606,40 +814,41 @@ fn activate_and_check_device_path(
 /// Get a list of all keyslots associated with the LUKS2 token.
 /// This is necessary because attempting to destroy an uninitialized
 /// keyslot will result in an error.
-fn get_keyslot_number(device: &mut CryptDevice) -> Result<Vec<c_uint>> {
-    let json = log_on_failure!(
-        device.token_handle().json_get(LUKS2_TOKEN_ID),
-        "Failed to get the JSON LUKS2 keyring token from the assigned keyslot"
-    );
+fn get_keyslot_number(device: &mut CryptDevice, token_id: c_uint) -> Result<Option<Vec<c_uint>>> {
+    let json = match device.token_handle().json_get(token_id) {
+        Ok(j) => j,
+        Err(_) => return Ok(None),
+    };
     let vec = json
         .get(TOKEN_KEYSLOTS_KEY)
         .and_then(|k| k.as_array())
         .ok_or_else(|| LibcryptErr::Other("keyslots value was malformed".to_string()))?;
-    Ok(vec
-        .iter()
-        .filter_map(|int_val| {
-            let as_str = int_val.as_str();
-            if as_str.is_none() {
-                warn!(
-                    "Discarding invalid value in LUKS2 token keyslot array: {}",
-                    int_val
-                );
-            }
-            let s = match as_str {
-                Some(s) => s,
-                None => return None,
-            };
-            let as_c_uint = s.parse::<c_uint>();
-            if let Err(ref e) = as_c_uint {
-                warn!(
-                    "Discarding invalid value in LUKS2 token keyslot array: {}; \
+    Ok(Some(
+        vec.iter()
+            .filter_map(|int_val| {
+                let as_str = int_val.as_str();
+                if as_str.is_none() {
+                    warn!(
+                        "Discarding invalid value in LUKS2 token keyslot array: {}",
+                        int_val
+                    );
+                }
+                let s = match as_str {
+                    Some(s) => s,
+                    None => return None,
+                };
+                let as_c_uint = s.parse::<c_uint>();
+                if let Err(ref e) = as_c_uint {
+                    warn!(
+                        "Discarding invalid value in LUKS2 token keyslot array: {}; \
                     failed to convert it to an integer: {}",
-                    s, e,
-                );
-            }
-            as_c_uint.ok()
-        })
-        .collect::<Vec<_>>())
+                        s, e,
+                    );
+                }
+                as_c_uint.ok()
+            })
+            .collect::<Vec<_>>(),
+    ))
 }
 
 /// Deactivate an encrypted Stratis device but do not wipe it. This is not
@@ -678,9 +887,9 @@ fn ceiling_sector_size_alignment(bytes: u64) -> u64 {
 /// This method is idempotent and leaves the disk as wiped.
 fn ensure_wiped(device: &mut CryptDevice, physical_path: &Path, name: &str) -> Result<()> {
     ensure_inactive(device, name)?;
-    let keyslot_number = get_keyslot_number(device);
+    let keyslot_number = get_keyslot_number(device, LUKS2_TOKEN_ID);
     match keyslot_number {
-        Ok(nums) => {
+        Ok(Some(nums)) => {
             for i in nums.iter() {
                 log_on_failure!(
                     device.keyslot_handle().destroy(*i),
@@ -688,6 +897,12 @@ fn ensure_wiped(device: &mut CryptDevice, physical_path: &Path, name: &str) -> R
                     i
                 );
             }
+        }
+        Ok(None) => {
+            info!(
+                "Token ID for keyslots to be wiped appears to be empty; the keyslot \
+                area will still be wiped in the next step."
+            );
         }
         Err(e) => {
             info!(
@@ -1126,7 +1341,7 @@ mod tests {
 
             handle.deactivate()?;
 
-            handle.activate()?;
+            handle.activate(UnlockMethod::Keyring)?;
             handle.wipe()?;
 
             Ok(())

@@ -19,7 +19,7 @@ use crate::{
     engine::types::{
         BlockDevPath, BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid,
         KeyDescription, MappingCreateAction, MaybeDbusPath, Name, PoolUuid, RenameAction,
-        ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction,
+        ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, UnlockMethod,
     },
     stratis::StratisResult,
 };
@@ -165,6 +165,13 @@ pub trait Pool: Debug {
         tier: BlockDevTier,
     ) -> StratisResult<SetCreateAction<DevUuid>>;
 
+    /// Bind all devices in the given pool to a tang server for automated unlocking
+    /// using clevis.
+    fn bind_clevis(&self, pin: &str, clevis_info: &Value) -> StratisResult<CreateAction<()>>;
+
+    /// Unbind all devices in the given pool from a tang server using clevis.
+    fn unbind_clevis(&self) -> StratisResult<DeleteAction<()>>;
+
     /// Ensures that all designated filesystems are gone from pool.
     /// Returns a list of the filesystems found, and actually destroyed.
     /// This list will be a subset of the uuids passed in fs_uuids.
@@ -302,7 +309,11 @@ pub trait Engine: Debug + Report {
     /// in the unlocked state. If some devices are able to be unlocked
     /// and some fail, an error is returned as all devices should be able to
     /// be unlocked if the necessary key is in the keyring.
-    fn unlock_pool(&mut self, uuid: PoolUuid) -> StratisResult<SetUnlockAction<DevUuid>>;
+    fn unlock_pool(
+        &mut self,
+        uuid: PoolUuid,
+        unlock_method: UnlockMethod,
+    ) -> StratisResult<SetUnlockAction<DevUuid>>;
 
     /// Find the pool designated by uuid.
     fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)>;

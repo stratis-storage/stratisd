@@ -21,7 +21,7 @@ use crate::{
         structures::Table,
         types::{
             CreateAction, DeleteAction, DevUuid, KeyDescription, Name, PoolUuid, RenameAction,
-            ReportType, SetUnlockAction,
+            ReportType, SetUnlockAction, UnlockMethod,
         },
         EngineEvent,
     },
@@ -178,7 +178,11 @@ impl Engine for SimEngine {
         Ok(RenameAction::Renamed(uuid))
     }
 
-    fn unlock_pool(&mut self, _pool_uuid: PoolUuid) -> StratisResult<SetUnlockAction<DevUuid>> {
+    fn unlock_pool(
+        &mut self,
+        _pool_uuid: PoolUuid,
+        _unlock_method: UnlockMethod,
+    ) -> StratisResult<SetUnlockAction<DevUuid>> {
         Ok(SetUnlockAction::empty())
     }
 

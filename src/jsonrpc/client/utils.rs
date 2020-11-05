@@ -12,8 +12,17 @@ use nix::sys::{
 #[macro_export]
 macro_rules! do_request {
     ($fn:path $(, $args:expr)*) => {{
-        match async_std::task::block_on(async {
-            let transport = jsonrpsee::transport::http::HttpTransportClient::new($crate::jsonrpc::consts::RPC_CONNADDR);
+        let runtime = tokio::runtime::Runtime::new()?;
+        match runtime.block_on(async {
+            let transport = $crate::jsonrpc::transport::UdsTransportClient::connect(
+                $crate::jsonrpc::consts::RPC_CONNADDR
+            )
+            .await
+            .map_err(|e| {
+                jsonrpsee::raw::RawClientError::Inner(
+                    Box::new(e) as Box<dyn std::error::Error + Send>
+                )
+            })?;
             let mut client = jsonrpsee::raw::RawClient::new(transport);
             $fn(&mut client $(, $args)*).await
         }) {

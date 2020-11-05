@@ -6,7 +6,6 @@ use crate::jsonrpc::consts::{SOCKFD_ADDR, SOCKFD_ADDR_DIR};
 
 use std::{
     fs::{create_dir_all, remove_file},
-    net::SocketAddr,
     os::unix::io::AsRawFd,
 };
 
@@ -14,7 +13,6 @@ use futures_util::stream::StreamExt;
 use jsonrpsee::{
     common::{Error, ErrorCode},
     raw::RawServer,
-    transport::http::HttpTransportServer,
 };
 use tokio::{
     runtime::Runtime,
@@ -31,17 +29,13 @@ use crate::{
             key, pool, report, udev,
             utils::{FdRef, UnixListenerStream},
         },
+        transport::UdsTransportServer,
     },
 };
 
 async fn server_loop(mut recv: Receiver<FdRef>) -> Result<(), String> {
-    let transport = HttpTransportServer::bind(
-        &RPC_SOCKADDR
-            .parse::<SocketAddr>()
-            .expect("Valid socket address"),
-    )
-    .await
-    .map_err(|e| e.to_string())?;
+    let _ = remove_file(RPC_SOCKADDR);
+    let transport = UdsTransportServer::bind(RPC_SOCKADDR).map_err(|e| e.to_string())?;
     let mut engine = StratEngine::initialize().map_err(|e| e.to_string())?;
     let mut server = RawServer::new(transport);
     loop {

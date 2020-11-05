@@ -61,7 +61,7 @@ async-std = "1.6"
 
 [dependencies.tokio]
 version = "0.3.2"
-features = ["stream", "sync", "macros", "rt", "rt-multi-thread", "signal", "net"]
+features = ["stream", "sync", "macros", "rt", "rt-multi-thread", "signal", "net", "io-util"]
 
 [dependencies.dbus]
 version = "0.8.4"

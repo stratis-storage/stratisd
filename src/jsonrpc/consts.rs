@@ -7,7 +7,7 @@ pub const OP_ERR: u16 = 1;
 
 pub const OP_OK_STR: &str = "OK";
 
-pub const RPC_SOCKADDR: &str = "127.0.0.1:8080";
-pub const RPC_CONNADDR: &str = "http://localhost:8080";
+pub const RPC_SOCKADDR: &str = "/run/stratisd/stratisd-min-jsonrpc";
+pub const RPC_CONNADDR: &str = "/run/stratisd/stratisd-min-jsonrpc";
 pub const SOCKFD_ADDR_DIR: &str = "/run/stratisd";
 pub const SOCKFD_ADDR: &str = "/run/stratisd/stratisd-min-fd";

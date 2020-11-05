@@ -613,8 +613,8 @@ fn tang_dispatch(json: &Value) -> Result<Value> {
 
     let thp = key.to_string();
     let mut hasher = Sha1::new();
-    hasher.input(thp.as_bytes());
-    let array = hasher.result();
+    hasher.update(thp.as_bytes());
+    let array = hasher.finalize();
     let thp = encode_config(array, Config::new(CharacterSet::UrlSafe, false));
 
     Ok(json!({"url": url.to_owned(), "thp": thp}))

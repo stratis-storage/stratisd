@@ -172,6 +172,9 @@ impl Backstore {
     /// Immediately after initialization a backstore has no cap device, since
     /// no segments are allocated in the data tier.
     ///
+    /// When the backstore is initialized it may be unencrypted, or it may
+    /// be encrypted only with a kernel keyring and without Clevis information.
+    ///
     /// WARNING: metadata changing event
     pub fn initialize(
         pool_uuid: PoolUuid,

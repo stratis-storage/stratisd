@@ -44,7 +44,7 @@ itertools = "0.9"
 libcryptsetup-rs = "0.4"
 semver = "0.11"
 termios = "0.3"
-regex = "1.3"
+regex = "1"
 base64 = "0.13"
 sha-1 = "0.8"
 

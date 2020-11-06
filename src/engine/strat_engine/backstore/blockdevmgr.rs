@@ -181,7 +181,7 @@ impl BlockDevMgr {
                     if c != cn {
                         Err(StratisError::Error(
                             "Clevis metadata is inconsistent; not all \
-                            devices are using the same tang server"
+                            devices are using the same Clevis configuration"
                                 .to_string(),
                         ))
                     } else {
@@ -459,7 +459,6 @@ impl BlockDevMgr {
         self.key_desc.is_some()
     }
 
-
     #[cfg(test)]
     fn invariant(&self) {
         let pool_uuids = self
@@ -469,7 +468,6 @@ impl BlockDevMgr {
             .collect::<HashSet<_>>();
         assert!(pool_uuids.len() == 1);
     }
-
 }
 
 impl Recordable<Vec<BaseBlockDevSave>> for BlockDevMgr {

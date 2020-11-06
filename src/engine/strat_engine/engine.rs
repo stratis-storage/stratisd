@@ -52,6 +52,7 @@ pub struct StratEngine {
     // TODO: Remove this code when Clevis supports reading keys from the
     // kernel keyring.
     // In memory filesystem for passing keys to Clevis.
+    // See GitHub issue: https://github.com/stratis-storage/project/issues/212.
     key_fs: MemoryFilesystem,
 }
 

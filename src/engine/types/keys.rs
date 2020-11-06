@@ -5,7 +5,6 @@
 use std::{
     convert::TryFrom,
     fmt::{self, Debug},
-    hash::Hash,
 };
 
 use libcryptsetup_rs::SafeMemHandle;

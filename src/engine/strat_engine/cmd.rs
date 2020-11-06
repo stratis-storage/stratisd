@@ -189,7 +189,7 @@ pub fn udev_settle() -> StratisResult<()> {
     execute_cmd(Command::new(get_executable(UDEVADM).as_os_str()).arg("settle"))
 }
 
-/// Bind a LUKS device to a tang server using clevis.
+/// Bind a LUKS device using clevis.
 pub fn clevis_luks_bind(
     dev_path: &Path,
     keyfile_path: &Path,
@@ -209,7 +209,7 @@ pub fn clevis_luks_bind(
     )
 }
 
-/// Unbind a LUKS device from a tang server using clevis.
+/// Unbind a LUKS device using clevis.
 pub fn clevis_luks_unbind(dev_path: &Path, keyslot: libc::c_uint) -> StratisResult<()> {
     execute_cmd(
         Command::new(CLEVIS)

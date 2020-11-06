@@ -171,7 +171,7 @@ impl BlockDevMgr {
     ///
     /// Returns Ok(Some(_)) containing the tang URL if clevis is enabled.
     /// Returns Ok(None) if clevis is not enabled.
-    fn clevis_enabled(&self, pool_uuid: PoolUuid) -> StratisResult<Option<(String, Value)>> {
+    fn clevis_enabled(&self) -> StratisResult<Option<(String, Value)>> {
         fn match_infos(
             clevis_info: Option<(String, Value)>,
             clevis_info_next: Option<(String, Value)>,
@@ -205,21 +205,19 @@ impl BlockDevMgr {
 
         let mut clevis_info: Option<Option<(String, Value)>> = None;
         for bd in self.block_devs.iter() {
-            if bd.pool_uuid() == pool_uuid {
-                let physical_path = bd.devnode().physical_path();
-                if let Some(mut handle) = CryptHandle::setup(physical_path)? {
-                    let clevis_info_next = handle.clevis_info()?;
-                    if let Some(ci) = clevis_info {
-                        clevis_info = Some(match_infos(ci, clevis_info_next)?);
-                    } else {
-                        clevis_info = Some(clevis_info_next);
-                    }
+            let physical_path = bd.devnode().physical_path();
+            if let Some(mut handle) = CryptHandle::setup(physical_path)? {
+                let clevis_info_next = handle.clevis_info()?;
+                if let Some(ci) = clevis_info {
+                    clevis_info = Some(match_infos(ci, clevis_info_next)?);
                 } else {
-                    return Err(StratisError::Error(format!(
-                        "Device {} is not an encrypted Stratis device",
-                        physical_path.display(),
-                    )));
+                    clevis_info = Some(clevis_info_next);
                 }
+            } else {
+                return Err(StratisError::Error(format!(
+                    "Device {} is not an encrypted Stratis device",
+                    physical_path.display(),
+                )));
             }
         }
 
@@ -230,6 +228,16 @@ impl BlockDevMgr {
     /// Return the uuids of all blockdevs corresponding to paths that were
     /// added.
     pub fn add(&mut self, pool_uuid: PoolUuid, paths: &[&Path]) -> StratisResult<Vec<DevUuid>> {
+        let this_pool_uuid = self.block_devs.get(0).map(|bd| bd.pool_uuid());
+        if this_pool_uuid.is_some() && this_pool_uuid != Some(pool_uuid) {
+            return Err(StratisError::Engine(
+                ErrorEnum::Invalid,
+                format!("block devices being managed have pool UUID {} but new devices are to be added with pool UUID {}",
+                        this_pool_uuid.expect("guarded by if-expression").to_simple_ref(),
+                        pool_uuid)
+            ));
+        }
+
         let current_uuids = self
             .block_devs
             .iter()
@@ -248,7 +256,7 @@ impl BlockDevMgr {
             ));
         }
 
-        let clevis_info = self.clevis_enabled(pool_uuid)?;
+        let clevis_info = self.clevis_enabled()?;
         // FIXME: This is a bug. If new devices are added to a pool, and the
         // variable length metadata requires more than the minimum allocated,
         // then the necessary amount must be provided or the data can not be
@@ -450,6 +458,18 @@ impl BlockDevMgr {
     pub fn is_encrypted(&self) -> bool {
         self.key_desc.is_some()
     }
+
+
+    #[cfg(test)]
+    fn invariant(&self) {
+        let pool_uuids = self
+            .block_devs
+            .iter()
+            .map(|bd| bd.pool_uuid())
+            .collect::<HashSet<_>>();
+        assert!(pool_uuids.len() == 1);
+    }
+
 }
 
 impl Recordable<Vec<BaseBlockDevSave>> for BlockDevMgr {
@@ -648,6 +668,7 @@ mod tests {
         );
 
         let original_length = bd_mgr.block_devs.len();
+        assert_matches!(bd_mgr.add(uuid2, paths1), Err(_));
         assert_matches!(bd_mgr.add(uuid, paths1), Ok(_));
         assert_eq!(bd_mgr.block_devs.len(), original_length);
 
@@ -655,6 +676,8 @@ mod tests {
         cmd::udev_settle().unwrap();
 
         assert_matches!(bd_mgr.add(uuid, paths2), Err(_));
+
+        bd_mgr.invariant()
     }
 
     #[test]

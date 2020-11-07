@@ -469,6 +469,20 @@ impl BlockDevMgr {
             .map(|bd| bd.pool_uuid())
             .collect::<HashSet<_>>();
         assert!(pool_uuids.len() == 1);
+
+        let key_descriptions = self
+            .block_devs
+            .iter()
+            .filter_map(|bd| bd.key_description())
+            .collect::<Vec<_>>();
+        if key_descriptions.is_empty() {
+            assert_eq!(self.key_desc, None);
+        } else {
+            assert_eq!(key_descriptions.len(), self.block_devs.len());
+
+            let kd_set = key_descriptions.iter().collect::<HashSet<_>>();
+            assert!(kd_set.len() == 1);
+        }
     }
 }
 

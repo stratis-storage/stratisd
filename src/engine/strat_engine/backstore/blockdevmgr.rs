@@ -23,11 +23,12 @@ use crate::{
                 crypt::CryptHandle,
                 devices::{initialize_devices, process_and_verify_devices, wipe_blockdevs},
             },
+            keys::MemoryPrivateFilesystem,
             metadata::MDADataSize,
             names::KeyDescription,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
         },
-        types::{DevUuid, PoolUuid},
+        types::{CreateAction, DeleteAction, DevUuid, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -107,6 +108,43 @@ pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<TargetLine<LinearDevTargetParam
     }
 
     table
+}
+
+fn get_crypt_handles(blockdevs: &[StratBlockDev]) -> StratisResult<Vec<CryptHandle>> {
+    let mut handles = Vec::new();
+    for bd in blockdevs.iter() {
+        let path = bd.devnode().physical_path();
+        let crypt_handle_opt = CryptHandle::setup(path)?;
+        let crypt_handle = crypt_handle_opt.ok_or_else(|| {
+            StratisError::Error(format!(
+                "Device {} is not an encrypted device",
+                path.display(),
+            ))
+        })?;
+        handles.push(crypt_handle);
+    }
+    Ok(handles)
+}
+
+fn clevis_is_enabled(handles: &mut Vec<CryptHandle>) -> StratisResult<bool> {
+    let mut clevis_infos = HashSet::new();
+    for handle in handles.iter_mut() {
+        let clevis_info = handle.clevis_info()?;
+        if let Some((pin, info)) = clevis_info {
+            clevis_infos.insert(json!({ pin: info }).to_string());
+        }
+    }
+    if clevis_infos.is_empty() {
+        Ok(false)
+    } else if clevis_infos.len() == 1 {
+        Ok(true)
+    } else {
+        Err(StratisError::Error(
+            "Inconsistency found in clevis metadata. Found multiple different \
+            configurations for clevis within the same pool."
+                .to_string(),
+        ))
+    }
 }
 
 #[derive(Debug)]
@@ -483,6 +521,90 @@ impl BlockDevMgr {
             let kd_set = key_descriptions.iter().collect::<HashSet<_>>();
             assert!(kd_set.len() == 1);
         }
+    }
+
+    pub fn bind_clevis(&self, pin: &str, clevis_info: &Value) -> StratisResult<CreateAction<()>> {
+        fn bind_clevis_loop<'a>(
+            key_fs: &MemoryPrivateFilesystem,
+            rollback_record: &'a mut Vec<CryptHandle>,
+            handles: &'a mut Vec<CryptHandle>,
+            key_desc: &KeyDescription,
+            pin: &str,
+            clevis_info: &Value,
+        ) -> StratisResult<()> {
+            for mut crypt_handle in handles.drain(..) {
+                let res = key_fs.key_op(key_desc, |keyfile_path| {
+                    crypt_handle
+                        .clevis_bind(keyfile_path, pin, clevis_info)
+                        .map_err(StratisError::Crypt)
+                });
+                if res.is_ok() {
+                    rollback_record.push(crypt_handle);
+                }
+                res?;
+            }
+            Ok(())
+        }
+
+        let key_description = match &self.key_desc {
+            Some(kd) => kd,
+            None => {
+                return Err(StratisError::Error(
+                    "Requested pool does not appear to be encrypted".to_string(),
+                ))
+            }
+        };
+
+        let mut crypt_handles = get_crypt_handles(&self.block_devs)?;
+        if clevis_is_enabled(&mut crypt_handles)? {
+            return Ok(CreateAction::Identity);
+        }
+
+        let key_fs = MemoryPrivateFilesystem::new()?;
+        let mut rollback_record = Vec::new();
+        let result = bind_clevis_loop(
+            &key_fs,
+            &mut rollback_record,
+            &mut crypt_handles,
+            key_description,
+            pin,
+            clevis_info,
+        );
+
+        if result.is_err() {
+            rollback_record.into_iter().for_each(|mut crypt_dev| {
+                if let Err(e) = crypt_dev.clevis_unbind() {
+                    warn!(
+                        "Failed to unbind device {} from clevis during \
+                        rollback: {}",
+                        crypt_dev.physical_device_path().display(),
+                        e,
+                    );
+                }
+            });
+            result?;
+        }
+        Ok(CreateAction::Created(()))
+    }
+
+    pub fn unbind_clevis(&self) -> StratisResult<DeleteAction<()>> {
+        let mut crypt_handles = get_crypt_handles(&self.block_devs)?;
+        if !clevis_is_enabled(&mut crypt_handles)? {
+            return Ok(DeleteAction::Identity);
+        }
+
+        for mut handle in crypt_handles {
+            let res = handle.clevis_unbind().map_err(StratisError::Crypt);
+            if let Err(ref e) = res {
+                warn!(
+                    "Failed to unbind from the tang server using clevis: {}. \
+                    This operation cannot be rolled back automatically.",
+                    e,
+                );
+            }
+            res?
+        }
+        Ok(DeleteAction::Deleted(()))
     }
 }
 

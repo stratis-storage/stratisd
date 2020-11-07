@@ -470,14 +470,14 @@ impl Pool for StratPool {
                 ))
             }
         };
-        let key_fs = MemoryPrivateFilesystem::new()?;
-        let blockdevs = get_data_devs(self.blockdevs());
 
+        let blockdevs = get_data_devs(self.blockdevs());
         let mut crypt_handles = get_crypt_handles(blockdevs.as_slice())?;
         if clevis_is_enabled(&mut crypt_handles)? {
             return Ok(CreateAction::Identity);
         }
 
+        let key_fs = MemoryPrivateFilesystem::new()?;
         let mut rollback_record = Vec::new();
         let result = bind_clevis_loop(
             &key_fs,

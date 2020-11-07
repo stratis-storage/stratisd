@@ -171,6 +171,8 @@ impl BlockDevMgr {
     ///
     /// Returns Ok(Some(_)) containing the tang URL if clevis is enabled.
     /// Returns Ok(None) if clevis is not enabled.
+    /// Returns an error if there are two blockdevs for which clevis info
+    /// does not match.
     fn clevis_enabled(&self) -> StratisResult<Option<(String, Value)>> {
         fn match_infos(
             clevis_info: Option<(String, Value)>,

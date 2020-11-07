@@ -728,8 +728,7 @@ impl Backstore {
             }
         };
 
-        let blockdevs = self.datadevs();
-        let mut crypt_handles = get_crypt_handles(blockdevs.as_slice())?;
+        let mut crypt_handles = get_crypt_handles(&self.datadevs())?;
         if clevis_is_enabled(&mut crypt_handles)? {
             return Ok(CreateAction::Identity);
         }
@@ -762,8 +761,7 @@ impl Backstore {
     }
 
     pub fn unbind_clevis(&self) -> StratisResult<DeleteAction<()>> {
-        let blockdevs = self.datadevs();
-        let mut crypt_handles = get_crypt_handles(blockdevs.as_slice())?;
+        let mut crypt_handles = get_crypt_handles(&self.datadevs())?;
         if !clevis_is_enabled(&mut crypt_handles)? {
             return Ok(DeleteAction::Identity);
         }

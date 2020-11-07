@@ -7,7 +7,6 @@
 use std::{cmp, collections::HashSet, path::Path};
 
 use chrono::{DateTime, Utc};
-use itertools::Itertools;
 use serde_json::Value;
 
 use devicemapper::{CacheDev, Device, DmDevice, LinearDev, Sectors};
@@ -478,31 +477,6 @@ impl Backstore {
         }
     }
 
-    /// Get the key description for all data devices in the given backstore.
-    ///
-    /// * Ok(Some(_)) is returned when the pool is encrypted and the metadata is
-    /// consistent.
-    /// * Ok(None) is returned when the pool is unencrypted.
-    /// * Err(_) is returned when the pool is encrypted and there is an inconsistency
-    /// in the metadata.
-    pub fn key_description(&self) -> StratisResult<Option<&KeyDescription>> {
-        let mut key_descs = self
-            .datadevs()
-            .into_iter()
-            .map(|(_, bd)| bd.key_description())
-            .unique()
-            .collect::<Vec<_>>();
-        if key_descs.len() > 1 {
-            Err(StratisError::Error(format!(
-                "Inconsistency detected in the pool encryption metadata; stratisd \
-                found the following key descriptions: {:?}",
-                key_descs,
-            )))
-        } else {
-            Ok(key_descs.pop().and_then(|kd| kd))
-        }
-    }
-
     /// Get only the datadevs in the pool.
     pub fn datadevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
         self.data_tier.blockdevs()
@@ -745,7 +719,7 @@ impl Backstore {
             Ok(())
         }
 
-        let key_description = match self.key_description()? {
+        let key_description = match self.data_key_desc() {
             Some(kd) => kd,
             None => {
                 return Err(StratisError::Error(

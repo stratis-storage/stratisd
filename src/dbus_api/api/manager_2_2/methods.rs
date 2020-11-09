@@ -7,5 +7,5 @@ use dbus::tree::{MTFn, MethodInfo, MethodResult};
 use crate::dbus_api::{api::shared::set_key_shared, types::TData};
 
 pub fn set_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    set_key_shared(m, true)
+    set_key_shared(m)
 }

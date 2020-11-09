@@ -54,7 +54,6 @@ pub trait KeyActions {
         &mut self,
         key_desc: &KeyDescription,
         key_fd: RawFd,
-        interactive: Option<bool>,
     ) -> StratisResult<MappingCreateAction<()>>;
 
     /// Return a list of all key descriptions of keys added to the keyring by

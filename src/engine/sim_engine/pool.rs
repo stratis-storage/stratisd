@@ -270,11 +270,23 @@ impl Pool for SimPool {
     }
 
     fn bind_clevis(&self, _pin: &str, _clevis_info: &Value) -> StratisResult<CreateAction<()>> {
-        Ok(CreateAction::Identity)
+        if !self.is_encrypted() {
+            Err(StratisError::Error(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ))
+        } else {
+            Ok(CreateAction::Identity)
+        }
     }
 
     fn unbind_clevis(&self) -> StratisResult<DeleteAction<()>> {
-        Ok(DeleteAction::Identity)
+        if !self.is_encrypted() {
+            Err(StratisError::Error(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ))
+        } else {
+            Ok(DeleteAction::Identity)
+        }
     }
 
     fn destroy_filesystems<'a>(

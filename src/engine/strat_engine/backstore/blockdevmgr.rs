@@ -562,6 +562,10 @@ impl BlockDevMgr {
     }
 
     pub fn unbind_clevis(&self) -> StratisResult<DeleteAction<()>> {
+        if !self.is_encrypted() {
+            return Ok(DeleteAction::Identity);
+        }
+
         let mut crypt_handles = get_crypt_handles(&self.block_devs)?;
         if clevis_enabled(&mut crypt_handles)?.is_none() {
             return Ok(DeleteAction::Identity);

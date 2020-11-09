@@ -563,7 +563,9 @@ impl BlockDevMgr {
 
     pub fn unbind_clevis(&self) -> StratisResult<DeleteAction<()>> {
         if !self.is_encrypted() {
-            return Ok(DeleteAction::Identity);
+            return Err(StratisError::Error(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ))
         }
 
         let mut crypt_handles = get_crypt_handles(&self.block_devs)?;

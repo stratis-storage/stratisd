@@ -110,6 +110,9 @@ pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<TargetLine<LinearDevTargetParam
     table
 }
 
+/// Get crypt handles for the slice of blockdevs.
+///
+/// Postconditions: blockdevs.len() == the len of the Vec result
 fn get_crypt_handles(blockdevs: &[StratBlockDev]) -> StratisResult<Vec<CryptHandle>> {
     let mut handles = Vec::new();
     for bd in blockdevs.iter() {
@@ -126,27 +129,52 @@ fn get_crypt_handles(blockdevs: &[StratBlockDev]) -> StratisResult<Vec<CryptHand
     Ok(handles)
 }
 
-fn clevis_is_enabled(handles: &mut Vec<CryptHandle>) -> StratisResult<bool> {
-    let mut clevis_infos = HashSet::new();
-    for handle in handles.iter_mut() {
-        let clevis_info = handle.clevis_info()?;
-        if let Some((pin, info)) = clevis_info {
-            clevis_infos.insert(json!({ pin: info }).to_string());
+/// Return whether clevis has been enabled for a given pool.
+///
+/// Returns Ok(Some(_)) containing the clevis info if clevis is enabled.
+/// Returns Ok(None) if clevis is not enabled.
+/// Returns an error if there are two blockdevs for which clevis info
+/// does not match or some blockdevs which have a clevis configuration and
+/// some which do not.
+fn clevis_enabled(handles: &mut Vec<CryptHandle>) -> StratisResult<Option<(String, Value)>> {
+    fn match_infos(
+        clevis_info: Option<(String, Value)>,
+        clevis_info_next: Option<(String, Value)>,
+    ) -> StratisResult<Option<(String, Value)>> {
+        match (clevis_info, clevis_info_next) {
+            (Some(c), Some(cn)) => {
+                if c != cn {
+                    Err(StratisError::Error(
+                        "Clevis metadata is inconsistent; not all \
+                            devices are using the same Clevis configuration"
+                            .to_string(),
+                    ))
+                } else {
+                    Ok(Some(c))
+                }
+            }
+            (None, Some(cn)) => Ok(Some(cn)),
+            (Some(_), None) => Err(StratisError::Error(
+                "Clevis metadata is inconsistent; not all \
+                        devices have clevis enabled."
+                    .to_string(),
+            )),
+            (None, None) => Ok(None),
         }
     }
-    if clevis_infos.is_empty() {
-        Ok(false)
-    } else if clevis_infos.len() == 1 {
-        Ok(true)
-    } else {
-        Err(StratisError::Error(
-            "Inconsistency found in clevis metadata. Found multiple different \
-            configurations for clevis within the same pool."
-                .to_string(),
-        ))
-    }
-}
 
+    let mut clevis_info: Option<Option<(String, Value)>> = None;
+    for handle in handles.iter_mut() {
+        let clevis_info_next = handle.clevis_info()?;
+        if let Some(ci) = clevis_info {
+            clevis_info = Some(match_infos(ci, clevis_info_next)?);
+        } else {
+            clevis_info = Some(clevis_info_next);
+        }
+    }
+
+    Ok(clevis_info.and_then(|ci| ci))
+}
 #[derive(Debug)]
 pub struct BlockDevMgr {
     block_devs: Vec<StratBlockDev>,
@@ -205,65 +233,6 @@ impl BlockDevMgr {
         )
     }
 
-    /// Return whether clevis has been enabled for a given pool.
-    ///
-    /// Returns Ok(Some(_)) containing the tang URL if clevis is enabled.
-    /// Returns Ok(None) if clevis is not enabled.
-    /// Returns an error if there are two blockdevs for which clevis info
-    /// does not match.
-    fn clevis_enabled(&self) -> StratisResult<Option<(String, Value)>> {
-        fn match_infos(
-            clevis_info: Option<(String, Value)>,
-            clevis_info_next: Option<(String, Value)>,
-        ) -> StratisResult<Option<(String, Value)>> {
-            match (clevis_info, clevis_info_next) {
-                (Some(c), Some(cn)) => {
-                    if c != cn {
-                        Err(StratisError::Error(
-                            "Clevis metadata is inconsistent; not all \
-                            devices are using the same Clevis configuration"
-                                .to_string(),
-                        ))
-                    } else {
-                        Ok(Some(c))
-                    }
-                }
-                (None, Some(cn)) => Ok(Some(cn)),
-                (Some(_), None) => Err(StratisError::Error(
-                    "Clevis metadata is inconsistent; not all \
-                        devices have clevis enabled."
-                        .to_string(),
-                )),
-                (None, None) => Ok(None),
-            }
-        }
-
-        // Clevis cannot be enabled on block devices that are not encrypted.
-        if self.key_desc.is_none() {
-            return Ok(None);
-        }
-
-        let mut clevis_info: Option<Option<(String, Value)>> = None;
-        for bd in self.block_devs.iter() {
-            let physical_path = bd.devnode().physical_path();
-            if let Some(mut handle) = CryptHandle::setup(physical_path)? {
-                let clevis_info_next = handle.clevis_info()?;
-                if let Some(ci) = clevis_info {
-                    clevis_info = Some(match_infos(ci, clevis_info_next)?);
-                } else {
-                    clevis_info = Some(clevis_info_next);
-                }
-            } else {
-                return Err(StratisError::Error(format!(
-                    "Device {} is not an encrypted Stratis device",
-                    physical_path.display(),
-                )));
-            }
-        }
-
-        Ok(clevis_info.and_then(|ci| ci))
-    }
-
     /// Add paths to self.
     /// Return the uuids of all blockdevs corresponding to paths that were
     /// added.
@@ -296,7 +265,12 @@ impl BlockDevMgr {
             ));
         }
 
-        let clevis_info = self.clevis_enabled()?;
+        let clevis_info = if self.is_encrypted() {
+            clevis_enabled(&mut get_crypt_handles(&self.block_devs)?)?
+        } else {
+            None
+        };
+
         // FIXME: This is a bug. If new devices are added to a pool, and the
         // variable length metadata requires more than the minimum allocated,
         // then the necessary amount must be provided or the data can not be
@@ -556,7 +530,7 @@ impl BlockDevMgr {
         };
 
         let mut crypt_handles = get_crypt_handles(&self.block_devs)?;
-        if clevis_is_enabled(&mut crypt_handles)? {
+        if clevis_enabled(&mut crypt_handles)?.is_some() {
             return Ok(CreateAction::Identity);
         }
 
@@ -589,7 +563,7 @@ impl BlockDevMgr {
 
     pub fn unbind_clevis(&self) -> StratisResult<DeleteAction<()>> {
         let mut crypt_handles = get_crypt_handles(&self.block_devs)?;
-        if !clevis_is_enabled(&mut crypt_handles)? {
+        if clevis_enabled(&mut crypt_handles)?.is_none() {
             return Ok(DeleteAction::Identity);
         }
 

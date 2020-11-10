@@ -37,7 +37,7 @@ macro_rules! default_handler {
             $fn(
                 $engine,
                 $($args),*
-            ),
+            ).await,
             $default_value,
         )).await
     }

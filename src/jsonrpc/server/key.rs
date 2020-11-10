@@ -2,10 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::os::unix::io::RawFd;
+use std::{os::unix::io::RawFd, sync::Arc};
+
+use tokio::sync::Mutex;
 
 use crate::{
-    engine::{DeleteAction, Engine, KeyDescription, MappingCreateAction, PoolUuid, StratEngine},
+    engine::{DeleteAction, Engine, KeyDescription, MappingCreateAction, PoolUuid},
     stratis::StratisResult,
 };
 
@@ -16,14 +18,16 @@ use crate::{
 /// used carefully as it will cause the password to be echoed on the screen if
 /// invoked interactively.
 // stratis-min key set
-pub fn key_set(
-    engine: &mut StratEngine,
+pub async fn key_set(
+    engine: Arc<Mutex<dyn Engine>>,
     key_desc: &KeyDescription,
     key_fd: RawFd,
     interactive: Option<bool>,
 ) -> StratisResult<Option<bool>> {
     Ok(
         match engine
+            .lock()
+            .await
             .get_key_handler_mut()
             .set(key_desc, key_fd, interactive)?
         {
@@ -34,18 +38,32 @@ pub fn key_set(
     )
 }
 
-pub fn key_unset(engine: &mut StratEngine, key_desc: &KeyDescription) -> StratisResult<bool> {
-    Ok(match engine.get_key_handler_mut().unset(key_desc)? {
-        DeleteAction::Deleted(()) => true,
-        DeleteAction::Identity => false,
-    })
+pub async fn key_unset(
+    engine: Arc<Mutex<dyn Engine>>,
+    key_desc: &KeyDescription,
+) -> StratisResult<bool> {
+    Ok(
+        match engine.lock().await.get_key_handler_mut().unset(key_desc)? {
+            DeleteAction::Deleted(()) => true,
+            DeleteAction::Identity => false,
+        },
+    )
 }
 
-pub fn key_list(engine: &mut StratEngine) -> StratisResult<Vec<KeyDescription>> {
-    Ok(engine.get_key_handler_mut().list()?.into_iter().collect())
+pub async fn key_list(engine: Arc<Mutex<dyn Engine>>) -> StratisResult<Vec<KeyDescription>> {
+    Ok(engine
+        .lock()
+        .await
+        .get_key_handler_mut()
+        .list()?
+        .into_iter()
+        .collect())
 }
 
-pub fn key_get_desc(engine: &mut StratEngine, pool_uuid: PoolUuid) -> Option<KeyDescription> {
-    let locked_pools = engine.locked_pools();
+pub async fn key_get_desc(
+    engine: Arc<Mutex<dyn Engine>>,
+    pool_uuid: PoolUuid,
+) -> Option<KeyDescription> {
+    let locked_pools = engine.lock().await.locked_pools();
     locked_pools.get(&pool_uuid).map(|kd| kd.to_owned())
 }

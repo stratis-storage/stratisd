@@ -2,11 +2,14 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use serde_json::Value;
+use std::sync::Arc;
 
-use crate::engine::StratEngine;
+use serde_json::Value;
+use tokio::sync::Mutex;
+
+use crate::engine::{Engine, ReportType};
 
 #[inline]
-pub fn report(engine: &StratEngine) -> Value {
-    engine.into()
+pub async fn report(engine: Arc<Mutex<dyn Engine>>) -> Value {
+    engine.lock().await.get_report(ReportType::EngineState)
 }

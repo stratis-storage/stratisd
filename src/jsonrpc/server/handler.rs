@@ -7,21 +7,25 @@ use crate::jsonrpc::consts::{SOCKFD_ADDR, SOCKFD_ADDR_DIR};
 use std::{
     fs::{create_dir_all, remove_file},
     os::unix::io::AsRawFd,
+    sync::Arc,
 };
 
 use futures_util::stream::StreamExt;
 use jsonrpsee::{
-    common::{Error, ErrorCode},
+    common::{Error as RPCError, ErrorCode},
     raw::RawServer,
 };
 use tokio::{
-    runtime::Runtime,
-    sync::mpsc::{channel, Receiver, Sender},
+    sync::{
+        mpsc::{channel, Receiver, Sender},
+        Mutex,
+    },
+    task::JoinHandle,
 };
 
 use crate::{
     default_handler,
-    engine::StratEngine,
+    engine::Engine,
     jsonrpc::{
         consts::RPC_SOCKADDR,
         interface::Stratis,
@@ -33,13 +37,22 @@ use crate::{
     },
 };
 
-async fn server_loop(mut recv: Receiver<FdRef>) -> Result<(), String> {
+async fn server_loop(engine_ref: Arc<Mutex<dyn Engine>>, mut recv: Receiver<FdRef>) {
     let _ = remove_file(RPC_SOCKADDR);
-    let transport = UdsTransportServer::bind(RPC_SOCKADDR).map_err(|e| e.to_string())?;
-    let mut engine = StratEngine::initialize().map_err(|e| e.to_string())?;
+    let transport = match UdsTransportServer::bind(RPC_SOCKADDR) {
+        Ok(t) => t,
+        Err(e) => {
+            error!(
+                "Failed to bind Unix socket to address {}: {}",
+                RPC_SOCKADDR, e
+            );
+            return;
+        }
+    };
     let mut server = RawServer::new(transport);
     loop {
         if let Ok(event) = Stratis::next_request(&mut server).await {
+            let engine = Arc::clone(&engine_ref);
             match event {
                 Stratis::KeySet {
                     respond,
@@ -50,21 +63,21 @@ async fn server_loop(mut recv: Receiver<FdRef>) -> Result<(), String> {
                         default_handler!(
                             respond,
                             key::key_set,
-                            &mut engine,
+                            engine,
                             None,
                             &key_desc,
                             fd.as_raw_fd(),
                             interactive
                         )
                     } else {
-                        respond.err(Error::new(ErrorCode::InternalError)).await
+                        respond.err(RPCError::new(ErrorCode::InternalError)).await
                     }
                 }
                 Stratis::KeyUnset { respond, key_desc } => {
-                    default_handler!(respond, key::key_unset, &mut engine, false, &key_desc)
+                    default_handler!(respond, key::key_unset, engine, false, &key_desc)
                 }
                 Stratis::KeyList { respond } => {
-                    default_handler!(respond, key::key_list, &mut engine, Vec::new())
+                    default_handler!(respond, key::key_list, engine, Vec::new())
                 }
                 Stratis::PoolCreate {
                     respond,
@@ -74,7 +87,7 @@ async fn server_loop(mut recv: Receiver<FdRef>) -> Result<(), String> {
                 } => default_handler!(
                     respond,
                     pool::pool_create,
-                    &mut engine,
+                    engine,
                     false,
                     &name,
                     blockdev_paths
@@ -88,14 +101,7 @@ async fn server_loop(mut recv: Receiver<FdRef>) -> Result<(), String> {
                     respond,
                     name,
                     new_name,
-                } => default_handler!(
-                    respond,
-                    pool::pool_rename,
-                    &mut engine,
-                    false,
-                    &name,
-                    &new_name
-                ),
+                } => default_handler!(respond, pool::pool_rename, engine, false, &name, &new_name),
                 Stratis::PoolInitCache {
                     respond,
                     name,
@@ -103,7 +109,7 @@ async fn server_loop(mut recv: Receiver<FdRef>) -> Result<(), String> {
                 } => default_handler!(
                     respond,
                     pool::pool_init_cache,
-                    &mut engine,
+                    engine,
                     false,
                     &name,
                     blockdev_paths
@@ -119,7 +125,7 @@ async fn server_loop(mut recv: Receiver<FdRef>) -> Result<(), String> {
                 } => default_handler!(
                     respond,
                     pool::pool_add_data,
-                    &mut engine,
+                    engine,
                     false,
                     &name,
                     blockdev_paths
@@ -135,7 +141,7 @@ async fn server_loop(mut recv: Receiver<FdRef>) -> Result<(), String> {
                 } => default_handler!(
                     respond,
                     pool::pool_add_cache,
-                    &mut engine,
+                    engine,
                     false,
                     &name,
                     blockdev_paths
@@ -145,7 +151,7 @@ async fn server_loop(mut recv: Receiver<FdRef>) -> Result<(), String> {
                         .as_slice()
                 ),
                 Stratis::PoolDestroy { respond, name } => {
-                    default_handler!(respond, pool::pool_destroy, &mut engine, false, &name)
+                    default_handler!(respond, pool::pool_destroy, engine, false, &name)
                 }
                 Stratis::PoolUnlock {
                     respond,
@@ -157,36 +163,25 @@ async fn server_loop(mut recv: Receiver<FdRef>) -> Result<(), String> {
                             default_handler!(
                                 respond,
                                 pool::pool_unlock,
-                                &mut engine,
+                                engine,
                                 false,
                                 pool_uuid,
                                 prompt.map(|b| (fd.as_raw_fd(), b))
                             )
                         } else {
-                            respond.err(Error::new(ErrorCode::InternalError)).await
+                            respond.err(RPCError::new(ErrorCode::InternalError)).await
                         }
                     } else {
-                        default_handler!(
-                            respond,
-                            pool::pool_unlock,
-                            &mut engine,
-                            false,
-                            pool_uuid,
-                            None
-                        )
+                        default_handler!(respond, pool::pool_unlock, engine, false, pool_uuid, None)
                     }
                 }
-                Stratis::PoolIsEncrypted { respond, pool_uuid } => default_handler!(
-                    respond,
-                    pool::pool_is_encrypted,
-                    &mut engine,
-                    false,
-                    pool_uuid
-                ),
-                Stratis::PoolList { respond } => respond.ok(pool::pool_list(&mut engine)).await,
-                Stratis::Report { respond } => respond.ok(report::report(&engine)).await,
+                Stratis::PoolIsEncrypted { respond, pool_uuid } => {
+                    default_handler!(respond, pool::pool_is_encrypted, engine, false, pool_uuid)
+                }
+                Stratis::PoolList { respond } => respond.ok(pool::pool_list(engine).await).await,
+                Stratis::Report { respond } => respond.ok(report::report(engine).await).await,
                 Stratis::Udev { respond, dm_name } => {
-                    default_handler!(respond, udev::udev, &mut engine, None, &dm_name)
+                    default_handler!(respond, udev::udev, engine, None, &dm_name)
                 }
             }
         }
@@ -201,7 +196,10 @@ pub async fn file_descriptor_listener(sender: Sender<FdRef>) {
     let mut listener = match UnixListenerStream::bind(SOCKFD_ADDR) {
         Ok(l) => l,
         Err(e) => {
-            warn!("{}", e);
+            error!(
+                "Failed to find Unix socket to address {}: {}",
+                SOCKFD_ADDR, e
+            );
             return;
         }
     };
@@ -225,17 +223,9 @@ pub async fn file_descriptor_listener(sender: Sender<FdRef>) {
     }
 }
 
-pub fn run_server() {
+pub fn run_server(engine: Arc<Mutex<dyn Engine>>) -> (JoinHandle<()>, JoinHandle<()>) {
     let (send, recv) = channel(16);
-    let runtime = match Runtime::new() {
-        Ok(rt) => rt,
-        Err(e) => {
-            error!("{}", e);
-            return;
-        }
-    };
-    runtime.spawn(async { file_descriptor_listener(send).await });
-    if let Err(e) = runtime.block_on(server_loop(recv)) {
-        error!("{}", e);
-    }
+    let fd_join = tokio::spawn(async { file_descriptor_listener(send).await });
+    let server_join = tokio::spawn(server_loop(engine, recv));
+    (fd_join, server_join)
 }

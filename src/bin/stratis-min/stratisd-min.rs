@@ -2,29 +2,36 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{env, str::FromStr};
+use std::{env, error::Error, str::FromStr};
 
 use clap::{App, Arg};
 use env_logger::Builder;
 use log::LevelFilter;
 
-use libstratis::jsonrpc::run_server;
+use libstratis::stratis::run;
 
 fn parse_args() -> App<'static, 'static> {
-    App::new("stratisd-min").arg(
-        Arg::with_name("log_level")
-            .empty_values(false)
-            .long("--log-level")
-            .possible_values(&["trace", "debug", "info", "warn", "error"])
-            .help("Sets level for generation of log messages."),
-    )
+    App::new("stratisd-min")
+        .arg(
+            Arg::with_name("log_level")
+                .empty_values(false)
+                .long("--log-level")
+                .possible_values(&["trace", "debug", "info", "warn", "error"])
+                .help("Sets level for generation of log messages."),
+        )
+        .arg(
+            Arg::with_name("sim")
+                .long("--sim")
+                .takes_value(false)
+                .help("Enables sim engine."),
+        )
 }
 
-fn main() -> Result<(), String> {
+fn main() -> Result<(), Box<dyn Error>> {
     let mut app = parse_args();
     let mut help = Vec::new();
-    app.write_long_help(&mut help).map_err(|e| e.to_string())?;
-    let help = String::from_utf8(help).map_err(|e| e.to_string())?;
+    app.write_long_help(&mut help)?;
+    let help = String::from_utf8(help)?;
     let args = app.get_matches();
 
     let mut builder = Builder::new();
@@ -48,7 +55,7 @@ fn main() -> Result<(), String> {
         println!("{}", help);
         Ok(())
     } else {
-        run_server();
+        run(args.is_present("sim"))?;
         Ok(())
     }
 }

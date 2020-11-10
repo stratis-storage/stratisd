@@ -383,11 +383,11 @@ impl Pool for StratPool {
         }
     }
 
-    fn bind_clevis(&self, pin: &str, clevis_info: &Value) -> StratisResult<CreateAction<()>> {
+    fn bind_clevis(&mut self, pin: &str, clevis_info: &Value) -> StratisResult<CreateAction<()>> {
         self.backstore.bind_clevis(pin, clevis_info)
     }
 
-    fn unbind_clevis(&self) -> StratisResult<DeleteAction<()>> {
+    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<()>> {
         self.backstore.unbind_clevis()
     }
 

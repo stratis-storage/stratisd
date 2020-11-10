@@ -12,13 +12,16 @@ Python import sorter: isort (4.3.21)
 YAML linter: yamllint (1.23.0)
 
 New Rust crate version requirements:
-  - env_logger: 0.7
+  - env_logger: 0.8
   - itertools: 0.9
   - nix: 0.18
   - rand: 0.7
   - semver: 0.11
   - uuid: 0.8
 
+
+- Rewrite mechanism to read encryption key from a file descriptor:
+  https://github.com/stratis-storage/stratisd/pull/2294
 
 - Make sure paths of devices passed as arguments to D-Bus calls are absolute:
   https://github.com/stratis-storage/stratisd/pull/2264
@@ -41,6 +44,9 @@ New Rust crate version requirements:
   https://github.com/stratis-storage/stratisd/pull/2251
 
 - Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/2296
+  https://github.com/stratis-storage/stratisd/pull/2293
+  https://github.com/stratis-storage/stratisd/pull/2292
   https://github.com/stratis-storage/stratisd/pull/2287
   https://github.com/stratis-storage/stratisd/pull/2284
   https://github.com/stratis-storage/stratisd/pull/2283
@@ -49,6 +55,7 @@ New Rust crate version requirements:
   https://github.com/stratis-storage/stratisd/pull/2267
   https://github.com/stratis-storage/stratisd/pull/2262
   https://github.com/stratis-storage/stratisd/pull/2259
+  https://github.com/stratis-storage/stratisd/pull/2258
   https://github.com/stratis-storage/stratisd/pull/2249
 
 

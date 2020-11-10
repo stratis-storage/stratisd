@@ -1,5 +1,5 @@
-stratisd 2.2.1 (UNRELEASED)
-===========================
+stratisd 2.2.1
+==============
 Recommended Rust toolchain version: 1.47.0
 Lowest supported Rust toolchain version: 1.45
 
@@ -45,6 +45,7 @@ New Rust crate version requirements:
 
 - Tidies and Maintenance:
   https://github.com/stratis-storage/stratisd/pull/2296
+  https://github.com/stratis-storage/stratisd/pull/2295
   https://github.com/stratis-storage/stratisd/pull/2293
   https://github.com/stratis-storage/stratisd/pull/2292
   https://github.com/stratis-storage/stratisd/pull/2287

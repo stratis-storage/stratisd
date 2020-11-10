@@ -7,7 +7,6 @@
 use std::{
     convert::TryFrom,
     fmt::{self, Display},
-    path::Path,
 };
 
 use devicemapper::{DmNameBuf, DmUuidBuf};
@@ -15,7 +14,7 @@ use devicemapper::{DmNameBuf, DmUuidBuf};
 pub use crate::engine::types::KeyDescription;
 use crate::{
     engine::types::{DevUuid, FilesystemUuid, PoolUuid},
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::StratisResult,
 };
 
 const FORMAT_VERSION: u16 = 1;
@@ -241,56 +240,6 @@ pub fn format_backstore_ids(pool_uuid: PoolUuid, role: CacheRole) -> (DmNameBuf,
     )
 }
 
-/// Validate a path for use as a Pool or Filesystem name.
-pub fn validate_name(name: &str) -> StratisResult<()> {
-    let name_path = Path::new(name);
-    if name.contains('\u{0}') {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name contains NULL characters : {}", name),
-        ));
-    }
-    if name_path.components().count() != 1 {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name is a path with 0 or more than 1 components : {}", name),
-        ));
-    }
-    if name_path.is_absolute() {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name is an absolute path : {}", name),
-        ));
-    }
-    if name == "." || name == ".." {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name is . or .. : {}", name),
-        ));
-    }
-    // Linux has a maximum filename length of 255 bytes
-    if name.len() > 255 {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name has more than 255 bytes : {}", name),
-        ));
-    }
-
-    if name.len() != name.trim().len() {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name contains leading or trailing space : {}", name),
-        ));
-    }
-    if name.chars().any(|c| c.is_control()) {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name contains control characters : {}", name),
-        ));
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use std::convert::TryFrom;
@@ -311,39 +260,5 @@ mod tests {
                 .map(|k| k.expect("no semi-colons")),
             Some(KeyDescription::try_from("stratis-1-key".to_string()).expect("no semi-colons"))
         );
-    }
-
-    #[test]
-    #[allow(clippy::cognitive_complexity)]
-    fn test_validate_name() {
-        assert_matches!(validate_name(&'\u{0}'.to_string()), Err(_));
-        assert_matches!(validate_name("./some"), Err(_));
-        assert_matches!(validate_name("../../root"), Err(_));
-        assert_matches!(validate_name("/"), Err(_));
-        assert_matches!(validate_name("\u{1c}\u{7}"), Err(_));
-        assert_matches!(validate_name("./foo/bar.txt"), Err(_));
-        assert_matches!(validate_name("."), Err(_));
-        assert_matches!(validate_name(".."), Err(_));
-        assert_matches!(validate_name("/dev/sdb"), Err(_));
-        assert_matches!(validate_name(""), Err(_));
-        assert_matches!(validate_name("/"), Err(_));
-        assert_matches!(validate_name(" leading_space"), Err(_));
-        assert_matches!(validate_name("trailing_space "), Err(_));
-        assert_matches!(validate_name("\u{0}leading_null"), Err(_));
-        assert_matches!(validate_name("trailing_null\u{0}"), Err(_));
-        assert_matches!(validate_name("middle\u{0}_null"), Err(_));
-        assert_matches!(validate_name("\u{0}multiple\u{0}_null\u{0}"), Err(_));
-        assert_matches!(validate_name(&"𐌏".repeat(64)), Err(_));
-
-        assert_matches!(validate_name(&"𐌏".repeat(63)), Ok(_));
-        assert_matches!(validate_name(&'\u{10fff8}'.to_string()), Ok(_));
-        assert_matches!(validate_name("*< ? >"), Ok(_));
-        assert_matches!(validate_name("..."), Ok(_));
-        assert_matches!(validate_name("ok.name"), Ok(_));
-        assert_matches!(validate_name("ok name with spaces"), Ok(_));
-        assert_matches!(validate_name("\\\\"), Ok(_));
-        assert_matches!(validate_name("\u{211D}"), Ok(_));
-        assert_matches!(validate_name("☺"), Ok(_));
-        assert_matches!(validate_name("ok_name"), Ok(_));
     }
 }

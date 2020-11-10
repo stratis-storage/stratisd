@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{os::unix::io::AsRawFd, path::Path, vec::Vec};
+use std::{convert::TryFrom, os::unix::io::AsRawFd, path::Path, vec::Vec};
 
 use dbus::{
     arg::{Array, OwnedFd},
@@ -19,7 +19,7 @@ use crate::{
             engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok, tuple_to_option,
         },
     },
-    engine::{CreateAction, MappingCreateAction, Name},
+    engine::{CreateAction, KeyDescription, MappingCreateAction, Name},
 };
 
 /// Shared code for the creation of pools using the D-Bus API without the option
@@ -32,10 +32,26 @@ pub fn create_pool_shared(m: &MethodInfo<MTFn<TData>, TData>, has_key_desc: bool
     let name: &str = get_next_arg(&mut iter, 0)?;
     let redundancy_tuple: (bool, u16) = get_next_arg(&mut iter, 1)?;
     let devs: Array<&str, _> = get_next_arg(&mut iter, 2)?;
-    let key_desc_tuple: Option<(bool, &str)> = if has_key_desc {
+    let key_desc_tuple: Option<(bool, String)> = if has_key_desc {
         Some(get_next_arg(&mut iter, 3)?)
     } else {
         None
+    };
+
+    let return_message = message.method_return();
+
+    let default_return: (bool, (dbus::Path<'static>, Vec<dbus::Path<'static>>)) =
+        (false, (dbus::Path::default(), Vec::new()));
+
+    let key_desc = match key_desc_tuple.and_then(tuple_to_option) {
+        Some(kds) => match KeyDescription::try_from(kds) {
+            Ok(kd) => Some(kd),
+            Err(e) => {
+                let (rc, rs) = engine_to_dbus_err_tuple(&e);
+                return Ok(vec![return_message.append3(default_return, rc, rs)]);
+            }
+        },
+        None => None,
     };
 
     let object_path = m.path.get_name();
@@ -45,15 +61,8 @@ pub fn create_pool_shared(m: &MethodInfo<MTFn<TData>, TData>, has_key_desc: bool
         name,
         &devs.map(|x| Path::new(x)).collect::<Vec<&Path>>(),
         tuple_to_option(redundancy_tuple),
-        key_desc_tuple
-            .and_then(tuple_to_option)
-            .map(|s| s.to_owned()),
+        key_desc,
     );
-
-    let return_message = message.method_return();
-
-    let default_return: (bool, (dbus::Path<'static>, Vec<dbus::Path<'static>>)) =
-        (false, (dbus::Path::default(), Vec::new()));
 
     let msg = match result {
         Ok(pool_uuid_action) => {
@@ -111,31 +120,32 @@ pub fn list_keys(info: &MethodInfo<MTFn<TData>, TData>) -> Result<Vec<String>, S
         .map_err(|e| e.to_string())
 }
 
-pub fn set_key_shared(
-    m: &MethodInfo<MTFn<TData>, TData>,
-    set_terminal_settings: bool,
-) -> MethodResult {
+pub fn set_key_shared(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let key_desc: &str = get_next_arg(&mut iter, 0)?;
+    let key_desc_str: String = get_next_arg(&mut iter, 0)?;
     let key_fd: OwnedFd = get_next_arg(&mut iter, 1)?;
-    let interactive: bool = get_next_arg(&mut iter, 2)?;
 
     let dbus_context = m.tree.get_data();
     let default_return = (false, false);
     let return_message = message.method_return();
 
     let msg = match dbus_context.engine.borrow_mut().get_key_handler_mut().set(
-        key_desc,
+        &match KeyDescription::try_from(key_desc_str) {
+            Ok(kd) => kd,
+            Err(e) => {
+                let (rc, rs) = engine_to_dbus_err_tuple(&e);
+                return Ok(vec![return_message.append3(default_return, rc, rs)]);
+            }
+        },
         key_fd.as_raw_fd(),
-        tuple_to_option((interactive, set_terminal_settings)),
     ) {
         Ok(idem_resp) => {
             let return_value = match idem_resp {
                 MappingCreateAction::Created(()) => (true, false),
                 MappingCreateAction::ValueChanged(()) => (true, true),
-                MappingCreateAction::Identity => (false, false),
+                MappingCreateAction::Identity => default_return,
             };
             return_message.append3(return_value, msg_code_ok(), msg_string_ok())
         }

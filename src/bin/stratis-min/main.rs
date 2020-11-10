@@ -2,7 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::convert::TryFrom;
+
 use clap::{App, Arg, ArgGroup, SubCommand};
+use libstratis::engine::KeyDescription;
 
 mod key;
 
@@ -25,12 +28,6 @@ fn parse_args() -> App<'static, 'static> {
                     .long("--keyfile-path")
                     .takes_value(true),
             )
-            .arg(
-                Arg::with_name("no_tty")
-                    .long("--no-tty")
-                    .takes_value(false)
-                    .conflicts_with("keyfile_path"),
-            )
             .arg(Arg::with_name("key_desc").required(true)),
         SubCommand::with_name("list"),
         SubCommand::with_name("unset").arg(Arg::with_name("key_desc").required(true)),
@@ -46,13 +43,17 @@ fn main() -> Result<(), String> {
     if let Some(subcommand) = args.subcommand_matches("key") {
         if let Some(args) = subcommand.subcommand_matches("set") {
             key::key_set(
-                args.value_of("key_desc").expect("required"),
+                &KeyDescription::try_from(args.value_of("key_desc").expect("required").to_owned())
+                    .map_err(|e| e.to_string())?,
                 args.value_of("keyfile_path"),
-                args.is_present("no_tty"),
             )
             .map_err(|e| e.to_string())
         } else if let Some(args) = subcommand.subcommand_matches("unset") {
-            key::key_unset(args.value_of("key_desc").expect("required")).map_err(|e| e.to_string())
+            key::key_unset(
+                &KeyDescription::try_from(args.value_of("key_desc").expect("required").to_owned())
+                    .map_err(|e| e.to_string())?,
+            )
+            .map_err(|e| e.to_string())
         } else {
             key::key_list().map_err(|e| e.to_string())
         }

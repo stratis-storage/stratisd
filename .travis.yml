@@ -47,12 +47,12 @@ jobs:
 
     # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
     - name: "format Rust source using current development toolchain"
-      rust: 1.46.0
+      rust: 1.47.0
       before_script:
         - rustup component add rustfmt
       env: TASK=fmt-travis
     - name: "lint Rust source using current development toolchain"
-      rust: 1.46.0
+      rust: 1.47.0
       before_script:
         - rustup component add clippy
       env: TASK=clippy
@@ -91,7 +91,7 @@ jobs:
     # MANDATORY PYTHON CHECKS ON RECOMMENDED DEVELOPMENT INTERPRETER
     - name: "lint Python code on recommended development interpreter"
       language: python
-      python: "3.7.7"
+      python: "3.7.9"
       install:
         - >
           pip
@@ -101,14 +101,16 @@ jobs:
           dbus-python-client-gen==0.7
           psutil==5.6.7
           pyudev==0.22.0
+          networkx==2.3
           requests==2.22.0
+          semantic_version==2.6.0
       script:
         - >
           (cd developer_tools; make -f Makefile lint) &&
           (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
     - name: "format Python code on recommended development interpreter"
       language: python
-      python: "3.7.7"
+      python: "3.7.9"
       install: pip install black==19.10b0 isort==4.3.21
       script:
         - >
@@ -128,7 +130,9 @@ jobs:
           dbus-python-client-gen==0.7
           psutil==5.4.3
           pyudev==0.22.0
+          networkx==2.3
           requests==2.20.0
+          semantic_version==2.6.0
       script:
         - >
           (cd developer_tools; make -f Makefile lint) &&
@@ -160,6 +164,6 @@ jobs:
 branches:
   only:
     - master
-    - develop-2.1.0
+    - develop-2.2.0
 
 script: make -f Makefile $TASK

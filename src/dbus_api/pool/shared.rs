@@ -61,7 +61,7 @@ pub fn get_pool_encryption_key_desc(
 ) -> Result<(bool, String), String> {
     pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
         Ok(option_to_tuple(
-            pool.key_desc().map(|key| key.to_string()),
+            pool.key_desc().map(|k| k.as_application_str().to_string()),
             String::new(),
         ))
     })

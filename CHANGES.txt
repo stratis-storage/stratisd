@@ -1,3 +1,65 @@
+stratisd 2.2.1
+==============
+Recommended Rust toolchain version: 1.47.0
+Lowest supported Rust toolchain version: 1.45
+
+Recommended Python interpreter: 3.7.9
+Lowest supported Python interpreter: 3.6.8
+Python linter: pylint (2.4.4)
+Python auto-formatter: black (19.10b0)
+Python import sorter: isort (4.3.21)
+
+YAML linter: yamllint (1.23.0)
+
+New Rust crate version requirements:
+  - env_logger: 0.8
+  - itertools: 0.9
+  - nix: 0.18
+  - rand: 0.7
+  - semver: 0.11
+  - uuid: 0.8
+
+
+- Rewrite mechanism to read encryption key from a file descriptor:
+  https://github.com/stratis-storage/stratisd/pull/2294
+
+- Make sure paths of devices passed as arguments to D-Bus calls are absolute:
+  https://github.com/stratis-storage/stratisd/pull/2264
+
+- Make sure that names of filesystems and pools do not include characters
+  that udev will substitute underscores for:
+  https://github.com/stratis-storage/stratisd/issues/2265
+  https://github.com/stratis-storage/stratisd/pull/2276
+
+- Use portable types from the libc crate in method calls:
+  https://github.com/stratis-storage/stratisd/issues/2260
+  https://github.com/stratis-storage/stratisd/pull/2261
+
+- Use KeyDescription type in trait methods:
+  https://github.com/stratis-storage/stratisd/issues/2156
+  https://github.com/stratis-storage/stratisd/pull/2271
+  https://github.com/stratis-storage/stratisd/pull/2268
+
+- Make error message on failure to unlock device more specific:
+  https://github.com/stratis-storage/stratisd/pull/2251
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/2296
+  https://github.com/stratis-storage/stratisd/pull/2295
+  https://github.com/stratis-storage/stratisd/pull/2293
+  https://github.com/stratis-storage/stratisd/pull/2292
+  https://github.com/stratis-storage/stratisd/pull/2287
+  https://github.com/stratis-storage/stratisd/pull/2284
+  https://github.com/stratis-storage/stratisd/pull/2283
+  https://github.com/stratis-storage/stratisd/pull/2280
+  https://github.com/stratis-storage/stratisd/pull/2279
+  https://github.com/stratis-storage/stratisd/pull/2267
+  https://github.com/stratis-storage/stratisd/pull/2262
+  https://github.com/stratis-storage/stratisd/pull/2259
+  https://github.com/stratis-storage/stratisd/pull/2258
+  https://github.com/stratis-storage/stratisd/pull/2249
+
+
 stratisd 2.2.0
 ==============
 Recommended Rust toolchain version: 1.46.0

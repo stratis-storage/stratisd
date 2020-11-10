@@ -5,7 +5,7 @@
 use std::{fs::File, io, os::unix::io::AsRawFd};
 
 use libstratis::{
-    engine::{DeleteAction, KeyActions, MappingCreateAction, StratKeyActions},
+    engine::{DeleteAction, KeyActions, KeyDescription, MappingCreateAction, StratKeyActions},
     stratis::{StratisError, StratisResult},
 };
 
@@ -15,34 +15,34 @@ use libstratis::{
 /// settings and settings such as `NOECHO` are not set. This option should be
 /// used carefully as it will cause the password to be echoed on the screen if
 /// invoked interactively.
-pub fn key_set(key_desc: &str, keyfile_path: Option<&str>, no_tty: bool) -> StratisResult<()> {
+pub fn key_set(key_desc: &KeyDescription, keyfile_path: Option<&str>) -> StratisResult<()> {
     let ret = match keyfile_path {
         Some(kp) => {
             let file = File::open(kp)?;
-            StratKeyActions.set(key_desc, file.as_raw_fd(), None)?
+            StratKeyActions.set(key_desc, file.as_raw_fd())?
         }
         None => {
             let stdin_fd = io::stdin().as_raw_fd();
             println!("Enter desired key data followed by the return key:");
-            StratKeyActions.set(key_desc, stdin_fd, Some(!no_tty))?
+            StratKeyActions.set(key_desc, stdin_fd)?
         }
     };
     match ret {
         MappingCreateAction::Identity => Err(StratisError::Error(format!(
             "Key with key description {} was unchanged by the set action",
-            key_desc
+            key_desc.as_application_str()
         ))),
         MappingCreateAction::Created(()) => Ok(()),
         MappingCreateAction::ValueChanged(()) => Ok(()),
     }
 }
 
-pub fn key_unset(key_desc: &str) -> StratisResult<()> {
+pub fn key_unset(key_desc: &KeyDescription) -> StratisResult<()> {
     match StratKeyActions.unset(key_desc)? {
         DeleteAction::Deleted(()) => Ok(()),
         DeleteAction::Identity => Err(StratisError::Error(format!(
             "Key with key description {} does not exist.",
-            key_desc
+            key_desc.as_application_str()
         ))),
     }
 }

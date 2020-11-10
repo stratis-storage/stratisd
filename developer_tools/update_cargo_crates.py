@@ -14,8 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-This script leverages cargo-outdated to generate information about Rust
-dependencies' outdatedness status with respect to the Koji package list.
+Calculates information comparing the versions of dependencies in a Rust project
+to the versions of dependencies available on Fedora Rawhide.
 """
 
 
@@ -24,389 +24,190 @@ import argparse
 import re
 import subprocess
 import sys
+from collections import defaultdict, namedtuple
 
 # isort: THIRDPARTY
 import requests
+from networkx import MultiDiGraph
+from networkx.algorithms.dag import all_topological_sorts
+from networkx.drawing.nx_pydot import write_dot
+from semantic_version import Spec, Version
+
+PLATFORM = "unix"
+OS = "linux"
+
+CARGO_OUTDATED_PLACE_HOLDER = "---"
+CARGO_OUTDATED_REMOVED = "Removed"
+
+CARGO_OUTDATED_RE = re.compile(
+    # pylint: disable=line-too-long
+    r"(?P<name>[^\s]*)\s*(?P<project>[^\s]*)\s*(?P<compat>[^\s]*)\s*(?P<latest>[^\s]*)\s*(?P<kind>[^\s]*)\s*(?P<platform>.*)"
+)
+CARGO_TREE_RE = re.compile(r"(?P<crate>[a-z0-9_\-]+) v(?P<version>[0-9\.]+)( \(.*\))?$")
+CFG_RE = re.compile(r"cfg\((?P<body>([^-]*))\)$")
+KEY_VALUE_RE = re.compile(r"(?P<key>.*) = \"(?P<value>.*)\"$")
+KOJI_RE = re.compile(
+    r"^toplink/packages/rust-(?P<name>[^\/]*?)/(?P<version>[^\/]*?)/[^]*)]*"
+)
+RE_DICT = {
+    "all_re": re.compile(r"all\(([^-]*)\)$"),
+    "any_re": re.compile(r"any\(([^-]*)\)$"),
+    "not_re": re.compile(r"not\(([^-]*)\)$"),
+}
+VERSION_FMT_STR = "{} ({})"
+
+Results = namedtuple(
+    "Results",
+    [
+        "uninteresting",
+        "up_to_date",
+        "not_found",
+        "auto_update",
+        "fedora_up_to_date",
+        "requires_edit",
+    ],
+)
 
 
-def build_rustc_cfg_dict():
-    """
-    :returns: dict containing information from the output of `rustc --print cfg`
-    the keys are the string representations of compilation environment identifers
-    the values are the string representations of the allowed compilation environment
-    identifer values
-    :rtype: dict
-    """
-    command = ["rustc", "--print", "cfg"]
-    proc = subprocess.Popen(command, stdout=subprocess.PIPE)
-
-    rustc_cfg_dict = {}
-
-    rustc_cfg_pattern = r'target_([^\s]*)="([^\s]*)"'
-    rustc_cfg_re = re.compile(rustc_cfg_pattern)
-
-    while True:
-        line = proc.stdout.readline()
-
-        if line == b"":
-            break
-
-        line_str = line.decode("utf-8")
-        rustc_cfg_match = rustc_cfg_re.match(line_str)
-
-        if rustc_cfg_match is not None:
-            key = "target_" + rustc_cfg_match.group(1)
-            value = rustc_cfg_match.group(2)
-            rustc_cfg_dict[key] = value
-
-        elif rustc_cfg_match != "debug_assertions":
-            rustc_cfg_dict["cfg"] = line_str.rstrip()
-
-    return rustc_cfg_dict
-
-
-def process_all(all_match, all_re, any_re, not_re, rustc_cfg_dict):
-    """
-    :param all_match: a match to the compiled "all" regular expression
-    :type all_match: re.Match
-    :param any_re: the compiled "any" regular expression
-    :type any_re: re.Pattern
-    :param not_re: the compiled "not" regular expression
-    :type not_re: re.Pattern
-    :param rustc_cfg_dict: dict containing information from the output of
-    `rustc --print cfg`
-    :type rustc_cfg_dict: dict
-    :returns: a bool indicating whether or not this "all" argument should
-    be included based on the contents of rustc_cfg_dict
-    :rtype: bool
-    """
-    all_args = all_match.group(1).split(", ")
-
-    for all_arg in all_args:
-        all_match = all_re.match(all_arg)
-        any_match = any_re.match(all_arg)
-        not_match = not_re.match(all_arg)
-
-        if all_match is not None:
-            if not process_all(all_match, all_re, any_re, not_re, rustc_cfg_dict):
-                return False
-
-        elif any_match is not None:
-            if not process_any(any_match, all_re, any_re, not_re, rustc_cfg_dict):
-                return False
-
-        elif not_match is not None:
-            if not process_not(not_match, all_re, any_re, not_re, rustc_cfg_dict):
-                return False
-
-        elif not process_basic(all_arg, rustc_cfg_dict):
-            return False
-
-    return True
-
-
-def process_any(any_match, all_re, any_re, not_re, rustc_cfg_dict):
-    """
-    :param any_match: a match to the compiled "any" regular expression
-    :type any_match: re.Match
-    :param all_re: the compiled "all" regular expression
-    :type all_re: re.Pattern
-    :param any_re: the compiled "any" regular expression
-    :type any_re: re.Pattern
-    :param not_re: the compiled "not" regular expression
-    :type not_re: re.Pattern
-    :param rustc_cfg_dict: dict containing information from the output of
-    `rustc --print cfg`
-    :type rustc_cfg_dict: dict
-    :returns: a bool indicating whether or not this "any" argument should
-    be included based on the contents of rustc_cfg_dict
-    :rtype: bool
-    """
-    any_args = any_match.group(1).split(", ")
-    for any_arg in any_args:
-        all_match = all_re.match(any_arg)
-        any_match = any_re.match(any_arg)
-        not_match = not_re.match(any_arg)
-
-        if all_match is not None:
-            if not process_all(all_match, all_re, any_re, not_re, rustc_cfg_dict):
-                return True
-
-        elif any_match is not None:
-            if not process_any(any_match, all_re, any_re, not_re, rustc_cfg_dict):
-                return True
-
-        elif not_match is not None:
-            if not process_not(not_match, all_re, any_re, not_re, rustc_cfg_dict):
-                return True
-
-        elif process_basic(any_arg, rustc_cfg_dict):
-            return True
-
-    return False
-
-
-def process_not(not_match, all_re, any_re, not_re, rustc_cfg_dict):
-    """
-    :param not_match: a match to the compiled "not" regular expression
-    :type not_match: re.Match
-    :param all_re: the compiled "all" regular expression
-    :type all_re: re.Pattern
-    :param any_re: the compiled "any" regular expression
-    :type any_re: re.Pattern
-    :param not_re: the compiled "not" regular expression
-    :type not_re: re.Pattern
-    :param rustc_cfg_dict: dict containing information from the output of
-    `rustc --print cfg`
-    :type rustc_cfg_dict: dict
-    :returns: whether or not this "not" argument should be included based
-    on the contents of rustc_cfg_dict
-    :rtype: bool
-    """
-    not_arg = not_match.group(1)
-
-    all_match = all_re.match(not_arg)
-    if all_match is not None:
-        return not process_all(all_match, all_re, any_re, not_re, rustc_cfg_dict)
-
-    any_match = any_re.match(not_arg)
-    if any_match is not None:
-        return not process_any(any_match, all_re, any_re, not_re, rustc_cfg_dict)
-
-    not_match = not_re.match(not_arg)
-    if not_match is not None:
-        return not process_not(not_match, all_re, any_re, not_re, rustc_cfg_dict)
-
-    return not process_basic(not_arg, rustc_cfg_dict)
-
-
-def process_basic(configuration_option, rustc_cfg_dict):
+def _check_cfg(configuration_option):
     """
     :param configuration_option: the string representation of the configuration
     option
-    :type basic_match: str
-    :param rustc_cfg_dict: dict containing information from the output of
-    `rustc --print cfg`
-    :type rustc_cfg_dict: dict
-    :returns: a bool indicating whether or not this "basic" argument should
-    be included based on the contents of rustc_cfg_dict
+    :type configuration option: str
+    :returns: a bool indicating whether or not this configuration option
+    indicates that the dependency is relevant. May return a false positive if
+    the configuration option is sufficiently complex.
     :rtype: bool
     """
-    key_value_pattern = r"([^-]*) = \"([^-]*)\""
-    key_value_re = re.compile(key_value_pattern)
-    key_value_match = key_value_re.match(configuration_option)
-
-    if key_value_match is not None:
-        return bool(
-            rustc_cfg_dict[key_value_match.group(1)] == key_value_match.group(2)
-        )
-
-    return bool(rustc_cfg_dict["cfg"] == configuration_option)
-
-
-def build_re_dict(cargo_outdated_platform):
-    """
-    :param cargo_outdated_platform: the string representation of the
-    platform outputted by `cargo outdated`
-    :type cargo_outdated_platform: str
-    :returns: dict containing regular expression information surrounding
-    cargo_outdated_platform
-    the keys are the string descriptions of re.Pattern objects and of
-    re.Match or NoneType objects
-    the values are the re.Pattern objects and the re.Match or NoneType
-    objects described by the keys
-    :rtype: dict
-    """
-
-    re_dict = {}
-
-    all_pattern = r"all\(([^-]*)\)"
-    any_pattern = r"any\(([^-]*)\)"
-    not_pattern = r"not\(([^-]*)\)"
-
-    re_dict["all_re"] = re.compile(all_pattern)
-    re_dict["any_re"] = re.compile(any_pattern)
-    re_dict["not_re"] = re.compile(not_pattern)
-
-    re_dict["all_match"] = re_dict["all_re"].match(cargo_outdated_platform)
-    re_dict["any_match"] = re_dict["any_re"].match(cargo_outdated_platform)
-    re_dict["not_match"] = re_dict["not_re"].match(cargo_outdated_platform)
-
-    return re_dict
-
-
-def parse_cfg_format_platform(cfg_match, rustc_cfg_dict):
-    """
-    :param cfg_match: the re.Match representation of the "cfg"-format platform
-    to parse
-    :type cfg_match: re.Match
-    :param rustc_cfg_dict: dict containing information from the output of
-    `rustc --print cfg`
-    :type rustc_cfg_dict: dict
-    :returns: a bool indicating whether or not this "cfg"-format platform should
-    be included based on the contents of rustc_cfg_dict
-    :rtype: bool
-    """
-    re_dict = build_re_dict(cfg_match.group(1))
-
-    if re_dict["all_match"] is not None:
-        return process_all(
-            re_dict["all_match"],
-            re_dict["all_re"],
-            re_dict["any_re"],
-            re_dict["not_re"],
-            rustc_cfg_dict,
-        )
-
-    if re_dict["any_match"] is not None:
-        return process_any(
-            re_dict["any_match"],
-            re_dict["all_re"],
-            re_dict["any_re"],
-            re_dict["not_re"],
-            rustc_cfg_dict,
-        )
-
-    if re_dict["not_match"] is not None:
-        return process_not(
-            re_dict["not_match"],
-            re_dict["all_re"],
-            re_dict["any_re"],
-            re_dict["not_re"],
-            rustc_cfg_dict,
-        )
-
-    return process_basic(cfg_match.group(1), rustc_cfg_dict)
-
-
-def parse_target_format_platform(unparsed_platform, rustc_cfg_dict):
-    """
-    :param unparsed_platform: the string representation of the "target"-format
-    platform to parse
-    :type unparsed_platform: str
-    :param rustc_cfg_dict: dict containing information from the output of
-    `rustc --print cfg`
-    :type rustc_cfg_dict: dict
-    :returns: a bool indicating whether or not this "target"-format platform
-    should be included based on the contents of rustc_cfg_dict
-    :rtype: bool
-    """
-    if unparsed_platform == "---":
+    if any(re.match(configuration_option) is not None for re in RE_DICT.values()):
         return True
 
-    target_components = unparsed_platform.split("-")
-    return (
-        len(target_components) == 4
-        and rustc_cfg_dict["target_arch"] == target_components[0]
-        and rustc_cfg_dict["target_vendor"] == target_components[1]
-        and rustc_cfg_dict["target_os"] == target_components[2]
-        and rustc_cfg_dict["target_env"] == target_components[3]
-    )
+    key_value_match = KEY_VALUE_RE.match(configuration_option)
+    if key_value_match is not None:
+        return (
+            key_value_match.group("value") == OS
+            if key_value_match.group("key") == "target_os"
+            else True
+        )
+
+    return configuration_option == PLATFORM
 
 
-def parse_platform(unparsed_platform):
+def _check_relevance(platform):
     """
-    :param unparsed_platform: the string representation of the platform to parse
-    :type unparsed_platform: str
-    :returns: a bool indicating whether or not this platform should be included
-    based on the contents of rustc_cfg_dict
+    Determines whether the platform is relevant. Returns True in case of
+    uncertainty.
+
+    :param str platform: the string representation of the platform annotation
+    :returns: True if the annotation indicates that the crate is relevant
     :rtype: bool
     """
 
-    cfg_pattern = r"cfg\(([^-]*)\)"
-    cfg_re = re.compile(cfg_pattern)
-    cfg_match = cfg_re.match(unparsed_platform)
+    if platform == CARGO_OUTDATED_PLACE_HOLDER:
+        return True
 
-    rustc_cfg_dict = build_rustc_cfg_dict()
-
+    cfg_match = CFG_RE.match(platform)
     if cfg_match is not None:
-        return parse_cfg_format_platform(cfg_match, rustc_cfg_dict)
+        return _check_cfg(cfg_match.group("body"))
 
-    return parse_target_format_platform(unparsed_platform, rustc_cfg_dict)
+    target_components = platform.split("-")
+    return len(target_components) == 4 and target_components[2] == OS
 
 
-def build_cargo_outdated_dict():
+def _build_cargo_tree_dict():
     """
-    :returns: a dictionary containing information from the output of `cargo
-    outdated`
-    the keys are the string representations of dependencies
-    the values are 4-tuples containing
-    1) the string represenation of the dependency's version (i.e. from the
-    "Project" column of the output of `cargo outdated`,
-    2) the string representation of the dependency the dependency is pulled in by
-    or None if the dependency is not pulled in by any dependency
-    3) the string representation of the dependency's platform information (i.e.
-    from the "Platform" column of the ouput of `cargo outdated`
-    4) a bool indicating whether or not the dependency should be "included", with
-    respect to the platform information
-    :rtype: dict
-    """
-    cargo_outdated_dict = {}
+    Build a map of crate names to versions from the output of cargo tree
 
+    :returns: a map from crates names to sets of versions
+    :rtype: dict of str * set of Version
+    """
+    command = ["cargo", "tree"]
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE)
+
+    stream = proc.stdout
+    stream.readline()  # omit libstratis, it's not packaged for Fedora
+
+    version_dict = defaultdict(set)
+    while True:
+        line = stream.readline()
+
+        if line == b"":
+            break
+
+        line_str = line.decode("utf-8").strip()
+        if (
+            # pylint: disable=bad-continuation
+            line_str.find("build-dependencies") != -1
+            or line_str.find("dev-dependencies") != -1
+        ):
+            continue
+        cargo_tree_match = CARGO_TREE_RE.search(line_str)
+        assert cargo_tree_match is not None, line_str
+        version_dict[cargo_tree_match.group("crate")].add(
+            Version(cargo_tree_match.group("version"), partial=True)
+        )
+
+    return version_dict
+
+
+def _build_cargo_outdated_graph():
+    """
+    :returns: A graph representation of `cargo updated` output
+    :rtype: MultiDiGraph
+    """
     command = ["cargo", "outdated"]
     proc = subprocess.Popen(command, stdout=subprocess.PIPE)
 
-    cargo_outdated_pattern = (
-        r"([^\s]*)\s*([^\s]*)\s*([^\s]*)\s*([^\s]*)\s*([^\s]*)\s*(.*)"
-    )
-    cargo_outdated_re = re.compile(cargo_outdated_pattern)
+    stream = proc.stdout
 
+    stream.readline()
+    stream.readline()
+
+    dependency_graph = MultiDiGraph()
     while True:
-        line = proc.stdout.readline()
+        line = stream.readline()
 
         if line == b"":
             break
 
         line_str = line.decode("utf-8")
-        cargo_outdated_match = cargo_outdated_re.match(line_str)
+        cargo_outdated_match = CARGO_OUTDATED_RE.match(line_str)
 
-        if cargo_outdated_match.group(1) in ("Name", "----"):
-            continue
-
-        dependencies = cargo_outdated_match.group(1)
+        dependencies = cargo_outdated_match.group("name")
         dependencies_split = dependencies.split("->")
-
         dependency = dependencies_split.pop(-1)
-
-        # pylint: disable=fixme
-        # FIXME: This implementation records exactly one version for every given dependency.
-        # In reality, a dependency may be pulled in by multiple different packages and that
-        # dependency may have different versions each time.
-
-        version = cargo_outdated_match.group(2)
         pulled_in_by = None if dependencies_split == [] else dependencies_split[0]
-        platform = cargo_outdated_match.group(6)
-        include = parse_platform(platform)
+        if pulled_in_by is None:
+            dependency_graph.add_node(
+                dependency,
+                platform=cargo_outdated_match.group("platform"),
+                project=cargo_outdated_match.group("project"),
+                compat=cargo_outdated_match.group("compat"),
+                latest=cargo_outdated_match.group("latest"),
+                kind=cargo_outdated_match.group("kind"),
+            )
+        else:
+            dependency_graph.add_edge(
+                pulled_in_by,
+                dependency,
+                platform=cargo_outdated_match.group("platform"),
+                project=cargo_outdated_match.group("project"),
+                compat=cargo_outdated_match.group("compat"),
+                latest=cargo_outdated_match.group("latest"),
+                kind=cargo_outdated_match.group("kind"),
+            )
 
-        cargo_outdated_dict[dependency] = (
-            version,
-            pulled_in_by,
-            platform,
-            include,
-        )
-
-    return cargo_outdated_dict
+    return dependency_graph
 
 
-def build_koji_repo_dict(cargo_outdated_dict):
+def _build_koji_repo_dict(cargo_tree):
     """
-    :param cargo_outdated_dict: a dictionary containing information from the
-    output of `cargo outdated`
+    :param cargo_tree: a table of crates and versions
+    :type cargo_tree: dict of str * set of Version
+    :returns: a dictionary containing information from the koji repo webpage
     the keys are the string representations of dependencies
-    the values are 4-tuples containing
-    1) the string represenation of the dependency's version (i.e. from the
-    "Project" column of the output of `cargo outdated`,
-    2) the string representation of the dependency the dependency is pulled in by
-    or None if the dependency is not pulled in by any dependency
-    3) the string representation of the dependency's platform information (i.e.
-    from the "Platform" column of the ouput of `cargo outdated`
-    4) a bool indicating whether or not the dependency should be "included", with
-    respect to the platform information
-    :type cargo_outdated_dict: dict
-    :returns: a dictioonary containing information from the koji repo webpage
-    the keys are the string representations of dependencies
-    the values are the string representations of versions of dependencies
-    :rtype: dict
+    the values are the versions of dependencies
+    :rtype: dict of str * Version
     """
     koji_repo_dict = {}
 
@@ -415,277 +216,448 @@ def build_koji_repo_dict(cargo_outdated_dict):
     )
     packages = requests_var.text
 
-    pattern = r"^toplink/packages/(rust-)?([^\/]*?)/([^\/]*?)/[^]*)]*"
-    my_reg_ex = re.compile(pattern)
-
     for line in packages.splitlines():
-        matches = my_reg_ex.match(line)
-        if matches.group(2) in cargo_outdated_dict.keys():
-            koji_repo_dict[matches.group(2)] = matches.group(3)
+        matches = KOJI_RE.match(line)
+        if matches is None:
+            continue
+        name = matches.group("name")
+        if name in cargo_tree:
+            koji_repo_dict[name] = Version(matches.group("version"), partial=True)
 
+    # Post-condition: koji_repo_dict.keys() <= cargo_tree.keys().
+    # cargo tree may show internal dependencies that are not separate packages
     return koji_repo_dict
 
 
-def build_and_print_command(outdated_dict):
+def _make_spec(project, compat):
     """
-    :param outdated_dict: the dictionary of the string representations
-    of outdated dependencies and the string representations of the
-    versions they ought to be updated to
-    :type outdated_dict: dict
+    Make a version specification for the range between project and compatible
+    versions. Handle special symbols.
+
+    :param str project: the curent project version
+    :param str compat: the highest compatible project version
+    :returns: the spec
+    :rtype: Spec
     """
-
-    command = ""
-    for key in outdated_dict:
-        command += "cargo update -p {} --precise {}\n".format(key, outdated_dict[key])
-
-    print("\n\nUSE THESE COMMANDS TO UPDATE PACKAGES\n")
-
-    print(command)
-
-
-def print_verbose_results(table_data):
-    """
-    :param table_data: the data to be printed out in a tablular format
-    :type table_data: list of lists
-    """
-    print("\n\nVERBOSE RESULTS\n")
-
-    for row in table_data:
-        print("{: <30} {: <10} {: <10} {: <10} {: <10} {: <30}".format(*row))
-
-
-def print_results(results):
-    """
-    :param results: a 4-tuple containing:
-    1) the dictionary of the string representations of outdated dependencies and the
-    string representations of the versions they ought to be updated to
-    2) the list of the string representations of the not-outdated dependencies
-    3) the list of the string representations of the not-found dependencies
-    4) the list of the string representations of the not-included dependencies
-    :type results: 4-tuple of dict, list, list, list
-    """
-    print("\n\nRESULTS")
-
-    print(
-        "\nThe following crates that were outputted by 'cargo outdated' are outdated"
-        " with respect to the koji repo, and should be updated to the following versions:"
+    return Spec(
+        "==%s" % project
+        if compat == CARGO_OUTDATED_PLACE_HOLDER
+        else ">=%s,<=%s" % (project, compat)
     )
-    print(results[0])
-
-    print(
-        "\nThe following crates that were outputted by 'cargo outdated' are not outdated"
-        " with respect to the koji repo:"
-    )
-    print(results[1])
-
-    print(
-        "\nThe following crates that were outputted by 'cargo outdated' were not found"
-        " in the koji repo:"
-    )
-    print(results[2])
-
-    print(
-        "\nThe following crates that were outputted by 'cargo outdated' have an irrelevant"
-        " platform and may or may not be outdated:"
-    )
-    print(results[3])
 
 
-def get_overall_include(cargo_outdated_dict, key):
+def _build_edge(edge):
     """
-    :param cargo_outdated_dict: a dictionary containing information from the
-    output of `cargo outdated`
-    the keys are the string representations of dependencies
-    the values are 4-tuples containing
-    1) the string represenation of the dependency's version (i.e. from the
-    "Project" column of the output of `cargo outdated`,
-    2) the string representation of the dependency the dependency is pulled in by
-    or None if the dependency is not pulled in by any dependency
-    3) the string representation of the dependency's platform information (i.e.
-    from the "Platform" column of the ouput of `cargo outdated`
-    4) a bool indicating whether or not the dependency should be "included", with
-    respect to the platform information
-    :type cargo_outdated_dict: dict
-    :param koji_repo_dict: a dictionary containing information from the koji repo webpage
-    the keys are the string representations of dependencies
-    the values are the string representations of versions of dependencies
-    :type koji_repo_dict: dict
-    :param key: the crate for which the "overall include" boolean should be determined
-    :type key: str
-    :returns: a bool indicating whether or not the key should be included with all the
-    dependencies it depends on taken into account
+    Build a multigraph graph edge.
+
+    Since there may be multiple edges between the same nodes, there is a
+    third entry, which is the index. Mostly there is only one edge, and in
+    that case the index is left out and has to be appended.
+
+    :returns: a triple represeting an edge
+    :rtype: tuple of str * str * int
+    """
+    edge = list(edge)
+    if len(edge) == 2:
+        edge.append(0)
+    return edge
+
+
+def _removable_node(graph, node):
+    """
+    Determine if a node can be removed from the graph.
+
+    It can be if it is descended only from nodes that can be removed.
+
+    If it is not descended from any nodes it can be removed if it is itself
+    removable.
+
+    Precondition: the node is a leaf
+    :return: True if the node is irrelevant to Fedora packaging, else False
     :rtype: bool
     """
+    if list(graph.in_edges(node)) == []:
+        platform = graph.nodes[node].get("platform")
+        return False if platform is None else not _check_relevance(platform)
 
-    current_key = key
-    pulled = cargo_outdated_dict[current_key][1]
-    include = cargo_outdated_dict[current_key][3]
-
-    if not include:
-        return False
-
-    while pulled in cargo_outdated_dict and cargo_outdated_dict[pulled] is not None:
-        if not cargo_outdated_dict[pulled][3]:
+    result = True
+    for edge in graph.in_edges(node):
+        edge = _build_edge(edge)
+        attrs = graph.edges[edge[0], edge[1], edge[2]]
+        if _check_relevance(attrs["platform"]) and not _removable_node(graph, edge[0]):
             return False
-        current_key = pulled
-        pulled = cargo_outdated_dict[current_key][1]
 
-    return True
+    return result
 
 
-def build_results(cargo_outdated_dict, koji_repo_dict):
+def _strip_irrelevant_nodes(cargo_outdated):
     """
-    :param cargo_outdated_dict: a dictionary containing information from the
-    output of `cargo outdated`
-    the keys are the string representations of dependencies
-    the values are 4-tuples containing
-    1) the string represenation of the dependency's version (i.e. from the
-    "Project" column of the output of `cargo outdated`,
-    2) the string representation of the dependency the dependency is pulled in by
-    or None if the dependency is not pulled in by any dependency
-    3) the string representation of the dependency's platform information (i.e.
-    from the "Platform" column of the ouput of `cargo outdated`
-    4) a bool indicating whether or not the dependency should be "included", with
-    respect to the platform information
-    :type cargo_outdated_dict: dict
+    Remove nodes that are irrelevant to Fedora.
+
+    :returns: a list of the nodes removed
+    :rtype: list of str
+    """
+
+    uninteresting = []
+    while True:
+        remove = None
+        for node in cargo_outdated.nodes:
+            if list(cargo_outdated.successors(node)) != []:
+                continue
+
+            if _removable_node(cargo_outdated, node):
+                remove = node
+                break
+            remove = None
+
+        if remove is None:
+            break
+
+        uninteresting.append(remove)
+        cargo_outdated.remove_node(remove)
+
+    return uninteresting
+
+
+def _find_up_to_date_nodes(cargo_outdated):
+    """
+    Find crates that are entirely up-to-date with the version published on
+    crates.io.
+
+    :returns: a list of the up-to-date crates
+    :rtype: set of str
+    """
+    up_to_date = set()
+    for node in cargo_outdated.nodes:
+        if list(cargo_outdated.predecessors(node)) != []:
+            continue
+        # found root of a graph, has no outdated parents, has no entry for
+        # itself.
+        if cargo_outdated.nodes[node] == {}:
+            up_to_date.add(node)
+
+    return up_to_date
+
+
+def _find_root_nodes(cargo_outdated):
+    """
+    Find all root nodes listed in the cargo outdated output.
+    These represent crates specified in the Cargo.toml file for this project.
+
+    :returns: a set of the outdated root nodes
+    :rtype: set of str
+    """
+    root = set()
+    for node in cargo_outdated.nodes:
+        if list(cargo_outdated.predecessors(node)) != []:
+            continue
+        if cargo_outdated.nodes[node] != {}:
+            root.add(node)
+
+    return root
+
+
+def _get_current_versions(cargo_outdated, node):
+    """
+    Get all current versions for a crate
+
+    Precondition: node is not up-to-date, so it either has parents or it
+    has attributes.
+
+    :returns: the set of current versions
+    :rtype: set of str
+    """
+    current_versions = set()
+    for edge in cargo_outdated.in_edges(node):
+        edge = _build_edge(edge)
+        attributes = cargo_outdated.edges[edge[0], edge[1], edge[2]]
+        current_versions.add(attributes["project"])
+
+    return (
+        set([cargo_outdated.nodes[node]["project"]])
+        if current_versions == set()
+        else current_versions
+    )
+
+
+def _get_specs(cargo_outdated, node):
+    """
+    Get the spec ranges from current to highest available auto-updatable
+
+    Precondition: node is not up-to-date, so it either has parents or it
+    has attributes.
+
+    :returns: the set of current specs. If the second part is "Removed"
+    omits the spec.
+
+    :returns: a set of specs
+    :rtype: set of Spec
+    """
+    specs = set()
+    for edge in cargo_outdated.in_edges(node):
+        edge = _build_edge(edge)
+        attributes = cargo_outdated.edges[edge[0], edge[1], edge[2]]
+        compat = attributes["compat"]
+        if compat != CARGO_OUTDATED_REMOVED:
+            specs.add(_make_spec(attributes["project"], compat))
+
+    if specs == set():
+        attributes = cargo_outdated.nodes[node]
+        # if this node has parents, but the only relevant ones have a
+        # Removed relationship in the second part of the spec, then
+        # it's possible for specs to be still empty even though the node
+        # is not up-to-date. So, it is necessary to check for empty
+        # attributes.
+        if attributes == {}:
+            return set()
+        compat = attributes["compat"]
+        if compat != CARGO_OUTDATED_REMOVED:
+            return set([_make_spec(attributes["project"], compat)])
+        return set()
+
+    return specs
+
+
+def _build_results(cargo_outdated, koji_repo_dict):
+    """
+    Precondition: It has already been verified that cargo_outdated contains
+    no crates with versions greater than the Fedora version.
+
+    :param cargo_outdated: information from the output of `cargo outdated`
+    :type cargo_outdated: MultiDiGraph
     :param koji_repo_dict: a dictionary containing information from the koji repo webpage
     the keys are the string representations of dependencies
     the values are the string representations of versions of dependencies
-    :type koji_repo_dict: dict
+    :type koji_repo_dict: dict of str * Version
     :returns: the results in the form of a tuple
     :rtype: 2-tuple of tuple, list
     """
 
-    outdated = {}
-    not_outdated = []
-    not_found = []
-    not_included = []
-    table_data = []
+    uninteresting = _strip_irrelevant_nodes(cargo_outdated)
 
-    table_data.append(
-        ["Crate", "Outdated", "Current", "Update To", "Include", "Platform",]
-    )
-    table_data.append(
-        ["-----", "--------", "-------", "---------", "-------", "--------",]
+    up_to_date = _find_up_to_date_nodes(cargo_outdated)
+
+    not_found = set(
+        node
+        for node in cargo_outdated.node
+        if node not in koji_repo_dict and node not in up_to_date
     )
 
-    for key in cargo_outdated_dict:
-
-        version = cargo_outdated_dict[key][0]
-        pulled_in_by = cargo_outdated_dict[key][1]
-        platform = cargo_outdated_dict[key][2]
-
-        # Key was not found.
-        if key not in koji_repo_dict.keys():
-            not_found.append(key)
-
-            table_data.append([key, "N/A", version, "-", "N/A", platform])
+    auto_update = {}
+    fedora_up_to_date = {}
+    requires_edit = {}
+    for node in cargo_outdated.nodes:
+        if node in up_to_date or node in not_found:
             continue
 
-        overall_include = get_overall_include(cargo_outdated_dict, key)
+        current_versions = _get_current_versions(cargo_outdated, node)
 
-        if overall_include:
-            overall_include_str = "Yes"
-        else:
-            overall_include_str = "No"
+        koji_version = koji_repo_dict[node]
+        if all(koji_version == Version(version) for version in current_versions):
+            fedora_up_to_date[node] = koji_version
+            continue
 
-        # Key is outdated.
-        if koji_repo_dict[key] != version:
+        assert all(koji_version >= Version(version) for version in current_versions)
 
-            if pulled_in_by in cargo_outdated_dict:
-                if cargo_outdated_dict[pulled_in_by][3] and overall_include:
-                    outdated[key] = koji_repo_dict[key]
-                    table_data.append(
-                        [
-                            key,
-                            "Yes",
-                            version,
-                            koji_repo_dict[key],
-                            overall_include_str,
-                            platform,
-                        ]
-                    )
+        specs = _get_specs(cargo_outdated, node)
 
-                if cargo_outdated_dict[pulled_in_by][3] and not overall_include:
-                    not_included.append(key)
-                    table_data.append(
-                        [
-                            key,
-                            "Yes",
-                            version,
-                            koji_repo_dict[key],
-                            overall_include_str,
-                            platform,
-                        ]
-                    )
+        if all(koji_version in spec for spec in specs):
+            auto_update[node] = koji_version
+            continue
 
-        # Key is up-to-date.
-        if koji_repo_dict[key] == version:
-            if pulled_in_by in cargo_outdated_dict:
+        requires_edit[node] = koji_version
 
-                if cargo_outdated_dict[pulled_in_by][3] and overall_include:
-                    not_outdated.append(key)
-                    table_data.append(
-                        [
-                            key,
-                            "No",
-                            version,
-                            koji_repo_dict[key],
-                            overall_include_str,
-                            platform,
-                        ]
-                    )
-
-                if cargo_outdated_dict[pulled_in_by][3] and not overall_include:
-                    not_included.append(key)
-                    table_data.append(
-                        [
-                            key,
-                            "No",
-                            version,
-                            koji_repo_dict[key],
-                            overall_include_str,
-                            platform,
-                        ]
-                    )
-
-    return (
-        (outdated, not_outdated, not_found, not_included),
-        table_data,
+    return Results(
+        uninteresting=uninteresting,
+        up_to_date=up_to_date,
+        not_found=not_found,
+        auto_update=auto_update,
+        fedora_up_to_date=fedora_up_to_date,
+        requires_edit=requires_edit,
     )
 
 
-def main():
+def main():  # pylint: disable=too-many-branches, too-many-locals, too-many-statements
     """
     The main method
     """
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description=(
+            "A script to process the output of the cargo-outdated command and "
+            "information about Fedora packages in order to make "
+            "recommendations about desirable updates"
+        )
+    )
     parser.add_argument(
-        "-v",
-        "--verbose",
-        help="print table with more detailed information",
-        dest="verbose",
+        "--auto-update",
+        help=(
+            "Print crates which can be automatically updated to the current "
+            "Fedora version using cargo-update. If list is specified print "
+            "a list, if command, print cargo-update commands instead"
+        ),
+        dest="auto_update",
+        action="store",
+        choices=["list", "command"],
+    )
+    parser.add_argument(
+        "--dependent",
+        help=(
+            "Print crates reported by the cargo-outdated command that "
+            "appear to be pinned to a low version by a dependent crate of this "
+            "project"
+        ),
+        dest="dependent",
         action="store_true",
     )
     parser.add_argument(
-        "-c",
-        "--command",
-        help="print command(s) that would update crates as necessary",
-        dest="command",
+        "--fedora-up-to-date",
+        help=(
+            "Print crates reported by the cargo-outdated command that "
+            "have the same version as the Fedora rawhide package but are not "
+            "up-to-date with respect to crates.io"
+        ),
+        dest="futd",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--irrelevant",
+        help=(
+            "Print crates reported by the cargo-outdated command but "
+            "actually irrelevant, since they are included only on non-Fedora "
+            "platforms, e.g., windows"
+        ),
+        dest="irrelevant",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--manual",
+        help=(
+            "Print crates reported by the cargo-outdated command that lag "
+            "the versions in Fedora but cannot be updated via cargo-update. "
+            "Print only those that can be changed by editing the Cargo.toml "
+            "for this project."
+        ),
+        dest="manual",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--not-found",
+        help=(
+            "Print crates reported by the cargo-outdated command but "
+            "apparently not available on Fedora"
+        ),
+        dest="missing",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--search",
+        help=("Find out how packages are classified at this time"),
+        dest="search",
+        default=[],
+        action="append",
+    )
+    parser.add_argument(
+        "--up-to-date",
+        help=(
+            "Print crates reported by the cargo-outdated command that are "
+            "entirely up-to-date with respect to the version released on "
+            "crates.io"
+        ),
+        dest="up_to_date",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--write",
+        help=("Export dependency graph to dot format"),
+        dest="write",
         action="store_true",
     )
     args = parser.parse_args()
 
-    cargo_outdated_dict = build_cargo_outdated_dict()
-    koji_repo_dict = build_koji_repo_dict(cargo_outdated_dict)
-    results = build_results(cargo_outdated_dict, koji_repo_dict)
-    print_results(results[0])
+    cargo_tree = _build_cargo_tree_dict()
+    koji_repo_dict = _build_koji_repo_dict(cargo_tree)
 
-    if args.command:
-        build_and_print_command(results[0][0])
+    for crate, versions in cargo_tree.items():
+        koji_version = koji_repo_dict.get(crate)
+        if koji_version is None:
+            continue
+        if any(version > koji_version for version in versions):
+            print(
+                "Some version of crate %s higher than maximum %s"
+                % (crate, koji_version),
+                file=sys.stderr,
+            )
+            return 1
 
-    if args.verbose:
-        print_verbose_results(results[1])
+    cargo_outdated = _build_cargo_outdated_graph()
+    result = _build_results(cargo_outdated, koji_repo_dict)
+
+    node_count = len(list(cargo_outdated.nodes))
+    result_count = sum(
+        len(getattr(result, res)) for res in result._fields if res != "uninteresting"
+    )
+
+    if node_count != result_count:
+        print(
+            "node count %s != result count %s" % (node_count, result_count),
+            file=sys.stderr,
+        )
+        return 1
+
+    if args.auto_update:
+        if args.auto_update == "command":
+            fmt_str = "cargo update -p {} --precise {}"
+        else:
+            fmt_str = VERSION_FMT_STR
+
+        subgraph = cargo_outdated.subgraph(result.auto_update.keys())
+        for crate in reversed(next(all_topological_sorts(subgraph))):
+            print(fmt_str.format(crate, result.auto_update[crate]))
+
+    if args.dependent:
+        root_nodes = _find_root_nodes(cargo_outdated)
+        for crate, version in sorted(result.requires_edit.items()):
+            if crate not in root_nodes:
+                print(VERSION_FMT_STR.format(crate, version))
+
+    if args.futd:
+        for crate, version in sorted(result.fedora_up_to_date.items()):
+            print(VERSION_FMT_STR.format(crate, version))
+
+    if args.irrelevant:
+        for crate in sorted(result.uninteresting):
+            print(crate)
+
+    if args.manual:
+        root_nodes = _find_root_nodes(cargo_outdated)
+        for crate, version in sorted(result.requires_edit.items()):
+            if crate in root_nodes:
+                print(VERSION_FMT_STR.format(crate, version))
+
+    if args.missing:
+        for crate in sorted(result.not_found):
+            print(crate)
+
+    if args.search != []:
+        for crate in sorted(args.search):
+            owners = [
+                field for field in result._fields if crate in getattr(result, field)
+            ]
+            assert len(owners) in (0, 1), owners
+
+            if owners == []:
+                print("{} not found".format(crate))
+            else:
+                print("{} in {}".format(crate, owners[0]))
+
+    if args.up_to_date:
+        for crate in sorted(result.up_to_date):
+            print(crate)
+
+    if args.write:
+        write_dot(cargo_outdated, sys.stdout)
+
+    return 0
 
 
 if __name__ == "__main__":

@@ -20,7 +20,7 @@ use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
         event::get_engine_listener_list,
-        shared::init_cache_idempotent_or_err,
+        shared::{init_cache_idempotent_or_err, validate_name, validate_paths},
         sim_engine::{blockdev::SimDev, filesystem::SimFilesystem, randomization::Randomizer},
         structures::Table,
         types::{
@@ -152,6 +152,8 @@ impl Pool for SimPool {
         _pool_name: &str,
         blockdevs: &[&Path],
     ) -> StratisResult<SetCreateAction<DevUuid>> {
+        validate_paths(blockdevs)?;
+
         if self.is_encrypted() {
             return Err(StratisError::Engine(
                 ErrorEnum::Invalid,
@@ -188,6 +190,11 @@ impl Pool for SimPool {
         specs: &[(&'b str, Option<Sectors>)],
     ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid)>> {
         let names: HashMap<_, _> = HashMap::from_iter(specs.iter().map(|&tup| (tup.0, tup.1)));
+
+        names.iter().fold(Ok(()), |res, (name, _)| {
+            res.and_then(|()| validate_name(name))
+        })?;
+
         let mut result = Vec::new();
         for name in names.keys() {
             if !self.filesystems.contains_name(name) {
@@ -209,6 +216,8 @@ impl Pool for SimPool {
         paths: &[&Path],
         tier: BlockDevTier,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
+        validate_paths(paths)?;
+
         if tier == BlockDevTier::Cache && !self.has_cache() {
             return Err(StratisError::Engine(
                     ErrorEnum::Invalid,
@@ -279,6 +288,8 @@ impl Pool for SimPool {
         uuid: FilesystemUuid,
         new_name: &str,
     ) -> StratisResult<RenameAction<FilesystemUuid>> {
+        validate_name(new_name)?;
+
         let old_name = rename_filesystem_pre_idem!(self; uuid; new_name);
 
         let (_, filesystem) = self
@@ -304,6 +315,8 @@ impl Pool for SimPool {
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
     ) -> StratisResult<CreateAction<(FilesystemUuid, &mut dyn Filesystem)>> {
+        validate_name(snapshot_name)?;
+
         if self.filesystems.contains_name(snapshot_name) {
             return Ok(CreateAction::Identity);
         }
@@ -441,10 +454,8 @@ impl Pool for SimPool {
         self.datadevs_encrypted()
     }
 
-    fn key_desc(&self) -> Option<&str> {
-        self.block_devs_key_desc
-            .as_ref()
-            .map(|k| k.as_application_str())
+    fn key_desc(&self) -> Option<&KeyDescription> {
+        self.block_devs_key_desc.as_ref()
     }
 }
 

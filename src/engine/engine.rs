@@ -52,9 +52,8 @@ pub trait KeyActions {
     /// in the keyring but the key data was updated.
     fn set(
         &mut self,
-        key_desc: &str,
+        key_desc: &KeyDescription,
         key_fd: RawFd,
-        interactive: Option<bool>,
     ) -> StratisResult<MappingCreateAction<()>>;
 
     /// Return a list of all key descriptions of keys added to the keyring by
@@ -63,7 +62,7 @@ pub trait KeyActions {
 
     /// Unset a key with the given key description in the root persistent kernel
     /// keyring.
-    fn unset(&mut self, key_desc: &str) -> StratisResult<DeleteAction<()>>;
+    fn unset(&mut self, key_desc: &KeyDescription) -> StratisResult<DeleteAction<()>>;
 }
 
 /// An interface for reporting internal engine state.
@@ -258,7 +257,7 @@ pub trait Pool: Debug {
 
     /// Get key description for the key in the kernel keyring used for encryption
     /// if it is encrypted
-    fn key_desc(&self) -> Option<&str>;
+    fn key_desc(&self) -> Option<&KeyDescription>;
 }
 
 pub trait Engine: Debug + Report {
@@ -271,7 +270,7 @@ pub trait Engine: Debug + Report {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
-        key_desc: Option<String>,
+        key_desc: Option<KeyDescription>,
     ) -> StratisResult<CreateAction<PoolUuid>>;
 
     /// Handle a libudev event.

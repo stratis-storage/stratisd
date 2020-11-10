@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{clone::Clone, collections::HashMap, convert::TryFrom, path::Path};
+use std::{clone::Clone, collections::HashMap, path::Path};
 
 use serde_json::Value;
 
@@ -12,14 +12,14 @@ use crate::{
     engine::{
         engine::{Eventable, KeyActions},
         event::get_engine_listener_list,
-        shared::create_pool_idempotent_or_err,
+        shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         strat_engine::{
             cmd::verify_binaries,
             devlinks,
             dm::{get_dm, get_dm_init},
             keys::StratKeyActions,
             liminal::{find_all, LiminalDevices},
-            names::{validate_name, KeyDescription},
+            names::KeyDescription,
             pool::StratPool,
         },
         structures::Table,
@@ -177,11 +177,13 @@ impl Engine for StratEngine {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
-        key_desc: Option<String>,
+        key_desc: Option<KeyDescription>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
         let redundancy = calculate_redundancy!(redundancy);
 
         validate_name(name)?;
+
+        validate_paths(blockdev_paths)?;
 
         match self.pools.get_by_name(name) {
             Some((_, pool)) => create_pool_idempotent_or_err(pool, name, blockdev_paths),
@@ -192,17 +194,8 @@ impl Engine for StratEngine {
                         "At least one blockdev is required to create a pool.".to_string(),
                     ))
                 } else {
-                    let key_description = match key_desc {
-                        Some(desc) => Some(KeyDescription::try_from(desc)?),
-                        None => None,
-                    };
-
-                    let (uuid, pool) = StratPool::initialize(
-                        name,
-                        blockdev_paths,
-                        redundancy,
-                        key_description.as_ref(),
-                    )?;
+                    let (uuid, pool) =
+                        StratPool::initialize(name, blockdev_paths, redundancy, key_desc.as_ref())?;
 
                     let name = Name::new(name.to_owned());
                     self.pools.insert(name, uuid, pool);

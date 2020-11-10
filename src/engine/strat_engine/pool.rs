@@ -13,11 +13,11 @@ use devicemapper::{DmName, DmNameBuf, Sectors};
 use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
-        shared::init_cache_idempotent_or_err,
+        shared::{init_cache_idempotent_or_err, validate_name, validate_paths},
         strat_engine::{
             backstore::{Backstore, StratBlockDev},
             metadata::MDADataSize,
-            names::{validate_name, KeyDescription},
+            names::KeyDescription,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
@@ -141,6 +141,7 @@ impl StratPool {
     /// Initialize a Stratis Pool.
     /// 1. Initialize the block devices specified by paths.
     /// 2. Set up thinpool device to back filesystems.
+    /// Precondition: p.is_absolute() is true for all p in paths
     pub fn initialize(
         name: &str,
         paths: &[&Path],
@@ -343,6 +344,8 @@ impl Pool for StratPool {
         pool_name: &str,
         blockdevs: &[&Path],
     ) -> StratisResult<SetCreateAction<DevUuid>> {
+        validate_paths(blockdevs)?;
+
         if self.is_encrypted() {
             return Err(StratisError::Engine(
                 ErrorEnum::Invalid,
@@ -406,6 +409,8 @@ impl Pool for StratPool {
         paths: &[&Path],
         tier: BlockDevTier,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
+        validate_paths(paths)?;
+
         let bdev_info = if tier == BlockDevTier::Cache && !self.has_cache() {
             return Err(StratisError::Error(format!(
                             "No cache has been initialized for pool with UUID {} and name {}; it is therefore impossible to add additional devices to the cache",
@@ -603,10 +608,8 @@ impl Pool for StratPool {
         self.datadevs_encrypted()
     }
 
-    fn key_desc(&self) -> Option<&str> {
-        self.backstore
-            .data_key_desc()
-            .map(|k| k.as_application_str())
+    fn key_desc(&self) -> Option<&KeyDescription> {
+        self.backstore.data_key_desc()
     }
 }
 
@@ -631,6 +634,11 @@ mod tests {
     fn invariant(pool: &StratPool, pool_name: &str) {
         check_metadata(&pool.record(&Name::new(pool_name.into()))).unwrap();
         assert!(!(pool.is_encrypted() && pool.backstore.has_cache()));
+        assert!(pool
+            .backstore
+            .blockdevs()
+            .iter()
+            .all(|(_, _, bd)| bd.devnode().user_path().is_absolute()))
     }
 
     /// Verify that a pool with no devices does not have the minimum amount of

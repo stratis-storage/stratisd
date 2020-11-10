@@ -8,6 +8,9 @@ RUST_2018_IDIOMS = -D bare-trait-objects \
 
 DENY = -D warnings -D future-incompatible -D unused ${RUST_2018_IDIOMS}
 
+# Clippy deny variable, including allows for troublesome lints.
+# Notable allows:
+# option_if_let_else: causing problems with if-else chains
 CLIPPY_DENY = -D clippy::pedantic \
               -A clippy::cast_possible_wrap \
               -A clippy::cast_sign_loss \
@@ -27,6 +30,7 @@ CLIPPY_DENY = -D clippy::pedantic \
               -A clippy::module_name_repetitions \
               -A clippy::needless_pass_by_value \
               -A clippy::non_ascii_literal \
+              -A clippy::option_if_let_else \
               -A clippy::redundant-closure-for-method-calls \
               -A clippy::shadow_unrelated \
               -A clippy::single_match_else \
@@ -57,7 +61,7 @@ bloat: ${HOME}/.cargo/bin/cargo-bloat
 	PATH=${HOME}/.cargo/bin:${PATH} cargo bloat --release --crates
 
 audit: ${HOME}/.cargo/bin/cargo-audit
-	PATH=${HOME}/.cargo/bin:${PATH} cargo audit -D
+	PATH=${HOME}/.cargo/bin:${PATH} cargo audit -D warnings
 
 fmt:
 	cargo fmt

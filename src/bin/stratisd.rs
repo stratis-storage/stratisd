@@ -44,7 +44,7 @@ fn initialize_log(log_level: Option<&str>) {
                 .expect("argument parser only accepts valid log levels"),
         );
     } else if let Ok(s) = env::var("RUST_LOG") {
-        builder.parse(&s);
+        builder.parse_filters(&s);
     }
 
     builder.init()

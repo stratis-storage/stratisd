@@ -38,12 +38,6 @@ fn parse_args() -> App<'static, 'static> {
                             .long("--keyfile-path")
                             .takes_value(true),
                     )
-                    .arg(
-                        Arg::with_name("no_tty")
-                            .long("--no-tty")
-                            .takes_value(false)
-                            .conflicts_with("keyfile_path"),
-                    )
                     .arg(Arg::with_name("key_desc").required(true)),
                 SubCommand::with_name("list"),
                 SubCommand::with_name("unset").arg(Arg::with_name("key_desc").required(true)),
@@ -51,13 +45,7 @@ fn parse_args() -> App<'static, 'static> {
             SubCommand::with_name("pool").subcommands(vec![
                 SubCommand::with_name("unlock")
                     .arg(Arg::with_name("pool_uuid").required(true))
-                    .arg(Arg::with_name("prompt").long("--prompt").takes_value(false))
-                    .arg(
-                        Arg::with_name("no_tty")
-                            .long("--no-tty")
-                            .takes_value(false)
-                            .requires("prompt"),
-                    ),
+                    .arg(Arg::with_name("prompt").long("--prompt").takes_value(false)),
                 SubCommand::with_name("create")
                     .arg(Arg::with_name("name").required(true))
                     .arg(Arg::with_name("blockdevs").multiple(true).required(true))

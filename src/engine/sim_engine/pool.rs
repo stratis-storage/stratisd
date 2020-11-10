@@ -41,8 +41,10 @@ use crate::{
 pub struct SimPool {
     block_devs: HashMap<DevUuid, SimDev>,
     block_devs_key_desc: Option<KeyDescription>,
+    block_devs_bound: bool,
     cache_devs: HashMap<DevUuid, SimDev>,
     cache_devs_key_desc: Option<KeyDescription>,
+    cache_devs_bound: bool,
     filesystems: Table<SimFilesystem>,
     redundancy: Redundancy,
     rdm: Rc<RefCell<Randomizer>>,
@@ -65,8 +67,10 @@ impl SimPool {
             SimPool {
                 block_devs: HashMap::from_iter(device_pairs),
                 block_devs_key_desc: key_desc.cloned(),
+                block_devs_bound: false,
                 cache_devs: HashMap::new(),
                 cache_devs_key_desc: key_desc.cloned(),
+                cache_devs_bound: false,
                 filesystems: Table::default(),
                 redundancy,
                 rdm: Rc::clone(rdm),
@@ -269,23 +273,33 @@ impl Pool for SimPool {
         Ok(SetCreateAction::new(ret_uuids))
     }
 
-    fn bind_clevis(&self, _pin: &str, _clevis_info: &Value) -> StratisResult<CreateAction<()>> {
+    fn bind_clevis(&mut self, _pin: &str, _clevis_info: &Value) -> StratisResult<CreateAction<()>> {
         if !self.is_encrypted() {
             Err(StratisError::Error(
                 "Requested pool does not appear to be encrypted".to_string(),
             ))
         } else {
-            Ok(CreateAction::Identity)
+            Ok(if self.block_devs_bound {
+                CreateAction::Identity
+            } else {
+                self.block_devs_bound = true;
+                CreateAction::Created(())
+            })
         }
     }
 
-    fn unbind_clevis(&self) -> StratisResult<DeleteAction<()>> {
+    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<()>> {
         if !self.is_encrypted() {
             Err(StratisError::Error(
                 "Requested pool does not appear to be encrypted".to_string(),
             ))
         } else {
-            Ok(DeleteAction::Identity)
+            Ok(if self.block_devs_bound {
+                self.block_devs_bound = false;
+                DeleteAction::Deleted(())
+            } else {
+                DeleteAction::Identity
+            })
         }
     }
 

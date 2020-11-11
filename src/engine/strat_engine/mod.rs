@@ -18,7 +18,11 @@ mod thinpool;
 mod udev;
 mod writing;
 
-pub use self::{engine::StratEngine, keys::StratKeyActions, metadata::BDA};
+pub use self::{
+    engine::StratEngine,
+    keys::StratKeyActions,
+    metadata::{StaticHeader, BDA},
+};
 
 #[cfg(test)]
 mod tests;

@@ -11,6 +11,7 @@ DENY = -D warnings -D future-incompatible -D unused ${RUST_2018_IDIOMS}
 # Clippy deny variable, including allows for troublesome lints.
 # Notable allows:
 # option_if_let_else: causing problems with if-else chains
+# similar_names: judges "yes" and "res" to be too similar
 CLIPPY_DENY = -D clippy::pedantic \
               -A clippy::cast_possible_wrap \
               -A clippy::cast_sign_loss \
@@ -33,6 +34,7 @@ CLIPPY_DENY = -D clippy::pedantic \
               -A clippy::option_if_let_else \
               -A clippy::redundant-closure-for-method-calls \
               -A clippy::shadow_unrelated \
+              -A clippy::similar_names \
               -A clippy::single_match_else \
               -A clippy::too_many_lines \
               -A clippy::unseparated_literal_suffix \

@@ -527,7 +527,7 @@ impl CryptHandle {
             .map_err(|e| LibcryptErr::Other(e.to_string()))
     }
 
-    /// Bind the given device to a tang server using clevis.
+    /// Unbind the given device using clevis.
     pub fn clevis_unbind(&mut self) -> Result<()> {
         let keyslots = self.keyslots(CLEVIS_LUKS_TOKEN_ID)?.ok_or_else(|| {
             LibcryptErr::Other(format!(

@@ -620,7 +620,7 @@ fn tang_dispatch(json: &Value) -> Result<Value> {
     Ok(json!({"url": url.to_owned(), "thp": thp}))
 }
 
-/// Generate Sharmir secret sharing JSON
+/// Generate Shamir secret sharing JSON
 fn sss_dispatch(json: &Value) -> Result<Value> {
     let object = json
         .get("clevis")

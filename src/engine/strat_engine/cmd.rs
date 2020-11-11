@@ -195,18 +195,24 @@ pub fn clevis_luks_bind(
     keyfile_path: &Path,
     pin: &str,
     json: &Value,
+    yes: bool,
 ) -> StratisResult<()> {
-    execute_cmd(
-        Command::new(CLEVIS)
-            .arg("luks")
-            .arg("bind")
-            .arg("-d")
-            .arg(dev_path.display().to_string())
-            .arg("-k")
-            .arg(keyfile_path)
-            .arg(pin)
-            .arg(json.to_string()),
-    )
+    let mut cmd = Command::new(CLEVIS);
+
+    cmd.arg("luks").arg("bind");
+
+    if yes {
+        cmd.arg("-y");
+    };
+
+    cmd.arg("-d")
+        .arg(dev_path.display().to_string())
+        .arg("-k")
+        .arg(keyfile_path)
+        .arg(pin)
+        .arg(json.to_string());
+
+    execute_cmd(&mut cmd)
 }
 
 /// Unbind a LUKS device using clevis.

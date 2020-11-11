@@ -34,6 +34,8 @@ const STRAT_MAGIC: &[u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 
 const STRAT_SIGBLOCK_VERSION: u8 = 1;
 
+pub type ReadResult = StratisResult<StratisResult<Option<StaticHeader>>>;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MetadataLocation {
     Both,
@@ -83,7 +85,8 @@ pub fn device_identifiers<F>(f: &mut F) -> StratisResult<Option<StratisIdentifie
 where
     F: Read + Seek + SyncAll,
 {
-    StaticHeader::setup(f).map(|sh| sh.map(|sh| sh.identifiers))
+    let read_results = StaticHeader::read_sigblocks(f);
+    StaticHeader::repair_sigblocks(f, read_results).map(|sh| sh.map(|sh| sh.identifiers))
 }
 
 /// Remove Stratis identifying information from device.
@@ -209,6 +212,22 @@ impl StaticHeader {
         BDAExtendedSize::new(self.mda_size.bda_size().sectors() + self.reserved_size.sectors())
     }
 
+    pub fn read_sigblocks<F>(f: &mut F) -> (ReadResult, ReadResult)
+    where
+        F: Read + Seek,
+    {
+        let (maybe_buf_1, maybe_buf_2) = StaticHeader::read(f);
+
+        (
+            maybe_buf_1
+                .map(|buf| StaticHeader::sigblock_from_buf(&buf))
+                .map_err(StratisError::from),
+            maybe_buf_2
+                .map(|buf| StaticHeader::sigblock_from_buf(&buf))
+                .map_err(StratisError::from),
+        )
+    }
+
     /// Try to find a valid StaticHeader on a device.
     /// Return the latest copy that validates as a Stratis BDA, however verify both
     /// copies and if one validates but one does not, re-write the one that is incorrect.  If both
@@ -220,7 +239,10 @@ impl StaticHeader {
     /// Return an error if the sigblocks differ in some unaccountable way.
     /// Returns an error if a write intended to repair an ill-formed,
     /// unreadable, or stale signature block failed.
-    pub fn setup<F>(f: &mut F) -> StratisResult<Option<StaticHeader>>
+    pub fn repair_sigblocks<F>(
+        f: &mut F,
+        read_results: (ReadResult, ReadResult),
+    ) -> StratisResult<Option<StaticHeader>>
     where
         F: Read + Seek + SyncAll,
     {
@@ -342,11 +364,7 @@ impl StaticHeader {
             Ok(Some(sh))
         }
 
-        let (maybe_buf_1, maybe_buf_2) = StaticHeader::read(f);
-        match (
-            maybe_buf_1.map(|buf| StaticHeader::sigblock_from_buf(&buf)),
-            maybe_buf_2.map(|buf| StaticHeader::sigblock_from_buf(&buf)),
-        ) {
+        match read_results {
             (Ok(buf_loc_1), Ok(buf_loc_2)) => match (buf_loc_1, buf_loc_2) {
                 (Ok(loc_1), Ok(loc_2)) => ok_ok_static_header_handling(f, loc_1, loc_2),
                 (Ok(loc_1), Err(loc_2)) => {
@@ -483,17 +501,22 @@ pub mod tests {
         fn test_ownership(ref sh in static_header_strategy()) {
             let buf_size = bytes!(static_header_size::STATIC_HEADER_SECTORS);
             let mut buf = Cursor::new(vec![0; buf_size]);
-            prop_assert!(StaticHeader::setup(&mut buf).unwrap().is_none());
+            let (s1, s2) =  StaticHeader::read_sigblocks(&mut buf);
+            prop_assert_eq!(s1.unwrap().unwrap(), None);
+            prop_assert_eq!(s2.unwrap().unwrap(), None);
 
             sh.write(&mut buf, MetadataLocation::Both).unwrap();
 
-            prop_assert!(StaticHeader::setup(&mut buf)
-                         .unwrap()
-                         .map(|new_sh| new_sh.identifiers == sh.identifiers)
-                         .unwrap_or(false));
+            let (s1, s2) = StaticHeader::read_sigblocks(&mut buf);
+            prop_assert!(s1.unwrap().unwrap().map(|new_sh| new_sh.identifiers == sh.identifiers).unwrap_or(false));
+            prop_assert!(s2.unwrap().unwrap().map(|new_sh| new_sh.identifiers == sh.identifiers).unwrap_or(false));
 
             StaticHeader::wipe(&mut buf).unwrap();
-            prop_assert!(StaticHeader::setup(&mut buf).unwrap().is_none());
+            let (s1, s2) =  StaticHeader::read_sigblocks(&mut buf);
+            prop_assert_eq!(s1.unwrap().unwrap(), None);
+            prop_assert_eq!(s2.unwrap().unwrap(), None);
+
+
         }
     }
 
@@ -573,7 +596,8 @@ pub mod tests {
                 .unwrap();
             }
 
-            let setup_result = StaticHeader::setup(&mut buf);
+            let read_results = StaticHeader::read_sigblocks(&mut buf);
+            let setup_result = StaticHeader::repair_sigblocks(&mut buf, read_results);
 
             match (primary, secondary) {
                 (Some(p_index), Some(s_index)) => {
@@ -653,9 +677,12 @@ pub mod tests {
             let mut buf = Cursor::new(vec![0; buf_size]);
             sh_older.write(&mut buf, older_location).unwrap();
             sh_newer.write(&mut buf, newer_location).unwrap();
+            let read_results = StaticHeader::read_sigblocks(&mut buf);
             assert_ne!(buf.get_ref(), reference_buf.get_ref());
             assert_eq!(
-                StaticHeader::setup(&mut buf).unwrap().as_ref(),
+                StaticHeader::repair_sigblocks(&mut buf, read_results)
+                    .unwrap()
+                    .as_ref(),
                 Some(sh_newer)
             );
             assert_eq!(buf.get_ref(), reference_buf.get_ref());

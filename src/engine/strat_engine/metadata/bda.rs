@@ -60,7 +60,8 @@ impl BDA {
     where
         F: Read + Seek + SyncAll,
     {
-        let header = match StaticHeader::setup(f)? {
+        let read_results = StaticHeader::read_sigblocks(f);
+        let header = match StaticHeader::repair_sigblocks(f, read_results)? {
             Some(header) => header,
             None => return Ok(None),
         };

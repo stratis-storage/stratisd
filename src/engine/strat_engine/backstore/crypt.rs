@@ -523,7 +523,7 @@ impl CryptHandle {
 
     /// Bind the given device to a tang server using clevis.
     pub fn clevis_bind(&mut self, keyfile_path: &Path, pin: &str, json: &Value) -> Result<()> {
-        clevis_luks_bind(&self.physical_path, keyfile_path, pin, json)
+        clevis_luks_bind(&self.physical_path, keyfile_path, pin, json, false)
             .map_err(|e| LibcryptErr::Other(e.to_string()))
     }
 

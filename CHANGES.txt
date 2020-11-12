@@ -1,3 +1,31 @@
+stratisd 2.3.0 (UNRELEASED)
+===========================
+Recommended Rust toolchain version: 1.47.0
+Lowest supported Rust toolchain version: 1.45
+
+Recommended Python interpreter: 3.7.9
+Lowest supported Python interpreter: 3.6.8
+Python linter: pylint (2.4.4)
+Python auto-formatter: black (19.10b0)
+Python import sorter: isort (4.3.21)
+
+YAML linter: yamllint (1.23.0)
+
+New Rust crate version requirements:
+  - error-chain: 0.12.2
+
+- Introduce support for Clevis encryption policies:
+  https://github.com/stratis-storage/stratisd/pull/2315
+  https://github.com/stratis-storage/stratisd/pull/2314
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/2317
+  https://github.com/stratis-storage/stratisd/pull/2311
+  https://github.com/stratis-storage/stratisd/pull/2309
+  https://github.com/stratis-storage/stratisd/pull/2304
+  https://github.com/stratis-storage/stratisd/pull/2299
+
+
 stratisd 2.2.1
 ==============
 Recommended Rust toolchain version: 1.47.0
@@ -44,6 +72,8 @@ New Rust crate version requirements:
   https://github.com/stratis-storage/stratisd/pull/2251
 
 - Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/2298
+  https://github.com/stratis-storage/stratisd/pull/2297
   https://github.com/stratis-storage/stratisd/pull/2296
   https://github.com/stratis-storage/stratisd/pull/2295
   https://github.com/stratis-storage/stratisd/pull/2293

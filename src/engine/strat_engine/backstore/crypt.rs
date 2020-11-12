@@ -61,6 +61,10 @@ const SECTOR_SIZE: u64 = 512;
 /// Path to logical devices for encrypted devices
 const DEVICEMAPPER_PATH: &str = "/dev/mapper";
 
+/// Key in clevis configuration for tang indicating that the URL of the
+/// tang server does not need to be verified.
+const CLEVIS_TANG_TRUST_URL: &str = "stratis:tang:trust_url";
+
 macro_rules! log_on_failure {
     ($op:expr, $fmt:tt $(, $arg:expr)*) => {{
         let result = $op;
@@ -522,8 +526,28 @@ impl CryptHandle {
     }
 
     /// Bind the given device using clevis.
+    /// The json argument may contain stratis and possibly pin specific
+    /// configuration which is not used by clevis and must be removed.
+    /// The configuration is not checked in any other way.
     pub fn clevis_bind(&mut self, keyfile_path: &Path, pin: &str, json: &Value) -> Result<()> {
-        clevis_luks_bind(&self.physical_path, keyfile_path, pin, json, false)
+        let mut json = json.clone();
+
+        let yes = if pin == "tang" {
+            let map = if let Some(m) = json.as_object_mut() {
+                m
+            } else {
+                return Err(LibcryptErr::Other(format!(
+                    "configuration for Clevis is is not in JSON object format: {}",
+                    json
+                )));
+            };
+
+            map.remove(CLEVIS_TANG_TRUST_URL).is_some()
+        } else {
+            false
+        };
+
+        clevis_luks_bind(&self.physical_path, keyfile_path, pin, &json, yes)
             .map_err(|e| LibcryptErr::Other(e.to_string()))
     }
 

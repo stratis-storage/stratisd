@@ -542,7 +542,9 @@ impl CryptHandle {
                 )));
             };
 
-            map.remove(CLEVIS_TANG_TRUST_URL).is_some()
+            map.remove(CLEVIS_TANG_TRUST_URL)
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
         } else {
             false
         };

@@ -10,6 +10,7 @@ use std::{
 };
 
 use chrono::{DateTime, Duration, Utc};
+use itertools::Itertools;
 use rand::{seq::IteratorRandom, thread_rng};
 use serde_json::Value;
 
@@ -179,7 +180,6 @@ fn clevis_enabled(handles: &mut Vec<CryptHandle>) -> StratisResult<Option<(Strin
 pub struct BlockDevMgr {
     block_devs: Vec<StratBlockDev>,
     last_update_time: Option<DateTime<Utc>>,
-    key_desc: Option<KeyDescription>,
 }
 
 impl BlockDevMgr {
@@ -187,12 +187,10 @@ impl BlockDevMgr {
     pub fn new(
         block_devs: Vec<StratBlockDev>,
         last_update_time: Option<DateTime<Utc>>,
-        key_desc: Option<&KeyDescription>,
     ) -> BlockDevMgr {
         BlockDevMgr {
             block_devs,
             last_update_time,
-            key_desc: key_desc.cloned(),
         }
     }
 
@@ -208,7 +206,6 @@ impl BlockDevMgr {
         Ok(BlockDevMgr::new(
             initialize_devices(devices, pool_uuid, mda_data_size, encryption_info)?,
             None,
-            encryption_info.map(|info| info.0),
         ))
     }
 
@@ -254,7 +251,8 @@ impl BlockDevMgr {
             .collect::<HashSet<_>>();
         let devices = process_and_verify_devices(pool_uuid, &current_uuids, paths)?;
 
-        if self.is_encrypted() && !self.has_valid_passphrase() {
+        let is_encrypted = self.is_encrypted();
+        if is_encrypted && !self.has_valid_passphrase() {
             return Err(StratisError::Engine(
                 ErrorEnum::Invalid,
                 "The key associated with the current registered key description \
@@ -265,7 +263,7 @@ impl BlockDevMgr {
             ));
         }
 
-        let clevis_info = if self.is_encrypted() {
+        let clevis_info = if is_encrypted {
             clevis_enabled(&mut get_crypt_handles(&self.block_devs)?)?
         } else {
             None
@@ -279,7 +277,7 @@ impl BlockDevMgr {
             devices,
             pool_uuid,
             MDADataSize::default(),
-            match self.key_desc.as_ref() {
+            match self.key_desc().as_ref() {
                 Some(kd) => Some((
                     kd,
                     clevis_info.as_ref().map(|(pin, val)| (pin.as_str(), val)),
@@ -466,11 +464,22 @@ impl BlockDevMgr {
     }
 
     pub fn key_desc(&self) -> Option<&KeyDescription> {
-        self.key_desc.as_ref()
+        let mut iter = self
+            .block_devs
+            .iter()
+            .filter_map(|bd| bd.key_description())
+            .unique();
+        let key_desc = iter.next();
+
+        // Liminal device code will note set up a pool with multiple key description
+        // values.
+        assert!(iter.next().is_none());
+
+        key_desc
     }
 
     pub fn is_encrypted(&self) -> bool {
-        self.key_desc.is_some()
+        self.key_desc().is_some()
     }
 
     #[cfg(test)]
@@ -488,7 +497,7 @@ impl BlockDevMgr {
             .filter_map(|bd| bd.key_description())
             .collect::<Vec<_>>();
         if key_descriptions.is_empty() {
-            assert_eq!(self.key_desc, None);
+            assert_eq!(self.key_desc(), None);
         } else {
             assert_eq!(key_descriptions.len(), self.block_devs.len());
 
@@ -520,7 +529,7 @@ impl BlockDevMgr {
             Ok(())
         }
 
-        let key_description = match &self.key_desc {
+        let key_description = match self.key_desc() {
             Some(kd) => kd,
             None => {
                 return Err(StratisError::Error(

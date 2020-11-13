@@ -314,6 +314,9 @@ impl LiminalDevices {
                 )));
             }
 
+            // NOTE: DeviceSet provides infos variable in setup_pool. DeviceSet
+            // ensures that all key descriptions match so we do not need to
+            // check again here.
             let num_with_luks = datadevs
                 .iter()
                 .filter_map(|sbd| sbd.key_description())
@@ -332,23 +335,7 @@ impl LiminalDevices {
                             &metadata.name)));
             }
 
-            // Either all the devices have a key description or none do;
-            // so only the first device needs to be accessed.
-            let key_description = datadevs
-                .get(0)
-                .expect("returned with error above if datadevs empty")
-                .key_description()
-                .cloned();
-
-            StratPool::setup(
-                pool_uuid,
-                datadevs,
-                cachedevs,
-                timestamp,
-                &metadata,
-                key_description.as_ref(),
-            )
-            .map_err(|err| {
+            StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata).map_err(|err| {
                 Destination::Errored(format!(
                     "An attempt to set up pool with UUID {} from the assembled devices failed: {}",
                     pool_uuid.to_simple_ref(),

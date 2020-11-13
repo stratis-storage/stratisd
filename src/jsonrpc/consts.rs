@@ -9,5 +9,3 @@ pub const OP_OK_STR: &str = "OK";
 
 pub const RPC_SOCKADDR: &str = "/run/stratisd/stratisd-min-jsonrpc";
 pub const RPC_CONNADDR: &str = "/run/stratisd/stratisd-min-jsonrpc";
-pub const SOCKFD_ADDR_DIR: &str = "/run/stratisd";
-pub const SOCKFD_ADDR: &str = "/run/stratisd/stratisd-min-fd";

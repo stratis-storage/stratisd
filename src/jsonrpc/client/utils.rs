@@ -2,13 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::os::unix::io::RawFd;
-
-use nix::sys::{
-    socket::{sendmsg, ControlMessage, MsgFlags},
-    uio::IoVec,
-};
-
 #[macro_export]
 macro_rules! do_request {
     ($fn:path $(, $args:expr)*) => {{
@@ -120,15 +113,4 @@ macro_rules! print_table {
             println!("{}", row);
         }
     }};
-}
-
-pub fn send_fd_to_sock(unix_fd: RawFd, fd: RawFd) -> Result<(), nix::Error> {
-    sendmsg(
-        unix_fd,
-        &[IoVec::from_slice(&[0, 0, 0, 0])],
-        &[ControlMessage::ScmRights(&[fd])],
-        MsgFlags::empty(),
-        None,
-    )?;
-    Ok(())
 }

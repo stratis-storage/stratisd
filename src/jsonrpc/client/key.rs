@@ -2,29 +2,24 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{
-    fs::File,
-    io::stdin,
-    os::unix::{io::AsRawFd, net::UnixStream},
-};
+use std::fs::File;
 
 use crate::{
     do_request, do_request_standard,
     engine::KeyDescription,
-    jsonrpc::{client::utils::send_fd_to_sock, Stratis, SOCKFD_ADDR},
+    jsonrpc::Stratis,
     print_table,
     stratis::{StratisError, StratisResult},
 };
 
 pub fn key_set(key_desc: KeyDescription, keyfile_path: Option<&str>) -> StratisResult<()> {
-    let stream = UnixStream::connect(SOCKFD_ADDR)?;
     match keyfile_path {
         Some(kp) => {
-            let file = File::open(kp)?;
-            send_fd_to_sock(stream.as_raw_fd(), file.as_raw_fd())?;
+            let _file = File::open(kp)?;
+            //send_fd_to_sock(stream.as_raw_fd(), file.as_raw_fd())?;
         }
         None => {
-            send_fd_to_sock(stream.as_raw_fd(), stdin().as_raw_fd())?;
+            //send_fd_to_sock(stream.as_raw_fd(), stdin().as_raw_fd())?;
             println!("Enter passphrase followed by return:");
         }
     };

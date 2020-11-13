@@ -2,22 +2,15 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use crate::jsonrpc::consts::{SOCKFD_ADDR, SOCKFD_ADDR_DIR};
+use std::{fs::remove_file, os::unix::io::AsRawFd, sync::Arc};
 
-use std::{
-    fs::{create_dir_all, remove_file},
-    os::unix::io::AsRawFd,
-    sync::Arc,
-};
-
-use futures_util::stream::StreamExt;
 use jsonrpsee::{
     common::{Error as RPCError, ErrorCode},
     raw::RawServer,
 };
 use tokio::{
     sync::{
-        mpsc::{channel, Receiver, Sender},
+        mpsc::{channel, Receiver},
         Mutex,
     },
     task::JoinHandle,
@@ -29,10 +22,7 @@ use crate::{
     jsonrpc::{
         consts::RPC_SOCKADDR,
         interface::Stratis,
-        server::{
-            key, pool, report, udev,
-            utils::{FdRef, UnixListenerStream},
-        },
+        server::{key, pool, report, server::FdRef, udev},
         transport::UdsTransportServer,
     },
 };
@@ -183,44 +173,7 @@ async fn server_loop(engine_ref: Arc<Mutex<dyn Engine>>, mut recv: Receiver<FdRe
     }
 }
 
-pub async fn file_descriptor_listener(sender: Sender<FdRef>) {
-    let _ = remove_file(SOCKFD_ADDR);
-    if let Err(e) = create_dir_all(SOCKFD_ADDR_DIR) {
-        warn!("{}", e);
-    }
-    let mut listener = match UnixListenerStream::bind(SOCKFD_ADDR) {
-        Ok(l) => l,
-        Err(e) => {
-            error!(
-                "Failed to find Unix socket to address {}: {}",
-                SOCKFD_ADDR, e
-            );
-            return;
-        }
-    };
-    loop {
-        match listener.next().await {
-            Some(Ok(stream)) => {
-                let fd = match stream.await {
-                    Ok(f) => f,
-                    Err(e) => {
-                        warn!("Could not get file descriptor sent from client: {}", e);
-                        continue;
-                    }
-                };
-                if let Err(e) = sender.send(fd).await {
-                    warn!("Could not sent file descriptor to engine thread: {}", e);
-                }
-            }
-            Some(Err(e)) => warn!("{}", e),
-            None => unreachable!(),
-        }
-    }
-}
-
-pub fn run_server(engine: Arc<Mutex<dyn Engine>>) -> (JoinHandle<()>, JoinHandle<()>) {
-    let (send, recv) = channel(16);
-    let fd_join = tokio::spawn(async { file_descriptor_listener(send).await });
-    let server_join = tokio::spawn(server_loop(engine, recv));
-    (fd_join, server_join)
+pub fn run_server(engine: Arc<Mutex<dyn Engine>>) -> JoinHandle<()> {
+    let (_send, recv) = channel(16);
+    tokio::spawn(server_loop(engine, recv))
 }

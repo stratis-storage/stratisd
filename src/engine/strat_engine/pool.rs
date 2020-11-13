@@ -206,18 +206,11 @@ impl StratPool {
         cachedevs: Vec<StratBlockDev>,
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
-        key_description: Option<&KeyDescription>,
     ) -> StratisResult<(Name, StratPool)> {
         check_metadata(metadata)?;
 
-        let mut backstore = Backstore::setup(
-            uuid,
-            &metadata.backstore,
-            datadevs,
-            cachedevs,
-            timestamp,
-            key_description,
-        )?;
+        let mut backstore =
+            Backstore::setup(uuid, &metadata.backstore, datadevs, cachedevs, timestamp)?;
         let mut thinpool = ThinPool::setup(
             uuid,
             &metadata.thinpool_dev,

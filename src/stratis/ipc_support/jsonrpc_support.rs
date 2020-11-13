@@ -41,15 +41,11 @@ pub async fn setup(
     _should_exit: Arc<AtomicBool>,
 ) -> StratisResult<()> {
     let mut udev_join = handle_udev(Arc::clone(&engine), recv);
-    let (mut fd_join, mut server_join) = run_server(engine);
+    let mut server_join = run_server(engine);
 
     select! {
         res = &mut udev_join => {
             error!("The JSON RPC udev handling thread exited...");
-            res.map_err(|e| StratisError::Error(e.to_string()))
-        }
-        res = &mut fd_join => {
-            error!("The file descriptor handler thread exited...");
             res.map_err(|e| StratisError::Error(e.to_string()))
         }
         res = &mut server_join => {

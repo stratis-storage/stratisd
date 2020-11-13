@@ -2,16 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{
-    io::stdin,
-    os::unix::{io::AsRawFd, net::UnixStream},
-    path::PathBuf,
-};
+use std::path::PathBuf;
 
 use crate::{
     do_request, do_request_standard,
     engine::{KeyDescription, PoolUuid},
-    jsonrpc::{client::utils::send_fd_to_sock, consts::SOCKFD_ADDR, interface::Stratis},
+    jsonrpc::interface::Stratis,
     print_table,
     stratis::{StratisError, StratisResult},
 };
@@ -38,8 +34,7 @@ pub fn pool_create(
 // stratis-min pool unlock
 pub fn pool_unlock(uuid: PoolUuid, prompt: bool) -> StratisResult<()> {
     if prompt {
-        let stream = UnixStream::connect(SOCKFD_ADDR)?;
-        send_fd_to_sock(stream.as_raw_fd(), stdin().as_raw_fd())?;
+        //send_fd_to_sock(stream.as_raw_fd(), stdin().as_raw_fd())?;
         println!("Enter passphrase followed by return:");
     }
     do_request_standard!(Stratis::pool_unlock, uuid, prompt)

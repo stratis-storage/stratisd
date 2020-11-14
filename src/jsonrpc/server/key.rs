@@ -7,7 +7,7 @@ use std::{os::unix::io::RawFd, sync::Arc};
 use tokio::sync::Mutex;
 
 use crate::{
-    engine::{DeleteAction, Engine, KeyDescription, MappingCreateAction, PoolUuid},
+    engine::{DeleteAction, Engine, KeyDescription, MappingCreateAction},
     stratis::StratisResult,
 };
 
@@ -59,12 +59,12 @@ pub async fn key_list(engine: Arc<Mutex<dyn Engine>>) -> StratisResult<Vec<KeyDe
         .collect())
 }
 
-pub async fn key_get_desc(
-    engine: Arc<Mutex<dyn Engine>>,
-    pool_uuid: PoolUuid,
-) -> Option<KeyDescription> {
-    let locked_pools = engine.lock().await.locked_pools();
-    locked_pools
-        .get(&pool_uuid)
-        .map(|info| info.key_description.to_owned())
-}
+//pub async fn key_get_desc(
+//    engine: Arc<Mutex<dyn Engine>>,
+//    pool_uuid: PoolUuid,
+//) -> Option<KeyDescription> {
+//    let locked_pools = engine.lock().await.locked_pools();
+//    locked_pools
+//        .get(&pool_uuid)
+//        .map(|info| info.key_description.to_owned())
+//}

@@ -2,14 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{convert::TryFrom, error::Error, path::PathBuf};
+use std::{convert::TryFrom, error::Error};
 
-use clap::{App, Arg, ArgGroup, ArgMatches, SubCommand};
+use clap::{App, Arg, ArgGroup, SubCommand};
 
-use libstratis::{
-    engine::{KeyDescription, PoolUuid},
-    jsonrpc::client::{key, pool, report, udev},
-};
+use libstratis::{engine::KeyDescription, jsonrpc::client::key};
 
 fn parse_args() -> App<'static, 'static> {
     App::new("stratis-min")
@@ -72,12 +69,12 @@ fn parse_args() -> App<'static, 'static> {
         ])
 }
 
-fn get_paths_from_args<'a>(args: &'a ArgMatches<'a>) -> Vec<PathBuf> {
-    args.values_of("blockdevs")
-        .expect("required")
-        .map(PathBuf::from)
-        .collect::<Vec<_>>()
-}
+//fn get_paths_from_args<'a>(args: &'a ArgMatches<'a>) -> Vec<PathBuf> {
+//    args.values_of("blockdevs")
+//        .expect("required")
+//        .map(PathBuf::from)
+//        .collect::<Vec<_>>()
+//}
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut app = parse_args();
@@ -101,64 +98,64 @@ fn main() -> Result<(), Box<dyn Error>> {
             key::key_list()?;
             Ok(())
         }
-    } else if let Some(subcommand) = args.subcommand_matches("pool") {
-        if let Some(args) = subcommand.subcommand_matches("unlock") {
-            let uuid = PoolUuid::parse_str(args.value_of("pool_uuid").expect("required"))?;
-            pool::pool_unlock(uuid, args.is_present("prompt"))?;
-            Ok(())
-        } else if let Some(args) = subcommand.subcommand_matches("create") {
-            let paths = get_paths_from_args(args);
-            pool::pool_create(
-                args.value_of("name").expect("required"),
-                paths.as_slice(),
-                match args.value_of("key_desc").map(|s| s.to_owned()) {
-                    Some(string) => Some(KeyDescription::try_from(string)?),
-                    None => None,
-                },
-            )?;
-            Ok(())
-        } else if let Some(args) = subcommand.subcommand_matches("destroy") {
-            pool::pool_destroy(args.value_of("name").expect("required"))?;
-            Ok(())
-        } else if let Some(args) = subcommand.subcommand_matches("init-cache") {
-            let paths = get_paths_from_args(args);
-            pool::pool_init_cache(args.value_of("name").expect("required"), paths.as_slice())?;
-            Ok(())
-        } else if let Some(args) = subcommand.subcommand_matches("rename") {
-            pool::pool_rename(
-                args.value_of("current_name").expect("required"),
-                args.value_of("new_name").expect("required"),
-            )?;
-            Ok(())
-        } else if let Some(args) = subcommand.subcommand_matches("add-data") {
-            let paths = get_paths_from_args(args);
-            pool::pool_add_data(args.value_of("name").expect("required"), paths.as_slice())?;
-            Ok(())
-        } else if let Some(args) = subcommand.subcommand_matches("add-cache") {
-            let paths = get_paths_from_args(args);
-            pool::pool_add_cache(args.value_of("name").expect("required"), paths.as_slice())?;
-            Ok(())
-        } else if let Some(args) = subcommand.subcommand_matches("is-encrypted") {
-            let uuid_str = args.value_of("pool_uuid").expect("required");
-            let uuid = PoolUuid::parse_str(uuid_str)?;
-            println!("{}", pool::pool_is_encrypted(uuid)?,);
-            Ok(())
-        } else {
-            pool::pool_list()?;
-            Ok(())
-        }
-    } else if let Some("report") = args.subcommand_name() {
-        report::report().and_then(|j| {
-            println!("{}", serde_json::to_string_pretty(&j)?);
-            Ok(())
-        })?;
-        Ok(())
-    } else if let Some(args) = args.subcommand_matches("udev") {
-        if let Some((pool_name, fs_name)) = udev::udev(args.value_of("dm_name").expect("required"))?
-        {
-            println!("STRATIS_SYMLINK=stratis/{}/{}", pool_name, fs_name);
-        }
-        Ok(())
+    //} else if let Some(subcommand) = args.subcommand_matches("pool") {
+    //    if let Some(args) = subcommand.subcommand_matches("unlock") {
+    //        let uuid = PoolUuid::parse_str(args.value_of("pool_uuid").expect("required"))?;
+    //        pool::pool_unlock(uuid, args.is_present("prompt"))?;
+    //        Ok(())
+    //    } else if let Some(args) = subcommand.subcommand_matches("create") {
+    //        let paths = get_paths_from_args(args);
+    //        pool::pool_create(
+    //            args.value_of("name").expect("required"),
+    //            paths.as_slice(),
+    //            match args.value_of("key_desc").map(|s| s.to_owned()) {
+    //                Some(string) => Some(KeyDescription::try_from(string)?),
+    //                None => None,
+    //            },
+    //        )?;
+    //        Ok(())
+    //    } else if let Some(args) = subcommand.subcommand_matches("destroy") {
+    //        pool::pool_destroy(args.value_of("name").expect("required"))?;
+    //        Ok(())
+    //    } else if let Some(args) = subcommand.subcommand_matches("init-cache") {
+    //        let paths = get_paths_from_args(args);
+    //        pool::pool_init_cache(args.value_of("name").expect("required"), paths.as_slice())?;
+    //        Ok(())
+    //    } else if let Some(args) = subcommand.subcommand_matches("rename") {
+    //        pool::pool_rename(
+    //            args.value_of("current_name").expect("required"),
+    //            args.value_of("new_name").expect("required"),
+    //        )?;
+    //        Ok(())
+    //    } else if let Some(args) = subcommand.subcommand_matches("add-data") {
+    //        let paths = get_paths_from_args(args);
+    //        pool::pool_add_data(args.value_of("name").expect("required"), paths.as_slice())?;
+    //        Ok(())
+    //    } else if let Some(args) = subcommand.subcommand_matches("add-cache") {
+    //        let paths = get_paths_from_args(args);
+    //        pool::pool_add_cache(args.value_of("name").expect("required"), paths.as_slice())?;
+    //        Ok(())
+    //    } else if let Some(args) = subcommand.subcommand_matches("is-encrypted") {
+    //        let uuid_str = args.value_of("pool_uuid").expect("required");
+    //        let uuid = PoolUuid::parse_str(uuid_str)?;
+    //        println!("{}", pool::pool_is_encrypted(uuid)?,);
+    //        Ok(())
+    //    } else {
+    //        pool::pool_list()?;
+    //        Ok(())
+    //    }
+    //} else if let Some("report") = args.subcommand_name() {
+    //    report::report().and_then(|j| {
+    //        println!("{}", serde_json::to_string_pretty(&j)?);
+    //        Ok(())
+    //    })?;
+    //    Ok(())
+    //} else if let Some(args) = args.subcommand_matches("udev") {
+    //    if let Some((pool_name, fs_name)) = udev::udev(args.value_of("dm_name").expect("required"))?
+    //    {
+    //        println!("STRATIS_SYMLINK=stratis/{}/{}", pool_name, fs_name);
+    //    }
+    //    Ok(())
     } else {
         println!("{}", help);
         Ok(())

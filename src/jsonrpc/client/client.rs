@@ -43,14 +43,14 @@ fn send_request(unix_fd: RawFd, vec: Vec<u8>, fd_opt: Option<RawFd>) -> StratisR
 pub struct StratisClient(UnixStream);
 
 impl StratisClient {
-    fn connect<P>(path: P) -> StratisResult<StratisClient>
+    pub fn connect<P>(path: P) -> StratisResult<StratisClient>
     where
         P: AsRef<Path>,
     {
         Ok(StratisClient(UnixStream::connect(path)?))
     }
 
-    fn request(&mut self, params: StratisParams) -> StratisResult<StratisRet> {
+    pub fn request(&mut self, params: StratisParams) -> StratisResult<StratisRet> {
         send_request(
             self.0.as_raw_fd(),
             serde_json::to_vec(&params.type_)?,

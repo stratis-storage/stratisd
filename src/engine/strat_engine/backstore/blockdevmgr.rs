@@ -29,7 +29,7 @@ use crate::{
             names::KeyDescription,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
         },
-        types::{CreateAction, DeleteAction, DevUuid, PoolUuid},
+        types::{CreateAction, DeleteAction, DevUuid, EncryptionInfo, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -199,7 +199,7 @@ impl BlockDevMgr {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         mda_data_size: MDADataSize,
-        encryption_info: Option<(&KeyDescription, Option<(&str, &Value)>)>,
+        encryption_info: Option<EncryptionInfo>,
     ) -> StratisResult<BlockDevMgr> {
         let devices = process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?;
 
@@ -263,6 +263,7 @@ impl BlockDevMgr {
             ));
         }
 
+        // FIXME: Use cached clevis info from BlockDev.
         let clevis_info = if is_encrypted {
             clevis_enabled(&mut get_crypt_handles(&self.block_devs)?)?
         } else {
@@ -277,11 +278,11 @@ impl BlockDevMgr {
             devices,
             pool_uuid,
             MDADataSize::default(),
-            match self.key_desc().as_ref() {
-                Some(kd) => Some((
-                    kd,
-                    clevis_info.as_ref().map(|(pin, val)| (pin.as_str(), val)),
-                )),
+            match self.key_desc() {
+                Some(kd) => Some(EncryptionInfo {
+                    key_description: kd.clone(),
+                    clevis_info,
+                }),
                 None => None,
             },
         )?;
@@ -670,7 +671,10 @@ mod tests {
                 pool_uuid,
                 &paths[..2],
                 MDADataSize::default(),
-                Some((key_desc, None)),
+                Some(EncryptionInfo {
+                    key_description: key_desc.clone(),
+                    clevis_info: None,
+                }),
             )?;
 
             if bdm.add(pool_uuid, &paths[2..3]).is_err() {
@@ -724,7 +728,10 @@ mod tests {
                 pool_uuid,
                 &paths[..2],
                 MDADataSize::default(),
-                Some((key_desc, None)),
+                Some(EncryptionInfo {
+                    key_description: key_desc.clone(),
+                    clevis_info: None,
+                }),
             )?;
             Ok((pool_uuid, bdm))
         }

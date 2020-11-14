@@ -22,8 +22,9 @@ use crate::{
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
         types::{
-            BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid, MaybeDbusPath, Name,
-            PoolUuid, Redundancy, RenameAction, SetCreateAction, SetDeleteAction,
+            BlockDevTier, CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid,
+            MaybeDbusPath, Name, PoolUuid, Redundancy, RenameAction, SetCreateAction,
+            SetDeleteAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -146,7 +147,7 @@ impl StratPool {
         name: &str,
         paths: &[&Path],
         redundancy: Redundancy,
-        key_desc: Option<&KeyDescription>,
+        key_desc: Option<KeyDescription>,
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = Uuid::new_v4();
 
@@ -157,7 +158,10 @@ impl StratPool {
             pool_uuid,
             paths,
             MDADataSize::default(),
-            key_desc.map(|kd| (kd, None)),
+            key_desc.map(|kd| EncryptionInfo {
+                key_description: kd,
+                clevis_info: None,
+            }),
         )?;
 
         let thinpool = ThinPool::new(

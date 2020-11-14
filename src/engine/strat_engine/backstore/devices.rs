@@ -33,7 +33,7 @@ use crate::{
             names::KeyDescription,
             udev::{block_device_apply, decide_ownership, get_udev_property, UdevOwnership},
         },
-        types::{BlockDevPath, DevUuid, PoolUuid},
+        types::{BlockDevPath, DevUuid, EncryptionInfo, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -437,7 +437,7 @@ pub fn initialize_devices(
     devices: Vec<DeviceInfo>,
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
-    encryption_info: Option<(&KeyDescription, Option<(&str, &Value)>)>,
+    encryption_info: Option<EncryptionInfo>,
 ) -> StratisResult<Vec<StratBlockDev>> {
     /// Map a major/minor device number of a physical device
     /// to the corresponding major/minor number of the encrypted
@@ -511,7 +511,7 @@ pub fn initialize_devices(
         dev_uuid: DevUuid,
         sizes: (MDADataSize, BlockdevSize),
         id_wwn: &Option<StratisResult<String>>,
-        key_description: Option<&KeyDescription>,
+        encryption_info: Option<EncryptionInfo>,
     ) -> StratisResult<StratBlockDev> {
         let (mda_data_size, data_size) = sizes;
         let mut f = OpenOptions::new().write(true).open(path.metadata_path())?;
@@ -519,7 +519,7 @@ pub fn initialize_devices(
         // NOTE: Encrypted devices will discard the hardware ID as encrypted devices
         // are always represented as logical, software-based devicemapper devices
         // which will never have a hardware ID.
-        let hw_id = match (key_description.is_some(), id_wwn) {
+        let hw_id = match (encryption_info.is_some(), id_wwn) {
             (true, _) => None,
             (_, Some(Ok(ref hw_id))) => Some(hw_id.to_owned()),
             (_, Some(Err(_))) => {
@@ -547,7 +547,7 @@ pub fn initialize_devices(
                 &[],
                 None,
                 hw_id,
-                key_description,
+                encryption_info,
             )
         })
     }
@@ -602,33 +602,39 @@ pub fn initialize_devices(
         dev_info: &DeviceInfo,
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
-        encryption_info: Option<(&KeyDescription, Option<(&str, &Value)>)>,
+        encryption_info: Option<EncryptionInfo>,
     ) -> StratisResult<StratBlockDev> {
         let dev_uuid = Uuid::new_v4();
         let (maybe_encrypted, devno, blockdev_size) = match encryption_info {
-            Some((desc, enable_clevis)) => {
-                initialize_encrypted(&dev_info.devnode, pool_uuid, dev_uuid, desc, enable_clevis)
-                    .map(|(handle, devno, devsize)| {
-                        debug!(
-                            "Info on physical device {}, logical device {}",
-                            &dev_info.devnode.display(),
-                            handle
-                                .logical_device_path()
-                                .expect("Initialization must have succeeded")
-                                .display(),
-                        );
-                        debug!(
-                            "Physical device size: {}, logical device size: {}",
-                            dev_info.size,
-                            devsize.bytes(),
-                        );
-                        debug!(
-                            "Physical device numbers: {}, logical device numbers: {}",
-                            dev_info.devno, devno,
-                        );
-                        (MaybeEncrypted::Encrypted(handle), devno, devsize)
-                    })?
-            }
+            Some(ref info) => initialize_encrypted(
+                &dev_info.devnode,
+                pool_uuid,
+                dev_uuid,
+                &info.key_description,
+                info.clevis_info
+                    .as_ref()
+                    .map(|(pin, json)| (pin.as_str(), json)),
+            )
+            .map(|(handle, devno, devsize)| {
+                debug!(
+                    "Info on physical device {}, logical device {}",
+                    &dev_info.devnode.display(),
+                    handle
+                        .logical_device_path()
+                        .expect("Initialization must have succeeded")
+                        .display(),
+                );
+                debug!(
+                    "Physical device size: {}, logical device size: {}",
+                    dev_info.size,
+                    devsize.bytes(),
+                );
+                debug!(
+                    "Physical device numbers: {}, logical device numbers: {}",
+                    dev_info.devno, devno,
+                );
+                (MaybeEncrypted::Encrypted(handle), devno, devsize)
+            })?,
             None => (
                 MaybeEncrypted::Unencrypted(dev_info.devnode.clone(), pool_uuid),
                 dev_info.devno,
@@ -650,7 +656,7 @@ pub fn initialize_devices(
             dev_uuid,
             (mda_data_size, BlockdevSize::new(blockdev_size)),
             &dev_info.id_wwn,
-            encryption_info.map(|(kd, _)| kd),
+            encryption_info,
         );
         if blockdev.is_err() {
             clean_up(maybe_encrypted);
@@ -660,7 +666,7 @@ pub fn initialize_devices(
 
     let mut initialized_blockdevs: Vec<StratBlockDev> = Vec::new();
     for dev_info in devices {
-        match initialize_one(&dev_info, pool_uuid, mda_data_size, encryption_info) {
+        match initialize_one(&dev_info, pool_uuid, mda_data_size, encryption_info.clone()) {
             Ok(blockdev) => initialized_blockdevs.push(blockdev),
             Err(err) => {
                 if let Err(err) = wipe_blockdevs(&initialized_blockdevs) {
@@ -741,7 +747,10 @@ mod tests {
             dev_infos,
             pool_uuid,
             MDADataSize::default(),
-            key_description.map(|kd| (kd, None)),
+            key_description.map(|kd| EncryptionInfo {
+                key_description: kd.clone(),
+                clevis_info: None,
+            }),
         )?;
 
         if blockdevs.len() != paths.len() {
@@ -1016,7 +1025,10 @@ mod tests {
             dev_infos,
             pool_uuid,
             MDADataSize::default(),
-            key_desc.map(|kd| (kd, None)),
+            key_desc.map(|kd| EncryptionInfo {
+                key_description: kd.clone(),
+                clevis_info: None,
+            }),
         )
         .is_ok()
         {

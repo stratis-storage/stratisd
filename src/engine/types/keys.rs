@@ -7,6 +7,8 @@ use std::{
     fmt::{self, Debug},
 };
 
+use serde_json::Value;
+
 use libcryptsetup_rs::SafeMemHandle;
 
 use crate::stratis::{ErrorEnum, StratisError, StratisResult};
@@ -34,6 +36,12 @@ impl AsRef<[u8]> for SizedKeyMemory {
     fn as_ref(&self) -> &[u8] {
         &self.mem.as_ref()[..self.size]
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct EncryptionInfo {
+    pub key_description: KeyDescription,
+    pub clevis_info: Option<(String, Value)>,
 }
 
 /// A data type respresenting a key description for the kernel keyring

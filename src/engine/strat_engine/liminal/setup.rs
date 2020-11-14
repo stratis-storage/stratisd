@@ -23,7 +23,7 @@ use crate::{
             metadata::BDA,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
         },
-        types::{BlockDevPath, BlockDevTier, DevUuid},
+        types::{BlockDevPath, BlockDevTier, DevUuid, EncryptionInfo},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -235,7 +235,11 @@ pub fn get_blockdevs(
                 segments.unwrap_or(&vec![]),
                 bd_save.user_info.clone(),
                 bd_save.hardware_info.clone(),
-                key_description,
+                // FIXME: Leaving Clevis info out of liminal devices for now.
+                key_description.map(|kd| EncryptionInfo {
+                    key_description: kd.clone(),
+                    clevis_info: None,
+                }),
             )?,
         ))
     }

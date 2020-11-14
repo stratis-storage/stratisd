@@ -443,12 +443,15 @@ mod tests {
     use uuid::Uuid;
 
     use crate::{
-        engine::strat_engine::{
-            backstore::{initialize_devices, process_and_verify_devices},
-            cmd::create_fs,
-            metadata::MDADataSize,
-            tests::{crypt, loopbacked, real},
-            udev::block_device_apply,
+        engine::{
+            strat_engine::{
+                backstore::{initialize_devices, process_and_verify_devices},
+                cmd::create_fs,
+                metadata::MDADataSize,
+                tests::{crypt, loopbacked, real},
+                udev::block_device_apply,
+            },
+            types::EncryptionInfo,
         },
         stratis::StratisError,
     };
@@ -476,7 +479,10 @@ mod tests {
                 process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?,
                 pool_uuid,
                 MDADataSize::default(),
-                Some((key_description, None)),
+                Some(EncryptionInfo {
+                    key_description: key_description.clone(),
+                    clevis_info: None,
+                }),
             )?;
 
             for devnode in devices.iter().map(|sbd| sbd.devnode()) {

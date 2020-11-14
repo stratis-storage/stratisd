@@ -20,7 +20,7 @@ use crate::{
             names::KeyDescription,
             serde_structs::{BaseBlockDevSave, Recordable},
         },
-        types::{BlockDevPath, DevUuid, MaybeDbusPath, PoolUuid},
+        types::{BlockDevPath, DevUuid, EncryptionInfo, MaybeDbusPath, PoolUuid},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -34,7 +34,7 @@ pub struct StratBlockDev {
     user_info: Option<String>,
     hardware_info: Option<String>,
     dbus_path: MaybeDbusPath,
-    key_description: Option<KeyDescription>,
+    encryption_info: Option<EncryptionInfo>,
 }
 
 impl StratBlockDev {
@@ -66,7 +66,7 @@ impl StratBlockDev {
         other_segments: &[(Sectors, Sectors)],
         user_info: Option<String>,
         hardware_info: Option<String>,
-        key_description: Option<&KeyDescription>,
+        encryption_info: Option<EncryptionInfo>,
     ) -> StratisResult<StratBlockDev> {
         let mut segments = vec![(Sectors(0), bda.extended_size().sectors())];
         segments.extend(other_segments);
@@ -81,7 +81,7 @@ impl StratBlockDev {
             user_info,
             hardware_info,
             dbus_path: MaybeDbusPath(None),
-            key_description: key_description.cloned(),
+            encryption_info,
         })
     }
 
@@ -189,7 +189,9 @@ impl StratBlockDev {
     }
 
     pub fn key_description(&self) -> Option<&KeyDescription> {
-        self.key_description.as_ref()
+        self.encryption_info
+            .as_ref()
+            .map(|info| &info.key_description)
     }
 }
 
@@ -199,7 +201,7 @@ impl<'a> Into<Value> for &'a StratBlockDev {
             "path": self.devnode.physical_path(),
             "uuid": self.bda.dev_uuid().to_simple_ref().to_string(),
         });
-        if let Some(ref key_desc) = self.key_description {
+        if let Some(ref key_desc) = self.key_description() {
             json.as_object_mut()
                 .expect("Created a JSON object above")
                 .insert(
@@ -243,7 +245,7 @@ impl BlockDev for StratBlockDev {
     }
 
     fn is_encrypted(&self) -> bool {
-        self.key_description.is_some()
+        self.key_description().is_some()
     }
 }
 

@@ -205,7 +205,7 @@ impl Engine for StratEngine {
                     ))
                 } else {
                     let (uuid, pool) =
-                        StratPool::initialize(name, blockdev_paths, redundancy, key_desc.as_ref())?;
+                        StratPool::initialize(name, blockdev_paths, redundancy, key_desc)?;
 
                     let name = Name::new(name.to_owned());
                     self.pools.insert(name, uuid, pool);

@@ -4,8 +4,17 @@
 
 use serde_json::Value;
 
-use crate::{do_request, jsonrpc::interface::Stratis, stratis::StratisResult};
+use crate::{
+    jsonrpc::interface::{StratisParamType, StratisParams},
+    stratis::StratisResult,
+};
 
 pub fn report() -> StratisResult<Value> {
-    Ok(do_request!(Stratis::report))
+    Ok(do_request!(
+        StratisParams {
+            type_: StratisParamType::Report,
+            fd_opt: None,
+        },
+        Report
+    ))
 }

@@ -3,13 +3,18 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use crate::{
-    do_request,
-    jsonrpc::interface::Stratis,
+    jsonrpc::interface::{StratisParamType, StratisParams},
     stratis::{StratisError, StratisResult},
 };
 
-pub fn udev(dm_name: &str) -> StratisResult<Option<(String, String)>> {
-    let (opt, rc, rs) = do_request!(Stratis::udev, dm_name);
+pub fn udev(dm_name: String) -> StratisResult<Option<(String, String)>> {
+    let (opt, rc, rs) = do_request!(
+        StratisParams {
+            type_: StratisParamType::Udev(dm_name),
+            fd_opt: None,
+        },
+        Udev
+    );
     if rc != 0 {
         Err(StratisError::Error(rs))
     } else {

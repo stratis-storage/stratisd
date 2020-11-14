@@ -7,17 +7,42 @@ use crate::{
     stratis::StratisResult,
 };
 
-#[macro_export]
-macro_rules! default_handler {
-    ($respond:expr, $fn:path, $engine:expr, $default_value:expr $(, $args:expr)*) => {
-        $respond.ok($crate::jsonrpc::server::utils::stratis_result_to_return(
-            $fn(
-                $engine,
-                $($args),*
-            ).await,
-            $default_value,
-        )).await
-    }
+macro_rules! expects_fd {
+    ($fd_opt:expr, $ret:ident, $default:expr, true) => {
+        match $fd_opt {
+            Some(fd) => fd,
+            None => {
+                let res = Err($crate::stratis::StratisError::Error(
+                    "Method expected a file descriptor and did not receive one".to_string(),
+                ));
+                return $crate::jsonrpc::interface::StratisRet::$ret(
+                    $crate::jsonrpc::server::utils::stratis_result_to_return(res, $default),
+                );
+            }
+        }
+    };
+    ($fd_opt:expr, $ret:ident, $default:expr, false) => {
+        match $fd_opt {
+            Some(fd) => {
+                if let Err(e) = nix::unistd::close(fd) {
+                    warn!(
+                        "Failed to close file descriptor {}: {}; a file descriptor \
+                        may have been leaked",
+                        fd, e,
+                    );
+                }
+                let res = Err($crate::stratis::StratisError::Error(
+                    "Method did not expect a file descriptor and received one \
+                    anyway; file descriptor has been closed"
+                        .to_string(),
+                ));
+                return $crate::jsonrpc::interface::StratisRet::$ret(
+                    $crate::jsonrpc::server::utils::stratis_result_to_return(res, $default),
+                );
+            }
+            None => (),
+        }
+    };
 }
 
 pub fn stratis_result_to_return<T>(result: StratisResult<T>, default_value: T) -> (T, u16, String) {

@@ -7,10 +7,8 @@ macro_rules! do_request {
     ($request:expr, $ret:ident) => {{
         let mut client =
             $crate::jsonrpc::client::StratisClient::connect($crate::jsonrpc::consts::RPC_SOCKADDR)?;
-        if let $crate::jsonrpc::interface::StratisRet::$ret(ret, rc, rs) =
-            client.request($request)?
-        {
-            (ret, rc, rs)
+        if let $crate::jsonrpc::interface::StratisRet::$ret(ret) = client.request($request)? {
+            ret
         } else {
             return Err($crate::stratis::StratisError::Error(
                 "Request and response types did not match".to_string(),

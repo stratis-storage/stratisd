@@ -2,12 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::path::PathBuf;
+use std::{io::stdin, os::unix::io::AsRawFd, path::PathBuf};
 
 use crate::{
-    do_request, do_request_standard,
     engine::{KeyDescription, PoolUuid},
-    jsonrpc::interface::Stratis,
+    jsonrpc::interface::{StratisParamType, StratisParams},
     print_table,
     stratis::{StratisError, StratisResult},
 };
@@ -24,45 +23,90 @@ const SUFFIXES: &[(u64, &str)] = &[
 
 // stratis-min pool create
 pub fn pool_create(
-    name: &str,
-    blockdevs: &[PathBuf],
+    name: String,
+    blockdevs: Vec<PathBuf>,
     key_desc: Option<KeyDescription>,
 ) -> StratisResult<()> {
-    do_request_standard!(Stratis::pool_create, name, blockdevs, key_desc)
+    do_request_standard!(
+        StratisParams {
+            type_: StratisParamType::PoolCreate(name, blockdevs, key_desc),
+            fd_opt: None,
+        },
+        PoolCreate
+    )
 }
 
 // stratis-min pool unlock
 pub fn pool_unlock(uuid: PoolUuid, prompt: bool) -> StratisResult<()> {
     if prompt {
-        //send_fd_to_sock(stream.as_raw_fd(), stdin().as_raw_fd())?;
         println!("Enter passphrase followed by return:");
     }
-    do_request_standard!(Stratis::pool_unlock, uuid, prompt)
+    do_request_standard!(
+        StratisParams {
+            type_: StratisParamType::PoolUnlock(uuid, prompt),
+            fd_opt: if prompt {
+                Some(stdin().as_raw_fd())
+            } else {
+                None
+            }
+        },
+        PoolUnlock
+    )
 }
 
 // stratis-min pool init-cache
-pub fn pool_init_cache(name: &str, paths: &[PathBuf]) -> StratisResult<()> {
-    do_request_standard!(Stratis::pool_init_cache, name, paths)
+pub fn pool_init_cache(name: String, paths: Vec<PathBuf>) -> StratisResult<()> {
+    do_request_standard!(
+        StratisParams {
+            type_: StratisParamType::PoolInitCache(name, paths),
+            fd_opt: None,
+        },
+        PoolInitCache
+    )
 }
 
 // stratis-min pool init-cache
-pub fn pool_rename(name: &str, new_name: &str) -> StratisResult<()> {
-    do_request_standard!(Stratis::pool_rename, name, new_name)
+pub fn pool_rename(name: String, new_name: String) -> StratisResult<()> {
+    do_request_standard!(
+        StratisParams {
+            type_: StratisParamType::PoolRename(name, new_name),
+            fd_opt: None,
+        },
+        PoolRename
+    )
 }
 
 // stratis-min pool add-data
-pub fn pool_add_data(name: &str, paths: &[PathBuf]) -> StratisResult<()> {
-    do_request_standard!(Stratis::pool_add_data, name, paths)
+pub fn pool_add_data(name: String, paths: Vec<PathBuf>) -> StratisResult<()> {
+    do_request_standard!(
+        StratisParams {
+            type_: StratisParamType::PoolAddData(name, paths),
+            fd_opt: None,
+        },
+        PoolAddData
+    )
 }
 
 // stratis-min pool add-cache
-pub fn pool_add_cache(name: &str, paths: &[PathBuf]) -> StratisResult<()> {
-    do_request_standard!(Stratis::pool_add_cache, name, paths)
+pub fn pool_add_cache(name: String, paths: Vec<PathBuf>) -> StratisResult<()> {
+    do_request_standard!(
+        StratisParams {
+            type_: StratisParamType::PoolAddCache(name, paths),
+            fd_opt: None,
+        },
+        PoolAddCache
+    )
 }
 
 // stratis-min pool destroy
-pub fn pool_destroy(name: &str) -> StratisResult<()> {
-    do_request_standard!(Stratis::pool_destroy, name)
+pub fn pool_destroy(name: String) -> StratisResult<()> {
+    do_request_standard!(
+        StratisParams {
+            type_: StratisParamType::PoolDestroy(name),
+            fd_opt: None,
+        },
+        PoolDestroy
+    )
 }
 
 #[allow(clippy::cast_precision_loss)]
@@ -115,7 +159,13 @@ fn properties_string(properties: Vec<(bool, bool)>) -> Vec<String> {
 
 // stratis-min pool [list]
 pub fn pool_list() -> StratisResult<()> {
-    let (names, sizes, properties) = do_request!(Stratis::pool_list);
+    let (names, sizes, properties) = do_request!(
+        StratisParams {
+            type_: StratisParamType::PoolList,
+            fd_opt: None,
+        },
+        PoolList
+    );
     let physical_col = size_string(sizes);
     let properties_col = properties_string(properties);
     print_table!(
@@ -129,7 +179,13 @@ pub fn pool_list() -> StratisResult<()> {
 
 // stratis-min is-encrypted
 pub fn pool_is_encrypted(uuid: PoolUuid) -> StratisResult<bool> {
-    let (is_encrypted, rc, rs) = do_request!(Stratis::pool_is_encrypted, uuid);
+    let (is_encrypted, rc, rs) = do_request!(
+        StratisParams {
+            type_: StratisParamType::PoolIsEncrypted(uuid),
+            fd_opt: None,
+        },
+        PoolIsEncrypted
+    );
     if rc != 0 {
         Err(StratisError::Error(rs))
     } else {

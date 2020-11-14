@@ -34,9 +34,9 @@ use tokio::{
 use crate::{
     engine::Engine,
     jsonrpc::{
-        consts::{OP_ERR, RPC_SOCKADDR},
+        consts::RPC_SOCKADDR,
         interface::{StratisParamType, StratisParams, StratisRet},
-        server::{key, utils::stratis_result_to_return},
+        server::{key, pool, report, udev, utils::stratis_result_to_return},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -45,29 +45,122 @@ impl StratisParams {
     async fn process(self, engine: Arc<Mutex<dyn Engine>>) -> StratisRet {
         match self.type_ {
             StratisParamType::KeySet(key_desc) => {
-                let fd = match self.fd_opt {
-                    Some(fd) => fd,
-                    None => {
-                        return StratisRet::KeySet(
-                            None,
-                            OP_ERR,
-                            "No file descriptor provided to KeySet".to_string(),
-                        )
-                    }
-                };
-                let (bool_opt, rc, rs) =
-                    stratis_result_to_return(key::key_set(engine, &key_desc, fd).await, None);
-                StratisRet::KeySet(bool_opt, rc, rs)
+                let fd = expects_fd!(self.fd_opt, KeySet, None, true);
+                StratisRet::KeySet(stratis_result_to_return(
+                    key::key_set(engine, &key_desc, fd).await,
+                    None,
+                ))
             }
             StratisParamType::KeyUnset(key_desc) => {
-                let (bool_val, rc, rs) =
-                    stratis_result_to_return(key::key_unset(engine, &key_desc).await, false);
-                StratisRet::KeyUnset(bool_val, rc, rs)
+                expects_fd!(self.fd_opt, KeyUnset, false, false);
+                StratisRet::KeyUnset(stratis_result_to_return(
+                    key::key_unset(engine, &key_desc).await,
+                    false,
+                ))
             }
             StratisParamType::KeyList => {
-                let (key_descs, rc, rs) =
-                    stratis_result_to_return(key::key_list(engine).await, Vec::new());
-                StratisRet::KeyList(key_descs, rc, rs)
+                expects_fd!(self.fd_opt, KeyUnset, false, false);
+                StratisRet::KeyList(stratis_result_to_return(
+                    key::key_list(engine).await,
+                    Vec::new(),
+                ))
+            }
+            StratisParamType::PoolCreate(name, paths, key_desc_opt) => {
+                expects_fd!(self.fd_opt, PoolCreate, false, true);
+                let path_ref: Vec<_> = paths.iter().map(|p| p.as_path()).collect();
+                StratisRet::PoolCreate(stratis_result_to_return(
+                    pool::pool_create(engine, name.as_str(), path_ref.as_slice(), key_desc_opt)
+                        .await,
+                    false,
+                ))
+            }
+            StratisParamType::PoolRename(name, new_name) => {
+                expects_fd!(self.fd_opt, PoolRename, false, false);
+                StratisRet::PoolRename(stratis_result_to_return(
+                    pool::pool_rename(engine, name.as_str(), new_name.as_str()).await,
+                    false,
+                ))
+            }
+            StratisParamType::PoolAddData(name, paths) => {
+                expects_fd!(self.fd_opt, PoolAddData, false, false);
+                let path_ref: Vec<_> = paths.iter().map(|p| p.as_path()).collect();
+                StratisRet::PoolInitCache(stratis_result_to_return(
+                    pool::pool_add_data(engine, name.as_str(), path_ref.as_slice()).await,
+                    false,
+                ))
+            }
+            StratisParamType::PoolInitCache(name, paths) => {
+                expects_fd!(self.fd_opt, PoolInitCache, false, false);
+                let path_ref: Vec<_> = paths.iter().map(|p| p.as_path()).collect();
+                StratisRet::PoolInitCache(stratis_result_to_return(
+                    pool::pool_init_cache(engine, name.as_str(), path_ref.as_slice()).await,
+                    false,
+                ))
+            }
+            StratisParamType::PoolAddCache(name, paths) => {
+                expects_fd!(self.fd_opt, PoolAddCache, false, false);
+                let path_ref: Vec<_> = paths.iter().map(|p| p.as_path()).collect();
+                StratisRet::PoolAddCache(stratis_result_to_return(
+                    pool::pool_add_cache(engine, name.as_str(), path_ref.as_slice()).await,
+                    false,
+                ))
+            }
+            StratisParamType::PoolDestroy(name) => {
+                expects_fd!(self.fd_opt, PoolDestroy, false, false);
+                StratisRet::PoolDestroy(stratis_result_to_return(
+                    pool::pool_destroy(engine, name.as_str()).await,
+                    false,
+                ))
+            }
+            StratisParamType::PoolUnlock(uuid, prompt) => {
+                let fd_opt = if prompt {
+                    Some(expects_fd!(self.fd_opt, PoolUnlock, false, true))
+                } else {
+                    expects_fd!(self.fd_opt, PoolUnlock, false, false);
+                    None
+                };
+                StratisRet::PoolUnlock(stratis_result_to_return(
+                    pool::pool_unlock(engine, uuid, fd_opt).await,
+                    false,
+                ))
+            }
+            StratisParamType::PoolList => {
+                if let Some(fd) = self.fd_opt {
+                    if let Err(e) = close(fd) {
+                        warn!(
+                            "Failed to close file descriptor {}: {}; a file \
+                            descriptor may have been leaked",
+                            fd, e,
+                        );
+                    }
+                }
+                StratisRet::PoolList(pool::pool_list(engine).await)
+            }
+            StratisParamType::PoolIsEncrypted(uuid) => {
+                expects_fd!(self.fd_opt, PoolIsEncrypted, false, false);
+                StratisRet::PoolIsEncrypted(stratis_result_to_return(
+                    pool::pool_is_encrypted(engine, uuid).await,
+                    false,
+                ))
+            }
+            StratisParamType::Report => {
+                if let Some(fd) = self.fd_opt {
+                    if let Err(e) = close(fd) {
+                        warn!(
+                            "Failed to close file descriptor {}: {}; a file \
+                            descriptor may have been leaked",
+                            fd, e,
+                        );
+                    }
+                }
+                StratisRet::Report(report::report(engine).await)
+            }
+            StratisParamType::Udev(dm_name) => {
+                expects_fd!(self.fd_opt, Udev, None, false);
+                StratisRet::Udev(stratis_result_to_return(
+                    udev::udev(engine, dm_name.as_str()).await,
+                    None,
+                ))
             }
         }
     }

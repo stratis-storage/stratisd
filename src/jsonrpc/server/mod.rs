@@ -1,9 +1,11 @@
+#[macro_use]
+mod utils;
+
 mod key;
-//mod pool;
-//mod report;
+mod pool;
+mod report;
 #[allow(clippy::module_inception)]
 mod server;
-//mod udev;
-mod utils;
+mod udev;
 
 pub use server::run_server;

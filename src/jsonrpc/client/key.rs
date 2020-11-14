@@ -5,7 +5,6 @@
 use std::{fs::File, io::stdin, os::unix::io::AsRawFd};
 
 use crate::{
-    do_request, do_request_standard,
     engine::KeyDescription,
     jsonrpc::interface::{StratisParamType, StratisParams},
     print_table,

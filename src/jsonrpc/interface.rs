@@ -21,9 +21,11 @@ pub struct JsonWithFd {
 }
 
 #[derive(Serialize, Deserialize)]
+#[allow(clippy::pub_enum_variant_names)]
 pub enum StratisParamType {
     KeySet(KeyDescription),
     KeyUnset(KeyDescription),
+    KeyList,
 }
 
 pub struct StratisParams {
@@ -43,26 +45,15 @@ impl TryFrom<JsonWithFd> for StratisParams {
 }
 
 #[derive(Serialize, Deserialize)]
+#[allow(clippy::pub_enum_variant_names)]
 pub enum StratisRet {
     KeySet(Option<bool>, u16, String),
     KeyUnset(bool, u16, String),
+    KeyList(Vec<KeyDescription>, u16, String),
 }
 
 rpc_api! {
     pub Stratis {
-        #[rpc(method = "SetKey")]
-        fn key_set(
-            key_desc: KeyDescription,
-        ) -> (Option<bool>, u16, String);
-
-        #[rpc(method = "UnsetKey")]
-        fn key_unset(
-            key_desc: KeyDescription,
-        ) -> (bool, u16, String);
-
-        #[rpc(method = "ListKeys")]
-        fn key_list() -> (Vec<KeyDescription>, u16, String);
-
         #[rpc(method = "CreatePool")]
         fn pool_create(
             name: String,

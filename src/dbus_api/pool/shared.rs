@@ -90,6 +90,18 @@ pub fn get_pool_total_used(m: &MethodInfo<MTFn<TData>, TData>) -> Result<String,
     })
 }
 
+pub fn get_pool_clevis_info(
+    m: &MethodInfo<MTFn<TData>, TData>,
+) -> Result<(bool, (String, String)), String> {
+    pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
+        Ok(option_to_tuple(
+            pool.clevis_info()
+                .map(|(pin, config)| (pin.to_owned(), config.to_string())),
+            (String::new(), String::new()),
+        ))
+    })
+}
+
 /// A method shared by all pool interfaces and by all blockdev-adding
 /// operations, including cache initialization, which is considered a
 /// blockdev-adding operation because when a cache is initialized, the

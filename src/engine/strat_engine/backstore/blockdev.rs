@@ -252,6 +252,11 @@ impl<'a> Into<Value> for &'a StratBlockDev {
                     Value::from(key_desc.as_application_str().to_string()),
                 );
         }
+        if let Some(ref info) = self.clevis_info() {
+            let map = json.as_object_mut().expect("Created a JSON object above");
+            map.insert("clevis_pin".to_string(), Value::from(info.0.to_owned()));
+            map.insert("clevis_config".to_string(), info.1.clone());
+        }
         json
     }
 }

@@ -188,10 +188,53 @@ impl StratBlockDev {
         &self.devnode
     }
 
+    /// Get the key description stored on the given encrypted blockdev.
+    ///
+    /// Returns Some(_) if it is encrypted.
+    /// Returns None if it is not encrypted.
     pub fn key_description(&self) -> Option<&KeyDescription> {
         self.encryption_info
             .as_ref()
             .map(|info| &info.key_description)
+    }
+
+    /// Get the clevis configuration stored on the given encrypted blockdev.
+    ///
+    /// Returns Some(_) if it has been bound using clevis.
+    /// Returns None if it is has not been bound using clevis or it is not encrypted.
+    pub fn clevis_info(&self) -> Option<&(String, Value)> {
+        self.encryption_info
+            .as_ref()
+            .and_then(|info| info.clevis_info.as_ref())
+    }
+
+    /// Set the clevis config cached in the blockdev data structure to the given
+    /// values.
+    pub fn set_clevis_info(&mut self, pin: String, config: Value) -> StratisResult<()> {
+        match self.encryption_info {
+            Some(ref mut info) => {
+                info.clevis_info = Some((pin, config));
+                Ok(())
+            }
+            None => Err(StratisError::Error(format!(
+                "Block device {} is not encrypted",
+                self.devnode.physical_path().display(),
+            ))),
+        }
+    }
+
+    /// Unset the clevis config cached in the blockdev data structure.
+    pub fn unset_clevis_info(&mut self) -> StratisResult<()> {
+        match self.encryption_info {
+            Some(ref mut info) => {
+                info.clevis_info = None;
+                Ok(())
+            }
+            None => Err(StratisError::Error(format!(
+                "Block device {} is not encrypted",
+                self.devnode.physical_path().display(),
+            ))),
+        }
     }
 }
 

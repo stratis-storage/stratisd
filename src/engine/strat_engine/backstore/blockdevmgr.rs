@@ -10,7 +10,6 @@ use std::{
 };
 
 use chrono::{DateTime, Duration, Utc};
-use itertools::Itertools;
 use rand::{seq::IteratorRandom, thread_rng};
 use serde_json::Value;
 
@@ -29,7 +28,7 @@ use crate::{
             names::KeyDescription,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
         },
-        types::{CreateAction, DeleteAction, DevUuid, EncryptionInfo, PoolUuid},
+        types::{DevUuid, EncryptionInfo, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -465,18 +464,25 @@ impl BlockDevMgr {
     }
 
     pub fn key_desc(&self) -> Option<&KeyDescription> {
-        let mut iter = self
-            .block_devs
-            .iter()
-            .filter_map(|bd| bd.key_description())
-            .unique();
-        let key_desc = iter.next();
+        let mut iter = self.block_devs.iter().map(|bd| bd.key_description());
+        let key_desc = iter.next().and_then(|opt| opt);
 
-        // Liminal device code will note set up a pool with multiple key description
+        // Liminal device code will not set up a pool with multiple key description
         // values.
-        assert!(iter.next().is_none());
+        assert!(iter.all(|elem| key_desc == elem));
 
         key_desc
+    }
+
+    pub fn clevis_info(&self) -> Option<&(String, Value)> {
+        let mut iter = self.block_devs.iter().map(|bd| bd.clevis_info());
+        let clevis_info = iter.next().and_then(|opt| opt);
+
+        // Liminal device code will not set up a pool with multiple clevis config
+        // values.
+        assert!(iter.all(|elem| clevis_info == elem));
+
+        clevis_info
     }
 
     pub fn is_encrypted(&self) -> bool {
@@ -507,7 +513,15 @@ impl BlockDevMgr {
         }
     }
 
-    pub fn bind_clevis(&self, pin: &str, clevis_info: &Value) -> StratisResult<CreateAction<()>> {
+    /// Bind all devices in the given blockdev manager using the given clevis
+    /// configuration.
+    ///
+    /// * Returns Ok(true) if the binding was performed.
+    /// * Returns Ok(false) if the binding had already been previously performed and
+    /// nothing was changed.
+    /// * Returns Err(_) if an inconsistency was found in the metadata across pools
+    /// or binding failed.
+    pub fn bind_clevis(&mut self, pin: String, clevis_info: Value) -> StratisResult<bool> {
         fn bind_clevis_loop<'a>(
             key_fs: &MemoryPrivateFilesystem,
             rollback_record: &'a mut Vec<CryptHandle>,
@@ -530,32 +544,7 @@ impl BlockDevMgr {
             Ok(())
         }
 
-        let key_description = match self.key_desc() {
-            Some(kd) => kd,
-            None => {
-                return Err(StratisError::Error(
-                    "Requested pool does not appear to be encrypted".to_string(),
-                ))
-            }
-        };
-
-        let mut crypt_handles = get_crypt_handles(&self.block_devs)?;
-        if clevis_enabled(&mut crypt_handles)?.is_some() {
-            return Ok(CreateAction::Identity);
-        }
-
-        let key_fs = MemoryPrivateFilesystem::new()?;
-        let mut rollback_record = Vec::new();
-        let result = bind_clevis_loop(
-            &key_fs,
-            &mut rollback_record,
-            &mut crypt_handles,
-            key_description,
-            pin,
-            clevis_info,
-        );
-
-        if result.is_err() {
+        fn rollback_loop(rollback_record: Vec<CryptHandle>) {
             rollback_record.into_iter().for_each(|mut crypt_dev| {
                 if let Err(e) = crypt_dev.clevis_unbind() {
                     warn!(
@@ -566,23 +555,70 @@ impl BlockDevMgr {
                     );
                 }
             });
-            result?;
         }
-        Ok(CreateAction::Created(()))
+
+        let key_description = match self.key_desc() {
+            Some(kd) => kd,
+            None => {
+                return Err(StratisError::Error(
+                    "Requested pool does not appear to be encrypted".to_string(),
+                ))
+            }
+        };
+
+        let clevis_info_current = self.clevis_info();
+        if let Some(info) = clevis_info_current {
+            let clevis_tuple = (pin, clevis_info);
+            if info == &clevis_tuple {
+                return Ok(false);
+            } else {
+                return Err(StratisError::Error(format!(
+                    "Block devices have already been bound with pin {} and config {}; \
+                    requested pin {} and config {} can't be applied",
+                    info.0, info.1, clevis_tuple.0, clevis_tuple.1,
+                )));
+            }
+        }
+
+        let key_fs = MemoryPrivateFilesystem::new()?;
+
+        let mut crypt_handles = get_crypt_handles(&self.block_devs)?;
+        let mut rollback_record = Vec::new();
+        let result = bind_clevis_loop(
+            &key_fs,
+            &mut rollback_record,
+            &mut crypt_handles,
+            key_description,
+            pin.as_str(),
+            &clevis_info,
+        );
+        if let Err(e) = result {
+            rollback_loop(crypt_handles);
+            return Err(e);
+        }
+
+        for (_, bd) in self.blockdevs_mut() {
+            let res = bd.set_clevis_info(pin.clone(), clevis_info.clone());
+            if let Err(e) = res {
+                rollback_loop(crypt_handles);
+                return Err(e);
+            }
+        }
+        Ok(true)
     }
 
-    pub fn unbind_clevis(&self) -> StratisResult<DeleteAction<()>> {
+    pub fn unbind_clevis(&mut self) -> StratisResult<bool> {
         if !self.is_encrypted() {
             return Err(StratisError::Error(
                 "Requested pool does not appear to be encrypted".to_string(),
             ));
         }
 
-        let mut crypt_handles = get_crypt_handles(&self.block_devs)?;
-        if clevis_enabled(&mut crypt_handles)?.is_none() {
-            return Ok(DeleteAction::Identity);
+        if self.clevis_info().is_none() {
+            return Ok(false);
         }
 
+        let crypt_handles = get_crypt_handles(&self.block_devs)?;
         for mut handle in crypt_handles {
             let res = handle.clevis_unbind().map_err(StratisError::Crypt);
             if let Err(ref e) = res {
@@ -594,7 +630,12 @@ impl BlockDevMgr {
             }
             res?
         }
-        Ok(DeleteAction::Deleted(()))
+        for (_, bd) in self.blockdevs_mut() {
+            if let Err(e) = bd.unset_clevis_info() {
+                warn!("{}", e);
+            }
+        }
+        Ok(true)
     }
 }
 

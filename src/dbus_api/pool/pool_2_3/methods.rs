@@ -44,7 +44,7 @@ pub fn bind_clevis(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };
-    let msg = match pool.bind_clevis(&pin, &json) {
+    let msg = match pool.bind_clevis(pin, json) {
         Ok(CreateAction::Identity) => return_message.append3(false, msg_code_ok(), msg_string_ok()),
         Ok(CreateAction::Created(_)) => {
             return_message.append3(true, msg_code_ok(), msg_string_ok())

@@ -380,12 +380,22 @@ impl Pool for StratPool {
         }
     }
 
-    fn bind_clevis(&mut self, pin: &str, clevis_info: &Value) -> StratisResult<CreateAction<()>> {
-        self.backstore.bind_clevis(pin, clevis_info)
+    fn bind_clevis(&mut self, pin: String, clevis_info: Value) -> StratisResult<CreateAction<()>> {
+        let changed = self.backstore.bind_clevis(pin, clevis_info)?;
+        if changed {
+            Ok(CreateAction::Created(()))
+        } else {
+            Ok(CreateAction::Identity)
+        }
     }
 
     fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<()>> {
-        self.backstore.unbind_clevis()
+        let changed = self.backstore.unbind_clevis()?;
+        if changed {
+            Ok(DeleteAction::Deleted(()))
+        } else {
+            Ok(DeleteAction::Identity)
+        }
     }
 
     fn create_filesystems<'a, 'b>(

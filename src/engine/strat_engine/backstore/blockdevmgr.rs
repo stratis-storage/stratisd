@@ -129,52 +129,6 @@ fn get_crypt_handles(blockdevs: &[StratBlockDev]) -> StratisResult<Vec<CryptHand
     Ok(handles)
 }
 
-/// Return whether clevis has been enabled for a given pool.
-///
-/// Returns Ok(Some(_)) containing the clevis info if clevis is enabled.
-/// Returns Ok(None) if clevis is not enabled.
-/// Returns an error if there are two blockdevs for which clevis info
-/// does not match or some blockdevs which have a clevis configuration and
-/// some which do not.
-fn clevis_enabled(handles: &mut Vec<CryptHandle>) -> StratisResult<Option<(String, Value)>> {
-    fn match_infos(
-        clevis_info: Option<(String, Value)>,
-        clevis_info_next: Option<(String, Value)>,
-    ) -> StratisResult<Option<(String, Value)>> {
-        match (clevis_info, clevis_info_next) {
-            (Some(c), Some(cn)) => {
-                if c != cn {
-                    Err(StratisError::Error(
-                        "Clevis metadata is inconsistent; not all \
-                            devices are using the same Clevis configuration"
-                            .to_string(),
-                    ))
-                } else {
-                    Ok(Some(c))
-                }
-            }
-            (None, Some(cn)) => Ok(Some(cn)),
-            (Some(_), None) => Err(StratisError::Error(
-                "Clevis metadata is inconsistent; not all \
-                        devices have clevis enabled."
-                    .to_string(),
-            )),
-            (None, None) => Ok(None),
-        }
-    }
-
-    let mut clevis_info: Option<Option<(String, Value)>> = None;
-    for handle in handles.iter_mut() {
-        let clevis_info_next = handle.clevis_info()?;
-        if let Some(ci) = clevis_info {
-            clevis_info = Some(match_infos(ci, clevis_info_next)?);
-        } else {
-            clevis_info = Some(clevis_info_next);
-        }
-    }
-
-    Ok(clevis_info.and_then(|ci| ci))
-}
 #[derive(Debug)]
 pub struct BlockDevMgr {
     block_devs: Vec<StratBlockDev>,
@@ -262,12 +216,7 @@ impl BlockDevMgr {
             ));
         }
 
-        // FIXME: Use cached clevis info from BlockDev.
-        let clevis_info = if is_encrypted {
-            clevis_enabled(&mut get_crypt_handles(&self.block_devs)?)?
-        } else {
-            None
-        };
+        let clevis_info = self.clevis_info();
 
         // FIXME: This is a bug. If new devices are added to a pool, and the
         // variable length metadata requires more than the minimum allocated,
@@ -280,7 +229,7 @@ impl BlockDevMgr {
             match self.key_desc() {
                 Some(kd) => Some(EncryptionInfo {
                     key_description: kd.clone(),
-                    clevis_info,
+                    clevis_info: clevis_info.cloned(),
                 }),
                 None => None,
             },

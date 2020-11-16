@@ -75,6 +75,11 @@ pub fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>
                 .add_m(fetch_properties_2_2::get_properties_method(&f)),
         )
         .add(
+            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_3, ())
+                .add_m(fetch_properties_2_2::get_all_properties_method(&f))
+                .add_m(fetch_properties_2_2::get_properties_method(&f)),
+        )
+        .add(
             f.interface(consts::REPORT_INTERFACE_NAME_2_1, ())
                 .add_m(report_2_1::get_report_method(&f)),
         );

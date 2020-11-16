@@ -4,7 +4,7 @@
 
 use std::{
     ffi::CString,
-    fs::{create_dir_all, OpenOptions},
+    fs::{create_dir_all, remove_file, OpenOptions},
     io::{self, Write},
     mem::size_of,
     os::unix::io::{AsRawFd, RawFd},
@@ -632,6 +632,9 @@ impl Drop for MemoryMappedKeyfile {
         }
         if let Err(e) = unsafe { munmap(self.0, self.1) } {
             warn!("Could not unmap temporary keyfile: {}", e);
+        }
+        if let Err(e) = remove_file(self.keyfile_path()) {
+            warn!("Failed to clean up temporary key file: {}", e);
         }
     }
 }

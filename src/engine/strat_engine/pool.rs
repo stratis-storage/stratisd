@@ -630,6 +630,10 @@ impl Pool for StratPool {
     fn key_desc(&self) -> Option<&KeyDescription> {
         self.backstore.data_key_desc()
     }
+
+    fn clevis_info(&self) -> Option<&(String, Value)> {
+        self.backstore.data_tier_clevis_info()
+    }
 }
 
 #[cfg(test)]

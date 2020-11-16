@@ -13,7 +13,7 @@ use devicemapper::{Bytes, Sectors, IEC};
 use crate::engine::{
     engine::BlockDev,
     sim_engine::randomization::Randomizer,
-    types::{BlockDevPath, KeyDescription, MaybeDbusPath},
+    types::{BlockDevPath, EncryptionInfo, MaybeDbusPath},
 };
 
 #[derive(Debug)]
@@ -25,7 +25,7 @@ pub struct SimDev {
     hardware_info: Option<String>,
     initialization_time: u64,
     dbus_path: MaybeDbusPath,
-    key_description: Option<KeyDescription>,
+    encryption_info: Option<EncryptionInfo>,
 }
 
 impl SimDev {
@@ -65,7 +65,7 @@ impl BlockDev for SimDev {
     }
 
     fn is_encrypted(&self) -> bool {
-        self.key_description.is_some()
+        self.encryption_info.is_some()
     }
 }
 
@@ -74,7 +74,7 @@ impl SimDev {
     pub fn new(
         rdm: Rc<RefCell<Randomizer>>,
         devnode: &Path,
-        key_description: Option<&KeyDescription>,
+        encryption_info: Option<&EncryptionInfo>,
     ) -> (Uuid, SimDev) {
         (
             Uuid::new_v4(),
@@ -85,7 +85,7 @@ impl SimDev {
                 hardware_info: None,
                 initialization_time: Utc::now().timestamp() as u64,
                 dbus_path: MaybeDbusPath(None),
-                key_description: key_description.cloned(),
+                encryption_info: encryption_info.cloned(),
             },
         )
     }
@@ -96,6 +96,25 @@ impl SimDev {
     pub fn set_user_info(&mut self, user_info: Option<&str>) -> bool {
         set_blockdev_user_info!(self; user_info)
     }
+
+    /// Set the clevis info for a block device.
+    pub fn set_clevis_info(&mut self, pin: String, config: Value) {
+        if let Some(ref mut info) = self.encryption_info {
+            info.clevis_info = Some((pin, config));
+        }
+    }
+
+    /// Unset the clevis info for a block device.
+    pub fn unset_clevis_info(&mut self) {
+        if let Some(ref mut info) = self.encryption_info {
+            info.clevis_info = None;
+        }
+    }
+
+    /// Get encryption information for this block device.
+    pub fn encryption_info(&self) -> Option<&EncryptionInfo> {
+        self.encryption_info.as_ref()
+    }
 }
 
 impl<'a> Into<Value> for &'a SimDev {
@@ -105,10 +124,14 @@ impl<'a> Into<Value> for &'a SimDev {
             "path".to_string(),
             Value::from(self.devnode.physical_path().display().to_string()),
         );
-        if let Some(ref key_desc) = self.key_description {
+        if let Some(EncryptionInfo {
+            ref key_description,
+            ..
+        }) = self.encryption_info
+        {
             json.insert(
                 "key_description".to_string(),
-                Value::from(key_desc.as_application_str()),
+                Value::from(key_description.as_application_str()),
             );
         }
         Value::from(json)

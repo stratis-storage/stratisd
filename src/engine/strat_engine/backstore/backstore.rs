@@ -652,6 +652,10 @@ impl Backstore {
         self.data_tier.is_encrypted()
     }
 
+    pub fn data_tier_clevis_info(&self) -> Option<&(String, Value)> {
+        self.data_tier.block_mgr.clevis_info()
+    }
+
     pub fn has_cache(&self) -> bool {
         self.cache_tier.is_some()
     }

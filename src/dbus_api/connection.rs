@@ -23,7 +23,7 @@ use dbus::{
     strings::Path,
     tree::{MTSync, Tree},
 };
-use tokio::sync::{mpsc::Receiver, RwLock};
+use tokio::sync::{mpsc::Receiver, Mutex};
 
 use crate::{
     dbus_api::{
@@ -37,7 +37,7 @@ use crate::{
 /// the tree.
 pub struct DbusTreeHandler {
     pub(super) connection: Arc<SyncConnection>,
-    pub(super) tree: Arc<RwLock<Tree<MTSync<TData>, TData>>>,
+    pub(super) tree: Arc<Mutex<Tree<MTSync<TData>, TData>>>,
     pub(super) receiver: Receiver<DbusAction>,
 }
 
@@ -54,15 +54,15 @@ impl DbusTreeHandler {
             DbusAction::Add(path, interfaces) => {
                 let path_name = path.get_name().clone();
                 {
-                    let mut rwlock = self.tree.write().await;
-                    (*rwlock).insert(path);
+                    let mut mutex = self.tree.lock().await;
+                    mutex.insert(path);
                 }
                 self.added_object_signal(path_name, interfaces)?;
             }
             DbusAction::Remove(path, interfaces) => {
                 {
-                    let mut rwlock = self.tree.write().await;
-                    (*rwlock).remove(&path);
+                    let mut mutex = self.tree.lock().await;
+                    mutex.remove(&path);
                 }
                 self.removed_object_signal(path, interfaces)?;
             }
@@ -126,14 +126,14 @@ pub struct DbusConnectionHandler {
 impl DbusConnectionHandler {
     pub(super) fn new(
         connection: Arc<SyncConnection>,
-        tree: Arc<RwLock<Tree<MTSync<TData>, TData>>>,
+        tree: Arc<Mutex<Tree<MTSync<TData>, TData>>>,
         should_exit: Arc<AtomicBool>,
     ) -> DbusConnectionHandler {
         connection.start_receive(
             MatchRule::new_method_call(),
             Box::new(move |msg, conn_ref| {
-                let read_lock = block_on(tree.read());
-                let messages = (*read_lock).handle(&msg);
+                let mutex = block_on(tree.lock());
+                let messages = mutex.handle(&msg);
                 if let Some(msgs) = messages {
                     for message in msgs {
                         if conn_ref.send(message).is_err() {

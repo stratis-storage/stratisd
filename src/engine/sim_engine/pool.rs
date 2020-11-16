@@ -24,27 +24,19 @@ use crate::{
         sim_engine::{blockdev::SimDev, filesystem::SimFilesystem, randomization::Randomizer},
         structures::Table,
         types::{
-            BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid, KeyDescription,
-            MaybeDbusPath, Name, PoolUuid, Redundancy, RenameAction, SetCreateAction,
-            SetDeleteAction,
+            BlockDevTier, CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid,
+            KeyDescription, MaybeDbusPath, Name, PoolUuid, Redundancy, RenameAction,
+            SetCreateAction, SetDeleteAction,
         },
         EngineEvent,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
-// NOTE: There are currently two separate key descriptions which currently must be the
-// same and as a result are functionally equivalent at the moment. The reason for this
-// separation is to allow ease in future development if separate key descriptions are ever
-// needed for data devices and cache devices.
 #[derive(Debug)]
 pub struct SimPool {
     block_devs: HashMap<DevUuid, SimDev>,
-    block_devs_key_desc: Option<KeyDescription>,
-    block_devs_bound: bool,
     cache_devs: HashMap<DevUuid, SimDev>,
-    cache_devs_key_desc: Option<KeyDescription>,
-    cache_devs_bound: bool,
     filesystems: Table<SimFilesystem>,
     redundancy: Redundancy,
     rdm: Rc<RefCell<Randomizer>>,
@@ -56,21 +48,17 @@ impl SimPool {
         rdm: &Rc<RefCell<Randomizer>>,
         paths: &[&Path],
         redundancy: Redundancy,
-        key_desc: Option<&KeyDescription>,
+        enc_info: Option<EncryptionInfo>,
     ) -> (PoolUuid, SimPool) {
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
         let device_pairs = devices
             .iter()
-            .map(|p| SimDev::new(Rc::clone(rdm), p, key_desc));
+            .map(|p| SimDev::new(Rc::clone(rdm), p, enc_info.as_ref()));
         (
             Uuid::new_v4(),
             SimPool {
                 block_devs: HashMap::from_iter(device_pairs),
-                block_devs_key_desc: key_desc.cloned(),
-                block_devs_bound: false,
                 cache_devs: HashMap::new(),
-                cache_devs_key_desc: key_desc.cloned(),
-                cache_devs_bound: false,
                 filesystems: Table::default(),
                 redundancy,
                 rdm: Rc::clone(rdm),
@@ -96,11 +84,30 @@ impl SimPool {
     }
 
     fn datadevs_encrypted(&self) -> bool {
-        self.block_devs_key_desc.is_some()
+        self.encryption_info().is_some()
     }
 
     pub fn destroy(&mut self) -> StratisResult<()> {
         Ok(())
+    }
+
+    fn encryption_info(&self) -> Option<&EncryptionInfo> {
+        self.block_devs
+            .iter()
+            .next()
+            .and_then(|(_, bd)| bd.encryption_info())
+    }
+
+    fn add_clevis_info(&mut self, pin: String, config: Value) {
+        self.block_devs
+            .iter_mut()
+            .for_each(|(_, bd)| bd.set_clevis_info(pin.clone(), config.clone()))
+    }
+
+    fn clear_clevis_info(&mut self) {
+        self.block_devs
+            .iter_mut()
+            .for_each(|(_, bd)| bd.unset_clevis_info())
     }
 }
 
@@ -244,8 +251,8 @@ impl Pool for SimPool {
                     Rc::clone(&self.rdm),
                     p,
                     match tier {
-                        BlockDevTier::Data => self.block_devs_key_desc.as_ref(),
-                        BlockDevTier::Cache => self.cache_devs_key_desc.as_ref(),
+                        BlockDevTier::Data => self.encryption_info(),
+                        BlockDevTier::Cache => None,
                     },
                 )
             })
@@ -273,37 +280,46 @@ impl Pool for SimPool {
         Ok(SetCreateAction::new(ret_uuids))
     }
 
-    fn bind_clevis(
-        &mut self,
-        _pin: String,
-        _clevis_info: Value,
-    ) -> StratisResult<CreateAction<()>> {
-        if !self.is_encrypted() {
+    fn bind_clevis(&mut self, pin: String, clevis_info: Value) -> StratisResult<CreateAction<()>> {
+        let encryption_info = self.encryption_info();
+        let clevis_info_current = encryption_info.and_then(|info| info.clevis_info.as_ref());
+        if encryption_info.is_some() {
+            if let Some(info) = clevis_info_current {
+                let clevis_tuple = (pin, clevis_info);
+                if info == &clevis_tuple {
+                    Ok(CreateAction::Identity)
+                } else {
+                    Err(StratisError::Error(format!(
+                        "This pool is already bound with clevis pin and config {:?};
+                        this differs from the requested pin and config {:?}",
+                        info, clevis_tuple,
+                    )))
+                }
+            } else {
+                self.add_clevis_info(pin, clevis_info);
+                Ok(CreateAction::Created(()))
+            }
+        } else {
             Err(StratisError::Error(
                 "Requested pool does not appear to be encrypted".to_string(),
             ))
-        } else {
-            Ok(if self.block_devs_bound {
-                CreateAction::Identity
-            } else {
-                self.block_devs_bound = true;
-                CreateAction::Created(())
-            })
         }
     }
 
     fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<()>> {
-        if !self.is_encrypted() {
-            Err(StratisError::Error(
-                "Requested pool does not appear to be encrypted".to_string(),
-            ))
-        } else {
-            Ok(if self.block_devs_bound {
-                self.block_devs_bound = false;
+        let encryption_info = self.encryption_info();
+        let clevis_info = encryption_info.and_then(|info| info.clevis_info.as_ref());
+        if encryption_info.is_some() {
+            Ok(if clevis_info.is_some() {
+                self.clear_clevis_info();
                 DeleteAction::Deleted(())
             } else {
                 DeleteAction::Identity
             })
+        } else {
+            Err(StratisError::Error(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ))
         }
     }
 
@@ -494,7 +510,15 @@ impl Pool for SimPool {
     }
 
     fn key_desc(&self) -> Option<&KeyDescription> {
-        self.block_devs_key_desc.as_ref()
+        self.encryption_info()
+            .as_ref()
+            .map(|info| &info.key_description)
+    }
+
+    fn clevis_info(&self) -> Option<&(String, Value)> {
+        self.encryption_info()
+            .as_ref()
+            .and_then(|info| info.clevis_info.as_ref())
     }
 }
 

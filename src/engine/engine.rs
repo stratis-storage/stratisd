@@ -265,6 +265,9 @@ pub trait Pool: Debug {
     /// Get key description for the key in the kernel keyring used for encryption
     /// if it is encrypted
     fn key_desc(&self) -> Option<&KeyDescription>;
+
+    /// Get pin and configuration info for the Clevis bind for this pool.
+    fn clevis_info(&self) -> Option<&(String, Value)>;
 }
 
 pub trait Engine: Debug + Report {

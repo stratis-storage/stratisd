@@ -166,7 +166,7 @@ pub trait Pool: Debug {
 
     /// Bind all devices in the given pool for automated unlocking
     /// using clevis.
-    fn bind_clevis(&mut self, pin: &str, clevis_info: &Value) -> StratisResult<CreateAction<()>>;
+    fn bind_clevis(&mut self, pin: String, clevis_info: Value) -> StratisResult<CreateAction<()>>;
 
     /// Unbind all devices in the given pool from using clevis.
     fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<()>>;

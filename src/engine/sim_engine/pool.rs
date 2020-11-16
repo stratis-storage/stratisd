@@ -273,7 +273,11 @@ impl Pool for SimPool {
         Ok(SetCreateAction::new(ret_uuids))
     }
 
-    fn bind_clevis(&mut self, _pin: &str, _clevis_info: &Value) -> StratisResult<CreateAction<()>> {
+    fn bind_clevis(
+        &mut self,
+        _pin: String,
+        _clevis_info: Value,
+    ) -> StratisResult<CreateAction<()>> {
         if !self.is_encrypted() {
             Err(StratisError::Error(
                 "Requested pool does not appear to be encrypted".to_string(),

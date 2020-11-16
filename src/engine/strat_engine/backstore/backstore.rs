@@ -26,7 +26,7 @@ use crate::{
             serde_structs::{BackstoreSave, CapSave, Recordable},
             writing::wipe_sectors,
         },
-        types::{BlockDevTier, CreateAction, DeleteAction, DevUuid, EncryptionInfo, PoolUuid},
+        types::{BlockDevTier, DevUuid, EncryptionInfo, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -656,11 +656,11 @@ impl Backstore {
         self.cache_tier.is_some()
     }
 
-    pub fn bind_clevis(&self, pin: &str, clevis_info: &Value) -> StratisResult<CreateAction<()>> {
+    pub fn bind_clevis(&mut self, pin: String, clevis_info: Value) -> StratisResult<bool> {
         self.data_tier.block_mgr.bind_clevis(pin, clevis_info)
     }
 
-    pub fn unbind_clevis(&self) -> StratisResult<DeleteAction<()>> {
+    pub fn unbind_clevis(&mut self) -> StratisResult<bool> {
         self.data_tier.block_mgr.unbind_clevis()
     }
 }

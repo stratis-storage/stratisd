@@ -244,18 +244,14 @@ impl<'a> Into<Value> for &'a StratBlockDev {
             "path": self.devnode.physical_path(),
             "uuid": self.bda.dev_uuid().to_simple_ref().to_string(),
         });
-        if let Some(ref key_desc) = self.key_description() {
-            json.as_object_mut()
-                .expect("Created a JSON object above")
-                .insert(
-                    "key_description".to_string(),
-                    Value::from(key_desc.as_application_str().to_string()),
-                );
-        }
-        if let Some(ref info) = self.clevis_info() {
-            let map = json.as_object_mut().expect("Created a JSON object above");
-            map.insert("clevis_pin".to_string(), Value::from(info.0.to_owned()));
-            map.insert("clevis_config".to_string(), info.1.clone());
+        let map = json.as_object_mut().expect("just created above");
+        if let Some(encryption_info) = &self.encryption_info {
+            if let Value::Object(enc_map) = <&EncryptionInfo as Into<Value>>::into(encryption_info)
+            {
+                map.extend(enc_map);
+            } else {
+                unreachable!("EncryptionInfo conversion returns a JSON object");
+            };
         }
         json
     }

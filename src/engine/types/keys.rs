@@ -77,6 +77,18 @@ impl Hash for EncryptionInfo {
     }
 }
 
+impl<'a> Into<Value> for &'a EncryptionInfo {
+    fn into(self) -> Value {
+        let mut json = json!({"key_description": self.key_description.as_application_str()});
+        if let Some(ref info) = self.clevis_info {
+            let map = json.as_object_mut().expect("Created a JSON object above");
+            map.insert("clevis_pin".to_string(), Value::from(info.0.to_owned()));
+            map.insert("clevis_config".to_string(), info.1.clone());
+        }
+        json
+    }
+}
+
 /// A data type respresenting a key description for the kernel keyring
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct KeyDescription(String);

@@ -19,13 +19,12 @@ use crate::{
             dm::{get_dm, get_dm_init},
             keys::{MemoryFilesystem, StratKeyActions},
             liminal::{find_all, LiminalDevices},
-            names::KeyDescription,
             pool::StratPool,
         },
         structures::Table,
         types::{
-            CreateAction, DeleteAction, DevUuid, RenameAction, ReportType, SetUnlockAction,
-            UnlockMethod,
+            CreateAction, DeleteAction, DevUuid, EncryptionInfo, KeyDescription, RenameAction,
+            ReportType, SetUnlockAction, UnlockMethod,
         },
         Engine, EngineEvent, Name, Pool, PoolUuid, Report,
     },
@@ -291,7 +290,7 @@ impl Engine for StratEngine {
         get_mut_pool!(self; uuid)
     }
 
-    fn locked_pools(&self) -> HashMap<PoolUuid, KeyDescription> {
+    fn locked_pools(&self) -> HashMap<PoolUuid, EncryptionInfo> {
         self.liminal_devices.locked_pools()
     }
 

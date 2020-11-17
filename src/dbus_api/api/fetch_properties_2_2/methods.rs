@@ -33,10 +33,10 @@ pub fn locked_pools(
     Ok(engine
         .locked_pools()
         .into_iter()
-        .map(|(u, kd)| {
+        .map(|(u, info)| {
             (
                 u.to_simple_ref().to_string(),
-                kd.as_application_str().to_string(),
+                info.key_description.as_application_str().to_string(),
             )
         })
         .collect())

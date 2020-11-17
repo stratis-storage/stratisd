@@ -197,7 +197,7 @@ impl Engine for SimEngine {
         get_mut_pool!(self; uuid)
     }
 
-    fn locked_pools(&self) -> HashMap<PoolUuid, KeyDescription> {
+    fn locked_pools(&self) -> HashMap<PoolUuid, EncryptionInfo> {
         HashMap::new()
     }
 

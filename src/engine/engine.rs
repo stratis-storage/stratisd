@@ -17,9 +17,9 @@ use devicemapper::{Bytes, Sectors};
 
 use crate::{
     engine::types::{
-        BlockDevPath, BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid,
-        KeyDescription, MappingCreateAction, MaybeDbusPath, Name, PoolUuid, RenameAction,
-        ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, UnlockMethod,
+        BlockDevPath, BlockDevTier, CreateAction, DeleteAction, DevUuid, EncryptionInfo,
+        FilesystemUuid, KeyDescription, MappingCreateAction, MaybeDbusPath, Name, PoolUuid,
+        RenameAction, ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, UnlockMethod,
     },
     stratis::StratisResult,
 };
@@ -323,9 +323,9 @@ pub trait Engine: Debug + Report {
     /// Get a mutable referent to the pool designated by uuid.
     fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut dyn Pool)>;
 
-    /// Get a mapping of encrypted pool UUIDs for pools that have not yet been set up
-    /// and need to be unlocked to their key descriptions.
-    fn locked_pools(&self) -> HashMap<PoolUuid, KeyDescription>;
+    /// Get a mapping of encrypted pool UUIDs for pools that have not yet
+    /// been set up and need to be unlocked to their encryption infos.
+    fn locked_pools(&self) -> HashMap<PoolUuid, EncryptionInfo>;
 
     /// Configure the simulator, for the real engine, this is a null op.
     /// denominator: the probably of failure is 1/denominator.

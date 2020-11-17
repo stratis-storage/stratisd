@@ -2,7 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{fs::File, io::stdin, os::unix::io::AsRawFd};
+use std::{fs::File, os::unix::io::AsRawFd};
+
+use nix::unistd::{pipe, write};
 
 use crate::{
     engine::KeyDescription,
@@ -24,11 +26,14 @@ pub fn key_set(key_desc: KeyDescription, keyfile_path: Option<&str>) -> StratisR
             )
         }
         None => {
-            println!("Enter passphrase followed by return:");
+            let password =
+                rpassword::prompt_password_stdout("Enter passphrase followed by return:")?;
+            let (read_end, write_end) = pipe()?;
+            write(write_end, password.as_bytes())?;
             do_request!(
                 StratisParams {
                     type_: StratisParamType::KeySet(key_desc),
-                    fd_opt: Some(stdin().as_raw_fd()),
+                    fd_opt: Some(read_end),
                 },
                 KeySet
             )

@@ -2,7 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{io::stdin, os::unix::io::AsRawFd, path::PathBuf};
+use std::path::PathBuf;
+
+use nix::unistd::{pipe, write};
 
 use crate::{
     engine::{KeyDescription, PoolUuid},
@@ -38,14 +40,15 @@ pub fn pool_create(
 
 // stratis-min pool unlock
 pub fn pool_unlock(uuid: PoolUuid, prompt: bool) -> StratisResult<()> {
-    if prompt {
-        println!("Enter passphrase followed by return:");
-    }
     do_request_standard!(
         StratisParams {
             type_: StratisParamType::PoolUnlock(uuid, prompt),
             fd_opt: if prompt {
-                Some(stdin().as_raw_fd())
+                let password =
+                    rpassword::prompt_password_stdout("Enter passphrase followed by return:")?;
+                let (read_end, write_end) = pipe()?;
+                write(write_end, password.as_bytes())?;
+                Some(read_end)
             } else {
                 None
             }

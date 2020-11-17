@@ -2,7 +2,7 @@
 
 # called by dracut
 check() {
-    require_binaries stratis-min thin_check thin_repair mkfs.xfs xfs_admin xfs_growfs || return 1
+    require_binaries stratis-min thin_check thin_repair mkfs.xfs xfs_admin xfs_growfs  plymouth /usr/sbin/plymouthd || return 1
     return 255
 }
 
@@ -21,11 +21,12 @@ installkernel() {
 install() {
     # Stratis dependencies
     inst_multiple stratis-min /usr/libexec/stratisd-min thin_check thin_repair mkfs.xfs \
-	    xfs_admin xfs_growfs
+	    xfs_admin xfs_growfs plymouth /usr/sbin/plymouthd
 
     # Dracut dependencies
     inst_multiple $systemdutildir/system-generators/stratis-setup-generator \
 	    $systemdutildir/system/stratisd-min.service \
+	    $systemdutildir/system/plymouth-start.service \
 	    $systemdutildir/stratis-rootfs-setup \
 	    plymouth
 

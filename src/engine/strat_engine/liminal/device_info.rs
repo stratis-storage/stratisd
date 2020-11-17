@@ -16,7 +16,7 @@ use crate::engine::{
         liminal::identify::{DeviceInfo, LuksInfo, StratisInfo},
         metadata::StratisIdentifiers,
     },
-    types::{DevUuid, EncryptionInfo, KeyDescription},
+    types::{DevUuid, EncryptionInfo},
 };
 
 /// Info for a discovered Luks Device belonging to Stratis.
@@ -181,20 +181,17 @@ impl LInfo {
         }
     }
 
-    pub fn key_desc(&self) -> Option<&KeyDescription> {
+    fn encryption_info(&self) -> Option<&EncryptionInfo> {
         match self {
-            LInfo::Luks(info) => Some(&info.encryption_info.key_description),
-            LInfo::Stratis(info) => info
-                .luks
-                .as_ref()
-                .map(|i| &i.encryption_info.key_description),
+            LInfo::Luks(info) => Some(&info.encryption_info),
+            LInfo::Stratis(info) => info.luks.as_ref().map(|i| &i.encryption_info),
         }
     }
 
     /// Returns true if the data represents a device with encryption managed
     /// by Stratis, otherwise false.
     pub fn is_encrypted(&self) -> bool {
-        self.key_desc().is_some()
+        self.encryption_info().is_some()
     }
 
     /// Returns true if the data represents a device with encryption managed
@@ -344,12 +341,12 @@ impl DeviceSet {
     #[cfg(test)]
     #[allow(dead_code)]
     fn invariant(&self) {
-        let key_descriptions: HashSet<KeyDescription> = self
+        let encryption_infos: HashSet<EncryptionInfo> = self
             .internal
             .iter()
-            .filter_map(|(_, info)| info.key_desc().cloned())
+            .filter_map(|(_, info)| info.encryption_info().cloned())
             .collect();
-        assert!(key_descriptions.is_empty() || key_descriptions.len() == 1);
+        assert!(encryption_infos.is_empty() || encryption_infos.len() == 1);
     }
 
     /// Create a new, empty DeviceSet
@@ -402,12 +399,12 @@ impl DeviceSet {
         }
     }
 
-    /// The unique key description for this set. If none of the infos
+    /// The unique encryption info for this set. If none of the infos
     /// correspond to a Stratis managed encrypted device, None.
-    pub fn key_description(&self) -> Option<&KeyDescription> {
+    pub fn encryption_info(&self) -> Option<&EncryptionInfo> {
         self.internal
             .iter()
-            .filter_map(|(_, info)| info.key_desc())
+            .filter_map(|(_, info)| info.encryption_info())
             .next()
     }
 
@@ -440,10 +437,10 @@ impl DeviceSet {
         // description, then it is likely that all the devices in the set also
         // have a key description, so that the search for a device with a key
         // description will stop at the first one.
-        if let Some(key_desc) = info.key_description() {
+        if let Some(encryption_info) = info.encryption_info() {
             if self
-                .key_description()
-                .filter(|&kd| kd != key_desc)
+                .encryption_info()
+                .filter(|&ei| ei != encryption_info)
                 .is_some()
             {
                 let mut hopeless: HashSet<LInfo> =

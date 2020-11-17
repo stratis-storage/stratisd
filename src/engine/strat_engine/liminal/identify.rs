@@ -58,7 +58,7 @@ use crate::engine::{
             STRATIS_FS_TYPE,
         },
     },
-    types::{EncryptionInfo, KeyDescription, PoolUuid},
+    types::{EncryptionInfo, PoolUuid},
 };
 
 /// A miscellaneous group of identifiers found when identifying a LUKS
@@ -140,9 +140,9 @@ impl DeviceInfo {
         }
     }
 
-    pub fn key_description(&self) -> Option<&KeyDescription> {
+    pub fn encryption_info(&self) -> Option<&EncryptionInfo> {
         match self {
-            DeviceInfo::Luks(info) => Some(&info.encryption_info.key_description),
+            DeviceInfo::Luks(info) => Some(&info.encryption_info),
             DeviceInfo::Stratis(_) => None,
         }
     }
@@ -459,7 +459,7 @@ mod tests {
                 tests::{crypt, loopbacked, real},
                 udev::block_device_apply,
             },
-            types::EncryptionInfo,
+            types::{EncryptionInfo, KeyDescription},
         },
         stratis::StratisError,
     };

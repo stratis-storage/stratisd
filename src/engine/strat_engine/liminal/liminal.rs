@@ -156,11 +156,14 @@ impl LiminalDevices {
     /// Get a mapping of pool UUIDs from all of the LUKS2 devices that are currently
     /// locked to their key descriptions in the set of pools that are not yet set up.
     // Precondition: All devices for a given errored pool have been determined to have
-    // the same key description.
+    // the same  encryption info.
     pub fn locked_pools(&self) -> HashMap<PoolUuid, KeyDescription> {
         self.errored_pool_devices
             .iter()
-            .filter_map(|(pool_uuid, map)| map.key_description().map(|kd| (*pool_uuid, kd.clone())))
+            .filter_map(|(pool_uuid, map)| {
+                map.encryption_info()
+                    .map(|info| (*pool_uuid, info.key_description.clone()))
+            })
             .collect()
     }
 

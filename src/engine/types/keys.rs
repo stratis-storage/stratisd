@@ -5,6 +5,7 @@
 use std::{
     convert::TryFrom,
     fmt::{self, Debug},
+    hash::{Hash, Hasher},
 };
 
 use serde_json::Value;
@@ -38,10 +39,42 @@ impl AsRef<[u8]> for SizedKeyMemory {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EncryptionInfo {
     pub key_description: KeyDescription,
     pub clevis_info: Option<(String, Value)>,
+}
+
+impl fmt::Display for EncryptionInfo {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let key_desc_str = format!(
+            "key description: \"{}\"",
+            self.key_description.as_application_str()
+        );
+        if let Some((pin, config)) = &self.clevis_info {
+            write!(
+                f,
+                "{}, clevis pin: \"{}\", clevis configuration: \"{}\"",
+                key_desc_str, pin, config
+            )
+        } else {
+            write!(f, "{}, no Clevis information", key_desc_str)
+        }
+    }
+}
+
+// Implement Hash explicitly because Value does not implement Hash.
+// The reason Value does not implement Hash is that some JSON is really big
+// and hashing it would be expensive. This JSON probably won't be, but it
+// serves no obvious purpose to stringify it and then hash it.
+// Necessary Hash Property: \forall x_1, x_2 in EncryptionInfo,
+// if x_1 == x_2, then hash(x_1) == hash(x_2) obviously holds.
+#[allow(clippy::derive_hash_xor_eq)]
+impl Hash for EncryptionInfo {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.key_description.hash(state);
+        self.clevis_info.as_ref().map(|(pin, _)| pin).hash(state);
+    }
 }
 
 /// A data type respresenting a key description for the kernel keyring

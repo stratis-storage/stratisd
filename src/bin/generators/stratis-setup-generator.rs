@@ -40,16 +40,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     let (_, early_dir, _) = lib::get_generator_args()?;
     let kernel_cmdline = lib::get_kernel_cmdline()?;
 
+    let rootfs_uuid_paths_key = "stratis.rootfs.uuid_paths";
     let rootfs_uuid_paths = kernel_cmdline
-        .get("stratis.rootfs.uuid_paths")
-        .and_then(|opt_s| opt_s.as_ref().map(|s| s.to_string()))
-        .ok_or_else(|| "Missing kernel command line parameter stratis.rootfs.uuids".to_string())?;
-    let pool_uuid = kernel_cmdline
-        .get("stratis.rootfs.pool_uuid")
+        .get(rootfs_uuid_paths_key)
         .and_then(|opt_s| opt_s.as_ref().map(|s| s.to_string()))
         .ok_or_else(|| {
-            "Missing kernel command line parameter stratis.rootfs.pool_uuid".to_string()
+            format!(
+                "Missing kernel command line parameter {}",
+                rootfs_uuid_paths_key
+            )
         })?;
+    let pool_uuid_key = "stratis.rootfs.pool_uuid";
+    let pool_uuid = kernel_cmdline
+        .get(pool_uuid_key)
+        .and_then(|opt_s| opt_s.as_ref().map(|s| s.to_string()))
+        .ok_or_else(|| format!("Missing kernel command line parameter {}", pool_uuid_key))?;
     let parsed_rootfs_uuid_paths: Vec<_> =
         rootfs_uuid_paths.split(',').map(PathBuf::from).collect();
     let parsed_pool_uuid = Uuid::parse_str(&pool_uuid)?;

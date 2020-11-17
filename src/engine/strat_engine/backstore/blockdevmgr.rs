@@ -413,25 +413,25 @@ impl BlockDevMgr {
     }
 
     pub fn key_desc(&self) -> Option<&KeyDescription> {
-        let mut iter = self.block_devs.iter().map(|bd| bd.key_description());
-        let key_desc = iter.next().and_then(|opt| opt);
+        let mut iter = self.block_devs.iter().map(|bd| bd.encryption_info());
+        let info = iter.next().and_then(|opt| opt);
 
         // Liminal device code will not set up a pool with multiple key description
         // values.
-        assert!(iter.all(|elem| key_desc == elem));
+        assert!(iter.all(|elem| info == elem));
 
-        key_desc
+        info.map(|i| &i.key_description)
     }
 
     pub fn clevis_info(&self) -> Option<&(String, Value)> {
-        let mut iter = self.block_devs.iter().map(|bd| bd.clevis_info());
-        let clevis_info = iter.next().and_then(|opt| opt);
+        let mut iter = self.block_devs.iter().map(|bd| bd.encryption_info());
+        let info = iter.next().and_then(|opt| opt);
 
-        // Liminal device code will not set up a pool with multiple clevis config
+        // Liminal device code will not set up a pool with multiple key description
         // values.
-        assert!(iter.all(|elem| clevis_info == elem));
+        assert!(iter.all(|elem| info == elem));
 
-        clevis_info
+        info.and_then(|i| i.clevis_info.as_ref())
     }
 
     pub fn is_encrypted(&self) -> bool {
@@ -447,18 +447,18 @@ impl BlockDevMgr {
             .collect::<HashSet<_>>();
         assert!(pool_uuids.len() == 1);
 
-        let key_descriptions = self
+        let encryption_infos = self
             .block_devs
             .iter()
-            .filter_map(|bd| bd.key_description())
+            .filter_map(|bd| bd.encryption_info())
             .collect::<Vec<_>>();
-        if key_descriptions.is_empty() {
+        if encryption_infos.is_empty() {
             assert_eq!(self.key_desc(), None);
         } else {
-            assert_eq!(key_descriptions.len(), self.block_devs.len());
+            assert_eq!(encryption_infos.len(), self.block_devs.len());
 
-            let kd_set = key_descriptions.iter().collect::<HashSet<_>>();
-            assert!(kd_set.len() == 1);
+            let info_set = encryption_infos.iter().collect::<HashSet<_>>();
+            assert!(info_set.len() == 1);
         }
     }
 

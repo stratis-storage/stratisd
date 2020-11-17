@@ -317,11 +317,11 @@ impl LiminalDevices {
             }
 
             // NOTE: DeviceSet provides infos variable in setup_pool. DeviceSet
-            // ensures that all key descriptions match so we do not need to
+            // ensures that all encryption infos match so we do not need to
             // check again here.
             let num_with_luks = datadevs
                 .iter()
-                .filter_map(|sbd| sbd.key_description())
+                .filter_map(|sbd| sbd.encryption_info())
                 .count();
 
             if num_with_luks != 0 && num_with_luks != datadevs.len() {

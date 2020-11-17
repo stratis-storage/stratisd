@@ -17,7 +17,6 @@ use crate::{
         strat_engine::{
             backstore::{crypt::CryptHandle, range_alloc::RangeAllocator},
             metadata::{disown_device, BDAExtendedSize, BlockdevSize, MDADataSize, BDA},
-            names::KeyDescription,
             serde_structs::{BaseBlockDevSave, Recordable},
         },
         types::{BlockDevPath, DevUuid, EncryptionInfo, MaybeDbusPath, PoolUuid},
@@ -188,24 +187,12 @@ impl StratBlockDev {
         &self.devnode
     }
 
-    /// Get the key description stored on the given encrypted blockdev.
+    /// Get the encryption_info stored on the given encrypted blockdev.
     ///
     /// Returns Some(_) if it is encrypted.
     /// Returns None if it is not encrypted.
-    pub fn key_description(&self) -> Option<&KeyDescription> {
-        self.encryption_info
-            .as_ref()
-            .map(|info| &info.key_description)
-    }
-
-    /// Get the clevis configuration stored on the given encrypted blockdev.
-    ///
-    /// Returns Some(_) if it has been bound using clevis.
-    /// Returns None if it is has not been bound using clevis or it is not encrypted.
-    pub fn clevis_info(&self) -> Option<&(String, Value)> {
-        self.encryption_info
-            .as_ref()
-            .and_then(|info| info.clevis_info.as_ref())
+    pub fn encryption_info(&self) -> Option<&EncryptionInfo> {
+        self.encryption_info.as_ref()
     }
 
     /// Set the clevis config cached in the blockdev data structure to the given
@@ -289,7 +276,7 @@ impl BlockDev for StratBlockDev {
     }
 
     fn is_encrypted(&self) -> bool {
-        self.key_description().is_some()
+        self.encryption_info().is_some()
     }
 }
 

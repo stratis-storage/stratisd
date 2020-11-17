@@ -23,7 +23,7 @@ use crate::{
             metadata::BDA,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
         },
-        types::{BlockDevPath, BlockDevTier, DevUuid, EncryptionInfo},
+        types::{BlockDevPath, BlockDevTier, DevUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -218,10 +218,10 @@ pub fn get_blockdevs(
         // conclusion is metadata corruption.
         let segments = segment_table.get(&dev_uuid);
 
-        let (path, key_description) = match &info.luks {
+        let (path, encryption_info) = match &info.luks {
             Some(luks) => (
                 BlockDevPath::mapped_device_path(&luks.ids.devnode, &info.ids.devnode)?,
-                Some(&luks.encryption_info.key_description),
+                Some(&luks.encryption_info),
             ),
             None => (BlockDevPath::physical_device_path(&info.ids.devnode), None),
         };
@@ -235,11 +235,7 @@ pub fn get_blockdevs(
                 segments.unwrap_or(&vec![]),
                 bd_save.user_info.clone(),
                 bd_save.hardware_info.clone(),
-                // FIXME: Leaving Clevis info out of liminal devices for now.
-                key_description.map(|kd| EncryptionInfo {
-                    key_description: kd.clone(),
-                    clevis_info: None,
-                }),
+                encryption_info.cloned(),
             )?,
         ))
     }

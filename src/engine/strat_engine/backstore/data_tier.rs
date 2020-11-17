@@ -16,10 +16,9 @@ use crate::{
                 blockdevmgr::{BlkDevSegment, BlockDevMgr},
                 shared::{coalesce_blkdevsegs, metadata_to_segment},
             },
-            names::KeyDescription,
             serde_structs::{BaseDevSave, BlockDevSave, DataTierSave, Recordable},
         },
-        types::{BlockDevTier, DevUuid, PoolUuid},
+        types::{BlockDevTier, DevUuid, PoolUuid, EncryptionInfo},
     },
     stratis::StratisResult,
 };
@@ -159,8 +158,8 @@ impl DataTier {
     }
 
     /// Data tier key description
-    pub fn key_desc(&self) -> Option<&KeyDescription> {
-        self.block_mgr.encryption_info().map(|i| &i.key_description)
+    pub fn encryption_info(&self) -> Option<&EncryptionInfo> {
+        self.block_mgr.encryption_info()
     }
 }
 

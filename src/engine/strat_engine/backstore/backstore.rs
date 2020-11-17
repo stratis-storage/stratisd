@@ -645,7 +645,7 @@ impl Backstore {
     }
 
     pub fn data_key_desc(&self) -> Option<&KeyDescription> {
-        self.data_tier.key_desc()
+        self.data_tier.encryption_info().map(|i| &i.key_description)
     }
 
     pub fn data_tier_is_encrypted(&self) -> bool {

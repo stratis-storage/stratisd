@@ -73,6 +73,10 @@ optional = true
 version = "0.2"
 optional = true
 
+[dependencies.rpassword]
+version = "5"
+optional = true
+
 [dependencies.uuid]
 version = "0.8"
 features = ["serde", "v4"]
@@ -91,4 +95,4 @@ matches = "0.1"
 default = ["dbus_enabled"]
 dbus_enabled = ["dbus", "libdbus-sys"]
 extras = []
-min = []
+min = ["rpassword"]

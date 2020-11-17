@@ -160,7 +160,7 @@ impl DataTier {
 
     /// Data tier key description
     pub fn key_desc(&self) -> Option<&KeyDescription> {
-        self.block_mgr.key_desc()
+        self.block_mgr.encryption_info().map(|i| &i.key_description)
     }
 }
 

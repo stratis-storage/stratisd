@@ -204,8 +204,8 @@ impl BlockDevMgr {
             .collect::<HashSet<_>>();
         let devices = process_and_verify_devices(pool_uuid, &current_uuids, paths)?;
 
-        let is_encrypted = self.is_encrypted();
-        if is_encrypted && !self.has_valid_passphrase() {
+        let encryption_info = self.encryption_info();
+        if encryption_info.is_some() && !self.has_valid_passphrase() {
             return Err(StratisError::Engine(
                 ErrorEnum::Invalid,
                 "The key associated with the current registered key description \
@@ -216,8 +216,6 @@ impl BlockDevMgr {
             ));
         }
 
-        let clevis_info = self.clevis_info();
-
         // FIXME: This is a bug. If new devices are added to a pool, and the
         // variable length metadata requires more than the minimum allocated,
         // then the necessary amount must be provided or the data can not be
@@ -226,13 +224,7 @@ impl BlockDevMgr {
             devices,
             pool_uuid,
             MDADataSize::default(),
-            match self.key_desc() {
-                Some(kd) => Some(EncryptionInfo {
-                    key_description: kd.clone(),
-                    clevis_info: clevis_info.cloned(),
-                }),
-                None => None,
-            },
+            encryption_info.cloned(),
         )?;
         let bdev_uuids = bds.iter().map(|bd| bd.uuid()).collect();
         self.block_devs.extend(bds);
@@ -412,7 +404,7 @@ impl BlockDevMgr {
             .sum()
     }
 
-    pub fn key_desc(&self) -> Option<&KeyDescription> {
+    pub fn encryption_info(&self) -> Option<&EncryptionInfo> {
         let mut iter = self.block_devs.iter().map(|bd| bd.encryption_info());
         let info = iter.next().and_then(|opt| opt);
 
@@ -420,22 +412,11 @@ impl BlockDevMgr {
         // values.
         assert!(iter.all(|elem| info == elem));
 
-        info.map(|i| &i.key_description)
-    }
-
-    pub fn clevis_info(&self) -> Option<&(String, Value)> {
-        let mut iter = self.block_devs.iter().map(|bd| bd.encryption_info());
-        let info = iter.next().and_then(|opt| opt);
-
-        // Liminal device code will not set up a pool with multiple key description
-        // values.
-        assert!(iter.all(|elem| info == elem));
-
-        info.and_then(|i| i.clevis_info.as_ref())
+        info
     }
 
     pub fn is_encrypted(&self) -> bool {
-        self.key_desc().is_some()
+        self.encryption_info().is_some()
     }
 
     #[cfg(test)]
@@ -453,7 +434,7 @@ impl BlockDevMgr {
             .filter_map(|bd| bd.encryption_info())
             .collect::<Vec<_>>();
         if encryption_infos.is_empty() {
-            assert_eq!(self.key_desc(), None);
+            assert_eq!(self.encryption_info(), None);
         } else {
             assert_eq!(encryption_infos.len(), self.block_devs.len());
 
@@ -506,8 +487,8 @@ impl BlockDevMgr {
             });
         }
 
-        let key_description = match self.key_desc() {
-            Some(kd) => kd,
+        let (key_description, clevis_info_current) = match self.encryption_info() {
+            Some(info) => (&info.key_description, &info.clevis_info),
             None => {
                 return Err(StratisError::Error(
                     "Requested pool does not appear to be encrypted".to_string(),
@@ -515,7 +496,6 @@ impl BlockDevMgr {
             }
         };
 
-        let clevis_info_current = self.clevis_info();
         if let Some(info) = clevis_info_current {
             let clevis_tuple = (pin, clevis_info);
             if info == &clevis_tuple {
@@ -557,14 +537,17 @@ impl BlockDevMgr {
     }
 
     pub fn unbind_clevis(&mut self) -> StratisResult<bool> {
-        if !self.is_encrypted() {
-            return Err(StratisError::Error(
-                "Requested pool does not appear to be encrypted".to_string(),
-            ));
-        }
-
-        if self.clevis_info().is_none() {
-            return Ok(false);
+        match self.encryption_info() {
+            None => {
+                return Err(StratisError::Error(
+                    "Requested pool does not appear to be encrypted".to_string(),
+                ));
+            }
+            Some(info) => {
+                if info.clevis_info.is_none() {
+                    return Ok(false);
+                }
+            }
         }
 
         let crypt_handles = get_crypt_handles(&self.block_devs)?;

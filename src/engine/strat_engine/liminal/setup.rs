@@ -221,7 +221,7 @@ pub fn get_blockdevs(
         let (path, key_description) = match &info.luks {
             Some(luks) => (
                 BlockDevPath::mapped_device_path(&luks.ids.devnode, &info.ids.devnode)?,
-                Some(&luks.key_description),
+                Some(&luks.encryption_info.key_description),
             ),
             None => (BlockDevPath::physical_device_path(&info.ids.devnode), None),
         };

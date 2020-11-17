@@ -16,7 +16,7 @@ use crate::engine::{
         liminal::identify::{DeviceInfo, LuksInfo, StratisInfo},
         metadata::StratisIdentifiers,
     },
-    types::{DevUuid, KeyDescription},
+    types::{DevUuid, EncryptionInfo, KeyDescription},
 };
 
 /// Info for a discovered Luks Device belonging to Stratis.
@@ -24,17 +24,12 @@ use crate::engine::{
 pub struct LLuksInfo {
     /// Generic information + Stratis identifiers
     pub ids: StratisInfo,
-    pub key_description: KeyDescription,
+    pub encryption_info: EncryptionInfo,
 }
 
 impl fmt::Display for LLuksInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}, key description: \"{}\"",
-            self.ids,
-            self.key_description.as_application_str()
-        )
+        write!(f, "{}, {}", self.ids, self.encryption_info)
     }
 }
 
@@ -42,28 +37,28 @@ impl From<LuksInfo> for LLuksInfo {
     fn from(info: LuksInfo) -> LLuksInfo {
         LLuksInfo {
             ids: info.info,
-            key_description: info.encryption_info.key_description,
+            encryption_info: info.encryption_info,
         }
     }
 }
 
 impl<'a> Into<Value> for &'a LLuksInfo {
     // Precondition: (&StratisInfo).into() pattern matches Value::Object()
+    // Precondition: (&EncryptionInfo).into() pattern matches Value::Object()
     fn into(self) -> Value {
-        let mut json = json!({
-            "key_description": Value::from(self.key_description.as_application_str())
-        });
-        if let Value::Object(ref mut map) = json {
-            map.extend(
-                if let Value::Object(map) = <&StratisInfo as Into<Value>>::into(&self.ids) {
-                    map.into_iter()
-                } else {
-                    unreachable!("StratisInfo conversion returns a JSON object");
-                },
-            );
-        } else {
-            unreachable!("json!() always creates a JSON object");
-        };
+        let mut json = <&StratisInfo as Into<Value>>::into(&self.ids);
+        let map = json
+            .as_object_mut()
+            .expect("StratisInfo conversion returns a JSON object");
+        map.extend(
+            if let Value::Object(enc_map) =
+                <&EncryptionInfo as Into<Value>>::into(&self.encryption_info)
+            {
+                enc_map.into_iter()
+            } else {
+                unreachable!("EncryptionInfo conversion returns a JSON object");
+            },
+        );
         json
     }
 }
@@ -188,8 +183,11 @@ impl LInfo {
 
     pub fn key_desc(&self) -> Option<&KeyDescription> {
         match self {
-            LInfo::Luks(info) => Some(&info.key_description),
-            LInfo::Stratis(info) => info.luks.as_ref().map(|i| &i.key_description),
+            LInfo::Luks(info) => Some(&info.encryption_info.key_description),
+            LInfo::Stratis(info) => info
+                .luks
+                .as_ref()
+                .map(|i| &i.encryption_info.key_description),
         }
     }
 
@@ -267,7 +265,7 @@ impl LInfo {
         fn luks_luks_compatible(info_1: &LLuksInfo, info_2: &LuksInfo) -> bool {
             assert_eq!(info_1.ids.identifiers, info_2.info.identifiers);
             info_1.ids.device_number == info_2.info.device_number
-                && info_1.key_description == info_2.encryption_info.key_description
+                && info_1.encryption_info == info_2.encryption_info
         }
 
         // Returns true if the information found via udev for two devices is

@@ -10,6 +10,4 @@ KillSignal=SIGINT
 Restart=on-abort
 StandardOutput=syslog
 StandardError=syslog
-
-[Install]
-WantedBy=initrd.target
+After=dev-mapper-control.device

@@ -18,7 +18,7 @@ use crate::{
             },
             serde_structs::{BaseDevSave, BlockDevSave, DataTierSave, Recordable},
         },
-        types::{BlockDevTier, DevUuid, PoolUuid, EncryptionInfo},
+        types::{BlockDevTier, DevUuid, EncryptionInfo, PoolUuid},
     },
     stratis::StratisResult,
 };

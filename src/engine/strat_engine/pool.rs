@@ -628,11 +628,11 @@ impl Pool for StratPool {
     }
 
     fn key_desc(&self) -> Option<&KeyDescription> {
-        self.backstore.data_key_desc()
+        self.backstore.data_tier_encryption_info().map(|i| &i.key_description)
     }
 
     fn clevis_info(&self) -> Option<&(String, Value)> {
-        self.backstore.data_tier_clevis_info()
+        self.backstore.data_tier_encryption_info().and_then(|i| i.clevis_info.as_ref())
     }
 }
 

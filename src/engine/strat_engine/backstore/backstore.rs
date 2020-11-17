@@ -22,7 +22,7 @@ use crate::{
             },
             dm::get_dm,
             metadata::MDADataSize,
-            names::{format_backstore_ids, CacheRole, KeyDescription},
+            names::{format_backstore_ids, CacheRole},
             serde_structs::{BackstoreSave, CapSave, Recordable},
             writing::wipe_sectors,
         },
@@ -644,19 +644,12 @@ impl Backstore {
         )
     }
 
-    pub fn data_key_desc(&self) -> Option<&KeyDescription> {
-        self.data_tier.encryption_info().map(|i| &i.key_description)
-    }
-
     pub fn data_tier_is_encrypted(&self) -> bool {
         self.data_tier.is_encrypted()
     }
 
-    pub fn data_tier_clevis_info(&self) -> Option<&(String, Value)> {
-        self.data_tier
-            .block_mgr
-            .encryption_info()
-            .and_then(|i| i.clevis_info.as_ref())
+    pub fn data_tier_encryption_info(&self) -> Option<&EncryptionInfo> {
+        self.data_tier.encryption_info()
     }
 
     pub fn has_cache(&self) -> bool {

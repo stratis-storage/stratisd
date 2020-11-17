@@ -42,7 +42,7 @@ impl From<LuksInfo> for LLuksInfo {
     fn from(info: LuksInfo) -> LLuksInfo {
         LLuksInfo {
             ids: info.info,
-            key_description: info.key_description,
+            key_description: info.encryption_info.key_description,
         }
     }
 }
@@ -267,7 +267,7 @@ impl LInfo {
         fn luks_luks_compatible(info_1: &LLuksInfo, info_2: &LuksInfo) -> bool {
             assert_eq!(info_1.ids.identifiers, info_2.info.identifiers);
             info_1.ids.device_number == info_2.info.device_number
-                && info_1.key_description == info_2.key_description
+                && info_1.key_description == info_2.encryption_info.key_description
         }
 
         // Returns true if the information found via udev for two devices is

@@ -485,10 +485,6 @@ impl CryptHandle {
     }
 
     /// Get info for the clevis binding.
-    // FIXME: This allow is only needed until the liminal device code uses this
-    // to populate stratisd with the clevis info from the encrypted block
-    // devices.
-    #[allow(dead_code)]
     pub fn clevis_info(&mut self) -> Result<Option<(String, Value)>> {
         let json = match self
             .device

@@ -58,7 +58,7 @@ use crate::engine::{
             STRATIS_FS_TYPE,
         },
     },
-    types::{KeyDescription, PoolUuid},
+    types::{EncryptionInfo, KeyDescription, PoolUuid},
 };
 
 /// A miscellaneous group of identifiers found when identifying a LUKS
@@ -67,18 +67,13 @@ use crate::engine::{
 pub struct LuksInfo {
     /// All the usual StratisInfo
     pub info: StratisInfo,
-    /// The key description, obtained from the LUKS keyring token
-    pub key_description: KeyDescription,
+    /// Encryption information
+    pub encryption_info: EncryptionInfo,
 }
 
 impl fmt::Display for LuksInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}, key description: \"{}\"",
-            self.info,
-            self.key_description.as_application_str()
-        )
+        write!(f, "{}, {}", self.info, self.encryption_info,)
     }
 }
 
@@ -147,7 +142,7 @@ impl DeviceInfo {
 
     pub fn key_description(&self) -> Option<&KeyDescription> {
         match self {
-            DeviceInfo::Luks(info) => Some(&info.key_description),
+            DeviceInfo::Luks(info) => Some(&info.encryption_info.key_description),
             DeviceInfo::Stratis(_) => None,
         }
     }
@@ -226,14 +221,27 @@ fn process_luks_device(dev: &libudev::Device) -> Option<LuksInfo> {
                             );
                     None
                 }
-                Ok(Some(handle)) => Some(LuksInfo {
-                    info: StratisInfo {
-                        identifiers: *handle.device_identifiers(),
-                        device_number,
-                        devnode: handle.physical_device_path().to_path_buf(),
-                    },
-                    key_description: handle.key_description().clone(),
-                }),
+                Ok(Some(mut handle)) => match handle.clevis_info() {
+                    Ok(clevis_info) => Some(LuksInfo {
+                        info: StratisInfo {
+                            identifiers: *handle.device_identifiers(),
+                            device_number,
+                            devnode: handle.physical_device_path().to_path_buf(),
+                        },
+                        encryption_info: EncryptionInfo {
+                            key_description: handle.key_description().clone(),
+                            clevis_info,
+                        },
+                    }),
+                    Err(err) => {
+                        warn!(
+                                "There was a problem decoding the Clevis info on device {}, disregarding the device: {}",
+                                devnode.display(),
+                                err
+                                );
+                        None
+                    }
+                },
             },
         },
         None => {
@@ -515,10 +523,10 @@ mod tests {
                     ))));
                 }
 
-                if &info.key_description != key_description {
+                if &info.encryption_info.key_description != key_description {
                     return Err(Box::new(StratisError::Error(format!(
                         "Discovered key description {} != expected key description {}",
-                        info.key_description.as_application_str(),
+                        info.encryption_info.key_description.as_application_str(),
                         key_description.as_application_str()
                     ))));
                 }

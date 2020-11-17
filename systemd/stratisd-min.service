@@ -2,6 +2,7 @@
 Description=Stratis minimal daemon
 Documentation=man:stratisd(8)
 DefaultDependencies=no
+After=dev-mapper-control.device
 
 [Service]
 Environment="RUST_BACKTRACE=1"
@@ -10,4 +11,3 @@ KillSignal=SIGINT
 Restart=on-abort
 StandardOutput=syslog
 StandardError=syslog
-After=dev-mapper-control.device

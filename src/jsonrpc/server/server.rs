@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    fs::remove_file,
+    fs::{create_dir_all, remove_file},
     future::Future,
     os::unix::io::{AsRawFd, RawFd},
     path::Path,
@@ -360,6 +360,11 @@ impl StratisUnixListener {
     where
         P: AsRef<Path>,
     {
+        let _ = create_dir_all(
+            Path::new(RPC_SOCKADDR)
+                .parent()
+                .expect("Static path always has parent"),
+        );
         let _ = remove_file(path.as_ref());
         let fd = socket(
             AddressFamily::Unix,

@@ -20,7 +20,7 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
-                crypt::CryptHandle,
+                crypt::{interpret_clevis_config, CryptHandle},
                 devices::{initialize_devices, process_and_verify_devices, wipe_blockdevs},
             },
             keys::MemoryPrivateFilesystem,
@@ -467,11 +467,12 @@ impl BlockDevMgr {
             key_desc: &KeyDescription,
             pin: &str,
             clevis_info: &Value,
+            yes: bool,
         ) -> StratisResult<()> {
             for mut crypt_handle in handles.drain(..) {
                 let res = key_fs.key_op(key_desc, |keyfile_path| {
                     crypt_handle
-                        .clevis_bind(keyfile_path, pin, clevis_info)
+                        .clevis_bind(keyfile_path, pin, clevis_info, yes)
                         .map_err(StratisError::Crypt)
                 });
                 if res.is_ok() {
@@ -504,6 +505,8 @@ impl BlockDevMgr {
             }
         };
 
+        let (yes, clevis_info) = interpret_clevis_config(&pin, clevis_info)?;
+
         if let Some(info) = clevis_info_current {
             let clevis_tuple = (pin, clevis_info);
             if info == &clevis_tuple {
@@ -528,6 +531,7 @@ impl BlockDevMgr {
             key_description,
             pin.as_str(),
             &clevis_info,
+            yes,
         );
         if let Err(e) = result {
             rollback_loop(rollback_record);

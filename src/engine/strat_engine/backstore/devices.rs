@@ -472,7 +472,7 @@ pub fn initialize_devices(
                 let mem_fs = MemoryPrivateFilesystem::new()?;
                 mem_fs.key_op(key_description, |key_path| {
                     handle
-                        .clevis_bind(key_path, pin, &json)
+                        .clevis_bind(key_path, pin, &json, false)
                         .map_err(|e| StratisError::Error(e.to_string()))
                 })?;
             };

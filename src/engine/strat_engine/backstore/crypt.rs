@@ -526,29 +526,13 @@ impl CryptHandle {
     }
 
     /// Bind the given device using clevis.
-    /// The json argument may contain stratis and possibly pin specific
-    /// configuration which is not used by clevis and must be removed.
-    /// The configuration is not checked in any other way.
-    pub fn clevis_bind(&mut self, keyfile_path: &Path, pin: &str, json: &Value) -> Result<()> {
-        let mut json = json.clone();
-
-        let yes = if pin == "tang" {
-            let map = if let Some(m) = json.as_object_mut() {
-                m
-            } else {
-                return Err(LibcryptErr::Other(format!(
-                    "configuration for Clevis is is not in JSON object format: {}",
-                    json
-                )));
-            };
-
-            map.remove(CLEVIS_TANG_TRUST_URL)
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false)
-        } else {
-            false
-        };
-
+    pub fn clevis_bind(
+        &mut self,
+        keyfile_path: &Path,
+        pin: &str,
+        json: &Value,
+        yes: bool,
+    ) -> Result<()> {
         clevis_luks_bind(&self.physical_path, keyfile_path, pin, &json, yes)
             .map_err(|e| LibcryptErr::Other(e.to_string()))
     }
@@ -597,6 +581,31 @@ impl CryptHandle {
         );
         Ok(Sectors(active_device.size))
     }
+}
+
+/// Interpret non-Clevis keys that may contain additional information about
+/// how to configure Clevis when binding. Remove any expected non-Clevis keys
+/// from the configuration and return it.
+/// The only value to be returned is whether or not the bind command should be
+/// passed the argument yes, which is returned in the first item of the
+/// returned pair.
+pub fn interpret_clevis_config(pin: &str, mut clevis_config: Value) -> Result<(bool, Value)> {
+    let yes = if pin == "tang" {
+        if let Some(map) = clevis_config.as_object_mut() {
+            map.remove(CLEVIS_TANG_TRUST_URL)
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+        } else {
+            return Err(LibcryptErr::Other(format!(
+                "configuration for Clevis is is not in JSON object format: {}",
+                clevis_config
+            )));
+        }
+    } else {
+        false
+    };
+
+    Ok((yes, clevis_config))
 }
 
 /// Generate tang JSON

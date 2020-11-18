@@ -24,11 +24,9 @@ pub fn get_dm_init() -> StratisResult<&'static DM> {
         INIT.call_once(|| DM_CONTEXT = Some(DM::new()));
         match DM_CONTEXT {
             Some(Ok(ref context)) => Ok(context),
-            // Can not move the error out of DM_CONTEXT, so synthesize a new
-            // error.
-            Some(Err(_)) => Err(StratisError::Engine(
+            Some(Err(ref e)) => Err(StratisError::Engine(
                 ErrorEnum::Error,
-                "Failed to initialize DM context".into(),
+                format!("Failed to initialize DM context: {}", e),
             )),
             _ => panic!("DM_CONTEXT.is_some()"),
         }

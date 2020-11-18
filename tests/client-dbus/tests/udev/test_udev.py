@@ -31,6 +31,7 @@ from stratisd_client_dbus import (
     get_object,
 )
 from stratisd_client_dbus._constants import TOP_OBJECT
+from stratisd_client_dbus._stratisd_constants import EncryptionMethod
 
 from ._loopback import UDEV_ADD_EVENT, LoopBackDevices
 from ._utils import (
@@ -302,7 +303,10 @@ class UdevTest3(UdevTest):
         with OptionalKeyServiceContextManager(key_spec=key_spec):
             ((option, unlock_uuids), exit_code, _) = Manager.Methods.UnlockPool(
                 get_object(TOP_OBJECT),
-                {"pool_uuid": pool_uuid, "unlock_method": "keyring"},
+                {
+                    "pool_uuid": pool_uuid,
+                    "unlock_method": str(EncryptionMethod.KEYRING),
+                },
             )
             if key_spec is None:
                 self.assertNotEqual(exit_code, StratisdErrors.OK)
@@ -402,7 +406,10 @@ class UdevTest4(UdevTest):
 
             ((option, unlock_uuids), exit_code, _) = Manager.Methods.UnlockPool(
                 get_object(TOP_OBJECT),
-                {"pool_uuid": pool_uuid, "unlock_method": "keyring"},
+                {
+                    "pool_uuid": pool_uuid,
+                    "unlock_method": str(EncryptionMethod.KEYRING),
+                },
             )
             if key_spec is None:
                 self.assertNotEqual(exit_code, StratisdErrors.OK)
@@ -421,7 +428,10 @@ class UdevTest4(UdevTest):
 
             ((option, unlock_uuids), exit_code, _) = Manager.Methods.UnlockPool(
                 get_object(TOP_OBJECT),
-                {"pool_uuid": pool_uuid, "unlock_method": "keyring"},
+                {
+                    "pool_uuid": pool_uuid,
+                    "unlock_method": str(EncryptionMethod.KEYRING),
+                },
             )
 
             if key_spec is None:
@@ -541,7 +551,10 @@ class UdevTest5(UdevTest):
             for pool_uuid in variant_pool_uuids:
                 ((option, _), exit_code, _) = Manager.Methods.UnlockPool(
                     get_object(TOP_OBJECT),
-                    {"pool_uuid": pool_uuid, "unlock_method": "keyring"},
+                    {
+                        "pool_uuid": pool_uuid,
+                        "unlock_method": str(EncryptionMethod.KEYRING),
+                    },
                 )
                 self.assertEqual(exit_code, StratisdErrors.OK)
                 self.assertEqual(option, True)

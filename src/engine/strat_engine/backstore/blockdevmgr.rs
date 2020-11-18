@@ -522,7 +522,7 @@ impl BlockDevMgr {
             &clevis_info,
         );
         if let Err(e) = result {
-            rollback_loop(crypt_handles);
+            rollback_loop(rollback_record);
             return Err(e);
         }
 

@@ -62,7 +62,7 @@ features = ["serde", "v4"]
 pkg-config = "0.3"
 
 [dev-dependencies]
-error-chain = "0.12"
+error-chain = "0.12.2"
 loopdev = "0.2"
 either = "1"
 proptest = "0.10"

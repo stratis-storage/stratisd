@@ -496,8 +496,8 @@ impl BlockDevMgr {
             });
         }
 
-        let (key_description, clevis_info_current) = match self.encryption_info() {
-            Some(info) => (&info.key_description, &info.clevis_info),
+        let encryption_info = match self.encryption_info() {
+            Some(info) => info,
             None => {
                 return Err(StratisError::Error(
                     "Requested pool does not appear to be encrypted".to_string(),
@@ -507,7 +507,7 @@ impl BlockDevMgr {
 
         let (yes, clevis_info) = interpret_clevis_config(&pin, clevis_info)?;
 
-        if let Some(info) = clevis_info_current {
+        if let Some(info) = &encryption_info.clevis_info {
             let clevis_tuple = (pin, clevis_info);
             if info == &clevis_tuple {
                 return Ok(false);
@@ -528,7 +528,7 @@ impl BlockDevMgr {
             &key_fs,
             &mut rollback_record,
             &mut crypt_handles,
-            key_description,
+            &encryption_info.key_description,
             pin.as_str(),
             &clevis_info,
             yes,

@@ -433,8 +433,7 @@ impl MemoryFilesystem {
                 )));
             } else {
                 let stat_info = stat(Self::TMPFS_LOCATION)?;
-                let mut parent_path = PathBuf::from(Self::TMPFS_LOCATION);
-                parent_path.push("..");
+                let parent_path: PathBuf = vec![Self::TMPFS_LOCATION, ".."].iter().collect();
                 let parent_stat_info = stat(&parent_path)?;
                 if stat_info.st_dev != parent_stat_info.st_dev {
                     info!("Mount found at {}; unmounting", Self::TMPFS_LOCATION);
@@ -498,8 +497,9 @@ impl MemoryPrivateFilesystem {
                 )));
             } else {
                 let stat_info = stat(MemoryFilesystem::TMPFS_LOCATION)?;
-                let mut parent_path = PathBuf::from(MemoryFilesystem::TMPFS_LOCATION);
-                parent_path.push("..");
+                let parent_path: PathBuf = vec![MemoryFilesystem::TMPFS_LOCATION, ".."]
+                    .iter()
+                    .collect();
                 let parent_stat_info = stat(&parent_path)?;
                 if stat_info.st_dev == parent_stat_info.st_dev {
                     return Err(StratisError::Io(io::Error::new(
@@ -524,8 +524,9 @@ impl MemoryPrivateFilesystem {
                 random_string.push(ch);
             }
         }
-        let mut private_fs_path = PathBuf::from(MemoryFilesystem::TMPFS_LOCATION);
-        private_fs_path.push(random_string);
+        let private_fs_path = vec![MemoryFilesystem::TMPFS_LOCATION, &random_string]
+            .iter()
+            .collect();
         create_dir_all(&private_fs_path)?;
 
         // Ensure that the original tmpfs mount point is private. This will work

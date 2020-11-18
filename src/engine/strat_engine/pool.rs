@@ -147,22 +147,15 @@ impl StratPool {
         name: &str,
         paths: &[&Path],
         redundancy: Redundancy,
-        key_desc: Option<KeyDescription>,
+        key_desc: Option<&KeyDescription>,
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = Uuid::new_v4();
 
         // FIXME: Initializing with the minimum MDA size is not necessarily
         // enough. If there are enough devices specified, more space will be
         // required.
-        let mut backstore = Backstore::initialize(
-            pool_uuid,
-            paths,
-            MDADataSize::default(),
-            key_desc.map(|kd| EncryptionInfo {
-                key_description: kd,
-                clevis_info: None,
-            }),
-        )?;
+        let mut backstore =
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), key_desc)?;
 
         let thinpool = ThinPool::new(
             pool_uuid,

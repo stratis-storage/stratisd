@@ -152,12 +152,20 @@ impl BlockDevMgr {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         mda_data_size: MDADataSize,
-        encryption_info: Option<EncryptionInfo>,
+        key_desc: Option<&KeyDescription>,
     ) -> StratisResult<BlockDevMgr> {
         let devices = process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?;
 
         Ok(BlockDevMgr::new(
-            initialize_devices(devices, pool_uuid, mda_data_size, encryption_info)?,
+            initialize_devices(
+                devices,
+                pool_uuid,
+                mda_data_size,
+                key_desc.map(|k| EncryptionInfo {
+                    key_description: k.clone(),
+                    clevis_info: None,
+                }),
+            )?,
             None,
         ))
     }
@@ -640,10 +648,7 @@ mod tests {
                 pool_uuid,
                 &paths[..2],
                 MDADataSize::default(),
-                Some(EncryptionInfo {
-                    key_description: key_desc.clone(),
-                    clevis_info: None,
-                }),
+                Some(key_desc),
             )?;
 
             if bdm.add(pool_uuid, &paths[2..3]).is_err() {
@@ -697,10 +702,7 @@ mod tests {
                 pool_uuid,
                 &paths[..2],
                 MDADataSize::default(),
-                Some(EncryptionInfo {
-                    key_description: key_desc.clone(),
-                    clevis_info: None,
-                }),
+                Some(key_desc),
             )?;
             Ok((pool_uuid, bdm))
         }

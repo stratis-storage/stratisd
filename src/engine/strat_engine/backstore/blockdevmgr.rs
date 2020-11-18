@@ -527,11 +527,8 @@ impl BlockDevMgr {
         }
 
         for (_, bd) in self.blockdevs_mut() {
-            let res = bd.set_clevis_info(pin.clone(), clevis_info.clone());
-            if let Err(e) = res {
-                rollback_loop(crypt_handles);
-                return Err(e);
-            }
+            bd.set_clevis_info(pin.clone(), clevis_info.clone())
+                .expect("devices are certainly encrypted, so all must have encryption info struct");
         }
         Ok(true)
     }
@@ -563,9 +560,8 @@ impl BlockDevMgr {
             res?
         }
         for (_, bd) in self.blockdevs_mut() {
-            if let Err(e) = bd.unset_clevis_info() {
-                warn!("{}", e);
-            }
+            bd.unset_clevis_info()
+                .expect("blockdevs are definitely encrypted, must have encryption_info set");
         }
         Ok(true)
     }

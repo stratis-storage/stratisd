@@ -408,8 +408,8 @@ impl BlockDevMgr {
         let mut iter = self.block_devs.iter().map(|bd| bd.encryption_info());
         let info = iter.next().and_then(|opt| opt);
 
-        // Liminal device code will not set up a pool with multiple key description
-        // values.
+        // Liminal device code will not set up a pool with devices with
+        // different encryption information.
         assert!(iter.all(|elem| info == elem));
 
         info

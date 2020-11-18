@@ -262,12 +262,8 @@ pub trait Pool: Debug {
     /// Determine if the pool's data is encrypted
     fn is_encrypted(&self) -> bool;
 
-    /// Get key description for the key in the kernel keyring used for encryption
-    /// if it is encrypted
-    fn key_desc(&self) -> Option<&KeyDescription>;
-
-    /// Get pin and configuration info for the Clevis bind for this pool.
-    fn clevis_info(&self) -> Option<&(String, Value)>;
+    /// Get all encryption information for this pool.
+    fn encryption_info(&self) -> Option<&EncryptionInfo>;
 }
 
 pub trait Engine: Debug + Report {

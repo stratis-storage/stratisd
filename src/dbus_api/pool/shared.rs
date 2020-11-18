@@ -61,7 +61,8 @@ pub fn get_pool_encryption_key_desc(
 ) -> Result<(bool, String), String> {
     pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
         Ok(option_to_tuple(
-            pool.key_desc().map(|k| k.as_application_str().to_string()),
+            pool.encryption_info()
+                .map(|i| i.key_description.as_application_str().to_string()),
             String::new(),
         ))
     })
@@ -95,7 +96,8 @@ pub fn get_pool_clevis_info(
 ) -> Result<(bool, (String, String)), String> {
     pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
         Ok(option_to_tuple(
-            pool.clevis_info()
+            pool.encryption_info()
+                .and_then(|i| i.clevis_info.as_ref())
                 .map(|(pin, config)| (pin.to_owned(), config.to_string())),
             (String::new(), String::new()),
         ))

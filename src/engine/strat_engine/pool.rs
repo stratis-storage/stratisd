@@ -627,12 +627,8 @@ impl Pool for StratPool {
         self.datadevs_encrypted()
     }
 
-    fn key_desc(&self) -> Option<&KeyDescription> {
-        self.backstore.data_tier_encryption_info().map(|i| &i.key_description)
-    }
-
-    fn clevis_info(&self) -> Option<&(String, Value)> {
-        self.backstore.data_tier_encryption_info().and_then(|i| i.clevis_info.as_ref())
+    fn encryption_info(&self) -> Option<&EncryptionInfo> {
+        self.backstore.data_tier_encryption_info()
     }
 }
 

@@ -25,8 +25,8 @@ use crate::{
         structures::Table,
         types::{
             BlockDevTier, CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid,
-            KeyDescription, MaybeDbusPath, Name, PoolUuid, Redundancy, RenameAction,
-            SetCreateAction, SetDeleteAction,
+            MaybeDbusPath, Name, PoolUuid, Redundancy, RenameAction, SetCreateAction,
+            SetDeleteAction,
         },
         EngineEvent,
     },
@@ -91,7 +91,7 @@ impl SimPool {
         Ok(())
     }
 
-    fn encryption_info(&self) -> Option<&EncryptionInfo> {
+    fn encryption_info_impl(&self) -> Option<&EncryptionInfo> {
         self.block_devs
             .iter()
             .next()
@@ -509,16 +509,8 @@ impl Pool for SimPool {
         self.datadevs_encrypted()
     }
 
-    fn key_desc(&self) -> Option<&KeyDescription> {
-        self.encryption_info()
-            .as_ref()
-            .map(|info| &info.key_description)
-    }
-
-    fn clevis_info(&self) -> Option<&(String, Value)> {
-        self.encryption_info()
-            .as_ref()
-            .and_then(|info| info.clevis_info.as_ref())
+    fn encryption_info(&self) -> Option<&EncryptionInfo> {
+        self.encryption_info_impl()
     }
 }
 

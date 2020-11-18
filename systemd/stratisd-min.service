@@ -2,8 +2,8 @@
 Description=Stratis minimal daemon
 Documentation=man:stratisd(8)
 DefaultDependencies=no
-Requires=dev-mapper-control.device
-After=dev-mapper-control.device
+Requires=systemd-modules-load.service
+After=systemd-modules-load.service
 
 [Service]
 Environment="RUST_BACKTRACE=1"

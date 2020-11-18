@@ -437,10 +437,14 @@ impl MemoryFilesystem {
                 parent_path.push("..");
                 let parent_stat_info = stat(&parent_path)?;
                 if stat_info.st_dev != parent_stat_info.st_dev {
-                    return Err(StratisError::Io(io::Error::new(
-                        io::ErrorKind::AlreadyExists,
-                        format!("A mount already exists at {}", tmpfs_path.display()),
-                    )));
+                    info!("Mount found at {}; unmounting", Self::TMPFS_LOCATION);
+                    if let Err(e) = umount(Self::TMPFS_LOCATION) {
+                        warn!(
+                            "Failed to unmount filesystem at {}: {}",
+                            Self::TMPFS_LOCATION,
+                            e
+                        );
+                    }
                 }
             }
         } else {

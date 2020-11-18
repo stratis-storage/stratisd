@@ -18,7 +18,7 @@ use crate::{
             },
             serde_structs::{BaseDevSave, BlockDevSave, DataTierSave, Recordable},
         },
-        types::{BlockDevTier, DevUuid, EncryptionInfo, PoolUuid},
+        types::{BlockDevTier, DevUuid, PoolUuid},
     },
     stratis::StratisResult,
 };
@@ -150,16 +150,6 @@ impl DataTier {
 
     pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut StratBlockDev)> {
         self.block_mgr.blockdevs_mut()
-    }
-
-    /// Data tier is encrypted
-    pub fn is_encrypted(&self) -> bool {
-        self.block_mgr.is_encrypted()
-    }
-
-    /// Data tier key description
-    pub fn encryption_info(&self) -> Option<&EncryptionInfo> {
-        self.block_mgr.encryption_info()
     }
 }
 

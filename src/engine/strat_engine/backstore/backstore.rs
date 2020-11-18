@@ -645,11 +645,11 @@ impl Backstore {
     }
 
     pub fn data_tier_is_encrypted(&self) -> bool {
-        self.data_tier.is_encrypted()
+        self.data_tier.block_mgr.is_encrypted()
     }
 
     pub fn data_tier_encryption_info(&self) -> Option<&EncryptionInfo> {
-        self.data_tier.encryption_info()
+        self.data_tier.block_mgr.encryption_info()
     }
 
     pub fn has_cache(&self) -> bool {

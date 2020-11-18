@@ -50,7 +50,7 @@ Manager = make_class(
 )
 FetchProperties = make_class(
     "FetchProperties",
-    ET.fromstring(SPECS["org.storage.stratis2.FetchProperties.r2"]),
+    ET.fromstring(SPECS["org.storage.stratis2.FetchProperties.r3"]),
     TIME_OUT,
 )
 Filesystem = make_class("Filesystem", _FILESYSTEM_SPEC, TIME_OUT)

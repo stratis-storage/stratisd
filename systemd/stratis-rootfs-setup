@@ -1,12 +1,5 @@
 #!/bin/bash
 
-# /run/cryptsetup required for any operation that invokes libcryptsetup or else
-# libcryptsetup prints a warning which will be captured in KEY_DESC below the first
-# time stratis-min is run.
-if [ ! -d /run/cryptsetup ]; then
-	mkdir -p /run/cryptsetup
-fi
-
 IS_ENCRYPTED=$(stratis-min pool is-encrypted $STRATIS_ROOTFS_UUID)
 if [ x"$IS_ENCRYPTED" = x"true" ]; then
 	plymouth ask-for-password \

@@ -19,9 +19,8 @@ Description=prompt for root filesystem password
 DefaultDependencies=no
 Conflicts=shutdown.target
 Wants=stratisd-min.service plymouth-start.service
-After=paths.target plymouth-start.service stratisd-min.service
+After=paths.target plymouth-start.service stratisd-min.service {}
 Before=initrd.target
-{}
 {}
 
 [Service]
@@ -30,8 +29,8 @@ Environment='STRATIS_ROOTFS_UUID={}'
 ExecStart=/usr/lib/systemd/stratis-rootfs-setup
 RemainAfterExit=yes
 ",
+        devices.join(" "),
         format!("Requires={}", devices.join(" ")),
-        format!("After={}", devices.join(" ")),
         pool_uuid,
     )
 }
@@ -43,22 +42,22 @@ fn main() -> Result<(), Box<dyn Error>> {
     let rootfs_uuid_paths_key = "stratis.rootfs.uuid_paths";
     let rootfs_uuid_paths = kernel_cmdline
         .get(rootfs_uuid_paths_key)
-        .and_then(|opt_s| opt_s.as_ref().map(|s| s.to_string()))
+        .and_then(|opt_s| opt_s.as_ref())
         .ok_or_else(|| {
             format!(
                 "Missing kernel command line parameter {}",
                 rootfs_uuid_paths_key
             )
         })?;
+    let rootfs_uuid_paths_parsed = rootfs_uuid_paths.iter().map(PathBuf::from).collect();
     let pool_uuid_key = "stratis.rootfs.pool_uuid";
     let pool_uuid = kernel_cmdline
         .get(pool_uuid_key)
-        .and_then(|opt_s| opt_s.as_ref().map(|s| s.to_string()))
+        .and_then(|opt_vec| opt_vec.as_ref())
+        .and_then(|vec| vec.iter().next())
         .ok_or_else(|| format!("Missing kernel command line parameter {}", pool_uuid_key))?;
-    let parsed_rootfs_uuid_paths: Vec<_> =
-        rootfs_uuid_paths.split(',').map(PathBuf::from).collect();
     let parsed_pool_uuid = Uuid::parse_str(&pool_uuid)?;
-    let file_contents = unit_template(parsed_rootfs_uuid_paths, parsed_pool_uuid);
+    let file_contents = unit_template(rootfs_uuid_paths_parsed, parsed_pool_uuid);
     let mut path = PathBuf::from(early_dir);
     path.push("stratis-setup.service");
     lib::write_unit_file(&path, file_contents)?;

@@ -47,7 +47,7 @@ mailing list, if preferred.
 ### Setting up for development
 
 #### Development Compiler
-The version of the compiler recommended for development is 1.47. Other
+The version of the compiler recommended for development is 1.48. Other
 versions of the compiler may disagree with the CI tasks on some points,
 so should be avoided.
 

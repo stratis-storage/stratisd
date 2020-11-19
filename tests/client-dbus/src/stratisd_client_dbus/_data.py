@@ -6,8 +6,8 @@ SPECS = {
     </method>
   </interface>
 """,
-    "org.storage.stratis2.FetchProperties.r2": """
-<interface name="org.storage.stratis2.FetchProperties.r2">
+    "org.storage.stratis2.FetchProperties.r3": """
+<interface name="org.storage.stratis2.FetchProperties.r3">
     <method name="GetAllProperties">
       <arg direction="out" name="results" type="a{s(bv)}" />
     </method>
@@ -17,8 +17,8 @@ SPECS = {
     </method>
   </interface>
 """,
-    "org.storage.stratis2.Manager.r2": """
-<interface name="org.storage.stratis2.Manager.r2">
+    "org.storage.stratis2.Manager.r3": """
+<interface name="org.storage.stratis2.Manager.r3">
     <method name="ConfigureSimulator">
       <arg direction="in" name="denominator" type="u" />
       <arg direction="out" name="return_code" type="q" />
@@ -49,6 +49,7 @@ SPECS = {
     </method>
     <method name="UnlockPool">
       <arg direction="in" name="pool_uuid" type="s" />
+      <arg direction="in" name="unlock_method" type="s" />
       <arg direction="out" name="result" type="(bas)" />
       <arg direction="out" name="return_code" type="q" />
       <arg direction="out" name="return_string" type="s" />
@@ -131,8 +132,8 @@ SPECS = {
     </property>
   </interface>
 """,
-    "org.storage.stratis2.pool.r1": """
-<interface name="org.storage.stratis2.pool.r1">
+    "org.storage.stratis2.pool.r3": """
+<interface name="org.storage.stratis2.pool.r3">
     <method name="AddCacheDevs">
       <arg direction="in" name="devices" type="as" />
       <arg direction="out" name="results" type="(bao)" />
@@ -142,6 +143,13 @@ SPECS = {
     <method name="AddDataDevs">
       <arg direction="in" name="devices" type="as" />
       <arg direction="out" name="results" type="(bao)" />
+      <arg direction="out" name="return_code" type="q" />
+      <arg direction="out" name="return_string" type="s" />
+    </method>
+    <method name="Bind">
+      <arg direction="in" name="pin" type="s" />
+      <arg direction="in" name="json" type="s" />
+      <arg direction="out" name="results" type="b" />
       <arg direction="out" name="return_code" type="q" />
       <arg direction="out" name="return_string" type="s" />
     </method>
@@ -173,6 +181,11 @@ SPECS = {
       <arg direction="in" name="origin" type="o" />
       <arg direction="in" name="snapshot_name" type="s" />
       <arg direction="out" name="result" type="(bo)" />
+      <arg direction="out" name="return_code" type="q" />
+      <arg direction="out" name="return_string" type="s" />
+    </method>
+    <method name="Unbind">
+      <arg direction="out" name="results" type="b" />
       <arg direction="out" name="return_code" type="q" />
       <arg direction="out" name="return_string" type="s" />
     </method>

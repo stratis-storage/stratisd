@@ -12,35 +12,22 @@ use dbus::{
 use itertools::Itertools;
 
 use crate::dbus_api::{
-    api::shared::{list_keys, locked_pool_uuids},
     consts,
+    pool::shared::{
+        get_pool_clevis_info, get_pool_encryption_key_desc, get_pool_has_cache,
+        get_pool_total_size, get_pool_total_used,
+    },
     types::TData,
     util::result_to_tuple,
 };
 
-const ALL_PROPERTIES: [&str; 3] = [
-    consts::KEY_LIST_PROP,
-    consts::LOCKED_POOLS,
-    consts::LOCKED_POOL_UUIDS,
+const ALL_PROPERTIES: [&str; 5] = [
+    consts::POOL_ENCRYPTION_KEY_DESC,
+    consts::POOL_HAS_CACHE_PROP,
+    consts::POOL_TOTAL_SIZE_PROP,
+    consts::POOL_TOTAL_USED_PROP,
+    consts::POOL_CLEVIS_INFO,
 ];
-
-pub fn locked_pools(
-    info: &MethodInfo<MTFn<TData>, TData>,
-) -> Result<HashMap<String, String>, String> {
-    let dbus_context = info.tree.get_data();
-
-    let engine = dbus_context.engine.borrow();
-    Ok(engine
-        .locked_pools()
-        .into_iter()
-        .map(|(u, info)| {
-            (
-                u.to_simple_ref().to_string(),
-                info.key_description.as_application_str().to_string(),
-            )
-        })
-        .collect())
-}
 
 fn get_properties_shared(
     m: &MethodInfo<MTFn<TData>, TData>,
@@ -53,9 +40,13 @@ fn get_properties_shared(
     let return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = properties
         .unique()
         .filter_map(|prop| match prop.as_str() {
-            consts::KEY_LIST_PROP => Some((prop, result_to_tuple(list_keys(m)))),
-            consts::LOCKED_POOLS => Some((prop, result_to_tuple(locked_pools(m)))),
-            consts::LOCKED_POOL_UUIDS => Some((prop, result_to_tuple(locked_pool_uuids(m)))),
+            consts::POOL_ENCRYPTION_KEY_DESC => {
+                Some((prop, result_to_tuple(get_pool_encryption_key_desc(m))))
+            }
+            consts::POOL_HAS_CACHE_PROP => Some((prop, result_to_tuple(get_pool_has_cache(m)))),
+            consts::POOL_TOTAL_SIZE_PROP => Some((prop, result_to_tuple(get_pool_total_size(m)))),
+            consts::POOL_TOTAL_USED_PROP => Some((prop, result_to_tuple(get_pool_total_used(m)))),
+            consts::POOL_CLEVIS_INFO => Some((prop, result_to_tuple(get_pool_clevis_info(m)))),
             _ => None,
         })
         .collect();

@@ -16,7 +16,7 @@ use crate::engine::{
         liminal::identify::{DeviceInfo, LuksInfo, StratisInfo},
         metadata::StratisIdentifiers,
     },
-    types::{DevUuid, KeyDescription},
+    types::{DevUuid, EncryptionInfo},
 };
 
 /// Info for a discovered Luks Device belonging to Stratis.
@@ -24,17 +24,12 @@ use crate::engine::{
 pub struct LLuksInfo {
     /// Generic information + Stratis identifiers
     pub ids: StratisInfo,
-    pub key_description: KeyDescription,
+    pub encryption_info: EncryptionInfo,
 }
 
 impl fmt::Display for LLuksInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}, key description: \"{}\"",
-            self.ids,
-            self.key_description.as_application_str()
-        )
+        write!(f, "{}, {}", self.ids, self.encryption_info)
     }
 }
 
@@ -42,28 +37,28 @@ impl From<LuksInfo> for LLuksInfo {
     fn from(info: LuksInfo) -> LLuksInfo {
         LLuksInfo {
             ids: info.info,
-            key_description: info.key_description,
+            encryption_info: info.encryption_info,
         }
     }
 }
 
 impl<'a> Into<Value> for &'a LLuksInfo {
     // Precondition: (&StratisInfo).into() pattern matches Value::Object()
+    // Precondition: (&EncryptionInfo).into() pattern matches Value::Object()
     fn into(self) -> Value {
-        let mut json = json!({
-            "key_description": Value::from(self.key_description.as_application_str())
-        });
-        if let Value::Object(ref mut map) = json {
-            map.extend(
-                if let Value::Object(map) = <&StratisInfo as Into<Value>>::into(&self.ids) {
-                    map.into_iter()
-                } else {
-                    unreachable!("StratisInfo conversion returns a JSON object");
-                },
-            );
-        } else {
-            unreachable!("json!() always creates a JSON object");
-        };
+        let mut json = <&StratisInfo as Into<Value>>::into(&self.ids);
+        let map = json
+            .as_object_mut()
+            .expect("StratisInfo conversion returns a JSON object");
+        map.extend(
+            if let Value::Object(enc_map) =
+                <&EncryptionInfo as Into<Value>>::into(&self.encryption_info)
+            {
+                enc_map.into_iter()
+            } else {
+                unreachable!("EncryptionInfo conversion returns a JSON object");
+            },
+        );
         json
     }
 }
@@ -186,17 +181,17 @@ impl LInfo {
         }
     }
 
-    pub fn key_desc(&self) -> Option<&KeyDescription> {
+    fn encryption_info(&self) -> Option<&EncryptionInfo> {
         match self {
-            LInfo::Luks(info) => Some(&info.key_description),
-            LInfo::Stratis(info) => info.luks.as_ref().map(|i| &i.key_description),
+            LInfo::Luks(info) => Some(&info.encryption_info),
+            LInfo::Stratis(info) => info.luks.as_ref().map(|i| &i.encryption_info),
         }
     }
 
     /// Returns true if the data represents a device with encryption managed
     /// by Stratis, otherwise false.
     pub fn is_encrypted(&self) -> bool {
-        self.key_desc().is_some()
+        self.encryption_info().is_some()
     }
 
     /// Returns true if the data represents a device with encryption managed
@@ -267,7 +262,7 @@ impl LInfo {
         fn luks_luks_compatible(info_1: &LLuksInfo, info_2: &LuksInfo) -> bool {
             assert_eq!(info_1.ids.identifiers, info_2.info.identifiers);
             info_1.ids.device_number == info_2.info.device_number
-                && info_1.key_description == info_2.key_description
+                && info_1.encryption_info == info_2.encryption_info
         }
 
         // Returns true if the information found via udev for two devices is
@@ -346,12 +341,12 @@ impl DeviceSet {
     #[cfg(test)]
     #[allow(dead_code)]
     fn invariant(&self) {
-        let key_descriptions: HashSet<KeyDescription> = self
+        let encryption_infos: HashSet<EncryptionInfo> = self
             .internal
             .iter()
-            .filter_map(|(_, info)| info.key_desc().cloned())
+            .filter_map(|(_, info)| info.encryption_info().cloned())
             .collect();
-        assert!(key_descriptions.is_empty() || key_descriptions.len() == 1);
+        assert!(encryption_infos.is_empty() || encryption_infos.len() == 1);
     }
 
     /// Create a new, empty DeviceSet
@@ -404,12 +399,12 @@ impl DeviceSet {
         }
     }
 
-    /// The unique key description for this set. If none of the infos
+    /// The unique encryption info for this set. If none of the infos
     /// correspond to a Stratis managed encrypted device, None.
-    pub fn key_description(&self) -> Option<&KeyDescription> {
+    pub fn encryption_info(&self) -> Option<&EncryptionInfo> {
         self.internal
             .iter()
-            .filter_map(|(_, info)| info.key_desc())
+            .filter_map(|(_, info)| info.encryption_info())
             .next()
     }
 
@@ -442,10 +437,10 @@ impl DeviceSet {
         // description, then it is likely that all the devices in the set also
         // have a key description, so that the search for a device with a key
         // description will stop at the first one.
-        if let Some(key_desc) = info.key_description() {
+        if let Some(encryption_info) = info.encryption_info() {
             if self
-                .key_description()
-                .filter(|&kd| kd != key_desc)
+                .encryption_info()
+                .filter(|&ei| ei != encryption_info)
                 .is_some()
             {
                 let mut hopeless: HashSet<LInfo> =

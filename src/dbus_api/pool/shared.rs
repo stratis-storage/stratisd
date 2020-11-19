@@ -61,7 +61,8 @@ pub fn get_pool_encryption_key_desc(
 ) -> Result<(bool, String), String> {
     pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
         Ok(option_to_tuple(
-            pool.key_desc().map(|k| k.as_application_str().to_string()),
+            pool.encryption_info()
+                .map(|i| i.key_description.as_application_str().to_string()),
             String::new(),
         ))
     })
@@ -87,6 +88,19 @@ pub fn get_pool_total_used(m: &MethodInfo<MTFn<TData>, TData>) -> Result<String,
         pool.total_physical_used()
             .map_err(|e| e.to_string())
             .map(|size| (u128::from(*size) * devicemapper::SECTOR_SIZE as u128).to_string())
+    })
+}
+
+pub fn get_pool_clevis_info(
+    m: &MethodInfo<MTFn<TData>, TData>,
+) -> Result<(bool, (String, String)), String> {
+    pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
+        Ok(option_to_tuple(
+            pool.encryption_info()
+                .and_then(|i| i.clevis_info.as_ref())
+                .map(|(pin, config)| (pin.to_owned(), config.to_string())),
+            (String::new(), String::new()),
+        ))
     })
 }
 

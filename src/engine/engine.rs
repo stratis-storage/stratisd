@@ -17,9 +17,9 @@ use devicemapper::{Bytes, Sectors};
 
 use crate::{
     engine::types::{
-        BlockDevPath, BlockDevTier, CreateAction, DeleteAction, DevUuid, FilesystemUuid,
-        KeyDescription, MappingCreateAction, MaybeDbusPath, Name, PoolUuid, RenameAction,
-        ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction,
+        BlockDevPath, BlockDevTier, CreateAction, DeleteAction, DevUuid, EncryptionInfo,
+        FilesystemUuid, KeyDescription, MappingCreateAction, MaybeDbusPath, Name, PoolUuid,
+        RenameAction, ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, UnlockMethod,
     },
     stratis::StratisResult,
 };
@@ -164,6 +164,13 @@ pub trait Pool: Debug {
         tier: BlockDevTier,
     ) -> StratisResult<SetCreateAction<DevUuid>>;
 
+    /// Bind all devices in the given pool for automated unlocking
+    /// using clevis.
+    fn bind_clevis(&mut self, pin: String, clevis_info: Value) -> StratisResult<CreateAction<()>>;
+
+    /// Unbind all devices in the given pool from using clevis.
+    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<()>>;
+
     /// Ensures that all designated filesystems are gone from pool.
     /// Returns a list of the filesystems found, and actually destroyed.
     /// This list will be a subset of the uuids passed in fs_uuids.
@@ -255,9 +262,8 @@ pub trait Pool: Debug {
     /// Determine if the pool's data is encrypted
     fn is_encrypted(&self) -> bool;
 
-    /// Get key description for the key in the kernel keyring used for encryption
-    /// if it is encrypted
-    fn key_desc(&self) -> Option<&KeyDescription>;
+    /// Get all encryption information for this pool.
+    fn encryption_info(&self) -> Option<&EncryptionInfo>;
 }
 
 pub trait Engine: Debug + Report {
@@ -301,7 +307,11 @@ pub trait Engine: Debug + Report {
     /// in the unlocked state. If some devices are able to be unlocked
     /// and some fail, an error is returned as all devices should be able to
     /// be unlocked if the necessary key is in the keyring.
-    fn unlock_pool(&mut self, uuid: PoolUuid) -> StratisResult<SetUnlockAction<DevUuid>>;
+    fn unlock_pool(
+        &mut self,
+        uuid: PoolUuid,
+        unlock_method: UnlockMethod,
+    ) -> StratisResult<SetUnlockAction<DevUuid>>;
 
     /// Find the pool designated by uuid.
     fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)>;
@@ -309,9 +319,9 @@ pub trait Engine: Debug + Report {
     /// Get a mutable referent to the pool designated by uuid.
     fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut dyn Pool)>;
 
-    /// Get a mapping of encrypted pool UUIDs for pools that have not yet been set up
-    /// and need to be unlocked to their key descriptions.
-    fn locked_pools(&self) -> HashMap<PoolUuid, KeyDescription>;
+    /// Get a mapping of encrypted pool UUIDs for pools that have not yet
+    /// been set up and need to be unlocked to their encryption infos.
+    fn locked_pools(&self) -> HashMap<PoolUuid, EncryptionInfo>;
 
     /// Configure the simulator, for the real engine, this is a null op.
     /// denominator: the probably of failure is 1/denominator.

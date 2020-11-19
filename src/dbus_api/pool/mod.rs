@@ -15,8 +15,10 @@ use crate::{
 
 mod fetch_properties_2_0;
 mod fetch_properties_2_1;
+mod fetch_properties_2_3;
 mod pool_2_0;
 mod pool_2_1;
+mod pool_2_3;
 mod shared;
 
 pub fn create_dbus_pool<'a>(
@@ -61,6 +63,21 @@ pub fn create_dbus_pool<'a>(
                 .add_p(pool_2_1::encrypted_property(&f)),
         )
         .add(
+            f.interface(consts::POOL_INTERFACE_NAME_2_3, ())
+                .add_m(pool_2_0::create_filesystems_method(&f))
+                .add_m(pool_2_0::destroy_filesystems_method(&f))
+                .add_m(pool_2_0::snapshot_filesystem_method(&f))
+                .add_m(pool_2_0::add_blockdevs_method(&f))
+                .add_m(pool_2_3::bind_clevis_method(&f))
+                .add_m(pool_2_3::unbind_clevis_method(&f))
+                .add_m(pool_2_1::init_cache_method(&f))
+                .add_m(pool_2_1::add_cachedevs_method(&f))
+                .add_m(pool_2_0::rename_method(&f))
+                .add_p(pool_2_0::name_property(&f))
+                .add_p(pool_2_0::uuid_property(&f))
+                .add_p(pool_2_1::encrypted_property(&f)),
+        )
+        .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME, ())
                 .add_m(fetch_properties_2_0::get_all_properties_method(&f))
                 .add_m(fetch_properties_2_0::get_properties_method(&f)),
@@ -74,6 +91,11 @@ pub fn create_dbus_pool<'a>(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_2, ())
                 .add_m(fetch_properties_2_1::get_all_properties_method(&f))
                 .add_m(fetch_properties_2_1::get_properties_method(&f)),
+        )
+        .add(
+            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_3, ())
+                .add_m(fetch_properties_2_3::get_all_properties_method(&f))
+                .add_m(fetch_properties_2_3::get_properties_method(&f)),
         );
 
     let path = object_path.get_name().to_owned();

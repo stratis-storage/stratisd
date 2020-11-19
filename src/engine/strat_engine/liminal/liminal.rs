@@ -25,7 +25,7 @@ use crate::{
             pool::StratPool,
         },
         structures::Table,
-        types::{DevUuid, KeyDescription, Name, PoolUuid},
+        types::{DevUuid, EncryptionInfo, Name, PoolUuid, UnlockMethod},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -82,10 +82,11 @@ impl LiminalDevices {
         &mut self,
         pools: &Table<StratPool>,
         pool_uuid: PoolUuid,
+        unlock_method: UnlockMethod,
     ) -> StratisResult<Vec<DevUuid>> {
-        fn handle_luks(luks_info: &LLuksInfo) -> StratisResult<()> {
+        fn handle_luks(luks_info: &LLuksInfo, unlock_method: UnlockMethod) -> StratisResult<()> {
             if let Some(mut handle) = CryptHandle::setup(&luks_info.ids.devnode)? {
-                handle.activate()?;
+                handle.activate(unlock_method)?;
                 Ok(())
             } else {
                 Err(StratisError::Engine(
@@ -115,7 +116,7 @@ impl LiminalDevices {
                 for (dev_uuid, info) in map.iter() {
                     match info {
                         LInfo::Stratis(_) => (),
-                        LInfo::Luks(ref luks_info) => match handle_luks(luks_info) {
+                        LInfo::Luks(ref luks_info) => match handle_luks(luks_info, unlock_method) {
                             Ok(()) => unlocked.push(*dev_uuid),
                             Err(e) => return Err(e),
                         },
@@ -153,13 +154,15 @@ impl LiminalDevices {
     }
 
     /// Get a mapping of pool UUIDs from all of the LUKS2 devices that are currently
-    /// locked to their key descriptions in the set of pools that are not yet set up.
+    /// locked to their encryption info in the set of pools that are not yet set up.
     // Precondition: All devices for a given errored pool have been determined to have
-    // the same key description.
-    pub fn locked_pools(&self) -> HashMap<PoolUuid, KeyDescription> {
+    // the same  encryption info.
+    pub fn locked_pools(&self) -> HashMap<PoolUuid, EncryptionInfo> {
         self.errored_pool_devices
             .iter()
-            .filter_map(|(pool_uuid, map)| map.key_description().map(|kd| (*pool_uuid, kd.clone())))
+            .filter_map(|(pool_uuid, map)| {
+                map.encryption_info().map(|info| (*pool_uuid, info.clone()))
+            })
             .collect()
     }
 
@@ -313,9 +316,12 @@ impl LiminalDevices {
                 )));
             }
 
+            // NOTE: DeviceSet provides infos variable in setup_pool. DeviceSet
+            // ensures that all encryption infos match so we do not need to
+            // check again here.
             let num_with_luks = datadevs
                 .iter()
-                .filter_map(|sbd| sbd.key_description())
+                .filter_map(|sbd| sbd.encryption_info())
                 .count();
 
             if num_with_luks != 0 && num_with_luks != datadevs.len() {
@@ -331,23 +337,7 @@ impl LiminalDevices {
                             &metadata.name)));
             }
 
-            // Either all the devices have a key description or none do;
-            // so only the first device needs to be accessed.
-            let key_description = datadevs
-                .get(0)
-                .expect("returned with error above if datadevs empty")
-                .key_description()
-                .cloned();
-
-            StratPool::setup(
-                pool_uuid,
-                datadevs,
-                cachedevs,
-                timestamp,
-                &metadata,
-                key_description.as_ref(),
-            )
-            .map_err(|err| {
+            StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata).map_err(|err| {
                 Destination::Errored(format!(
                     "An attempt to set up pool with UUID {} from the assembled devices failed: {}",
                     pool_uuid.to_simple_ref(),

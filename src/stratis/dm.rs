@@ -36,7 +36,8 @@ impl Stream for DmFd {
     type Item = StratisResult<()>;
 
     fn poll_next(self: Pin<&mut Self>, cxt: &mut Context) -> Poll<Option<StratisResult<()>>> {
-        let _ = ready!(self.fd.poll_read_ready(cxt));
+        let mut ready_guard = ready!(self.fd.poll_read_ready(cxt))?;
+        ready_guard.clear_ready();
         let lock_future = self.engine.lock();
         pin!(lock_future);
         let mut lock = ready!(lock_future.poll(cxt));

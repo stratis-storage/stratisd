@@ -585,11 +585,10 @@ impl CryptHandle {
 
 /// Interpret non-Clevis keys that may contain additional information about
 /// how to configure Clevis when binding. Remove any expected non-Clevis keys
-/// from the configuration and return it.
+/// from the configuration.
 /// The only value to be returned is whether or not the bind command should be
-/// passed the argument yes, which is returned in the first item of the
-/// returned pair.
-pub fn interpret_clevis_config(pin: &str, mut clevis_config: Value) -> Result<(bool, Value)> {
+/// passed the argument yes.
+pub fn interpret_clevis_config(pin: &str, clevis_config: &mut Value) -> Result<bool> {
     let yes = if pin == "tang" {
         if let Some(map) = clevis_config.as_object_mut() {
             map.remove(CLEVIS_TANG_TRUST_URL)
@@ -605,7 +604,7 @@ pub fn interpret_clevis_config(pin: &str, mut clevis_config: Value) -> Result<(b
         false
     };
 
-    Ok((yes, clevis_config))
+    Ok(yes)
 }
 
 /// Generate tang JSON

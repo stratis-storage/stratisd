@@ -459,7 +459,7 @@ impl BlockDevMgr {
     /// nothing was changed.
     /// * Returns Err(_) if an inconsistency was found in the metadata across pools
     /// or binding failed.
-    pub fn bind_clevis(&mut self, pin: String, clevis_info: Value) -> StratisResult<bool> {
+    pub fn bind_clevis(&mut self, pin: String, mut clevis_info: Value) -> StratisResult<bool> {
         fn bind_clevis_loop<'a>(
             key_fs: &MemoryPrivateFilesystem,
             rollback_record: &'a mut Vec<CryptHandle>,
@@ -505,7 +505,7 @@ impl BlockDevMgr {
             }
         };
 
-        let (yes, clevis_info) = interpret_clevis_config(&pin, clevis_info)?;
+        let yes = interpret_clevis_config(&pin, &mut clevis_info)?;
 
         if let Some(info) = &encryption_info.clevis_info {
             let clevis_tuple = (pin, clevis_info);

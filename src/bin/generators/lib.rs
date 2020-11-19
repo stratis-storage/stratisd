@@ -13,23 +13,37 @@ use std::{
 
 const WANTED_BY_INITRD_PATH: &str = "/run/systemd/system/initrd.target.wants";
 
-pub fn get_kernel_cmdline() -> Result<HashMap<String, Option<String>>, io::Error> {
+pub fn get_kernel_cmdline() -> Result<HashMap<String, Option<Vec<String>>>, io::Error> {
     let mut cmdline = OpenOptions::new().read(true).open("/proc/cmdline")?;
     let mut cmdline_contents = String::new();
     cmdline.read_to_string(&mut cmdline_contents)?;
 
-    Ok(cmdline_contents
-        .split_whitespace()
-        .map(|s| {
-            let mut name_value = s.splitn(2, '=');
-            let name = name_value
-                .next()
-                .expect("Format must contain value")
-                .to_string();
-            let value = name_value.next().map(|s| s.to_string());
-            (name, value)
-        })
-        .collect())
+    let mut cmdline_map: HashMap<_, Option<Vec<String>>> = HashMap::new();
+    for pair in cmdline_contents.split_whitespace() {
+        let mut name_value = pair.splitn(2, '=');
+        let name = name_value
+            .next()
+            .expect("Format must contain value")
+            .to_string();
+        let value_in_map = cmdline_map.get_mut(&name);
+        let value = name_value.next().map(|s| s.to_string());
+        match value_in_map {
+            Some(Some(ref mut vec)) => {
+                if let Some(v) = value {
+                    vec.push(v);
+                }
+            }
+            Some(val_in_map) => {
+                if let Some(v) = value {
+                    *val_in_map = Some(vec![v]);
+                }
+            }
+            None => {
+                cmdline_map.insert(name, value.map(|v| vec![v]));
+            }
+        }
+    }
+    Ok(cmdline_map)
 }
 
 pub fn get_generator_args() -> Result<(String, String, String), String> {

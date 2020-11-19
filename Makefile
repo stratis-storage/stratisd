@@ -23,6 +23,7 @@ CLIPPY_DENY = -D clippy::pedantic \
               -A clippy::find_map \
               -A clippy::if_not_else \
               -A clippy::items_after_statements \
+              -A clippy::map_err_ignore \
               -A clippy::map_unwrap_or \
               -A clippy::match_same_arms \
               -A clippy::match_wildcard_for_single_variants \

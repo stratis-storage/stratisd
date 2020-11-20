@@ -44,15 +44,13 @@ pub async fn setup(
             })?;
 
     let mut tree_handle = task::spawn(async move {
-        loop {
-            if let Err(e) = tree.process_dbus_action().await {
-                error!(
-                    "Failed to process D-Bus object path addition or removal: {}; \
-                    exiting D-Bus thread",
-                    e,
-                );
-                return;
-            }
+        if let Err(e) = tree.process_dbus_actions().await {
+            error!(
+                "Failed to process D-Bus object path addition or removal: {}; \
+                exiting D-Bus thread",
+                e,
+            );
+            return;
         }
     });
     let mut conn_handle = task::spawn_blocking(move || loop {

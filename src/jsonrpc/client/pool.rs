@@ -8,7 +8,6 @@ use nix::unistd::{pipe, write};
 
 use crate::{
     engine::{KeyDescription, PoolUuid},
-    jsonrpc::interface::{StratisParamType, StratisParams},
     print_table,
     stratis::{StratisError, StratisResult},
 };
@@ -29,87 +28,47 @@ pub fn pool_create(
     blockdevs: Vec<PathBuf>,
     key_desc: Option<KeyDescription>,
 ) -> StratisResult<()> {
-    do_request_standard!(
-        StratisParams {
-            type_: StratisParamType::PoolCreate(name, blockdevs, key_desc),
-            fd_opt: None,
-        },
-        PoolCreate
-    )
+    do_request_standard!(PoolCreate, name, blockdevs, key_desc)
 }
 
 // stratis-min pool unlock
 pub fn pool_unlock(uuid: PoolUuid, prompt: bool) -> StratisResult<()> {
-    do_request_standard!(
-        StratisParams {
-            type_: StratisParamType::PoolUnlock(uuid, prompt),
-            fd_opt: if prompt {
-                let password =
-                    rpassword::prompt_password_stdout("Enter passphrase followed by return:")?;
-                let (read_end, write_end) = pipe()?;
-                write(write_end, password.as_bytes())?;
-                Some(read_end)
-            } else {
-                None
-            }
-        },
-        PoolUnlock
-    )
+    if prompt {
+        do_request_standard!(PoolUnlock, uuid; {
+            let password =
+                rpassword::prompt_password_stdout("Enter passphrase followed by return:")?;
+            let (read_end, write_end) = pipe()?;
+            write(write_end, password.as_bytes())?;
+            read_end
+        })
+    } else {
+        do_request_standard!(PoolUnlock, uuid)
+    }
 }
 
 // stratis-min pool init-cache
 pub fn pool_init_cache(name: String, paths: Vec<PathBuf>) -> StratisResult<()> {
-    do_request_standard!(
-        StratisParams {
-            type_: StratisParamType::PoolInitCache(name, paths),
-            fd_opt: None,
-        },
-        PoolInitCache
-    )
+    do_request_standard!(PoolInitCache, name, paths)
 }
 
 // stratis-min pool init-cache
 pub fn pool_rename(name: String, new_name: String) -> StratisResult<()> {
-    do_request_standard!(
-        StratisParams {
-            type_: StratisParamType::PoolRename(name, new_name),
-            fd_opt: None,
-        },
-        PoolRename
-    )
+    do_request_standard!(PoolRename, name, new_name)
 }
 
 // stratis-min pool add-data
 pub fn pool_add_data(name: String, paths: Vec<PathBuf>) -> StratisResult<()> {
-    do_request_standard!(
-        StratisParams {
-            type_: StratisParamType::PoolAddData(name, paths),
-            fd_opt: None,
-        },
-        PoolAddData
-    )
+    do_request_standard!(PoolAddData, name, paths)
 }
 
 // stratis-min pool add-cache
 pub fn pool_add_cache(name: String, paths: Vec<PathBuf>) -> StratisResult<()> {
-    do_request_standard!(
-        StratisParams {
-            type_: StratisParamType::PoolAddCache(name, paths),
-            fd_opt: None,
-        },
-        PoolAddCache
-    )
+    do_request_standard!(PoolAddCache, name, paths)
 }
 
 // stratis-min pool destroy
 pub fn pool_destroy(name: String) -> StratisResult<()> {
-    do_request_standard!(
-        StratisParams {
-            type_: StratisParamType::PoolDestroy(name),
-            fd_opt: None,
-        },
-        PoolDestroy
-    )
+    do_request_standard!(PoolDestroy, name)
 }
 
 #[allow(clippy::cast_precision_loss)]
@@ -162,13 +121,7 @@ fn properties_string(properties: Vec<(bool, bool)>) -> Vec<String> {
 
 // stratis-min pool [list]
 pub fn pool_list() -> StratisResult<()> {
-    let (names, sizes, properties) = do_request!(
-        StratisParams {
-            type_: StratisParamType::PoolList,
-            fd_opt: None,
-        },
-        PoolList
-    );
+    let (names, sizes, properties) = do_request!(PoolList);
     let physical_col = size_string(sizes);
     let properties_col = properties_string(properties);
     print_table!(
@@ -182,13 +135,7 @@ pub fn pool_list() -> StratisResult<()> {
 
 // stratis-min is-encrypted
 pub fn pool_is_encrypted(uuid: PoolUuid) -> StratisResult<bool> {
-    let (is_encrypted, rc, rs) = do_request!(
-        StratisParams {
-            type_: StratisParamType::PoolIsEncrypted(uuid),
-            fd_opt: None,
-        },
-        PoolIsEncrypted
-    );
+    let (is_encrypted, rc, rs) = do_request!(PoolIsEncrypted, uuid);
     if rc != 0 {
         Err(StratisError::Error(rs))
     } else {

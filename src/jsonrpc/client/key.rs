@@ -8,7 +8,6 @@ use nix::unistd::{pipe, write};
 
 use crate::{
     engine::KeyDescription,
-    jsonrpc::interface::{StratisParamType, StratisParams},
     print_table,
     stratis::{StratisError, StratisResult},
 };
@@ -17,26 +16,14 @@ pub fn key_set(key_desc: KeyDescription, keyfile_path: Option<&str>) -> StratisR
     let (changed, rc, rs) = match keyfile_path {
         Some(kp) => {
             let file = File::open(kp)?;
-            do_request!(
-                StratisParams {
-                    type_: StratisParamType::KeySet(key_desc),
-                    fd_opt: Some(file.as_raw_fd()),
-                },
-                KeySet
-            )
+            do_request!(KeySet, key_desc; file.as_raw_fd())
         }
         None => {
             let password =
                 rpassword::prompt_password_stdout("Enter passphrase followed by return:")?;
             let (read_end, write_end) = pipe()?;
             write(write_end, password.as_bytes())?;
-            do_request!(
-                StratisParams {
-                    type_: StratisParamType::KeySet(key_desc),
-                    fd_opt: Some(read_end),
-                },
-                KeySet
-            )
+            do_request!(KeySet, key_desc; read_end)
         }
     };
     if rc != 0 {
@@ -51,23 +38,11 @@ pub fn key_set(key_desc: KeyDescription, keyfile_path: Option<&str>) -> StratisR
 }
 
 pub fn key_unset(key_desc: KeyDescription) -> StratisResult<()> {
-    do_request_standard!(
-        StratisParams {
-            type_: StratisParamType::KeyUnset(key_desc),
-            fd_opt: None,
-        },
-        KeyUnset
-    )
+    do_request_standard!(KeyUnset, key_desc)
 }
 
 pub fn key_list() -> StratisResult<()> {
-    let (info, rc, rs): (Vec<KeyDescription>, u16, String) = do_request!(
-        StratisParams {
-            type_: StratisParamType::KeyList,
-            fd_opt: None,
-        },
-        KeyList
-    );
+    let (info, rc, rs): (Vec<KeyDescription>, u16, String) = do_request!(KeyList);
     if rc != 0 {
         Err(StratisError::Error(rs))
     } else {

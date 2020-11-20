@@ -28,7 +28,7 @@ pub enum StratisParamType {
     PoolInitCache(String, Vec<PathBuf>),
     PoolAddCache(String, Vec<PathBuf>),
     PoolDestroy(String),
-    PoolUnlock(PoolUuid, bool),
+    PoolUnlock(PoolUuid),
     PoolList,
     PoolIsEncrypted(PoolUuid),
     Report,

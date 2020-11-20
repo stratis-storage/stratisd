@@ -4,10 +4,51 @@
 
 #[macro_export]
 macro_rules! do_request {
-    ($request:expr, $ret:ident) => {{
+    ($request:ident, $($arg:expr),+; $fd:expr) => {{
         let mut client =
             $crate::jsonrpc::client::StratisClient::connect($crate::jsonrpc::consts::RPC_SOCKADDR)?;
-        if let $crate::jsonrpc::interface::StratisRet::$ret(ret) = client.request($request)? {
+        if let $crate::jsonrpc::interface::StratisRet::$request(ret) = client.request(
+            $crate::jsonrpc::interface::StratisParams {
+                type_: $crate::jsonrpc::interface::StratisParamType::$request(
+                    $($arg),+
+                ),
+                fd_opt: Some($fd),
+            }
+        )? {
+            ret
+        } else {
+            return Err($crate::stratis::StratisError::Error(
+                "Request and response types did not match".to_string(),
+            ));
+        }
+    }};
+    ($request:ident, $($arg:expr ),+) => {{
+        let mut client =
+            $crate::jsonrpc::client::StratisClient::connect($crate::jsonrpc::consts::RPC_SOCKADDR)?;
+        if let $crate::jsonrpc::interface::StratisRet::$request(ret) = client.request(
+            $crate::jsonrpc::interface::StratisParams {
+                type_: $crate::jsonrpc::interface::StratisParamType::$request(
+                    $($arg),+
+                ),
+                fd_opt: None,
+            }
+        )? {
+            ret
+        } else {
+            return Err($crate::stratis::StratisError::Error(
+                "Request and response types did not match".to_string(),
+            ));
+        }
+    }};
+    ($request:ident) => {{
+        let mut client =
+            $crate::jsonrpc::client::StratisClient::connect($crate::jsonrpc::consts::RPC_SOCKADDR)?;
+        if let $crate::jsonrpc::interface::StratisRet::$request(ret) = client.request(
+            $crate::jsonrpc::interface::StratisParams {
+                type_: $crate::jsonrpc::interface::StratisParamType::$request,
+                fd_opt: None,
+            }
+        )? {
             ret
         } else {
             return Err($crate::stratis::StratisError::Error(
@@ -19,8 +60,32 @@ macro_rules! do_request {
 
 #[macro_export]
 macro_rules! do_request_standard {
-    ($request:expr, $ret:ident) => {{
-        let (changed, rc, rs) = $crate::do_request!($request, $ret);
+    ($request:ident, $($arg:expr),+; $fd:expr) => {{
+        let (changed, rc, rs) = $crate::do_request!($request, $($arg),+; $fd);
+        if rc != 0 {
+            Err(StratisError::Error(rs))
+        } else if !changed {
+            Err(StratisError::Error(
+                "The requested action had no effect".to_string(),
+            ))
+        } else {
+            Ok(())
+        }
+    }};
+    ($request:ident, $($arg:expr ),+) => {{
+        let (changed, rc, rs) = $crate::do_request!($request, $($arg),+);
+        if rc != 0 {
+            Err(StratisError::Error(rs))
+        } else if !changed {
+            Err(StratisError::Error(
+                "The requested action had no effect".to_string(),
+            ))
+        } else {
+            Ok(())
+        }
+    }};
+    ($request:ident) => {{
+        let (changed, rc, rs) = $crate::do_request!($request);
         if rc != 0 {
             Err(StratisError::Error(rs))
         } else if !changed {

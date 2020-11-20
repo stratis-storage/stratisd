@@ -17,5 +17,6 @@ pub async fn setup(
     _recv: Receiver<UdevEngineEvent>,
     _should_exit: Arc<AtomicBool>,
 ) -> StratisResult<()> {
-    Ok(pending!())
+    pending!();
+    Ok(())
 }

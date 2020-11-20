@@ -244,13 +244,13 @@ dependencies = [
 
 [[package]]
 name = "devicemapper"
-version = "0.28.0"
-source = "git+https://github.com/jbaublitz/devicemapper-rs?branch=u128-bytes#aca885e6cf578c9c5568ea4d61568c75b7a4ff09"
+version = "0.28.1"
+source = "git+https://github.com/jbaublitz/devicemapper-rs?branch=u128-bytes#0900f2c2780e1df866346e88f93c6b941b72d574"
 dependencies = [
  "bitflags",
  "error-chain",
  "libc",
- "nix 0.14.0",
+ "nix 0.18.0",
  "serde",
 ]
 

@@ -7,12 +7,15 @@ use std::sync::{atomic::AtomicBool, Arc};
 use futures_util::pending;
 use tokio::sync::{mpsc::Receiver, Mutex};
 
-use crate::engine::{Engine, UdevEngineEvent};
+use crate::{
+    engine::{Engine, UdevEngineEvent},
+    stratis::errors::StratisResult,
+};
 
 pub async fn setup(
     _engine: Arc<Mutex<dyn Engine>>,
     _recv: Receiver<UdevEngineEvent>,
     _should_exit: Arc<AtomicBool>,
-) {
-    pending!()
+) -> StratisResult<()> {
+    Ok(pending!())
 }

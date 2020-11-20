@@ -14,7 +14,7 @@ use dbus::{
 };
 use tokio::sync::{
     mpsc::{channel, Receiver},
-    Mutex,
+    Mutex, RwLock,
 };
 
 use devicemapper::DmError;
@@ -199,11 +199,7 @@ pub fn create_dbus_handlers(
     c.request_name(consts::STRATIS_BASE_SERVICE, false, true, true)?;
 
     let connection_arc = Arc::new(c);
-    // FIXME: This should eventually move to a read-write lock when the engine is
-    // moved to a read-write lock. When this happens, special care should be taken
-    // to queue the lock requests in a FIFO manner so that the D-Bus interface
-    // is always up to date after the completion of a request.
-    let tree = Arc::new(Mutex::new(tree));
+    let tree = Arc::new(RwLock::new(tree));
     let connection =
         DbusConnectionHandler::new(Arc::clone(&connection_arc), Arc::clone(&tree), should_exit);
     let udev = DbusUdevHandler {

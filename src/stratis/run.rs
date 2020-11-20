@@ -114,13 +114,21 @@ pub fn run(sim: bool) -> StratisResult<()> {
         let mut join_dm = task::spawn(dm_event_thread(engine));
 
         select! {
-            _ = &mut join_udev => {
-                error!("The udev thread exited; shutting down stratisd...");
+            res = &mut join_udev => {
+                if let Ok(Err(e)) = res {
+                    error!("The udev thread exited with an error: {}; shutting down stratisd...", e);
+                } else {
+                    error!("The udev thread exited; shutting down stratisd...");
+                }
             }
-            _ = &mut join_ipc => {
-                error!("The IPC thread exited; shutting down stratisd...");
+            res = &mut join_ipc => {
+                if let Ok(Err(e)) = res {
+                    error!("The IPC thread exited with an error: {}; shutting down stratisd...", e);
+                } else {
+                    error!("The IPC thread exited; shutting down stratisd...");
+                }
             }
-            Err(e) = &mut join_dm => {
+            Ok(Err(e)) = &mut join_dm => {
                 error!("The devicemapper thread exited with an error: {}; shutting down stratisd...", e);
             }
             _ = &mut join_signal => {

@@ -14,6 +14,11 @@ YAML linter: yamllint (1.23.0)
 New Rust crate version requirements:
   - error-chain: 0.12.2
 
+New external dependencies:
+  - clevis: 15
+  - clevis-luks: 15
+
+
 - Introduce support for Clevis encryption policies:
   https://github.com/stratis-storage/stratisd/pull/2315
   https://github.com/stratis-storage/stratisd/pull/2314

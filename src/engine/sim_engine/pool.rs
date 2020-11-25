@@ -20,7 +20,10 @@ use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
         event::get_engine_listener_list,
-        shared::{init_cache_idempotent_or_err, validate_name, validate_paths},
+        shared::{
+            create_pool_idempotent_or_err, init_cache_idempotent_or_err, validate_name,
+            validate_paths,
+        },
         sim_engine::{blockdev::SimDev, filesystem::SimFilesystem, randomization::Randomizer},
         structures::Table,
         types::{
@@ -78,6 +81,10 @@ impl SimPool {
         !self.filesystems.is_empty()
     }
 
+    fn datadevs(&self) -> Vec<(DevUuid, &SimDev)> {
+        self.block_devs.iter().map(|(u, d)| (*u, d)).collect()
+    }
+
     fn get_mut_blockdev_internal(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut SimDev)> {
         let cache_devs = &mut self.cache_devs;
         self.block_devs
@@ -96,6 +103,31 @@ impl SimPool {
 
     pub fn destroy(&mut self) -> StratisResult<()> {
         Ok(())
+    }
+
+    pub fn idempotency_check(
+        &self,
+        blockdev_paths: &[&Path],
+        key_description: &Option<KeyDescription>,
+    ) -> StratisResult<()> {
+        create_pool_idempotent_or_err(
+            &self
+                .datadevs()
+                .iter()
+                .map(|(_, bd)| bd.devnode().physical_path().to_owned())
+                .collect(),
+            blockdev_paths,
+        ).and_then(|_| {
+            if key_description != &self.block_devs_key_desc {
+                Err(StratisError::Engine(
+                        ErrorEnum::Invalid,
+                        format!("Key description of existing pool {} and requested key description {} do not match",
+                                self.block_devs_key_desc.as_ref().map_or("<no key>", |key| key.as_application_str()),
+                                key_description.as_ref().map_or("<no key>", |key| key.as_application_str()))))
+            } else {
+                Ok(())
+            }
+        })
     }
 }
 

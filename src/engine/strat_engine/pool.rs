@@ -13,7 +13,10 @@ use devicemapper::{DmName, DmNameBuf, Sectors};
 use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
-        shared::{init_cache_idempotent_or_err, validate_name, validate_paths},
+        shared::{
+            create_pool_idempotent_or_err, init_cache_idempotent_or_err, validate_name,
+            validate_paths,
+        },
         strat_engine::{
             backstore::{Backstore, StratBlockDev},
             metadata::MDADataSize,
@@ -294,6 +297,14 @@ impl StratPool {
         self.backstore.data_tier_is_encrypted()
     }
 
+    fn datadevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
+        self.backstore
+            .datadevs()
+            .iter()
+            .map(|&(u, b)| (u, b))
+            .collect()
+    }
+
     pub fn get_strat_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &StratBlockDev)> {
         self.backstore.get_blockdev_by_uuid(uuid)
     }
@@ -312,6 +323,33 @@ impl StratPool {
         self.thin_pool.teardown()?;
         self.backstore.destroy()?;
         Ok(())
+    }
+
+    /// Given some input arguments, return an error if the creation action
+    /// requested is not idempotent.
+    pub fn idempotency_check(
+        &self,
+        blockdev_paths: &[&Path],
+        key_description: &Option<KeyDescription>,
+    ) -> StratisResult<()> {
+        create_pool_idempotent_or_err(
+            &self
+                .datadevs()
+                .iter()
+                .map(|(_, bd)| bd.devnode().physical_path().to_owned())
+                .collect(),
+            blockdev_paths,
+        ).and_then(|_| {
+            if key_description.as_ref() != self.backstore.data_key_desc() {
+                Err(StratisError::Engine(
+                        ErrorEnum::Invalid,
+                        format!("Key description of existing pool {} and requested key description {} do not match",
+                                self.backstore.data_key_desc().map_or("<no key>", |key| key.as_application_str()),
+                                key_description.as_ref().map_or("<no key>", |key| key.as_application_str()))))
+            } else {
+                Ok(())
+            }
+        })
     }
 }
 

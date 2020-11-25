@@ -12,7 +12,7 @@ use crate::{
     engine::{
         engine::{Eventable, KeyActions},
         event::get_engine_listener_list,
-        shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
+        shared::{validate_name, validate_paths},
         strat_engine::{
             cmd::verify_binaries,
             devlinks,
@@ -185,24 +185,19 @@ impl Engine for StratEngine {
 
         validate_paths(blockdev_paths)?;
 
-        match self.pools.get_by_name(name) {
-            Some((_, pool)) => create_pool_idempotent_or_err(pool, name, blockdev_paths),
-            None => {
-                if blockdev_paths.is_empty() {
-                    Err(StratisError::Engine(
-                        ErrorEnum::Invalid,
-                        "At least one blockdev is required to create a pool.".to_string(),
-                    ))
-                } else {
-                    let (uuid, pool) =
-                        StratPool::initialize(name, blockdev_paths, redundancy, key_desc.as_ref())?;
-
-                    let name = Name::new(name.to_owned());
-                    self.pools.insert(name, uuid, pool);
-                    Ok(CreateAction::Created(uuid))
-                }
-            }
+        if blockdev_paths.is_empty() {
+            return Err(StratisError::Engine(
+                ErrorEnum::Invalid,
+                "At least one blockdev is required to create a pool.".to_string(),
+            ));
         }
+
+        self.liminal_devices
+            .create_pool(name, blockdev_paths, redundancy, key_desc)
+            .map(|res| match res {
+                Some(uuid) => CreateAction::Created(uuid),
+                None => CreateAction::Identity,
+            })
     }
 
     fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {

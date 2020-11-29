@@ -336,10 +336,11 @@ impl StaticHeader {
         {
             match maybe_sh {
                 Ok(loc) => {
-                    if let Some(ref sh) = loc {
-                        sh.write(f, repair_location)?;
+                    if let Some(sh) = loc {
+                        write_header(f, sh, repair_location)
+                    } else {
+                        Ok(loc)
                     }
-                    Ok(loc)
                 }
                 Err(e) => Err(e),
             }

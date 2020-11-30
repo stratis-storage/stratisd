@@ -193,7 +193,7 @@ jobs:
           pip3 install setuptools
           pip3 install ${{ matrix.dependencies }}
       - name: Run test
-        run: ${{ matrix.dependencies }}
+        run: ${{ matrix.task }}
 
   # VERIFICATION OF TEST INFRASTRUCTURE
   yamllint:

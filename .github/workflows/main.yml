@@ -186,10 +186,11 @@ jobs:
       - uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python_version }}
-      - name: Install setuptools
-        run: pip3 install setuptools
-      - name: Install depdendencies
-        run: pip3 install ${{ matrix.dependencies }}
+      - name: Install dependencies
+        run: |
+          sudo apt-get install libdbus-1-dev libudev-dev libdbus-glib-1-dev
+          pip3 install setuptools
+          pip3 install ${{ matrix.dependencies }}
       - name: Run test
         run: ${{ matrix.dependencies }}
 

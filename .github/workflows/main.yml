@@ -61,32 +61,32 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
           override: true
       - name: Install dependencies
-        run: sudo apt-get install libdbus-1-dev libudev-dev libdbus-glib-1-dev
+        run: |
+          sudo apt-get -q update
+          sudo apt-get -y install libdbus-1-dev libudev-dev libdbus-glib-1-dev
       - name: Install dependencies
         run: >
           sudo
           add-apt-repository -y
           "deb http://us.archive.ubuntu.com/ubuntu/ eoan main"
       - name: Install dependencies
-        run: sudo apt-get -q update
-      # Update to a more recent version of blkid
-      - name: Install dependencies
-        run: sudo apt-get -y install util-linux libblkid-dev
-      # cryptsetup-bin conflicts with custom built cryptsetup
-      - name: Install dependencies
-        run: sudo apt-get remove cryptsetup-bin
-      - name: Install dependencies
-        run: sudo apt-get install -y libargon2-0 libjson-c3
+        run: |
+          sudo apt-get -q update
+          # Update to a more recent version of blkid
+          sudo apt-get -y install util-linux libblkid-dev
+          # cryptsetup-bin conflicts with custom built cryptsetup
+          sudo apt-get remove cryptsetup-bin
+          sudo apt-get -y install libargon2-0 libjson-c3
       - name: Install dependencies
         run: >
           wget
           "https://github.com/jbaublitz/stratisd/raw/deb/cryptsetup_2.3.0-1_amd64.deb"
       - name: Install dependencies
-        run: sudo dpkg -i ./cryptsetup_2.3.0-1_amd64.deb
-      # Linking fails if libcryptsetup 2.2 is present - must force
-      # remove due to system dependencies
-      - name: Install dependencies
-        run: sudo dpkg --purge --force-all libcryptsetup12
+        run: |
+          sudo dpkg -i ./cryptsetup_2.3.0-1_amd64.deb
+          # Linking fails if libcryptsetup 2.2 is present - must force
+          # remove due to system dependencies
+          sudo dpkg --purge --force-all libcryptsetup12
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
@@ -116,31 +116,31 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
           override: true
       - name: Install dependencies
-        run: sudo apt-get install libdbus-1-dev libudev-dev libdbus-glib-1-dev
+        run: |
+          sudo apt-get -q update
+          sudo apt-get -y install libdbus-1-dev libudev-dev libdbus-glib-1-dev
       - name: Install dependencies
         run: >
           sudo add-apt-repository -y
           "deb http://us.archive.ubuntu.com/ubuntu/ eoan main"
       - name: Install dependencies
-        run: sudo apt-get -q update
-      # Update to a more recent version of blkid
-      - name: Install dependencies
-        run: sudo apt-get -y install util-linux libblkid-dev
-      # cryptsetup-bin conflicts with custom built cryptsetup
-      - name: Install dependencies
-        run: sudo apt-get remove cryptsetup-bin
-      - name: Install dependencies
-        run: sudo apt-get install -y libargon2-0 libjson-c3
+        run: |
+          sudo apt-get -q update
+          # Update to a more recent version of blkid
+          sudo apt-get -y install util-linux libblkid-dev
+          # cryptsetup-bin conflicts with custom built cryptsetup
+          sudo apt-get remove cryptsetup-bin
+          sudo apt-get -y install libargon2-0 libjson-c3
       - name: Install dependencies
         run: >
           wget
           "https://github.com/jbaublitz/stratisd/raw/deb/cryptsetup_2.3.0-1_amd64.deb"
       - name: Install dependencies
-        run: sudo dpkg -i ./cryptsetup_2.3.0-1_amd64.deb
-      # Linking fails if libcryptsetup 2.2 is present - must force
-      # remove due to system dependencies
-      - name: Install dependencies
-        run: sudo dpkg --purge --force-all libcryptsetup12
+        run: |
+          sudo dpkg -i ./cryptsetup_2.3.0-1_amd64.deb
+          # Linking fails if libcryptsetup 2.2 is present - must force
+          # remove due to system dependencies
+          sudo dpkg --purge --force-all libcryptsetup12
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
@@ -188,7 +188,8 @@ jobs:
           python-version: ${{ matrix.python_version }}
       - name: Install dependencies
         run: |
-          sudo apt-get install libdbus-1-dev libudev-dev libdbus-glib-1-dev
+          sudo apt-get -q update
+          sudo apt-get -y install libdbus-1-dev libudev-dev libdbus-glib-1-dev
           pip3 install setuptools
           pip3 install ${{ matrix.dependencies }}
       - name: Run test

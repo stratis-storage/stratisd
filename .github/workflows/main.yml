@@ -16,17 +16,18 @@ on:
   workflow_dispatch:
 
 jobs:
-  # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
   checks:
     strategy:
       matrix:
         include:
+          # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
           - task: make -f Makefile fmt-travis
             toolchain: 1.47.0
             components: rustfmt
           - task: make -f Makefile clippy
             toolchain: 1.47.0
             components: clippy
+          # MANDATORY TESTING ON STABLE
           - task: make -f Makefile build
             toolchain: stable
             components: cargo

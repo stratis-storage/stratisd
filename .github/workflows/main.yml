@@ -1,0 +1,157 @@
+name: stratisd CI
+
+on:
+  push:
+    branches:
+      - master
+      - develop-2.2.1
+  pull_request:
+    branches:
+      - master
+      - develop-2.2.1
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
+  checks:
+    strategy:
+      matrix:
+        include:
+          - task: make -f Makefile fmt-travis
+            toolchain: 1.47.0
+            components: rustfmt
+          - task: make -f Makefile clippy
+            toolchain: 1.47.0
+            components: clippy
+          - task: make -f Makefile build
+            toolchain: stable
+            components: cargo
+          - task: make -f Makefile build-no-default
+            toolchain: stable
+            components: cargo
+          - task: make -f Makefile build-extras
+            toolchain: stable
+            components: cargo
+          - task: make -f Makefile docs-travis
+            toolchain: stable
+            components: cargo
+          - task: make -f Makefile test
+            toolchain: stable
+            components: cargo
+          - task: sudo PATH=$GITHUB_WORKSPACE/.cargo/bin:$PATH RUST_LOG=libstratis=info make -f Makefile test-travis
+            toolchain: stable
+            components: cargo
+          - task: make -f Makefile release
+            toolchain: stable
+            components: cargo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: ${{ matrix.components }}
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+      - name: Install dependencies
+        run: |
+          sudo apt-get install libdbus-1-dev libudev-dev libdbus-glib-1-dev
+          sudo add-apt-repository -y "deb http://us.archive.ubuntu.com/ubuntu/ eoan main"
+          sudo apt-get -q update
+          # Update to a more recent version of blkid
+          sudo apt-get -y install util-linux libblkid-dev
+          # cryptsetup-bin conflicts with custom built cryptsetup
+          sudo apt-get remove cryptsetup-bin
+          sudo apt-get install -y libargon2-0 libjson-c3
+          wget "https://github.com/jbaublitz/stratisd/raw/deb/cryptsetup_2.3.0-1_amd64.deb"
+          sudo dpkg -i ./cryptsetup_2.3.0-1_amd64.deb
+          # Linking fails if libcryptsetup 2.2 is present - must force
+          # remove due to system dependencies
+          sudo dpkg --purge --force-all libcryptsetup12
+      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
+        run: ${{ matrix.task }}
+
+  # ALLOWED FAILURES
+  allowed_failures:
+    continue-on-error: true
+    strategy:
+      matrix:
+        include:
+          # Allowed because a failure may occur after a new Rust stable
+          # version is released.
+          - task: make -f Makefile clippy
+            toolchain: stable
+            components: clippy
+          # Run audit on Rust stable.  Make it an allowed failure, because:
+          # * It takes 9 minutes, the longest of any task.
+          # * It should be an advisory, and should not gate our development.
+          - task: make -f Makefile audit
+            toolchain: stable
+            components: cargo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: ${{ matrix.components }}
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+      - name: Install dependencies
+        run: |
+          sudo apt-get install libdbus-1-dev libudev-dev libdbus-glib-1-dev
+          sudo add-apt-repository -y "deb http://us.archive.ubuntu.com/ubuntu/ eoan main"
+          sudo apt-get -q update
+          # Update to a more recent version of blkid
+          sudo apt-get -y install util-linux libblkid-dev
+          # cryptsetup-bin conflicts with custom built cryptsetup
+          sudo apt-get remove cryptsetup-bin
+          sudo apt-get install -y libargon2-0 libjson-c3
+          wget "https://github.com/jbaublitz/stratisd/raw/deb/cryptsetup_2.3.0-1_amd64.deb"
+          sudo dpkg -i ./cryptsetup_2.3.0-1_amd64.deb
+          # Linking fails if libcryptsetup 2.2 is present - must force
+          # remove due to system dependencies
+          sudo dpkg --purge --force-all libcryptsetup12
+      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
+        run: ${{ matrix.task }}
+
+  # MANDATORY PYTHON CHECKS ON LOWEST SUPPORTED INTERPRETER
+  python-checks:
+    strategy:
+      matrix:
+        include:
+          - python-version: 3.7.9
+            dependencies: pylint==2.4.4 dbus-client-gen==0.4 dbus-python-client-gen==0.7 psutil==5.6.7 pyudev==0.22.0 networkx==2.3 requests==2.22.0 semantic_version==2.6.0
+            task: (cd developer_tools; make -f Makefile lint) && (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
+          - python-version: 3.7.9
+            dependencies: black==19.10b0 isort==4.3.21
+            task: (cd developer_tools; make fmt-travis) && (cd tests/client-dbus; make fmt-travis)
+          - python-version: 3.6.8
+            dependencies: pylint==2.4.4 dbus-client-gen==0.4 dbus-python-client-gen==0.7 psutil==5.4.3 pyudev==0.22.0 networkx==2.3 requests==2.20.0 semantic_version==2.6.0
+            task: (cd developer_tools; make -f Makefile lint) && (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python_version }}
+      - name: Install depdendencies
+        run: pip install ${{ matrix.dependencies }}
+      - name: Run test
+        run: ${{ matrix.dependencies }}
+
+  # VERIFICATION OF TEST INFRASTRUCTURE
+  yamllint:
+    env:
+      TASK: yamllint
+      PYTHON: 3.7.6
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ env.PYTHON }}
+      - name: Install dependencies
+        run: pip3 install yamllint==1.23.0
+      - name: Run yamllint
+        run: make -f Makefile $TASK

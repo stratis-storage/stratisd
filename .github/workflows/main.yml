@@ -176,7 +176,7 @@ jobs:
               (cd developer_tools;
               PATH=$GITHUB_WORKSPACE/.local/bin:$PATH make fmt-travis) &&
               (cd tests/client-dbus;
-              PATH=$GITHUB_WORKSPACE/.local/bin:$PATH make fmt-travis) &&
+              PATH=$GITHUB_WORKSPACE/.local/bin:$PATH make fmt-travis)
           # MANDATORY PYTHON CHECKS ON LOWEST SUPPORTED INTERPRETER
           - python-version: 3.6.8
             dependencies: >

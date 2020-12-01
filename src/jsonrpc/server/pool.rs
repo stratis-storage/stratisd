@@ -8,12 +8,15 @@ use tokio::sync::Mutex;
 
 use crate::{
     engine::{
-        BlockDevTier, CreateAction, DeleteAction, Engine, EngineAction, KeyDescription, Pool,
-        PoolUuid, RenameAction, UnlockMethod,
+        BlockDevTier, CreateAction, DeleteAction, Engine, EngineAction, KeyDescription, PoolUuid,
+        RenameAction, UnlockMethod,
     },
     jsonrpc::{
         interface::PoolListType,
-        server::key::{key_get_desc, key_set},
+        server::{
+            key::{key_get_desc, key_set},
+            utils::name_to_uuid_and_pool,
+        },
     },
     stratis::{StratisError, StratisResult},
 };
@@ -64,21 +67,6 @@ pub async fn pool_destroy(engine: Arc<Mutex<dyn Engine>>, name: &str) -> Stratis
         DeleteAction::Deleted(_) => true,
         DeleteAction::Identity => false,
     })
-}
-
-/// Convert a string representing the name of a pool to the UUID and stratisd
-/// data structure representing the pool state.
-fn name_to_uuid_and_pool<'a>(
-    engine: &'a mut dyn Engine,
-    name: &str,
-) -> Option<(PoolUuid, &'a mut dyn Pool)> {
-    let mut uuids_pools_for_name = engine
-        .pools_mut()
-        .into_iter()
-        .filter_map(|(n, u, p)| if &*n == name { Some((u, p)) } else { None })
-        .collect::<Vec<_>>();
-    assert!(uuids_pools_for_name.len() <= 1);
-    uuids_pools_for_name.pop()
 }
 
 // stratis-min pool init-cache

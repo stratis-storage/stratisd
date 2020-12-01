@@ -1,6 +1,7 @@
 #[macro_use]
 mod utils;
 
+mod filesystem;
 mod key;
 mod pool;
 mod report;

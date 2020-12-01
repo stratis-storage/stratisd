@@ -36,7 +36,7 @@ use crate::{
     jsonrpc::{
         consts::RPC_SOCKADDR,
         interface::{StratisParamType, StratisParams, StratisRet},
-        server::{key, pool, report, udev, utils::stratis_result_to_return},
+        server::{filesystem, key, pool, report, udev, utils::stratis_result_to_return},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -66,7 +66,11 @@ impl StratisParams {
                 ))
             }
             StratisParamType::PoolCreate(name, paths, key_desc_opt) => {
-                expects_fd!(self.fd_opt, PoolCreate, false, true);
+                if key_desc_opt.is_some() {
+                    expects_fd!(self.fd_opt, PoolCreate, false, true);
+                } else {
+                    expects_fd!(self.fd_opt, PoolCreate, false, false);
+                }
                 let path_ref: Vec<_> = paths.iter().map(|p| p.as_path()).collect();
                 StratisRet::PoolCreate(stratis_result_to_return(
                     pool::pool_create(engine, name.as_str(), path_ref.as_slice(), key_desc_opt)
@@ -134,6 +138,25 @@ impl StratisParams {
                     pool::pool_is_encrypted(engine, uuid).await,
                     false,
                 ))
+            }
+            StratisParamType::FsCreate(pool_name, fs_name) => {
+                expects_fd!(self.fd_opt, FsCreate, false, false);
+                StratisRet::FsCreate(stratis_result_to_return(
+                    filesystem::filesystem_create(engine, &pool_name, &fs_name).await,
+                    false,
+                ))
+            }
+            StratisParamType::FsList => {
+                if let Some(fd) = self.fd_opt {
+                    if let Err(e) = close(fd) {
+                        warn!(
+                            "Failed to close file descriptor {}: {}; a file \
+                            descriptor may have been leaked",
+                            fd, e,
+                        );
+                    }
+                }
+                StratisRet::FsList(filesystem::filesystem_list(engine).await)
             }
             StratisParamType::Report => {
                 if let Some(fd) = self.fd_opt {

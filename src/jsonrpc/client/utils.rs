@@ -63,9 +63,9 @@ macro_rules! do_request_standard {
     ($request:ident, $($arg:expr),+; $fd:expr) => {{
         let (changed, rc, rs) = $crate::do_request!($request, $($arg),+; $fd);
         if rc != 0 {
-            Err(StratisError::Error(rs))
+            Err($crate::stratis::StratisError::Error(rs))
         } else if !changed {
-            Err(StratisError::Error(
+            Err($crate::stratis::StratisError::Error(
                 "The requested action had no effect".to_string(),
             ))
         } else {
@@ -75,9 +75,9 @@ macro_rules! do_request_standard {
     ($request:ident, $($arg:expr ),+) => {{
         let (changed, rc, rs) = $crate::do_request!($request, $($arg),+);
         if rc != 0 {
-            Err(StratisError::Error(rs))
+            Err($crate::stratis::StratisError::Error(rs))
         } else if !changed {
-            Err(StratisError::Error(
+            Err($crate::stratis::StratisError::Error(
                 "The requested action had no effect".to_string(),
             ))
         } else {
@@ -87,9 +87,9 @@ macro_rules! do_request_standard {
     ($request:ident) => {{
         let (changed, rc, rs) = $crate::do_request!($request);
         if rc != 0 {
-            Err(StratisError::Error(rs))
+            Err($crate::stratis::StratisError::Error(rs))
         } else if !changed {
-            Err(StratisError::Error(
+            Err($crate::stratis::StratisError::Error(
                 "The requested action had no effect".to_string(),
             ))
         } else {
@@ -168,4 +168,30 @@ macro_rules! print_table {
             println!("{}", row);
         }
     }};
+}
+
+const SUFFIXES: &[(u64, &str)] = &[
+    (60, "EiB"),
+    (50, "PiB"),
+    (40, "TiB"),
+    (30, "GiB"),
+    (20, "MiB"),
+    (10, "KiB"),
+    (1, "B"),
+];
+
+#[allow(clippy::cast_precision_loss)]
+pub fn to_suffix_repr(size: u64) -> String {
+    SUFFIXES.iter().fold(String::new(), |acc, (div, suffix)| {
+        let div_shifted = 1 << div;
+        if acc.is_empty() && size / div_shifted >= 1 {
+            format!(
+                "{:.2} {}",
+                (size / div_shifted) as f64 + ((size % div_shifted) as f64 / div_shifted as f64),
+                suffix
+            )
+        } else {
+            acc
+        }
+    })
 }

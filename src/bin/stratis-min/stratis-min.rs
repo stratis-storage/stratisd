@@ -8,7 +8,7 @@ use clap::{App, Arg, ArgGroup, ArgMatches, SubCommand};
 
 use libstratis::{
     engine::{KeyDescription, PoolUuid},
-    jsonrpc::client::{key, pool, report, udev},
+    jsonrpc::client::{filesystem, key, pool, report, udev},
 };
 
 fn parse_args() -> App<'static, 'static> {
@@ -67,6 +67,9 @@ fn parse_args() -> App<'static, 'static> {
                 SubCommand::with_name("is-encrypted")
                     .arg(Arg::with_name("pool_uuid").required(true)),
             ]),
+            SubCommand::with_name("filesystem").subcommands(vec![SubCommand::with_name("create")
+                .arg(Arg::with_name("pool_name"))
+                .arg(Arg::with_name("fs_name"))]),
             SubCommand::with_name("report"),
             SubCommand::with_name("udev").arg(Arg::with_name("dm_name").required(true)),
         ])
@@ -145,6 +148,17 @@ fn main() -> Result<(), Box<dyn Error>> {
             Ok(())
         } else {
             pool::pool_list()?;
+            Ok(())
+        }
+    } else if let Some(subcommand) = args.subcommand_matches("filesystem") {
+        if let Some(args) = subcommand.subcommand_matches("create") {
+            filesystem::filesystem_create(
+                args.value_of("pool_name").expect("required").to_string(),
+                args.value_of("fs_name").expect("required").to_string(),
+            )?;
+            Ok(())
+        } else {
+            filesystem::filesystem_list()?;
             Ok(())
         }
     } else if let Some("report") = args.subcommand_name() {

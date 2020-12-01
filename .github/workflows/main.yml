@@ -145,11 +145,11 @@ jobs:
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
-  # MANDATORY PYTHON CHECKS ON LOWEST SUPPORTED INTERPRETER
   python-checks:
     strategy:
       matrix:
         include:
+          # MANDATORY PYTHON CHECKS ON RECOMMENDED DEVELOPMENT INTERPRETER
           - python-version: 3.7.9
             dependencies: >
               pylint==2.4.4
@@ -161,22 +161,14 @@ jobs:
               requests==2.22.0
               semantic_version==2.6.0
             task: >
-              # Path added in as workaround for executables not being found
-              # in Github Actions after being installed through pip
-              (cd developer_tools;
-              PATH=$GITHUB_WORKSPACE/.local/bin:$PATH make -f Makefile lint) &&
-              (cd tests/client-dbus;
-              PATH=$GITHUB_WORKSPACE/.local/bin:$PATH PYTHONPATH=./src
-              make -f Makefile lint)
+              (cd developer_tools; make -f Makefile lint) &&
+              (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
           - python-version: 3.7.9
             dependencies: black==19.10b0 isort==4.3.21
             task: >
-              # Path added in as workaround for executables not being found
-              # in Github Actions after being installed through pip
-              (cd developer_tools;
-              PATH=$GITHUB_WORKSPACE/.local/bin:$PATH make fmt-travis) &&
-              (cd tests/client-dbus;
-              PATH=$GITHUB_WORKSPACE/.local/bin:$PATH make fmt-travis) &&
+              (cd developer_tools; make fmt-travis) &&
+              (cd tests/client-dbus; make fmt-travis)
+          # MANDATORY PYTHON CHECKS ON LOWEST SUPPORTED INTERPRETER
           - python-version: 3.6.8
             dependencies: >
               pylint==2.4.4
@@ -188,24 +180,18 @@ jobs:
               requests==2.20.0
               semantic_version==2.6.0
             task: >
-              # Path added in as workaround for executables not being found
-              # in Github Actions after being installed through pip
-              (cd developer_tools;
-              PATH=$GITHUB_WORKSPACE/.local/bin:$PATH make -f Makefile lint) &&
-              (cd tests/client-dbus;
-              PATH=$GITHUB_WORKSPACE/.local/bin:$PATH PYTHONPATH=./src
-              make -f Makefile lint)
+              (cd developer_tools; make -f Makefile lint) &&
+              (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
         with:
-          python-version: ${{ matrix.python_version }}
+          python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
           sudo apt-get -q update
           sudo apt-get -y install libdbus-1-dev libudev-dev libdbus-glib-1-dev
-          pip3 install setuptools
           pip3 install ${{ matrix.dependencies }}
       - name: Run test
         run: ${{ matrix.task }}

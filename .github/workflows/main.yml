@@ -192,7 +192,6 @@ jobs:
         run: |
           sudo apt-get -q update
           sudo apt-get -y install libdbus-1-dev libudev-dev libdbus-glib-1-dev
-          pip3 install setuptools
           pip3 install ${{ matrix.dependencies }}
       - name: Run test
         run: ${{ matrix.task }}

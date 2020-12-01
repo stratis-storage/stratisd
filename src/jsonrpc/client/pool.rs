@@ -8,19 +8,10 @@ use nix::unistd::{pipe, write};
 
 use crate::{
     engine::{KeyDescription, PoolUuid},
+    jsonrpc::client::utils::to_suffix_repr,
     print_table,
     stratis::{StratisError, StratisResult},
 };
-
-const SUFFIXES: &[(u64, &str)] = &[
-    (60, "EiB"),
-    (50, "PiB"),
-    (40, "TiB"),
-    (30, "GiB"),
-    (20, "MiB"),
-    (10, "KiB"),
-    (1, "B"),
-];
 
 // stratis-min pool create
 pub fn pool_create(
@@ -69,22 +60,6 @@ pub fn pool_add_cache(name: String, paths: Vec<PathBuf>) -> StratisResult<()> {
 // stratis-min pool destroy
 pub fn pool_destroy(name: String) -> StratisResult<()> {
     do_request_standard!(PoolDestroy, name)
-}
-
-#[allow(clippy::cast_precision_loss)]
-fn to_suffix_repr(size: u64) -> String {
-    SUFFIXES.iter().fold(String::new(), |acc, (div, suffix)| {
-        let div_shifted = 1 << div;
-        if acc.is_empty() && size / div_shifted >= 1 {
-            format!(
-                "{:.2} {}",
-                (size / div_shifted) as f64 + ((size % div_shifted) as f64 / div_shifted as f64),
-                suffix
-            )
-        } else {
-            acc
-        }
-    })
 }
 
 fn size_string(sizes: Vec<(u64, Option<u64>)>) -> Vec<String> {

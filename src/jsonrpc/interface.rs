@@ -8,9 +8,20 @@ use std::{convert::TryFrom, error::Error, os::unix::io::RawFd, path::PathBuf};
 
 use serde_json::Value;
 
-use crate::engine::{KeyDescription, PoolUuid};
+use crate::engine::{FilesystemUuid, KeyDescription, PoolUuid};
 
 pub type PoolListType = (Vec<String>, Vec<(u64, Option<u64>)>, Vec<(bool, bool)>);
+// FIXME: 4th tuple argument (String) can be implemented as a new type struct wrapping
+// chrono::DateTime<Utc> as long as it implements serde::Serialize and
+// serde::Deserialize.
+pub type FsListType = (
+    Vec<String>,
+    Vec<String>,
+    Vec<Option<u64>>,
+    Vec<String>,
+    Vec<PathBuf>,
+    Vec<FilesystemUuid>,
+);
 
 pub struct JsonWithFd {
     pub json: Value,
@@ -31,6 +42,8 @@ pub enum StratisParamType {
     PoolUnlock(PoolUuid),
     PoolList,
     PoolIsEncrypted(PoolUuid),
+    FsCreate(String, String),
+    FsList,
     Report,
     Udev(String),
 }
@@ -65,6 +78,8 @@ pub enum StratisRet {
     PoolUnlock((bool, u16, String)),
     PoolList(PoolListType),
     PoolIsEncrypted((bool, u16, String)),
+    FsCreate((bool, u16, String)),
+    FsList(FsListType),
     Report(Value),
     Udev((Option<(String, String)>, u16, String)),
 }

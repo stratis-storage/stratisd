@@ -35,7 +35,6 @@ impl DevFlock {
         Ok(DevFlock(MaybeFile::File(file, dev_path.to_owned())))
     }
 
-    #[allow(dead_code)]
     pub fn new_from_fd(fd: RawFd, flag: DevFlockFlags) -> StratisResult<DevFlock> {
         DevFlock::flock(fd, flag)?;
         Ok(DevFlock(MaybeFile::Fd(fd)))

@@ -2,13 +2,17 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::io::{Read, Seek};
+use std::{
+    io::{Read, Seek},
+    os::unix::io::AsRawFd,
+};
 
 use chrono::{DateTime, Utc};
 
 use crate::{
     engine::{
         strat_engine::{
+            flock::{DevFlock, DevFlockFlags},
             metadata::{
                 mda,
                 sizes::{BDAExtendedSize, BlockdevSize, MDADataSize, STATIC_HEADER_SIZE},
@@ -30,6 +34,27 @@ pub struct BDA {
 impl BDA {
     /// Initialize a blockdev with a Stratis BDA.
     pub fn initialize<F>(
+        f: &mut F,
+        identifiers: StratisIdentifiers,
+        mda_data_size: MDADataSize,
+        blkdev_size: BlockdevSize,
+        initialization_time: u64,
+    ) -> StratisResult<BDA>
+    where
+        F: AsRawFd + Seek + SyncAll,
+    {
+        #[allow(unused_variables)]
+        let flock = DevFlock::new_from_fd(f.as_raw_fd(), DevFlockFlags::Exclusive)?;
+        BDA::initialize_impl(
+            f,
+            identifiers,
+            mda_data_size,
+            blkdev_size,
+            initialization_time,
+        )
+    }
+
+    fn initialize_impl<F>(
         f: &mut F,
         identifiers: StratisIdentifiers,
         mda_data_size: MDADataSize,
@@ -157,7 +182,7 @@ mod tests {
         fn empty_bda(ref sh in static_header_strategy()) {
             let buf_size = convert_test!(*sh.mda_size.bda_size().sectors().bytes(), u128, usize);
             let mut buf = Cursor::new(vec![0; buf_size]);
-            let bda = BDA::initialize(
+            let bda = BDA::initialize_impl(
                 &mut buf,
                 sh.identifiers,
                 sh.mda_size.region_size().data_size(),
@@ -185,7 +210,7 @@ mod tests {
                 usize
             )
         ]);
-        let mut bda = BDA::initialize(
+        let mut bda = BDA::initialize_impl(
             &mut buf,
             sh.identifiers,
             sh.mda_size.region_size().data_size(),
@@ -236,7 +261,7 @@ mod tests {
         ) {
             let buf_size = convert_test!(*sh.mda_size.bda_size().sectors().bytes(), u128, usize);
             let mut buf = Cursor::new(vec![0; buf_size]);
-            let mut bda = BDA::initialize(
+            let mut bda = BDA::initialize_impl(
                 &mut buf,
                 sh.identifiers,
                 sh.mda_size.region_size().data_size(),

@@ -87,6 +87,7 @@ pub enum Redundancy {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[allow(clippy::rc_buffer)]
 pub struct Name(Rc<String>);
 
 impl Name {

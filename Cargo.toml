@@ -1,6 +1,6 @@
 [package]
 name = "libstratis"
-version = "2.2.1"
+version = "2.3.0"
 authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.com>"]
 edition = "2018"
 build = "build.rs"
@@ -45,6 +45,8 @@ libcryptsetup-rs = "0.4"
 semver = "0.11"
 termios = "0.3"
 regex = "1"
+base64 = "0.13"
+sha-1 = "0.9"
 
 [dependencies.dbus]
 version = "0.8"
@@ -52,7 +54,7 @@ optional = true
 
 [dependencies.libdbus-sys]
 version = "0.2"
-optional=true
+optional = true
 
 [dependencies.uuid]
 version = "0.8"
@@ -62,7 +64,7 @@ features = ["serde", "v4"]
 pkg-config = "0.3"
 
 [dev-dependencies]
-error-chain = "0.12"
+error-chain = "0.12.2"
 loopdev = "0.2"
 either = "1"
 proptest = "0.10"

@@ -17,13 +17,15 @@ use crate::{
             cmd::verify_binaries,
             devlinks,
             dm::{get_dm, get_dm_init},
-            keys::StratKeyActions,
+            keys::{MemoryFilesystem, StratKeyActions},
             liminal::{find_all, LiminalDevices},
-            names::KeyDescription,
             pool::StratPool,
         },
         structures::Table,
-        types::{CreateAction, DeleteAction, DevUuid, RenameAction, ReportType, SetUnlockAction},
+        types::{
+            CreateAction, DeleteAction, DevUuid, EncryptionInfo, KeyDescription, RenameAction,
+            ReportType, SetUnlockAction, UnlockMethod,
+        },
         Engine, EngineEvent, Name, Pool, PoolUuid, Report,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -45,6 +47,12 @@ pub struct StratEngine {
 
     // Handler for key operations
     key_handler: StratKeyActions,
+
+    // TODO: Remove this code when Clevis supports reading keys from the
+    // kernel keyring.
+    // In memory filesystem for passing keys to Clevis.
+    // See GitHub issue: https://github.com/stratis-storage/project/issues/212.
+    key_fs: MemoryFilesystem,
 }
 
 impl StratEngine {
@@ -80,6 +88,7 @@ impl StratEngine {
             liminal_devices,
             watched_dev_last_event_nrs: HashMap::new(),
             key_handler: StratKeyActions,
+            key_fs: MemoryFilesystem::new()?,
         })
     }
 
@@ -262,8 +271,14 @@ impl Engine for StratEngine {
         }
     }
 
-    fn unlock_pool(&mut self, pool_uuid: PoolUuid) -> StratisResult<SetUnlockAction<DevUuid>> {
-        let unlocked = self.liminal_devices.unlock_pool(&self.pools, pool_uuid)?;
+    fn unlock_pool(
+        &mut self,
+        pool_uuid: PoolUuid,
+        unlock_method: UnlockMethod,
+    ) -> StratisResult<SetUnlockAction<DevUuid>> {
+        let unlocked = self
+            .liminal_devices
+            .unlock_pool(&self.pools, pool_uuid, unlock_method)?;
         Ok(SetUnlockAction::new(unlocked))
     }
 
@@ -275,7 +290,7 @@ impl Engine for StratEngine {
         get_mut_pool!(self; uuid)
     }
 
-    fn locked_pools(&self) -> HashMap<PoolUuid, KeyDescription> {
+    fn locked_pools(&self) -> HashMap<PoolUuid, EncryptionInfo> {
         self.liminal_devices.locked_pools()
     }
 

@@ -218,10 +218,10 @@ pub fn get_blockdevs(
         // conclusion is metadata corruption.
         let segments = segment_table.get(&dev_uuid);
 
-        let (path, key_description) = match &info.luks {
+        let (path, encryption_info) = match &info.luks {
             Some(luks) => (
                 BlockDevPath::mapped_device_path(&luks.ids.devnode, &info.ids.devnode)?,
-                Some(&luks.key_description),
+                Some(&luks.encryption_info),
             ),
             None => (BlockDevPath::physical_device_path(&info.ids.devnode), None),
         };
@@ -235,7 +235,7 @@ pub fn get_blockdevs(
                 segments.unwrap_or(&vec![]),
                 bd_save.user_info.clone(),
                 bd_save.hardware_info.clone(),
-                key_description,
+                encryption_info.cloned(),
             )?,
         ))
     }

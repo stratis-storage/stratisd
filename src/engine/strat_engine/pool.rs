@@ -22,8 +22,9 @@ use crate::{
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
         types::{
-            BlockDevTier, CreateAction, DevUuid, FilesystemUuid, MaybeDbusPath, Name, PoolUuid,
-            Redundancy, RenameAction, SetCreateAction, SetDeleteAction,
+            BlockDevTier, CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid,
+            MaybeDbusPath, Name, PoolUuid, Redundancy, RenameAction, SetCreateAction,
+            SetDeleteAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -202,18 +203,11 @@ impl StratPool {
         cachedevs: Vec<StratBlockDev>,
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
-        key_description: Option<&KeyDescription>,
     ) -> StratisResult<(Name, StratPool)> {
         check_metadata(metadata)?;
 
-        let mut backstore = Backstore::setup(
-            uuid,
-            &metadata.backstore,
-            datadevs,
-            cachedevs,
-            timestamp,
-            key_description,
-        )?;
+        let mut backstore =
+            Backstore::setup(uuid, &metadata.backstore, datadevs, cachedevs, timestamp)?;
         let mut thinpool = ThinPool::setup(
             uuid,
             &metadata.thinpool_dev,
@@ -376,6 +370,24 @@ impl Pool for StratPool {
                     .into_iter()
                     .map(|(_, bd)| bd.devnode().physical_path().to_owned()),
             )
+        }
+    }
+
+    fn bind_clevis(&mut self, pin: String, clevis_info: Value) -> StratisResult<CreateAction<()>> {
+        let changed = self.backstore.bind_clevis(pin, clevis_info)?;
+        if changed {
+            Ok(CreateAction::Created(()))
+        } else {
+            Ok(CreateAction::Identity)
+        }
+    }
+
+    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<()>> {
+        let changed = self.backstore.unbind_clevis()?;
+        if changed {
+            Ok(DeleteAction::Deleted(()))
+        } else {
+            Ok(DeleteAction::Identity)
         }
     }
 
@@ -608,8 +620,8 @@ impl Pool for StratPool {
         self.datadevs_encrypted()
     }
 
-    fn key_desc(&self) -> Option<&KeyDescription> {
-        self.backstore.data_key_desc()
+    fn encryption_info(&self) -> Option<&EncryptionInfo> {
+        self.backstore.data_tier_encryption_info()
     }
 }
 

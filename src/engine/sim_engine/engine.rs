@@ -3,11 +3,9 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    cell::RefCell,
     collections::{hash_map::RandomState, HashMap, HashSet},
     iter::FromIterator,
     path::Path,
-    rc::Rc,
 };
 
 use serde_json::{json, Value};
@@ -17,7 +15,7 @@ use crate::{
         engine::{Engine, Eventable, KeyActions, Pool, Report},
         event::get_engine_listener_list,
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
-        sim_engine::{keys::SimKeyActions, pool::SimPool, randomization::Randomizer},
+        sim_engine::{keys::SimKeyActions, pool::SimPool},
         structures::Table,
         types::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, KeyDescription, Name, PoolUuid,
@@ -31,7 +29,6 @@ use crate::{
 #[derive(Debug, Default)]
 pub struct SimEngine {
     pools: Table<SimPool>,
-    rdm: Rc<RefCell<Randomizer>>,
     key_handler: SimKeyActions,
 }
 
@@ -113,7 +110,6 @@ impl Engine for SimEngine {
                     let devices = device_set.into_iter().cloned().collect::<Vec<&Path>>();
 
                     let (pool_uuid, pool) = SimPool::new(
-                        &Rc::clone(&self.rdm),
                         &devices,
                         redundancy,
                         key_desc.map(|kd| EncryptionInfo {
@@ -121,10 +117,6 @@ impl Engine for SimEngine {
                             clevis_info: None,
                         }),
                     );
-
-                    if self.rdm.borrow_mut().throw_die() {
-                        return Err(StratisError::Engine(ErrorEnum::Error, "X".into()));
-                    }
 
                     self.pools
                         .insert(Name::new(name.to_owned()), pool_uuid, pool);
@@ -202,8 +194,7 @@ impl Engine for SimEngine {
     }
 
     /// Set properties of the simulator
-    fn configure_simulator(&mut self, denominator: u32) -> StratisResult<()> {
-        self.rdm.borrow_mut().set_probability(denominator);
+    fn configure_simulator(&mut self, _denominator: u32) -> StratisResult<()> {
         Ok(())
     }
 

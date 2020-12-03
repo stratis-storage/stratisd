@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{cell::RefCell, path::Path, rc::Rc};
+use std::path::Path;
 
 use chrono::{DateTime, TimeZone, Utc};
 use serde_json::{Map, Value};
@@ -12,7 +12,6 @@ use devicemapper::{Bytes, Sectors, IEC};
 
 use crate::engine::{
     engine::BlockDev,
-    sim_engine::randomization::Randomizer,
     types::{BlockDevPath, EncryptionInfo, MaybeDbusPath},
 };
 
@@ -20,7 +19,6 @@ use crate::engine::{
 /// A simulated device.
 pub struct SimDev {
     devnode: BlockDevPath,
-    rdm: Rc<RefCell<Randomizer>>,
     user_info: Option<String>,
     hardware_info: Option<String>,
     initialization_time: u64,
@@ -71,16 +69,11 @@ impl BlockDev for SimDev {
 
 impl SimDev {
     /// Generates a new device from any devnode.
-    pub fn new(
-        rdm: Rc<RefCell<Randomizer>>,
-        devnode: &Path,
-        encryption_info: Option<&EncryptionInfo>,
-    ) -> (Uuid, SimDev) {
+    pub fn new(devnode: &Path, encryption_info: Option<&EncryptionInfo>) -> (Uuid, SimDev) {
         (
             Uuid::new_v4(),
             SimDev {
                 devnode: BlockDevPath::physical_device_path(devnode),
-                rdm,
                 user_info: None,
                 hardware_info: None,
                 initialization_time: Utc::now().timestamp() as u64,

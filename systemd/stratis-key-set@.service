@@ -1,0 +1,9 @@
+[Unit]
+Description=Set stratis key
+Documentation=man:stratisd(8)
+DefaultDependencies=no
+After=sysinit.target
+
+[Service]
+ExecStart=/usr/lib/systemd/stratis-key-set %i
+Type=oneshot

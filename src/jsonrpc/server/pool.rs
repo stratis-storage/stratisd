@@ -24,19 +24,36 @@ use crate::{
 // stratis-min pool unlock
 pub async fn pool_unlock(
     engine: Arc<Mutex<dyn Engine>>,
-    pool_uuid: PoolUuid,
+    pool_uuid: Option<PoolUuid>,
     prompt: Option<RawFd>,
 ) -> StratisResult<bool> {
-    if let (Some(fd), Some(kd)) = (prompt, key_get_desc(Arc::clone(&engine), pool_uuid).await) {
-        key_set(Arc::clone(&engine), &kd, fd).await?;
+    if let Some(uuid) = pool_uuid {
+        if let (Some(fd), Some(kd)) = (prompt, key_get_desc(Arc::clone(&engine), uuid).await) {
+            key_set(Arc::clone(&engine), &kd, fd).await?;
+        }
     }
 
-    Ok(engine
-        .lock()
-        .await
-        .unlock_pool(pool_uuid, UnlockMethod::Keyring)?
-        .changed()
-        .is_some())
+    let mut lock = engine.lock().await;
+    match pool_uuid {
+        Some(u) => Ok(lock
+            .unlock_pool(u, UnlockMethod::Keyring)?
+            .changed()
+            .is_some()),
+        None => {
+            let changed = lock
+                .locked_pools()
+                .into_iter()
+                .fold(false, |acc, (uuid, _)| {
+                    let res = lock.unlock_pool(uuid, UnlockMethod::Keyring);
+                    if let Ok(ok) = res {
+                        acc || ok.is_changed()
+                    } else {
+                        acc
+                    }
+                });
+            Ok(changed)
+        }
+    }
 }
 
 // stratis-min pool create

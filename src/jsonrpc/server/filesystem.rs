@@ -8,7 +8,7 @@ use chrono::SecondsFormat;
 use tokio::sync::Mutex;
 
 use crate::{
-    engine::{Engine, EngineAction},
+    engine::{Engine, EngineAction, Name},
     jsonrpc::{interface::FsListType, server::utils::name_to_uuid_and_pool},
     stratis::{StratisError, StratisResult},
 };
@@ -52,4 +52,37 @@ pub async fn filesystem_list(engine: Arc<Mutex<dyn Engine>>) -> FsListType {
             acc
         },
     )
+}
+
+// stratis-min filesystem destroy
+pub async fn filesystem_destroy(
+    engine: Arc<Mutex<dyn Engine>>,
+    pool_name: &str,
+    fs_name: &str,
+) -> StratisResult<bool> {
+    let mut lock = engine.lock().await;
+    let (_, pool) = name_to_uuid_and_pool(&mut *lock, pool_name)
+        .ok_or_else(|| StratisError::Error(format!("No pool named {} found", pool_name)))?;
+    let (uuid, _) = pool
+        .get_filesystem_by_name(&Name::new(fs_name.to_string()))
+        .ok_or_else(|| StratisError::Error(format!("No filesystem named {} found", fs_name)))?;
+    Ok(pool.destroy_filesystems(pool_name, &[uuid])?.is_changed())
+}
+
+// stratis-min filesystem rename
+pub async fn filesystem_rename(
+    engine: Arc<Mutex<dyn Engine>>,
+    pool_name: &str,
+    fs_name: &str,
+    new_fs_name: &str,
+) -> StratisResult<bool> {
+    let mut lock = engine.lock().await;
+    let (_, pool) = name_to_uuid_and_pool(&mut *lock, pool_name)
+        .ok_or_else(|| StratisError::Error(format!("No pool named {} found", pool_name)))?;
+    let (uuid, _) = pool
+        .get_filesystem_by_name(&Name::new(fs_name.to_string()))
+        .ok_or_else(|| StratisError::Error(format!("No filesystem named {} found", fs_name)))?;
+    Ok(pool
+        .rename_filesystem(pool_name, uuid, new_fs_name)?
+        .is_changed())
 }

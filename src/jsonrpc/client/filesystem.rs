@@ -35,3 +35,17 @@ pub fn filesystem_list() -> StratisResult<()> {
     );
     Ok(())
 }
+
+// stratis-min filesystem destroy
+pub fn filesystem_destroy(pool_name: String, filesystem_name: String) -> StratisResult<()> {
+    do_request_standard!(FsDestroy, pool_name, filesystem_name)
+}
+
+// stratis-min filesystem rename
+pub fn filesystem_rename(
+    pool_name: String,
+    filesystem_name: String,
+    new_filesystem_name: String,
+) -> StratisResult<()> {
+    do_request_standard!(FsRename, pool_name, filesystem_name, new_filesystem_name)
+}

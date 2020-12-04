@@ -44,8 +44,13 @@ fn parse_args() -> App<'static, 'static> {
             ]),
             SubCommand::with_name("pool").subcommands(vec![
                 SubCommand::with_name("unlock")
-                    .arg(Arg::with_name("pool_uuid").required(true))
-                    .arg(Arg::with_name("prompt").long("--prompt").takes_value(false)),
+                    .arg(Arg::with_name("pool_uuid").required(false))
+                    .arg(
+                        Arg::with_name("prompt")
+                            .long("--prompt")
+                            .takes_value(false)
+                            .requires("pool_uuid"),
+                    ),
                 SubCommand::with_name("create")
                     .arg(Arg::with_name("name").required(true))
                     .arg(Arg::with_name("blockdevs").multiple(true).required(true))
@@ -67,9 +72,18 @@ fn parse_args() -> App<'static, 'static> {
                 SubCommand::with_name("is-encrypted")
                     .arg(Arg::with_name("pool_uuid").required(true)),
             ]),
-            SubCommand::with_name("filesystem").subcommands(vec![SubCommand::with_name("create")
-                .arg(Arg::with_name("pool_name"))
-                .arg(Arg::with_name("fs_name"))]),
+            SubCommand::with_name("filesystem").subcommands(vec![
+                SubCommand::with_name("create")
+                    .arg(Arg::with_name("pool_name").required(true))
+                    .arg(Arg::with_name("fs_name").required(true)),
+                SubCommand::with_name("destroy")
+                    .arg(Arg::with_name("pool_name").required(true))
+                    .arg(Arg::with_name("fs_name").required(true)),
+                SubCommand::with_name("rename")
+                    .arg(Arg::with_name("pool_name").required(true))
+                    .arg(Arg::with_name("fs_name").required(true))
+                    .arg(Arg::with_name("new_fs_name").required(true)),
+            ]),
             SubCommand::with_name("report"),
             SubCommand::with_name("udev").arg(Arg::with_name("dm_name").required(true)),
         ])
@@ -106,7 +120,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     } else if let Some(subcommand) = args.subcommand_matches("pool") {
         if let Some(args) = subcommand.subcommand_matches("unlock") {
-            let uuid = PoolUuid::parse_str(args.value_of("pool_uuid").expect("required"))?;
+            let uuid = match args.value_of("pool_uuid") {
+                Some(u) => Some(PoolUuid::parse_str(u)?),
+                None => None,
+            };
             pool::pool_unlock(uuid, args.is_present("prompt"))?;
             Ok(())
         } else if let Some(args) = subcommand.subcommand_matches("create") {
@@ -155,6 +172,19 @@ fn main() -> Result<(), Box<dyn Error>> {
             filesystem::filesystem_create(
                 args.value_of("pool_name").expect("required").to_string(),
                 args.value_of("fs_name").expect("required").to_string(),
+            )?;
+            Ok(())
+        } else if let Some(args) = subcommand.subcommand_matches("destroy") {
+            filesystem::filesystem_destroy(
+                args.value_of("pool_name").expect("required").to_string(),
+                args.value_of("fs_name").expect("required").to_string(),
+            )?;
+            Ok(())
+        } else if let Some(args) = subcommand.subcommand_matches("rename") {
+            filesystem::filesystem_rename(
+                args.value_of("pool_name").expect("required").to_string(),
+                args.value_of("fs_name").expect("required").to_string(),
+                args.value_of("new_fs_name").expect("required").to_string(),
             )?;
             Ok(())
         } else {

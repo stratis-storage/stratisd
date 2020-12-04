@@ -1,0 +1,11 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+	echo "Requires key description to set as argument"
+	exit 1
+fi
+
+KEYDESC=$1
+
+systemd-ask-password | stratis-min key set --capture-key $KEYDESC
+stratis-min pool unlock

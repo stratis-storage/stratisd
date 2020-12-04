@@ -23,7 +23,7 @@ pub fn pool_create(
 }
 
 // stratis-min pool unlock
-pub fn pool_unlock(uuid: PoolUuid, prompt: bool) -> StratisResult<()> {
+pub fn pool_unlock(uuid: Option<PoolUuid>, prompt: bool) -> StratisResult<()> {
     if prompt {
         do_request_standard!(PoolUnlock, uuid; {
             let password =

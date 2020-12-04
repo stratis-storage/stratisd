@@ -229,6 +229,15 @@ pub trait Pool: Debug {
     /// Get the mutable filesystem in this pool with this UUID.
     fn get_mut_filesystem(&mut self, uuid: FilesystemUuid) -> Option<(Name, &mut dyn Filesystem)>;
 
+    /// Get the filesystem in this pool with this name.
+    fn get_filesystem_by_name(&self, name: &Name) -> Option<(FilesystemUuid, &dyn Filesystem)>;
+
+    /// Get the mutable filesystem in this pool with this name.
+    fn get_mut_filesystem_by_name(
+        &mut self,
+        name: &Name,
+    ) -> Option<(FilesystemUuid, &mut dyn Filesystem)>;
+
     /// Get _all_ the blockdevs that belong to this pool.
     /// All really means all. For example, it does not exclude cache blockdevs.
     fn blockdevs(&self) -> Vec<(Uuid, BlockDevTier, &dyn BlockDev)>;

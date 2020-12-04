@@ -158,6 +158,20 @@ impl StratisParams {
                 }
                 StratisRet::FsList(filesystem::filesystem_list(engine).await)
             }
+            StratisParamType::FsDestroy(pool_name, fs_name) => {
+                expects_fd!(self.fd_opt, FsDestroy, false, false);
+                StratisRet::FsDestroy(stratis_result_to_return(
+                    filesystem::filesystem_destroy(engine, &pool_name, &fs_name).await,
+                    false,
+                ))
+            }
+            StratisParamType::FsRename(pool_name, fs_name, new_fs_name) => {
+                expects_fd!(self.fd_opt, FsRename, false, false);
+                StratisRet::FsRename(stratis_result_to_return(
+                    filesystem::filesystem_rename(engine, &pool_name, &fs_name, &new_fs_name).await,
+                    false,
+                ))
+            }
             StratisParamType::Report => {
                 if let Some(fd) = self.fd_opt {
                     if let Err(e) = close(fd) {

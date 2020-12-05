@@ -2,6 +2,7 @@
 Description=Stratis daemon
 Documentation=man:stratisd(8)
 DefaultDependencies=no
+Conflicts=stratisd-min-postinitrd.service
 
 [Service]
 BusName=org.storage.stratis2

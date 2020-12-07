@@ -7,4 +7,4 @@ fi
 
 POOL_UUID=$1
 
-systemd-ask-password | stratis-min pool unlock --prompt $POOL_UUID
+systemd-ask-password "Enter password for pool with pool UUID $POOL_UUID" | stratis-min pool unlock --prompt $POOL_UUID

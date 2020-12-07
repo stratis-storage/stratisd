@@ -1,12 +1,12 @@
 ACTION=="add|change",
 	ENV{DM_NAME}=="stratis-1-[0-9a-f]*-thin-fs-[0-9a-f]*",
-	PROGRAM+="systemctl is-active stratisd-min-postinitrd.service"
-	RESULT=="active"
+	PROGRAM+="systemctl is-active stratisd-min-postinitrd.service",
+	RESULT=="active",
 	IMPORT{program}="/usr/bin/stratis-min udev $env{DM_NAME}",
 	SYMLINK+="$env{STRATIS_SYMLINK}"
 ACTION=="add|change",
 	ENV{DM_NAME}=="stratis-1-[0-9a-f]*-thin-fs-[0-9a-f]*",
-	PROGRAM+="systemctl is-active stratisd.service"
-	RESULT=="active"
+	PROGRAM+="systemctl is-active stratisd.service",
+	RESULT=="active",
 	IMPORT{program}="stratis_uuids_to_names $env{DM_NAME}",
 	SYMLINK+="$env{STRATIS_SYMLINK}"

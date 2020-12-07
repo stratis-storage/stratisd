@@ -77,6 +77,10 @@ optional = true
 version = "5"
 optional = true
 
+[dependencies.systemd]
+version = "0.8"
+optional = true
+
 [dependencies.uuid]
 version = "0.8"
 features = ["serde", "v4"]
@@ -96,3 +100,4 @@ default = ["dbus_enabled"]
 dbus_enabled = ["dbus", "libdbus-sys"]
 extras = []
 min = ["rpassword"]
+systemd_notify = ["systemd"]

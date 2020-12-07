@@ -201,10 +201,13 @@ impl StratisServer {
     where
         P: AsRef<Path>,
     {
-        Ok(StratisServer {
+        let server = StratisServer {
             engine,
             listener: StratisUnixListener::bind(path)?,
-        })
+        };
+        #[cfg(feature = "systemd_notify")]
+        systemd::daemon::notify(false, [("READY", "1")].iter())?;
+        Ok(server)
     }
 
     async fn handle_request(&mut self) -> StratisResult<Option<()>> {

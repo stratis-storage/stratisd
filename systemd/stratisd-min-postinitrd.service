@@ -4,6 +4,7 @@ Documentation=man:stratisd(8)
 DefaultDependencies=no
 
 [Service]
+Type=notify
 Environment="RUST_BACKTRACE=1"
 ExecStartPre=-mkdir -p /run/cryptsetup
 ExecStart=/usr/libexec/stratisd-min --log-level debug

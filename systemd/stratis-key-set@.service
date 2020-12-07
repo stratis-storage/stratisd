@@ -2,7 +2,8 @@
 Description=Set stratis key
 Documentation=man:stratisd(8)
 DefaultDependencies=no
-After=sysinit.target
+Requires=stratisd-min-postinitrd.service
+After=stratisd-min-postinitrd.service
 
 [Service]
 ExecStart=/usr/lib/systemd/stratis-key-set %i

@@ -34,7 +34,15 @@ const STRAT_MAGIC: &[u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 
 const STRAT_SIGBLOCK_VERSION: u8 = 1;
 
-pub type ReadResult = StratisResult<StratisResult<Option<StaticHeader>>>;
+/// Data structure to hold results of reading and parsing a signature buffer.
+/// Invariant: bytes is Err <-> header == None, because if there was an error
+/// reading the data then there is no point in parsing.
+pub struct StaticHeaderResult {
+    /// The bytes read
+    bytes: StratisResult<[u8; bytes!(static_header_size::SIGBLOCK_SECTORS)]>,
+    /// The header parsed from the bytes
+    header: Option<StratisResult<Option<StaticHeader>>>,
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum MetadataLocation {
@@ -212,19 +220,33 @@ impl StaticHeader {
         BDAExtendedSize::new(self.mda_size.bda_size().sectors() + self.reserved_size.sectors())
     }
 
-    pub fn read_sigblocks<F>(f: &mut F) -> (ReadResult, ReadResult)
+    pub fn read_sigblocks<F>(f: &mut F) -> (StaticHeaderResult, StaticHeaderResult)
     where
         F: Read + Seek,
     {
         let (maybe_buf_1, maybe_buf_2) = StaticHeader::read(f);
 
         (
-            maybe_buf_1
-                .map(|buf| StaticHeader::sigblock_from_buf(&buf))
-                .map_err(StratisError::from),
-            maybe_buf_2
-                .map(|buf| StaticHeader::sigblock_from_buf(&buf))
-                .map_err(StratisError::from),
+            match maybe_buf_1 {
+                Ok(buf) => StaticHeaderResult {
+                    bytes: Ok(buf),
+                    header: Some(StaticHeader::sigblock_from_buf(&buf)),
+                },
+                Err(err) => StaticHeaderResult {
+                    bytes: Err(err.into()),
+                    header: None,
+                },
+            },
+            match maybe_buf_2 {
+                Ok(buf) => StaticHeaderResult {
+                    bytes: Ok(buf),
+                    header: Some(StaticHeader::sigblock_from_buf(&buf)),
+                },
+                Err(err) => StaticHeaderResult {
+                    bytes: Err(err.into()),
+                    header: None,
+                },
+            },
         )
     }
 
@@ -241,7 +263,7 @@ impl StaticHeader {
     /// unreadable, or stale signature block failed.
     pub fn repair_sigblocks<F>(
         f: &mut F,
-        read_results: (ReadResult, ReadResult),
+        read_results: (StaticHeaderResult, StaticHeaderResult),
     ) -> StratisResult<Option<StaticHeader>>
     where
         F: Read + Seek + SyncAll,
@@ -365,7 +387,16 @@ impl StaticHeader {
         }
 
         match read_results {
-            (Ok(buf_loc_1), Ok(buf_loc_2)) => match (buf_loc_1, buf_loc_2) {
+            (
+                StaticHeaderResult {
+                    header: Some(maybe_sh_1),
+                    bytes: Ok(_),
+                },
+                StaticHeaderResult {
+                    header: Some(maybe_sh_2),
+                    bytes: Ok(_),
+                },
+            ) => match (maybe_sh_1, maybe_sh_2) {
                 (Ok(loc_1), Ok(loc_2)) => ok_ok_static_header_handling(f, loc_1, loc_2),
                 (Ok(loc_1), Err(loc_2)) => {
                     ok_err_static_header_handling(f, loc_1, loc_2, MetadataLocation::Second)
@@ -378,12 +409,40 @@ impl StaticHeader {
                     Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
                 }
             },
-            (Ok(buf_loc_1), Err(_)) => copy_ok_err_handling(f, buf_loc_1, MetadataLocation::Second),
-            (Err(_), Ok(buf_loc_2)) => copy_ok_err_handling(f, buf_loc_2, MetadataLocation::First),
-            (Err(_), Err(_)) => {
+            (
+                StaticHeaderResult {
+                    header: Some(maybe_sh_1),
+                    bytes: Ok(_),
+                },
+                StaticHeaderResult {
+                    header: None,
+                    bytes: Err(_),
+                },
+            ) => copy_ok_err_handling(f, maybe_sh_1, MetadataLocation::Second),
+            (
+                StaticHeaderResult {
+                    header: None,
+                    bytes: Err(_),
+                },
+                StaticHeaderResult {
+                    header: Some(maybe_sh_2),
+                    bytes: Ok(_),
+                },
+            ) => copy_ok_err_handling(f, maybe_sh_2, MetadataLocation::First),
+            (
+                StaticHeaderResult {
+                    header: None,
+                    bytes: Err(_),
+                },
+                StaticHeaderResult {
+                    header: None,
+                    bytes: Err(_),
+                },
+            ) => {
                 let err_str = "Unable to read data at sigblock locations.";
                 Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
             }
+            (_, _) => unreachable!("header == None <-> bytes is Err(_)"),
         }
     }
 
@@ -502,19 +561,19 @@ pub mod tests {
             let buf_size = bytes!(static_header_size::STATIC_HEADER_SECTORS);
             let mut buf = Cursor::new(vec![0; buf_size]);
             let (s1, s2) =  StaticHeader::read_sigblocks(&mut buf);
-            prop_assert_eq!(s1.unwrap().unwrap(), None);
-            prop_assert_eq!(s2.unwrap().unwrap(), None);
+            prop_assert_eq!(s1.header.unwrap().unwrap(), None);
+            prop_assert_eq!(s2.header.unwrap().unwrap(), None);
 
             sh.write(&mut buf, MetadataLocation::Both).unwrap();
 
             let (s1, s2) = StaticHeader::read_sigblocks(&mut buf);
-            prop_assert!(s1.unwrap().unwrap().map(|new_sh| new_sh.identifiers == sh.identifiers).unwrap_or(false));
-            prop_assert!(s2.unwrap().unwrap().map(|new_sh| new_sh.identifiers == sh.identifiers).unwrap_or(false));
+            prop_assert!(s1.header.unwrap().unwrap().map(|new_sh| new_sh.identifiers == sh.identifiers).unwrap_or(false));
+            prop_assert!(s2.header.unwrap().unwrap().map(|new_sh| new_sh.identifiers == sh.identifiers).unwrap_or(false));
 
             StaticHeader::wipe(&mut buf).unwrap();
             let (s1, s2) =  StaticHeader::read_sigblocks(&mut buf);
-            prop_assert_eq!(s1.unwrap().unwrap(), None);
-            prop_assert_eq!(s2.unwrap().unwrap(), None);
+            prop_assert_eq!(s1.header.unwrap().unwrap(), None);
+            prop_assert_eq!(s2.header.unwrap().unwrap(), None);
 
 
         }

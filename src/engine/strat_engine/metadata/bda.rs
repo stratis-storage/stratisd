@@ -56,16 +56,10 @@ impl BDA {
 
     /// Load a BDA on initial setup of a device.
     /// Returns None if no BDA appears to exist.
-    pub fn load<F>(f: &mut F) -> StratisResult<Option<BDA>>
+    pub fn load<F>(header: StratisResult<Option<StaticHeader>>, f: &mut F) -> StratisResult<Option<BDA>>
     where
         F: Read + Seek + SyncAll,
     {
-        let read_results = StaticHeader::read_sigblocks(f);
-        let header = match StaticHeader::repair_sigblocks(f, read_results)? {
-            Some(header) => header,
-            None => return Ok(None),
-        };
-
         // Assume that, since a valid StaticHeader was found on the device,
         // that this implies that BDA::initialize() was succesfully executed
         // sometime in the past. Since that is the case, valid MDA headers

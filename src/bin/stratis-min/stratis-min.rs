@@ -7,7 +7,7 @@ use std::{convert::TryFrom, error::Error, path::PathBuf};
 use clap::{App, Arg, ArgGroup, ArgMatches, SubCommand};
 
 use libstratis::{
-    engine::{KeyDescription, PoolUuid},
+    engine::{KeyDescription, PoolUuid, UnlockMethod},
     jsonrpc::client::{filesystem, key, pool, report, udev},
 };
 
@@ -44,6 +44,7 @@ fn parse_args() -> App<'static, 'static> {
             ]),
             SubCommand::with_name("pool").subcommands(vec![
                 SubCommand::with_name("unlock")
+                    .arg(Arg::with_name("unlock_method").required(true))
                     .arg(Arg::with_name("pool_uuid").required(false))
                     .arg(
                         Arg::with_name("prompt")
@@ -121,11 +122,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     } else if let Some(subcommand) = args.subcommand_matches("pool") {
         if let Some(args) = subcommand.subcommand_matches("unlock") {
+            let unlock_method =
+                UnlockMethod::try_from(args.value_of("unlock_method").expect("required"))?;
             let uuid = match args.value_of("pool_uuid") {
                 Some(u) => Some(PoolUuid::parse_str(u)?),
                 None => None,
             };
-            pool::pool_unlock(uuid, args.is_present("prompt"))?;
+            pool::pool_unlock(unlock_method, uuid, args.is_present("prompt"))?;
             Ok(())
         } else if let Some(args) = subcommand.subcommand_matches("create") {
             let paths = get_paths_from_args(args);
@@ -168,6 +171,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             let uuid_str = args.value_of("pool_uuid").expect("required");
             let uuid = PoolUuid::parse_str(uuid_str)?;
             println!("{}", pool::pool_is_locked(uuid)?,);
+            Ok(())
+        } else if let Some(args) = subcommand.subcommand_matches("is-bound") {
+            let uuid_str = args.value_of("pool_uuid").expect("required");
+            let uuid = PoolUuid::parse_str(uuid_str)?;
+            println!("{}", pool::pool_is_bound(uuid)?,);
             Ok(())
         } else {
             pool::pool_list()?;

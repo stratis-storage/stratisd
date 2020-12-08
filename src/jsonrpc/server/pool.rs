@@ -24,6 +24,7 @@ use crate::{
 // stratis-min pool unlock
 pub async fn pool_unlock(
     engine: Arc<Mutex<dyn Engine>>,
+    unlock_method: UnlockMethod,
     pool_uuid: Option<PoolUuid>,
     prompt: Option<RawFd>,
 ) -> StratisResult<bool> {
@@ -35,16 +36,13 @@ pub async fn pool_unlock(
 
     let mut lock = engine.lock().await;
     match pool_uuid {
-        Some(u) => Ok(lock
-            .unlock_pool(u, UnlockMethod::Keyring)?
-            .changed()
-            .is_some()),
+        Some(u) => Ok(lock.unlock_pool(u, unlock_method)?.changed().is_some()),
         None => {
             let changed = lock
                 .locked_pools()
                 .into_iter()
                 .fold(false, |acc, (uuid, _)| {
-                    let res = lock.unlock_pool(uuid, UnlockMethod::Keyring);
+                    let res = lock.unlock_pool(uuid, unlock_method);
                     if let Ok(ok) = res {
                         acc || ok.is_changed()
                     } else {
@@ -193,6 +191,24 @@ pub async fn pool_is_locked(engine: Arc<Mutex<dyn Engine>>, uuid: PoolUuid) -> S
         Ok(false)
     } else if lock.locked_pools().get(&uuid).is_some() {
         Ok(true)
+    } else {
+        Err(StratisError::Error(format!(
+            "Pool with UUID {} not found",
+            uuid.to_simple_ref()
+        )))
+    }
+}
+
+// stratis-min pool is-bound
+pub async fn pool_is_bound(engine: Arc<Mutex<dyn Engine>>, uuid: PoolUuid) -> StratisResult<bool> {
+    let lock = engine.lock().await;
+    if let Some((_, pool)) = lock.get_pool(uuid) {
+        Ok(pool
+            .encryption_info()
+            .map(|ei| ei.clevis_info.is_some())
+            .unwrap_or(false))
+    } else if let Some(info) = lock.locked_pools().get(&uuid) {
+        Ok(info.clevis_info.is_some())
     } else {
         Err(StratisError::Error(format!(
             "Pool with UUID {} not found",

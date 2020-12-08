@@ -112,10 +112,12 @@ impl StratisParams {
                     false,
                 ))
             }
-            StratisParamType::PoolUnlock(uuid) => StratisRet::PoolUnlock(stratis_result_to_return(
-                pool::pool_unlock(engine, uuid, self.fd_opt).await,
-                false,
-            )),
+            StratisParamType::PoolUnlock(unlock_method, uuid) => {
+                StratisRet::PoolUnlock(stratis_result_to_return(
+                    pool::pool_unlock(engine, unlock_method, uuid, self.fd_opt).await,
+                    false,
+                ))
+            }
             StratisParamType::PoolList => {
                 if let Some(fd) = self.fd_opt {
                     if let Err(e) = close(fd) {
@@ -139,6 +141,13 @@ impl StratisParams {
                 expects_fd!(self.fd_opt, PoolIsLocked, false, false);
                 StratisRet::PoolIsLocked(stratis_result_to_return(
                     pool::pool_is_locked(engine, uuid).await,
+                    false,
+                ))
+            }
+            StratisParamType::PoolIsBound(uuid) => {
+                expects_fd!(self.fd_opt, PoolIsBound, false, false);
+                StratisRet::PoolIsBound(stratis_result_to_return(
+                    pool::pool_is_bound(engine, uuid).await,
                     false,
                 ))
             }

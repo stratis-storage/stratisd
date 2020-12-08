@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use nix::unistd::{pipe, write};
 
 use crate::{
-    engine::{KeyDescription, PoolUuid},
+    engine::{KeyDescription, PoolUuid, UnlockMethod},
     jsonrpc::client::utils::to_suffix_repr,
     print_table,
     stratis::{StratisError, StratisResult},
@@ -23,9 +23,13 @@ pub fn pool_create(
 }
 
 // stratis-min pool unlock
-pub fn pool_unlock(uuid: Option<PoolUuid>, prompt: bool) -> StratisResult<()> {
+pub fn pool_unlock(
+    unlock_method: UnlockMethod,
+    uuid: Option<PoolUuid>,
+    prompt: bool,
+) -> StratisResult<()> {
     if prompt {
-        do_request_standard!(PoolUnlock, uuid; {
+        do_request_standard!(PoolUnlock, unlock_method, uuid; {
             let password =
                 rpassword::prompt_password_stdout("Enter passphrase followed by return:")?;
             let (read_end, write_end) = pipe()?;
@@ -33,7 +37,7 @@ pub fn pool_unlock(uuid: Option<PoolUuid>, prompt: bool) -> StratisResult<()> {
             read_end
         })
     } else {
-        do_request_standard!(PoolUnlock, uuid)
+        do_request_standard!(PoolUnlock, unlock_method, uuid)
     }
 }
 
@@ -108,7 +112,7 @@ pub fn pool_list() -> StratisResult<()> {
     Ok(())
 }
 
-// stratis-min is-encrypted
+// stratis-min pool is-encrypted
 pub fn pool_is_encrypted(uuid: PoolUuid) -> StratisResult<bool> {
     let (is_encrypted, rc, rs) = do_request!(PoolIsEncrypted, uuid);
     if rc != 0 {
@@ -118,12 +122,22 @@ pub fn pool_is_encrypted(uuid: PoolUuid) -> StratisResult<bool> {
     }
 }
 
-// stratis-min is-locked
+// stratis-min pool is-locked
 pub fn pool_is_locked(uuid: PoolUuid) -> StratisResult<bool> {
     let (is_locked, rc, rs) = do_request!(PoolIsLocked, uuid);
     if rc != 0 {
         Err(StratisError::Error(rs))
     } else {
         Ok(is_locked)
+    }
+}
+
+// stratis-min pool is-bound
+pub fn pool_is_bound(uuid: PoolUuid) -> StratisResult<bool> {
+    let (is_bound, rc, rs) = do_request!(PoolIsBound, uuid);
+    if rc != 0 {
+        Err(StratisError::Error(rs))
+    } else {
+        Ok(is_bound)
     }
 }

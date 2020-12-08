@@ -71,6 +71,7 @@ fn parse_args() -> App<'static, 'static> {
                 SubCommand::with_name("destroy").arg(Arg::with_name("name").required(true)),
                 SubCommand::with_name("is-encrypted")
                     .arg(Arg::with_name("pool_uuid").required(true)),
+                SubCommand::with_name("is-locked").arg(Arg::with_name("pool_uuid").required(true)),
             ]),
             SubCommand::with_name("filesystem").subcommands(vec![
                 SubCommand::with_name("create")
@@ -162,6 +163,11 @@ fn main() -> Result<(), Box<dyn Error>> {
             let uuid_str = args.value_of("pool_uuid").expect("required");
             let uuid = PoolUuid::parse_str(uuid_str)?;
             println!("{}", pool::pool_is_encrypted(uuid)?,);
+            Ok(())
+        } else if let Some(args) = subcommand.subcommand_matches("is-locked") {
+            let uuid_str = args.value_of("pool_uuid").expect("required");
+            let uuid = PoolUuid::parse_str(uuid_str)?;
+            println!("{}", pool::pool_is_locked(uuid)?,);
             Ok(())
         } else {
             pool::pool_list()?;

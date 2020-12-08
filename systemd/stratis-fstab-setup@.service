@@ -1,10 +1,10 @@
 [Unit]
-Description=Set stratis key
+Description=Set up stratis filesystems in /etc/fstab
 Documentation=man:stratisd(8)
 DefaultDependencies=no
 Requires=stratisd-min-postinitrd.service
 After=stratisd-min-postinitrd.service
 
 [Service]
-ExecStart=/usr/lib/systemd/stratis-key-set %i
+ExecStart=/usr/lib/systemd/stratis-fstab-setup %i
 Type=oneshot

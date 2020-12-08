@@ -185,3 +185,18 @@ pub async fn pool_is_encrypted(
         )))
     }
 }
+
+// stratis-min pool is-locked
+pub async fn pool_is_locked(engine: Arc<Mutex<dyn Engine>>, uuid: PoolUuid) -> StratisResult<bool> {
+    let lock = engine.lock().await;
+    if lock.get_pool(uuid).is_some() {
+        Ok(false)
+    } else if lock.locked_pools().get(&uuid).is_some() {
+        Ok(true)
+    } else {
+        Err(StratisError::Error(format!(
+            "Pool with UUID {} not found",
+            uuid.to_simple_ref()
+        )))
+    }
+}

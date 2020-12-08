@@ -117,3 +117,13 @@ pub fn pool_is_encrypted(uuid: PoolUuid) -> StratisResult<bool> {
         Ok(is_encrypted)
     }
 }
+
+// stratis-min is-locked
+pub fn pool_is_locked(uuid: PoolUuid) -> StratisResult<bool> {
+    let (is_locked, rc, rs) = do_request!(PoolIsLocked, uuid);
+    if rc != 0 {
+        Err(StratisError::Error(rs))
+    } else {
+        Ok(is_locked)
+    }
+}

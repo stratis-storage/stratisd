@@ -135,6 +135,13 @@ impl StratisParams {
                     false,
                 ))
             }
+            StratisParamType::PoolIsLocked(uuid) => {
+                expects_fd!(self.fd_opt, PoolIsLocked, false, false);
+                StratisRet::PoolIsLocked(stratis_result_to_return(
+                    pool::pool_is_locked(engine, uuid).await,
+                    false,
+                ))
+            }
             StratisParamType::FsCreate(pool_name, fs_name) => {
                 expects_fd!(self.fd_opt, FsCreate, false, false);
                 StratisRet::FsCreate(stratis_result_to_return(

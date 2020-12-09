@@ -115,6 +115,7 @@ impl DbusTreeHandler {
 /// Handler for a D-Bus receiving connection.
 pub struct DbusConnectionHandler {
     connection: Arc<SyncConnection>,
+    /// Shared boolean value, true if the engine should exit, otherwise false.
     should_exit: Arc<AtomicBool>,
 }
 
@@ -151,6 +152,8 @@ impl DbusConnectionHandler {
     }
 
     /// Handle a D-Bus action passed from a D-Bus connection.
+    /// Returns true if stratisd should exit after handling this D-Bus
+    /// request, otherwise false.
     pub fn process_dbus_request(&self) -> StratisResult<bool> {
         self.connection
             .process(Duration::from_millis(100))

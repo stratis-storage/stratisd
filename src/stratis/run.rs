@@ -63,6 +63,7 @@ fn udev_thread(sender: Sender<UdevEngineEvent>, should_exit: Arc<AtomicBool>) ->
     }
 }
 
+// Waits for SIGINT. If received, sets should_exit to true.
 async fn signal_thread(should_exit: Arc<AtomicBool>) {
     if let Err(e) = signal::ctrl_c().await {
         error!("Failure while listening for signals: {}", e);
@@ -70,6 +71,8 @@ async fn signal_thread(should_exit: Arc<AtomicBool>) {
     should_exit.store(true, Ordering::Relaxed);
 }
 
+// Waits for devicemapper event. On devicemapper event, transfers control
+// to engine to handle event and waits until control is returned from engine.
 async fn dm_event_thread(engine: Option<Arc<Mutex<dyn Engine>>>) -> StratisResult<()> {
     match engine {
         Some(e) => {

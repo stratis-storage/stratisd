@@ -154,8 +154,8 @@ pub async fn pool_list(engine: Arc<Mutex<dyn Engine>>) -> PoolListType {
             .iter()
             .map(|(_, _, p)| {
                 (
-                    *p.total_physical_size(),
-                    p.total_physical_used().ok().map(|u| *u),
+                    *p.total_physical_size().bytes(),
+                    p.total_physical_used().ok().map(|u| *u.bytes()),
                 )
             })
             .collect(),

@@ -63,8 +63,7 @@ fn process_poll(fds: &mut Vec<libc::pollfd>) -> StratisResult<()> {
 
 /// Set up all sorts of signal and event handling mechanisms.
 /// Initialize the engine and keep it running until a signal is received
-/// or a fatal error is encountered. Dump log entries on specified signal
-/// via buff_log.
+/// or a fatal error is encountered.
 /// If sim is true, start the sim engine rather than the real engine.
 pub fn run(sim: bool) -> StratisResult<()> {
     // Setup a udev listener before initializing the engine. A device may

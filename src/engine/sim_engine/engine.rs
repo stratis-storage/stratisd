@@ -193,11 +193,6 @@ impl Engine for SimEngine {
         HashMap::new()
     }
 
-    /// Set properties of the simulator
-    fn configure_simulator(&mut self, _denominator: u32) -> StratisResult<()> {
-        Ok(())
-    }
-
     fn pools(&self) -> Vec<(Name, PoolUuid, &dyn Pool)> {
         self.pools
             .iter()
@@ -234,7 +229,6 @@ mod tests {
 
     use std::{self, path::Path};
 
-    use proptest::prelude::any;
     use uuid::Uuid;
 
     use crate::{
@@ -246,17 +240,6 @@ mod tests {
     };
 
     use super::*;
-
-    proptest! {
-        #[test]
-        /// This method should always return Ok.
-        fn configure_simulator_runs(denominator in any::<u32>()) {
-            prop_assert!(SimEngine::default()
-                .configure_simulator(denominator)
-                .is_ok())
-        }
-
-    }
 
     #[test]
     /// When an engine has no pools, any name lookup should fail

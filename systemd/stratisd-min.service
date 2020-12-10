@@ -5,6 +5,7 @@ DefaultDependencies=no
 After=sysinit.target
 
 [Service]
+Type=notify
 Environment="RUST_BACKTRACE=1"
 ExecStartPre=-mkdir -p /run/cryptsetup
 ExecStart=/usr/libexec/stratisd-min --log-level debug

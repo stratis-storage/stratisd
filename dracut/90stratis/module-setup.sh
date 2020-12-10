@@ -2,7 +2,19 @@
 
 # called by dracut
 check() {
-    require_binaries stratis-min thin_check thin_repair mkfs.xfs xfs_admin xfs_growfs  plymouth /usr/sbin/plymouthd || return 1
+    require_binaries stratis-min \
+	    thin_check \
+	    thin_repair \
+	    mkfs.xfs \
+	    xfs_admin \
+	    xfs_growfs \
+	    plymouth \
+	    /usr/sbin/plymouthd \
+	    clevis \
+	    clevis-luks-bind \
+	    clevis-luks-unbind \
+	    clevis-luks-unlock \
+	    || return 1
     return 255
 }
 
@@ -20,8 +32,19 @@ installkernel() {
 # called by dracut
 install() {
     # Stratis dependencies
-    inst_multiple stratis-min /usr/libexec/stratisd-min thin_check thin_repair mkfs.xfs \
-	    xfs_admin xfs_growfs plymouth /usr/sbin/plymouthd
+    inst_multiple stratis-min \
+	    /usr/libexec/stratisd-min \
+	    thin_check \
+	    thin_repair \
+	    mkfs.xfs \
+	    xfs_admin \
+	    xfs_growfs \
+	    plymouth \
+	    /usr/sbin/plymouthd \
+	    clevis \
+	    clevis-luks-bind \
+	    clevis-luks-unbind \
+	    clevis-luks-unlock
 
     # Dracut dependencies
     inst_multiple $systemdutildir/system-generators/stratis-setup-generator \

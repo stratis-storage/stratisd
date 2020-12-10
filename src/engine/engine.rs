@@ -323,9 +323,10 @@ pub trait Engine: Debug + Report {
     /// been set up and need to be unlocked to their encryption infos.
     fn locked_pools(&self) -> HashMap<PoolUuid, EncryptionInfo>;
 
-    /// Configure the simulator, for the real engine, this is a null op.
-    /// denominator: the probably of failure is 1/denominator.
-    fn configure_simulator(&mut self, denominator: u32) -> StratisResult<()>;
+    /// Configure the simulator. Obsolete.
+    fn configure_simulator(&mut self, _: u32) -> StratisResult<()> {
+        Ok(())
+    }
 
     /// Get all pools belonging to this engine.
     fn pools(&self) -> Vec<(Name, PoolUuid, &dyn Pool)>;

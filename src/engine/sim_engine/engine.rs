@@ -222,6 +222,10 @@ impl Engine for SimEngine {
     fn get_key_handler_mut(&mut self) -> &mut dyn KeyActions {
         &mut self.key_handler as &mut dyn KeyActions
     }
+
+    fn is_sim(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]

@@ -346,6 +346,9 @@ pub trait Engine: Debug + Report {
 
     /// Get the handler for kernel keyring operations mutably.
     fn get_key_handler_mut(&mut self) -> &mut dyn KeyActions;
+
+    /// Return true if this engine is the simulator engine, otherwise false.
+    fn is_sim(&self) -> bool;
 }
 
 /// Allows an Engine to include a fd in the event loop. See

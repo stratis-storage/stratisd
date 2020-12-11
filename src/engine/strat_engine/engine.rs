@@ -344,6 +344,10 @@ impl Engine for StratEngine {
     fn get_key_handler_mut(&mut self) -> &mut dyn KeyActions {
         &mut self.key_handler as &mut dyn KeyActions
     }
+
+    fn is_sim(&self) -> bool {
+        false
+    }
 }
 
 #[cfg(test)]

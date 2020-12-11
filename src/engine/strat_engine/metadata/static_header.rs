@@ -94,7 +94,7 @@ where
     F: Read + Seek + SyncAll,
 {
     let read_results = StaticHeader::read_sigblocks(f);
-    StaticHeader::repair_sigblocks(f, read_results).map(|sh| sh.map(|sh| sh.identifiers))
+    StaticHeader::repair_sigblocks(f, read_results, true).map(|sh| sh.map(|sh| sh.identifiers))
 }
 
 /// Remove Stratis identifying information from device.
@@ -264,6 +264,7 @@ impl StaticHeader {
     pub fn repair_sigblocks<F>(
         f: &mut F,
         read_results: (StaticHeaderResult, StaticHeaderResult),
+        write_sh: bool,
     ) -> StratisResult<Option<StaticHeader>>
     where
         F: Read + Seek + SyncAll,
@@ -280,14 +281,15 @@ impl StaticHeader {
             maybe_sh: Option<StaticHeader>,
             sh_error: StratisError,
             repair_location: MetadataLocation,
+            write_sh: bool,
         ) -> StratisResult<Option<StaticHeader>>
         where
             F: Seek + SyncAll,
         {
-            if let Some(sh) = maybe_sh {
-                write_header(f, sh, repair_location)
-            } else {
-                Err(sh_error)
+            match maybe_sh {
+                Some(sh) if write_sh => write_header(f, sh, repair_location),
+                Some(sh) => Ok(Some(sh)),
+                None => Err(sh_error),
             }
         }
 
@@ -306,6 +308,7 @@ impl StaticHeader {
             f: &mut F,
             maybe_sh1: Option<StaticHeader>,
             maybe_sh2: Option<StaticHeader>,
+            write_sh: bool,
         ) -> StratisResult<Option<StaticHeader>>
         where
             F: Seek + SyncAll,
@@ -313,8 +316,10 @@ impl StaticHeader {
             match (maybe_sh1, maybe_sh2) {
                 (Some(loc_1), Some(loc_2)) => compare_headers(f, loc_1, loc_2),
                 (None, None) => Ok(None),
-                (Some(loc_1), None) => write_header(f, loc_1, MetadataLocation::Second),
-                (None, Some(loc_2)) => write_header(f, loc_2, MetadataLocation::First),
+                (Some(loc_1), None) if write_sh => write_header(f, loc_1, MetadataLocation::Second),
+                (Some(loc_1), None) => Ok(Some(loc_1)),
+                (None, Some(loc_2)) if write_sh => write_header(f, loc_2, MetadataLocation::First),
+                (None, Some(loc_2)) => Ok(Some(loc_2)),
             }
         }
 
@@ -397,13 +402,21 @@ impl StaticHeader {
                     bytes: Ok(_),
                 },
             ) => match (maybe_sh_1, maybe_sh_2) {
-                (Ok(loc_1), Ok(loc_2)) => ok_ok_static_header_handling(f, loc_1, loc_2),
-                (Ok(loc_1), Err(loc_2)) => {
-                    ok_err_static_header_handling(f, loc_1, loc_2, MetadataLocation::Second)
-                }
-                (Err(loc_1), Ok(loc_2)) => {
-                    ok_err_static_header_handling(f, loc_2, loc_1, MetadataLocation::First)
-                }
+                (Ok(loc_1), Ok(loc_2)) => ok_ok_static_header_handling(f, loc_1, loc_2, write_sh),
+                (Ok(loc_1), Err(loc_2)) => ok_err_static_header_handling(
+                    f,
+                    loc_1,
+                    loc_2,
+                    MetadataLocation::Second,
+                    write_sh,
+                ),
+                (Err(loc_1), Ok(loc_2)) => ok_err_static_header_handling(
+                    f,
+                    loc_2,
+                    loc_1,
+                    MetadataLocation::First,
+                    write_sh,
+                ),
                 (Err(_), Err(_)) => {
                     let err_str = "Appeared to be a Stratis device, but no valid sigblock found";
                     Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
@@ -656,7 +669,7 @@ pub mod tests {
             }
 
             let read_results = StaticHeader::read_sigblocks(&mut buf);
-            let setup_result = StaticHeader::repair_sigblocks(&mut buf, read_results);
+            let setup_result = StaticHeader::repair_sigblocks(&mut buf, read_results, true);
 
             match (primary, secondary) {
                 (Some(p_index), Some(s_index)) => {
@@ -739,7 +752,7 @@ pub mod tests {
             let read_results = StaticHeader::read_sigblocks(&mut buf);
             assert_ne!(buf.get_ref(), reference_buf.get_ref());
             assert_eq!(
-                StaticHeader::repair_sigblocks(&mut buf, read_results)
+                StaticHeader::repair_sigblocks(&mut buf, read_results, true)
                     .unwrap()
                     .as_ref(),
                 Some(sh_newer)

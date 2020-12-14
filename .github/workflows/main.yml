@@ -150,7 +150,7 @@ jobs:
       matrix:
         include:
           # MANDATORY PYTHON CHECKS ON RECOMMENDED DEVELOPMENT INTERPRETER
-          - python-version: 3.7.9
+          - python-version: 3.8.6
             dependencies: >
               pylint==2.4.4
               dbus-client-gen==0.4
@@ -163,7 +163,7 @@ jobs:
             task: >
               (cd developer_tools; make -f Makefile lint) &&
               (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
-          - python-version: 3.7.9
+          - python-version: 3.8.6
             dependencies: black==19.10b0 isort==4.3.21
             task: >
               (cd developer_tools; make fmt-travis) &&

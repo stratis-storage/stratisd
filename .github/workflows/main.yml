@@ -200,7 +200,7 @@ jobs:
   yamllint:
     env:
       TASK: yamllint
-      PYTHON: 3.7.6
+      PYTHON: 3.8.6
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -208,6 +208,6 @@ jobs:
         with:
           python-version: ${{ env.PYTHON }}
       - name: Install dependencies
-        run: pip3 install yamllint==1.23.0
+        run: pip3 install yamllint==1.25.0
       - name: Run yamllint
         run: make -f Makefile $TASK

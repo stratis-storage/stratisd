@@ -115,6 +115,16 @@ impl DbusContext {
         }
     }
 
+    /// Generates a new id for object paths.
+    /// It is assumed that, while Stratisd is running, it will never generate
+    /// more than 2^64 object paths. If it turns out that this is a bad
+    /// assumption, the solution is to use unbounded integers.
+    pub fn get_next_id(&self) -> u64 {
+        let index = self.next_index.load(Ordering::Acquire) + 1;
+        self.next_index.store(index, Ordering::Release);
+        index
+    }
+
     pub fn push_add(
         &self,
         object_path: ObjectPath<MTSync<TData>, TData>,
@@ -176,16 +186,6 @@ impl DbusContext {
                 item, e,
             )
         }
-    }
-
-    /// Generates a new id for object paths.
-    /// It is assumed that, while Stratisd is running, it will never generate
-    /// more than 2^64 object paths. If it turns out that this is a bad
-    /// assumption, the solution is to use unbounded integers.
-    pub fn get_next_id(&self) -> u64 {
-        let index = self.next_index.load(Ordering::Acquire) + 1;
-        self.next_index.store(index, Ordering::Release);
-        index
     }
 }
 

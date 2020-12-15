@@ -96,7 +96,7 @@ impl OPContext {
 
 #[derive(Clone)]
 pub struct DbusContext {
-    pub(super) next_index: Arc<AtomicU64>,
+    next_index: Arc<AtomicU64>,
     pub(super) engine: Arc<Mutex<dyn Engine>>,
     pub(super) sender: TokioSender<DbusAction>,
     connection: Arc<SyncConnection>,

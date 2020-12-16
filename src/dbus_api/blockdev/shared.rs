@@ -77,7 +77,18 @@ where
 /// Generate D-Bus representation of devnode property.
 #[inline]
 pub fn blockdev_devnode_prop(dev: &dyn BlockDev) -> String {
-    dev.devnode().user_path().display().to_string()
+    let pathbuf = match dev.user_path() {
+        Ok(path) => path,
+        Err(e) => {
+            warn!(
+                "Failed to canonicalize metadata path for block device: {}; \
+                falling back on non-canonicalized path",
+                e
+            );
+            dev.metadata_path().to_owned()
+        }
+    };
+    pathbuf.display().to_string()
 }
 
 /// Generate D-Bus representation of hardware info property.
@@ -109,5 +120,5 @@ pub fn blockdev_tier_prop(tier: BlockDevTier) -> u16 {
 // Generate a D-Bus representation of the physical path
 #[inline]
 pub fn blockdev_physical_path_prop(dev: &dyn BlockDev) -> String {
-    dev.devnode().physical_path().display().to_string()
+    dev.devnode().display().to_string()
 }

@@ -41,7 +41,7 @@ pub fn create_pool_idempotent_or_err(
         .iter()
         .filter_map(|(_, tier, bd)| {
             if *tier == BlockDevTier::Data {
-                Some(bd.devnode().physical_path().to_owned())
+                Some(bd.devnode().to_owned())
             } else {
                 None
             }

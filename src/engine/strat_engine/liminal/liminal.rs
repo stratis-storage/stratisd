@@ -15,7 +15,7 @@ use crate::{
     engine::{
         engine::Pool,
         strat_engine::{
-            backstore::CryptHandle,
+            backstore::CryptActivationHandle,
             liminal::{
                 device_info::{DeviceBag, DeviceSet, LInfo, LLuksInfo, LStratisInfo},
                 identify::{identify_block_device, DeviceInfo, LuksInfo, StratisInfo},
@@ -85,8 +85,7 @@ impl LiminalDevices {
         unlock_method: UnlockMethod,
     ) -> StratisResult<Vec<DevUuid>> {
         fn handle_luks(luks_info: &LLuksInfo, unlock_method: UnlockMethod) -> StratisResult<()> {
-            if let Some(mut handle) = CryptHandle::setup(&luks_info.ids.devnode)? {
-                handle.activate(unlock_method)?;
+            if CryptActivationHandle::setup(&luks_info.ids.devnode, unlock_method)?.is_some() {
                 Ok(())
             } else {
                 Err(StratisError::Engine(

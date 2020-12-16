@@ -221,27 +221,14 @@ fn process_luks_device(dev: &libudev::Device) -> Option<LuksInfo> {
                             );
                     None
                 }
-                Ok(Some(mut handle)) => match handle.clevis_info() {
-                    Ok(clevis_info) => Some(LuksInfo {
-                        info: StratisInfo {
-                            identifiers: *handle.device_identifiers(),
-                            device_number,
-                            devnode: handle.physical_device_path().to_path_buf(),
-                        },
-                        encryption_info: EncryptionInfo {
-                            key_description: handle.key_description().clone(),
-                            clevis_info,
-                        },
-                    }),
-                    Err(err) => {
-                        warn!(
-                                "There was a problem decoding the Clevis info on device {}, disregarding the device: {}",
-                                devnode.display(),
-                                err
-                                );
-                        None
-                    }
-                },
+                Ok(Some(handle)) => Some(LuksInfo {
+                    info: StratisInfo {
+                        identifiers: *handle.device_identifiers(),
+                        device_number,
+                        devnode: handle.luks2_device_path().to_path_buf(),
+                    },
+                    encryption_info: handle.encryption_info().to_owned(),
+                }),
             },
         },
         None => {
@@ -460,6 +447,7 @@ mod tests {
                 udev::block_device_apply,
             },
             types::{EncryptionInfo, KeyDescription},
+            BlockDev,
         },
         stratis::StratisError,
     };
@@ -493,19 +481,18 @@ mod tests {
                 }),
             )?;
 
-            for devnode in devices.iter().map(|sbd| sbd.devnode()) {
-                let info =
-                    block_device_apply(devnode.physical_path(), |dev| process_luks_device(dev))?
-                        .ok_or_else(|| {
-                            StratisError::Error(
-                                "No device with specified devnode found in udev database".into(),
-                            )
-                        })?
-                        .ok_or_else(|| {
-                            StratisError::Error(
-                                "No LUKS information for Stratis found on specified device".into(),
-                            )
-                        })?;
+            for dev in devices {
+                let info = block_device_apply(dev.physical_path(), |dev| process_luks_device(dev))?
+                    .ok_or_else(|| {
+                        StratisError::Error(
+                            "No device with specified devnode found in udev database".into(),
+                        )
+                    })?
+                    .ok_or_else(|| {
+                        StratisError::Error(
+                            "No LUKS information for Stratis found on specified device".into(),
+                        )
+                    })?;
 
                 if info.info.identifiers.pool_uuid != pool_uuid {
                     return Err(Box::new(StratisError::Error(format!(
@@ -515,11 +502,11 @@ mod tests {
                     ))));
                 }
 
-                if info.info.devnode != devnode.physical_path() {
+                if info.info.devnode != dev.physical_path() {
                     return Err(Box::new(StratisError::Error(format!(
                         "Discovered device node {} != expected device node {}",
                         info.info.devnode.display(),
-                        devnode.physical_path().display()
+                        dev.physical_path().display()
                     ))));
                 }
 
@@ -532,7 +519,7 @@ mod tests {
                 }
 
                 let info =
-                    block_device_apply(devnode.physical_path(), |dev| process_stratis_device(dev))?
+                    block_device_apply(dev.physical_path(), |dev| process_stratis_device(dev))?
                         .ok_or_else(|| {
                             StratisError::Error(
                                 "No device with specified devnode found in udev database".into(),
@@ -546,7 +533,7 @@ mod tests {
                 }
 
                 let info =
-                    block_device_apply(devnode.user_path(), |dev| process_stratis_device(dev))?
+                    block_device_apply(&dev.user_path()?, |dev| process_stratis_device(dev))?
                         .ok_or_else(|| {
                             StratisError::Error(
                                 "No device with specified devnode found in udev database".into(),
@@ -558,13 +545,13 @@ mod tests {
                             )
                         })?;
 
-                if info.identifiers.pool_uuid != pool_uuid || info.devnode != devnode.user_path() {
+                if info.identifiers.pool_uuid != pool_uuid || info.devnode != dev.user_path()? {
                     return Err(Box::new(StratisError::Error(format!(
                         "Wrong identifiers and devnode found on Stratis block device: found: pool UUID: {}, device node; {} != expected: pool UUID: {}, device node: {}",
                         info.identifiers.pool_uuid.to_simple_ref(),
                         info.devnode.display(),
                         pool_uuid,
-                        devnode.metadata_path().display()),
+                        dev.user_path()?.display()),
                     )));
                 }
             }

@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, TimeZone, Utc};
 use serde_json::{Map, Value};
@@ -10,15 +10,18 @@ use uuid::Uuid;
 
 use devicemapper::{Bytes, Sectors, IEC};
 
-use crate::engine::{
-    engine::BlockDev,
-    types::{BlockDevPath, EncryptionInfo, MaybeDbusPath},
+use crate::{
+    engine::{
+        engine::BlockDev,
+        types::{EncryptionInfo, MaybeDbusPath},
+    },
+    stratis::StratisResult,
 };
 
 #[derive(Debug)]
 /// A simulated device.
 pub struct SimDev {
-    devnode: BlockDevPath,
+    devnode: PathBuf,
     user_info: Option<String>,
     hardware_info: Option<String>,
     initialization_time: u64,
@@ -28,13 +31,21 @@ pub struct SimDev {
 
 impl SimDev {
     /// Access a structure containing the simulated device path
-    pub fn devnode(&self) -> &BlockDevPath {
+    pub fn devnode(&self) -> &Path {
         &self.devnode
     }
 }
 
 impl BlockDev for SimDev {
-    fn devnode(&self) -> &BlockDevPath {
+    fn devnode(&self) -> &Path {
+        self.devnode()
+    }
+
+    fn user_path(&self) -> StratisResult<PathBuf> {
+        Ok(self.devnode.clone())
+    }
+
+    fn metadata_path(&self) -> &Path {
         self.devnode()
     }
 
@@ -73,7 +84,7 @@ impl SimDev {
         (
             Uuid::new_v4(),
             SimDev {
-                devnode: BlockDevPath::physical_device_path(devnode),
+                devnode: devnode.to_owned(),
                 user_info: None,
                 hardware_info: None,
                 initialization_time: Utc::now().timestamp() as u64,
@@ -115,7 +126,7 @@ impl<'a> Into<Value> for &'a SimDev {
         let mut json = Map::new();
         json.insert(
             "path".to_string(),
-            Value::from(self.devnode.physical_path().display().to_string()),
+            Value::from(self.devnode.display().to_string()),
         );
         if let Some(EncryptionInfo {
             ref key_description,

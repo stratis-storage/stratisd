@@ -4,6 +4,7 @@
 
 use std::{
     convert::TryFrom,
+    fmt::{self, Debug},
     io,
     path::{Path, PathBuf},
 };
@@ -25,7 +26,7 @@ use crate::engine::{
         metadata::StratisIdentifiers,
         names::format_crypt_name,
     },
-    types::{KeyDescription, SizedKeyMemory, UnlockMethod},
+    types::{EncryptionInfo, KeyDescription, SizedKeyMemory, UnlockMethod},
     DevUuid, PoolUuid,
 };
 
@@ -305,7 +306,10 @@ impl CryptInitializer {
                 device,
                 self.physical_path,
                 self.identifiers,
-                key_description.clone(),
+                EncryptionInfo {
+                    key_description: key_description.clone(),
+                    clevis_info: None,
+                },
                 format_crypt_name(&dev_uuid),
             )),
             Err(e) => {
@@ -326,23 +330,37 @@ pub struct CryptHandle {
     device: CryptDevice,
     physical_path: PathBuf,
     identifiers: StratisIdentifiers,
-    key_description: KeyDescription,
+    encryption_info: EncryptionInfo,
     name: String,
 }
 
+impl Debug for CryptHandle {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "CryptHandle {{ device: CryptDevice, physical_path: {}, identifiers: {}, \
+            encryption_info: {}, name: {} }}",
+            self.physical_path.display(),
+            self.identifiers,
+            self.encryption_info,
+            self.name,
+        )
+    }
+}
+
 impl CryptHandle {
-    pub(crate) fn new(
+    fn new(
         device: CryptDevice,
         physical_path: PathBuf,
         identifiers: StratisIdentifiers,
-        key_description: KeyDescription,
+        encryption_info: EncryptionInfo,
         name: String,
     ) -> CryptHandle {
         CryptHandle {
             device,
             physical_path,
             identifiers,
-            key_description,
+            encryption_info,
             name,
         }
     }
@@ -436,14 +454,23 @@ impl CryptHandle {
                 )));
             }
         };
+        let clevis_info = clevis_info_from_metadata(&mut device)?;
         let name = name_from_metadata(&mut device)?;
         Ok(Some(CryptHandle {
             device,
             physical_path: physical_path.to_owned(),
             identifiers,
-            key_description,
+            encryption_info: EncryptionInfo {
+                key_description,
+                clevis_info,
+            },
             name,
         }))
+    }
+
+    /// Get the encryption info for this encrypted device.
+    pub fn encryption_info(&self) -> &EncryptionInfo {
+        &self.encryption_info
     }
 
     /// Return the path to the device node of the underlying physical device
@@ -474,11 +501,6 @@ impl CryptHandle {
         &self.identifiers
     }
 
-    /// Get the key description for a given encrypted device.
-    pub fn key_description(&self) -> &KeyDescription {
-        &self.key_description
-    }
-
     /// Get the keyslot associated with the given token ID.
     pub fn keyslots(&mut self, token_id: c_uint) -> Result<Option<Vec<c_uint>>> {
         get_keyslot_number(&mut self.device, token_id)
@@ -486,29 +508,7 @@ impl CryptHandle {
 
     /// Get info for the clevis binding.
     pub fn clevis_info(&mut self) -> Result<Option<(String, Value)>> {
-        let json = match self
-            .device
-            .token_handle()
-            .json_get(CLEVIS_LUKS_TOKEN_ID)
-            .ok()
-        {
-            Some(j) => j,
-            None => return Ok(None),
-        };
-        let json_b64 = match json
-            .get("jwe")
-            .and_then(|map| map.get("protected"))
-            .and_then(|string| string.as_str())
-        {
-            Some(s) => s.to_owned(),
-            None => return Ok(None),
-        };
-        let json_bytes = decode(json_b64).map_err(|e| LibcryptErr::Other(e.to_string()))?;
-
-        let subjson: Value = serde_json::from_slice(json_bytes.as_slice())
-            .map_err(|e| LibcryptErr::Other(e.to_string()))?;
-
-        pin_dispatch(&subjson).map(Some)
+        clevis_info_from_metadata(&mut self.device)
     }
 
     /// Activate encrypted Stratis device using the name stored in the
@@ -517,7 +517,7 @@ impl CryptHandle {
         match unlock_method {
             UnlockMethod::Keyring => activate_and_check_device_path(
                 &mut self.device,
-                &self.key_description,
+                &self.encryption_info.key_description,
                 &self.name.to_owned(),
             ),
             UnlockMethod::Clevis => clevis_luks_unlock(&self.physical_path, &self.name)
@@ -534,7 +534,9 @@ impl CryptHandle {
         yes: bool,
     ) -> Result<()> {
         clevis_luks_bind(&self.physical_path, keyfile_path, pin, &json, yes)
-            .map_err(|e| LibcryptErr::Other(e.to_string()))
+            .map_err(|e| LibcryptErr::Other(e.to_string()))?;
+        self.encryption_info.clevis_info = Some((pin.to_string(), json.clone()));
+        Ok(())
     }
 
     /// Unbind the given device using clevis.
@@ -554,6 +556,7 @@ impl CryptHandle {
                 );
             }
         }
+        self.encryption_info.clevis_info = None;
         Ok(())
     }
 
@@ -581,6 +584,27 @@ impl CryptHandle {
         );
         Ok(Sectors(active_device.size))
     }
+}
+
+fn clevis_info_from_metadata(device: &mut CryptDevice) -> Result<Option<(String, Value)>> {
+    let json = match device.token_handle().json_get(CLEVIS_LUKS_TOKEN_ID).ok() {
+        Some(j) => j,
+        None => return Ok(None),
+    };
+    let json_b64 = match json
+        .get("jwe")
+        .and_then(|map| map.get("protected"))
+        .and_then(|string| string.as_str())
+    {
+        Some(s) => s.to_owned(),
+        None => return Ok(None),
+    };
+    let json_bytes = decode(json_b64).map_err(|e| LibcryptErr::Other(e.to_string()))?;
+
+    let subjson: Value = serde_json::from_slice(json_bytes.as_slice())
+        .map_err(|e| LibcryptErr::Other(e.to_string()))?;
+
+    pin_dispatch(&subjson).map(Some)
 }
 
 /// Interpret non-Clevis keys that may contain additional information about

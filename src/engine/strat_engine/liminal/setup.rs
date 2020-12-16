@@ -17,7 +17,7 @@ use devicemapper::Sectors;
 use crate::{
     engine::{
         strat_engine::{
-            backstore::StratBlockDev,
+            backstore::{CryptHandle, StratBlockDev},
             device::blkdev_size,
             liminal::device_info::LStratisInfo,
             metadata::BDA,
@@ -218,14 +218,12 @@ pub fn get_blockdevs(
         // conclusion is metadata corruption.
         let segments = segment_table.get(&dev_uuid);
 
-        let (path, encryption_info) = match &info.luks {
-            Some(luks) => (
-                BlockDevPath::mapped_device_path(&luks.ids.devnode, &info.ids.devnode)?,
-                Some(&luks.encryption_info),
-            ),
-            None => (BlockDevPath::physical_device_path(&info.ids.devnode), None),
+        let path = match &info.luks {
+            Some(luks) => BlockDevPath::mapped_device_path(&luks.ids.devnode, &info.ids.devnode)?,
+            None => BlockDevPath::physical_device_path(&info.ids.devnode),
         };
 
+        let handle = CryptHandle::setup(path.physical_path())?;
         Ok((
             tier,
             StratBlockDev::new(
@@ -235,7 +233,7 @@ pub fn get_blockdevs(
                 segments.unwrap_or(&vec![]),
                 bd_save.user_info.clone(),
                 bd_save.hardware_info.clone(),
-                encryption_info.cloned(),
+                handle,
             )?,
         ))
     }

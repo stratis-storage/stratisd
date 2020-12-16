@@ -541,10 +541,6 @@ impl BlockDevMgr {
             return Err(e);
         }
 
-        for (_, bd) in self.blockdevs_mut() {
-            bd.set_clevis_info(pin.clone(), clevis_info.clone())
-                .expect("devices are certainly encrypted, so all must have encryption info struct");
-        }
         Ok(true)
     }
 
@@ -573,10 +569,6 @@ impl BlockDevMgr {
                 );
             }
             res?
-        }
-        for (_, bd) in self.blockdevs_mut() {
-            bd.unset_clevis_info()
-                .expect("blockdevs are definitely encrypted, must have encryption_info set");
         }
         Ok(true)
     }

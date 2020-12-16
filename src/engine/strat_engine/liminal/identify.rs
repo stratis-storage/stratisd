@@ -221,27 +221,14 @@ fn process_luks_device(dev: &libudev::Device) -> Option<LuksInfo> {
                             );
                     None
                 }
-                Ok(Some(mut handle)) => match handle.clevis_info() {
-                    Ok(clevis_info) => Some(LuksInfo {
-                        info: StratisInfo {
-                            identifiers: *handle.device_identifiers(),
-                            device_number,
-                            devnode: handle.physical_device_path().to_path_buf(),
-                        },
-                        encryption_info: EncryptionInfo {
-                            key_description: handle.key_description().clone(),
-                            clevis_info,
-                        },
-                    }),
-                    Err(err) => {
-                        warn!(
-                                "There was a problem decoding the Clevis info on device {}, disregarding the device: {}",
-                                devnode.display(),
-                                err
-                                );
-                        None
-                    }
-                },
+                Ok(Some(handle)) => Some(LuksInfo {
+                    info: StratisInfo {
+                        identifiers: *handle.device_identifiers(),
+                        device_number,
+                        devnode: handle.physical_device_path().to_path_buf(),
+                    },
+                    encryption_info: handle.encryption_info().to_owned(),
+                }),
             },
         },
         None => {

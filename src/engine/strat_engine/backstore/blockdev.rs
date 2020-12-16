@@ -36,7 +36,7 @@ pub struct StratBlockDev {
     user_info: Option<String>,
     hardware_info: Option<String>,
     dbus_path: MaybeDbusPath,
-    encryption_info: Option<EncryptionInfo>,
+    crypt_handle: Option<CryptHandle>,
 }
 
 impl StratBlockDev {
@@ -68,7 +68,7 @@ impl StratBlockDev {
         other_segments: &[(Sectors, Sectors)],
         user_info: Option<String>,
         hardware_info: Option<String>,
-        encryption_info: Option<EncryptionInfo>,
+        crypt_handle: Option<CryptHandle>,
     ) -> StratisResult<StratBlockDev> {
         let mut segments = vec![(Sectors(0), bda.extended_size().sectors())];
         segments.extend(other_segments);
@@ -83,7 +83,7 @@ impl StratBlockDev {
             user_info,
             hardware_info,
             dbus_path: MaybeDbusPath(None),
-            encryption_info,
+            crypt_handle,
         })
     }
 
@@ -197,36 +197,7 @@ impl StratBlockDev {
     /// Returns Some(_) if it is encrypted.
     /// Returns None if it is not encrypted.
     pub fn encryption_info(&self) -> Option<&EncryptionInfo> {
-        self.encryption_info.as_ref()
-    }
-
-    /// Set the clevis config cached in the blockdev data structure to the given
-    /// values.
-    pub fn set_clevis_info(&mut self, pin: String, config: Value) -> StratisResult<()> {
-        match self.encryption_info {
-            Some(ref mut info) => {
-                info.clevis_info = Some((pin, config));
-                Ok(())
-            }
-            None => Err(StratisError::Error(format!(
-                "Block device {} is not encrypted",
-                self.devnode.physical_path().display(),
-            ))),
-        }
-    }
-
-    /// Unset the clevis config cached in the blockdev data structure.
-    pub fn unset_clevis_info(&mut self) -> StratisResult<()> {
-        match self.encryption_info {
-            Some(ref mut info) => {
-                info.clevis_info = None;
-                Ok(())
-            }
-            None => Err(StratisError::Error(format!(
-                "Block device {} is not encrypted",
-                self.devnode.physical_path().display(),
-            ))),
-        }
+        self.crypt_handle.as_ref().map(|ch| ch.encryption_info())
     }
 }
 
@@ -237,7 +208,7 @@ impl<'a> Into<Value> for &'a StratBlockDev {
             "uuid": self.bda.dev_uuid().to_simple_ref().to_string(),
         });
         let map = json.as_object_mut().expect("just created above");
-        if let Some(encryption_info) = &self.encryption_info {
+        if let Some(encryption_info) = self.crypt_handle.as_ref().map(|ch| ch.encryption_info()) {
             if let Value::Object(enc_map) = <&EncryptionInfo as Into<Value>>::into(encryption_info)
             {
                 map.extend(enc_map);

@@ -24,7 +24,7 @@ use crate::{
         },
         types::{BlockDevPath, DevUuid, EncryptionInfo, MaybeDbusPath, PoolUuid},
     },
-    stratis::{StratisError, StratisResult},
+    stratis::StratisResult,
 };
 
 #[derive(Debug)]
@@ -105,27 +105,17 @@ impl StratBlockDev {
     /// Precondition: if self.is_encrypted() == true, the data on
     ///               self.devnode.physical_path() has been encrypted with
     ///               aes-xts-plain64 encryption.
-    pub fn disown(&self) -> StratisResult<()> {
-        if !self.is_encrypted() {
+    pub fn disown(&mut self) -> StratisResult<()> {
+        if let Some(ref mut handle) = self.crypt_handle {
+            handle.wipe()?;
+        } else {
             disown_device(
                 &mut OpenOptions::new()
                     .write(true)
                     .open(self.devnode.metadata_path())?,
             )?;
-            Ok(())
-        } else if let Some(ref mut handle) = CryptHandle::setup(self.devnode.physical_path())? {
-            handle.wipe()?;
-            Ok(())
-        } else {
-            warn!(
-                "Device {} was determined to not be a Stratis device; cannot \
-                disown a device that does not belong to Stratis.",
-                self.devnode.physical_path().display()
-            );
-            Err(StratisError::Error(
-                "Device requested to be disowned did not belong to Stratis".to_string(),
-            ))
         }
+        Ok(())
     }
 
     pub fn save_state(&mut self, time: &DateTime<Utc>, metadata: &[u8]) -> StratisResult<()> {

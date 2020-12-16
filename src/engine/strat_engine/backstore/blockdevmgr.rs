@@ -243,7 +243,7 @@ impl BlockDevMgr {
     }
 
     pub fn destroy_all(&mut self) -> StratisResult<()> {
-        wipe_blockdevs(&self.block_devs)
+        wipe_blockdevs(&mut self.block_devs)
     }
 
     /// Remove the specified block devs and erase their metadata.
@@ -282,7 +282,7 @@ impl BlockDevMgr {
                 ));
             }
         }
-        wipe_blockdevs(&removed)?;
+        wipe_blockdevs(&mut removed)?;
         Ok(())
     }
 

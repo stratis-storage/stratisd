@@ -671,7 +671,7 @@ pub fn initialize_devices(
         match initialize_one(&dev_info, pool_uuid, mda_data_size, encryption_info.clone()) {
             Ok(blockdev) => initialized_blockdevs.push(blockdev),
             Err(err) => {
-                if let Err(err) = wipe_blockdevs(&initialized_blockdevs) {
+                if let Err(err) = wipe_blockdevs(&mut initialized_blockdevs) {
                     warn!("Failed to clean up some devices after initialization of device {} for pool with UUID {} failed: {}",
                           dev_info.devnode.display(),
                           pool_uuid.to_simple_ref(),
@@ -687,9 +687,9 @@ pub fn initialize_devices(
 /// Wipe some blockdevs of their identifying headers.
 /// Return an error if any of the blockdevs could not be wiped.
 /// If an error occurs while wiping a blockdev, attempt to wipe all remaining.
-pub fn wipe_blockdevs(blockdevs: &[StratBlockDev]) -> StratisResult<()> {
+pub fn wipe_blockdevs(blockdevs: &mut [StratBlockDev]) -> StratisResult<()> {
     let unerased_devnodes: Vec<_> = blockdevs
-        .iter()
+        .iter_mut()
         .filter_map(|bd| match bd.disown() {
             Err(e) => Some((bd.devnode().physical_path(), e)),
             _ => None,
@@ -750,7 +750,7 @@ mod tests {
             )));
         }
 
-        let blockdevs = initialize_devices(
+        let mut blockdevs = initialize_devices(
             dev_infos,
             pool_uuid,
             MDADataSize::default(),
@@ -866,7 +866,7 @@ mod tests {
                 )));
         }
 
-        wipe_blockdevs(&blockdevs)?;
+        wipe_blockdevs(&mut blockdevs)?;
 
         for path in paths {
             if key_description.is_some() {

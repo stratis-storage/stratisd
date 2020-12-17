@@ -37,6 +37,7 @@ const STRAT_SIGBLOCK_VERSION: u8 = 1;
 /// Data structure to hold results of reading and parsing a signature buffer.
 /// Invariant: bytes is Err <-> header == None, because if there was an error
 /// reading the data then there is no point in parsing.
+#[derive(Debug)]
 pub struct StaticHeaderResult {
     /// The bytes read
     bytes: StratisResult<[u8; bytes!(static_header_size::SIGBLOCK_SECTORS)]>,

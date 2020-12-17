@@ -21,9 +21,9 @@ fn run(devpath: &str) -> Result<(), String> {
         .map_err(|the_io_error| format!("Error opening device: {}", the_io_error))?;
 
     let read_results = StaticHeader::read_sigblocks(&mut devfile);
+    println!("{:#?}", read_results);
     let header =
         StaticHeader::repair_sigblocks(&mut devfile, read_results, StaticHeader::do_nothing);
-    // Handle printing unrepaired header here
     let bda = BDA::load(header, &mut devfile)
         .map_err(|bda_load_error| format!("BDA detected but error found: {}", bda_load_error))?
         .ok_or_else(|| "No Stratis BDA metadata found".to_string())?;

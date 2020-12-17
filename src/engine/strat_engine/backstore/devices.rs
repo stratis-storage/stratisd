@@ -689,7 +689,7 @@ pub fn wipe_blockdevs(blockdevs: &[StratBlockDev]) -> StratisResult<()> {
     let unerased_devnodes: Vec<_> = blockdevs
         .iter()
         .filter_map(|bd| match bd.disown() {
-            Err(_) => Some(bd.devnode().physical_path()),
+            Err(e) => Some((bd.devnode().physical_path(), e)),
             _ => None,
         })
         .collect();
@@ -698,8 +698,13 @@ pub fn wipe_blockdevs(blockdevs: &[StratBlockDev]) -> StratisResult<()> {
         Ok(())
     } else {
         let err_msg = format!(
-            "Failed to wipe already initialized devnodes: {:?}",
+            "Failed to wipe already initialized devnodes; {}",
             unerased_devnodes
+                .into_iter()
+                .map(|(devnode, error)| {
+                    format!("Failed to wipe blockdev {}: {}", devnode.display(), error)
+                })
+                .fold(String::new(), |error, next| error + next.as_str()),
         );
         Err(StratisError::Engine(ErrorEnum::Error, err_msg))
     }

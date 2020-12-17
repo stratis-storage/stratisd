@@ -94,7 +94,8 @@ where
     F: Read + Seek + SyncAll,
 {
     let read_results = StaticHeader::read_sigblocks(f);
-    StaticHeader::repair_sigblocks(f, read_results).map(|sh| sh.map(|sh| sh.identifiers))
+    StaticHeader::repair_sigblocks(f, read_results, StaticHeader::write_header)
+        .map(|sh| sh.map(|sh| sh.identifiers))
 }
 
 /// Remove Stratis identifying information from device.
@@ -250,6 +251,32 @@ impl StaticHeader {
         )
     }
 
+    pub fn write_header<F>(
+        f: &mut F,
+        sh: StaticHeader,
+        repair_location: MetadataLocation,
+    ) -> StratisResult<Option<StaticHeader>>
+    where
+        F: Seek + SyncAll,
+    {
+        sh.write(f, repair_location)?;
+        Ok(Some(sh))
+    }
+
+    // Replacement function for write_header
+    // for cases when writing repairs to corrupted
+    // sigblocks is not desired
+    pub fn do_nothing<F>(
+        _f: &mut F,
+        sh: StaticHeader,
+        _repair_location: MetadataLocation,
+    ) -> StratisResult<Option<StaticHeader>>
+    where
+        F: Seek + SyncAll,
+    {
+        Ok(Some(sh))
+    }
+
     /// Try to find a valid StaticHeader on a device.
     /// Return the latest copy that validates as a Stratis BDA, however verify both
     /// copies and if one validates but one does not, re-write the one that is incorrect.  If both
@@ -261,12 +288,14 @@ impl StaticHeader {
     /// Return an error if the sigblocks differ in some unaccountable way.
     /// Returns an error if a write intended to repair an ill-formed,
     /// unreadable, or stale signature block failed.
-    pub fn repair_sigblocks<F>(
+    pub fn repair_sigblocks<C, F>(
         f: &mut F,
         read_results: (StaticHeaderResult, StaticHeaderResult),
+        closure: C,
     ) -> StratisResult<Option<StaticHeader>>
     where
         F: Read + Seek + SyncAll,
+        C: Fn(&mut F, StaticHeader, MetadataLocation) -> StratisResult<Option<StaticHeader>>,
     {
         // Action taken when one sigblock is interpreted as invalid.
         //
@@ -275,17 +304,19 @@ impl StaticHeader {
         // the valid sigblock.
         //
         // In all other cases, return the error associated with the invalid sigblock.
-        fn ok_err_static_header_handling<F>(
+        fn ok_err_static_header_handling<F, C>(
             f: &mut F,
             maybe_sh: Option<StaticHeader>,
             sh_error: StratisError,
             repair_location: MetadataLocation,
+            closure: C,
         ) -> StratisResult<Option<StaticHeader>>
         where
             F: Seek + SyncAll,
+            C: Fn(&mut F, StaticHeader, MetadataLocation) -> StratisResult<Option<StaticHeader>>,
         {
             if let Some(sh) = maybe_sh {
-                write_header(f, sh, repair_location)
+                closure(f, sh, repair_location)
             } else {
                 Err(sh_error)
             }
@@ -302,19 +333,21 @@ impl StaticHeader {
         //
         // If neither sigblock is a valid Stratis header,
         // return Ok(None)
-        fn ok_ok_static_header_handling<F>(
+        fn ok_ok_static_header_handling<F, C>(
             f: &mut F,
             maybe_sh1: Option<StaticHeader>,
             maybe_sh2: Option<StaticHeader>,
+            closure: C,
         ) -> StratisResult<Option<StaticHeader>>
         where
             F: Seek + SyncAll,
+            C: Fn(&mut F, StaticHeader, MetadataLocation) -> StratisResult<Option<StaticHeader>>,
         {
             match (maybe_sh1, maybe_sh2) {
-                (Some(loc_1), Some(loc_2)) => compare_headers(f, loc_1, loc_2),
+                (Some(loc_1), Some(loc_2)) => compare_headers(f, loc_1, loc_2, closure),
                 (None, None) => Ok(None),
-                (Some(loc_1), None) => write_header(f, loc_1, MetadataLocation::Second),
-                (None, Some(loc_2)) => write_header(f, loc_2, MetadataLocation::First),
+                (Some(loc_1), None) => closure(f, loc_1, MetadataLocation::Second),
+                (None, Some(loc_2)) => closure(f, loc_2, MetadataLocation::First),
             }
         }
 
@@ -354,13 +387,15 @@ impl StaticHeader {
         // If the contents of the signature blocks are not equivalent,
         // overwrite the older block with the contents of the newer one,
         // or return an error if the blocks have the same initialization time.
-        fn compare_headers<F>(
+        fn compare_headers<F, C>(
             f: &mut F,
             sh_1: StaticHeader,
             sh_2: StaticHeader,
+            closure: C,
         ) -> StratisResult<Option<StaticHeader>>
         where
             F: Seek + SyncAll,
+            C: Fn(&mut F, StaticHeader, MetadataLocation) -> StratisResult<Option<StaticHeader>>,
         {
             if sh_1 == sh_2 {
                 Ok(Some(sh_1))
@@ -368,22 +403,10 @@ impl StaticHeader {
                 let err_str = "Appeared to be a Stratis device, but signature blocks disagree.";
                 Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
             } else if sh_1.initialization_time > sh_2.initialization_time {
-                write_header(f, sh_1, MetadataLocation::Second)
+                closure(f, sh_1, MetadataLocation::Second)
             } else {
-                write_header(f, sh_2, MetadataLocation::First)
+                closure(f, sh_2, MetadataLocation::First)
             }
-        }
-
-        fn write_header<F>(
-            f: &mut F,
-            sh: StaticHeader,
-            repair_location: MetadataLocation,
-        ) -> StratisResult<Option<StaticHeader>>
-        where
-            F: Seek + SyncAll,
-        {
-            sh.write(f, repair_location)?;
-            Ok(Some(sh))
         }
 
         match read_results {
@@ -397,12 +420,16 @@ impl StaticHeader {
                     bytes: Ok(_),
                 },
             ) => match (maybe_sh_1, maybe_sh_2) {
-                (Ok(loc_1), Ok(loc_2)) => ok_ok_static_header_handling(f, loc_1, loc_2),
-                (Ok(loc_1), Err(loc_2)) => {
-                    ok_err_static_header_handling(f, loc_1, loc_2, MetadataLocation::Second)
-                }
+                (Ok(loc_1), Ok(loc_2)) => ok_ok_static_header_handling(f, loc_1, loc_2, closure),
+                (Ok(loc_1), Err(loc_2)) => ok_err_static_header_handling(
+                    f,
+                    loc_1,
+                    loc_2,
+                    MetadataLocation::Second,
+                    closure,
+                ),
                 (Err(loc_1), Ok(loc_2)) => {
-                    ok_err_static_header_handling(f, loc_2, loc_1, MetadataLocation::First)
+                    ok_err_static_header_handling(f, loc_2, loc_1, MetadataLocation::First, closure)
                 }
                 (Err(_), Err(_)) => {
                     let err_str = "Appeared to be a Stratis device, but no valid sigblock found";
@@ -655,7 +682,7 @@ pub mod tests {
             }
 
             let read_results = StaticHeader::read_sigblocks(&mut buf);
-            let setup_result = StaticHeader::repair_sigblocks(&mut buf, read_results);
+            let setup_result = StaticHeader::repair_sigblocks(&mut buf, read_results, StaticHeader::write_header);
 
             match (primary, secondary) {
                 (Some(p_index), Some(s_index)) => {
@@ -738,7 +765,7 @@ pub mod tests {
             let read_results = StaticHeader::read_sigblocks(&mut buf);
             assert_ne!(buf.get_ref(), reference_buf.get_ref());
             assert_eq!(
-                StaticHeader::repair_sigblocks(&mut buf, read_results)
+                StaticHeader::repair_sigblocks(&mut buf, read_results, StaticHeader::write_header)
                     .unwrap()
                     .as_ref(),
                 Some(sh_newer)

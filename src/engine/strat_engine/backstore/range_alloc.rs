@@ -13,7 +13,12 @@ use crate::{
 
 #[derive(Debug)]
 pub struct RangeAllocator {
+    /// No sectors can be allocated beyond this point.
     limit: Sectors,
+    /// A map of chunks of data allocated for a single blockdev. The LHS
+    /// is the offset from the start of the device, the RHS is the length.
+    /// Uses a BTReeMap so that an iteration over the elements in the tree
+    /// will be ordered by the value of the LHS.
     used: BTreeMap<Sectors, Sectors>,
 }
 
@@ -140,7 +145,9 @@ impl RangeAllocator {
         self.used.values().cloned().sum()
     }
 
-    /// Get a list of (offset, length) segments that are in use
+    /// Get a list of (offset, length) segments that are in use.
+    /// The segments are ordered by the first element of the pair because
+    /// the underslying data structure, used, is a BTreeMap.
     fn used_ranges(&self) -> Vec<(Sectors, Sectors)> {
         self.used.iter().map(|(k, v)| (*k, *v)).collect()
     }

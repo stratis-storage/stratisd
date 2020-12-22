@@ -131,7 +131,10 @@ fn get_crypt_handles(blockdevs: &[StratBlockDev]) -> StratisResult<Vec<CryptHand
 
 #[derive(Debug)]
 pub struct BlockDevMgr {
+    /// All the block devices that belong to this block dev manager.
     block_devs: Vec<StratBlockDev>,
+    /// The most recent time that variable length metadata was saved to the
+    /// devices managed by this block dev manager.
     last_update_time: Option<DateTime<Utc>>,
 }
 

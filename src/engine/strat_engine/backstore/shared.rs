@@ -20,6 +20,14 @@ use crate::{
 };
 
 #[derive(Debug)]
+/// A structure that keeps a bunch of segments organized by their initial
+/// index. This is principally useful for the range allocator.
+/// It enforces some invariants:
+/// * No 0 length segment
+/// * No continguous segments; if two segments would be contiguous they are
+/// coalesced into a single segments.
+/// * No overlapping segments
+/// * No segments that extend beyond limit
 pub struct Segments {
     // the end, no sectors can be allocated beyond this point
     limit: Sectors,

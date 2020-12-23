@@ -123,6 +123,8 @@ impl PerDevSegments {
         let (start, len) = range;
         let (start, len) = (*start, *len);
 
+        assert!(len != Sectors(0));
+
         if start + len < start {
             return Err(StratisError::Engine(
                 ErrorEnum::Invalid,
@@ -497,5 +499,14 @@ mod tests {
         // If index is exactly 0, previous and next are both 0.
         let result = allocator.locate_prev_and_next(Sectors(0)).unwrap();
         assert_eq!(result, (Some(Sectors(0)), Some(Sectors(0))));
+    }
+
+    #[test]
+    /// Verify that a segment of length 0 can not be inserted. Such a segment
+    /// is just silently dropped if specified.
+    fn test_allocator_zero_length_insertion() {
+        let mut allocator = PerDevSegments::new(Sectors(400));
+        assert_matches!(allocator.insert(&(Sectors(12), Sectors(0))), Ok(_));
+        assert_eq!(allocator.len(), 0);
     }
 }

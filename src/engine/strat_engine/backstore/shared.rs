@@ -42,6 +42,11 @@ impl Segments {
         }
     }
 
+    /// The number of distinct ranges
+    pub fn len(&self) -> usize {
+        self.used.len()
+    }
+
     /// The boundary past which no allocation is considered.
     pub fn limit(&self) -> Sectors {
         self.limit

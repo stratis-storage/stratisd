@@ -43,13 +43,12 @@ impl RangeAllocator {
         self.segments.iter().map(|(_, l)| l).cloned().sum()
     }
 
-    /// Attempt to allocate. Returns number of sectors allocated (may
-    /// be less than request, including zero) and a Vec<(offset,
-    /// length)> of sectors successfully allocated.
+    /// Attempt to allocate.
+    /// Returns a Segments object containing the allocated ranges.
     /// If all available sectors are desired, use available() method to
     /// discover that amount.
-    pub fn request(&mut self, amount: Sectors) -> (Sectors, Vec<(Sectors, Sectors)>) {
-        let mut segs = Vec::new();
+    pub fn request(&mut self, amount: Sectors) -> Segments {
+        let mut segs = Segments::new(self.segments.limit());
         let mut needed = amount;
 
         for (&start, &len) in self.segments.complement().iter() {
@@ -58,14 +57,16 @@ impl RangeAllocator {
             }
             let to_use = min(needed, len);
             let used_range = (start, to_use);
-            segs.push(used_range);
+            segs.insert(&used_range)
+                .expect("wholly disjoint from other elements in segs");
             needed -= to_use;
         }
 
-        self.segments
-            .insert_all(&segs)
+        self.segments = self
+            .segments
+            .union(&segs)
             .expect("all segments verified to be in available ranges");
-        (amount - needed, segs)
+        segs
     }
 }
 
@@ -95,10 +96,9 @@ mod tests {
         assert_eq!(allocator.available(), Sectors(28));
 
         let request = allocator.request(Sectors(50));
-        assert_eq!(request.0, Sectors(28));
         assert_eq!(allocator.used(), Sectors(128));
         assert_eq!(allocator.available(), Sectors(0));
-        assert_eq!(request.1.len(), 2);
+        assert_eq!(request.len(), 2);
 
         let available = allocator.available();
         allocator.request(available);
@@ -112,8 +112,11 @@ mod tests {
         let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
 
         let request = allocator.request(Sectors(128));
-        assert_eq!(request.0, Sectors(128));
-        assert_eq!(request.1, &[(Sectors(0), Sectors(128))]);
+        assert_eq!(allocator.used(), Sectors(128));
+        assert_eq!(
+            request.iter().collect::<Vec<_>>(),
+            vec![(&Sectors(0), &Sectors(128))]
+        );
 
         assert!(allocator.segments.complement().iter().next().is_none());
 

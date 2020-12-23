@@ -313,12 +313,12 @@ impl BlockDevMgr {
                     break;
                 }
 
-                let (gotten, r_segs) = bd.request_space(needed - alloc);
-                let blkdev_segs = r_segs.into_iter().map(|(start, length)| {
+                let r_segs = bd.request_space(needed - alloc);
+                let blkdev_segs = r_segs.iter().map(|(&start, &length)| {
                     BlkDevSegment::new(bd.uuid(), Segment::new(*bd.device(), start, length))
                 });
                 segs.extend(blkdev_segs);
-                alloc += gotten;
+                alloc += r_segs.iter().map(|(_, l)| l).cloned().sum();
             }
             assert_eq!(alloc, needed);
             lists.push(segs);

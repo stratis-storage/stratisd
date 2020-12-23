@@ -15,7 +15,7 @@ use crate::{
     engine::{
         engine::BlockDev,
         strat_engine::{
-            backstore::{crypt::CryptHandle, range_alloc::RangeAllocator},
+            backstore::{crypt::CryptHandle, range_alloc::RangeAllocator, shared::Segments},
             metadata::{disown_device, BDAExtendedSize, BlockdevSize, MDADataSize, BDA},
             serde_structs::{BaseBlockDevSave, Recordable},
         },
@@ -145,7 +145,7 @@ impl StratBlockDev {
     /// Find some sector ranges that could be allocated. If more
     /// sectors are needed than are available, return partial results.
     /// If all sectors are desired, use available() method to get all.
-    pub fn request_space(&mut self, size: Sectors) -> (Sectors, Vec<(Sectors, Sectors)>) {
+    pub fn request_space(&mut self, size: Sectors) -> Segments {
         self.used.request(size)
     }
 

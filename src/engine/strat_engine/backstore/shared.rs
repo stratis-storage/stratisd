@@ -72,16 +72,6 @@ impl PerDevSegments {
         &self,
         value: Sectors,
     ) -> StratisResult<(Option<Sectors>, Option<Sectors>)> {
-        if value >= self.limit {
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
-                format!(
-                    "value specified for start of range, {}, exceeds limit, {}",
-                    value, self.limit
-                ),
-            ));
-        }
-
         let mut prev = None;
         let mut next = None;
         for (&key, _) in self.used.iter() {
@@ -197,6 +187,16 @@ impl PerDevSegments {
     /// Inserting a 0 length range has no effect.
     pub fn insert(&mut self, range: &(Sectors, Sectors)) -> StratisResult<()> {
         let (start, len) = range;
+
+        if *start >= self.limit {
+            return Err(StratisError::Engine(
+                ErrorEnum::Invalid,
+                format!(
+                    "value specified for start of range, {}, exceeds limit, {}",
+                    start, self.limit
+                ),
+            ));
+        }
 
         if *len == Sectors(0) {
             return Ok(());

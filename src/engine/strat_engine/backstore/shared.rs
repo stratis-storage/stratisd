@@ -535,4 +535,11 @@ mod tests {
         assert_eq!(allocator.len(), 0);
         allocator.invariant();
     }
+
+    #[test]
+    /// Verify invariant on PerDevSegment w/ 0 length
+    fn test_allocator_zero_length() {
+        let allocator = PerDevSegments::new(Sectors(0));
+        allocator.invariant();
+    }
 }

@@ -35,8 +35,6 @@ pub struct PerDevSegments {
     // is the offset from the start of the device, the RHS is the length.
     // Uses a BTReeMap so that an iteration over the elements in the tree
     // will be ordered by the value of the LHS.
-    // Invariant: forall (s, l) in used there is no s_i, l_i and
-    // s_(i + 1), l_(i + 1) s.t. s_1 + l_1 >= s_(i+1)
     used: BTreeMap<Sectors, Sectors>,
 }
 
@@ -298,6 +296,27 @@ impl PerDevSegments {
             used: free,
         }
     }
+
+    #[cfg(test)]
+    fn invariant(&self) {
+        // No segment has 0 len
+        assert!(self.used.values().all(|&l| l != Sectors(0)));
+        // No adjacent segments are contiguous, no adjacent segments overlap
+        assert!(self
+            .used
+            .iter()
+            .collect::<Vec<_>>()
+            .windows(2)
+            .all(|l| *l[0].0 + *l[0].1 < *l[1].0));
+        // Last segment does not extend past limit
+        assert!(self
+            .used
+            .iter()
+            .rev()
+            .next()
+            .map(|(s, l)| *s + *l <= self.limit)
+            .unwrap_or(true));
+    }
 }
 
 /// An iterator for PerDevSegments
@@ -409,6 +428,7 @@ mod tests {
             allocator.used.iter().next().unwrap(),
             (&Sectors(10), &Sectors(30))
         );
+        allocator.invariant();
     }
 
     #[test]
@@ -425,6 +445,7 @@ mod tests {
             allocator.used.iter().next().unwrap(),
             (&Sectors(10), &Sectors(30))
         );
+        allocator.invariant();
     }
 
     #[test]
@@ -462,6 +483,7 @@ mod tests {
 
         // overflow limit range
         assert_matches!(allocator.insert(&(Sectors(1), Sectors(128))), Err(_));
+        allocator.invariant();
     }
 
     #[test]
@@ -474,6 +496,7 @@ mod tests {
 
         // overflow max u64
         assert_matches!(allocator.insert(&(Sectors(MAX), Sectors(1))), Err(_));
+        allocator.invariant();
     }
 
     #[test]
@@ -484,6 +507,7 @@ mod tests {
         let result = allocator.locate_prev_and_next(Sectors(37)).unwrap();
 
         assert_eq!(result, (None, None));
+        allocator.invariant();
     }
 
     #[test]
@@ -499,6 +523,7 @@ mod tests {
         // If index is exactly 0, previous and next are both 0.
         let result = allocator.locate_prev_and_next(Sectors(0)).unwrap();
         assert_eq!(result, (Some(Sectors(0)), Some(Sectors(0))));
+        allocator.invariant();
     }
 
     #[test]
@@ -508,5 +533,6 @@ mod tests {
         let mut allocator = PerDevSegments::new(Sectors(400));
         assert_matches!(allocator.insert(&(Sectors(12), Sectors(0))), Ok(_));
         assert_eq!(allocator.len(), 0);
+        allocator.invariant();
     }
 }

@@ -7,13 +7,13 @@ use std::cmp::min;
 use devicemapper::Sectors;
 
 use crate::{
-    engine::strat_engine::{backstore::shared::Segments, metadata::BlockdevSize},
+    engine::strat_engine::{backstore::shared::PerDevSegments, metadata::BlockdevSize},
     stratis::StratisResult,
 };
 
 #[derive(Debug)]
 pub struct RangeAllocator {
-    segments: Segments,
+    segments: PerDevSegments,
 }
 
 impl RangeAllocator {
@@ -23,7 +23,7 @@ impl RangeAllocator {
         limit: BlockdevSize,
         initial_used: &[(Sectors, Sectors)],
     ) -> StratisResult<RangeAllocator> {
-        let mut segments = Segments::new(limit.sectors());
+        let mut segments = PerDevSegments::new(limit.sectors());
         segments.insert_all(initial_used)?;
         Ok(RangeAllocator { segments })
     }
@@ -44,12 +44,12 @@ impl RangeAllocator {
     }
 
     /// Attempt to allocate.
-    /// Returns a Segments object containing the allocated ranges.
+    /// Returns a PerDevSegments object containing the allocated ranges.
     /// If all available sectors are desired, don't use this function.
     /// Write a simple request_all() function to get the result much more
     /// efficiently.
-    pub fn request(&mut self, amount: Sectors) -> Segments {
-        let mut segs = Segments::new(self.segments.limit());
+    pub fn request(&mut self, amount: Sectors) -> PerDevSegments {
+        let mut segs = PerDevSegments::new(self.segments.limit());
         let mut needed = amount;
 
         for (&start, &len) in self.segments.complement().iter() {

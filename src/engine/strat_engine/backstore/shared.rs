@@ -28,7 +28,7 @@ use crate::{
 /// coalesced into a single segments.
 /// * No overlapping segments
 /// * No segments that extend beyond limit
-pub struct Segments {
+pub struct PerDevSegments {
     // the end, no sectors can be allocated beyond this point
     limit: Sectors,
     // A map of chunks of data allocated for a single blockdev. The LHS
@@ -40,11 +40,11 @@ pub struct Segments {
     used: BTreeMap<Sectors, Sectors>,
 }
 
-impl Segments {
-    /// Create a new Segments struct with the designated limit and no used
-    /// ranges.
-    pub fn new(limit: Sectors) -> Segments {
-        Segments {
+impl PerDevSegments {
+    /// Create a new PerDevSegments struct with the designated limit and no
+    /// used ranges.
+    pub fn new(limit: Sectors) -> PerDevSegments {
+        PerDevSegments {
             limit,
             used: BTreeMap::new(),
         }
@@ -231,7 +231,7 @@ impl Segments {
     /// overlap w/ each other.
     /// The operation is atomic; either all ranges or none will be inserted.
     pub fn insert_all(&mut self, ranges: &[(Sectors, Sectors)]) -> StratisResult<()> {
-        let mut temp = Segments::new(self.limit);
+        let mut temp = PerDevSegments::new(self.limit);
         for range in ranges.iter() {
             temp.insert(range)?;
         }
@@ -243,13 +243,13 @@ impl Segments {
         Ok(())
     }
 
-    /// Take the union of two Segments. Require that both Segments objects have
-    /// the same limit, for simplicity.
-    pub fn union(&self, other: &Segments) -> StratisResult<Segments> {
+    /// Take the union of two PerDevSegments. Require that both PerDevSegments
+    /// objects have the same limit, for simplicity.
+    pub fn union(&self, other: &PerDevSegments) -> StratisResult<PerDevSegments> {
         if self.limit != other.limit {
             return Err(StratisError::Engine(
                 ErrorEnum::Invalid,
-                "limits differ between Segments structs, can not do a union".into(),
+                "limits differ between PerDevSegments structs, can not do a union".into(),
             ));
         }
 
@@ -260,7 +260,7 @@ impl Segments {
             .cloned()
             .collect::<BTreeSet<Sectors>>();
 
-        let mut union = Segments::new(self.limit);
+        let mut union = PerDevSegments::new(self.limit);
 
         for key in keys.iter().rev() {
             if let Some(val) = self.used.get(key) {
@@ -274,9 +274,9 @@ impl Segments {
         Ok(union)
     }
 
-    /// A Segments object that is the complement of self, i.e., its used
-    /// ranges are self's free ranges and vice-versa.
-    pub fn complement(&self) -> Segments {
+    /// A PerDevSegments object that is the complement of self, i.e., its
+    /// used ranges are self's free ranges and vice-versa.
+    pub fn complement(&self) -> PerDevSegments {
         let mut free = BTreeMap::new();
         let mut prev_end = Sectors(0);
         for (&start, &len) in self.used.iter() {
@@ -291,14 +291,14 @@ impl Segments {
             free.insert(prev_end, self.limit - prev_end);
         }
 
-        Segments {
+        PerDevSegments {
             limit: self.limit,
             used: free,
         }
     }
 }
 
-/// An iterator for Segments
+/// An iterator for PerDevSegments
 pub struct Iter<'a> {
     items: btree_map::Iter<'a, Sectors, Sectors>,
 }
@@ -393,7 +393,7 @@ mod tests {
     #[test]
     // Verify some proper functioning when allocator initialized with ranges.
     fn test_allocator_initialized_with_range() {
-        let mut allocator = Segments::new(Sectors(128));
+        let mut allocator = PerDevSegments::new(Sectors(128));
 
         let ranges = [
             (Sectors(20), Sectors(10)),
@@ -412,7 +412,7 @@ mod tests {
     #[test]
     /// Verify that insert() properly coalesces adjacent allocations.
     fn test_allocator_insert_ranges_contig() {
-        let mut allocator = Segments::new(Sectors(128));
+        let mut allocator = PerDevSegments::new(Sectors(128));
 
         allocator.insert(&(Sectors(20), Sectors(10))).unwrap();
         allocator.insert(&(Sectors(10), Sectors(10))).unwrap();
@@ -431,13 +431,13 @@ mod tests {
     fn test_max_allocator_range() {
         use std::u64::MAX;
 
-        Segments::new(Sectors(MAX));
+        PerDevSegments::new(Sectors(MAX));
     }
 
     #[test]
     /// Verify that if two argument ranges overlap there is an error.
     fn test_allocator_insert_prev_overlap() {
-        let mut allocator = Segments::new(Sectors(128));
+        let mut allocator = PerDevSegments::new(Sectors(128));
 
         let bad_insert_ranges = [(Sectors(21), Sectors(20)), (Sectors(40), Sectors(40))];
         assert_matches!(allocator.insert_all(&bad_insert_ranges), Err(_))
@@ -446,7 +446,7 @@ mod tests {
     #[test]
     /// Verify that if two argument ranges overlap there is an error.
     fn test_allocator_insert_next_overlap() {
-        let mut allocator = Segments::new(Sectors(128));
+        let mut allocator = PerDevSegments::new(Sectors(128));
 
         let bad_insert_ranges = [(Sectors(40), Sectors(1)), (Sectors(39), Sectors(2))];
         assert_matches!(allocator.insert_all(&bad_insert_ranges), Err(_))
@@ -456,7 +456,7 @@ mod tests {
     /// Verify that insert_ranges() errors when an element outside the range
     /// limit is requested.
     fn test_allocator_failures_overflow_limit() {
-        let mut allocator = Segments::new(Sectors(128));
+        let mut allocator = PerDevSegments::new(Sectors(128));
 
         // overflow limit range
         assert_matches!(allocator.insert(&(Sectors(1), Sectors(128))), Err(_));
@@ -468,7 +468,7 @@ mod tests {
     fn test_allocator_failures_overflow_max() {
         use std::u64::MAX;
 
-        let mut allocator = Segments::new(Sectors(MAX));
+        let mut allocator = PerDevSegments::new(Sectors(MAX));
 
         // overflow max u64
         assert_matches!(allocator.insert(&(Sectors(MAX), Sectors(1))), Err(_));

@@ -473,4 +473,29 @@ mod tests {
         // overflow max u64
         assert_matches!(allocator.insert(&(Sectors(MAX), Sectors(1))), Err(_));
     }
+
+    #[test]
+    /// Verify that if used is empty, the values for both prev and next will
+    /// be None.
+    fn test_allocator_indices_empty() {
+        let allocator = PerDevSegments::new(Sectors(400));
+        let result = allocator.locate_prev_and_next(Sectors(37)).unwrap();
+
+        assert_eq!(result, (None, None));
+    }
+
+    #[test]
+    /// Verify some facts if used is entirely occupied
+    fn test_allocator_indices_full() {
+        let mut allocator = PerDevSegments::new(Sectors(400));
+        allocator.insert(&(Sectors(0), Sectors(400))).unwrap();
+
+        // If index is after 0 only previous will have a value
+        let result = allocator.locate_prev_and_next(Sectors(37)).unwrap();
+        assert_eq!(result, (Some(Sectors(0)), None));
+
+        // If index is exactly 0, previous and next are both 0.
+        let result = allocator.locate_prev_and_next(Sectors(0)).unwrap();
+        assert_eq!(result, (Some(Sectors(0)), Some(Sectors(0))));
+    }
 }

@@ -45,8 +45,9 @@ impl RangeAllocator {
 
     /// Attempt to allocate.
     /// Returns a Segments object containing the allocated ranges.
-    /// If all available sectors are desired, use available() method to
-    /// discover that amount.
+    /// If all available sectors are desired, don't use this function.
+    /// Write a simple request_all() function to get the result much more
+    /// efficiently.
     pub fn request(&mut self, amount: Sectors) -> Segments {
         let mut segs = Segments::new(self.segments.limit());
         let mut needed = amount;

@@ -65,8 +65,9 @@ impl PerDevSegments {
     }
 
     // Locate two adjacent keys in used. LHS <= value and RHS >= value.
-    // If LHS == RHS then they both equal value. If both are None, then
-    // Precondition: value < limit
+    // If LHS == RHS then they both equal value.
+    // Precondition: value <= limit
+    // Postcondition: result == (None, None) <=> used.len() == 0
     fn locate_prev_and_next(
         &self,
         value: Sectors,

@@ -72,8 +72,6 @@ impl PerDevSegments {
         &self,
         value: Sectors,
     ) -> StratisResult<(Option<Sectors>, Option<Sectors>)> {
-        // This condition is necessary for termination of the loop
-        assert!(value <= self.limit);
         let mut prev = None;
         let mut next = None;
         for &key in self.used.keys() {

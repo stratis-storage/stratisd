@@ -322,6 +322,10 @@ impl PerDevSegments {
             .next()
             .map(|(s, l)| *s + *l <= self.limit)
             .unwrap_or(true));
+        // The complement really is the complement
+        let same = self.complement().complement();
+        assert_eq!(same.limit, self.limit);
+        assert_eq!(same.used, self.used);
     }
 }
 

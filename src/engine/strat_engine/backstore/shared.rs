@@ -74,7 +74,7 @@ impl PerDevSegments {
         assert!(value < self.limit);
         let mut prev = None;
         let mut next = None;
-        for (&key, _) in self.used.iter() {
+        for &key in self.used.keys() {
             if value >= key {
                 prev = Some(key);
             }

@@ -435,27 +435,6 @@ mod tests {
     }
 
     #[test]
-    /// Verify that insert_ranges() errors when all sectors have already been
-    /// allocated.
-    fn test_allocator_failures_range_overwrite() {
-        let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
-
-        let request = allocator.request(Sectors(128));
-        assert_eq!(allocator.used(), Sectors(128));
-        assert_eq!(
-            request.iter().collect::<Vec<_>>(),
-            vec![(&Sectors(0), &Sectors(128))]
-        );
-
-        assert!(allocator.segments.complement().iter().next().is_none());
-
-        assert_matches!(
-            allocator.segments.insert_all(&[(Sectors(1), Sectors(1))]),
-            Err(_)
-        );
-    }
-
-    #[test]
     // Verify some proper functioning when allocator initialized with ranges.
     fn test_allocator_initialized_with_range() {
         let mut allocator = PerDevSegments::new(Sectors(128));
@@ -517,6 +496,27 @@ mod tests {
 
         let bad_insert_ranges = [(Sectors(40), Sectors(1)), (Sectors(39), Sectors(2))];
         assert_matches!(allocator.insert_all(&bad_insert_ranges), Err(_))
+    }
+
+    #[test]
+    /// Verify that insert_ranges() errors when all sectors have already been
+    /// allocated.
+    fn test_allocator_failures_range_overwrite() {
+        let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
+
+        let request = allocator.request(Sectors(128));
+        assert_eq!(allocator.used(), Sectors(128));
+        assert_eq!(
+            request.iter().collect::<Vec<_>>(),
+            vec![(&Sectors(0), &Sectors(128))]
+        );
+
+        assert!(allocator.segments.complement().iter().next().is_none());
+
+        assert_matches!(
+            allocator.segments.insert_all(&[(Sectors(1), Sectors(1))]),
+            Err(_)
+        );
     }
 
     #[test]

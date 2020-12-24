@@ -53,6 +53,11 @@ impl PerDevSegments {
         self.used.len()
     }
 
+    /// The number of sectors occupied by all the ranges
+    pub fn sum(&self) -> Sectors {
+        self.used.values().cloned().sum()
+    }
+
     /// The boundary past which no allocation is considered.
     pub fn limit(&self) -> Sectors {
         self.limit

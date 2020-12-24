@@ -97,9 +97,10 @@ mod tests {
         assert_eq!(allocator.available(), Sectors(28));
 
         let request = allocator.request(Sectors(50));
+        assert_eq!(request.len(), 2);
+        assert_eq!(request.sum(), Sectors(28));
         assert_eq!(allocator.used(), Sectors(128));
         assert_eq!(allocator.available(), Sectors(0));
-        assert_eq!(request.len(), 2);
 
         let available = allocator.available();
         allocator.request(available);

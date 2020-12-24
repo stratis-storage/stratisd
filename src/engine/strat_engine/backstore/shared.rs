@@ -115,7 +115,9 @@ impl PerDevSegments {
 
         assert!(len != Sectors(0));
 
-        if start.checked_add(len).is_none() {
+        let end = if let Some(end) = start.checked_add(len) {
+            end
+        } else {
             return Err(StratisError::Engine(
                 ErrorEnum::Invalid,
                 format!(
@@ -123,9 +125,9 @@ impl PerDevSegments {
                     start, len
                 ),
             ));
-        }
+        };
 
-        if start + len > self.limit {
+        if end > self.limit {
             return Err(StratisError::Engine(
                 ErrorEnum::Invalid,
                 format!(

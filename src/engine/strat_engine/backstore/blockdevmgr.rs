@@ -318,7 +318,7 @@ impl BlockDevMgr {
                     BlkDevSegment::new(bd.uuid(), Segment::new(*bd.device(), start, length))
                 });
                 segs.extend(blkdev_segs);
-                alloc += r_segs.iter().map(|(_, l)| l).cloned().sum();
+                alloc += r_segs.sum();
             }
             assert_eq!(alloc, needed);
             lists.push(segs);

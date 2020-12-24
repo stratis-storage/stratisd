@@ -72,7 +72,7 @@ impl PerDevSegments {
         value: Sectors,
     ) -> StratisResult<(Option<Sectors>, Option<Sectors>)> {
         // This condition is necessary for termination of the loop
-        assert!(value < self.limit);
+        assert!(value <= self.limit);
         let mut prev = None;
         let mut next = None;
         for &key in self.used.keys() {
@@ -114,7 +114,7 @@ impl PerDevSegments {
 
         assert!(len != Sectors(0));
 
-        if start + len < start {
+        if start.checked_add(len).is_none() {
             return Err(StratisError::Engine(
                 ErrorEnum::Invalid,
                 format!(
@@ -189,7 +189,7 @@ impl PerDevSegments {
     pub fn insert(&mut self, range: &(Sectors, Sectors)) -> StratisResult<()> {
         let (start, len) = range;
 
-        if *start >= self.limit {
+        if *start > self.limit {
             return Err(StratisError::Engine(
                 ErrorEnum::Invalid,
                 format!(
@@ -477,7 +477,7 @@ mod tests {
     }
 
     #[test]
-    /// Verify that insert_ranges() errors when an element outside the range
+    /// Verify that insert() errors when an element outside the range
     /// limit is requested.
     fn test_allocator_failures_overflow_limit() {
         let mut allocator = PerDevSegments::new(Sectors(128));
@@ -488,7 +488,7 @@ mod tests {
     }
 
     #[test]
-    /// Verify that insert_ranges() errors when an element in a requested range
+    /// Verify that insert() errors when an element in a requested range
     /// exceeds u64::MAX.
     fn test_allocator_failures_overflow_max() {
         use std::u64::MAX;
@@ -541,6 +541,20 @@ mod tests {
     /// Verify invariant on PerDevSegment w/ 0 length
     fn test_allocator_zero_length() {
         let allocator = PerDevSegments::new(Sectors(0));
+        allocator.invariant();
+    }
+
+    #[test]
+    /// Verify that an insertion at the end with 0 length has no effect,
+    /// but with 1 length returns an error.
+    fn test_allocator_end_behavior() {
+        let mut allocator = PerDevSegments::new(Sectors(127));
+        allocator.insert(&(Sectors(127), Sectors(0))).unwrap();
+
+        assert_eq!(allocator.len(), 0);
+
+        assert_matches!(allocator.insert(&(Sectors(127), Sectors(1))), Err(_));
+
         allocator.invariant();
     }
 }

@@ -66,12 +66,12 @@ impl PerDevSegments {
 
     // Locate two adjacent keys in used. LHS <= value and RHS >= value.
     // If LHS == RHS then they both equal value. If both are None, then
-    // used is empty. Returns an error if value > limit.
-    // Postcondition: value < limit
+    // Precondition: value < limit
     fn locate_prev_and_next(
         &self,
         value: Sectors,
     ) -> StratisResult<(Option<Sectors>, Option<Sectors>)> {
+        assert!(value < self.limit);
         let mut prev = None;
         let mut next = None;
         for (&key, _) in self.used.iter() {

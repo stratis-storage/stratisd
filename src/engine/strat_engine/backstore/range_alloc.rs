@@ -414,11 +414,15 @@ mod tests {
     /// 8. Verify that number of available sectors is 60, used is 68.
     /// 9. Request all available, then verify that nothing is left.
     fn test_allocator_allocations() {
-        let mut allocator = RangeAllocator::new(
-            BlockdevSize::new(Sectors(128)),
-            &[(Sectors(10), Sectors(100))],
-        )
-        .unwrap();
+        let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
+
+        assert_eq!(allocator.used(), Sectors(0));
+        assert_eq!(allocator.available(), Sectors(128));
+
+        allocator
+            .segments
+            .insert_all(&[(Sectors(10), Sectors(100))])
+            .unwrap();
 
         assert_eq!(allocator.used(), Sectors(100));
         assert_eq!(allocator.available(), Sectors(28));

@@ -40,7 +40,7 @@ impl RangeAllocator {
 
     /// Allocated sectors
     pub fn used(&self) -> Sectors {
-        self.segments.iter().map(|(_, l)| l).cloned().sum()
+        self.segments.sum()
     }
 
     /// Attempt to allocate.

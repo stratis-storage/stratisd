@@ -529,6 +529,24 @@ mod tests {
     }
 
     #[test]
+    /// Verify that locate_prev_and_next works even if value exceeds limit
+    fn test_search_over_limit() {
+        let mut allocator = PerDevSegments::new(Sectors(400));
+        assert_eq!(
+            allocator.locate_prev_and_next(Sectors(500)).unwrap(),
+            (None, None)
+        );
+
+        allocator.insert(&(Sectors(0), Sectors(400))).unwrap();
+        assert_eq!(
+            allocator.locate_prev_and_next(Sectors(500)).unwrap(),
+            (Some(Sectors(0)), None)
+        );
+
+        allocator.invariant();
+    }
+
+    #[test]
     /// Verify that a segment of length 0 can not be inserted. Such a segment
     /// is just silently dropped if specified.
     fn test_allocator_zero_length_insertion() {

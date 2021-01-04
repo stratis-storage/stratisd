@@ -107,8 +107,7 @@ impl PerDevSegments {
         (Sectors, Sectors),
         Option<(Sectors, Sectors)>,
     )> {
-        let (start, len) = range;
-        let (start, len) = (*start, *len);
+        let &(start, len) = range;
 
         assert!(len != Sectors(0));
 
@@ -187,9 +186,9 @@ impl PerDevSegments {
     /// is contiguous with an existing range, combine the two.
     /// Inserting a 0 length range has no effect.
     pub fn insert(&mut self, range: &(Sectors, Sectors)) -> StratisResult<()> {
-        let (start, len) = range;
+        let &(start, len) = range;
 
-        if *start > self.limit {
+        if start > self.limit {
             return Err(StratisError::Engine(
                 ErrorEnum::Invalid,
                 format!(
@@ -199,11 +198,11 @@ impl PerDevSegments {
             ));
         }
 
-        if *len == Sectors(0) {
+        if len == Sectors(0) {
             return Ok(());
         }
 
-        let (prev, next) = self.locate_prev_and_next(*start)?;
+        let (prev, next) = self.locate_prev_and_next(start)?;
         let (prev_res, (new_start, new_len), next_res) =
             self.insertion_result(prev, next, range)?;
 

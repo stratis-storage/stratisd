@@ -148,8 +148,8 @@ impl StratBlockDev {
     /// Find some sector ranges that could be allocated. If more
     /// sectors are needed than are available, return partial results.
     /// If all available sectors are desired, don't use this function.
-    /// Write a simple request_all() function in the RangeAllocator
-    /// implmentation to get the result much more efficiently.
+    /// Define a request_all() function here and have it invoke the
+    /// RangeAllocator::request_all() function.
     pub fn request_space(&mut self, size: Sectors) -> PerDevSegments {
         self.used.request(size)
     }

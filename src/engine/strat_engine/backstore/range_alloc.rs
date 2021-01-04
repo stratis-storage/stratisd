@@ -369,11 +369,21 @@ impl RangeAllocator {
         self.segments.sum()
     }
 
+    #[allow(dead_code)]
+    /// Just allocate all the sectors that are available.
+    pub fn request_all(&mut self) -> PerDevSegments {
+        let segs = self.segments.complement();
+
+        let mut temp = PerDevSegments::new(self.segments.limit);
+        temp.insert(&(Sectors(0), self.segments.limit))
+            .expect("exactly one segment to fill whole range");
+        self.segments = temp;
+
+        segs
+    }
+
     /// Attempt to allocate.
     /// Returns a PerDevSegments object containing the allocated ranges.
-    /// If all available sectors are desired, don't use this function.
-    /// Write a simple request_all() function to get the result much more
-    /// efficiently.
     pub fn request(&mut self, amount: Sectors) -> PerDevSegments {
         let mut segs = PerDevSegments::new(self.segments.limit());
         let mut needed = amount;
@@ -394,6 +404,31 @@ impl RangeAllocator {
             .union(&segs)
             .expect("all segments verified to be in available ranges");
         segs
+    }
+
+    #[cfg(test)]
+    fn invariant(&self) {
+        // Verify that calling request_all() has the identical effect to
+        // calling request() and requesting all available.
+        let mut dup1 = RangeAllocator {
+            segments: PerDevSegments {
+                limit: self.segments.limit,
+                used: self.segments.used.clone(),
+            },
+        };
+        let mut dup2 = RangeAllocator {
+            segments: PerDevSegments {
+                limit: self.segments.limit,
+                used: self.segments.used.clone(),
+            },
+        };
+        let result1 = dup1.request_all();
+        let result2 = dup2.request(dup2.available());
+        assert_eq!(result1.limit, result2.limit);
+        assert_eq!(result1.used, result2.used);
+
+        assert_eq!(dup1.available(), Sectors(0));
+        assert_eq!(dup2.available(), Sectors(0));
     }
 }
 
@@ -435,6 +470,8 @@ mod tests {
         let available = allocator.available();
         allocator.request(available);
         assert_eq!(allocator.available(), Sectors(0));
+
+        allocator.invariant();
     }
 
     #[test]
@@ -520,6 +557,8 @@ mod tests {
             allocator.segments.insert_all(&[(Sectors(1), Sectors(1))]),
             Err(_)
         );
+
+        allocator.invariant();
     }
 
     #[test]

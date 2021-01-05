@@ -439,7 +439,7 @@ def _build_results(cargo_outdated, koji_repo_dict):
 
     not_found = set(
         node
-        for node in cargo_outdated.node
+        for node in cargo_outdated.nodes
         if node not in koji_repo_dict and node not in up_to_date
     )
 

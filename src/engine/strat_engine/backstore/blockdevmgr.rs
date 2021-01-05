@@ -131,7 +131,10 @@ fn get_crypt_handles(blockdevs: &[StratBlockDev]) -> StratisResult<Vec<CryptHand
 
 #[derive(Debug)]
 pub struct BlockDevMgr {
+    /// All the block devices that belong to this block dev manager.
     block_devs: Vec<StratBlockDev>,
+    /// The most recent time that variable length metadata was saved to the
+    /// devices managed by this block dev manager.
     last_update_time: Option<DateTime<Utc>>,
 }
 
@@ -310,12 +313,12 @@ impl BlockDevMgr {
                     break;
                 }
 
-                let (gotten, r_segs) = bd.request_space(needed - alloc);
-                let blkdev_segs = r_segs.into_iter().map(|(start, length)| {
+                let r_segs = bd.request_space(needed - alloc);
+                let blkdev_segs = r_segs.iter().map(|(&start, &length)| {
                     BlkDevSegment::new(bd.uuid(), Segment::new(*bd.device(), start, length))
                 });
                 segs.extend(blkdev_segs);
-                alloc += gotten;
+                alloc += r_segs.sum();
             }
             assert_eq!(alloc, needed);
             lists.push(segs);

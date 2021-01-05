@@ -1,3 +1,43 @@
+stratisd 2.3.1 (UNRELEASED)
+===========================
+
+Recommended Rust toolchain version: 1.48.0
+Lowest supported Rust toolchain version: 1.47
+
+Recommended Python interpreter: 3.8.6
+Lowest supported Python interpreter: 3.6.8
+Python linter: pylint (2.4.4)
+Python auto-formatter: black (19.10b0)
+Python import sorter: isort (4.3.21)
+
+YAML linter: yamllint (1.25.0)
+
+- Enrich error when pool devices are not all wiped of metadata:
+  https://github.com/stratis-storage/stratisd/issues/2354
+  https://github.com/stratis-storage/stratisd/pull/2356
+
+- Remove support in engine for incorporating random behavior in the sim engine:
+  https://github.com/stratis-storage/stratisd/issues/2336
+  https://github.com/stratis-storage/stratisd/pull/2343
+  https://github.com/stratis-storage/stratisd/pull/2338
+
+- Add an is_sim method to the Engine trait:
+  https://github.com/stratis-storage/stratisd/pull/2344
+
+- Refactor range allocation:
+  https://github.com/stratis-storage/stratisd/pull/2364
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/2365
+  https://github.com/stratis-storage/stratisd/pull/2363
+  https://github.com/stratis-storage/stratisd/pull/2352
+  https://github.com/stratis-storage/stratisd/pull/2351
+  https://github.com/stratis-storage/stratisd/pull/2350
+  https://github.com/stratis-storage/stratisd/pull/2345
+  https://github.com/stratis-storage/stratisd/pull/2342
+  https://github.com/stratis-storage/stratisd/pull/2335
+
+
 stratisd 2.3.0
 ==============
 Recommended Rust toolchain version: 1.48.0

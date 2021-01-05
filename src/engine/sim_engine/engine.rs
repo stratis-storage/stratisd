@@ -10,9 +10,11 @@ use std::{
 
 use serde_json::{json, Value};
 
+use devicemapper::DM;
+
 use crate::{
     engine::{
-        engine::{Engine, Eventable, KeyActions, Pool, Report},
+        engine::{Engine, KeyActions, Pool, Report},
         event::get_engine_listener_list,
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         sim_engine::{keys::SimKeyActions, pool::SimPool},
@@ -207,7 +209,7 @@ impl Engine for SimEngine {
             .collect()
     }
 
-    fn get_eventable(&self) -> Option<&'static dyn Eventable> {
+    fn get_dm_context(&self) -> Option<&'static DM> {
         None
     }
 

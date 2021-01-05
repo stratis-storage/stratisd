@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 use serde_json::Value;
 use uuid::Uuid;
 
-use devicemapper::{Bytes, Sectors};
+use devicemapper::{Bytes, Sectors, DM};
 
 use crate::{
     engine::types::{
@@ -334,11 +334,11 @@ pub trait Engine: Debug + Report {
     /// Get mutable references to all pools belonging to this engine.
     fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut dyn Pool)>;
 
-    /// If the engine would like to include an event in the message loop, it
-    /// may return an Eventable from this method.
-    fn get_eventable(&self) -> Option<&'static dyn Eventable>;
+    /// Return the DM file descriptor to check for DM events. If the engine
+    /// is the sim engine, the value is None.
+    fn get_dm_context(&self) -> Option<&'static DM>;
 
-    /// Notify the engine that an event has occurred on the Eventable.
+    /// Notify the engine that an event has occurred on the DM file descriptor.
     fn evented(&mut self) -> StratisResult<()>;
 
     /// Get the handler for kernel keyring operations.
@@ -349,15 +349,4 @@ pub trait Engine: Debug + Report {
 
     /// Return true if this engine is the simulator engine, otherwise false.
     fn is_sim(&self) -> bool;
-}
-
-/// Allows an Engine to include a fd in the event loop. See
-/// Engine::get_eventable() and Engine::evented().
-pub trait Eventable {
-    /// Get fd the engine would like to monitor for activity
-    fn get_pollable_fd(&self) -> RawFd;
-
-    /// Assuming level-triggered semantics, clear the event that caused the
-    /// Eventable to trigger.
-    fn clear_event(&self) -> StratisResult<()>;
 }

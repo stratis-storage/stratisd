@@ -40,7 +40,16 @@ pub fn get_bdas(infos: &HashMap<DevUuid, &LStratisInfo>) -> StratisResult<HashMa
     fn read_bda(info: &LStratisInfo) -> StratisResult<BDA> {
         let f = &mut OpenOptions::new().read(true).open(&info.ids.devnode)?;
         let read_results = StaticHeader::read_sigblocks(f);
-        let header = StaticHeader::repair_sigblocks(f, read_results, StaticHeader::write_header);
+        let header =
+            match StaticHeader::repair_sigblocks(f, read_results, StaticHeader::write_header) {
+                Ok(Some(header)) => header,
+                Ok(None) => {
+                    return Err(StratisError::Error(
+                        "Failed to find valid Stratis signature in header".to_string(),
+                    ))
+                }
+                Err(err) => return Err(err),
+            };
         BDA::load(header, f)?.ok_or_else(|| {
             StratisError::Error(format!("Failed to read BDA from device: {}", info.ids))
         })

@@ -54,20 +54,13 @@ impl BDA {
         Ok(BDA { header, regions })
     }
 
-    /// Load a BDA on initial setup of a device.
+    /// Load a BDA on initial setup of a device, given valid StaticHeader.
+    /// Returns None if no valid StaticHeader exists.
     /// Returns None if no BDA appears to exist.
-    pub fn load<F>(
-        static_header: StratisResult<Option<StaticHeader>>,
-        f: &mut F,
-    ) -> StratisResult<Option<BDA>>
+    pub fn load<F>(header: StaticHeader, f: &mut F) -> StratisResult<Option<BDA>>
     where
         F: Read + Seek + SyncAll,
     {
-        let header = match static_header {
-            Ok(Some(header)) => header,
-            Ok(None) => return Ok(None),
-            Err(e) => return Err(e),
-        };
         // Assume that, since a valid StaticHeader was found on the device,
         // that this implies that BDA::initialize() was succesfully executed
         // sometime in the past. Since that is the case, valid MDA headers
@@ -253,7 +246,7 @@ mod tests {
             prop_assert!(loaded_state.map(|s| &s == state).unwrap_or(false));
 
             let read_results = StaticHeader::read_sigblocks(&mut buf);
-            let header = StaticHeader::repair_sigblocks(&mut buf, read_results, StaticHeader::write_header);
+            let header = StaticHeader::repair_sigblocks(&mut buf, read_results, StaticHeader::write_header).unwrap().unwrap();
             let mut bda = BDA::load(header, &mut buf).unwrap().unwrap();
             let loaded_state = bda.load_state(&mut buf).unwrap();
             prop_assert!(loaded_state.map(|s| &s == state).unwrap_or(false));

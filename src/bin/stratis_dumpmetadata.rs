@@ -23,7 +23,9 @@ fn run(devpath: &str) -> Result<(), String> {
     let read_results = StaticHeader::read_sigblocks(&mut devfile);
     println!("{:#?}", read_results);
     let header =
-        StaticHeader::repair_sigblocks(&mut devfile, read_results, StaticHeader::do_nothing);
+        StaticHeader::repair_sigblocks(&mut devfile, read_results, StaticHeader::do_nothing)
+            .map_err(|repair_error| format!("No valid StaticHeader found: {}", repair_error))?
+            .ok_or_else(|| "No valid Stratis signature found".to_string())?;
     let bda = BDA::load(header, &mut devfile)
         .map_err(|bda_load_error| format!("BDA detected but error found: {}", bda_load_error))?
         .ok_or_else(|| "No Stratis BDA metadata found".to_string())?;

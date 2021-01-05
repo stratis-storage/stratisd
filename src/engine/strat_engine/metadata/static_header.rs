@@ -279,9 +279,14 @@ impl StaticHeader {
     }
 
     /// Try to find a valid StaticHeader on a device.
+    /// Pass StaticHeader::write_header as closure in order to
+    /// repair header in the case of an ill-formed, unreadable, or stale signature block,
+    /// or pass StaticHeader::do_nothing in order to leave the header unchanged.
     /// Return the latest copy that validates as a Stratis BDA, however verify both
-    /// copies and if one validates but one does not, re-write the one that is incorrect.  If both
-    /// copies are valid, but one is newer than the other, rewrite the older one to match.
+    /// copies and if one validates but one does not, re-write the one that is incorrect or leave
+    /// it be, depending on the closure parameter.  If both
+    /// copies are valid, but one is newer than the other, rewrite the older one to match or leave
+    /// it be depending on the closure paraemter.
     /// Return None if it's not a Stratis device.
     /// Return an error if the metadata seems to indicate that the device is
     /// a Stratis device, but no well-formed signature block could be read.

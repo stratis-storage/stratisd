@@ -51,7 +51,7 @@ impl SimPool {
         (
             Uuid::new_v4(),
             SimPool {
-                block_devs: HashMap::from_iter(device_pairs),
+                block_devs: device_pairs.collect(),
                 cache_devs: HashMap::new(),
                 filesystems: Table::default(),
                 redundancy,
@@ -191,7 +191,7 @@ impl Pool for SimPool {
         _pool_uuid: PoolUuid,
         specs: &[(&'b str, Option<Sectors>)],
     ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid)>> {
-        let names: HashMap<_, _> = HashMap::from_iter(specs.iter().map(|&tup| (tup.0, tup.1)));
+        let names: HashMap<_, _> = specs.iter().map(|&tup| (tup.0, tup.1)).collect();
 
         names.iter().fold(Ok(()), |res, (name, _)| {
             res.and_then(|()| validate_name(name))

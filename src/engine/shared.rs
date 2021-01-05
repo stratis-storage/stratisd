@@ -6,7 +6,6 @@ use std::{
     collections::{hash_map::RandomState, HashSet},
     fs::File,
     io::Read,
-    iter::FromIterator,
     os::unix::io::{AsRawFd, FromRawFd, RawFd},
     path::{Path, PathBuf},
 };
@@ -78,8 +77,8 @@ pub fn init_cache_idempotent_or_err<I>(
 where
     I: Iterator<Item = PathBuf>,
 {
-    let input_devices = HashSet::from_iter(blockdev_paths.iter().map(|p| p.to_path_buf()));
-    let existing_devices = HashSet::<_, RandomState>::from_iter(existing_iter);
+    let input_devices: HashSet<_> = blockdev_paths.iter().map(|p| p.to_path_buf()).collect();
+    let existing_devices = existing_iter.collect();
     if input_devices == existing_devices {
         Ok(SetCreateAction::empty())
     } else {

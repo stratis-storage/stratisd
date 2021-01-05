@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, iter::FromIterator, path::Path, vec::Vec};
+use std::{collections::HashMap, path::Path, vec::Vec};
 
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
@@ -313,13 +313,13 @@ impl<'a> Into<Value> for &'a StratPool {
     // Precondition: (&ThinPool).into() pattern matches Value::Object(_)
     // Precondition: (&Backstore).into() pattern matches Value::Object(_)
     fn into(self) -> Value {
-        let mut map = Map::from_iter(
+        let mut map: Map<_, _> =
             if let Value::Object(map) = <&ThinPool as Into<Value>>::into(&self.thin_pool) {
                 map.into_iter()
             } else {
                 unreachable!("ThinPool conversion returns a JSON object")
-            },
-        );
+            }
+            .collect();
         map.extend(
             if let Value::Object(map) = <&Backstore as Into<Value>>::into(&self.backstore) {
                 map.into_iter()
@@ -396,7 +396,7 @@ impl Pool for StratPool {
         pool_uuid: PoolUuid,
         specs: &[(&'b str, Option<Sectors>)],
     ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid)>> {
-        let names: HashMap<_, _> = HashMap::from_iter(specs.iter().map(|&tup| (tup.0, tup.1)));
+        let names: HashMap<_, _> = specs.iter().map(|&tup| (tup.0, tup.1)).collect();
 
         names.iter().fold(Ok(()), |res, (name, _)| {
             res.and_then(|()| validate_name(name))

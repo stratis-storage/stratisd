@@ -218,7 +218,10 @@ pub fn get_blockdevs(
         // conclusion is metadata corruption.
         let segments = segment_table.get(&dev_uuid);
 
-        let physical_path = &info.ids.devnode;
+        let physical_path = match &info.luks {
+            Some(luks) => &luks.ids.devnode,
+            None => &info.ids.devnode,
+        };
         let handle = CryptHandle::setup(physical_path)?;
         Ok((
             tier,

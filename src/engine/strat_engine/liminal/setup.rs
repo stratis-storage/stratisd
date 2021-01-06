@@ -44,9 +44,10 @@ pub fn get_bdas(infos: &HashMap<DevUuid, &LStratisInfo>) -> StratisResult<HashMa
             match StaticHeader::repair_sigblocks(f, read_results, StaticHeader::write_header) {
                 Ok(Some(header)) => header,
                 Ok(None) => {
-                    return Err(StratisError::Error(
-                        "Failed to find valid Stratis signature in header".to_string(),
-                    ))
+                    return Err(StratisError::Error(format!(
+                        "Failed to find valid Stratis signature in header from device: {}",
+                        info.ids
+                    )))
                 }
                 Err(err) => return Err(err),
             };

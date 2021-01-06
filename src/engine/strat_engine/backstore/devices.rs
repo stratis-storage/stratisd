@@ -33,7 +33,7 @@ use crate::{
             names::KeyDescription,
             udev::{block_device_apply, decide_ownership, get_udev_property, UdevOwnership},
         },
-        types::{BlockDevPath, DevUuid, EncryptionInfo, PoolUuid},
+        types::{DevUuid, EncryptionInfo, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -242,14 +242,6 @@ fn process_devices(
     Ok(infos)
 }
 
-/// A handle to a device that may or may not be encrypted. This handle
-/// contains the necessary information for writing metadata to both
-/// encrypted and unencrypted devices.
-enum MaybeEncrypted {
-    Encrypted(CryptHandle),
-    Unencrypted(PathBuf),
-}
-
 // Check coherence of pool and device UUIDs against a set of current UUIDs.
 // If the selection of devices is incompatible with the current
 // state of the set, or simply invalid, return an error.
@@ -446,12 +438,7 @@ pub fn initialize_devices(
                 })?;
             };
 
-            map_device_nums(
-                &handle
-                    .logical_device_path()
-                    .expect("Initialization completed successfully"),
-            )
-            .map(|dn| (dn, device_size))
+            map_device_nums(handle.activated_device_path()).map(|dn| (dn, device_size))
         }
 
         let mut handle = CryptInitializer::new(physical_path.to_owned(), pool_uuid, dev_uuid)
@@ -459,13 +446,13 @@ pub fn initialize_devices(
         match initialize_encrypted_with_err(&mut handle, key_description, enable_clevis) {
             Ok((devno, devsize)) => Ok((handle, devno, devsize)),
             Err(error) => {
+                let path = handle.luks2_device_path().display().to_string();
                 if let Err(e) = handle.wipe() {
                     warn!(
                         "Failed to clean up encrypted device {}; cleanup \
                         was attempted because initialization of the device \
                         failed: {}",
-                        handle.physical_device_path().display(),
-                        e
+                        path, e
                     );
                 }
                 Err(error)
@@ -474,7 +461,7 @@ pub fn initialize_devices(
     }
 
     fn initialize_stratis_metadata(
-        path: &BlockDevPath,
+        physical_path: &Path,
         devno: Device,
         pool_uuid: PoolUuid,
         dev_uuid: DevUuid,
@@ -483,7 +470,11 @@ pub fn initialize_devices(
         crypt_handle: Option<CryptHandle>,
     ) -> StratisResult<StratBlockDev> {
         let (mda_data_size, data_size) = sizes;
-        let mut f = OpenOptions::new().write(true).open(path.metadata_path())?;
+        let metadata_path = match crypt_handle {
+            Some(ref ch) => ch.activated_device_path(),
+            None => physical_path,
+        };
+        let mut f = OpenOptions::new().write(true).open(metadata_path)?;
 
         // NOTE: Encrypted devices will discard the hardware ID as encrypted devices
         // are always represented as logical, software-based devicemapper devices
@@ -493,7 +484,7 @@ pub fn initialize_devices(
             (_, Some(Ok(ref hw_id))) => Some(hw_id.to_owned()),
             (_, Some(Err(_))) => {
                 warn!("Value for ID_WWN for device {} obtained from the udev database could not be decoded; inserting device into pool with UUID {} anyway",
-                      path.physical_path().display(),
+                      physical_path.display(),
                       pool_uuid.to_simple_ref());
                 None
             }
@@ -509,19 +500,19 @@ pub fn initialize_devices(
         );
 
         bda.and_then(|bda| {
-            StratBlockDev::new(devno, path.to_owned(), bda, &[], None, hw_id, crypt_handle)
+            StratBlockDev::new(devno, physical_path, bda, &[], None, hw_id, crypt_handle)
         })
     }
 
     /// Clean up an encrypted device after initialization failure.
-    fn clean_up_encrypted(mut handle: CryptHandle) {
+    fn clean_up_encrypted(handle: CryptHandle) {
+        let path = handle.luks2_device_path().display().to_string();
         if let Err(e) = handle.wipe() {
             warn!(
                 "Failed to clean up encrypted device {}; cleanup \
                 was attempted because initialization of the device \
                 failed; clean up failure cause: {}",
-                handle.physical_device_path().display(),
-                e,
+                path, e,
             );
         }
     }
@@ -562,7 +553,7 @@ pub fn initialize_devices(
         encryption_info: Option<EncryptionInfo>,
     ) -> StratisResult<StratBlockDev> {
         let dev_uuid = Uuid::new_v4();
-        let (maybe_encrypted, devno, blockdev_size) = match encryption_info {
+        let (handle, devno, blockdev_size) = match encryption_info {
             Some(ref info) => initialize_encrypted(
                 &dev_info.devnode,
                 pool_uuid,
@@ -576,10 +567,7 @@ pub fn initialize_devices(
                 debug!(
                     "Info on physical device {}, logical device {}",
                     &dev_info.devnode.display(),
-                    handle
-                        .logical_device_path()
-                        .expect("Initialization must have succeeded")
-                        .display(),
+                    handle.activated_device_path().display(),
                 );
                 debug!(
                     "Physical device size: {}, logical device size: {}",
@@ -590,43 +578,15 @@ pub fn initialize_devices(
                     "Physical device numbers: {}, logical device numbers: {}",
                     dev_info.devno, devno,
                 );
-                (MaybeEncrypted::Encrypted(handle), devno, devsize)
+                (Some(handle), devno, devsize)
             })?,
-            None => (
-                MaybeEncrypted::Unencrypted(dev_info.devnode.clone()),
-                dev_info.devno,
-                dev_info.size.sectors(),
-            ),
+            None => (None, dev_info.devno, dev_info.size.sectors()),
         };
 
-        let (path, handle) = match maybe_encrypted {
-            MaybeEncrypted::Encrypted(handle) => {
-                let logical_path = match handle.logical_device_path().ok_or_else(|| {
-                    StratisError::Error(format!(
-                        "Encrypted device {} appears not to be activated",
-                        handle.physical_device_path().display(),
-                    ))
-                }) {
-                    Ok(path) => path,
-                    Err(e) => {
-                        clean_up_encrypted(handle);
-                        return Err(e);
-                    }
-                };
-                match BlockDevPath::mapped_device_path(handle.physical_device_path(), &logical_path)
-                {
-                    Ok(path) => (path, Some(handle)),
-                    Err(e) => {
-                        clean_up_encrypted(handle);
-                        return Err(StratisError::from(e));
-                    }
-                }
-            }
-            MaybeEncrypted::Unencrypted(path) => (BlockDevPath::physical_device_path(&path), None),
-        };
+        let physical_path = &dev_info.devnode;
         let is_encrypted = handle.is_some();
         let blockdev = initialize_stratis_metadata(
-            &path,
+            physical_path,
             devno,
             pool_uuid,
             dev_uuid,
@@ -636,13 +596,13 @@ pub fn initialize_devices(
         );
         if blockdev.is_err() {
             if is_encrypted {
-                let handle = match CryptHandle::setup(path.physical_path()) {
+                let handle = match CryptHandle::setup(physical_path) {
                     Ok(Some(h)) => h,
                     Ok(None) => {
                         let error = format!(
                             "Device {} appears not to be encrypted; cannot roll back encryption \
                             operation",
-                            path.physical_path().display(),
+                            physical_path.display(),
                         );
                         warn!("{}", error);
                         return Err(StratisError::Error(error));
@@ -652,7 +612,7 @@ pub fn initialize_devices(
                             "Failed to clean up encrypted device after a failure to write \
                             Stratis metadata to the initialized encrypted device {}; the \
                             cause of the failure: {}",
-                            path.physical_path().display(),
+                            physical_path.display(),
                             e,
                         );
                         return Err(StratisError::from(e));
@@ -660,7 +620,7 @@ pub fn initialize_devices(
                 };
                 clean_up_encrypted(handle);
             } else {
-                clean_up_unencrypted(path.physical_path());
+                clean_up_unencrypted(physical_path);
             }
         }
         blockdev
@@ -671,7 +631,7 @@ pub fn initialize_devices(
         match initialize_one(&dev_info, pool_uuid, mda_data_size, encryption_info.clone()) {
             Ok(blockdev) => initialized_blockdevs.push(blockdev),
             Err(err) => {
-                if let Err(err) = wipe_blockdevs(&mut initialized_blockdevs) {
+                if let Err(err) = wipe_blockdevs(initialized_blockdevs) {
                     warn!("Failed to clean up some devices after initialization of device {} for pool with UUID {} failed: {}",
                           dev_info.devnode.display(),
                           pool_uuid.to_simple_ref(),
@@ -687,12 +647,15 @@ pub fn initialize_devices(
 /// Wipe some blockdevs of their identifying headers.
 /// Return an error if any of the blockdevs could not be wiped.
 /// If an error occurs while wiping a blockdev, attempt to wipe all remaining.
-pub fn wipe_blockdevs(blockdevs: &mut [StratBlockDev]) -> StratisResult<()> {
+pub fn wipe_blockdevs(blockdevs: Vec<StratBlockDev>) -> StratisResult<()> {
     let unerased_devnodes: Vec<_> = blockdevs
-        .iter_mut()
-        .filter_map(|bd| match bd.disown() {
-            Err(e) => Some((bd.devnode().physical_path(), e)),
-            _ => None,
+        .into_iter()
+        .filter_map(|bd| {
+            let path = bd.physical_path().to_owned();
+            match bd.disown() {
+                Err(e) => Some((path, e)),
+                _ => None,
+            }
         })
         .collect();
 
@@ -750,7 +713,7 @@ mod tests {
             )));
         }
 
-        let mut blockdevs = initialize_devices(
+        let blockdevs = initialize_devices(
             dev_infos,
             pool_uuid,
             MDADataSize::default(),
@@ -768,7 +731,7 @@ mod tests {
 
         let stratis_devnodes: Vec<PathBuf> = blockdevs
             .iter()
-            .map(|bd| bd.devnode().metadata_path().to_owned())
+            .map(|bd| bd.metadata_path().to_owned())
             .collect();
 
         let stratis_identifiers: Vec<Option<StratisIdentifiers>> = stratis_devnodes
@@ -866,7 +829,7 @@ mod tests {
                 )));
         }
 
-        wipe_blockdevs(&mut blockdevs)?;
+        wipe_blockdevs(blockdevs)?;
 
         for path in paths {
             if key_description.is_some() {

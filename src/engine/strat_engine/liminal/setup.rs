@@ -23,7 +23,7 @@ use crate::{
             metadata::BDA,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
         },
-        types::{BlockDevPath, BlockDevTier, DevUuid},
+        types::{BlockDevTier, DevUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -218,17 +218,13 @@ pub fn get_blockdevs(
         // conclusion is metadata corruption.
         let segments = segment_table.get(&dev_uuid);
 
-        let path = match &info.luks {
-            Some(luks) => BlockDevPath::mapped_device_path(&luks.ids.devnode, &info.ids.devnode)?,
-            None => BlockDevPath::physical_device_path(&info.ids.devnode),
-        };
-
-        let handle = CryptHandle::setup(path.physical_path())?;
+        let physical_path = &info.ids.devnode;
+        let handle = CryptHandle::setup(physical_path)?;
         Ok((
             tier,
             StratBlockDev::new(
                 info.ids.device_number,
-                path,
+                physical_path,
                 bda,
                 segments.unwrap_or(&vec![]),
                 bd_save.user_info.clone(),

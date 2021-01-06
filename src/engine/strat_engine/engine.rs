@@ -6,11 +6,11 @@ use std::{clone::Clone, collections::HashMap, path::Path};
 
 use serde_json::Value;
 
-use devicemapper::DmNameBuf;
+use devicemapper::{DmNameBuf, DM};
 
 use crate::{
     engine::{
-        engine::{Eventable, KeyActions},
+        engine::KeyActions,
         event::get_engine_listener_list,
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         strat_engine::{
@@ -308,7 +308,7 @@ impl Engine for StratEngine {
             .collect()
     }
 
-    fn get_eventable(&self) -> Option<&'static dyn Eventable> {
+    fn get_dm_context(&self) -> Option<&'static DM> {
         Some(get_dm())
     }
 

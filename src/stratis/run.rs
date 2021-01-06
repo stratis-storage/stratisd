@@ -134,11 +134,11 @@ pub fn run(sim: bool) -> StratisResult<()> {
         events: libc::POLLIN,
     });
 
-    let eventable = engine.borrow().get_eventable();
+    let eventable = engine.borrow().get_dm_context();
 
     if let Some(evt) = eventable {
         fds.push(libc::pollfd {
-            fd: evt.get_pollable_fd(),
+            fd: evt.file().as_raw_fd(),
             revents: 0,
             events: libc::POLLIN,
         });
@@ -168,7 +168,7 @@ pub fn run(sim: bool) -> StratisResult<()> {
 
         if let Some(evt) = eventable {
             if fds[FD_INDEX_ENGINE].revents != 0 {
-                evt.clear_event()?;
+                evt.arm_poll()?;
                 engine.borrow_mut().evented()?;
             }
         }

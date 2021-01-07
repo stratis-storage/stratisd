@@ -4,9 +4,7 @@
 
 use std::{
     cmp::Ordering,
-    convert::TryInto,
     io::{Read, Seek, SeekFrom},
-    num::TryFromIntError,
 };
 
 use byteorder::{ByteOrder, LittleEndian};
@@ -73,11 +71,11 @@ impl MDARegions {
         let region_size = mda_size.region_size();
         let region_size_bytes = region_size.sectors().bytes();
         for region in 0..mda_size::NUM_MDA_REGIONS {
-            f.seek(SeekFrom::Start(
-                MDARegions::mda_offset(header_size, region, region_size_bytes)
-                    .try_into()
-                    .map_err(|e: TryFromIntError| StratisError::Error(e.to_string()))?,
-            ))?;
+            f.seek(SeekFrom::Start(convert_int!(
+                MDARegions::mda_offset(header_size, region, region_size_bytes),
+                u128,
+                u64
+            )?))?;
             f.write_all(&hdr_buf)?;
         }
 
@@ -113,11 +111,11 @@ impl MDARegions {
         // been corrupted, return an error.
         let mut load_a_region = |index: usize| -> StratisResult<Option<MDAHeader>> {
             let mut hdr_buf = [0u8; mda_size::_MDA_REGION_HDR_SIZE];
-            f.seek(SeekFrom::Start(
-                MDARegions::mda_offset(header_size, index, region_size_bytes)
-                    .try_into()
-                    .map_err(|e: TryFromIntError| StratisError::Error(e.to_string()))?,
-            ))?;
+            f.seek(SeekFrom::Start(convert_int!(
+                MDARegions::mda_offset(header_size, index, region_size_bytes),
+                u128,
+                u64
+            )?))?;
             f.read_exact(&mut hdr_buf)?;
             Ok(MDAHeader::from_buf(&hdr_buf)?)
         };
@@ -180,11 +178,11 @@ impl MDARegions {
         // Write data to a region specified by index.
         let region_size = self.region_size.sectors().bytes();
         let mut save_region = |index: usize| -> StratisResult<()> {
-            f.seek(SeekFrom::Start(
-                MDARegions::mda_offset(header_size, index, region_size)
-                    .try_into()
-                    .map_err(|e: TryFromIntError| StratisError::Error(e.to_string()))?,
-            ))?;
+            f.seek(SeekFrom::Start(convert_int!(
+                MDARegions::mda_offset(header_size, index, region_size),
+                u128,
+                u64
+            )?))?;
             f.write_all(&hdr_buf)?;
             f.write_all(data)?;
             f.sync_all()?;
@@ -223,9 +221,7 @@ impl MDARegions {
         let mut load_region = |index: usize| -> StratisResult<Vec<u8>> {
             let offset = MDARegions::mda_offset(header_size, index, region_size)
                 + mda_size::_MDA_REGION_HDR_SIZE as u128;
-            f.seek(SeekFrom::Start(offset.try_into().map_err(
-                |e: TryFromIntError| StratisError::Error(e.to_string()),
-            )?))?;
+            f.seek(SeekFrom::Start(convert_int!(offset, u128, u64)?))?;
             mda.load_region(f)
         };
 

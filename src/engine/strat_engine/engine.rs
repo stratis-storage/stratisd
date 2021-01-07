@@ -154,10 +154,13 @@ impl<'a> Into<Value> for &'a StratEngine {
 }
 
 impl Report for StratEngine {
+    fn engine_state_report(&self) -> Value {
+        self.into()
+    }
+
     fn get_report(&self, report_type: ReportType) -> Value {
         match report_type {
             ReportType::ErroredPoolDevices => (&self.liminal_devices).into(),
-            ReportType::EngineState => self.into(),
         }
     }
 }

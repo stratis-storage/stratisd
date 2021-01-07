@@ -17,8 +17,8 @@ SPECS = {
     </method>
   </interface>
 """,
-    "org.storage.stratis2.Manager.r3": """
-<interface name="org.storage.stratis2.Manager.r3">
+    "org.storage.stratis2.Manager.r4": """
+<interface name="org.storage.stratis2.Manager.r4">
     <method name="ConfigureSimulator">
       <arg direction="in" name="denominator" type="u" />
       <arg direction="out" name="return_code" type="q" />
@@ -57,6 +57,11 @@ SPECS = {
     <method name="UnsetKey">
       <arg direction="in" name="key_desc" type="s" />
       <arg direction="out" name="result" type="b" />
+      <arg direction="out" name="return_code" type="q" />
+      <arg direction="out" name="return_string" type="s" />
+    </method>
+    <method name="EngineStateReport">
+      <arg direction="out" name="result" type="s" />
       <arg direction="out" name="return_code" type="q" />
       <arg direction="out" name="return_string" type="s" />
     </method>

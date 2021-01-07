@@ -46,7 +46,7 @@ Report = make_class(
     "Report", ET.fromstring(SPECS["org.storage.stratis2.Report.r1"]), TIME_OUT
 )
 Manager = make_class(
-    "Manager", ET.fromstring(SPECS["org.storage.stratis2.Manager.r3"]), TIME_OUT
+    "Manager", ET.fromstring(SPECS["org.storage.stratis2.Manager.r4"]), TIME_OUT
 )
 FetchProperties = make_class(
     "FetchProperties",

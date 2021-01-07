@@ -67,6 +67,12 @@ pub trait KeyActions {
 
 /// An interface for reporting internal engine state.
 pub trait Report {
+    /// Supported engine state report.
+    ///
+    /// NOTE: The JSON schema for this report is not guaranteed to be stable.
+    fn engine_state_report(&self) -> Value;
+
+    /// Unsupported reports. The available reports and JSON schemas of these reports may change.
     fn get_report(&self, report_type: ReportType) -> Value;
 }
 

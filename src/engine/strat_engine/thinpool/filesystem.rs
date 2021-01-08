@@ -72,7 +72,7 @@ impl StratFilesystem {
             id,
         )?;
 
-        if let Err(err) = create_fs(&thin_dev.devnode(), Some(fs_uuid)) {
+        if let Err(err) = create_fs(&thin_dev.devnode(), Some(fs_uuid), false) {
             udev_settle().unwrap_or_else(|err| {
                 warn!("{}", err);
                 sleep(Duration::from_secs(5));

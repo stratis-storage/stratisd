@@ -681,7 +681,7 @@ mod tests {
         }
 
         for path in paths {
-            create_fs(path, None).unwrap();
+            create_fs(path, None, false).unwrap();
             assert_eq!(
                 block_device_apply(path, |dev| process_stratis_device(dev))
                     .unwrap()

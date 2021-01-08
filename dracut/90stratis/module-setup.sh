@@ -10,17 +10,14 @@ check() {
 	    xfs_growfs \
 	    plymouth \
 	    /usr/sbin/plymouthd \
-	    clevis \
-	    clevis-luks-bind \
-	    clevis-luks-unbind \
-	    clevis-luks-unlock \
 	    || return 1
     return 255
 }
 
 # called by dracut
 depends() {
-    echo dm
+    # clevis modules can be installed using the clevis-dracut package on Fedora
+    echo dm clevis clevis-pin-sss clevis-pin-tang clevis-pin-tpm2
     return 0
 }
 
@@ -40,11 +37,7 @@ install() {
 	    xfs_admin \
 	    xfs_growfs \
 	    plymouth \
-	    /usr/sbin/plymouthd \
-	    clevis \
-	    clevis-luks-bind \
-	    clevis-luks-unbind \
-	    clevis-luks-unlock
+	    /usr/sbin/plymouthd
 
     # Dracut dependencies
     inst_multiple $systemdutildir/system-generators/stratis-setup-generator \

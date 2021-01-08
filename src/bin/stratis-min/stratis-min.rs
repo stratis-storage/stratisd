@@ -9,6 +9,7 @@ use clap::{App, Arg, ArgGroup, ArgMatches, SubCommand};
 use libstratis::{
     engine::{KeyDescription, PoolUuid, UnlockMethod},
     jsonrpc::client::{filesystem, key, pool, report, udev},
+    stratis::StratisError,
 };
 
 fn parse_args() -> App<'static, 'static> {
@@ -128,7 +129,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 Some(u) => Some(PoolUuid::parse_str(u)?),
                 None => None,
             };
-            pool::pool_unlock(unlock_method, uuid, args.is_present("prompt"))?;
+            let prompt = args.is_present("prompt");
+            if prompt && unlock_method == UnlockMethod::Clevis {
+                return Err(Box::new(StratisError::Error(
+                    "--prompt and an unlock_method of clevis are mutally exclusive".to_string(),
+                )));
+            }
+            pool::pool_unlock(unlock_method, uuid, prompt)?;
             Ok(())
         } else if let Some(args) = subcommand.subcommand_matches("create") {
             let paths = get_paths_from_args(args);

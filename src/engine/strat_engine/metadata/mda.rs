@@ -158,7 +158,7 @@ impl MDARegions {
             ));
         }
 
-        let used = Bytes(data.len() as u128);
+        let used = Bytes::from(data.len());
         let max_available = self.max_data_size().bytes();
         if used > max_available {
             let err_msg = format!(
@@ -334,7 +334,7 @@ impl MDAHeader {
                 assert!(secs <= std::i64::MAX as u64);
 
                 Some(MDAHeader {
-                    used: MetaDataSize::new(Bytes(u128::from(used))),
+                    used: MetaDataSize::new(Bytes::from(used)),
                     last_updated: Utc.timestamp(secs as i64, LittleEndian::read_u32(&buf[24..28])),
                     data_crc: LittleEndian::read_u32(&buf[4..8]),
                 })
@@ -482,7 +482,7 @@ mod tests {
 
             let header = MDAHeader {
                 last_updated: Utc.timestamp(sec, nsec),
-                used: MetaDataSize::new(Bytes(data.len() as u128)),
+                used: MetaDataSize::new(Bytes::from(data.len())),
                 data_crc: crc32::checksum_castagnoli(data),
             };
             let buf = header.to_buf();
@@ -504,7 +504,7 @@ mod tests {
 
         let header = MDAHeader {
             last_updated: Utc::now(),
-            used: MetaDataSize::new(Bytes(data.len() as u128)),
+            used: MetaDataSize::new(Bytes::from(data.len())),
             data_crc: crc32::checksum_castagnoli(&data),
         };
         let mut buf = header.to_buf();

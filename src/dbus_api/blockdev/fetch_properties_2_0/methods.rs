@@ -34,7 +34,7 @@ fn get_properties_shared(
                 result_to_tuple(blockdev_operation(
                     m.tree,
                     object_path.get_name(),
-                    |_, bd| Ok((*bd.size()).to_string()),
+                    |_, bd| Ok((*bd.size().bytes()).to_string()),
                 )),
             )),
             _ => None,

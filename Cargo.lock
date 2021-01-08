@@ -245,7 +245,7 @@ dependencies = [
 [[package]]
 name = "devicemapper"
 version = "0.28.1"
-source = "git+https://github.com/jbaublitz/devicemapper-rs?branch=u128-bytes#0900f2c2780e1df866346e88f93c6b941b72d574"
+source = "git+https://github.com/jbaublitz/devicemapper-rs?branch=u128-bytes#4fb3306025cb1168358a491e956b58bf7512f971"
 dependencies = [
  "bitflags",
  "error-chain",

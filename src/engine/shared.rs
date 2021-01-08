@@ -113,7 +113,7 @@ pub fn set_key_shared(key_fd: RawFd) -> StratisResult<SizedKeyMemory> {
                 ErrorEnum::Invalid,
                 format!(
                     "Provided key exceeded maximum allow length of {}",
-                    Bytes(MAX_STRATIS_PASS_SIZE as u128)
+                    Bytes::from(MAX_STRATIS_PASS_SIZE)
                 ),
             ));
         }

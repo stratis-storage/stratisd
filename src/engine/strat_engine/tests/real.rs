@@ -37,7 +37,7 @@ impl RealTestDev {
         wipe_sectors(
             test_dev.as_path(),
             Sectors(0),
-            Bytes(u128::from(IEC::Mi)).sectors(),
+            Bytes::from(IEC::Mi).sectors(),
         )
         .unwrap();
         test_dev
@@ -50,12 +50,7 @@ impl RealTestDev {
 
     /// Teardown a real test dev
     fn teardown(self) {
-        wipe_sectors(
-            &self.as_path(),
-            Sectors(0),
-            Bytes(u128::from(IEC::Mi)).sectors(),
-        )
-        .unwrap();
+        wipe_sectors(&self.as_path(), Sectors(0), Bytes::from(IEC::Mi).sectors()).unwrap();
         if let Some(mut ld) = self.dev.right() {
             ld.teardown(get_dm()).unwrap();
         }
@@ -99,7 +94,7 @@ fn get_device_runs<'a>(
         }
     };
 
-    let min_size = min_size.unwrap_or_else(|| Bytes(u128::from(IEC::Gi)).sectors());
+    let min_size = min_size.unwrap_or_else(|| Bytes::from(IEC::Gi).sectors());
 
     assert!(max_size.is_none() || Some(min_size) <= max_size);
 

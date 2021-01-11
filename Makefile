@@ -192,7 +192,7 @@ stratis-min:
 stratisd-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build --bin=stratisd-min --features min ${TARGET_ARGS}
+	cargo build --bin=stratisd-min --features min,systemd_notify ${TARGET_ARGS}
 
 profiledir := $(shell if test -d target/release; then echo target/release; else echo target/debug; fi)
 install: release docs

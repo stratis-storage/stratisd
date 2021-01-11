@@ -31,7 +31,7 @@ required-features = ["min"]
 [[bin]]
 name = "stratis-setup-generator"
 path = "src/bin/generators/stratis-setup-generator.rs"
-required-features = ["extras"]
+required-features = ["min"]
 
 [dependencies]
 clap = "2"

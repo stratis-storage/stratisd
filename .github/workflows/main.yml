@@ -22,10 +22,10 @@ jobs:
         include:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
           - task: make -f Makefile fmt-travis
-            toolchain: 1.48.0
+            toolchain: 1.49.0
             components: rustfmt
           - task: make -f Makefile clippy
-            toolchain: 1.48.0
+            toolchain: 1.49.0
             components: clippy
           # MANDATORY TESTING ON STABLE
           - task: make -f Makefile build

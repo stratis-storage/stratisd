@@ -45,6 +45,6 @@ install() {
 	    plymouth
 
     inst_rules "$moddir/11-stratisd.rules"
-    inst_simple "$moddir/stratisd-min.service" $systemdutildir/system
-    inst_simple "$moddir/stratis-rootfs-setup" $systemdutildir
+    inst_simple "$moddir/stratisd-min.service" $systemdutildir/system/stratisd-min.service
+    inst_simple "$moddir/stratis-rootfs-setup" $systemdutildir/stratis-rootfs-setup
 }

@@ -176,7 +176,8 @@ build-extras:
 build-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build --bin=stratis-min --bin=stratisd-min --no-default-features \
+	cargo build --bin=stratis-min --bin=stratisd-min --bin=stratis-setup-generator \
+	--no-default-features \
 	--features min,systemd_notify ${TARGET_ARGS}
 
 stratis-dumpmetadata:

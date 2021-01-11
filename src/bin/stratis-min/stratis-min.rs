@@ -74,6 +74,7 @@ fn parse_args() -> App<'static, 'static> {
                 SubCommand::with_name("is-encrypted")
                     .arg(Arg::with_name("pool_uuid").required(true)),
                 SubCommand::with_name("is-locked").arg(Arg::with_name("pool_uuid").required(true)),
+                SubCommand::with_name("is-bound").arg(Arg::with_name("pool_uuid").required(true)),
             ]),
             SubCommand::with_name("filesystem").subcommands(vec![
                 SubCommand::with_name("create")

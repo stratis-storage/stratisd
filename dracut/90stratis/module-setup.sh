@@ -10,14 +10,15 @@ check() {
 	    xfs_growfs \
 	    plymouth \
 	    /usr/sbin/plymouthd \
+	    jose \
+	    jq \
 	    || return 1
     return 255
 }
 
 # called by dracut
 depends() {
-    # clevis modules can be installed using the clevis-dracut package on Fedora
-    echo dm clevis clevis-pin-sss clevis-pin-tang clevis-pin-tpm2
+    echo dm
     return 0
 }
 
@@ -37,7 +38,12 @@ install() {
 	    xfs_admin \
 	    xfs_growfs \
 	    plymouth \
-	    /usr/sbin/plymouthd
+	    /usr/sbin/plymouthd \
+	    /usr/bin/clevis* \
+	    /usr/bin/tpm2_* \
+	    jose \
+	    jq
+
 
     # Dracut dependencies
     inst_multiple $systemdutildir/system-generators/stratis-setup-generator \

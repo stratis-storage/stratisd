@@ -12,6 +12,7 @@ check() {
 	    /usr/sbin/plymouthd \
 	    jose \
 	    jq \
+	    cryptsetup \
 	    || return 1
     return 255
 }
@@ -42,7 +43,8 @@ install() {
 	    /usr/bin/clevis* \
 	    /usr/bin/tpm2_* \
 	    jose \
-	    jq
+	    jq \
+	    cryptsetup
 
 
     # Dracut dependencies

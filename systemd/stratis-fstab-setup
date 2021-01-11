@@ -8,7 +8,7 @@ fi
 POOL_UUID=$1
 
 if [ $(stratis-min pool is-locked $POOL_UUID) ]; then
-	if [ $(stratis-min pool is-bound) ]; then
+	if [ $(stratis-min pool is-bound $POOL_UUID) ]; then
 		stratis-min pool unlock clevis $POOL_UUID
 	else
 		systemd-ask-password \

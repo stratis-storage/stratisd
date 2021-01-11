@@ -41,10 +41,10 @@ install() {
 
     # Dracut dependencies
     inst_multiple $systemdutildir/system-generators/stratis-setup-generator \
-	    $systemdutildir/system/stratisd-min.service \
 	    $systemdutildir/system/plymouth-start.service \
-	    $systemdutildir/stratis-rootfs-setup \
 	    plymouth
 
     inst_rules "$moddir/11-stratisd.rules"
+    inst_simple "$moddir/stratisd-min.service" $systemdutildir/system
+    inst_simple "$moddir/stratis-rootfs-setup" $systemdutildir
 }

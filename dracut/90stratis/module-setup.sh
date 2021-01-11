@@ -25,7 +25,8 @@ depends() {
 
 # called by dracut
 installkernel() {
-    instmods xfs dm_crypt dm-thin-pool
+    instmods xfs dm_crypt dm-thin-pool tpm
+    hostonly='' instmods =drivers/char/tpm
 }
 
 # called by dracut

@@ -28,6 +28,6 @@ pub fn blkdev_size(file: &File) -> StratisResult<Bytes> {
 
     match unsafe { blkgetsize64(file.as_raw_fd(), &mut val) } {
         Err(x) => Err(StratisError::Nix(x)),
-        Ok(_) => Ok(Bytes(val)),
+        Ok(_) => Ok(Bytes::from(val)),
     }
 }

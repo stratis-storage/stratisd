@@ -34,7 +34,12 @@ impl RealTestDev {
     /// Wipe initial MiB to clear metadata.
     pub fn new(dev: Either<PathBuf, LinearDev>) -> RealTestDev {
         let test_dev = RealTestDev { dev };
-        wipe_sectors(test_dev.as_path(), Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
+        wipe_sectors(
+            test_dev.as_path(),
+            Sectors(0),
+            Bytes::from(IEC::Mi).sectors(),
+        )
+        .unwrap();
         test_dev
     }
 
@@ -45,7 +50,7 @@ impl RealTestDev {
 
     /// Teardown a real test dev
     fn teardown(self) {
-        wipe_sectors(&self.as_path(), Sectors(0), Bytes(IEC::Mi).sectors()).unwrap();
+        wipe_sectors(&self.as_path(), Sectors(0), Bytes::from(IEC::Mi).sectors()).unwrap();
         if let Some(mut ld) = self.dev.right() {
             ld.teardown(get_dm()).unwrap();
         }
@@ -89,7 +94,7 @@ fn get_device_runs<'a>(
         }
     };
 
-    let min_size = min_size.unwrap_or_else(|| Bytes(IEC::Gi).sectors());
+    let min_size = min_size.unwrap_or_else(|| Bytes::from(IEC::Gi).sectors());
 
     assert!(max_size.is_none() || Some(min_size) <= max_size);
 

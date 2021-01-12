@@ -138,7 +138,7 @@ pub fn run(sim: bool) -> StratisResult<()> {
 
     if let Some(evt) = eventable {
         fds.push(libc::pollfd {
-            fd: evt.file().as_raw_fd(),
+            fd: evt.as_raw_fd(),
             revents: 0,
             events: libc::POLLIN,
         });

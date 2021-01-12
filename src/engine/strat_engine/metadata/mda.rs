@@ -43,7 +43,7 @@ pub struct MDARegions {
 
 impl MDARegions {
     /// Calculate the offset from start of device for an MDARegion.
-    fn mda_offset(header_size: Bytes, index: usize, per_region_size: Bytes) -> u64 {
+    fn mda_offset(header_size: Bytes, index: usize, per_region_size: Bytes) -> u128 {
         *(header_size + per_region_size * index)
     }
 
@@ -71,11 +71,11 @@ impl MDARegions {
         let region_size = mda_size.region_size();
         let region_size_bytes = region_size.sectors().bytes();
         for region in 0..mda_size::NUM_MDA_REGIONS {
-            f.seek(SeekFrom::Start(MDARegions::mda_offset(
-                header_size,
-                region,
-                region_size_bytes,
-            )))?;
+            f.seek(SeekFrom::Start(convert_int!(
+                MDARegions::mda_offset(header_size, region, region_size_bytes),
+                u128,
+                u64
+            )?))?;
             f.write_all(&hdr_buf)?;
         }
 
@@ -111,11 +111,11 @@ impl MDARegions {
         // been corrupted, return an error.
         let mut load_a_region = |index: usize| -> StratisResult<Option<MDAHeader>> {
             let mut hdr_buf = [0u8; mda_size::_MDA_REGION_HDR_SIZE];
-            f.seek(SeekFrom::Start(MDARegions::mda_offset(
-                header_size,
-                index,
-                region_size_bytes,
-            )))?;
+            f.seek(SeekFrom::Start(convert_int!(
+                MDARegions::mda_offset(header_size, index, region_size_bytes),
+                u128,
+                u64
+            )?))?;
             f.read_exact(&mut hdr_buf)?;
             Ok(MDAHeader::from_buf(&hdr_buf)?)
         };
@@ -158,7 +158,7 @@ impl MDARegions {
             ));
         }
 
-        let used = Bytes(data.len() as u64);
+        let used = Bytes::from(data.len());
         let max_available = self.max_data_size().bytes();
         if used > max_available {
             let err_msg = format!(
@@ -178,11 +178,11 @@ impl MDARegions {
         // Write data to a region specified by index.
         let region_size = self.region_size.sectors().bytes();
         let mut save_region = |index: usize| -> StratisResult<()> {
-            f.seek(SeekFrom::Start(MDARegions::mda_offset(
-                header_size,
-                index,
-                region_size,
-            )))?;
+            f.seek(SeekFrom::Start(convert_int!(
+                MDARegions::mda_offset(header_size, index, region_size),
+                u128,
+                u64
+            )?))?;
             f.write_all(&hdr_buf)?;
             f.write_all(data)?;
             f.sync_all()?;
@@ -220,8 +220,8 @@ impl MDARegions {
         // It is an error if the metadata can not be found.
         let mut load_region = |index: usize| -> StratisResult<Vec<u8>> {
             let offset = MDARegions::mda_offset(header_size, index, region_size)
-                + mda_size::_MDA_REGION_HDR_SIZE as u64;
-            f.seek(SeekFrom::Start(offset))?;
+                + mda_size::_MDA_REGION_HDR_SIZE as u128;
+            f.seek(SeekFrom::Start(convert_int!(offset, u128, u64)?))?;
             mda.load_region(f)
         };
 
@@ -334,7 +334,7 @@ impl MDAHeader {
                 assert!(secs <= std::i64::MAX as u64);
 
                 Some(MDAHeader {
-                    used: MetaDataSize::new(Bytes(used)),
+                    used: MetaDataSize::new(Bytes::from(used)),
                     last_updated: Utc.timestamp(secs as i64, LittleEndian::read_u32(&buf[24..28])),
                     data_crc: LittleEndian::read_u32(&buf[4..8]),
                 })
@@ -382,7 +382,10 @@ impl MDAHeader {
         let mut buf = [0u8; mda_size::_MDA_REGION_HDR_SIZE];
 
         LittleEndian::write_u32(&mut buf[4..8], self.data_crc);
-        LittleEndian::write_u64(&mut buf[8..16], *self.used.bytes() as u64);
+        LittleEndian::write_u64(
+            &mut buf[8..16],
+            convert_int!(*self.used.bytes(), u128, u64).expect("Size must fit into metadata"),
+        );
         LittleEndian::write_u64(&mut buf[16..24], self.last_updated.timestamp() as u64);
         LittleEndian::write_u32(&mut buf[24..28], self.last_updated.timestamp_subsec_nanos());
         buf[28] = STRAT_REGION_HDR_VERSION;
@@ -402,7 +405,7 @@ impl MDAHeader {
     where
         F: Read,
     {
-        let mut data_buf = vec![0u8; convert_int!(*self.used.bytes(), u64, usize)?];
+        let mut data_buf = vec![0u8; convert_int!(*self.used.bytes(), u128, usize)?];
 
         f.read_exact(&mut data_buf)?;
 
@@ -448,8 +451,11 @@ mod tests {
     /// initialized.
     fn test_reading_mda_regions() {
         let offset = Bytes(100);
-        let buf_length =
-            convert_test!(*(offset + MDASize::default().sectors().bytes()), u64, usize);
+        let buf_length = convert_test!(
+            *(offset + MDASize::default().sectors().bytes()),
+            u128,
+            usize
+        );
         let mut buf = Cursor::new(vec![0; buf_length]);
         assert_matches!(
             MDARegions::load(offset, MDASize::default(), &mut buf),
@@ -476,7 +482,7 @@ mod tests {
 
             let header = MDAHeader {
                 last_updated: Utc.timestamp(sec, nsec),
-                used: MetaDataSize::new(Bytes(data.len() as u64)),
+                used: MetaDataSize::new(Bytes::from(data.len())),
                 data_crc: crc32::checksum_castagnoli(data),
             };
             let buf = header.to_buf();
@@ -498,7 +504,7 @@ mod tests {
 
         let header = MDAHeader {
             last_updated: Utc::now(),
-            used: MetaDataSize::new(Bytes(data.len() as u64)),
+            used: MetaDataSize::new(Bytes::from(data.len())),
             data_crc: crc32::checksum_castagnoli(&data),
         };
         let mut buf = header.to_buf();

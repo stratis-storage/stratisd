@@ -60,11 +60,11 @@ fn write_sectors<P: AsRef<Path>>(
     buf: &[u8; SECTOR_SIZE],
 ) -> StratisResult<()> {
     let mut f = BufWriter::with_capacity(
-        convert_const!(min(IEC::Mi, *(length.bytes())), u64, usize),
+        convert_const!(min(u128::from(IEC::Mi), *(length.bytes())), u128, usize),
         OpenOptions::new().write(true).open(path)?,
     );
 
-    f.seek(SeekFrom::Start(*offset.bytes()))?;
+    f.seek(SeekFrom::Start(convert_int!(*offset.bytes(), u128, u64)?))?;
     for _ in 0..*length {
         f.write_all(buf)?;
     }

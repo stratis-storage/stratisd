@@ -43,6 +43,7 @@ install() {
 	    /usr/sbin/plymouthd \
 	    /usr/bin/clevis* \
 	    /usr/bin/tpm2_* \
+	    /lib64/libtss2-* \
 	    jose \
 	    jq \
 	    cryptsetup

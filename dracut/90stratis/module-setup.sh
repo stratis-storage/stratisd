@@ -13,6 +13,7 @@ check() {
 	    jose \
 	    jq \
 	    cryptsetup \
+	    curl \
 	    || return 1
     return 255
 }
@@ -46,8 +47,8 @@ install() {
 	    /lib64/libtss2-* \
 	    jose \
 	    jq \
-	    cryptsetup
-
+	    cryptsetup \
+	    curl
 
     # Dracut dependencies
     inst_multiple $systemdutildir/system-generators/stratis-setup-generator \

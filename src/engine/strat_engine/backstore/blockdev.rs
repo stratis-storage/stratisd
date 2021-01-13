@@ -128,8 +128,8 @@ impl StratBlockDev {
     /// Precondition: if self.is_encrypted() == true, the data on
     ///               self.devnode.physical_path() has been encrypted with
     ///               aes-xts-plain64 encryption.
-    pub fn disown(self) -> StratisResult<()> {
-        if let Some(handle) = self.crypt_handle {
+    pub fn disown(&mut self) -> StratisResult<()> {
+        if let Some(ref mut handle) = self.crypt_handle {
             handle.wipe()?;
         } else {
             disown_device(&mut OpenOptions::new().write(true).open(self.devnode.path())?)?;

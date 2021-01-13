@@ -505,14 +505,14 @@ pub fn initialize_devices(
     }
 
     /// Clean up an encrypted device after initialization failure.
-    fn clean_up_encrypted(handle: CryptHandle) {
-        let path = handle.luks2_device_path().display().to_string();
+    fn clean_up_encrypted(mut handle: CryptHandle) {
         if let Err(e) = handle.wipe() {
             warn!(
                 "Failed to clean up encrypted device {}; cleanup \
                 was attempted because initialization of the device \
                 failed; clean up failure cause: {}",
-                path, e,
+                handle.luks2_device_path().display(),
+                e,
             );
         }
     }
@@ -631,7 +631,7 @@ pub fn initialize_devices(
         match initialize_one(&dev_info, pool_uuid, mda_data_size, encryption_info.clone()) {
             Ok(blockdev) => initialized_blockdevs.push(blockdev),
             Err(err) => {
-                if let Err(err) = wipe_blockdevs(initialized_blockdevs) {
+                if let Err(err) = wipe_blockdevs(&mut initialized_blockdevs) {
                     warn!("Failed to clean up some devices after initialization of device {} for pool with UUID {} failed: {}",
                           dev_info.devnode.display(),
                           pool_uuid.to_simple_ref(),
@@ -647,15 +647,12 @@ pub fn initialize_devices(
 /// Wipe some blockdevs of their identifying headers.
 /// Return an error if any of the blockdevs could not be wiped.
 /// If an error occurs while wiping a blockdev, attempt to wipe all remaining.
-pub fn wipe_blockdevs(blockdevs: Vec<StratBlockDev>) -> StratisResult<()> {
+pub fn wipe_blockdevs(blockdevs: &mut [StratBlockDev]) -> StratisResult<()> {
     let unerased_devnodes: Vec<_> = blockdevs
-        .into_iter()
-        .filter_map(|bd| {
-            let path = bd.physical_path().to_owned();
-            match bd.disown() {
-                Err(e) => Some((path, e)),
-                _ => None,
-            }
+        .iter_mut()
+        .filter_map(|bd| match bd.disown() {
+            Err(e) => Some((bd.physical_path(), e)),
+            _ => None,
         })
         .collect();
 
@@ -713,7 +710,7 @@ mod tests {
             )));
         }
 
-        let blockdevs = initialize_devices(
+        let mut blockdevs = initialize_devices(
             dev_infos,
             pool_uuid,
             MDADataSize::default(),
@@ -829,7 +826,7 @@ mod tests {
                 )));
         }
 
-        wipe_blockdevs(blockdevs)?;
+        wipe_blockdevs(&mut blockdevs)?;
 
         for path in paths {
             if key_description.is_some() {

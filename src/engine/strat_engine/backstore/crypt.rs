@@ -524,10 +524,10 @@ impl CryptHandle {
     }
 
     /// Wipe all LUKS2 metadata on the device safely using libcryptsetup.
-    pub fn wipe(mut self) -> Result<()> {
-        let physical_path = self.luks2_device_path().to_owned();
+    pub fn wipe(&mut self) -> Result<()> {
+        let path = self.luks2_device_path().to_owned();
         let name = self.name.to_owned();
-        ensure_wiped(&mut self.device, &physical_path, &name)
+        ensure_wiped(&mut self.device, &path, &name)
     }
 
     /// Get the size of the logical device built on the underlying encrypted physical
@@ -1280,7 +1280,7 @@ mod tests {
                 }
             }
 
-            for handle in handles {
+            for handle in handles.iter_mut() {
                 handle.wipe()?;
             }
 
@@ -1441,8 +1441,8 @@ mod tests {
 
             handle.deactivate()?;
 
-            let handle =
-                CryptActivationHandle::setup(path, UnlockMethod::Keyring)?.ok_or_else(|| {
+            let mut handle = CryptActivationHandle::setup(path, UnlockMethod::Keyring)?
+                .ok_or_else(|| {
                     Box::new(io::Error::new(
                         io::ErrorKind::Other,
                         format!(

@@ -162,7 +162,7 @@ pub struct BlockDevPath {
 
 impl BlockDevPath {
     /// Create a new node in the graph representing a device with no children.
-    pub fn new(path: PathBuf) -> Arc<BlockDevPath> {
+    pub fn leaf(path: PathBuf) -> Arc<Self> {
         Arc::new(BlockDevPath {
             path,
             child_paths: vec![],
@@ -170,7 +170,7 @@ impl BlockDevPath {
     }
 
     /// Create a new node in the graph representing the devices and their children.
-    pub fn new_with_children<I>(path: PathBuf, child_paths: I) -> Arc<BlockDevPath>
+    pub fn node_with_children<I>(path: PathBuf, child_paths: I) -> Arc<Self>
     where
         I: IntoIterator<Item = Arc<Self>>,
     {

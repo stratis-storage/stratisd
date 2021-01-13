@@ -399,8 +399,10 @@ impl CryptHandle {
         encryption_info: EncryptionInfo,
         name: String,
     ) -> CryptHandle {
-        let path =
-            BlockDevPath::new_with_children(activated_path, vec![BlockDevPath::new(physical_path)]);
+        let path = BlockDevPath::node_with_children(
+            activated_path,
+            vec![BlockDevPath::leaf(physical_path)],
+        );
         CryptHandle {
             device,
             path,
@@ -584,9 +586,9 @@ fn setup_crypt_handle(
 
     Ok(Some(CryptHandle {
         device,
-        path: BlockDevPath::new_with_children(
+        path: BlockDevPath::node_with_children(
             activated_path,
-            vec![BlockDevPath::new(physical_path.to_owned())],
+            vec![BlockDevPath::leaf(physical_path.to_owned())],
         ),
         identifiers,
         encryption_info: EncryptionInfo {

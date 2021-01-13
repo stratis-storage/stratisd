@@ -84,7 +84,7 @@ impl StratBlockDev {
             dev,
             devnode: match crypt_handle {
                 Some(ref ch) => ch.get_physical_path_ref(),
-                None => BlockDevPath::new(devnode.to_owned()),
+                None => BlockDevPath::leaf(devnode.to_owned()),
             },
             bda,
             used: allocator,

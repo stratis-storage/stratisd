@@ -20,7 +20,7 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
-                crypt::{interpret_clevis_config, CryptHandle},
+                crypt::{interpret_clevis_config, CryptActivationHandle},
                 devices::{initialize_devices, process_and_verify_devices, wipe_blockdevs},
             },
             keys::MemoryPrivateFilesystem,
@@ -110,25 +110,6 @@ pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<TargetLine<LinearDevTargetParam
     table
 }
 
-/// Get crypt handles for the slice of blockdevs.
-///
-/// Postconditions: blockdevs.len() == the len of the Vec result
-fn get_crypt_handles(blockdevs: &[StratBlockDev]) -> StratisResult<Vec<CryptHandle>> {
-    let mut handles = Vec::new();
-    for bd in blockdevs.iter() {
-        let path = bd.devnode().physical_path();
-        let crypt_handle_opt = CryptHandle::setup(path)?;
-        let crypt_handle = crypt_handle_opt.ok_or_else(|| {
-            StratisError::Error(format!(
-                "Device {} is not an encrypted device",
-                path.display(),
-            ))
-        })?;
-        handles.push(crypt_handle);
-    }
-    Ok(handles)
-}
-
 #[derive(Debug)]
 pub struct BlockDevMgr {
     /// All the block devices that belong to this block dev manager.
@@ -185,11 +166,10 @@ impl BlockDevMgr {
     /// unlock at least one of the existing block devices registered.
     /// Precondition: self.block_devs must have at least one device.
     pub fn has_valid_passphrase(&self) -> bool {
-        CryptHandle::can_unlock(
+        CryptActivationHandle::can_unlock(
             self.block_devs
                 .get(0)
                 .expect("Must have at least one blockdev")
-                .devnode()
                 .physical_path(),
         )
     }
@@ -243,7 +223,7 @@ impl BlockDevMgr {
     }
 
     pub fn destroy_all(&mut self) -> StratisResult<()> {
-        wipe_blockdevs(&self.block_devs)
+        wipe_blockdevs(&mut self.block_devs)
     }
 
     /// Remove the specified block devs and erase their metadata.
@@ -282,7 +262,7 @@ impl BlockDevMgr {
                 ));
             }
         }
-        wipe_blockdevs(&removed)?;
+        wipe_blockdevs(&mut removed)?;
         Ok(())
     }
 
@@ -463,36 +443,35 @@ impl BlockDevMgr {
     /// * Returns Err(_) if an inconsistency was found in the metadata across pools
     /// or binding failed.
     pub fn bind_clevis(&mut self, pin: String, mut clevis_info: Value) -> StratisResult<bool> {
-        fn bind_clevis_loop<'a>(
+        fn bind_clevis_loop<'a, I>(
             key_fs: &MemoryPrivateFilesystem,
-            rollback_record: &'a mut Vec<CryptHandle>,
-            handles: &'a mut Vec<CryptHandle>,
-            key_desc: &KeyDescription,
+            blockdevs: I,
             pin: &str,
             clevis_info: &Value,
             yes: bool,
-        ) -> StratisResult<()> {
-            for mut crypt_handle in handles.drain(..) {
-                let res = key_fs.key_op(key_desc, |keyfile_path| {
-                    crypt_handle
-                        .clevis_bind(keyfile_path, pin, clevis_info, yes)
-                        .map_err(StratisError::Crypt)
-                });
-                if res.is_ok() {
-                    rollback_record.push(crypt_handle);
+        ) -> StratisResult<()>
+        where
+            I: IntoIterator<Item = &'a mut StratBlockDev>,
+        {
+            let mut rollback_record = Vec::new();
+            for blockdev_ref in blockdevs {
+                if let Err(e) = blockdev_ref.bind_clevis(key_fs, pin, clevis_info, yes) {
+                    rollback_loop(rollback_record);
+                    return Err(e);
+                } else {
+                    rollback_record.push(blockdev_ref);
                 }
-                res?;
             }
             Ok(())
         }
 
-        fn rollback_loop(rollback_record: Vec<CryptHandle>) {
-            rollback_record.into_iter().for_each(|mut crypt_dev| {
-                if let Err(e) = crypt_dev.clevis_unbind() {
+        fn rollback_loop(rollback_record: Vec<&mut StratBlockDev>) {
+            rollback_record.into_iter().for_each(|blockdev| {
+                if let Err(e) = blockdev.unbind_clevis() {
                     warn!(
                         "Failed to unbind device {} from clevis during \
                         rollback: {}",
-                        crypt_dev.physical_device_path().display(),
+                        blockdev.physical_path().display(),
                         e,
                     );
                 }
@@ -525,26 +504,14 @@ impl BlockDevMgr {
 
         let key_fs = MemoryPrivateFilesystem::new()?;
 
-        let mut crypt_handles = get_crypt_handles(&self.block_devs)?;
-        let mut rollback_record = Vec::new();
-        let result = bind_clevis_loop(
+        bind_clevis_loop(
             &key_fs,
-            &mut rollback_record,
-            &mut crypt_handles,
-            &encryption_info.key_description,
+            self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
             pin.as_str(),
             &clevis_info,
             yes,
-        );
-        if let Err(e) = result {
-            rollback_loop(rollback_record);
-            return Err(e);
-        }
+        )?;
 
-        for (_, bd) in self.blockdevs_mut() {
-            bd.set_clevis_info(pin.clone(), clevis_info.clone())
-                .expect("devices are certainly encrypted, so all must have encryption info struct");
-        }
         Ok(true)
     }
 
@@ -562,9 +529,8 @@ impl BlockDevMgr {
             }
         }
 
-        let crypt_handles = get_crypt_handles(&self.block_devs)?;
-        for mut handle in crypt_handles {
-            let res = handle.clevis_unbind().map_err(StratisError::Crypt);
+        for blockdev in self.blockdevs_mut().into_iter().map(|(_, bd)| bd) {
+            let res = blockdev.unbind_clevis();
             if let Err(ref e) = res {
                 warn!(
                     "Failed to unbind from the tang server using clevis: {}. \
@@ -573,10 +539,6 @@ impl BlockDevMgr {
                 );
             }
             res?
-        }
-        for (_, bd) in self.blockdevs_mut() {
-            bd.unset_clevis_info()
-                .expect("blockdevs are definitely encrypted, must have encryption_info set");
         }
         Ok(true)
     }

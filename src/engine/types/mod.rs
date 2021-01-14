@@ -5,10 +5,11 @@
 use std::{
     borrow::Borrow,
     convert::TryFrom,
-    fmt, io,
+    fmt,
     ops::Deref,
     path::{Path, PathBuf},
     rc::Rc,
+    sync::Arc,
 };
 
 mod actions;
@@ -153,58 +154,44 @@ impl<'a> TryFrom<&'a str> for ReportType {
 
 #[derive(Clone, Debug)]
 pub struct BlockDevPath {
-    /// Path to the physical device.
-    physical_path: PathBuf,
-    /// Optional tuple for encrypted devices. The first path is the internal
-    /// path of the logical device and the second is the canonicalized path
-    /// of the logical device.
-    logical_path: Option<(PathBuf, PathBuf)>,
+    /// Path to the device represented by this data structure.
+    path: PathBuf,
+    /// Reference to the path of the child device of this device.
+    child_paths: Vec<Arc<BlockDevPath>>,
 }
 
 impl BlockDevPath {
-    /// Path for a device that only has a physical path.
-    pub fn physical_device_path(physical: &Path) -> BlockDevPath {
-        BlockDevPath {
-            physical_path: physical.to_owned(),
-            logical_path: None,
-        }
-    }
-
-    /// Path for a device that has both an associated physical path and a mapped
-    /// logical path.
-    pub fn mapped_device_path(physical: &Path, logical: &Path) -> Result<BlockDevPath, io::Error> {
-        let logical_path = Some((logical.to_owned(), logical.canonicalize()?));
-        Ok(BlockDevPath {
-            physical_path: physical.to_owned(),
-            logical_path,
+    /// Create a new node in the graph representing a device with no children.
+    pub fn leaf(path: PathBuf) -> Arc<Self> {
+        Arc::new(BlockDevPath {
+            path,
+            child_paths: vec![],
         })
     }
 
-    /// Path to the physical device storing the data.
-    pub fn physical_path(&self) -> &Path {
-        &self.physical_path
+    /// Create a new node in the graph representing the devices and their children.
+    pub fn node_with_children<I>(path: PathBuf, child_paths: I) -> Arc<Self>
+    where
+        I: IntoIterator<Item = Arc<Self>>,
+    {
+        Arc::new(BlockDevPath {
+            path,
+            child_paths: child_paths.into_iter().collect(),
+        })
     }
 
-    /// Path to the physical or logical device where the Stratis metadata should
-    /// be written.
-    pub fn metadata_path(&self) -> &Path {
-        if let Some((ref path, _)) = self.logical_path {
-            path
-        } else {
-            &self.physical_path
-        }
+    /// Get the path of the device associated with the current structure.
+    pub fn path(&self) -> &Path {
+        self.path.as_path()
     }
 
-    /// This is the path of devices that will be reported to the user.
-    ///
-    /// In the case of an encrypted device, this will be the canonicalized path of
-    /// the path of the device path where metadata should be written. In the
-    /// case of an unencrypted device, it returns the user provided path.
-    pub fn user_path(&self) -> &Path {
-        if let Some((_, ref path)) = self.logical_path {
-            path
-        } else {
-            &self.physical_path
-        }
+    /// Get the child nodes of this node in the tree.
+    pub fn children(&self) -> impl Iterator<Item = Arc<Self>> + '_ {
+        self.child_paths.iter().cloned()
+    }
+
+    /// Paths of the child devices of this node in the graph.
+    pub fn child_paths(&self) -> impl Iterator<Item = &Path> + '_ {
+        self.child_paths.iter().map(|child| child.path())
     }
 }

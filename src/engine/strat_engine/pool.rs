@@ -368,7 +368,7 @@ impl Pool for StratPool {
                 self.backstore
                     .cachedevs()
                     .into_iter()
-                    .map(|(_, bd)| bd.devnode().physical_path().to_owned()),
+                    .map(|(_, bd)| bd.physical_path().to_owned()),
             )
         }
     }
@@ -650,7 +650,7 @@ mod tests {
             .backstore
             .blockdevs()
             .iter()
-            .all(|(_, _, bd)| bd.devnode().user_path().is_absolute()))
+            .all(|(_, _, bd)| bd.user_path().unwrap().is_absolute()))
     }
 
     /// Verify that a pool with no devices does not have the minimum amount of

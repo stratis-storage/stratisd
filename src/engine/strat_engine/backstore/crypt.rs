@@ -600,7 +600,7 @@ fn setup_crypt_handle(
 }
 
 /// Create a device handle and load the LUKS2 header into memory from
-/// a phyiscal path.
+/// a physical path.
 fn device_from_physical_path(physical_path: &Path) -> Result<Option<CryptDevice>> {
     let mut device = log_on_failure!(
         CryptInit::init(physical_path),

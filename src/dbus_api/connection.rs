@@ -166,7 +166,7 @@ impl DbusConnectionHandler {
         Arc::clone(&self.connection)
     }
 
-    /// Handle a D-Bus action passed from the udev handler.
+    /// Handle a D-Bus action passed from a D-Bus connection.
     pub fn process_dbus_request(&self) -> StratisResult<bool> {
         self.connection
             .process(Duration::from_millis(100))

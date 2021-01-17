@@ -3,6 +3,14 @@ else
   TARGET_ARGS = --target=${TARGET}
 endif
 
+DESTDIR ?=
+PREFIX ?= /usr
+LIBEXECDIR ?= $(PREFIX)/libexec
+DATADIR ?= $(PREFIX)/share
+UDEVDIR ?= $(PREFIX)/lib/udev
+MANDIR ?= $(DATADIR)/man
+UNITDIR ?= $(PREFIX)/lib/systemd/system
+
 RUST_2018_IDIOMS = -D bare-trait-objects \
                    -D ellipsis-inclusive-range-patterns
 
@@ -103,6 +111,16 @@ stratis-min:
 	RUSTFLAGS="${DENY}" \
 	cargo build --bin=stratis-min --features extras ${TARGET_ARGS}
 
+profiledir := $(shell if test -d target/release; then echo target/release; else echo target/debug; fi)
+install: build docs
+	install -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) $(profiledir)/stratisd
+	install -Dpm0755 -t $(DESTDIR)$(UDEVDIR) $(profiledir)/stratis_uuids_to_names
+	install -Dpm0644 -t $(DESTDIR)$(DATADIR)/dbus-1/system.d stratisd.conf
+	install -Dpm0644 -t $(DESTDIR)$(MANDIR)/man8 docs/stratisd.8
+	install -Dpm0644 -t $(DESTDIR)$(UDEVDIR)/rules.d udev/11-stratisd.rules
+	install -Dpm0644 -t $(DESTDIR)$(UNITDIR) stratisd.service
+	install -Dpm0755 -t $(DESTDIR)$(PREFIX)/bin developer_tools/stratis_migrate_symlinks.sh
+
 release:
 	RUSTFLAGS="${DENY}" cargo build --release
 
@@ -147,6 +165,7 @@ clippy:
 	docs-travis
 	fmt
 	fmt-travis
+	install
 	license
 	outdated
 	release

@@ -265,6 +265,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "drop_bomb"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9bda8e21c04aca2ae33ffc2fd8c23134f3cac46db123ba97bd9d3f3b8a4a85e1"
+
+[[package]]
 name = "either"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -517,6 +523,8 @@ dependencies = [
  "loopdev",
  "matches",
  "nix 0.18.0",
+ "openat",
+ "openat-ext",
  "pkg-config",
  "proptest",
  "rand 0.7.3",
@@ -670,6 +678,28 @@ name = "opaque-debug"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
+
+[[package]]
+name = "openat"
+version = "0.1.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8eff876e3964841fd6067ecf1d040e0315879c1a1cce2a0f162828e82f04d1ce"
+dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "openat-ext"
+version = "0.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7ac688336340b9ce22dd83e3b26d9d9063ceef5990679f75176b7e17f4e6a51"
+dependencies = [
+ "drop_bomb",
+ "libc",
+ "nix 0.18.0",
+ "openat",
+ "rand 0.7.3",
+]
 
 [[package]]
 name = "peeking_take_while"

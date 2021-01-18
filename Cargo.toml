@@ -48,6 +48,8 @@ regex = "1"
 base64 = "0.13"
 sha-1 = "0.9"
 either = "1"
+openat-ext = "0.1.10"
+openat = "0.1.19"
 
 [dependencies.dbus]
 version = "0.8"

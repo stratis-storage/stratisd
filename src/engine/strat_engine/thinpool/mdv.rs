@@ -6,10 +6,12 @@
 
 use std::{
     convert::From,
-    fs::{create_dir, create_dir_all, read_dir, remove_dir, remove_file, rename, OpenOptions},
+    fs::{create_dir, create_dir_all, read_dir, remove_dir, remove_file, OpenOptions},
     io::{prelude::*, ErrorKind},
     path::{Path, PathBuf},
 };
+
+use openat_ext::OpenatDirExt;
 
 use nix::mount::{mount, umount, MsFlags};
 
@@ -128,31 +130,13 @@ impl MetadataVol {
         uuid: FilesystemUuid,
         fs: &StratFilesystem,
     ) -> StratisResult<()> {
-        let data = serde_json::to_string(&fs.record(name, uuid))?;
-        let path = self
-            .mount_pt
-            .join(FILESYSTEM_DIR)
-            .join(uuid.to_simple_ref().to_string())
-            .with_extension("json");
-
-        let temp_path = path.with_extension("temp");
-
         let _mount = MountedMDV::mount(self)?;
-
-        // Braces to ensure f is closed before renaming
-        {
-            let mut f = OpenOptions::new()
-                .write(true)
-                .create(true)
-                .open(&temp_path)?;
-            f.write_all(data.as_bytes())?;
-
-            // Try really hard to make sure it goes to disk
-            f.sync_all()?;
-        }
-
-        rename(temp_path, path)?;
-
+        let mntdfd = &openat::Dir::open(&self.mount_pt.join(FILESYSTEM_DIR))?;
+        let filename = Path::new(&uuid.to_simple_ref().to_string()).with_extension("json");
+        mntdfd.write_file_with_sync(&filename, 0o644, |w| -> StratisResult<()> {
+            let v = &fs.record(name, uuid);
+            Ok(serde_json::to_writer(w, &v)?)
+        })?;
         Ok(())
     }
 

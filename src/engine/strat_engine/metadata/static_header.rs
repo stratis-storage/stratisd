@@ -40,7 +40,7 @@ const STRAT_SIGBLOCK_VERSION: u8 = 1;
 #[derive(Debug)]
 pub struct StaticHeaderResult {
     /// The bytes read
-    bytes: StratisResult<[u8; bytes!(static_header_size::SIGBLOCK_SECTORS)]>,
+    bytes: StratisResult<Box<[u8; bytes!(static_header_size::SIGBLOCK_SECTORS)]>>,
     /// The header parsed from the bytes
     header: Option<StratisResult<Option<StaticHeader>>>,
 }
@@ -231,7 +231,7 @@ impl StaticHeader {
         (
             match maybe_buf_1 {
                 Ok(buf) => StaticHeaderResult {
-                    bytes: Ok(buf),
+                    bytes: Ok(Box::new(buf)),
                     header: Some(StaticHeader::sigblock_from_buf(&buf)),
                 },
                 Err(err) => StaticHeaderResult {
@@ -241,7 +241,7 @@ impl StaticHeader {
             },
             match maybe_buf_2 {
                 Ok(buf) => StaticHeaderResult {
-                    bytes: Ok(buf),
+                    bytes: Ok(Box::new(buf)),
                     header: Some(StaticHeader::sigblock_from_buf(&buf)),
                 },
                 Err(err) => StaticHeaderResult {

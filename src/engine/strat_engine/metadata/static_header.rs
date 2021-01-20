@@ -222,6 +222,14 @@ impl StaticHeader {
         BDAExtendedSize::new(self.mda_size.bda_size().sectors() + self.reserved_size.sectors())
     }
 
+    /// Read a pair of headers from device.
+    ///
+    /// Return the StaticHeaders and corresponding
+    /// array of bytes in the form of a tuple of StaticHeaderResults.
+    /// If read successfully, StaticHeaderResult with contain a reference
+    /// to the buffer that was read, and the resulting StaticHeader.
+    /// If reading a buffer fails, StaticHeaderResult will contain an error
+    /// in the bytes buffer, and None for the header.
     pub fn read_sigblocks<F>(f: &mut F) -> (StaticHeaderResult, StaticHeaderResult)
     where
         F: Read + Seek,
@@ -252,6 +260,9 @@ impl StaticHeader {
         )
     }
 
+    /// Writes the specified static header
+    /// to a specified repair location. Used to update
+    /// corrupted or outdated static headers.
     pub fn write_header<F>(
         f: &mut F,
         sh: StaticHeader,
@@ -264,9 +275,9 @@ impl StaticHeader {
         Ok(Some(sh))
     }
 
-    // Replacement function for write_header
-    // for cases when writing repairs to corrupted
-    // sigblocks is not desired
+    /// Replacement function for write_header
+    /// for cases when writing repairs to corrupted
+    /// sigblocks is not desired
     pub fn do_nothing<F>(
         _f: &mut F,
         sh: StaticHeader,
@@ -754,13 +765,14 @@ pub mod tests {
             .write(&mut reference_buf, MetadataLocation::Both)
             .unwrap();
 
-        // Test that StaticHeader::setup succeeds by writing the older
+        // Test the StaticHeader::repair_sigblocks method by writing the older
         // signature block to the specified older location and the newer
-        // sigblock to the specified newer location and then calling
-        // StaticHeader::setup. StaticHeader::setup should return without
-        // error with the newer sigblock. As a side-effect, it should have
-        // overwritten the location of the older sigblock with the value of
-        // the newer sigblock.
+        // sigblock to the specified newer location, then calling
+        // StaticHeader::repair_sigblocks, which should return without
+        // error with the newer sigblock. As a side-effect, it should
+        // overwrite the location of the older sigblock with the value of
+        // the newer sigblock, since StaticHeader::write_header was provided
+        // as an argument.
         let test_rewrite = |sh_older: &StaticHeader,
                             sh_newer: &StaticHeader,
                             older_location: MetadataLocation,

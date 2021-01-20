@@ -494,7 +494,7 @@ dependencies = [
 
 [[package]]
 name = "libstratis"
-version = "2.3.0"
+version = "2.4.0"
 dependencies = [
  "base64",
  "byteorder",

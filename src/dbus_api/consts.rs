@@ -11,6 +11,7 @@ pub const MANAGER_INTERFACE_NAME: &str = "org.storage.stratis2.Manager";
 pub const MANAGER_INTERFACE_NAME_2_1: &str = "org.storage.stratis2.Manager.r1";
 pub const MANAGER_INTERFACE_NAME_2_2: &str = "org.storage.stratis2.Manager.r2";
 pub const MANAGER_INTERFACE_NAME_2_3: &str = "org.storage.stratis2.Manager.r3";
+pub const MANAGER_INTERFACE_NAME_2_4: &str = "org.storage.stratis2.Manager.r4";
 pub const REPORT_INTERFACE_NAME_2_1: &str = "org.storage.stratis2.Report.r1";
 
 pub const PROPERTY_FETCH_INTERFACE_NAME: &str = "org.storage.stratis2.FetchProperties";

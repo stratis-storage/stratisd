@@ -1,8 +1,10 @@
-stratisd 2.3.1 (UNRELEASED)
+stratisd 2.4.0 (UNRELEASED)
 ===========================
-
-Recommended Rust toolchain version: 1.48.0
+Recommended Rust toolchain version: 1.49.0
 Lowest supported Rust toolchain version: 1.47
+
+New D-Bus interfaces:
+  - org.storage.stratis2.Manager.r4
 
 Recommended Python interpreter: 3.8.6
 Lowest supported Python interpreter: 3.6.8
@@ -12,9 +14,33 @@ Python import sorter: isort (4.3.21)
 
 YAML linter: yamllint (1.25.0)
 
+New Rust crate version requirements:
+  - devicemapper-rs: 0.29
+
+New minimum Python package requirement (for testing):
+  - networkx: 2.5
+  - semantic_version: 2.8.4
+
+- Add EngineStateReport method to new Manager.r4 interface:
+  https://github.com/stratis-storage/stratisd/issues/2369
+  https://github.com/stratis-storage/stratisd/pull/2378
+
+- Create the filesystem on the mdv with the xfs -noalign option:
+  https://github.com/stratis-storage/stratisd/issues/2370
+  https://github.com/stratis-storage/stratisd/pull/2373
+
+- Require devicemapper 0.29; make use of 128-bit Bytes type:
+  https://github.com/stratis-storage/stratisd/pull/2374
+
 - Enrich error when pool devices are not all wiped of metadata:
   https://github.com/stratis-storage/stratisd/issues/2354
   https://github.com/stratis-storage/stratisd/pull/2356
+
+- Add install target to Makefile:
+  https://github.com/stratis-storage/stratisd/pull/2379
+
+- Refactor to use graph structure for tracking device paths:
+  https://github.com/stratis-storage/stratisd/pull/2377
 
 - Remove support in engine for incorporating random behavior in the sim engine:
   https://github.com/stratis-storage/stratisd/issues/2336
@@ -28,6 +54,11 @@ YAML linter: yamllint (1.25.0)
   https://github.com/stratis-storage/stratisd/pull/2364
 
 - Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/2389
+  https://github.com/stratis-storage/stratisd/pull/2385
+  https://github.com/stratis-storage/stratisd/pull/2375
+  https://github.com/stratis-storage/stratisd/pull/2367
+  https://github.com/stratis-storage/stratisd/pull/2366
   https://github.com/stratis-storage/stratisd/pull/2365
   https://github.com/stratis-storage/stratisd/pull/2363
   https://github.com/stratis-storage/stratisd/pull/2352

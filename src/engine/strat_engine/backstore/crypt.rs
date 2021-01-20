@@ -8,6 +8,7 @@ use std::{
     io,
     path::{Path, PathBuf},
     sync::Arc,
+    thread::{current, ThreadId},
 };
 
 use base64::{decode, encode_config, CharacterSet, Config};
@@ -67,6 +68,16 @@ const DEVICEMAPPER_PATH: &str = "/dev/mapper";
 /// Key in clevis configuration for tang indicating that the URL of the
 /// tang server does not need to be verified.
 const CLEVIS_TANG_TRUST_URL: &str = "stratis:tang:trust_url";
+
+lazy_static! {
+    static ref THREAD_ID: ThreadId = current().id();
+}
+
+macro_rules! assert_single_thread {
+    () => {
+        assert_eq!(*THREAD_ID, current().id());
+    };
+}
 
 macro_rules! log_on_failure {
     ($op:expr, $fmt:tt $(, $arg:expr)*) => {{
@@ -206,6 +217,7 @@ impl CryptInitializer {
     }
 
     pub fn initialize(self, key_description: &KeyDescription) -> Result<CryptHandle> {
+        assert_single_thread!();
         let mut device = log_on_failure!(
             CryptInit::init(&self.physical_path),
             "Failed to acquire context for device {} while initializing; \
@@ -310,6 +322,7 @@ impl CryptInitializer {
     }
 
     pub fn rollback(mut device: CryptDevice, physical_path: &Path, name: String) -> Result<()> {
+        assert_single_thread!();
         ensure_wiped(&mut device, physical_path, &name)
     }
 }
@@ -322,6 +335,8 @@ impl CryptActivationHandle {
     /// environment (e.g. the proper key is in the kernel keyring, the device
     /// is formatted as a LUKS2 device, etc.)
     pub fn can_unlock(physical_path: &Path) -> bool {
+        assert_single_thread!();
+
         fn can_unlock_with_failures(physical_path: &Path) -> Result<bool> {
             let device_result = device_from_physical_path(physical_path);
             match device_result {
@@ -357,6 +372,7 @@ impl CryptActivationHandle {
     /// * has a valid Stratis LUKS2 token
     /// * has a token of the proper type for LUKS2 keyring unlocking
     pub fn setup(physical_path: &Path, unlock_method: UnlockMethod) -> Result<Option<CryptHandle>> {
+        assert_single_thread!();
         setup_crypt_handle(physical_path, Some(unlock_method))
     }
 }
@@ -433,6 +449,7 @@ impl CryptHandle {
     /// * has a valid Stratis LUKS2 token
     /// * has a token of the proper type for LUKS2 keyring unlocking
     pub fn setup(physical_path: &Path) -> Result<Option<CryptHandle>> {
+        assert_single_thread!();
         setup_crypt_handle(physical_path, None)
     }
 
@@ -475,11 +492,13 @@ impl CryptHandle {
 
     /// Get the keyslot associated with the given token ID.
     pub fn keyslots(&mut self, token_id: c_uint) -> Result<Option<Vec<c_uint>>> {
+        assert_single_thread!();
         get_keyslot_number(&mut self.device, token_id)
     }
 
     /// Get info for the clevis binding.
     pub fn clevis_info(&mut self) -> Result<Option<(String, Value)>> {
+        assert_single_thread!();
         clevis_info_from_metadata(&mut self.device)
     }
 
@@ -521,12 +540,14 @@ impl CryptHandle {
     /// Deactivate the device referenced by the current device handle.
     #[cfg(test)]
     pub fn deactivate(&mut self) -> Result<()> {
+        assert_single_thread!();
         let name = self.name.to_owned();
         ensure_inactive(&mut self.device, &name)
     }
 
     /// Wipe all LUKS2 metadata on the device safely using libcryptsetup.
     pub fn wipe(&mut self) -> Result<()> {
+        assert_single_thread!();
         let path = self.luks2_device_path().to_owned();
         let name = self.name.to_owned();
         ensure_wiped(&mut self.device, &path, &name)
@@ -535,6 +556,7 @@ impl CryptHandle {
     /// Get the size of the logical device built on the underlying encrypted physical
     /// device. `devicemapper` will return the size in terms of number of sectors.
     pub fn logical_device_size(&mut self) -> Result<Sectors> {
+        assert_single_thread!();
         let name = self.name.clone();
         let active_device = log_on_failure!(
             self.device.runtime_handle(&name).get_active_device(),

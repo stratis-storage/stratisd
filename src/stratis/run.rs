@@ -176,5 +176,7 @@ pub fn run(sim: bool) -> StratisResult<()> {
         dbus_support.process(&mut fds, dbus_client_index_start);
 
         process_poll(&mut fds)?;
+
+        assert_eq!(Rc::strong_count(&engine), 2);
     }
 }

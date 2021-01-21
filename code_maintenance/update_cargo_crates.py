@@ -222,7 +222,12 @@ def _build_koji_repo_dict(cargo_tree):
             continue
         name = matches.group("name")
         if name in cargo_tree:
-            koji_repo_dict[name] = Version(matches.group("version"), partial=True)
+            # Fedora appears to be using non-SemVer standard version strings:
+            # the standard seems to be to use a "~" instead of a "-" in some
+            # places. See https://semver.org/ for the canonical grammar that
+            # the semantic_version library adheres to.
+            version = matches.group("version").replace("~", "-")
+            koji_repo_dict[name] = Version(version, partial=True)
 
     # Post-condition: koji_repo_dict.keys() <= cargo_tree.keys().
     # cargo tree may show internal dependencies that are not separate packages

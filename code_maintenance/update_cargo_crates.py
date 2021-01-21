@@ -144,7 +144,7 @@ def _build_cargo_tree_dict():
         cargo_tree_match = CARGO_TREE_RE.search(line_str)
         assert cargo_tree_match is not None, line_str
         version_dict[cargo_tree_match.group("crate")].add(
-            Version(cargo_tree_match.group("version"), partial=True)
+            Version(cargo_tree_match.group("version"))
         )
 
     return version_dict
@@ -222,7 +222,12 @@ def _build_koji_repo_dict(cargo_tree):
             continue
         name = matches.group("name")
         if name in cargo_tree:
-            koji_repo_dict[name] = Version(matches.group("version"), partial=True)
+            # Fedora appears to be using non-SemVer standard version strings:
+            # the standard seems to be to use a "~" instead of a "-" in some
+            # places. See https://semver.org/ for the canonical grammar that
+            # the semantic_version library adheres to.
+            version = matches.group("version").replace("~", "-")
+            koji_repo_dict[name] = Version(version)
 
     # Post-condition: koji_repo_dict.keys() <= cargo_tree.keys().
     # cargo tree may show internal dependencies that are not separate packages
@@ -587,7 +592,6 @@ def main():  # pylint: disable=too-many-branches, too-many-locals, too-many-stat
                 % (crate, koji_version),
                 file=sys.stderr,
             )
-            return 1
 
     cargo_outdated = _build_cargo_outdated_graph()
     result = _build_results(cargo_outdated, koji_repo_dict)

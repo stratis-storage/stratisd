@@ -66,17 +66,13 @@ impl BDA {
         Ok(())
     }
 
-    /// Load a BDA on initial setup of a device.
+    /// Load a BDA on initial setup of a device, given valid StaticHeader.
+    /// Returns None if no valid StaticHeader exists.
     /// Returns None if no BDA appears to exist.
-    pub fn load<F>(f: &mut F) -> StratisResult<Option<BDA>>
+    pub fn load<F>(header: StaticHeader, f: &mut F) -> StratisResult<Option<BDA>>
     where
         F: Read + Seek + SyncAll,
     {
-        let header = match StaticHeader::setup(f)? {
-            Some(header) => header,
-            None => return Ok(None),
-        };
-
         // Assume that, since a valid StaticHeader was found on the device,
         // that this implies that BDA::initialize() was succesfully executed
         // sometime in the past. Since that is the case, valid MDA headers
@@ -177,8 +173,9 @@ mod tests {
                 Utc::now().timestamp() as u64,
             );
             bda.initialize(&mut buf).unwrap();
-
-            let bda = BDA::load(&mut buf).unwrap().unwrap();
+            let read_results = StaticHeader::read_sigblocks(&mut buf);
+            let header = StaticHeader::repair_sigblocks(&mut buf, read_results, StaticHeader::do_nothing).unwrap().unwrap();
+            let bda = BDA::load(header, &mut buf).unwrap().unwrap();
             prop_assert!(bda.last_update_time().is_none());
         }
     }
@@ -263,7 +260,9 @@ mod tests {
             prop_assert!(bda.last_update_time().map(|t| t == &current_time).unwrap_or(false));
             prop_assert!(loaded_state.map(|s| &s == state).unwrap_or(false));
 
-            let mut bda = BDA::load(&mut buf).unwrap().unwrap();
+            let read_results = StaticHeader::read_sigblocks(&mut buf);
+            let header = StaticHeader::repair_sigblocks(&mut buf, read_results, StaticHeader::write_header).unwrap().unwrap();
+            let mut bda = BDA::load(header, &mut buf).unwrap().unwrap();
             let loaded_state = bda.load_state(&mut buf).unwrap();
             prop_assert!(loaded_state.map(|s| &s == state).unwrap_or(false));
             prop_assert!(bda.last_update_time().map(|t| t == &current_time).unwrap_or(false));

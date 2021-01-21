@@ -177,6 +177,6 @@ pub fn run(sim: bool) -> StratisResult<()> {
 
         process_poll(&mut fds)?;
 
-        assert_eq!(Rc::strong_count(&engine), 2);
+        assert_eq!(Rc::strong_count(&engine), 3);
     }
 }

@@ -22,7 +22,7 @@ pub use self::{
     dm::{get_dm, get_dm_init},
     engine::StratEngine,
     keys::StratKeyActions,
-    metadata::BDA,
+    metadata::{BDA, StaticHeader},
 };
 
 #[cfg(test)]

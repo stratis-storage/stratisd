@@ -20,7 +20,7 @@ use crate::{
             backstore::{CryptHandle, StratBlockDev},
             device::blkdev_size,
             liminal::device_info::LStratisInfo,
-            metadata::BDA,
+            metadata::{StaticHeader, BDA},
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
         },
         types::{BlockDevTier, DevUuid},
@@ -38,7 +38,20 @@ use crate::{
 /// is returned.
 pub fn get_bdas(infos: &HashMap<DevUuid, &LStratisInfo>) -> StratisResult<HashMap<DevUuid, BDA>> {
     fn read_bda(info: &LStratisInfo) -> StratisResult<BDA> {
-        BDA::load(&mut OpenOptions::new().read(true).open(&info.ids.devnode)?)?.ok_or_else(|| {
+        let f = &mut OpenOptions::new().read(true).open(&info.ids.devnode)?;
+        let read_results = StaticHeader::read_sigblocks(f);
+        let header =
+            match StaticHeader::repair_sigblocks(f, read_results, StaticHeader::write_header) {
+                Ok(Some(header)) => header,
+                Ok(None) => {
+                    return Err(StratisError::Error(format!(
+                        "Failed to find valid Stratis signature in header from device: {}",
+                        info.ids
+                    )))
+                }
+                Err(err) => return Err(err),
+            };
+        BDA::load(header, f)?.ok_or_else(|| {
             StratisError::Error(format!("Failed to read BDA from device: {}", info.ids))
         })
     }

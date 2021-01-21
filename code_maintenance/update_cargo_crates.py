@@ -592,7 +592,6 @@ def main():  # pylint: disable=too-many-branches, too-many-locals, too-many-stat
                 % (crate, koji_version),
                 file=sys.stderr,
             )
-            return 1
 
     cargo_outdated = _build_cargo_outdated_graph()
     result = _build_results(cargo_outdated, koji_repo_dict)

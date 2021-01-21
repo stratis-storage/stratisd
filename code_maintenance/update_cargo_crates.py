@@ -144,7 +144,7 @@ def _build_cargo_tree_dict():
         cargo_tree_match = CARGO_TREE_RE.search(line_str)
         assert cargo_tree_match is not None, line_str
         version_dict[cargo_tree_match.group("crate")].add(
-            Version(cargo_tree_match.group("version"), partial=True)
+            Version(cargo_tree_match.group("version"))
         )
 
     return version_dict
@@ -227,7 +227,7 @@ def _build_koji_repo_dict(cargo_tree):
             # places. See https://semver.org/ for the canonical grammar that
             # the semantic_version library adheres to.
             version = matches.group("version").replace("~", "-")
-            koji_repo_dict[name] = Version(version, partial=True)
+            koji_repo_dict[name] = Version(version)
 
     # Post-condition: koji_repo_dict.keys() <= cargo_tree.keys().
     # cargo tree may show internal dependencies that are not separate packages

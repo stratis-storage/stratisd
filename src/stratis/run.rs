@@ -12,6 +12,7 @@ use std::{
     },
 };
 
+use futures::pending;
 use nix::poll::{poll, PollFd, PollFlags};
 use tokio::{
     runtime::Runtime,
@@ -32,6 +33,8 @@ use crate::{
     },
 };
 
+// Poll for udev events.
+// Check for exit condition and return if true.
 fn udev_thread(sender: Sender<UdevEngineEvent>, should_exit: Arc<AtomicBool>) -> StratisResult<()> {
     let context = libudev::Context::new()?;
     let mut udev = UdevMonitor::create(&context)?;
@@ -67,15 +70,18 @@ async fn signal_thread(should_exit: Arc<AtomicBool>) {
     should_exit.store(true, Ordering::Relaxed);
 }
 
-async fn dm_event_thread(engine: Arc<Mutex<dyn Engine>>) -> StratisResult<()> {
-    let dm_fd_opt = DmFd::new(engine).await?;
-    if let Some(mut fd) = dm_fd_opt {
-        loop {
-            fd.next().await;
+async fn dm_event_thread(engine: Option<Arc<Mutex<dyn Engine>>>) -> StratisResult<()> {
+    match engine {
+        Some(e) => {
+            let mut dm_fd_opt = DmFd::new(e)?;
+            loop {
+                dm_fd_opt.next().await;
+            }
         }
-    } else {
-        info!("Engine will not listen for devicemapper events");
-        Ok(())
+        None => {
+            pending!();
+            Ok(())
+        }
     }
 }
 
@@ -83,6 +89,7 @@ async fn dm_event_thread(engine: Arc<Mutex<dyn Engine>>) -> StratisResult<()> {
 /// Initialize the engine and keep it running until a signal is received
 /// or a fatal error is encountered.
 /// If sim is true, start the sim engine rather than the real engine.
+/// Always check for devicemapper context.
 pub fn run(sim: bool) -> StratisResult<()> {
     let runtime = Runtime::new()?;
     runtime.block_on(async move {
@@ -107,30 +114,34 @@ pub fn run(sim: bool) -> StratisResult<()> {
         let (sender, receiver) = channel::<UdevEngineEvent>(1024);
 
         let udev_arc_clone = Arc::clone(&should_exit);
-        let mut join_udev = task::spawn_blocking(move || udev_thread(sender, udev_arc_clone));
-        let mut join_ipc = task::spawn(setup(Arc::clone(&engine), receiver, Arc::clone(&should_exit)));
-        let mut join_signal = task::spawn(signal_thread(Arc::clone(&should_exit)));
-        let mut join_dm = task::spawn(dm_event_thread(engine));
+        let join_udev = task::spawn_blocking(move || udev_thread(sender, udev_arc_clone));
+        let join_ipc = task::spawn(setup(Arc::clone(&engine), receiver, Arc::clone(&should_exit)));
+        let join_signal = task::spawn(signal_thread(Arc::clone(&should_exit)));
+        let join_dm = task::spawn(dm_event_thread(if sim {
+            None
+        } else {
+            Some(Arc::clone(&engine))
+        }));
 
         select! {
-            res = &mut join_udev => {
+            res = join_udev => {
                 if let Ok(Err(e)) = res {
                     error!("The udev thread exited with an error: {}; shutting down stratisd...", e);
                 } else {
                     error!("The udev thread exited; shutting down stratisd...");
                 }
             }
-            res = &mut join_ipc => {
+            res = join_ipc => {
                 if let Ok(Err(e)) = res {
                     error!("The IPC thread exited with an error: {}; shutting down stratisd...", e);
                 } else {
                     error!("The IPC thread exited; shutting down stratisd...");
                 }
             }
-            Ok(Err(e)) = &mut join_dm => {
+            Ok(Err(e)) = join_dm => {
                 error!("The devicemapper thread exited with an error: {}; shutting down stratisd...", e);
             }
-            _ = &mut join_signal => {
+            _ = join_signal => {
                 info!("Caught SIGINT; exiting...");
             }
         }

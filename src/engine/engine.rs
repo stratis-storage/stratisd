@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 use serde_json::Value;
 use uuid::Uuid;
 
-use devicemapper::{Bytes, Sectors, DM};
+use devicemapper::{Bytes, Sectors};
 
 use crate::{
     engine::types::{
@@ -336,10 +336,6 @@ pub trait Engine: Debug + Report + Send {
 
     /// Get mutable references to all pools belonging to this engine.
     fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut dyn Pool)>;
-
-    /// Return the DM file descriptor to check for DM events. If the engine
-    /// is the sim engine, the value is None.
-    fn get_dm_context(&self) -> Option<&'static DM>;
 
     /// Notify the engine that an event has occurred on the DM file descriptor.
     fn evented(&mut self) -> StratisResult<()>;

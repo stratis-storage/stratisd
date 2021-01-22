@@ -6,7 +6,7 @@ pub use self::{
     engine::{BlockDev, Engine, Filesystem, KeyActions, Pool, Report},
     event::{get_engine_listener_list_mut, EngineEvent, EngineListener},
     sim_engine::SimEngine,
-    strat_engine::{StratEngine, StratKeyActions, BDA},
+    strat_engine::{get_dm, get_dm_init, StratEngine, StratKeyActions, BDA},
     types::{
         BlockDevState, BlockDevTier, CreateAction, DeleteAction, DevUuid, EngineAction,
         FilesystemUuid, KeyDescription, MappingCreateAction, MaybeDbusPath, Name, PoolUuid,

@@ -10,8 +10,6 @@ use std::{
 
 use serde_json::{json, Value};
 
-use devicemapper::DM;
-
 use crate::{
     engine::{
         engine::{Engine, KeyActions, Pool, Report},
@@ -213,10 +211,6 @@ impl Engine for SimEngine {
             .iter_mut()
             .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &mut dyn Pool))
             .collect()
-    }
-
-    fn get_dm_context(&self) -> Option<&'static DM> {
-        None
     }
 
     fn evented(&mut self) -> StratisResult<()> {

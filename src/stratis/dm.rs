@@ -6,8 +6,9 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures_util::ready;
-use tokio::{io::unix::AsyncFd, pin, stream::Stream, sync::Mutex};
+use futures::ready;
+use tokio::{io::unix::AsyncFd, pin, sync::Mutex};
+use tokio_stream::Stream;
 
 use crate::{async_fd::FdWrapper, engine::Engine, stratis::errors::StratisResult};
 
@@ -44,7 +45,7 @@ impl Stream for DmFd {
         let mut lock = ready!(lock_future.poll(cxt));
         if let Some(evt) = lock.get_dm_context() {
             evt.arm_poll()?;
-            (*lock).evented()?;
+            lock.evented()?;
             Poll::Ready(Some(Ok(())))
         } else {
             Poll::Ready(None)

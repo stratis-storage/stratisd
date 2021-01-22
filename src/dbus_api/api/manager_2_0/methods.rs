@@ -48,7 +48,7 @@ pub fn destroy_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
         }
     };
 
-    let msg = match (*mutex_lock!(dbus_context.engine)).destroy_pool(pool_uuid) {
+    let msg = match mutex_lock!(dbus_context.engine).destroy_pool(pool_uuid) {
         Ok(DeleteAction::Deleted(uuid)) => {
             dbus_context.push_remove(&pool_path, m.tree, consts::pool_interface_list());
             return_message.append3(
@@ -78,7 +78,7 @@ pub fn configure_simulator(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
 
     let dbus_context = m.tree.get_data();
     let mut mutex_lock = mutex_lock!(dbus_context.engine);
-    let result = (*mutex_lock).configure_simulator(denominator);
+    let result = mutex_lock.configure_simulator(denominator);
 
     let msg = match result {
         Ok(_) => return_message.append2(msg_code_ok(), msg_string_ok()),

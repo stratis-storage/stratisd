@@ -35,8 +35,7 @@ pub async fn setup(
                 let event_handler = Box::new(EventHandler::new(conn.new_connection_ref()));
                 get_engine_listener_list_mut().register_listener(event_handler);
                 let mut mutex_lock = mutex_lock!(engine);
-                let engine_ref = &mut *mutex_lock;
-                for (pool_name, pool_uuid, pool) in engine_ref.pools_mut() {
+                for (pool_name, pool_uuid, pool) in mutex_lock.pools_mut() {
                     udev.register_pool(&pool_name, pool_uuid, pool)
                 }
                 info!("D-Bus API is available");

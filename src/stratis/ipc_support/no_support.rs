@@ -4,7 +4,7 @@
 
 use std::sync::{atomic::AtomicBool, Arc};
 
-use futures_util::pending;
+use futures::pending;
 use tokio::sync::{mpsc::Receiver, Mutex};
 
 use crate::{

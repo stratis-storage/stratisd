@@ -46,7 +46,7 @@ pub fn create_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult 
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
     let mut mutex_lock = mutex_lock!(dbus_context.engine);
-    let (pool_name, pool) = get_mut_pool!(*mutex_lock; pool_uuid; default_return; return_message);
+    let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
     let result = pool.create_filesystems(
         pool_uuid,
@@ -116,7 +116,7 @@ pub fn destroy_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
     let mut mutex_lock = mutex_lock!(dbus_context.engine);
-    let (pool_name, pool) = get_mut_pool!(*mutex_lock; pool_uuid; default_return; return_message);
+    let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
     let filesystem_map: HashMap<FilesystemUuid, dbus::Path<'static>> = filesystems
         .filter_map(|path| {
@@ -188,7 +188,7 @@ pub fn snapshot_filesystem(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
     };
 
     let mut mutex_lock = mutex_lock!(dbus_context.engine);
-    let (pool_name, pool) = get_mut_pool!(*mutex_lock; pool_uuid; default_return; return_message);
+    let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
     let msg = match pool.snapshot_filesystem(pool_uuid, fs_uuid, snapshot_name) {
         Ok(CreateAction::Created((uuid, fs))) => {
@@ -239,7 +239,7 @@ pub fn add_cachedevs(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let cache_initialized = {
         let dbus_context = m.tree.get_data();
         let mutex_lock = mutex_lock!(dbus_context.engine);
-        let (_, pool) = get_pool!(*mutex_lock; pool_uuid; default_return; return_message);
+        let (_, pool) = get_pool!(mutex_lock; pool_uuid; default_return; return_message);
         pool.has_cache()
     };
     add_blockdevs(
@@ -269,7 +269,7 @@ pub fn rename_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
         .expect("implicit argument must be in tree");
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
-    let msg = match (*mutex_lock!(dbus_context.engine)).rename_pool(pool_uuid, new_name) {
+    let msg = match mutex_lock!(dbus_context.engine).rename_pool(pool_uuid, new_name) {
         Ok(RenameAction::NoSource) => {
             let error_message = format!("engine doesn't know about pool {}", pool_uuid);
             let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, error_message);

@@ -46,7 +46,7 @@ where
         .uuid;
 
     let mutex_lock = mutex_lock!(dbus_context.engine);
-    let (_, pool) = (*mutex_lock)
+    let (_, pool) = mutex_lock
         .get_pool(pool_uuid)
         .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
     let (tier, blockdev) = pool

@@ -36,7 +36,7 @@ pub fn rename_filesystem(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
 
     let mut mutex_lock = mutex_lock!(dbus_context.engine);
-    let (pool_name, pool) = get_mut_pool!(*mutex_lock; pool_uuid; default_return; return_message);
+    let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
     let msg = match pool.rename_filesystem(&pool_name, filesystem_data.uuid, new_name) {
         Ok(RenameAction::NoSource) => {

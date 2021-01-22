@@ -12,18 +12,17 @@ use std::{
     },
 };
 
-use async_std::task::block_on;
 use nix::poll::{poll, PollFd, PollFlags};
 use tokio::{
     runtime::Runtime,
     select, signal,
-    stream::StreamExt,
     sync::{
         mpsc::{channel, Sender},
         Mutex,
     },
     task,
 };
+use tokio_stream::StreamExt;
 
 use crate::{
     engine::{Engine, SimEngine, StratEngine, UdevEngineEvent},
@@ -48,13 +47,13 @@ fn udev_thread(sender: Sender<UdevEngineEvent>, should_exit: Arc<AtomicBool>) ->
             }
             _ => {
                 if let Some(ref e) = udev.poll() {
-                    let _ = block_on(sender.send(UdevEngineEvent::from(e))).map_err(|e| {
+                    if let Err(e) = sender.blocking_send(UdevEngineEvent::from(e)) {
                         warn!(
                             "udev event could not be sent to engine thread: {}; the \
                             engine was not notified of this udev event",
                             e,
                         );
-                    });
+                    }
                 }
             }
         }

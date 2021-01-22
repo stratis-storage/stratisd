@@ -11,12 +11,12 @@ use std::{
     },
 };
 
-use async_std::task::block_on;
 use dbus::{
     arg::{RefArg, Variant},
     tree::{DataType, MTSync, ObjectPath, Tree},
     Path,
 };
+use futures::executor::block_on;
 use tokio::sync::{mpsc::Sender, Mutex};
 use uuid::Uuid;
 
@@ -119,7 +119,10 @@ impl DbusContext {
         interfaces: InterfacesAdded,
     ) {
         let object_path_name = object_path.get_name().clone();
-        if let Err(e) = block_on(self.sender.send(DbusAction::Add(object_path, interfaces))) {
+        if let Err(e) = self
+            .sender
+            .blocking_send(DbusAction::Add(object_path, interfaces))
+        {
             warn!(
                 "D-Bus add event could not be sent to the processing thread; the D-Bus \
                 server will not be aware of the D-Bus object with path {}: {}",
@@ -140,21 +143,19 @@ impl DbusContext {
                 .as_ref()
                 .map_or(false, |op_cxt| op_cxt.parent == *item)
         }) {
-            if let Err(e) = block_on(
-                self.sender.send(DbusAction::Remove(
-                    opath.get_name().clone(),
-                    match opath
-                        .get_data()
-                        .as_ref()
-                        .expect("all objects with parents have data")
-                        .op_type
-                    {
-                        ObjectPathType::Pool => consts::pool_interface_list(),
-                        ObjectPathType::Filesystem => consts::filesystem_interface_list(),
-                        ObjectPathType::Blockdev => consts::blockdev_interface_list(),
-                    },
-                )),
-            ) {
+            if let Err(e) = self.sender.blocking_send(DbusAction::Remove(
+                opath.get_name().clone(),
+                match opath
+                    .get_data()
+                    .as_ref()
+                    .expect("all objects with parents have data")
+                    .op_type
+                {
+                    ObjectPathType::Pool => consts::pool_interface_list(),
+                    ObjectPathType::Filesystem => consts::filesystem_interface_list(),
+                    ObjectPathType::Blockdev => consts::blockdev_interface_list(),
+                },
+            )) {
                 warn!(
                     "D-Bus remove event could not be sent to the processing thread; the D-Bus \
                     server will still expect the D-Bus object with path {} to be present: {}",

@@ -11,7 +11,6 @@ use std::{
     time::Duration,
 };
 
-use async_std::task::block_on;
 use dbus::{
     arg::{RefArg, Variant},
     blocking::SyncConnection,
@@ -23,10 +22,8 @@ use dbus::{
     strings::Path,
     tree::{MTSync, Tree},
 };
-use tokio::sync::{
-    mpsc::{error::TryRecvError, Receiver},
-    RwLock,
-};
+use futures::executor::block_on;
+use tokio::sync::{mpsc::Receiver, RwLock};
 
 use crate::{
     dbus_api::{
@@ -48,34 +45,21 @@ impl DbusTreeHandler {
     /// Process a D-Bus action (add/remove) request.
     pub async fn process_dbus_actions(&mut self) -> StratisResult<()> {
         loop {
-            let mut action = self.receiver.recv().await.ok_or_else(|| {
+            let action = self.receiver.recv().await.ok_or_else(|| {
                 StratisError::Error(
                     "The channel from the D-Bus request handler to the D-Bus object handler was closed".to_string()
                 )
             })?;
             let mut write_lock = self.tree.write().await;
-            loop {
-                match action {
-                    DbusAction::Add(path, interfaces) => {
-                        let path_name = path.get_name().clone();
-                        write_lock.insert(path);
-                        self.added_object_signal(path_name, interfaces)?;
-                    }
-                    DbusAction::Remove(path, interfaces) => {
-                        write_lock.remove(&path);
-                        self.removed_object_signal(path, interfaces)?;
-                    }
+            match action {
+                DbusAction::Add(path, interfaces) => {
+                    let path_name = path.get_name().clone();
+                    write_lock.insert(path);
+                    self.added_object_signal(path_name, interfaces)?;
                 }
-                action = match self.receiver.try_recv() {
-                    Ok(a) => a,
-                    Err(TryRecvError::Empty) => break,
-                    Err(TryRecvError::Closed) => {
-                        return Err(StratisError::Error(
-                            "The channel from the D-Bus request handler to the \
-                            D-Bus object handler was closed"
-                                .to_string(),
-                        ))
-                    }
+                DbusAction::Remove(path, interfaces) => {
+                    write_lock.remove(&path);
+                    self.removed_object_signal(path, interfaces)?;
                 }
             }
         }

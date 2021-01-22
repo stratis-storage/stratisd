@@ -64,7 +64,7 @@ pub fn create_pool_shared(
     let object_path = m.path.get_name();
     let dbus_context = m.tree.get_data();
     let mut mutex_lock = mutex_lock!(dbus_context.engine);
-    let result = (*mutex_lock).create_pool(
+    let result = mutex_lock.create_pool(
         name,
         &devs.map(|x| Path::new(x)).collect::<Vec<&Path>>(),
         tuple_to_option(redundancy_tuple),
@@ -75,8 +75,7 @@ pub fn create_pool_shared(
         Ok(pool_uuid_action) => {
             let results = match pool_uuid_action {
                 CreateAction::Created(uuid) => {
-                    let (_, pool) =
-                        get_mut_pool!(*mutex_lock; uuid; default_return; return_message);
+                    let (_, pool) = get_mut_pool!(mutex_lock; uuid; default_return; return_message);
 
                     let pool_object_path: dbus::Path = create_dbus_pool(
                         dbus_context,
@@ -117,7 +116,7 @@ pub fn list_keys(info: &MethodInfo<MTSync<TData>, TData>) -> Result<Vec<String>,
     let dbus_context = info.tree.get_data();
 
     let mutex_lock = mutex_lock!(dbus_context.engine);
-    (*mutex_lock)
+    mutex_lock
         .get_key_handler()
         .list()
         .map(|v| {
@@ -139,18 +138,16 @@ pub fn set_key_shared(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let default_return = (false, false);
     let return_message = message.method_return();
 
-    let msg = match (*mutex_lock!(dbus_context.engine))
-        .get_key_handler_mut()
-        .set(
-            &match KeyDescription::try_from(key_desc_str) {
-                Ok(kd) => kd,
-                Err(e) => {
-                    let (rc, rs) = engine_to_dbus_err_tuple(&e);
-                    return Ok(vec![return_message.append3(default_return, rc, rs)]);
-                }
-            },
-            key_fd.as_raw_fd(),
-        ) {
+    let msg = match mutex_lock!(dbus_context.engine).get_key_handler_mut().set(
+        &match KeyDescription::try_from(key_desc_str) {
+            Ok(kd) => kd,
+            Err(e) => {
+                let (rc, rs) = engine_to_dbus_err_tuple(&e);
+                return Ok(vec![return_message.append3(default_return, rc, rs)]);
+            }
+        },
+        key_fd.as_raw_fd(),
+    ) {
         Ok(idem_resp) => {
             let return_value = match idem_resp {
                 MappingCreateAction::Created(()) => (true, false),
@@ -171,7 +168,7 @@ pub fn locked_pool_uuids(info: &MethodInfo<MTSync<TData>, TData>) -> Result<Vec<
     let dbus_context = info.tree.get_data();
 
     let mutex_lock = mutex_lock!(dbus_context.engine);
-    Ok((*mutex_lock)
+    Ok(mutex_lock
         .locked_pools()
         .into_iter()
         .map(|(u, _)| u.to_simple_ref().to_string())

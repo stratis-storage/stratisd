@@ -255,7 +255,8 @@ impl CryptInitializer {
                 self.activation_name,
             )),
             Err(e) => {
-                if let Err(err) = Self::rollback(device, &self.physical_path, self.activation_name)
+                if let Err(err) =
+                    ensure_wiped(&mut device, &self.physical_path, &self.activation_name)
                 {
                     warn!(
                         "Failed to roll back crypt device initialization; you may need \
@@ -336,13 +337,6 @@ impl CryptInitializer {
         );
 
         activate_and_check_device_path(device, key_description, &self.activation_name)
-    }
-
-    pub fn rollback(mut device: CryptDevice, physical_path: &Path, name: String) -> Result<()> {
-        #[allow(unused_variables)]
-        let lock = acquire_mutex!()?;
-
-        ensure_wiped(&mut device, physical_path, &name)
     }
 }
 

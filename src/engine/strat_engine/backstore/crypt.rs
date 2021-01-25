@@ -7,7 +7,7 @@ use std::{
     fmt::{self, Debug},
     io,
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, Mutex},
 };
 
 use base64::{decode, encode_config, CharacterSet, Config};
@@ -68,6 +68,10 @@ const DEVICEMAPPER_PATH: &str = "/dev/mapper";
 /// tang server does not need to be verified.
 const CLEVIS_TANG_TRUST_URL: &str = "stratis:tang:trust_url";
 
+lazy_static! {
+    static ref CRYPT_MUTEX: Mutex<()> = Mutex::new(());
+}
+
 macro_rules! log_on_failure {
     ($op:expr, $fmt:tt $(, $arg:expr)*) => {{
         let result = $op;
@@ -80,6 +84,29 @@ macro_rules! log_on_failure {
         }
         result?
     }}
+}
+
+macro_rules! acquire_crypt_device {
+    ($device_path:expr) => {
+        log_on_failure!(
+            device_from_physical_path($device_path),
+            "Failed to acquire crypt context while determining used keyslots"
+        )
+        .ok_or_else(|| {
+            LibcryptErr::Other(format!(
+                "Device {} does not appear to be a LUKS2 device",
+                $device_path.display()
+            ))
+        })?
+    };
+}
+
+macro_rules! acquire_mutex {
+    () => {
+        CRYPT_MUTEX
+            .lock()
+            .map_err(|e| LibcryptErr::Other(e.to_string()))
+    };
 }
 
 struct StratisLuks2Token {
@@ -206,6 +233,9 @@ impl CryptInitializer {
     }
 
     pub fn initialize(self, key_description: &KeyDescription) -> Result<CryptHandle> {
+        #[allow(unused_variables)]
+        let lock = acquire_mutex!()?;
+
         let mut device = log_on_failure!(
             CryptInit::init(&self.physical_path),
             "Failed to acquire context for device {} while initializing; \
@@ -215,7 +245,6 @@ impl CryptInitializer {
         let result = self.initialize_with_err(&mut device, key_description);
         match result {
             Ok(activated_path) => Ok(CryptHandle::new(
-                device,
                 self.physical_path,
                 activated_path,
                 self.identifiers,
@@ -310,6 +339,9 @@ impl CryptInitializer {
     }
 
     pub fn rollback(mut device: CryptDevice, physical_path: &Path, name: String) -> Result<()> {
+        #[allow(unused_variables)]
+        let lock = acquire_mutex!()?;
+
         ensure_wiped(&mut device, physical_path, &name)
     }
 }
@@ -322,6 +354,8 @@ impl CryptActivationHandle {
     /// environment (e.g. the proper key is in the kernel keyring, the device
     /// is formatted as a LUKS2 device, etc.)
     pub fn can_unlock(physical_path: &Path) -> bool {
+        let lock = acquire_mutex!();
+
         fn can_unlock_with_failures(physical_path: &Path) -> Result<bool> {
             let device_result = device_from_physical_path(physical_path);
             match device_result {
@@ -330,16 +364,18 @@ impl CryptActivationHandle {
             }
         }
 
-        can_unlock_with_failures(physical_path)
-            .map_err(|e| {
+        lock.and_then(|_| {
+            can_unlock_with_failures(physical_path).map_err(|e| {
                 warn!(
                     "stratisd was unable to simulate opening the given device \
-                    in the current environment. This may be due to an expired \
-                    or missing key in the kernel keyring: {}",
+                        in the current environment. This may be due to an expired \
+                        or missing key in the kernel keyring: {}",
                     e,
                 );
+                e
             })
-            .unwrap_or(false)
+        })
+        .unwrap_or(false)
     }
 
     /// Query the device metadata to reconstruct a handle for performing operations
@@ -357,6 +393,9 @@ impl CryptActivationHandle {
     /// * has a valid Stratis LUKS2 token
     /// * has a token of the proper type for LUKS2 keyring unlocking
     pub fn setup(physical_path: &Path, unlock_method: UnlockMethod) -> Result<Option<CryptHandle>> {
+        #[allow(unused_variables)]
+        let lock = acquire_mutex!()?;
+
         setup_crypt_handle(physical_path, Some(unlock_method))
     }
 }
@@ -369,7 +408,6 @@ impl CryptActivationHandle {
 /// * CryptActivationHandle requires the user to activate a device to yield a CryptHandle.
 /// * CryptHandle::setup() fails if the device is not active.
 pub struct CryptHandle {
-    device: CryptDevice,
     path: Arc<BlockDevPath>,
     identifiers: StratisIdentifiers,
     encryption_info: EncryptionInfo,
@@ -392,7 +430,6 @@ impl Debug for CryptHandle {
 
 impl CryptHandle {
     fn new(
-        device: CryptDevice,
         physical_path: PathBuf,
         activated_path: PathBuf,
         identifiers: StratisIdentifiers,
@@ -404,17 +441,11 @@ impl CryptHandle {
             vec![BlockDevPath::leaf(physical_path)],
         );
         CryptHandle {
-            device,
             path,
             identifiers,
             encryption_info,
             name,
         }
-    }
-
-    #[cfg(test)]
-    fn as_crypt_device(&mut self) -> &mut CryptDevice {
-        &mut self.device
     }
 
     /// Query the device metadata to reconstruct a handle for performing operations
@@ -433,6 +464,9 @@ impl CryptHandle {
     /// * has a valid Stratis LUKS2 token
     /// * has a token of the proper type for LUKS2 keyring unlocking
     pub fn setup(physical_path: &Path) -> Result<Option<CryptHandle>> {
+        #[allow(unused_variables)]
+        let lock = acquire_mutex!()?;
+
         setup_crypt_handle(physical_path, None)
     }
 
@@ -475,12 +509,20 @@ impl CryptHandle {
 
     /// Get the keyslot associated with the given token ID.
     pub fn keyslots(&mut self, token_id: c_uint) -> Result<Option<Vec<c_uint>>> {
-        get_keyslot_number(&mut self.device, token_id)
+        #[allow(unused_variables)]
+        let lock = acquire_mutex!()?;
+
+        let mut device = acquire_crypt_device!(self.luks2_device_path());
+        get_keyslot_number(&mut device, token_id)
     }
 
     /// Get info for the clevis binding.
     pub fn clevis_info(&mut self) -> Result<Option<(String, Value)>> {
-        clevis_info_from_metadata(&mut self.device)
+        #[allow(unused_variables)]
+        let lock = acquire_mutex!()?;
+
+        let mut device = acquire_crypt_device!(self.luks2_device_path());
+        clevis_info_from_metadata(&mut device)
     }
 
     /// Bind the given device using clevis.
@@ -499,6 +541,9 @@ impl CryptHandle {
 
     /// Unbind the given device using clevis.
     pub fn clevis_unbind(&mut self) -> Result<()> {
+        #[allow(unused_variables)]
+        let lock = acquire_mutex!()?;
+
         let keyslots = self.keyslots(CLEVIS_LUKS_TOKEN_ID)?.ok_or_else(|| {
             LibcryptErr::Other(format!(
                 "Token slot {} appears to be empty; could not determine keyslots",
@@ -521,23 +566,31 @@ impl CryptHandle {
     /// Deactivate the device referenced by the current device handle.
     #[cfg(test)]
     pub fn deactivate(&mut self) -> Result<()> {
-        let name = self.name.to_owned();
-        ensure_inactive(&mut self.device, &name)
+        #[allow(unused_variables)]
+        let lock = acquire_mutex!()?;
+
+        let mut device = acquire_crypt_device!(self.luks2_device_path());
+        ensure_inactive(&mut device, &self.name)
     }
 
     /// Wipe all LUKS2 metadata on the device safely using libcryptsetup.
     pub fn wipe(&mut self) -> Result<()> {
-        let path = self.luks2_device_path().to_owned();
-        let name = self.name.to_owned();
-        ensure_wiped(&mut self.device, &path, &name)
+        #[allow(unused_variables)]
+        let lock = acquire_mutex!()?;
+
+        let mut device = acquire_crypt_device!(self.luks2_device_path());
+        ensure_wiped(&mut device, self.luks2_device_path(), &self.name)
     }
 
     /// Get the size of the logical device built on the underlying encrypted physical
     /// device. `devicemapper` will return the size in terms of number of sectors.
     pub fn logical_device_size(&mut self) -> Result<Sectors> {
-        let name = self.name.clone();
+        #[allow(unused_variables)]
+        let lock = acquire_mutex!()?;
+
+        let mut device = acquire_crypt_device!(self.luks2_device_path());
         let active_device = log_on_failure!(
-            self.device.runtime_handle(&name).get_active_device(),
+            device.runtime_handle(&self.name).get_active_device(),
             "Failed to get device size for encrypted logical device"
         );
         Ok(Sectors(active_device.size))
@@ -585,7 +638,6 @@ fn setup_crypt_handle(
     };
 
     Ok(Some(CryptHandle {
-        device,
         path: BlockDevPath::node_with_children(
             activated_path,
             vec![BlockDevPath::leaf(physical_path.to_owned())],
@@ -1422,8 +1474,14 @@ mod tests {
             };
 
             let device_name = handle.name.clone();
+            let mut device = device_from_physical_path(path)?.ok_or_else(|| {
+                LibcryptErr::Other(format!(
+                    "Device {} does not appear to be a LUKS2 device",
+                    path.display(),
+                ))
+            })?;
             loop {
-                match libcryptsetup_rs::status(Some(handle.as_crypt_device()), &device_name) {
+                match libcryptsetup_rs::status(Some(&mut device), &device_name) {
                     Ok(CryptStatusInfo::Busy) => (),
                     Ok(CryptStatusInfo::Active) => break,
                     Ok(s) => {

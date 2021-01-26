@@ -18,7 +18,7 @@ fn unit_template(uuids: Vec<PathBuf>, pool_uuid: Uuid) -> String {
 Description=prompt for root filesystem password
 DefaultDependencies=no
 Conflicts=shutdown.target
-OnFailure=emergency.target
+OnFailure=dracut-emergency.service
 Wants=stratisd-min.service plymouth-start.service
 After=paths.target plymouth-start.service stratisd-min.service {}
 Before=initrd.target

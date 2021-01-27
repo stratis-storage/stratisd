@@ -78,9 +78,9 @@ async fn signal_thread(should_exit: Arc<AtomicBool>) {
 async fn dm_event_thread(engine: Option<Arc<Mutex<dyn Engine>>>) -> StratisResult<()> {
     match engine {
         Some(e) => {
-            let mut dm_fd_opt = DmFd::new(e)?;
+            let mut dm_fd = DmFd::new(e)?;
             loop {
-                dm_fd_opt.next().await;
+                dm_fd.next().await;
             }
         }
         None => Ok(()),

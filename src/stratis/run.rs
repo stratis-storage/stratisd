@@ -73,6 +73,8 @@ async fn signal_thread(should_exit: Arc<AtomicBool>) {
 
 // Waits for devicemapper event. On devicemapper event, transfers control
 // to engine to handle event and waits until control is returned from engine.
+// Accepts None as an argument; this indicates that devicemapper events are
+// to be ignored.
 async fn dm_event_thread(engine: Option<Arc<Mutex<dyn Engine>>>) -> StratisResult<()> {
     match engine {
         Some(e) => {

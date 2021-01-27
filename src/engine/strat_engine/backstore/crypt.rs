@@ -362,8 +362,8 @@ impl CryptActivationHandle {
             can_unlock_with_failures(physical_path).map_err(|e| {
                 warn!(
                     "stratisd was unable to simulate opening the given device \
-                        in the current environment. This may be due to an expired \
-                        or missing key in the kernel keyring: {}",
+                    in the current environment. This may be due to an expired \
+                    or missing key in the kernel keyring: {}",
                     e,
                 );
                 e
@@ -993,7 +993,7 @@ fn get_keyslot_number(device: &mut CryptDevice, token_id: c_uint) -> Result<Opti
                 if let Err(ref e) = as_c_uint {
                     warn!(
                         "Discarding invalid value in LUKS2 token keyslot array: {}; \
-                    failed to convert it to an integer: {}",
+                        failed to convert it to an integer: {}",
                         s, e,
                     );
                 }

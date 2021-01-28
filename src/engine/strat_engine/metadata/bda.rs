@@ -12,7 +12,6 @@ use chrono::{DateTime, Utc};
 use crate::{
     engine::{
         strat_engine::{
-            flock::{DevFlock, DevFlockFlags},
             metadata::{
                 mda,
                 sizes::{BDAExtendedSize, BlockdevSize, MDADataSize, STATIC_HEADER_SIZE},
@@ -43,8 +42,6 @@ impl BDA {
     where
         F: AsRawFd + Seek + SyncAll,
     {
-        #[allow(unused_variables)]
-        let flock = DevFlock::new_from_fd(f.as_raw_fd(), DevFlockFlags::Exclusive)?;
         BDA::initialize_impl(
             f,
             identifiers,

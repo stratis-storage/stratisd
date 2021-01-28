@@ -6,13 +6,17 @@ use std::{
     fs::File,
     os::unix::io::{AsRawFd, RawFd},
     path::{Path, PathBuf},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 
 use nix::fcntl::{flock, FlockArg};
 
-use crate::stratis::StratisResult;
+use crate::{engine::types::BlockDevPath, stratis::StratisResult};
 
-#[allow(dead_code)]
+#[derive(Copy, Clone)]
 pub enum DevFlockFlags {
     Exclusive,
     ExclusiveNonblock,
@@ -25,19 +29,38 @@ enum MaybeFile {
     Fd(RawFd),
 }
 
-pub struct DevFlock(MaybeFile);
+pub struct DevFlock(MaybeFile, Arc<AtomicBool>);
 
 impl DevFlock {
     #[allow(dead_code)]
-    pub fn new(dev_path: &Path, flag: DevFlockFlags) -> StratisResult<DevFlock> {
+    pub fn new(
+        dev_path: &Path,
+        locked: Arc<AtomicBool>,
+        flag: DevFlockFlags,
+    ) -> StratisResult<Option<DevFlock>> {
+        if locked.swap(true, Ordering::Relaxed) {
+            return Ok(None);
+        }
+
         let file = File::open(dev_path)?;
         DevFlock::flock(file.as_raw_fd(), flag)?;
-        Ok(DevFlock(MaybeFile::File(file, dev_path.to_owned())))
+        Ok(Some(DevFlock(
+            MaybeFile::File(file, dev_path.to_owned()),
+            locked,
+        )))
     }
 
-    pub fn new_from_fd(fd: RawFd, flag: DevFlockFlags) -> StratisResult<DevFlock> {
+    pub fn new_from_fd(
+        fd: RawFd,
+        locked: Arc<AtomicBool>,
+        flag: DevFlockFlags,
+    ) -> StratisResult<Option<DevFlock>> {
+        if locked.swap(true, Ordering::Relaxed) {
+            return Ok(None);
+        }
+
         DevFlock::flock(fd, flag)?;
-        Ok(DevFlock(MaybeFile::Fd(fd)))
+        Ok(Some(DevFlock(MaybeFile::Fd(fd), locked)))
     }
 
     fn flock(fd: RawFd, flag: DevFlockFlags) -> StratisResult<()> {
@@ -55,6 +78,7 @@ impl DevFlock {
 
 impl Drop for DevFlock {
     fn drop(&mut self) {
+        self.1.store(false, Ordering::Relaxed);
         if let MaybeFile::File(ref file, ref path) = self.0 {
             if let Err(e) = flock(file.as_raw_fd(), FlockArg::Unlock) {
                 warn!(
@@ -78,7 +102,7 @@ impl Drop for DevFlock {
 pub enum RecursiveFlock {
     Flock {
         lock: DevFlock,
-        sublock: Box<RecursiveFlock>,
+        sublocks: Vec<RecursiveFlock>,
     },
     Base,
 }
@@ -87,24 +111,55 @@ impl RecursiveFlock {
     #[allow(dead_code)]
     fn new(
         path: &Path,
-        sublock: RecursiveFlock,
+        locked: Arc<AtomicBool>,
+        sublocks: Vec<RecursiveFlock>,
         flag: DevFlockFlags,
     ) -> StratisResult<RecursiveFlock> {
-        Ok(RecursiveFlock::Flock {
-            lock: DevFlock::new(path, flag)?,
-            sublock: Box::new(sublock),
-        })
+        let lock = match DevFlock::new(path, locked, flag)? {
+            Some(flock) => flock,
+            None => return Ok(RecursiveFlock::Base),
+        };
+        Ok(RecursiveFlock::Flock { lock, sublocks })
     }
 
     #[allow(dead_code)]
     fn new_from_fd(
         fd: RawFd,
-        sublock: RecursiveFlock,
+        locked: Arc<AtomicBool>,
+        sublocks: Vec<RecursiveFlock>,
         flag: DevFlockFlags,
     ) -> StratisResult<RecursiveFlock> {
-        Ok(RecursiveFlock::Flock {
-            lock: DevFlock::new_from_fd(fd, flag)?,
-            sublock: Box::new(sublock),
-        })
+        let lock = match DevFlock::new_from_fd(fd, locked, flag)? {
+            Some(flock) => flock,
+            None => return Ok(RecursiveFlock::Base),
+        };
+        Ok(RecursiveFlock::Flock { lock, sublocks })
+    }
+}
+
+impl BlockDevPath {
+    /// Flock this single BlockDevPath. This should be used for metadata operations
+    /// on Stratis devices prior to the data structures being set up.
+    pub fn flock(&self, flag: DevFlockFlags) -> StratisResult<Option<DevFlock>> {
+        DevFlock::new(&self.path, Arc::clone(&self.locked), flag)
+    }
+
+    /// Flock the BlockDevPath recursively. This should be used for Stratis data
+    /// structures respresenting devicemapper stacks.
+    pub fn rec_flock(&self, flag: DevFlockFlags) -> StratisResult<RecursiveFlock> {
+        let mut locks = Vec::new();
+        for path in self.child_paths.iter() {
+            locks.push(path.rec_flock(flag)?);
+        }
+        RecursiveFlock::new(
+            &self.path,
+            Arc::clone(&self.locked),
+            if locks.is_empty() {
+                vec![RecursiveFlock::Base]
+            } else {
+                locks
+            },
+            flag,
+        )
     }
 }

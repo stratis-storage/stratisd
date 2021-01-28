@@ -9,7 +9,7 @@ use std::{
     ops::Deref,
     path::{Path, PathBuf},
     rc::Rc,
-    sync::Arc,
+    sync::{atomic::AtomicBool, Arc},
 };
 
 mod actions;
@@ -155,9 +155,11 @@ impl<'a> TryFrom<&'a str> for ReportType {
 #[derive(Clone, Debug)]
 pub struct BlockDevPath {
     /// Path to the device represented by this data structure.
-    path: PathBuf,
+    pub path: PathBuf,
+    /// Indicates whether the BlockDevPath is already locked.
+    pub locked: Arc<AtomicBool>,
     /// Reference to the path of the child device of this device.
-    child_paths: Vec<Arc<BlockDevPath>>,
+    pub child_paths: Vec<Arc<BlockDevPath>>,
 }
 
 impl BlockDevPath {
@@ -165,6 +167,7 @@ impl BlockDevPath {
     pub fn leaf(path: PathBuf) -> Arc<Self> {
         Arc::new(BlockDevPath {
             path,
+            locked: Arc::new(AtomicBool::new(false)),
             child_paths: vec![],
         })
     }
@@ -176,6 +179,7 @@ impl BlockDevPath {
     {
         Arc::new(BlockDevPath {
             path,
+            locked: Arc::new(AtomicBool::new(false)),
             child_paths: child_paths.into_iter().collect(),
         })
     }

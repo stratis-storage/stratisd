@@ -12,7 +12,7 @@ use std::{
     },
 };
 
-use futures::pending;
+use futures::{executor::block_on, pending};
 use nix::poll::{poll, PollFd, PollFlags};
 use tokio::{
     runtime::Runtime,
@@ -50,7 +50,7 @@ fn udev_thread(sender: Sender<UdevEngineEvent>, should_exit: Arc<AtomicBool>) ->
             }
             _ => {
                 if let Some(ref e) = udev.poll() {
-                    if let Err(e) = sender.blocking_send(UdevEngineEvent::from(e)) {
+                    if let Err(e) = block_on(sender.send(UdevEngineEvent::from(e))) {
                         warn!(
                             "udev event could not be sent to engine thread: {}; the \
                             engine was not notified of this udev event",

@@ -75,6 +75,15 @@ bloat: ${HOME}/.cargo/bin/cargo-bloat
 audit: ${HOME}/.cargo/bin/cargo-audit
 	PATH=${HOME}/.cargo/bin:${PATH} cargo audit -D warnings
 
+${PWD}/stratisd-vendor.tar.gz:
+	cargo vendor
+	tar -czvf stratisd-vendor.tar.gz vendor
+
+create-release: ${PWD}/stratisd-vendor.tar.gz
+	${PWD}/code_maintenance/create_release.py ${RELEASE_VERSION}
+	rm -rf vendor
+	rm stratisd-vendor.tar.gz
+
 fmt:
 	cargo fmt
 

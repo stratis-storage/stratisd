@@ -39,17 +39,20 @@ where
         .get(&filesystem_data.parent)
         .ok_or_else(|| format!("no path for parent object path {}", &filesystem_data.parent))?;
 
-    let pool_uuid = pool_path
-        .get_data()
-        .as_ref()
-        .ok_or_else(|| format!("no data for object path {}", object_path))?
-        .uuid;
+    let pool_uuid = typed_uuid_string_err!(
+        pool_path
+            .get_data()
+            .as_ref()
+            .ok_or_else(|| format!("no data for object path {}", object_path))?
+            .uuid;
+        Pool
+    );
 
     let engine = dbus_context.engine.borrow();
     let (pool_name, pool) = engine
         .get_pool(pool_uuid)
         .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
-    let filesystem_uuid = filesystem_data.uuid;
+    let filesystem_uuid = typed_uuid_string_err!(filesystem_data.uuid; Fs);
     let (fs_name, fs) = pool
         .get_filesystem(filesystem_uuid)
         .ok_or_else(|| format!("no name for filesystem with uuid {}", &filesystem_uuid))?;

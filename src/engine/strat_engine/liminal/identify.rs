@@ -435,8 +435,6 @@ mod tests {
 
     use std::{collections::HashSet, error::Error};
 
-    use uuid::Uuid;
-
     use crate::{
         engine::{
             strat_engine::{
@@ -469,7 +467,7 @@ mod tests {
             key_description: &KeyDescription,
             _: Option<()>,
         ) -> Result<(), Box<dyn Error>> {
-            let pool_uuid = Uuid::new_v4();
+            let pool_uuid = PoolUuid::new_v4();
 
             let devices = initialize_devices(
                 process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?,
@@ -590,7 +588,7 @@ mod tests {
     fn test_process_device_initialized(paths: &[&Path]) {
         assert!(!paths.is_empty());
 
-        let pool_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
 
         initialize_devices(
             process_and_verify_devices(pool_uuid, &HashSet::new(), paths).unwrap(),

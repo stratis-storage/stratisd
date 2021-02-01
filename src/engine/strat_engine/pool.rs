@@ -6,7 +6,6 @@ use std::{collections::HashMap, path::Path, vec::Vec};
 
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
-use uuid::Uuid;
 
 use devicemapper::{DmName, DmNameBuf, Sectors};
 
@@ -149,7 +148,7 @@ impl StratPool {
         redundancy: Redundancy,
         key_desc: Option<&KeyDescription>,
     ) -> StratisResult<(PoolUuid, StratPool)> {
-        let pool_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
 
         // FIXME: Initializing with the minimum MDA size is not necessarily
         // enough. If there are enough devices specified, more space will be

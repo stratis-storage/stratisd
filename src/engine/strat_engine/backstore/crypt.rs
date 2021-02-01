@@ -1186,8 +1186,6 @@ mod tests {
         ptr, slice,
     };
 
-    use uuid::Uuid;
-
     use crate::{
         engine::strat_engine::tests::{crypt, loopbacked, real},
         stratis::StratisError,
@@ -1205,8 +1203,8 @@ mod tests {
         let key_description =
             KeyDescription::try_from("I am not a key".to_string()).expect("no semi-colons");
 
-        let pool_uuid = Uuid::new_v4();
-        let dev_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
+        let dev_uuid = DevUuid::new_v4();
 
         let result = CryptInitializer::new((*path).to_owned(), pool_uuid, dev_uuid)
             .initialize(&key_description);
@@ -1253,9 +1251,9 @@ mod tests {
         ) -> std::result::Result<(), Box<dyn Error>> {
             let mut handles = vec![];
 
-            let pool_uuid = Uuid::new_v4();
+            let pool_uuid = PoolUuid::new_v4();
             for path in paths {
-                let dev_uuid = Uuid::new_v4();
+                let dev_uuid = DevUuid::new_v4();
 
                 let handle = CryptInitializer::new((*path).to_owned(), pool_uuid, dev_uuid)
                     .initialize(key_desc)?;
@@ -1349,8 +1347,8 @@ mod tests {
                 ))
             })?;
 
-            let pool_uuid = Uuid::new_v4();
-            let dev_uuid = Uuid::new_v4();
+            let pool_uuid = PoolUuid::new_v4();
+            let dev_uuid = DevUuid::new_v4();
 
             let mut handle = CryptInitializer::new((*path).to_owned(), pool_uuid, dev_uuid)
                 .initialize(key_desc)?;

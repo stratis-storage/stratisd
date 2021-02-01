@@ -10,7 +10,7 @@ use crate::{
         types::{DbusContext, InterfacesAdded, OPContext, ObjectPathType},
         util::make_object_path,
     },
-    engine::{MaybeDbusPath, Name, Pool, PoolUuid},
+    engine::{MaybeDbusPath, Name, Pool, PoolUuid, StratisUuid},
 };
 
 mod fetch_properties_2_0;
@@ -35,7 +35,11 @@ pub fn create_dbus_pool<'a>(
     let object_path = f
         .object_path(
             object_name,
-            Some(OPContext::new(parent, uuid, ObjectPathType::Pool)),
+            Some(OPContext::new(
+                parent,
+                StratisUuid::Pool(uuid),
+                ObjectPathType::Pool,
+            )),
         )
         .introspectable()
         .add(

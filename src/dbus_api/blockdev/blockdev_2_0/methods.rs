@@ -35,14 +35,19 @@ pub fn set_user_info(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let blockdev_data = get_data!(blockdev_path; default_return; return_message);
 
     let pool_path = get_parent!(m; blockdev_data; default_return; return_message);
-    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
 
     let mut engine = dbus_context.engine.borrow_mut();
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
+    let blockdev_uuid = typed_uuid!(blockdev_data.uuid; Dev; default_return; return_message);
     let result =
-        pool.set_blockdev_user_info(&pool_name, blockdev_data.uuid, tuple_to_option(new_id_spec));
-
+        pool.set_blockdev_user_info(&pool_name, blockdev_uuid, tuple_to_option(new_id_spec));
     let msg = match result {
         Ok(RenameAction::NoSource) => {
             let error_message = format!(

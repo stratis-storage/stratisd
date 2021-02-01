@@ -32,7 +32,12 @@ pub fn bind_clevis(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .tree
         .get(object_path)
         .expect("implicit argument must be in tree");
-    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
 
     let mut engine = dbus_context.engine.borrow_mut();
     let (_, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
@@ -69,7 +74,12 @@ pub fn unbind_clevis(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .tree
         .get(object_path)
         .expect("implicit argument must be in tree");
-    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
 
     let mut engine = dbus_context.engine.borrow_mut();
     let (_, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);

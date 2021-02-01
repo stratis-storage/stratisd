@@ -11,7 +11,6 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use serde_json::Value;
-use uuid::Uuid;
 
 use devicemapper::{Bytes, Sectors, DM};
 
@@ -232,7 +231,7 @@ pub trait Pool: Debug {
 
     /// Get _all_ the blockdevs that belong to this pool.
     /// All really means all. For example, it does not exclude cache blockdevs.
-    fn blockdevs(&self) -> Vec<(Uuid, BlockDevTier, &dyn BlockDev)>;
+    fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &dyn BlockDev)>;
 
     /// Get all the blockdevs belonging to this pool as mutable references.
     fn blockdevs_mut(&mut self) -> Vec<(DevUuid, BlockDevTier, &mut dyn BlockDev)>;

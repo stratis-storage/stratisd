@@ -19,7 +19,9 @@ use crate::{
         types::{DbusErrorEnum, TData},
         util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
     },
-    engine::{CreateAction, EngineAction, FilesystemUuid, Name, PoolUuid, RenameAction},
+    engine::{
+        CreateAction, EngineAction, FilesystemUuid, Name, PoolUuid, RenameAction, StratisUuid,
+    },
 };
 
 pub fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -43,11 +45,15 @@ pub fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .tree
         .get(object_path)
         .expect("implicit argument must be in tree");
-    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
 
     let mut engine = dbus_context.engine.borrow_mut();
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
-
     let result = pool.create_filesystems(
         pool_uuid,
         &filesystems
@@ -113,7 +119,12 @@ pub fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .tree
         .get(object_path)
         .expect("implicit argument must be in tree");
-    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
 
     let mut engine = dbus_context.engine.borrow_mut();
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
@@ -121,9 +132,13 @@ pub fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let filesystem_map: HashMap<FilesystemUuid, dbus::Path<'static>> = filesystems
         .filter_map(|path| {
             m.tree.get(&path).and_then(|op| {
-                op.get_data()
-                    .as_ref()
-                    .map(|d| (d.uuid, op.get_name().clone()))
+                op.get_data().as_ref().and_then(|d| match d.uuid {
+                    StratisUuid::Fs(uuid) => Some((uuid, op.get_name().clone())),
+                    ref u => {
+                        warn!("Expected filesystem UUID but detected {:?}", u);
+                        None
+                    }
+                })
             })
         })
         .collect();
@@ -180,10 +195,20 @@ pub fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .tree
         .get(object_path)
         .expect("implicit argument must be in tree");
-    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
 
     let fs_uuid = match m.tree.get(&filesystem) {
-        Some(op) => get_data!(op; default_return; return_message).uuid,
+        Some(op) => typed_uuid!(
+            get_data!(op; default_return; return_message).uuid;
+            Fs;
+            default_return;
+            return_message
+        ),
         None => {
             let message = format!("no data for object path {}", filesystem);
             let (rc, rs) = (DbusErrorEnum::NOTFOUND as u16, message);
@@ -239,7 +264,12 @@ pub fn add_cachedevs(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .tree
         .get(object_path)
         .expect("implicit argument must be in tree");
-    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
     let cache_initialized = {
         let dbus_context = m.tree.get_data();
         let engine = dbus_context.engine.borrow();
@@ -271,7 +301,12 @@ pub fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .tree
         .get(object_path)
         .expect("implicit argument must be in tree");
-    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
 
     let msg = match dbus_context
         .engine

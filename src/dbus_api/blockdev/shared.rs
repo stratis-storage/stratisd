@@ -34,23 +34,27 @@ where
         .get_data()
         .as_ref()
         .ok_or_else(|| format!("no data for object path {}", object_path))?;
+    let blockdev_uuid = typed_uuid_string_err!(blockdev_data.uuid; Dev);
 
     let pool_path = tree
         .get(&blockdev_data.parent)
         .ok_or_else(|| format!("no path for parent object path {}", &blockdev_data.parent))?;
 
-    let pool_uuid = pool_path
-        .get_data()
-        .as_ref()
-        .ok_or_else(|| format!("no data for object path {}", object_path))?
-        .uuid;
+    let pool_uuid = typed_uuid_string_err!(
+        pool_path
+            .get_data()
+            .as_ref()
+            .ok_or_else(|| format!("no data for object path {}", object_path))?
+            .uuid;
+        Pool
+    );
 
     let engine = dbus_context.engine.borrow();
     let (_, pool) = engine
         .get_pool(pool_uuid)
         .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
     let (tier, blockdev) = pool
-        .get_blockdev(blockdev_data.uuid)
+        .get_blockdev(blockdev_uuid)
         .ok_or_else(|| format!("no blockdev with uuid {}", blockdev_data.uuid))?;
     closure(tier, blockdev)
 }

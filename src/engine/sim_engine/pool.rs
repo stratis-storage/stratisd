@@ -10,7 +10,6 @@ use std::{
 };
 
 use serde_json::{Map, Value};
-use uuid::Uuid;
 
 use devicemapper::{Sectors, IEC};
 
@@ -49,7 +48,7 @@ impl SimPool {
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
         let device_pairs = devices.iter().map(|p| SimDev::new(p, enc_info.as_ref()));
         (
-            Uuid::new_v4(),
+            PoolUuid::new_v4(),
             SimPool {
                 block_devs: device_pairs.collect(),
                 cache_devs: HashMap::new(),
@@ -200,7 +199,7 @@ impl Pool for SimPool {
         let mut result = Vec::new();
         for name in names.keys() {
             if !self.filesystems.contains_name(name) {
-                let uuid = Uuid::new_v4();
+                let uuid = FilesystemUuid::new_v4();
                 let new_filesystem = SimFilesystem::new();
                 self.filesystems
                     .insert(Name::new((&**name).to_owned()), uuid, new_filesystem);
@@ -362,7 +361,7 @@ impl Pool for SimPool {
             return Ok(CreateAction::Identity);
         }
 
-        let uuid = Uuid::new_v4();
+        let uuid = FilesystemUuid::new_v4();
         let snapshot = match self.get_filesystem(origin_uuid) {
             Some(_filesystem) => SimFilesystem::new(),
             None => {
@@ -505,8 +504,6 @@ mod tests {
 
     use std::path::Path;
 
-    use uuid::Uuid;
-
     use crate::engine::Engine;
 
     use crate::engine::sim_engine::SimEngine;
@@ -532,7 +529,7 @@ mod tests {
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         assert_matches!(
-            pool.rename_filesystem(pool_name, Uuid::new_v4(), "new_name"),
+            pool.rename_filesystem(pool_name, FilesystemUuid::new_v4(), "new_name"),
             Ok(RenameAction::NoSource)
         );
     }
@@ -613,7 +610,7 @@ mod tests {
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         assert_matches!(
-            pool.rename_filesystem(pool_name, Uuid::new_v4(), new_name),
+            pool.rename_filesystem(pool_name, FilesystemUuid::new_v4(), new_name),
             Ok(RenameAction::NoSource)
         );
     }
@@ -657,7 +654,7 @@ mod tests {
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         assert_matches!(
-            pool.destroy_filesystems(pool_name, &[Uuid::new_v4()]),
+            pool.destroy_filesystems(pool_name, &[FilesystemUuid::new_v4()]),
             Ok(_)
         );
     }

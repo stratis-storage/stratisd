@@ -292,8 +292,7 @@ class UdevTest3(UdevTest):
             )
             pool_uuid = Pool.Properties.Uuid.Get(get_object(pool_object_path))
 
-            pool_list = get_pools()
-            self.assertEqual(len(pool_list), 1)
+            self.assertEqual(len(get_pools()), 1)
 
             wait_for_udev(STRATIS_FS_TYPE, get_devnodes(device_object_paths))
 

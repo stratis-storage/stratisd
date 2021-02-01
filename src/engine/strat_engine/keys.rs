@@ -23,13 +23,14 @@ use nix::{
 };
 use rand::{distributions::Standard, Rng};
 
-use libcryptsetup_rs::{SafeBorrowedMemZero, SafeMemHandle};
-
 use crate::{
     engine::{
-        engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
+        engine::KeyActions,
         shared,
-        strat_engine::names::KeyDescription,
+        strat_engine::{
+            backstore::{alloc_safe_mem_handle, memzero},
+            names::KeyDescription,
+        },
         types::{DeleteAction, MappingCreateAction, SizedKeyMemory},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -122,7 +123,7 @@ fn read_key(
         return Ok(None);
     };
 
-    let mut key_buffer = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
+    let mut key_buffer = alloc_safe_mem_handle()?;
     let mut_ref = key_buffer.as_mut();
 
     // Read key from keyring
@@ -393,7 +394,9 @@ impl KeyActions for StratKeyActions {
         key_desc: &KeyDescription,
         key_fd: RawFd,
     ) -> StratisResult<MappingCreateAction<()>> {
-        let memory = shared::set_key_shared(key_fd)?;
+        let mut mem_buffer = alloc_safe_mem_handle()?;
+        let len = shared::set_key_shared(key_fd, mem_buffer.as_mut())?;
+        let memory = SizedKeyMemory::new(mem_buffer, len);
 
         Ok(set_key_idem(key_desc, memory)?)
     }
@@ -632,9 +635,9 @@ impl MemoryMappedKeyfile {
 
 impl Drop for MemoryMappedKeyfile {
     fn drop(&mut self) {
-        {
-            unsafe { SafeBorrowedMemZero::from_ptr(self.0, self.1) };
-        }
+        if let Err(e) = unsafe { memzero(self.0, self.1) } {
+            warn!("Failed to zero keyfile memory safely: {}", e);
+        };
         if let Err(e) = unsafe { munmap(self.0, self.1) } {
             warn!("Could not unmap temporary keyfile: {}", e);
         }

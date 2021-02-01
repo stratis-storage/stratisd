@@ -12,16 +12,19 @@ use std::{
 
 use base64::{decode, encode_config, CharacterSet, Config};
 use either::Either;
+use libc::c_void;
 use serde_json::{Map, Value};
 use sha1::{Digest, Sha1};
 
 use devicemapper::Sectors;
 use libcryptsetup_rs::{
     c_uint, CryptActivateFlags, CryptDeactivateFlags, CryptDevice, CryptInit, CryptStatusInfo,
-    CryptVolumeKeyFlags, CryptWipePattern, EncryptionFormat, LibcryptErr, TokenInput,
+    CryptVolumeKeyFlags, CryptWipePattern, EncryptionFormat, LibcryptErr, SafeBorrowedMemZero,
+    SafeMemHandle, TokenInput,
 };
 
 use crate::engine::{
+    engine::MAX_STRATIS_PASS_SIZE,
     strat_engine::{
         cmd::{clevis_luks_bind, clevis_luks_unbind, clevis_luks_unlock},
         keys,
@@ -107,6 +110,21 @@ macro_rules! acquire_mutex {
             .lock()
             .map_err(|e| LibcryptErr::Other(e.to_string()))
     };
+}
+
+pub fn alloc_safe_mem_handle() -> Result<SafeMemHandle> {
+    #[allow(unused_variables)]
+    let mutex = acquire_mutex!()?;
+
+    SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)
+}
+
+pub unsafe fn memzero(ptr: *mut c_void, len: usize) -> Result<()> {
+    #[allow(unused_variables)]
+    let mutex = acquire_mutex!()?;
+
+    SafeBorrowedMemZero::from_ptr(ptr, len);
+    Ok(())
 }
 
 struct StratisLuks2Token {

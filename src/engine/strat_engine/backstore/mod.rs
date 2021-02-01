@@ -16,7 +16,7 @@ mod shared;
 pub use self::{
     backstore::Backstore,
     blockdev::StratBlockDev,
-    crypt::{CryptActivationHandle, CryptHandle},
+    crypt::{alloc_safe_mem_handle, memzero, CryptActivationHandle, CryptHandle},
 };
 
 #[cfg(test)]

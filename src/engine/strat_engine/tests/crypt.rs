@@ -4,11 +4,11 @@
 
 use std::{convert::TryFrom, error::Error, fs::File, io::Read, path::Path};
 
-use libcryptsetup_rs::SafeMemHandle;
-
 use crate::engine::{
     engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
-    strat_engine::{keys::StratKeyActions, names::KeyDescription},
+    strat_engine::{
+        backstore::alloc_safe_mem_handle, keys::StratKeyActions, names::KeyDescription,
+    },
     types::SizedKeyMemory,
 };
 
@@ -29,7 +29,7 @@ where
     let mut key_handle = StratKeyActions;
     let desc_str = "test-description-for-stratisd";
     let key_description = KeyDescription::try_from(desc_str.to_string()).expect("no semi-colons");
-    let mut mem = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
+    let mut mem = alloc_safe_mem_handle()?;
     File::open("/dev/urandom")
         .unwrap()
         .read_exact(mem.as_mut())

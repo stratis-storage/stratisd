@@ -5,7 +5,7 @@
 use std::{
     borrow::Borrow,
     convert::TryFrom,
-    fmt::{self, Debug},
+    fmt::{self, Debug, Display},
     hash::Hash,
     ops::Deref,
     path::{Path, PathBuf},
@@ -13,8 +13,8 @@ use std::{
     sync::Arc,
 };
 
-mod actions;
-mod keys;
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 pub use crate::engine::types::{
     actions::{
@@ -25,23 +25,92 @@ pub use crate::engine::types::{
 };
 use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
-use uuid::Uuid;
+mod actions;
+mod keys;
 
-// Potential FIXME: Do we want to require all of these traits to be implemented
-// in the definition? All of them are required for the current implementation
-// of table and it may or may not be good to explicitly call them out in
-// the definition of the trait.
-pub trait AsUuid: Debug + PartialEq + Eq + Hash + Copy + Clone {
-    fn as_uuid(&self) -> &Uuid;
+macro_rules! uuid {
+    ($vis:vis $ident:ident) => {
+        #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Deserialize, Serialize)]
+        $vis struct $ident(pub uuid::Uuid);
+
+        impl $ident {
+            pub fn new_v4() -> Self {
+                $ident(uuid::Uuid::new_v4())
+            }
+
+            pub fn parse_str(s: &str) -> $crate::stratis::StratisResult<Self> {
+                Ok($ident(uuid::Uuid::parse_str(s)?))
+            }
+
+            pub fn nil() -> Self {
+                $ident(uuid::Uuid::nil())
+            }
+        }
+
+        impl std::ops::Deref for $ident {
+            type Target = uuid::Uuid;
+
+            fn deref(&self) -> &Self::Target {
+                &self.0
+            }
+        }
+
+        impl std::fmt::Display for $ident {
+            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                std::fmt::Display::fmt(&self.0.to_simple_ref(), f)
+            }
+        }
+
+        impl $crate::engine::types::AsUuid for $ident {}
+    }
 }
 
-pub type DevUuid = Uuid;
-pub type FilesystemUuid = Uuid;
-pub type PoolUuid = Uuid;
+pub trait AsUuid:
+    Copy
+    + Clone
+    + Debug
+    + Hash
+    + Eq
+    + PartialEq
+    + for<'a> Deserialize<'a>
+    + Serialize
+    + Deref<Target = Uuid>
+    + Display
+{
+}
 
-impl AsUuid for Uuid {
-    fn as_uuid(&self) -> &Uuid {
-        self
+uuid!(pub DevUuid);
+
+uuid!(pub FilesystemUuid);
+
+uuid!(pub PoolUuid);
+
+#[derive(Debug)]
+pub enum StratisUuid {
+    Dev(DevUuid),
+    Fs(FilesystemUuid),
+    Pool(PoolUuid),
+}
+
+impl Deref for StratisUuid {
+    type Target = Uuid;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            StratisUuid::Dev(d) => &*d,
+            StratisUuid::Fs(f) => &*f,
+            StratisUuid::Pool(p) => &*p,
+        }
+    }
+}
+
+impl Display for StratisUuid {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            StratisUuid::Dev(d) => Display::fmt(d, f),
+            StratisUuid::Fs(fs) => Display::fmt(fs, f),
+            StratisUuid::Pool(p) => Display::fmt(p, f),
+        }
     }
 }
 

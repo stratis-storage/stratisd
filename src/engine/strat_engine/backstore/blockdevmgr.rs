@@ -554,8 +554,6 @@ impl Recordable<Vec<BaseBlockDevSave>> for BlockDevMgr {
 mod tests {
     use std::error::Error;
 
-    use uuid::Uuid;
-
     use crate::engine::strat_engine::{
         cmd,
         tests::{crypt, loopbacked, real},
@@ -569,7 +567,8 @@ mod tests {
     /// in balance.
     fn test_blockdevmgr_used(paths: &[&Path]) {
         let mut mgr =
-            BlockDevMgr::initialize(Uuid::new_v4(), paths, MDADataSize::default(), None).unwrap();
+            BlockDevMgr::initialize(PoolUuid::new_v4(), paths, MDADataSize::default(), None)
+                .unwrap();
         assert_eq!(mgr.avail_space() + mgr.metadata_size(), mgr.size());
 
         let allocated = Sectors(2);
@@ -612,7 +611,7 @@ mod tests {
             key_desc: &KeyDescription,
             _: Option<()>,
         ) -> Result<(), Box<dyn Error>> {
-            let pool_uuid = Uuid::new_v4();
+            let pool_uuid = PoolUuid::new_v4();
             let mut bdm = BlockDevMgr::initialize(
                 pool_uuid,
                 &paths[..2],
@@ -666,7 +665,7 @@ mod tests {
             key_desc: &KeyDescription,
             _: Option<()>,
         ) -> Result<(PoolUuid, BlockDevMgr), Box<dyn Error>> {
-            let pool_uuid = Uuid::new_v4();
+            let pool_uuid = PoolUuid::new_v4();
             let bdm = BlockDevMgr::initialize(
                 pool_uuid,
                 &paths[..2],
@@ -727,8 +726,8 @@ mod tests {
         assert!(paths.len() > 1);
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
-        let uuid = Uuid::new_v4();
-        let uuid2 = Uuid::new_v4();
+        let uuid = PoolUuid::new_v4();
+        let uuid2 = PoolUuid::new_v4();
 
         let mut bd_mgr =
             BlockDevMgr::initialize(uuid, paths1, MDADataSize::default(), None).unwrap();

@@ -3,7 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use chrono::{DateTime, TimeZone, Utc};
-use uuid::Uuid;
 
 use std::{
     fs::File,
@@ -33,7 +32,7 @@ use crate::{
             serde_structs::FilesystemSave,
             thinpool::{thinpool::DATA_LOWATER, DATA_BLOCK_SIZE},
         },
-        types::{FilesystemUuid, MaybeDbusPath, Name, PoolUuid},
+        types::{FilesystemUuid, MaybeDbusPath, Name, PoolUuid, StratisUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -61,7 +60,7 @@ impl StratFilesystem {
         size: Option<Sectors>,
         id: ThinDevId,
     ) -> StratisResult<(FilesystemUuid, StratFilesystem)> {
-        let fs_uuid = Uuid::new_v4();
+        let fs_uuid = FilesystemUuid::new_v4();
         let (dm_name, dm_uuid) = format_thin_ids(pool_uuid, ThinRole::Filesystem(fs_uuid));
         let mut thin_dev = ThinDev::new(
             get_dm(),
@@ -72,7 +71,7 @@ impl StratFilesystem {
             id,
         )?;
 
-        if let Err(err) = create_fs(&thin_dev.devnode(), Some(fs_uuid), false) {
+        if let Err(err) = create_fs(&thin_dev.devnode(), Some(StratisUuid::Fs(fs_uuid)), false) {
             udev_settle().unwrap_or_else(|err| {
                 warn!("{}", err);
                 sleep(Duration::from_secs(5));

@@ -21,9 +21,11 @@ use std::{
 };
 
 use serde_json::Value;
-use uuid::Uuid;
 
-use crate::stratis::{StratisError, StratisResult};
+use crate::{
+    engine::types::{FilesystemUuid, StratisUuid},
+    stratis::{StratisError, StratisResult},
+};
 
 const BINARIES_PATHS: [&str; 4] = ["/usr/sbin", "/sbin", "/usr/bin", "/bin"];
 
@@ -132,7 +134,7 @@ fn get_executable(name: &str) -> &Path {
 /// Create a filesystem on devnode. If uuid specified, set the UUID of the
 /// filesystem on creation. `noalign` should be `true` when creating small metadata filesystems
 /// like the MDV.
-pub fn create_fs(devnode: &Path, uuid: Option<Uuid>, noalign: bool) -> StratisResult<()> {
+pub fn create_fs(devnode: &Path, uuid: Option<StratisUuid>, noalign: bool) -> StratisResult<()> {
     let mut command = Command::new(get_executable(MKFS_XFS).as_os_str());
     command.arg("-f");
     command.arg("-q");
@@ -140,7 +142,7 @@ pub fn create_fs(devnode: &Path, uuid: Option<Uuid>, noalign: bool) -> StratisRe
 
     if let Some(uuid) = uuid {
         command.arg("-m");
-        command.arg(format!("uuid={}", uuid));
+        command.arg(format!("uuid={}", *uuid));
     }
     if noalign {
         command.arg("-d");
@@ -160,7 +162,7 @@ pub fn xfs_growfs(mount_point: &Path) -> StratisResult<()> {
 }
 
 /// Set a new UUID for filesystem on the devnode.
-pub fn set_uuid(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
+pub fn set_uuid(devnode: &Path, uuid: FilesystemUuid) -> StratisResult<()> {
     execute_cmd(
         Command::new(get_executable(XFS_DB).as_os_str())
             .arg("-x")

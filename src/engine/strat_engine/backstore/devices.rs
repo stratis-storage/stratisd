@@ -13,7 +13,6 @@ use std::{
 use chrono::Utc;
 use itertools::Itertools;
 use serde_json::Value;
-use uuid::Uuid;
 
 use devicemapper::{Bytes, Device, Sectors, IEC};
 
@@ -552,7 +551,7 @@ pub fn initialize_devices(
         mda_data_size: MDADataSize,
         encryption_info: Option<EncryptionInfo>,
     ) -> StratisResult<StratBlockDev> {
-        let dev_uuid = Uuid::new_v4();
+        let dev_uuid = DevUuid::new_v4();
         let (handle, devno, blockdev_size) = match encryption_info {
             Some(ref info) => initialize_encrypted(
                 &dev_info.devnode,
@@ -676,8 +675,6 @@ pub fn wipe_blockdevs(blockdevs: &mut [StratBlockDev]) -> StratisResult<()> {
 mod tests {
     use std::{error::Error, fs::OpenOptions};
 
-    use uuid::Uuid;
-
     use crate::engine::strat_engine::{
         backstore::crypt::CryptHandle,
         metadata::device_identifiers,
@@ -693,7 +690,7 @@ mod tests {
         paths: &[&Path],
         key_description: Option<&KeyDescription>,
     ) -> Result<(), Box<dyn Error>> {
-        let pool_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
         let infos: Vec<_> = process_devices(paths)?;
 
         if infos.len() != paths.len() {
@@ -798,7 +795,7 @@ mod tests {
         }
 
         if process_and_verify_devices(
-            Uuid::new_v4(),
+            PoolUuid::new_v4(),
             &initialized_uuids,
             stratis_devnodes
                 .iter()
@@ -958,7 +955,7 @@ mod tests {
         }
 
         let infos: Vec<_> = process_devices(paths)?;
-        let pool_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
 
         if infos.len() != paths.len() {
             return Err(Box::new(StratisError::Error(

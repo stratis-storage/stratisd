@@ -21,7 +21,7 @@ use crate::{
             cmd::create_fs, dm::get_dm, serde_structs::FilesystemSave,
             thinpool::filesystem::StratFilesystem,
         },
-        types::{FilesystemUuid, Name, PoolUuid},
+        types::{FilesystemUuid, Name, PoolUuid, StratisUuid},
     },
     stratis::StratisResult,
 };
@@ -90,7 +90,7 @@ impl<'a> Drop for MountedMDV<'a> {
 impl MetadataVol {
     /// Initialize a new Metadata Volume.
     pub fn initialize(pool_uuid: PoolUuid, dev: LinearDev) -> StratisResult<MetadataVol> {
-        create_fs(&dev.devnode(), Some(pool_uuid), true)?;
+        create_fs(&dev.devnode(), Some(StratisUuid::Pool(pool_uuid)), true)?;
         MetadataVol::setup(pool_uuid, dev)
     }
 

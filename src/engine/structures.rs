@@ -23,9 +23,10 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_map()
-            .entries(self.iter().map(|(name, uuid, item)| {
-                ((name.to_string(), uuid.as_uuid().to_simple_ref()), item)
-            }))
+            .entries(
+                self.iter()
+                    .map(|(name, uuid, item)| ((name.to_string(), uuid.to_simple_ref()), item)),
+            )
             .finish()
     }
 }
@@ -292,16 +293,14 @@ where
 #[cfg(test)]
 mod tests {
 
-    use uuid::Uuid;
-
-    use crate::engine::Name;
+    use crate::engine::{types::PoolUuid, Name};
 
     use super::*;
 
     #[derive(Debug)]
     struct TestThing {
         name: String,
-        uuid: Uuid,
+        uuid: PoolUuid,
         stuff: u32,
     }
 
@@ -324,7 +323,7 @@ mod tests {
     }
 
     impl TestThing {
-        pub fn new(name: &str, uuid: Uuid) -> TestThing {
+        pub fn new(name: &str, uuid: PoolUuid) -> TestThing {
             TestThing {
                 name: name.to_owned(),
                 uuid,
@@ -339,10 +338,10 @@ mod tests {
     /// Verify that the table is now empty and that removing by name yields
     /// no result.
     fn remove_existing_item() {
-        let mut t: Table<Uuid, TestThing> = Table::default();
+        let mut t: Table<PoolUuid, TestThing> = Table::default();
         table_invariant(&t);
 
-        let uuid = Uuid::new_v4();
+        let uuid = PoolUuid::new_v4();
         let name = "name";
         t.insert(Name::new(name.to_owned()), uuid, TestThing::new(name, uuid));
         table_invariant(&t);
@@ -369,10 +368,10 @@ mod tests {
     /// This is good, because then you can't have a thing that is both in
     /// the table and not in the table.
     fn insert_same_keys() {
-        let mut t: Table<Uuid, TestThing> = Table::default();
+        let mut t: Table<PoolUuid, TestThing> = Table::default();
         table_invariant(&t);
 
-        let uuid = Uuid::new_v4();
+        let uuid = PoolUuid::new_v4();
         let name = "name";
         let thing = TestThing::new(name, uuid);
         let thing_key = thing.stuff;
@@ -410,10 +409,10 @@ mod tests {
     /// Insert a thing and then insert another thing with the same name.
     /// The previously inserted thing should be returned.
     fn insert_same_name() {
-        let mut t: Table<Uuid, TestThing> = Table::default();
+        let mut t: Table<PoolUuid, TestThing> = Table::default();
         table_invariant(&t);
 
-        let uuid = Uuid::new_v4();
+        let uuid = PoolUuid::new_v4();
         let name = "name";
         let thing = TestThing::new(name, uuid);
         let thing_key = thing.stuff;
@@ -428,7 +427,7 @@ mod tests {
         assert!(t.contains_uuid(uuid));
 
         // Insert new item with different UUID.
-        let uuid2 = Uuid::new_v4();
+        let uuid2 = PoolUuid::new_v4();
         let thing2 = TestThing::new(name, uuid2);
         let thing_key2 = thing2.stuff;
         let displaced = t.insert(Name::new(name.to_owned()), uuid2, thing2);
@@ -454,10 +453,10 @@ mod tests {
     /// Insert a thing and then insert another thing with the same uuid.
     /// The previously inserted thing should be returned.
     fn insert_same_uuid() {
-        let mut t: Table<Uuid, TestThing> = Table::default();
+        let mut t: Table<PoolUuid, TestThing> = Table::default();
         table_invariant(&t);
 
-        let uuid = Uuid::new_v4();
+        let uuid = PoolUuid::new_v4();
         let name = "name";
         let thing = TestThing::new(name, uuid);
         let thing_key = thing.stuff;
@@ -498,15 +497,15 @@ mod tests {
     /// Insert two things, then insert a thing that matches one name and one
     /// uuid of each. Both existing things should be returned.
     fn insert_same_uuid_and_same_name() {
-        let mut t: Table<Uuid, TestThing> = Table::default();
+        let mut t: Table<PoolUuid, TestThing> = Table::default();
         table_invariant(&t);
 
-        let uuid1 = Uuid::new_v4();
+        let uuid1 = PoolUuid::new_v4();
         let name1 = "name1";
         let thing1 = TestThing::new(name1, uuid1);
         let thing_key1 = thing1.stuff;
 
-        let uuid2 = Uuid::new_v4();
+        let uuid2 = PoolUuid::new_v4();
         let name2 = "name2";
         let thing2 = TestThing::new(name2, uuid2);
         let thing_key2 = thing2.stuff;

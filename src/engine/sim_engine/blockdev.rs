@@ -6,14 +6,13 @@ use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, TimeZone, Utc};
 use serde_json::{Map, Value};
-use uuid::Uuid;
 
 use devicemapper::{Bytes, Sectors, IEC};
 
 use crate::{
     engine::{
         engine::BlockDev,
-        types::{EncryptionInfo, MaybeDbusPath},
+        types::{DevUuid, EncryptionInfo, MaybeDbusPath},
     },
     stratis::StratisResult,
 };
@@ -80,9 +79,9 @@ impl BlockDev for SimDev {
 
 impl SimDev {
     /// Generates a new device from any devnode.
-    pub fn new(devnode: &Path, encryption_info: Option<&EncryptionInfo>) -> (Uuid, SimDev) {
+    pub fn new(devnode: &Path, encryption_info: Option<&EncryptionInfo>) -> (DevUuid, SimDev) {
         (
-            Uuid::new_v4(),
+            DevUuid::new_v4(),
             SimDev {
                 devnode: devnode.to_owned(),
                 user_info: None,

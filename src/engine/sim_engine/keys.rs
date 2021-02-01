@@ -43,7 +43,7 @@ impl KeyActions for SimKeyActions {
         key_desc: &KeyDescription,
         key_fd: RawFd,
     ) -> StratisResult<MappingCreateAction<()>> {
-        let mut memory = Vec::with_capacity(MAX_STRATIS_PASS_SIZE);
+        let mut memory = vec![0; MAX_STRATIS_PASS_SIZE];
         let len = shared::set_key_shared(key_fd, &mut memory)?;
         memory.truncate(len);
 

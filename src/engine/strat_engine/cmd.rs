@@ -142,7 +142,7 @@ pub fn create_fs(devnode: &Path, uuid: Option<StratisUuid>, noalign: bool) -> St
 
     if let Some(uuid) = uuid {
         command.arg("-m");
-        command.arg(format!("uuid={}", *uuid));
+        command.arg(format!("uuid={}", uuid));
     }
     if noalign {
         command.arg("-d");

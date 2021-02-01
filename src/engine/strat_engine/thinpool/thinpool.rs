@@ -52,6 +52,9 @@ const MIN_META_SEGMENT_SIZE: MetaBlocks = MetaBlocks(4 * IEC::Ki);
 const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768);
 const INITIAL_MDV_SIZE: Sectors = Sectors(32 * IEC::Ki); // 16 MiB
 
+// The maximum allowable size of the thinpool metadata device
+const MAX_META_SIZE: MetaBlocks = MetaBlocks(255 * ((1 << 14) - 64));
+
 const SPACE_CRIT_PCT: u8 = 95;
 
 fn sectors_to_datablocks(sectors: Sectors) -> DataBlocks {
@@ -526,8 +529,11 @@ impl ThinPool {
             let usage = &status.usage;
 
             // Ensure meta subdevice is approx. 1/1000th of total usable
-            // size
-            let target_meta_size = (backstore.datatier_usable_size() / 1000u16).metablocks();
+            // size, but no larger than the maximum allowed by devicemapper.
+            let target_meta_size = min(
+                (backstore.datatier_usable_size() / 1000u16).metablocks(),
+                MAX_META_SIZE,
+            );
             if usage.total_meta < target_meta_size {
                 let meta_request = target_meta_size - usage.total_meta;
 

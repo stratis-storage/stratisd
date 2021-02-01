@@ -57,7 +57,7 @@ macro_rules! uuid {
 
         impl std::fmt::Display for $ident {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                std::fmt::Display::fmt(&self.0.to_simple_ref(), f)
+                std::fmt::Display::fmt(&self.0, f)
             }
         }
 

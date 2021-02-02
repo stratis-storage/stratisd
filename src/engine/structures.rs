@@ -299,8 +299,6 @@ mod tests {
 
     #[derive(Debug)]
     struct TestThing {
-        name: String,
-        uuid: PoolUuid,
         stuff: u32,
     }
 
@@ -323,10 +321,8 @@ mod tests {
     }
 
     impl TestThing {
-        pub fn new(name: &str, uuid: PoolUuid) -> TestThing {
+        pub fn new() -> TestThing {
             TestThing {
-                name: name.to_owned(),
-                uuid,
                 stuff: rand::random::<u32>(),
             }
         }
@@ -343,7 +339,7 @@ mod tests {
 
         let uuid = PoolUuid::new_v4();
         let name = "name";
-        t.insert(Name::new(name.to_owned()), uuid, TestThing::new(name, uuid));
+        t.insert(Name::new(name.to_owned()), uuid, TestThing::new());
         table_invariant(&t);
 
         assert!(t.get_by_name(name).is_some());
@@ -351,8 +347,6 @@ mod tests {
         let thing = t.remove_by_uuid(uuid);
         table_invariant(&t);
         assert!(thing.is_some());
-        let mut thing = thing.unwrap();
-        thing.1.stuff = 0;
         assert!(t.is_empty());
         assert_matches!(t.remove_by_name(name), None);
         table_invariant(&t);
@@ -373,7 +367,7 @@ mod tests {
 
         let uuid = PoolUuid::new_v4();
         let name = "name";
-        let thing = TestThing::new(name, uuid);
+        let thing = TestThing::new();
         let thing_key = thing.stuff;
         let displaced = t.insert(Name::new(name.to_owned()), uuid, thing);
         table_invariant(&t);
@@ -387,7 +381,7 @@ mod tests {
         assert_eq!(t.get_by_uuid(uuid).unwrap().1.stuff, thing_key);
 
         // Add another thing with the same keys.
-        let thing2 = TestThing::new(name, uuid);
+        let thing2 = TestThing::new();
         let thing_key2 = thing2.stuff;
         let displaced = t.insert(Name::new(name.to_owned()), uuid, thing2);
         table_invariant(&t);
@@ -414,7 +408,7 @@ mod tests {
 
         let uuid = PoolUuid::new_v4();
         let name = "name";
-        let thing = TestThing::new(name, uuid);
+        let thing = TestThing::new();
         let thing_key = thing.stuff;
 
         // There was nothing in the table before, so displaced is empty.
@@ -428,7 +422,7 @@ mod tests {
 
         // Insert new item with different UUID.
         let uuid2 = PoolUuid::new_v4();
-        let thing2 = TestThing::new(name, uuid2);
+        let thing2 = TestThing::new();
         let thing_key2 = thing2.stuff;
         let displaced = t.insert(Name::new(name.to_owned()), uuid2, thing2);
         table_invariant(&t);
@@ -458,7 +452,7 @@ mod tests {
 
         let uuid = PoolUuid::new_v4();
         let name = "name";
-        let thing = TestThing::new(name, uuid);
+        let thing = TestThing::new();
         let thing_key = thing.stuff;
 
         // There was nothing in the table before, so displaced is empty.
@@ -472,7 +466,7 @@ mod tests {
 
         // Insert new item with different UUID.
         let name2 = "name2";
-        let thing2 = TestThing::new(name2, uuid);
+        let thing2 = TestThing::new();
         let thing_key2 = thing2.stuff;
         let displaced = t.insert(Name::new(name2.to_owned()), uuid, thing2);
         table_invariant(&t);
@@ -502,12 +496,12 @@ mod tests {
 
         let uuid1 = PoolUuid::new_v4();
         let name1 = "name1";
-        let thing1 = TestThing::new(name1, uuid1);
+        let thing1 = TestThing::new();
         let thing_key1 = thing1.stuff;
 
         let uuid2 = PoolUuid::new_v4();
         let name2 = "name2";
-        let thing2 = TestThing::new(name2, uuid2);
+        let thing2 = TestThing::new();
         let thing_key2 = thing2.stuff;
 
         // Insert first item. There was nothing in the table before, so
@@ -533,7 +527,7 @@ mod tests {
         // other.
         let uuid3 = uuid1;
         let name3 = name2;
-        let thing3 = TestThing::new(name3, uuid3);
+        let thing3 = TestThing::new();
         let thing_key3 = thing3.stuff;
 
         // Insert third item.

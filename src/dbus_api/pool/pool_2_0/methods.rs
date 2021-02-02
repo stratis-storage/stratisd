@@ -19,9 +19,7 @@ use crate::{
         types::{DbusErrorEnum, TData},
         util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
     },
-    engine::{
-        CreateAction, EngineAction, FilesystemUuid, Name, PoolUuid, RenameAction, StratisUuid,
-    },
+    engine::{CreateAction, EngineAction, FilesystemUuid, Name, PoolUuid, RenameAction},
 };
 
 pub fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -129,19 +127,17 @@ pub fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut engine = dbus_context.engine.borrow_mut();
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-    let filesystem_map: HashMap<FilesystemUuid, dbus::Path<'static>> = filesystems
-        .filter_map(|path| {
-            m.tree.get(&path).and_then(|op| {
-                op.get_data().as_ref().and_then(|d| match d.uuid {
-                    StratisUuid::Fs(uuid) => Some((uuid, op.get_name().clone())),
-                    ref u => {
-                        warn!("Expected filesystem UUID but detected {:?}", u);
-                        None
-                    }
-                })
-            })
-        })
-        .collect();
+    let mut filesystem_map: HashMap<FilesystemUuid, dbus::Path<'static>> = HashMap::new();
+    for path in filesystems {
+        if let Some((u, path)) = m.tree.get(&path).and_then(|op| {
+            op.get_data()
+                .as_ref()
+                .map(|d| (&d.uuid, op.get_name().clone()))
+        }) {
+            let uuid = *typed_uuid!(u; Fs; default_return; return_message);
+            filesystem_map.insert(uuid, path);
+        }
+    }
 
     let result = pool.destroy_filesystems(
         &pool_name,

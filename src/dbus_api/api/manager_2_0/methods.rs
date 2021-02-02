@@ -11,10 +11,10 @@ use crate::{
     dbus_api::{
         api::shared::create_pool_shared,
         consts,
-        types::{DbusErrorEnum, TData},
+        types::TData,
         util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
     },
-    engine::{DeleteAction, PoolUuid, StratisUuid},
+    engine::{DeleteAction, PoolUuid},
 };
 
 pub fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
@@ -38,14 +38,7 @@ pub fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .and_then(|op| op.get_data().as_ref())
         .map(|d| &d.uuid)
     {
-        Some(StratisUuid::Pool(uuid)) => *uuid,
-        Some(u) => {
-            let (rc, rs) = (
-                DbusErrorEnum::INTERNAL_ERROR as u16,
-                format!("Expected pool UUID, found {:?}", u),
-            );
-            return Ok(vec![return_message.append3(default_return, rc, rs)]);
-        }
+        Some(uuid) => *typed_uuid!(uuid; Pool; default_return; return_message),
         None => {
             return Ok(vec![return_message.append3(
                 default_return,

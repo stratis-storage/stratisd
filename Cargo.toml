@@ -41,7 +41,6 @@ libudev = "0.2"
 lazy_static = "1"
 timerfd = "1"
 itertools = "0.9"
-libcryptsetup-rs = "0.4"
 semver = "0.11"
 termios = "0.3"
 regex = "1"
@@ -50,6 +49,10 @@ sha-1 = "0.9"
 either = "1"
 futures = "0.3"
 tokio-stream = "0.1"
+
+[dependencies.libcryptsetup-rs]
+version = "0.4.3"
+features = ["mutex"]
 
 [dependencies.tokio]
 version = "1.0"

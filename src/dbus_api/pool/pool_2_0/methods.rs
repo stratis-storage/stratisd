@@ -52,12 +52,12 @@ pub fn create_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
 
     let mut engine = dbus_context.engine.borrow_mut();
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
-    let result = pool.create_filesystems(
+    let result = log_action!(pool.create_filesystems(
         pool_uuid,
         &filesystems
             .map(|x| (x, None))
             .collect::<Vec<(&str, Option<Sectors>)>>(),
-    );
+    ));
 
     let infos = match result {
         Ok(created_set) => created_set.changed(),
@@ -139,10 +139,10 @@ pub fn destroy_filesystems(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         }
     }
 
-    let result = pool.destroy_filesystems(
+    let result = log_action!(pool.destroy_filesystems(
         &pool_name,
         &filesystem_map.keys().cloned().collect::<Vec<_>>(),
-    );
+    ));
     let msg = match result {
         Ok(uuids) => {
             // Only get changed values here as non-existant filesystems will have been filtered out
@@ -215,7 +215,7 @@ pub fn snapshot_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut engine = dbus_context.engine.borrow_mut();
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-    let msg = match pool.snapshot_filesystem(pool_uuid, fs_uuid, snapshot_name) {
+    let msg = match log_action!(pool.snapshot_filesystem(pool_uuid, fs_uuid, snapshot_name)) {
         Ok(CreateAction::Created((uuid, fs))) => {
             let fs_object_path: dbus::Path = create_dbus_filesystem(
                 dbus_context,
@@ -304,10 +304,10 @@ pub fn rename_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let msg = match dbus_context
+    let msg = match log_action!(dbus_context
         .engine
         .borrow_mut()
-        .rename_pool(pool_uuid, new_name)
+        .rename_pool(pool_uuid, new_name))
     {
         Ok(RenameAction::NoSource) => {
             let error_message = format!("engine doesn't know about pool {}", pool_uuid);

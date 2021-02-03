@@ -21,9 +21,9 @@ use crate::{
         sim_engine::{blockdev::SimDev, filesystem::SimFilesystem},
         structures::Table,
         types::{
-            BlockDevTier, CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid,
-            MaybeDbusPath, Name, PoolUuid, Redundancy, RenameAction, SetCreateAction,
-            SetDeleteAction,
+            BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo,
+            FilesystemUuid, MaybeDbusPath, Name, PoolUuid, Redundancy, RenameAction,
+            SetCreateAction, SetDeleteAction,
         },
         EngineEvent,
     },
@@ -265,7 +265,11 @@ impl Pool for SimPool {
         Ok(SetCreateAction::new(ret_uuids))
     }
 
-    fn bind_clevis(&mut self, pin: String, clevis_info: Value) -> StratisResult<CreateAction<()>> {
+    fn bind_clevis(
+        &mut self,
+        pin: String,
+        clevis_info: Value,
+    ) -> StratisResult<CreateAction<Clevis>> {
         let encryption_info = self.encryption_info();
         let clevis_info_current = encryption_info.and_then(|info| info.clevis_info.as_ref());
         if encryption_info.is_some() {
@@ -282,7 +286,7 @@ impl Pool for SimPool {
                 }
             } else {
                 self.add_clevis_info(pin, clevis_info);
-                Ok(CreateAction::Created(()))
+                Ok(CreateAction::Created(Clevis))
             }
         } else {
             Err(StratisError::Error(
@@ -291,13 +295,13 @@ impl Pool for SimPool {
         }
     }
 
-    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<()>> {
+    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<Clevis>> {
         let encryption_info = self.encryption_info();
         let clevis_info = encryption_info.and_then(|info| info.clevis_info.as_ref());
         if encryption_info.is_some() {
             Ok(if clevis_info.is_some() {
                 self.clear_clevis_info();
-                DeleteAction::Deleted(())
+                DeleteAction::Deleted(Clevis)
             } else {
                 DeleteAction::Identity
             })

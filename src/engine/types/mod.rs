@@ -18,7 +18,7 @@ use uuid::Uuid;
 
 pub use crate::engine::types::{
     actions::{
-        CreateAction, DeleteAction, EngineAction, MappingCreateAction, RenameAction,
+        Clevis, CreateAction, DeleteAction, EngineAction, Key, MappingCreateAction, RenameAction,
         SetCreateAction, SetDeleteAction, SetUnlockAction,
     },
     keys::{EncryptionInfo, KeyDescription, SizedKeyMemory},

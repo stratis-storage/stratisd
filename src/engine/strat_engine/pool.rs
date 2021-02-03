@@ -21,9 +21,9 @@ use crate::{
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
         types::{
-            BlockDevTier, CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid,
-            MaybeDbusPath, Name, PoolUuid, Redundancy, RenameAction, SetCreateAction,
-            SetDeleteAction,
+            BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo,
+            FilesystemUuid, MaybeDbusPath, Name, PoolUuid, Redundancy, RenameAction,
+            SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -372,19 +372,23 @@ impl Pool for StratPool {
         }
     }
 
-    fn bind_clevis(&mut self, pin: String, clevis_info: Value) -> StratisResult<CreateAction<()>> {
+    fn bind_clevis(
+        &mut self,
+        pin: String,
+        clevis_info: Value,
+    ) -> StratisResult<CreateAction<Clevis>> {
         let changed = self.backstore.bind_clevis(pin, clevis_info)?;
         if changed {
-            Ok(CreateAction::Created(()))
+            Ok(CreateAction::Created(Clevis))
         } else {
             Ok(CreateAction::Identity)
         }
     }
 
-    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<()>> {
+    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<Clevis>> {
         let changed = self.backstore.unbind_clevis()?;
         if changed {
-            Ok(DeleteAction::Deleted(()))
+            Ok(DeleteAction::Deleted(Clevis))
         } else {
             Ok(DeleteAction::Identity)
         }

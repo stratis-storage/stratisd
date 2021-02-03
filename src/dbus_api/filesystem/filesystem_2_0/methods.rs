@@ -44,7 +44,7 @@ pub fn rename_filesystem(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
     let uuid = typed_uuid!(filesystem_data.uuid; Fs; default_return; return_message);
-    let msg = match pool.rename_filesystem(&pool_name, uuid, new_name) {
+    let msg = match log_action!(pool.rename_filesystem(&pool_name, uuid, new_name)) {
         Ok(RenameAction::NoSource) => {
             let error_message = format!(
                 "pool {} doesn't know about filesystem {}",

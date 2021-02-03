@@ -61,12 +61,12 @@ pub fn create_pool_shared(m: &MethodInfo<MTFn<TData>, TData>, has_key_desc: bool
     let object_path = m.path.get_name();
     let dbus_context = m.tree.get_data();
     let mut engine = dbus_context.engine.borrow_mut();
-    let result = engine.create_pool(
+    let result = log_action!(engine.create_pool(
         name,
         &devs.map(|x| Path::new(x)).collect::<Vec<&Path>>(),
         tuple_to_option(redundancy_tuple),
         key_desc,
-    );
+    ));
 
     let msg = match result {
         Ok(pool_uuid_action) => {
@@ -135,7 +135,7 @@ pub fn set_key_shared(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = (false, false);
     let return_message = message.method_return();
 
-    let msg = match dbus_context.engine.borrow_mut().get_key_handler_mut().set(
+    let msg = match log_action!(dbus_context.engine.borrow_mut().get_key_handler_mut().set(
         &match KeyDescription::try_from(key_desc_str) {
             Ok(kd) => kd,
             Err(e) => {
@@ -144,11 +144,11 @@ pub fn set_key_shared(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             }
         },
         key_fd.as_raw_fd(),
-    ) {
+    )) {
         Ok(idem_resp) => {
             let return_value = match idem_resp {
-                MappingCreateAction::Created(()) => (true, false),
-                MappingCreateAction::ValueChanged(()) => (true, true),
+                MappingCreateAction::Created(_) => (true, false),
+                MappingCreateAction::ValueChanged(_) => (true, true),
                 MappingCreateAction::Identity => default_return,
             };
             return_message.append3(return_value, msg_code_ok(), msg_string_ok())
@@ -209,20 +209,21 @@ pub fn unlock_pool_shared(
         UnlockMethod::Keyring
     };
 
-    let msg = match dbus_context
+    let msg = match log_action!(dbus_context
         .engine
         .borrow_mut()
-        .unlock_pool(pool_uuid, unlock_method)
-        .map(|v| v.changed())
+        .unlock_pool(pool_uuid, unlock_method))
     {
-        Ok(Some(vec)) => {
-            let str_uuids: Vec<_> = vec
-                .into_iter()
-                .map(|u| u.to_simple_ref().to_string())
-                .collect();
-            return_message.append3((true, str_uuids), msg_code_ok(), msg_string_ok())
-        }
-        Ok(_) => return_message.append3(default_return, msg_code_ok(), msg_string_ok()),
+        Ok(unlock_action) => match unlock_action.changed() {
+            Some(vec) => {
+                let str_uuids: Vec<_> = vec
+                    .into_iter()
+                    .map(|u| u.to_simple_ref().to_string())
+                    .collect();
+                return_message.append3((true, str_uuids), msg_code_ok(), msg_string_ok())
+            }
+            None => return_message.append3(default_return, msg_code_ok(), msg_string_ok()),
+        },
         Err(e) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e);
             return_message.append3(default_return, rc, rs)

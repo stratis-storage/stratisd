@@ -164,3 +164,13 @@ macro_rules! initial_properties {
         interfaces
     }};
 }
+
+macro_rules! log_action {
+    ($action:expr) => {{
+        let action = $action;
+        if let Ok(ref a) = action {
+            log::info!("{}", a);
+        }
+        action
+    }};
+}

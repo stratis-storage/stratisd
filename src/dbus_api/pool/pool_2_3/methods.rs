@@ -49,7 +49,7 @@ pub fn bind_clevis(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
             return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };
-    let msg = match pool.bind_clevis(pin, json) {
+    let msg = match log_action!(pool.bind_clevis(pin, json)) {
         Ok(CreateAction::Identity) => return_message.append3(false, msg_code_ok(), msg_string_ok()),
         Ok(CreateAction::Created(_)) => {
             return_message.append3(true, msg_code_ok(), msg_string_ok())
@@ -84,7 +84,7 @@ pub fn unbind_clevis(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let mut engine = dbus_context.engine.borrow_mut();
     let (_, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
 
-    let msg = match pool.unbind_clevis() {
+    let msg = match log_action!(pool.unbind_clevis()) {
         Ok(DeleteAction::Identity) => return_message.append3(false, msg_code_ok(), msg_string_ok()),
         Ok(DeleteAction::Deleted(_)) => {
             return_message.append3(true, msg_code_ok(), msg_string_ok())

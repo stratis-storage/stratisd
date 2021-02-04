@@ -178,7 +178,7 @@ build-min:
 	RUSTFLAGS="${DENY}" \
 	cargo build --bin=stratis-min --bin=stratisd-min --bin=stratis-setup-generator \
 	--no-default-features \
-	--features min,systemd_notify ${TARGET_ARGS}
+	--features min,systemd_compat ${TARGET_ARGS}
 
 stratis-dumpmetadata:
 	PKG_CONFIG_ALLOW_CROSS=1 \
@@ -193,7 +193,7 @@ stratis-min:
 stratisd-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build --bin=stratisd-min --features min,systemd_notify ${TARGET_ARGS}
+	cargo build --bin=stratisd-min --features min,systemd_compat ${TARGET_ARGS}
 
 profiledir := $(shell if test -d target/release; then echo target/release; else echo target/debug; fi)
 install: release docs

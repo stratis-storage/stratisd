@@ -4,9 +4,25 @@
 
 use std::{error::Error, path::PathBuf};
 
+use log::{info, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
+use systemd::journal::log_record;
 use uuid::Uuid;
 
 mod lib;
+
+struct SystemdLogger;
+
+impl Log for SystemdLogger {
+    fn enabled(&self, _meta: &Metadata<'_>) -> bool {
+        true
+    }
+
+    fn log(&self, record: &Record<'_>) {
+        log_record(record)
+    }
+
+    fn flush(&self) {}
+}
 
 fn unit_template(uuids: Vec<PathBuf>, pool_uuid: Uuid) -> String {
     let devices: Vec<_> = uuids
@@ -36,27 +52,47 @@ RemainAfterExit=yes
     )
 }
 
+static LOGGER: SystemdLogger = SystemdLogger;
+
 fn main() -> Result<(), Box<dyn Error>> {
+    set_logger(&LOGGER)?;
+    set_max_level(LevelFilter::Info);
+
     let (_, early_dir, _) = lib::get_generator_args()?;
     let kernel_cmdline = lib::get_kernel_cmdline()?;
 
     let rootfs_uuid_paths_key = "stratis.rootfs.uuid_paths";
-    let rootfs_uuid_paths = kernel_cmdline
+    let rootfs_uuid_paths = match kernel_cmdline
         .get(rootfs_uuid_paths_key)
         .and_then(|opt_s| opt_s.as_ref())
-        .ok_or_else(|| {
-            format!(
-                "Missing kernel command line parameter {}",
+    {
+        Some(paths) => paths,
+        None => {
+            info!(
+                "{} kernel command line parameter not found; disabling generator",
                 rootfs_uuid_paths_key
-            )
-        })?;
-    let rootfs_uuid_paths_parsed = rootfs_uuid_paths.iter().map(PathBuf::from).collect();
+            );
+            return Ok(());
+        }
+    };
+
     let pool_uuid_key = "stratis.rootfs.pool_uuid";
-    let pool_uuid = kernel_cmdline
+    let pool_uuid = match kernel_cmdline
         .get(pool_uuid_key)
         .and_then(|opt_vec| opt_vec.as_ref())
         .and_then(|vec| vec.iter().next())
-        .ok_or_else(|| format!("Missing kernel command line parameter {}", pool_uuid_key))?;
+    {
+        Some(uuid) => uuid,
+        None => {
+            info!(
+                "{} kernel command line parameter not found; disabling generator",
+                pool_uuid_key
+            );
+            return Ok(());
+        }
+    };
+
+    let rootfs_uuid_paths_parsed = rootfs_uuid_paths.iter().map(PathBuf::from).collect();
     let parsed_pool_uuid = Uuid::parse_str(&pool_uuid)?;
     let file_contents = unit_template(rootfs_uuid_paths_parsed, parsed_pool_uuid);
     let mut path = PathBuf::from(early_dir);

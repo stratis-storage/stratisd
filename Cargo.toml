@@ -31,7 +31,7 @@ required-features = ["min"]
 [[bin]]
 name = "stratis-setup-generator"
 path = "src/bin/generators/stratis-setup-generator.rs"
-required-features = ["min"]
+required-features = ["min", "systemd_compat"]
 
 [dependencies]
 clap = "2"
@@ -112,4 +112,4 @@ default = ["dbus_enabled"]
 dbus_enabled = ["dbus", "dbus-tree", "dbus-tokio", "libdbus-sys"]
 extras = []
 min = ["rpassword"]
-systemd_notify = ["systemd"]
+systemd_compat = ["systemd"]

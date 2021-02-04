@@ -17,10 +17,10 @@
 Uploads the vendored dependency tarball as a release asset.
 """
 
-from getpass import getpass
 import os
-import sys
 import re
+import sys
+from getpass import getpass
 
 from github import Github
 

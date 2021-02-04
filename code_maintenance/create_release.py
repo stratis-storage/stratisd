@@ -17,8 +17,10 @@
 Uploads the vendored dependency tarball as a release asset.
 """
 
+from getpass import getpass
 import os
 import sys
+import re
 
 from github import Github
 
@@ -27,12 +29,31 @@ def main():
     """
     Main function
     """
+
+    if len(sys.argv) < 2:
+        print("USAGE: %s <RELEASE_VERSION>" % sys.argv[0])
+        print("\tRELEASE_VERSION: MAJOR.MINOR.PATCH")
+        raise RuntimeError("One positional argument is required")
+
+    release_version = sys.argv[1]
+    if re.match(r"^[0-9]+\.[0-9]+\.[0-9]$", release_version) is None:
+        raise RuntimeError("Invalid release version %s provided" % release_version)
+
     api_key = os.environ.get("GITHUB_API_KEY")
     if api_key is None:
-        raise RuntimeError("GITHUB_API_KEY environment variable is required")
+        api_key = getpass("API key: ")
 
     git = Github(api_key)
+
     repo = git.get_repo("stratis-storage/stratisd")
+    branch_name = repo.default_branch
+
+    repo.create_git_release(
+        "v%s" % release_version,
+        "Version %s" % release_version,
+        "Version %s of stratisd" % release_version,
+    )
+
     release = repo.get_latest_release()
     tag_name = release.tag_name
     release.upload_asset(

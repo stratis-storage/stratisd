@@ -79,8 +79,8 @@ ${PWD}/vendor:
 	cargo vendor
 	tar -czvf stratisd-vendor.tar.gz vendor
 
-upload-vendor-asset: ${PWD}/vendor
-	${PWD}/code_maintenance/upload-vendor-asset.py
+create-release: ${PWD}/vendor
+	${PWD}/code_maintenance/create_release.py ${RELEASE_VERSION}
 	rm -rf vendor
 	rm stratisd-vendor.tar.gz
 

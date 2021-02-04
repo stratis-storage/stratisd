@@ -15,12 +15,12 @@ fn unit_template(uuids: Vec<PathBuf>, pool_uuid: Uuid) -> String {
         .collect();
     format!(
         r"[Unit]
-Description=prompt for root filesystem password
+Description=setup for Stratis root filesystem
 DefaultDependencies=no
 Conflicts=shutdown.target
 OnFailure=dracut-emergency.service
-Wants=stratisd-min.service plymouth-start.service
-After=paths.target plymouth-start.service stratisd-min.service {}
+Wants=stratisd-min.service plymouth-start.service network-online.target
+After=paths.target plymouth-start.service stratisd-min.service network-online.target {}
 Before=initrd.target
 {}
 

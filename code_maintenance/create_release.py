@@ -48,13 +48,13 @@ def main():
     repo = git.get_repo("stratis-storage/stratisd")
     branch_name = repo.default_branch
 
-    repo.create_git_release(
+    release = repo.create_git_release(
         "v%s" % release_version,
         "Version %s" % release_version,
         "Version %s of stratisd" % release_version,
+        True,
     )
 
-    release = repo.get_latest_release()
     tag_name = release.tag_name
     release.upload_asset(
         "stratisd-vendor.tar.gz", "stratisd-vendor-%s.tar.gz" % tag_name

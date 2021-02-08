@@ -35,7 +35,7 @@ pub trait KeyActions {
     /// Successful return values:
     /// * `Ok(MappingCreateAction::Identity)`: The key was already in the keyring
     /// with the appropriate key description and key data.
-    /// * `Ok(MappingCreateAction::Created(()))`: The key was newly added to the
+    /// * `Ok(MappingCreateAction::Created(_))`: The key was newly added to the
     /// keyring.
     /// * `Ok(MappingCreateAction::Changed)`: The key description was already present
     /// in the keyring but the key data was updated.

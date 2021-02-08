@@ -51,8 +51,8 @@ def main():
     release = repo.create_git_release(
         "v%s" % release_version,
         "Version %s" % release_version,
-        "Version %s of stratisd" % release_version,
-        True,
+        "See changelog here: https://github.com/stratis-storage/stratisd/blob/master/CHANGES.txt",
+        draft=True,
     )
 
     tag_name = release.tag_name

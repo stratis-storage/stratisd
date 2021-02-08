@@ -33,16 +33,6 @@ pub trait KeyActions {
     /// containing a `bool` which indicates whether a key with the requested
     /// key description was in the keyring and the key data was updated.
     ///
-    /// If `interactive` is `Some(_)`, the end of a passphrase should be delimited
-    /// by a newline.
-    ///
-    /// If `interactive` is `Some(true)`, stratisd will change the terminal settings
-    /// on the interactive file descriptor to prompt the user without echo and with
-    /// a few additional security measures. This requires that stdin is a terminal.
-    ///
-    /// If `interactive` is `Some(false)`, it is up to the user to remove the echo
-    /// property on the file descriptor and any other settings that they require.
-    ///
     /// Successful return values:
     /// * `Ok(MappingCreateAction::Identity)`: The key was already in the keyring
     /// with the appropriate key description and key data.

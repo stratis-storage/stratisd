@@ -28,6 +28,7 @@ check() {
 	    clevis-decrypt-tang \
 	    clevis-decrypt-tpm2 \
 	    clevis-luks-common-functions \
+	    mktemp \
 	    || return 1
     require_any_binary tpm2_pcrread tpm2_pcrlist || return 1
     return 255
@@ -74,6 +75,7 @@ install() {
 	    jose \
 	    jq \
 	    cryptsetup \
+	    mktemp \
 	    curl
     inst_multiple -o tpm2_pcrread tpm2_pcrlist
     inst_libdir_file "libtss2-tcti-device.so*"

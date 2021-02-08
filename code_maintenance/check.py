@@ -20,6 +20,11 @@ ARG_MAP = {
         "--disable=I",
         "--msg-template='{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}'",
     ],
+    "create_release.py": [
+        "--reports=no",
+        "--disable=I",
+        "--msg-template='{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}'",
+    ],
 }
 
 

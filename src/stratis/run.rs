@@ -12,7 +12,7 @@ use std::{
     },
 };
 
-use futures::{executor::block_on, pending};
+use futures::executor::block_on;
 use nix::poll::{poll, PollFd, PollFlags};
 use tokio::{
     runtime::Runtime,
@@ -78,10 +78,7 @@ async fn dm_event_thread(engine: Option<Arc<Mutex<dyn Engine>>>) -> StratisResul
                 dm_fd_opt.next().await;
             }
         }
-        None => {
-            pending!();
-            Ok(())
-        }
+        None => Ok(()),
     }
 }
 

@@ -4,7 +4,11 @@
 
 // Code to handle the backing store of a pool.
 
-use std::{cmp, path::Path};
+use std::{
+    cmp,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use chrono::{DateTime, Utc};
 use serde_json::Value;
@@ -20,13 +24,13 @@ use crate::{
                 cache_tier::CacheTier,
                 data_tier::DataTier,
             },
-            dm::get_dm,
+            dm::{get_dm, DEVICEMAPPER_PATH},
             metadata::MDADataSize,
             names::{format_backstore_ids, CacheRole},
             serde_structs::{BackstoreSave, CapSave, Recordable},
             writing::wipe_sectors,
         },
-        types::{BlockDevTier, DevUuid, EncryptionInfo, KeyDescription, PoolUuid},
+        types::{BlockDevPath, BlockDevTier, DevUuid, EncryptionInfo, KeyDescription, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -93,7 +97,7 @@ pub struct Backstore {
     /// Coordinates handling of the blockdevs that form the base.
     data_tier: DataTier,
     /// A linear DM device.
-    linear: Option<LinearDev>,
+    linear: Option<(Arc<BlockDevPath>, LinearDev)>,
     /// Index for managing allocation of cap device
     next: Sectors,
 }
@@ -128,9 +132,19 @@ impl Backstore {
         cachedevs: Vec<StratBlockDev>,
         last_update_time: DateTime<Utc>,
     ) -> StratisResult<Backstore> {
+        let children = datadevs
+            .iter()
+            .map(|bd| bd.devnode_arc())
+            .collect::<Vec<_>>();
         let block_mgr = BlockDevMgr::new(datadevs, Some(last_update_time));
         let data_tier = DataTier::setup(block_mgr, &backstore_save.data_tier)?;
         let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
+        let node = BlockDevPath::node_with_children(
+            [DEVICEMAPPER_PATH, dm_name.to_string().as_str()]
+                .iter()
+                .collect::<PathBuf>(),
+            children,
+        );
         let origin = LinearDev::setup(
             get_dm(),
             &dm_name,
@@ -159,7 +173,7 @@ impl Backstore {
         Ok(Backstore {
             data_tier,
             cache_tier,
-            linear: origin,
+            linear: origin.map(|o| (node, o)),
             cache,
             next: backstore_save.cap.allocs[0].1,
         })
@@ -230,7 +244,8 @@ impl Backstore {
 
                 let linear = self.linear
                     .take()
-                    .expect("some space has already been allocated from the backstore => (cache_tier.is_none() <=> self.linear.is_some())");
+                    .expect("some space has already been allocated from the backstore => (cache_tier.is_none() <=> self.linear.is_some())")
+                    .1;
 
                 let cache = make_cache(pool_uuid, &cache_tier, linear, true)?;
 
@@ -318,7 +333,7 @@ impl Backstore {
                 cache.resume(get_dm())?;
                 false
             }
-            (None, Some(linear)) => {
+            (None, Some((_, linear))) => {
                 let table = map_to_dm(&self.data_tier.segments);
                 linear.set_table(get_dm(), table)?;
                 linear.resume(get_dm())?;
@@ -328,10 +343,24 @@ impl Backstore {
         };
 
         if create {
+            let children = self
+                .data_tier
+                .blockdevs()
+                .into_iter()
+                .map(|(_, bd)| bd.devnode_arc())
+                .collect::<Vec<_>>();
             let table = map_to_dm(&self.data_tier.segments);
             let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
             let origin = LinearDev::setup(get_dm(), &dm_name, Some(&dm_uuid), table)?;
-            self.linear = Some(origin);
+            self.linear = Some((
+                BlockDevPath::node_with_children(
+                    [DEVICEMAPPER_PATH, dm_name.to_string().as_str()]
+                        .iter()
+                        .collect::<PathBuf>(),
+                    children,
+                ),
+                origin,
+            ));
         }
 
         Ok(())
@@ -506,7 +535,7 @@ impl Backstore {
     fn size(&self) -> Sectors {
         self.linear
             .as_ref()
-            .map(|d| d.size())
+            .map(|(_, d)| d.size())
             .or_else(|| self.cache.as_ref().map(|d| d.size()))
             .unwrap_or(Sectors(0))
     }
@@ -545,7 +574,7 @@ impl Backstore {
                     .destroy()?;
             }
             None => {
-                if let Some(ref mut linear) = self.linear {
+                if let Some((_, ref mut linear)) = self.linear {
                     linear.teardown(get_dm())?;
                 }
             }
@@ -559,7 +588,7 @@ impl Backstore {
         match self.cache {
             Some(ref mut cache) => cache.teardown(get_dm()),
             None => {
-                if let Some(ref mut linear) = self.linear {
+                if let Some((_, ref mut linear)) = self.linear {
                     linear.teardown(get_dm())
                 } else {
                     Ok(())
@@ -577,7 +606,7 @@ impl Backstore {
         self.cache
             .as_ref()
             .map(|d| d.device())
-            .or_else(|| self.linear.as_ref().map(|d| d.device()))
+            .or_else(|| self.linear.as_ref().map(|(_, d)| d.device()))
     }
 
     /// Lookup an immutable blockdev by its Stratis UUID.
@@ -732,7 +761,7 @@ mod tests {
             match (&backstore.linear, &backstore.cache) {
                 (None, None) => Sectors(0),
                 (&None, &Some(ref cache)) => cache.size(),
-                (&Some(ref linear), &None) => linear.size(),
+                (&Some((_, ref linear)), &None) => linear.size(),
                 _ => panic!("impossible; see first assertion"),
             }
         );

@@ -10,6 +10,9 @@ use devicemapper::{DmResult, DM};
 
 use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
+/// Path to logical devicemapper devices
+pub const DEVICEMAPPER_PATH: &str = "/dev/mapper";
+
 static INIT: Once = Once::new();
 static mut DM_CONTEXT: Option<DmResult<DM>> = None;
 

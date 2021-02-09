@@ -203,6 +203,12 @@ impl StratBlockDev {
         &self.devnode
     }
 
+    /// Get the structure containing paths (such as physical and logical device
+    /// paths) for the device wrapped in an `Arc`.
+    pub fn devnode_arc(&self) -> Arc<BlockDevPath> {
+        Arc::clone(&self.devnode)
+    }
+
     /// Get the encryption_info stored on the given encrypted blockdev.
     ///
     /// Returns Some(_) if it is encrypted.

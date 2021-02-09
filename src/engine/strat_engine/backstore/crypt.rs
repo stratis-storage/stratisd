@@ -24,6 +24,7 @@ use libcryptsetup_rs::{
 use crate::engine::{
     strat_engine::{
         cmd::{clevis_luks_bind, clevis_luks_unbind, clevis_luks_unlock},
+        dm::DEVICEMAPPER_PATH,
         keys,
         metadata::StratisIdentifiers,
         names::format_crypt_name,
@@ -60,9 +61,6 @@ const STRATIS_MEK_SIZE: usize = 512 / 8;
 
 /// Sector size as determined in `cryptsetup/lib/internal.h`
 const SECTOR_SIZE: u64 = 512;
-
-/// Path to logical devices for encrypted devices
-const DEVICEMAPPER_PATH: &str = "/dev/mapper";
 
 /// Key in clevis configuration for tang indicating that the URL of the
 /// tang server does not need to be verified.

@@ -243,7 +243,7 @@ impl<'a> Into<Value> for &'a StratBlockDev {
     fn into(self) -> Value {
         let mut json = json!({
             "path": self.devnode.path(),
-            "uuid": self.bda.dev_uuid().to_simple_ref().to_string(),
+            "uuid": self.bda.dev_uuid().to_string(),
         });
         let map = json.as_object_mut().expect("just created above");
         if let Some(encryption_info) = self.crypt_handle.as_ref().map(|ch| ch.encryption_info()) {

@@ -111,7 +111,7 @@ impl<'a> Into<Value> for &'a SimPool {
                 self.filesystems.iter()
                     .map(|(name, uuid, _)| json!({
                         "name": name.to_string(),
-                        "uuid": uuid.to_simple_ref().to_string(),
+                        "uuid": uuid.to_string(),
                     }))
                     .collect()
             ),
@@ -120,7 +120,7 @@ impl<'a> Into<Value> for &'a SimPool {
                     self.block_devs.iter()
                         .map(|(uuid, dev)| {
                             let mut json = Map::new();
-                            json.insert("uuid".to_string(), Value::from(uuid.to_simple_ref().to_string()));
+                            json.insert("uuid".to_string(), Value::from(uuid.to_string()));
                             if let Value::Object(map) = dev.into() {
                                 json.extend(map.into_iter());
                             } else {
@@ -134,7 +134,7 @@ impl<'a> Into<Value> for &'a SimPool {
                     self.cache_devs.iter()
                         .map(|(uuid, dev)| {
                             let mut json = Map::new();
-                            json.insert("uuid".to_string(), Value::from(uuid.to_simple_ref().to_string()));
+                            json.insert("uuid".to_string(), Value::from(uuid.to_string()));
                             if let Value::Object(map) = dev.into() {
                                 json.extend(map.into_iter());
                             } else {

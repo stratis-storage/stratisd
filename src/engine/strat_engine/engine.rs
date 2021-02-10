@@ -122,7 +122,7 @@ impl<'a> Into<Value> for &'a StratEngine {
                 self.pools.iter()
                     .map(|(name, uuid, pool)| {
                         let mut json = json!({
-                            "uuid": Value::from(uuid.to_simple_ref().to_string()),
+                            "uuid": Value::from(uuid.to_string()),
                             "name": Value::from(name.to_string()),
                         });
                         if let Value::Object(ref mut map) = json {

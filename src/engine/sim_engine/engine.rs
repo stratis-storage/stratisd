@@ -42,7 +42,7 @@ impl<'a> Into<Value> for &'a SimEngine {
             "pools": Value::Array(
                 self.pools.iter().map(|(name, uuid, pool)| {
                     let json = json!({
-                        "pool_uuid": uuid.to_simple_ref().to_string(),
+                        "pool_uuid": uuid.to_string(),
                         "name": name.to_string(),
                     });
                     let pool_json = pool.into();

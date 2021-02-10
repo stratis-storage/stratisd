@@ -1092,7 +1092,7 @@ impl<'a> Into<Value> for &'a ThinPool {
                 self.filesystems.iter()
                     .map(|(name, uuid, _)| json!({
                         "name": name.to_string(),
-                        "uuid": uuid.to_simple_ref().to_string(),
+                        "uuid": uuid.to_string(),
                     }))
                     .collect()
             )

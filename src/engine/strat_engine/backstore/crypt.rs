@@ -93,8 +93,8 @@ impl Into<Value> for StratisLuks2Token {
             TOKEN_TYPE_KEY: STRATIS_TOKEN_TYPE,
             TOKEN_KEYSLOTS_KEY: [],
             STRATIS_TOKEN_DEVNAME_KEY: self.devname,
-            STRATIS_TOKEN_POOL_UUID_KEY: self.identifiers.pool_uuid.to_simple_ref().to_string(),
-            STRATIS_TOKEN_DEV_UUID_KEY: self.identifiers.device_uuid.to_simple_ref().to_string(),
+            STRATIS_TOKEN_POOL_UUID_KEY: self.identifiers.pool_uuid.to_string(),
+            STRATIS_TOKEN_DEV_UUID_KEY: self.identifiers.device_uuid.to_string(),
         })
     }
 }

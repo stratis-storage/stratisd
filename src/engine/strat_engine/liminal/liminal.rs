@@ -477,7 +477,7 @@ impl<'a> Into<Value> for &'a LiminalDevices {
                     .iter()
                     .map(|(uuid, map)| {
                         json!({
-                            "pool_uuid": uuid.to_simple_ref().to_string(),
+                            "pool_uuid": uuid.to_string(),
                             "devices": <&DeviceSet as Into<Value>>::into(&map),
                         })
                     })
@@ -488,7 +488,7 @@ impl<'a> Into<Value> for &'a LiminalDevices {
                     .iter()
                     .map(|(uuid, set)| {
                         json!({
-                            "pool_uuid": uuid.to_simple_ref().to_string(),
+                            "pool_uuid": uuid.to_string(),
                             "devices": <&DeviceBag as Into<Value>>::into(&set),
                         })
                     })

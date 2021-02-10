@@ -102,7 +102,7 @@ lazy_static! {
     .iter()
     .cloned()
     .collect();
-    pub static ref USE_CLEVIS: bool = CLEVIS_EXECS.iter().all(|exec| find_binary(exec).is_some());
+    static ref USE_CLEVIS: bool = CLEVIS_EXECS.iter().all(|exec| find_binary(exec).is_some());
 }
 
 /// Verify that all binaries that the engine might invoke are available at some

@@ -4,6 +4,7 @@
 
 use std::{
     fs::File,
+    ops::{Deref, DerefMut},
     os::unix::io::{AsRawFd, RawFd},
     path::{Path, PathBuf},
     sync::{
@@ -138,18 +139,12 @@ impl RecursiveFlock {
 }
 
 impl BlockDevPath {
-    /// Flock this single BlockDevPath. This should be used for metadata operations
-    /// on Stratis devices prior to the data structures being set up.
-    pub fn flock(&self, flag: DevFlockFlags) -> StratisResult<Option<DevFlock>> {
-        DevFlock::new(&self.path, Arc::clone(&self.locked), flag)
-    }
-
     /// Flock the BlockDevPath recursively. This should be used for Stratis data
     /// structures respresenting devicemapper stacks.
-    pub fn rec_flock(&self, flag: DevFlockFlags) -> StratisResult<RecursiveFlock> {
+    pub fn flock(&self, flag: DevFlockFlags) -> StratisResult<RecursiveFlock> {
         let mut locks = Vec::new();
         for path in self.child_paths.iter() {
-            locks.push(path.rec_flock(flag)?);
+            locks.push(path.flock(flag)?);
         }
         RecursiveFlock::new(
             &self.path,
@@ -161,5 +156,71 @@ impl BlockDevPath {
             },
             flag,
         )
+    }
+}
+
+pub struct FlockRef<'a, T>(&'a T, RecursiveFlock);
+
+impl<'a, T> Deref for FlockRef<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        self.0
+    }
+}
+
+pub struct FlockRefMut<'a, T>(&'a mut T, RecursiveFlock);
+
+impl<'a, T> Deref for FlockRefMut<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &*self.0
+    }
+}
+
+impl<'a, T> DerefMut for FlockRefMut<'a, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0
+    }
+}
+
+/// A wrapper that maps a devicemapper data type's mutability constraints to the
+/// appropriate type of flock arguments.
+#[derive(Debug)]
+pub struct WithFlock<T> {
+    inner: T,
+    path: Arc<BlockDevPath>,
+}
+
+impl<T> WithFlock<T> {
+    /// Create a new wrapper.
+    #[allow(dead_code)]
+    pub fn new(inner: T, path: Arc<BlockDevPath>) -> Self {
+        WithFlock { inner, path }
+    }
+
+    /// Create a shared flock and return an immutable reference.
+    #[allow(dead_code)]
+    pub fn flock(&self) -> StratisResult<FlockRef<'_, T>> {
+        Ok(FlockRef(
+            &self.inner,
+            self.path.flock(DevFlockFlags::Shared)?,
+        ))
+    }
+
+    /// Create an exclusive flock and return a mutable reference.
+    #[allow(dead_code)]
+    pub fn flock_mut(&mut self) -> StratisResult<FlockRefMut<'_, T>> {
+        Ok(FlockRefMut(
+            &mut self.inner,
+            self.path.flock(DevFlockFlags::Exclusive)?,
+        ))
+    }
+
+    /// Consume the wrapper and return the inner type.
+    #[allow(dead_code)]
+    pub fn into_inner(self) -> T {
+        self.inner
     }
 }

@@ -184,7 +184,8 @@ fn get_executable(name: &str) -> &Path {
         .expect("verify_binaries() was previously called and returned no error")
 }
 
-/// Get an absolute path for the Clevis executables with the given name.
+/// Get an absolute path for the Clevis executable or return an error if Clevis
+/// support is disabled.
 fn get_clevis_executable() -> StratisResult<&'static Path> {
     Ok(CLEVIS_BINARY.as_ref().ok_or_else(|| {
         StratisError::Error(format!(

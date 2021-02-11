@@ -554,9 +554,8 @@ fn setup_crypt_handle(
         Ok(Some(mut dev)) => {
             if !is_encrypted_stratis_device(&mut dev) {
                 return Ok(None);
-            } else {
-                dev
             }
+            dev
         }
         Err(e) => return Err(e),
     };

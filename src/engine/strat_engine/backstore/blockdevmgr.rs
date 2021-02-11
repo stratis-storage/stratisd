@@ -458,9 +458,8 @@ impl BlockDevMgr {
                 if let Err(e) = blockdev_ref.bind_clevis(key_fs, pin, clevis_info, yes) {
                     rollback_loop(rollback_record);
                     return Err(e);
-                } else {
-                    rollback_record.push(blockdev_ref);
                 }
+                rollback_record.push(blockdev_ref);
             }
             Ok(())
         }
@@ -493,13 +492,12 @@ impl BlockDevMgr {
             let clevis_tuple = (pin, clevis_info);
             if info == &clevis_tuple {
                 return Ok(false);
-            } else {
-                return Err(StratisError::Error(format!(
-                    "Block devices have already been bound with pin {} and config {}; \
-                    requested pin {} and config {} can't be applied",
-                    info.0, info.1, clevis_tuple.0, clevis_tuple.1,
-                )));
             }
+            return Err(StratisError::Error(format!(
+                "Block devices have already been bound with pin {} and config {}; \
+                requested pin {} and config {} can't be applied",
+                info.0, info.1, clevis_tuple.0, clevis_tuple.1,
+            )));
         }
 
         let key_fs = MemoryPrivateFilesystem::new()?;

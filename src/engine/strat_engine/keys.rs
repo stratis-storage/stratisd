@@ -431,19 +431,18 @@ impl MemoryFilesystem {
                     io::ErrorKind::AlreadyExists,
                     format!("{} exists and is not a directory", tmpfs_path.display()),
                 )));
-            } else {
-                let stat_info = stat(Self::TMPFS_LOCATION)?;
-                let parent_path: PathBuf = vec![Self::TMPFS_LOCATION, ".."].iter().collect();
-                let parent_stat_info = stat(&parent_path)?;
-                if stat_info.st_dev != parent_stat_info.st_dev {
-                    info!("Mount found at {}; unmounting", Self::TMPFS_LOCATION);
-                    if let Err(e) = umount(Self::TMPFS_LOCATION) {
-                        warn!(
-                            "Failed to unmount filesystem at {}: {}",
-                            Self::TMPFS_LOCATION,
-                            e
-                        );
-                    }
+            }
+            let stat_info = stat(Self::TMPFS_LOCATION)?;
+            let parent_path: PathBuf = vec![Self::TMPFS_LOCATION, ".."].iter().collect();
+            let parent_stat_info = stat(&parent_path)?;
+            if stat_info.st_dev != parent_stat_info.st_dev {
+                info!("Mount found at {}; unmounting", Self::TMPFS_LOCATION);
+                if let Err(e) = umount(Self::TMPFS_LOCATION) {
+                    warn!(
+                        "Failed to unmount filesystem at {}: {}",
+                        Self::TMPFS_LOCATION,
+                        e
+                    );
                 }
             }
         } else {
@@ -495,21 +494,20 @@ impl MemoryPrivateFilesystem {
                     io::ErrorKind::AlreadyExists,
                     format!("{} exists and is not a directory", tmpfs_path.display()),
                 )));
-            } else {
-                let stat_info = stat(MemoryFilesystem::TMPFS_LOCATION)?;
-                let parent_path: PathBuf = vec![MemoryFilesystem::TMPFS_LOCATION, ".."]
-                    .iter()
-                    .collect();
-                let parent_stat_info = stat(&parent_path)?;
-                if stat_info.st_dev == parent_stat_info.st_dev {
-                    return Err(StratisError::Io(io::Error::new(
-                        io::ErrorKind::NotFound,
-                        format!(
-                            "No mount found at {} which is required to proceed",
-                            tmpfs_path.display(),
-                        ),
-                    )));
-                }
+            }
+            let stat_info = stat(MemoryFilesystem::TMPFS_LOCATION)?;
+            let parent_path: PathBuf = vec![MemoryFilesystem::TMPFS_LOCATION, ".."]
+                .iter()
+                .collect();
+            let parent_stat_info = stat(&parent_path)?;
+            if stat_info.st_dev == parent_stat_info.st_dev {
+                return Err(StratisError::Io(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!(
+                        "No mount found at {} which is required to proceed",
+                        tmpfs_path.display(),
+                    ),
+                )));
             }
         } else {
             return Err(StratisError::Io(io::Error::new(

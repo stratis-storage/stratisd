@@ -67,6 +67,11 @@ const TPM2_UNSEAL: &str = "tpm2_unseal";
 const TPM2_LOAD: &str = "tpm2_load";
 const MKTEMP: &str = "mktemp";
 
+// This list of executables required for Clevis to function properly is based
+// off of the Clevis dracut module and the Stratis dracut module for supporting
+// Clevis in the initramfs. This list is the complete list of executables required
+// in the initramfs and so we must check that all of these are present for proper
+// Clevis support outside of the initramfs as well.
 const CLEVIS_EXEC_NAMES: &[&str] = &[
     CLEVIS,
     CLEVIS_BIND,

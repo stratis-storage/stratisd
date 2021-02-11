@@ -56,7 +56,6 @@ const CLEVIS_UNLOCK: &str = "clevis-luks-unlock";
 const CLEVIS_DECRYPT: &str = "clevis-decrypt";
 const CLEVIS_DECRYPT_TANG: &str = "clevis-decrypt-tang";
 const CLEVIS_DECRYPT_TPM2: &str = "clevis-decrypt-tpm2";
-const CLEVIS_ENCRYPT: &str = "clevis-encrypt";
 const CLEVIS_ENCRYPT_TANG: &str = "clevis-encrypt-tang";
 const CLEVIS_ENCRYPT_TPM2: &str = "clevis-encrypt-tpm2";
 const JOSE: &str = "jose";
@@ -68,7 +67,7 @@ const TPM2_UNSEAL: &str = "tpm2_unseal";
 const TPM2_LOAD: &str = "tpm2_load";
 const MKTEMP: &str = "mktemp";
 
-const CLEVIS_EXECS: &[&str] = &[
+const CLEVIS_EXEC_NAMES: &[&str] = &[
     CLEVIS,
     CLEVIS_BIND,
     CLEVIS_UNBIND,
@@ -77,7 +76,6 @@ const CLEVIS_EXECS: &[&str] = &[
     CLEVIS_DECRYPT,
     CLEVIS_DECRYPT_TANG,
     CLEVIS_DECRYPT_TPM2,
-    CLEVIS_ENCRYPT,
     CLEVIS_ENCRYPT_TANG,
     CLEVIS_ENCRYPT_TPM2,
     JOSE,
@@ -102,7 +100,25 @@ lazy_static! {
     .iter()
     .cloned()
     .collect();
-    static ref USE_CLEVIS: bool = CLEVIS_EXECS.iter().all(|exec| find_binary(exec).is_some());
+    static ref CLEVIS_BINARIES: Option<HashMap<String, PathBuf>> =
+        CLEVIS_EXEC_NAMES
+            .iter()
+            .fold(Some(HashMap::new()), |hm, name| {
+                match (hm, find_binary(name)) {
+                    (None, _) => None,
+                    (Some(mut hm), Some(path)) => {
+                        hm.insert((*name).to_string(), path);
+                        Some(hm)
+                    }
+                    (_, None) => {
+                        info!(
+                            "Clevis executable {} not found; disabling Clevis support",
+                            name
+                        );
+                        None
+                    }
+                }
+            });
 }
 
 /// Verify that all binaries that the engine might invoke are available at some
@@ -161,6 +177,23 @@ fn get_executable(name: &str) -> &Path {
         .expect("name arguments are all constants defined with BINARIES, lookup can not fail")
         .as_ref()
         .expect("verify_binaries() was previously called and returned no error")
+}
+
+/// Get an absolute path for the Clevis executables with the given name.
+fn get_clevis_executable(name: &str) -> StratisResult<&Path> {
+    Ok(CLEVIS_BINARIES
+        .as_ref()
+        .ok_or_else(|| {
+            StratisError::Error(format!(
+                "Clevis has been disabled due to some of the required executables not \
+                being found on this system. Required executables are: {:?}",
+                CLEVIS_EXEC_NAMES,
+            ))
+        })?
+        .get(name)
+        .expect(
+            "name arguments are all constants defined with CLEVIS_BINARIES, lookup can not fail",
+        ))
 }
 
 /// Create a filesystem on devnode. If uuid specified, set the UUID of the
@@ -236,15 +269,7 @@ pub fn clevis_luks_bind(
     json: &Value,
     yes: bool,
 ) -> StratisResult<()> {
-    if !*USE_CLEVIS {
-        return Err(StratisError::Error(format!(
-            "Clevis has been disabled due to some of the required executables not \
-            being found on this system. Required executables are: {:?}",
-            CLEVIS_EXECS,
-        )));
-    }
-
-    let mut cmd = Command::new(CLEVIS);
+    let mut cmd = Command::new(get_clevis_executable(CLEVIS)?);
 
     cmd.arg("luks").arg("bind");
 
@@ -264,16 +289,8 @@ pub fn clevis_luks_bind(
 
 /// Unbind a LUKS device using clevis.
 pub fn clevis_luks_unbind(dev_path: &Path, keyslot: libc::c_uint) -> StratisResult<()> {
-    if !*USE_CLEVIS {
-        return Err(StratisError::Error(format!(
-            "Clevis has been disabled due to some of the required executables not \
-            being found on this system. Required executables are: {:?}",
-            CLEVIS_EXECS,
-        )));
-    }
-
     execute_cmd(
-        Command::new(CLEVIS)
+        Command::new(get_clevis_executable(CLEVIS)?)
             .arg("luks")
             .arg("unbind")
             .arg("-d")
@@ -286,16 +303,8 @@ pub fn clevis_luks_unbind(dev_path: &Path, keyslot: libc::c_uint) -> StratisResu
 
 /// Unlock a device using the clevis CLI.
 pub fn clevis_luks_unlock(dev_path: &Path, dm_name: &str) -> StratisResult<()> {
-    if !*USE_CLEVIS {
-        return Err(StratisError::Error(format!(
-            "Clevis has been disabled due to some of the required executables not \
-            being found on this system. Required executables are: {:?}",
-            CLEVIS_EXECS,
-        )));
-    }
-
     execute_cmd(
-        Command::new(CLEVIS)
+        Command::new(get_clevis_executable(CLEVIS)?)
             .arg("luks")
             .arg("unlock")
             .arg("-d")

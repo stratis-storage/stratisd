@@ -127,7 +127,7 @@ install: build docs
 	install -Dpm0644 -t $(DESTDIR)$(DATADIR)/dbus-1/system.d stratisd.conf
 	install -Dpm0644 -t $(DESTDIR)$(MANDIR)/man8 docs/stratisd.8
 	install -Dpm0644 -t $(DESTDIR)$(UDEVDIR)/rules.d udev/11-stratisd.rules
-	install -Dpm0644 -t $(DESTDIR)$(UNITDIR) stratisd.service
+	install -Dpm0644 -t $(DESTDIR)$(UNITDIR) systemd/stratisd.service
 	install -Dpm0755 -t $(DESTDIR)$(PREFIX)/bin developer_tools/stratis_migrate_symlinks.sh
 
 release:

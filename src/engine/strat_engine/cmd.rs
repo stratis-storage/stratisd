@@ -49,9 +49,49 @@ const UDEVADM: &str = "udevadm";
 const XFS_DB: &str = "xfs_db";
 const XFS_GROWFS: &str = "xfs_growfs";
 const CLEVIS: &str = "clevis";
+const CLEVIS_LIB: &str = "clevis-luks-common-functions";
 const CLEVIS_BIND: &str = "clevis-luks-bind";
 const CLEVIS_UNBIND: &str = "clevis-luks-unbind";
 const CLEVIS_UNLOCK: &str = "clevis-luks-unlock";
+const CLEVIS_DECRYPT: &str = "clevis-decrypt";
+const CLEVIS_DECRYPT_TANG: &str = "clevis-decrypt-tang";
+const CLEVIS_DECRYPT_TPM2: &str = "clevis-decrypt-tpm2";
+const CLEVIS_ENCRYPT_TANG: &str = "clevis-encrypt-tang";
+const CLEVIS_ENCRYPT_TPM2: &str = "clevis-encrypt-tpm2";
+const JOSE: &str = "jose";
+const JQ: &str = "jq";
+const CRYPTSETUP: &str = "cryptsetup";
+const CURL: &str = "curl";
+const TPM2_CREATEPRIMARY: &str = "tpm2_createprimary";
+const TPM2_UNSEAL: &str = "tpm2_unseal";
+const TPM2_LOAD: &str = "tpm2_load";
+const MKTEMP: &str = "mktemp";
+
+// This list of executables required for Clevis to function properly is based
+// off of the Clevis dracut module and the Stratis dracut module for supporting
+// Clevis in the initramfs. This list is the complete list of executables required
+// in the initramfs and so we must check that all of these are present for proper
+// Clevis support outside of the initramfs as well.
+const CLEVIS_EXEC_NAMES: &[&str] = &[
+    CLEVIS,
+    CLEVIS_BIND,
+    CLEVIS_UNBIND,
+    CLEVIS_UNLOCK,
+    CLEVIS_LIB,
+    CLEVIS_DECRYPT,
+    CLEVIS_DECRYPT_TANG,
+    CLEVIS_DECRYPT_TPM2,
+    CLEVIS_ENCRYPT_TANG,
+    CLEVIS_ENCRYPT_TPM2,
+    JOSE,
+    JQ,
+    CRYPTSETUP,
+    CURL,
+    TPM2_CREATEPRIMARY,
+    TPM2_UNSEAL,
+    TPM2_LOAD,
+    MKTEMP,
+];
 
 lazy_static! {
     static ref BINARIES: HashMap<String, Option<PathBuf>> = [
@@ -61,14 +101,29 @@ lazy_static! {
         (UDEVADM.to_string(), find_binary(UDEVADM)),
         (XFS_DB.to_string(), find_binary(XFS_DB)),
         (XFS_GROWFS.to_string(), find_binary(XFS_GROWFS)),
-        (CLEVIS.to_string(), find_binary(CLEVIS)),
-        (CLEVIS_BIND.to_string(), find_binary(CLEVIS_BIND)),
-        (CLEVIS_UNBIND.to_string(), find_binary(CLEVIS_UNBIND)),
-        (CLEVIS_UNLOCK.to_string(), find_binary(CLEVIS_UNLOCK)),
     ]
     .iter()
     .cloned()
     .collect();
+    static ref CLEVIS_BINARY: Option<PathBuf> = CLEVIS_EXEC_NAMES
+        .iter()
+        .fold(Some(HashMap::new()), |hm, name| {
+            match (hm, find_binary(name)) {
+                (None, _) => None,
+                (Some(mut hm), Some(path)) => {
+                    hm.insert((*name).to_string(), path);
+                    Some(hm)
+                }
+                (_, None) => {
+                    info!(
+                        "Clevis executable {} not found; disabling Clevis support",
+                        name
+                    );
+                    None
+                }
+            }
+        })
+        .and_then(|mut hm| hm.remove(CLEVIS));
 }
 
 /// Verify that all binaries that the engine might invoke are available at some
@@ -127,6 +182,18 @@ fn get_executable(name: &str) -> &Path {
         .expect("name arguments are all constants defined with BINARIES, lookup can not fail")
         .as_ref()
         .expect("verify_binaries() was previously called and returned no error")
+}
+
+/// Get an absolute path for the Clevis executable or return an error if Clevis
+/// support is disabled.
+fn get_clevis_executable() -> StratisResult<&'static Path> {
+    Ok(CLEVIS_BINARY.as_ref().ok_or_else(|| {
+        StratisError::Error(format!(
+            "Clevis has been disabled due to some of the required executables not \
+            being found on this system. Required executables are: {:?}",
+            CLEVIS_EXEC_NAMES,
+        ))
+    })?)
 }
 
 /// Create a filesystem on devnode. If uuid specified, set the UUID of the
@@ -202,7 +269,7 @@ pub fn clevis_luks_bind(
     json: &Value,
     yes: bool,
 ) -> StratisResult<()> {
-    let mut cmd = Command::new(CLEVIS);
+    let mut cmd = Command::new(get_clevis_executable()?);
 
     cmd.arg("luks").arg("bind");
 
@@ -223,7 +290,7 @@ pub fn clevis_luks_bind(
 /// Unbind a LUKS device using clevis.
 pub fn clevis_luks_unbind(dev_path: &Path, keyslot: libc::c_uint) -> StratisResult<()> {
     execute_cmd(
-        Command::new(CLEVIS)
+        Command::new(get_clevis_executable()?)
             .arg("luks")
             .arg("unbind")
             .arg("-d")
@@ -237,7 +304,7 @@ pub fn clevis_luks_unbind(dev_path: &Path, keyslot: libc::c_uint) -> StratisResu
 /// Unlock a device using the clevis CLI.
 pub fn clevis_luks_unlock(dev_path: &Path, dm_name: &str) -> StratisResult<()> {
     execute_cmd(
-        Command::new(CLEVIS)
+        Command::new(get_clevis_executable()?)
             .arg("luks")
             .arg("unlock")
             .arg("-d")

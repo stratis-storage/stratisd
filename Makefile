@@ -21,6 +21,7 @@ DENY = -D warnings -D future-incompatible -D unused ${RUST_2018_IDIOMS}
 # map_err_ignore: we generally drop the errors for a reason
 # option_if_let_else: causing problems with if-else chains
 # similar_names: judges "yes" and "res" to be too similar
+# suspicious_operation_groupings: doesn't type-check its suggestions
 CLIPPY_DENY = -D clippy::pedantic \
               -A clippy::cast_possible_wrap \
               -A clippy::cast_sign_loss \
@@ -46,6 +47,7 @@ CLIPPY_DENY = -D clippy::pedantic \
               -A clippy::shadow_unrelated \
               -A clippy::similar_names \
               -A clippy::single_match_else \
+              -A clippy::suspicious_operation_groupings \
               -A clippy::too_many_lines \
               -A clippy::unseparated_literal_suffix \
               -A clippy::unused_self

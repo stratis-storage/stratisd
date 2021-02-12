@@ -27,6 +27,8 @@ const ALL_PROPERTIES: [&str; 4] = [
     consts::POOL_TOTAL_USED_PROP,
 ];
 
+#[allow(clippy::unknown_clippy_lints)]
+#[allow(clippy::unnecessary_wraps)]
 fn get_properties_shared(
     m: &MethodInfo<MTFn<TData>, TData>,
     properties: &mut dyn Iterator<Item = String>,

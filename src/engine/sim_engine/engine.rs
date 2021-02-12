@@ -30,7 +30,7 @@ use crate::{
 
 #[derive(Debug, Default)]
 pub struct SimEngine {
-    pools: Table<SimPool>,
+    pools: Table<PoolUuid, SimPool>,
     key_handler: SimKeyActions,
 }
 
@@ -42,7 +42,7 @@ impl<'a> Into<Value> for &'a SimEngine {
             "pools": Value::Array(
                 self.pools.iter().map(|(name, uuid, pool)| {
                     let json = json!({
-                        "pool_uuid": uuid.to_simple_ref().to_string(),
+                        "pool_uuid": uuid.to_string(),
                         "name": name.to_string(),
                     });
                     let pool_json = pool.into();
@@ -238,8 +238,6 @@ mod tests {
 
     use std::{self, path::Path};
 
-    use uuid::Uuid;
-
     use crate::{
         engine::{
             types::{EngineAction, RenameAction},
@@ -253,13 +251,13 @@ mod tests {
     #[test]
     /// When an engine has no pools, any name lookup should fail
     fn get_pool_err() {
-        assert_matches!(SimEngine::default().get_pool(Uuid::new_v4()), None);
+        assert_matches!(SimEngine::default().get_pool(PoolUuid::new_v4()), None);
     }
 
     #[test]
     /// When an engine has no pools, destroying any pool must succeed
     fn destroy_pool_empty() {
-        assert_matches!(SimEngine::default().destroy_pool(Uuid::new_v4()), Ok(_));
+        assert_matches!(SimEngine::default().destroy_pool(PoolUuid::new_v4()), Ok(_));
     }
 
     #[test]
@@ -376,7 +374,7 @@ mod tests {
     fn rename_empty() {
         let mut engine = SimEngine::default();
         assert_matches!(
-            engine.rename_pool(Uuid::new_v4(), "new_name"),
+            engine.rename_pool(PoolUuid::new_v4(), "new_name"),
             Ok(RenameAction::NoSource)
         );
     }
@@ -465,7 +463,7 @@ mod tests {
             )
             .unwrap();
         assert_matches!(
-            engine.rename_pool(Uuid::new_v4(), new_name),
+            engine.rename_pool(PoolUuid::new_v4(), new_name),
             Ok(RenameAction::NoSource)
         );
     }

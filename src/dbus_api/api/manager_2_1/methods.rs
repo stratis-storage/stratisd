@@ -36,7 +36,7 @@ pub fn unset_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = false;
     let return_message = message.method_return();
 
-    let msg = match dbus_context
+    let msg = match log_action!(dbus_context
         .engine
         .borrow_mut()
         .get_key_handler_mut()
@@ -46,9 +46,9 @@ pub fn unset_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                 let (rc, rs) = engine_to_dbus_err_tuple(&e);
                 return Ok(vec![return_message.append3(default_return, rc, rs)]);
             }
-        }) {
+        })) {
         Ok(idem_resp) => {
-            let return_value = matches!(idem_resp, DeleteAction::Deleted(()));
+            let return_value = matches!(idem_resp, DeleteAction::Deleted(_));
             return_message.append3(return_value, msg_code_ok(), msg_string_ok())
         }
         Err(e) => {

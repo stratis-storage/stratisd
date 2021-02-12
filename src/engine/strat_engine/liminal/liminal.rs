@@ -80,7 +80,7 @@ impl LiminalDevices {
     /// Unlock the liminal encrypted devices that correspond to the given pool UUID.
     pub fn unlock_pool(
         &mut self,
-        pools: &Table<StratPool>,
+        pools: &Table<PoolUuid, StratPool>,
         pool_uuid: PoolUuid,
         unlock_method: UnlockMethod,
     ) -> StratisResult<Vec<DevUuid>> {
@@ -238,7 +238,7 @@ impl LiminalDevices {
     ///               self.hopeless_device_sets.get(pool_uuid).is_none()
     fn try_setup_pool(
         &mut self,
-        pools: &Table<StratPool>,
+        pools: &Table<PoolUuid, StratPool>,
         pool_uuid: PoolUuid,
         infos: DeviceSet,
     ) -> Option<(Name, StratPool)> {
@@ -252,7 +252,7 @@ impl LiminalDevices {
         // Precondition: every device represented by an item in infos has
         // already been determined to belong to the pool with pool_uuid.
         fn setup_pool(
-            pools: &Table<StratPool>,
+            pools: &Table<PoolUuid, StratPool>,
             pool_uuid: PoolUuid,
             infos: &HashMap<DevUuid, &LStratisInfo>,
         ) -> Result<(Name, StratPool), Destination> {
@@ -389,7 +389,7 @@ impl LiminalDevices {
     /// constructing the pool, retain the set of devices.
     pub fn block_evaluate(
         &mut self,
-        pools: &Table<StratPool>,
+        pools: &Table<PoolUuid, StratPool>,
         event: &libudev::Event,
     ) -> Option<(PoolUuid, Name, StratPool)> {
         let event_type = event.event_type();
@@ -477,7 +477,7 @@ impl<'a> Into<Value> for &'a LiminalDevices {
                     .iter()
                     .map(|(uuid, map)| {
                         json!({
-                            "pool_uuid": uuid.to_simple_ref().to_string(),
+                            "pool_uuid": uuid.to_string(),
                             "devices": <&DeviceSet as Into<Value>>::into(&map),
                         })
                     })
@@ -488,7 +488,7 @@ impl<'a> Into<Value> for &'a LiminalDevices {
                     .iter()
                     .map(|(uuid, set)| {
                         json!({
-                            "pool_uuid": uuid.to_simple_ref().to_string(),
+                            "pool_uuid": uuid.to_string(),
                             "devices": <&DeviceBag as Into<Value>>::into(&set),
                         })
                     })

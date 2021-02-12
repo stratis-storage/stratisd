@@ -12,7 +12,6 @@ use std::{
 };
 
 use serde_json::Value;
-use uuid::Uuid;
 
 use devicemapper::{
     device_exists, DataBlocks, Device, DmDevice, DmName, DmNameBuf, FlakeyTargetParams, LinearDev,
@@ -270,7 +269,7 @@ pub struct ThinPool {
     thin_pool: ThinPoolDev,
     segments: Segments,
     id_gen: ThinDevIdPool,
-    filesystems: Table<StratFilesystem>,
+    filesystems: Table<FilesystemUuid, StratFilesystem>,
     mdv: MetadataVol,
     /// The single DM device that the backstore presents as its upper-most
     /// layer. All DM components obtain their storage from this layer.
@@ -865,7 +864,7 @@ impl ThinPool {
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
     ) -> StratisResult<(FilesystemUuid, &mut dyn Filesystem)> {
-        let snapshot_fs_uuid = Uuid::new_v4();
+        let snapshot_fs_uuid = FilesystemUuid::new_v4();
         let (snapshot_dm_name, snapshot_dm_uuid) =
             format_thin_ids(pool_uuid, ThinRole::Filesystem(snapshot_fs_uuid));
         let snapshot_id = self.id_gen.new_id()?;
@@ -951,7 +950,7 @@ impl ThinPool {
         pool_name: &str,
         uuid: FilesystemUuid,
         new_name: &str,
-    ) -> StratisResult<Option<Uuid>> {
+    ) -> StratisResult<Option<FilesystemUuid>> {
         let old_name = rename_filesystem_pre!(self; uuid; new_name);
         let new_name = Name::new(new_name.to_owned());
 
@@ -1093,7 +1092,7 @@ impl<'a> Into<Value> for &'a ThinPool {
                 self.filesystems.iter()
                     .map(|(name, uuid, _)| json!({
                         "name": name.to_string(),
-                        "uuid": uuid.to_simple_ref().to_string(),
+                        "uuid": uuid.to_string(),
                     }))
                     .collect()
             )
@@ -1196,7 +1195,6 @@ mod tests {
     };
 
     use nix::mount::{mount, umount, MsFlags};
-    use uuid::Uuid;
 
     use devicemapper::{Bytes, SECTOR_SIZE};
 
@@ -1220,7 +1218,7 @@ mod tests {
     /// FIXME: This is a temporary test; it should be removed when greedy
     /// allocation is removed.
     fn test_greedy_allocation(paths: &[&Path]) {
-        let pool_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
 
         let mut backstore =
             Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
@@ -1261,7 +1259,7 @@ mod tests {
 
     /// Verify that a full pool extends properly when additional space is added.
     fn test_full_pool(paths: &[&Path]) {
-        let pool_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
         let (first_path, remaining_paths) = paths.split_at(1);
         let mut backstore =
             Backstore::initialize(pool_uuid, first_path, MDADataSize::default(), None).unwrap();
@@ -1366,7 +1364,7 @@ mod tests {
 
     /// Verify a snapshot has the same files and same contents as the origin.
     fn test_filesystem_snapshot(paths: &[&Path]) {
-        let pool_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
         let mut backstore =
             Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
@@ -1476,7 +1474,7 @@ mod tests {
         let name1 = "name1";
         let name2 = "name2";
 
-        let pool_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
         let mut backstore =
             Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
@@ -1521,7 +1519,7 @@ mod tests {
     /// down does not fail. Clutter the original pool with a filesystem with
     /// some data on it.
     fn test_pool_setup(paths: &[&Path]) {
-        let pool_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
         let mut backstore =
             Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
@@ -1583,7 +1581,7 @@ mod tests {
     /// from the thinpool, by attempting to reinstantiate it using the
     /// same thin id and verifying that it fails.
     fn test_thindev_destroy(paths: &[&Path]) {
-        let pool_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
         let mut backstore =
             Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
@@ -1634,7 +1632,7 @@ mod tests {
     /// by tearing down/reconstructing the pool and verify the thindev size is updated.
     fn test_thindev_expand(paths: &[&Path]) {
         let start_thindev_size: Sectors;
-        let pool_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
         let mut backstore =
             Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
@@ -1724,7 +1722,7 @@ mod tests {
     /// Suspend twice in succession and then resume twice in succession
     /// to check idempotency.
     fn test_suspend_resume(paths: &[&Path]) {
-        let pool_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
         let mut backstore =
             Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
@@ -1769,7 +1767,7 @@ mod tests {
 
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
-        let pool_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
         let mut backstore =
             Backstore::initialize(pool_uuid, paths2, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(

@@ -11,7 +11,6 @@ use std::{
 use byteorder::{ByteOrder, LittleEndian};
 use crc::crc32;
 use serde_json::Value;
-use uuid::Uuid;
 
 use devicemapper::{Sectors, IEC, SECTOR_SIZE};
 
@@ -70,8 +69,8 @@ impl fmt::Display for StratisIdentifiers {
 impl<'a> Into<Value> for &'a StratisIdentifiers {
     fn into(self) -> Value {
         json!({
-            "pool_uuid": Value::from(self.pool_uuid.to_simple_ref().to_string()),
-            "device_uuid": Value::from(self.device_uuid.to_simple_ref().to_string())
+            "pool_uuid": Value::from(self.pool_uuid.to_string()),
+            "device_uuid": Value::from(self.device_uuid.to_string())
         })
     }
 }
@@ -429,8 +428,8 @@ impl StaticHeader {
             ));
         }
 
-        let pool_uuid = Uuid::parse_str(from_utf8(&buf[32..64])?)?;
-        let dev_uuid = Uuid::parse_str(from_utf8(&buf[64..96])?)?;
+        let pool_uuid = PoolUuid::parse_str(from_utf8(&buf[32..64])?)?;
+        let dev_uuid = DevUuid::parse_str(from_utf8(&buf[64..96])?)?;
 
         let mda_size = MDASize(Sectors(LittleEndian::read_u64(&buf[96..104])));
 
@@ -462,7 +461,6 @@ pub mod tests {
     use std::io::Cursor;
 
     use proptest::{option, prelude::BoxedStrategy, strategy::Strategy};
-    use uuid::Uuid;
 
     use chrono::Utc;
 
@@ -500,8 +498,8 @@ pub mod tests {
     /// Return a static header with random block device and MDA size.
     /// The block device is less than the minimum, for efficiency in testing.
     pub fn random_static_header(blkdev_size: u64, mda_size_factor: u32) -> StaticHeader {
-        let pool_uuid = Uuid::new_v4();
-        let dev_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
+        let dev_uuid = DevUuid::new_v4();
         let mda_size =
             MDADataSize::new(MDADataSize::default().bytes() + Bytes::from(mda_size_factor * 4))
                 .region_size()

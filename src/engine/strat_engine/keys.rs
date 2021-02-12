@@ -30,7 +30,7 @@ use crate::{
         engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
         shared,
         strat_engine::names::KeyDescription,
-        types::{DeleteAction, MappingCreateAction, SizedKeyMemory},
+        types::{DeleteAction, Key, MappingCreateAction, SizedKeyMemory},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -219,20 +219,20 @@ fn set_key(
 fn set_key_idem(
     key_desc: &KeyDescription,
     key_data: SizedKeyMemory,
-) -> StratisResult<MappingCreateAction<()>> {
+) -> StratisResult<MappingCreateAction<Key>> {
     let keyring_id = get_persistent_keyring()?;
     match read_key(keyring_id, key_desc) {
         Ok(Some((key_id, old_key_data))) => {
             let changed = reset_key(key_id, old_key_data, key_data)?;
             if changed {
-                Ok(MappingCreateAction::ValueChanged(()))
+                Ok(MappingCreateAction::ValueChanged(Key))
             } else {
                 Ok(MappingCreateAction::Identity)
             }
         }
         Ok(None) => {
             set_key(key_desc, key_data, keyring_id)?;
-            Ok(MappingCreateAction::Created(()))
+            Ok(MappingCreateAction::Created(Key))
         }
         Err(e) => Err(e),
     }
@@ -382,7 +382,7 @@ impl StratKeyActions {
         &mut self,
         key_desc: &KeyDescription,
         key: SizedKeyMemory,
-    ) -> StratisResult<MappingCreateAction<()>> {
+    ) -> StratisResult<MappingCreateAction<Key>> {
         Ok(set_key_idem(&key_desc, key)?)
     }
 }
@@ -392,7 +392,7 @@ impl KeyActions for StratKeyActions {
         &mut self,
         key_desc: &KeyDescription,
         key_fd: RawFd,
-    ) -> StratisResult<MappingCreateAction<()>> {
+    ) -> StratisResult<MappingCreateAction<Key>> {
         let memory = shared::set_key_shared(key_fd)?;
 
         Ok(set_key_idem(key_desc, memory)?)
@@ -404,11 +404,11 @@ impl KeyActions for StratKeyActions {
         key_ids.to_key_descs()
     }
 
-    fn unset(&mut self, key_desc: &KeyDescription) -> StratisResult<DeleteAction<()>> {
+    fn unset(&mut self, key_desc: &KeyDescription) -> StratisResult<DeleteAction<Key>> {
         let keyring_id = get_persistent_keyring()?;
 
         if let Some(key_id) = search_key(keyring_id, key_desc)? {
-            unset_key(key_id).map(|_| DeleteAction::Deleted(()))
+            unset_key(key_id).map(|_| DeleteAction::Deleted(Key))
         } else {
             Ok(DeleteAction::Identity)
         }

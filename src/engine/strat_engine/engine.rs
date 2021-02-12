@@ -35,7 +35,7 @@ const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 
 #[derive(Debug)]
 pub struct StratEngine {
-    pools: Table<StratPool>,
+    pools: Table<PoolUuid, StratPool>,
 
     // Maps pool UUIDs to information about sets of devices that are
     // associated with that UUID but have not been converted into a pool.
@@ -122,7 +122,7 @@ impl<'a> Into<Value> for &'a StratEngine {
                 self.pools.iter()
                     .map(|(name, uuid, pool)| {
                         let mut json = json!({
-                            "uuid": Value::from(uuid.to_simple_ref().to_string()),
+                            "uuid": Value::from(uuid.to_string()),
                             "name": Value::from(name.to_string()),
                         });
                         if let Value::Object(ref mut map) = json {

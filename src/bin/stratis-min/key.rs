@@ -32,14 +32,14 @@ pub fn key_set(key_desc: &KeyDescription, keyfile_path: Option<&str>) -> Stratis
             "Key with key description {} was unchanged by the set action",
             key_desc.as_application_str()
         ))),
-        MappingCreateAction::Created(()) => Ok(()),
-        MappingCreateAction::ValueChanged(()) => Ok(()),
+        MappingCreateAction::Created(_) => Ok(()),
+        MappingCreateAction::ValueChanged(_) => Ok(()),
     }
 }
 
 pub fn key_unset(key_desc: &KeyDescription) -> StratisResult<()> {
     match StratKeyActions.unset(key_desc)? {
-        DeleteAction::Deleted(()) => Ok(()),
+        DeleteAction::Deleted(_) => Ok(()),
         DeleteAction::Identity => Err(StratisError::Error(format!(
             "Key with key description {} does not exist.",
             key_desc.as_application_str()

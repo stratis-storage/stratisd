@@ -11,14 +11,13 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use serde_json::Value;
-use uuid::Uuid;
 
 use devicemapper::{Bytes, Sectors, DM};
 
 use crate::{
     engine::types::{
-        BlockDevTier, CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid,
-        KeyDescription, MappingCreateAction, MaybeDbusPath, Name, PoolUuid, RenameAction,
+        BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid,
+        Key, KeyDescription, MappingCreateAction, MaybeDbusPath, Name, PoolUuid, RenameAction,
         ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, UnlockMethod,
     },
     stratis::StratisResult,
@@ -36,7 +35,7 @@ pub trait KeyActions {
     /// Successful return values:
     /// * `Ok(MappingCreateAction::Identity)`: The key was already in the keyring
     /// with the appropriate key description and key data.
-    /// * `Ok(MappingCreateAction::Created(()))`: The key was newly added to the
+    /// * `Ok(MappingCreateAction::Created(_))`: The key was newly added to the
     /// keyring.
     /// * `Ok(MappingCreateAction::Changed)`: The key description was already present
     /// in the keyring but the key data was updated.
@@ -44,7 +43,7 @@ pub trait KeyActions {
         &mut self,
         key_desc: &KeyDescription,
         key_fd: RawFd,
-    ) -> StratisResult<MappingCreateAction<()>>;
+    ) -> StratisResult<MappingCreateAction<Key>>;
 
     /// Return a list of all key descriptions of keys added to the keyring by
     /// Stratis that are still valid.
@@ -52,7 +51,7 @@ pub trait KeyActions {
 
     /// Unset a key with the given key description in the root persistent kernel
     /// keyring.
-    fn unset(&mut self, key_desc: &KeyDescription) -> StratisResult<DeleteAction<()>>;
+    fn unset(&mut self, key_desc: &KeyDescription) -> StratisResult<DeleteAction<Key>>;
 }
 
 /// An interface for reporting internal engine state.
@@ -168,10 +167,14 @@ pub trait Pool: Debug {
 
     /// Bind all devices in the given pool for automated unlocking
     /// using clevis.
-    fn bind_clevis(&mut self, pin: String, clevis_info: Value) -> StratisResult<CreateAction<()>>;
+    fn bind_clevis(
+        &mut self,
+        pin: String,
+        clevis_info: Value,
+    ) -> StratisResult<CreateAction<Clevis>>;
 
     /// Unbind all devices in the given pool from using clevis.
-    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<()>>;
+    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<Clevis>>;
 
     /// Ensures that all designated filesystems are gone from pool.
     /// Returns a list of the filesystems found, and actually destroyed.
@@ -232,7 +235,7 @@ pub trait Pool: Debug {
 
     /// Get _all_ the blockdevs that belong to this pool.
     /// All really means all. For example, it does not exclude cache blockdevs.
-    fn blockdevs(&self) -> Vec<(Uuid, BlockDevTier, &dyn BlockDev)>;
+    fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &dyn BlockDev)>;
 
     /// Get all the blockdevs belonging to this pool as mutable references.
     fn blockdevs_mut(&mut self) -> Vec<(DevUuid, BlockDevTier, &mut dyn BlockDev)>;

@@ -36,9 +36,9 @@ pub fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         .tree
         .get(&pool_path)
         .and_then(|op| op.get_data().as_ref())
-        .map(|d| d.uuid)
+        .map(|d| &d.uuid)
     {
-        Some(uuid) => uuid,
+        Some(uuid) => *typed_uuid!(uuid; Pool; default_return; return_message),
         None => {
             return Ok(vec![return_message.append3(
                 default_return,
@@ -48,7 +48,7 @@ pub fn destroy_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
         }
     };
 
-    let msg = match dbus_context.engine.borrow_mut().destroy_pool(pool_uuid) {
+    let msg = match log_action!(dbus_context.engine.borrow_mut().destroy_pool(pool_uuid)) {
         Ok(DeleteAction::Deleted(uuid)) => {
             dbus_context.actions.borrow_mut().push_remove(
                 &pool_path,

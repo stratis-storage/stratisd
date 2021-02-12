@@ -96,7 +96,7 @@ impl MetadataVol {
 
     /// Set up an existing Metadata Volume.
     pub fn setup(pool_uuid: PoolUuid, dev: LinearDev) -> StratisResult<MetadataVol> {
-        let filename = format!(".mdv-{}", pool_uuid.to_simple_ref());
+        let filename = format!(".mdv-{}", uuid_to_string!(pool_uuid));
         let mount_pt: PathBuf = vec![RUN_DIR, &filename].iter().collect();
 
         let mdv = MetadataVol { dev, mount_pt };
@@ -132,7 +132,7 @@ impl MetadataVol {
         let path = self
             .mount_pt
             .join(FILESYSTEM_DIR)
-            .join(uuid.to_simple_ref().to_string())
+            .join(uuid_to_string!(uuid))
             .with_extension("json");
 
         let temp_path = path.with_extension("temp");
@@ -161,7 +161,7 @@ impl MetadataVol {
         let fs_path = self
             .mount_pt
             .join(FILESYSTEM_DIR)
-            .join(fs_uuid.to_simple_ref().to_string())
+            .join(uuid_to_string!(fs_uuid))
             .with_extension("json");
 
         let _mount = MountedMDV::mount(self)?;

@@ -25,7 +25,7 @@ where
         f.debug_map()
             .entries(
                 self.iter()
-                    .map(|(name, uuid, item)| ((name.to_string(), uuid.to_simple_ref()), item)),
+                    .map(|(name, uuid, item)| ((name.to_string(), uuid), item)),
             )
             .finish()
     }

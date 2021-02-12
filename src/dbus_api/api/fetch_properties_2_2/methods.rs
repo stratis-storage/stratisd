@@ -35,7 +35,7 @@ pub fn locked_pools(
         .into_iter()
         .map(|(u, info)| {
             (
-                u.to_simple_ref().to_string(),
+                uuid_to_string!(u),
                 info.key_description.as_application_str().to_string(),
             )
         })

@@ -68,7 +68,7 @@ pub fn format_crypt_name(dev_uuid: &DevUuid) -> String {
     format!(
         "stratis-{}-private-{}-crypt",
         FORMAT_VERSION,
-        dev_uuid.to_simple_ref()
+        uuid_to_string!(dev_uuid)
     )
 }
 
@@ -99,7 +99,7 @@ pub enum ThinRole {
 impl Display for ThinRole {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            ThinRole::Filesystem(uuid) => write!(f, "fs-{}", uuid.to_simple_ref()),
+            ThinRole::Filesystem(uuid) => write!(f, "fs-{}", uuid_to_string!(uuid)),
         }
     }
 }
@@ -157,7 +157,7 @@ pub fn format_flex_ids(pool_uuid: PoolUuid, role: FlexRole) -> (DmNameBuf, DmUui
     let value = format!(
         "stratis-{}-private-{}-flex-{}",
         FORMAT_VERSION,
-        pool_uuid.to_simple_ref(),
+        uuid_to_string!(pool_uuid),
         role
     );
     (
@@ -181,7 +181,7 @@ pub fn format_thin_ids(pool_uuid: PoolUuid, role: ThinRole) -> (DmNameBuf, DmUui
     let value = format!(
         "stratis-{}-{}-thin-{}",
         FORMAT_VERSION,
-        pool_uuid.to_simple_ref(),
+        uuid_to_string!(pool_uuid),
         role
     );
     (
@@ -206,7 +206,7 @@ pub fn format_thinpool_ids(pool_uuid: PoolUuid, role: ThinPoolRole) -> (DmNameBu
     let value = format!(
         "stratis-{}-private-{}-thinpool-{}",
         FORMAT_VERSION,
-        pool_uuid.to_simple_ref(),
+        uuid_to_string!(pool_uuid),
         role
     );
     (
@@ -231,7 +231,7 @@ pub fn format_backstore_ids(pool_uuid: PoolUuid, role: CacheRole) -> (DmNameBuf,
     let value = format!(
         "stratis-{}-private-{}-physical-{}",
         FORMAT_VERSION,
-        pool_uuid.to_simple_ref(),
+        uuid_to_string!(pool_uuid),
         role
     );
     (

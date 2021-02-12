@@ -135,7 +135,7 @@ fn uuid_to_stratis_name(
     if names.len() > 1 {
         Err(StratisUdevError::new(format!(
             "More than one device has the UUID {}",
-            uuid.to_simple_ref()
+            uuid
         )))
     } else {
         Ok(names.pop())

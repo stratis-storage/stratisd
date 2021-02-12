@@ -60,8 +60,7 @@ impl fmt::Display for StratisIdentifiers {
         write!(
             f,
             "Stratis pool UUID: \"{}\", Stratis device UUID: \"{}\"",
-            self.pool_uuid.to_simple_ref(),
-            self.device_uuid.to_simple_ref()
+            self.pool_uuid, self.device_uuid,
         )
     }
 }
@@ -374,20 +373,8 @@ impl StaticHeader {
         buf[4..20].clone_from_slice(STRAT_MAGIC);
         LittleEndian::write_u64(&mut buf[20..28], *self.blkdev_size.sectors());
         buf[28] = STRAT_SIGBLOCK_VERSION;
-        buf[32..64].clone_from_slice(
-            self.identifiers
-                .pool_uuid
-                .to_simple_ref()
-                .to_string()
-                .as_bytes(),
-        );
-        buf[64..96].clone_from_slice(
-            self.identifiers
-                .device_uuid
-                .to_simple_ref()
-                .to_string()
-                .as_bytes(),
-        );
+        buf[32..64].clone_from_slice(uuid_to_string!(self.identifiers.pool_uuid).as_bytes());
+        buf[64..96].clone_from_slice(uuid_to_string!(self.identifiers.device_uuid).as_bytes());
         LittleEndian::write_u64(&mut buf[96..104], *self.mda_size.sectors());
         LittleEndian::write_u64(&mut buf[104..112], *self.reserved_size.sectors());
         LittleEndian::write_u64(&mut buf[120..128], self.initialization_time);

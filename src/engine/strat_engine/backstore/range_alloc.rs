@@ -67,10 +67,7 @@ impl PerDevSegments {
     // Locate two adjacent keys in used. LHS <= value and RHS >= value.
     // If LHS == RHS then they both equal value.
     // Postcondition: result == (None, None) <=> used.len() == 0
-    fn locate_prev_and_next(
-        &self,
-        value: Sectors,
-    ) -> StratisResult<(Option<Sectors>, Option<Sectors>)> {
+    fn locate_prev_and_next(&self, value: Sectors) -> (Option<Sectors>, Option<Sectors>) {
         let mut prev = None;
         let mut next = None;
         for &key in self.used.keys() {
@@ -83,7 +80,7 @@ impl PerDevSegments {
             }
         }
 
-        Ok((prev, next))
+        (prev, next)
     }
 
     // Return the result of what should be obtained on an insertion. A None at
@@ -202,7 +199,7 @@ impl PerDevSegments {
             return Ok(());
         }
 
-        let (prev, next) = self.locate_prev_and_next(start)?;
+        let (prev, next) = self.locate_prev_and_next(start);
         let (prev_res, (new_start, new_len), next_res) =
             self.insertion_result(prev, next, range)?;
 
@@ -590,7 +587,7 @@ mod tests {
     /// be None.
     fn test_allocator_indices_empty() {
         let allocator = PerDevSegments::new(Sectors(400));
-        let result = allocator.locate_prev_and_next(Sectors(37)).unwrap();
+        let result = allocator.locate_prev_and_next(Sectors(37));
 
         assert_eq!(result, (None, None));
         allocator.invariant();
@@ -603,11 +600,11 @@ mod tests {
         allocator.insert(&(Sectors(0), Sectors(400))).unwrap();
 
         // If index is after 0 only previous will have a value
-        let result = allocator.locate_prev_and_next(Sectors(37)).unwrap();
+        let result = allocator.locate_prev_and_next(Sectors(37));
         assert_eq!(result, (Some(Sectors(0)), None));
 
         // If index is exactly 0, previous and next are both 0.
-        let result = allocator.locate_prev_and_next(Sectors(0)).unwrap();
+        let result = allocator.locate_prev_and_next(Sectors(0));
         assert_eq!(result, (Some(Sectors(0)), Some(Sectors(0))));
         allocator.invariant();
     }
@@ -616,14 +613,11 @@ mod tests {
     /// Verify that locate_prev_and_next works even if value exceeds limit
     fn test_search_over_limit() {
         let mut allocator = PerDevSegments::new(Sectors(400));
-        assert_eq!(
-            allocator.locate_prev_and_next(Sectors(500)).unwrap(),
-            (None, None)
-        );
+        assert_eq!(allocator.locate_prev_and_next(Sectors(500)), (None, None));
 
         allocator.insert(&(Sectors(0), Sectors(400))).unwrap();
         assert_eq!(
-            allocator.locate_prev_and_next(Sectors(500)).unwrap(),
+            allocator.locate_prev_and_next(Sectors(500)),
             (Some(Sectors(0)), None)
         );
 

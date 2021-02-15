@@ -10,6 +10,8 @@ DATADIR ?= $(PREFIX)/share
 UDEVDIR ?= $(PREFIX)/lib/udev
 MANDIR ?= $(DATADIR)/man
 UNITDIR ?= $(PREFIX)/lib/systemd/system
+UNITEXECDIR ?= $(PREFIX)/lib/systemd
+UNITGENDIR ?= $(PREFIX)/lib/systemd/system-generators
 
 RELEASE_VERSION ?= 9.9.9
 
@@ -201,8 +203,16 @@ install: release docs
 	install -Dpm0644 -t $(DESTDIR)$(DATADIR)/dbus-1/system.d stratisd.conf
 	install -Dpm0644 -t $(DESTDIR)$(MANDIR)/man8 docs/stratisd.8
 	install -Dpm0644 -t $(DESTDIR)$(UDEVDIR)/rules.d udev/14-stratisd.rules
-	install -Dpm0644 -t $(DESTDIR)$(UNITDIR) stratisd.service
 	install -Dpm0755 -t $(DESTDIR)$(PREFIX)/bin developer_tools/stratis_migrate_symlinks.sh
+	install -Dpm0644 -t $(DESTDIR)$(PREFIX)/lib/dracut dracut/90-stratis.conf
+	install -Dpm0755 -t $(DESTDIR)$(PREFIX)/lib/dracut/modules.d dracut/90stratis
+	install -Dpm0644 -t $(DESTDIR)$(UNITDIR) systemd/stratisd-min-postinitrd.service
+	install -Dpm0644 -t $(DESTDIR)$(UNITDIR) systemd/stratisd.service
+	install -Dpm0755 -t $(DESTDIR)$(UNITEXECDIR) systemd/stratis-fstab-setup
+	install -Dpm0644 -t $(DESTDIR)$(UNITDIR) systemd/stratis-fstab-setup@.service
+	install -Dpm0755 -t $(DESTDIR)$(PREFIX)/bin $(profiledir)/stratis-min
+	install -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) $(profiledir)/stratisd-min
+	install -Dpm0755 -t $(DESTDIR)$(UNITGENDIR) $(profiledir)/stratis-setup-generator
 
 release:
 	RUSTFLAGS="${DENY}" cargo build --release

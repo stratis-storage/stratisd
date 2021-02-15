@@ -7,7 +7,6 @@
 use std::{
     cmp,
     path::{Path, PathBuf},
-    sync::Arc,
 };
 
 use chrono::{DateTime, Utc};
@@ -25,6 +24,7 @@ use crate::{
                 data_tier::DataTier,
             },
             dm::{get_dm, DEVICEMAPPER_PATH},
+            lock::WithLock,
             metadata::MDADataSize,
             names::{format_backstore_ids, CacheRole},
             serde_structs::{BackstoreSave, CapSave, Recordable},
@@ -97,7 +97,7 @@ pub struct Backstore {
     /// Coordinates handling of the blockdevs that form the base.
     data_tier: DataTier,
     /// A linear DM device.
-    linear: Option<(Arc<BlockDevPath>, LinearDev)>,
+    linear: Option<WithLock<LinearDev>>,
     /// Index for managing allocation of cap device
     next: Sectors,
 }
@@ -173,7 +173,7 @@ impl Backstore {
         Ok(Backstore {
             data_tier,
             cache_tier,
-            linear: origin.map(|o| (node, o)),
+            linear: origin.map(|o| WithLock::new(o, node)),
             cache,
             next: backstore_save.cap.allocs[0].1,
         })
@@ -245,7 +245,7 @@ impl Backstore {
                 let linear = self.linear
                     .take()
                     .expect("some space has already been allocated from the backstore => (cache_tier.is_none() <=> self.linear.is_some())")
-                    .1;
+                    .into_inner();
 
                 let cache = make_cache(pool_uuid, &cache_tier, linear, true)?;
 
@@ -333,7 +333,8 @@ impl Backstore {
                 cache.resume(get_dm())?;
                 false
             }
-            (None, Some((_, linear))) => {
+            (None, Some(linear_locked)) => {
+                let mut linear = linear_locked.lock_mut();
                 let table = map_to_dm(&self.data_tier.segments);
                 linear.set_table(get_dm(), table)?;
                 linear.resume(get_dm())?;
@@ -352,14 +353,14 @@ impl Backstore {
             let table = map_to_dm(&self.data_tier.segments);
             let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
             let origin = LinearDev::setup(get_dm(), &dm_name, Some(&dm_uuid), table)?;
-            self.linear = Some((
+            self.linear = Some(WithLock::new(
+                origin,
                 BlockDevPath::node_with_children(
                     [DEVICEMAPPER_PATH, dm_name.to_string().as_str()]
                         .iter()
                         .collect::<PathBuf>(),
                     children,
                 ),
-                origin,
             ));
         }
 
@@ -535,7 +536,7 @@ impl Backstore {
     fn size(&self) -> Sectors {
         self.linear
             .as_ref()
-            .map(|(_, d)| d.size())
+            .map(|d| d.lock().size())
             .or_else(|| self.cache.as_ref().map(|d| d.size()))
             .unwrap_or(Sectors(0))
     }
@@ -574,8 +575,8 @@ impl Backstore {
                     .destroy()?;
             }
             None => {
-                if let Some((_, ref mut linear)) = self.linear {
-                    linear.teardown(get_dm())?;
+                if let Some(ref mut linear) = self.linear {
+                    linear.lock_mut().teardown(get_dm())?;
                 }
             }
         };
@@ -588,8 +589,8 @@ impl Backstore {
         match self.cache {
             Some(ref mut cache) => cache.teardown(get_dm()),
             None => {
-                if let Some((_, ref mut linear)) = self.linear {
-                    linear.teardown(get_dm())
+                if let Some(ref mut linear) = self.linear {
+                    linear.lock_mut().teardown(get_dm())
                 } else {
                     Ok(())
                 }
@@ -606,7 +607,7 @@ impl Backstore {
         self.cache
             .as_ref()
             .map(|d| d.device())
-            .or_else(|| self.linear.as_ref().map(|(_, d)| d.device()))
+            .or_else(|| self.linear.as_ref().map(|d| d.lock().device()))
     }
 
     /// Lookup an immutable blockdev by its Stratis UUID.
@@ -761,7 +762,7 @@ mod tests {
             match (&backstore.linear, &backstore.cache) {
                 (None, None) => Sectors(0),
                 (&None, &Some(ref cache)) => cache.size(),
-                (&Some((_, ref linear)), &None) => linear.size(),
+                (&Some(ref linear), &None) => linear.lock().size(),
                 _ => panic!("impossible; see first assertion"),
             }
         );

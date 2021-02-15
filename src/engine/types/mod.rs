@@ -12,6 +12,8 @@ use std::{
     sync::{atomic::AtomicBool, Arc},
 };
 
+use tokio::sync::RwLock;
+
 mod actions;
 mod keys;
 
@@ -152,14 +154,16 @@ impl<'a> TryFrom<&'a str> for ReportType {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct BlockDevPath {
     /// Path to the device represented by this data structure.
-    pub path: PathBuf,
+    pub(super) path: PathBuf,
     /// Indicates whether the BlockDevPath is already locked.
-    pub locked: Arc<AtomicBool>,
+    pub(super) locked: Arc<AtomicBool>,
     /// Reference to the path of the child device of this device.
-    pub child_paths: Vec<Arc<BlockDevPath>>,
+    pub(super) child_paths: Vec<Arc<BlockDevPath>>,
+    /// Synchronization lock.
+    pub(super) lock: RwLock<()>,
 }
 
 impl BlockDevPath {
@@ -169,6 +173,7 @@ impl BlockDevPath {
             path,
             locked: Arc::new(AtomicBool::new(false)),
             child_paths: vec![],
+            lock: RwLock::new(()),
         })
     }
 
@@ -181,6 +186,7 @@ impl BlockDevPath {
             path,
             locked: Arc::new(AtomicBool::new(false)),
             child_paths: child_paths.into_iter().collect(),
+            lock: RwLock::new(()),
         })
     }
 

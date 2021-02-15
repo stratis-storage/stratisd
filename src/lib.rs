@@ -33,5 +33,3 @@ pub mod engine;
 pub mod dbus_api;
 
 pub mod stratis;
-
-mod async_fd;

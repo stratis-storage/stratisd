@@ -12,6 +12,7 @@ MANDIR ?= $(DATADIR)/man
 UNITDIR ?= $(PREFIX)/lib/systemd/system
 UNITEXECDIR ?= $(PREFIX)/lib/systemd
 UNITGENDIR ?= $(PREFIX)/lib/systemd/system-generators
+DRACUTDIR ?= $(PREFIX)/lib/dracut
 
 RELEASE_VERSION ?= 9.9.9
 
@@ -204,12 +205,12 @@ install: release docs
 	install -Dpm0644 -t $(DESTDIR)$(MANDIR)/man8 docs/stratisd.8
 	install -Dpm0644 -t $(DESTDIR)$(UDEVDIR)/rules.d udev/14-stratisd.rules
 	install -Dpm0755 -t $(DESTDIR)$(PREFIX)/bin developer_tools/stratis_migrate_symlinks.sh
-	install -Dpm0644 -t $(DESTDIR)$(PREFIX)/lib/dracut dracut/90-stratis.conf
-	install -Dpm0755 -d $(DESTDIR)$(PREFIX)/lib/dracut/modules.d/90stratis
-	install -Dpm0755 -t $(DESTDIR)$(PREFIX)/lib/dracut/modules.d/90stratis dracut/90stratis/module-setup.sh
-	install -Dpm0755 -t $(DESTDIR)$(PREFIX)/lib/dracut/modules.d/90stratis dracut/90stratis/stratis-rootfs-setup
-	install -Dpm0644 -t $(DESTDIR)$(PREFIX)/lib/dracut/modules.d/90stratis dracut/90stratis/stratisd-min.service
-	install -Dpm0644 -t $(DESTDIR)$(PREFIX)/lib/dracut/modules.d/90stratis dracut/90stratis/11-stratisd.rules
+	install -Dpm0644 -t $(DESTDIR)$(DRACUTDIR)/dracut.conf.d dracut/90-stratis.conf
+	install -Dpm0755 -d $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis
+	install -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/module-setup.sh
+	install -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/stratis-rootfs-setup
+	install -Dpm0644 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/stratisd-min.service
+	install -Dpm0644 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/11-stratisd.rules
 	install -Dpm0644 -t $(DESTDIR)$(UNITDIR) systemd/stratisd-min-postinitrd.service
 	install -Dpm0644 -t $(DESTDIR)$(UNITDIR) systemd/stratisd.service
 	install -Dpm0755 -t $(DESTDIR)$(UNITEXECDIR) systemd/stratis-fstab-setup

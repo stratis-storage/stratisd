@@ -1,6 +1,6 @@
 use std::{
     future::Future,
-    os::unix::io::AsRawFd,
+    os::unix::io::{AsRawFd, RawFd},
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
@@ -11,7 +11,6 @@ use tokio::{io::unix::AsyncFd, pin, sync::Mutex};
 use tokio_stream::Stream;
 
 use crate::{
-    async_fd::FdWrapper,
     engine::{get_dm, get_dm_init, Engine},
     stratis::errors::{ErrorEnum, StratisError, StratisResult},
 };
@@ -34,7 +33,7 @@ fn setup_dm() -> StratisResult<()> {
 
 pub struct DmFd {
     engine: Arc<Mutex<dyn Engine>>,
-    fd: AsyncFd<FdWrapper>,
+    fd: AsyncFd<RawFd>,
 }
 
 impl DmFd {
@@ -45,7 +44,7 @@ impl DmFd {
 
         Ok(DmFd {
             engine,
-            fd: AsyncFd::new(FdWrapper::new(get_dm().as_raw_fd()))?,
+            fd: AsyncFd::new(get_dm().as_raw_fd())?,
         })
     }
 }

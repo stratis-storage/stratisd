@@ -217,7 +217,7 @@ impl StratisServer {
             engine,
             listener: StratisUnixListener::bind(path)?,
         };
-        #[cfg(feature = "systemd_notify")]
+        #[cfg(feature = "systemd_compat")]
         systemd::daemon::notify(false, [("READY", "1")].iter())?;
         Ok(server)
     }

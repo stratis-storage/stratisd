@@ -217,3 +217,11 @@ macro_rules! convert_test {
         <$to_type as std::convert::TryFrom<$from_type>>::try_from($expr).unwrap()
     };
 }
+
+// Macro for formatting a Uuid object for use in a device name or in
+// a signature buffer.
+macro_rules! uuid_to_string {
+    ($uuid:expr) => {
+        $uuid.to_simple_ref().to_string()
+    };
+}

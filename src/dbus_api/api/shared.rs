@@ -168,7 +168,7 @@ pub fn locked_pool_uuids(info: &MethodInfo<MTFn<TData>, TData>) -> Result<Vec<St
     Ok(engine
         .locked_pools()
         .into_iter()
-        .map(|(u, _)| u.to_simple_ref().to_string())
+        .map(|(u, _)| uuid_to_string!(u))
         .collect())
 }
 
@@ -216,10 +216,7 @@ pub fn unlock_pool_shared(
     {
         Ok(unlock_action) => match unlock_action.changed() {
             Some(vec) => {
-                let str_uuids: Vec<_> = vec
-                    .into_iter()
-                    .map(|u| u.to_simple_ref().to_string())
-                    .collect();
+                let str_uuids: Vec<_> = vec.into_iter().map(|u| uuid_to_string!(u)).collect();
                 return_message.append3((true, str_uuids), msg_code_ok(), msg_string_ok())
             }
             None => return_message.append3(default_return, msg_code_ok(), msg_string_ok()),

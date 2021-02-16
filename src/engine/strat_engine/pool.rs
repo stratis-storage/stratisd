@@ -429,7 +429,7 @@ impl Pool for StratPool {
         let bdev_info = if tier == BlockDevTier::Cache && !self.has_cache() {
             return Err(StratisError::Error(format!(
                             "No cache has been initialized for pool with UUID {} and name {}; it is therefore impossible to add additional devices to the cache",
-                            pool_uuid.to_simple_ref(),
+                            pool_uuid,
                             pool_name)
                 ));
         } else if paths.is_empty() {

@@ -300,7 +300,7 @@ fn check_device_ids(
                         .map(|(_, info)| info.devnode.display().to_string())
                         .collect::<Vec<_>>()
                         .join(", "),
-                    pool_uuid.to_simple_ref()
+                    pool_uuid
                 )
             })
             .collect::<Vec<_>>()
@@ -330,7 +330,7 @@ fn check_device_ids(
                     .map(|(_, info)| info.devnode.display().to_string())
                     .collect::<Vec<_>>()
                     .join(", "),
-                pool_uuid.to_simple_ref()
+                pool_uuid
             );
             return Err(StratisError::Engine(ErrorEnum::Invalid, error_message));
         }
@@ -344,12 +344,12 @@ fn check_device_ids(
                         format!(
                             "(device node: {}, device UUID: {})",
                             info.devnode.display().to_string(),
-                            dev_uuid.to_simple_ref()
+                            dev_uuid
                         )
                     })
                     .collect::<Vec<_>>()
                     .join(", "),
-                pool_uuid.to_simple_ref()
+                pool_uuid
             );
         }
     }
@@ -484,7 +484,7 @@ pub fn initialize_devices(
             (_, Some(Err(_))) => {
                 warn!("Value for ID_WWN for device {} obtained from the udev database could not be decoded; inserting device into pool with UUID {} anyway",
                       physical_path.display(),
-                      pool_uuid.to_simple_ref());
+                      pool_uuid);
                 None
             }
             (_, None) => None,
@@ -633,7 +633,7 @@ pub fn initialize_devices(
                 if let Err(err) = wipe_blockdevs(&mut initialized_blockdevs) {
                     warn!("Failed to clean up some devices after initialization of device {} for pool with UUID {} failed: {}",
                           dev_info.devnode.display(),
-                          pool_uuid.to_simple_ref(),
+                          pool_uuid,
                           err);
                 }
                 return Err(err);

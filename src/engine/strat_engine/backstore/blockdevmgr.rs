@@ -183,7 +183,7 @@ impl BlockDevMgr {
             return Err(StratisError::Engine(
                 ErrorEnum::Invalid,
                 format!("block devices being managed have pool UUID {} but new devices are to be added with pool UUID {}",
-                        this_pool_uuid.expect("guarded by if-expression").to_simple_ref(),
+                        this_pool_uuid.expect("guarded by if-expression"),
                         pool_uuid)
             ));
         }
@@ -255,10 +255,7 @@ impl BlockDevMgr {
             if !found {
                 return Err(StratisError::Engine(
                     ErrorEnum::Error,
-                    format!(
-                        "Blockdev corresponding to UUID: {} not found.",
-                        uuid.to_simple_ref()
-                    ),
+                    format!("Blockdev corresponding to UUID: {} not found.", uuid),
                 ));
             }
         }

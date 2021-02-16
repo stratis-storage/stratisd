@@ -106,7 +106,7 @@ impl LiminalDevices {
                         ErrorEnum::Error,
                         format!(
                             "Attempted to unlock set of devices belonging to an unencrypted pool with UUID {}",
-                            pool_uuid.to_simple_ref(),
+                            pool_uuid,
                         ),
                     ));
                 }
@@ -132,7 +132,7 @@ impl LiminalDevices {
                             ErrorEnum::Error,
                             format!(
                                 "Pool with UUID {} is not encrypted and cannot be unlocked.",
-                                pool_uuid.to_simple_ref()
+                                pool_uuid,
                             ),
                         ));
                     }
@@ -142,7 +142,7 @@ impl LiminalDevices {
                         ErrorEnum::Error,
                         format!(
                             "No devices with UUID {} have been registered with stratisd.",
-                            pool_uuid.to_simple_ref(),
+                            pool_uuid,
                         ),
                     ))
                 }
@@ -260,7 +260,7 @@ impl LiminalDevices {
                 Err(err) => Err(
                     Destination::Errored(format!(
                         "There was an error encountered when reading the BDAs for the devices found for pool with UUID {}: {}",
-                        pool_uuid.to_simple_ref(),
+                        pool_uuid,
                         err))),
                 Ok(infos) => Ok(infos),
             }?;
@@ -280,12 +280,12 @@ impl LiminalDevices {
                 Err(err) => return Err(
                     Destination::Errored(format!(
                         "There was an error encountered when reading the metadata for the devices found for pool with UUID {}: {}",
-                        pool_uuid.to_simple_ref(),
+                        pool_uuid,
                         err))),
                 Ok(None) => return Err(
                     Destination::Errored(format!(
                         "No metadata found on devices associated with pool UUID {}",
-                        pool_uuid.to_simple_ref()))),
+                        pool_uuid))),
                 Ok(Some((timestamp, metadata))) => (timestamp, metadata),
             };
 
@@ -293,16 +293,16 @@ impl LiminalDevices {
                 return Err(
                     Destination::Errored(format!(
                         "There is a pool name conflict. The devices currently being processed have been identified as belonging to the pool with UUID {} and name {}, but a pool with the same name and UUID {} is already active",
-                        pool_uuid.to_simple_ref(),
+                        pool_uuid,
                         &metadata.name,
-                        uuid.to_simple_ref())));
+                        uuid)));
             }
 
             let (datadevs, cachedevs) = match get_blockdevs(&metadata.backstore, infos, bdas) {
                 Err(err) => return Err(
                     Destination::Errored(format!(
                         "There was an error encountered when calculating the block devices for pool with UUID {} and name {}: {}",
-                        pool_uuid.to_simple_ref(),
+                        pool_uuid,
                         &metadata.name,
                         err))),
                 Ok((datadevs, cachedevs)) => (datadevs, cachedevs),
@@ -311,7 +311,7 @@ impl LiminalDevices {
             if datadevs.get(0).is_none() {
                 return Err(Destination::Hopeless(format!(
                     "There do not appear to be any data devices in the set with pool UUID {}",
-                    pool_uuid.to_simple_ref()
+                    pool_uuid
                 )));
             }
 
@@ -332,15 +332,14 @@ impl LiminalDevices {
                 return Err(
                     Destination::Errored(format!(
                             "Some data devices in the set belonging to pool with UUID {} and name {} appear to be encrypted devices managed by Stratis, and some do not",
-                            pool_uuid.to_simple_ref(),
+                            pool_uuid,
                             &metadata.name)));
             }
 
             StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata).map_err(|err| {
                 Destination::Errored(format!(
                     "An attempt to set up pool with UUID {} from the assembled devices failed: {}",
-                    pool_uuid.to_simple_ref(),
-                    err
+                    pool_uuid, err
                 ))
             })
         }
@@ -359,8 +358,7 @@ impl LiminalDevices {
             Ok((pool_name, pool)) => {
                 info!(
                     "Pool with name \"{}\" and UUID \"{}\" set up",
-                    pool_name,
-                    pool_uuid.to_simple_ref()
+                    pool_name, pool_uuid
                 );
                 Some((pool_name, pool))
             }
@@ -402,7 +400,7 @@ impl LiminalDevices {
                     if pool.get_strat_blockdev(device_uuid).is_none() {
                         warn!("Found a device with {} that identifies itself as belonging to pool with UUID {}, but that pool is already up and running and does not appear to contain the device",
                               info,
-                              pool_uuid.to_simple_ref());
+                              pool_uuid);
                     }
                     // FIXME: There might be something to check if the device is
                     // included in the pool, but that is less clear.
@@ -444,7 +442,7 @@ impl LiminalDevices {
                     if pool.get_strat_blockdev(device_uuid).is_some() {
                         warn!("udev reports that a device with {} that appears to belong to a pool with UUID {} has just been removed; this is likely to result in data loss",
                               info,
-                              pool_uuid.to_simple_ref());
+                              pool_uuid);
                     }
                     None
                 } else if let Some(mut set) = self.hopeless_device_sets.remove(&pool_uuid) {

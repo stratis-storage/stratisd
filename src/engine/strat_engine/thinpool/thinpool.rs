@@ -692,10 +692,9 @@ impl ThinPool {
     ) -> StratisResult<Sectors> {
         assert!(modulus != Sectors(0));
         let sub_device_str = if data { "data" } else { "metadata" };
-        let pool_uuid_str = pool_uuid.to_simple_ref();
         info!(
             "Attempting to extend thinpool {} sub-device belonging to pool {} by {}",
-            sub_device_str, pool_uuid_str, extend_size,
+            sub_device_str, pool_uuid, extend_size,
         );
 
         let result = if let Some(region) = backstore.request(pool_uuid, extend_size, modulus)? {
@@ -724,12 +723,12 @@ impl ThinPool {
                 if (extend_size / modulus) * modulus == actual_extend_size {
                     info!(
                         "Extended thinpool {} sub-device belonging to pool with uuid {} by {}",
-                        sub_device_str, pool_uuid_str, actual_extend_size
+                        sub_device_str, pool_uuid, actual_extend_size
                     );
                 } else {
                     warn!("Insufficient free space available in backstore; extended thinpool {} sub-device belonging to pool with uuid {} by {}, request was {}",
                       sub_device_str,
-                      pool_uuid_str,
+                      pool_uuid,
                       actual_extend_size,
                       extend_size);
                 }
@@ -737,7 +736,7 @@ impl ThinPool {
             Err(ref err) => {
                 error!("Attempted to extend thinpool {} sub-device belonging to pool with uuid {} by {} but failed with error: {:?}",
                        sub_device_str,
-                       pool_uuid_str,
+                       pool_uuid,
                        extend_size,
                        err);
             }

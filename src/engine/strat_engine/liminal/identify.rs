@@ -495,8 +495,7 @@ mod tests {
                 if info.info.identifiers.pool_uuid != pool_uuid {
                     return Err(Box::new(StratisError::Error(format!(
                         "Discovered pool UUID {} != expected pool UUID {}",
-                        info.info.identifiers.pool_uuid.to_simple_ref(),
-                        pool_uuid.to_simple_ref()
+                        info.info.identifiers.pool_uuid, pool_uuid
                     ))));
                 }
 
@@ -546,7 +545,7 @@ mod tests {
                 if info.identifiers.pool_uuid != pool_uuid || info.devnode != dev.user_path()? {
                     return Err(Box::new(StratisError::Error(format!(
                         "Wrong identifiers and devnode found on Stratis block device: found: pool UUID: {}, device node; {} != expected: pool UUID: {}, device node: {}",
-                        info.identifiers.pool_uuid.to_simple_ref(),
+                        info.identifiers.pool_uuid,
                         info.devnode.display(),
                         pool_uuid,
                         dev.user_path()?.display()),

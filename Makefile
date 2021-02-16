@@ -183,6 +183,14 @@ build-min:
 	--no-default-features \
 	--features min,systemd_compat ${TARGET_ARGS}
 
+release-min:
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY}" \
+	cargo build --release --bin=stratis-min --bin=stratisd-min \
+	--bin=stratis-setup-generator \
+	--no-default-features \
+	--features min,systemd_compat ${TARGET_ARGS}
+
 stratis-dumpmetadata:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
@@ -199,7 +207,7 @@ stratisd-min:
 	cargo build --bin=stratisd-min --features min,systemd_compat ${TARGET_ARGS}
 
 profiledir := $(shell if test -d target/release; then echo target/release; else echo target/debug; fi)
-install: release docs
+install: release release-min docs
 	install -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) $(profiledir)/stratisd
 	install -Dpm0644 -t $(DESTDIR)$(DATADIR)/dbus-1/system.d stratisd.conf
 	install -Dpm0644 -t $(DESTDIR)$(MANDIR)/man8 docs/stratisd.8

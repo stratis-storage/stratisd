@@ -216,11 +216,6 @@ impl DbusConnectionHandler {
         }
     }
 
-    /// Create a new reference to the D-Bus connection.
-    pub fn new_connection_ref(&self) -> Arc<SyncConnection> {
-        Arc::clone(&self.connection)
-    }
-
     /// Handle a D-Bus action passed from a D-Bus connection.
     /// Returns true if stratisd should exit after handling this D-Bus
     /// request, otherwise false.

@@ -21,8 +21,8 @@ use crate::{
         structures::Table,
         types::{
             BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo,
-            FilesystemUuid, MaybeDbusPath, Name, PoolUuid, Redundancy, RenameAction,
-            SetCreateAction, SetDeleteAction,
+            FilesystemUuid, Name, PoolUuid, Redundancy, RenameAction, SetCreateAction,
+            SetDeleteAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -34,7 +34,6 @@ pub struct SimPool {
     cache_devs: HashMap<DevUuid, SimDev>,
     filesystems: Table<FilesystemUuid, SimFilesystem>,
     redundancy: Redundancy,
-    dbus_path: MaybeDbusPath,
 }
 
 impl SimPool {
@@ -52,7 +51,6 @@ impl SimPool {
                 cache_devs: HashMap::new(),
                 filesystems: Table::default(),
                 redundancy,
-                dbus_path: MaybeDbusPath(None),
             },
         )
     }
@@ -472,14 +470,6 @@ impl Pool for SimPool {
                 }
             },
         ))
-    }
-
-    fn set_dbus_path(&mut self, path: MaybeDbusPath) {
-        self.dbus_path = path
-    }
-
-    fn get_dbus_path(&self) -> &MaybeDbusPath {
-        &self.dbus_path
     }
 
     fn has_cache(&self) -> bool {

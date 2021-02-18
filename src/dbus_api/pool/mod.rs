@@ -10,7 +10,7 @@ use crate::{
         types::{DbusContext, InterfacesAdded, OPContext, ObjectPathType},
         util::make_object_path,
     },
-    engine::{MaybeDbusPath, Name, Pool, PoolUuid, StratisUuid},
+    engine::{Name, Pool, PoolUuid, StratisUuid},
 };
 
 mod fetch_properties_2_0;
@@ -26,7 +26,7 @@ pub fn create_dbus_pool<'a>(
     parent: dbus::Path<'static>,
     name: &Name,
     uuid: PoolUuid,
-    pool: &mut dyn Pool,
+    pool: &dyn Pool,
 ) -> dbus::Path<'a> {
     let f = Factory::new_sync();
 
@@ -105,7 +105,6 @@ pub fn create_dbus_pool<'a>(
     let path = object_path.get_name().to_owned();
     let interfaces = get_initial_properties(name, uuid, pool);
     dbus_context.push_add(object_path, interfaces);
-    pool.set_dbus_path(MaybeDbusPath(Some(path.clone())));
     path
 }
 

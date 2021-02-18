@@ -128,10 +128,7 @@ impl Engine for SimEngine {
         }
     }
 
-    fn handle_event(
-        &mut self,
-        _event: &UdevEngineEvent,
-    ) -> Option<(Name, PoolUuid, &mut dyn Pool)> {
+    fn handle_event(&mut self, _event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &dyn Pool)> {
         None
     }
 

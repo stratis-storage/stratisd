@@ -36,7 +36,7 @@ impl DbusUdevHandler {
     }
 
     /// Register a pool in the engine with D-Bus.
-    pub fn register_pool(&self, pool_name: &Name, pool_uuid: PoolUuid, pool: &mut dyn Pool) {
+    pub fn register_pool(&self, pool_name: &Name, pool_uuid: PoolUuid, pool: &dyn Pool) {
         let pool_path = create_dbus_pool(
             &self.dbus_context,
             self.path.clone(),

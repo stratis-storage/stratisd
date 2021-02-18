@@ -243,12 +243,6 @@ pub trait Pool: Debug {
         user_info: Option<&str>,
     ) -> StratisResult<RenameAction<DevUuid>>;
 
-    /// Set dbus path associated with the Pool.
-    fn set_dbus_path(&mut self, path: MaybeDbusPath);
-
-    /// Get dbus path associated with the Pool.
-    fn get_dbus_path(&self) -> &MaybeDbusPath;
-
     /// true if the pool has a cache, otherwise false
     fn has_cache(&self) -> bool;
 
@@ -277,7 +271,7 @@ pub trait Engine: Debug + Report + Send {
     /// and its UUID.
     ///
     /// Precondition: the subsystem of the device evented on is "block".
-    fn handle_event(&mut self, event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &mut dyn Pool)>;
+    fn handle_event(&mut self, event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &dyn Pool)>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.

@@ -32,8 +32,8 @@ pub async fn setup(
         create_dbus_handlers(Arc::clone(&engine), receiver, should_exit)
             .map_err(|err| -> StratisError { err.into() })
             .map(|(conn, udev, tree)| {
-                let mut mutex_lock = mutex_lock!(engine);
-                for (pool_name, pool_uuid, pool) in mutex_lock.pools_mut() {
+                let mutex_lock = mutex_lock!(engine);
+                for (pool_name, pool_uuid, pool) in mutex_lock.pools() {
                     udev.register_pool(&pool_name, pool_uuid, pool)
                 }
                 info!("D-Bus API is available");

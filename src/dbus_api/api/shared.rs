@@ -75,7 +75,7 @@ pub fn create_pool_shared(
         Ok(pool_uuid_action) => {
             let results = match pool_uuid_action {
                 CreateAction::Created(uuid) => {
-                    let (_, pool) = get_mut_pool!(mutex_lock; uuid; default_return; return_message);
+                    let (_, pool) = get_pool!(mutex_lock; uuid; default_return; return_message);
 
                     let pool_object_path: dbus::Path = create_dbus_pool(
                         dbus_context,

@@ -36,7 +36,7 @@ use crate::{
             writing::wipe_sectors,
         },
         structures::Table,
-        types::{FilesystemUuid, MaybeDbusPath, Name, PoolUuid},
+        types::{FilesystemUuid, Name, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -275,7 +275,6 @@ pub struct ThinPool {
     /// The device will change if the backstore adds or removes a cache.
     backstore_device: Device,
     thin_pool_status: Option<ThinPoolStatus>,
-    dbus_path: MaybeDbusPath,
 }
 
 impl ThinPool {
@@ -383,7 +382,6 @@ impl ThinPool {
             mdv,
             backstore_device,
             thin_pool_status: None,
-            dbus_path: MaybeDbusPath(None),
         })
     }
 
@@ -493,7 +491,6 @@ impl ThinPool {
             mdv,
             backstore_device,
             thin_pool_status: None,
-            dbus_path: MaybeDbusPath(None),
         })
     }
 
@@ -1072,10 +1069,6 @@ impl ThinPool {
         self.backstore_device = backstore_device;
 
         Ok(true)
-    }
-
-    pub fn set_dbus_path(&mut self, path: MaybeDbusPath) {
-        self.dbus_path = path
     }
 }
 

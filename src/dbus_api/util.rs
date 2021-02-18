@@ -187,6 +187,14 @@ where
 }
 
 /// Create both ends of the D-Bus processing handlers.
+/// Returns a triple:
+/// 1. A DbusConnectionHandler which may be used to process D-Bus methods calls
+/// 2. A DbusUdevHandler which may be used to handle detected udev events
+/// 3. A DbusTreeHandler which may be used to update the D-Bus tree
+///
+/// Messages may be:
+/// * received by the DbusUdevHandler from the udev thread,
+/// * sent by the DbusContext to the DbusTreeHandler
 pub fn create_dbus_handlers(
     engine: Arc<Mutex<dyn Engine>>,
     udev_receiver: Receiver<UdevEngineEvent>,

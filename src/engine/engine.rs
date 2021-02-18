@@ -78,12 +78,6 @@ pub trait Filesystem: Debug {
 
     /// The amount of data stored on the filesystem, including overhead.
     fn used(&self) -> StratisResult<Bytes>;
-
-    /// Set dbus path associated with the Pool.
-    fn set_dbus_path(&mut self, path: MaybeDbusPath);
-
-    /// Get dbus path associated with the Pool.
-    fn get_dbus_path(&self) -> &MaybeDbusPath;
 }
 
 pub trait BlockDev: Debug {

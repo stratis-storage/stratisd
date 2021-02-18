@@ -44,7 +44,7 @@ impl DbusUdevHandler {
             pool_uuid,
             pool,
         );
-        for (fs_name, fs_uuid, fs) in pool.filesystems_mut() {
+        for (fs_name, fs_uuid, fs) in pool.filesystems() {
             create_dbus_filesystem(
                 &self.dbus_context,
                 pool_path.clone(),

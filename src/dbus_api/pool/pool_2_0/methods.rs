@@ -83,7 +83,7 @@ pub fn create_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult 
                             &pool_name,
                             &Name::new(name.to_string()),
                             uuid,
-                            pool.get_mut_filesystem(uuid)
+                            pool.get_filesystem(uuid)
                                 .expect("just inserted by create_filesystems")
                                 .1,
                         ),

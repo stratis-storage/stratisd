@@ -10,7 +10,7 @@ use crate::{
         types::{DbusContext, InterfacesAdded, OPContext, ObjectPathType},
         util::make_object_path,
     },
-    engine::{Filesystem, FilesystemUuid, MaybeDbusPath, Name, StratisUuid},
+    engine::{Filesystem, FilesystemUuid, Name, StratisUuid},
 };
 
 mod fetch_properties_2_0;
@@ -23,7 +23,7 @@ pub fn create_dbus_filesystem<'a>(
     pool_name: &Name,
     name: &Name,
     uuid: FilesystemUuid,
-    filesystem: &mut dyn Filesystem,
+    filesystem: &dyn Filesystem,
 ) -> dbus::Path<'a> {
     let f = Factory::new_sync();
 
@@ -72,7 +72,6 @@ pub fn create_dbus_filesystem<'a>(
     let path = object_path.get_name().to_owned();
     let interfaces = get_initial_properties(parent, pool_name, name, uuid, filesystem);
     dbus_context.push_add(object_path, interfaces);
-    filesystem.set_dbus_path(MaybeDbusPath(Some(path.clone())));
     path
 }
 

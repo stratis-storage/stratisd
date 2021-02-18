@@ -73,6 +73,13 @@ impl DbusTreeHandler {
                         &consts::standard_pool_interfaces(),
                     )?;
                 }
+                DbusAction::InvalidateFilesystemDevnode(path) => {
+                    self.property_invalidated_signal(
+                        consts::FILESYSTEM_DEVNODE_PROP,
+                        &path,
+                        &consts::standard_filesystem_interfaces(),
+                    )?;
+                }
                 DbusAction::Remove(path, interfaces) => {
                     write_lock.remove(&path);
                     self.removed_object_signal(path, interfaces)?;
@@ -121,6 +128,26 @@ impl DbusTreeHandler {
         prop_changed
             .changed_properties
             .insert(prop_name.into(), Variant(new_value.box_clone()));
+
+        interfaces.iter().try_for_each(|interface| {
+            prop_changed.interface_name = interface.to_owned();
+            self.connection
+                .send(prop_changed.to_emit_message(object))
+                .map(|_| ())
+                .map_err(|_| {
+                    dbus::Error::new_failed("Failed to send the requested signal on the D-Bus.")
+                })
+        })
+    }
+
+    fn property_invalidated_signal(
+        &self,
+        prop_name: &str,
+        object: &Path,
+        interfaces: &[String],
+    ) -> Result<(), dbus::Error> {
+        let mut prop_changed: PropertiesPropertiesChanged = Default::default();
+        prop_changed.invalidated_properties.push(prop_name.into());
 
         interfaces.iter().try_for_each(|interface| {
             prop_changed.interface_name = interface.to_owned();

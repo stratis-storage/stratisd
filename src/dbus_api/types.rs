@@ -56,6 +56,7 @@ impl DbusErrorEnum {
 #[derive(Debug)]
 pub enum DbusAction {
     Add(ObjectPath<MTSync<TData>, TData>, InterfacesAdded),
+    InvalidateFilesystemDevnode(Path<'static>),
     ChangeFilesystemName(Path<'static>, String),
     ChangePoolName(Path<'static>, String),
     Remove(Path<'static>, InterfacesRemoved),
@@ -152,9 +153,24 @@ impl DbusContext {
                 object_path, e,
             )
         }
+        if let Err(e) = block_on(
+            self.sender
+                .send(DbusAction::InvalidateFilesystemDevnode(object_path.clone())),
+        ) {
+            warn!(
+                "D-Bus filesystem devnode invalidated event could not be sent to the processing thread; the D-Bus \
+                server will not be aware of the new devnode of the D-Bus object with path {}: {}",
+                object_path, e,
+            )
+        }
     }
 
-    pub fn push_pool_name_change(&self, object_path: &Path<'static>, new_name: &str) {
+    pub fn push_pool_name_change(
+        &self,
+        object_path: &Path<'static>,
+        new_name: &str,
+        tree: &Tree<MTSync<TData>, TData>,
+    ) {
         if let Err(e) = block_on(self.sender.send(DbusAction::ChangePoolName(
             object_path.clone(),
             new_name.to_owned(),
@@ -164,6 +180,30 @@ impl DbusContext {
                 server will not be aware of the new name of the D-Bus object with path {}: {}",
                 object_path, e,
             )
+        }
+
+        for opath in tree.iter().filter(|opath| {
+            opath
+                .get_data()
+                .as_ref()
+                .map_or(false, |op_cxt| op_cxt.parent == *object_path)
+        }) {
+            if let ObjectPathType::Filesystem = opath
+                .get_data()
+                .as_ref()
+                .expect("all objects with parents have data")
+                .op_type
+            {
+                if let Err(e) = block_on(self.sender.send(DbusAction::InvalidateFilesystemDevnode(
+                    opath.get_name().clone(),
+                ))) {
+                    warn!(
+                        "D-Bus filesystem devnode invalidated event could not be sent to the processing thread; the D-Bus \
+                        server will not be aware of the new devnode of the D-Bus object with path {}: {}",
+                        opath.get_name(), e,
+                    )
+                }
+            }
         }
     }
 

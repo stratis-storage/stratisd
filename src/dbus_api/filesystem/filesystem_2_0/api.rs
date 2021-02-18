@@ -29,7 +29,7 @@ pub fn rename_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>,
 pub fn devnode_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
     f.property::<&str, _>(consts::FILESYSTEM_DEVNODE_PROP, ())
         .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::Const)
+        .emits_changed(EmitsChangedSignal::Invalidates)
         .on_get(get_filesystem_devnode)
 }
 

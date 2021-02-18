@@ -222,7 +222,7 @@ impl DbusConnectionHandler {
     /// request, otherwise false.
     pub fn process_dbus_request(&self) -> StratisResult<bool> {
         self.connection
-            .process(Duration::from_millis(100))
+            .process(Duration::from_millis(0))
             .map(|_| ())?;
 
         Ok(self.should_exit.load(Ordering::Relaxed))

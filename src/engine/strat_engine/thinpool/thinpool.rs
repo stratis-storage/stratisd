@@ -22,7 +22,6 @@ use devicemapper::{
 use crate::{
     engine::{
         engine::Filesystem,
-        event::{get_engine_listener_list, EngineEvent},
         strat_engine::{
             backstore::Backstore,
             cmd::{thin_check, thin_repair, udev_settle},
@@ -964,11 +963,6 @@ impl ThinPool {
             self.filesystems.insert(old_name, uuid, filesystem);
             Err(err)
         } else {
-            get_engine_listener_list().notify(&EngineEvent::FilesystemRenamed {
-                dbus_path: filesystem.get_dbus_path(),
-                from: &*old_name,
-                to: &*new_name,
-            });
             self.filesystems.insert(new_name.clone(), uuid, filesystem);
             if let Err(e) = devlinks::filesystem_renamed(pool_name, &old_name) {
                 warn!("Filesystem rename symlink action failed: {}", e);

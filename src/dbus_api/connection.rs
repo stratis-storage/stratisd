@@ -16,7 +16,7 @@ use dbus::{
     blocking::SyncConnection,
     channel::{MatchingReceiver, Sender},
     ffidisp::stdintf::org_freedesktop_dbus::{
-        ObjectManagerInterfacesAdded, ObjectManagerInterfacesRemoved,
+        ObjectManagerInterfacesAdded, ObjectManagerInterfacesRemoved, PropertiesPropertiesChanged,
     },
     message::{MatchRule, SignalArgs},
     strings::Path,
@@ -57,6 +57,22 @@ impl DbusTreeHandler {
                     write_lock.insert(path);
                     self.added_object_signal(path_name, interfaces)?;
                 }
+                DbusAction::ChangeFilesystemName(path, new_name) => {
+                    self.property_changed_signal(
+                        consts::FILESYSTEM_NAME_PROP,
+                        &new_name,
+                        &path,
+                        &consts::standard_filesystem_interfaces(),
+                    )?;
+                }
+                DbusAction::ChangePoolName(path, new_name) => {
+                    self.property_changed_signal(
+                        consts::POOL_NAME_PROP,
+                        &new_name,
+                        &path,
+                        &consts::standard_pool_interfaces(),
+                    )?;
+                }
                 DbusAction::Remove(path, interfaces) => {
                     write_lock.remove(&path);
                     self.removed_object_signal(path, interfaces)?;
@@ -92,6 +108,29 @@ impl DbusTreeHandler {
             .map_err(|_| {
                 dbus::Error::new_failed("Failed to send the requested signal on the D-Bus.")
             })
+    }
+
+    fn property_changed_signal<T: RefArg>(
+        &self,
+        prop_name: &str,
+        new_value: &T,
+        object: &Path,
+        interfaces: &[String],
+    ) -> Result<(), dbus::Error> {
+        let mut prop_changed: PropertiesPropertiesChanged = Default::default();
+        prop_changed
+            .changed_properties
+            .insert(prop_name.into(), Variant(new_value.box_clone()));
+
+        interfaces.iter().try_for_each(|interface| {
+            prop_changed.interface_name = interface.to_owned();
+            self.connection
+                .send(prop_changed.to_emit_message(object))
+                .map(|_| ())
+                .map_err(|_| {
+                    dbus::Error::new_failed("Failed to send the requested signal on the D-Bus.")
+                })
+        })
     }
 
     /// Send an InterfacesRemoved signal on the D-Bus

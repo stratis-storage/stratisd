@@ -7,9 +7,6 @@ use std::sync::{atomic::AtomicBool, Arc};
 use dbus::{
     arg::{ArgType, Iter, IterAppend, RefArg, Variant},
     blocking::SyncConnection,
-    channel::Sender,
-    ffidisp::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged,
-    message::SignalArgs,
     tree::{MTSync, MethodErr, PropInfo},
 };
 use tokio::sync::{
@@ -158,31 +155,6 @@ pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTSync<TData>, TData>) -> Res
         .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
 
     i.append(data.parent.clone());
-    Ok(())
-}
-
-/// Place a property changed signal on the D-Bus for the given property name
-/// and value and for all interfaces specified.
-pub fn prop_changed_dispatch<T: 'static>(
-    conn: &SyncConnection,
-    prop_name: &str,
-    new_value: T,
-    path: &dbus::Path,
-    interfaces: &[String],
-) -> Result<(), ()>
-where
-    T: RefArg,
-{
-    let mut prop_changed: PropertiesPropertiesChanged = Default::default();
-    prop_changed
-        .changed_properties
-        .insert(prop_name.into(), Variant(Box::new(new_value)));
-
-    for interface in interfaces {
-        prop_changed.interface_name = interface.to_owned();
-        conn.send(prop_changed.to_emit_message(path))?;
-    }
-
     Ok(())
 }
 

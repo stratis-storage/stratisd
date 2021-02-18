@@ -1,4 +1,3 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
@@ -57,6 +56,8 @@ impl DbusErrorEnum {
 #[derive(Debug)]
 pub enum DbusAction {
     Add(ObjectPath<MTSync<TData>, TData>, InterfacesAdded),
+    ChangeFilesystemName(Path<'static>, String),
+    ChangePoolName(Path<'static>, String),
     Remove(Path<'static>, InterfacesRemoved),
 }
 
@@ -136,6 +137,32 @@ impl DbusContext {
                 "D-Bus add event could not be sent to the processing thread; the D-Bus \
                 server will not be aware of the D-Bus object with path {}: {}",
                 object_path_name, e,
+            )
+        }
+    }
+
+    pub fn push_filesystem_name_change(&self, object_path: &Path<'static>, new_name: &str) {
+        if let Err(e) = block_on(self.sender.send(DbusAction::ChangeFilesystemName(
+            object_path.clone(),
+            new_name.to_owned(),
+        ))) {
+            warn!(
+                "D-Bus filesystem name change event could not be sent to the processing thread; the D-Bus \
+                server will not be aware of the new name of the D-Bus object with path {}: {}",
+                object_path, e,
+            )
+        }
+    }
+
+    pub fn push_pool_name_change(&self, object_path: &Path<'static>, new_name: &str) {
+        if let Err(e) = block_on(self.sender.send(DbusAction::ChangePoolName(
+            object_path.clone(),
+            new_name.to_owned(),
+        ))) {
+            warn!(
+                "D-Bus pool name change event could not be sent to the processing thread; the D-Bus \
+                server will not be aware of the new name of the D-Bus object with path {}: {}",
+                object_path, e,
             )
         }
     }

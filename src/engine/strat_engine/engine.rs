@@ -11,7 +11,6 @@ use devicemapper::DmNameBuf;
 use crate::{
     engine::{
         engine::KeyActions,
-        event::get_engine_listener_list,
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         strat_engine::{
             cmd::verify_binaries,
@@ -26,7 +25,7 @@ use crate::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, KeyDescription, RenameAction,
             ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
         },
-        Engine, EngineEvent, Name, Pool, PoolUuid, Report,
+        Engine, Name, Pool, PoolUuid, Report,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -249,12 +248,6 @@ impl Engine for StratEngine {
             self.pools.insert(old_name, uuid, pool);
             Err(err)
         } else {
-            get_engine_listener_list().notify(&EngineEvent::PoolRenamed {
-                dbus_path: pool.get_dbus_path(),
-                from: &*old_name,
-                to: &*new_name,
-            });
-
             self.pools.insert(new_name.clone(), uuid, pool);
             if let Err(e) = devlinks::pool_renamed(&old_name) {
                 warn!("Pool rename symlink action failed: {}", e)

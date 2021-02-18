@@ -18,8 +18,8 @@ use tokio::{
 };
 
 use crate::{
-    dbus_api::{create_dbus_handlers, EventHandler},
-    engine::{get_engine_listener_list_mut, Engine, UdevEngineEvent},
+    dbus_api::create_dbus_handlers,
+    engine::{Engine, UdevEngineEvent},
     stratis::{StratisError, StratisResult},
 };
 
@@ -32,8 +32,6 @@ pub async fn setup(
         create_dbus_handlers(Arc::clone(&engine), receiver, should_exit)
             .map_err(|err| -> StratisError { err.into() })
             .map(|(conn, udev, tree)| {
-                let event_handler = Box::new(EventHandler::new(conn.new_connection_ref()));
-                get_engine_listener_list_mut().register_listener(event_handler);
                 let mut mutex_lock = mutex_lock!(engine);
                 for (pool_name, pool_uuid, pool) in mutex_lock.pools_mut() {
                     udev.register_pool(&pool_name, pool_uuid, pool)

@@ -310,11 +310,14 @@ pub fn rename_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
         Ok(RenameAction::Identity) => {
             return_message.append3(default_return, msg_code_ok(), msg_string_ok())
         }
-        Ok(RenameAction::Renamed(uuid)) => return_message.append3(
-            (true, uuid_to_string!(uuid)),
-            msg_code_ok(),
-            msg_string_ok(),
-        ),
+        Ok(RenameAction::Renamed(uuid)) => {
+            dbus_context.push_pool_name_change(object_path, new_name);
+            return_message.append3(
+                (true, uuid_to_string!(uuid)),
+                msg_code_ok(),
+                msg_string_ok(),
+            )
+        }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append3(default_return, rc, rs)

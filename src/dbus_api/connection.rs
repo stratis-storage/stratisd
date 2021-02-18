@@ -186,6 +186,10 @@ pub struct DbusConnectionHandler {
 }
 
 impl DbusConnectionHandler {
+    /// Set up the callback for the D-Bus connection.
+    /// The callback is triggered on every D-Bus method call.
+    /// Every method call requires a read lock on the D-Bus tree.
+    /// All arguments are moved into the callback.
     pub(super) fn new(
         connection: Arc<SyncConnection>,
         tree: Arc<RwLock<Tree<MTSync<TData>, TData>>>,

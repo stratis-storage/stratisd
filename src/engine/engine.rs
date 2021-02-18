@@ -17,9 +17,8 @@ use devicemapper::{Bytes, Sectors};
 use crate::{
     engine::types::{
         BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid,
-        Key, KeyDescription, MappingCreateAction, MaybeDbusPath, Name, PoolUuid, RenameAction,
-        ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, UdevEngineEvent,
-        UnlockMethod,
+        Key, KeyDescription, MappingCreateAction, Name, PoolUuid, RenameAction, ReportType,
+        SetCreateAction, SetDeleteAction, SetUnlockAction, UdevEngineEvent, UnlockMethod,
     },
     stratis::StratisResult,
 };
@@ -102,12 +101,6 @@ pub trait BlockDev: Debug {
 
     /// The total size of the device, including space not usable for data.
     fn size(&self) -> Sectors;
-
-    /// Set dbus path associated with the BlockDev.
-    fn set_dbus_path(&mut self, path: MaybeDbusPath);
-
-    /// Get dbus path associated with the BlockDev.
-    fn get_dbus_path(&self) -> &MaybeDbusPath;
 
     /// Get the status of whether a block device is encrypted or not.
     fn is_encrypted(&self) -> bool;

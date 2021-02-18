@@ -12,7 +12,7 @@ use devicemapper::{Bytes, Sectors, IEC};
 use crate::{
     engine::{
         engine::BlockDev,
-        types::{DevUuid, EncryptionInfo, MaybeDbusPath},
+        types::{DevUuid, EncryptionInfo},
     },
     stratis::StratisResult,
 };
@@ -24,7 +24,6 @@ pub struct SimDev {
     user_info: Option<String>,
     hardware_info: Option<String>,
     initialization_time: u64,
-    dbus_path: MaybeDbusPath,
     encryption_info: Option<EncryptionInfo>,
 }
 
@@ -64,14 +63,6 @@ impl BlockDev for SimDev {
         Bytes::from(IEC::Gi).sectors()
     }
 
-    fn set_dbus_path(&mut self, path: MaybeDbusPath) {
-        self.dbus_path = path
-    }
-
-    fn get_dbus_path(&self) -> &MaybeDbusPath {
-        &self.dbus_path
-    }
-
     fn is_encrypted(&self) -> bool {
         self.encryption_info.is_some()
     }
@@ -87,7 +78,6 @@ impl SimDev {
                 user_info: None,
                 hardware_info: None,
                 initialization_time: Utc::now().timestamp() as u64,
-                dbus_path: MaybeDbusPath(None),
                 encryption_info: encryption_info.cloned(),
             },
         )

@@ -86,7 +86,7 @@ pub fn create_pool_shared(
                     );
 
                     let bd_paths = pool
-                        .blockdevs_mut()
+                        .blockdevs()
                         .into_iter()
                         .map(|(uuid, tier, bd)| {
                             create_dbus_blockdev(

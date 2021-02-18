@@ -54,7 +54,7 @@ impl DbusUdevHandler {
                 fs,
             );
         }
-        for (uuid, tier, bd) in pool.blockdevs_mut() {
+        for (uuid, tier, bd) in pool.blockdevs() {
             create_dbus_blockdev(&self.dbus_context, pool_path.clone(), uuid, tier, bd);
         }
     }

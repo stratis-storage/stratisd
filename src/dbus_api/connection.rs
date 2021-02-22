@@ -28,7 +28,7 @@ use tokio::sync::{mpsc::Receiver, RwLock};
 use crate::{
     dbus_api::{
         consts,
-        types::{DbusAction, InterfacesAdded, InterfacesRemoved, TData},
+        types::{DbusAction, InterfacesAdded, InterfacesRemoved, ObjectPathType, TData},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -58,27 +58,50 @@ impl DbusTreeHandler {
                     self.added_object_signal(path_name, interfaces)?;
                 }
                 DbusAction::ChangeFilesystemName(path, new_name) => {
-                    self.property_changed_signal(
-                        consts::FILESYSTEM_NAME_PROP,
-                        &new_name,
+                    let mut changed = HashMap::new();
+                    changed.insert(
+                        consts::FILESYSTEM_NAME_PROP.into(),
+                        Variant(new_name.box_clone()),
+                    );
+
+                    self.property_changed_invalidated_signal(
                         &path,
+                        changed,
+                        vec![consts::FILESYSTEM_DEVNODE_PROP.into()],
                         &consts::standard_filesystem_interfaces(),
                     )?;
                 }
                 DbusAction::ChangePoolName(path, new_name) => {
-                    self.property_changed_signal(
-                        consts::POOL_NAME_PROP,
-                        &new_name,
+                    let mut changed = HashMap::new();
+                    changed.insert(consts::POOL_NAME_PROP.into(), Variant(new_name.box_clone()));
+
+                    self.property_changed_invalidated_signal(
                         &path,
+                        changed,
+                        vec![],
                         &consts::standard_pool_interfaces(),
                     )?;
-                }
-                DbusAction::InvalidateFilesystemDevnode(path) => {
-                    self.property_invalidated_signal(
-                        consts::FILESYSTEM_DEVNODE_PROP,
-                        &path,
-                        &consts::standard_filesystem_interfaces(),
-                    )?;
+
+                    for opath in write_lock.iter().filter(|opath| {
+                        opath
+                            .get_data()
+                            .as_ref()
+                            .map_or(false, |op_cxt| op_cxt.parent == path)
+                    }) {
+                        if let ObjectPathType::Filesystem = opath
+                            .get_data()
+                            .as_ref()
+                            .expect("all objects with parents have data")
+                            .op_type
+                        {
+                            self.property_changed_invalidated_signal(
+                                opath.get_name(),
+                                HashMap::new(),
+                                vec![consts::FILESYSTEM_DEVNODE_PROP.into()],
+                                &consts::standard_filesystem_interfaces(),
+                            )?;
+                        }
+                    }
                 }
                 DbusAction::Remove(path, interfaces) => {
                     write_lock.remove(&path);
@@ -117,37 +140,18 @@ impl DbusTreeHandler {
             })
     }
 
-    fn property_changed_signal<T: RefArg>(
+    fn property_changed_invalidated_signal(
         &self,
-        prop_name: &str,
-        new_value: &T,
         object: &Path,
+        changed: HashMap<String, Variant<Box<dyn RefArg>>>,
+        invalidated: Vec<String>,
         interfaces: &[String],
     ) -> Result<(), dbus::Error> {
-        let mut prop_changed: PropertiesPropertiesChanged = Default::default();
-        prop_changed
-            .changed_properties
-            .insert(prop_name.into(), Variant(new_value.box_clone()));
-
-        interfaces.iter().try_for_each(|interface| {
-            prop_changed.interface_name = interface.to_owned();
-            self.connection
-                .send(prop_changed.to_emit_message(object))
-                .map(|_| ())
-                .map_err(|_| {
-                    dbus::Error::new_failed("Failed to send the requested signal on the D-Bus.")
-                })
-        })
-    }
-
-    fn property_invalidated_signal(
-        &self,
-        prop_name: &str,
-        object: &Path,
-        interfaces: &[String],
-    ) -> Result<(), dbus::Error> {
-        let mut prop_changed: PropertiesPropertiesChanged = Default::default();
-        prop_changed.invalidated_properties.push(prop_name.into());
+        let mut prop_changed = PropertiesPropertiesChanged {
+            changed_properties: changed,
+            invalidated_properties: invalidated,
+            ..Default::default()
+        };
 
         interfaces.iter().try_for_each(|interface| {
             prop_changed.interface_name = interface.to_owned();

@@ -311,7 +311,7 @@ pub fn rename_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
             return_message.append3(default_return, msg_code_ok(), msg_string_ok())
         }
         Ok(RenameAction::Renamed(uuid)) => {
-            dbus_context.push_pool_name_change(object_path, new_name, m.tree);
+            dbus_context.push_pool_name_change(object_path, new_name);
             return_message.append3(
                 (true, uuid_to_string!(uuid)),
                 msg_code_ok(),

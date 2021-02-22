@@ -13,9 +13,9 @@ use std::{
 
 use dbus::{
     arg::{RefArg, Variant},
-    tree::{DataType, MTSync, ObjectPath, Tree},
     Path,
 };
+use dbus_tree::{DataType, MTSync, ObjectPath, Tree};
 use futures::executor::block_on;
 use tokio::sync::{mpsc::Sender, Mutex};
 

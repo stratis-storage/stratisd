@@ -64,7 +64,11 @@ version = "1.0"
 features = ["sync", "macros", "rt", "rt-multi-thread", "signal", "net"]
 
 [dependencies.dbus]
-version = "0.8.4"
+version = "0.9"
+optional = true
+
+[dependencies.dbus-tree]
+version = "0.9"
 optional = true
 
 [dependencies.libdbus-sys]
@@ -86,5 +90,5 @@ matches = "0.1"
 
 [features]
 default = ["dbus_enabled"]
-dbus_enabled = ["dbus", "libdbus-sys"]
+dbus_enabled = ["dbus", "dbus-tree", "libdbus-sys"]
 extras = []

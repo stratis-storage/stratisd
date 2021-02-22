@@ -112,20 +112,20 @@ macro_rules! uuid_to_string {
 macro_rules! properties_footer {
     () => {
         pub fn get_all_properties(
-            m: &dbus::tree::MethodInfo<
-                dbus::tree::MTSync<$crate::dbus_api::types::TData>,
+            m: &dbus_tree::MethodInfo<
+                dbus_tree::MTSync<$crate::dbus_api::types::TData>,
                 $crate::dbus_api::types::TData,
             >,
-        ) -> dbus::tree::MethodResult {
+        ) -> dbus_tree::MethodResult {
             get_properties_shared(m, &mut ALL_PROPERTIES.iter().map(|&s| s.to_string()))
         }
 
         pub fn get_properties(
-            m: &dbus::tree::MethodInfo<
-                dbus::tree::MTSync<$crate::dbus_api::types::TData>,
+            m: &dbus_tree::MethodInfo<
+                dbus_tree::MTSync<$crate::dbus_api::types::TData>,
                 $crate::dbus_api::types::TData,
             >,
-        ) -> dbus::tree::MethodResult {
+        ) -> dbus_tree::MethodResult {
             let message: &dbus::Message = m.msg;
             let mut iter = message.iter_init();
             let mut properties: dbus::arg::Array<String, _> =

@@ -6,9 +6,9 @@ use std::{collections::HashMap, convert::TryFrom, os::unix::io::AsRawFd, path::P
 
 use dbus::{
     arg::{Array, OwnedFd},
-    tree::{MTSync, MethodInfo, MethodResult},
     Message,
 };
+use dbus_tree::{MTSync, MethodInfo, MethodResult};
 
 use crate::{
     dbus_api::{

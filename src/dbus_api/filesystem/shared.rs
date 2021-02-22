@@ -3,10 +3,8 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use chrono::SecondsFormat;
-use dbus::{
-    tree::{MTSync, Tree},
-    Path,
-};
+use dbus::Path;
+use dbus_tree::{MTSync, Tree};
 
 use crate::{
     dbus_api::types::TData,

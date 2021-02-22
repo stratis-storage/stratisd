@@ -10,8 +10,8 @@ use dbus::{
     channel::Sender,
     ffidisp::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged,
     message::SignalArgs,
-    tree::{MTSync, MethodErr, PropInfo},
 };
+use dbus_tree::{MTSync, MethodErr, PropInfo};
 use tokio::sync::{
     mpsc::{channel, Receiver},
     Mutex, RwLock,

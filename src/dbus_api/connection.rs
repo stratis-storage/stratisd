@@ -20,8 +20,8 @@ use dbus::{
     },
     message::{MatchRule, SignalArgs},
     strings::Path,
-    tree::{MTSync, Tree},
 };
+use dbus_tree::{MTSync, Tree};
 use futures::executor::block_on;
 use tokio::sync::{mpsc::Receiver, RwLock};
 

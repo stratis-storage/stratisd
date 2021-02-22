@@ -6,9 +6,9 @@ use std::path::Path;
 
 use dbus::{
     arg::{Array, IterAppend},
-    tree::{MTSync, MethodErr, MethodInfo, MethodResult, PropInfo, Tree},
     Message,
 };
+use dbus_tree::{MTSync, MethodErr, MethodInfo, MethodResult, PropInfo, Tree};
 
 use crate::{
     dbus_api::{

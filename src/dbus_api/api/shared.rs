@@ -6,9 +6,9 @@ use std::{convert::TryFrom, os::unix::io::AsRawFd, path::Path, vec::Vec};
 
 use dbus::{
     arg::{Array, OwnedFd},
-    tree::{MTSync, MethodInfo, MethodResult},
     Message,
 };
+use dbus_tree::{MTSync, MethodInfo, MethodResult};
 
 use crate::{
     dbus_api::{

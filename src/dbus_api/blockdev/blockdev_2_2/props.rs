@@ -2,10 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus::{
-    arg::IterAppend,
-    tree::{MTSync, MethodErr, PropInfo},
-};
+use dbus::arg::IterAppend;
+use dbus_tree::{MTSync, MethodErr, PropInfo};
 
 use crate::dbus_api::{
     blockdev::shared::{self, get_blockdev_property},

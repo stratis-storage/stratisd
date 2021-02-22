@@ -4,10 +4,8 @@
 
 use std::convert::TryFrom;
 
-use dbus::{
-    tree::{MTSync, MethodInfo, MethodResult},
-    Message,
-};
+use dbus::Message;
+use dbus_tree::{MTSync, MethodInfo, MethodResult};
 
 use crate::{
     dbus_api::{

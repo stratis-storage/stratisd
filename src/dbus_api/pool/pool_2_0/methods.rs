@@ -4,11 +4,8 @@
 
 use std::collections::HashMap;
 
-use dbus::{
-    arg::Array,
-    tree::{MTSync, MethodInfo, MethodResult},
-    Message,
-};
+use dbus::{arg::Array, Message};
+use dbus_tree::{MTSync, MethodInfo, MethodResult};
 use devicemapper::Sectors;
 
 use crate::{

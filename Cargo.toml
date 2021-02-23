@@ -4,6 +4,11 @@ version = "2.4.0"
 authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.com>"]
 edition = "2018"
 build = "build.rs"
+description = "Stratis daemon"
+license = "MPL-2.0"
+repository = "https://github.com/stratis-storage/stratisd/"
+keywords = ["Linux", "filesystem", "storage"]
+categories = ["filesystem"]
 
 [[bin]]
 name = "stratis_dumpmetadata"

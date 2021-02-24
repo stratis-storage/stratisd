@@ -7,7 +7,7 @@ build = "build.rs"
 description = "Stratis daemon"
 license = "MPL-2.0"
 repository = "https://github.com/stratis-storage/stratisd/"
-keywords = ["storage", "filesystem"]
+keywords = ["Linux", "filesystem", "storage"]
 categories = ["filesystem"]
 
 [[bin]]

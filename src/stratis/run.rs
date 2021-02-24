@@ -112,7 +112,7 @@ pub fn run(sim: bool) -> StratisResult<()> {
 
         let udev_arc_clone = Arc::clone(&should_exit);
         let join_udev = task::spawn_blocking(move || udev_thread(sender, udev_arc_clone));
-        let join_ipc = task::spawn(setup(Arc::clone(&engine), receiver, Arc::clone(&should_exit)));
+        let join_ipc = task::spawn(setup(Arc::clone(&engine), receiver));
         let join_signal = task::spawn(signal_thread(Arc::clone(&should_exit)));
         let join_dm = task::spawn(dm_event_thread(if sim {
             None

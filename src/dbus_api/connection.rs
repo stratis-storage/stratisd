@@ -2,22 +2,15 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
+use std::sync::Arc;
 
-use dbus::{
-    blocking::SyncConnection,
-    channel::{MatchingReceiver, Sender},
-    message::MatchRule,
-};
+use dbus::{channel::Sender, message::MatchRule, nonblock::SyncConnection};
 use dbus_tree::{MTSync, Tree};
-use futures::executor::block_on;
-use tokio::sync::{mpsc::Receiver, RwLock};
+use futures::{executor::block_on, StreamExt};
+use tokio::{
+    sync::{mpsc::Receiver, RwLock},
+    task::spawn_blocking,
+};
 
 use crate::{
     dbus_api::types::{DbusAction, TData},
@@ -63,34 +56,15 @@ impl DbusTreeHandler {
 /// Handler for a D-Bus receiving connection.
 pub struct DbusConnectionHandler {
     connection: Arc<SyncConnection>,
-    should_exit: Arc<AtomicBool>,
+    tree: Arc<RwLock<Tree<MTSync<TData>, TData>>>,
 }
 
 impl DbusConnectionHandler {
     pub(super) fn new(
         connection: Arc<SyncConnection>,
         tree: Arc<RwLock<Tree<MTSync<TData>, TData>>>,
-        should_exit: Arc<AtomicBool>,
     ) -> DbusConnectionHandler {
-        connection.start_receive(
-            MatchRule::new_method_call(),
-            Box::new(move |msg, conn_ref| {
-                let read_lock = block_on(tree.read());
-                let messages = read_lock.handle(&msg);
-                if let Some(msgs) = messages {
-                    for message in msgs {
-                        if conn_ref.send(message).is_err() {
-                            warn!("Failed to send response on the D-Bus");
-                        }
-                    }
-                }
-                true
-            }),
-        );
-        DbusConnectionHandler {
-            connection,
-            should_exit,
-        }
+        DbusConnectionHandler { connection, tree }
     }
 
     /// Create a new reference to the D-Bus connection.
@@ -99,11 +73,26 @@ impl DbusConnectionHandler {
     }
 
     /// Handle a D-Bus action passed from a D-Bus connection.
-    pub fn process_dbus_request(&self) -> StratisResult<bool> {
-        self.connection
-            .process(Duration::from_millis(100))
-            .map(|_| ())?;
-
-        Ok(self.should_exit.load(Ordering::Relaxed))
+    pub async fn process_dbus_requests(&self) -> StratisResult<()> {
+        let match_msg = self
+            .connection
+            .add_match(MatchRule::new_method_call())
+            .await?;
+        let (_match_msg, mut stream) = match_msg.msg_stream();
+        while let Some(msg) = stream.next().await {
+            let tree = Arc::clone(&self.tree);
+            let connection = Arc::clone(&self.connection);
+            spawn_blocking(move || {
+                let lock = block_on(tree.read());
+                if let Some(msgs) = lock.handle(&msg) {
+                    for msg in msgs {
+                        if connection.send(msg).is_err() {
+                            warn!("Failed to send reply to D-Bus client");
+                        }
+                    }
+                }
+            });
+        }
+        Ok(())
     }
 }

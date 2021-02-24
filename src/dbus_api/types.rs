@@ -13,14 +13,12 @@ use std::{
 
 use dbus::{
     arg::{RefArg, Variant},
-    blocking::{
-        stdintf::org_freedesktop_dbus::{
-            ObjectManagerInterfacesAdded, ObjectManagerInterfacesRemoved,
-        },
-        SyncConnection,
+    blocking::stdintf::org_freedesktop_dbus::{
+        ObjectManagerInterfacesAdded, ObjectManagerInterfacesRemoved,
     },
     channel::Sender,
     message::SignalArgs,
+    nonblock::SyncConnection,
     Path,
 };
 use dbus_tree::{DataType, MTSync, ObjectPath, Tree};

@@ -2,15 +2,16 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::sync::{atomic::AtomicBool, Arc};
+use std::sync::Arc;
 
 use dbus::{
     arg::{ArgType, Iter, IterAppend, RefArg, Variant},
-    blocking::SyncConnection,
     channel::Sender,
     ffidisp::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged,
     message::SignalArgs,
+    nonblock::SyncConnection,
 };
+use dbus_tokio::connection::new_system_sync;
 use dbus_tree::{MTSync, MethodErr, PropInfo};
 use tokio::sync::{
     mpsc::{channel, Receiver},
@@ -187,19 +188,20 @@ where
 }
 
 /// Create both ends of the D-Bus processing handlers.
-pub fn create_dbus_handlers(
+pub async fn create_dbus_handlers(
     engine: Arc<Mutex<dyn Engine>>,
     udev_receiver: Receiver<UdevEngineEvent>,
-    should_exit: Arc<AtomicBool>,
 ) -> Result<(DbusConnectionHandler, DbusUdevHandler, DbusTreeHandler), dbus::Error> {
-    let c = Arc::new(SyncConnection::new_system()?);
+    let (io, conn) = new_system_sync()?;
+    tokio::spawn(io);
     let (sender, receiver) = channel(1024);
-    let (tree, object_path) = get_base_tree(DbusContext::new(engine, sender, Arc::clone(&c)));
+    let (tree, object_path) = get_base_tree(DbusContext::new(engine, sender, Arc::clone(&conn)));
     let dbus_context = tree.get_data().clone();
-    c.request_name(consts::STRATIS_BASE_SERVICE, false, true, true)?;
+    conn.request_name(consts::STRATIS_BASE_SERVICE, false, true, true)
+        .await?;
 
     let tree = Arc::new(RwLock::new(tree));
-    let connection = DbusConnectionHandler::new(c, Arc::clone(&tree), should_exit);
+    let connection = DbusConnectionHandler::new(conn, Arc::clone(&tree));
     let udev = DbusUdevHandler {
         receiver: udev_receiver,
         path: object_path,

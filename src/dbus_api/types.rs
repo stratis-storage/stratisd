@@ -13,11 +13,19 @@ use std::{
 
 use dbus::{
     arg::{RefArg, Variant},
+    blocking::{
+        stdintf::org_freedesktop_dbus::{
+            ObjectManagerInterfacesAdded, ObjectManagerInterfacesRemoved,
+        },
+        SyncConnection,
+    },
+    channel::Sender,
+    message::SignalArgs,
     Path,
 };
 use dbus_tree::{DataType, MTSync, ObjectPath, Tree};
 use futures::executor::block_on;
-use tokio::sync::{mpsc::Sender, Mutex};
+use tokio::sync::{mpsc::Sender as TokioSender, Mutex};
 
 use crate::{
     dbus_api::consts,
@@ -56,8 +64,8 @@ impl DbusErrorEnum {
 
 #[derive(Debug)]
 pub enum DbusAction {
-    Add(ObjectPath<MTSync<TData>, TData>, InterfacesAdded),
-    Remove(Path<'static>, InterfacesRemoved),
+    Add(ObjectPath<MTSync<TData>, TData>),
+    Remove(Vec<Path<'static>>),
 }
 
 /// Indicates the type of object pointed to by the object path.
@@ -92,7 +100,8 @@ impl OPContext {
 pub struct DbusContext {
     pub(super) next_index: Arc<AtomicU64>,
     pub(super) engine: Arc<Mutex<dyn Engine>>,
-    pub(super) sender: Sender<DbusAction>,
+    pub(super) sender: TokioSender<DbusAction>,
+    connection: Arc<SyncConnection>,
 }
 
 impl Debug for DbusContext {
@@ -107,11 +116,16 @@ impl Debug for DbusContext {
 }
 
 impl DbusContext {
-    pub fn new(engine: Arc<Mutex<dyn Engine>>, sender: Sender<DbusAction>) -> DbusContext {
+    pub fn new(
+        engine: Arc<Mutex<dyn Engine>>,
+        sender: TokioSender<DbusAction>,
+        connection: Arc<SyncConnection>,
+    ) -> DbusContext {
         DbusContext {
             engine,
             next_index: Arc::new(AtomicU64::new(0)),
             sender,
+            connection,
         }
     }
 
@@ -121,7 +135,13 @@ impl DbusContext {
         interfaces: InterfacesAdded,
     ) {
         let object_path_name = object_path.get_name().clone();
-        if let Err(e) = block_on(self.sender.send(DbusAction::Add(object_path, interfaces))) {
+        if self
+            .added_object_signal(object_path_name.clone(), interfaces)
+            .is_err()
+        {
+            warn!("Signal on object add was not sent to the D-Bus client");
+        }
+        if let Err(e) = block_on(self.sender.send(DbusAction::Add(object_path))) {
             warn!(
                 "D-Bus add event could not be sent to the processing thread; the D-Bus \
                 server will not be aware of the D-Bus object with path {}: {}",
@@ -130,20 +150,51 @@ impl DbusContext {
         }
     }
 
+    /// Send an InterfacesAdded signal on the D-Bus
+    fn added_object_signal(
+        &self,
+        object: Path<'static>,
+        interfaces: InterfacesAdded,
+    ) -> Result<(), dbus::Error> {
+        self.connection
+            .send(
+                ObjectManagerInterfacesAdded {
+                    object,
+                    interfaces: interfaces
+                        .into_iter()
+                        .map(|(k, map)| {
+                            let new_map: HashMap<String, Variant<Box<dyn RefArg>>> = map
+                                .into_iter()
+                                .map(|(subk, var)| (subk, Variant(var.0 as Box<dyn RefArg>)))
+                                .collect();
+                            (k, new_map)
+                        })
+                        .collect(),
+                }
+                .to_emit_message(&Path::from(consts::STRATIS_BASE_PATH)),
+            )
+            .map(|_| ())
+            .map_err(|_| {
+                dbus::Error::new_failed("Failed to send the requested signal on the D-Bus.")
+            })
+    }
+
     pub fn push_remove(
         &self,
         item: &Path<'static>,
         tree: &Tree<MTSync<TData>, TData>,
         interfaces: InterfacesRemoved,
     ) {
+        let mut paths = Vec::new();
         for opath in tree.iter().filter(|opath| {
             opath
                 .get_data()
                 .as_ref()
                 .map_or(false, |op_cxt| op_cxt.parent == *item)
         }) {
-            if let Err(e) = block_on(
-                self.sender.send(DbusAction::Remove(
+            paths.push(opath.get_name().clone());
+            if self
+                .removed_object_signal(
                     opath.get_name().clone(),
                     match opath
                         .get_data()
@@ -155,27 +206,44 @@ impl DbusContext {
                         ObjectPathType::Filesystem => consts::filesystem_interface_list(),
                         ObjectPathType::Blockdev => consts::blockdev_interface_list(),
                     },
-                )),
-            ) {
-                warn!(
-                    "D-Bus remove event could not be sent to the processing thread; the D-Bus \
-                    server will still expect the D-Bus object with path {} to be present: {}",
-                    opath.get_name(),
-                    e,
                 )
-            }
+                .is_err()
+            {
+                warn!("Signal on object removal was not sent to the D-Bus client");
+            };
         }
+        paths.push(item.clone());
+        if self
+            .removed_object_signal(item.clone(), interfaces)
+            .is_err()
+        {
+            warn!("Signal on object removal was not sent to the D-Bus client");
+        };
 
-        if let Err(e) = block_on(
-            self.sender
-                .send(DbusAction::Remove(item.clone(), interfaces)),
-        ) {
+        if let Err(e) = block_on(self.sender.send(DbusAction::Remove(paths))) {
             warn!(
                 "D-Bus remove event could not be sent to the processing thread; the D-Bus \
                 server will still expect the D-Bus object with path {} to be present: {}",
                 item, e,
             )
         }
+    }
+
+    /// Send an InterfacesRemoved signal on the D-Bus
+    fn removed_object_signal(
+        &self,
+        object: Path<'static>,
+        interfaces: InterfacesRemoved,
+    ) -> Result<(), dbus::Error> {
+        self.connection
+            .send(
+                ObjectManagerInterfacesRemoved { object, interfaces }
+                    .to_emit_message(&Path::from(consts::STRATIS_BASE_PATH)),
+            )
+            .map(|_| ())
+            .map_err(|_| {
+                dbus::Error::new_failed("Failed to send the requested signal on the D-Bus.")
+            })
     }
 
     /// Generates a new id for object paths.

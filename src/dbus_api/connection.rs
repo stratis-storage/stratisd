@@ -3,7 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    collections::HashMap,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -12,36 +11,34 @@ use std::{
 };
 
 use dbus::{
-    arg::{RefArg, Variant},
     blocking::SyncConnection,
     channel::{MatchingReceiver, Sender},
-    ffidisp::stdintf::org_freedesktop_dbus::{
-        ObjectManagerInterfacesAdded, ObjectManagerInterfacesRemoved,
-    },
-    message::{MatchRule, SignalArgs},
-    strings::Path,
+    message::MatchRule,
 };
 use dbus_tree::{MTSync, Tree};
 use futures::executor::block_on;
 use tokio::sync::{mpsc::Receiver, RwLock};
 
 use crate::{
-    dbus_api::{
-        consts,
-        types::{DbusAction, InterfacesAdded, InterfacesRemoved, TData},
-    },
+    dbus_api::types::{DbusAction, TData},
     stratis::{StratisError, StratisResult},
 };
 
 /// Handler for a D-Bus tree. This will be used to process add and remove requests from
 /// the tree.
 pub struct DbusTreeHandler {
-    pub(super) connection: Arc<SyncConnection>,
-    pub(super) tree: Arc<RwLock<Tree<MTSync<TData>, TData>>>,
-    pub(super) receiver: Receiver<DbusAction>,
+    tree: Arc<RwLock<Tree<MTSync<TData>, TData>>>,
+    receiver: Receiver<DbusAction>,
 }
 
 impl DbusTreeHandler {
+    pub fn new(
+        tree: Arc<RwLock<Tree<MTSync<TData>, TData>>>,
+        receiver: Receiver<DbusAction>,
+    ) -> Self {
+        DbusTreeHandler { tree, receiver }
+    }
+
     /// Process a D-Bus action (add/remove) request.
     pub async fn process_dbus_actions(&mut self) -> StratisResult<()> {
         loop {
@@ -52,63 +49,14 @@ impl DbusTreeHandler {
             })?;
             let mut write_lock = self.tree.write().await;
             match action {
-                DbusAction::Add(path, interfaces) => {
-                    let path_name = path.get_name().clone();
-                    write_lock.insert(path);
-                    self.added_object_signal(path_name, interfaces)?;
-                }
-                DbusAction::Remove(path, interfaces) => {
-                    write_lock.remove(&path);
-                    self.removed_object_signal(path, interfaces)?;
+                DbusAction::Add(path) => write_lock.insert(path),
+                DbusAction::Remove(paths) => {
+                    for path in paths {
+                        write_lock.remove(&path);
+                    }
                 }
             }
         }
-    }
-
-    /// Send an InterfacesAdded signal on the D-Bus
-    fn added_object_signal(
-        &self,
-        object: Path<'static>,
-        interfaces: InterfacesAdded,
-    ) -> Result<(), dbus::Error> {
-        self.connection
-            .send(
-                ObjectManagerInterfacesAdded {
-                    object,
-                    interfaces: interfaces
-                        .into_iter()
-                        .map(|(k, map)| {
-                            let new_map: HashMap<String, Variant<Box<dyn RefArg>>> = map
-                                .into_iter()
-                                .map(|(subk, var)| (subk, Variant(var.0 as Box<dyn RefArg>)))
-                                .collect();
-                            (k, new_map)
-                        })
-                        .collect(),
-                }
-                .to_emit_message(&Path::from(consts::STRATIS_BASE_PATH)),
-            )
-            .map(|_| ())
-            .map_err(|_| {
-                dbus::Error::new_failed("Failed to send the requested signal on the D-Bus.")
-            })
-    }
-
-    /// Send an InterfacesRemoved signal on the D-Bus
-    fn removed_object_signal(
-        &self,
-        object: Path<'static>,
-        interfaces: InterfacesRemoved,
-    ) -> Result<(), dbus::Error> {
-        self.connection
-            .send(
-                ObjectManagerInterfacesRemoved { object, interfaces }
-                    .to_emit_message(&Path::from(consts::STRATIS_BASE_PATH)),
-            )
-            .map(|_| ())
-            .map_err(|_| {
-                dbus::Error::new_failed("Failed to send the requested signal on the D-Bus.")
-            })
     }
 }
 

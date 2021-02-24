@@ -7,7 +7,7 @@ use std::{
     sync::Arc,
 };
 
-use dbus::blocking::SyncConnection;
+use dbus::nonblock::SyncConnection;
 
 use crate::{
     dbus_api::{consts, util::prop_changed_dispatch},

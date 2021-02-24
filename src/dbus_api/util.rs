@@ -192,25 +192,19 @@ pub fn create_dbus_handlers(
     udev_receiver: Receiver<UdevEngineEvent>,
     should_exit: Arc<AtomicBool>,
 ) -> Result<(DbusConnectionHandler, DbusUdevHandler, DbusTreeHandler), dbus::Error> {
-    let c = SyncConnection::new_system()?;
+    let c = Arc::new(SyncConnection::new_system()?);
     let (sender, receiver) = channel(1024);
-    let (tree, object_path) = get_base_tree(DbusContext::new(engine, sender));
+    let (tree, object_path) = get_base_tree(DbusContext::new(engine, sender, Arc::clone(&c)));
     let dbus_context = tree.get_data().clone();
     c.request_name(consts::STRATIS_BASE_SERVICE, false, true, true)?;
 
-    let connection_arc = Arc::new(c);
     let tree = Arc::new(RwLock::new(tree));
-    let connection =
-        DbusConnectionHandler::new(Arc::clone(&connection_arc), Arc::clone(&tree), should_exit);
+    let connection = DbusConnectionHandler::new(c, Arc::clone(&tree), should_exit);
     let udev = DbusUdevHandler {
         receiver: udev_receiver,
         path: object_path,
         dbus_context,
     };
-    let tree = DbusTreeHandler {
-        connection: connection_arc,
-        receiver,
-        tree,
-    };
+    let tree = DbusTreeHandler::new(tree, receiver);
     Ok((connection, udev, tree))
 }

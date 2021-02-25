@@ -23,6 +23,7 @@ use crate::{
     stratis::{StratisError, StratisResult},
 };
 
+/// Set up the cooperating D-Bus threads.
 pub async fn setup(
     engine: Arc<Mutex<dyn Engine>>,
     receiver: Receiver<UdevEngineEvent>,

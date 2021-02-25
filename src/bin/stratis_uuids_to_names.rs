@@ -157,9 +157,16 @@ fn main_report_error() -> Result<Option<(String, String)>, StratisUdevError> {
 
     if let Some((pool_uuid, fs_uuid)) = udev_name_to_uuids(&dm_name)? {
         let pool_name = uuid_to_stratis_name(&managed_objects, STRATIS_POOL_IFACE, pool_uuid)?
-            .ok_or_else(|| StratisUdevError::new("Could not get pool name from UUID."))?;
+            .ok_or_else(|| {
+                StratisUdevError::new(format!("Could not get pool name from UUID {}.", pool_uuid))
+            })?;
         let fs_name = uuid_to_stratis_name(&managed_objects, STRATIS_FS_IFACE, fs_uuid)?
-            .ok_or_else(|| StratisUdevError::new("Could not get filesystem name from UUID."))?;
+            .ok_or_else(|| {
+                StratisUdevError::new(format!(
+                    "Could not get filesystem name from UUID {}.",
+                    fs_uuid
+                ))
+            })?;
         Ok(Some((pool_name, fs_name)))
     } else {
         Ok(None)

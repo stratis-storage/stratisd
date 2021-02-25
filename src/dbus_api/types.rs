@@ -14,7 +14,7 @@ use std::{
 use dbus::{
     arg::{RefArg, Variant},
     blocking::stdintf::org_freedesktop_dbus::{
-        ObjectManagerInterfacesAdded, ObjectManagerInterfacesRemoved,
+        ObjectManagerInterfacesAdded, ObjectManagerInterfacesRemoved, PropertiesPropertiesChanged,
     },
     channel::Sender,
     message::SignalArgs,
@@ -252,6 +252,105 @@ impl DbusContext {
             .map_err(|_| {
                 dbus::Error::new_failed("Failed to send the requested signal on the D-Bus.")
             })
+    }
+
+    /// Send changed signal for Name property and invalidated signal for
+    /// Devnode property.
+    pub fn push_filesystem_name_change(&self, item: &Path<'static>, new_name: &str) {
+        let mut changed = HashMap::new();
+        changed.insert(
+            consts::FILESYSTEM_NAME_PROP.into(),
+            Variant(new_name.to_string().box_clone()),
+        );
+
+        if self
+            .property_changed_invalidated_signal(
+                &item,
+                changed,
+                vec![consts::FILESYSTEM_DEVNODE_PROP.into()],
+                &consts::standard_filesystem_interfaces(),
+            )
+            .is_err()
+        {
+            warn!("Signal on filesystem name change was not sent to the D-Bus client");
+        }
+    }
+
+    /// Send changed signal for pool Name property and invalidated signal for
+    /// all Devnode properties of child filesystems.
+    pub fn push_pool_name_change(
+        &self,
+        item: &Path<'static>,
+        new_name: &str,
+        tree: &Tree<MTSync<TData>, TData>,
+    ) {
+        let mut changed = HashMap::new();
+        changed.insert(
+            consts::POOL_NAME_PROP.into(),
+            Variant(new_name.to_string().box_clone()),
+        );
+
+        if self
+            .property_changed_invalidated_signal(
+                &item,
+                changed,
+                vec![],
+                &consts::standard_pool_interfaces(),
+            )
+            .is_err()
+        {
+            warn!("Signal on pool name change was not sent to the D-Bus client");
+        }
+
+        for opath in tree.iter().filter(|opath| {
+            opath
+                .get_data()
+                .as_ref()
+                .map_or(false, |op_cxt| op_cxt.parent == *item)
+        }) {
+            if let ObjectPathType::Filesystem = opath
+                .get_data()
+                .as_ref()
+                .expect("all objects with parents have data")
+                .op_type
+            {
+                if self
+                    .property_changed_invalidated_signal(
+                        &opath.get_name().clone(),
+                        HashMap::new(),
+                        vec![consts::FILESYSTEM_DEVNODE_PROP.into()],
+                        &consts::standard_filesystem_interfaces(),
+                    )
+                    .is_err()
+                {
+                    warn!("Signal on filesystem devnode change was not sent to the D-Bus client");
+                }
+            }
+        }
+    }
+
+    fn property_changed_invalidated_signal(
+        &self,
+        object: &Path,
+        changed_properties: HashMap<String, Variant<Box<dyn RefArg>>>,
+        invalidated_properties: Vec<String>,
+        interfaces: &[String],
+    ) -> Result<(), dbus::Error> {
+        let mut prop_changed = PropertiesPropertiesChanged {
+            changed_properties,
+            invalidated_properties,
+            interface_name: "temp_value".into(),
+        };
+
+        interfaces.iter().try_for_each(|interface| {
+            prop_changed.interface_name = interface.to_owned();
+            self.connection
+                .send(prop_changed.to_emit_message(object))
+                .map(|_| ())
+                .map_err(|_| {
+                    dbus::Error::new_failed("Failed to send the requested signal on the D-Bus.")
+                })
+        })
     }
 }
 

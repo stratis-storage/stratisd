@@ -18,8 +18,8 @@ use tokio::{
 };
 
 use crate::{
-    dbus_api::{create_dbus_handlers, EventHandler},
-    engine::{get_engine_listener_list_mut, Engine, UdevEngineEvent},
+    dbus_api::create_dbus_handlers,
+    engine::{Engine, UdevEngineEvent},
     stratis::{StratisError, StratisResult},
 };
 
@@ -31,10 +31,8 @@ pub async fn setup(
     let (conn, mut udev, mut tree) = create_dbus_handlers(Arc::clone(&engine), receiver)
         .await
         .map(|(conn, udev, tree)| {
-            let event_handler = Box::new(EventHandler::new(conn.new_connection_ref()));
-            get_engine_listener_list_mut().register_listener(event_handler);
-            let mut mutex_lock = mutex_lock!(engine);
-            for (pool_name, pool_uuid, pool) in mutex_lock.pools_mut() {
+            let mutex_lock = mutex_lock!(engine);
+            for (pool_name, pool_uuid, pool) in mutex_lock.pools() {
                 udev.register_pool(&pool_name, pool_uuid, pool)
             }
             info!("D-Bus API is available");

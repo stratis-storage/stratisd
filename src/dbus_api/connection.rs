@@ -17,8 +17,8 @@ use crate::{
     stratis::{StratisError, StratisResult},
 };
 
-/// Handler for a D-Bus tree. This will be used to process add and remove requests from
-/// the tree.
+/// Handler for a D-Bus tree.
+/// Proceses messages specifying tree mutations.
 pub struct DbusTreeHandler {
     tree: Arc<RwLock<Tree<MTSync<TData>, TData>>>,
     receiver: Receiver<DbusAction>,
@@ -54,6 +54,8 @@ impl DbusTreeHandler {
 }
 
 /// Handler for a D-Bus receiving connection.
+/// stratisd has exactly one connection handler, but this handler spawns
+/// a thread for every D-Bus method.
 pub struct DbusConnectionHandler {
     connection: Arc<SyncConnection>,
     tree: Arc<RwLock<Tree<MTSync<TData>, TData>>>,
@@ -73,6 +75,8 @@ impl DbusConnectionHandler {
     }
 
     /// Handle a D-Bus action passed from a D-Bus connection.
+    /// Spawn a new thread for every D-Bus method call.
+    /// Every method call requires a read lock on the D-Bus tree.
     pub async fn process_dbus_requests(&self) -> StratisResult<()> {
         let match_msg = self
             .connection

@@ -24,6 +24,15 @@ pub fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>
 
     let base_tree = f.tree(dbus_context);
 
+    let obj_path = f.object_path("/", None).introspectable();
+    let base_tree = base_tree.add(obj_path);
+
+    let obj_path = f.object_path("/org", None).introspectable();
+    let base_tree = base_tree.add(obj_path);
+
+    let obj_path = f.object_path("/org/storage", None).introspectable();
+    let base_tree = base_tree.add(obj_path);
+
     let obj_path = f
         .object_path(consts::STRATIS_BASE_PATH, None)
         .introspectable()

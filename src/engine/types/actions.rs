@@ -128,7 +128,10 @@ impl<T> EngineAction for MappingCreateAction<T> {
     type Return = T;
 
     fn is_changed(&self) -> bool {
-        matches!(*self, MappingCreateAction::Created(_) | MappingCreateAction::ValueChanged(_))
+        matches!(
+            *self,
+            MappingCreateAction::Created(_) | MappingCreateAction::ValueChanged(_)
+        )
     }
 
     fn changed(self) -> Option<T> {

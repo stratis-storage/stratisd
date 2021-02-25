@@ -69,11 +69,6 @@ impl DbusConnectionHandler {
         DbusConnectionHandler { connection, tree }
     }
 
-    /// Create a new reference to the D-Bus connection.
-    pub fn new_connection_ref(&self) -> Arc<SyncConnection> {
-        Arc::clone(&self.connection)
-    }
-
     /// Handle a D-Bus action passed from a D-Bus connection.
     /// Spawn a new thread for every D-Bus method call.
     /// Every method call requires a read lock on the D-Bus tree.

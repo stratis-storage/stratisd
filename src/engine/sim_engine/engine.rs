@@ -13,7 +13,6 @@ use serde_json::{json, Value};
 use crate::{
     engine::{
         engine::{Engine, KeyActions, Pool, Report},
-        event::get_engine_listener_list,
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         sim_engine::{keys::SimKeyActions, pool::SimPool},
         structures::Table,
@@ -21,7 +20,6 @@ use crate::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, KeyDescription, Name, PoolUuid,
             RenameAction, ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
         },
-        EngineEvent,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -130,10 +128,7 @@ impl Engine for SimEngine {
         }
     }
 
-    fn handle_event(
-        &mut self,
-        _event: &UdevEngineEvent,
-    ) -> Option<(Name, PoolUuid, &mut dyn Pool)> {
+    fn handle_event(&mut self, _event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &dyn Pool)> {
         None
     }
 
@@ -161,18 +156,12 @@ impl Engine for SimEngine {
         uuid: PoolUuid,
         new_name: &str,
     ) -> StratisResult<RenameAction<PoolUuid>> {
-        let old_name = rename_pool_pre_idem!(self; uuid; new_name);
+        rename_pool_pre_idem!(self; uuid; new_name);
 
         let (_, pool) = self
             .pools
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
-
-        get_engine_listener_list().notify(&EngineEvent::PoolRenamed {
-            dbus_path: pool.get_dbus_path(),
-            from: &*old_name,
-            to: &*new_name,
-        });
 
         self.pools
             .insert(Name::new(new_name.to_owned()), uuid, pool);

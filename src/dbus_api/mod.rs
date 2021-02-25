@@ -9,7 +9,6 @@ mod api;
 mod blockdev;
 mod connection;
 mod consts;
-mod event_handler;
 mod filesystem;
 mod pool;
 mod types;
@@ -18,7 +17,6 @@ mod util;
 
 pub use self::{
     connection::{DbusConnectionHandler, DbusTreeHandler},
-    event_handler::EventHandler,
     udev::DbusUdevHandler,
     util::create_dbus_handlers,
 };

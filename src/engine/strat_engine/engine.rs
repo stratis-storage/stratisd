@@ -11,7 +11,6 @@ use devicemapper::DmNameBuf;
 use crate::{
     engine::{
         engine::KeyActions,
-        event::get_engine_listener_list,
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         strat_engine::{
             cmd::verify_binaries,
@@ -26,7 +25,7 @@ use crate::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, KeyDescription, RenameAction,
             ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
         },
-        Engine, EngineEvent, Name, Pool, PoolUuid, Report,
+        Engine, Name, Pool, PoolUuid, Report,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -155,7 +154,7 @@ impl Report for StratEngine {
 }
 
 impl Engine for StratEngine {
-    fn handle_event(&mut self, event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &mut dyn Pool)> {
+    fn handle_event(&mut self, event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &dyn Pool)> {
         if let Some((pool_uuid, pool_name, pool)) =
             self.liminal_devices.block_evaluate(&self.pools, event)
         {
@@ -249,12 +248,6 @@ impl Engine for StratEngine {
             self.pools.insert(old_name, uuid, pool);
             Err(err)
         } else {
-            get_engine_listener_list().notify(&EngineEvent::PoolRenamed {
-                dbus_path: pool.get_dbus_path(),
-                from: &*old_name,
-                to: &*new_name,
-            });
-
             let has_filesystems = pool.has_filesystems();
             self.pools.insert(new_name.clone(), uuid, pool);
             if has_filesystems {

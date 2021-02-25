@@ -168,7 +168,7 @@ pub fn add_blockdevs(m: &MethodInfo<MTSync<TData>, TData>, op: BlockDevOp) -> Me
                             BlockDevOp::AddData => BlockDevTier::Data,
                             _ => BlockDevTier::Cache,
                         },
-                        pool.get_mut_blockdev(*uuid)
+                        pool.get_blockdev(*uuid)
                             .expect("just inserted by add_blockdevs")
                             .1,
                     )

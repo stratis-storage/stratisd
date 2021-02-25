@@ -36,7 +36,7 @@ impl DbusUdevHandler {
     }
 
     /// Register a pool in the engine with D-Bus.
-    pub fn register_pool(&self, pool_name: &Name, pool_uuid: PoolUuid, pool: &mut dyn Pool) {
+    pub fn register_pool(&self, pool_name: &Name, pool_uuid: PoolUuid, pool: &dyn Pool) {
         let pool_path = create_dbus_pool(
             &self.dbus_context,
             self.path.clone(),
@@ -44,7 +44,7 @@ impl DbusUdevHandler {
             pool_uuid,
             pool,
         );
-        for (fs_name, fs_uuid, fs) in pool.filesystems_mut() {
+        for (fs_name, fs_uuid, fs) in pool.filesystems() {
             create_dbus_filesystem(
                 &self.dbus_context,
                 pool_path.clone(),
@@ -54,7 +54,7 @@ impl DbusUdevHandler {
                 fs,
             );
         }
-        for (uuid, tier, bd) in pool.blockdevs_mut() {
+        for (uuid, tier, bd) in pool.blockdevs() {
             create_dbus_blockdev(&self.dbus_context, pool_path.clone(), uuid, tier, bd);
         }
     }

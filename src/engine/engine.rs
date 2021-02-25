@@ -17,9 +17,9 @@ use devicemapper::{Bytes, Sectors};
 use crate::{
     engine::types::{
         BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid,
-        Key, KeyDescription, LockedPoolInfo, MappingCreateAction, MaybeDbusPath, Name, PoolUuid,
-        RenameAction, ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction,
-        UdevEngineEvent, UnlockMethod,
+        Key, KeyDescription, LockedPoolInfo, MappingCreateAction, Name, PoolUuid, RenameAction,
+        ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, UdevEngineEvent,
+        UnlockMethod,
     },
     stratis::StratisResult,
 };
@@ -78,12 +78,6 @@ pub trait Filesystem: Debug {
 
     /// The amount of data stored on the filesystem, including overhead.
     fn used(&self) -> StratisResult<Bytes>;
-
-    /// Set dbus path associated with the Pool.
-    fn set_dbus_path(&mut self, path: MaybeDbusPath);
-
-    /// Get dbus path associated with the Pool.
-    fn get_dbus_path(&self) -> &MaybeDbusPath;
 }
 
 pub trait BlockDev: Debug {
@@ -108,12 +102,6 @@ pub trait BlockDev: Debug {
 
     /// The total size of the device, including space not usable for data.
     fn size(&self) -> Sectors;
-
-    /// Set dbus path associated with the BlockDev.
-    fn set_dbus_path(&mut self, path: MaybeDbusPath);
-
-    /// Get dbus path associated with the BlockDev.
-    fn get_dbus_path(&self) -> &MaybeDbusPath;
 
     /// Get the status of whether a block device is encrypted or not.
     fn is_encrypted(&self) -> bool;
@@ -256,12 +244,6 @@ pub trait Pool: Debug {
         user_info: Option<&str>,
     ) -> StratisResult<RenameAction<DevUuid>>;
 
-    /// Set dbus path associated with the Pool.
-    fn set_dbus_path(&mut self, path: MaybeDbusPath);
-
-    /// Get dbus path associated with the Pool.
-    fn get_dbus_path(&self) -> &MaybeDbusPath;
-
     /// true if the pool has a cache, otherwise false
     fn has_cache(&self) -> bool;
 
@@ -290,7 +272,7 @@ pub trait Engine: Debug + Report + Send {
     /// and its UUID.
     ///
     /// Precondition: the subsystem of the device evented on is "block".
-    fn handle_event(&mut self, event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &mut dyn Pool)>;
+    fn handle_event(&mut self, event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &dyn Pool)>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.

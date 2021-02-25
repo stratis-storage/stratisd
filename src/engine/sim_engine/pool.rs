@@ -16,16 +16,14 @@ use devicemapper::{Sectors, IEC};
 use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
-        event::get_engine_listener_list,
         shared::{init_cache_idempotent_or_err, validate_name, validate_paths},
         sim_engine::{blockdev::SimDev, filesystem::SimFilesystem},
         structures::Table,
         types::{
             BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo,
-            FilesystemUuid, MaybeDbusPath, Name, PoolUuid, Redundancy, RenameAction,
-            SetCreateAction, SetDeleteAction,
+            FilesystemUuid, Name, PoolUuid, Redundancy, RenameAction, SetCreateAction,
+            SetDeleteAction,
         },
-        EngineEvent,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -36,7 +34,6 @@ pub struct SimPool {
     cache_devs: HashMap<DevUuid, SimDev>,
     filesystems: Table<FilesystemUuid, SimFilesystem>,
     redundancy: Redundancy,
-    dbus_path: MaybeDbusPath,
 }
 
 impl SimPool {
@@ -54,7 +51,6 @@ impl SimPool {
                 cache_devs: HashMap::new(),
                 filesystems: Table::default(),
                 redundancy,
-                dbus_path: MaybeDbusPath(None),
             },
         )
     }
@@ -334,18 +330,12 @@ impl Pool for SimPool {
     ) -> StratisResult<RenameAction<FilesystemUuid>> {
         validate_name(new_name)?;
 
-        let old_name = rename_filesystem_pre_idem!(self; uuid; new_name);
+        rename_filesystem_pre_idem!(self; uuid; new_name);
 
         let (_, filesystem) = self
             .filesystems
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.filesystems.get_by_uuid() returned a value");
-
-        get_engine_listener_list().notify(&EngineEvent::FilesystemRenamed {
-            dbus_path: filesystem.get_dbus_path(),
-            from: &*old_name,
-            to: &*new_name,
-        });
 
         self.filesystems
             .insert(Name::new(new_name.to_owned()), uuid, filesystem);
@@ -480,14 +470,6 @@ impl Pool for SimPool {
                 }
             },
         ))
-    }
-
-    fn set_dbus_path(&mut self, path: MaybeDbusPath) {
-        self.dbus_path = path
-    }
-
-    fn get_dbus_path(&self) -> &MaybeDbusPath {
-        &self.dbus_path
     }
 
     fn has_cache(&self) -> bool {

@@ -148,15 +148,6 @@ pub enum BlockDevState {
     InUse = 4,
 }
 
-/// A struct that may contain a dbus::Path, or may not, and most certainly
-/// doesn't if dbus is compiled out. This avoids littering engine code with
-/// conditional code.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct MaybeDbusPath(
-    #[cfg(feature = "dbus_enabled")] pub Option<dbus::Path<'static>>,
-    #[cfg(not(feature = "dbus_enabled"))] pub Option<()>,
-);
-
 /// Blockdev tier. Used to distinguish between blockdevs used for
 /// data and blockdevs used for a cache.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

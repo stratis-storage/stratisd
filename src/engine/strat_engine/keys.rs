@@ -5,7 +5,7 @@
 use std::{
     ffi::CString,
     fs::{create_dir_all, remove_file, set_permissions, OpenOptions, Permissions},
-    io::{self, Write},
+    io::{self, Read, Write},
     mem::size_of,
     os::unix::{
         fs::PermissionsExt,
@@ -598,6 +598,15 @@ impl MemoryPrivateFilesystem {
         mem_file_path.push(key_desc.as_application_str());
         let mem_file = MemoryMappedKeyfile::new(&mem_file_path, key_data)?;
         f(mem_file.keyfile_path())
+    }
+
+    pub fn rand_key(&self) -> StratisResult<MemoryMappedKeyfile> {
+        let mut key_data = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
+        File::open("/dev/urandom")?.read_exact(key_data.as_mut())?;
+        MemoryMappedKeyfile::new(
+            &self.0,
+            SizedKeyMemory::new(key_data, MAX_STRATIS_PASS_SIZE),
+        )
     }
 }
 

@@ -82,6 +82,7 @@ def create_pool(name, devices, *, key_description=None):
             "key_desc": (False, "")
             if key_description is None
             else (True, key_description),
+            "clevis_info": (False, ("", "")),
         },
     )
 

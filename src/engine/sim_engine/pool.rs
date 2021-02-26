@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
+    borrow::Cow,
     collections::{hash_map::RandomState, HashMap, HashSet},
     iter::FromIterator,
     path::Path,
@@ -21,8 +22,8 @@ use crate::{
         structures::Table,
         types::{
             BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo,
-            FilesystemUuid, Name, PoolUuid, Redundancy, RenameAction, SetCreateAction,
-            SetDeleteAction,
+            FilesystemUuid, Key, KeyDescription, Name, PoolUuid, Redundancy, RenameAction,
+            SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -40,10 +41,12 @@ impl SimPool {
     pub fn new(
         paths: &[&Path],
         redundancy: Redundancy,
-        enc_info: Option<EncryptionInfo>,
+        enc_info: &EncryptionInfo,
     ) -> (PoolUuid, SimPool) {
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
-        let device_pairs = devices.iter().map(|p| SimDev::new(p, enc_info.as_ref()));
+        let device_pairs = devices
+            .iter()
+            .map(|p| SimDev::new(p, Cow::Borrowed(enc_info)));
         (
             PoolUuid::new_v4(),
             SimPool {
@@ -72,30 +75,43 @@ impl SimPool {
     }
 
     fn datadevs_encrypted(&self) -> bool {
-        self.encryption_info().is_some()
+        self.encryption_info().is_encrypted()
     }
 
     pub fn destroy(&mut self) -> StratisResult<()> {
         Ok(())
     }
 
-    fn encryption_info_impl(&self) -> Option<&EncryptionInfo> {
+    fn encryption_info_impl(&self) -> &EncryptionInfo {
         self.block_devs
             .iter()
             .next()
-            .and_then(|(_, bd)| bd.encryption_info())
+            .map(|(_, bd)| bd.encryption_info())
+            .expect("Pool must contain at least one blockdev")
     }
 
-    fn add_clevis_info(&mut self, pin: String, config: Value) {
+    fn add_clevis_info(&mut self, pin: &str, config: &Value) {
         self.block_devs
             .iter_mut()
-            .for_each(|(_, bd)| bd.set_clevis_info(pin.clone(), config.clone()))
+            .for_each(|(_, bd)| bd.set_clevis_info(pin, config))
     }
 
     fn clear_clevis_info(&mut self) {
         self.block_devs
             .iter_mut()
             .for_each(|(_, bd)| bd.unset_clevis_info())
+    }
+
+    fn add_key_desc(&mut self, key_desc: &KeyDescription) {
+        self.block_devs
+            .iter_mut()
+            .for_each(|(_, bd)| bd.set_key_desc(key_desc))
+    }
+
+    fn clear_key_desc(&mut self) {
+        self.block_devs
+            .iter_mut()
+            .for_each(|(_, bd)| bd.unset_key_desc())
     }
 }
 
@@ -167,7 +183,10 @@ impl Pool for SimPool {
                     "At least one blockdev path is required to initialize a cache.".to_string(),
                 ));
             }
-            let blockdev_pairs: Vec<_> = blockdevs.iter().map(|p| SimDev::new(p, None)).collect();
+            let blockdev_pairs: Vec<_> = blockdevs
+                .iter()
+                .map(|p| SimDev::new(p, Cow::Owned(EncryptionInfo::default())))
+                .collect();
             let blockdev_uuids: Vec<_> = blockdev_pairs.iter().map(|(uuid, _)| *uuid).collect();
             self.cache_devs.extend(blockdev_pairs);
             Ok(SetCreateAction::new(blockdev_uuids))
@@ -237,7 +256,7 @@ impl Pool for SimPool {
                     p,
                     match tier {
                         BlockDevTier::Data => self.encryption_info(),
-                        BlockDevTier::Cache => None,
+                        BlockDevTier::Cache => Cow::Owned(EncryptionInfo::default()),
                     },
                 )
             })
@@ -264,21 +283,20 @@ impl Pool for SimPool {
 
     fn bind_clevis(
         &mut self,
-        pin: String,
-        clevis_info: Value,
+        pin: &str,
+        clevis_info: &Value,
     ) -> StratisResult<CreateAction<Clevis>> {
         let encryption_info = self.encryption_info();
-        let clevis_info_current = encryption_info.and_then(|info| info.clevis_info.as_ref());
-        if encryption_info.is_some() {
-            if let Some(info) = clevis_info_current {
-                let clevis_tuple = (pin, clevis_info);
-                if info == &clevis_tuple {
+        let clevis_info_current = encryption_info.clevis_info.as_ref();
+        if self.is_encrypted() {
+            if let Some((current_pin, current_info)) = clevis_info_current {
+                if (current_pin.as_str(), current_info) == (pin, clevis_info) {
                     Ok(CreateAction::Identity)
                 } else {
                     Err(StratisError::Error(format!(
-                        "This pool is already bound with clevis pin and config {:?};
-                        this differs from the requested pin and config {:?}",
-                        info, clevis_tuple,
+                        "This pool is already bound with clevis pin {} and config {};
+                        this differs from the requested pin {} and config {}",
+                        current_pin, current_info, pin, clevis_info,
                     )))
                 }
             } else {
@@ -294,11 +312,72 @@ impl Pool for SimPool {
 
     fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<Clevis>> {
         let encryption_info = self.encryption_info();
-        let clevis_info = encryption_info.and_then(|info| info.clevis_info.as_ref());
-        if encryption_info.is_some() {
-            Ok(if clevis_info.is_some() {
+
+        if encryption_info.key_description.is_none() {
+            return Err(StratisError::Error(
+                "This device is not bound to a keyring passphrase; refusing to remove \
+                the only unlocking method"
+                    .to_string(),
+            ));
+        }
+
+        if encryption_info.is_encrypted() {
+            Ok(if encryption_info.clevis_info.is_some() {
                 self.clear_clevis_info();
                 DeleteAction::Deleted(Clevis)
+            } else {
+                DeleteAction::Identity
+            })
+        } else {
+            Err(StratisError::Error(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ))
+        }
+    }
+
+    fn bind_keyring(
+        &mut self,
+        key_description: &KeyDescription,
+    ) -> StratisResult<CreateAction<Key>> {
+        let encryption_info = self.encryption_info();
+        if encryption_info.is_encrypted() {
+            if let Some(ref kd) = encryption_info.key_description {
+                if key_description == kd {
+                    Ok(CreateAction::Identity)
+                } else {
+                    Err(StratisError::Error(format!(
+                        "This pool is already bound with key description {};
+                        this differs from the requested key description {}",
+                        kd.as_application_str(),
+                        key_description.as_application_str(),
+                    )))
+                }
+            } else {
+                self.add_key_desc(key_description);
+                Ok(CreateAction::Created(Key))
+            }
+        } else {
+            Err(StratisError::Error(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ))
+        }
+    }
+
+    fn unbind_keyring(&mut self) -> StratisResult<DeleteAction<Key>> {
+        let encryption_info = self.encryption_info();
+
+        if encryption_info.clevis_info.is_none() {
+            return Err(StratisError::Error(
+                "This device is not bound to Clevis; refusing to remove the only \
+                unlocking method"
+                    .to_string(),
+            ));
+        }
+
+        if self.is_encrypted() {
+            Ok(if encryption_info.key_description.is_some() {
+                self.clear_key_desc();
+                DeleteAction::Deleted(Key)
             } else {
                 DeleteAction::Identity
             })
@@ -482,8 +561,8 @@ impl Pool for SimPool {
         self.datadevs_encrypted()
     }
 
-    fn encryption_info(&self) -> Option<&EncryptionInfo> {
-        self.encryption_info_impl()
+    fn encryption_info(&self) -> Cow<EncryptionInfo> {
+        Cow::Borrowed(self.encryption_info_impl())
     }
 }
 
@@ -510,7 +589,7 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
@@ -532,7 +611,7 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
@@ -562,7 +641,7 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
@@ -591,7 +670,7 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
@@ -613,7 +692,7 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
@@ -635,7 +714,7 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
@@ -657,7 +736,7 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
@@ -685,7 +764,7 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
@@ -705,7 +784,7 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
@@ -732,7 +811,7 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
@@ -757,7 +836,7 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
@@ -782,7 +861,7 @@ mod tests {
                 "pool_name",
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()

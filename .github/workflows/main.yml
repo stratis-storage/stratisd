@@ -192,6 +192,57 @@ jobs:
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
+  # TESTS WITH TANG
+  checks_with_tang:
+    strategy:
+      matrix:
+        include:
+          # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
+          - task: >-
+              TANG_URL=tang
+              RUST_LOG=libstratis=debug
+              make -f Makefile test-clevis-loop
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+    runs-on: ubuntu-18.04
+    container:
+      image: ${{ matrix.image }}
+      options: --privileged -v /dev:/dev
+    services:
+      tang:
+        image: docker.pkg.github.com/stratis-storage/stratisd/tang:32
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+        options: --privileged -p 80:80
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies for Fedora
+        run: >
+          dnf install -y
+          clang
+          cryptsetup-devel
+          clevis
+          clevis-luks
+          curl
+          device-mapper-persistent-data
+          dbus-devel
+          libblkid-devel
+          make
+          systemd-devel
+          systemd-udev
+          xfsprogs
+      - name: Start udev
+        run: /usr/lib/systemd/systemd-udevd &
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: ${{ matrix.components }}
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
+        run: ${{ matrix.task }}
+
   # ALLOWED FAILURES
   allowed_failures:
     continue-on-error: true

@@ -6,7 +6,8 @@ use dbus::Message;
 use dbus_tree::{MTSync, MethodInfo, MethodResult};
 
 use crate::dbus_api::{
-    types::TData,
+    api::shared::create_pool_shared,
+    types::{CreatePoolParams, TData},
     util::{engine_to_dbus_err_tuple, msg_code_ok, msg_string_ok},
 };
 
@@ -28,4 +29,8 @@ pub fn engine_state_report(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
     };
 
     Ok(vec![msg])
+}
+
+pub fn create_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+    create_pool_shared(m, CreatePoolParams::Both)
 }

@@ -25,12 +25,14 @@ use crate::{
     engine::{
         strat_engine::{
             cmd::{clevis_luks_bind, clevis_luks_unbind, clevis_luks_unlock},
-            keys,
+            keys::{self, MemoryPrivateFilesystem},
             metadata::StratisIdentifiers,
             names::format_crypt_name,
         },
-        types::{BlockDevPath, EncryptionInfo, KeyDescription, SizedKeyMemory, UnlockMethod},
-        DevUuid, PoolUuid,
+        types::{
+            BlockDevPath, DevUuid, EncryptionInfo, KeyDescription, PoolUuid, SizedKeyMemory,
+            UnlockMethod,
+        },
     },
     stratis::{StratisError, StratisResult},
 };
@@ -213,7 +215,7 @@ impl CryptInitializer {
             nothing to clean up",
             self.physical_path.display()
         );
-        let result = self.initialize_with_err(&mut device, key_description);
+        let result = self.initialize_with_err(&mut device, Some(key_description), None);
         match result {
             Ok(activated_path) => Ok(CryptHandle::new(
                 self.physical_path,
@@ -239,22 +241,11 @@ impl CryptInitializer {
         }
     }
 
-    fn initialize_with_err(
+    fn initialize_with_keyring(
         &self,
         device: &mut CryptDevice,
         key_description: &KeyDescription,
-    ) -> StratisResult<PathBuf> {
-        log_on_failure!(
-            device.context_handle().format::<()>(
-                EncryptionFormat::Luks2,
-                ("aes", "xts-plain64"),
-                None,
-                libcryptsetup_rs::Either::Right(STRATIS_MEK_SIZE),
-                None,
-            ),
-            "Failed to format device {} with LUKS2 header",
-            self.physical_path.display()
-        );
+    ) -> StratisResult<()> {
         let key_option = log_on_failure!(
             read_key(key_description),
             "Failed to read key with key description {} from keyring",
@@ -279,19 +270,92 @@ impl CryptInitializer {
             "Failed to initialize keyslot with provided key in keyring"
         );
 
-        // Initialize keyring token
-        log_on_failure!(
-            device
-                .token_handle()
-                .luks2_keyring_set(Some(LUKS2_TOKEN_ID), &key_description.to_system_string()),
-            "Failed to initialize the LUKS2 token for driving keyring activation operations"
+        initialize_keyring_tokens(device, keyslot, key_description)
+    }
+
+    fn initialize_with_clevis(
+        &self,
+        device: &mut CryptDevice,
+        (pin, json): &(String, Value),
+    ) -> StratisResult<()> {
+        let fs = MemoryPrivateFilesystem::new().map_err(|e| LibcryptErr::Other(e.to_string()))?;
+        let keyfile = fs
+            .rand_key()
+            .map_err(|e| LibcryptErr::Other(e.to_string()))?;
+
+        let keyslot = log_on_failure!(
+            device.keyslot_handle().add_by_key(
+                None,
+                None,
+                keyfile.as_ref(),
+                CryptVolumeKeyFlags::empty(),
+            ),
+            "Failed to initialize keyslot with provided key in keyring"
         );
+
+        clevis_luks_bind(
+            &self.physical_path,
+            keyfile.keyfile_path(),
+            pin.as_str(),
+            &json,
+            // FIXME: Pass yes variable
+            false,
+        )
+        .map_err(|e| LibcryptErr::Other(e.to_string()))?;
+
+        device.keyslot_handle().destroy(keyslot)?;
+
+        Ok(())
+    }
+
+    fn initialize_with_both(
+        &self,
+        device: &mut CryptDevice,
+        key_description: &KeyDescription,
+        (pin, json): &(String, Value),
+    ) -> StratisResult<()> {
+        self.initialize_with_keyring(device, key_description)?;
+
+        let fs = MemoryPrivateFilesystem::new().map_err(|e| LibcryptErr::Other(e.to_string()))?;
+        fs.key_op(key_description, |kf| {
+            clevis_luks_bind(
+                &self.physical_path,
+                kf,
+                pin.as_str(),
+                &json,
+                // FIXME: Pass yes variable
+                false,
+            )
+        })
+        .map_err(|e| LibcryptErr::Other(e.to_string()))?;
+
+        Ok(())
+    }
+
+    fn initialize_with_err(
+        &self,
+        device: &mut CryptDevice,
+        key_description: Option<&KeyDescription>,
+        clevis_info: Option<(String, Value)>,
+    ) -> StratisResult<PathBuf> {
         log_on_failure!(
-            device
-                .token_handle()
-                .assign_keyslot(LUKS2_TOKEN_ID, Some(keyslot)),
-            "Failed to assign the LUKS2 keyring token to the Stratis keyslot"
+            device.context_handle().format::<()>(
+                EncryptionFormat::Luks2,
+                ("aes", "xts-plain64"),
+                None,
+                libcryptsetup_rs::Either::Right(STRATIS_MEK_SIZE),
+                None,
+            ),
+            "Failed to format device {} with LUKS2 header",
+            self.physical_path.display()
         );
+
+        match (key_description, clevis_info) {
+            (Some(kd), Some(ref ci)) => self.initialize_with_both(device, kd, ci)?,
+            (Some(kd), _) => self.initialize_with_keyring(device, kd)?,
+            (_, Some(ref ci)) => self.initialize_with_clevis(device, ci)?,
+            (_, _) => unreachable!(),
+        };
 
         // Initialize stratis token
         log_on_failure!(
@@ -306,7 +370,14 @@ impl CryptInitializer {
             "Failed to create the Stratis token"
         );
 
-        activate_and_check_device_path(device, key_description, &self.activation_name)
+        activate(
+            if let Some(kd) = key_description {
+                Either::Left((device, kd))
+            } else {
+                Either::Right(&self.physical_path)
+            },
+            &self.activation_name,
+        )
     }
 
     pub fn rollback(
@@ -553,6 +624,29 @@ impl CryptHandle {
     }
 }
 
+/// Initialize LUKS2 keyring token
+fn initialize_keyring_tokens(
+    device: &mut CryptDevice,
+    keyslot: libc::c_uint,
+    key_description: &KeyDescription,
+) -> StratisResult<()> {
+    log_on_failure!(
+        device
+            .token_handle()
+            .luks2_keyring_set(Some(LUKS2_TOKEN_ID), &key_description.to_system_string()),
+        "Failed to initialize the LUKS2 token for driving keyring activation operations"
+    );
+    log_on_failure!(
+        device
+            .token_handle()
+            .assign_keyslot(LUKS2_TOKEN_ID, Some(keyslot)),
+        "Failed to assign the LUKS2 keyring token to the Stratis keyslot"
+    );
+    Ok(())
+}
+
+/// Set up a handle to a crypt device using either Clevis or the keyring to activate
+/// the device.
 fn setup_crypt_handle(
     physical_path: &Path,
     unlock_method: Option<UnlockMethod>,
@@ -587,9 +681,9 @@ fn setup_crypt_handle(
 
     let activated_path = match unlock_method {
         Some(UnlockMethod::Keyring) => {
-            activate(&mut device, Either::Left(&key_description), &name)?
+            activate(Either::Left((&mut device, &key_description)), &name)?
         }
-        Some(UnlockMethod::Clevis) => activate(&mut device, Either::Right(physical_path), &name)?,
+        Some(UnlockMethod::Clevis) => activate(Either::Right(physical_path), &name)?,
         None => [DEVICEMAPPER_PATH, &name].iter().collect(),
     };
 
@@ -878,32 +972,11 @@ fn device_is_active(device: Option<&mut CryptDevice>, device_name: &str) -> Stra
     }
 }
 
-/// Activate device by token then check that the logical path exists corresponding
-/// to the activation name passed into this method.
-fn activate_and_check_device_path(
-    crypt_device: &mut CryptDevice,
-    key_desc: &KeyDescription,
-    name: &str,
-) -> StratisResult<PathBuf> {
-    let key_description_missing = keys::search_key_persistent(key_desc)
-        .map_err(|_| {
-            StratisError::Error(format!(
-                "Searching the persistent keyring for the key description {} failed.",
-                key_desc.as_application_str(),
-            ))
-        })?
-        .is_none();
-    if key_description_missing {
-        warn!(
-            "Key description {} was not found in the keyring",
-            key_desc.as_application_str()
-        );
-        return Err(StratisError::Error(format!(
-            "The key description \"{}\" is not currently set.",
-            key_desc.as_application_str(),
-        )));
-    }
-
+/// Activate device by LUKS2 keyring token.
+///
+/// Precondition: The key description has been verfified to be present in the keyring
+/// if matches!(unlock_method, UnlockMethod::Keyring).
+fn activate_with_keyring(crypt_device: &mut CryptDevice, name: &str) -> StratisResult<()> {
     // Activate by token
     log_on_failure!(
         crypt_device.token_handle().activate_by_token::<()>(
@@ -915,9 +988,46 @@ fn activate_and_check_device_path(
         "Failed to activate device with name {}",
         name
     );
+    Ok(())
+}
+
+/// Activate encrypted Stratis device using the name stored in the
+/// Stratis token.
+fn activate(
+    unlock_param: Either<(&mut CryptDevice, &KeyDescription), &Path>,
+    name: &str,
+) -> StratisResult<PathBuf> {
+    let crypt_device = match unlock_param {
+        Either::Left((device, kd)) => {
+            let key_description_missing = keys::search_key_persistent(kd)
+                .map_err(|_| {
+                    LibcryptErr::Other(format!(
+                        "Searching the persistent keyring for the key description {} failed.",
+                        kd.as_application_str(),
+                    ))
+                })?
+                .is_none();
+            if key_description_missing {
+                warn!(
+                    "Key description {} was not found in the keyring",
+                    kd.as_application_str()
+                );
+                return Err(StratisError::Error(format!(
+                    "The key description \"{}\" is not currently set.",
+                    kd.as_application_str(),
+                )));
+            }
+            activate_with_keyring(device, name)?;
+            Some(device)
+        }
+        Either::Right(path) => {
+            clevis_luks_unlock(path, name).map_err(|e| LibcryptErr::Other(e.to_string()))?;
+            None
+        }
+    };
 
     // Check activation status.
-    device_is_active(Some(crypt_device), name)?;
+    device_is_active(crypt_device, name)?;
 
     // Checking that the symlink was created may also be valuable in case a race
     // condition occurs with udev.
@@ -930,22 +1040,6 @@ fn activate_and_check_device_path(
         Ok(activated_path)
     } else {
         Err(StratisError::Io(io::Error::from(io::ErrorKind::NotFound)))
-    }
-}
-
-/// Activate encrypted Stratis device using the name stored in the
-/// Stratis token
-fn activate(
-    crypt_device: &mut CryptDevice,
-    unlock_param: Either<&KeyDescription, &Path>,
-    name: &str,
-) -> StratisResult<PathBuf> {
-    match unlock_param {
-        Either::Left(kd) => activate_and_check_device_path(crypt_device, kd, name),
-        Either::Right(path) => {
-            clevis_luks_unlock(path, name)?;
-            Ok([DEVICEMAPPER_PATH, name].iter().collect())
-        }
     }
 }
 

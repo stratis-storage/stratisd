@@ -668,6 +668,12 @@ impl MemoryMappedKeyfile {
     }
 }
 
+impl AsRef<[u8]> for MemoryMappedKeyfile {
+    fn as_ref(&self) -> &[u8] {
+        unsafe { slice::from_raw_parts(self.0 as *const u8, self.1) }
+    }
+}
+
 impl Drop for MemoryMappedKeyfile {
     fn drop(&mut self) {
         {

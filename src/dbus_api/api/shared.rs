@@ -187,7 +187,10 @@ pub fn locked_pools(
         .map(|(u, info)| {
             (
                 uuid_to_string!(u),
-                info.info.key_description.as_application_str().to_string(),
+                info.info
+                    .key_description
+                    .map(|kd| kd.as_application_str().to_string())
+                    .unwrap_or_else(String::new),
             )
         })
         .collect())

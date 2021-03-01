@@ -556,7 +556,8 @@ pub fn initialize_devices(
                 &dev_info.devnode,
                 pool_uuid,
                 dev_uuid,
-                &info.key_description,
+                // FIXME: Make optional
+                info.key_description.as_ref().unwrap(),
                 info.clevis_info
                     .as_ref()
                     .map(|(pin, json)| (pin.as_str(), json)),
@@ -711,7 +712,7 @@ mod tests {
             pool_uuid,
             MDADataSize::default(),
             key_description.map(|kd| EncryptionInfo {
-                key_description: kd.clone(),
+                key_description: Some(kd.clone()),
                 clevis_info: None,
             }),
         )?;
@@ -965,7 +966,7 @@ mod tests {
             pool_uuid,
             MDADataSize::default(),
             key_desc.map(|kd| EncryptionInfo {
-                key_description: kd.clone(),
+                key_description: Some(kd.clone()),
                 clevis_info: None,
             }),
         )

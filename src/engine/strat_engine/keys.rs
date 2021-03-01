@@ -4,7 +4,7 @@
 
 use std::{
     ffi::CString,
-    fs::{create_dir_all, remove_file, set_permissions, OpenOptions, Permissions},
+    fs::{create_dir_all, remove_file, set_permissions, File, OpenOptions, Permissions},
     io::{self, Read, Write},
     mem::size_of,
     os::unix::{
@@ -665,6 +665,12 @@ impl MemoryMappedKeyfile {
 
     pub fn keyfile_path(&self) -> &Path {
         &self.2
+    }
+}
+
+impl AsRef<[u8]> for MemoryMappedKeyfile {
+    fn as_ref(&self) -> &[u8] {
+        unsafe { slice::from_raw_parts(self.0 as *const u8, self.1) }
     }
 }
 

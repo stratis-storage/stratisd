@@ -70,22 +70,27 @@ pub fn create_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult 
             let v = newly_created_filesystems
                 .iter()
                 .map(|&(name, uuid)| {
+                    let filesystem = pool.get_filesystem(uuid)
+                        .expect("just inserted by create_filesystems")
+                        .1;
                     // FIXME: To avoid this expect, modify create_filesystem
                     // so that it returns a mutable reference to the
                     // filesystem created.
-                    (
+                    let info = (
                         create_dbus_filesystem(
                             dbus_context,
                             object_path.clone(),
                             &pool_name,
                             &Name::new(name.to_string()),
                             uuid,
-                            pool.get_filesystem(uuid)
-                                .expect("just inserted by create_filesystems")
-                                .1,
+                            filesystem,
                         ),
                         name,
-                    )
+                    );
+                    if let Err(e) = filesystem.send_udev_change() {
+                        warn!("Failed to send a synthetic udev event after filesystem creation for udev rule: {}", e);
+                    }
+                    info
                 })
                 .collect::<Vec<_>>();
             (true, v)

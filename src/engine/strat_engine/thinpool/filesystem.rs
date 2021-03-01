@@ -5,8 +5,8 @@
 use chrono::{DateTime, TimeZone, Utc};
 
 use std::{
-    fs::File,
-    io::Read,
+    fs::{File, OpenOptions},
+    io::{Read, Write},
     path::{Path, PathBuf},
     thread::sleep,
     time::Duration,
@@ -291,6 +291,22 @@ impl StratFilesystem {
 }
 
 impl Filesystem for StratFilesystem {
+    fn send_udev_change(&self) -> StratisResult<()> {
+        let device = self.thin_dev.device();
+        let uevent_file = [
+            "/sys/dev/block",
+            &format!("{}:{}", device.major, device.minor),
+            "uevent",
+        ]
+        .iter()
+        .collect::<PathBuf>();
+        OpenOptions::new()
+            .write(true)
+            .open(&uevent_file)?
+            .write_all("change".as_bytes())?;
+        Ok(())
+    }
+
     fn devnode(&self) -> PathBuf {
         self.thin_dev.devnode()
     }

@@ -146,7 +146,7 @@ impl BlockDevMgr {
                 pool_uuid,
                 mda_data_size,
                 key_desc.map(|k| EncryptionInfo {
-                    key_description: k.clone(),
+                    key_description: Some(k.clone()),
                     clevis_info: None,
                 }),
             )?,

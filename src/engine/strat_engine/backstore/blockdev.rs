@@ -221,8 +221,11 @@ impl StratBlockDev {
             StratisError::Error("This device does not appear to be encrypted".to_string())
         })?;
         let key_description = crypt_handle.encryption_info().key_description.clone();
-        memfs.key_op(&key_description, |keyfile_path| {
-            crypt_handle.clevis_bind(keyfile_path, pin, clevis_info, yes)
+        memfs.key_op(key_description.as_ref().ok_or_else(|| {
+            StratisError::Error("A key description is required to bind to clevis after initialization but none was found".to_string())
+        })?, |keyfile_path| {
+            crypt_handle
+                .clevis_bind(keyfile_path, pin, clevis_info, yes)
         })
     }
 

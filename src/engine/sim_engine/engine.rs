@@ -115,7 +115,7 @@ impl Engine for SimEngine {
                         &devices,
                         redundancy,
                         key_desc.map(|kd| EncryptionInfo {
-                            key_description: kd,
+                            key_description: Some(kd),
                             clevis_info: None,
                         }),
                     );

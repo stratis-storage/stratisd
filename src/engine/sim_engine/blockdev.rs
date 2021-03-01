@@ -122,10 +122,12 @@ impl<'a> Into<Value> for &'a SimDev {
             ref clevis_info,
         }) = self.encryption_info
         {
-            json.insert(
-                "key_description".to_string(),
-                Value::from(key_description.as_application_str()),
-            );
+            if let Some(kd) = key_description {
+                json.insert(
+                    "key_description".to_string(),
+                    Value::from(kd.as_application_str()),
+                );
+            }
             if let Some((ref pin, ref config)) = clevis_info {
                 json.insert("clevis_pin".to_string(), Value::from(pin.to_owned()));
                 json.insert("clevis_config".to_string(), config.to_owned());

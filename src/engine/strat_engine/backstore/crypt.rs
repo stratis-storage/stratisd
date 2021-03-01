@@ -220,7 +220,7 @@ impl CryptInitializer {
                 activated_path,
                 self.identifiers,
                 EncryptionInfo {
-                    key_description: key_description.clone(),
+                    key_description: Some(key_description.clone()),
                     clevis_info: None,
                 },
                 self.activation_name,
@@ -600,7 +600,7 @@ fn setup_crypt_handle(
         ),
         identifiers,
         encryption_info: EncryptionInfo {
-            key_description,
+            key_description: Some(key_description),
             clevis_info,
         },
         name,

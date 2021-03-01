@@ -65,7 +65,8 @@ pub fn get_pool_encryption_key_desc(
     pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
         Ok(option_to_tuple(
             pool.encryption_info()
-                .map(|i| i.key_description.as_application_str().to_string()),
+                .and_then(|i| i.key_description.as_ref())
+                .map(|kd| kd.as_application_str().to_string()),
             String::new(),
         ))
     })

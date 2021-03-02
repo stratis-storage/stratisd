@@ -63,7 +63,7 @@ impl DbusErrorEnum {
 #[derive(Debug)]
 pub enum DbusAction {
     Add(ObjectPath<MTSync<TData>, TData>),
-    Remove(Vec<Path<'static>>),
+    Remove(Path<'static>),
 }
 
 /// Indicates the type of object pointed to by the object path.
@@ -132,9 +132,7 @@ impl DbusContext {
     /// more than 2^64 object paths. If it turns out that this is a bad
     /// assumption, the solution is to use unbounded integers.
     pub fn get_next_id(&self) -> u64 {
-        let index = self.next_index.load(Ordering::Acquire) + 1;
-        self.next_index.store(index, Ordering::Release);
-        index
+        self.next_index.fetch_add(1, Ordering::Relaxed)
     }
 
     pub fn push_add(
@@ -193,14 +191,12 @@ impl DbusContext {
         tree: &Tree<MTSync<TData>, TData>,
         interfaces: InterfacesRemoved,
     ) {
-        let mut paths = Vec::new();
         for opath in tree.iter().filter(|opath| {
             opath
                 .get_data()
                 .as_ref()
                 .map_or(false, |op_cxt| op_cxt.parent == *item)
         }) {
-            paths.push(opath.get_name().clone());
             if self
                 .removed_object_signal(
                     opath.get_name().clone(),
@@ -220,7 +216,6 @@ impl DbusContext {
                 warn!("Signal on object removal was not sent to the D-Bus client");
             };
         }
-        paths.push(item.clone());
         if self
             .removed_object_signal(item.clone(), interfaces)
             .is_err()
@@ -228,7 +223,7 @@ impl DbusContext {
             warn!("Signal on object removal was not sent to the D-Bus client");
         };
 
-        if let Err(e) = block_on(self.sender.send(DbusAction::Remove(paths))) {
+        if let Err(e) = block_on(self.sender.send(DbusAction::Remove(item.clone()))) {
             warn!(
                 "D-Bus remove event could not be sent to the processing thread; the D-Bus \
                 server will still expect the D-Bus object with path {} to be present: {}",

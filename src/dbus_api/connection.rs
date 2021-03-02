@@ -4,7 +4,11 @@
 
 use std::sync::Arc;
 
-use dbus::{channel::Sender, message::MatchRule, nonblock::SyncConnection};
+use dbus::{
+    channel::{default_reply, Sender},
+    message::MatchRule,
+    nonblock::SyncConnection,
+};
 use dbus_tree::{MTSync, Tree};
 use futures::{executor::block_on, StreamExt};
 use tokio::{
@@ -86,6 +90,13 @@ impl DbusConnectionHandler {
                 if let Some(msgs) = lock.handle(&msg) {
                     for msg in msgs {
                         if connection.send(msg).is_err() {
+                            warn!("Failed to send reply to D-Bus client");
+                        }
+                    }
+                } else {
+                    let reply = default_reply(&msg);
+                    if let Some(r) = reply {
+                        if connection.send(r).is_err() {
                             warn!("Failed to send reply to D-Bus client");
                         }
                     }

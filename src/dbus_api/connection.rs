@@ -47,10 +47,23 @@ impl DbusTreeHandler {
             let mut write_lock = self.tree.write().await;
             match action {
                 DbusAction::Add(path) => write_lock.insert(path),
-                DbusAction::Remove(paths) => {
+                DbusAction::Remove(path) => {
+                    let paths = write_lock
+                        .iter()
+                        .filter_map(|opath| {
+                            opath.get_data().as_ref().and_then(|op_cxt| {
+                                if op_cxt.parent == path {
+                                    Some(opath.get_name().clone())
+                                } else {
+                                    None
+                                }
+                            })
+                        })
+                        .collect::<Vec<_>>();
                     for path in paths {
                         write_lock.remove(&path);
                     }
+                    write_lock.remove(&path);
                 }
             }
         }

@@ -11,6 +11,7 @@ use dbus::{
     nonblock::{
         stdintf::org_freedesktop_dbus::{
             ObjectManagerInterfacesAdded, ObjectManagerInterfacesRemoved,
+            PropertiesPropertiesChanged,
         },
         SyncConnection,
     },
@@ -107,6 +108,69 @@ impl DbusTreeHandler {
                         warn!("Signal on object removal was not sent to the D-Bus client");
                     };
                 }
+                DbusAction::FsNameChange(item, new_name) => {
+                    let mut changed = HashMap::new();
+                    changed.insert(
+                        consts::FILESYSTEM_NAME_PROP.into(),
+                        Variant(new_name.to_string().box_clone()),
+                    );
+                    if self
+                        .property_changed_invalidated_signal(
+                            &item,
+                            changed,
+                            vec![consts::FILESYSTEM_DEVNODE_PROP.into()],
+                            &consts::standard_filesystem_interfaces(),
+                        )
+                        .is_err()
+                    {
+                        warn!("Signal on filesystem name change was not sent to the D-Bus client");
+                    }
+                }
+                DbusAction::PoolNameChange(item, new_name) => {
+                    let mut changed = HashMap::new();
+                    changed.insert(
+                        consts::POOL_NAME_PROP.into(),
+                        Variant(new_name.to_string().box_clone()),
+                    );
+
+                    if self
+                        .property_changed_invalidated_signal(
+                            &item,
+                            changed,
+                            vec![],
+                            &consts::standard_pool_interfaces(),
+                        )
+                        .is_err()
+                    {
+                        warn!("Signal on pool name change was not sent to the D-Bus client");
+                    }
+
+                    for opath in write_lock.iter().filter(|opath| {
+                        opath
+                            .get_data()
+                            .as_ref()
+                            .map_or(false, |op_cxt| op_cxt.parent == item)
+                    }) {
+                        if let StratisUuid::Fs(_) = opath
+                            .get_data()
+                            .as_ref()
+                            .expect("all objects with parents have data")
+                            .uuid
+                        {
+                            if self
+                                .property_changed_invalidated_signal(
+                                    &opath.get_name().clone(),
+                                    HashMap::new(),
+                                    vec![consts::FILESYSTEM_DEVNODE_PROP.into()],
+                                    &consts::standard_filesystem_interfaces(),
+                                )
+                                .is_err()
+                            {
+                                warn!("Signal on filesystem devnode change was not sent to the D-Bus client");
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -155,6 +219,30 @@ impl DbusTreeHandler {
             .map_err(|_| {
                 dbus::Error::new_failed("Failed to send the requested signal on the D-Bus.")
             })
+    }
+
+    fn property_changed_invalidated_signal(
+        &self,
+        object: &Path,
+        changed_properties: HashMap<String, Variant<Box<dyn RefArg>>>,
+        invalidated_properties: Vec<String>,
+        interfaces: &[String],
+    ) -> Result<(), dbus::Error> {
+        let mut prop_changed = PropertiesPropertiesChanged {
+            changed_properties,
+            invalidated_properties,
+            interface_name: "temp_value".into(),
+        };
+
+        interfaces.iter().try_for_each(|interface| {
+            prop_changed.interface_name = interface.to_owned();
+            self.connection
+                .send(prop_changed.to_emit_message(object))
+                .map(|_| ())
+                .map_err(|_| {
+                    dbus::Error::new_failed("Failed to send the requested signal on the D-Bus.")
+                })
+        })
     }
 }
 

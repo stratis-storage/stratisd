@@ -48,7 +48,7 @@ pub fn destroy_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
 
     let msg = match log_action!(mutex_lock!(dbus_context.engine).destroy_pool(pool_uuid)) {
         Ok(DeleteAction::Deleted(uuid)) => {
-            dbus_context.push_remove(&pool_path, m.tree, consts::pool_interface_list());
+            dbus_context.push_remove(&pool_path, consts::pool_interface_list());
             return_message.append3(
                 (true, uuid_to_string!(uuid)),
                 msg_code_ok(),

@@ -155,7 +155,7 @@ pub fn destroy_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
                     let op = filesystem_map
                         .get(uuid)
                         .expect("'uuids' is a subset of filesystem_map.keys()");
-                    dbus_context.push_remove(op, m.tree, filesystem_interface_list());
+                    dbus_context.push_remove(op, filesystem_interface_list());
                 }
                 changed_uuids
                     .iter()

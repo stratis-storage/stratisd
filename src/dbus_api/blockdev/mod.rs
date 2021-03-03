@@ -8,7 +8,7 @@ use dbus_tree::Factory;
 use crate::{
     dbus_api::{
         consts,
-        types::{DbusContext, InterfacesAdded, OPContext, ObjectPathType},
+        types::{DbusContext, InterfacesAdded, OPContext},
         util::make_object_path,
     },
     engine::{BlockDev, BlockDevTier, DevUuid, StratisUuid},
@@ -33,11 +33,7 @@ pub fn create_dbus_blockdev<'a>(
     let object_path = f
         .object_path(
             object_name,
-            Some(OPContext::new(
-                parent.clone(),
-                StratisUuid::Dev(uuid),
-                ObjectPathType::Blockdev,
-            )),
+            Some(OPContext::new(parent.clone(), StratisUuid::Dev(uuid))),
         )
         .introspectable()
         .add(

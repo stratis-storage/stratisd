@@ -2,12 +2,19 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use dbus::{
+    arg::{RefArg, Variant},
     channel::{default_reply, Sender},
-    message::MatchRule,
-    nonblock::SyncConnection,
+    message::{MatchRule, SignalArgs},
+    nonblock::{
+        stdintf::org_freedesktop_dbus::{
+            ObjectManagerInterfacesAdded, ObjectManagerInterfacesRemoved,
+        },
+        SyncConnection,
+    },
+    Path,
 };
 use dbus_tree::{MTSync, Tree};
 use futures::{executor::block_on, StreamExt};
@@ -17,7 +24,11 @@ use tokio::{
 };
 
 use crate::{
-    dbus_api::types::{DbusAction, TData},
+    dbus_api::{
+        consts,
+        types::{DbusAction, InterfacesAdded, InterfacesRemoved, TData},
+    },
+    engine::StratisUuid,
     stratis::{StratisError, StratisResult},
 };
 
@@ -26,14 +37,20 @@ use crate::{
 pub struct DbusTreeHandler {
     tree: Arc<RwLock<Tree<MTSync<TData>, TData>>>,
     receiver: Receiver<DbusAction>,
+    connection: Arc<SyncConnection>,
 }
 
 impl DbusTreeHandler {
     pub fn new(
         tree: Arc<RwLock<Tree<MTSync<TData>, TData>>>,
         receiver: Receiver<DbusAction>,
+        connection: Arc<SyncConnection>,
     ) -> Self {
-        DbusTreeHandler { tree, receiver }
+        DbusTreeHandler {
+            tree,
+            receiver,
+            connection,
+        }
     }
 
     /// Process a D-Bus action (add/remove) request.
@@ -46,27 +63,98 @@ impl DbusTreeHandler {
             })?;
             let mut write_lock = self.tree.write().await;
             match action {
-                DbusAction::Add(path) => write_lock.insert(path),
-                DbusAction::Remove(path) => {
+                DbusAction::Add(path, interfaces) => {
+                    let path_name = path.get_name().clone();
+                    write_lock.insert(path);
+                    if self.added_object_signal(path_name, interfaces).is_err() {
+                        warn!("Signal on object add was not sent to the D-Bus client");
+                    }
+                }
+                DbusAction::Remove(path, interfaces) => {
                     let paths = write_lock
                         .iter()
                         .filter_map(|opath| {
                             opath.get_data().as_ref().and_then(|op_cxt| {
                                 if op_cxt.parent == path {
-                                    Some(opath.get_name().clone())
+                                    Some((
+                                        opath.get_name().clone(),
+                                        match op_cxt.uuid {
+                                            StratisUuid::Pool(_) => consts::pool_interface_list(),
+                                            StratisUuid::Fs(_) => {
+                                                consts::filesystem_interface_list()
+                                            }
+                                            StratisUuid::Dev(_) => {
+                                                consts::blockdev_interface_list()
+                                            }
+                                        },
+                                    ))
                                 } else {
                                     None
                                 }
                             })
                         })
                         .collect::<Vec<_>>();
-                    for path in paths {
+                    for (path, interfaces) in paths {
                         write_lock.remove(&path);
+                        if self.removed_object_signal(path, interfaces).is_err() {
+                            warn!("Signal on object removal was not sent to the D-Bus client");
+                        };
                     }
-                    write_lock.remove(&path);
+                    if self
+                        .removed_object_signal(path.clone(), interfaces)
+                        .is_err()
+                    {
+                        warn!("Signal on object removal was not sent to the D-Bus client");
+                    };
                 }
             }
         }
+    }
+
+    /// Send an InterfacesAdded signal on the D-Bus
+    fn added_object_signal(
+        &self,
+        object: Path<'static>,
+        interfaces: InterfacesAdded,
+    ) -> Result<(), dbus::Error> {
+        self.connection
+            .send(
+                ObjectManagerInterfacesAdded {
+                    object,
+                    interfaces: interfaces
+                        .into_iter()
+                        .map(|(k, map)| {
+                            let new_map: HashMap<String, Variant<Box<dyn RefArg>>> = map
+                                .into_iter()
+                                .map(|(subk, var)| (subk, Variant(var.0 as Box<dyn RefArg>)))
+                                .collect();
+                            (k, new_map)
+                        })
+                        .collect(),
+                }
+                .to_emit_message(&Path::from(consts::STRATIS_BASE_PATH)),
+            )
+            .map(|_| ())
+            .map_err(|_| {
+                dbus::Error::new_failed("Failed to send the requested signal on the D-Bus.")
+            })
+    }
+
+    /// Send an InterfacesRemoved signal on the D-Bus
+    fn removed_object_signal(
+        &self,
+        object: Path<'static>,
+        interfaces: InterfacesRemoved,
+    ) -> Result<(), dbus::Error> {
+        self.connection
+            .send(
+                ObjectManagerInterfacesRemoved { object, interfaces }
+                    .to_emit_message(&Path::from(consts::STRATIS_BASE_PATH)),
+            )
+            .map(|_| ())
+            .map_err(|_| {
+                dbus::Error::new_failed("Failed to send the requested signal on the D-Bus.")
+            })
     }
 }
 

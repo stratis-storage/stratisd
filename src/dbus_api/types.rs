@@ -13,9 +13,7 @@ use std::{
 
 use dbus::{
     arg::{RefArg, Variant},
-    blocking::stdintf::org_freedesktop_dbus::{
-        ObjectManagerInterfacesAdded, ObjectManagerInterfacesRemoved, PropertiesPropertiesChanged,
-    },
+    blocking::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged,
     channel::Sender,
     message::SignalArgs,
     nonblock::SyncConnection,
@@ -62,16 +60,8 @@ impl DbusErrorEnum {
 
 #[derive(Debug)]
 pub enum DbusAction {
-    Add(ObjectPath<MTSync<TData>, TData>),
-    Remove(Path<'static>),
-}
-
-/// Indicates the type of object pointed to by the object path.
-#[derive(Debug)]
-pub enum ObjectPathType {
-    Pool,
-    Filesystem,
-    Blockdev,
+    Add(ObjectPath<MTSync<TData>, TData>, InterfacesAdded),
+    Remove(Path<'static>, InterfacesRemoved),
 }
 
 /// Context for an object path.
@@ -81,16 +71,11 @@ pub enum ObjectPathType {
 pub struct OPContext {
     pub(super) parent: Path<'static>,
     pub(super) uuid: StratisUuid,
-    pub(super) op_type: ObjectPathType,
 }
 
 impl OPContext {
-    pub fn new(parent: Path<'static>, uuid: StratisUuid, op_type: ObjectPathType) -> OPContext {
-        OPContext {
-            parent,
-            uuid,
-            op_type,
-        }
+    pub fn new(parent: Path<'static>, uuid: StratisUuid) -> OPContext {
+        OPContext { parent, uuid }
     }
 }
 
@@ -141,13 +126,7 @@ impl DbusContext {
         interfaces: InterfacesAdded,
     ) {
         let object_path_name = object_path.get_name().clone();
-        if self
-            .added_object_signal(object_path_name.clone(), interfaces)
-            .is_err()
-        {
-            warn!("Signal on object add was not sent to the D-Bus client");
-        }
-        if let Err(e) = block_on(self.sender.send(DbusAction::Add(object_path))) {
+        if let Err(e) = block_on(self.sender.send(DbusAction::Add(object_path, interfaces))) {
             warn!(
                 "D-Bus add event could not be sent to the processing thread; the D-Bus \
                 server will not be aware of the D-Bus object with path {}: {}",
@@ -156,97 +135,17 @@ impl DbusContext {
         }
     }
 
-    /// Send an InterfacesAdded signal on the D-Bus
-    fn added_object_signal(
-        &self,
-        object: Path<'static>,
-        interfaces: InterfacesAdded,
-    ) -> Result<(), dbus::Error> {
-        self.connection
-            .send(
-                ObjectManagerInterfacesAdded {
-                    object,
-                    interfaces: interfaces
-                        .into_iter()
-                        .map(|(k, map)| {
-                            let new_map: HashMap<String, Variant<Box<dyn RefArg>>> = map
-                                .into_iter()
-                                .map(|(subk, var)| (subk, Variant(var.0 as Box<dyn RefArg>)))
-                                .collect();
-                            (k, new_map)
-                        })
-                        .collect(),
-                }
-                .to_emit_message(&Path::from(consts::STRATIS_BASE_PATH)),
-            )
-            .map(|_| ())
-            .map_err(|_| {
-                dbus::Error::new_failed("Failed to send the requested signal on the D-Bus.")
-            })
-    }
-
-    pub fn push_remove(
-        &self,
-        item: &Path<'static>,
-        tree: &Tree<MTSync<TData>, TData>,
-        interfaces: InterfacesRemoved,
-    ) {
-        for opath in tree.iter().filter(|opath| {
-            opath
-                .get_data()
-                .as_ref()
-                .map_or(false, |op_cxt| op_cxt.parent == *item)
-        }) {
-            if self
-                .removed_object_signal(
-                    opath.get_name().clone(),
-                    match opath
-                        .get_data()
-                        .as_ref()
-                        .expect("all objects with parents have data")
-                        .op_type
-                    {
-                        ObjectPathType::Pool => consts::pool_interface_list(),
-                        ObjectPathType::Filesystem => consts::filesystem_interface_list(),
-                        ObjectPathType::Blockdev => consts::blockdev_interface_list(),
-                    },
-                )
-                .is_err()
-            {
-                warn!("Signal on object removal was not sent to the D-Bus client");
-            };
-        }
-        if self
-            .removed_object_signal(item.clone(), interfaces)
-            .is_err()
-        {
-            warn!("Signal on object removal was not sent to the D-Bus client");
-        };
-
-        if let Err(e) = block_on(self.sender.send(DbusAction::Remove(item.clone()))) {
+    pub fn push_remove(&self, item: &Path<'static>, interfaces: InterfacesRemoved) {
+        if let Err(e) = block_on(
+            self.sender
+                .send(DbusAction::Remove(item.clone(), interfaces)),
+        ) {
             warn!(
                 "D-Bus remove event could not be sent to the processing thread; the D-Bus \
                 server will still expect the D-Bus object with path {} to be present: {}",
                 item, e,
             )
         }
-    }
-
-    /// Send an InterfacesRemoved signal on the D-Bus
-    fn removed_object_signal(
-        &self,
-        object: Path<'static>,
-        interfaces: InterfacesRemoved,
-    ) -> Result<(), dbus::Error> {
-        self.connection
-            .send(
-                ObjectManagerInterfacesRemoved { object, interfaces }
-                    .to_emit_message(&Path::from(consts::STRATIS_BASE_PATH)),
-            )
-            .map(|_| ())
-            .map_err(|_| {
-                dbus::Error::new_failed("Failed to send the requested signal on the D-Bus.")
-            })
     }
 
     /// Send changed signal for Name property and invalidated signal for
@@ -303,11 +202,11 @@ impl DbusContext {
                 .as_ref()
                 .map_or(false, |op_cxt| op_cxt.parent == *item)
         }) {
-            if let ObjectPathType::Filesystem = opath
+            if let StratisUuid::Fs(_) = opath
                 .get_data()
                 .as_ref()
                 .expect("all objects with parents have data")
-                .op_type
+                .uuid
             {
                 if self
                     .property_changed_invalidated_signal(

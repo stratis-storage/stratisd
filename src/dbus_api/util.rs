@@ -178,12 +178,12 @@ pub async fn create_dbus_handlers(
         .await?;
 
     let tree = Arc::new(RwLock::new(tree));
-    let connection = DbusConnectionHandler::new(conn, Arc::clone(&tree));
+    let connection = DbusConnectionHandler::new(Arc::clone(&conn), Arc::clone(&tree));
     let udev = DbusUdevHandler {
         receiver: udev_receiver,
         path: object_path,
         dbus_context,
     };
-    let tree = DbusTreeHandler::new(tree, receiver);
+    let tree = DbusTreeHandler::new(tree, receiver, conn);
     Ok((connection, udev, tree))
 }

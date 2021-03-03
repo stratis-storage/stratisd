@@ -8,7 +8,7 @@ use dbus_tree::Factory;
 use crate::{
     dbus_api::{
         consts,
-        types::{DbusContext, InterfacesAdded, OPContext, ObjectPathType},
+        types::{DbusContext, InterfacesAdded, OPContext},
         util::make_object_path,
     },
     engine::{Name, Pool, PoolUuid, StratisUuid},
@@ -36,11 +36,7 @@ pub fn create_dbus_pool<'a>(
     let object_path = f
         .object_path(
             object_name,
-            Some(OPContext::new(
-                parent,
-                StratisUuid::Pool(uuid),
-                ObjectPathType::Pool,
-            )),
+            Some(OPContext::new(parent, StratisUuid::Pool(uuid))),
         )
         .introspectable()
         .add(

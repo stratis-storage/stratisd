@@ -16,6 +16,10 @@ RUST_2018_IDIOMS = -D bare-trait-objects \
 
 DENY = -D warnings -D future-incompatible -D unused ${RUST_2018_IDIOMS}
 
+# Clippy-related lints
+CLIPPY_CARGO = -D clippy::cargo_common_metadata \
+               -D clippy::wildcard_dependencies
+
 # Explicitly allow these lints because they don't seem helpful
 # doc_markdown: we would rather have useful than well-formatted docs
 # map_err_ignore: we generally drop the errors for a reason
@@ -218,7 +222,7 @@ stratisd.8.gz: stratisd.8
 	gzip --stdout docs/stratisd.8 > docs/stratisd.8.gz
 
 clippy:
-	cargo clippy --all-targets --all-features -- ${DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+	cargo clippy --all-targets --all-features -- ${DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
 
 .PHONY:
 	audit

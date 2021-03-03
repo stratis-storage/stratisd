@@ -53,7 +53,7 @@ jobs:
           - task: make -f Makefile release
             toolchain: stable
             components: cargo
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -108,7 +108,7 @@ jobs:
           - task: make -f Makefile audit
             toolchain: stable
             components: cargo
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -182,7 +182,7 @@ jobs:
             task: >
               (cd developer_tools; make -f Makefile lint) &&
               (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
@@ -201,7 +201,7 @@ jobs:
     env:
       TASK: yamllint
       PYTHON: 3.8.6
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2

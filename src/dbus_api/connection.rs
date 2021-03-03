@@ -20,7 +20,7 @@ use dbus::{
 use dbus_tree::{MTSync, Tree};
 use futures::{executor::block_on, StreamExt};
 use tokio::{
-    sync::{mpsc::Receiver, RwLock},
+    sync::{mpsc::UnboundedReceiver, RwLock},
     task::spawn_blocking,
 };
 
@@ -37,14 +37,14 @@ use crate::{
 /// Proceses messages specifying tree mutations.
 pub struct DbusTreeHandler {
     tree: Arc<RwLock<Tree<MTSync<TData>, TData>>>,
-    receiver: Receiver<DbusAction>,
+    receiver: UnboundedReceiver<DbusAction>,
     connection: Arc<SyncConnection>,
 }
 
 impl DbusTreeHandler {
     pub fn new(
         tree: Arc<RwLock<Tree<MTSync<TData>, TData>>>,
-        receiver: Receiver<DbusAction>,
+        receiver: UnboundedReceiver<DbusAction>,
         connection: Arc<SyncConnection>,
     ) -> Self {
         DbusTreeHandler {

@@ -13,7 +13,7 @@ use std::sync::Arc;
 
 use tokio::{
     select,
-    sync::{mpsc::Receiver, Mutex},
+    sync::{mpsc::UnboundedReceiver, Mutex},
     task,
 };
 
@@ -26,7 +26,7 @@ use crate::{
 /// Set up the cooperating D-Bus threads.
 pub async fn setup(
     engine: Arc<Mutex<dyn Engine>>,
-    receiver: Receiver<UdevEngineEvent>,
+    receiver: UnboundedReceiver<UdevEngineEvent>,
 ) -> StratisResult<()> {
     let (conn, mut udev, mut tree) = create_dbus_handlers(Arc::clone(&engine), receiver)
         .await

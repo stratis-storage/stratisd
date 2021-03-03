@@ -5,7 +5,7 @@
 use std::sync::Arc;
 
 use futures::pending;
-use tokio::sync::{mpsc::Receiver, Mutex};
+use tokio::sync::{mpsc::UnboundedReceiver, Mutex};
 
 use crate::{
     engine::{Engine, UdevEngineEvent},
@@ -14,7 +14,7 @@ use crate::{
 
 pub async fn setup(
     _engine: Arc<Mutex<dyn Engine>>,
-    _recv: Receiver<UdevEngineEvent>,
+    _recv: UnboundedReceiver<UdevEngineEvent>,
 ) -> StratisResult<()> {
     pending!();
     Ok(())

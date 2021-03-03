@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use tokio::sync::mpsc::Receiver;
+use tokio::sync::mpsc::UnboundedReceiver;
 
 use crate::{
     dbus_api::{
@@ -14,12 +14,24 @@ use crate::{
 };
 
 pub struct DbusUdevHandler {
-    pub(super) receiver: Receiver<UdevEngineEvent>,
+    pub(super) receiver: UnboundedReceiver<UdevEngineEvent>,
     pub(super) path: dbus::Path<'static>,
     pub(super) dbus_context: DbusContext,
 }
 
 impl DbusUdevHandler {
+    pub fn new(
+        receiver: UnboundedReceiver<UdevEngineEvent>,
+        path: dbus::Path<'static>,
+        dbus_context: DbusContext,
+    ) -> Self {
+        DbusUdevHandler {
+            receiver,
+            path,
+            dbus_context,
+        }
+    }
+
     /// Process udev events that were detected on the udev socket.
     pub async fn handle_udev_event(&mut self) -> StratisResult<()> {
         let udev_event = self.receiver.recv().await.ok_or_else(|| {

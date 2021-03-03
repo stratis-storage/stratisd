@@ -12,13 +12,12 @@ use std::{
     },
 };
 
-use futures::executor::block_on;
 use nix::poll::{poll, PollFd, PollFlags};
 use tokio::{
     runtime::Runtime,
     select, signal,
     sync::{
-        mpsc::{channel, Sender},
+        mpsc::{unbounded_channel, UnboundedSender},
         Mutex,
     },
     task,
@@ -35,7 +34,10 @@ use crate::{
 
 // Poll for udev events.
 // Check for exit condition and return if true.
-fn udev_thread(sender: Sender<UdevEngineEvent>, should_exit: Arc<AtomicBool>) -> StratisResult<()> {
+fn udev_thread(
+    sender: UnboundedSender<UdevEngineEvent>,
+    should_exit: Arc<AtomicBool>,
+) -> StratisResult<()> {
     let context = libudev::Context::new()?;
     let mut udev = UdevMonitor::create(&context)?;
 
@@ -50,7 +52,7 @@ fn udev_thread(sender: Sender<UdevEngineEvent>, should_exit: Arc<AtomicBool>) ->
             }
             _ => {
                 if let Some(ref e) = udev.poll() {
-                    if let Err(e) = block_on(sender.send(UdevEngineEvent::from(e))) {
+                    if let Err(e) = sender.send(UdevEngineEvent::from(e)) {
                         warn!(
                             "udev event could not be sent to engine thread: {}; the \
                             engine was not notified of this udev event",
@@ -113,7 +115,7 @@ pub fn run(sim: bool) -> StratisResult<()> {
         };
 
         let should_exit = Arc::new(AtomicBool::new(false));
-        let (sender, receiver) = channel::<UdevEngineEvent>(1024);
+        let (sender, receiver) = unbounded_channel::<UdevEngineEvent>();
 
         let udev_arc_clone = Arc::clone(&should_exit);
         let join_udev = task::spawn_blocking(move || udev_thread(sender, udev_arc_clone));

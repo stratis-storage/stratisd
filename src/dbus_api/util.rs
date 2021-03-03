@@ -8,7 +8,7 @@ use dbus::arg::{ArgType, Iter, IterAppend, RefArg, Variant};
 use dbus_tokio::connection::new_system_sync;
 use dbus_tree::{MTSync, MethodErr, PropInfo};
 use tokio::sync::{
-    mpsc::{channel, Receiver},
+    mpsc::{unbounded_channel, UnboundedReceiver},
     Mutex, RwLock,
 };
 
@@ -167,11 +167,11 @@ pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTSync<TData>, TData>) -> Res
 /// * sent by the DbusContext to the DbusTreeHandler
 pub async fn create_dbus_handlers(
     engine: Arc<Mutex<dyn Engine>>,
-    udev_receiver: Receiver<UdevEngineEvent>,
+    udev_receiver: UnboundedReceiver<UdevEngineEvent>,
 ) -> Result<(DbusConnectionHandler, DbusUdevHandler, DbusTreeHandler), dbus::Error> {
     let (io, conn) = new_system_sync()?;
     tokio::spawn(io);
-    let (sender, receiver) = channel(1024);
+    let (sender, receiver) = unbounded_channel();
     let (tree, object_path) = get_base_tree(DbusContext::new(engine, sender, Arc::clone(&conn)));
     let dbus_context = tree.get_data().clone();
     conn.request_name(consts::STRATIS_BASE_SERVICE, false, true, true)
@@ -179,11 +179,7 @@ pub async fn create_dbus_handlers(
 
     let tree = Arc::new(RwLock::new(tree));
     let connection = DbusConnectionHandler::new(Arc::clone(&conn), Arc::clone(&tree));
-    let udev = DbusUdevHandler {
-        receiver: udev_receiver,
-        path: object_path,
-        dbus_context,
-    };
+    let udev = DbusUdevHandler::new(udev_receiver, object_path, dbus_context);
     let tree = DbusTreeHandler::new(tree, receiver, conn);
     Ok((connection, udev, tree))
 }

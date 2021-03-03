@@ -17,8 +17,7 @@ use dbus::{
     Path,
 };
 use dbus_tree::{DataType, MTSync, ObjectPath};
-use futures::executor::block_on;
-use tokio::sync::{mpsc::Sender as TokioSender, Mutex};
+use tokio::sync::{mpsc::UnboundedSender as TokioSender, Mutex};
 
 use crate::engine::{Engine, StratisUuid};
 
@@ -122,7 +121,7 @@ impl DbusContext {
         interfaces: InterfacesAdded,
     ) {
         let object_path_name = object_path.get_name().clone();
-        if let Err(e) = block_on(self.sender.send(DbusAction::Add(object_path, interfaces))) {
+        if let Err(e) = self.sender.send(DbusAction::Add(object_path, interfaces)) {
             warn!(
                 "D-Bus add event could not be sent to the processing thread; the D-Bus \
                 server will not be aware of the D-Bus object with path {}: {}",
@@ -132,10 +131,10 @@ impl DbusContext {
     }
 
     pub fn push_remove(&self, item: &Path<'static>, interfaces: InterfacesRemoved) {
-        if let Err(e) = block_on(
-            self.sender
-                .send(DbusAction::Remove(item.clone(), interfaces)),
-        ) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::Remove(item.clone(), interfaces))
+        {
             warn!(
                 "D-Bus remove event could not be sent to the processing thread; the D-Bus \
                 server will still expect the D-Bus object with path {} to be present: {}",
@@ -147,10 +146,10 @@ impl DbusContext {
     /// Send changed signal for Name property and invalidated signal for
     /// Devnode property.
     pub fn push_filesystem_name_change(&self, item: &Path<'static>, new_name: &str) {
-        if let Err(e) = block_on(
-            self.sender
-                .send(DbusAction::FsNameChange(item.clone(), new_name.to_string())),
-        ) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::FsNameChange(item.clone(), new_name.to_string()))
+        {
             warn!(
                 "D-Bus filesystem name change event could not be sent to the processing thread; \
                 no signal will be sent out for pool with path {}: {}",
@@ -162,10 +161,10 @@ impl DbusContext {
     /// Send changed signal for pool Name property and invalidated signal for
     /// all Devnode properties of child filesystems.
     pub fn push_pool_name_change(&self, item: &Path<'static>, new_name: &str) {
-        if let Err(e) = block_on(
-            self.sender
-                .send(DbusAction::FsNameChange(item.clone(), new_name.to_string())),
-        ) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::FsNameChange(item.clone(), new_name.to_string()))
+        {
             warn!(
                 "D-Bus pool name change event could not be sent to the processing thread; \
                 no signal will be sent out for the name change of pool with path {} or any \

@@ -11,6 +11,7 @@ use crate::dbus_api::{
 
 mod fetch_properties_2_1;
 mod fetch_properties_2_2;
+mod fetch_properties_2_4;
 mod manager_2_0;
 mod manager_2_1;
 mod manager_2_2;
@@ -99,6 +100,11 @@ pub fn get_base_tree<'a>(dbus_context: DbusContext) -> (Tree<MTFn<TData>, TData>
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_3, ())
                 .add_m(fetch_properties_2_2::get_all_properties_method(&f))
                 .add_m(fetch_properties_2_2::get_properties_method(&f)),
+        )
+        .add(
+            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_4, ())
+                .add_m(fetch_properties_2_4::get_all_properties_method(&f))
+                .add_m(fetch_properties_2_4::get_properties_method(&f)),
         )
         .add(
             f.interface(consts::REPORT_INTERFACE_NAME_2_1, ())

@@ -25,7 +25,7 @@ use crate::{
             pool::StratPool,
         },
         structures::Table,
-        types::{DevUuid, EncryptionInfo, Name, PoolUuid, UnlockMethod},
+        types::{DevUuid, LockedPoolInfo, Name, PoolUuid, UnlockMethod},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -156,12 +156,10 @@ impl LiminalDevices {
     /// locked to their encryption info in the set of pools that are not yet set up.
     // Precondition: All devices for a given errored pool have been determined to have
     // the same  encryption info.
-    pub fn locked_pools(&self) -> HashMap<PoolUuid, EncryptionInfo> {
+    pub fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo> {
         self.errored_pool_devices
             .iter()
-            .filter_map(|(pool_uuid, map)| {
-                map.encryption_info().map(|info| (*pool_uuid, info.clone()))
-            })
+            .filter_map(|(pool_uuid, map)| map.locked_pool_info().map(|info| (*pool_uuid, info)))
             .collect()
     }
 

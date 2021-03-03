@@ -17,8 +17,8 @@ use devicemapper::{Bytes, Sectors, DM};
 use crate::{
     engine::types::{
         BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid,
-        Key, KeyDescription, MappingCreateAction, MaybeDbusPath, Name, PoolUuid, RenameAction,
-        ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, UnlockMethod,
+        Key, KeyDescription, LockedPoolInfo, MappingCreateAction, MaybeDbusPath, Name, PoolUuid,
+        RenameAction, ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, UnlockMethod,
     },
     stratis::StratisResult,
 };
@@ -326,7 +326,7 @@ pub trait Engine: Debug + Report {
 
     /// Get a mapping of encrypted pool UUIDs for pools that have not yet
     /// been set up and need to be unlocked to their encryption infos.
-    fn locked_pools(&self) -> HashMap<PoolUuid, EncryptionInfo>;
+    fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo>;
 
     /// Configure the simulator. Obsolete.
     fn configure_simulator(&mut self, _: u32) -> StratisResult<()> {

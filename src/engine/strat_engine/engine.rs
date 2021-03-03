@@ -23,7 +23,7 @@ use crate::{
         },
         structures::Table,
         types::{
-            CreateAction, DeleteAction, DevUuid, EncryptionInfo, KeyDescription, RenameAction,
+            CreateAction, DeleteAction, DevUuid, KeyDescription, LockedPoolInfo, RenameAction,
             ReportType, SetUnlockAction, UnlockMethod,
         },
         Engine, EngineEvent, Name, Pool, PoolUuid, Report,
@@ -296,7 +296,7 @@ impl Engine for StratEngine {
         get_mut_pool!(self; uuid)
     }
 
-    fn locked_pools(&self) -> HashMap<PoolUuid, EncryptionInfo> {
+    fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo> {
         self.liminal_devices.locked_pools()
     }
 

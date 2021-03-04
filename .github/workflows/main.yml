@@ -69,7 +69,7 @@ jobs:
           libudev-dev
           make
           thin-provisioning-tools
-          udevadm
+          udev
           xfsprogs
       - uses: actions-rs/toolchain@v1
         with:

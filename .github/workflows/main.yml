@@ -43,9 +43,6 @@ jobs:
           - task: make -f Makefile test
             toolchain: stable
             components: cargo
-          - task: RUST_LOG=libstratis=info make -f Makefile test-travis
-            toolchain: stable
-            components: cargo
           - task: make -f Makefile release
             toolchain: stable
             components: cargo
@@ -71,6 +68,48 @@ jobs:
           thin-provisioning-tools
           udev
           xfsprogs
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: ${{ matrix.components }}
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
+        run: ${{ matrix.task }}
+
+  # TESTS WITH UDEV
+  checks:
+    strategy:
+      matrix:
+        include:
+          # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
+          - task: RUST_LOG=libstratis=info make -f Makefile test-travis
+            toolchain: stable
+            components: cargo
+    runs-on: ubuntu-18.04
+    container:
+      image: ubuntu:groovy
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies
+        run: apt-get -q update
+      - name: Install dependencies
+        run: >
+          DEBIAN_FRONTEND=noninteractive
+          apt-get -y install
+          clang
+          curl
+          libblkid-dev
+          libcryptsetup-dev
+          libdbus-1-dev
+          libudev-dev
+          make
+          systemd
+          thin-provisioning-tools
+          udev
+          xfsprogs
+      - name: Start udev
+        run: /usr/lib/systemd/systemd-udevd &
       - uses: actions-rs/toolchain@v1
         with:
           components: ${{ matrix.components }}

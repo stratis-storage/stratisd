@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  checks:
+  checks_ubuntu:
     strategy:
       matrix:
         include:
@@ -76,8 +76,62 @@ jobs:
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
+  checks_fedora:
+    strategy:
+      matrix:
+        include:
+          # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
+          - task: make -f Makefile fmt-travis
+            toolchain: 1.50.0
+            components: rustfmt
+          - task: make -f Makefile clippy
+            toolchain: 1.50.0
+            components: clippy
+          # MANDATORY TESTING ON STABLE
+          - task: make -f Makefile build
+            toolchain: stable
+            components: cargo
+          - task: make -f Makefile build-no-default
+            toolchain: stable
+            components: cargo
+          - task: make -f Makefile build-extras
+            toolchain: stable
+            components: cargo
+          - task: make -f Makefile docs-travis
+            toolchain: stable
+            components: cargo
+          - task: make -f Makefile test
+            toolchain: stable
+            components: cargo
+          - task: make -f Makefile release
+            toolchain: stable
+            components: cargo
+    runs-on: ubuntu-18.04
+    container:
+      image: fedora:32
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies
+        run: >
+          dnf install -y
+          clang
+          curl
+          cryptsetup-devel
+          dbus-devel
+          libblkid-devel
+          make
+          systemd-devel
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: ${{ matrix.components }}
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
+        run: ${{ matrix.task }}
+
   # TESTS WITH UDEV
-  checks_with_udev:
+  checks_with_udev_ubuntu:
     strategy:
       matrix:
         include:
@@ -107,6 +161,44 @@ jobs:
           systemd
           thin-provisioning-tools
           udev
+          xfsprogs
+      - name: Start udev
+        run: /usr/lib/systemd/systemd-udevd &
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: ${{ matrix.components }}
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
+        run: ${{ matrix.task }}
+
+  # TESTS WITH UDEV
+  checks_with_udev_fedora:
+    strategy:
+      matrix:
+        include:
+          # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
+          - task: RUST_LOG=libstratis=info make -f Makefile test-travis
+            toolchain: stable
+            components: cargo
+    runs-on: ubuntu-18.04
+    container:
+      image: fedora:32
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies
+        run: >
+          dnf install -y
+          clang
+          cryptsetup-devel
+          curl
+          device-mapper-persistent-data
+          dbus-devel
+          libblkid-devel
+          make
+          systemd-devel
+          systemd-udev
           xfsprogs
       - name: Start udev
         run: /usr/lib/systemd/systemd-udevd &

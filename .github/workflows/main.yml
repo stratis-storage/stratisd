@@ -68,6 +68,8 @@ jobs:
           libdbus-1-dev
           libudev-dev
           make
+          thin-provisioning-tools
+          xfsprogs
       - uses: actions-rs/toolchain@v1
         with:
           components: ${{ matrix.components }}
@@ -110,6 +112,7 @@ jobs:
           libblkid-dev
           libcryptsetup-dev
           libdbus-1-dev
+          libssl-dev
           libudev-dev
           make
       - uses: actions-rs/toolchain@v1

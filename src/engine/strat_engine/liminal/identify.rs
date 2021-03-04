@@ -574,14 +574,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn travis_test_process_luks_device_initialized() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Exactly(1, None),
-            test_process_luks_device_initialized,
-        );
-    }
-
     /// Test that the process_*_device methods return the expected
     /// pool UUID and device node for initialized paths.
     fn test_process_device_initialized(paths: &[&Path]) {
@@ -626,14 +618,6 @@ mod tests {
     fn real_test_process_device_initialized() {
         real::test_with_spec(
             &real::DeviceLimits::Exactly(1, None, None),
-            test_process_device_initialized,
-        );
-    }
-
-    #[test]
-    fn travis_test_process_device_initialized() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Exactly(1, None),
             test_process_device_initialized,
         );
     }
@@ -693,14 +677,6 @@ mod tests {
     fn real_test_process_device_uninitialized() {
         real::test_with_spec(
             &real::DeviceLimits::Exactly(1, None, None),
-            test_process_device_uninitialized,
-        );
-    }
-
-    #[test]
-    fn travis_test_process_device_uninitialized() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Exactly(1, None),
             test_process_device_uninitialized,
         );
     }

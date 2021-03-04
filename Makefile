@@ -199,11 +199,8 @@ test-loop:
 test-real:
 	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test real_
 
-test-travis:
-	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test travis_
-
 test:
-	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 cargo test -- --skip real_ --skip loop_ --skip travis_
+	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 cargo test -- --skip real_ --skip loop_
 
 yamllint:
 	yamllint --strict .github/workflows/main.yml
@@ -241,5 +238,4 @@ clippy:
 	test
 	test-loop
 	test-real
-	test-travis
 	yamllint

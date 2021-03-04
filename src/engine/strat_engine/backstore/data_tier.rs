@@ -238,12 +238,4 @@ mod tests {
             test_add_and_alloc,
         );
     }
-
-    #[test]
-    fn travis_test_add_and_alloc() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, None),
-            test_add_and_alloc,
-        );
-    }
 }

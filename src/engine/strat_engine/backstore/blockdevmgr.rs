@@ -592,14 +592,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn travis_test_blockdevmgr_used() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(1, 3, None),
-            test_blockdevmgr_used,
-        );
-    }
-
     /// Test that the `BlockDevMgr` will add devices if the same key
     /// is used to encrypted the existing devices and the added devices.
     fn test_blockdevmgr_same_key(paths: &[&Path]) {
@@ -641,14 +633,6 @@ mod tests {
     fn real_test_blockdevmgr_same_key() {
         real::test_with_spec(
             &real::DeviceLimits::Exactly(3, None, None),
-            test_blockdevmgr_same_key,
-        );
-    }
-
-    #[test]
-    fn travis_test_blockdevmgr_same_key() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Exactly(3, None),
             test_blockdevmgr_same_key,
         );
     }
@@ -706,14 +690,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn travis_test_blockdevmgr_changed_key() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Exactly(3, None),
-            test_blockdevmgr_changed_key,
-        );
-    }
-
     /// Verify that it is impossible to steal blockdevs from another Stratis
     /// pool.
     /// 1. Initialize devices with pool uuid.
@@ -760,14 +736,6 @@ mod tests {
     fn real_test_initialization_stratis() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(2, None, None),
-            test_initialization_add_stratis,
-        );
-    }
-
-    #[test]
-    fn travis_test_initialization_stratis() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, None),
             test_initialization_add_stratis,
         );
     }

@@ -49,7 +49,7 @@ jobs:
     runs-on: ubuntu-18.04
     container:
       image: ubuntu:groovy
-      options: --privileged
+      options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies
@@ -109,7 +109,7 @@ jobs:
     runs-on: ubuntu-18.04
     container:
       image: fedora:32
-      options: --privileged
+      options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies
@@ -142,7 +142,7 @@ jobs:
     runs-on: ubuntu-18.04
     container:
       image: ubuntu:groovy
-      options: --privileged
+      options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies
@@ -184,7 +184,7 @@ jobs:
     runs-on: ubuntu-18.04
     container:
       image: fedora:32
-      options: --privileged
+      options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies
@@ -230,7 +230,7 @@ jobs:
     runs-on: ubuntu-18.04
     container:
       image: ubuntu:groovy
-      options: --privileged
+      options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies

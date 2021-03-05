@@ -27,7 +27,7 @@ jobs:
         libudev-dev
         make
       UBUNTU_DEP_CMDS: |
-        apt-get update -q
+        apt-get -q update
         DEBIAN_FRONTEND=noninteractive apt-get install y $UBUNTU_DEPS
       FEDORA_DEP_CMDS: >
         dnf install -y

@@ -55,7 +55,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: Install dependencies for Ubuntu
         run: apt-get -q update
-        if: matrix.image == "ubuntu:groovy"
+        if: matrix.image == 'ubuntu:groovy'
       - name: Install dependencies for Ubuntu
         run: >
           DEBIAN_FRONTEND=noninteractive 
@@ -67,7 +67,7 @@ jobs:
           libdbus-1-dev
           libudev-dev
           make
-        if: matrix.image == "ubuntu:groovy"
+        if: matrix.image == 'ubuntu:groovy'
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -91,17 +91,15 @@ jobs:
   checks_with_udev:
     strategy:
       matrix:
-        image: ["ubunu:groovy", "fedora:32"]
+        image: ["ubuntu:groovy", "fedora:32"]
         include:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
           - task: RUST_LOG=libstratis=info make -f Makefile test-travis
             toolchain: stable
             components: cargo
-            image: ubuntu:groovy
           - task: RUST_LOG=libstratis=info make -f Makefile test-travis
             toolchain: stable
             components: cargo
-            image: fedora:32
     runs-on: ubuntu-18.04
     container:
       image: ${{ matrix.image }}

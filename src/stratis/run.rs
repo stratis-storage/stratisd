@@ -7,14 +7,14 @@
 use std::{
     os::unix::io::AsRawFd,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
         Arc,
     },
 };
 
 use nix::poll::{poll, PollFd, PollFlags};
 use tokio::{
-    runtime::Runtime,
+    runtime::Builder,
     select, signal,
     sync::{
         mpsc::{unbounded_channel, UnboundedSender},
@@ -95,7 +95,24 @@ async fn dm_event_thread(engine: Option<Arc<Mutex<dyn Engine>>>) -> StratisResul
 /// If sim is true, start the sim engine rather than the real engine.
 /// Always check for devicemapper context.
 pub fn run(sim: bool) -> StratisResult<()> {
-    let runtime = Runtime::new()?;
+    let runtime = Builder::new_multi_thread()
+        .enable_all()
+        .thread_name_fn(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            format!("stratis-wt-{}", id)
+        })
+        .on_thread_start(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            debug!("{}: thread started", id)
+        })
+        .on_thread_stop(|| {
+            static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
+            let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
+            debug!("{}: thread finished", id)
+        })
+        .build()?;
     runtime.block_on(async move {
         let engine: Arc<Mutex<dyn Engine>> = {
             info!("stratis daemon version {} started", VERSION);

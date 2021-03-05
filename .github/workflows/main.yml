@@ -97,7 +97,7 @@ jobs:
         if: matrix.image == 'ubuntu:groovy'
       - name: Install dependencies for Ubuntu
         run: >
-          DEBIAN_FRONTEND=noninteractive 
+          DEBIAN_FRONTEND=noninteractive
           apt-get install -y
           clang
           curl
@@ -151,7 +151,7 @@ jobs:
         if: matrix.image == 'ubuntu:groovy'
       - name: Install dependencies for Ubuntu
         run: >
-          DEBIAN_FRONTEND=noninteractive 
+          DEBIAN_FRONTEND=noninteractive
           apt-get install -y
           clang
           curl

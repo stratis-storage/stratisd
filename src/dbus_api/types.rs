@@ -112,7 +112,7 @@ impl DbusContext {
     /// more than 2^64 object paths. If it turns out that this is a bad
     /// assumption, the solution is to use unbounded integers.
     pub fn get_next_id(&self) -> u64 {
-        self.next_index.fetch_add(1, Ordering::Relaxed)
+        self.next_index.fetch_add(1, Ordering::SeqCst)
     }
 
     pub fn push_add(

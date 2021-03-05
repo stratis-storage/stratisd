@@ -16,48 +16,10 @@ on:
   workflow_dispatch:
 
 jobs:
-  checks_ubuntu:
+  checks:
     strategy:
-      matrix:
-        include:
-          # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
-          - task: make -f Makefile fmt-travis
-            toolchain: 1.50.0
-            components: rustfmt
-          - task: make -f Makefile clippy
-            toolchain: 1.50.0
-            components: clippy
-          # MANDATORY TESTING ON STABLE
-          - task: make -f Makefile build
-            toolchain: stable
-            components: cargo
-          - task: make -f Makefile build-no-default
-            toolchain: stable
-            components: cargo
-          - task: make -f Makefile build-extras
-            toolchain: stable
-            components: cargo
-          - task: make -f Makefile docs-travis
-            toolchain: stable
-            components: cargo
-          - task: make -f Makefile test
-            toolchain: stable
-            components: cargo
-          - task: make -f Makefile release
-            toolchain: stable
-            components: cargo
-    runs-on: ubuntu-18.04
-    container:
-      image: ubuntu:groovy
-      options: --privileged -v /dev:/dev
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install dependencies
-        run: apt-get -q update
-      - name: Install dependencies
-        run: >
-          DEBIAN_FRONTEND=noninteractive
-          apt-get -y install
+      env:
+        UBUNTU_DEPS: >
           clang
           curl
           libblkid-dev
@@ -65,55 +27,10 @@ jobs:
           libdbus-1-dev
           libudev-dev
           make
-          thin-provisioning-tools
-          udev
-          xfsprogs
-      - uses: actions-rs/toolchain@v1
-        with:
-          components: ${{ matrix.components }}
-          toolchain: ${{ matrix.toolchain }}
-          override: true
-      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
-        run: ${{ matrix.task }}
-
-  checks_fedora:
-    strategy:
-      matrix:
-        include:
-          # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
-          - task: make -f Makefile fmt-travis
-            toolchain: 1.50.0
-            components: rustfmt
-          - task: make -f Makefile clippy
-            toolchain: 1.50.0
-            components: clippy
-          # MANDATORY TESTING ON STABLE
-          - task: make -f Makefile build
-            toolchain: stable
-            components: cargo
-          - task: make -f Makefile build-no-default
-            toolchain: stable
-            components: cargo
-          - task: make -f Makefile build-extras
-            toolchain: stable
-            components: cargo
-          - task: make -f Makefile docs-travis
-            toolchain: stable
-            components: cargo
-          - task: make -f Makefile test
-            toolchain: stable
-            components: cargo
-          - task: make -f Makefile release
-            toolchain: stable
-            components: cargo
-    runs-on: ubuntu-18.04
-    container:
-      image: fedora:32
-      options: --privileged -v /dev:/dev
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install dependencies
-        run: >
+        UBUNTU_DEP_CMDS: |
+          apt-get update -q
+          DEBIAN_FRONTEND=noninteractive apt-get install y $UBUNTU_DEPS
+        FEDORA_DEP_CMDS: >
           dnf install -y
           clang
           curl
@@ -122,6 +39,98 @@ jobs:
           libblkid-devel
           make
           systemd-devel
+      matrix:
+        include:
+          # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
+          - task: make -f Makefile fmt-travis
+            toolchain: 1.50.0
+            components: rustfmt
+            image: ubuntu:groovy
+            dependency_cmds: $UBUNTU_DEP_CMDS
+          - task: make -f Makefile clippy
+            toolchain: 1.50.0
+            components: clippy
+            image: ubuntu:groovy
+            dependency_cmds: $UBUNTU_DEP_CMDS
+          - task: make -f Makefile fmt-travis
+            toolchain: 1.50.0
+            components: rustfmt
+            image: fedora:32
+            dependency_cmds: $FEDORA_DEP_CMDS
+          - task: make -f Makefile clippy
+            toolchain: 1.50.0
+            components: clippy
+            image: fedora:32
+            dependency_cmds: $FEDORA_DEP_CMDS
+          # MANDATORY TESTING ON STABLE
+          - task: make -f Makefile build
+            toolchain: stable
+            components: cargo
+            image: ubuntu:groovy
+            dependency_cmds: $UBUNTU_DEP_CMDS
+          - task: make -f Makefile build-no-default
+            toolchain: stable
+            components: cargo
+            image: ubuntu:groovy
+            dependency_cmds: $UBUNTU_DEP_CMDS
+          - task: make -f Makefile build-extras
+            toolchain: stable
+            components: cargo
+            image: ubuntu:groovy
+            dependency_cmds: $UBUNTU_DEP_CMDS
+          - task: make -f Makefile docs-travis
+            toolchain: stable
+            components: cargo
+            image: ubuntu:groovy
+            dependency_cmds: $UBUNTU_DEP_CMDS
+          - task: make -f Makefile test
+            toolchain: stable
+            components: cargo
+            image: ubuntu:groovy
+            dependency_cmds: $UBUNTU_DEP_CMDS
+          - task: make -f Makefile release
+            toolchain: stable
+            components: cargo
+            image: ubuntu:groovy
+            dependency_cmds: $UBUNTU_DEP_CMDS
+          - task: make -f Makefile build
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+            dependency_cmds: $FEDORA_DEP_CMDS
+          - task: make -f Makefile build-no-default
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+            dependency_cmds: $FEDORA_DEP_CMDS
+          - task: make -f Makefile build-extras
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+            dependency_cmds: $FEDORA_DEP_CMDS
+          - task: make -f Makefile docs-travis
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+            dependency_cmds: $FEDORA_DEP_CMDS
+          - task: make -f Makefile test
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+            dependency_cmds: $FEDORA_DEP_CMDS
+          - task: make -f Makefile release
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+            dependency_cmds: $FEDORA_DEP_CMDS
+    runs-on: ubuntu-18.04
+    container:
+      image: ${{ matrix.image }}
+      options: --privileged -v /dev:/dev
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies on ${{ matrix.image }}
+        run: ${{ matrix.dependency_cmds }}
       - uses: actions-rs/toolchain@v1
         with:
           components: ${{ matrix.components }}
@@ -131,64 +140,10 @@ jobs:
         run: ${{ matrix.task }}
 
   # TESTS WITH UDEV
-  checks_with_udev_ubuntu:
+  checks_with_udev:
     strategy:
-      matrix:
-        include:
-          # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
-          - task: RUST_LOG=libstratis=info make -f Makefile test-travis
-            toolchain: stable
-            components: cargo
-    runs-on: ubuntu-18.04
-    container:
-      image: ubuntu:groovy
-      options: --privileged -v /dev:/dev
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install dependencies
-        run: apt-get -q update
-      - name: Install dependencies
-        run: >
-          DEBIAN_FRONTEND=noninteractive
-          apt-get -y install
-          clang
-          curl
-          libblkid-dev
-          libcryptsetup-dev
-          libdbus-1-dev
-          libudev-dev
-          make
-          systemd
-          thin-provisioning-tools
-          udev
-          xfsprogs
-      - name: Start udev
-        run: /usr/lib/systemd/systemd-udevd &
-      - uses: actions-rs/toolchain@v1
-        with:
-          components: ${{ matrix.components }}
-          toolchain: ${{ matrix.toolchain }}
-          override: true
-      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
-        run: ${{ matrix.task }}
-
-  # TESTS WITH UDEV
-  checks_with_udev_fedora:
-    strategy:
-      matrix:
-        include:
-          # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
-          - task: RUST_LOG=libstratis=info make -f Makefile test-travis
-            toolchain: stable
-            components: cargo
-    runs-on: ubuntu-18.04
-    container:
-      image: fedora:32
-      options: --privileged -v /dev:/dev
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install dependencies
-        run: >
+      env:
+        FEDORA_DEP_CMDS: >
           dnf install -y
           clang
           cryptsetup-devel
@@ -200,6 +155,42 @@ jobs:
           systemd-devel
           systemd-udev
           xfsprogs
+        UBUNTU_DEPS: >
+          clang
+          curl
+          libblkid-dev
+          libcryptsetup-dev
+          libdbus-1-dev
+          libudev-dev
+          make
+          systemd
+          thin-provisioning-tools
+          udev
+          xfsprogs
+        UBUNTU_DEP_CMDS: |
+          apt-get -q update
+          DEBIAN_FRONTEND=noninteractive apt-get -y install $UBUNTU_DEPS
+      matrix:
+        include:
+          # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
+          - task: RUST_LOG=libstratis=info make -f Makefile test-travis
+            toolchain: stable
+            components: cargo
+            image: ubuntu:groovy
+            dependency_cmds: $UBUNTU_DEP_CMDS
+          - task: RUST_LOG=libstratis=info make -f Makefile test-travis
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+            dependency_cmds: $FEDORA_DEP_CMDS
+    runs-on: ubuntu-18.04
+    container:
+      image: ${{ matrix.image }}
+      options: --privileged -v /dev:/dev
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies for ${{ matrix.image }}
+        run: ${{ matrix.dependency_cmds }}
       - name: Start udev
         run: /usr/lib/systemd/systemd-udevd &
       - uses: actions-rs/toolchain@v1

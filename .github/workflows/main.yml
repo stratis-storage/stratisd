@@ -27,7 +27,7 @@ jobs:
         libudev-dev
         make
       UBUNTU_DEP_CMDS: >
-        apt-get -q update;
+        apt-get -q update ;
         DEBIAN_FRONTEND=noninteractive apt-get install -y $UBUNTU_DEPS
       FEDORA_DEP_CMDS: >
         dnf install -y
@@ -167,7 +167,7 @@ jobs:
         udev
         xfsprogs
       UBUNTU_DEP_CMDS: >
-        apt-get -q update;
+        apt-get -q update ;
         DEBIAN_FRONTEND=noninteractive apt-get -y install $UBUNTU_DEPS
     strategy:
       matrix:

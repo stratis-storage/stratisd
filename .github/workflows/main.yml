@@ -132,11 +132,11 @@ jobs:
       matrix:
         include:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
-          - task: RUST_LOG=libstratis=info make -f Makefile test-travis
+          - task: RUST_LOG=libstratis=debug make -f Makefile test-travis
             toolchain: stable
             components: cargo
             image: ubuntu:groovy
-          - task: RUST_LOG=libstratis=info make -f Makefile test-travis
+          - task: RUST_LOG=libstratis=debug make -f Makefile test-travis
             toolchain: stable
             components: cargo
             image: fedora:32

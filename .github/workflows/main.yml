@@ -17,120 +17,68 @@ on:
 
 jobs:
   checks:
-    env:
-      UBUNTU_DEP_CMDS: >
-        apt-get -q update &&
-        DEBIAN_FRONTEND=noninteractive 
-        apt-get install -y
-        clang
-        curl
-        libblkid-dev
-        libcryptsetup-dev
-        libdbus-1-dev
-        libudev-dev
-        make
-      FEDORA_DEP_CMDS: >
-        dnf install -y
-        clang
-        curl
-        cryptsetup-devel
-        dbus-devel
-        libblkid-devel
-        make
-        systemd-devel
     strategy:
       matrix:
+        image: ["ubunu:groovy", "fedora:32"]
         include:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
           - task: make -f Makefile fmt-travis
             toolchain: 1.50.0
             components: rustfmt
-            image: ubuntu:groovy
-            dependency_cmds: $UBUNTU_DEP_CMDS
           - task: make -f Makefile clippy
             toolchain: 1.50.0
             components: clippy
-            image: ubuntu:groovy
-            dependency_cmds: $UBUNTU_DEP_CMDS
-          - task: make -f Makefile fmt-travis
-            toolchain: 1.50.0
-            components: rustfmt
-            image: fedora:32
-            dependency_cmds: $FEDORA_DEP_CMDS
-          - task: make -f Makefile clippy
-            toolchain: 1.50.0
-            components: clippy
-            image: fedora:32
-            dependency_cmds: $FEDORA_DEP_CMDS
           # MANDATORY TESTING ON STABLE
           - task: make -f Makefile build
             toolchain: stable
             components: cargo
-            image: ubuntu:groovy
-            dependency_cmds: $UBUNTU_DEP_CMDS
           - task: make -f Makefile build-no-default
             toolchain: stable
             components: cargo
-            image: ubuntu:groovy
-            dependency_cmds: $UBUNTU_DEP_CMDS
           - task: make -f Makefile build-extras
             toolchain: stable
             components: cargo
-            image: ubuntu:groovy
-            dependency_cmds: $UBUNTU_DEP_CMDS
           - task: make -f Makefile docs-travis
             toolchain: stable
             components: cargo
-            image: ubuntu:groovy
-            dependency_cmds: $UBUNTU_DEP_CMDS
           - task: make -f Makefile test
             toolchain: stable
             components: cargo
-            image: ubuntu:groovy
-            dependency_cmds: $UBUNTU_DEP_CMDS
           - task: make -f Makefile release
             toolchain: stable
             components: cargo
-            image: ubuntu:groovy
-            dependency_cmds: $UBUNTU_DEP_CMDS
-          - task: make -f Makefile build
-            toolchain: stable
-            components: cargo
-            image: fedora:32
-            dependency_cmds: $FEDORA_DEP_CMDS
-          - task: make -f Makefile build-no-default
-            toolchain: stable
-            components: cargo
-            image: fedora:32
-            dependency_cmds: $FEDORA_DEP_CMDS
-          - task: make -f Makefile build-extras
-            toolchain: stable
-            components: cargo
-            image: fedora:32
-            dependency_cmds: $FEDORA_DEP_CMDS
-          - task: make -f Makefile docs-travis
-            toolchain: stable
-            components: cargo
-            image: fedora:32
-            dependency_cmds: $FEDORA_DEP_CMDS
-          - task: make -f Makefile test
-            toolchain: stable
-            components: cargo
-            image: fedora:32
-            dependency_cmds: $FEDORA_DEP_CMDS
-          - task: make -f Makefile release
-            toolchain: stable
-            components: cargo
-            image: fedora:32
-            dependency_cmds: $FEDORA_DEP_CMDS
     runs-on: ubuntu-18.04
     container:
       image: ${{ matrix.image }}
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
-      - name: Install dependencies on ${{ matrix.image }}
-        run: ${{ matrix.dependency_cmds }}
+      - name: Install dependencies for Ubuntu
+        run: apt-get -q update
+        if: matrix.image == "ubuntu:groovy"
+      - name: Install dependencies for Ubuntu
+        run: >
+          DEBIAN_FRONTEND=noninteractive 
+          apt-get install -y
+          clang
+          curl
+          libblkid-dev
+          libcryptsetup-dev
+          libdbus-1-dev
+          libudev-dev
+          make
+        if: matrix.image == "ubuntu:groovy"
+      - name: Install dependencies for Fedora
+        run: >
+          dnf install -y
+          clang
+          curl
+          cryptsetup-devel
+          dbus-devel
+          libblkid-devel
+          make
+          systemd-devel
+        if: matrix.image == "fedora:32"
       - uses: actions-rs/toolchain@v1
         with:
           components: ${{ matrix.components }}
@@ -141,52 +89,54 @@ jobs:
 
   # TESTS WITH UDEV
   checks_with_udev:
-    env:
-      FEDORA_DEP_CMDS: >
-        dnf install -y
-        clang
-        cryptsetup-devel
-        curl
-        device-mapper-persistent-data
-        dbus-devel
-        libblkid-devel
-        make
-        systemd-devel
-        systemd-udev
-        xfsprogs
-      UBUNTU_DEP_CMDS: >
-        apt-get -q update &&
-        DEBIAN_FRONTEND=noninteractive 
-        apt-get install -y
-        clang
-        curl
-        libblkid-dev
-        libcryptsetup-dev
-        libdbus-1-dev
-        libudev-dev
-        make
     strategy:
       matrix:
+        image: ["ubunu:groovy", "fedora:32"]
         include:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
           - task: RUST_LOG=libstratis=info make -f Makefile test-travis
             toolchain: stable
             components: cargo
             image: ubuntu:groovy
-            dependency_cmds: $UBUNTU_DEP_CMDS
           - task: RUST_LOG=libstratis=info make -f Makefile test-travis
             toolchain: stable
             components: cargo
             image: fedora:32
-            dependency_cmds: $FEDORA_DEP_CMDS
     runs-on: ubuntu-18.04
     container:
       image: ${{ matrix.image }}
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
-      - name: Install dependencies for ${{ matrix.image }}
-        run: ${{ matrix.dependency_cmds }}
+      - name: Install dependencies for Ubuntu
+        run: apt-get -q update
+        if: matrix.image == "ubuntu:groovy"
+      - name: Install dependencies for Ubuntu
+        run: >
+          DEBIAN_FRONTEND=noninteractive 
+          apt-get install -y
+          clang
+          curl
+          libblkid-dev
+          libcryptsetup-dev
+          libdbus-1-dev
+          libudev-dev
+          make
+        if: matrix.image == "ubuntu:groovy"
+      - name: Install dependencies for Fedora
+        run: >
+          dnf install -y
+          clang
+          cryptsetup-devel
+          curl
+          device-mapper-persistent-data
+          dbus-devel
+          libblkid-devel
+          make
+          systemd-devel
+          systemd-udev
+          xfsprogs
+        if: matrix.image == "fedora:32"
       - name: Start udev
         run: /usr/lib/systemd/systemd-udevd &
       - uses: actions-rs/toolchain@v1

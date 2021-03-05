@@ -78,7 +78,7 @@ jobs:
           libblkid-devel
           make
           systemd-devel
-        if: matrix.image == "fedora:32"
+        if: matrix.image == 'fedora:32'
       - uses: actions-rs/toolchain@v1
         with:
           components: ${{ matrix.components }}
@@ -110,7 +110,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: Install dependencies for Ubuntu
         run: apt-get -q update
-        if: matrix.image == "ubuntu:groovy"
+        if: matrix.image == 'ubuntu:groovy'
       - name: Install dependencies for Ubuntu
         run: >
           DEBIAN_FRONTEND=noninteractive 
@@ -122,7 +122,7 @@ jobs:
           libdbus-1-dev
           libudev-dev
           make
-        if: matrix.image == "ubuntu:groovy"
+        if: matrix.image == 'ubuntu:groovy'
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -136,7 +136,7 @@ jobs:
           systemd-devel
           systemd-udev
           xfsprogs
-        if: matrix.image == "fedora:32"
+        if: matrix.image == 'fedora:32'
       - name: Start udev
         run: /usr/lib/systemd/systemd-udevd &
       - uses: actions-rs/toolchain@v1

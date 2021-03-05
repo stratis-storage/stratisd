@@ -832,10 +832,44 @@ fn is_encrypted_stratis_device(device: &mut CryptDevice) -> bool {
         .unwrap_or(false)
 }
 
-fn device_is_active(device: &mut CryptDevice, device_name: &str) -> bool {
-    libcryptsetup_rs::status(Some(device), device_name)
-        .map(|status| status == CryptStatusInfo::Active)
-        .unwrap_or(false)
+fn device_is_active(device: Option<&mut CryptDevice>, device_name: &str) -> Result<()> {
+    match libcryptsetup_rs::status(device, device_name) {
+        Ok(CryptStatusInfo::Active) => Ok(()),
+        Ok(CryptStatusInfo::Busy) => {
+            warn!(
+                "Newly activated device {} reported that it was busy; you may see \
+                temporary failures due to the device being busy.",
+                device_name,
+            );
+            Ok(())
+        }
+        Ok(CryptStatusInfo::Inactive) => {
+            warn!(
+                "Newly activated device {} reported that it is inactive; device \
+                activation appears to have failed",
+                device_name,
+            );
+            Err(LibcryptErr::Other(format!(
+                "Device {} was activated but is reporting that it is inactive",
+                device_name,
+            )))
+        }
+        Ok(CryptStatusInfo::Invalid) => {
+            warn!(
+                "Newly activated device {} reported that its status is invalid; \
+                device activation appears to have failed",
+                device_name,
+            );
+            Err(LibcryptErr::Other(format!(
+                "Device {} was activated but is reporting an invalid status",
+                device_name,
+            )))
+        }
+        Err(e) => Err(LibcryptErr::Other(format!(
+            "Failed to fetch status for device name {}: {}",
+            device_name, e,
+        ))),
+    }
 }
 
 /// Activate device by token then check that the logical path exists corresponding
@@ -877,13 +911,7 @@ fn activate_and_check_device_path(
     );
 
     // Check activation status.
-    if !device_is_active(crypt_device, name) {
-        warn!(
-            "Activation reported success but device does not appear to be \
-            active"
-        );
-        return Err(LibcryptErr::Other("Device activation failed".to_string()));
-    }
+    device_is_active(Some(crypt_device), name)?;
 
     // Checking that the symlink was created may also be valuable in case a race
     // condition occurs with udev.

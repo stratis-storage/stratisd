@@ -45,7 +45,11 @@ fn dm_stratis_devices_remove() -> Result<()> {
         {
             match get_dm().device_remove(&DevId::Name(n), &DmOptions::new()) {
                 Ok(_) => progress_made = true,
-                Err(_) => remain.push(n.to_string()),
+                Err(e) => {
+                    let name = n.to_string();
+                    debug!("Failed to remove device {}: {}", name, e);
+                    remain.push(name)
+                }
             }
         }
         Ok((progress_made, remain))

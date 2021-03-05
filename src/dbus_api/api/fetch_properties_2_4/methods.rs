@@ -25,9 +25,11 @@ const ALL_PROPERTIES: [&str; 4] = [
     consts::LOCKED_POOL_DEVS,
 ];
 
+type LockedPoolsWithDevs = HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>;
+
 pub fn locked_pools_with_devs(
     info: &MethodInfo<MTFn<TData>, TData>,
-) -> Result<HashMap<String, Variant<Box<dyn RefArg>>>, String> {
+) -> Result<LockedPoolsWithDevs, String> {
     let dbus_context = info.tree.get_data();
 
     let engine = dbus_context.engine.borrow();
@@ -37,36 +39,34 @@ pub fn locked_pools_with_devs(
         .map(|(u, locked)| {
             (
                 uuid_to_string!(u),
-                Variant(Box::new(
-                    vec![
-                        (
-                            "key_description".to_string(),
-                            Variant(Box::new(
-                                locked.info.key_description.as_application_str().to_string(),
-                            ) as Box<dyn RefArg>),
-                        ),
-                        (
-                            "devs".to_string(),
-                            Variant(Box::new(
-                                locked
-                                    .devices
-                                    .into_iter()
-                                    .map(|d| {
-                                        let mut map = HashMap::new();
-                                        map.insert(
-                                            "devnode".to_string(),
-                                            d.devnode.display().to_string(),
-                                        );
-                                        map.insert("uuid".to_string(), uuid_to_string!(d.uuid));
-                                        map
-                                    })
-                                    .collect::<Vec<_>>(),
-                            )),
-                        ),
-                    ]
-                    .into_iter()
-                    .collect::<HashMap<_, _>>(),
-                ) as Box<dyn RefArg>),
+                vec![
+                    (
+                        "key_description".to_string(),
+                        Variant(Box::new(
+                            locked.info.key_description.as_application_str().to_string(),
+                        ) as Box<dyn RefArg>),
+                    ),
+                    (
+                        "devs".to_string(),
+                        Variant(Box::new(
+                            locked
+                                .devices
+                                .into_iter()
+                                .map(|d| {
+                                    let mut map = HashMap::new();
+                                    map.insert(
+                                        "devnode".to_string(),
+                                        d.devnode.display().to_string(),
+                                    );
+                                    map.insert("uuid".to_string(), uuid_to_string!(d.uuid));
+                                    map
+                                })
+                                .collect::<Vec<_>>(),
+                        )),
+                    ),
+                ]
+                .into_iter()
+                .collect::<HashMap<_, _>>(),
             )
         })
         .collect())

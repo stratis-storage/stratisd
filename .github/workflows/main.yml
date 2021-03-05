@@ -160,6 +160,9 @@ jobs:
           libdbus-1-dev
           libudev-dev
           make
+          thin-provisioning-tools
+          udev
+          xfsprogs
         if: matrix.image == 'ubuntu:groovy'
       - name: Install dependencies for Fedora
         run: >

@@ -29,7 +29,7 @@ jobs:
         libdbus-1-dev
         libudev-dev
         make
-      UBUNTU_DEP_CMDS: bash -c "$UPDATE_UBUNTU; INSTALL_UBUNTU"
+      UBUNTU_DEP_CMDS: bash -c "$UPDATE_UBUNTU; $INSTALL_UBUNTU"
       FEDORA_DEP_CMDS: >
         dnf install -y
         clang
@@ -166,7 +166,7 @@ jobs:
         libdbus-1-dev
         libudev-dev
         make
-      UBUNTU_DEP_CMDS: bash -c "$UPDATE_UBUNTU; INSTALL_UBUNTU"
+      UBUNTU_DEP_CMDS: bash -c "$UPDATE_UBUNTU; $INSTALL_UBUNTU"
     strategy:
       matrix:
         include:

@@ -101,6 +101,7 @@ impl DbusTreeHandler {
                             warn!("Signal on object removal was not sent to the D-Bus client");
                         };
                     }
+                    write_lock.remove(&path);
                     if self
                         .removed_object_signal(path.clone(), interfaces)
                         .is_err()

@@ -2,11 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{fs::File, io::Read, path::PathBuf};
+use std::{fs::File, io::Read, path::PathBuf, thread::sleep, time::Duration};
 
 use nix::mount::{umount2, MntFlags};
 
-use devicemapper::{DevId, DmOptions};
+use devicemapper::{DevId, DmName, DmOptions};
 
 use crate::engine::strat_engine::{
     cmd::udev_settle,
@@ -45,13 +45,36 @@ fn dm_stratis_devices_remove() -> Result<()> {
         {
             match get_dm().device_remove(&DevId::Name(n), &DmOptions::new()) {
                 Ok(_) => progress_made = true,
-                Err(e) => {
+                Err(_) => {
                     let name = n.to_string();
-                    debug!("Failed to remove device {}: {}", name, e);
                     remain.push(name)
                 }
             }
         }
+
+        // Retries if no progress has been made.
+        if remain.is_empty() && !progress_made {
+            remain = remain
+                .into_iter()
+                .filter(|name| {
+                    for _ in 0..3 {
+                        let dm_name = match DmName::new(&name) {
+                            Ok(n) => n,
+                            Err(_) => return true,
+                        };
+                        match get_dm().device_remove(&DevId::Name(dm_name), &DmOptions::new()) {
+                            Ok(_) => return false,
+                            Err(e) => {
+                                debug!("Failed to remove device {} on retry: {}", name, e);
+                                sleep(Duration::from_secs(1));
+                            }
+                        }
+                    }
+                    true
+                })
+                .collect();
+        }
+
         Ok((progress_made, remain))
     }
 

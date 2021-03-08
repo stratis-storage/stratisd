@@ -1593,7 +1593,18 @@ mod tests {
         let pool_name = "stratis_test_pool";
         let fs_name = "stratis_test_filesystem";
         let fs_uuid = pool.create_filesystem(pool_uuid, fs_name, None).unwrap();
-        pool.destroy_filesystem(pool_name, fs_uuid).unwrap();
+        for i in 0.. {
+            match (pool.destroy_filesystem(pool_name, fs_uuid), i) {
+                (Ok(_), _) => break,
+                (Err(e), i) if i == 3 => {
+                    panic!("{}", e);
+                }
+                (Err(e), _) => {
+                    debug!("Waiting on filesystem destroy that returned error {}", e);
+                }
+            }
+            sleep(Duration::from_secs(1));
+        }
         let flexdevs: FlexDevsSave = pool.record();
         let thinpooldevsave: ThinPoolDevSave = pool.record();
         pool.teardown().unwrap();

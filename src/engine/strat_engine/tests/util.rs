@@ -53,7 +53,7 @@ fn dm_stratis_devices_remove() -> Result<()> {
         }
 
         // Retries if no progress has been made.
-        if remain.is_empty() && !progress_made {
+        if !remain.is_empty() && !progress_made {
             remain = remain
                 .into_iter()
                 .filter(|name| {

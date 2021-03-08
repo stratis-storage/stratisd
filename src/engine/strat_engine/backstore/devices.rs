@@ -876,14 +876,6 @@ mod tests {
     }
 
     #[test]
-    fn travis_test_ownership() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(1, 3, None),
-            test_ownership_no_crypt,
-        );
-    }
-
-    #[test]
     fn loop_test_crypt_ownership() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(1, 3, None),
@@ -895,14 +887,6 @@ mod tests {
     fn real_test_crypt_ownership() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(1, None, None),
-            test_ownership_crypt,
-        );
-    }
-
-    #[test]
-    fn travis_test_crypt_ownership() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(1, 3, None),
             test_ownership_crypt,
         );
     }
@@ -929,14 +913,6 @@ mod tests {
     fn real_test_nonexistent_path() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(1, None, None),
-            test_nonexistent_path,
-        );
-    }
-
-    #[test]
-    fn travis_test_nonexistent_path() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(1, 3, None),
             test_nonexistent_path,
         );
     }
@@ -1064,14 +1040,6 @@ mod tests {
     }
 
     #[test]
-    fn travis_test_crypt_failure_cleanup() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, None),
-            test_failure_cleanup_crypt,
-        );
-    }
-
-    #[test]
     fn loop_test_failure_cleanup() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(2, 3, None),
@@ -1083,14 +1051,6 @@ mod tests {
     fn real_test_failure_cleanup() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(2, None, None),
-            test_failure_cleanup_no_crypt,
-        );
-    }
-
-    #[test]
-    fn travis_test_failure_cleanup() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, None),
             test_failure_cleanup_no_crypt,
         );
     }
@@ -1123,14 +1083,6 @@ mod tests {
     fn real_test_duplicate_devnodes() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(1, None, None),
-            test_duplicate_devnodes,
-        );
-    }
-
-    #[test]
-    fn travis_test_duplicate_devnodes() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(1, 2, None),
             test_duplicate_devnodes,
         );
     }

@@ -1261,14 +1261,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn travis_test_failed_init() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Exactly(1, None),
-            test_failed_init,
-        );
-    }
-
     /// Test the method `can_unlock` works on an initialized device in both
     /// active and inactive states.
     fn test_can_unlock(paths: &[&Path]) {
@@ -1338,14 +1330,6 @@ mod tests {
     fn real_test_can_unlock() {
         real::test_with_spec(
             &real::DeviceLimits::Range(1, 3, None, None),
-            test_can_unlock,
-        );
-    }
-
-    #[test]
-    fn travis_test_can_unlock() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(1, 3, None),
             test_can_unlock,
         );
     }

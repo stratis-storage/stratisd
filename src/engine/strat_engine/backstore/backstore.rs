@@ -830,14 +830,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn travis_test_add_cache_devs() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(4, 5, None),
-            test_add_cache_devs,
-        );
-    }
-
     /// Create a backstore.
     /// Request a amount that can not be allocated because the modulus is
     /// bigger than the reqested amount.
@@ -891,11 +883,6 @@ mod tests {
     #[test]
     fn real_test_request() {
         real::test_with_spec(&real::DeviceLimits::AtLeast(1, None, None), test_request);
-    }
-
-    #[test]
-    fn travis_test_request() {
-        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_request);
     }
 
     /// Create a backstore.
@@ -957,10 +944,5 @@ mod tests {
     #[test]
     fn real_test_setup() {
         real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_setup);
-    }
-
-    #[test]
-    fn travis_test_setup() {
-        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(2, 3, None), test_setup);
     }
 }

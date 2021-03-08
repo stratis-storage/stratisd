@@ -297,9 +297,4 @@ mod tests {
     fn real_cache_test_add() {
         real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), cache_test_add);
     }
-
-    #[test]
-    fn travis_cache_test_add() {
-        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(2, 3, None), cache_test_add);
-    }
 }

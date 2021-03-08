@@ -208,7 +208,7 @@ pub async fn pool_is_bound(engine: Arc<Mutex<dyn Engine>>, uuid: PoolUuid) -> St
             .map(|ei| ei.clevis_info.is_some())
             .unwrap_or(false))
     } else if let Some(info) = lock.locked_pools().get(&uuid) {
-        Ok(info.clevis_info.is_some())
+        Ok(info.info.clevis_info.is_some())
     } else {
         Err(StratisError::Error(format!(
             "Pool with UUID {} not found",

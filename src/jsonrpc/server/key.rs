@@ -66,5 +66,5 @@ pub async fn key_get_desc(
     let locked_pools = engine.lock().await.locked_pools();
     locked_pools
         .get(&pool_uuid)
-        .map(|info| info.key_description.to_owned())
+        .map(|info| info.info.key_description.to_owned())
 }

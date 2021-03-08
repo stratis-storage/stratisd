@@ -413,6 +413,11 @@ impl DeviceSet {
     /// The encryption information and devices registered for this locked pools to be
     /// exported over the API. If none of the infos correspond to a Stratis managed
     /// encrypted device, None.
+    ///
+    /// This method filters out Stratis devices that have no detected associated
+    /// LUKS2 device. This could happen for encrypted devices if the LUKS2 device
+    /// is detected after the unlocked Stratis device but should eventually become
+    /// consistent.
     pub fn locked_pool_info(&self) -> Option<LockedPoolInfo> {
         let encryption_info = self
             .internal

@@ -57,13 +57,16 @@ fn dm_stratis_devices_remove() -> Result<()> {
             remain = remain
                 .into_iter()
                 .filter(|name| {
+                    let dm_name = match DmName::new(&name) {
+                        Ok(n) => n,
+                        Err(_) => return true,
+                    };
                     for _ in 0..3 {
-                        let dm_name = match DmName::new(&name) {
-                            Ok(n) => n,
-                            Err(_) => return true,
-                        };
                         match get_dm().device_remove(&DevId::Name(dm_name), &DmOptions::new()) {
-                            Ok(_) => return false,
+                            Ok(_) => {
+                                progress_made = true;
+                                return false;
+                            }
                             Err(e) => {
                                 debug!("Failed to remove device {} on retry: {}", name, e);
                                 sleep(Duration::from_secs(1));

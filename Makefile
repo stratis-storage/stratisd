@@ -181,7 +181,7 @@ stratis-min:
 	cargo build --bin=stratis-min --features extras ${TARGET_ARGS}
 
 profiledir := $(shell if test -d target/release; then echo target/release; else echo target/debug; fi)
-install: build docs
+install: release docs
 	install -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) $(profiledir)/stratisd
 	install -Dpm0755 -t $(DESTDIR)$(UDEVDIR) $(profiledir)/stratis_uuids_to_names
 	install -Dpm0644 -t $(DESTDIR)$(DATADIR)/dbus-1/system.d stratisd.conf

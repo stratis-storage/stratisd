@@ -6,7 +6,7 @@ use std::{fs::File, io::Read, path::PathBuf, thread::sleep, time::Duration};
 
 use nix::mount::{umount2, MntFlags};
 
-use devicemapper::{DevId, DmName, DmOptions};
+use devicemapper::{DevId, DmNameBuf, DmOptions};
 
 use crate::engine::strat_engine::{
     cmd::udev_settle,
@@ -29,7 +29,7 @@ use self::cleanup_errors::{Error, Result};
 /// FIXME: Current implementation complicated by https://bugzilla.redhat.com/show_bug.cgi?id=1506287
 fn dm_stratis_devices_remove() -> Result<()> {
     /// One iteration of removing devicemapper devices
-    fn one_iteration() -> Result<(bool, Vec<String>)> {
+    fn one_iteration() -> Result<(bool, Vec<DmNameBuf>)> {
         let mut progress_made = false;
         let mut remain = Vec::new();
 
@@ -45,10 +45,7 @@ fn dm_stratis_devices_remove() -> Result<()> {
         {
             match get_dm().device_remove(&DevId::Name(n), &DmOptions::new()) {
                 Ok(_) => progress_made = true,
-                Err(_) => {
-                    let name = n.to_string();
-                    remain.push(name)
-                }
+                Err(_) => remain.push(n.to_owned()),
             }
         }
 
@@ -57,18 +54,18 @@ fn dm_stratis_devices_remove() -> Result<()> {
             remain = remain
                 .into_iter()
                 .filter(|name| {
-                    let dm_name = match DmName::new(&name) {
-                        Ok(n) => n,
-                        Err(_) => return true,
-                    };
                     for _ in 0..3 {
-                        match get_dm().device_remove(&DevId::Name(dm_name), &DmOptions::new()) {
+                        match get_dm().device_remove(&DevId::Name(name), &DmOptions::new()) {
                             Ok(_) => {
                                 progress_made = true;
                                 return false;
                             }
                             Err(e) => {
-                                debug!("Failed to remove device {} on retry: {}", name, e);
+                                debug!(
+                                    "Failed to remove device {} on retry: {}",
+                                    name.to_string(),
+                                    e
+                                );
                                 sleep(Duration::from_secs(1));
                             }
                         }
@@ -83,7 +80,7 @@ fn dm_stratis_devices_remove() -> Result<()> {
 
     /// Do one iteration of removals until progress stops. Return remaining
     /// dm devices.
-    fn do_while_progress() -> Result<Vec<String>> {
+    fn do_while_progress() -> Result<Vec<DmNameBuf>> {
         let mut result = one_iteration()?;
         while result.0 {
             result = one_iteration()?;

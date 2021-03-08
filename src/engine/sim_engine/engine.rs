@@ -20,8 +20,8 @@ use crate::{
         sim_engine::{keys::SimKeyActions, pool::SimPool},
         structures::Table,
         types::{
-            CreateAction, DeleteAction, DevUuid, EncryptionInfo, KeyDescription, Name, PoolUuid,
-            RenameAction, ReportType, SetUnlockAction, UnlockMethod,
+            CreateAction, DeleteAction, DevUuid, EncryptionInfo, KeyDescription, LockedPoolInfo,
+            Name, PoolUuid, RenameAction, ReportType, SetUnlockAction, UnlockMethod,
         },
         EngineEvent,
     },
@@ -194,7 +194,7 @@ impl Engine for SimEngine {
         get_mut_pool!(self; uuid)
     }
 
-    fn locked_pools(&self) -> HashMap<PoolUuid, EncryptionInfo> {
+    fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo> {
         HashMap::new()
     }
 

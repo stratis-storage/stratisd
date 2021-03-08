@@ -279,3 +279,13 @@ impl BlockDevPath {
         self.child_paths.iter().map(|child| child.path())
     }
 }
+
+pub struct LockedPoolDevice {
+    pub devnode: PathBuf,
+    pub uuid: DevUuid,
+}
+
+pub struct LockedPoolInfo {
+    pub info: EncryptionInfo,
+    pub devices: Vec<LockedPoolDevice>,
+}

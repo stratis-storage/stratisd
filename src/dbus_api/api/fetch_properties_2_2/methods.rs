@@ -12,7 +12,7 @@ use dbus::{
 use itertools::Itertools;
 
 use crate::dbus_api::{
-    api::shared::{list_keys, locked_pool_uuids},
+    api::shared::{list_keys, locked_pool_uuids, locked_pools},
     consts,
     types::TData,
     util::result_to_tuple,
@@ -23,24 +23,6 @@ const ALL_PROPERTIES: [&str; 3] = [
     consts::LOCKED_POOLS,
     consts::LOCKED_POOL_UUIDS,
 ];
-
-pub fn locked_pools(
-    info: &MethodInfo<MTFn<TData>, TData>,
-) -> Result<HashMap<String, String>, String> {
-    let dbus_context = info.tree.get_data();
-
-    let engine = dbus_context.engine.borrow();
-    Ok(engine
-        .locked_pools()
-        .into_iter()
-        .map(|(u, info)| {
-            (
-                uuid_to_string!(u),
-                info.key_description.as_application_str().to_string(),
-            )
-        })
-        .collect())
-}
 
 #[allow(clippy::unknown_clippy_lints)]
 #[allow(clippy::unnecessary_wraps)]

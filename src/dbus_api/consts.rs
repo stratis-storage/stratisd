@@ -18,11 +18,13 @@ pub const PROPERTY_FETCH_INTERFACE_NAME: &str = "org.storage.stratis2.FetchPrope
 pub const PROPERTY_FETCH_INTERFACE_NAME_2_1: &str = "org.storage.stratis2.FetchProperties.r1";
 pub const PROPERTY_FETCH_INTERFACE_NAME_2_2: &str = "org.storage.stratis2.FetchProperties.r2";
 pub const PROPERTY_FETCH_INTERFACE_NAME_2_3: &str = "org.storage.stratis2.FetchProperties.r3";
+pub const PROPERTY_FETCH_INTERFACE_NAME_2_4: &str = "org.storage.stratis2.FetchProperties.r4";
 
 pub const KEY_LIST_PROP: &str = "KeyList";
 
 pub const LOCKED_POOL_UUIDS: &str = "LockedPoolUuids";
 pub const LOCKED_POOLS: &str = "LockedPools";
+pub const LOCKED_POOL_DEVS: &str = "LockedPoolsWithDevs";
 
 pub const POOL_INTERFACE_NAME: &str = "org.storage.stratis2.pool";
 pub const POOL_INTERFACE_NAME_2_1: &str = "org.storage.stratis2.pool.r1";

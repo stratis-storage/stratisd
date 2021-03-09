@@ -25,6 +25,7 @@ pub enum StratisError {
     Uuid(uuid::Error),
     Utf8(str::Utf8Error),
     Serde(serde_json::error::Error),
+    Decode(base64::DecodeError),
     DM(devicemapper::DmError),
     Crypt(libcryptsetup_rs::LibcryptErr),
 
@@ -43,6 +44,7 @@ impl fmt::Display for StratisError {
             StratisError::Uuid(ref err) => write!(f, "Uuid error: {}", err),
             StratisError::Utf8(ref err) => write!(f, "Utf8 error: {}", err),
             StratisError::Serde(ref err) => write!(f, "Serde error: {}", err),
+            StratisError::Decode(ref err) => write!(f, "base64 error: {}", err),
             StratisError::DM(ref err) => write!(f, "DM error: {}", err),
             StratisError::Crypt(ref err) => write!(f, "Cryptsetup error: {}", err),
 
@@ -64,6 +66,7 @@ impl Error for StratisError {
             StratisError::Uuid(ref err) => Some(err),
             StratisError::Utf8(ref err) => Some(err),
             StratisError::Serde(ref err) => Some(err),
+            StratisError::Decode(ref err) => Some(err),
             StratisError::DM(ref err) => Some(err),
             StratisError::Crypt(ref err) => Some(err),
 
@@ -101,6 +104,12 @@ impl From<str::Utf8Error> for StratisError {
 impl From<serde_json::error::Error> for StratisError {
     fn from(err: serde_json::error::Error) -> StratisError {
         StratisError::Serde(err)
+    }
+}
+
+impl From<base64::DecodeError> for StratisError {
+    fn from(err: base64::DecodeError) -> StratisError {
+        StratisError::Decode(err)
     }
 }
 

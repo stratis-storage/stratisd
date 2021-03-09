@@ -92,6 +92,7 @@ pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
         StratisError::Uuid(_)
         | StratisError::Utf8(_)
         | StratisError::Serde(_)
+        | StratisError::Decode(_)
         | StratisError::DM(_)
         | StratisError::Dbus(_)
         | StratisError::Udev(_)

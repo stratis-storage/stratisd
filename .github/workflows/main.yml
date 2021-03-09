@@ -24,70 +24,167 @@ jobs:
           - task: make -f Makefile fmt-travis
             toolchain: 1.50.0
             components: rustfmt
+            image: ubuntu:groovy
           - task: make -f Makefile clippy
             toolchain: 1.50.0
             components: clippy
+            image: ubuntu:groovy
+          - task: make -f Makefile fmt-travis
+            toolchain: 1.50.0
+            components: rustfmt
+            image: fedora:32
+          - task: make -f Makefile clippy
+            toolchain: 1.50.0
+            components: clippy
+            image: fedora:32
           # MANDATORY TESTING ON STABLE
           - task: make -f Makefile build
             toolchain: stable
             components: cargo
+            image: ubuntu:groovy
           - task: make -f Makefile build-no-default
             toolchain: stable
             components: cargo
+            image: ubuntu:groovy
           - task: make -f Makefile build-extras
             toolchain: stable
             components: cargo
+            image: ubuntu:groovy
           - task: make -f Makefile docs-travis
             toolchain: stable
             components: cargo
+            image: ubuntu:groovy
           - task: make -f Makefile test
             toolchain: stable
             components: cargo
-          - task: >
-              sudo
-              PATH=$GITHUB_WORKSPACE/.cargo/bin:$PATH
-              RUST_LOG=libstratis=info
-              make -f Makefile test-travis
-            toolchain: stable
-            components: cargo
+            image: ubuntu:groovy
           - task: make -f Makefile release
             toolchain: stable
             components: cargo
+            image: ubuntu:groovy
+          - task: make -f Makefile build
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+          - task: make -f Makefile build-no-default
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+          - task: make -f Makefile build-extras
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+          - task: make -f Makefile docs-travis
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+          - task: make -f Makefile test
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+          - task: make -f Makefile release
+            toolchain: stable
+            components: cargo
+            image: fedora:32
     runs-on: ubuntu-18.04
+    container:
+      image: ${{ matrix.image }}
+      options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
+      - name: Install dependencies for Ubuntu
+        run: apt-get -q update
+        if: matrix.image == 'ubuntu:groovy'
+      - name: Install dependencies for Ubuntu
+        run: >
+          DEBIAN_FRONTEND=noninteractive
+          apt-get install -y
+          clang
+          curl
+          libblkid-dev
+          libcryptsetup-dev
+          libdbus-1-dev
+          libudev-dev
+          make
+        if: matrix.image == 'ubuntu:groovy'
+      - name: Install dependencies for Fedora
+        run: >
+          dnf install -y
+          clang
+          curl
+          cryptsetup-devel
+          dbus-devel
+          libblkid-devel
+          make
+          systemd-devel
+        if: matrix.image == 'fedora:32'
       - uses: actions-rs/toolchain@v1
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
           override: true
-      - name: Install dependencies
-        run: |
-          sudo apt-get -q update
-          sudo apt-get -y install libdbus-1-dev libudev-dev libdbus-glib-1-dev
-      - name: Install dependencies
+      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
+        run: ${{ matrix.task }}
+
+  # TESTS WITH UDEV
+  checks_with_udev:
+    strategy:
+      matrix:
+        include:
+          # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
+          - task: RUST_LOG=libstratis=debug make -f Makefile test-loop
+            toolchain: stable
+            components: cargo
+            image: ubuntu:groovy
+          - task: RUST_LOG=libstratis=debug make -f Makefile test-loop
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+    runs-on: ubuntu-18.04
+    container:
+      image: ${{ matrix.image }}
+      options: --privileged -v /dev:/dev
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies for Ubuntu
+        run: apt-get -q update
+        if: matrix.image == 'ubuntu:groovy'
+      - name: Install dependencies for Ubuntu
         run: >
-          sudo
-          add-apt-repository -y
-          "deb http://us.archive.ubuntu.com/ubuntu/ focal main"
-      - name: Install dependencies
-        run: |
-          sudo apt-get -q update
-          # Update to a more recent version of blkid
-          sudo apt-get -y install util-linux libblkid-dev
-          # cryptsetup-bin conflicts with custom built cryptsetup
-          sudo apt-get remove cryptsetup-bin
-          sudo apt-get -y install libargon2-0 libjson-c3
-      - name: Install dependencies
+          DEBIAN_FRONTEND=noninteractive
+          apt-get install -y
+          clang
+          curl
+          libblkid-dev
+          libcryptsetup-dev
+          libdbus-1-dev
+          libudev-dev
+          make
+          thin-provisioning-tools
+          udev
+          xfsprogs
+        if: matrix.image == 'ubuntu:groovy'
+      - name: Install dependencies for Fedora
         run: >
-          wget
-          "https://github.com/jbaublitz/stratisd/raw/deb/cryptsetup_2.3.0-1_amd64.deb"
-      - name: Install dependencies
-        run: |
-          sudo dpkg -i ./cryptsetup_2.3.0-1_amd64.deb
-          # Linking fails if libcryptsetup 2.2 is present - must force
-          # remove due to system dependencies
-          sudo dpkg --purge --force-all libcryptsetup12
+          dnf install -y
+          clang
+          cryptsetup-devel
+          curl
+          device-mapper-persistent-data
+          dbus-devel
+          libblkid-devel
+          make
+          systemd-devel
+          systemd-udev
+          xfsprogs
+        if: matrix.image == 'fedora:32'
+      - name: Start udev
+        run: /usr/lib/systemd/systemd-udevd &
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: ${{ matrix.components }}
+          toolchain: ${{ matrix.toolchain }}
+          override: true
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
@@ -109,39 +206,30 @@ jobs:
             toolchain: stable
             components: cargo
     runs-on: ubuntu-18.04
+    container:
+      image: ubuntu:groovy
+      options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
+      - name: Install dependencies
+        run: apt-get -q update
+      - name: Install dependencies
+        run: >
+          DEBIAN_FRONTEND=noninteractive
+          apt-get -y install
+          clang
+          curl
+          libblkid-dev
+          libcryptsetup-dev
+          libdbus-1-dev
+          libssl-dev
+          libudev-dev
+          make
       - uses: actions-rs/toolchain@v1
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
           override: true
-      - name: Install dependencies
-        run: |
-          sudo apt-get -q update
-          sudo apt-get -y install libdbus-1-dev libudev-dev libdbus-glib-1-dev
-      - name: Install dependencies
-        run: >
-          sudo add-apt-repository -y
-          "deb http://us.archive.ubuntu.com/ubuntu/ focal main"
-      - name: Install dependencies
-        run: |
-          sudo apt-get -q update
-          # Update to a more recent version of blkid
-          sudo apt-get -y install util-linux libblkid-dev
-          # cryptsetup-bin conflicts with custom built cryptsetup
-          sudo apt-get remove cryptsetup-bin
-          sudo apt-get -y install libargon2-0 libjson-c3
-      - name: Install dependencies
-        run: >
-          wget
-          "https://github.com/jbaublitz/stratisd/raw/deb/cryptsetup_2.3.0-1_amd64.deb"
-      - name: Install dependencies
-        run: |
-          sudo dpkg -i ./cryptsetup_2.3.0-1_amd64.deb
-          # Linking fails if libcryptsetup 2.2 is present - must force
-          # remove due to system dependencies
-          sudo dpkg --purge --force-all libcryptsetup12
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 

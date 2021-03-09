@@ -212,7 +212,11 @@ impl CryptInitializer {
         }
     }
 
-    pub fn initialize(self, key_description: &KeyDescription) -> StratisResult<CryptHandle> {
+    pub fn initialize(
+        self,
+        key_description: Option<&KeyDescription>,
+        clevis_info: Option<(&str, &Value)>,
+    ) -> StratisResult<CryptHandle> {
         let mut device = log_on_failure!(
             CryptInit::init(&self.physical_path),
             "Failed to acquire context for device {} while initializing; \
@@ -223,15 +227,15 @@ impl CryptInitializer {
             MetadataSize::try_from(DEFAULT_CRYPT_METADATA_SIZE)?,
             KeyslotsSize::try_from(DEFAULT_CRYPT_KEYSLOTS_SIZE)?,
         )?;
-        let result = self.initialize_with_err(&mut device, Some(key_description), None);
+        let result = self.initialize_with_err(&mut device, key_description, None);
         match result {
             Ok(activated_path) => Ok(CryptHandle::new(
                 self.physical_path,
                 activated_path,
                 self.identifiers,
                 EncryptionInfo {
-                    key_description: Some(key_description.clone()),
-                    clevis_info: None,
+                    key_description: key_description.cloned(),
+                    clevis_info: clevis_info.map(|(pin, config)| (pin.to_owned(), config.clone())),
                 },
                 self.activation_name,
             )),
@@ -278,7 +282,20 @@ impl CryptInitializer {
             "Failed to initialize keyslot with provided key in keyring"
         );
 
-        initialize_keyring_tokens(device, keyslot, key_description)
+        log_on_failure!(
+            device
+                .token_handle()
+                .luks2_keyring_set(Some(LUKS2_TOKEN_ID), &key_description.to_system_string()),
+            "Failed to initialize the LUKS2 token for driving keyring activation operations"
+        );
+        log_on_failure!(
+            device
+                .token_handle()
+                .assign_keyslot(LUKS2_TOKEN_ID, Some(keyslot)),
+            "Failed to assign the LUKS2 keyring token to the Stratis keyslot"
+        );
+
+        Ok(())
     }
 
     fn initialize_with_clevis(
@@ -632,27 +649,6 @@ impl CryptHandle {
     }
 }
 
-/// Initialize LUKS2 keyring token
-fn initialize_keyring_tokens(
-    device: &mut CryptDevice,
-    keyslot: libc::c_uint,
-    key_description: &KeyDescription,
-) -> StratisResult<()> {
-    log_on_failure!(
-        device
-            .token_handle()
-            .luks2_keyring_set(Some(LUKS2_TOKEN_ID), &key_description.to_system_string()),
-        "Failed to initialize the LUKS2 token for driving keyring activation operations"
-    );
-    log_on_failure!(
-        device
-            .token_handle()
-            .assign_keyslot(LUKS2_TOKEN_ID, Some(keyslot)),
-        "Failed to assign the LUKS2 keyring token to the Stratis keyslot"
-    );
-    Ok(())
-}
-
 /// Set up a handle to a crypt device using either Clevis or the keyring to activate
 /// the device.
 fn setup_crypt_handle(
@@ -673,23 +669,38 @@ fn setup_crypt_handle(
     };
 
     let identifiers = identifiers_from_metadata(&mut device)?;
-    let key_description = key_desc_from_metadata(&mut device)?;
-    let key_description = match KeyDescription::from_system_key_desc(&key_description) {
-        Some(Ok(description)) => description,
-        _ => {
+    let key_description = key_desc_from_metadata(&mut device);
+    let key_description = match key_description
+        .as_ref()
+        .map(|kd| KeyDescription::from_system_key_desc(kd))
+    {
+        Some(Some(Ok(description))) => Some(description),
+        Some(Some(Err(e))) => {
             return Err(StratisError::Error(format!(
-                "key description {} found on devnode {} is not a valid Stratis key description",
-                key_description,
-                physical_path.display()
+                "key description {} found on devnode {} is not a valid Stratis key description: {}",
+                key_description.expect("key_desc_from_metadata determined to be Some(_) above"),
+                physical_path.display(),
+                e,
             )));
         }
+        Some(None) => {
+            warn!("Key description stored on device {} does not appear to be a Stratis key description; ignoring", physical_path.display());
+            None
+        }
+        None => None,
     };
     let clevis_info = clevis_info_from_metadata(&mut device)?;
     let name = name_from_metadata(&mut device)?;
 
     let activated_path = match unlock_method {
         Some(UnlockMethod::Keyring) => {
-            activate(Either::Left((&mut device, &key_description)), &name)?
+            activate(Either::Left((
+                &mut device,
+                key_description.as_ref()
+                    .ok_or_else(|| {
+                        LibcryptErr::Other("Unlock action was specified to be keyring but not key description is present in the metadata".to_string())
+                    })?,
+            )), &name)?
         }
         Some(UnlockMethod::Clevis) => activate(Either::Right(physical_path), &name)?,
         None => [DEVICEMAPPER_PATH, &name].iter().collect(),
@@ -702,7 +713,7 @@ fn setup_crypt_handle(
         ),
         identifiers,
         encryption_info: EncryptionInfo {
-            key_description: Some(key_description),
+            key_description,
             clevis_info,
         },
         name,
@@ -728,6 +739,7 @@ fn device_from_physical_path(physical_path: &Path) -> StratisResult<Option<Crypt
     }
 }
 
+/// Get the Clevis binding information from the device metadata.
 fn clevis_info_from_metadata(device: &mut CryptDevice) -> StratisResult<Option<(String, Value)>> {
     let json = match device.token_handle().json_get(CLEVIS_LUKS_TOKEN_ID).ok() {
         Some(j) => j,
@@ -1269,12 +1281,8 @@ fn name_from_metadata(device: &mut CryptDevice) -> StratisResult<String> {
 
 /// Query the Stratis metadata for the key description used to unlock the
 /// physical device.
-fn key_desc_from_metadata(device: &mut CryptDevice) -> StratisResult<String> {
-    let key_desc = log_on_failure!(
-        device.token_handle().luks2_keyring_get(LUKS2_TOKEN_ID),
-        "Failed to get key description from LUKS2 keyring metadata"
-    );
-    Ok(key_desc)
+fn key_desc_from_metadata(device: &mut CryptDevice) -> Option<String> {
+    device.token_handle().luks2_keyring_get(LUKS2_TOKEN_ID).ok()
 }
 
 /// Query the Stratis metadata for the device identifiers.
@@ -1342,7 +1350,7 @@ mod tests {
         let dev_uuid = DevUuid::new_v4();
 
         let result = CryptInitializer::new((*path).to_owned(), pool_uuid, dev_uuid)
-            .initialize(&key_description);
+            .initialize(Some(&key_description), None);
 
         // Initialization cannot occur with a non-existent key
         assert!(result.is_err());
@@ -1383,7 +1391,7 @@ mod tests {
                 let dev_uuid = DevUuid::new_v4();
 
                 let handle = CryptInitializer::new((*path).to_owned(), pool_uuid, dev_uuid)
-                    .initialize(key_desc)?;
+                    .initialize(Some(key_desc), None)?;
                 handles.push(handle);
             }
 
@@ -1470,7 +1478,7 @@ mod tests {
             let dev_uuid = DevUuid::new_v4();
 
             let mut handle = CryptInitializer::new((*path).to_owned(), pool_uuid, dev_uuid)
-                .initialize(key_desc)?;
+                .initialize(Some(key_desc), None)?;
             let logical_path = handle.activated_device_path();
 
             const WINDOW_SIZE: usize = 1024 * 1024;

@@ -24,7 +24,6 @@ use crate::{
                 crypt::{CryptHandle, CryptInitializer},
             },
             device::blkdev_size,
-            keys::MemoryPrivateFilesystem,
             metadata::{
                 device_identifiers, disown_device, BlockdevSize, MDADataSize, StratisIdentifiers,
                 BDA,
@@ -421,29 +420,11 @@ pub fn initialize_devices(
         key_description: &KeyDescription,
         enable_clevis: Option<(&str, &Value)>,
     ) -> StratisResult<(CryptHandle, Device, Sectors)> {
-        fn initialize_encrypted_with_err(
-            handle: &mut CryptHandle,
-            key_description: &KeyDescription,
-            enable_clevis: Option<(&str, &Value)>,
-        ) -> StratisResult<(Device, Sectors)> {
-            let device_size = handle.logical_device_size()?;
-
-            if let Some((pin, json)) = enable_clevis {
-                let mem_fs = MemoryPrivateFilesystem::new()?;
-                mem_fs.key_op(key_description, |key_path| {
-                    handle
-                        .clevis_bind(key_path, pin, &json, false)
-                        .map_err(|e| StratisError::Error(e.to_string()))
-                })?;
-            };
-
-            map_device_nums(handle.activated_device_path()).map(|dn| (dn, device_size))
-        }
-
         let mut handle = CryptInitializer::new(physical_path.to_owned(), pool_uuid, dev_uuid)
-            .initialize(key_description)?;
-        match initialize_encrypted_with_err(&mut handle, key_description, enable_clevis) {
-            Ok((devno, devsize)) => Ok((handle, devno, devsize)),
+            .initialize(Some(key_description), enable_clevis)?;
+
+        let device_size = match handle.logical_device_size() {
+            Ok(size) => size,
             Err(error) => {
                 let path = handle.luks2_device_path().display().to_string();
                 if let Err(e) = handle.wipe() {
@@ -454,9 +435,10 @@ pub fn initialize_devices(
                         path, e
                     );
                 }
-                Err(error)
+                return Err(error);
             }
-        }
+        };
+        map_device_nums(handle.activated_device_path()).map(|dn| (handle, dn, device_size))
     }
 
     fn initialize_stratis_metadata(

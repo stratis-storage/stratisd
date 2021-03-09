@@ -233,9 +233,7 @@ macro_rules! retry_operation {
         for i in 0.. {
             match ($expr, i) {
                 (Ok(_), _) => break,
-                (Err(e), i) if i == 3 => {
-                    panic!("{:?}", e);
-                }
+                (Err(e), i) if i == 3 => Err(e).unwrap(),
                 (Err(e), _) => {
                     debug!(
                         "Waiting on {} that returned error {:?}",

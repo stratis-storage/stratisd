@@ -235,11 +235,7 @@ macro_rules! retry_operation {
                 (Ok(_), _) => break,
                 (Err(e), i) if i == 3 => Err(e).unwrap(),
                 (Err(e), _) => {
-                    debug!(
-                        "Waiting on {} that returned error {:?}",
-                        stringify!($expr),
-                        e
-                    );
+                    debug!("Waiting on {} that returned error {}", stringify!($expr), e);
                 }
             }
             std::thread::sleep(std::time::Duration::from_secs(1));

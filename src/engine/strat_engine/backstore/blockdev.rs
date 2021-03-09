@@ -224,9 +224,7 @@ impl StratBlockDev {
         })?;
         let key_description = crypt_handle.encryption_info().key_description.clone();
         memfs.key_op(&key_description, |keyfile_path| {
-            crypt_handle
-                .clevis_bind(keyfile_path, pin, clevis_info, yes)
-                .map_err(StratisError::Crypt)
+            crypt_handle.clevis_bind(keyfile_path, pin, clevis_info, yes)
         })
     }
 
@@ -235,7 +233,7 @@ impl StratBlockDev {
         let crypt_handle = self.crypt_handle.as_mut().ok_or_else(|| {
             StratisError::Error("This device does not appear to be encrypted".to_string())
         })?;
-        crypt_handle.clevis_unbind().map_err(StratisError::Crypt)
+        crypt_handle.clevis_unbind()
     }
 }
 

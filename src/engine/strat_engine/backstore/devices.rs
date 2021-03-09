@@ -614,7 +614,7 @@ pub fn initialize_devices(
                             physical_path.display(),
                             e,
                         );
-                        return Err(StratisError::from(e));
+                        return Err(e);
                     }
                 };
                 clean_up_encrypted(handle);

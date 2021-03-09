@@ -296,6 +296,6 @@ jobs:
         with:
           python-version: ${{ env.PYTHON }}
       - name: Install dependencies
-        run: pip3 install yamllint==1.25.0
+        run: pip3 install yamllint==1.26.0
       - name: Run yamllint
         run: make -f Makefile $TASK

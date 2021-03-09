@@ -1478,7 +1478,8 @@ mod tests {
         assert_matches!(action, Some(_));
         let flexdevs: FlexDevsSave = pool.record();
         let thinpoolsave: ThinPoolDevSave = pool.record();
-        pool.teardown().unwrap();
+
+        retry_operation!(pool.teardown());
 
         let pool = ThinPool::setup(pool_uuid, &thinpoolsave, &flexdevs, &backstore).unwrap();
 
@@ -1580,18 +1581,7 @@ mod tests {
         let pool_name = "stratis_test_pool";
         let fs_name = "stratis_test_filesystem";
         let fs_uuid = pool.create_filesystem(pool_uuid, fs_name, None).unwrap();
-        for i in 0.. {
-            match (pool.destroy_filesystem(pool_name, fs_uuid), i) {
-                (Ok(_), _) => break,
-                (Err(e), i) if i == 3 => {
-                    panic!("{}", e);
-                }
-                (Err(e), _) => {
-                    debug!("Waiting on filesystem destroy that returned error {}", e);
-                }
-            }
-            sleep(Duration::from_secs(1));
-        }
+        retry_operation!(pool.destroy_filesystem(pool_name, fs_uuid));
         let flexdevs: FlexDevsSave = pool.record();
         let thinpooldevsave: ThinPoolDevSave = pool.record();
         pool.teardown().unwrap();

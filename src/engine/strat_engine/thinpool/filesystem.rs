@@ -5,8 +5,8 @@
 use chrono::{DateTime, TimeZone, Utc};
 
 use std::{
-    fs::File,
-    io::Read,
+    fs::{File, OpenOptions},
+    io::{Read, Write},
     path::{Path, PathBuf},
     thread::sleep,
     time::Duration,
@@ -32,7 +32,7 @@ use crate::{
             serde_structs::FilesystemSave,
             thinpool::{thinpool::DATA_LOWATER, DATA_BLOCK_SIZE},
         },
-        types::{FilesystemUuid, MaybeDbusPath, Name, PoolUuid, StratisUuid},
+        types::{FilesystemUuid, Name, PoolUuid, StratisUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -49,7 +49,6 @@ pub const FILESYSTEM_LOWATER: Sectors = Sectors(4 * (DATA_LOWATER.0 * DATA_BLOCK
 pub struct StratFilesystem {
     thin_dev: ThinDev,
     created: DateTime<Utc>,
-    dbus_path: MaybeDbusPath,
 }
 
 impl StratFilesystem {
@@ -94,7 +93,6 @@ impl StratFilesystem {
             StratFilesystem {
                 thin_dev,
                 created: Utc::now(),
-                dbus_path: MaybeDbusPath(None),
             },
         ))
     }
@@ -117,7 +115,6 @@ impl StratFilesystem {
         Ok(StratFilesystem {
             thin_dev,
             created: Utc.timestamp(fssave.created as i64, 0),
-            dbus_path: MaybeDbusPath(None),
         })
     }
 
@@ -175,7 +172,6 @@ impl StratFilesystem {
                 Ok(StratFilesystem {
                     thin_dev,
                     created: Utc::now(),
-                    dbus_path: MaybeDbusPath(None),
                 })
             }
             Err(e) => Err(StratisError::Engine(
@@ -295,6 +291,22 @@ impl StratFilesystem {
 }
 
 impl Filesystem for StratFilesystem {
+    fn send_udev_change(&self) -> StratisResult<()> {
+        let device = self.thin_dev.device();
+        let uevent_file = [
+            "/sys/dev/block",
+            &format!("{}:{}", device.major, device.minor),
+            "uevent",
+        ]
+        .iter()
+        .collect::<PathBuf>();
+        OpenOptions::new()
+            .write(true)
+            .open(&uevent_file)?
+            .write_all("change".as_bytes())?;
+        Ok(())
+    }
+
     fn devnode(&self) -> PathBuf {
         self.thin_dev.devnode()
     }
@@ -322,14 +334,6 @@ impl Filesystem for StratFilesystem {
                 Err(StratisError::Engine(ErrorEnum::Error, error_msg))
             }
         }
-    }
-
-    fn set_dbus_path(&mut self, path: MaybeDbusPath) {
-        self.dbus_path = path
-    }
-
-    fn get_dbus_path(&self) -> &MaybeDbusPath {
-        &self.dbus_path
     }
 }
 

@@ -8,8 +8,9 @@ pub use self::{
     stratis::VERSION,
 };
 
-mod dbus_support;
+mod dm;
 mod errors;
+mod ipc_support;
 mod run;
 #[allow(clippy::module_inception)]
 mod stratis;

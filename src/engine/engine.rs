@@ -12,13 +12,14 @@ use std::{
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 
-use devicemapper::{Bytes, Sectors, DM};
+use devicemapper::{Bytes, Sectors};
 
 use crate::{
     engine::types::{
         BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid,
-        Key, KeyDescription, LockedPoolInfo, MappingCreateAction, MaybeDbusPath, Name, PoolUuid,
-        RenameAction, ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, UnlockMethod,
+        Key, KeyDescription, LockedPoolInfo, MappingCreateAction, Name, PoolUuid, RenameAction,
+        ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, UdevEngineEvent,
+        UnlockMethod,
     },
     stratis::StratisResult,
 };
@@ -66,6 +67,10 @@ pub trait Report {
 }
 
 pub trait Filesystem: Debug {
+    /// Send a synthetic udev change event to the devicemapper device representing
+    /// the filesystem.
+    fn send_udev_change(&self) -> StratisResult<()>;
+
     /// path of the device node
     fn devnode(&self) -> PathBuf;
 
@@ -77,12 +82,6 @@ pub trait Filesystem: Debug {
 
     /// The amount of data stored on the filesystem, including overhead.
     fn used(&self) -> StratisResult<Bytes>;
-
-    /// Set dbus path associated with the Pool.
-    fn set_dbus_path(&mut self, path: MaybeDbusPath);
-
-    /// Get dbus path associated with the Pool.
-    fn get_dbus_path(&self) -> &MaybeDbusPath;
 }
 
 pub trait BlockDev: Debug {
@@ -107,12 +106,6 @@ pub trait BlockDev: Debug {
 
     /// The total size of the device, including space not usable for data.
     fn size(&self) -> Sectors;
-
-    /// Set dbus path associated with the BlockDev.
-    fn set_dbus_path(&mut self, path: MaybeDbusPath);
-
-    /// Get dbus path associated with the BlockDev.
-    fn get_dbus_path(&self) -> &MaybeDbusPath;
 
     /// Get the status of whether a block device is encrypted or not.
     fn is_encrypted(&self) -> bool;
@@ -255,12 +248,6 @@ pub trait Pool: Debug {
         user_info: Option<&str>,
     ) -> StratisResult<RenameAction<DevUuid>>;
 
-    /// Set dbus path associated with the Pool.
-    fn set_dbus_path(&mut self, path: MaybeDbusPath);
-
-    /// Get dbus path associated with the Pool.
-    fn get_dbus_path(&self) -> &MaybeDbusPath;
-
     /// true if the pool has a cache, otherwise false
     fn has_cache(&self) -> bool;
 
@@ -271,7 +258,7 @@ pub trait Pool: Debug {
     fn encryption_info(&self) -> Option<&EncryptionInfo>;
 }
 
-pub trait Engine: Debug + Report {
+pub trait Engine: Debug + Report + Send {
     /// Create a Stratis pool.
     /// Returns the UUID of the newly created pool.
     /// Returns an error if the redundancy code does not correspond to a
@@ -289,7 +276,7 @@ pub trait Engine: Debug + Report {
     /// and its UUID.
     ///
     /// Precondition: the subsystem of the device evented on is "block".
-    fn handle_event(&mut self, event: &libudev::Event) -> Option<(Name, PoolUuid, &mut dyn Pool)>;
+    fn handle_event(&mut self, event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &dyn Pool)>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.
@@ -338,10 +325,6 @@ pub trait Engine: Debug + Report {
 
     /// Get mutable references to all pools belonging to this engine.
     fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut dyn Pool)>;
-
-    /// Return the DM file descriptor to check for DM events. If the engine
-    /// is the sim engine, the value is None.
-    fn get_dm_context(&self) -> Option<&'static DM>;
 
     /// Notify the engine that an event has occurred on the DM file descriptor.
     fn evented(&mut self) -> StratisResult<()>;

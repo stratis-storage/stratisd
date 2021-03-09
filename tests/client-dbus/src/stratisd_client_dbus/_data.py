@@ -126,7 +126,7 @@ SPECS = {
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>
     <property name="Devnode" type="s" access="read">
-      <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
+      <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="invalidates" />
     </property>
     <property name="Name" type="s" access="read" />
     <property name="Pool" type="o" access="read">

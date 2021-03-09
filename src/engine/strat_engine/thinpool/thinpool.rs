@@ -1478,7 +1478,19 @@ mod tests {
         assert_matches!(action, Some(_));
         let flexdevs: FlexDevsSave = pool.record();
         let thinpoolsave: ThinPoolDevSave = pool.record();
-        pool.teardown().unwrap();
+
+        for i in 0.. {
+            match (pool.teardown(), i) {
+                (Ok(_), _) => break,
+                (Err(e), i) if i == 3 => {
+                    panic!("{}", e);
+                }
+                (Err(e), _) => {
+                    debug!("Waiting on pool teardown that returned error {}", e);
+                }
+            }
+            sleep(Duration::from_secs(1));
+        }
 
         let pool = ThinPool::setup(pool_uuid, &thinpoolsave, &flexdevs, &backstore).unwrap();
 

@@ -213,13 +213,23 @@ impl CryptInitializer {
         key_description: Option<&KeyDescription>,
         clevis_info: Option<(&str, &Value)>,
     ) -> StratisResult<CryptHandle> {
+        let mut clevis_info_owned =
+            clevis_info.map(|(pin, config)| (pin.to_owned(), config.clone()));
+        let clevis_parsed = match clevis_info_owned {
+            Some((ref pin, ref mut config)) => {
+                let yes = interpret_clevis_config(pin, config)?;
+                Some((pin.as_str(), &*config, yes))
+            }
+            None => None,
+        };
+
         let mut device = log_on_failure!(
             CryptInit::init(&self.physical_path),
             "Failed to acquire context for device {} while initializing; \
             nothing to clean up",
             self.physical_path.display()
         );
-        let result = self.initialize_with_err(&mut device, key_description, None);
+        let result = self.initialize_with_err(&mut device, key_description, clevis_parsed);
         match result {
             Ok(activated_path) => Ok(CryptHandle::new(
                 self.physical_path,
@@ -227,7 +237,7 @@ impl CryptInitializer {
                 self.identifiers,
                 EncryptionInfo {
                     key_description: key_description.cloned(),
-                    clevis_info: clevis_info.map(|(pin, config)| (pin.to_owned(), config.clone())),
+                    clevis_info: clevis_info_owned,
                 },
                 self.activation_name,
             )),
@@ -293,7 +303,7 @@ impl CryptInitializer {
     fn initialize_with_clevis(
         &self,
         device: &mut CryptDevice,
-        (pin, json): &(String, Value),
+        (pin, json, yes): (&str, &Value, bool),
     ) -> StratisResult<()> {
         let fs = MemoryPrivateFilesystem::new().map_err(|e| LibcryptErr::Other(e.to_string()))?;
         let keyfile = fs
@@ -314,10 +324,9 @@ impl CryptInitializer {
             &self.physical_path,
             keyfile.keyfile_path(),
             CLEVIS_LUKS_TOKEN_ID,
-            pin.as_str(),
-            &json,
-            // FIXME: Pass yes variable
-            false,
+            pin,
+            json,
+            yes,
         )
         .map_err(|e| LibcryptErr::Other(e.to_string()))?;
 
@@ -330,7 +339,7 @@ impl CryptInitializer {
         &self,
         device: &mut CryptDevice,
         key_description: &KeyDescription,
-        (pin, json): &(String, Value),
+        (pin, json, yes): (&str, &Value, bool),
     ) -> StratisResult<()> {
         self.initialize_with_keyring(device, key_description)?;
 
@@ -340,10 +349,9 @@ impl CryptInitializer {
                 &self.physical_path,
                 kf,
                 CLEVIS_LUKS_TOKEN_ID,
-                pin.as_str(),
-                &json,
-                // FIXME: Pass yes variable
-                false,
+                pin,
+                json,
+                yes,
             )
         })
         .map_err(|e| LibcryptErr::Other(e.to_string()))?;
@@ -355,7 +363,7 @@ impl CryptInitializer {
         &self,
         device: &mut CryptDevice,
         key_description: Option<&KeyDescription>,
-        clevis_info: Option<(String, Value)>,
+        clevis_info: Option<(&str, &Value, bool)>,
     ) -> StratisResult<PathBuf> {
         log_on_failure!(
             device.context_handle().format::<()>(
@@ -370,9 +378,9 @@ impl CryptInitializer {
         );
 
         match (key_description, clevis_info) {
-            (Some(kd), Some(ref ci)) => self.initialize_with_both(device, kd, ci)?,
+            (Some(kd), Some(ci)) => self.initialize_with_both(device, kd, ci)?,
             (Some(kd), _) => self.initialize_with_keyring(device, kd)?,
-            (_, Some(ref ci)) => self.initialize_with_clevis(device, ci)?,
+            (_, Some(ci)) => self.initialize_with_clevis(device, ci)?,
             (_, _) => unreachable!(),
         };
 
@@ -593,17 +601,19 @@ impl CryptHandle {
         keyfile_path: &Path,
         pin: &str,
         json: &Value,
-        yes: bool,
     ) -> StratisResult<()> {
+        let mut json_owned = json.clone();
+        let yes = interpret_clevis_config(pin, &mut json_owned)?;
+
         clevis_luks_bind(
             self.luks2_device_path(),
             keyfile_path,
             CLEVIS_LUKS_TOKEN_ID,
             pin,
-            &json,
+            &json_owned,
             yes,
         )?;
-        self.encryption_info.clevis_info = Some((pin.to_string(), json.clone()));
+        self.encryption_info.clevis_info = Some((pin.to_string(), json_owned));
         Ok(())
     }
 

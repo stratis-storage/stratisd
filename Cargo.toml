@@ -33,6 +33,11 @@ name = "stratis-setup-generator"
 path = "src/bin/generators/stratis-setup-generator.rs"
 required-features = ["min", "systemd_compat"]
 
+[[bin]]
+name = "stratis-clevis-setup-generator"
+path = "src/bin/generators/stratis-clevis-setup-generator.rs"
+required-features = ["min", "systemd_compat"]
+
 [dependencies]
 clap = "2"
 nix = "0.18"

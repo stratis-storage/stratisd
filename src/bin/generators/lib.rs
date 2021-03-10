@@ -5,13 +5,36 @@
 use std::{
     collections::HashMap,
     env,
-    fs::{create_dir_all, OpenOptions},
+    error::Error,
+    fs::OpenOptions,
     io::{self, Read, Write},
-    os::unix::fs::symlink,
-    path::{Path, PathBuf},
+    path::Path,
 };
 
-const WANTED_BY_INITRD_PATH: &str = "/run/systemd/system/initrd.target.wants";
+use log::{set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
+use systemd::journal::log_record;
+
+static LOGGER: SystemdLogger = SystemdLogger;
+
+struct SystemdLogger;
+
+impl Log for SystemdLogger {
+    fn enabled(&self, _meta: &Metadata<'_>) -> bool {
+        true
+    }
+
+    fn log(&self, record: &Record<'_>) {
+        log_record(record)
+    }
+
+    fn flush(&self) {}
+}
+
+pub fn setup_logger() -> Result<(), Box<dyn Error>> {
+    set_logger(&LOGGER)?;
+    set_max_level(LevelFilter::Info);
+    Ok(())
+}
 
 pub fn get_kernel_cmdline() -> Result<HashMap<String, Option<Vec<String>>>, io::Error> {
     let mut cmdline = OpenOptions::new().read(true).open("/proc/cmdline")?;
@@ -58,47 +81,6 @@ pub fn get_generator_args() -> Result<(String, String, String), String> {
         .next()
         .ok_or_else(|| "Missing late priority directory argument".to_string())?;
     Ok((normal_dir, early_dir, late_dir))
-}
-
-pub fn encode_path_to_device_unit(path: &Path) -> String {
-    let mut encoded_path =
-        path.display()
-            .to_string()
-            .chars()
-            .skip(1)
-            .fold(String::new(), |mut acc, c| {
-                if c.is_alphanumeric() || c == '_' {
-                    acc.push(c);
-                } else if c == '/' {
-                    acc.push('-');
-                } else {
-                    let buffer = &mut [0; 4];
-                    let encoded_buffer = c.encode_utf8(buffer).as_bytes();
-                    for byte in encoded_buffer.iter() {
-                        acc += format!(r"\x{:x}", byte).as_str();
-                    }
-                }
-                acc
-            });
-    encoded_path += ".device";
-    encoded_path
-}
-
-pub fn make_wanted_by_initrd(unit_path: &Path) -> Result<(), io::Error> {
-    let initrd_target_wants_path = &Path::new(WANTED_BY_INITRD_PATH);
-    if !initrd_target_wants_path.exists() {
-        create_dir_all(initrd_target_wants_path)?;
-    }
-    symlink(
-        unit_path,
-        [
-            initrd_target_wants_path,
-            &Path::new(unit_path.file_name().expect("Is unit file")),
-        ]
-        .iter()
-        .collect::<PathBuf>(),
-    )?;
-    Ok(())
 }
 
 pub fn write_unit_file(dest: &Path, file_contents: String) -> Result<(), io::Error> {

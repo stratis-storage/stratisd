@@ -2,32 +2,66 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{error::Error, path::PathBuf};
+use std::{
+    error::Error,
+    fs::create_dir_all,
+    io,
+    os::unix::fs::symlink,
+    path::{Path, PathBuf},
+};
 
-use log::{info, set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
-use systemd::journal::log_record;
+use log::info;
 use uuid::Uuid;
 
 mod lib;
 
-struct SystemdLogger;
+const WANTED_BY_INITRD_PATH: &str = "/run/systemd/system/initrd.target.wants";
 
-impl Log for SystemdLogger {
-    fn enabled(&self, _meta: &Metadata<'_>) -> bool {
-        true
+fn make_wanted_by_initrd(unit_path: &Path) -> Result<(), io::Error> {
+    let initrd_target_wants_path = &Path::new(WANTED_BY_INITRD_PATH);
+    if !initrd_target_wants_path.exists() {
+        create_dir_all(initrd_target_wants_path)?;
     }
+    symlink(
+        unit_path,
+        [
+            initrd_target_wants_path,
+            &Path::new(unit_path.file_name().expect("Is unit file")),
+        ]
+        .iter()
+        .collect::<PathBuf>(),
+    )?;
+    Ok(())
+}
 
-    fn log(&self, record: &Record<'_>) {
-        log_record(record)
-    }
-
-    fn flush(&self) {}
+fn encode_path_to_device_unit(path: &Path) -> String {
+    let mut encoded_path =
+        path.display()
+            .to_string()
+            .chars()
+            .skip(1)
+            .fold(String::new(), |mut acc, c| {
+                if c.is_alphanumeric() || c == '_' {
+                    acc.push(c);
+                } else if c == '/' {
+                    acc.push('-');
+                } else {
+                    let buffer = &mut [0; 4];
+                    let encoded_buffer = c.encode_utf8(buffer).as_bytes();
+                    for byte in encoded_buffer.iter() {
+                        acc += format!(r"\x{:x}", byte).as_str();
+                    }
+                }
+                acc
+            });
+    encoded_path += ".device";
+    encoded_path
 }
 
 fn unit_template(uuids: Vec<PathBuf>, pool_uuid: Uuid) -> String {
     let devices: Vec<_> = uuids
         .into_iter()
-        .map(|uuid_path| lib::encode_path_to_device_unit(&uuid_path))
+        .map(|uuid_path| encode_path_to_device_unit(&uuid_path))
         .collect();
     format!(
         r"[Unit]
@@ -35,8 +69,8 @@ Description=setup for Stratis root filesystem
 DefaultDependencies=no
 Conflicts=shutdown.target
 OnFailure=dracut-emergency.service
-Wants=stratisd-min.service plymouth-start.service network-online.target
-After=paths.target plymouth-start.service stratisd-min.service network-online.target {}
+Wants=stratisd-min.service plymouth-start.service stratis-clevis-setup.service
+After=paths.target plymouth-start.service stratisd-min.service {}
 Before=initrd.target
 {}
 
@@ -52,11 +86,8 @@ RemainAfterExit=yes
     )
 }
 
-static LOGGER: SystemdLogger = SystemdLogger;
-
 fn main() -> Result<(), Box<dyn Error>> {
-    set_logger(&LOGGER)?;
-    set_max_level(LevelFilter::Info);
+    lib::setup_logger()?;
 
     let (_, early_dir, _) = lib::get_generator_args()?;
     let kernel_cmdline = lib::get_kernel_cmdline()?;
@@ -98,6 +129,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut path = PathBuf::from(early_dir);
     path.push("stratis-setup.service");
     lib::write_unit_file(&path, file_contents)?;
-    lib::make_wanted_by_initrd(&path)?;
+    make_wanted_by_initrd(&path)?;
     Ok(())
 }

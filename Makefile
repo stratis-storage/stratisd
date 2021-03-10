@@ -180,14 +180,14 @@ build-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
 	cargo build --bin=stratis-min --bin=stratisd-min --bin=stratis-setup-generator \
-	--no-default-features \
+	--bin=stratis-clevis-setup-generator --no-default-features \
 	--features min,systemd_compat ${TARGET_ARGS}
 
 release-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
 	cargo build --release --bin=stratis-min --bin=stratisd-min \
-	--bin=stratis-setup-generator \
+	--bin=stratis-setup-generator --bin=stratis-clevis-setup-generator \
 	--no-default-features \
 	--features min,systemd_compat ${TARGET_ARGS}
 
@@ -226,6 +226,7 @@ install: release release-min docs
 	install -Dpm0755 -t $(DESTDIR)$(PREFIX)/bin $(profiledir)/stratis-min
 	install -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) $(profiledir)/stratisd-min
 	install -Dpm0755 -t $(DESTDIR)$(UNITGENDIR) $(profiledir)/stratis-setup-generator
+	install -Dpm0755 -t $(DESTDIR)$(UNITGENDIR) $(profiledir)/stratis-clevis-setup-generator
 
 release:
 	RUSTFLAGS="${DENY}" cargo build --release

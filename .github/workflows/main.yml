@@ -120,6 +120,7 @@ jobs:
           libblkid-dev
           libcryptsetup-dev
           libdbus-1-dev
+          libsystemd-dev
           libudev-dev
           make
         if: matrix.image == 'ubuntu:groovy'

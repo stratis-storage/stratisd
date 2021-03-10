@@ -6,8 +6,8 @@ pub use self::{
     engine::{BlockDev, Engine, Filesystem, KeyActions, Pool, Report},
     sim_engine::SimEngine,
     strat_engine::{
-        blkdev_size, crypt_metadata_size, get_dm, get_dm_init, StaticHeader, StratEngine,
-        StratKeyActions, BDA, CLEVIS_TANG_TRUST_URL,
+        blkdev_size, crypt_metadata_size, get_dm, get_dm_init, StaticHeader, StaticHeaderResult,
+        StratEngine, StratKeyActions, BDA, CLEVIS_TANG_TRUST_URL,
     },
     structures::{ExclusiveGuard, SharedGuard},
     types::{

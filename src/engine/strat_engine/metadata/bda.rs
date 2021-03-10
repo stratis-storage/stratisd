@@ -173,8 +173,9 @@ mod tests {
                 Utc::now().timestamp() as u64,
             );
             bda.initialize(&mut buf).unwrap();
-
-            let bda = BDA::load(&mut buf).unwrap().unwrap();
+            let read_results = StaticHeader::read_sigblocks(&mut buf);
+            let header = StaticHeader::repair_sigblocks(&mut buf, read_results, StaticHeader::do_nothing).unwrap().unwrap();
+            let bda = BDA::load(header, &mut buf).unwrap().unwrap();
             prop_assert!(bda.last_update_time().is_none());
         }
     }

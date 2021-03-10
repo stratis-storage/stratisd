@@ -475,10 +475,10 @@ mod tests {
                 process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?,
                 pool_uuid,
                 MDADataSize::default(),
-                Some(EncryptionInfo {
+                &EncryptionInfo {
                     key_description: Some(key_description.clone()),
                     clevis_info: None,
-                }),
+                },
             )?;
 
             for dev in devices {
@@ -587,7 +587,7 @@ mod tests {
             process_and_verify_devices(pool_uuid, &HashSet::new(), paths).unwrap(),
             pool_uuid,
             MDADataSize::default(),
-            None,
+            &EncryptionInfo::default(),
         )
         .unwrap();
 

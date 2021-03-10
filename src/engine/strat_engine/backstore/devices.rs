@@ -396,7 +396,7 @@ pub fn initialize_devices(
     devices: Vec<DeviceInfo>,
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
-    encryption_info: Option<EncryptionInfo>,
+    encryption_info: &EncryptionInfo,
 ) -> StratisResult<Vec<StratBlockDev>> {
     /// Map a major/minor device number of a physical device
     /// to the corresponding major/minor number of the encrypted
@@ -530,17 +530,17 @@ pub fn initialize_devices(
         dev_info: &DeviceInfo,
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
-        encryption_info: Option<EncryptionInfo>,
+        encryption_info: &EncryptionInfo,
     ) -> StratisResult<StratBlockDev> {
         let dev_uuid = DevUuid::new_v4();
-        let (handle, devno, blockdev_size) = match encryption_info {
-            Some(ref info) => initialize_encrypted(
+        let (handle, devno, blockdev_size) = if encryption_info.is_encrypted() {
+            initialize_encrypted(
                 &dev_info.devnode,
                 pool_uuid,
                 dev_uuid,
-                // FIXME: Make optional
-                info.key_description.as_ref().unwrap(),
-                info.clevis_info
+                encryption_info.key_description.as_ref().unwrap(),
+                encryption_info
+                    .clevis_info
                     .as_ref()
                     .map(|(pin, json)| (pin.as_str(), json)),
             )
@@ -560,8 +560,9 @@ pub fn initialize_devices(
                     dev_info.devno, devno,
                 );
                 (Some(handle), devno, devsize)
-            })?,
-            None => (None, dev_info.devno, dev_info.size.sectors()),
+            })?
+        } else {
+            (None, dev_info.devno, dev_info.size.sectors())
         };
 
         let physical_path = &dev_info.devnode;
@@ -609,7 +610,7 @@ pub fn initialize_devices(
 
     let mut initialized_blockdevs: Vec<StratBlockDev> = Vec::new();
     for dev_info in devices {
-        match initialize_one(&dev_info, pool_uuid, mda_data_size, encryption_info.clone()) {
+        match initialize_one(&dev_info, pool_uuid, mda_data_size, encryption_info) {
             Ok(blockdev) => initialized_blockdevs.push(blockdev),
             Err(err) => {
                 if let Err(err) = wipe_blockdevs(&mut initialized_blockdevs) {
@@ -693,10 +694,10 @@ mod tests {
             dev_infos,
             pool_uuid,
             MDADataSize::default(),
-            key_description.map(|kd| EncryptionInfo {
-                key_description: Some(kd.clone()),
+            &EncryptionInfo {
+                key_description: key_description.cloned(),
                 clevis_info: None,
-            }),
+            },
         )?;
 
         if blockdevs.len() != paths.len() {
@@ -947,10 +948,10 @@ mod tests {
             dev_infos,
             pool_uuid,
             MDADataSize::default(),
-            key_desc.map(|kd| EncryptionInfo {
-                key_description: Some(kd.clone()),
+            &EncryptionInfo {
+                key_description: key_desc.cloned(),
                 clevis_info: None,
-            }),
+            },
         )
         .is_ok()
         {

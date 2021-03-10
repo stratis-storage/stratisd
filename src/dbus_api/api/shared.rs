@@ -20,8 +20,8 @@ use crate::{
         },
     },
     engine::{
-        CreateAction, EngineAction, KeyDescription, MappingCreateAction, Name, PoolUuid,
-        UnlockMethod,
+        CreateAction, EncryptionInfo, EngineAction, KeyDescription, MappingCreateAction, Name,
+        PoolUuid, UnlockMethod,
     },
     stratis::{ErrorEnum, StratisError},
 };
@@ -68,7 +68,10 @@ pub fn create_pool_shared(
         name,
         &devs.map(|x| Path::new(x)).collect::<Vec<&Path>>(),
         tuple_to_option(redundancy_tuple),
-        key_desc,
+        &EncryptionInfo {
+            key_description: key_desc,
+            clevis_info: None,
+        }
     ));
 
     let msg = match result {

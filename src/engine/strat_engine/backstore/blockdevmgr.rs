@@ -5,6 +5,7 @@
 // Code to handle a collection of block devices.
 
 use std::{
+    borrow::Cow,
     collections::{HashMap, HashSet},
     path::Path,
 };
@@ -25,7 +26,6 @@ use crate::{
             },
             keys::MemoryPrivateFilesystem,
             metadata::MDADataSize,
-            names::KeyDescription,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
         },
         types::{DevUuid, EncryptionInfo, PoolUuid},
@@ -136,20 +136,12 @@ impl BlockDevMgr {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         mda_data_size: MDADataSize,
-        key_desc: Option<&KeyDescription>,
+        encryption_info: &EncryptionInfo,
     ) -> StratisResult<BlockDevMgr> {
         let devices = process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?;
 
         Ok(BlockDevMgr::new(
-            initialize_devices(
-                devices,
-                pool_uuid,
-                mda_data_size,
-                key_desc.map(|k| EncryptionInfo {
-                    key_description: Some(k.clone()),
-                    clevis_info: None,
-                }),
-            )?,
+            initialize_devices(devices, pool_uuid, mda_data_size, encryption_info)?,
             None,
         ))
     }
@@ -165,7 +157,7 @@ impl BlockDevMgr {
     /// Check that the registered key description for these block devices can
     /// unlock at least one of the existing block devices registered.
     /// Precondition: self.block_devs must have at least one device.
-    pub fn has_valid_passphrase(&self) -> bool {
+    pub fn can_unlock(&self) -> bool {
         CryptActivationHandle::can_unlock(
             self.block_devs
                 .get(0)
@@ -196,13 +188,12 @@ impl BlockDevMgr {
         let devices = process_and_verify_devices(pool_uuid, &current_uuids, paths)?;
 
         let encryption_info = self.encryption_info();
-        if encryption_info.is_some() && !self.has_valid_passphrase() {
+        if encryption_info.is_encrypted() && !self.can_unlock() {
             return Err(StratisError::Engine(
                 ErrorEnum::Invalid,
-                "The key associated with the current registered key description \
-                was not able to unlock an existing encrypted device; check that \
-                the same key is in the keyring that was used to create the encrypted \
-                pool"
+                "Neither the keyring nor Clevis could be used to unlock the device; \
+                check that either the appropriate key in the keyring is set or that \
+                the Clevis key storage method is available"
                     .to_string(),
             ));
         }
@@ -211,12 +202,7 @@ impl BlockDevMgr {
         // variable length metadata requires more than the minimum allocated,
         // then the necessary amount must be provided or the data can not be
         // saved.
-        let bds = initialize_devices(
-            devices,
-            pool_uuid,
-            MDADataSize::default(),
-            encryption_info.cloned(),
-        )?;
+        let bds = initialize_devices(devices, pool_uuid, MDADataSize::default(), &encryption_info)?;
         let bdev_uuids = bds.iter().map(|bd| bd.uuid()).collect();
         self.block_devs.extend(bds);
         Ok(bdev_uuids)
@@ -392,9 +378,11 @@ impl BlockDevMgr {
             .sum()
     }
 
-    pub fn encryption_info(&self) -> Option<&EncryptionInfo> {
+    pub fn encryption_info(&self) -> Cow<EncryptionInfo> {
         let mut iter = self.block_devs.iter().map(|bd| bd.encryption_info());
-        let info = iter.next().and_then(|opt| opt);
+        let info = iter
+            .next()
+            .expect("At least one blockdev in the given manager");
 
         // Liminal device code will not set up a pool with devices with
         // different encryption information.
@@ -404,7 +392,7 @@ impl BlockDevMgr {
     }
 
     pub fn is_encrypted(&self) -> bool {
-        self.encryption_info().is_some()
+        self.encryption_info().is_encrypted()
     }
 
     #[cfg(test)]
@@ -419,10 +407,17 @@ impl BlockDevMgr {
         let encryption_infos = self
             .block_devs
             .iter()
-            .filter_map(|bd| bd.encryption_info())
+            .filter_map(|bd| {
+                let encryption_info = bd.encryption_info();
+                if encryption_info.is_encrypted() {
+                    Some(encryption_info)
+                } else {
+                    None
+                }
+            })
             .collect::<Vec<_>>();
         if encryption_infos.is_empty() {
-            assert_eq!(self.encryption_info(), None);
+            assert_eq!(self.encryption_info().as_ref(), &EncryptionInfo::default());
         } else {
             assert_eq!(encryption_infos.len(), self.block_devs.len());
 
@@ -475,13 +470,12 @@ impl BlockDevMgr {
             });
         }
 
-        let encryption_info = match self.encryption_info() {
-            Some(info) => info,
-            None => {
-                return Err(StratisError::Error(
-                    "Requested pool does not appear to be encrypted".to_string(),
-                ))
-            }
+        let encryption_info = if self.is_encrypted() {
+            self.encryption_info()
+        } else {
+            return Err(StratisError::Error(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ));
         };
 
         let yes = interpret_clevis_config(&pin, &mut clevis_info)?;
@@ -513,17 +507,12 @@ impl BlockDevMgr {
     }
 
     pub fn unbind_clevis(&mut self) -> StratisResult<bool> {
-        match self.encryption_info() {
-            None => {
-                return Err(StratisError::Error(
-                    "Requested pool does not appear to be encrypted".to_string(),
-                ));
-            }
-            Some(info) => {
-                if info.clevis_info.is_none() {
-                    return Ok(false);
-                }
-            }
+        if !self.is_encrypted() {
+            return Err(StratisError::Error(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ));
+        } else if self.encryption_info().clevis_info.is_none() {
+            return Ok(false);
         }
 
         for blockdev in self.blockdevs_mut().into_iter().map(|(_, bd)| bd) {
@@ -553,6 +542,7 @@ mod tests {
 
     use crate::engine::strat_engine::{
         cmd,
+        names::KeyDescription,
         tests::{crypt, loopbacked, real},
     };
 
@@ -563,9 +553,13 @@ mod tests {
     /// After 2 Sectors have been allocated, that amount must also be included
     /// in balance.
     fn test_blockdevmgr_used(paths: &[&Path]) {
-        let mut mgr =
-            BlockDevMgr::initialize(PoolUuid::new_v4(), paths, MDADataSize::default(), None)
-                .unwrap();
+        let mut mgr = BlockDevMgr::initialize(
+            PoolUuid::new_v4(),
+            paths,
+            MDADataSize::default(),
+            &EncryptionInfo::default(),
+        )
+        .unwrap();
         assert_eq!(mgr.avail_space() + mgr.metadata_size(), mgr.size());
 
         let allocated = Sectors(2);
@@ -605,7 +599,10 @@ mod tests {
                 pool_uuid,
                 &paths[..2],
                 MDADataSize::default(),
-                Some(key_desc),
+                &EncryptionInfo {
+                    key_description: Some(key_desc.clone()),
+                    clevis_info: None,
+                },
             )?;
 
             if bdm.add(pool_uuid, &paths[2..3]).is_err() {
@@ -651,7 +648,10 @@ mod tests {
                 pool_uuid,
                 &paths[..2],
                 MDADataSize::default(),
-                Some(key_desc),
+                &EncryptionInfo {
+                    key_description: Some(key_desc.clone()),
+                    clevis_info: None,
+                },
             )?;
             Ok((pool_uuid, bdm))
         }
@@ -702,12 +702,22 @@ mod tests {
         let uuid = PoolUuid::new_v4();
         let uuid2 = PoolUuid::new_v4();
 
-        let mut bd_mgr =
-            BlockDevMgr::initialize(uuid, paths1, MDADataSize::default(), None).unwrap();
+        let mut bd_mgr = BlockDevMgr::initialize(
+            uuid,
+            paths1,
+            MDADataSize::default(),
+            &EncryptionInfo::default(),
+        )
+        .unwrap();
         cmd::udev_settle().unwrap();
 
         assert_matches!(
-            BlockDevMgr::initialize(uuid2, paths1, MDADataSize::default(), None),
+            BlockDevMgr::initialize(
+                uuid2,
+                paths1,
+                MDADataSize::default(),
+                &EncryptionInfo::default()
+            ),
             Err(_)
         );
 
@@ -716,7 +726,13 @@ mod tests {
         assert_matches!(bd_mgr.add(uuid, paths1), Ok(_));
         assert_eq!(bd_mgr.block_devs.len(), original_length);
 
-        BlockDevMgr::initialize(uuid, paths2, MDADataSize::default(), None).unwrap();
+        BlockDevMgr::initialize(
+            uuid,
+            paths2,
+            MDADataSize::default(),
+            &EncryptionInfo::default(),
+        )
+        .unwrap();
         cmd::udev_settle().unwrap();
 
         assert_matches!(bd_mgr.add(uuid, paths2), Err(_));

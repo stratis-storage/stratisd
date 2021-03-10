@@ -21,7 +21,7 @@ use crate::{
         },
         structures::Table,
         types::{
-            CreateAction, DeleteAction, DevUuid, KeyDescription, LockedPoolInfo, RenameAction,
+            CreateAction, DeleteAction, DevUuid, EncryptionInfo, LockedPoolInfo, RenameAction,
             ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
         },
         Engine, Name, Pool, PoolUuid, Report,
@@ -176,7 +176,7 @@ impl Engine for StratEngine {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
-        key_desc: Option<KeyDescription>,
+        encryption_info: &EncryptionInfo,
     ) -> StratisResult<CreateAction<PoolUuid>> {
         let redundancy = calculate_redundancy!(redundancy);
 
@@ -194,7 +194,7 @@ impl Engine for StratEngine {
                     ))
                 } else {
                     let (uuid, pool) =
-                        StratPool::initialize(name, blockdev_paths, redundancy, key_desc.as_ref())?;
+                        StratPool::initialize(name, blockdev_paths, redundancy, encryption_info)?;
 
                     let name = Name::new(name.to_owned());
                     self.pools.insert(name, uuid, pool);
@@ -349,7 +349,7 @@ mod test {
 
         let name1 = "name1";
         let uuid1 = engine
-            .create_pool(name1, paths, None, None)
+            .create_pool(name1, paths, None, &EncryptionInfo::default())
             .unwrap()
             .changed()
             .unwrap();
@@ -445,14 +445,14 @@ mod test {
 
         let name1 = "name1";
         let uuid1 = engine
-            .create_pool(name1, paths1, None, None)
+            .create_pool(name1, paths1, None, &EncryptionInfo::default())
             .unwrap()
             .changed()
             .unwrap();
 
         let name2 = "name2";
         let uuid2 = engine
-            .create_pool(name2, paths2, None, None)
+            .create_pool(name2, paths2, None, &EncryptionInfo::default())
             .unwrap()
             .changed()
             .unwrap();

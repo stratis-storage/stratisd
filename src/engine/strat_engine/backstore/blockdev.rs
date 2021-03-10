@@ -220,7 +220,6 @@ impl StratBlockDev {
         memfs: &MemoryPrivateFilesystem,
         pin: &str,
         clevis_info: &Value,
-        yes: bool,
     ) -> StratisResult<()> {
         let crypt_handle = self.crypt_handle.as_mut().ok_or_else(|| {
             StratisError::Error("This device does not appear to be encrypted".to_string())
@@ -230,7 +229,7 @@ impl StratBlockDev {
             StratisError::Error("A key description is required to bind to clevis after initialization but none was found".to_string())
         })?, |keyfile_path| {
             crypt_handle
-                .clevis_bind(keyfile_path, pin, clevis_info, yes)
+                .clevis_bind(keyfile_path, pin, clevis_info)
         })
     }
 

@@ -21,7 +21,7 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
-                crypt::{interpret_clevis_config, CryptActivationHandle},
+                crypt::CryptActivationHandle,
                 devices::{initialize_devices, process_and_verify_devices, wipe_blockdevs},
             },
             keys::MemoryPrivateFilesystem,
@@ -434,20 +434,19 @@ impl BlockDevMgr {
     /// nothing was changed.
     /// * Returns Err(_) if an inconsistency was found in the metadata across pools
     /// or binding failed.
-    pub fn bind_clevis(&mut self, pin: String, mut clevis_info: Value) -> StratisResult<bool> {
+    pub fn bind_clevis(&mut self, pin: String, clevis_info: Value) -> StratisResult<bool> {
         fn bind_clevis_loop<'a, I>(
             key_fs: &MemoryPrivateFilesystem,
             blockdevs: I,
             pin: &str,
             clevis_info: &Value,
-            yes: bool,
         ) -> StratisResult<()>
         where
             I: IntoIterator<Item = &'a mut StratBlockDev>,
         {
             let mut rollback_record = Vec::new();
             for blockdev_ref in blockdevs {
-                if let Err(e) = blockdev_ref.bind_clevis(key_fs, pin, clevis_info, yes) {
+                if let Err(e) = blockdev_ref.bind_clevis(key_fs, pin, clevis_info) {
                     rollback_loop(rollback_record);
                     return Err(e);
                 } else {
@@ -478,8 +477,6 @@ impl BlockDevMgr {
             ));
         };
 
-        let yes = interpret_clevis_config(&pin, &mut clevis_info)?;
-
         if let Some(info) = &encryption_info.clevis_info {
             let clevis_tuple = (pin, clevis_info);
             if info == &clevis_tuple {
@@ -500,7 +497,6 @@ impl BlockDevMgr {
             self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
             pin.as_str(),
             &clevis_info,
-            yes,
         )?;
 
         Ok(true)

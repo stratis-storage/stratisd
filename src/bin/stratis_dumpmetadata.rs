@@ -10,18 +10,30 @@ use std::{
     vec::Vec,
 };
 
+extern crate clap;
+use clap::{App, Arg};
+
 use serde_json::Value;
 
-use libstratis::engine::{StaticHeader, BDA};
+use libstratis::engine::{StaticHeader, StaticHeaderResult, BDA};
 
-fn run(devpath: &str) -> Result<(), String> {
+fn run(devpath: &str, print_bytes: bool) -> Result<(), String> {
     let mut devfile = OpenOptions::new()
         .read(true)
         .open(&devpath)
         .map_err(|the_io_error| format!("Error opening device: {}", the_io_error))?;
 
     let read_results = StaticHeader::read_sigblocks(&mut devfile);
-    println!("{:#?}", read_results);
+    println!(
+        "{}",
+        StaticHeaderResult::fmt_metadata(&read_results.0, print_bytes)
+    );
+    if read_results.0 != read_results.1 {
+        println!(
+            "{}",
+            StaticHeaderResult::fmt_metadata(&read_results.1, print_bytes)
+        );
+    }
     let header =
         StaticHeader::repair_sigblocks(&mut devfile, read_results, StaticHeader::do_nothing)
             .map_err(|repair_error| format!("No valid StaticHeader found: {}", repair_error))?
@@ -39,7 +51,7 @@ fn run(devpath: &str) -> Result<(), String> {
         .load_state(&mut devfile)
         .map_err(|stateload_err| format!("Error during load state: {}", stateload_err))?;
     println!("Pool metadata:");
-
+    // FIXME Print pool uuid here
     if let Some(loaded_state) = loaded_state {
         let state_json: Value = serde_json::from_slice(&loaded_state)
             .map_err(|extract_err| format!("Error during state JSON extract: {}", extract_err))?;
@@ -59,9 +71,18 @@ fn main() {
         eprintln!("Usage: stratis_dumpmetadata <device>");
         process::exit(2);
     }
-    let devpath = &args[1];
+    let matches = App::new("dumpmetadata")
+        .arg(Arg::with_name("dev").required(true))
+        .arg(Arg::with_name("print_bytes"))
+        .get_matches();
+    let devpath = matches.value_of("dev").unwrap();
 
-    match run(devpath) {
+    let print_bytes: bool = match matches.value_of("print_bytes") {
+        Some("bytes") => true,
+        _ => false,
+    };
+
+    match run(devpath, print_bytes) {
         Ok(()) => {}
         Err(e) => {
             eprintln!("Error encountered: {}", e);

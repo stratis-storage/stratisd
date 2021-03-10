@@ -5,7 +5,7 @@
 pub use self::{
     engine::{BlockDev, Engine, Filesystem, KeyActions, Pool, Report},
     sim_engine::SimEngine,
-    strat_engine::{get_dm, get_dm_init, StaticHeader, StratEngine, StratKeyActions, BDA},
+    strat_engine::{get_dm, get_dm_init, StaticHeader, StaticHeaderResult, StratEngine, StratKeyActions, BDA},
     types::{
         BlockDevState, BlockDevTier, CreateAction, DeleteAction, DevUuid, EngineAction,
         FilesystemUuid, KeyDescription, MappingCreateAction, Name, PoolUuid, Redundancy,

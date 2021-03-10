@@ -10,6 +10,7 @@ use std::{
 
 use byteorder::{ByteOrder, LittleEndian};
 use crc::crc32;
+use pretty_hex::pretty_hex;
 use serde_json::Value;
 
 use devicemapper::{Sectors, IEC, SECTOR_SIZE};
@@ -43,6 +44,39 @@ pub struct StaticHeaderResult {
     bytes: StratisResult<Box<[u8; bytes!(static_header_size::SIGBLOCK_SECTORS)]>>,
     /// The header parsed from the bytes
     header: Option<StratisResult<Option<StaticHeader>>>,
+}
+
+impl PartialEq for StaticHeaderResult {
+    fn eq(&self, other: &Self) -> bool {
+        match (self.header.as_ref(), other.header.as_ref()) {
+            (Some(Ok(Some(sh0))), Some(Ok(Some(sh1)))) => sh0 == sh1,
+            _ => false,
+        }
+    }
+}
+
+impl StaticHeaderResult {
+    pub fn fmt_metadata(&self, print_bytes: bool) -> String {
+        let mut result = String::from("\nHeader:")
+            + self
+                .header
+                .as_ref()
+                .map_or(String::from("\nNone"), |sh| format!("\n{:?}", sh))
+                .as_str();
+        if print_bytes {
+            result += "\nBytes:\n";
+            match &self.bytes {
+                Ok(ref boxed) => {
+                    result += pretty_hex(boxed.as_ref()).as_str();
+                }
+                Err(e) => {
+                    result += e.to_string().as_str();
+                }
+            }
+        }
+
+        return result;
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

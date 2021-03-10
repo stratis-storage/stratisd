@@ -20,6 +20,7 @@ use std::{
     process::Command,
 };
 
+use libc::c_uint;
 use serde_json::Value;
 
 use crate::{
@@ -267,6 +268,7 @@ pub fn udev_settle() -> StratisResult<()> {
 pub fn clevis_luks_bind(
     dev_path: &Path,
     keyfile_path: &Path,
+    slot: c_uint,
     pin: &str,
     json: &Value,
     yes: bool,
@@ -283,6 +285,8 @@ pub fn clevis_luks_bind(
         .arg(dev_path.display().to_string())
         .arg("-k")
         .arg(keyfile_path)
+        .arg("-s")
+        .arg(slot.to_string())
         .arg(pin)
         .arg(json.to_string());
 

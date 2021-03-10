@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, path::Path, vec::Vec};
+use std::{borrow::Cow, collections::HashMap, path::Path, vec::Vec};
 
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
@@ -16,7 +16,6 @@ use crate::{
         strat_engine::{
             backstore::{Backstore, StratBlockDev},
             metadata::MDADataSize,
-            names::KeyDescription,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
@@ -145,7 +144,7 @@ impl StratPool {
         name: &str,
         paths: &[&Path],
         redundancy: Redundancy,
-        key_desc: Option<&KeyDescription>,
+        encryption_info: &EncryptionInfo,
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = PoolUuid::new_v4();
 
@@ -153,7 +152,7 @@ impl StratPool {
         // enough. If there are enough devices specified, more space will be
         // required.
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), key_desc)?;
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), encryption_info)?;
 
         let thinpool = ThinPool::new(
             pool_uuid,
@@ -611,7 +610,7 @@ impl Pool for StratPool {
         self.datadevs_encrypted()
     }
 
-    fn encryption_info(&self) -> Option<&EncryptionInfo> {
+    fn encryption_info(&self) -> Cow<EncryptionInfo> {
         self.backstore.data_tier_encryption_info()
     }
 }
@@ -649,7 +648,12 @@ mod tests {
     fn test_empty_pool(paths: &[&Path]) {
         assert_eq!(paths.len(), 0);
         assert_matches!(
-            StratPool::initialize("stratis_test_pool", paths, Redundancy::NONE, None),
+            StratPool::initialize(
+                "stratis_test_pool",
+                paths,
+                Redundancy::NONE,
+                &EncryptionInfo::default()
+            ),
             Err(_)
         );
     }
@@ -673,7 +677,9 @@ mod tests {
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let name = "stratis-test-pool";
-        let (uuid, mut pool) = StratPool::initialize(name, paths2, Redundancy::NONE, None).unwrap();
+        let (uuid, mut pool) =
+            StratPool::initialize(name, paths2, Redundancy::NONE, &EncryptionInfo::default())
+                .unwrap();
         invariant(&pool, name);
 
         let metadata1 = pool.record(name);
@@ -757,7 +763,8 @@ mod tests {
 
         let name = "stratis-test-pool";
         let (pool_uuid, mut pool) =
-            StratPool::initialize(name, paths1, Redundancy::NONE, None).unwrap();
+            StratPool::initialize(name, paths1, Redundancy::NONE, &EncryptionInfo::default())
+                .unwrap();
         invariant(&pool, name);
 
         let fs_name = "stratis_test_filesystem";

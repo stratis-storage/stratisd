@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
+    borrow::Cow,
     collections::HashMap,
     fmt::Debug,
     os::unix::io::RawFd,
@@ -255,7 +256,7 @@ pub trait Pool: Debug {
     fn is_encrypted(&self) -> bool;
 
     /// Get all encryption information for this pool.
-    fn encryption_info(&self) -> Option<&EncryptionInfo>;
+    fn encryption_info(&self) -> Cow<EncryptionInfo>;
 }
 
 pub trait Engine: Debug + Report + Send {
@@ -268,7 +269,7 @@ pub trait Engine: Debug + Report + Send {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
-        key_desc: Option<KeyDescription>,
+        encryption_info: &EncryptionInfo,
     ) -> StratisResult<CreateAction<PoolUuid>>;
 
     /// Handle a libudev event.

@@ -50,6 +50,21 @@ pub struct EncryptionInfo {
     pub clevis_info: Option<(String, Value)>,
 }
 
+impl EncryptionInfo {
+    pub fn is_encrypted(&self) -> bool {
+        self.key_description.is_some() || self.clevis_info.is_some()
+    }
+}
+
+impl Default for EncryptionInfo {
+    fn default() -> Self {
+        EncryptionInfo {
+            key_description: None,
+            clevis_info: None,
+        }
+    }
+}
+
 impl fmt::Display for EncryptionInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let key_desc_str = if let Some(ref kd) = self.key_description {

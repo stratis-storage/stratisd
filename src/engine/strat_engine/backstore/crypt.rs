@@ -313,6 +313,7 @@ impl CryptInitializer {
         clevis_luks_bind(
             &self.physical_path,
             keyfile.keyfile_path(),
+            CLEVIS_LUKS_TOKEN_ID,
             pin.as_str(),
             &json,
             // FIXME: Pass yes variable
@@ -338,6 +339,7 @@ impl CryptInitializer {
             clevis_luks_bind(
                 &self.physical_path,
                 kf,
+                CLEVIS_LUKS_TOKEN_ID,
                 pin.as_str(),
                 &json,
                 // FIXME: Pass yes variable
@@ -414,6 +416,7 @@ impl CryptActivationHandle {
     /// environment (e.g. the proper key is in the kernel keyring, the device
     /// is formatted as a LUKS2 device, etc.)
     pub fn can_unlock(physical_path: &Path) -> bool {
+        // FIXME: Add support for Clevis checking.
         fn can_unlock_with_failures(physical_path: &Path) -> StratisResult<bool> {
             let device_result = device_from_physical_path(physical_path);
             match device_result {
@@ -484,6 +487,9 @@ impl Debug for CryptHandle {
     }
 }
 
+// FIXME: Add support for adding and removing keyring keyslots.
+// FIXME: Add checks in Clevis bind/unbind methods so that there is always one active
+// keyslot.
 impl CryptHandle {
     fn new(
         physical_path: PathBuf,
@@ -589,7 +595,14 @@ impl CryptHandle {
         json: &Value,
         yes: bool,
     ) -> StratisResult<()> {
-        clevis_luks_bind(self.luks2_device_path(), keyfile_path, pin, &json, yes)?;
+        clevis_luks_bind(
+            self.luks2_device_path(),
+            keyfile_path,
+            CLEVIS_LUKS_TOKEN_ID,
+            pin,
+            &json,
+            yes,
+        )?;
         self.encryption_info.clevis_info = Some((pin.to_string(), json.clone()));
         Ok(())
     }
@@ -732,6 +745,12 @@ fn device_from_physical_path(physical_path: &Path) -> StratisResult<Option<Crypt
 }
 
 /// Get the Clevis binding information from the device metadata.
+///
+/// This method returns:
+/// * Ok(Some(_)) if a Clevis token was detected
+/// * Ok(None) if no token in the Clevis slot was detected or a token was detected
+/// but does not appear to be a Clevis token
+/// * Err(_) if the token appears to be a Clevis token but is malformed in some way
 fn clevis_info_from_metadata(device: &mut CryptDevice) -> StratisResult<Option<(String, Value)>> {
     let json = match device.token_handle().json_get(CLEVIS_LUKS_TOKEN_ID).ok() {
         Some(j) => j,

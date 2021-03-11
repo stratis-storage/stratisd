@@ -68,7 +68,8 @@ fn unit_template(uuids: Vec<PathBuf>, pool_uuid: Uuid) -> String {
 Description=setup for Stratis root filesystem
 DefaultDependencies=no
 Conflicts=shutdown.target
-OnFailure=dracut-emergency.service
+OnFailure=emergency.target
+OnFailureJobMode=isolate
 Wants=stratisd-min.service plymouth-start.service stratis-clevis-setup.service
 After=paths.target plymouth-start.service stratisd-min.service {}
 Before=initrd.target

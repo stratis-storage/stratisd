@@ -15,7 +15,8 @@ fn unit_template(pool_uuid: Uuid) -> String {
 Description=setup for Stratis root filesystem using Clevis
 DefaultDependencies=no
 Conflicts=shutdown.target
-OnFailure=dracut-emergency.service
+OnFailure=emergency.target
+OnFailureJobMode=isolate
 Wants=stratisd-min.service network-online.target
 After=stratisd-min.service network-online.target
 Before=stratis-setup.service

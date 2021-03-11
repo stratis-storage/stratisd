@@ -4,6 +4,7 @@
 check() {
     require_binaries stratis-min \
 	    /usr/libexec/stratisd-min \
+	    $systemdutildir/system-generators/stratis-setup-generator \
 	    thin_check \
 	    thin_repair \
 	    mkfs.xfs \

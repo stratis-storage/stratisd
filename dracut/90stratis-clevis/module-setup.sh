@@ -23,6 +23,7 @@ check() {
 	    clevis-decrypt-tpm2 \
 	    clevis-luks-common-functions \
 	    mktemp \
+	    $systemdutildir/system-generators/stratis-clevis-setup-generator \
 	    || return 1
     require_any_binary tpm2_pcrread tpm2_pcrlist || return 1
     return 255
@@ -63,4 +64,8 @@ install() {
 	    curl
     inst_multiple -o tpm2_pcrread tpm2_pcrlist
     inst_libdir_file "libtss2-tcti-device.so*"
+
+    # Dracut dependencies
+    inst_multiple $systemdutildir/system-generators/stratis-clevis-setup-generator
+    inst_simple "$moddir/stratis-clevis-rootfs-setup" $systemdutildir/stratis-clevis-rootfs-setup
 }

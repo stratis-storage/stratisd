@@ -23,7 +23,7 @@ Before=stratis-setup.service
 [Service]
 Type=oneshot
 Environment='STRATIS_ROOTFS_UUID={}'
-ExecStart=/usr/lib/systemd/stratis-rootfs-clevis-setup
+ExecStart=/usr/lib/systemd/stratis-clevis-rootfs-setup
 RemainAfterExit=yes
 ",
         pool_uuid,

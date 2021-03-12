@@ -163,12 +163,19 @@ pub trait Pool: Debug {
     /// using clevis.
     fn bind_clevis(
         &mut self,
-        pin: String,
-        clevis_info: Value,
+        pin: &str,
+        clevis_info: &Value,
     ) -> StratisResult<CreateAction<Clevis>>;
 
     /// Unbind all devices in the given pool from using clevis.
     fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<Clevis>>;
+
+    /// Bind all devices in the given pool for unlocking using a passphrase
+    /// in the kernel keyring.
+    fn bind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<CreateAction<Key>>;
+
+    /// Unbind all devices in the given pool from the registered keyring passphrase.
+    fn unbind_keyring(&mut self) -> StratisResult<DeleteAction<Key>>;
 
     /// Ensures that all designated filesystems are gone from pool.
     /// Returns a list of the filesystems found, and actually destroyed.

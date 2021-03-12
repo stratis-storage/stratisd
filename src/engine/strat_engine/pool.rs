@@ -21,8 +21,8 @@ use crate::{
         },
         types::{
             BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo,
-            FilesystemUuid, Name, PoolUuid, Redundancy, RenameAction, SetCreateAction,
-            SetDeleteAction,
+            FilesystemUuid, Key, KeyDescription, Name, PoolUuid, Redundancy, RenameAction,
+            SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -370,8 +370,8 @@ impl Pool for StratPool {
 
     fn bind_clevis(
         &mut self,
-        pin: String,
-        clevis_info: Value,
+        pin: &str,
+        clevis_info: &Value,
     ) -> StratisResult<CreateAction<Clevis>> {
         let changed = self.backstore.bind_clevis(pin, clevis_info)?;
         if changed {
@@ -385,6 +385,27 @@ impl Pool for StratPool {
         let changed = self.backstore.unbind_clevis()?;
         if changed {
             Ok(DeleteAction::Deleted(Clevis))
+        } else {
+            Ok(DeleteAction::Identity)
+        }
+    }
+
+    fn bind_keyring(
+        &mut self,
+        key_description: &KeyDescription,
+    ) -> StratisResult<CreateAction<Key>> {
+        let changed = self.backstore.bind_keyring(key_description)?;
+        if changed {
+            Ok(CreateAction::Created(Key))
+        } else {
+            Ok(CreateAction::Identity)
+        }
+    }
+
+    fn unbind_keyring(&mut self) -> StratisResult<DeleteAction<Key>> {
+        let changed = self.backstore.unbind_keyring()?;
+        if changed {
+            Ok(DeleteAction::Deleted(Key))
         } else {
             Ok(DeleteAction::Identity)
         }

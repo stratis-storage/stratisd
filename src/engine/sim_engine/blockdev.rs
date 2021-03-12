@@ -15,7 +15,7 @@ use devicemapper::{Bytes, Sectors, IEC};
 use crate::{
     engine::{
         engine::BlockDev,
-        types::{DevUuid, EncryptionInfo},
+        types::{DevUuid, EncryptionInfo, KeyDescription},
     },
     stratis::StratisResult,
 };
@@ -94,13 +94,23 @@ impl SimDev {
     }
 
     /// Set the clevis info for a block device.
-    pub fn set_clevis_info(&mut self, pin: String, config: Value) {
-        self.encryption_info.clevis_info = Some((pin, config));
+    pub fn set_clevis_info(&mut self, pin: &str, config: &Value) {
+        self.encryption_info.clevis_info = Some((pin.to_owned(), config.clone()));
     }
 
     /// Unset the clevis info for a block device.
     pub fn unset_clevis_info(&mut self) {
         self.encryption_info.clevis_info = None;
+    }
+
+    /// Set the key description for a block device.
+    pub fn set_key_desc(&mut self, key_desc: &KeyDescription) {
+        self.encryption_info.key_description = Some(key_desc.clone())
+    }
+
+    /// Unset the key description for a block device.
+    pub fn unset_key_desc(&mut self) {
+        self.encryption_info.key_description = None;
     }
 
     /// Get encryption information for this block device.

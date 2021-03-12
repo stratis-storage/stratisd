@@ -496,8 +496,6 @@ impl Debug for CryptHandle {
 }
 
 // FIXME: Add support for adding and removing keyring keyslots.
-// FIXME: Add checks in Clevis bind/unbind methods so that there is always one active
-// keyslot.
 impl CryptHandle {
     fn new(
         physical_path: PathBuf,
@@ -619,6 +617,14 @@ impl CryptHandle {
 
     /// Unbind the given device using clevis.
     pub fn clevis_unbind(&mut self) -> StratisResult<()> {
+        if self.encryption_info.key_description.is_none() {
+            return Err(StratisError::Error(
+                "The kernel keyring token slot is empty; removing the Clevis binding \
+                would remove the ability to open this device; aborting"
+                    .to_string(),
+            ));
+        }
+
         let keyslots = self.keyslots(CLEVIS_LUKS_TOKEN_ID)?.ok_or_else(|| {
             StratisError::Error(format!(
                 "Token slot {} appears to be empty; could not determine keyslots",

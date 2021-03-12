@@ -28,7 +28,7 @@ use crate::{
             metadata::MDADataSize,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
         },
-        types::{DevUuid, EncryptionInfo, PoolUuid},
+        types::{DevUuid, EncryptionInfo, KeyDescription, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -434,80 +434,51 @@ impl BlockDevMgr {
     /// nothing was changed.
     /// * Returns Err(_) if an inconsistency was found in the metadata across pools
     /// or binding failed.
-    pub fn bind_clevis(&mut self, pin: String, clevis_info: Value) -> StratisResult<bool> {
-        fn bind_clevis_loop<'a, I>(
-            key_fs: &MemoryPrivateFilesystem,
-            blockdevs: I,
-            pin: &str,
-            clevis_info: &Value,
-        ) -> StratisResult<()>
-        where
-            I: IntoIterator<Item = &'a mut StratBlockDev>,
-        {
-            let mut rollback_record = Vec::new();
-            for blockdev_ref in blockdevs {
-                if let Err(e) = blockdev_ref.bind_clevis(key_fs, pin, clevis_info) {
-                    rollback_loop(rollback_record);
-                    return Err(e);
-                } else {
-                    rollback_record.push(blockdev_ref);
-                }
-            }
-            Ok(())
-        }
-
-        fn rollback_loop(rollback_record: Vec<&mut StratBlockDev>) {
-            rollback_record.into_iter().for_each(|blockdev| {
-                if let Err(e) = blockdev.unbind_clevis() {
-                    warn!(
-                        "Failed to unbind device {} from clevis during \
-                        rollback: {}",
-                        blockdev.physical_path().display(),
-                        e,
-                    );
-                }
-            });
-        }
-
-        let encryption_info = if self.is_encrypted() {
-            self.encryption_info()
-        } else {
+    pub fn bind_clevis(&mut self, pin: &str, clevis_info: &Value) -> StratisResult<bool> {
+        let encryption_info = self.encryption_info();
+        if !encryption_info.is_encrypted() {
             return Err(StratisError::Error(
                 "Requested pool does not appear to be encrypted".to_string(),
             ));
         };
 
-        if let Some(info) = &encryption_info.clevis_info {
-            let clevis_tuple = (pin, clevis_info);
-            if info == &clevis_tuple {
+        if let Some((ref existing_pin, ref existing_info)) = encryption_info.clevis_info {
+            if (existing_pin.as_str(), existing_info) == (pin, clevis_info) {
                 return Ok(false);
             } else {
                 return Err(StratisError::Error(format!(
                     "Block devices have already been bound with pin {} and config {}; \
                     requested pin {} and config {} can't be applied",
-                    info.0, info.1, clevis_tuple.0, clevis_tuple.1,
+                    existing_pin, existing_info, pin, clevis_info,
                 )));
             }
         }
 
         let key_fs = MemoryPrivateFilesystem::new()?;
 
-        bind_clevis_loop(
-            &key_fs,
+        bind_loop(
             self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
-            pin.as_str(),
-            &clevis_info,
+            |blockdev| blockdev.bind_clevis(&key_fs, pin, clevis_info),
+            |blockdev| blockdev.unbind_clevis(),
         )?;
 
         Ok(true)
     }
 
+    /// Unbind all devices in the given blockdev manager from clevis.
+    ///
+    /// * Returns Ok(true) if the unbinding was performed.
+    /// * Returns Ok(false) if the unbinding had already been previously performed and
+    /// nothing was changed.
+    /// * Returns Err(_) if an inconsistency was found in the metadata across pools
+    /// or unbinding failed.
     pub fn unbind_clevis(&mut self) -> StratisResult<bool> {
-        if !self.is_encrypted() {
+        let encryption_info = self.encryption_info();
+        if encryption_info.is_encrypted() {
             return Err(StratisError::Error(
                 "Requested pool does not appear to be encrypted".to_string(),
             ));
-        } else if self.encryption_info().clevis_info.is_none() {
+        } else if encryption_info.clevis_info.is_none() {
             return Ok(false);
         }
 
@@ -524,6 +495,118 @@ impl BlockDevMgr {
         }
         Ok(true)
     }
+
+    /// Bind all devices in the given blockdev manager to a passphrase using the
+    /// given key description.
+    ///
+    /// * Returns Ok(true) if the binding was performed.
+    /// * Returns Ok(false) if the binding had already been previously performed and
+    /// nothing was changed.
+    /// * Returns Err(_) if an inconsistency was found in the metadata across pools
+    /// or binding failed.
+    pub fn bind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<bool> {
+        let encryption_info = self.encryption_info();
+        if !encryption_info.is_encrypted() {
+            return Err(StratisError::Error(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ));
+        };
+
+        if let Some(ref kd) = encryption_info.key_description {
+            if kd == key_desc {
+                if self.can_unlock() {
+                    return Ok(false);
+                } else {
+                    return Err(StratisError::Error(format!(
+                        "Key description {} is registered in the metadata but the \
+                        associated passphrase can't unlock the device; the \
+                        associated passphrase may have changed since binding",
+                        key_desc.as_application_str(),
+                    )));
+                }
+            } else {
+                return Err(StratisError::Error(format!(
+                    "Block devices have already been bound with key description {}; \
+                    requested key description {} can't be applied",
+                    key_desc.as_application_str(),
+                    kd.as_application_str(),
+                )));
+            }
+        }
+
+        bind_loop(
+            self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
+            |blockdev| blockdev.bind_keyring(key_desc),
+            |blockdev| blockdev.unbind_keyring(),
+        )?;
+
+        Ok(true)
+    }
+
+    /// Unbind all devices in the given blockdev manager from the passphrase
+    /// associated with the key description.
+    ///
+    /// * Returns Ok(true) if the unbinding was performed.
+    /// * Returns Ok(false) if the unbinding had already been previously performed and
+    /// nothing was changed.
+    /// * Returns Err(_) if an inconsistency was found in the metadata across pools
+    /// or unbinding failed.
+    pub fn unbind_keyring(&mut self) -> StratisResult<bool> {
+        let encryption_info = self.encryption_info();
+        if !encryption_info.is_encrypted() {
+            return Err(StratisError::Error(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ));
+        } else if encryption_info.key_description.is_none() {
+            return Ok(false);
+        }
+
+        for blockdev in self.blockdevs_mut().into_iter().map(|(_, bd)| bd) {
+            let res = blockdev.unbind_keyring();
+            if let Err(ref e) = res {
+                warn!(
+                    "Failed to unbind from the passphrase in the kernel keyring: {}. \
+                    This operation cannot be rolled back automatically.",
+                    e,
+                );
+            }
+            res?
+        }
+        Ok(true)
+    }
+}
+
+fn bind_loop<'a, I, B, U>(blockdevs: I, bind: B, unbind: U) -> StratisResult<()>
+where
+    I: IntoIterator<Item = &'a mut StratBlockDev>,
+    B: Fn(&mut StratBlockDev) -> StratisResult<()>,
+    U: Fn(&mut StratBlockDev) -> StratisResult<()>,
+{
+    fn rollback_loop<U>(rollback_record: Vec<&mut StratBlockDev>, unbind: U)
+    where
+        U: Fn(&mut StratBlockDev) -> StratisResult<()>,
+    {
+        rollback_record.into_iter().for_each(|blockdev| {
+            if let Err(e) = unbind(blockdev) {
+                warn!(
+                    "Failed to unbind device {} during rollback: {}",
+                    blockdev.physical_path().display(),
+                    e,
+                );
+            }
+        });
+    }
+
+    let mut rollback_record = Vec::new();
+    for blockdev_ref in blockdevs {
+        if let Err(e) = bind(blockdev_ref) {
+            rollback_loop(rollback_record, unbind);
+            return Err(e);
+        } else {
+            rollback_record.push(blockdev_ref);
+        }
+    }
+    Ok(())
 }
 
 impl Recordable<Vec<BaseBlockDevSave>> for BlockDevMgr {

@@ -28,7 +28,7 @@ use crate::{
             metadata::{disown_device, BDAExtendedSize, BlockdevSize, MDADataSize, BDA},
             serde_structs::{BaseBlockDevSave, Recordable},
         },
-        types::{BlockDevPath, DevUuid, EncryptionInfo, PoolUuid},
+        types::{BlockDevPath, DevUuid, EncryptionInfo, KeyDescription, PoolUuid},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -239,6 +239,24 @@ impl StratBlockDev {
             StratisError::Error("This device does not appear to be encrypted".to_string())
         })?;
         crypt_handle.clevis_unbind()
+    }
+
+    /// Bind a block device to a passphrase represented by a key description
+    /// in the kernel keyring.
+    pub fn bind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<()> {
+        let crypt_handle = self.crypt_handle.as_mut().ok_or_else(|| {
+            StratisError::Error("This device does not appear to be encrypted".to_string())
+        })?;
+        crypt_handle.bind_keyring(key_desc)
+    }
+
+    /// Unbind a block device from a passphrase represented by a key description
+    /// in the kernel keyring.
+    pub fn unbind_keyring(&mut self) -> StratisResult<()> {
+        let crypt_handle = self.crypt_handle.as_mut().ok_or_else(|| {
+            StratisError::Error("This device does not appear to be encrypted".to_string())
+        })?;
+        crypt_handle.unbind_keyring()
     }
 }
 

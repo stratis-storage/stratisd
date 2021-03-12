@@ -616,8 +616,7 @@ impl CryptHandle {
     }
 
     /// Add a keyring binding to the underlying LUKS2 volume.
-    #[allow(dead_code)]
-    fn bind_keyring(&mut self, key_desc: KeyDescription) -> StratisResult<()> {
+    pub fn bind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<()> {
         let mut device = self.acquire_crypt_device()?;
         let key = Self::clevis_decrypt(&mut device)?.ok_or_else(|| {
             StratisError::Error(
@@ -628,15 +627,14 @@ impl CryptHandle {
             )
         })?;
 
-        add_keyring_keyslot(&mut device, &key_desc, Some(key))?;
+        add_keyring_keyslot(&mut device, key_desc, Some(key))?;
 
-        self.encryption_info.key_description = Some(key_desc);
+        self.encryption_info.key_description = Some(key_desc.clone());
         Ok(())
     }
 
     /// Add a keyring binding to the underlying LUKS2 volume.
-    #[allow(dead_code)]
-    fn unbind_keyring(&mut self) -> StratisResult<()> {
+    pub fn unbind_keyring(&mut self) -> StratisResult<()> {
         if self.encryption_info.clevis_info.is_none() {
             return Err(StratisError::Error(
                 "No Clevis binding was found; removing the keyring binding would \

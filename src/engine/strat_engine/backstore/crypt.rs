@@ -515,13 +515,11 @@ impl CryptHandle {
             ))
         })?;
         for keyslot in keyslots {
-            if let Err(e) = clevis_luks_unbind(self.luks2_device_path(), keyslot) {
-                warn!(
-                    "Failed to unbind device {} from Clevis: {}",
-                    self.luks2_device_path().display(),
-                    e,
-                );
-            }
+            log_on_failure!(
+                clevis_luks_unbind(self.luks2_device_path(), keyslot),
+                "Failed to unbind device {} from Clevis",
+                self.luks2_device_path().display()
+            );
         }
         self.encryption_info.clevis_info = None;
         Ok(())
@@ -831,7 +829,7 @@ fn is_encrypted_stratis_device(device: &mut CryptDevice) -> bool {
 
     device_operations(device)
         .map_err(|e| {
-            warn!(
+            debug!(
                 "Operations querying device to determine if it is a Stratis device \
                 failed with an error: {}; reporting as not a Stratis device.",
                 e
@@ -844,7 +842,7 @@ fn device_is_active(device: Option<&mut CryptDevice>, device_name: &str) -> Stra
     match libcryptsetup_rs::status(device, device_name) {
         Ok(CryptStatusInfo::Active) => Ok(()),
         Ok(CryptStatusInfo::Busy) => {
-            warn!(
+            info!(
                 "Newly activated device {} reported that it was busy; you may see \
                 temporary failures due to the device being busy.",
                 device_name,

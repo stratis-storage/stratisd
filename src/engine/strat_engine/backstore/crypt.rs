@@ -391,21 +391,50 @@ impl CryptActivationHandle {
     /// environment (e.g. the proper key is in the kernel keyring, the device
     /// is formatted as a LUKS2 device, etc.)
     pub fn can_unlock(physical_path: &Path) -> bool {
-        // FIXME: Add support for Clevis checking.
         fn can_unlock_with_failures(physical_path: &Path) -> StratisResult<bool> {
-            let device_result = device_from_physical_path(physical_path);
-            match device_result {
-                Ok(Some(mut dev)) => check_luks2_token(&mut dev).map(|_| true),
-                _ => Ok(false),
+            let maybe_encrypted = device_from_physical_path(physical_path)?;
+            let mut device = match maybe_encrypted {
+                Some(dev) => dev,
+                _ => return Ok(false),
+            };
+            let key_description = key_desc_from_metadata(&mut device);
+
+            if key_description.is_some() {
+                check_luks2_token(&mut device)?;
             }
+            let token = device.token_handle().json_get(CLEVIS_LUKS_TOKEN_ID).ok();
+            let jwe = token.as_ref().and_then(|t| t.get("jwe"));
+            if let Some(jwe) = jwe {
+                let pass = clevis_decrypt(jwe)?;
+                if let Some(keyslot) = get_keyslot_number(&mut device, CLEVIS_LUKS_TOKEN_ID)?
+                    .and_then(|k| k.into_iter().next())
+                {
+                    log_on_failure!(
+                        device.activate_handle().activate_by_passphrase(
+                            None,
+                            Some(keyslot),
+                            pass.as_ref(),
+                            CryptActivateFlags::empty(),
+                        ),
+                        "libcryptsetup reported that the decrypted Clevis passphrase \
+                        is unable to open the encrypted device"
+                    );
+                } else {
+                    return Err(StratisError::Error(
+                        "Clevis JWE was found in the Stratis metadata but was \
+                        not associated with any keyslots"
+                            .to_string(),
+                    ));
+                }
+            }
+            Ok(true)
         }
 
         can_unlock_with_failures(physical_path)
             .map_err(|e| {
                 warn!(
                     "stratisd was unable to simulate opening the given device \
-                    in the current environment. This may be due to an expired \
-                    or missing key in the kernel keyring: {}",
+                    in the current environment: {}",
                     e,
                 );
             })
@@ -671,7 +700,7 @@ impl CryptHandle {
                     CLEVIS_LUKS_TOKEN_ID,
                 ))
             })?;
-        clevis_decrypt(jwe).map(Some)
+        clevis_decrypt(&jwe).map(Some)
     }
 
     /// Deactivate the device referenced by the current device handle.

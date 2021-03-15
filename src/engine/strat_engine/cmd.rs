@@ -339,7 +339,7 @@ pub fn clevis_luks_unlock(dev_path: &Path, dm_name: &str) -> StratisResult<()> {
     )
 }
 
-pub fn clevis_decrypt(jwe: Value) -> StratisResult<SizedKeyMemory> {
+pub fn clevis_decrypt(jwe: &Value) -> StratisResult<SizedKeyMemory> {
     let mut jose_child = Command::new(get_jose_executable()?)
         .arg("jwe")
         .arg("fmt")

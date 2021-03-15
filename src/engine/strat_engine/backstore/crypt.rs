@@ -47,12 +47,6 @@ const STRATIS_TOKEN_DEV_UUID_KEY: &str = "device_uuid";
 
 const STRATIS_TOKEN_ID: c_uint = 0;
 const LUKS2_TOKEN_ID: c_uint = 1;
-/// NOTE: Only token IDs 0 and 1 will be used at the time of clevis bindings
-/// so until support for more clevis operations are added, this can be reliably
-/// depended upon as cryptsetup token import will use the next available token ID
-/// which, in this case, is 2.
-/// FIXME: Specify token ID when clevis adds support so that we can rely on this
-/// deterministically as we add other tokens.
 const CLEVIS_LUKS_TOKEN_ID: c_uint = 2;
 
 const LUKS2_TOKEN_TYPE: &str = "luks2-keyring";
@@ -468,7 +462,6 @@ impl Debug for CryptHandle {
     }
 }
 
-// FIXME: Add support for adding and removing keyring keyslots.
 impl CryptHandle {
     fn new(
         physical_path: PathBuf,

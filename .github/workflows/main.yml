@@ -240,7 +240,7 @@ jobs:
           # MANDATORY PYTHON CHECKS ON RECOMMENDED DEVELOPMENT INTERPRETER
           - python-version: 3.8.6
             dependencies: >
-              pylint==2.4.4
+              pylint==2.6.0
               dbus-client-gen==0.4
               dbus-python-client-gen==0.7
               psutil==5.6.7
@@ -262,7 +262,7 @@ jobs:
           # MANDATORY PYTHON CHECKS ON LOWEST SUPPORTED INTERPRETER
           - python-version: 3.6.8
             dependencies: >
-              pylint==2.4.4
+              pylint==2.6.0
               dbus-client-gen==0.4
               dbus-python-client-gen==0.7
               psutil==5.4.3

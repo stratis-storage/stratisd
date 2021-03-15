@@ -278,6 +278,7 @@ clippy:
 	outdated
 	release
 	build-min
+	release-min
 	test
 	test-loop
 	test-real

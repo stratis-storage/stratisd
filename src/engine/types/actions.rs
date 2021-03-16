@@ -85,7 +85,26 @@ impl Display for CreateAction<Clevis> {
             CreateAction::Identity => {
                 write!(
                     f,
-                    "The pool requested for binding is already bound; no action taken"
+                    "The pool requested for clevis binding is already bound; no action taken"
+                )
+            }
+        }
+    }
+}
+
+impl Display for CreateAction<Key> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            CreateAction::Created(Key) => {
+                write!(
+                    f,
+                    "Pool successfully bound to a passphrase in the kernel keyring"
+                )
+            }
+            CreateAction::Identity => {
+                write!(
+                    f,
+                    "The pool requested for keyring binding is already bound; no action taken"
                 )
             }
         }
@@ -124,6 +143,21 @@ pub enum MappingCreateAction<T> {
     ValueChanged(T),
 }
 
+impl Display for MappingCreateAction<Key> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            MappingCreateAction::Created(Key) => write!(f, "Set a new key successfully"),
+            MappingCreateAction::Identity => {
+                write!(f, "The requested key already exists; no action was taken")
+            }
+            MappingCreateAction::ValueChanged(Key) => write!(
+                f,
+                "An existing key was updated with a new value successfully"
+            ),
+        }
+    }
+}
+
 impl<T> EngineAction for MappingCreateAction<T> {
     type Return = T;
 
@@ -142,17 +176,42 @@ impl<T> EngineAction for MappingCreateAction<T> {
     }
 }
 
-impl Display for MappingCreateAction<Key> {
+/// Idempotent type representing a delete action for a mapping from a key to a value
+#[derive(Debug, PartialEq, Eq)]
+pub enum MappingDeleteAction<T> {
+    /// The key and the value were deleted.
+    Deleted(T),
+    /// The key did not exist.
+    Identity,
+}
+
+impl<T> EngineAction for MappingDeleteAction<T> {
+    type Return = T;
+
+    fn is_changed(&self) -> bool {
+        matches!(*self, MappingDeleteAction::Deleted(_))
+    }
+
+    fn changed(self) -> Option<T> {
+        match self {
+            MappingDeleteAction::Deleted(t) => Some(t),
+            _ => None,
+        }
+    }
+}
+
+impl Display for MappingDeleteAction<Key> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            MappingCreateAction::Created(Key) => write!(f, "Set a new key successfully"),
-            MappingCreateAction::Identity => {
-                write!(f, "The requested key already exists; no action was taken")
+            MappingDeleteAction::Deleted(_) => {
+                write!(f, "A key was deleted successfully")
             }
-            MappingCreateAction::ValueChanged(Key) => write!(
-                f,
-                "An existing key was updated with a new value successfully"
-            ),
+            MappingDeleteAction::Identity => {
+                write!(
+                    f,
+                    "The key requested for deletion is already absent; no action taken"
+                )
+            }
         }
     }
 }
@@ -428,12 +487,15 @@ impl Display for DeleteAction<Key> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             DeleteAction::Deleted(_) => {
-                write!(f, "A key was deleted successfully")
+                write!(
+                    f,
+                    "Bindings to a passphrase in the kernel keyring were removed successfully"
+                )
             }
             DeleteAction::Identity => {
                 write!(
                     f,
-                    "The key requested for deletion is already absent; no action taken"
+                    "The keyring bindings requested for removal are already absent; no action taken"
                 )
             }
         }

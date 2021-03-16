@@ -21,7 +21,7 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
-                crypt::CryptActivationHandle,
+                crypt::{interpret_clevis_config, CryptActivationHandle},
                 devices::{initialize_devices, process_and_verify_devices, wipe_blockdevs},
             },
             keys::MemoryPrivateFilesystem,
@@ -154,15 +154,17 @@ impl BlockDevMgr {
             .collect()
     }
 
-    /// Check that the registered key description for these block devices can
-    /// unlock at least one of the existing block devices registered.
+    /// Check that the registered key description and Clevis information for these
+    /// block devices can unlock at least one of the existing block devices registered.
     /// Precondition: self.block_devs must have at least one device.
-    pub fn can_unlock(&self) -> bool {
+    pub fn can_unlock(&self, try_unlock_keyring: bool, try_unlock_clevis: bool) -> bool {
         CryptActivationHandle::can_unlock(
             self.block_devs
                 .get(0)
                 .expect("Must have at least one blockdev")
                 .physical_path(),
+            try_unlock_keyring,
+            try_unlock_clevis,
         )
     }
 
@@ -188,7 +190,12 @@ impl BlockDevMgr {
         let devices = process_and_verify_devices(pool_uuid, &current_uuids, paths)?;
 
         let encryption_info = self.encryption_info();
-        if encryption_info.is_encrypted() && !self.can_unlock() {
+        if encryption_info.is_encrypted()
+            && !self.can_unlock(
+                encryption_info.key_description.is_some(),
+                encryption_info.clevis_info.is_some(),
+            )
+        {
             return Err(StratisError::Engine(
                 ErrorEnum::Invalid,
                 "Neither the keyring nor Clevis could be used to unlock the device; \
@@ -442,14 +449,19 @@ impl BlockDevMgr {
             ));
         };
 
+        let mut parsed_config = clevis_info.clone();
+        let _ = interpret_clevis_config(pin, &mut parsed_config)?;
+
         if let Some((ref existing_pin, ref existing_info)) = encryption_info.clevis_info {
-            if (existing_pin.as_str(), existing_info) == (pin, clevis_info) {
+            if (existing_pin.as_str(), existing_info) == (pin, &parsed_config)
+                && self.can_unlock(false, true)
+            {
                 return Ok(false);
             } else {
                 return Err(StratisError::Error(format!(
                     "Block devices have already been bound with pin {} and config {}; \
                     requested pin {} and config {} can't be applied",
-                    existing_pin, existing_info, pin, clevis_info,
+                    existing_pin, existing_info, pin, parsed_config,
                 )));
             }
         }
@@ -474,7 +486,7 @@ impl BlockDevMgr {
     /// or unbinding failed.
     pub fn unbind_clevis(&mut self) -> StratisResult<bool> {
         let encryption_info = self.encryption_info();
-        if encryption_info.is_encrypted() {
+        if !encryption_info.is_encrypted() {
             return Err(StratisError::Error(
                 "Requested pool does not appear to be encrypted".to_string(),
             ));
@@ -514,7 +526,7 @@ impl BlockDevMgr {
 
         if let Some(ref kd) = encryption_info.key_description {
             if kd == key_desc {
-                if self.can_unlock() {
+                if self.can_unlock(true, false) {
                     return Ok(false);
                 } else {
                     return Err(StratisError::Error(format!(

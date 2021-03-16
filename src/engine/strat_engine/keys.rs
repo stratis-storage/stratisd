@@ -37,7 +37,7 @@ use crate::{
         engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
         shared,
         strat_engine::names::KeyDescription,
-        types::{DeleteAction, Key, MappingCreateAction, SizedKeyMemory},
+        types::{Key, MappingCreateAction, MappingDeleteAction, SizedKeyMemory},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -413,13 +413,13 @@ impl KeyActions for StratKeyActions {
         key_ids.to_key_descs()
     }
 
-    fn unset(&mut self, key_desc: &KeyDescription) -> StratisResult<DeleteAction<Key>> {
+    fn unset(&mut self, key_desc: &KeyDescription) -> StratisResult<MappingDeleteAction<Key>> {
         let keyring_id = get_persistent_keyring()?;
 
         if let Some(key_id) = search_key(keyring_id, key_desc)? {
-            unset_key(key_id).map(|_| DeleteAction::Deleted(Key))
+            unset_key(key_id).map(|_| MappingDeleteAction::Deleted(Key))
         } else {
-            Ok(DeleteAction::Identity)
+            Ok(MappingDeleteAction::Identity)
         }
     }
 }

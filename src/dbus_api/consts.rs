@@ -29,6 +29,7 @@ pub const LOCKED_POOL_DEVS: &str = "LockedPoolsWithDevs";
 pub const POOL_INTERFACE_NAME: &str = "org.storage.stratis2.pool";
 pub const POOL_INTERFACE_NAME_2_1: &str = "org.storage.stratis2.pool.r1";
 pub const POOL_INTERFACE_NAME_2_3: &str = "org.storage.stratis2.pool.r3";
+pub const POOL_INTERFACE_NAME_2_4: &str = "org.storage.stratis2.pool.r4";
 pub const POOL_NAME_PROP: &str = "Name";
 pub const POOL_UUID_PROP: &str = "Uuid";
 pub const POOL_HAS_CACHE_PROP: &str = "HasCache";

@@ -418,47 +418,56 @@ impl CryptActivationHandle {
     /// Check whether the given physical device can be unlocked with the current
     /// environment (e.g. the proper key is in the kernel keyring, the device
     /// is formatted as a LUKS2 device, etc.)
-    pub fn can_unlock(physical_path: &Path) -> bool {
-        fn can_unlock_with_failures(physical_path: &Path) -> StratisResult<bool> {
-            let maybe_encrypted = device_from_physical_path(physical_path)?;
-            let mut device = match maybe_encrypted {
-                Some(dev) => dev,
-                _ => return Ok(false),
-            };
-            let key_description = key_desc_from_metadata(&mut device);
+    pub fn can_unlock(
+        physical_path: &Path,
+        try_unlock_keyring: bool,
+        try_unlock_clevis: bool,
+    ) -> bool {
+        fn can_unlock_with_failures(
+            physical_path: &Path,
+            try_unlock_keyring: bool,
+            try_unlock_clevis: bool,
+        ) -> StratisResult<bool> {
+            let mut device = acquire_crypt_device(physical_path)?;
 
-            if key_description.is_some() {
-                check_luks2_token(&mut device)?;
+            if try_unlock_keyring {
+                let key_description = key_desc_from_metadata(&mut device);
+
+                if key_description.is_some() {
+                    check_luks2_token(&mut device)?;
+                }
             }
-            let token = device.token_handle().json_get(CLEVIS_LUKS_TOKEN_ID).ok();
-            let jwe = token.as_ref().and_then(|t| t.get("jwe"));
-            if let Some(jwe) = jwe {
-                let pass = clevis_decrypt(jwe)?;
-                if let Some(keyslot) = get_keyslot_number(&mut device, CLEVIS_LUKS_TOKEN_ID)?
-                    .and_then(|k| k.into_iter().next())
-                {
-                    log_on_failure!(
-                        device.activate_handle().activate_by_passphrase(
-                            None,
-                            Some(keyslot),
-                            pass.as_ref(),
-                            CryptActivateFlags::empty(),
-                        ),
-                        "libcryptsetup reported that the decrypted Clevis passphrase \
-                        is unable to open the encrypted device"
-                    );
-                } else {
-                    return Err(StratisError::Error(
-                        "Clevis JWE was found in the Stratis metadata but was \
-                        not associated with any keyslots"
-                            .to_string(),
-                    ));
+            if try_unlock_clevis {
+                let token = device.token_handle().json_get(CLEVIS_LUKS_TOKEN_ID).ok();
+                let jwe = token.as_ref().and_then(|t| t.get("jwe"));
+                if let Some(jwe) = jwe {
+                    let pass = clevis_decrypt(jwe)?;
+                    if let Some(keyslot) = get_keyslot_number(&mut device, CLEVIS_LUKS_TOKEN_ID)?
+                        .and_then(|k| k.into_iter().next())
+                    {
+                        log_on_failure!(
+                            device.activate_handle().activate_by_passphrase(
+                                None,
+                                Some(keyslot),
+                                pass.as_ref(),
+                                CryptActivateFlags::empty(),
+                            ),
+                            "libcryptsetup reported that the decrypted Clevis passphrase \
+                            is unable to open the encrypted device"
+                        );
+                    } else {
+                        return Err(StratisError::Error(
+                            "Clevis JWE was found in the Stratis metadata but was \
+                            not associated with any keyslots"
+                                .to_string(),
+                        ));
+                    }
                 }
             }
             Ok(true)
         }
 
-        can_unlock_with_failures(physical_path)
+        can_unlock_with_failures(physical_path, try_unlock_keyring, try_unlock_clevis)
             .map_err(|e| {
                 warn!(
                     "stratisd was unable to simulate opening the given device \
@@ -775,14 +784,14 @@ fn add_keyring_keyslot(
     let key_option = log_on_failure!(
         read_key(key_description),
         "Failed to read key with key description {} from keyring",
-        key_description.to_system_string()
+        key_description.as_application_str()
     );
     let key = if let Some(key) = key_option {
         key
     } else {
         return Err(StratisError::Error(format!(
-            "Key with key description {} was not found in the kernel keyring",
-            key_description.to_system_string(),
+            "Key with key description {} was not found",
+            key_description.as_application_str(),
         )));
     };
 
@@ -1440,9 +1449,9 @@ fn read_key(key_description: &KeyDescription) -> StratisResult<Option<SizedKeyMe
     let read_key_result = keys::read_key_persistent(key_description);
     if read_key_result.is_err() {
         warn!(
-            "Failed to read the key with key description {} from the keyring; \
-            encryption cannot continue",
-            key_description.to_system_string(),
+            "Failed to read the key with key description {}; encryption cannot \
+            continue",
+            key_description.as_application_str(),
         );
     }
     read_key_result.map(|opt| opt.map(|(_, mem)| mem))
@@ -1585,7 +1594,7 @@ mod tests {
             }
 
             for path in paths {
-                if !CryptActivationHandle::can_unlock(path) {
+                if !CryptActivationHandle::can_unlock(path, true, false) {
                     return Err(Box::new(StratisError::Error(
                         "All devices should be able to be unlocked".to_string(),
                     )));
@@ -1597,7 +1606,7 @@ mod tests {
             }
 
             for path in paths {
-                if !CryptActivationHandle::can_unlock(path) {
+                if !CryptActivationHandle::can_unlock(path, true, false) {
                     return Err(Box::new(StratisError::Error(
                         "All devices should be able to be unlocked".to_string(),
                     )));
@@ -1609,7 +1618,7 @@ mod tests {
             }
 
             for path in paths {
-                if CryptActivationHandle::can_unlock(path) {
+                if CryptActivationHandle::can_unlock(path, true, false) {
                     return Err(Box::new(StratisError::Error(
                         "All devices should no longer be able to be unlocked".to_string(),
                     )));

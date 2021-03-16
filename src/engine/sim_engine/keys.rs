@@ -10,7 +10,7 @@ use crate::{
     engine::{
         engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
         shared,
-        types::{DeleteAction, Key, KeyDescription, MappingCreateAction, SizedKeyMemory},
+        types::{Key, KeyDescription, MappingCreateAction, MappingDeleteAction, SizedKeyMemory},
     },
     stratis::StratisResult,
 };
@@ -66,10 +66,10 @@ impl KeyActions for SimKeyActions {
         Ok(self.0.keys().cloned().collect())
     }
 
-    fn unset(&mut self, key_desc: &KeyDescription) -> StratisResult<DeleteAction<Key>> {
+    fn unset(&mut self, key_desc: &KeyDescription) -> StratisResult<MappingDeleteAction<Key>> {
         match self.0.remove(key_desc) {
-            Some(_) => Ok(DeleteAction::Deleted(Key)),
-            None => Ok(DeleteAction::Identity),
+            Some(_) => Ok(MappingDeleteAction::Deleted(Key)),
+            None => Ok(MappingDeleteAction::Identity),
         }
     }
 }

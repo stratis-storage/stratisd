@@ -34,12 +34,8 @@ impl BDA {
         blkdev_size: BlockdevSize,
         initialization_time: u64,
     ) -> BDA {
-        let header = StaticHeader::new(
-            identifiers,
-            mda_data_size.region_size().mda_size(),
-            blkdev_size,
-            initialization_time,
-        );
+        let header =
+            StaticHeader::new(identifiers, mda_data_size, blkdev_size, initialization_time);
 
         let regions = mda::MDARegions::new(header.mda_size);
 

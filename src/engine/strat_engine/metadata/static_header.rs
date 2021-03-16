@@ -18,7 +18,8 @@ use crate::{
     engine::{
         strat_engine::{
             metadata::sizes::{
-                static_header_size, BDAExtendedSize, BlockdevSize, MDASize, ReservedSize,
+                static_header_size, BDAExtendedSize, BlockdevSize, MDADataSize, MDASize,
+                ReservedSize,
             },
             writing::SyncAll,
         },
@@ -106,14 +107,14 @@ pub struct StaticHeader {
 impl StaticHeader {
     pub fn new(
         identifiers: StratisIdentifiers,
-        mda_size: MDASize,
+        mda_data_size: MDADataSize,
         blkdev_size: BlockdevSize,
         initialization_time: u64,
     ) -> StaticHeader {
         StaticHeader {
             blkdev_size,
             identifiers,
-            mda_size,
+            mda_size: mda_data_size.region_size().mda_size(),
             reserved_size: ReservedSize::new(RESERVED_SECTORS),
             flags: 0,
             initialization_time,
@@ -487,14 +488,12 @@ pub mod tests {
     pub fn random_static_header(blkdev_size: u64, mda_size_factor: u32) -> StaticHeader {
         let pool_uuid = PoolUuid::new_v4();
         let dev_uuid = DevUuid::new_v4();
-        let mda_size =
-            MDADataSize::new(MDADataSize::default().bytes() + Bytes::from(mda_size_factor * 4))
-                .region_size()
-                .mda_size();
+        let mda_data_size =
+            MDADataSize::new(MDADataSize::default().bytes() + Bytes::from(mda_size_factor * 4));
         let blkdev_size = (Bytes::from(IEC::Mi) + Sectors(blkdev_size).bytes()).sectors();
         StaticHeader::new(
             StratisIdentifiers::new(pool_uuid, dev_uuid),
-            mda_size,
+            mda_data_size,
             BlockdevSize::new(blkdev_size),
             Utc::now().timestamp() as u64,
         )
@@ -612,8 +611,14 @@ pub mod tests {
         let sh = random_static_header(10000, 4);
 
         let ts = Utc::now().timestamp() as u64;
-        let sh_older = StaticHeader::new(sh.identifiers, sh.mda_size, sh.blkdev_size, ts);
-        let sh_newer = StaticHeader::new(sh.identifiers, sh.mda_size, sh.blkdev_size, ts + 1);
+        let sh_older = StaticHeader {
+            initialization_time: ts,
+            ..sh
+        };
+        let sh_newer = StaticHeader {
+            initialization_time: ts + 1,
+            ..sh
+        };
         assert_ne!(sh_older, sh_newer);
 
         let buf_size = bytes!(static_header_size::STATIC_HEADER_SECTORS);

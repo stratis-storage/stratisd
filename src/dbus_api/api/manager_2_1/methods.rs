@@ -13,7 +13,7 @@ use crate::{
         types::TData,
         util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
     },
-    engine::{DeleteAction, KeyDescription},
+    engine::{KeyDescription, MappingDeleteAction},
 };
 
 pub fn create_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
@@ -44,7 +44,7 @@ pub fn unset_key(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
             }
         })) {
         Ok(idem_resp) => {
-            let return_value = matches!(idem_resp, DeleteAction::Deleted(_));
+            let return_value = matches!(idem_resp, MappingDeleteAction::Deleted(_));
             return_message.append3(return_value, msg_code_ok(), msg_string_ok())
         }
         Err(e) => {

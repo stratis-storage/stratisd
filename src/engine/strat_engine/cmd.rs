@@ -359,7 +359,7 @@ pub fn clevis_decrypt(jwe: &Value) -> StratisResult<SizedKeyMemory> {
 
     jose_child.wait()?;
 
-    let mut jose_output = Vec::new();
+    let mut jose_output = String::new();
     jose_child
         .stdout
         .ok_or_else(|| {
@@ -369,7 +369,7 @@ pub fn clevis_decrypt(jwe: &Value) -> StratisResult<SizedKeyMemory> {
                     .to_string(),
             )
         })?
-        .read_to_end(&mut jose_output)?;
+        .read_to_string(&mut jose_output)?;
 
     let mut clevis_child = Command::new(get_clevis_executable()?)
         .arg("decrypt")
@@ -383,7 +383,8 @@ pub fn clevis_decrypt(jwe: &Value) -> StratisResult<SizedKeyMemory> {
                 .to_string(),
         )
     })?;
-    clevis_stdin.write_all(jose_output.as_slice())?;
+    clevis_stdin.write_all(jose_output.as_bytes())?;
+    drop(clevis_stdin);
 
     clevis_child.wait()?;
 

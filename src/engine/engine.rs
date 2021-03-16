@@ -18,9 +18,9 @@ use devicemapper::{Bytes, Sectors};
 use crate::{
     engine::types::{
         BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid,
-        Key, KeyDescription, LockedPoolInfo, MappingCreateAction, Name, PoolUuid, RenameAction,
-        ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, UdevEngineEvent,
-        UnlockMethod,
+        Key, KeyDescription, LockedPoolInfo, MappingCreateAction, MappingDeleteAction, Name,
+        PoolUuid, RenameAction, ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction,
+        UdevEngineEvent, UnlockMethod,
     },
     stratis::StratisResult,
 };
@@ -53,7 +53,7 @@ pub trait KeyActions {
 
     /// Unset a key with the given key description in the root persistent kernel
     /// keyring.
-    fn unset(&mut self, key_desc: &KeyDescription) -> StratisResult<DeleteAction<Key>>;
+    fn unset(&mut self, key_desc: &KeyDescription) -> StratisResult<MappingDeleteAction<Key>>;
 }
 
 /// An interface for reporting internal engine state.

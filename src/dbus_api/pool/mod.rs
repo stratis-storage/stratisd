@@ -20,6 +20,7 @@ mod fetch_properties_2_3;
 mod pool_2_0;
 mod pool_2_1;
 mod pool_2_3;
+mod pool_2_4;
 mod shared;
 
 pub fn create_dbus_pool<'a>(
@@ -88,6 +89,8 @@ pub fn create_dbus_pool<'a>(
                 .add_m(pool_2_3::unbind_clevis_method(&f))
                 .add_m(pool_2_1::init_cache_method(&f))
                 .add_m(pool_2_1::add_cachedevs_method(&f))
+                .add_m(pool_2_4::bind_keyring_method(&f))
+                .add_m(pool_2_4::unbind_keyring_method(&f))
                 .add_m(pool_2_0::rename_method(&f))
                 .add_p(pool_2_0::name_property(&f))
                 .add_p(pool_2_0::uuid_property(&f))

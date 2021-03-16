@@ -25,7 +25,10 @@ use nix::{
     },
     unistd::{chown, gettid, Uid},
 };
-use rand::{distributions::Standard, Rng};
+use rand::{
+    distributions::{Alphanumeric, Distribution},
+    thread_rng,
+};
 
 use libcryptsetup_rs::{SafeBorrowedMemZero, SafeMemHandle};
 
@@ -529,13 +532,10 @@ impl MemoryPrivateFilesystem {
                 format!("Path {} does not exist", MemoryFilesystem::TMPFS_LOCATION,),
             )));
         };
-        let mut random_string = String::new();
-        while random_string.len() < 16 {
-            let ch: char = rand::thread_rng().sample(Standard);
-            if ch.is_ascii_alphanumeric() {
-                random_string.push(ch);
-            }
-        }
+        let random_string = Alphanumeric
+            .sample_iter(thread_rng())
+            .take(16)
+            .collect::<String>();
         let private_fs_path = vec![MemoryFilesystem::TMPFS_LOCATION, &random_string]
             .iter()
             .collect();
@@ -603,8 +603,15 @@ impl MemoryPrivateFilesystem {
     pub fn rand_key(&self) -> StratisResult<MemoryMappedKeyfile> {
         let mut key_data = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
         File::open("/dev/urandom")?.read_exact(key_data.as_mut())?;
+        let mut mem_file_path = PathBuf::from(&self.0);
+        mem_file_path.push(
+            Alphanumeric
+                .sample_iter(thread_rng())
+                .take(10)
+                .collect::<String>(),
+        );
         MemoryMappedKeyfile::new(
-            &self.0,
+            &mem_file_path,
             SizedKeyMemory::new(key_data, MAX_STRATIS_PASS_SIZE),
         )
     }
@@ -627,6 +634,10 @@ pub struct MemoryMappedKeyfile(*mut libc::c_void, usize, PathBuf);
 
 impl MemoryMappedKeyfile {
     pub fn new(file_path: &Path, key_data: SizedKeyMemory) -> StratisResult<MemoryMappedKeyfile> {
+        debug!(
+            "Initializing in memory keyfile at path {}",
+            file_path.display()
+        );
         if file_path.exists() {
             return Err(StratisError::Io(io::Error::new(
                 io::ErrorKind::AlreadyExists,

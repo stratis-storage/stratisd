@@ -28,17 +28,12 @@ pub struct BDA {
 }
 
 impl BDA {
-    /// Initialize a blockdev with a Stratis BDA.
-    pub fn initialize<F>(
-        f: &mut F,
+    pub fn new(
         identifiers: StratisIdentifiers,
         mda_data_size: MDADataSize,
         blkdev_size: BlockdevSize,
         initialization_time: u64,
-    ) -> StratisResult<BDA>
-    where
-        F: Seek + SyncAll,
-    {
+    ) -> BDA {
         let header = StaticHeader::new(
             identifiers,
             mda_data_size.region_size().mda_size(),
@@ -46,12 +41,22 @@ impl BDA {
             initialization_time,
         );
 
-        header.write(f, MetadataLocation::Both)?;
+        let regions = mda::MDARegions::new(header.mda_size);
 
-        let regions =
-            mda::MDARegions::initialize(STATIC_HEADER_SIZE.sectors().bytes(), header.mda_size, f)?;
+        BDA { header, regions }
+    }
 
-        Ok(BDA { header, regions })
+    /// Initialize a blockdev with a Stratis BDA.
+    pub fn initialize<F>(&self, f: &mut F) -> StratisResult<()>
+    where
+        F: Seek + SyncAll,
+    {
+        self.header.write(f, MetadataLocation::Both)?;
+
+        self.regions
+            .initialize(STATIC_HEADER_SIZE.sectors().bytes(), f)?;
+
+        Ok(())
     }
 
     /// Load a BDA on initial setup of a device.
@@ -157,13 +162,16 @@ mod tests {
         fn empty_bda(ref sh in static_header_strategy()) {
             let buf_size = convert_test!(*sh.mda_size.bda_size().sectors().bytes(), u128, usize);
             let mut buf = Cursor::new(vec![0; buf_size]);
-            let bda = BDA::initialize(
-                &mut buf,
+
+            let bda = BDA::new(
                 sh.identifiers,
                 sh.mda_size.region_size().data_size(),
                 sh.blkdev_size,
                 Utc::now().timestamp() as u64,
-            ).unwrap();
+            );
+            bda.initialize(&mut buf).unwrap();
+
+            let bda = BDA::load(&mut buf).unwrap().unwrap();
             prop_assert!(bda.last_update_time().is_none());
         }
     }
@@ -185,14 +193,13 @@ mod tests {
                 usize
             )
         ]);
-        let mut bda = BDA::initialize(
-            &mut buf,
+        let mut bda = BDA::new(
             sh.identifiers,
             sh.mda_size.region_size().data_size(),
             sh.blkdev_size,
             Utc::now().timestamp() as u64,
-        )
-        .unwrap();
+        );
+        bda.initialize(&mut buf).unwrap();
 
         let timestamp0 = Utc::now();
         thread::sleep(sleep_time);
@@ -236,13 +243,13 @@ mod tests {
         ) {
             let buf_size = convert_test!(*sh.mda_size.bda_size().sectors().bytes(), u128, usize);
             let mut buf = Cursor::new(vec![0; buf_size]);
-            let mut bda = BDA::initialize(
-                &mut buf,
+            let mut bda = BDA::new(
                 sh.identifiers,
                 sh.mda_size.region_size().data_size(),
                 sh.blkdev_size,
                 Utc::now().timestamp() as u64,
-            ).unwrap();
+            );
+            bda.initialize(&mut buf).unwrap();
             let current_time = Utc::now();
             bda.save_state(&current_time, state, &mut buf).unwrap();
             let loaded_state = bda.load_state(&mut buf).unwrap();

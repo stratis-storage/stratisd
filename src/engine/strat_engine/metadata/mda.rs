@@ -42,6 +42,14 @@ pub struct MDARegions {
 }
 
 impl MDARegions {
+    /// Construct a new MDA regions struct.
+    pub fn new(mda_size: MDASize) -> MDARegions {
+        MDARegions {
+            region_size: mda_size.region_size(),
+            mda_headers: [None, None],
+        }
+    }
+
     /// Calculate the offset from start of device for an MDARegion.
     fn mda_offset(header_size: Bytes, index: usize, per_region_size: Bytes) -> u128 {
         *(header_size + per_region_size * index)
@@ -53,23 +61,16 @@ impl MDARegions {
         self.region_size.data_size()
     }
 
-    /// Initialize the space allotted to the MDA region headers.
+    /// Initialize the space allotted to all the MDA regions headers.
     /// For each MDA region, write the data corresponding to a default
     /// MDAHeader to the appropriate location. This default MDA header
-    /// has all zero values. The returned MDARegions struct's optional
-    /// MDAHeader structs are all None.
-    pub fn initialize<F>(
-        header_size: Bytes,
-        mda_size: MDASize,
-        f: &mut F,
-    ) -> StratisResult<MDARegions>
+    /// has all zero values.
+    pub fn initialize<F>(&self, header_size: Bytes, f: &mut F) -> StratisResult<()>
     where
         F: Seek + SyncAll,
     {
         let hdr_buf = MDAHeader::default().to_buf();
-
-        let region_size = mda_size.region_size();
-        let region_size_bytes = region_size.sectors().bytes();
+        let region_size_bytes = self.region_size.sectors().bytes();
         for region in 0..mda_size::NUM_MDA_REGIONS {
             f.seek(SeekFrom::Start(convert_int!(
                 MDARegions::mda_offset(header_size, region, region_size_bytes),
@@ -81,10 +82,7 @@ impl MDARegions {
 
         f.sync_all()?;
 
-        Ok(MDARegions {
-            region_size,
-            mda_headers: [None, None],
-        })
+        Ok(())
     }
 
     /// Construct an MDARegions struct from data on the disk.
@@ -462,7 +460,8 @@ mod tests {
             Err(_)
         );
 
-        MDARegions::initialize(offset, MDASize::default(), &mut buf).unwrap();
+        let mda_regions = MDARegions::new(MDASize::default());
+        mda_regions.initialize(offset, &mut buf).unwrap();
         let regions = MDARegions::load(offset, MDASize::default(), &mut buf).unwrap();
         regions.invariant();
 

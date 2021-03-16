@@ -46,10 +46,6 @@ jobs:
             toolchain: stable
             components: cargo
             image: ubuntu:groovy
-          - task: make -f Makefile build-no-default
-            toolchain: stable
-            components: cargo
-            image: ubuntu:groovy
           - task: make -f Makefile build-extras
             toolchain: stable
             components: cargo
@@ -75,10 +71,6 @@ jobs:
             components: cargo
             image: fedora:32
           - task: make -f Makefile build-min
-            toolchain: stable
-            components: cargo
-            image: fedora:32
-          - task: make -f Makefile build-no-default
             toolchain: stable
             components: cargo
             image: fedora:32

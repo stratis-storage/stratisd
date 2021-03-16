@@ -43,26 +43,6 @@ where
     }
 }
 
-impl<U, T> Extend<(Name, U, T)> for Table<U, T>
-where
-    U: AsUuid,
-{
-    fn extend<I>(&mut self, iter: I)
-    where
-        I: IntoIterator<Item = (Name, U, T)>,
-    {
-        for ((ntu_n, ntu_u), (i_u, i_t)) in iter
-            .into_iter()
-            .map(|(n, u, t)| ((n.clone(), u), (u, (n, t))))
-        {
-            if !self.contains_uuid(i_u) {
-                self.name_to_uuid.insert(ntu_n, ntu_u);
-                self.items.insert(i_u, i_t);
-            }
-        }
-    }
-}
-
 pub struct Iter<'a, U: 'a, T: 'a> {
     items: hash_map::Iter<'a, U, (Name, T)>,
 }

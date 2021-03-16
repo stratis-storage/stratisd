@@ -17,7 +17,7 @@ use crate::{
 };
 
 pub fn create_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
-    create_pool_shared(m, true)
+    create_pool_shared(m, Some(false))
 }
 
 pub fn set_key(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {

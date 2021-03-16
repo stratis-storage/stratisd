@@ -417,11 +417,11 @@ pub fn initialize_devices(
         physical_path: &Path,
         pool_uuid: PoolUuid,
         dev_uuid: DevUuid,
-        key_description: &KeyDescription,
+        key_description: Option<&KeyDescription>,
         enable_clevis: Option<(&str, &Value)>,
     ) -> StratisResult<(CryptHandle, Device, Sectors)> {
         let mut handle = CryptInitializer::new(physical_path.to_owned(), pool_uuid, dev_uuid)
-            .initialize(Some(key_description), enable_clevis)?;
+            .initialize(key_description, enable_clevis)?;
 
         let device_size = match handle.logical_device_size() {
             Ok(size) => size,
@@ -538,7 +538,7 @@ pub fn initialize_devices(
                 &dev_info.devnode,
                 pool_uuid,
                 dev_uuid,
-                encryption_info.key_description.as_ref().unwrap(),
+                encryption_info.key_description.as_ref(),
                 encryption_info
                     .clevis_info
                     .as_ref()

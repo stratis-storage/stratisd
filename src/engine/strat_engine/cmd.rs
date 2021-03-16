@@ -304,7 +304,7 @@ pub fn clevis_luks_bind(
         .arg(dev_path.display().to_string())
         .arg("-k")
         .arg(keyfile_path)
-        .arg("-s")
+        .arg("-t")
         .arg(slot.to_string())
         .arg(pin)
         .arg(json.to_string());

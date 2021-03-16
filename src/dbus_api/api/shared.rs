@@ -31,7 +31,7 @@ use crate::{
 /// the interface.
 pub fn create_pool_shared(
     m: &MethodInfo<MTSync<TData>, TData>,
-    has_key_desc: bool,
+    has_additional_params: Option<bool>,
 ) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
@@ -39,10 +39,16 @@ pub fn create_pool_shared(
     let name: &str = get_next_arg(&mut iter, 0)?;
     let redundancy_tuple: (bool, u16) = get_next_arg(&mut iter, 1)?;
     let devs: Array<&str, _> = get_next_arg(&mut iter, 2)?;
-    let key_desc_tuple: Option<(bool, String)> = if has_key_desc {
-        Some(get_next_arg(&mut iter, 3)?)
+    let (key_desc_tuple, clevis_tuple) = if has_additional_params.is_some() {
+        let key_desc: Option<(bool, String)> = Some(get_next_arg(&mut iter, 3)?);
+        if has_additional_params.unwrap_or(false) {
+            let clevis: Option<(bool, (String, String))> = Some(get_next_arg(&mut iter, 4)?);
+            (key_desc, clevis)
+        } else {
+            (key_desc, None)
+        }
     } else {
-        None
+        (None, None)
     };
 
     let return_message = message.method_return();
@@ -61,6 +67,17 @@ pub fn create_pool_shared(
         None => None,
     };
 
+    let clevis_info = match clevis_tuple.and_then(tuple_to_option) {
+        Some((pin, json_string)) => match serde_json::from_str(json_string.as_str()) {
+            Ok(j) => Some((pin, j)),
+            Err(e) => {
+                let (rc, rs) = engine_to_dbus_err_tuple(&StratisError::Serde(e));
+                return Ok(vec![return_message.append3(default_return, rc, rs)]);
+            }
+        },
+        None => None,
+    };
+
     let object_path = m.path.get_name();
     let dbus_context = m.tree.get_data();
     let mut mutex_lock = mutex_lock!(dbus_context.engine);
@@ -70,7 +87,7 @@ pub fn create_pool_shared(
         tuple_to_option(redundancy_tuple),
         &EncryptionInfo {
             key_description: key_desc,
-            clevis_info: None,
+            clevis_info,
         }
     ));
 

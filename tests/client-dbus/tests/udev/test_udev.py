@@ -286,7 +286,7 @@ class UdevTest3(UdevTest):
     daemon, brings it up again, and allows it to discover the existing pool.
     """
 
-    def _simple_initial_discovery_test(  # pylint: disable=bad-continuation
+    def _simple_initial_discovery_test(
         self, *, key_spec=None, take_down_dm=False
     ):  # pylint: disable=too-many-locals
         """

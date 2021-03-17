@@ -15,7 +15,7 @@ ARG_MAP = {
         "--disable=I",
         "--msg-template='{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}'",
     ],
-    "stratis_id": [
+    "stratis_id.py": [
         "--reports=no",
         "--disable=I",
         "--msg-template='{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}'",

@@ -638,7 +638,7 @@ impl Recordable<Vec<BaseBlockDevSave>> for BlockDevMgr {
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
+    use std::{error::Error, path::PathBuf};
 
     use crate::engine::strat_engine::{
         cmd,
@@ -917,9 +917,8 @@ mod tests {
                         json!({"url": "localhost", "stratis:tang:trust_url": true}),
                     )),
                 },
-            )
-            .unwrap();
-            cmd::udev_settle().unwrap();
+            )?;
+            cmd::udev_settle()?;
 
             if !matches!(
                 mgr.bind_clevis(
@@ -1006,6 +1005,72 @@ mod tests {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Range(2, 4, None),
             test_clevis_both_initialize,
+        );
+    }
+
+    fn test_clevis_both_rollback(paths: &[&Path]) {
+        fn test_both(
+            paths: &[&Path],
+            key_desc: &KeyDescription,
+            _: (),
+        ) -> Result<(), Box<dyn Error>> {
+            let mut paths_vec = paths.to_vec();
+            let invalid_path = PathBuf::from("/i/am/not/a/path");
+            paths_vec.push(invalid_path.as_path());
+            let _memfs = MemoryFilesystem::new().unwrap();
+            let res = BlockDevMgr::initialize(
+                PoolUuid::new_v4(),
+                paths_vec.as_slice(),
+                MDADataSize::default(),
+                &EncryptionInfo {
+                    key_description: Some(key_desc.clone()),
+                    clevis_info: Some((
+                        "tang".to_string(),
+                        json!({"url": "localhost", "stratis:tang:trust_url": true}),
+                    )),
+                },
+            );
+
+            if matches!(res, Ok(_)) {
+                return Err(Box::new(StratisError::Error(
+                    "Initialization should fail".to_string(),
+                )));
+            }
+
+            // Ensure that rollback completed successfully by trying a call that
+            // should succeed.
+            BlockDevMgr::initialize(
+                PoolUuid::new_v4(),
+                paths,
+                MDADataSize::default(),
+                &EncryptionInfo {
+                    key_description: Some(key_desc.clone()),
+                    clevis_info: Some((
+                        "tang".to_string(),
+                        json!({"url": "localhost", "stratis:tang:trust_url": true}),
+                    )),
+                },
+            )?;
+
+            Ok(())
+        }
+
+        crypt::insert_and_cleanup_key(paths, test_both);
+    }
+
+    #[test]
+    fn clevis_real_test_both_rollback() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(2, None, None),
+            test_clevis_both_rollback,
+        );
+    }
+
+    #[test]
+    fn clevis_loop_test_both_rollback() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 4, None),
+            test_clevis_both_rollback,
         );
     }
 }

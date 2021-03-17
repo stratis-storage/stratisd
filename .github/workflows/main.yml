@@ -220,6 +220,8 @@ jobs:
           DEBIAN_FRONTEND=noninteractive
           apt-get install -y
           clang
+          clevis
+          clevis-luks
           curl
           libblkid-dev
           libcryptsetup-dev
@@ -239,6 +241,8 @@ jobs:
           dnf install -y
           clang
           cryptsetup-devel
+          clevis
+          clevis-luks
           curl
           device-mapper-persistent-data
           dbus-devel

@@ -1528,7 +1528,10 @@ mod tests {
     };
 
     use crate::{
-        engine::strat_engine::tests::{crypt, loopbacked, real},
+        engine::strat_engine::{
+            keys::MemoryFilesystem,
+            tests::{crypt, loopbacked, real},
+        },
         stratis::StratisError,
     };
 
@@ -1580,7 +1583,7 @@ mod tests {
         fn crypt_test(
             paths: &[&Path],
             key_desc: &KeyDescription,
-            _: Option<()>,
+            _: (),
         ) -> std::result::Result<(), Box<dyn Error>> {
             let mut handles = vec![];
 
@@ -1664,7 +1667,7 @@ mod tests {
         fn crypt_test(
             paths: &[&Path],
             key_desc: &KeyDescription,
-            _: Option<()>,
+            _: (),
         ) -> std::result::Result<(), Box<dyn Error>> {
             let path = paths.get(0).ok_or_else(|| {
                 Box::new(StratisError::Error(
@@ -1794,6 +1797,86 @@ mod tests {
         real::test_with_spec(
             &real::DeviceLimits::Exactly(1, None, Some(Sectors(1024 * 1024 * 1024 / 512))),
             test_crypt_device_ops,
+        );
+    }
+
+    fn test_both_initialize(paths: &[&Path]) {
+        fn both_initialize(
+            paths: &[&Path],
+            key_desc: &KeyDescription,
+            _: (),
+        ) -> Result<(), Box<dyn Error>> {
+            let _memfs = MemoryFilesystem::new()?;
+            let path = paths
+                .get(0)
+                .copied()
+                .ok_or_else(|| StratisError::Error("Expected exactly one path".to_string()))?;
+            let handle =
+                CryptInitializer::new(path.to_owned(), PoolUuid::new_v4(), DevUuid::new_v4())
+                    .initialize(
+                        Some(key_desc),
+                        Some((
+                            "tang",
+                            &json!({"url": "localhost", "stratis:tang:trust_url": true}),
+                        )),
+                    )?;
+
+            let mut device = acquire_crypt_device(handle.luks2_device_path())?;
+            device.token_handle().json_get(LUKS2_TOKEN_ID)?;
+            device.token_handle().json_get(CLEVIS_LUKS_TOKEN_ID)?;
+            Ok(())
+        }
+
+        crypt::insert_and_cleanup_key(paths, both_initialize);
+    }
+
+    #[test]
+    fn clevis_real_test_both_initialize() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(1, None, Some(Sectors(1024 * 1024 * 1024 / 512))),
+            test_both_initialize,
+        );
+    }
+
+    #[test]
+    fn clevis_loop_test_both_initialize() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(1, None),
+            test_both_initialize,
+        );
+    }
+
+    fn test_clevis_initialize(paths: &[&Path]) {
+        let _memfs = MemoryFilesystem::new().unwrap();
+        let path = paths[0];
+        let handle = CryptInitializer::new(path.to_owned(), PoolUuid::new_v4(), DevUuid::new_v4())
+            .initialize(
+                None,
+                Some((
+                    "tang",
+                    &json!({"url": "localhost", "stratis:tang:trust_url": true}),
+                )),
+            )
+            .unwrap();
+
+        let mut device = acquire_crypt_device(handle.luks2_device_path()).unwrap();
+        assert!(device.token_handle().json_get(CLEVIS_LUKS_TOKEN_ID).is_ok());
+        assert!(device.token_handle().json_get(LUKS2_TOKEN_ID).is_err());
+    }
+
+    #[test]
+    fn clevis_real_test_initialize() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(1, None, Some(Sectors(1024 * 1024 * 1024 / 512))),
+            test_clevis_initialize,
+        );
+    }
+
+    #[test]
+    fn clevis_loop_test_initialize() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(1, None),
+            test_clevis_initialize,
         );
     }
 }

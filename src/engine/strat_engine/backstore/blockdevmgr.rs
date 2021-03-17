@@ -450,9 +450,18 @@ impl BlockDevMgr {
         };
 
         let mut parsed_config = clevis_info.clone();
-        let _ = interpret_clevis_config(pin, &mut parsed_config)?;
+        let yes = interpret_clevis_config(pin, &mut parsed_config)?;
 
         if let Some((ref existing_pin, ref existing_info)) = encryption_info.clevis_info {
+            // Ignore thumbprint if stratis:tang:trust_url is set in the clevis_info
+            // config.
+            let mut config_to_check = existing_info.clone();
+            if yes {
+                if let Value::Object(ref mut o) = config_to_check {
+                    o.remove("thp");
+                }
+            }
+
             if (existing_pin.as_str(), existing_info) == (pin, &parsed_config)
                 && self.can_unlock(false, true)
             {
@@ -633,6 +642,7 @@ mod tests {
 
     use crate::engine::strat_engine::{
         cmd,
+        keys::MemoryFilesystem,
         names::KeyDescription,
         tests::{crypt, loopbacked, real},
     };
@@ -683,7 +693,7 @@ mod tests {
         fn test_with_key(
             paths: &[&Path],
             key_desc: &KeyDescription,
-            _: Option<()>,
+            _: (),
         ) -> Result<(), Box<dyn Error>> {
             let pool_uuid = PoolUuid::new_v4();
             let mut bdm = BlockDevMgr::initialize(
@@ -732,7 +742,7 @@ mod tests {
         fn test_with_first_key(
             paths: &[&Path],
             key_desc: &KeyDescription,
-            _: Option<()>,
+            _: (),
         ) -> Result<(PoolUuid, BlockDevMgr), Box<dyn Error>> {
             let pool_uuid = PoolUuid::new_v4();
             let bdm = BlockDevMgr::initialize(
@@ -844,6 +854,158 @@ mod tests {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(2, None, None),
             test_initialization_add_stratis,
+        );
+    }
+
+    fn test_clevis_initialize(paths: &[&Path]) {
+        let _memfs = MemoryFilesystem::new().unwrap();
+        let mut mgr = BlockDevMgr::initialize(
+            PoolUuid::new_v4(),
+            paths,
+            MDADataSize::default(),
+            &EncryptionInfo {
+                key_description: None,
+                clevis_info: Some((
+                    "tang".to_string(),
+                    json!({"url": "localhost", "stratis:tang:trust_url": true}),
+                )),
+            },
+        )
+        .unwrap();
+        cmd::udev_settle().unwrap();
+
+        matches!(
+            mgr.bind_clevis(
+                "tang",
+                &json!({"url": "localhost", "stratis:tang:trust_url": true})
+            ),
+            Ok(false)
+        );
+    }
+
+    #[test]
+    fn clevis_real_test_initialize() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(2, None, None),
+            test_clevis_initialize,
+        );
+    }
+
+    #[test]
+    fn clevis_loop_test_initialize() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 4, None),
+            test_clevis_initialize,
+        );
+    }
+
+    fn test_clevis_both_initialize(paths: &[&Path]) {
+        fn test_both(
+            paths: &[&Path],
+            key_desc: &KeyDescription,
+            _: (),
+        ) -> Result<(), Box<dyn Error>> {
+            let _memfs = MemoryFilesystem::new().unwrap();
+            let mut mgr = BlockDevMgr::initialize(
+                PoolUuid::new_v4(),
+                paths,
+                MDADataSize::default(),
+                &EncryptionInfo {
+                    key_description: Some(key_desc.clone()),
+                    clevis_info: Some((
+                        "tang".to_string(),
+                        json!({"url": "localhost", "stratis:tang:trust_url": true}),
+                    )),
+                },
+            )
+            .unwrap();
+            cmd::udev_settle().unwrap();
+
+            if !matches!(
+                mgr.bind_clevis(
+                    "tang",
+                    &json!({"url": "localhost", "stratis:tang:trust_url": true})
+                ),
+                Ok(false)
+            ) {
+                return Err(Box::new(StratisError::Error(
+                    "Clevis bind idemptotence test failed".to_string(),
+                )));
+            }
+            if !matches!(mgr.bind_keyring(key_desc), Ok(false)) {
+                return Err(Box::new(StratisError::Error(
+                    "Keyring bind idemptotence test failed".to_string(),
+                )));
+            }
+
+            if !matches!(mgr.unbind_clevis(), Ok(true)) {
+                return Err(Box::new(StratisError::Error(
+                    "Clevis unbind test failed".to_string(),
+                )));
+            }
+            if !matches!(mgr.unbind_clevis(), Ok(false)) {
+                return Err(Box::new(StratisError::Error(
+                    "Clevis unbind idempotence test failed".to_string(),
+                )));
+            }
+            if mgr.unbind_keyring().is_ok() {
+                return Err(Box::new(StratisError::Error(
+                    "Keyring unbind check test failed".to_string(),
+                )));
+            }
+
+            if !matches!(
+                mgr.bind_clevis(
+                    "tang",
+                    &json!({"url": "localhost", "stratis:tang:trust_url": true})
+                ),
+                Ok(true)
+            ) {
+                return Err(Box::new(StratisError::Error(
+                    "Clevis bind test failed".to_string(),
+                )));
+            }
+            if !matches!(mgr.unbind_keyring(), Ok(true)) {
+                return Err(Box::new(StratisError::Error(
+                    "Keyring unbind test failed".to_string(),
+                )));
+            }
+            if !matches!(mgr.unbind_keyring(), Ok(false)) {
+                return Err(Box::new(StratisError::Error(
+                    "Keyring unbind idempotence test failed".to_string(),
+                )));
+            }
+            if mgr.unbind_clevis().is_ok() {
+                return Err(Box::new(StratisError::Error(
+                    "Clevis unbind check test failed".to_string(),
+                )));
+            }
+
+            if !matches!(mgr.bind_keyring(key_desc), Ok(true)) {
+                return Err(Box::new(StratisError::Error(
+                    "Keyring bind test failed".to_string(),
+                )));
+            }
+
+            Ok(())
+        }
+
+        crypt::insert_and_cleanup_key(paths, test_both);
+    }
+
+    #[test]
+    fn clevis_real_test_both_initialize() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(2, None, None),
+            test_clevis_both_initialize,
+        );
+    }
+
+    #[test]
+    fn clevis_loop_test_both_initialize() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 4, None),
+            test_clevis_both_initialize,
         );
     }
 }

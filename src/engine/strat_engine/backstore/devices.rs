@@ -829,7 +829,7 @@ mod tests {
         fn call_crypt_test(
             paths: &[&Path],
             key_description: &KeyDescription,
-            _: Option<()>,
+            _: (),
         ) -> Result<(), Box<dyn Error>> {
             test_ownership(paths, Some(key_description))
         }
@@ -993,7 +993,7 @@ mod tests {
         fn failure_cleanup_crypt(
             paths: &[&Path],
             key_desc: &KeyDescription,
-            _: Option<()>,
+            _: (),
         ) -> Result<(), Box<dyn Error>> {
             test_failure_cleanup(paths, Some(key_desc))
         }

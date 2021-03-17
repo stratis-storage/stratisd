@@ -232,7 +232,7 @@ jobs:
           xfsprogs
         if: matrix.image == 'ubuntu:groovy'
       - name: Start tangd on Ubuntu 
-        run: /usr/lib/x86_64-linux-gnu/tangd /var/cache/tang &
+        run: /usr/libexec/tangd /var/cache/tang &
         if: matrix.image == 'ubuntu:groovy'
       - name: Install dependencies for Fedora
         run: >

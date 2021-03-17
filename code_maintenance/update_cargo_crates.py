@@ -136,7 +136,6 @@ def _build_cargo_tree_dict():
 
         line_str = line.decode("utf-8").strip()
         if (
-            # pylint: disable=bad-continuation
             line_str.find("build-dependencies") != -1
             or line_str.find("dev-dependencies") != -1
         ):

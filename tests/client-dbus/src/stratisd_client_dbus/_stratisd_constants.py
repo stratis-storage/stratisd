@@ -50,5 +50,8 @@ class EncryptionMethod(Enum):
     KEYRING = "keyring"
     CLEVIS = "clevis"
 
+    # False positive on a string enum
+    # Bug: https://github.com/PyCQA/pylint/issues/3649
+    # pylint: disable=invalid-str-returned
     def __str__(self):
         return self.value

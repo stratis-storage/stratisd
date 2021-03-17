@@ -55,10 +55,8 @@ def main():
         draft=True,
     )
 
-    tag_name = release.tag_name
-    release.upload_asset(
-        "stratisd-vendor.tar.gz", "stratisd-vendor-%s.tar.gz" % tag_name
-    )
+    label = "stratisd-%s-vendor.tar.gz" % release_version
+    release.upload_asset(label, label)
 
 
 if __name__ == "__main__":

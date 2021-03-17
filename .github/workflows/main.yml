@@ -251,7 +251,7 @@ jobs:
               PyGithub==1.45
             task: >
               (cd code_maintenance; make -f Makefile lint) &&
-              (cd developer_tools; make -f Makefile lint) &&
+              (cd developer_tools; PYTHONPATH=.:./stratis_id make -f Makefile lint) &&
               (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
           - python-version: 3.8.6
             dependencies: black==20.8b1 isort==4.3.21
@@ -268,7 +268,7 @@ jobs:
               psutil==5.4.3
               pyudev==0.21.0
             task: >
-              (cd developer_tools; make -f Makefile lint) &&
+              (cd developer_tools; PYTHONPATH=.:./stratis_id make -f Makefile lint) &&
               (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
     runs-on: ubuntu-18.04
     steps:

@@ -268,7 +268,7 @@ jobs:
               psutil==5.4.3
               pyudev==0.21.0
             task: >
-              (cd developer_tools; make -f Makefile lint) &&
+              (cd developer_tools; PYTHONPATH=.. make -f Makefile lint) &&
               (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
     runs-on: ubuntu-18.04
     steps:

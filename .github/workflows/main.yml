@@ -218,6 +218,7 @@ jobs:
           clang
           clevis
           clevis-luks
+          clevis-tpm2
           curl
           libblkid-dev
           libcryptsetup-dev
@@ -239,7 +240,6 @@ jobs:
           cryptsetup-devel
           clevis
           clevis-luks
-          clevis-tpm2
           curl
           device-mapper-persistent-data
           dbus-devel

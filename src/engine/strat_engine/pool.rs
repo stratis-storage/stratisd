@@ -229,6 +229,15 @@ impl StratPool {
         Ok((Name::new(pool_name.to_owned()), pool))
     }
 
+    /// Send a synthetic udev change event to every filesystem on the given pool.
+    pub fn udev_pool_change(&self, pool_name: &str) -> StratisResult<()> {
+        for (name, uuid, fs) in self.thin_pool.filesystems() {
+            fs.udev_fs_change(pool_name, uuid, &name)?;
+        }
+
+        Ok(())
+    }
+
     /// Write current metadata to pool members.
     pub fn write_metadata(&mut self, name: &str) -> StratisResult<()> {
         let data = serde_json::to_string(&self.record(name))?;
@@ -393,6 +402,7 @@ impl Pool for StratPool {
 
     fn create_filesystems<'a, 'b>(
         &'a mut self,
+        pool_name: &str,
         pool_uuid: PoolUuid,
         specs: &[(&'b str, Option<Sectors>)],
     ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid)>> {
@@ -406,7 +416,9 @@ impl Pool for StratPool {
         let mut result = Vec::new();
         for (name, size) in names {
             if self.thin_pool.get_mut_filesystem_by_name(name).is_none() {
-                let fs_uuid = self.thin_pool.create_filesystem(pool_uuid, name, size)?;
+                let fs_uuid = self
+                    .thin_pool
+                    .create_filesystem(pool_name, pool_uuid, name, size)?;
                 result.push((name, fs_uuid));
             }
         }
@@ -505,6 +517,7 @@ impl Pool for StratPool {
 
     fn snapshot_filesystem(
         &mut self,
+        pool_name: &str,
         pool_uuid: PoolUuid,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
@@ -520,7 +533,7 @@ impl Pool for StratPool {
         }
 
         self.thin_pool
-            .snapshot_filesystem(pool_uuid, origin_uuid, snapshot_name)
+            .snapshot_filesystem(pool_name, pool_uuid, origin_uuid, snapshot_name)
             .map(CreateAction::Created)
     }
 
@@ -541,11 +554,19 @@ impl Pool for StratPool {
     }
 
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)> {
-        self.thin_pool.filesystems()
+        self.thin_pool
+            .filesystems()
+            .into_iter()
+            .map(|(n, u, f)| (n, u, f as &dyn Filesystem))
+            .collect()
     }
 
     fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut dyn Filesystem)> {
-        self.thin_pool.filesystems_mut()
+        self.thin_pool
+            .filesystems_mut()
+            .into_iter()
+            .map(|(n, u, f)| (n, u, f as &mut dyn Filesystem))
+            .collect()
     }
 
     fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &dyn Filesystem)> {
@@ -680,7 +701,7 @@ mod tests {
         assert_matches!(metadata1.backstore.cache_tier, None);
 
         let (_, fs_uuid) = pool
-            .create_filesystems(uuid, &[("stratis-filesystem", None)])
+            .create_filesystems(name, uuid, &[("stratis-filesystem", None)])
             .unwrap()
             .changed()
             .and_then(|mut fs| fs.pop())
@@ -762,7 +783,7 @@ mod tests {
 
         let fs_name = "stratis_test_filesystem";
         let (_, fs_uuid) = pool
-            .create_filesystems(pool_uuid, &[(fs_name, None)])
+            .create_filesystems(name, pool_uuid, &[(fs_name, None)])
             .unwrap()
             .changed()
             .and_then(|mut fs| fs.pop())

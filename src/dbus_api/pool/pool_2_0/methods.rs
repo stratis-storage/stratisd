@@ -51,6 +51,7 @@ pub fn create_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult 
     let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
     let result = log_action!(pool.create_filesystems(
+        &pool_name,
         pool_uuid,
         &filesystems
             .map(|x| (x, None))
@@ -70,13 +71,14 @@ pub fn create_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult 
             let v = newly_created_filesystems
                 .iter()
                 .map(|&(name, uuid)| {
-                    let filesystem = pool.get_filesystem(uuid)
+                    let filesystem = pool
+                        .get_filesystem(uuid)
                         .expect("just inserted by create_filesystems")
                         .1;
                     // FIXME: To avoid this expect, modify create_filesystem
                     // so that it returns a mutable reference to the
                     // filesystem created.
-                    let info = (
+                    (
                         create_dbus_filesystem(
                             dbus_context,
                             object_path.clone(),
@@ -86,11 +88,7 @@ pub fn create_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult 
                             filesystem,
                         ),
                         name,
-                    );
-                    if let Err(e) = filesystem.send_udev_change() {
-                        warn!("Failed to send a synthetic udev event after filesystem creation for udev rule: {}", e);
-                    }
-                    info
+                    )
                 })
                 .collect::<Vec<_>>();
             (true, v)
@@ -214,7 +212,12 @@ pub fn snapshot_filesystem(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
     let mut mutex_lock = mutex_lock!(dbus_context.engine);
     let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
-    let msg = match log_action!(pool.snapshot_filesystem(pool_uuid, fs_uuid, snapshot_name)) {
+    let msg = match log_action!(pool.snapshot_filesystem(
+        &pool_name,
+        pool_uuid,
+        fs_uuid,
+        snapshot_name
+    )) {
         Ok(CreateAction::Created((uuid, fs))) => {
             let fs_object_path: dbus::Path = create_dbus_filesystem(
                 dbus_context,

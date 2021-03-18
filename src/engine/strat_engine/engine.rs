@@ -14,7 +14,6 @@ use crate::{
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         strat_engine::{
             cmd::verify_binaries,
-            devlinks,
             dm::get_dm,
             keys::{MemoryFilesystem, StratKeyActions},
             liminal::{find_all, LiminalDevices},
@@ -248,12 +247,10 @@ impl Engine for StratEngine {
             self.pools.insert(old_name, uuid, pool);
             Err(err)
         } else {
-            let has_filesystems = pool.has_filesystems();
-            self.pools.insert(new_name.clone(), uuid, pool);
-            if has_filesystems {
-                if let Err(e) = devlinks::pool_renamed(&old_name) {
-                    warn!("Pool rename symlink action failed: {}", e)
-                };
+            self.pools.insert(new_name, uuid, pool);
+            let (new_name, pool) = self.pools.get_by_uuid(uuid).expect("Inserted above");
+            if let Err(e) = pool.udev_pool_change(&new_name) {
+                warn!("Pool rename symlink action failed: {}", e)
             }
             Ok(RenameAction::Renamed(uuid))
         }

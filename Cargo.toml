@@ -15,10 +15,6 @@ name = "stratis_dumpmetadata"
 required-features = ["extras"]
 
 [[bin]]
-name = "stratis_uuids_to_names"
-required-features = ["dbus_enabled"]
-
-[[bin]]
 name = "stratis_dbusquery_version"
 required-features = ["dbus_enabled"]
 

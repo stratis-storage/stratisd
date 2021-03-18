@@ -186,10 +186,9 @@ stratis-min:
 profiledir := $(shell if test -d target/release; then echo target/release; else echo target/debug; fi)
 install: release docs
 	install -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) $(profiledir)/stratisd
-	install -Dpm0755 -t $(DESTDIR)$(UDEVDIR) $(profiledir)/stratis_uuids_to_names
 	install -Dpm0644 -t $(DESTDIR)$(DATADIR)/dbus-1/system.d stratisd.conf
 	install -Dpm0644 -t $(DESTDIR)$(MANDIR)/man8 docs/stratisd.8
-	install -Dpm0644 -t $(DESTDIR)$(UDEVDIR)/rules.d udev/11-stratisd.rules
+	install -Dpm0644 -t $(DESTDIR)$(UDEVDIR)/rules.d udev/14-stratisd.rules
 	install -Dpm0644 -t $(DESTDIR)$(UNITDIR) stratisd.service
 	install -Dpm0755 -t $(DESTDIR)$(PREFIX)/bin developer_tools/stratis_migrate_symlinks.sh
 

@@ -239,6 +239,7 @@ jobs:
           cryptsetup-devel
           clevis
           clevis-luks
+          clevis-tpm2
           curl
           device-mapper-persistent-data
           dbus-devel

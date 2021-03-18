@@ -46,7 +46,6 @@ def main():
     git = Github(api_key)
 
     repo = git.get_repo("stratis-storage/stratisd")
-    branch_name = repo.default_branch
 
     release = repo.create_git_release(
         "v%s" % release_version,

@@ -1,0 +1,1 @@
+ACTION=="change", ENV{DM_NAME}=="stratis-1-[0-9a-f]*-thin-fs-[0-9a-f]*", ENV{SYNTH_UUID}=="[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a-f]*-[0-9a=f]*", ENV{SYNTH_ARG_POOLNAME}!="", ENV{SYNTH_ARG_FSNAME}!="", SYMLINK+="stratis/$env{SYNTH_ARG_POOLNAME}/$env{SYNTH_ARG_FSNAME}"

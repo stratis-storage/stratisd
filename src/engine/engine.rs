@@ -69,7 +69,12 @@ pub trait Report {
 pub trait Filesystem: Debug {
     /// Send a synthetic udev change event to the devicemapper device representing
     /// the filesystem.
-    fn send_udev_change(&self) -> StratisResult<()>;
+    fn send_udev_change(
+        &self,
+        pool_name: &str,
+        fs_uuid: FilesystemUuid,
+        fs_name: &str,
+    ) -> StratisResult<()>;
 
     /// path of the device node
     fn devnode(&self) -> PathBuf;

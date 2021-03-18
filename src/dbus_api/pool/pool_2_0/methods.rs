@@ -87,7 +87,7 @@ pub fn create_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult 
                         ),
                         name,
                     );
-                    if let Err(e) = filesystem.send_udev_change() {
+                    if let Err(e) = filesystem.send_udev_change(&pool_name, uuid, name) {
                         warn!("Failed to send a synthetic udev event after filesystem creation for udev rule: {}", e);
                     }
                     info

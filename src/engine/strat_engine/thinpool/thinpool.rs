@@ -25,7 +25,6 @@ use crate::{
         strat_engine::{
             backstore::Backstore,
             cmd::{thin_check, thin_repair, udev_settle},
-            devlinks,
             dm::get_dm,
             names::{
                 format_flex_ids, format_thin_ids, format_thinpool_ids, FlexRole, ThinPoolRole,
@@ -960,9 +959,13 @@ impl ThinPool {
             Err(err)
         } else {
             self.filesystems.insert(new_name.clone(), uuid, filesystem);
-            if let Err(e) = devlinks::filesystem_renamed(pool_name, &old_name) {
+            let (_, fs) = self
+                .filesystems
+                .get_by_name(&new_name)
+                .expect("Inserted above");
+            if let Err(e) = fs.send_udev_change(pool_name, uuid, &new_name) {
                 warn!("Filesystem rename symlink action failed: {}", e);
-            };
+            }
             Ok(Some(uuid))
         }
     }

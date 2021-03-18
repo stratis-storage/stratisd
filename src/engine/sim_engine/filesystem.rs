@@ -8,7 +8,10 @@ use std::path::PathBuf;
 
 use devicemapper::Bytes;
 
-use crate::{engine::Filesystem, stratis::StratisResult};
+use crate::{
+    engine::{types::FilesystemUuid, Filesystem},
+    stratis::StratisResult,
+};
 
 #[derive(Debug)]
 pub struct SimFilesystem {
@@ -26,7 +29,7 @@ impl SimFilesystem {
 }
 
 impl Filesystem for SimFilesystem {
-    fn send_udev_change(&self) -> StratisResult<()> {
+    fn send_udev_change(&self, _: &str, _: FilesystemUuid, _: &str) -> StratisResult<()> {
         Ok(())
     }
 

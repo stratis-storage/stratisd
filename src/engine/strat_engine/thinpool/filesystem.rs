@@ -291,7 +291,12 @@ impl StratFilesystem {
 }
 
 impl Filesystem for StratFilesystem {
-    fn send_udev_change(&self) -> StratisResult<()> {
+    fn send_udev_change(
+        &self,
+        pool_name: &str,
+        fs_uuid: FilesystemUuid,
+        fs_name: &str,
+    ) -> StratisResult<()> {
         let device = self.thin_dev.device();
         let uevent_file = [
             "/sys/dev/block",
@@ -303,7 +308,16 @@ impl Filesystem for StratFilesystem {
         OpenOptions::new()
             .write(true)
             .open(&uevent_file)?
-            .write_all("change".as_bytes())?;
+            .write_all(
+                format!(
+                    "{} {} POOLNAME={} FSNAME={}",
+                    devlinks::UEVENT_CHANGE_EVENT,
+                    fs_uuid,
+                    pool_name,
+                    fs_name,
+                )
+                .as_bytes(),
+            )?;
         Ok(())
     }
 

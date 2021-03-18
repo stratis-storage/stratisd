@@ -310,7 +310,7 @@ impl Filesystem for StratFilesystem {
             .open(&uevent_file)?
             .write_all(
                 format!(
-                    "{} {} POOLNAME={} FSNAME={}",
+                    "{} {} STRATISPOOLNAME={} STRATISFSNAME={}",
                     devlinks::UEVENT_CHANGE_EVENT,
                     fs_uuid,
                     pool_name,

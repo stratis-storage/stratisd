@@ -171,6 +171,14 @@ build-extras:
 	RUSTFLAGS="${DENY}" \
 	cargo build --features extras ${TARGET_ARGS}
 
+build-minimal-dependencies:
+	cargo build -Z minimal-versions
+
+test-minimal-dependencies:
+	cargo update -Z minimal-versions
+	cargo update -p pkg-config --precise 0.3.19
+	cargo test --no-run
+
 stratis-dumpmetadata:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \

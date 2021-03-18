@@ -86,6 +86,23 @@ jobs:
             toolchain: stable
             components: cargo
             image: fedora:32
+          # MANDATORY TESTING ON NIGHTLY
+          - task: make -f Makefile build-minimal-dependencies
+            toolchain: nightly
+            components: cargo
+            image: ubuntu:groovy
+          - task: make -f Makefile test-minimal-dependencies
+            toolchain: nightly
+            components: cargo
+            image: ubuntu:groovy
+          - task: make -f Makefile build-minimal-dependencies
+            toolchain: nightly
+            components: cargo
+            image: fedora:32
+          - task: make -f Makefile test-minimal-dependencies
+            toolchain: nightly
+            components: cargo
+            image: fedora:32
     runs-on: ubuntu-18.04
     container:
       image: ${{ matrix.image }}

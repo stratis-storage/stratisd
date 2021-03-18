@@ -220,6 +220,7 @@ jobs:
           clevis-luks
           clevis-tpm2
           curl
+          jq
           libblkid-dev
           libcryptsetup-dev
           libdbus-1-dev

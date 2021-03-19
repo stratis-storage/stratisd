@@ -24,7 +24,7 @@ required-features = ["extras"]
 
 [dependencies]
 clap = "2"
-nix = "0.18"
+nix = "0.20.0"
 devicemapper = "0.29"
 crc = "1"
 byteorder = "1"

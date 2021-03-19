@@ -1528,6 +1528,7 @@ fn identifiers_from_metadata(device: &mut CryptDevice) -> StratisResult<StratisI
 #[cfg(test)]
 mod tests {
     use std::{
+        env,
         error::Error,
         ffi::CString,
         fs::{File, OpenOptions},
@@ -1826,7 +1827,7 @@ mod tests {
                         Some(key_desc),
                         Some((
                             "tang",
-                            &json!({"url": "localhost", "stratis:tang:trust_url": true}),
+                            &json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true}),
                         )),
                     )?;
 
@@ -1863,7 +1864,7 @@ mod tests {
                 None,
                 Some((
                     "tang",
-                    &json!({"url": "localhost", "stratis:tang:trust_url": true}),
+                    &json!({"url": env::var("TANG_URL").unwrap(), "stratis:tang:trust_url": true}),
                 )),
             )
             .unwrap();

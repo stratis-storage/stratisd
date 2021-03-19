@@ -635,7 +635,7 @@ impl Recordable<Vec<BaseBlockDevSave>> for BlockDevMgr {
 
 #[cfg(test)]
 mod tests {
-    use std::{error::Error, path::PathBuf};
+    use std::{env, error::Error, path::PathBuf};
 
     use crate::engine::strat_engine::{
         cmd,
@@ -864,7 +864,7 @@ mod tests {
                 key_description: None,
                 clevis_info: Some((
                     "tang".to_string(),
-                    json!({"url": "localhost", "stratis:tang:trust_url": true}),
+                    json!({"url": env::var("TANG_URL").unwrap(), "stratis:tang:trust_url": true}),
                 )),
             },
         )
@@ -874,7 +874,7 @@ mod tests {
         matches!(
             mgr.bind_clevis(
                 "tang",
-                &json!({"url": "localhost", "stratis:tang:trust_url": true})
+                &json!({"url": env::var("TANG_URL").unwrap(), "stratis:tang:trust_url": true})
             ),
             Ok(false)
         );
@@ -911,7 +911,7 @@ mod tests {
                     key_description: Some(key_desc.clone()),
                     clevis_info: Some((
                         "tang".to_string(),
-                        json!({"url": "localhost", "stratis:tang:trust_url": true}),
+                        json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true}),
                     )),
                 },
             )?;
@@ -920,7 +920,7 @@ mod tests {
             if !matches!(
                 mgr.bind_clevis(
                     "tang",
-                    &json!({"url": "localhost", "stratis:tang:trust_url": true})
+                    &json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true})
                 ),
                 Ok(false)
             ) {
@@ -953,7 +953,7 @@ mod tests {
             if !matches!(
                 mgr.bind_clevis(
                     "tang",
-                    &json!({"url": "localhost", "stratis:tang:trust_url": true})
+                    &json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true})
                 ),
                 Ok(true)
             ) {
@@ -1023,7 +1023,7 @@ mod tests {
                     key_description: Some(key_desc.clone()),
                     clevis_info: Some((
                         "tang".to_string(),
-                        json!({"url": "localhost", "stratis:tang:trust_url": true}),
+                        json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true}),
                     )),
                 },
             );
@@ -1044,7 +1044,7 @@ mod tests {
                     key_description: Some(key_desc.clone()),
                     clevis_info: Some((
                         "tang".to_string(),
-                        json!({"url": "localhost", "stratis:tang:trust_url": true}),
+                        json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true}),
                     )),
                 },
             )?;

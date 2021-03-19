@@ -10,10 +10,9 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::ready;
+use futures::{ready, stream::Stream};
 use nix::fcntl::{fcntl, FcntlArg, OFlag};
 use tokio::{io::unix::AsyncFd, pin, sync::Mutex};
-use tokio_stream::Stream;
 
 use crate::{
     engine::{get_dm, get_dm_init, Engine},

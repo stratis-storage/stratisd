@@ -620,23 +620,32 @@ impl CryptHandle {
     }
 
     /// Bind the given device using clevis.
-    pub fn clevis_bind(
-        &mut self,
-        keyfile_path: &Path,
-        pin: &str,
-        json: &Value,
-    ) -> StratisResult<()> {
+    pub fn clevis_bind(&mut self, pin: &str, json: &Value) -> StratisResult<()> {
         let mut json_owned = json.clone();
         let yes = interpret_clevis_config(pin, &mut json_owned)?;
 
-        clevis_luks_bind(
-            self.luks2_device_path(),
-            keyfile_path,
-            CLEVIS_LUKS_TOKEN_ID,
-            pin,
-            &json_owned,
-            yes,
-        )?;
+        let key_desc = self
+            .encryption_info
+            .key_description
+            .as_ref()
+            .ok_or_else(|| {
+                StratisError::Error(
+                    "Clevis binding requires a registered key description for the device \
+                    but none was found"
+                        .to_string(),
+                )
+            })?;
+        let memfs = MemoryPrivateFilesystem::new()?;
+        memfs.key_op(key_desc, |keyfile_path| {
+            clevis_luks_bind(
+                self.luks2_device_path(),
+                keyfile_path,
+                CLEVIS_LUKS_TOKEN_ID,
+                pin,
+                &json_owned,
+                yes,
+            )
+        })?;
         self.encryption_info.clevis_info = Some((pin.to_string(), json_owned));
         Ok(())
     }

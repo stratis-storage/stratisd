@@ -4,10 +4,13 @@
 
 use std::{
     ffi::CString,
-    fs::{create_dir_all, remove_file, OpenOptions},
+    fs::{create_dir_all, remove_file, set_permissions, OpenOptions, Permissions},
     io::{self, Write},
     mem::size_of,
-    os::unix::io::{AsRawFd, RawFd},
+    os::unix::{
+        fs::PermissionsExt,
+        io::{AsRawFd, RawFd},
+    },
     path::{Path, PathBuf},
     ptr, slice, str,
 };
@@ -20,6 +23,7 @@ use nix::{
         mman::{mmap, munmap, MapFlags, ProtFlags},
         stat::stat,
     },
+    unistd::{chown, gettid, Uid},
 };
 use rand::{distributions::Standard, Rng};
 
@@ -34,6 +38,8 @@ use crate::{
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
+
+const INIT_MNT_NS_PATH: &str = "/proc/1/ns/mnt";
 
 /// A type corresponding to key IDs in the kernel keyring. In `libkeyutils`,
 /// this is represented as the C type `key_serial_t`.
@@ -457,7 +463,6 @@ impl MemoryFilesystem {
             Some("size=1M"),
         )?;
 
-        unshare(CloneFlags::CLONE_NEWNS)?;
         mount::<str, str, str, str>(
             None,
             MemoryFilesystem::TMPFS_LOCATION,
@@ -478,6 +483,13 @@ impl Drop for MemoryFilesystem {
             );
         }
     }
+}
+
+/// Check if the stratisd mount namespace for this thread is in the root namespace.
+fn is_in_root_namespace() -> StratisResult<bool> {
+    let pid_one_stat = stat(INIT_MNT_NS_PATH)?;
+    let self_stat = stat(format!("/proc/self/task/{}/ns/mnt", gettid()).as_str())?;
+    Ok(pid_one_stat.st_ino == self_stat.st_ino)
 }
 
 /// An in-memory filesystem that mounts a tmpfs that can house keyfiles so that they
@@ -528,6 +540,20 @@ impl MemoryPrivateFilesystem {
             .iter()
             .collect();
         create_dir_all(&private_fs_path)?;
+
+        // Only create a new mount namespace if the thread is in the root namespace.
+        if is_in_root_namespace()? {
+            unshare(CloneFlags::CLONE_NEWNS)?;
+        }
+        // Check that the namespace is now different.
+        if is_in_root_namespace()? {
+            return Err(StratisError::Error(
+                "It was detected that the in-memory key files would have ended up \
+                visible on the host system; aborting operation prior to generating \
+                in memory key file"
+                    .to_string(),
+            ));
+        }
 
         // Ensure that the original tmpfs mount point is private. This will work
         // even if someone mounts their own volume at this mount point as the
@@ -604,6 +630,9 @@ impl MemoryMappedKeyfile {
             .write(true)
             .create(true)
             .open(file_path)?;
+        assert!(Uid::current().is_root());
+        chown(file_path, Some(Uid::current()), None)?;
+        set_permissions(file_path, Permissions::from_mode(0o600))?;
         let needed_keyfile_length = key_data.as_ref().len();
         keyfile.set_len(convert_int!(needed_keyfile_length, usize, u64)?)?;
         let mem = unsafe {

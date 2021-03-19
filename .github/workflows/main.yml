@@ -201,10 +201,6 @@ jobs:
           - task: RUST_LOG=libstratis=debug make -f Makefile test-clevis-loop
             toolchain: stable
             components: cargo
-            image: ubuntu:groovy
-          - task: RUST_LOG=libstratis=debug make -f Makefile test-clevis-loop
-            toolchain: stable
-            components: cargo
             image: fedora:32
     runs-on: ubuntu-18.04
     container:
@@ -212,32 +208,6 @@ jobs:
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
-      - name: Install dependencies for Ubuntu
-        run: apt-get -q update
-        if: matrix.image == 'ubuntu:groovy'
-      - name: Install dependencies for Ubuntu
-        run: >
-          DEBIAN_FRONTEND=noninteractive
-          apt-get install -y
-          clang
-          clevis
-          clevis-luks
-          clevis-tpm2
-          curl
-          jq
-          libblkid-dev
-          libcryptsetup-dev
-          libdbus-1-dev
-          libudev-dev
-          make
-          tang
-          thin-provisioning-tools
-          udev
-          xfsprogs
-        if: matrix.image == 'ubuntu:groovy'
-      - name: Start tangd on Ubuntu 
-        run: /usr/libexec/tangd /var/cache/tang &
-        if: matrix.image == 'ubuntu:groovy'
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -254,10 +224,8 @@ jobs:
           systemd-udev
           tang
           xfsprogs
-        if: matrix.image == 'fedora:32'
       - name: Start tangd on Fedora
         run: /usr/libexec/tangd /var/db/tang &
-        if: matrix.image == 'fedora:32'
       - name: Start udev
         run: /usr/lib/systemd/systemd-udevd &
       - uses: actions-rs/toolchain@v1

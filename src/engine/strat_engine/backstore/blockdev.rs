@@ -24,7 +24,6 @@ use crate::{
                 crypt::CryptHandle,
                 range_alloc::{PerDevSegments, RangeAllocator},
             },
-            keys::MemoryPrivateFilesystem,
             metadata::{disown_device, BDAExtendedSize, BlockdevSize, MDADataSize, BDA},
             serde_structs::{BaseBlockDevSave, Recordable},
         },
@@ -215,22 +214,11 @@ impl StratBlockDev {
     }
 
     /// Bind encrypted device using the given clevis configuration.
-    pub fn bind_clevis(
-        &mut self,
-        memfs: &MemoryPrivateFilesystem,
-        pin: &str,
-        clevis_info: &Value,
-    ) -> StratisResult<()> {
+    pub fn bind_clevis(&mut self, pin: &str, clevis_info: &Value) -> StratisResult<()> {
         let crypt_handle = self.crypt_handle.as_mut().ok_or_else(|| {
             StratisError::Error("This device does not appear to be encrypted".to_string())
         })?;
-        let key_description = crypt_handle.encryption_info().key_description.clone();
-        memfs.key_op(key_description.as_ref().ok_or_else(|| {
-            StratisError::Error("A key description is required to bind to clevis after initialization but none was found".to_string())
-        })?, |keyfile_path| {
-            crypt_handle
-                .clevis_bind(keyfile_path, pin, clevis_info)
-        })
+        crypt_handle.clevis_bind(pin, clevis_info)
     }
 
     /// Unbind encrypted device using the given clevis configuration.

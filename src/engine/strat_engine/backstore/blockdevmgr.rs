@@ -24,7 +24,6 @@ use crate::{
                 crypt::{interpret_clevis_config, CryptActivationHandle},
                 devices::{initialize_devices, process_and_verify_devices, wipe_blockdevs},
             },
-            keys::MemoryPrivateFilesystem,
             metadata::MDADataSize,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
         },
@@ -475,11 +474,9 @@ impl BlockDevMgr {
             }
         }
 
-        let key_fs = MemoryPrivateFilesystem::new()?;
-
         bind_loop(
             self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
-            |blockdev| blockdev.bind_clevis(&key_fs, pin, clevis_info),
+            |blockdev| blockdev.bind_clevis(pin, clevis_info),
             |blockdev| blockdev.unbind_clevis(),
         )?;
 

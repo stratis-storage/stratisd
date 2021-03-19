@@ -174,13 +174,13 @@ build-extras:
 build-minimal-dependencies:
 	cargo update -Z minimal-versions
 	cargo update -p pkg-config --precise 0.3.19
-	carog update -p env_looger --precise 0.8.0
+	carog update -p env_logger --precise 0.8.0
 	cargo build -Z minimal-versions
 
 test-minimal-dependencies:
 	cargo update -Z minimal-versions
 	cargo update -p pkg-config --precise 0.3.19
-	carog update -p env_looger --precise 0.8.0
+	carog update -p env_logger --precise 0.8.0
 	cargo test --no-run
 
 stratis-dumpmetadata:

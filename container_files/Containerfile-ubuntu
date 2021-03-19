@@ -1,0 +1,6 @@
+FROM ubuntu:groovy
+
+RUN apt-get update
+RUN apt-get install -y systemd
+
+CMD /usr/lib/systemd/systemd

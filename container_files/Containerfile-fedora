@@ -1,0 +1,5 @@
+FROM fedora:32
+
+RUN dnf install -y systemd
+
+CMD /usr/lib/systemd/systemd

@@ -1,3 +1,5 @@
+#!/bin/sh
+
 cargo update -p clap --precise 2.21.1
 cargo update -p nix:0.20.0 --precise 0.20.0
 cargo update -p devicemapper --precise 0.29.0

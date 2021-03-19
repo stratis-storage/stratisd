@@ -206,11 +206,12 @@ jobs:
       image: ${{ matrix.image }}
       options: --privileged -v /dev:/dev
     services:
-      image: docker.pkg.github.com/stratis-storage/stratisd/tang:32
-      credentials:
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-        options: --privileged -p 80:80
+      tang:
+        image: docker.pkg.github.com/stratis-storage/stratisd/tang:32
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          options: --privileged -p 80:80
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies for Fedora

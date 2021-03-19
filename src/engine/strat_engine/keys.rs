@@ -4,7 +4,7 @@
 
 use std::{
     ffi::CString,
-    fs::{create_dir_all, remove_file, set_permissions, OpenOptions, Permissions},
+    fs::{create_dir_all, remove_file, set_permissions, File, OpenOptions, Permissions},
     io::{self, Read, Write},
     mem::size_of,
     os::unix::{

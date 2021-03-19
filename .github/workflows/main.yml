@@ -146,6 +146,9 @@ jobs:
     container:
       image: ${{ matrix.image }}
       options: --privileged -v /dev:/dev
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies for Ubuntu

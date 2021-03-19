@@ -210,6 +210,10 @@ jobs:
     strategy:
       matrix:
         include:
+          # Allowed so as not to make an extra step for external contributors
+          - task: cargo update --locked
+            toolchain: stable
+            component: cargo
           # Allowed because a failure may occur after a new Rust stable
           # version is released.
           - task: make -f Makefile clippy

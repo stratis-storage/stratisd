@@ -11,6 +11,8 @@ UDEVDIR ?= $(PREFIX)/lib/udev
 MANDIR ?= $(DATADIR)/man
 UNITDIR ?= $(PREFIX)/lib/systemd/system
 
+RELEASE_VERSION ?= 9.9.9
+
 RUST_2018_IDIOMS = -D bare-trait-objects \
                    -D ellipsis-inclusive-range-patterns
 

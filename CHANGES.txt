@@ -1,11 +1,7 @@
 stratisd 2.4.0 (UNRELEASED)
 ===========================
-Recommended Rust toolchain version: 1.50.0
+Recommended Rust toolchain version: 1.51.0
 Lowest supported Rust toolchain version: 1.49
-
-New D-Bus interfaces:
-  - org.storage.stratis2.Manager.r4
-  - org.storage.stratis2.FetchProperties.r4
 
 Recommended Python interpreter: 3.8.6
 Lowest supported Python interpreter: 3.6.8
@@ -15,18 +11,25 @@ Python import sorter: isort (4.3.21)
 
 YAML linter: yamllint (1.26.0)
 
-New Rust crate version requirements:
-  - devicemapper-rs: 0.29
+- Allow booting from a Stratis root filesystem:
+  https://github.com/stratis-storage/stratisd/issues/2134
+  https://github.com/stratis-storage/stratisd/pull/2529
 
-New minimum Python package requirement (for testing):
-  - networkx: 2.5
-  - semantic_version: 2.8.4
+- Add ability to bind with Clevis on pool creation and to unbind and bind
+  an encrypted pool separately with either Clevis or a kernel keyring:
+  https://github.com/stratis-storage/stratisd/pull/2502
 
 - Add new FetchProperties interface to Manager object that supports key
   LockedPoolsWithDevs:
   https://github.com/stratis-storage/stratisd/issues/2423
   https://github.com/stratis-storage/stratisd/pull/2441
   https://github.com/stratis-storage/stratisd/pull/2431
+
+- Improvements to management of filesystem symlinks:
+  https://github.com/stratis-storage/stratisd/issues/2307
+  https://github.com/stratis-storage/stratisd/issues/2477
+  https://github.com/stratis-storage/stratisd/pull/2488
+  https://github.com/stratis-storage/stratisd/pull/2475
 
 - Add EngineStateReport method to new Manager.r4 interface:
   https://github.com/stratis-storage/stratisd/issues/2369
@@ -37,10 +40,18 @@ New minimum Python package requirement (for testing):
   https://github.com/stratis-storage/stratisd/issues/2227
   https://github.com/stratis-storage/stratisd/issues/2219
 
+- Predict size of free area on devices:
+  https://github.com/stratis-storage/stratisd/pull/2516
+  https://github.com/stratis-storage/stratisd/pull/2476
+  https://github.com/stratis-storage/stratisd/pull/2447
+
 - Make Clevis dependency optional:
   https://github.com/stratis-storage/stratisd/pull/2398
 
 - Add preliminary multi-threading support:
+  https://github.com/stratis-storage/stratisd/pull/2510
+  https://github.com/stratis-storage/stratisd/pull/2468
+  https://github.com/stratis-storage/stratisd/pull/2465
   https://github.com/stratis-storage/stratisd/pull/2439
 
 - Create the filesystem on the mdv with the xfs -noalign option:
@@ -82,8 +93,30 @@ New minimum Python package requirement (for testing):
 - Reduce severity level of some encryption related log messages:
   https://github.com/stratis-storage/stratisd/pull/2443
 
+- Add warn log message on bad MDAHeader in metadata module:
+  https://github.com/stratis-storage/stratisd/issues/2517
+  https://github.com/stratis-storage/stratisd/pull/2522
+
+- Make name displayed in stratisd help text "stratisd", not "stratis":
+  https://github.com/stratis-storage/stratisd/pull/2506
+
+- Improve logging on failure to read BDA from device during setup:
+  https://github.com/stratis-storage/stratisd/pull/2523
+
+- Drop support for migrating symlinks from /stratis to /dev/stratis:
+  https://github.com/stratis-storage/stratisd/pull/2503
+
+- Add logging support to stratis_dumpmetadata:
+  https://github.com/stratis-storage/stratisd/issues/2518
+  https://github.com/stratis-storage/stratisd/pull/2526
+
 - Add install target to Makefile:
   https://github.com/stratis-storage/stratisd/pull/2379
+
+- Include githooks in source distribution:
+  https://github.com/stratis-storage/stratisd/issues/2445
+  https://github.com/stratis-storage/stratisd/pull/2459
+  https://github.com/stratis-storage/stratisd/pull/2452
 
 - Refactor to use graph structure for tracking device paths:
   https://github.com/stratis-storage/stratisd/pull/2377
@@ -105,6 +138,32 @@ New minimum Python package requirement (for testing):
   https://github.com/stratis-storage/stratisd/pull/2434
 
 - Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/2527
+  https://github.com/stratis-storage/stratisd/pull/2524
+  https://github.com/stratis-storage/stratisd/pull/2521
+  https://github.com/stratis-storage/stratisd/pull/2520
+  https://github.com/stratis-storage/stratisd/pull/2515
+  https://github.com/stratis-storage/stratisd/pull/2508
+  https://github.com/stratis-storage/stratisd/pull/2504
+  https://github.com/stratis-storage/stratisd/pull/2501
+  https://github.com/stratis-storage/stratisd/pull/2499
+  https://github.com/stratis-storage/stratisd/pull/2498
+  https://github.com/stratis-storage/stratisd/pull/2496
+  https://github.com/stratis-storage/stratisd/pull/2495
+  https://github.com/stratis-storage/stratisd/pull/2492
+  https://github.com/stratis-storage/stratisd/pull/2491
+  https://github.com/stratis-storage/stratisd/pull/2489
+  https://github.com/stratis-storage/stratisd/pull/2487
+  https://github.com/stratis-storage/stratisd/pull/2485
+  https://github.com/stratis-storage/stratisd/pull/2483
+  https://github.com/stratis-storage/stratisd/pull/2481
+  https://github.com/stratis-storage/stratisd/pull/2480
+  https://github.com/stratis-storage/stratisd/pull/2474
+  https://github.com/stratis-storage/stratisd/pull/2469
+  https://github.com/stratis-storage/stratisd/pull/2462
+  https://github.com/stratis-storage/stratisd/pull/2455
+  https://github.com/stratis-storage/stratisd/pull/2451
+  https://github.com/stratis-storage/stratisd/pull/2449
   https://github.com/stratis-storage/stratisd/pull/2438
   https://github.com/stratis-storage/stratisd/pull/2435
   https://github.com/stratis-storage/stratisd/pull/2429
@@ -116,6 +175,7 @@ New minimum Python package requirement (for testing):
   https://github.com/stratis-storage/stratisd/pull/2403
   https://github.com/stratis-storage/stratisd/pull/2396
   https://github.com/stratis-storage/stratisd/pull/2394
+  https://github.com/stratis-storage/stratisd/pull/2393
   https://github.com/stratis-storage/stratisd/pull/2389
   https://github.com/stratis-storage/stratisd/pull/2385
   https://github.com/stratis-storage/stratisd/pull/2383

@@ -174,13 +174,13 @@ build-extras:
 build-minimal-dependencies:
 	cargo update -Z minimal-versions
 	cargo update -p pkg-config --precise 0.3.19
-	cargo update -p num-traits --precise 0.2.2
+	cargo update -p num-traits:0.1.32 --precise 0.2.2
 	cargo build -Z minimal-versions
 
 test-minimal-dependencies:
 	cargo update -Z minimal-versions
 	cargo update -p pkg-config --precise 0.3.19
-	cargo update -p num-traits --precise 0.2.2
+	cargo update -p num-traits:0.1.32 --precise 0.2.2
 	cargo test --no-run
 
 stratis-dumpmetadata:

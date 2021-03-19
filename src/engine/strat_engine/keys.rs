@@ -636,10 +636,6 @@ pub struct MemoryMappedKeyfile(*mut libc::c_void, usize, PathBuf);
 
 impl MemoryMappedKeyfile {
     pub fn new(file_path: &Path, key_data: SizedKeyMemory) -> StratisResult<MemoryMappedKeyfile> {
-        debug!(
-            "Initializing in memory keyfile at path {}",
-            file_path.display()
-        );
         if file_path.exists() {
             return Err(StratisError::Io(io::Error::new(
                 io::ErrorKind::AlreadyExists,

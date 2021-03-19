@@ -12,6 +12,7 @@ use std::{
     },
 };
 
+use futures::stream::StreamExt;
 use nix::poll::{poll, PollFd, PollFlags};
 use tokio::{
     runtime::Builder,
@@ -22,7 +23,6 @@ use tokio::{
     },
     task,
 };
-use tokio_stream::StreamExt;
 
 use crate::{
     engine::{Engine, SimEngine, StratEngine, UdevEngineEvent},

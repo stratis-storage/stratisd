@@ -223,6 +223,12 @@ stratisd.8.gz: stratisd.8
 clippy:
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets --all-features -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
 
+check_fedora_updates_available:
+	${PWD}/code_maintenance/update_cargo_crates.py; test "($$? & 16)"
+
+check_fedora_incompatible:
+	${PWD}/code_maintenance/update_cargo_crates.py; test "($$? & 4) | ($$? & 8)"
+
 .PHONY:
 	audit
 	bloat

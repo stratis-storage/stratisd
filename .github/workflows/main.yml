@@ -211,7 +211,7 @@ jobs:
         credentials:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-          options: --privileged -p 80:80
+        options: --privileged -p 80:80
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies for Fedora

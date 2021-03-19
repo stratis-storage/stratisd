@@ -136,12 +136,12 @@ jobs:
             toolchain: stable
             components: cargo
             image: >-
-              docker.pkg.github.com/stratis-storage/stratisd/ubuntu-systemd:groovy
+              docker.pkg.github.com/stratis-storage/stratisd/systemd-ubuntu:groovy
           - task: RUST_LOG=libstratis=debug make -f Makefile test-loop
             toolchain: stable
             components: cargo
             image: >-
-              docker.pkg.github.com/stratis-storage/stratisd/fedora-systemd:32
+              docker.pkg.github.com/stratis-storage/stratisd/systemd-fedora:32
     runs-on: ubuntu-18.04
     container:
       image: ${{ matrix.image }}

@@ -62,6 +62,14 @@ jobs:
             toolchain: stable
             components: cargo
             image: ubuntu:groovy
+          - task: make -f Makefile build-lowest
+            toolchain: stable
+            components: cargo
+            image: ubuntu:groovy
+          - task: make -f Makefile test-lowest
+            toolchain: stable
+            components: cargo
+            image: ubuntu:groovy
           - task: make -f Makefile build
             toolchain: stable
             components: cargo
@@ -83,6 +91,14 @@ jobs:
             components: cargo
             image: fedora:32
           - task: make -f Makefile release
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+          - task: make -f Makefile build-lowest
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+          - task: make -f Makefile test-lowest
             toolchain: stable
             components: cargo
             image: fedora:32

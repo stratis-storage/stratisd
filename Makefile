@@ -171,6 +171,12 @@ build-extras:
 	RUSTFLAGS="${DENY}" \
 	cargo build --features extras ${TARGET_ARGS}
 
+build-lowest:
+	${PWD}/code_maintenance/updates.sh
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY}" \
+	cargo build ${TARGET_ARGS}
+
 stratis-dumpmetadata:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
@@ -201,6 +207,10 @@ test-real:
 	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test real_
 
 test:
+	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 cargo test -- --skip real_ --skip loop_
+
+test-lowest:
+	${PWD}/code_maintenance/updates.sh
 	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 cargo test -- --skip real_ --skip loop_
 
 yamllint:

@@ -4,7 +4,7 @@ cargo update -p devicemapper --precise 0.29.0
 cargo update -p crc --precise 1.0.0
 cargo update -p byteorder --precise 1.2.3
 cargo update -p chrono --precise 0.4.1
-(cargo update -p rand:0.7.3 --precise 0.7.0 >& /dev/null || cargo update -p rand:0.7.0 --precise 0.7.0)
+(cargo update -p rand:0.8.3 --precise 0.8.0 >& /dev/null || cargo update -p rand:0.8.0 --precise 0.8.0)
 cargo update -p serde --precise 1.0.119
 cargo update -p serde_derive --precise 1.0.119
 cargo update -p serde_json --precise 1.0.50

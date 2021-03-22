@@ -159,6 +159,12 @@ SPECS = {
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
+    <method name="BindKeyring">
+      <arg name="key_desc" type="s" direction="in" />
+      <arg name="results" type="b" direction="out" />
+      <arg name="return_code" type="q" direction="out" />
+      <arg name="return_string" type="s" direction="out" />
+    </method>
     <method name="CreateFilesystems">
       <arg name="specs" type="as" direction="in" />
       <arg name="results" type="(ba(os))" direction="out" />
@@ -191,6 +197,11 @@ SPECS = {
       <arg name="return_string" type="s" direction="out" />
     </method>
     <method name="Unbind">
+      <arg name="results" type="b" direction="out" />
+      <arg name="return_code" type="q" direction="out" />
+      <arg name="return_string" type="s" direction="out" />
+    </method>
+    <method name="UnbindKeyring">
       <arg name="results" type="b" direction="out" />
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />

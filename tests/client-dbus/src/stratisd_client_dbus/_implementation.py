@@ -24,7 +24,7 @@ from dbus_python_client_gen import make_class
 
 from ._data import SPECS
 
-_POOL_SPEC = ET.fromstring(SPECS["org.storage.stratis2.pool.r3"])
+_POOL_SPEC = ET.fromstring(SPECS["org.storage.stratis2.pool.r4"])
 _FILESYSTEM_SPEC = ET.fromstring(SPECS["org.storage.stratis2.filesystem"])
 _BLOCKDEV_SPEC = ET.fromstring(SPECS["org.storage.stratis2.blockdev.r2"])
 

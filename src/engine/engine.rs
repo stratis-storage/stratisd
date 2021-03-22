@@ -67,15 +67,6 @@ pub trait Report {
 }
 
 pub trait Filesystem: Debug {
-    /// Send a synthetic udev change event to the devicemapper device representing
-    /// the filesystem.
-    fn send_udev_change(
-        &self,
-        pool_name: &str,
-        fs_uuid: FilesystemUuid,
-        fs_name: &str,
-    ) -> StratisResult<()>;
-
     /// path of the device node
     fn devnode(&self) -> PathBuf;
 
@@ -145,6 +136,7 @@ pub trait Pool: Debug {
     /// times, the size associated with the last item is used.
     fn create_filesystems<'a, 'b>(
         &'a mut self,
+        pool_name: &str,
         pool_uuid: PoolUuid,
         specs: &[(&'b str, Option<Sectors>)],
     ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid)>>;
@@ -200,6 +192,7 @@ pub trait Pool: Debug {
     /// Create a CoW snapshot of the origin
     fn snapshot_filesystem(
         &mut self,
+        pool_name: &str,
         pool_uuid: PoolUuid,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,

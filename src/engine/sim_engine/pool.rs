@@ -183,6 +183,7 @@ impl Pool for SimPool {
 
     fn create_filesystems<'a, 'b>(
         &'a mut self,
+        _pool_name: &str,
         _pool_uuid: PoolUuid,
         specs: &[(&'b str, Option<Sectors>)],
     ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid)>> {
@@ -345,6 +346,7 @@ impl Pool for SimPool {
 
     fn snapshot_filesystem(
         &mut self,
+        _pool_name: &str,
         _pool_uuid: PoolUuid,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
@@ -537,7 +539,7 @@ mod tests {
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         let infos = pool
-            .create_filesystems(uuid, &[("old_name", None)])
+            .create_filesystems(pool_name, uuid, &[("old_name", None)])
             .unwrap()
             .changed()
             .unwrap();
@@ -567,7 +569,7 @@ mod tests {
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         let results = pool
-            .create_filesystems(uuid, &[(old_name, None), (new_name, None)])
+            .create_filesystems(pool_name, uuid, &[(old_name, None), (new_name, None)])
             .unwrap()
             .changed()
             .unwrap();
@@ -662,7 +664,7 @@ mod tests {
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         let fs_results = pool
-            .create_filesystems(uuid, &[("fs_name", None)])
+            .create_filesystems(pool_name, uuid, &[("fs_name", None)])
             .unwrap()
             .changed()
             .unwrap();
@@ -689,7 +691,7 @@ mod tests {
             .changed()
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
-        let fs = pool.create_filesystems(uuid, &[]).unwrap();
+        let fs = pool.create_filesystems(pool_name, uuid, &[]).unwrap();
         assert!(!fs.is_changed())
     }
 
@@ -710,7 +712,7 @@ mod tests {
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         assert!(match pool
-            .create_filesystems(uuid, &[("name", None)])
+            .create_filesystems(pool_name, uuid, &[("name", None)])
             .ok()
             .and_then(|fs| fs.changed())
         {
@@ -736,8 +738,11 @@ mod tests {
             .changed()
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
-        pool.create_filesystems(uuid, &[(fs_name, None)]).unwrap();
-        let set_create_action = pool.create_filesystems(uuid, &[(fs_name, None)]).unwrap();
+        pool.create_filesystems(pool_name, uuid, &[(fs_name, None)])
+            .unwrap();
+        let set_create_action = pool
+            .create_filesystems(pool_name, uuid, &[(fs_name, None)])
+            .unwrap();
         assert!(!set_create_action.is_changed());
     }
 
@@ -759,7 +764,7 @@ mod tests {
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         assert!(match pool
-            .create_filesystems(uuid, &[(fs_name, None), (fs_name, None)])
+            .create_filesystems(pool_name, uuid, &[(fs_name, None), (fs_name, None)])
             .ok()
             .and_then(|fs| fs.changed())
         {

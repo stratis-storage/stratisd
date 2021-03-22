@@ -247,12 +247,10 @@ impl Engine for StratEngine {
             self.pools.insert(old_name, uuid, pool);
             Err(err)
         } else {
-            self.pools.insert(new_name.clone(), uuid, pool);
-            let (_, pool) = self.pools.get_by_name(&new_name).expect("Inserted above");
-            for (fs_name, uuid, fs) in pool.filesystems() {
-                if let Err(e) = fs.send_udev_change(&new_name, uuid, &fs_name) {
-                    warn!("Pool rename symlink action failed: {}", e)
-                };
+            self.pools.insert(new_name, uuid, pool);
+            let (new_name, pool) = self.pools.get_by_uuid(uuid).expect("Inserted above");
+            if let Err(e) = pool.udev_pool_name_change(&new_name) {
+                warn!("Pool rename symlink action failed: {}", e)
             }
             Ok(RenameAction::Renamed(uuid))
         }

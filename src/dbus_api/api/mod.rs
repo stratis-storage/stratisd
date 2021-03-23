@@ -111,6 +111,10 @@ pub fn get_base_tree<'a>(
         .add(
             f.interface(consts::REPORT_INTERFACE_NAME_2_1, ())
                 .add_m(report_2_1::get_report_method(&f)),
+        )
+        .add(
+            f.interface(consts::REPORT_INTERFACE_NAME_2_4, ())
+                .add_m(report_2_1::get_report_method(&f)),
         );
 
     let path = obj_path.get_name().to_owned();

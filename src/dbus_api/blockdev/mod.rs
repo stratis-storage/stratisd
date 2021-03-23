@@ -60,6 +60,18 @@ pub fn create_dbus_blockdev<'a>(
                 .add_p(blockdev_2_2::physical_path_property(&f)),
         )
         .add(
+            f.interface(consts::BLOCKDEV_INTERFACE_NAME_2_4, ())
+                .add_m(blockdev_2_0::set_userid_method(&f))
+                .add_p(blockdev_2_0::devnode_property(&f))
+                .add_p(blockdev_2_0::hardware_info_property(&f))
+                .add_p(blockdev_2_0::initialization_time_property(&f))
+                .add_p(blockdev_2_0::pool_property(&f))
+                .add_p(blockdev_2_0::tier_property(&f))
+                .add_p(blockdev_2_0::user_info_property(&f))
+                .add_p(blockdev_2_0::uuid_property(&f))
+                .add_p(blockdev_2_2::physical_path_property(&f)),
+        )
+        .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME, ())
                 .add_m(fetch_properties_2_0::get_all_properties_method(&f))
                 .add_m(fetch_properties_2_0::get_properties_method(&f)),

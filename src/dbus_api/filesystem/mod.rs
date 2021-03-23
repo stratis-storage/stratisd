@@ -46,6 +46,15 @@ pub fn create_dbus_filesystem<'a>(
                 .add_p(filesystem_2_0::created_property(&f)),
         )
         .add(
+            f.interface(consts::FILESYSTEM_INTERFACE_NAME_2_4, ())
+                .add_m(filesystem_2_0::rename_method(&f))
+                .add_p(filesystem_2_0::devnode_property(&f))
+                .add_p(filesystem_2_0::name_property(&f))
+                .add_p(filesystem_2_0::pool_property(&f))
+                .add_p(filesystem_2_0::uuid_property(&f))
+                .add_p(filesystem_2_0::created_property(&f)),
+        )
+        .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME, ())
                 .add_m(fetch_properties_2_0::get_all_properties_method(&f))
                 .add_m(fetch_properties_2_0::get_properties_method(&f)),

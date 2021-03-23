@@ -249,7 +249,7 @@ impl Engine for StratEngine {
         } else {
             self.pools.insert(new_name, uuid, pool);
             let (new_name, pool) = self.pools.get_by_uuid(uuid).expect("Inserted above");
-            if let Err(e) = pool.udev_pool_name_change(&new_name) {
+            if let Err(e) = pool.udev_pool_change(&new_name) {
                 warn!("Pool rename symlink action failed: {}", e)
             }
             Ok(RenameAction::Renamed(uuid))

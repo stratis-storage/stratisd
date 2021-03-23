@@ -230,9 +230,9 @@ impl StratPool {
     }
 
     /// Send a synthetic udev change event to every filesystem on the given pool.
-    pub fn udev_pool_name_change(&self, pool_name: &str) -> StratisResult<()> {
+    pub fn udev_pool_change(&self, pool_name: &str) -> StratisResult<()> {
         for (name, uuid, fs) in self.thin_pool.filesystems() {
-            fs.udev_fs_name_change(pool_name, uuid, &name)?;
+            fs.udev_fs_change(pool_name, uuid, &name)?;
         }
 
         Ok(())

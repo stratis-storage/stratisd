@@ -120,7 +120,7 @@ impl StratFilesystem {
 
     /// Send a synthetic udev change event to the devicemapper device representing
     /// the filesystem.
-    pub fn udev_fs_name_change(
+    pub fn udev_fs_change(
         &self,
         pool_name: &str,
         fs_uuid: FilesystemUuid,

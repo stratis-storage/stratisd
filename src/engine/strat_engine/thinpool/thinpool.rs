@@ -851,7 +851,7 @@ impl ThinPool {
             .filesystems
             .get_by_uuid(fs_uuid)
             .expect("Inserted above");
-        if let Err(e) = fs.udev_fs_name_change(&pool_name, fs_uuid, &name) {
+        if let Err(e) = fs.udev_fs_change(&pool_name, fs_uuid, &name) {
             warn!(
                 "Failed to trigger filesystem symlink creation in udev: {}",
                 e
@@ -900,7 +900,7 @@ impl ThinPool {
             .filesystems
             .get_by_uuid(snapshot_fs_uuid)
             .expect("Inserted above");
-        if let Err(e) = fs.udev_fs_name_change(&pool_name, snapshot_fs_uuid, &new_fs_name) {
+        if let Err(e) = fs.udev_fs_change(&pool_name, snapshot_fs_uuid, &new_fs_name) {
             warn!(
                 "Failed to trigger filesystem snapshot symlink creation in udev: {}",
                 e
@@ -980,12 +980,9 @@ impl ThinPool {
             self.filesystems.insert(old_name, uuid, filesystem);
             Err(err)
         } else {
-            self.filesystems.insert(new_name.clone(), uuid, filesystem);
-            let (_, fs) = self
-                .filesystems
-                .get_by_name(&new_name)
-                .expect("Inserted above");
-            if let Err(e) = fs.udev_fs_name_change(pool_name, uuid, &new_name) {
+            self.filesystems.insert(new_name, uuid, filesystem);
+            let (new_name, fs) = self.filesystems.get_by_uuid(uuid).expect("Inserted above");
+            if let Err(e) = fs.udev_fs_change(pool_name, uuid, &new_name) {
                 warn!("Filesystem rename symlink action failed: {}", e);
             }
             Ok(Some(uuid))

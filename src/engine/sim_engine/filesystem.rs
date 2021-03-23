@@ -26,10 +26,6 @@ impl SimFilesystem {
 }
 
 impl Filesystem for SimFilesystem {
-    fn send_udev_change(&self) -> StratisResult<()> {
-        Ok(())
-    }
-
     fn devnode(&self) -> PathBuf {
         ["/stratis", &format!("random-{}", self.rand)]
             .iter()

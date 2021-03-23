@@ -118,6 +118,38 @@ impl StratFilesystem {
         })
     }
 
+    /// Send a synthetic udev change event to the devicemapper device representing
+    /// the filesystem.
+    pub fn udev_fs_change(
+        &self,
+        pool_name: &str,
+        fs_uuid: FilesystemUuid,
+        fs_name: &str,
+    ) -> StratisResult<()> {
+        let device = self.thin_dev.device();
+        let uevent_file = [
+            "/sys/dev/block",
+            &format!("{}:{}", device.major, device.minor),
+            "uevent",
+        ]
+        .iter()
+        .collect::<PathBuf>();
+        OpenOptions::new()
+            .write(true)
+            .open(&uevent_file)?
+            .write_all(
+                format!(
+                    "{} {} STRATISPOOLNAME={} STRATISFSNAME={}",
+                    devlinks::UEVENT_CHANGE_EVENT,
+                    fs_uuid,
+                    pool_name,
+                    fs_name,
+                )
+                .as_bytes(),
+            )?;
+        Ok(())
+    }
+
     /// Create a snapshot of the filesystem. Return the resulting filesystem/ThinDev
     /// to the caller.  Use snapshot_name for the Stratis filesystem name.  Use
     /// snapshot_dmname for the new name of the ThinDev allocated for the snapshot.
@@ -291,22 +323,6 @@ impl StratFilesystem {
 }
 
 impl Filesystem for StratFilesystem {
-    fn send_udev_change(&self) -> StratisResult<()> {
-        let device = self.thin_dev.device();
-        let uevent_file = [
-            "/sys/dev/block",
-            &format!("{}:{}", device.major, device.minor),
-            "uevent",
-        ]
-        .iter()
-        .collect::<PathBuf>();
-        OpenOptions::new()
-            .write(true)
-            .open(&uevent_file)?
-            .write_all("change".as_bytes())?;
-        Ok(())
-    }
-
     fn devnode(&self) -> PathBuf {
         self.thin_dev.devnode()
     }

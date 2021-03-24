@@ -18,7 +18,8 @@ use sha1::{Digest, Sha1};
 use devicemapper::Sectors;
 use libcryptsetup_rs::{
     c_uint, CryptActivateFlags, CryptDeactivateFlags, CryptDevice, CryptInit, CryptStatusInfo,
-    CryptVolumeKeyFlags, CryptWipePattern, EncryptionFormat, LibcryptErr, TokenInput,
+    CryptVolumeKeyFlags, CryptWipePattern, EncryptionFormat, KeyslotsSize, LibcryptErr,
+    MetadataSize, TokenInput,
 };
 
 use crate::{
@@ -68,6 +69,9 @@ const DEVICEMAPPER_PATH: &str = "/dev/mapper";
 /// Key in clevis configuration for tang indicating that the URL of the
 /// tang server does not need to be verified.
 const CLEVIS_TANG_TRUST_URL: &str = "stratis:tang:trust_url";
+
+const DEFAULT_CRYPT_METADATA_SIZE: u64 = 16384;
+const DEFAULT_CRYPT_KEYSLOTS_SIZE: u64 = 16_744_448;
 
 macro_rules! log_on_failure {
     ($op:expr, $fmt:tt $(, $arg:expr)*) => {{
@@ -213,6 +217,10 @@ impl CryptInitializer {
             nothing to clean up",
             self.physical_path.display()
         );
+        device.settings_handle().set_metadata_size(
+            MetadataSize::try_from(DEFAULT_CRYPT_METADATA_SIZE)?,
+            KeyslotsSize::try_from(DEFAULT_CRYPT_KEYSLOTS_SIZE)?,
+        )?;
         let result = self.initialize_with_err(&mut device, key_description);
         match result {
             Ok(activated_path) => Ok(CryptHandle::new(
@@ -1487,5 +1495,27 @@ mod tests {
             &real::DeviceLimits::Exactly(1, None, Some(Sectors(1024 * 1024 * 1024 / 512))),
             test_crypt_device_ops,
         );
+    }
+
+    #[test]
+    fn loop_test_crypt_metadata_defaults() {
+        fn test_defaults(paths: &[&Path]) {
+            let mut context = CryptInit::init(paths[0]).unwrap();
+            context
+                .context_handle()
+                .format::<()>(
+                    EncryptionFormat::Luks2,
+                    ("aes", "xts-plain64"),
+                    None,
+                    Either::Right(STRATIS_MEK_SIZE),
+                    None,
+                )
+                .unwrap();
+            let (metadata, keyslot) = context.settings_handle().get_metadata_size().unwrap();
+            assert_eq!(DEFAULT_CRYPT_METADATA_SIZE, *metadata);
+            assert_eq!(DEFAULT_CRYPT_KEYSLOTS_SIZE, *keyslot);
+        }
+
+        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Exactly(1, None), test_defaults);
     }
 }

@@ -456,8 +456,7 @@ impl ThinPool {
                     Ok(fs) => {
                         if let Err(e) = fs.udev_fs_change(pool_name, fssave.uuid, &fssave.name) {
                             warn!(
-                                "Failed to notify udev to create symlink {}: {}",
-                                fs.devnode().display(),
+                                "Failed to notify udev to create filesystem symlink: {}",
                                 e
                             );
                         }
@@ -862,10 +861,7 @@ impl ThinPool {
             .get_by_uuid(fs_uuid)
             .expect("Inserted above");
         if let Err(e) = fs.udev_fs_change(&pool_name, fs_uuid, &name) {
-            warn!(
-                "Failed to trigger filesystem symlink creation in udev: {}",
-                e
-            );
+            warn!("Failed to notify udev to create filesystem symlink: {}", e);
         }
 
         Ok(fs_uuid)
@@ -911,10 +907,7 @@ impl ThinPool {
             .get_by_uuid(snapshot_fs_uuid)
             .expect("Inserted above");
         if let Err(e) = fs.udev_fs_change(&pool_name, snapshot_fs_uuid, &new_fs_name) {
-            warn!(
-                "Failed to trigger filesystem snapshot symlink creation in udev: {}",
-                e
-            );
+            warn!("Failed to notify udev to create filesystem symlink: {}", e);
         }
         Ok((
             snapshot_fs_uuid,

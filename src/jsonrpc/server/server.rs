@@ -34,7 +34,7 @@ use crate::{
     jsonrpc::{
         consts::RPC_SOCKADDR,
         interface::{StratisParamType, StratisParams, StratisRet},
-        server::{filesystem, key, pool, report, udev, utils::stratis_result_to_return},
+        server::{filesystem, key, pool, report, utils::stratis_result_to_return},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -193,13 +193,6 @@ impl StratisParams {
                     }
                 }
                 StratisRet::Report(report::report(engine).await)
-            }
-            StratisParamType::Udev(dm_name) => {
-                expects_fd!(self.fd_opt, Udev, None, false);
-                StratisRet::Udev(stratis_result_to_return(
-                    udev::udev(engine, dm_name.as_str()).await,
-                    None,
-                ))
             }
         }
     }

@@ -1,1 +1,0 @@
-ACTION=="add|change", ENV{DM_NAME}=="stratis-1-[0-9a-f]*-thin-fs-[0-9a-f]*", IMPORT{program}+="/usr/bin/stratis-min udev $env{DM_NAME}", SYMLINK+="$env{STRATIS_SYMLINK}"

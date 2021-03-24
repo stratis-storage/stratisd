@@ -49,7 +49,6 @@ pub enum StratisParamType {
     FsRename(String, String, String),
     FsList,
     Report,
-    Udev(String),
 }
 
 pub struct StratisParams {
@@ -89,5 +88,4 @@ pub enum StratisRet {
     FsDestroy((bool, u16, String)),
     FsRename((bool, u16, String)),
     Report(Value),
-    Udev((Option<(String, String)>, u16, String)),
 }

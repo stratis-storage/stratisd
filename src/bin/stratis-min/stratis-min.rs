@@ -8,7 +8,7 @@ use clap::{App, Arg, ArgGroup, ArgMatches, SubCommand};
 
 use libstratis::{
     engine::{KeyDescription, PoolUuid, UnlockMethod},
-    jsonrpc::client::{filesystem, key, pool, report, udev},
+    jsonrpc::client::{filesystem, key, pool, report},
     stratis::StratisError,
 };
 
@@ -89,7 +89,6 @@ fn parse_args() -> App<'static, 'static> {
                     .arg(Arg::with_name("new_fs_name").required(true)),
             ]),
             SubCommand::with_name("report"),
-            SubCommand::with_name("udev").arg(Arg::with_name("dm_name").required(true)),
         ])
 }
 
@@ -218,13 +217,6 @@ fn main() -> Result<(), Box<dyn Error>> {
             println!("{}", serde_json::to_string_pretty(&j)?);
             Ok(())
         })?;
-        Ok(())
-    } else if let Some(args) = args.subcommand_matches("udev") {
-        if let Some((pool_name, fs_name)) =
-            udev::udev(args.value_of("dm_name").expect("required").to_string())?
-        {
-            println!("STRATIS_SYMLINK=stratis/{}/{}", pool_name, fs_name);
-        }
         Ok(())
     } else {
         println!("{}", help);

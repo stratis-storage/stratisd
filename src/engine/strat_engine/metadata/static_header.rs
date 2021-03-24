@@ -56,15 +56,18 @@ impl PartialEq for StaticHeaderResult {
 }
 
 impl StaticHeaderResult {
+    /// Format metadata on a given device
+    /// Returns StaticHeader fields
+    /// Returns an additional bytes buffer if print_bytes flag is True
     pub fn fmt_metadata(&self, print_bytes: bool) -> String {
-        let mut result = String::from("\nHeader:")
+        let mut result = String::from("\n\nHeader:\n")
             + self
                 .header
                 .as_ref()
-                .map_or(String::from("\nNone"), |sh| format!("\n{:?}", sh))
+                .map_or(String::from("\nNone"), |sh| format!("\n{:#?}", sh))
                 .as_str();
         if print_bytes {
-            result += "\nBytes:\n";
+            result += "\n\nBytes:\n\n";
             match &self.bytes {
                 Ok(ref boxed) => {
                     result += pretty_hex(boxed.as_ref()).as_str();

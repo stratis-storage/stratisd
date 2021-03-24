@@ -3,14 +3,11 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    env,
     fs::OpenOptions,
     io::{Seek, SeekFrom},
     process,
-    vec::Vec,
 };
 
-extern crate clap;
 use clap::{App, Arg};
 
 use serde_json::Value;
@@ -51,7 +48,6 @@ fn run(devpath: &str, print_bytes: bool) -> Result<(), String> {
         .load_state(&mut devfile)
         .map_err(|stateload_err| format!("Error during load state: {}", stateload_err))?;
     println!("Pool metadata:");
-    // FIXME Print pool uuid here
     if let Some(loaded_state) = loaded_state {
         let state_json: Value = serde_json::from_slice(&loaded_state)
             .map_err(|extract_err| format!("Error during state JSON extract: {}", extract_err))?;
@@ -66,14 +62,13 @@ fn run(devpath: &str, print_bytes: bool) -> Result<(), String> {
 }
 
 fn main() {
-    let args: Vec<String> = env::args().collect();
-    if args.len() < 2 {
-        eprintln!("Usage: stratis_dumpmetadata <device>");
-        process::exit(2);
-    }
-    let matches = App::new("dumpmetadata")
-        .arg(Arg::with_name("dev").required(true))
-        .arg(Arg::with_name("print_bytes"))
+    let matches = App::new("stratis-dumpmetadata")
+        .arg(
+            Arg::with_name("dev")
+                .required(true)
+                .help("Print metadata of given device"),
+        )
+        .arg(Arg::with_name("print_bytes").help("Print byte buffer of device"))
         .get_matches();
     let devpath = matches.value_of("dev").unwrap();
 

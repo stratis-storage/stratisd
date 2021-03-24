@@ -634,6 +634,7 @@ dependencies = [
  "matches",
  "nix 0.20.0",
  "pkg-config",
+ "pretty-hex",
  "proptest",
  "rand 0.8.3",
  "regex",
@@ -873,6 +874,12 @@ name = "ppv-lite86"
 version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac74c624d6b2d21f425f752262f42188365d7b8ff1aff74c82e45136510a4857"
+
+[[package]]
+name = "pretty-hex"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bc5c99d529f0d30937f6f4b8a86d988047327bb88d04d2c4afc356de74722131"
 
 [[package]]
 name = "proc-macro-hack"

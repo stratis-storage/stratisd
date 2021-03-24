@@ -233,9 +233,7 @@ impl StratPool {
     /// Send a synthetic udev change event to every filesystem on the given pool.
     pub fn udev_pool_change(&self, pool_name: &str) {
         for (name, uuid, fs) in self.thin_pool.filesystems() {
-            if let Err(e) = fs.udev_fs_change(pool_name, uuid, &name) {
-                warn!("Filesystem rename symlink action failed: {}", e);
-            }
+            fs.udev_fs_change(pool_name, uuid, &name);
         }
     }
 

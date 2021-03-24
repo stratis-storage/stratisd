@@ -120,34 +120,40 @@ impl StratFilesystem {
 
     /// Send a synthetic udev change event to the devicemapper device representing
     /// the filesystem.
-    pub fn udev_fs_change(
-        &self,
-        pool_name: &str,
-        fs_uuid: FilesystemUuid,
-        fs_name: &str,
-    ) -> StratisResult<()> {
-        let device = self.thin_dev.device();
-        let uevent_file = [
-            "/sys/dev/block",
-            &format!("{}:{}", device.major, device.minor),
-            "uevent",
-        ]
-        .iter()
-        .collect::<PathBuf>();
-        OpenOptions::new()
-            .write(true)
-            .open(&uevent_file)?
-            .write_all(
-                format!(
-                    "{} {} STRATISPOOLNAME={} STRATISFSNAME={}",
-                    devlinks::UEVENT_CHANGE_EVENT,
-                    fs_uuid,
-                    pool_name,
-                    fs_name,
-                )
-                .as_bytes(),
-            )?;
-        Ok(())
+    pub fn udev_fs_change(&self, pool_name: &str, fs_uuid: FilesystemUuid, fs_name: &str) {
+        fn udev_change_event(
+            thin_dev: &ThinDev,
+            pool_name: &str,
+            fs_uuid: FilesystemUuid,
+            fs_name: &str,
+        ) -> StratisResult<()> {
+            let device = thin_dev.device();
+            let uevent_file = [
+                "/sys/dev/block",
+                &format!("{}:{}", device.major, device.minor),
+                "uevent",
+            ]
+            .iter()
+            .collect::<PathBuf>();
+            OpenOptions::new()
+                .write(true)
+                .open(&uevent_file)?
+                .write_all(
+                    format!(
+                        "{} {} STRATISPOOLNAME={} STRATISFSNAME={}",
+                        devlinks::UEVENT_CHANGE_EVENT,
+                        fs_uuid,
+                        pool_name,
+                        fs_name,
+                    )
+                    .as_bytes(),
+                )?;
+            Ok(())
+        }
+
+        if let Err(e) = udev_change_event(&self.thin_dev, pool_name, fs_uuid, fs_name) {
+            warn!("Failed to notify udev to perform symlink operation: {}", e);
+        }
     }
 
     /// Create a snapshot of the filesystem. Return the resulting filesystem/ThinDev

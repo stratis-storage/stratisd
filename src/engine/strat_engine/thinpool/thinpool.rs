@@ -454,12 +454,7 @@ impl ThinPool {
             .filter_map(
                 |fssave| match StratFilesystem::setup(pool_uuid, &thinpool_dev, fssave) {
                     Ok(fs) => {
-                        if let Err(e) = fs.udev_fs_change(pool_name, fssave.uuid, &fssave.name) {
-                            warn!(
-                                "Failed to notify udev to create filesystem symlink: {}",
-                                e
-                            );
-                        }
+                        fs.udev_fs_change(pool_name, fssave.uuid, &fssave.name);
                         Some((Name::new(fssave.name.to_owned()), fssave.uuid, fs))
                     },
                     Err(err) => {
@@ -860,9 +855,7 @@ impl ThinPool {
             .filesystems
             .get_by_uuid(fs_uuid)
             .expect("Inserted above");
-        if let Err(e) = fs.udev_fs_change(&pool_name, fs_uuid, &name) {
-            warn!("Failed to notify udev to create filesystem symlink: {}", e);
-        }
+        fs.udev_fs_change(&pool_name, fs_uuid, &name);
 
         Ok(fs_uuid)
     }
@@ -906,9 +899,7 @@ impl ThinPool {
             .filesystems
             .get_by_uuid(snapshot_fs_uuid)
             .expect("Inserted above");
-        if let Err(e) = fs.udev_fs_change(&pool_name, snapshot_fs_uuid, &new_fs_name) {
-            warn!("Failed to notify udev to create filesystem symlink: {}", e);
-        }
+        fs.udev_fs_change(&pool_name, snapshot_fs_uuid, &new_fs_name);
         Ok((
             snapshot_fs_uuid,
             self.filesystems
@@ -985,9 +976,7 @@ impl ThinPool {
         } else {
             self.filesystems.insert(new_name, uuid, filesystem);
             let (new_name, fs) = self.filesystems.get_by_uuid(uuid).expect("Inserted above");
-            if let Err(e) = fs.udev_fs_change(pool_name, uuid, &new_name) {
-                warn!("Filesystem rename symlink action failed: {}", e);
-            }
+            fs.udev_fs_change(pool_name, uuid, &new_name);
             Ok(Some(uuid))
         }
     }

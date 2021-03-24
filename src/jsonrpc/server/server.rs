@@ -12,7 +12,10 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::ready;
+use futures::{
+    ready,
+    stream::{Stream, StreamExt},
+};
 use nix::{
     fcntl::{fcntl, FcntlArg, OFlag},
     sys::{
@@ -25,7 +28,6 @@ use nix::{
     unistd::close,
 };
 use tokio::{io::unix::AsyncFd, sync::Mutex, task::JoinHandle};
-use tokio_stream::{Stream, StreamExt};
 
 use crate::{
     engine::Engine,

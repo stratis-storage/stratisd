@@ -23,7 +23,7 @@ pub async fn filesystem_create(
     let (pool_uuid, pool) = name_to_uuid_and_pool(&mut *lock, pool_name)
         .ok_or_else(|| StratisError::Error(format!("No pool named {} found", pool_name)))?;
     Ok(pool
-        .create_filesystems(pool_uuid, &[(name, None)])?
+        .create_filesystems(pool_name, pool_uuid, &[(name, None)])?
         .is_changed())
 }
 

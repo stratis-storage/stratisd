@@ -205,7 +205,10 @@ impl StratPool {
 
         let mut backstore =
             Backstore::setup(uuid, &metadata.backstore, datadevs, cachedevs, timestamp)?;
+        let pool_name = &metadata.name;
+
         let mut thinpool = ThinPool::setup(
+            pool_name,
             uuid,
             &metadata.thinpool_dev,
             &metadata.flex_devs,
@@ -219,8 +222,6 @@ impl StratPool {
             redundancy: Redundancy::NONE,
             thin_pool: thinpool,
         };
-
-        let pool_name = &metadata.name;
 
         if changed {
             pool.write_metadata(pool_name)?;

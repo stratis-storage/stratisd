@@ -249,9 +249,7 @@ impl Engine for StratEngine {
         } else {
             self.pools.insert(new_name, uuid, pool);
             let (new_name, pool) = self.pools.get_by_uuid(uuid).expect("Inserted above");
-            if let Err(e) = pool.udev_pool_change(&new_name) {
-                warn!("Pool rename symlink action failed: {}", e)
-            }
+            pool.udev_pool_change(&new_name);
             Ok(RenameAction::Renamed(uuid))
         }
     }
@@ -333,9 +331,15 @@ impl Engine for StratEngine {
 
 #[cfg(test)]
 mod test {
-    use crate::engine::strat_engine::tests::{loopbacked, real};
+    use devicemapper::Sectors;
 
-    use crate::engine::types::EngineAction;
+    use crate::engine::{
+        strat_engine::{
+            cmd,
+            tests::{loopbacked, real},
+        },
+        types::EngineAction,
+    };
 
     use super::*;
 
@@ -350,8 +354,54 @@ mod test {
             .changed()
             .unwrap();
 
+        let fs_name1 = "testfs1";
+        let fs_name2 = "testfs2";
+        let (_, pool) = engine.pools.get_mut_by_uuid(uuid1).unwrap();
+        let fs_uuid1 = pool
+            .create_filesystems(name1, uuid1, &[(fs_name1, None)])
+            .unwrap()
+            .changed()
+            .unwrap();
+        let fs_uuid2 = pool
+            .create_filesystems(name1, uuid1, &[(fs_name2, None)])
+            .unwrap()
+            .changed()
+            .unwrap();
+
+        cmd::udev_settle().unwrap();
+
+        assert!(Path::new(&format!("/dev/stratis/{}/{}", name1, fs_name1)).exists());
+        assert!(Path::new(&format!("/dev/stratis/{}/{}", name1, fs_name2)).exists());
+
         let name2 = "name2";
         let action = engine.rename_pool(uuid1, name2).unwrap();
+
+        cmd::udev_settle().unwrap();
+
+        assert!(!Path::new(&format!("/dev/stratis/{}/{}", name1, fs_name1)).exists());
+        assert!(!Path::new(&format!("/dev/stratis/{}/{}", name1, fs_name2)).exists());
+        assert!(Path::new(&format!("/dev/stratis/{}/{}", name2, fs_name1)).exists());
+        assert!(Path::new(&format!("/dev/stratis/{}/{}", name2, fs_name2)).exists());
+
+        let (_, pool) = engine.pools.get_mut_by_uuid(uuid1).unwrap();
+        pool.destroy_filesystems(
+            name2,
+            fs_uuid1
+                .into_iter()
+                .map(|(_, u)| u)
+                .collect::<Vec<_>>()
+                .as_slice(),
+        )
+        .unwrap();
+        pool.destroy_filesystems(
+            name2,
+            fs_uuid2
+                .into_iter()
+                .map(|(_, u)| u)
+                .collect::<Vec<_>>()
+                .as_slice(),
+        )
+        .unwrap();
 
         assert_eq!(action, RenameAction::Renamed(uuid1));
         engine.teardown().unwrap();
@@ -364,7 +414,7 @@ mod test {
     #[test]
     fn loop_test_pool_rename() {
         loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(1, 3, None),
+            &loopbacked::DeviceLimits::Range(1, 3, Some(Sectors(10 * 1024 * 1024))),
             test_pool_rename,
         );
     }
@@ -372,7 +422,7 @@ mod test {
     #[test]
     fn real_test_pool_rename() {
         real::test_with_spec(
-            &real::DeviceLimits::AtLeast(1, None, None),
+            &real::DeviceLimits::AtLeast(1, Some(Sectors(10 * 1024 * 1024)), None),
             test_pool_rename,
         );
     }

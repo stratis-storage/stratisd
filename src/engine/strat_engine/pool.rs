@@ -205,7 +205,10 @@ impl StratPool {
 
         let mut backstore =
             Backstore::setup(uuid, &metadata.backstore, datadevs, cachedevs, timestamp)?;
+        let pool_name = &metadata.name;
+
         let mut thinpool = ThinPool::setup(
+            pool_name,
             uuid,
             &metadata.thinpool_dev,
             &metadata.flex_devs,
@@ -220,8 +223,6 @@ impl StratPool {
             thin_pool: thinpool,
         };
 
-        let pool_name = &metadata.name;
-
         if changed {
             pool.write_metadata(pool_name)?;
         }
@@ -230,12 +231,12 @@ impl StratPool {
     }
 
     /// Send a synthetic udev change event to every filesystem on the given pool.
-    pub fn udev_pool_change(&self, pool_name: &str) -> StratisResult<()> {
+    pub fn udev_pool_change(&self, pool_name: &str) {
         for (name, uuid, fs) in self.thin_pool.filesystems() {
-            fs.udev_fs_change(pool_name, uuid, &name)?;
+            if let Err(e) = fs.udev_fs_change(pool_name, uuid, &name) {
+                warn!("Filesystem rename symlink action failed: {}", e);
+            }
         }
-
-        Ok(())
     }
 
     /// Write current metadata to pool members.

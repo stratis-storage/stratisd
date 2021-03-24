@@ -392,6 +392,7 @@ impl ThinPool {
     /// the problem by running thin_repair. If failure recurs, return an
     /// error.
     pub fn setup(
+        pool_name: &str,
         pool_uuid: PoolUuid,
         thin_pool_save: &ThinPoolDevSave,
         flex_devs: &FlexDevsSave,
@@ -452,7 +453,15 @@ impl ThinPool {
             .iter()
             .filter_map(
                 |fssave| match StratFilesystem::setup(pool_uuid, &thinpool_dev, fssave) {
-                    Ok(fs) => Some((Name::new(fssave.name.to_owned()), fssave.uuid, fs)),
+                    Ok(fs) => {
+                        if let Err(e) = fs.udev_fs_change(pool_name, fssave.uuid, &fssave.name) {
+                            warn!(
+                                "Failed to notify udev to create filesystem symlink: {}",
+                                e
+                            );
+                        }
+                        Some((Name::new(fssave.name.to_owned()), fssave.uuid, fs))
+                    },
                     Err(err) => {
                         warn!(
                             "Filesystem specified by metadata {:?} could not be setup, reason: {:?}",
@@ -852,10 +861,7 @@ impl ThinPool {
             .get_by_uuid(fs_uuid)
             .expect("Inserted above");
         if let Err(e) = fs.udev_fs_change(&pool_name, fs_uuid, &name) {
-            warn!(
-                "Failed to trigger filesystem symlink creation in udev: {}",
-                e
-            );
+            warn!("Failed to notify udev to create filesystem symlink: {}", e);
         }
 
         Ok(fs_uuid)
@@ -901,10 +907,7 @@ impl ThinPool {
             .get_by_uuid(snapshot_fs_uuid)
             .expect("Inserted above");
         if let Err(e) = fs.udev_fs_change(&pool_name, snapshot_fs_uuid, &new_fs_name) {
-            warn!(
-                "Failed to trigger filesystem snapshot symlink creation in udev: {}",
-                e
-            );
+            warn!("Failed to notify udev to create filesystem symlink: {}", e);
         }
         Ok((
             snapshot_fs_uuid,
@@ -1507,7 +1510,8 @@ mod tests {
 
         retry_operation!(pool.teardown());
 
-        let pool = ThinPool::setup(pool_uuid, &thinpoolsave, &flexdevs, &backstore).unwrap();
+        let pool =
+            ThinPool::setup(pool_name, pool_uuid, &thinpoolsave, &flexdevs, &backstore).unwrap();
 
         assert_eq!(&*pool.get_filesystem_by_uuid(fs_uuid).unwrap().0, name2);
     }
@@ -1575,8 +1579,14 @@ mod tests {
         }
         let thinpooldevsave: ThinPoolDevSave = pool.record();
 
-        let new_pool =
-            ThinPool::setup(pool_uuid, &thinpooldevsave, &pool.record(), &backstore).unwrap();
+        let new_pool = ThinPool::setup(
+            pool_name,
+            pool_uuid,
+            &thinpooldevsave,
+            &pool.record(),
+            &backstore,
+        )
+        .unwrap();
 
         assert!(new_pool.get_filesystem_by_uuid(fs_uuid).is_some());
     }
@@ -1620,7 +1630,14 @@ mod tests {
         // Check that destroyed fs is not present in MDV. If the record
         // had been left on the MDV that didn't match a thin_id in the
         // thinpool, ::setup() will fail.
-        let pool = ThinPool::setup(pool_uuid, &thinpooldevsave, &flexdevs, &backstore).unwrap();
+        let pool = ThinPool::setup(
+            pool_name,
+            pool_uuid,
+            &thinpooldevsave,
+            &flexdevs,
+            &backstore,
+        )
+        .unwrap();
 
         assert_matches!(pool.get_filesystem_by_uuid(fs_uuid), None);
     }
@@ -1715,7 +1732,8 @@ mod tests {
         let flexdevs: FlexDevsSave = pool.record();
         let thinpoolsave: ThinPoolDevSave = pool.record();
         pool.teardown().unwrap();
-        let mut pool = ThinPool::setup(pool_uuid, &thinpoolsave, &flexdevs, &backstore).unwrap();
+        let mut pool =
+            ThinPool::setup(pool_name, pool_uuid, &thinpoolsave, &flexdevs, &backstore).unwrap();
         let filesystem = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap().1;
         let thindev_size = filesystem.thindev_size();
         assert!(thindev_size > start_thindev_size)

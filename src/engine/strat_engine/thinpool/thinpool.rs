@@ -1199,6 +1199,7 @@ mod tests {
     use devicemapper::{Bytes, SECTOR_SIZE};
 
     use crate::engine::strat_engine::{
+        cmd,
         metadata::MDADataSize,
         tests::{loopbacked, real},
         writing::SyncAll,
@@ -1377,9 +1378,14 @@ mod tests {
         )
         .unwrap();
 
+        let filesystem_name = "stratis_test_filesystem";
         let fs_uuid = pool
-            .create_filesystem(pool_name, pool_uuid, "stratis_test_filesystem", None)
+            .create_filesystem(pool_name, pool_uuid, filesystem_name, None)
             .unwrap();
+
+        cmd::udev_settle().unwrap();
+
+        assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, filesystem_name)).exists());
 
         let write_buf = &[8u8; SECTOR_SIZE];
         let file_count = 10;
@@ -1426,9 +1432,17 @@ mod tests {
         )
         .unwrap();
 
+        let snapshot_name = "test_snapshot";
         let (_, snapshot_filesystem) = pool
-            .snapshot_filesystem(pool_name, pool_uuid, fs_uuid, "test_snapshot")
+            .snapshot_filesystem(pool_name, pool_uuid, fs_uuid, snapshot_name)
             .unwrap();
+
+        cmd::udev_settle().unwrap();
+
+        // Assert both symlinks are still present.
+        assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, filesystem_name)).exists());
+        assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, snapshot_name)).exists());
+
         let mut read_buf = [0u8; SECTOR_SIZE];
         let snapshot_tmp_dir = tempfile::Builder::new()
             .prefix("stratis_testing")
@@ -1492,7 +1506,18 @@ mod tests {
             .create_filesystem(pool_name, pool_uuid, name1, None)
             .unwrap();
 
+        cmd::udev_settle().unwrap();
+
+        assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, name1)).exists());
+
         let action = pool.rename_filesystem(pool_name, fs_uuid, name2).unwrap();
+
+        cmd::udev_settle().unwrap();
+
+        // Check that the symlink has been renamed.
+        assert!(!Path::new(&format!("/dev/stratis/{}/{}", pool_name, name1)).exists());
+        assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, name2)).exists());
+
         assert_matches!(action, Some(_));
         let flexdevs: FlexDevsSave = pool.record();
         let thinpoolsave: ThinPoolDevSave = pool.record();

@@ -22,6 +22,9 @@ required-features = ["dbus_enabled"]
 name = "stratis-min"
 required-features = ["extras"]
 
+[[bin]]
+name = "stratis-utils"
+
 [dependencies]
 clap = "2"
 nix = "0.20.0"
@@ -45,10 +48,10 @@ itertools = "0.10.0"
 semver = "0.11"
 termios = "0.3"
 regex = "1"
-base64 = "0.13"
 sha-1 = "0.9"
 either = "1"
 futures = "0.3"
+data-encoding = "2"
 
 [dependencies.libcryptsetup-rs]
 version = "0.4.3"

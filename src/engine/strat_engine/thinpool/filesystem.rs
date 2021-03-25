@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use chrono::{DateTime, TimeZone, Utc};
+use data_encoding::BASE32_NOPAD;
 
 use std::{
     fs::{File, OpenOptions},
@@ -143,8 +144,8 @@ impl StratFilesystem {
                         "{} {} STRATISPOOLNAME={} STRATISFSNAME={}",
                         devlinks::UEVENT_CHANGE_EVENT,
                         fs_uuid,
-                        pool_name,
-                        fs_name,
+                        BASE32_NOPAD.encode(pool_name.as_bytes()),
+                        BASE32_NOPAD.encode(fs_name.as_bytes()),
                     )
                     .as_bytes(),
                 )?;

@@ -114,6 +114,7 @@ CLIPPY_PEDANTIC = -D clippy::await_holding_lock \
                   -D clippy::unsafe_derive_deserialize \
                   -A clippy::unseparated_literal_suffix \
                   -A clippy::unused_self \
+                  -A clippy::upper_case_acronyms \
                   -D clippy::used_underscore_binding \
                   -D clippy::used_underscore_binding \
                   -D clippy::verbose_bit_mask \

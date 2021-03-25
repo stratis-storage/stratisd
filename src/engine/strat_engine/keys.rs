@@ -389,7 +389,7 @@ impl StratKeyActions {
         key_desc: &KeyDescription,
         key: SizedKeyMemory,
     ) -> StratisResult<MappingCreateAction<Key>> {
-        Ok(set_key_idem(&key_desc, key)?)
+        set_key_idem(&key_desc, key)
     }
 }
 
@@ -401,7 +401,7 @@ impl KeyActions for StratKeyActions {
     ) -> StratisResult<MappingCreateAction<Key>> {
         let memory = shared::set_key_shared(key_fd)?;
 
-        Ok(set_key_idem(key_desc, memory)?)
+        set_key_idem(key_desc, memory)
     }
 
     fn list(&self) -> StratisResult<Vec<KeyDescription>> {

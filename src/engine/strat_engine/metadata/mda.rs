@@ -115,7 +115,7 @@ impl MDARegions {
                 u64
             )?))?;
             f.read_exact(&mut hdr_buf)?;
-            Ok(MDAHeader::from_buf(&hdr_buf)?)
+            MDAHeader::from_buf(&hdr_buf)
         };
 
         // Get an MDAHeader for the given index.

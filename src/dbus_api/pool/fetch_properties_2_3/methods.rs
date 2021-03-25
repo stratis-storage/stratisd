@@ -29,7 +29,7 @@ const ALL_PROPERTIES: [&str; 5] = [
     consts::POOL_CLEVIS_INFO,
 ];
 
-#[allow(clippy::unknown_clippy_lints)]
+#[allow(unknown_lints)]
 #[allow(clippy::unnecessary_wraps)]
 fn get_properties_shared(
     m: &MethodInfo<MTSync<TData>, TData>,

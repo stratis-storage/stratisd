@@ -43,19 +43,19 @@ fn next_index(flex_devs: &FlexDevsSave) -> Sectors {
         flex_devs
             .meta_dev
             .last()
-            .unwrap_or_else(|| panic!(expect_msg)),
+            .unwrap_or_else(|| panic!("{}", expect_msg)),
         flex_devs
             .thin_meta_dev
             .last()
-            .unwrap_or_else(|| panic!(expect_msg)),
+            .unwrap_or_else(|| panic!("{}", expect_msg)),
         flex_devs
             .thin_data_dev
             .last()
-            .unwrap_or_else(|| panic!(expect_msg)),
+            .unwrap_or_else(|| panic!("{}", expect_msg)),
         flex_devs
             .thin_meta_dev_spare
             .last()
-            .unwrap_or_else(|| panic!(expect_msg)),
+            .unwrap_or_else(|| panic!("{}", expect_msg)),
     ]
     .iter()
     .max_by_key(|x| x.0)

@@ -56,6 +56,7 @@ CLIPPY_PEDANTIC = -D clippy::await_holding_lock \
                   -A clippy::filter_map \
                   -A clippy::filter_map_next \
                   -D clippy::fn_params_excessive_bools \
+                  -A clippy::from_over_into \
                   -A clippy::if_not_else \
                   -D clippy::implicit_hasher \
                   -D clippy::implicit_saturating_sub \

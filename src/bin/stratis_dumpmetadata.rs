@@ -72,10 +72,7 @@ fn main() {
         .get_matches();
     let devpath = matches.value_of("dev").unwrap();
 
-    let print_bytes: bool = match matches.value_of("print_bytes") {
-        Some("bytes") => true,
-        _ => false,
-    };
+    let print_bytes: bool = matches!(matches.value_of("print_bytes"), Some("bytes"));
 
     match run(devpath, print_bytes) {
         Ok(()) => {}

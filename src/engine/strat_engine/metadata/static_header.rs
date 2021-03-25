@@ -78,7 +78,7 @@ impl StaticHeaderResult {
             }
         }
 
-        return result;
+        result
     }
 }
 

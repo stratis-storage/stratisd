@@ -183,14 +183,8 @@ jobs:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
           override: true
-      - name: Build udev executable
-        run: make -f Makefile build
-      - name: Install udev executables
-        run: |
-          cp ./target/debug/stratis-utils /usr/lib/udev/stratis-str-cmp
-          ln /usr/lib/udev/stratis-str-cmp /usr/lib/udev/stratis-base32-decode
-      - name: Apply udev rule
-        run: cp udev/61-stratisd.rules /usr/lib/udev/rules.d
+      - name: Install all necessary Stratis files
+        run: make install
       - name: Start udev
         run: /usr/lib/systemd/systemd-udevd &
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain

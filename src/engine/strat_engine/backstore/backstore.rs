@@ -526,10 +526,9 @@ impl Backstore {
         // will be allocated incorrectly from the cap device.
         assert!(
             self.next <= size,
-            format!(
-                "next index, {}, is greater than the total size available {}",
-                self.next, size
-            )
+            "next index, {}, is greater than the total size available {}",
+            self.next,
+            size
         );
         size - self.next
     }

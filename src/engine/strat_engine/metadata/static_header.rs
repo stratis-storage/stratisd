@@ -188,7 +188,7 @@ impl StaticHeader {
             f.write_all(&zeroed[..bytes!(static_header_size::POST_SIGBLOCK_PADDING_SECTORS)])?;
             f.sync_all()?;
             Ok(())
-        };
+        }
 
         if which == MetadataLocation::Both || which == MetadataLocation::First {
             write_region(f, &signature_block, &zeroed)?;

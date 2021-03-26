@@ -146,14 +146,6 @@ jobs:
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
-      - name: Apply udev rule
-        run: cp udev/14-stratisd.rules /usr/lib/udev/rules.d
-      - name: Build udev executable
-        run: cargo build --bin=stratis-utils
-      - name: install udev executables
-        run: |
-          cp ./target/debug/stratis-utils /usr/lib/udev/stratis-str-cmp
-          ln /usr/lib/udev/stratis-str-cmp /usr/lib/udev/stratis-base32-decode
       - name: Install dependencies for Ubuntu
         run: apt-get -q update
         if: matrix.image == 'ubuntu:groovy'
@@ -186,13 +178,21 @@ jobs:
           systemd-udev
           xfsprogs
         if: matrix.image == 'fedora:32'
-      - name: Start udev
-        run: /usr/lib/systemd/systemd-udevd &
       - uses: actions-rs/toolchain@v1
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
           override: true
+      - name: Build udev executable
+        run: cargo build --bin=stratis-utils
+      - name: install udev executables
+        run: |
+          cp ./target/debug/stratis-utils /usr/lib/udev/stratis-str-cmp
+          ln /usr/lib/udev/stratis-str-cmp /usr/lib/udev/stratis-base32-decode
+      - name: Apply udev rule
+        run: cp udev/14-stratisd.rules /usr/lib/udev/rules.d
+      - name: Start udev
+        run: /usr/lib/systemd/systemd-udevd &
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 

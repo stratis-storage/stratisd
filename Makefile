@@ -10,6 +10,7 @@ DATADIR ?= $(PREFIX)/share
 UDEVDIR ?= $(PREFIX)/lib/udev
 MANDIR ?= $(DATADIR)/man
 UNITDIR ?= $(PREFIX)/lib/systemd/system
+PROFILEDIR ?= target/release
 
 RELEASE_VERSION ?= 9.9.9
 
@@ -183,13 +184,12 @@ stratis-min:
 	RUSTFLAGS="${DENY}" \
 	cargo build --bin=stratis-min --features extras ${TARGET_ARGS}
 
-profiledir := $(shell if test -d target/release; then echo target/release; else echo target/debug; fi)
 install: release docs
-	install -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) $(profiledir)/stratisd
+	install -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) $(PROFILEDIR)/stratisd
 	install -Dpm0644 -t $(DESTDIR)$(DATADIR)/dbus-1/system.d stratisd.conf
 	install -Dpm0644 -t $(DESTDIR)$(MANDIR)/man8 docs/stratisd.8
 	install -Dpm0644 -t $(DESTDIR)$(UDEVDIR)/rules.d udev/61-stratisd.rules
-	install -Dpm0755 -t $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(profiledir)/stratis-utils
+	install -Dpm0755 -t $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(PROFILEDIR)/stratis-utils
 	ln $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(UDEVDIR)/stratis-base32-decode
 	install -Dpm0644 -t $(DESTDIR)$(UNITDIR) stratisd.service
 	install -Dpm0755 -t $(DESTDIR)$(PREFIX)/bin developer_tools/stratis_migrate_symlinks.sh

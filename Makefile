@@ -224,7 +224,8 @@ clippy:
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets --all-features -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
 
 dependency_check:
-	${PWD}/code_maintenance/update_cargo_crates.py; test "($$? & 16)"
+	${PWD}/code_maintenance/update_cargo_crates.py || [ $$? -lt 16 ]
+
 
 .PHONY:
 	audit

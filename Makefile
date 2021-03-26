@@ -205,7 +205,7 @@ test:
 	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 cargo test -- --skip real_ --skip loop_
 
 yamllint:
-	yamllint --strict .github/workflows/main.yml
+	yamllint --strict .github/workflows/*.yml
 
 docs: stratisd.8 docs-rust
 
@@ -222,6 +222,9 @@ stratisd.8.gz: stratisd.8
 
 clippy:
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets --all-features -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
+
+dependency_check:
+	${PWD}/code_maintenance/update_cargo_crates.py; test "($$? & 16)"
 
 .PHONY:
 	audit

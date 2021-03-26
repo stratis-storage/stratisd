@@ -39,9 +39,9 @@ type GetVerRet = Variant<Box<dyn RefArg + 'static>>;
 fn get_version() -> Result<GetVerRet, dbus::Error> {
     let connection = Connection::new_system()?;
     let proxy = connection.with_proxy(STRATIS_BUS_NAME, STRATIS_MANAGER_OBJECT, *TIMEOUT);
-    Ok(proxy
+    proxy
         .method_call(DBUS_PROPS_IFACE, "Get", (STRATIS_MANAGER_IFACE, "Version"))
-        .map(|r: (GetVerRet,)| r.0)?)
+        .map(|r: (GetVerRet,)| r.0)
 }
 
 fn run() -> Result<Version, String> {

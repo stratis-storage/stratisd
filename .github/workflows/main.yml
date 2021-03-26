@@ -153,6 +153,7 @@ jobs:
         run: >
           DEBIAN_FRONTEND=noninteractive
           apt-get install -y
+          asciidoc
           clang
           curl
           libblkid-dev
@@ -167,6 +168,7 @@ jobs:
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
+          asciidoc
           clang
           cryptsetup-devel
           curl

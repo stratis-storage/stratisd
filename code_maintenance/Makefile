@@ -6,8 +6,7 @@ lint:
 
 .PHONY: fmt
 fmt:
-	isort --recursive check.py update_cargo_crates.py
-	isort --recursive check.py create_release.py
+	isort --recursive .
 	black .
 
 .PHONY: fmt-travis

@@ -17,11 +17,13 @@
 Uploads the vendored dependency tarball as a release asset.
 """
 
+# isort: STDLIB
 import os
 import re
 import sys
 from getpass import getpass
 
+# isort: THIRDPARTY
 from github import Github
 
 

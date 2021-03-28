@@ -15,12 +15,22 @@ ARG_MAP = {
         "--disable=I",
         "--msg-template='{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}'",
     ],
-    "update_cargo_crates.py": [
+    "compare_fedora_versions": [
         "--reports=no",
         "--disable=I",
         "--msg-template='{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}'",
     ],
     "create_release.py": [
+        "--reports=no",
+        "--disable=I",
+        "--msg-template='{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}'",
+    ],
+    "set_lower_bounds": [
+        "--reports=no",
+        "--disable=I",
+        "--msg-template='{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}'",
+    ],
+    "_utils.py": [
         "--reports=no",
         "--disable=I",
         "--msg-template='{path}:{line}: [{msg_id}({symbol}), {obj}] {msg}'",

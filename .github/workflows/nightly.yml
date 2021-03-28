@@ -34,4 +34,4 @@ jobs:
           components: cargo
           toolchain: stable
       - name: Check for outdated dependencies
-        run: make -f Makefile dependency_check
+        run: make -f Makefile compare-fedora

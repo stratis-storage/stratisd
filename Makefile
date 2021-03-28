@@ -223,8 +223,15 @@ stratisd.8.gz: stratisd.8
 clippy:
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets --all-features -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
 
-dependency_check:
-	${PWD}/code_maintenance/update_cargo_crates.py || [ $$? -lt 16 ]
+compare-fedora:
+	${PWD}/code_maintenance/compare_fedora_versions || [ $$? -lt 16 ]
+
+set-lower-bounds:
+	${PWD}/code_maintenance/set_lower_bounds
+
+# Verify that the dependency bounds set in Cargo.toml are not lower
+# than is actually reqired.
+verify-dependency-bounds: set-lower-bounds clippy
 
 
 .PHONY:
@@ -232,6 +239,7 @@ dependency_check:
 	bloat
 	build
 	clippy
+	compare-fedora
 	create-release
 	docs
 	docs-rust
@@ -242,7 +250,9 @@ dependency_check:
 	license
 	outdated
 	release
+	set-lower-bounds
 	test
 	test-loop
 	test-real
+	verify-dependency-bounds
 	yamllint

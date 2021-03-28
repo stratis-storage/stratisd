@@ -194,9 +194,13 @@ jobs:
     strategy:
       matrix:
         include:
-          # Allowed so as not to make an extra step for external contributors
+          # Allowed so as not to make an extra step for external contributors.
           - task: cargo update --locked
-            toolchain: stable
+            toolchain: 1.50.0  # RECOMMENDED DEVELOPMENT TOOLCHAIN
+            components: cargo
+          # Allowed so as not to make an extra step for external contributors.
+          - task: make -f Makefile verify-dependency-bounds
+            toolchain: 1.50.0  # RECOMMENDED DEVELOPMENT TOOLCHAIN
             components: cargo
           # Allowed because a failure may occur after a new Rust stable
           # version is released.
@@ -211,24 +215,23 @@ jobs:
             components: cargo
     runs-on: ubuntu-18.04
     container:
-      image: ubuntu:groovy
+      image: fedora:32
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies
-        run: apt-get -q update
-      - name: Install dependencies
         run: >
-          DEBIAN_FRONTEND=noninteractive
-          apt-get -y install
+          dnf install -y
           clang
           curl
-          libblkid-dev
-          libcryptsetup-dev
-          libdbus-1-dev
-          libssl-dev
-          libudev-dev
+          cryptsetup-devel
+          dbus-devel
+          libblkid-devel
           make
+          openssl-devel
+          python-requests
+          python-semantic_version
+          systemd-devel
       - uses: actions-rs/toolchain@v1
         with:
           components: ${{ matrix.components }}

@@ -22,19 +22,19 @@ jobs:
         include:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
           - task: make -f Makefile fmt-travis
-            toolchain: 1.50.0
+            toolchain: 1.51.0
             components: rustfmt
             image: ubuntu:groovy
           - task: make -f Makefile clippy
-            toolchain: 1.50.0
+            toolchain: 1.51.0
             components: clippy
             image: ubuntu:groovy
           - task: make -f Makefile fmt-travis
-            toolchain: 1.50.0
+            toolchain: 1.51.0
             components: rustfmt
             image: fedora:32
           - task: make -f Makefile clippy
-            toolchain: 1.50.0
+            toolchain: 1.51.0
             components: clippy
             image: fedora:32
           # MANDATORY TESTING ON STABLE
@@ -196,11 +196,11 @@ jobs:
         include:
           # Allowed so as not to make an extra step for external contributors.
           - task: cargo update --locked
-            toolchain: 1.50.0  # RECOMMENDED DEVELOPMENT TOOLCHAIN
+            toolchain: 1.51.0  # RECOMMENDED DEVELOPMENT TOOLCHAIN
             components: cargo
           # Allowed so as not to make an extra step for external contributors.
           - task: make -f Makefile verify-dependency-bounds
-            toolchain: 1.50.0  # RECOMMENDED DEVELOPMENT TOOLCHAIN
+            toolchain: 1.51.0  # RECOMMENDED DEVELOPMENT TOOLCHAIN
             components: cargo
           # Allowed because a failure may occur after a new Rust stable
           # version is released.

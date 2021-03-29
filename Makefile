@@ -198,7 +198,7 @@ clean:
 	rm -fv $(DESTDIR)$(MANDIR)/man8/stratisd.8
 	rm -fv $(DESTDIR)$(UDEVDIR)/rules.d/*-stratisd.rules
 	rm -fv $(DESTDIR)$(UNITDIR)/stratisd.service
-	rm -fv $(DESTDIR)$(PREFIX)/bin/developer_tools/stratis_migrate_symlinks.sh
+	rm -fv $(DESTDIR)$(PREFIX)/bin/stratis_migrate_symlinks.sh
 
 release:
 	RUSTFLAGS="${DENY}" cargo build --release

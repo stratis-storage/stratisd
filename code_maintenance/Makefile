@@ -1,8 +1,10 @@
 .PHONY: lint
 lint:
 	./check.py check.py
-	./check.py update_cargo_crates.py
+	./check.py compare_fedora_versions
 	./check.py create_release.py
+	./check.py set_lower_bounds 
+	./check.py _utils.py
 
 .PHONY: fmt
 fmt:

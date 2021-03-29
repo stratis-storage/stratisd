@@ -1,0 +1,87 @@
+#!/usr/bin/python3
+#
+# Copyright 2020 Red Hat, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""
+Calculates information comparing the versions of dependencies in a Rust project
+to the versions of dependencies available on Fedora Rawhide.
+"""
+
+
+# isort: STDLIB
+import argparse
+import sys
+
+# isort: LOCAL
+from _utils import build_cargo_metadata, build_koji_repo_dict
+
+
+def main():
+    """
+    The main method
+    """
+    parser = argparse.ArgumentParser(
+        description=(
+            "Compares versions of direct dependencies in Fedora with versions "
+            "specified in Cargo.toml. Prints some information to stdout. Rules "
+            "for exit code: "
+            "if exit code & 0x4 == 0x4, a dependency is missing in "
+            "Fedora, if exit code & 0x8 = 0x8, a dependency is higher than "
+            "that available in Fedora, if exit code & 0x10 == 0x10, then a "
+            "dependency can be bumped to a higher version in Fedora."
+        )
+    )
+    parser.parse_args()
+
+    # Read the dependency versions specified in Cargo.toml
+    explicit_dependencies = build_cargo_metadata()
+
+    # Build koji dict
+    koji_repo_dict = build_koji_repo_dict(frozenset(explicit_dependencies.keys()))
+
+    exit_code = 0x0
+
+    for crate, version in explicit_dependencies.items():
+        koji_version = koji_repo_dict.get(crate)
+        if koji_version is None:
+            print("No Fedora package for crate %s found" % crate, file=sys.stdout)
+            exit_code |= 0x4
+            continue
+
+        if koji_version < version:
+            print(
+                "Version %s of crate %s higher than maximum %s that is available on Fedora"
+                % (version, crate, koji_version),
+                file=sys.stdout,
+            )
+            exit_code |= 0x8
+            continue
+
+        exclusive_upper_bound = (
+            version.next_major() if version.major != 0 else version.next_minor()
+        )
+
+        if koji_version >= exclusive_upper_bound:
+            print(
+                "Version %s of crate %s is available in Fedora. Requires update in Cargo.toml"
+                % (koji_version, crate),
+                file=sys.stdout,
+            )
+            exit_code |= 0x10
+
+    return exit_code
+
+
+if __name__ == "__main__":
+    sys.exit(main())

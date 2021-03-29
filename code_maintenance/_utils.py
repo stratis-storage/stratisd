@@ -20,16 +20,17 @@ to the versions of dependencies available on Fedora Rawhide.
 
 
 # isort: STDLIB
-import argparse
 import json
 import re
 import subprocess
-import sys
 
 # isort: THIRDPARTY
 import requests
 from semantic_version import Version
 
+CARGO_TREE_RE = re.compile(
+    r"^[|`]-- (?P<crate>[a-z0-9_\-]+) v(?P<version>[0-9\.]+)( \(.*\))?$"
+)
 KOJI_RE = re.compile(
     r"^toplink/packages/rust-(?P<name>[^\/]*?)/(?P<version>[^\/]*?)/[^]*)]*"
 )
@@ -38,7 +39,34 @@ VERSION_RE = re.compile(
 )
 
 
-def _build_koji_repo_dict(crates):
+def build_cargo_tree_dict():
+    """
+    Build a map of crate names to versions from the output of cargo tree.
+    Determine only the versions of direct dependencies.
+
+    :returns: a map from crates names to sets of versions
+    :rtype: dict of str * set of Version
+    """
+    command = ["cargo", "tree", "--charset=ascii"]
+    proc = subprocess.Popen(command, stdout=subprocess.PIPE)
+
+    stream = proc.stdout
+
+    version_dict = dict()
+    line = stream.readline()
+    while line != b"":
+        line_str = line.decode("utf-8").rstrip()
+        cargo_tree_match = CARGO_TREE_RE.search(line_str)
+        if cargo_tree_match is not None:
+            version_dict[cargo_tree_match.group("crate")] = Version(
+                cargo_tree_match.group("version")
+            )
+        line = stream.readline()
+
+    return version_dict
+
+
+def build_koji_repo_dict(crates):
     """
     :param crates: a set of crates
     :type cargo_tree: set of str
@@ -72,7 +100,7 @@ def _build_koji_repo_dict(crates):
     return koji_repo_dict
 
 
-def _build_cargo_metadata():
+def build_cargo_metadata():
     """
     Build a dict mapping crate to version spec from Cargo.toml.
     """
@@ -96,63 +124,3 @@ def _build_cargo_metadata():
         result[item["name"]] = Version(major=major, minor=minor, patch=patch)
 
     return result
-
-
-def main():
-    """
-    The main method
-    """
-    parser = argparse.ArgumentParser(
-        description=(
-            "Compares versions of direct dependencies in Fedora with versions "
-            "specified in Cargo.toml. Prints some information to stdout. Rules "
-            "for exit code: "
-            "if exit code & 0x4 == 0x4, a dependency is missing in "
-            "Fedora, if exit code & 0x8 = 0x8, a dependency is higher than "
-            "that available in Fedora, if exit code & 0x10 == 0x10, then a "
-            "dependency can be bumped to a higher version in Fedora."
-        )
-    )
-    parser.parse_args()
-
-    # Read the dependency versions specified in Cargo.toml
-    explicit_dependencies = _build_cargo_metadata()
-
-    # Build koji dict
-    koji_repo_dict = _build_koji_repo_dict(frozenset(explicit_dependencies.keys()))
-
-    exit_code = 0x0
-
-    for crate, version in explicit_dependencies.items():
-        koji_version = koji_repo_dict.get(crate)
-        if koji_version is None:
-            print("No Fedora package for crate %s found" % crate, file=sys.stdout)
-            exit_code |= 0x4
-            continue
-
-        if koji_version < version:
-            print(
-                "Version %s of crate %s higher than maximum %s that is available on Fedora"
-                % (version, crate, koji_version),
-                file=sys.stdout,
-            )
-            exit_code |= 0x8
-            continue
-
-        exclusive_upper_bound = (
-            version.next_major() if version.major != 0 else version.next_minor()
-        )
-
-        if koji_version >= exclusive_upper_bound:
-            print(
-                "Version %s of crate %s is available in Fedora. Requires update in Cargo.toml"
-                % (koji_version, crate),
-                file=sys.stdout,
-            )
-            exit_code |= 0x10
-
-    return exit_code
-
-
-if __name__ == "__main__":
-    sys.exit(main())

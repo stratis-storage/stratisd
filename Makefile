@@ -192,6 +192,14 @@ install: release docs
 	install -Dpm0644 -t $(DESTDIR)$(UNITDIR) stratisd.service
 	install -Dpm0755 -t $(DESTDIR)$(PREFIX)/bin developer_tools/stratis_migrate_symlinks.sh
 
+clean:
+	rm -fv $(DESTDIR)$(LIBEXECDIR)/stratisd
+	rm -fv $(DESTDIR)$(DATADIR)/dbus-1/system.d/stratisd.conf
+	rm -fv $(DESTDIR)$(MANDIR)/man8/stratisd.8
+	rm -fv $(DESTDIR)$(UDEVDIR)/rules.d/*-stratisd.rules
+	rm -fv $(DESTDIR)$(UNITDIR)/stratisd.service
+	rm -fv $(DESTDIR)$(PREFIX)/bin/stratis_migrate_symlinks.sh
+
 release:
 	RUSTFLAGS="${DENY}" cargo build --release
 
@@ -238,6 +246,7 @@ verify-dependency-bounds: set-lower-bounds clippy
 	audit
 	bloat
 	build
+	clean
 	clippy
 	compare-fedora
 	create-release

@@ -238,40 +238,43 @@ impl CryptInitializer {
             KeyslotsSize::try_from(DEFAULT_CRYPT_KEYSLOTS_SIZE)?,
         )?;
         let result = self.initialize_with_err(device, key_description, clevis_parsed);
-        match result {
-            Ok(activated_path) => Ok(CryptHandle::new(
-                self.physical_path,
-                activated_path,
-                self.identifiers,
-                EncryptionInfo {
-                    key_description: key_description.cloned(),
-                    clevis_info: clevis_info_owned,
-                },
-                self.activation_name,
-            )),
+        let mut device = match self.acquire_crypt_device() {
+            Ok(d) => d,
             Err(e) => {
-                let device = match self.acquire_crypt_device() {
-                    Ok(d) => d,
-                    Err(e) => {
-                        warn!(
-                            "Failed to roll back crypt device initialization; you \
-                            may need to manually wipe this device: {}",
-                            e,
-                        );
-                        return Err(e);
-                    }
-                };
-                if let Err(err) = Self::rollback(device, &self.physical_path, self.activation_name)
+                warn!(
+                    "Failed to roll back crypt device initialization; you \
+                    may need to manually wipe this device: {}",
+                    e,
+                );
+                return Err(e);
+            }
+        };
+
+        result
+            .and_then(|activated_path| {
+                Ok(CryptHandle::new(
+                    self.physical_path.clone(),
+                    activated_path,
+                    self.identifiers,
+                    EncryptionInfo {
+                        key_description: key_description.cloned(),
+                        clevis_info: clevis_info_from_metadata(&mut device)?,
+                    },
+                    self.activation_name.clone(),
+                ))
+            })
+            .map_err(|e| {
+                if let Err(err) =
+                    Self::rollback(&mut device, &self.physical_path, self.activation_name)
                 {
                     warn!(
                         "Failed to roll back crypt device initialization; you may need \
-                        to manually wipe this device: {}",
+                    to manually wipe this device: {}",
                         err
                     );
                 }
-                Err(e)
-            }
-        }
+                e
+            })
     }
 
     /// Initialize with a passphrase in the kernel keyring only.
@@ -411,11 +414,11 @@ impl CryptInitializer {
     }
 
     pub fn rollback(
-        mut device: CryptDevice,
+        device: &mut CryptDevice,
         physical_path: &Path,
         name: String,
     ) -> StratisResult<()> {
-        ensure_wiped(&mut device, physical_path, &name)
+        ensure_wiped(device, physical_path, &name)
     }
 }
 

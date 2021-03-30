@@ -183,22 +183,26 @@ stratis-min:
 	RUSTFLAGS="${DENY}" \
 	cargo build --bin=stratis-min --features extras ${TARGET_ARGS}
 
-profiledir := $(shell if test -d target/release; then echo target/release; else echo target/debug; fi)
-install: release docs
-	install -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) $(profiledir)/stratisd
+install-cfg:
 	install -Dpm0644 -t $(DESTDIR)$(DATADIR)/dbus-1/system.d stratisd.conf
 	install -Dpm0644 -t $(DESTDIR)$(MANDIR)/man8 docs/stratisd.8
 	install -Dpm0644 -t $(DESTDIR)$(UDEVDIR)/rules.d udev/14-stratisd.rules
 	install -Dpm0644 -t $(DESTDIR)$(UNITDIR) stratisd.service
 	install -Dpm0755 -t $(DESTDIR)$(PREFIX)/bin developer_tools/stratis_migrate_symlinks.sh
 
-clean:
-	rm -fv $(DESTDIR)$(LIBEXECDIR)/stratisd
+profiledir := $(shell if test -d target/release; then echo target/release; else echo target/debug; fi)
+install: release docs install-cfg
+	install -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) $(profiledir)/stratisd
+
+clean-cfg:
 	rm -fv $(DESTDIR)$(DATADIR)/dbus-1/system.d/stratisd.conf
 	rm -fv $(DESTDIR)$(MANDIR)/man8/stratisd.8
 	rm -fv $(DESTDIR)$(UDEVDIR)/rules.d/*-stratisd.rules
 	rm -fv $(DESTDIR)$(UNITDIR)/stratisd.service
 	rm -fv $(DESTDIR)$(PREFIX)/bin/stratis_migrate_symlinks.sh
+
+clean: clean-cfg
+	rm -fv $(DESTDIR)$(LIBEXECDIR)/stratisd
 
 release:
 	RUSTFLAGS="${DENY}" cargo build --release
@@ -247,6 +251,7 @@ verify-dependency-bounds: set-lower-bounds clippy
 	bloat
 	build
 	clean
+	clean-cfg
 	clippy
 	compare-fedora
 	create-release
@@ -256,6 +261,7 @@ verify-dependency-bounds: set-lower-bounds clippy
 	fmt
 	fmt-travis
 	install
+	install-cfg
 	license
 	outdated
 	release

@@ -183,7 +183,7 @@ stratis-min:
 	RUSTFLAGS="${DENY}" \
 	cargo build --bin=stratis-min --features extras ${TARGET_ARGS}
 
-install-cfg:
+install-cfg: docs
 	install -Dpm0644 -t $(DESTDIR)$(DATADIR)/dbus-1/system.d stratisd.conf
 	install -Dpm0644 -t $(DESTDIR)$(MANDIR)/man8 docs/stratisd.8
 	install -Dpm0644 -t $(DESTDIR)$(UDEVDIR)/rules.d udev/14-stratisd.rules
@@ -191,7 +191,7 @@ install-cfg:
 	install -Dpm0755 -t $(DESTDIR)$(PREFIX)/bin developer_tools/stratis_migrate_symlinks.sh
 
 profiledir := $(shell if test -d target/release; then echo target/release; else echo target/debug; fi)
-install: release docs install-cfg
+install: release install-cfg
 	install -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) $(profiledir)/stratisd
 
 clean-cfg:

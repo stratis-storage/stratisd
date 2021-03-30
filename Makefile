@@ -63,6 +63,7 @@ CLIPPY_PEDANTIC = -D clippy::await_holding_lock \
                   -A clippy::filter_map \
                   -A clippy::filter_map_next \
                   -D clippy::fn_params_excessive_bools \
+                  -A clippy::from_over_into \
                   -A clippy::if_not_else \
                   -D clippy::implicit_hasher \
                   -D clippy::implicit_saturating_sub \
@@ -114,6 +115,7 @@ CLIPPY_PEDANTIC = -D clippy::await_holding_lock \
                   -D clippy::unsafe_derive_deserialize \
                   -A clippy::unseparated_literal_suffix \
                   -A clippy::unused_self \
+                  -A clippy::upper_case_acronyms \
                   -D clippy::used_underscore_binding \
                   -D clippy::used_underscore_binding \
                   -D clippy::verbose_bit_mask \

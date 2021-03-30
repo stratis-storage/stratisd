@@ -148,9 +148,7 @@ fn get_device_runs<'a>(
         return vec![];
     }
 
-    let mut device_lists = vec![];
-
-    device_lists.push(avail_specs.iter().take(lower).cloned().collect::<Vec<_>>());
+    let mut device_lists = vec![avail_specs.iter().take(lower).cloned().collect::<Vec<_>>()];
 
     if lower != avail {
         match maybe_upper {

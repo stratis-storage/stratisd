@@ -14,6 +14,11 @@ use serde_json::Value;
 
 use libstratis::engine::{StaticHeader, StaticHeaderResult, BDA};
 
+// Print metadata, such as StaticHeaders, BDA, and Pool Metadata of given device.
+// If sigblocks match, display the StaticHeader fields of a single sigblock,
+// Otherwise display the StaticHeader fields of both sigblocks.
+// If print_bytes flag is set to True, display the bytes buffer
+// of the sigblock alongside the StaticHeader.
 fn run(devpath: &str, print_bytes: bool) -> Result<(), String> {
     let mut devfile = OpenOptions::new()
         .read(true)
@@ -27,7 +32,7 @@ fn run(devpath: &str, print_bytes: bool) -> Result<(), String> {
     );
     if read_results.0 != read_results.1 {
         println!(
-            "{}",
+            "Second sigblock differs: \n\n {}",
             StaticHeaderResult::fmt_metadata(&read_results.1, print_bytes)
         );
     }

@@ -10,6 +10,7 @@ DATADIR ?= $(PREFIX)/share
 UDEVDIR ?= $(PREFIX)/lib/udev
 MANDIR ?= $(DATADIR)/man
 UNITDIR ?= $(PREFIX)/lib/systemd/system
+PROFILE ?= release
 
 RELEASE_VERSION ?= 9.9.9
 
@@ -190,9 +191,8 @@ install-cfg: docs
 	install -Dpm0644 -t $(DESTDIR)$(UNITDIR) stratisd.service
 	install -Dpm0755 -t $(DESTDIR)$(PREFIX)/bin developer_tools/stratis_migrate_symlinks.sh
 
-profiledir := $(shell if test -d target/release; then echo target/release; else echo target/debug; fi)
-install: release install-cfg
-	install -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) $(profiledir)/stratisd
+install: $(PROFILE) install-cfg
+	install -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILE)/stratisd
 
 clean-cfg:
 	rm -fv $(DESTDIR)$(DATADIR)/dbus-1/system.d/stratisd.conf

@@ -22,12 +22,16 @@ required-features = ["dbus_enabled"]
 name = "stratis-min"
 required-features = ["extras"]
 
+[[bin]]
+name = "stratis-utils"
+
 [dependencies]
 base64 = "0.13.0"
 byteorder = "1.2.3"
 chrono = "0.4.1"
 clap = "2.23.0"
 crc = "1.0.0"
+data-encoding = "2.3.0"
 devicemapper = "0.29.0"
 either = "1.5.0"
 env_logger="0.8.0"

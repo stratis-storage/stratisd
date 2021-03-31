@@ -153,6 +153,7 @@ jobs:
         run: >
           DEBIAN_FRONTEND=noninteractive
           apt-get install -y
+          asciidoc
           clang
           curl
           libblkid-dev
@@ -167,6 +168,7 @@ jobs:
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
+          asciidoc
           clang
           cryptsetup-devel
           curl
@@ -178,13 +180,15 @@ jobs:
           systemd-udev
           xfsprogs
         if: matrix.image == 'fedora:32'
-      - name: Start udev
-        run: /usr/lib/systemd/systemd-udevd &
       - uses: actions-rs/toolchain@v1
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
           override: true
+      - name: Install all necessary Stratis files
+        run: make install
+      - name: Start udev
+        run: /usr/lib/systemd/systemd-udevd &
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 

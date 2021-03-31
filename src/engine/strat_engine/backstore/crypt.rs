@@ -10,7 +10,7 @@ use std::{
     sync::Arc,
 };
 
-use base64::{decode, encode_config, CharacterSet, Config};
+use data_encoding::BASE64URL_NOPAD;
 use either::Either;
 use serde_json::{Map, Value};
 use sha1::{Digest, Sha1};
@@ -647,7 +647,7 @@ fn clevis_info_from_metadata(device: &mut CryptDevice) -> StratisResult<Option<(
         Some(s) => s.to_owned(),
         None => return Ok(None),
     };
-    let json_bytes = decode(json_b64)?;
+    let json_bytes = BASE64URL_NOPAD.decode(json_b64.as_bytes())?;
 
     let subjson: Value = serde_json::from_slice(json_bytes.as_slice())?;
 
@@ -720,7 +720,7 @@ fn tang_dispatch(json: &Value) -> StratisResult<Value> {
     let mut hasher = Sha1::new();
     hasher.update(thp.as_bytes());
     let array = hasher.finalize();
-    let thp = encode_config(array, Config::new(CharacterSet::UrlSafe, false));
+    let thp = BASE64URL_NOPAD.encode(array.as_slice());
 
     Ok(json!({"url": url.to_owned(), "thp": thp}))
 }
@@ -765,7 +765,7 @@ fn sss_dispatch(json: &Value) -> StratisResult<Value> {
                 ))
             })?;
 
-            let json_bytes = decode(json_s)?;
+            let json_bytes = BASE64URL_NOPAD.decode(json_s.as_bytes())?;
             let value: Value = serde_json::from_slice(&json_bytes)?;
             let (pin, value) = pin_dispatch(&value)?;
             match pin_map.get_mut(&pin) {

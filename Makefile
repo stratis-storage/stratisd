@@ -241,8 +241,6 @@ test:
 yamllint:
 	yamllint --strict .github/workflows/*.yml
 
-docs: docs/stratisd.8 docs-rust
-
 docs-travis: docs-rust
 
 docs-rust:
@@ -276,7 +274,6 @@ verify-dependency-bounds: set-lower-bounds clippy
 	clippy
 	compare-fedora
 	create-release
-	docs
 	docs-rust
 	docs-travis
 	fmt

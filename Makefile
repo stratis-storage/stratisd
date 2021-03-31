@@ -193,7 +193,7 @@ stratis-min:
 	RUSTFLAGS="${DENY}" \
 	cargo build --bin=stratis-min --features extras ${TARGET_ARGS}
 
-install-cfg: docs
+install-cfg: docs/stratisd.8
 	install -Dpm0644 -t $(DESTDIR)$(DATADIR)/dbus-1/system.d stratisd.conf
 	install -Dpm0644 -t $(DESTDIR)$(MANDIR)/man8 docs/stratisd.8
 	install -Dpm0644 -t $(DESTDIR)$(UDEVDIR)/rules.d udev/61-stratisd.rules
@@ -241,18 +241,13 @@ test:
 yamllint:
 	yamllint --strict .github/workflows/*.yml
 
-docs: stratisd.8 docs-rust
-
 docs-travis: docs-rust
 
 docs-rust:
 	cargo doc --no-deps
 
-stratisd.8: docs/stratisd.txt
+docs/stratisd.8: docs/stratisd.txt
 	a2x -f manpage docs/stratisd.txt
-
-stratisd.8.gz: stratisd.8
-	gzip --stdout docs/stratisd.8 > docs/stratisd.8.gz
 
 clippy:
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets --all-features -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
@@ -279,7 +274,6 @@ verify-dependency-bounds: set-lower-bounds clippy
 	clippy
 	compare-fedora
 	create-release
-	docs
 	docs-rust
 	docs-travis
 	fmt

@@ -251,9 +251,6 @@ docs-rust:
 stratisd.8: docs/stratisd.txt
 	a2x -f manpage docs/stratisd.txt
 
-stratisd.8.gz: stratisd.8
-	gzip --stdout docs/stratisd.8 > docs/stratisd.8.gz
-
 clippy:
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets --all-features -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
 

@@ -112,7 +112,6 @@ def build_cargo_metadata():
     packages = metadata["packages"]
     assert len(packages) == 1
     package = packages[0]
-    assert package["name"] == "libstratis"
     dependencies = package["dependencies"]
 
     result = dict()

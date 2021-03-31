@@ -259,8 +259,10 @@ set-lower-bounds:
 	${PWD}/code_maintenance/set_lower_bounds
 
 # Verify that the dependency bounds set in Cargo.toml are not lower
-# than is actually reqired.
-verify-dependency-bounds: set-lower-bounds clippy
+# than is actually reqired. Run clippy with defaults, in order to be less
+# strict but still be compiling just about everything.
+verify-dependency-bounds: set-lower-bounds
+	cargo clippy --all-targets --all-features
 
 
 .PHONY:

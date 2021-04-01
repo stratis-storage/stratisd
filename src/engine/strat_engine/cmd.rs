@@ -339,6 +339,7 @@ pub fn clevis_luks_unlock(dev_path: &Path, dm_name: &str) -> StratisResult<()> {
     )
 }
 
+/// Safely query clevis for the decrypted passphrase stored on a LUKS2 volume.
 pub fn clevis_decrypt(jwe: &Value) -> StratisResult<SizedKeyMemory> {
     let mut jose_child = Command::new(get_jose_executable()?)
         .arg("jwe")

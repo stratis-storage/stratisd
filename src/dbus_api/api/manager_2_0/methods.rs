@@ -9,14 +9,14 @@ use crate::{
     dbus_api::{
         api::shared::create_pool_shared,
         consts,
-        types::TData,
+        types::{CreatePoolParams, TData},
         util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
     },
     engine::{DeleteAction, PoolUuid},
 };
 
 pub fn create_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
-    create_pool_shared(m, None)
+    create_pool_shared(m, CreatePoolParams::Neither)
 }
 
 pub fn destroy_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {

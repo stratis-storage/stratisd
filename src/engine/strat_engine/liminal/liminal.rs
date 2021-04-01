@@ -318,14 +318,7 @@ impl LiminalDevices {
             // check again here.
             let num_with_luks = datadevs
                 .iter()
-                .filter_map(|sbd| {
-                    let encryption_info = sbd.encryption_info();
-                    if encryption_info.is_encrypted() {
-                        Some(encryption_info)
-                    } else {
-                        None
-                    }
-                })
+                .filter(|sbd| sbd.encryption_info().is_encrypted())
                 .count();
 
             if num_with_luks != 0 && num_with_luks != datadevs.len() {

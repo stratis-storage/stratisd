@@ -14,7 +14,7 @@ use crate::{
     dbus_api::{
         blockdev::create_dbus_blockdev,
         pool::create_dbus_pool,
-        types::TData,
+        types::{CreatePoolParams, TData},
         util::{
             engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok, tuple_to_option,
         },
@@ -26,12 +26,14 @@ use crate::{
     stratis::{ErrorEnum, StratisError},
 };
 
+type EncryptionParams = (Option<(bool, String)>, Option<(bool, (String, String))>);
+
 /// Shared code for the creation of pools using the D-Bus API without the option
 /// for a key description or with an optional key description in later versions of
 /// the interface.
 pub fn create_pool_shared(
     m: &MethodInfo<MTSync<TData>, TData>,
-    has_additional_params: Option<bool>,
+    has_additional_params: CreatePoolParams,
 ) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
@@ -39,16 +41,13 @@ pub fn create_pool_shared(
     let name: &str = get_next_arg(&mut iter, 0)?;
     let redundancy_tuple: (bool, u16) = get_next_arg(&mut iter, 1)?;
     let devs: Array<&str, _> = get_next_arg(&mut iter, 2)?;
-    let (key_desc_tuple, clevis_tuple) = if has_additional_params.is_some() {
-        let key_desc: Option<(bool, String)> = Some(get_next_arg(&mut iter, 3)?);
-        if has_additional_params.unwrap_or(false) {
-            let clevis: Option<(bool, (String, String))> = Some(get_next_arg(&mut iter, 4)?);
-            (key_desc, clevis)
-        } else {
-            (key_desc, None)
-        }
-    } else {
-        (None, None)
+    let (key_desc_tuple, clevis_tuple): EncryptionParams = match has_additional_params {
+        CreatePoolParams::Neither => (None, None),
+        CreatePoolParams::KeyDesc => (Some(get_next_arg(&mut iter, 3)?), None),
+        CreatePoolParams::Both => (
+            Some(get_next_arg(&mut iter, 3)?),
+            Some(get_next_arg(&mut iter, 4)?),
+        ),
     };
 
     let return_message = message.method_return();

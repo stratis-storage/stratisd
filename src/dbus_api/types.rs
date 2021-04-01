@@ -185,3 +185,10 @@ impl DataType for TData {
     type Method = ();
     type Signal = ();
 }
+
+/// Tri-state enum to determine CreatePool parameters accepted by the D-Bus method.
+pub enum CreatePoolParams {
+    Neither,
+    KeyDesc,
+    Both,
+}

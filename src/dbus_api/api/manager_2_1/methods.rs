@@ -10,14 +10,14 @@ use dbus_tree::{MTSync, MethodInfo, MethodResult};
 use crate::{
     dbus_api::{
         api::shared::{create_pool_shared, set_key_shared, unlock_pool_shared},
-        types::TData,
+        types::{CreatePoolParams, TData},
         util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
     },
     engine::{KeyDescription, MappingDeleteAction},
 };
 
 pub fn create_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
-    create_pool_shared(m, Some(false))
+    create_pool_shared(m, CreatePoolParams::KeyDesc)
 }
 
 pub fn set_key(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {

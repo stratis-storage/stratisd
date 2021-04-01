@@ -268,8 +268,7 @@ impl CryptInitializer {
                     Self::rollback(&mut device, &self.physical_path, self.activation_name)
                 {
                     warn!(
-                        "Failed to roll back crypt device initialization; you may need \
-                    to manually wipe this device: {}",
+                        "Failed to roll back crypt device initialization; you may need to manually wipe this device: {}",
                         err
                     );
                 }

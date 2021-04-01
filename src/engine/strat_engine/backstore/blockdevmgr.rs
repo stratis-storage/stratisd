@@ -197,10 +197,7 @@ impl BlockDevMgr {
         {
             return Err(StratisError::Engine(
                 ErrorEnum::Invalid,
-                "Neither the keyring nor Clevis could be used to unlock the device; \
-                check that either the appropriate key in the keyring is set or that \
-                the Clevis key storage method is available"
-                    .to_string(),
+                "Neither the key in the kernel keyring nor Clevis could be used to perform encryption operations on the devices in the pool; check that either the appropriate key in the keyring is set or that the Clevis key storage method is available".to_string(),
             ));
         }
 

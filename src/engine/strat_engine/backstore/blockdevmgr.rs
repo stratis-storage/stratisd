@@ -452,21 +452,16 @@ impl BlockDevMgr {
         let yes = interpret_clevis_config(pin, &mut parsed_config)?;
 
         if let Some((ref existing_pin, ref existing_info)) = encryption_info.clevis_info {
-            let existing_info_owned = existing_info.clone();
-
             // Ignore thumbprint if stratis:tang:trust_url is set in the clevis_info
             // config.
-            let config_to_check = existing_info.clone();
+            let mut config_to_check = existing_info.clone();
             if yes {
-                if let (Value::Object(ref mut o), Value::Object(ref mut ei)) =
-                    (config_to_check, existing_info_owned)
-                {
-                    o.remove("thp");
+                if let Value::Object(ref mut ei) = config_to_check {
                     ei.remove("thp");
                 }
             }
 
-            if (existing_pin.as_str(), existing_info) == (pin, &parsed_config)
+            if (existing_pin.as_str(), &config_to_check) == (pin, &parsed_config)
                 && self.can_unlock(false, true)
             {
                 return Ok(false);

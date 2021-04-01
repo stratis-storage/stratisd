@@ -11,6 +11,16 @@ on:
 
 jobs:
   dependencies:
+    continue-on-error: true
+    strategy:
+      matrix:
+        include:
+          - task: cargo update --locked
+            toolchain: 1.51.0  # CURRENT DEVELOPMENT TOOLCHAIN
+            components: cargo
+          - task: make -f Makefile compare-fedora
+            toolchain: 1.51.0  # CURRENT DEVELOPMENT TOOLCHAIN
+            components: cargo
     runs-on: ubuntu-18.04
     container:
       image: fedora:32
@@ -31,7 +41,7 @@ jobs:
           systemd-devel
       - uses: actions-rs/toolchain@v1
         with:
-          components: cargo
-          toolchain: stable
-      - name: Check for outdated dependencies
-        run: make -f Makefile compare-fedora
+          components: ${{ matrix.components }}
+          toolchain: ${{ matrix.toolchain }}
+      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
+        run: ${{ matrix.task }}

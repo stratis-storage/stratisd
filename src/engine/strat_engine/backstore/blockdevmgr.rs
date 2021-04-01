@@ -922,12 +922,12 @@ mod tests {
                 &json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true}),
             )? {
                 return Err(Box::new(StratisError::Error(
-                    "Clevis bind idemptotence test failed".to_string(),
+                    "Clevis bind idempotence test failed".to_string(),
                 )));
             }
             if mgr.bind_keyring(key_desc)? {
                 return Err(Box::new(StratisError::Error(
-                    "Keyring bind idemptotence test failed".to_string(),
+                    "Keyring bind idempotence test failed".to_string(),
                 )));
             }
 

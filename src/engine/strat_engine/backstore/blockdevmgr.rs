@@ -917,29 +917,26 @@ mod tests {
             )?;
             cmd::udev_settle()?;
 
-            if !matches!(
-                mgr.bind_clevis(
-                    "tang",
-                    &json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true})
-                ),
-                Ok(false)
-            ) {
+            if mgr.bind_clevis(
+                "tang",
+                &json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true}),
+            )? {
                 return Err(Box::new(StratisError::Error(
                     "Clevis bind idemptotence test failed".to_string(),
                 )));
             }
-            if !matches!(mgr.bind_keyring(key_desc), Ok(false)) {
+            if mgr.bind_keyring(key_desc)? {
                 return Err(Box::new(StratisError::Error(
                     "Keyring bind idemptotence test failed".to_string(),
                 )));
             }
 
-            if !matches!(mgr.unbind_clevis(), Ok(true)) {
+            if !(mgr.unbind_clevis()?) {
                 return Err(Box::new(StratisError::Error(
                     "Clevis unbind test failed".to_string(),
                 )));
             }
-            if !matches!(mgr.unbind_clevis(), Ok(false)) {
+            if mgr.unbind_clevis()? {
                 return Err(Box::new(StratisError::Error(
                     "Clevis unbind idempotence test failed".to_string(),
                 )));
@@ -950,23 +947,20 @@ mod tests {
                 )));
             }
 
-            if !matches!(
-                mgr.bind_clevis(
-                    "tang",
-                    &json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true})
-                ),
-                Ok(true)
-            ) {
+            if !(mgr.bind_clevis(
+                "tang",
+                &json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true}),
+            )?) {
                 return Err(Box::new(StratisError::Error(
                     "Clevis bind test failed".to_string(),
                 )));
             }
-            if !matches!(mgr.unbind_keyring(), Ok(true)) {
+            if !(mgr.unbind_keyring()?) {
                 return Err(Box::new(StratisError::Error(
                     "Keyring unbind test failed".to_string(),
                 )));
             }
-            if !matches!(mgr.unbind_keyring(), Ok(false)) {
+            if mgr.unbind_keyring()? {
                 return Err(Box::new(StratisError::Error(
                     "Keyring unbind idempotence test failed".to_string(),
                 )));
@@ -977,7 +971,7 @@ mod tests {
                 )));
             }
 
-            if !matches!(mgr.bind_keyring(key_desc), Ok(true)) {
+            if !(mgr.bind_keyring(key_desc)?) {
                 return Err(Box::new(StratisError::Error(
                     "Keyring bind test failed".to_string(),
                 )));

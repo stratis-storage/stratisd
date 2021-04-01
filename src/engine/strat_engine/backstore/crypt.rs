@@ -902,7 +902,7 @@ fn setup_crypt_handle(
                 &mut device,
                 key_description.as_ref()
                     .ok_or_else(|| {
-                        LibcryptErr::Other("Unlock action was specified to be keyring but not key description is present in the metadata".to_string())
+                        StratisError::Error("Unlock action was specified to be keyring but not key description is present in the metadata".to_string())
                     })?,
             )), &name)?
         }
@@ -1239,7 +1239,7 @@ fn activate(
         Either::Left((device, kd)) => {
             let key_description_missing = keys::search_key_persistent(kd)
                 .map_err(|_| {
-                    LibcryptErr::Other(format!(
+                    StratisError::Error(format!(
                         "Searching the persistent keyring for the key description {} failed.",
                         kd.as_application_str(),
                     ))

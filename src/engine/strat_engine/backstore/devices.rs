@@ -24,7 +24,6 @@ use crate::{
                 crypt::{CryptHandle, CryptInitializer},
             },
             device::blkdev_size,
-            keys::MemoryPrivateFilesystem,
             metadata::{
                 device_identifiers, disown_device, BlockdevSize, MDADataSize, StratisIdentifiers,
                 BDA,
@@ -397,7 +396,7 @@ pub fn initialize_devices(
     devices: Vec<DeviceInfo>,
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
-    encryption_info: Option<EncryptionInfo>,
+    encryption_info: &EncryptionInfo,
 ) -> StratisResult<Vec<StratBlockDev>> {
     /// Map a major/minor device number of a physical device
     /// to the corresponding major/minor number of the encrypted
@@ -418,32 +417,14 @@ pub fn initialize_devices(
         physical_path: &Path,
         pool_uuid: PoolUuid,
         dev_uuid: DevUuid,
-        key_description: &KeyDescription,
+        key_description: Option<&KeyDescription>,
         enable_clevis: Option<(&str, &Value)>,
     ) -> StratisResult<(CryptHandle, Device, Sectors)> {
-        fn initialize_encrypted_with_err(
-            handle: &mut CryptHandle,
-            key_description: &KeyDescription,
-            enable_clevis: Option<(&str, &Value)>,
-        ) -> StratisResult<(Device, Sectors)> {
-            let device_size = handle.logical_device_size()?;
-
-            if let Some((pin, json)) = enable_clevis {
-                let mem_fs = MemoryPrivateFilesystem::new()?;
-                mem_fs.key_op(key_description, |key_path| {
-                    handle
-                        .clevis_bind(key_path, pin, &json, false)
-                        .map_err(|e| StratisError::Error(e.to_string()))
-                })?;
-            };
-
-            map_device_nums(handle.activated_device_path()).map(|dn| (dn, device_size))
-        }
-
         let mut handle = CryptInitializer::new(physical_path.to_owned(), pool_uuid, dev_uuid)
-            .initialize(key_description)?;
-        match initialize_encrypted_with_err(&mut handle, key_description, enable_clevis) {
-            Ok((devno, devsize)) => Ok((handle, devno, devsize)),
+            .initialize(key_description, enable_clevis)?;
+
+        let device_size = match handle.logical_device_size() {
+            Ok(size) => size,
             Err(error) => {
                 let path = handle.luks2_device_path().display().to_string();
                 if let Err(e) = handle.wipe() {
@@ -454,9 +435,10 @@ pub fn initialize_devices(
                         path, e
                     );
                 }
-                Err(error)
+                return Err(error);
             }
-        }
+        };
+        map_device_nums(handle.activated_device_path()).map(|dn| (handle, dn, device_size))
     }
 
     fn initialize_stratis_metadata(
@@ -548,16 +530,17 @@ pub fn initialize_devices(
         dev_info: &DeviceInfo,
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
-        encryption_info: Option<EncryptionInfo>,
+        encryption_info: &EncryptionInfo,
     ) -> StratisResult<StratBlockDev> {
         let dev_uuid = DevUuid::new_v4();
-        let (handle, devno, blockdev_size) = match encryption_info {
-            Some(ref info) => initialize_encrypted(
+        let (handle, devno, blockdev_size) = if encryption_info.is_encrypted() {
+            initialize_encrypted(
                 &dev_info.devnode,
                 pool_uuid,
                 dev_uuid,
-                &info.key_description,
-                info.clevis_info
+                encryption_info.key_description.as_ref(),
+                encryption_info
+                    .clevis_info
                     .as_ref()
                     .map(|(pin, json)| (pin.as_str(), json)),
             )
@@ -577,8 +560,9 @@ pub fn initialize_devices(
                     dev_info.devno, devno,
                 );
                 (Some(handle), devno, devsize)
-            })?,
-            None => (None, dev_info.devno, dev_info.size.sectors()),
+            })?
+        } else {
+            (None, dev_info.devno, dev_info.size.sectors())
         };
 
         let physical_path = &dev_info.devnode;
@@ -626,7 +610,7 @@ pub fn initialize_devices(
 
     let mut initialized_blockdevs: Vec<StratBlockDev> = Vec::new();
     for dev_info in devices {
-        match initialize_one(&dev_info, pool_uuid, mda_data_size, encryption_info.clone()) {
+        match initialize_one(&dev_info, pool_uuid, mda_data_size, encryption_info) {
             Ok(blockdev) => initialized_blockdevs.push(blockdev),
             Err(err) => {
                 if let Err(err) = wipe_blockdevs(&mut initialized_blockdevs) {
@@ -710,10 +694,10 @@ mod tests {
             dev_infos,
             pool_uuid,
             MDADataSize::default(),
-            key_description.map(|kd| EncryptionInfo {
-                key_description: kd.clone(),
+            &EncryptionInfo {
+                key_description: key_description.cloned(),
                 clevis_info: None,
-            }),
+            },
         )?;
 
         if blockdevs.len() != paths.len() {
@@ -845,7 +829,7 @@ mod tests {
         fn call_crypt_test(
             paths: &[&Path],
             key_description: &KeyDescription,
-            _: Option<()>,
+            _: (),
         ) -> Result<(), Box<dyn Error>> {
             test_ownership(paths, Some(key_description))
         }
@@ -964,10 +948,10 @@ mod tests {
             dev_infos,
             pool_uuid,
             MDADataSize::default(),
-            key_desc.map(|kd| EncryptionInfo {
-                key_description: kd.clone(),
+            &EncryptionInfo {
+                key_description: key_desc.cloned(),
                 clevis_info: None,
-            }),
+            },
         )
         .is_ok()
         {
@@ -1009,7 +993,7 @@ mod tests {
         fn failure_cleanup_crypt(
             paths: &[&Path],
             key_desc: &KeyDescription,
-            _: Option<()>,
+            _: (),
         ) -> Result<(), Box<dyn Error>> {
             test_failure_cleanup(paths, Some(key_desc))
         }

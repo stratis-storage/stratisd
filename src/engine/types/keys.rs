@@ -8,7 +8,7 @@ use std::{
     hash::{Hash, Hasher},
 };
 
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use libcryptsetup_rs::SafeMemHandle;
 
@@ -46,16 +46,32 @@ impl AsRef<[u8]> for SizedKeyMemory {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EncryptionInfo {
-    pub key_description: KeyDescription,
+    pub key_description: Option<KeyDescription>,
     pub clevis_info: Option<(String, Value)>,
+}
+
+impl EncryptionInfo {
+    pub fn is_encrypted(&self) -> bool {
+        self.key_description.is_some() || self.clevis_info.is_some()
+    }
+}
+
+impl Default for EncryptionInfo {
+    fn default() -> Self {
+        EncryptionInfo {
+            key_description: None,
+            clevis_info: None,
+        }
+    }
 }
 
 impl fmt::Display for EncryptionInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let key_desc_str = format!(
-            "key description: \"{}\"",
-            self.key_description.as_application_str()
-        );
+        let key_desc_str = if let Some(ref kd) = self.key_description {
+            format!("key description: \"{}\"", kd.as_application_str())
+        } else {
+            "no key description".to_string()
+        };
         if let Some((pin, config)) = &self.clevis_info {
             write!(
                 f,
@@ -84,13 +100,18 @@ impl Hash for EncryptionInfo {
 
 impl<'a> Into<Value> for &'a EncryptionInfo {
     fn into(self) -> Value {
-        let mut json = json!({"key_description": self.key_description.as_application_str()});
-        if let Some(ref info) = self.clevis_info {
-            let map = json.as_object_mut().expect("Created a JSON object above");
-            map.insert("clevis_pin".to_string(), Value::from(info.0.to_owned()));
-            map.insert("clevis_config".to_string(), info.1.clone());
+        let mut json = Map::new();
+        if let Some(ref kd) = self.key_description {
+            json.insert(
+                "key_description".to_string(),
+                Value::from(kd.as_application_str()),
+            );
         }
-        json
+        if let Some(ref info) = self.clevis_info {
+            json.insert("clevis_pin".to_string(), Value::from(info.0.to_owned()));
+            json.insert("clevis_config".to_string(), info.1.clone());
+        }
+        Value::from(json)
     }
 }
 

@@ -5,6 +5,7 @@
 // Code to handle a single block device.
 
 use std::{
+    borrow::Cow,
     fs::OpenOptions,
     path::{Path, PathBuf},
     sync::Arc,
@@ -23,11 +24,10 @@ use crate::{
                 crypt::CryptHandle,
                 range_alloc::{PerDevSegments, RangeAllocator},
             },
-            keys::MemoryPrivateFilesystem,
             metadata::{disown_device, BDAExtendedSize, BlockdevSize, MDADataSize, BDA},
             serde_structs::{BaseBlockDevSave, Recordable},
         },
-        types::{BlockDevPath, DevUuid, EncryptionInfo, PoolUuid},
+        types::{BlockDevPath, DevUuid, EncryptionInfo, KeyDescription, PoolUuid},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -203,27 +203,22 @@ impl StratBlockDev {
 
     /// Get the encryption_info stored on the given encrypted blockdev.
     ///
-    /// Returns Some(_) if it is encrypted.
-    /// Returns None if it is not encrypted.
-    pub fn encryption_info(&self) -> Option<&EncryptionInfo> {
-        self.crypt_handle.as_ref().map(|ch| ch.encryption_info())
+    /// The `Cow` return type is required due to the optional `CryptHandle` type.
+    /// If the device is not encrypted, it must return an owned `EncryptionInfo`
+    /// structure.
+    pub fn encryption_info(&self) -> Cow<EncryptionInfo> {
+        match self.crypt_handle {
+            Some(ref ch) => Cow::Borrowed(ch.encryption_info()),
+            None => Cow::Owned(EncryptionInfo::default()),
+        }
     }
 
     /// Bind encrypted device using the given clevis configuration.
-    pub fn bind_clevis(
-        &mut self,
-        memfs: &MemoryPrivateFilesystem,
-        pin: &str,
-        clevis_info: &Value,
-        yes: bool,
-    ) -> StratisResult<()> {
+    pub fn bind_clevis(&mut self, pin: &str, clevis_info: &Value) -> StratisResult<()> {
         let crypt_handle = self.crypt_handle.as_mut().ok_or_else(|| {
             StratisError::Error("This device does not appear to be encrypted".to_string())
         })?;
-        let key_description = crypt_handle.encryption_info().key_description.clone();
-        memfs.key_op(&key_description, |keyfile_path| {
-            crypt_handle.clevis_bind(keyfile_path, pin, clevis_info, yes)
-        })
+        crypt_handle.clevis_bind(pin, clevis_info)
     }
 
     /// Unbind encrypted device using the given clevis configuration.
@@ -232,6 +227,24 @@ impl StratBlockDev {
             StratisError::Error("This device does not appear to be encrypted".to_string())
         })?;
         crypt_handle.clevis_unbind()
+    }
+
+    /// Bind a block device to a passphrase represented by a key description
+    /// in the kernel keyring.
+    pub fn bind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<()> {
+        let crypt_handle = self.crypt_handle.as_mut().ok_or_else(|| {
+            StratisError::Error("This device does not appear to be encrypted".to_string())
+        })?;
+        crypt_handle.bind_keyring(key_desc)
+    }
+
+    /// Unbind a block device from a passphrase represented by a key description
+    /// in the kernel keyring.
+    pub fn unbind_keyring(&mut self) -> StratisResult<()> {
+        let crypt_handle = self.crypt_handle.as_mut().ok_or_else(|| {
+            StratisError::Error("This device does not appear to be encrypted".to_string())
+        })?;
+        crypt_handle.unbind_keyring()
     }
 }
 
@@ -286,7 +299,7 @@ impl BlockDev for StratBlockDev {
     }
 
     fn is_encrypted(&self) -> bool {
-        self.encryption_info().is_some()
+        self.encryption_info().is_encrypted()
     }
 }
 

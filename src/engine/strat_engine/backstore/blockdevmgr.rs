@@ -5,6 +5,7 @@
 // Code to handle a collection of block devices.
 
 use std::{
+    borrow::Cow,
     collections::{HashMap, HashSet},
     path::Path,
 };
@@ -23,12 +24,10 @@ use crate::{
                 crypt::{interpret_clevis_config, CryptActivationHandle},
                 devices::{initialize_devices, process_and_verify_devices, wipe_blockdevs},
             },
-            keys::MemoryPrivateFilesystem,
             metadata::MDADataSize,
-            names::KeyDescription,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
         },
-        types::{DevUuid, EncryptionInfo, PoolUuid},
+        types::{DevUuid, EncryptionInfo, KeyDescription, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -136,20 +135,12 @@ impl BlockDevMgr {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         mda_data_size: MDADataSize,
-        key_desc: Option<&KeyDescription>,
+        encryption_info: &EncryptionInfo,
     ) -> StratisResult<BlockDevMgr> {
         let devices = process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?;
 
         Ok(BlockDevMgr::new(
-            initialize_devices(
-                devices,
-                pool_uuid,
-                mda_data_size,
-                key_desc.map(|k| EncryptionInfo {
-                    key_description: k.clone(),
-                    clevis_info: None,
-                }),
-            )?,
+            initialize_devices(devices, pool_uuid, mda_data_size, encryption_info)?,
             None,
         ))
     }
@@ -162,15 +153,17 @@ impl BlockDevMgr {
             .collect()
     }
 
-    /// Check that the registered key description for these block devices can
-    /// unlock at least one of the existing block devices registered.
+    /// Check that the registered key description and Clevis information for these
+    /// block devices can unlock at least one of the existing block devices registered.
     /// Precondition: self.block_devs must have at least one device.
-    pub fn has_valid_passphrase(&self) -> bool {
+    pub fn can_unlock(&self, try_unlock_keyring: bool, try_unlock_clevis: bool) -> bool {
         CryptActivationHandle::can_unlock(
             self.block_devs
                 .get(0)
                 .expect("Must have at least one blockdev")
                 .physical_path(),
+            try_unlock_keyring,
+            try_unlock_clevis,
         )
     }
 
@@ -196,14 +189,15 @@ impl BlockDevMgr {
         let devices = process_and_verify_devices(pool_uuid, &current_uuids, paths)?;
 
         let encryption_info = self.encryption_info();
-        if encryption_info.is_some() && !self.has_valid_passphrase() {
+        if encryption_info.is_encrypted()
+            && !self.can_unlock(
+                encryption_info.key_description.is_some(),
+                encryption_info.clevis_info.is_some(),
+            )
+        {
             return Err(StratisError::Engine(
                 ErrorEnum::Invalid,
-                "The key associated with the current registered key description \
-                was not able to unlock an existing encrypted device; check that \
-                the same key is in the keyring that was used to create the encrypted \
-                pool"
-                    .to_string(),
+                "Neither the key in the kernel keyring nor Clevis could be used to perform encryption operations on the devices in the pool; check that either the appropriate key in the keyring is set or that the Clevis key storage method is available".to_string(),
             ));
         }
 
@@ -211,12 +205,7 @@ impl BlockDevMgr {
         // variable length metadata requires more than the minimum allocated,
         // then the necessary amount must be provided or the data can not be
         // saved.
-        let bds = initialize_devices(
-            devices,
-            pool_uuid,
-            MDADataSize::default(),
-            encryption_info.cloned(),
-        )?;
+        let bds = initialize_devices(devices, pool_uuid, MDADataSize::default(), &encryption_info)?;
         let bdev_uuids = bds.iter().map(|bd| bd.uuid()).collect();
         self.block_devs.extend(bds);
         Ok(bdev_uuids)
@@ -392,9 +381,11 @@ impl BlockDevMgr {
             .sum()
     }
 
-    pub fn encryption_info(&self) -> Option<&EncryptionInfo> {
+    pub fn encryption_info(&self) -> Cow<EncryptionInfo> {
         let mut iter = self.block_devs.iter().map(|bd| bd.encryption_info());
-        let info = iter.next().and_then(|opt| opt);
+        let info = iter
+            .next()
+            .expect("At least one blockdev in the given manager");
 
         // Liminal device code will not set up a pool with devices with
         // different encryption information.
@@ -404,7 +395,7 @@ impl BlockDevMgr {
     }
 
     pub fn is_encrypted(&self) -> bool {
-        self.encryption_info().is_some()
+        self.encryption_info().is_encrypted()
     }
 
     #[cfg(test)]
@@ -419,10 +410,17 @@ impl BlockDevMgr {
         let encryption_infos = self
             .block_devs
             .iter()
-            .filter_map(|bd| bd.encryption_info())
+            .filter_map(|bd| {
+                let encryption_info = bd.encryption_info();
+                if encryption_info.is_encrypted() {
+                    Some(encryption_info)
+                } else {
+                    None
+                }
+            })
             .collect::<Vec<_>>();
         if encryption_infos.is_empty() {
-            assert_eq!(self.encryption_info(), None);
+            assert_eq!(self.encryption_info().as_ref(), &EncryptionInfo::default());
         } else {
             assert_eq!(encryption_infos.len(), self.block_devs.len());
 
@@ -439,91 +437,64 @@ impl BlockDevMgr {
     /// nothing was changed.
     /// * Returns Err(_) if an inconsistency was found in the metadata across pools
     /// or binding failed.
-    pub fn bind_clevis(&mut self, pin: String, mut clevis_info: Value) -> StratisResult<bool> {
-        fn bind_clevis_loop<'a, I>(
-            key_fs: &MemoryPrivateFilesystem,
-            blockdevs: I,
-            pin: &str,
-            clevis_info: &Value,
-            yes: bool,
-        ) -> StratisResult<()>
-        where
-            I: IntoIterator<Item = &'a mut StratBlockDev>,
-        {
-            let mut rollback_record = Vec::new();
-            for blockdev_ref in blockdevs {
-                if let Err(e) = blockdev_ref.bind_clevis(key_fs, pin, clevis_info, yes) {
-                    rollback_loop(rollback_record);
-                    return Err(e);
-                } else {
-                    rollback_record.push(blockdev_ref);
-                }
-            }
-            Ok(())
-        }
-
-        fn rollback_loop(rollback_record: Vec<&mut StratBlockDev>) {
-            rollback_record.into_iter().for_each(|blockdev| {
-                if let Err(e) = blockdev.unbind_clevis() {
-                    warn!(
-                        "Failed to unbind device {} from clevis during \
-                        rollback: {}",
-                        blockdev.physical_path().display(),
-                        e,
-                    );
-                }
-            });
-        }
-
-        let encryption_info = match self.encryption_info() {
-            Some(info) => info,
-            None => {
-                return Err(StratisError::Error(
-                    "Requested pool does not appear to be encrypted".to_string(),
-                ))
-            }
+    pub fn bind_clevis(&mut self, pin: &str, clevis_info: &Value) -> StratisResult<bool> {
+        let encryption_info = self.encryption_info();
+        if !encryption_info.is_encrypted() {
+            return Err(StratisError::Error(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ));
         };
 
-        let yes = interpret_clevis_config(&pin, &mut clevis_info)?;
+        let mut parsed_config = clevis_info.clone();
+        let yes = interpret_clevis_config(pin, &mut parsed_config)?;
 
-        if let Some(info) = &encryption_info.clevis_info {
-            let clevis_tuple = (pin, clevis_info);
-            if info == &clevis_tuple {
+        if let Some((ref existing_pin, ref existing_info)) = encryption_info.clevis_info {
+            // Ignore thumbprint if stratis:tang:trust_url is set in the clevis_info
+            // config.
+            let mut config_to_check = existing_info.clone();
+            if yes {
+                if let Value::Object(ref mut ei) = config_to_check {
+                    ei.remove("thp");
+                }
+            }
+
+            if (existing_pin.as_str(), &config_to_check) == (pin, &parsed_config)
+                && self.can_unlock(false, true)
+            {
                 return Ok(false);
             } else {
                 return Err(StratisError::Error(format!(
                     "Block devices have already been bound with pin {} and config {}; \
                     requested pin {} and config {} can't be applied",
-                    info.0, info.1, clevis_tuple.0, clevis_tuple.1,
+                    existing_pin, existing_info, pin, parsed_config,
                 )));
             }
         }
 
-        let key_fs = MemoryPrivateFilesystem::new()?;
-
-        bind_clevis_loop(
-            &key_fs,
+        bind_loop(
             self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
-            pin.as_str(),
-            &clevis_info,
-            yes,
+            |blockdev| blockdev.bind_clevis(pin, clevis_info),
+            |blockdev| blockdev.unbind_clevis(),
         )?;
 
         Ok(true)
     }
 
+    /// Unbind all devices in the given blockdev manager from clevis.
+    ///
+    /// * Returns Ok(true) if the unbinding was performed.
+    /// * Returns Ok(false) if the unbinding had already been previously performed and
+    /// nothing was changed.
+    /// * Returns Err(_) if an inconsistency was found in the metadata across pools
+    /// or unbinding failed.
     pub fn unbind_clevis(&mut self) -> StratisResult<bool> {
-        match self.encryption_info() {
-            None => {
-                return Err(StratisError::Error(
-                    "Requested pool does not appear to be encrypted".to_string(),
-                ));
-            }
-            Some(info) => {
-                if info.clevis_info.is_none() {
-                    return Ok(false);
-                }
-            }
+        let encryption_info = self.encryption_info();
+        if !encryption_info.is_encrypted() {
+            return Err(StratisError::Error(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ));
+        } else if encryption_info.clevis_info.is_none() {
+            return Ok(false);
         }
 
         for blockdev in self.blockdevs_mut().into_iter().map(|(_, bd)| bd) {
@@ -539,6 +510,118 @@ impl BlockDevMgr {
         }
         Ok(true)
     }
+
+    /// Bind all devices in the given blockdev manager to a passphrase using the
+    /// given key description.
+    ///
+    /// * Returns Ok(true) if the binding was performed.
+    /// * Returns Ok(false) if the binding had already been previously performed and
+    /// nothing was changed.
+    /// * Returns Err(_) if an inconsistency was found in the metadata across pools
+    /// or binding failed.
+    pub fn bind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<bool> {
+        let encryption_info = self.encryption_info();
+        if !encryption_info.is_encrypted() {
+            return Err(StratisError::Error(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ));
+        };
+
+        if let Some(ref kd) = encryption_info.key_description {
+            if kd == key_desc {
+                if self.can_unlock(true, false) {
+                    return Ok(false);
+                } else {
+                    return Err(StratisError::Error(format!(
+                        "Key description {} is registered in the metadata but the \
+                        associated passphrase can't unlock the device; the \
+                        associated passphrase may have changed since binding",
+                        key_desc.as_application_str(),
+                    )));
+                }
+            } else {
+                return Err(StratisError::Error(format!(
+                    "Block devices have already been bound with key description {}; \
+                    requested key description {} can't be applied",
+                    key_desc.as_application_str(),
+                    kd.as_application_str(),
+                )));
+            }
+        }
+
+        bind_loop(
+            self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
+            |blockdev| blockdev.bind_keyring(key_desc),
+            |blockdev| blockdev.unbind_keyring(),
+        )?;
+
+        Ok(true)
+    }
+
+    /// Unbind all devices in the given blockdev manager from the passphrase
+    /// associated with the key description.
+    ///
+    /// * Returns Ok(true) if the unbinding was performed.
+    /// * Returns Ok(false) if the unbinding had already been previously performed and
+    /// nothing was changed.
+    /// * Returns Err(_) if an inconsistency was found in the metadata across pools
+    /// or unbinding failed.
+    pub fn unbind_keyring(&mut self) -> StratisResult<bool> {
+        let encryption_info = self.encryption_info();
+        if !encryption_info.is_encrypted() {
+            return Err(StratisError::Error(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ));
+        } else if encryption_info.key_description.is_none() {
+            return Ok(false);
+        }
+
+        for blockdev in self.blockdevs_mut().into_iter().map(|(_, bd)| bd) {
+            let res = blockdev.unbind_keyring();
+            if let Err(ref e) = res {
+                warn!(
+                    "Failed to unbind from the passphrase in the kernel keyring: {}. \
+                    This operation cannot be rolled back automatically.",
+                    e,
+                );
+            }
+            res?
+        }
+        Ok(true)
+    }
+}
+
+fn bind_loop<'a, I, B, U>(blockdevs: I, bind: B, unbind: U) -> StratisResult<()>
+where
+    I: IntoIterator<Item = &'a mut StratBlockDev>,
+    B: Fn(&mut StratBlockDev) -> StratisResult<()>,
+    U: Fn(&mut StratBlockDev) -> StratisResult<()>,
+{
+    fn rollback_loop<U>(rollback_record: Vec<&mut StratBlockDev>, unbind: U)
+    where
+        U: Fn(&mut StratBlockDev) -> StratisResult<()>,
+    {
+        rollback_record.into_iter().for_each(|blockdev| {
+            if let Err(e) = unbind(blockdev) {
+                warn!(
+                    "Failed to unbind device {} during rollback: {}",
+                    blockdev.physical_path().display(),
+                    e,
+                );
+            }
+        });
+    }
+
+    let mut rollback_record = Vec::new();
+    for blockdev_ref in blockdevs {
+        if let Err(e) = bind(blockdev_ref) {
+            rollback_loop(rollback_record, unbind);
+            return Err(e);
+        } else {
+            rollback_record.push(blockdev_ref);
+        }
+    }
+    Ok(())
 }
 
 impl Recordable<Vec<BaseBlockDevSave>> for BlockDevMgr {
@@ -549,10 +632,12 @@ impl Recordable<Vec<BaseBlockDevSave>> for BlockDevMgr {
 
 #[cfg(test)]
 mod tests {
-    use std::error::Error;
+    use std::{env, error::Error, path::PathBuf};
 
     use crate::engine::strat_engine::{
         cmd,
+        keys::MemoryFilesystem,
+        names::KeyDescription,
         tests::{crypt, loopbacked, real},
     };
 
@@ -563,9 +648,13 @@ mod tests {
     /// After 2 Sectors have been allocated, that amount must also be included
     /// in balance.
     fn test_blockdevmgr_used(paths: &[&Path]) {
-        let mut mgr =
-            BlockDevMgr::initialize(PoolUuid::new_v4(), paths, MDADataSize::default(), None)
-                .unwrap();
+        let mut mgr = BlockDevMgr::initialize(
+            PoolUuid::new_v4(),
+            paths,
+            MDADataSize::default(),
+            &EncryptionInfo::default(),
+        )
+        .unwrap();
         assert_eq!(mgr.avail_space() + mgr.metadata_size(), mgr.size());
 
         let allocated = Sectors(2);
@@ -598,14 +687,17 @@ mod tests {
         fn test_with_key(
             paths: &[&Path],
             key_desc: &KeyDescription,
-            _: Option<()>,
+            _: (),
         ) -> Result<(), Box<dyn Error>> {
             let pool_uuid = PoolUuid::new_v4();
             let mut bdm = BlockDevMgr::initialize(
                 pool_uuid,
                 &paths[..2],
                 MDADataSize::default(),
-                Some(key_desc),
+                &EncryptionInfo {
+                    key_description: Some(key_desc.clone()),
+                    clevis_info: None,
+                },
             )?;
 
             if bdm.add(pool_uuid, &paths[2..3]).is_err() {
@@ -644,14 +736,17 @@ mod tests {
         fn test_with_first_key(
             paths: &[&Path],
             key_desc: &KeyDescription,
-            _: Option<()>,
+            _: (),
         ) -> Result<(PoolUuid, BlockDevMgr), Box<dyn Error>> {
             let pool_uuid = PoolUuid::new_v4();
             let bdm = BlockDevMgr::initialize(
                 pool_uuid,
                 &paths[..2],
                 MDADataSize::default(),
-                Some(key_desc),
+                &EncryptionInfo {
+                    key_description: Some(key_desc.clone()),
+                    clevis_info: None,
+                },
             )?;
             Ok((pool_uuid, bdm))
         }
@@ -702,12 +797,22 @@ mod tests {
         let uuid = PoolUuid::new_v4();
         let uuid2 = PoolUuid::new_v4();
 
-        let mut bd_mgr =
-            BlockDevMgr::initialize(uuid, paths1, MDADataSize::default(), None).unwrap();
+        let mut bd_mgr = BlockDevMgr::initialize(
+            uuid,
+            paths1,
+            MDADataSize::default(),
+            &EncryptionInfo::default(),
+        )
+        .unwrap();
         cmd::udev_settle().unwrap();
 
         assert_matches!(
-            BlockDevMgr::initialize(uuid2, paths1, MDADataSize::default(), None),
+            BlockDevMgr::initialize(
+                uuid2,
+                paths1,
+                MDADataSize::default(),
+                &EncryptionInfo::default()
+            ),
             Err(_)
         );
 
@@ -716,7 +821,13 @@ mod tests {
         assert_matches!(bd_mgr.add(uuid, paths1), Ok(_));
         assert_eq!(bd_mgr.block_devs.len(), original_length);
 
-        BlockDevMgr::initialize(uuid, paths2, MDADataSize::default(), None).unwrap();
+        BlockDevMgr::initialize(
+            uuid,
+            paths2,
+            MDADataSize::default(),
+            &EncryptionInfo::default(),
+        )
+        .unwrap();
         cmd::udev_settle().unwrap();
 
         assert_matches!(bd_mgr.add(uuid, paths2), Err(_));
@@ -737,6 +848,217 @@ mod tests {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(2, None, None),
             test_initialization_add_stratis,
+        );
+    }
+
+    fn test_clevis_initialize(paths: &[&Path]) {
+        let _memfs = MemoryFilesystem::new().unwrap();
+        let mut mgr = BlockDevMgr::initialize(
+            PoolUuid::new_v4(),
+            paths,
+            MDADataSize::default(),
+            &EncryptionInfo {
+                key_description: None,
+                clevis_info: Some((
+                    "tang".to_string(),
+                    json!({"url": env::var("TANG_URL").unwrap(), "stratis:tang:trust_url": true}),
+                )),
+            },
+        )
+        .unwrap();
+        cmd::udev_settle().unwrap();
+
+        matches!(
+            mgr.bind_clevis(
+                "tang",
+                &json!({"url": env::var("TANG_URL").unwrap(), "stratis:tang:trust_url": true})
+            ),
+            Ok(false)
+        );
+    }
+
+    #[test]
+    fn clevis_real_test_initialize() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(2, None, None),
+            test_clevis_initialize,
+        );
+    }
+
+    #[test]
+    fn clevis_loop_test_initialize() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 4, None),
+            test_clevis_initialize,
+        );
+    }
+
+    fn test_clevis_both_initialize(paths: &[&Path]) {
+        fn test_both(
+            paths: &[&Path],
+            key_desc: &KeyDescription,
+            _: (),
+        ) -> Result<(), Box<dyn Error>> {
+            let _memfs = MemoryFilesystem::new().unwrap();
+            let mut mgr = BlockDevMgr::initialize(
+                PoolUuid::new_v4(),
+                paths,
+                MDADataSize::default(),
+                &EncryptionInfo {
+                    key_description: Some(key_desc.clone()),
+                    clevis_info: Some((
+                        "tang".to_string(),
+                        json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true}),
+                    )),
+                },
+            )?;
+            cmd::udev_settle()?;
+
+            if mgr.bind_clevis(
+                "tang",
+                &json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true}),
+            )? {
+                return Err(Box::new(StratisError::Error(
+                    "Clevis bind idempotence test failed".to_string(),
+                )));
+            }
+            if mgr.bind_keyring(key_desc)? {
+                return Err(Box::new(StratisError::Error(
+                    "Keyring bind idempotence test failed".to_string(),
+                )));
+            }
+
+            if !(mgr.unbind_clevis()?) {
+                return Err(Box::new(StratisError::Error(
+                    "Clevis unbind test failed".to_string(),
+                )));
+            }
+            if mgr.unbind_clevis()? {
+                return Err(Box::new(StratisError::Error(
+                    "Clevis unbind idempotence test failed".to_string(),
+                )));
+            }
+            if mgr.unbind_keyring().is_ok() {
+                return Err(Box::new(StratisError::Error(
+                    "Keyring unbind check test failed".to_string(),
+                )));
+            }
+
+            if !(mgr.bind_clevis(
+                "tang",
+                &json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true}),
+            )?) {
+                return Err(Box::new(StratisError::Error(
+                    "Clevis bind test failed".to_string(),
+                )));
+            }
+            if !(mgr.unbind_keyring()?) {
+                return Err(Box::new(StratisError::Error(
+                    "Keyring unbind test failed".to_string(),
+                )));
+            }
+            if mgr.unbind_keyring()? {
+                return Err(Box::new(StratisError::Error(
+                    "Keyring unbind idempotence test failed".to_string(),
+                )));
+            }
+            if mgr.unbind_clevis().is_ok() {
+                return Err(Box::new(StratisError::Error(
+                    "Clevis unbind check test failed".to_string(),
+                )));
+            }
+
+            if !(mgr.bind_keyring(key_desc)?) {
+                return Err(Box::new(StratisError::Error(
+                    "Keyring bind test failed".to_string(),
+                )));
+            }
+
+            Ok(())
+        }
+
+        crypt::insert_and_cleanup_key(paths, test_both);
+    }
+
+    #[test]
+    fn clevis_real_test_both_initialize() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(2, None, None),
+            test_clevis_both_initialize,
+        );
+    }
+
+    #[test]
+    fn clevis_loop_test_both_initialize() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 4, None),
+            test_clevis_both_initialize,
+        );
+    }
+
+    fn test_clevis_both_rollback(paths: &[&Path]) {
+        fn test_both(
+            paths: &[&Path],
+            key_desc: &KeyDescription,
+            _: (),
+        ) -> Result<(), Box<dyn Error>> {
+            let mut paths_vec = paths.to_vec();
+            let invalid_path = PathBuf::from("/i/am/not/a/path");
+            paths_vec.push(invalid_path.as_path());
+            let _memfs = MemoryFilesystem::new().unwrap();
+            let res = BlockDevMgr::initialize(
+                PoolUuid::new_v4(),
+                paths_vec.as_slice(),
+                MDADataSize::default(),
+                &EncryptionInfo {
+                    key_description: Some(key_desc.clone()),
+                    clevis_info: Some((
+                        "tang".to_string(),
+                        json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true}),
+                    )),
+                },
+            );
+
+            if matches!(res, Ok(_)) {
+                return Err(Box::new(StratisError::Error(
+                    "Initialization should fail".to_string(),
+                )));
+            }
+
+            // Ensure that rollback completed successfully by trying a call that
+            // should succeed.
+            BlockDevMgr::initialize(
+                PoolUuid::new_v4(),
+                paths,
+                MDADataSize::default(),
+                &EncryptionInfo {
+                    key_description: Some(key_desc.clone()),
+                    clevis_info: Some((
+                        "tang".to_string(),
+                        json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true}),
+                    )),
+                },
+            )?;
+
+            Ok(())
+        }
+
+        crypt::insert_and_cleanup_key(paths, test_both);
+    }
+
+    #[test]
+    fn clevis_real_test_both_rollback() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(2, None, None),
+            test_clevis_both_rollback,
+        );
+    }
+
+    #[test]
+    fn clevis_loop_test_both_rollback() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 4, None),
+            test_clevis_both_rollback,
         );
     }
 }

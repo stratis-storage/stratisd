@@ -5,7 +5,9 @@
 use std::{fs::File, io, os::unix::io::AsRawFd};
 
 use libstratis::{
-    engine::{DeleteAction, KeyActions, KeyDescription, MappingCreateAction, StratKeyActions},
+    engine::{
+        KeyActions, KeyDescription, MappingCreateAction, MappingDeleteAction, StratKeyActions,
+    },
     stratis::{StratisError, StratisResult},
 };
 
@@ -39,8 +41,8 @@ pub fn key_set(key_desc: &KeyDescription, keyfile_path: Option<&str>) -> Stratis
 
 pub fn key_unset(key_desc: &KeyDescription) -> StratisResult<()> {
     match StratKeyActions.unset(key_desc)? {
-        DeleteAction::Deleted(_) => Ok(()),
-        DeleteAction::Identity => Err(StratisError::Error(format!(
+        MappingDeleteAction::Deleted(_) => Ok(()),
+        MappingDeleteAction::Identity => Err(StratisError::Error(format!(
             "Key with key description {} does not exist.",
             key_desc.as_application_str()
         ))),

@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
+    borrow::Cow,
     collections::HashMap,
     fmt::Debug,
     os::unix::io::RawFd,
@@ -17,9 +18,9 @@ use devicemapper::{Bytes, Sectors};
 use crate::{
     engine::types::{
         BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid,
-        Key, KeyDescription, LockedPoolInfo, MappingCreateAction, Name, PoolUuid, RenameAction,
-        ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, UdevEngineEvent,
-        UnlockMethod,
+        Key, KeyDescription, LockedPoolInfo, MappingCreateAction, MappingDeleteAction, Name,
+        PoolUuid, RenameAction, ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction,
+        UdevEngineEvent, UnlockMethod,
     },
     stratis::StratisResult,
 };
@@ -52,7 +53,7 @@ pub trait KeyActions {
 
     /// Unset a key with the given key description in the root persistent kernel
     /// keyring.
-    fn unset(&mut self, key_desc: &KeyDescription) -> StratisResult<DeleteAction<Key>>;
+    fn unset(&mut self, key_desc: &KeyDescription) -> StratisResult<MappingDeleteAction<Key>>;
 }
 
 /// An interface for reporting internal engine state.
@@ -159,12 +160,19 @@ pub trait Pool: Debug {
     /// using clevis.
     fn bind_clevis(
         &mut self,
-        pin: String,
-        clevis_info: Value,
+        pin: &str,
+        clevis_info: &Value,
     ) -> StratisResult<CreateAction<Clevis>>;
 
     /// Unbind all devices in the given pool from using clevis.
     fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<Clevis>>;
+
+    /// Bind all devices in the given pool for unlocking using a passphrase
+    /// in the kernel keyring.
+    fn bind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<CreateAction<Key>>;
+
+    /// Unbind all devices in the given pool from the registered keyring passphrase.
+    fn unbind_keyring(&mut self) -> StratisResult<DeleteAction<Key>>;
 
     /// Ensures that all designated filesystems are gone from pool.
     /// Returns a list of the filesystems found, and actually destroyed.
@@ -253,7 +261,7 @@ pub trait Pool: Debug {
     fn is_encrypted(&self) -> bool;
 
     /// Get all encryption information for this pool.
-    fn encryption_info(&self) -> Option<&EncryptionInfo>;
+    fn encryption_info(&self) -> Cow<EncryptionInfo>;
 }
 
 pub trait Engine: Debug + Report + Send {
@@ -266,7 +274,7 @@ pub trait Engine: Debug + Report + Send {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
-        key_desc: Option<KeyDescription>,
+        encryption_info: &EncryptionInfo,
     ) -> StratisResult<CreateAction<PoolUuid>>;
 
     /// Handle a libudev event.

@@ -32,7 +32,7 @@ fn run(devpath: &str, print_bytes: bool) -> Result<(), String> {
     );
     if read_results.0 != read_results.1 {
         println!(
-            "Second sigblock differs: \n\n {}",
+            "\n\n(Second sigblock differs)\n {}",
             StaticHeaderResult::fmt_metadata(&read_results.1, print_bytes)
         );
     }
@@ -77,7 +77,7 @@ fn main() {
         .get_matches();
     let devpath = matches.value_of("dev").unwrap();
 
-    let print_bytes: bool = matches!(matches.value_of("print_bytes"), Some("bytes"));
+    let print_bytes: bool = matches!(matches.value_of("print_bytes"), Some("print_bytes"));
 
     match run(devpath, print_bytes) {
         Ok(()) => {}

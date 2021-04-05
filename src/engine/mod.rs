@@ -5,7 +5,9 @@
 pub use self::{
     engine::{BlockDev, Engine, Filesystem, KeyActions, Pool, Report},
     sim_engine::SimEngine,
-    strat_engine::{crypt_metadata_size, get_dm, get_dm_init, StratEngine, StratKeyActions, BDA},
+    strat_engine::{
+        blkdev_size, crypt_metadata_size, get_dm, get_dm_init, StratEngine, StratKeyActions, BDA,
+    },
     types::{
         BlockDevState, BlockDevTier, CreateAction, DeleteAction, DevUuid, EncryptionInfo,
         EngineAction, FilesystemUuid, KeyDescription, MappingCreateAction, MappingDeleteAction,

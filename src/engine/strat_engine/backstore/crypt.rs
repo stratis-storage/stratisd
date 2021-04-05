@@ -1535,6 +1535,11 @@ fn identifiers_from_metadata(device: &mut CryptDevice) -> StratisResult<StratisI
     Ok(StratisIdentifiers::new(pool_uuid, dev_uuid))
 }
 
+// Bytes occupied by crypt metadata
+pub fn crypt_metadata_size() -> u64 {
+    2 * DEFAULT_CRYPT_METADATA_SIZE + DEFAULT_CRYPT_KEYSLOTS_SIZE
+}
+
 #[cfg(test)]
 mod tests {
     use std::{

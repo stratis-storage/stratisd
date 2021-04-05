@@ -16,7 +16,7 @@ mod shared;
 pub use self::{
     backstore::Backstore,
     blockdev::StratBlockDev,
-    crypt::{CryptActivationHandle, CryptHandle},
+    crypt::{crypt_metadata_size, CryptActivationHandle, CryptHandle},
 };
 
 #[cfg(test)]

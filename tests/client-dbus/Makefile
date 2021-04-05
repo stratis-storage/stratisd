@@ -7,7 +7,7 @@ lint:
 
 .PHONY: misc-tests
 misc-tests:
-	python3 -m unittest ${UNITTEST_OPTS} tests.misc.test_startup.TestUniqueInstance.test_unique_instance
+	python3 -m unittest ${UNITTEST_OPTS} tests.misc.test_startup
 
 .PHONY: fmt
 fmt:
@@ -22,6 +22,7 @@ fmt-travis:
 .PHONY: udev-tests
 udev-tests:
 	python3 -m unittest ${UNITTEST_OPTS} tests.udev.test_udev
+	python3 -m unittest ${UNITTEST_OPTS} tests.udev.test_predict
 
 .PHONY: tests
 tests: misc-tests udev-tests

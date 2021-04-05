@@ -239,4 +239,10 @@ pub mod blkdev_size {
             self.0
         }
     }
+
+    impl Default for BlockdevSize {
+        fn default() -> BlockdevSize {
+            BlockdevSize(Sectors(0))
+        }
+    }
 }

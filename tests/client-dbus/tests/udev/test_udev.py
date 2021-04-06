@@ -17,11 +17,6 @@ Used to test behavior of the udev device discovery mechanism.
 
 # isort: STDLIB
 import random
-import time
-import unittest
-
-# isort: THIRDPARTY
-import psutil
 
 # isort: LOCAL
 from stratisd_client_dbus import (
@@ -34,16 +29,15 @@ from stratisd_client_dbus import (
 from stratisd_client_dbus._constants import TOP_OBJECT
 from stratisd_client_dbus._stratisd_constants import EncryptionMethod
 
-from ._loopback import UDEV_ADD_EVENT, LoopBackDevices
+from ._loopback import UDEV_ADD_EVENT
 from ._utils import (
     CRYPTO_LUKS_FS_TYPE,
     STRATIS_FS_TYPE,
     OptionalKeyServiceContextManager,
     ServiceContextManager,
+    UdevTest,
     create_pool,
     get_devnodes,
-    get_pools,
-    processes,
     random_string,
     remove_stratis_dm_devices,
     settle,
@@ -52,52 +46,6 @@ from ._utils import (
 )
 
 LOCKED_POOL_UUIDS_PROP_NAME = "LockedPoolUuids"
-
-
-class UdevTest(unittest.TestCase):
-    """
-    Test udev add event support.
-    """
-
-    def setUp(self):
-        self._lb_mgr = LoopBackDevices()
-        self.addCleanup(self._clean_up)
-
-    def _clean_up(self):
-        """
-        Cleans up the test environment
-        :return: None
-        """
-        stratisds = list(processes("stratisd"))
-        for process in stratisds:
-            process.terminate()
-        psutil.wait_procs(stratisds)
-
-        remove_stratis_dm_devices()
-        self._lb_mgr.destroy_all()
-
-    def wait_for_pools(self, expected_num, *, name=None):
-        """
-        Returns a list of all pools found by GetManagedObjects, or a list
-        of pools with names matching the specified name, if passed.
-        :param int expected_num: the number of pools expected
-        :param name: filter for pool name
-        :type name: str or NoneType
-        :return: list of pool information found
-        :rtype: list of (str * MOPool)
-        """
-        found_num = None
-
-        end_time = time.time() + 10.0
-
-        while time.time() < end_time and not expected_num == found_num:
-            known_pools = get_pools(name=name)
-            found_num = len(known_pools)
-            time.sleep(1)
-
-        self.assertEqual(found_num, expected_num)
-
-        return known_pools
 
 
 class UdevTest1(UdevTest):

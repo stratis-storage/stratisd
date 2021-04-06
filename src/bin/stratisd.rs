@@ -85,7 +85,7 @@ fn trylock_pid_file() -> StratisResult<File> {
 }
 
 fn main() {
-    let matches = App::new("stratis")
+    let matches = App::new("stratisd")
         .version(VERSION)
         .about("Stratis storage management")
         .arg(

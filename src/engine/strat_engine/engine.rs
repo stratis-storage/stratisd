@@ -6,6 +6,8 @@ use std::{clone::Clone, collections::HashMap, path::Path};
 
 use serde_json::Value;
 
+use devicemapper::DmNameBuf;
+
 use crate::{
     engine::{
         engine::KeyActions,
@@ -19,8 +21,8 @@ use crate::{
         },
         structures::Table,
         types::{
-            CreateAction, DeleteAction, DevUuid, DevicemapperInfo, EncryptionInfo, LockedPoolInfo,
-            RenameAction, ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
+            CreateAction, DeleteAction, DevUuid, EncryptionInfo, LockedPoolInfo, RenameAction,
+            ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
         },
         Engine, Name, Pool, PoolUuid, Report,
     },
@@ -37,7 +39,7 @@ pub struct StratEngine {
 
     // Maps name of DM devices we are watching to the most recent event number
     // we've handled for each
-    watched_dev_last_event_nrs: HashMap<PoolUuid, DevicemapperInfo>,
+    watched_dev_last_event_nrs: HashMap<PoolUuid, HashMap<DmNameBuf, u32>>,
 
     // Handler for key operations
     key_handler: StratKeyActions,
@@ -313,21 +315,16 @@ impl Engine for StratEngine {
                     }
                 })
                 .collect::<HashMap<_, _>>();
-            let device_count = event_nrs.len();
 
-            let dm_info = DevicemapperInfo {
-                event_nrs,
-                device_count,
-            };
-
-            if self.watched_dev_last_event_nrs.get(pool_uuid) != Some(&dm_info) {
+            if self.watched_dev_last_event_nrs.get(pool_uuid) != Some(&event_nrs) {
                 // Return error early before updating the watched event numbers
                 // so that if another event comes in on any pool, this method
                 // will retry eventing as the event number will be higher than
                 // what was previously recorded.
                 pool.event_on(*pool_uuid, pool_name)?;
             }
-            self.watched_dev_last_event_nrs.insert(*pool_uuid, dm_info);
+            self.watched_dev_last_event_nrs
+                .insert(*pool_uuid, event_nrs);
         }
 
         Ok(())

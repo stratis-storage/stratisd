@@ -18,8 +18,6 @@ use libudev::EventType;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use devicemapper::DmNameBuf;
-
 pub use crate::engine::types::{
     actions::{
         Clevis, CreateAction, DeleteAction, EngineAction, Key, MappingCreateAction,
@@ -354,10 +352,4 @@ impl<'a> From<&'a libudev::Device<'a>> for UdevEngineDevice {
                 .collect(),
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct DevicemapperInfo {
-    pub event_nrs: HashMap<DmNameBuf, u32>,
-    pub device_count: usize,
 }

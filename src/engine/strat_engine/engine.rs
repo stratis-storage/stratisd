@@ -303,18 +303,21 @@ impl Engine for StratEngine {
 
         for (pool_name, pool_uuid, pool) in self.pools.iter_mut() {
             let dev_names = pool.get_eventing_dev_names(*pool_uuid);
+            let event_nrs = device_list
+                .iter()
+                .filter_map(|(dm_name, event_nr)| {
+                    if dev_names.contains(dm_name) {
+                        Some((dm_name.clone(), *event_nr))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<HashMap<_, _>>();
+            let device_count = event_nrs.len();
+
             let dm_info = DevicemapperInfo {
-                highest_event_nr: itertools::max(device_list.iter().filter_map(
-                    |(dm_name, event_nr)| {
-                        if dev_names.contains(dm_name) {
-                            Some(event_nr)
-                        } else {
-                            None
-                        }
-                    },
-                ))
-                .copied(),
-                device_count: dev_names.len(),
+                event_nrs,
+                device_count,
             };
 
             if self.watched_dev_last_event_nrs.get(pool_uuid) != Some(&dm_info) {

@@ -10,7 +10,10 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::{ready, stream::Stream};
+use futures::{
+    ready,
+    stream::{Stream, StreamExt},
+};
 use nix::fcntl::{fcntl, FcntlArg, OFlag};
 use tokio::{io::unix::AsyncFd, pin, sync::Mutex};
 
@@ -20,6 +23,22 @@ use crate::{
 };
 
 const REQUIRED_DM_MINOR_VERSION: u32 = 37;
+
+// Waits for devicemapper event. On devicemapper event, transfers control
+// to engine to handle event and waits until control is returned from engine.
+// Accepts None as an argument; this indicates that devicemapper events are
+// to be ignored.
+pub async fn dm_event_thread(engine: Option<Arc<Mutex<dyn Engine>>>) -> StratisResult<()> {
+    match engine {
+        Some(e) => {
+            let mut dm_fd = DmFd::new(e)?;
+            loop {
+                dm_fd.next().await;
+            }
+        }
+        None => Ok(()),
+    }
+}
 
 fn setup_dm() -> StratisResult<()> {
     let dm = get_dm_init()?;
@@ -35,7 +54,7 @@ fn setup_dm() -> StratisResult<()> {
     }
 }
 
-pub struct DmFd {
+struct DmFd {
     engine: Arc<Mutex<dyn Engine>>,
     fd: AsyncFd<RawFd>,
 }
@@ -43,7 +62,7 @@ pub struct DmFd {
 impl DmFd {
     /// Constructs a DmFd struct containing a reference to the engine and a DM
     /// context file descriptor.
-    pub fn new(engine: Arc<Mutex<dyn Engine>>) -> StratisResult<DmFd> {
+    fn new(engine: Arc<Mutex<dyn Engine>>) -> StratisResult<DmFd> {
         setup_dm()?;
         let fd = get_dm().as_raw_fd();
         fcntl(

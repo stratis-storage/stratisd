@@ -4,66 +4,25 @@
 
 //! Main loop
 
-use std::{
-    os::unix::io::AsRawFd,
-    sync::{
-        atomic::{AtomicBool, AtomicUsize, Ordering},
-        Arc,
-    },
+use std::sync::{
+    atomic::{AtomicBool, AtomicUsize, Ordering},
+    Arc,
 };
 
-use futures::stream::StreamExt;
-use nix::poll::{poll, PollFd, PollFlags};
 use tokio::{
     runtime::Builder,
     select, signal,
-    sync::{
-        mpsc::{unbounded_channel, UnboundedSender},
-        Mutex,
-    },
+    sync::{mpsc::unbounded_channel, Mutex},
     task,
 };
 
 use crate::{
     engine::{Engine, SimEngine, StratEngine, UdevEngineEvent},
     stratis::{
-        dm::DmFd, errors::StratisResult, ipc_support::setup, stratis::VERSION,
-        udev_monitor::UdevMonitor,
+        dm::dm_event_thread, errors::StratisResult, ipc_support::setup, stratis::VERSION,
+        udev_monitor::udev_thread,
     },
 };
-
-// Poll for udev events.
-// Check for exit condition and return if true.
-fn udev_thread(
-    sender: UnboundedSender<UdevEngineEvent>,
-    should_exit: Arc<AtomicBool>,
-) -> StratisResult<()> {
-    let context = libudev::Context::new()?;
-    let mut udev = UdevMonitor::create(&context)?;
-
-    let mut pollers = [PollFd::new(udev.as_raw_fd(), PollFlags::POLLIN)];
-    loop {
-        match poll(&mut pollers, 100)? {
-            0 => {
-                if should_exit.load(Ordering::Relaxed) {
-                    info!("udev thread was notified to exit");
-                    return Ok(());
-                }
-            }
-            _ => {
-                if let Some(ref e) = udev.poll() {
-                    if let Err(e) = sender.send(UdevEngineEvent::from(e)) {
-                        warn!(
-                            "udev event could not be sent to engine thread: {}; the \
-                            engine was not notified of this udev event",
-                            e,
-                        );
-                    }
-                }
-            }
-        }
-    }
-}
 
 // Waits for SIGINT. If received, sets should_exit to true.
 async fn signal_thread(should_exit: Arc<AtomicBool>) {
@@ -71,22 +30,6 @@ async fn signal_thread(should_exit: Arc<AtomicBool>) {
         error!("Failure while listening for signals: {}", e);
     }
     should_exit.store(true, Ordering::Relaxed);
-}
-
-// Waits for devicemapper event. On devicemapper event, transfers control
-// to engine to handle event and waits until control is returned from engine.
-// Accepts None as an argument; this indicates that devicemapper events are
-// to be ignored.
-async fn dm_event_thread(engine: Option<Arc<Mutex<dyn Engine>>>) -> StratisResult<()> {
-    match engine {
-        Some(e) => {
-            let mut dm_fd = DmFd::new(e)?;
-            loop {
-                dm_fd.next().await;
-            }
-        }
-        None => Ok(()),
-    }
 }
 
 /// Set up all sorts of signal and event handling mechanisms.

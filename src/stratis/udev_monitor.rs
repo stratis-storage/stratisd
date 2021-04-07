@@ -4,20 +4,61 @@
 
 //! Support for monitoring udev events.
 
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::{
+    os::unix::io::{AsRawFd, RawFd},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+};
 
 use libudev::Event;
+use nix::poll::{poll, PollFd, PollFlags};
+use tokio::sync::mpsc::UnboundedSender;
 
-use crate::stratis::errors::StratisResult;
+use crate::{engine::UdevEngineEvent, stratis::errors::StratisResult};
+
+// Poll for udev events.
+// Check for exit condition and return if true.
+pub fn udev_thread(
+    sender: UnboundedSender<UdevEngineEvent>,
+    should_exit: Arc<AtomicBool>,
+) -> StratisResult<()> {
+    let context = libudev::Context::new()?;
+    let mut udev = UdevMonitor::create(&context)?;
+
+    let mut pollers = [PollFd::new(udev.as_raw_fd(), PollFlags::POLLIN)];
+    loop {
+        match poll(&mut pollers, 100)? {
+            0 => {
+                if should_exit.load(Ordering::Relaxed) {
+                    info!("udev thread was notified to exit");
+                    return Ok(());
+                }
+            }
+            _ => {
+                if let Some(ref e) = udev.poll() {
+                    if let Err(e) = sender.send(UdevEngineEvent::from(e)) {
+                        warn!(
+                            "udev event could not be sent to engine thread: {}; the \
+                            engine was not notified of this udev event",
+                            e,
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
 
 /// A facility for listening for and handling udev events that stratisd
 /// considers interesting.
-pub struct UdevMonitor<'a> {
+struct UdevMonitor<'a> {
     socket: libudev::MonitorSocket<'a>,
 }
 
 impl<'a> UdevMonitor<'a> {
-    pub fn create(context: &'a libudev::Context) -> StratisResult<UdevMonitor<'a>> {
+    fn create(context: &'a libudev::Context) -> StratisResult<UdevMonitor<'a>> {
         let mut monitor = libudev::Monitor::new(&context)?;
         monitor.match_subsystem("block")?;
 

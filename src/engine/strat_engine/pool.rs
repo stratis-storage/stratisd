@@ -7,7 +7,7 @@ use std::{borrow::Cow, collections::HashMap, path::Path, vec::Vec};
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
 
-use devicemapper::{DmName, DmNameBuf, Sectors};
+use devicemapper::{DmNameBuf, Sectors};
 
 use crate::{
     engine::{
@@ -261,17 +261,7 @@ impl StratPool {
     /// Called when a DM device in this pool has generated an event.
     // TODO: Just check the device that evented. Currently checks
     // everything.
-    pub fn event_on(
-        &mut self,
-        pool_uuid: PoolUuid,
-        pool_name: &Name,
-        dm_name: &DmName,
-    ) -> StratisResult<()> {
-        assert!(self
-            .thin_pool
-            .get_eventing_dev_names(pool_uuid)
-            .iter()
-            .any(|x| dm_name == &**x));
+    pub fn event_on(&mut self, pool_uuid: PoolUuid, pool_name: &Name) -> StratisResult<()> {
         if self.thin_pool.check(pool_uuid, &mut self.backstore)? {
             self.write_metadata(pool_name)?;
         }

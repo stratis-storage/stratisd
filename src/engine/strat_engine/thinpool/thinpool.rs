@@ -983,12 +983,18 @@ impl ThinPool {
 
     /// The names of DM devices belonging to this pool that may generate events
     pub fn get_eventing_dev_names(&self, pool_uuid: PoolUuid) -> Vec<DmNameBuf> {
-        vec![
+        let mut eventing = vec![
             format_flex_ids(pool_uuid, FlexRole::ThinMeta).0,
             format_flex_ids(pool_uuid, FlexRole::ThinData).0,
             format_flex_ids(pool_uuid, FlexRole::MetadataVolume).0,
             format_thinpool_ids(pool_uuid, ThinPoolRole::Pool).0,
-        ]
+        ];
+        eventing.extend(
+            self.filesystems
+                .iter()
+                .map(|(_, uuid, _)| format_thin_ids(pool_uuid, ThinRole::Filesystem(*uuid)).0),
+        );
+        eventing
     }
 
     /// Suspend the thinpool

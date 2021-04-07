@@ -353,3 +353,9 @@ impl<'a> From<&'a libudev::Device<'a>> for UdevEngineDevice {
         }
     }
 }
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DevicemapperInfo {
+    pub highest_event_nr: Option<u32>,
+    pub device_count: usize,
+}

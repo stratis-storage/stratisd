@@ -6,8 +6,6 @@ use std::{clone::Clone, collections::HashMap, path::Path};
 
 use serde_json::Value;
 
-use devicemapper::DmNameBuf;
-
 use crate::{
     engine::{
         engine::KeyActions,
@@ -21,8 +19,8 @@ use crate::{
         },
         structures::Table,
         types::{
-            CreateAction, DeleteAction, DevUuid, EncryptionInfo, LockedPoolInfo, RenameAction,
-            ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
+            CreateAction, DeleteAction, DevUuid, DevicemapperInfo, EncryptionInfo, LockedPoolInfo,
+            RenameAction, ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
         },
         Engine, Name, Pool, PoolUuid, Report,
     },
@@ -39,7 +37,7 @@ pub struct StratEngine {
 
     // Maps name of DM devices we are watching to the most recent event number
     // we've handled for each
-    watched_dev_last_event_nrs: HashMap<DmNameBuf, u32>,
+    watched_dev_last_event_nrs: HashMap<PoolUuid, DevicemapperInfo>,
 
     // Handler for key operations
     key_handler: StratKeyActions,
@@ -303,15 +301,31 @@ impl Engine for StratEngine {
             })
             .collect();
 
-        for (pool_name, pool_uuid, pool) in &mut self.pools {
-            for dm_name in pool.get_eventing_dev_names(*pool_uuid) {
-                if device_list.get(&dm_name) > self.watched_dev_last_event_nrs.get(&dm_name) {
-                    pool.event_on(*pool_uuid, pool_name, &dm_name)?;
-                }
-            }
-        }
+        for (pool_name, pool_uuid, pool) in self.pools.iter_mut() {
+            let dev_names = pool.get_eventing_dev_names(*pool_uuid);
+            let dm_info = DevicemapperInfo {
+                highest_event_nr: itertools::max(device_list.iter().filter_map(
+                    |(dm_name, event_nr)| {
+                        if dev_names.contains(dm_name) {
+                            Some(event_nr)
+                        } else {
+                            None
+                        }
+                    },
+                ))
+                .copied(),
+                device_count: dev_names.len(),
+            };
 
-        self.watched_dev_last_event_nrs = device_list;
+            if self.watched_dev_last_event_nrs.get(pool_uuid) != Some(&dm_info) {
+                // Return error early before updating the watched event numbers
+                // so that if another event comes in on any pool, this method
+                // will retry eventing as the event number will be higher than
+                // what was previously recorded.
+                pool.event_on(*pool_uuid, pool_name)?;
+            }
+            self.watched_dev_last_event_nrs.insert(*pool_uuid, dm_info);
+        }
 
         Ok(())
     }

@@ -41,6 +41,34 @@ class TestSpaceUsagePrediction(UdevTest):
 
     _CAP_DEVICE_STR = "stratis-1-private-%s-physical-originsub"
 
+    def _test_cap_size(self, pool_name, prediction):
+        """
+        Helper function to verify that the cap device is the correct size.
+
+        :param str pool_name: the name of the pool to test
+        :param prediction: JSON output from script
+        """
+        proxy = get_object(TOP_OBJECT)
+        managed_objects = ObjectManager.Methods.GetManagedObjects(proxy, {})
+
+        _pool_object_path, pool = next(
+            pools(props={"Name": pool_name})
+            .require_unique_match(True)
+            .search(managed_objects)
+        )
+
+        pool_uuid = MOPool(pool).Uuid()
+
+        cap_name = self._CAP_DEVICE_STR % pool_uuid
+
+        command = subprocess.Popen(
+            ["blockdev", "--getsize64", "/dev/mapper/%s" % cap_name],
+            stdout=subprocess.PIPE,
+            universal_newlines=True,
+        )
+        cap_device_size, _ = command.communicate()
+        self.assertEqual(cap_device_size.rstrip("\n"), prediction["free"])
+
     def test_prediction(self):
         """
         Verify that the prediction of space used equals the reality.
@@ -57,29 +85,9 @@ class TestSpaceUsagePrediction(UdevTest):
             pool_name = random_string(5)
             create_pool(pool_name, devnodes)
             self.wait_for_pools(1)
+            self._test_cap_size(pool_name, prediction)
 
-            proxy = get_object(TOP_OBJECT)
-            managed_objects = ObjectManager.Methods.GetManagedObjects(proxy, {})
-
-            _pool_object_path, pool = next(
-                pools(props={"Name": pool_name})
-                .require_unique_match(True)
-                .search(managed_objects)
-            )
-
-            pool_uuid = MOPool(pool).Uuid()
-
-            cap_name = self._CAP_DEVICE_STR % pool_uuid
-
-            command = subprocess.Popen(
-                ["blockdev", "--getsize64", "/dev/mapper/%s" % cap_name],
-                stdout=subprocess.PIPE,
-                universal_newlines=True,
-            )
-            cap_device_size, _ = command.communicate()
-            self.assertEqual(cap_device_size.rstrip("\n"), prediction["free"])
-
-    def test_prediction_encrypted(self):  # pylint: disable=too-many-locals
+    def test_prediction_encrypted(self):
         """
         Verify that the prediction of space used equals the reality if pool
         is encrypted.
@@ -97,24 +105,4 @@ class TestSpaceUsagePrediction(UdevTest):
             pool_name = random_string(5)
             create_pool(pool_name, devnodes, key_description=key_description)
             self.wait_for_pools(1)
-
-            proxy = get_object(TOP_OBJECT)
-            managed_objects = ObjectManager.Methods.GetManagedObjects(proxy, {})
-
-            _pool_object_path, pool = next(
-                pools(props={"Name": pool_name})
-                .require_unique_match(True)
-                .search(managed_objects)
-            )
-
-            pool_uuid = MOPool(pool).Uuid()
-
-            cap_name = self._CAP_DEVICE_STR % pool_uuid
-
-            command = subprocess.Popen(
-                ["blockdev", "--getsize64", "/dev/mapper/%s" % cap_name],
-                stdout=subprocess.PIPE,
-                universal_newlines=True,
-            )
-            cap_device_size, _ = command.communicate()
-            self.assertEqual(cap_device_size.rstrip("\n"), prediction["free"])
+            self._test_cap_size(pool_name, prediction)

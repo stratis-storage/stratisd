@@ -1221,6 +1221,22 @@ mod tests {
     #[allow(clippy::cast_possible_truncation)]
     const BYTES_PER_WRITE: usize = 2 * IEC::Ki as usize * SECTOR_SIZE as usize;
 
+    // Check expected size of thin pool after one file creation in order
+    // to verify expected size required by one thin device remains constant.
+    // If the value of the expected size changes, update to a new value and
+    // notify blivet.
+    macro_rules! check_expected_filesystem_size {
+        ($p:ident) => {
+            match $p.thin_pool.status(get_dm()).unwrap() {
+                ThinPoolStatus::Working(status) => {
+                    assert_eq!(status.usage.used_data, DataBlocks(546));
+                }
+                ThinPoolStatus::Error => panic!("Could not obtain status for thinpool."),
+                ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail  Expected working."),
+            }
+        };
+    }
+
     /// Test greedy allocation.
     /// Verify that ThinPool::new() allocates nearly everything available.
     /// Verify that meta and data devices are roughly in their correct
@@ -1295,6 +1311,9 @@ mod tests {
         let fs_uuid = pool
             .create_filesystem(pool_name, pool_uuid, "stratis_test_filesystem", None)
             .unwrap();
+
+        check_expected_filesystem_size!(pool);
+
         let write_buf = &[8u8; BYTES_PER_WRITE];
         let source_tmp_dir = tempfile::Builder::new()
             .prefix("stratis_testing")
@@ -1406,6 +1425,8 @@ mod tests {
         let fs_uuid = pool
             .create_filesystem(pool_name, pool_uuid, filesystem_name, None)
             .unwrap();
+
+        check_expected_filesystem_size!(pool);
 
         cmd::udev_settle().unwrap();
 
@@ -1535,6 +1556,8 @@ mod tests {
             .create_filesystem(pool_name, pool_uuid, name1, None)
             .unwrap();
 
+        check_expected_filesystem_size!(pool);
+
         cmd::udev_settle().unwrap();
 
         assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, name1)).exists());
@@ -1599,6 +1622,8 @@ mod tests {
         let fs_uuid = pool
             .create_filesystem(pool_name, pool_uuid, "fsname", None)
             .unwrap();
+
+        check_expected_filesystem_size!(pool);
 
         let tmp_dir = tempfile::Builder::new()
             .prefix("stratis_testing")
@@ -1675,6 +1700,9 @@ mod tests {
         let fs_uuid = pool
             .create_filesystem(pool_name, pool_uuid, fs_name, None)
             .unwrap();
+
+        check_expected_filesystem_size!(pool);
+
         retry_operation!(pool.destroy_filesystem(pool_name, fs_uuid));
         let flexdevs: FlexDevsSave = pool.record();
         let thinpooldevsave: ThinPoolDevSave = pool.record();
@@ -1745,6 +1773,9 @@ mod tests {
         let fs_uuid = pool
             .create_filesystem(pool_name, pool_uuid, fs_name, Some(fs_size))
             .unwrap();
+
+        check_expected_filesystem_size!(pool);
+
         let tmp_dir = tempfile::Builder::new()
             .prefix("stratis_testing")
             .tempdir()
@@ -1888,6 +1919,8 @@ mod tests {
         let fs_uuid = pool
             .create_filesystem(pool_name, pool_uuid, "stratis_test_filesystem", None)
             .unwrap();
+
+        check_expected_filesystem_size!(pool);
 
         let tmp_dir = tempfile::Builder::new()
             .prefix("stratis_testing")

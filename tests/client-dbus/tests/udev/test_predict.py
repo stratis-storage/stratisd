@@ -19,7 +19,6 @@ Test that predictions of space usage match the actual.
 # isort: STDLIB
 import json
 import subprocess
-import sys
 
 # isort: LOCAL
 from stratisd_client_dbus import MOPool, ObjectManager, get_object, pools
@@ -27,6 +26,7 @@ from stratisd_client_dbus._constants import TOP_OBJECT
 
 from ._utils import (
     _STRATIS_PREDICT_USAGE,
+    OptionalKeyServiceContextManager,
     ServiceContextManager,
     UdevTest,
     create_pool,
@@ -39,6 +39,8 @@ class TestSpaceUsagePrediction(UdevTest):
     Test relations of prediction to reality.
     """
 
+    _CAP_DEVICE_STR = "stratis-1-private-%s-physical-originsub"
+
     def test_prediction(self):
         """
         Verify that the prediction of space used equals the reality.
@@ -50,11 +52,12 @@ class TestSpaceUsagePrediction(UdevTest):
         )
         outs, _ = command.communicate()
         prediction = json.loads(outs)
-        print(prediction, file=sys.stderr)
 
         with ServiceContextManager():
             pool_name = random_string(5)
             create_pool(pool_name, devnodes)
+            self.wait_for_pools(1)
+
             proxy = get_object(TOP_OBJECT)
             managed_objects = ObjectManager.Methods.GetManagedObjects(proxy, {})
 
@@ -64,4 +67,54 @@ class TestSpaceUsagePrediction(UdevTest):
                 .search(managed_objects)
             )
 
-            _pool_uuid = MOPool(pool).Uuid()
+            pool_uuid = MOPool(pool).Uuid()
+
+            cap_name = self._CAP_DEVICE_STR % pool_uuid
+
+            command = subprocess.Popen(
+                ["blockdev", "--getsize64", "/dev/mapper/%s" % cap_name],
+                stdout=subprocess.PIPE,
+                universal_newlines=True,
+            )
+            cap_device_size, _ = command.communicate()
+            self.assertEqual(cap_device_size.rstrip("\n"), prediction["free"])
+
+    def test_prediction_encrypted(self):  # pylint: disable=too-many-locals
+        """
+        Verify that the prediction of space used equals the reality if pool
+        is encrypted.
+        """
+        device_tokens = self._lb_mgr.create_devices(4)
+        devnodes = self._lb_mgr.device_files(device_tokens)
+        command = subprocess.Popen(
+            [_STRATIS_PREDICT_USAGE, "--encrypted"] + devnodes, stdout=subprocess.PIPE
+        )
+        outs, _ = command.communicate()
+        prediction = json.loads(outs)
+
+        (key_description, key) = ("key_spec", "data")
+        with OptionalKeyServiceContextManager(key_spec=[(key_description, key)]):
+            pool_name = random_string(5)
+            create_pool(pool_name, devnodes, key_description=key_description)
+            self.wait_for_pools(1)
+
+            proxy = get_object(TOP_OBJECT)
+            managed_objects = ObjectManager.Methods.GetManagedObjects(proxy, {})
+
+            _pool_object_path, pool = next(
+                pools(props={"Name": pool_name})
+                .require_unique_match(True)
+                .search(managed_objects)
+            )
+
+            pool_uuid = MOPool(pool).Uuid()
+
+            cap_name = self._CAP_DEVICE_STR % pool_uuid
+
+            command = subprocess.Popen(
+                ["blockdev", "--getsize64", "/dev/mapper/%s" % cap_name],
+                stdout=subprocess.PIPE,
+                universal_newlines=True,
+            )
+            cap_device_size, _ = command.communicate()
+            self.assertEqual(cap_device_size.rstrip("\n"), prediction["free"])

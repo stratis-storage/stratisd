@@ -1774,8 +1774,6 @@ mod tests {
             .create_filesystem(pool_name, pool_uuid, fs_name, Some(fs_size))
             .unwrap();
 
-        check_expected_filesystem_size!(pool);
-
         let tmp_dir = tempfile::Builder::new()
             .prefix("stratis_testing")
             .tempdir()

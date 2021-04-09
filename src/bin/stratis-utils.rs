@@ -114,8 +114,16 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
 
     if argv1.ends_with("stratis-str-cmp") {
         let parser = App::new("stratis-str-cmp")
-            .arg(Arg::with_name("left").help("First string to compare"))
-            .arg(Arg::with_name("right").help("Second string to compare"));
+            .arg(
+                Arg::with_name("left")
+                    .help("First string to compare")
+                    .required(true),
+            )
+            .arg(
+                Arg::with_name("right")
+                    .help("Second string to compare")
+                    .required(true),
+            );
         let matches = parser.get_matches_from(&args);
         string_compare(
             &matches.value_of("left").expect("required argument"),

@@ -231,7 +231,6 @@ install-cfg: docs/stratisd.8
 	install -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis-clevis dracut/90stratis-clevis/stratis-clevis-rootfs-setup
 	install -Dpm0644 -t $(DESTDIR)$(UNITDIR) systemd/stratisd-min-postinitrd.service
 	install -Dpm0644 -t $(DESTDIR)$(UNITDIR) systemd/stratis-fstab-setup@.service
-	install -Dpm0755 -t $(DESTDIR)$(UNITGENDIR) $(profiledir)/stratis-setup-generator
 
 install: $(PROFILETARGET) install-cfg
 	install -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd
@@ -240,9 +239,10 @@ install: $(PROFILETARGET) install-cfg
 	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(UDEVDIR)/stratis-base32-decode
 	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(BINDIR)/stratis-predict-usage
 	install -Dpm0755 -t $(DESTDIR)$(UNITEXECDIR) systemd/stratis-fstab-setup
-	install -Dpm0755 -t $(DESTDIR)$(PREFIX)/bin $(profiledir)/stratis-min
-	install -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) $(profiledir)/stratisd-min
-	install -Dpm0755 -t $(DESTDIR)$(UNITGENDIR) $(profiledir)/stratis-clevis-setup-generator
+	install -Dpm0755 -t $(DESTDIR)$(PREFIX)/bin target/$(PROFILEDIR)/stratis-min
+	install -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd-min
+	install -Dpm0755 -t $(DESTDIR)$(UNITGENDIR) target/$(PROFILEDIR)/stratis-clevis-setup-generator
+	install -Dpm0755 -t $(DESTDIR)$(UNITGENDIR) target/$(PROFILEDIR)/stratis-setup-generator
 
 # remove installed configuration files
 clean-cfg:

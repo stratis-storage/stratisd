@@ -27,6 +27,17 @@ pub struct BDA {
     regions: mda::MDARegions,
 }
 
+impl Default for BDA {
+    fn default() -> BDA {
+        BDA::new(
+            StratisIdentifiers::new(PoolUuid::nil(), DevUuid::nil()),
+            MDADataSize::default(),
+            BlockdevSize::default(),
+            0,
+        )
+    }
+}
+
 impl BDA {
     pub fn new(
         identifiers: StratisIdentifiers,

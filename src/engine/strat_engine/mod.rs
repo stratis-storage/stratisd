@@ -19,6 +19,8 @@ mod udev;
 mod writing;
 
 pub use self::{
+    backstore::crypt_metadata_size,
+    device::blkdev_size,
     dm::{get_dm, get_dm_init},
     engine::StratEngine,
     keys::StratKeyActions,

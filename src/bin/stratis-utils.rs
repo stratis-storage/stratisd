@@ -130,14 +130,22 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
             &matches.value_of("right").expect("required argument"),
         );
     } else if argv1.ends_with("stratis-base32-decode") {
-        if args.len() != 3 {
-            return Err(Box::new(ExecutableError(format!(
-                "{} requires two positional arguments",
-                argv1
-            ))));
-        }
-
-        base32_decode(&args[1], &args[2])?;
+        let parser = App::new("stratis-base32-decode")
+            .arg(
+                Arg::with_name("key")
+                    .help("Key for output string")
+                    .required(true),
+            )
+            .arg(
+                Arg::with_name("value")
+                    .help("value to be decoded from base32 encoded sequence")
+                    .required(true),
+            );
+        let matches = parser.get_matches_from(&args);
+        base32_decode(
+            &matches.value_of("key").expect("required argument"),
+            &matches.value_of("value").expect("required argument"),
+        )?;
     } else if argv1.ends_with("stratis-predict-usage") {
         let parser = App::new("stratis-predict-usage")
             .arg(

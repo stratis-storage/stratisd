@@ -1,0 +1,8 @@
+ACTION=="change", ENV{DM_NAME}=="stratis-1-[0-9a-f]*-thin-fs-[0-9a-f]*", IMPORT{program}="stratis-base32-decode STRATIS_POOL_NAME $env{SYNTH_ARG_STRATISPOOLNAME}", ENV{SYNTH_ARG_STRATISPOOLNAME}!=""
+ACTION=="change", ENV{DM_NAME}=="stratis-1-[0-9a-f]*-thin-fs-[0-9a-f]*", IMPORT{program}="stratis-base32-decode STRATIS_FS_NAME $env{SYNTH_ARG_STRATISFSNAME}", ENV{SYNTH_ARG_STRATISFSNAME}!=""
+ACTION=="change", ENV{DM_NAME}=="stratis-1-[0-9a-f]*-thin-fs-[0-9a-f]*", PROGRAM+="stratis-str-cmp $env{SYNTH_UUID} $env{ID_FS_UUID}", RESULT=="0", ENV{SYNTH_UUID}!="", ENV{STRATIS_POOL_NAME}!="", ENV{STRATIS_FS_NAME}!="", SYMLINK+="stratis/$env{STRATIS_POOL_NAME}/$env{STRATIS_FS_NAME}", GOTO="stratis_end"
+
+IMPORT{db}="STRATIS_POOL_NAME", IMPORT{db}="STRATIS_FS_NAME"
+ACTION=="change", ENV{DM_NAME}=="stratis-1-[0-9a-f]*-thin-fs-[0-9a-f]*", ENV{STRATIS_POOL_NAME}!="", ENV{STRATIS_FS_NAME}!="", SYMLINK+="stratis/$env{STRATIS_POOL_NAME}/$env{STRATIS_FS_NAME}"
+
+LABEL="stratis_end"

@@ -42,7 +42,7 @@ install() {
 	    plymouth \
 	    /usr/sbin/plymouthd \
 	    /usr/lib/udev/stratis-str-cmp
-    ln /usr/lib/udev/stratis-str-cmp /usr/lib/udev/stratis-base32-decode
+    ln ${initdir}/usr/lib/udev/stratis-str-cmp ${initdir}/usr/lib/udev/stratis-base32-decode
 
     # Dracut dependencies
     inst_multiple $systemdutildir/system-generators/stratis-setup-generator \

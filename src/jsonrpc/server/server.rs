@@ -63,11 +63,11 @@ impl StratisParams {
                     Vec::new(),
                 ))
             }
-            StratisParamType::PoolCreate(name, paths, key_desc_opt) => {
+            StratisParamType::PoolCreate(name, paths, encryption_info) => {
                 expects_fd!(self.fd_opt, PoolCreate, false, false);
                 let path_ref: Vec<_> = paths.iter().map(|p| p.as_path()).collect();
                 StratisRet::PoolCreate(stratis_result_to_return(
-                    pool::pool_create(engine, name.as_str(), path_ref.as_slice(), key_desc_opt)
+                    pool::pool_create(engine, name.as_str(), path_ref.as_slice(), encryption_info)
                         .await,
                     false,
                 ))

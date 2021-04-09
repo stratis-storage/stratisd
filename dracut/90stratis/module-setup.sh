@@ -12,6 +12,8 @@ check() {
 	    xfs_growfs \
 	    plymouth \
 	    /usr/sbin/plymouthd \
+	    /usr/lib/udev/stratis-str-cmp \
+	    /usr/lib/udev/stratis-base32-decode \
 	    || return 1
     return 255
 }
@@ -39,13 +41,15 @@ install() {
 	    xfs_growfs \
 	    plymouth \
 	    /usr/sbin/plymouthd \
+	    /usr/lib/udev/stratis-str-cmp
+    ln /usr/lib/udev/stratis-str-cmp /usr/lib/udev/stratis-base32-decode
 
     # Dracut dependencies
     inst_multiple $systemdutildir/system-generators/stratis-setup-generator \
 	    $systemdutildir/system/plymouth-start.service \
 	    plymouth
 
-    inst_rules "$moddir/14-stratisd.rules"
+    inst_rules "$moddir/61-stratisd.rules"
     inst_simple "$moddir/stratisd-min.service" $systemdutildir/system/stratisd-min.service
     inst_simple "$moddir/stratis-rootfs-setup" $systemdutildir/stratis-rootfs-setup
 }

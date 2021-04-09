@@ -44,7 +44,7 @@ impl AsRef<[u8]> for SizedKeyMemory {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub struct EncryptionInfo {
     pub key_description: Option<KeyDescription>,
     pub clevis_info: Option<(String, Value)>,

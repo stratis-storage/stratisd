@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use nix::unistd::{pipe, write};
 
 use crate::{
-    engine::{KeyDescription, PoolUuid, UnlockMethod},
+    engine::{EncryptionInfo, PoolUuid, UnlockMethod},
     jsonrpc::client::utils::to_suffix_repr,
     print_table,
     stratis::{StratisError, StratisResult},
@@ -17,9 +17,9 @@ use crate::{
 pub fn pool_create(
     name: String,
     blockdevs: Vec<PathBuf>,
-    key_desc: Option<KeyDescription>,
+    enc_info: EncryptionInfo,
 ) -> StratisResult<()> {
-    do_request_standard!(PoolCreate, name, blockdevs, key_desc)
+    do_request_standard!(PoolCreate, name, blockdevs, enc_info)
 }
 
 // stratis-min pool unlock

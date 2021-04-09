@@ -8,8 +8,8 @@ use tokio::sync::Mutex;
 
 use crate::{
     engine::{
-        BlockDevTier, CreateAction, DeleteAction, EncryptionInfo, Engine, EngineAction,
-        KeyDescription, PoolUuid, RenameAction, UnlockMethod,
+        BlockDevTier, CreateAction, DeleteAction, EncryptionInfo, Engine, EngineAction, PoolUuid,
+        RenameAction, UnlockMethod,
     },
     jsonrpc::{
         interface::PoolListType,
@@ -59,18 +59,14 @@ pub async fn pool_create(
     engine: Arc<Mutex<dyn Engine>>,
     name: &str,
     blockdev_paths: &[&Path],
-    key_desc: Option<KeyDescription>,
+    enc_info: EncryptionInfo,
 ) -> StratisResult<bool> {
     Ok(
-        match engine.lock().await.create_pool(
-            name,
-            blockdev_paths,
-            None,
-            &EncryptionInfo {
-                key_description: key_desc,
-                clevis_info: None,
-            },
-        )? {
+        match engine
+            .lock()
+            .await
+            .create_pool(name, blockdev_paths, None, &enc_info)?
+        {
             CreateAction::Created(_) => true,
             CreateAction::Identity => false,
         },

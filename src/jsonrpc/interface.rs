@@ -8,7 +8,7 @@ use std::{convert::TryFrom, error::Error, os::unix::io::RawFd, path::PathBuf};
 
 use serde_json::Value;
 
-use crate::engine::{FilesystemUuid, KeyDescription, PoolUuid, UnlockMethod};
+use crate::engine::{EncryptionInfo, FilesystemUuid, KeyDescription, PoolUuid, UnlockMethod};
 
 pub type PoolListType = (Vec<String>, Vec<(u128, Option<u128>)>, Vec<(bool, bool)>);
 // FIXME: 4th tuple argument (String) can be implemented as a new type struct wrapping
@@ -33,7 +33,7 @@ pub enum StratisParamType {
     KeySet(KeyDescription),
     KeyUnset(KeyDescription),
     KeyList,
-    PoolCreate(String, Vec<PathBuf>, Option<KeyDescription>),
+    PoolCreate(String, Vec<PathBuf>, EncryptionInfo),
     PoolRename(String, String),
     PoolAddData(String, Vec<PathBuf>),
     PoolInitCache(String, Vec<PathBuf>),

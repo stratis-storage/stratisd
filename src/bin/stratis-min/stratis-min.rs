@@ -5,9 +5,10 @@
 use std::{convert::TryFrom, error::Error, path::PathBuf};
 
 use clap::{App, Arg, ArgGroup, ArgMatches, SubCommand};
+use serde_json::{json, Map, Value};
 
 use libstratis::{
-    engine::{KeyDescription, PoolUuid, UnlockMethod},
+    engine::{EncryptionInfo, KeyDescription, PoolUuid, UnlockMethod, CLEVIS_TANG_TRUST_URL},
     jsonrpc::client::{filesystem, key, pool, report},
     stratis::StratisError,
 };
@@ -60,6 +61,36 @@ fn parse_args() -> App<'static, 'static> {
                         Arg::with_name("key_desc")
                             .long("--key-desc")
                             .takes_value(true),
+                    )
+                    .arg(
+                        Arg::with_name("clevis")
+                            .long("--clevis")
+                            .takes_value(true)
+                            .possible_values(&["nbde", "tang", "tpm2"])
+                            .requires_if("nbde", "tang_args")
+                            .requires_if("tang", "tang_args"),
+                    )
+                    .arg(
+                        Arg::with_name("tang_url")
+                            .long("--tang-url")
+                            .takes_value(true)
+                            .required_if("clevis", "nbde")
+                            .required_if("clevis", "tang"),
+                    )
+                    .arg(
+                        Arg::with_name("thumbprint")
+                            .long("--thumbprint")
+                            .takes_value(true),
+                    )
+                    .arg(
+                        Arg::with_name("trust_url")
+                            .long("--trust-url")
+                            .takes_value(false),
+                    )
+                    .group(
+                        ArgGroup::with_name("tang_args")
+                            .arg("thumbprint")
+                            .arg("trust_url"),
                     ),
                 SubCommand::with_name("init-cache")
                     .arg(Arg::with_name("name").required(true))
@@ -139,12 +170,35 @@ fn main() -> Result<(), Box<dyn Error>> {
             Ok(())
         } else if let Some(args) = subcommand.subcommand_matches("create") {
             let paths = get_paths_from_args(args);
+            let key_description = match args.value_of("key_desc").map(|s| s.to_owned()) {
+                Some(string) => Some(KeyDescription::try_from(string)?),
+                None => None,
+            };
+            let pin = args.value_of("clevis");
+            let clevis_info = match pin {
+                Some("nbde") | Some("tang") => {
+                    let mut json = Map::new();
+                    json.insert(
+                        "url".to_string(),
+                        Value::from(args.value_of("tang_url").expect("Required")),
+                    );
+                    if args.is_present("trust_url") {
+                        json.insert(CLEVIS_TANG_TRUST_URL.to_string(), Value::from(true));
+                    } else if let Some(thp) = args.value_of("thumbprint") {
+                        json.insert("thp".to_string(), Value::from(thp));
+                    }
+                    pin.map(|p| (p.to_string(), Value::from(json)))
+                }
+                Some("tpm2") => Some(("tpm2".to_string(), json!({}))),
+                Some(_) => unreachable!("Validated by parser"),
+                None => None,
+            };
             pool::pool_create(
                 args.value_of("name").expect("required").to_string(),
                 paths,
-                match args.value_of("key_desc").map(|s| s.to_owned()) {
-                    Some(string) => Some(KeyDescription::try_from(string)?),
-                    None => None,
+                EncryptionInfo {
+                    key_description,
+                    clevis_info,
                 },
             )?;
             Ok(())

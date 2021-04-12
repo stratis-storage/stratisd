@@ -47,7 +47,7 @@ def build_cargo_tree_dict():
     :returns: a map from crates names to sets of versions
     :rtype: dict of str * set of Version
     """
-    command = ["cargo", "tree", "--charset=ascii"]
+    command = ["cargo", "tree", "--charset=ascii", "--all-features"]
     proc = subprocess.Popen(command, stdout=subprocess.PIPE)
 
     stream = proc.stdout
@@ -104,7 +104,13 @@ def build_cargo_metadata():
     """
     Build a dict mapping crate to version spec from Cargo.toml.
     """
-    command = ["cargo", "metadata", "--format-version=1", "--no-deps"]
+    command = [
+        "cargo",
+        "metadata",
+        "--format-version=1",
+        "--no-deps",
+        "--all-features",
+    ]
     proc = subprocess.Popen(command, stdout=subprocess.PIPE)
     stream = proc.stdout
     metadata_str = stream.readline()

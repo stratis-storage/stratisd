@@ -32,7 +32,12 @@ def _do_updates(explicit_dependencies, cargo_tree):
     """
     Emit commands that update dependencies to the lowest allowed by Cargo.toml.
     """
-    assert frozenset(explicit_dependencies.keys()) == frozenset(cargo_tree.keys())
+    assert frozenset(explicit_dependencies.keys()) == frozenset(
+        cargo_tree.keys()
+    ), "in Cargo.toml but not in 'cargo tree' output: %s, vice-versa: %s" % (
+        frozenset(explicit_dependencies.keys()) - frozenset(cargo_tree.keys()),
+        frozenset(cargo_tree.keys()) - frozenset(explicit_dependencies.keys()),
+    )
     for (crate, version) in explicit_dependencies.items():
         current_version = cargo_tree[crate]
         subprocess.run(

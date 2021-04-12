@@ -5,13 +5,15 @@
 use std::{
     collections::HashMap,
     error::Error,
+    ffi::CString,
     fs::OpenOptions,
     io::{self, Read, Write},
     path::Path,
 };
 
 use log::{set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
-use systemd::journal::log_record;
+
+use libstratis::systemd;
 
 static LOGGER: SystemdLogger = SystemdLogger;
 
@@ -23,7 +25,11 @@ impl Log for SystemdLogger {
     }
 
     fn log(&self, record: &Record<'_>) {
-        log_record(record)
+        let cstring = match CString::new(record.args().to_string()) {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+        unsafe { systemd::syslog(record.level() as libc::c_int, cstring.as_ptr()) }
     }
 
     fn flush(&self) {}

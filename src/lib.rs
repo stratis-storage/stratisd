@@ -36,3 +36,6 @@ pub mod stratis;
 
 #[cfg(feature = "min")]
 pub mod jsonrpc;
+
+#[cfg(feature = "systemd_compat")]
+pub mod systemd;

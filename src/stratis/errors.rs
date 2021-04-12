@@ -29,6 +29,7 @@ pub enum StratisError {
     DM(devicemapper::DmError),
     Crypt(libcryptsetup_rs::LibcryptErr),
     Recv(sync::mpsc::RecvError),
+    Null(std::ffi::NulError),
 
     #[cfg(feature = "dbus_enabled")]
     Dbus(dbus::Error),
@@ -49,6 +50,7 @@ impl fmt::Display for StratisError {
             StratisError::DM(ref err) => write!(f, "DM error: {}", err),
             StratisError::Crypt(ref err) => write!(f, "Cryptsetup error: {}", err),
             StratisError::Recv(ref err) => write!(f, "Synchronization channel error: {}", err),
+            StratisError::Null(ref err) => write!(f, "C string conversion error: {}", err),
 
             #[cfg(feature = "dbus_enabled")]
             StratisError::Dbus(ref err) => {
@@ -72,11 +74,18 @@ impl Error for StratisError {
             StratisError::DM(ref err) => Some(err),
             StratisError::Crypt(ref err) => Some(err),
             StratisError::Recv(ref err) => Some(err),
+            StratisError::Null(ref err) => Some(err),
 
             #[cfg(feature = "dbus_enabled")]
             StratisError::Dbus(ref err) => Some(err),
             StratisError::Udev(ref err) => Some(err),
         }
+    }
+}
+
+impl From<std::ffi::NulError> for StratisError {
+    fn from(err: std::ffi::NulError) -> StratisError {
+        StratisError::Null(err)
     }
 }
 

@@ -3,8 +3,10 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
+    ffi::CString,
     fs::{create_dir_all, remove_file},
     future::Future,
+    io,
     os::unix::io::{AsRawFd, RawFd},
     path::Path,
     pin::Pin,
@@ -37,6 +39,7 @@ use crate::{
         server::{filesystem, key, pool, report, utils::stratis_result_to_return},
     },
     stratis::{StratisError, StratisResult},
+    systemd,
 };
 
 impl StratisParams {
@@ -213,7 +216,12 @@ impl StratisServer {
             listener: StratisUnixListener::bind(path)?,
         };
         #[cfg(feature = "systemd_compat")]
-        systemd::daemon::notify(false, [("READY", "1")].iter())?;
+        {
+            let cstring = CString::new("READY=1")?;
+            if unsafe { systemd::sd_notify(0, cstring.as_ptr()) } != 0 {
+                return Err(StratisError::Io(io::Error::last_os_error()));
+            }
+        }
         Ok(server)
     }
 

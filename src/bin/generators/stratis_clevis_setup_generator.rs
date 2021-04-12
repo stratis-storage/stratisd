@@ -7,7 +7,7 @@ use std::{error::Error, path::PathBuf};
 use log::info;
 use uuid::Uuid;
 
-mod lib;
+use super::lib;
 
 fn unit_template(pool_uuid: Uuid) -> String {
     format!(
@@ -31,10 +31,9 @@ RemainAfterExit=yes
     )
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+pub fn generator(early_dir: String) -> Result<(), Box<dyn Error>> {
     lib::setup_logger()?;
 
-    let (_, early_dir, _) = lib::get_generator_args()?;
     let kernel_cmdline = lib::get_kernel_cmdline()?;
 
     let pool_uuid_key = "stratis.rootfs.pool_uuid";

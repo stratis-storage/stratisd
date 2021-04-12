@@ -4,7 +4,6 @@
 
 use std::{
     collections::HashMap,
-    env,
     error::Error,
     fs::OpenOptions,
     io::{self, Read, Write},
@@ -67,20 +66,6 @@ pub fn get_kernel_cmdline() -> Result<HashMap<String, Option<Vec<String>>>, io::
         }
     }
     Ok(cmdline_map)
-}
-
-pub fn get_generator_args() -> Result<(String, String, String), String> {
-    let mut args = env::args();
-    let normal_dir = args
-        .nth(1)
-        .ok_or_else(|| "Missing normal priority directory argument".to_string())?;
-    let early_dir = args
-        .next()
-        .ok_or_else(|| "Missing early priority directory argument".to_string())?;
-    let late_dir = args
-        .next()
-        .ok_or_else(|| "Missing late priority directory argument".to_string())?;
-    Ok((normal_dir, early_dir, late_dir))
 }
 
 pub fn write_unit_file(dest: &Path, file_contents: String) -> Result<(), io::Error> {

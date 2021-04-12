@@ -188,16 +188,14 @@ build-extras:
 build-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build --bin=stratis-min --bin=stratisd-min --bin=stratis-setup-generator \
-	--bin=stratis-clevis-setup-generator --no-default-features \
-	--features min,systemd_compat ${TARGET_ARGS}
+	cargo build --bin=stratis-min --bin=stratisd-min --bin=stratis-utils \
+	--no-default-features --features min,systemd_compat ${TARGET_ARGS}
 
 release-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
 	cargo build --release --bin=stratis-min --bin=stratisd-min \
-	--bin=stratis-setup-generator --bin=stratis-clevis-setup-generator \
-	--no-default-features \
+	--bin=stratis-utils --no-default-features \
 	--features min,systemd_compat ${TARGET_ARGS}
 
 stratis-dumpmetadata:

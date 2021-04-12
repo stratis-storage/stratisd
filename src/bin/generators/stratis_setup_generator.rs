@@ -13,7 +13,7 @@ use std::{
 use log::info;
 use uuid::Uuid;
 
-mod lib;
+use super::lib;
 
 const WANTED_BY_INITRD_PATH: &str = "/run/systemd/system/initrd.target.wants";
 
@@ -87,10 +87,9 @@ RemainAfterExit=yes
     )
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
+pub fn generator(early_dir: String) -> Result<(), Box<dyn Error>> {
     lib::setup_logger()?;
 
-    let (_, early_dir, _) = lib::get_generator_args()?;
     let kernel_cmdline = lib::get_kernel_cmdline()?;
 
     let rootfs_uuid_paths_key = "stratis.rootfs.uuid_paths";

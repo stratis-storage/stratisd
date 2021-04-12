@@ -147,23 +147,29 @@ async fn add_blockdevs(
 // stratis-min pool [list]
 pub async fn pool_list(engine: Arc<Mutex<dyn Engine>>) -> PoolListType {
     let lock = engine.lock().await;
-    let pools = lock.pools();
-    (
-        pools.iter().map(|(n, _, _)| n.to_string()).collect(),
-        pools
-            .iter()
-            .map(|(_, _, p)| {
+    lock.pools()
+        .iter()
+        .map(|(n, u, p)| {
+            (
+                n.to_string(),
                 (
                     *p.total_physical_size().bytes(),
                     p.total_physical_used().ok().map(|u| *u.bytes()),
-                )
-            })
-            .collect(),
-        pools
-            .iter()
-            .map(|(_, _, p)| (p.has_cache(), p.is_encrypted()))
-            .collect(),
-    )
+                ),
+                (p.has_cache(), p.is_encrypted()),
+                u,
+            )
+        })
+        .fold(
+            (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
+            |(mut name_vec, mut size_vec, mut pool_props_vec, mut uuid_vec), (n, s, p, u)| {
+                name_vec.push(n);
+                size_vec.push(s);
+                pool_props_vec.push(p);
+                uuid_vec.push(*u);
+                (name_vec, size_vec, pool_props_vec, uuid_vec)
+            },
+        )
 }
 
 // stratis-min pool is-encrypted

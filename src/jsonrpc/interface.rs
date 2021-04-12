@@ -10,7 +10,12 @@ use serde_json::Value;
 
 use crate::engine::{EncryptionInfo, FilesystemUuid, KeyDescription, PoolUuid, UnlockMethod};
 
-pub type PoolListType = (Vec<String>, Vec<(u128, Option<u128>)>, Vec<(bool, bool)>);
+pub type PoolListType = (
+    Vec<String>,
+    Vec<(u128, Option<u128>)>,
+    Vec<(bool, bool)>,
+    Vec<PoolUuid>,
+);
 // FIXME: 4th tuple argument (String) can be implemented as a new type struct wrapping
 // chrono::DateTime<Utc> as long as it implements serde::Serialize and
 // serde::Deserialize.

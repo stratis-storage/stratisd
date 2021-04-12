@@ -266,17 +266,28 @@ compare-fedora:
 set-lower-bounds:
 	${PWD}/code_maintenance/set_lower_bounds
 
+# Allow future incompatible, as log crate is only just fixing its macros
+# Probably will be able to remove once log:0.4.14 is available on Fedora
+# Note that this target is really just a helper target for the
+# verify-dependency-bounds target.
+DENY_BUILD_ALL = ${DENY} -A future-incompatible
+build-all:
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY_BUILD_ALL}" \
+	cargo build --all-targets --all-features
+
 # Verify that the dependency bounds set in Cargo.toml are not lower
-# than is actually reqired. Run clippy with defaults, in order to be less
-# strict but still be compiling just about everything.
-verify-dependency-bounds: set-lower-bounds
-	cargo clippy --all-targets --all-features
+# than is actually reqired. Use build-all target to set up for cargo-tree
+# and also to test that everything still compiles when the versions are set
+# to their precise values.
+verify-dependency-bounds: build-all set-lower-bounds build-all
 
 
 .PHONY:
 	audit
 	bloat
 	build
+	build-all
 	clean
 	clean-ancillary
 	clean-cfg

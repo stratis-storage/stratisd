@@ -10,8 +10,12 @@ lint:
 fmt:
 	isort --recursive .
 	black .
+	black compare_fedora_versions
+	black set_lower_bounds
 
 .PHONY: fmt-travis
 fmt-travis:
 	isort --recursive --diff --check-only .
 	black . --check
+	black compare_fedora_versions --check
+	black set_lower_bounds --check

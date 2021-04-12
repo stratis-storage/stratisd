@@ -331,6 +331,7 @@ verify-dependency-bounds: build-all set-lower-bounds build-all
 	bloat
 	build
 	build-all
+	build-min
 	clean
 	clean-ancillary
 	clean-cfg
@@ -347,9 +348,8 @@ verify-dependency-bounds: build-all set-lower-bounds build-all
 	license
 	outdated
 	release
-	set-lower-bounds
-	build-min
 	release-min
+	set-lower-bounds
 	test
 	test-loop
 	test-real

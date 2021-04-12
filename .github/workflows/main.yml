@@ -177,6 +177,7 @@ jobs:
           libsystemd-dev
           libudev-dev
           make
+          systemd
           thin-provisioning-tools
           udev
           xfsprogs
@@ -192,7 +193,6 @@ jobs:
           dbus-devel
           libblkid-devel
           make
-          systemd
           systemd-devel
           systemd-udev
           xfsprogs

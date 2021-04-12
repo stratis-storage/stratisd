@@ -38,9 +38,18 @@ use crate::{
 /// is returned.
 pub fn get_bdas(infos: &HashMap<DevUuid, &LStratisInfo>) -> StratisResult<HashMap<DevUuid, BDA>> {
     fn read_bda(info: &LStratisInfo) -> StratisResult<BDA> {
-        BDA::load(&mut OpenOptions::new().read(true).open(&info.ids.devnode)?)?.ok_or_else(|| {
-            StratisError::Error(format!("Failed to read BDA from device: {}", info.ids))
-        })
+        OpenOptions::new()
+            .read(true)
+            .open(&info.ids.devnode)
+            .map_err(StratisError::from)
+            .and_then(|mut f| BDA::load(&mut f))
+            .and_then(|res| res.ok_or_else(|| StratisError::Error("No BDA found".to_string())))
+            .map_err(|e| {
+                StratisError::Error(format!(
+                    "Failed to read BDA from device {}: {}",
+                    info.ids, e
+                ))
+            })
     }
 
     infos

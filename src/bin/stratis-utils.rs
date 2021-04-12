@@ -172,7 +172,7 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
                 .unwrap_or_default(),
         )?;
     } else if argv1.ends_with("stratis-clevis-setup-generator")
-        || argv1.ends_with("stratis_setup_generator")
+        || argv1.ends_with("stratis-setup-generator")
     {
         #[cfg(feature = "systemd_compat")]
         if argv1.ends_with("stratis-clevis-setup-generator") {

@@ -25,16 +25,6 @@ path = "src/bin/stratis-min/stratisd-min.rs"
 required-features = ["min"]
 
 [[bin]]
-name = "stratis-setup-generator"
-path = "src/bin/generators/stratis-setup-generator.rs"
-required-features = ["min", "systemd_compat"]
-
-[[bin]]
-name = "stratis-clevis-setup-generator"
-path = "src/bin/generators/stratis-clevis-setup-generator.rs"
-required-features = ["min", "systemd_compat"]
-
-[[bin]]
 name = "stratis-utils"
 
 [dependencies]

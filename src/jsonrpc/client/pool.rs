@@ -100,13 +100,14 @@ fn properties_string(properties: Vec<(bool, bool)>) -> Vec<String> {
 
 // stratis-min pool [list]
 pub fn pool_list() -> StratisResult<()> {
-    let (names, sizes, properties) = do_request!(PoolList);
+    let (names, sizes, properties, uuids) = do_request!(PoolList);
     let physical_col = size_string(sizes);
     let properties_col = properties_string(properties);
     print_table!(
         "Name", names, "<";
         "Total Physical", physical_col, ">";
-        "Properties", properties_col, ">"
+        "Properties", properties_col, ">";
+        "UUID", uuids.iter().map(|u| u.to_string()).collect::<Vec<_>>(), ">"
     );
 
     Ok(())

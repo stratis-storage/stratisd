@@ -192,6 +192,7 @@ jobs:
           dbus-devel
           libblkid-devel
           make
+          systemd
           systemd-devel
           systemd-udev
           xfsprogs

@@ -219,8 +219,9 @@ impl StratisServer {
         #[cfg(feature = "systemd_compat")]
         {
             let cstring = CString::new("READY=1")?;
-            if unsafe { systemd::sd_notify(0, cstring.as_ptr()) } != 0 {
-                return Err(StratisError::Io(io::Error::last_os_error()));
+            let ret = unsafe { systemd::sd_notify(0, cstring.as_ptr()) };
+            if ret != 0 {
+                return Err(StratisError::Io(io::Error::from_raw_os_error(ret)));
             }
         }
         Ok(server)

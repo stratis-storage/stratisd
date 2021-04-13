@@ -25,4 +25,4 @@ udev-tests:
 	python3 -m unittest ${UNITTEST_OPTS} tests.udev.test_predict
 
 .PHONY: tests
-tests: misc-tests udev-tests
+tests: udev-tests misc-tests

@@ -123,6 +123,10 @@ impl MDARegions {
         // second. If there is a failure reading both, return an error.
         let mut get_mda = |index: usize| -> StratisResult<Option<MDAHeader>> {
             load_a_region(index)
+                .map_err(|e| {
+                    warn!("First MDA header is invalid: {}", e);
+                    e
+                })
                 .or_else(|_| load_a_region(index + mda_size::NUM_PRIMARY_MDA_REGIONS))
         };
 

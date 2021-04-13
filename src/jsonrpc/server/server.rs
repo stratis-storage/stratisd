@@ -220,8 +220,8 @@ impl StratisServer {
         {
             let cstring = CString::new("READY=1")?;
             let ret = unsafe { systemd::sd_notify(0, cstring.as_ptr()) };
-            if ret != 0 {
-                return Err(StratisError::Io(io::Error::from_raw_os_error(ret)));
+            if ret < 0 {
+                return Err(StratisError::Io(io::Error::from_raw_os_error(-ret)));
             }
         }
         Ok(server)

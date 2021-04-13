@@ -2,11 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#[cfg(feature = "systemd_compat")]
+use std::{ffi::CString, io};
 use std::{
-    ffi::CString,
     fs::{create_dir_all, remove_file},
     future::Future,
-    io,
     os::unix::io::{AsRawFd, RawFd},
     path::Path,
     pin::Pin,
@@ -31,6 +31,8 @@ use nix::{
 };
 use tokio::{io::unix::AsyncFd, sync::Mutex, task::JoinHandle};
 
+#[cfg(feature = "systemd_compat")]
+use crate::systemd;
 use crate::{
     engine::Engine,
     jsonrpc::{
@@ -39,7 +41,6 @@ use crate::{
         server::{filesystem, key, pool, report, utils::stratis_result_to_return},
     },
     stratis::{StratisError, StratisResult},
-    systemd,
 };
 
 impl StratisParams {

@@ -130,11 +130,16 @@ fn get_paths_from_args<'a>(args: &'a ArgMatches<'a>) -> Vec<PathBuf> {
         .collect::<Vec<_>>()
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let mut app = parse_args();
+fn get_long_help(app: &mut App) -> Result<String, Box<dyn Error>> {
     let mut help = Vec::new();
     app.write_long_help(&mut help)?;
-    let help = String::from_utf8(help)?;
+    Ok(String::from_utf8(help)?)
+}
+
+fn main() -> Result<(), Box<dyn Error>> {
+    let mut app = parse_args();
+    let long_help = get_long_help(&mut app)?;
+
     let args = app.get_matches();
     if let Some(subcommand) = args.subcommand_matches("key") {
         if let Some(args) = subcommand.subcommand_matches("set") {
@@ -273,7 +278,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         })?;
         Ok(())
     } else {
-        println!("{}", help);
+        println!("{}", long_help);
         Ok(())
     }
 }

@@ -177,21 +177,47 @@ const SUFFIXES: &[(u64, &str)] = &[
     (30, "GiB"),
     (20, "MiB"),
     (10, "KiB"),
-    (1, "B"),
+    (0, "B"),
 ];
 
 #[allow(clippy::cast_precision_loss)]
 pub fn to_suffix_repr(size: u128) -> String {
     SUFFIXES.iter().fold(String::new(), |acc, (div, suffix)| {
         let div_shifted = 1 << div;
-        if acc.is_empty() && size / div_shifted >= 1 {
+        if acc.is_empty() && size == 0 {
+            "0.00 B".to_string()
+        } else if acc.is_empty() && size / div_shifted >= 1 {
+            // Round two decimal places down to avoid output like 1.00 MiB for
+            // exactly one vs. 1024 KiB for 0.99 MiB.
+            #[allow(clippy::cast_possible_truncation)]
+            // This is allowed because the maximum value possible of
+            // two_decimal_places is 99 because size % div_shifted / div_shifted
+            // will always be < 1.
+            let two_decimal_places =
+                ((size % div_shifted) as f64 / (div_shifted as f64) * 100f64) as u8;
+            let decimal_value = f64::from(two_decimal_places) / 100f64;
             format!(
                 "{:.2} {}",
-                (size / div_shifted) as f64 + ((size % div_shifted) as f64 / div_shifted as f64),
+                (size / div_shifted) as f64 + decimal_value,
                 suffix
             )
         } else {
             acc
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_zero_to_suffix() {
+        assert_eq!(to_suffix_repr(0), "0.00 B");
+        assert_eq!(to_suffix_repr(5), "5.00 B");
+        assert_eq!(to_suffix_repr(1035), "1.01 KiB");
+        assert_eq!(to_suffix_repr(1_048_576), "1.00 MiB");
+        assert_eq!(to_suffix_repr(1_935_000), "1.84 MiB");
+        assert_eq!(to_suffix_repr(1_048_575), "1023.99 KiB");
+    }
 }

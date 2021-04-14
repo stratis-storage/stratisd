@@ -12,8 +12,6 @@ use std::{
 
 use env_logger::Builder;
 
-use log::warn;
-
 use serde_json::Value;
 
 use libstratis::engine::BDA;
@@ -74,8 +72,6 @@ fn main() {
     let devpath = &args[1];
 
     initialize_log();
-
-    warn!("Test warn message");
 
     match run(devpath) {
         Ok(()) => {}

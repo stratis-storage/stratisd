@@ -3,7 +3,7 @@ Description=Set up stratis filesystems in /etc/fstab
 Documentation=man:stratisd(8)
 DefaultDependencies=no
 Requires=stratisd-min-postinitrd.service
-After=stratisd-min-postinitrd.service
+After=stratisd-min-postinitrd.service network-online.target
 
 [Service]
 ExecStart=/usr/lib/systemd/stratis-fstab-setup %i

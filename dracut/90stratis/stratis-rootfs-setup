@@ -6,7 +6,7 @@ if $(stratis-min pool is-locked $STRATIS_ROOTFS_UUID); then
 		--prompt="Enter root filesystem password" \
 		--number-of-tries=3
 	then
-		echo Failed to unlock pool with UUID $STRATIS_ROOTFS_UUID with provided passphrase >&2
+		echo Failed to unlock pool with UUID $STRATIS_ROOTFS_UUID using a passphrase >&2
 		exit 1
 	fi
 fi

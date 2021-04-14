@@ -5,7 +5,7 @@
 use std::sync::Arc;
 
 use chrono::SecondsFormat;
-use tokio::sync::Mutex;
+use tokio::{sync::Mutex, task::block_in_place};
 
 use crate::{
     engine::{Engine, EngineAction, Name},
@@ -22,9 +22,11 @@ pub async fn filesystem_create(
     let mut lock = engine.lock().await;
     let (pool_uuid, pool) = name_to_uuid_and_pool(&mut *lock, pool_name)
         .ok_or_else(|| StratisError::Error(format!("No pool named {} found", pool_name)))?;
-    Ok(pool
-        .create_filesystems(pool_name, pool_uuid, &[(name, None)])?
-        .is_changed())
+    block_in_place(|| {
+        Ok(pool
+            .create_filesystems(pool_name, pool_uuid, &[(name, None)])?
+            .is_changed())
+    })
 }
 
 // stratis-min filesystem [list]
@@ -66,7 +68,7 @@ pub async fn filesystem_destroy(
     let (uuid, _) = pool
         .get_filesystem_by_name(&Name::new(fs_name.to_string()))
         .ok_or_else(|| StratisError::Error(format!("No filesystem named {} found", fs_name)))?;
-    Ok(pool.destroy_filesystems(pool_name, &[uuid])?.is_changed())
+    block_in_place(|| Ok(pool.destroy_filesystems(pool_name, &[uuid])?.is_changed()))
 }
 
 // stratis-min filesystem rename
@@ -82,7 +84,9 @@ pub async fn filesystem_rename(
     let (uuid, _) = pool
         .get_filesystem_by_name(&Name::new(fs_name.to_string()))
         .ok_or_else(|| StratisError::Error(format!("No filesystem named {} found", fs_name)))?;
-    Ok(pool
-        .rename_filesystem(pool_name, uuid, new_fs_name)?
-        .is_changed())
+    block_in_place(|| {
+        Ok(pool
+            .rename_filesystem(pool_name, uuid, new_fs_name)?
+            .is_changed())
+    })
 }

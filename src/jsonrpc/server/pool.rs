@@ -4,7 +4,7 @@
 
 use std::{os::unix::io::RawFd, path::Path, sync::Arc};
 
-use tokio::sync::Mutex;
+use tokio::{sync::Mutex, task::block_in_place};
 
 use crate::{
     engine::{
@@ -36,13 +36,13 @@ pub async fn pool_unlock(
 
     let mut lock = engine.lock().await;
     match pool_uuid {
-        Some(u) => Ok(lock.unlock_pool(u, unlock_method)?.changed().is_some()),
+        Some(u) => block_in_place(|| Ok(lock.unlock_pool(u, unlock_method)?.changed().is_some())),
         None => {
             let changed = lock
                 .locked_pools()
                 .into_iter()
                 .fold(false, |acc, (uuid, _)| {
-                    let res = lock.unlock_pool(uuid, unlock_method);
+                    let res = block_in_place(|| lock.unlock_pool(uuid, unlock_method));
                     if let Ok(ok) = res {
                         acc || ok.is_changed()
                     } else {
@@ -61,12 +61,9 @@ pub async fn pool_create(
     blockdev_paths: &[&Path],
     enc_info: EncryptionInfo,
 ) -> StratisResult<bool> {
+    let mut lock = engine.lock().await;
     Ok(
-        match engine
-            .lock()
-            .await
-            .create_pool(name, blockdev_paths, None, &enc_info)?
-        {
+        match block_in_place(|| lock.create_pool(name, blockdev_paths, None, &enc_info))? {
             CreateAction::Created(_) => true,
             CreateAction::Identity => false,
         },
@@ -78,7 +75,7 @@ pub async fn pool_destroy(engine: Arc<Mutex<dyn Engine>>, name: &str) -> Stratis
     let mut lock = engine.lock().await;
     let (uuid, _) = name_to_uuid_and_pool(&mut *lock, name)
         .ok_or_else(|| StratisError::Error(format!("No pool found with name {}", name)))?;
-    Ok(match lock.destroy_pool(uuid)? {
+    Ok(match block_in_place(|| lock.destroy_pool(uuid))? {
         DeleteAction::Deleted(_) => true,
         DeleteAction::Identity => false,
     })
@@ -93,7 +90,7 @@ pub async fn pool_init_cache(
     let mut lock = engine.lock().await;
     let (uuid, pool) = name_to_uuid_and_pool(&mut *lock, name)
         .ok_or_else(|| StratisError::Error(format!("No pool found with name {}", name)))?;
-    Ok(pool.init_cache(uuid, name, paths)?.is_changed())
+    block_in_place(|| Ok(pool.init_cache(uuid, name, paths)?.is_changed()))
 }
 
 // stratis-min pool rename
@@ -105,7 +102,7 @@ pub async fn pool_rename(
     let mut lock = engine.lock().await;
     let (uuid, _) = name_to_uuid_and_pool(&mut *lock, current_name)
         .ok_or_else(|| StratisError::Error(format!("No pool found with name {}", current_name)))?;
-    Ok(match lock.rename_pool(uuid, new_name)? {
+    Ok(match block_in_place(|| lock.rename_pool(uuid, new_name))? {
         RenameAction::Identity => false,
         RenameAction::Renamed(_) => true,
         RenameAction::NoSource => unreachable!(),
@@ -139,9 +136,11 @@ async fn add_blockdevs(
     let mut lock = engine.lock().await;
     let (uuid, pool) = name_to_uuid_and_pool(&mut *lock, name)
         .ok_or_else(|| StratisError::Error(format!("No pool found with name {}", name)))?;
-    Ok(pool
-        .add_blockdevs(uuid, name, blockdevs, tier)?
-        .is_changed())
+    block_in_place(|| {
+        Ok(pool
+            .add_blockdevs(uuid, name, blockdevs, tier)?
+            .is_changed())
+    })
 }
 
 // stratis-min pool [list]

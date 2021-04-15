@@ -64,7 +64,7 @@ const DEVICEMAPPER_PATH: &str = "/dev/mapper";
 
 /// Key in clevis configuration for tang indicating that the URL of the
 /// tang server does not need to be verified.
-const CLEVIS_TANG_TRUST_URL: &str = "stratis:tang:trust_url";
+pub const CLEVIS_TANG_TRUST_URL: &str = "stratis:tang:trust_url";
 
 const DEFAULT_CRYPT_METADATA_SIZE: u64 = 16384;
 const DEFAULT_CRYPT_KEYSLOTS_SIZE: u64 = 16_744_448;

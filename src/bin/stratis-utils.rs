@@ -2,6 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#[cfg(feature = "systemd_compat")]
+mod generators;
+
 use std::{
     env,
     error::Error,
@@ -16,6 +19,8 @@ use serde_json::{json, Value};
 
 use devicemapper::{Bytes, Sectors};
 
+#[cfg(feature = "systemd_compat")]
+use crate::generators::{stratis_clevis_setup_generator, stratis_setup_generator};
 use libstratis::{
     engine::{blkdev_size, crypt_metadata_size, BDA},
     stratis::StratisResult,
@@ -166,6 +171,64 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
                 .map(|bs| bs.map(PathBuf::from).collect::<Vec<_>>())
                 .unwrap_or_default(),
         )?;
+    } else if argv1.ends_with("stratis-clevis-setup-generator")
+        || argv1.ends_with("stratis-setup-generator")
+    {
+        #[cfg(feature = "systemd_compat")]
+        if argv1.ends_with("stratis-clevis-setup-generator") {
+            let parser = App::new("stratis-clevis-setup-generator")
+                .arg(
+                    Arg::with_name("normal_priority_dir")
+                        .required(true)
+                        .help("Directory in which to write a unit file for normal priority"),
+                )
+                .arg(
+                    Arg::with_name("early_priority_dir")
+                        .required(true)
+                        .help("Directory in which to write a unit file for early priority"),
+                )
+                .arg(
+                    Arg::with_name("late_priority_dir")
+                        .required(true)
+                        .help("Directory in which to write a unit file for late priority"),
+                );
+            let matches = parser.get_matches_from(&args);
+            stratis_clevis_setup_generator::generator(
+                matches
+                    .value_of("early_priority_dir")
+                    .expect("required")
+                    .to_string(),
+            )?;
+        } else if argv1.ends_with("stratis-setup-generator") {
+            let parser = App::new("stratis-setup-generator")
+                .arg(
+                    Arg::with_name("normal_priority_dir")
+                        .required(true)
+                        .help("Directory in which to write a unit file for normal priority"),
+                )
+                .arg(
+                    Arg::with_name("early_priority_dir")
+                        .required(true)
+                        .help("Directory in which to write a unit file for early priority"),
+                )
+                .arg(
+                    Arg::with_name("late_priority_dir")
+                        .required(true)
+                        .help("Directory in which to write a unit file for late priority"),
+                );
+            let matches = parser.get_matches_from(&args);
+            stratis_setup_generator::generator(
+                matches
+                    .value_of("early_priority_dir")
+                    .expect("required")
+                    .to_string(),
+            )?;
+        }
+
+        #[cfg(not(feature = "systemd_compat"))]
+        return Err(Box::new(ExecutableError(format!(
+            "systemd compatibility disabled for this build"
+        ))));
     } else {
         return Err(Box::new(ExecutableError(format!(
             "{} is not a recognized executable name",

@@ -22,6 +22,9 @@ import os
 import subprocess
 import unittest
 
+# isort: THIRDPARTY
+import psutil
+
 _STRATISD = os.environ["STRATISD"]
 
 
@@ -42,6 +45,9 @@ class TestUniqueInstance(unittest.TestCase):
             close_fds=True,
             env=os.environ,
         )
+
+        while not psutil.pid_exists(process.pid):
+            pass
 
         def cleanup():
             process.terminate()

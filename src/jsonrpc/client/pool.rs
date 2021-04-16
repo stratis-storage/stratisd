@@ -29,9 +29,11 @@ pub fn pool_unlock(
     prompt: bool,
 ) -> StratisResult<()> {
     if prompt {
+        let password = rpassword::prompt_password_stdout("Enter passphrase followed by return:")?;
+        if password.is_empty() {
+            return Ok(());
+        }
         do_request_standard!(PoolUnlock, unlock_method, uuid; {
-            let password =
-                rpassword::prompt_password_stdout("Enter passphrase followed by return:")?;
             let (read_end, write_end) = pipe()?;
             write(write_end, password.as_bytes())?;
             read_end

@@ -11,12 +11,6 @@ use crate::{
     stratis::StratisResult,
 };
 
-/// This method sets a key in the kernel keyring. It accepts an optional keyfile path
-/// and if this is not provided, the user is prompted for a passphrase. When `no_tty`
-/// is true, this command assumes that no TTY is available for setting terminal
-/// settings and settings such as `NOECHO` are not set. This option should be
-/// used carefully as it will cause the password to be echoed on the screen if
-/// invoked interactively.
 // stratis-min key set
 pub async fn key_set(
     engine: Arc<Mutex<dyn Engine>>,
@@ -37,6 +31,7 @@ pub async fn key_set(
     )
 }
 
+// stratis-min key unset
 pub async fn key_unset(
     engine: Arc<Mutex<dyn Engine>>,
     key_desc: &KeyDescription,
@@ -49,6 +44,7 @@ pub async fn key_unset(
     )
 }
 
+// stratis-min key [list]
 pub async fn key_list(engine: Arc<Mutex<dyn Engine>>) -> StratisResult<Vec<KeyDescription>> {
     Ok(engine
         .lock()

@@ -2,24 +2,22 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::sync::Arc;
-
 use chrono::SecondsFormat;
-use tokio::{sync::Mutex, task::block_in_place};
+use tokio::task::block_in_place;
 
 use crate::{
-    engine::{Engine, EngineAction, Name},
+    engine::{Engine, EngineAction, Locked, Name},
     jsonrpc::{interface::FsListType, server::utils::name_to_uuid_and_pool},
     stratis::{StratisError, StratisResult},
 };
 
 // stratis-min filesystem create
 pub async fn filesystem_create(
-    engine: Arc<Mutex<dyn Engine>>,
+    engine: Locked<dyn Engine>,
     pool_name: &str,
     name: &str,
 ) -> StratisResult<bool> {
-    let mut lock = engine.lock().await;
+    let mut lock = engine.write().await;
     let (pool_uuid, pool) = name_to_uuid_and_pool(&mut *lock, pool_name)
         .ok_or_else(|| StratisError::Error(format!("No pool named {} found", pool_name)))?;
     block_in_place(|| {
@@ -30,8 +28,8 @@ pub async fn filesystem_create(
 }
 
 // stratis-min filesystem [list]
-pub async fn filesystem_list(engine: Arc<Mutex<dyn Engine>>) -> FsListType {
-    let lock = engine.lock().await;
+pub async fn filesystem_list(engine: Locked<dyn Engine>) -> FsListType {
+    let lock = engine.read().await;
     lock.pools().into_iter().fold(
         (
             Vec::new(),
@@ -58,11 +56,11 @@ pub async fn filesystem_list(engine: Arc<Mutex<dyn Engine>>) -> FsListType {
 
 // stratis-min filesystem destroy
 pub async fn filesystem_destroy(
-    engine: Arc<Mutex<dyn Engine>>,
+    engine: Locked<dyn Engine>,
     pool_name: &str,
     fs_name: &str,
 ) -> StratisResult<bool> {
-    let mut lock = engine.lock().await;
+    let mut lock = engine.write().await;
     let (_, pool) = name_to_uuid_and_pool(&mut *lock, pool_name)
         .ok_or_else(|| StratisError::Error(format!("No pool named {} found", pool_name)))?;
     let (uuid, _) = pool
@@ -73,12 +71,12 @@ pub async fn filesystem_destroy(
 
 // stratis-min filesystem rename
 pub async fn filesystem_rename(
-    engine: Arc<Mutex<dyn Engine>>,
+    engine: Locked<dyn Engine>,
     pool_name: &str,
     fs_name: &str,
     new_fs_name: &str,
 ) -> StratisResult<bool> {
-    let mut lock = engine.lock().await;
+    let mut lock = engine.write().await;
     let (_, pool) = name_to_uuid_and_pool(&mut *lock, pool_name)
         .ok_or_else(|| StratisError::Error(format!("No pool named {} found", pool_name)))?;
     let (uuid, _) = pool

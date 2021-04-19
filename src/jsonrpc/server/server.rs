@@ -29,12 +29,12 @@ use nix::{
     },
     unistd::close,
 };
-use tokio::{io::unix::AsyncFd, sync::Mutex, task::JoinHandle};
+use tokio::{io::unix::AsyncFd, task::JoinHandle};
 
 #[cfg(feature = "systemd_compat")]
 use crate::systemd;
 use crate::{
-    engine::Engine,
+    engine::{Engine, Locked},
     jsonrpc::{
         consts::RPC_SOCKADDR,
         interface::{StratisParamType, StratisParams, StratisRet},
@@ -44,7 +44,7 @@ use crate::{
 };
 
 impl StratisParams {
-    async fn process(self, engine: Arc<Mutex<dyn Engine>>) -> StratisRet {
+    async fn process(self, engine: Locked<dyn Engine>) -> StratisRet {
         match self.type_ {
             StratisParamType::KeySet(key_desc) => {
                 let fd = expects_fd!(self.fd_opt, KeySet, None, true);
@@ -217,12 +217,12 @@ impl StratisParams {
 }
 
 pub struct StratisServer {
-    engine: Arc<Mutex<dyn Engine>>,
+    engine: Locked<dyn Engine>,
     listener: StratisUnixListener,
 }
 
 impl StratisServer {
-    pub fn new<P>(engine: Arc<Mutex<dyn Engine>>, path: P) -> StratisResult<StratisServer>
+    pub fn new<P>(engine: Locked<dyn Engine>, path: P) -> StratisResult<StratisServer>
     where
         P: AsRef<Path>,
     {
@@ -246,7 +246,7 @@ impl StratisServer {
             Some(req_res) => req_res?,
             None => return Ok(None),
         };
-        let engine = Arc::clone(&self.engine);
+        let engine = self.engine.clone();
         tokio::spawn(async move {
             let fd = Arc::clone(&request_handler.fd);
             let params = match request_handler.await {
@@ -459,7 +459,7 @@ impl Stream for StratisUnixListener {
     }
 }
 
-pub fn run_server(engine: Arc<Mutex<dyn Engine>>) -> JoinHandle<()> {
+pub fn run_server(engine: Locked<dyn Engine>) -> JoinHandle<()> {
     tokio::spawn(async move {
         match StratisServer::new(engine, RPC_SOCKADDR) {
             Ok(server) => server.run().await,

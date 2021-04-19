@@ -6,9 +6,15 @@ use std::{
     collections::{hash_map, HashMap},
     fmt,
     iter::IntoIterator,
+    sync::Arc,
 };
 
-use crate::engine::types::{AsUuid, Name};
+use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+
+use crate::engine::{
+    types::{AsUuid, Name},
+    Engine,
+};
 
 /// Map UUID and name to T items.
 pub struct Table<U, T> {
@@ -287,6 +293,48 @@ where
             // nothing ejected
             (None, None) => None,
         }
+    }
+}
+
+pub struct Locked<T: ?Sized>(Arc<RwLock<T>>);
+
+impl<T> Locked<T>
+where
+    T: Send + Sync,
+{
+    pub fn new(inner: T) -> Self {
+        Locked(Arc::new(RwLock::new(inner)))
+    }
+}
+
+impl<T> Locked<T>
+where
+    T: ?Sized,
+{
+    pub async fn read(&self) -> RwLockReadGuard<'_, T> {
+        self.0.read().await
+    }
+
+    pub async fn write(&self) -> RwLockWriteGuard<'_, T> {
+        self.0.write().await
+    }
+}
+
+impl<T> Locked<T>
+where
+    T: Engine + 'static,
+{
+    pub fn into_dyn_engine(self) -> Locked<dyn Engine> {
+        Locked(self.0 as Arc<RwLock<dyn Engine>>)
+    }
+}
+
+impl<T> Clone for Locked<T>
+where
+    T: ?Sized,
+{
+    fn clone(&self) -> Self {
+        Locked(Arc::clone(&self.0))
     }
 }
 

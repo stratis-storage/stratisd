@@ -9,15 +9,10 @@ use std::sync::{
     Arc,
 };
 
-use tokio::{
-    runtime::Builder,
-    select, signal,
-    sync::{mpsc::unbounded_channel, Mutex},
-    task,
-};
+use tokio::{runtime::Builder, select, signal, sync::mpsc::unbounded_channel, task};
 
 use crate::{
-    engine::{Engine, SimEngine, StratEngine, UdevEngineEvent},
+    engine::{Engine, Locked, SimEngine, StratEngine, UdevEngineEvent},
     stratis::{
         dm::dm_event_thread, errors::StratisResult, ipc_support::setup, stratis::VERSION,
         udev_monitor::udev_thread,
@@ -57,20 +52,20 @@ pub fn run(sim: bool) -> StratisResult<()> {
         })
         .build()?;
     runtime.block_on(async move {
-        let engine: Arc<Mutex<dyn Engine>> = {
+        let engine: Locked<dyn Engine> = {
             info!("stratis daemon version {} started", VERSION);
             if sim {
                 info!("Using SimEngine");
-                Arc::new(Mutex::new(SimEngine::default()))
+                Locked::new(SimEngine::default()).into_dyn_engine()
             } else {
                 info!("Using StratEngine");
-                Arc::new(Mutex::new(match StratEngine::initialize() {
+                Locked::new(match StratEngine::initialize() {
                     Ok(engine) => engine,
                     Err(e) => {
                         error!("Failed to start up stratisd engine: {}; exiting", e);
                         return Err(e);
                     }
-                }))
+                }).into_dyn_engine()
             }
         };
 
@@ -79,12 +74,12 @@ pub fn run(sim: bool) -> StratisResult<()> {
 
         let udev_arc_clone = Arc::clone(&should_exit);
         let join_udev = task::spawn_blocking(move || udev_thread(sender, udev_arc_clone));
-        let join_ipc = task::spawn(setup(Arc::clone(&engine), receiver));
+        let join_ipc = task::spawn(setup(engine.clone(), receiver));
         let join_signal = task::spawn(signal_thread(Arc::clone(&should_exit)));
         let join_dm = task::spawn(dm_event_thread(if sim {
             None
         } else {
-            Some(Arc::clone(&engine))
+            Some(engine.clone())
         }));
 
         select! {

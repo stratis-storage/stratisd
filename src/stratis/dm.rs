@@ -2,16 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{
-    os::unix::io::{AsRawFd, RawFd},
-    sync::Arc,
-};
+use std::os::unix::io::{AsRawFd, RawFd};
 
 use nix::fcntl::{fcntl, FcntlArg, OFlag};
-use tokio::{io::unix::AsyncFd, sync::Mutex};
+use tokio::io::unix::AsyncFd;
 
 use crate::{
-    engine::{get_dm, get_dm_init, Engine},
+    engine::{get_dm, get_dm_init, Engine, Locked},
     stratis::errors::{ErrorEnum, StratisError, StratisResult},
 };
 
@@ -21,7 +18,7 @@ const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 // to engine to handle event and waits until control is returned from engine.
 // Accepts None as an argument; this indicates that devicemapper events are
 // to be ignored.
-pub async fn dm_event_thread(engine: Option<Arc<Mutex<dyn Engine>>>) -> StratisResult<()> {
+pub async fn dm_event_thread(engine: Option<Locked<dyn Engine>>) -> StratisResult<()> {
     match engine {
         Some(engine) => {
             let fd = setup_dm()?;
@@ -31,7 +28,7 @@ pub async fn dm_event_thread(engine: Option<Arc<Mutex<dyn Engine>>>) -> StratisR
                     guard.clear_ready();
                 }
                 get_dm().arm_poll()?;
-                let mut lock = engine.lock().await;
+                let mut lock = engine.write().await;
                 lock.evented()?;
             }
         }

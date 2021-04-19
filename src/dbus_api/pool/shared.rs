@@ -51,8 +51,8 @@ where
         Pool
     );
 
-    let mutex_lock = mutex_lock!(dbus_context.engine);
-    let (pool_name, pool) = mutex_lock
+    let lock = engine_lock!(dbus_context.engine, read);
+    let (pool_name, pool) = lock
         .get_pool(pool_uuid)
         .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
 
@@ -141,8 +141,8 @@ pub fn add_blockdevs(m: &MethodInfo<MTSync<TData>, TData>, op: BlockDevOp) -> Me
         return_message
     );
 
-    let mut mutex_lock = mutex_lock!(dbus_context.engine);
-    let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
+    let mut lock = engine_lock!(dbus_context.engine, write);
+    let (pool_name, pool) = get_mut_pool!(lock; pool_uuid; default_return; return_message);
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 

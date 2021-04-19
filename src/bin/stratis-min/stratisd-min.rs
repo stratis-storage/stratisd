@@ -64,7 +64,7 @@ fn trylock_pid_file() -> StratisResult<File> {
     let stratisd_min_file = match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
         Ok(_) => {
             f.write_all(getpid().to_string().as_bytes())?;
-            Ok(f)
+            f
         }
         Err(_) => {
             let mut buf = String::new();
@@ -73,10 +73,10 @@ fn trylock_pid_file() -> StratisResult<File> {
                 buf = "<unreadable>".to_string();
             }
 
-            Err(StratisError::Error(format!(
+            return Err(StratisError::Error(format!(
                 "Daemon already running with supposed pid: {}",
                 buf
-            )))
+            )));
         }
     };
 
@@ -107,7 +107,7 @@ fn trylock_pid_file() -> StratisResult<File> {
         }
     };
 
-    stratisd_min_file
+    Ok(stratisd_min_file)
 }
 
 fn main() -> Result<(), Box<dyn Error>> {

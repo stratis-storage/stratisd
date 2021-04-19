@@ -44,8 +44,8 @@ pub fn bind_keyring(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let mut mutex_lock = mutex_lock!(dbus_context.engine);
-    let (_, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
+    let mut lock = engine_lock!(dbus_context.engine, write);
+    let (_, pool) = get_mut_pool!(lock; pool_uuid; default_return; return_message);
 
     let msg = match log_action!(pool.bind_keyring(&key_desc)) {
         Ok(CreateAction::Identity) => return_message.append3(false, msg_code_ok(), msg_string_ok()),
@@ -79,8 +79,8 @@ pub fn unbind_keyring(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let mut mutex_lock = mutex_lock!(dbus_context.engine);
-    let (_, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
+    let mut lock = engine_lock!(dbus_context.engine, write);
+    let (_, pool) = get_mut_pool!(lock; pool_uuid; default_return; return_message);
 
     let msg = match log_action!(pool.unbind_keyring()) {
         Ok(DeleteAction::Identity) => return_message.append3(false, msg_code_ok(), msg_string_ok()),

@@ -2,21 +2,19 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, io::Write, os::unix::io::RawFd};
-
-use libcryptsetup_rs::SafeMemHandle;
+use std::{collections::HashMap, os::unix::io::RawFd};
 
 use crate::{
     engine::{
-        engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
+        engine::KeyActions,
         shared,
-        types::{Key, KeyDescription, MappingCreateAction, MappingDeleteAction, SizedKeyMemory},
+        types::{Key, KeyDescription, MappingCreateAction, MappingDeleteAction},
     },
     stratis::StratisResult,
 };
 
 #[derive(Debug, Default)]
-pub struct SimKeyActions(HashMap<KeyDescription, SizedKeyMemory>);
+pub struct SimKeyActions(HashMap<KeyDescription, Vec<u8>>);
 
 impl SimKeyActions {
     pub fn contains_key(&self, key_desc: &KeyDescription) -> bool {
@@ -25,15 +23,8 @@ impl SimKeyActions {
 
     /// Read the contents of a key from the simulated keyring or return `None`
     /// if no key with the given key description exists.
-    fn read(&self, key_desc: &KeyDescription) -> StratisResult<Option<SizedKeyMemory>> {
-        match self.0.get(key_desc) {
-            Some(key) => {
-                let mut key_clone = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
-                let size = key_clone.as_mut().write(key.as_ref())?;
-                Ok(Some(SizedKeyMemory::new(key_clone, size)))
-            }
-            None => Ok(None),
-        }
+    fn read(&self, key_desc: &KeyDescription) -> Option<&[u8]> {
+        self.0.get(key_desc).map(|mem| mem.as_slice())
     }
 }
 
@@ -43,22 +34,22 @@ impl KeyActions for SimKeyActions {
         key_desc: &KeyDescription,
         key_fd: RawFd,
     ) -> StratisResult<MappingCreateAction<Key>> {
-        let memory = shared::set_key_shared(key_fd)?;
+        let mut memory = Vec::new();
+        let _ = shared::set_key_shared(key_fd, &mut memory)?;
 
         match self.read(key_desc) {
-            Ok(Some(key_data)) => {
-                if key_data.as_ref() == memory.as_ref() {
+            Some(key_data) => {
+                if key_data == memory.as_slice() {
                     Ok(MappingCreateAction::Identity)
                 } else {
                     self.0.insert((*key_desc).clone(), memory);
                     Ok(MappingCreateAction::ValueChanged(Key))
                 }
             }
-            Ok(None) => {
+            None => {
                 self.0.insert((*key_desc).clone(), memory);
                 Ok(MappingCreateAction::Created(Key))
             }
-            Err(e) => Err(e),
         }
     }
 

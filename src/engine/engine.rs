@@ -273,7 +273,7 @@ pub trait Pool: Debug {
     fn encryption_info(&self) -> Cow<EncryptionInfo>;
 }
 
-pub trait Engine: Debug + Report + Send {
+pub trait Engine: Debug + Report + Send + Sync {
     /// Create a Stratis pool.
     /// Returns the UUID of the newly created pool.
     /// Returns an error if the redundancy code does not correspond to a

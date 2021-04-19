@@ -402,9 +402,11 @@ impl KeyActions for StratKeyActions {
         key_desc: &KeyDescription,
         key_fd: RawFd,
     ) -> StratisResult<MappingCreateAction<Key>> {
-        let memory = shared::set_key_shared(key_fd)?;
+        let mut memory = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
+        let bytes_read = shared::set_key_shared(key_fd, &mut memory)?;
+        let sized_memory = SizedKeyMemory::new(memory, bytes_read);
 
-        set_key_idem(key_desc, memory)
+        set_key_idem(key_desc, sized_memory)
     }
 
     fn list(&self) -> StratisResult<Vec<KeyDescription>> {

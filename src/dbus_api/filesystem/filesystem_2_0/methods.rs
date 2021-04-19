@@ -38,7 +38,7 @@ pub fn rename_filesystem(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let mut mutex_lock = mutex_lock!(dbus_context.engine);
+    let mut mutex_lock = engine_lock!(dbus_context.engine, write);
     let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
     let uuid = typed_uuid!(filesystem_data.uuid; Fs; default_return; return_message);

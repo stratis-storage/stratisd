@@ -9,29 +9,23 @@
 // and one for the unsupported version. Also, Default is not really a
 // helpful concept here.
 
-use std::sync::Arc;
-
-use tokio::{
-    select,
-    sync::{mpsc::UnboundedReceiver, Mutex},
-    task,
-};
+use tokio::{select, sync::mpsc::UnboundedReceiver, task};
 
 use crate::{
     dbus_api::create_dbus_handlers,
-    engine::{Engine, UdevEngineEvent},
+    engine::{Engine, Locked, UdevEngineEvent},
     stratis::{StratisError, StratisResult},
 };
 
 /// Set up the cooperating D-Bus threads.
 pub async fn setup(
-    engine: Arc<Mutex<dyn Engine>>,
+    engine: Locked<dyn Engine>,
     receiver: UnboundedReceiver<UdevEngineEvent>,
 ) -> StratisResult<()> {
-    let (conn, mut udev, mut tree) = create_dbus_handlers(Arc::clone(&engine), receiver)
+    let (conn, mut udev, mut tree) = create_dbus_handlers(engine.clone(), receiver)
         .await
         .map(|(conn, udev, tree)| {
-            let mutex_lock = mutex_lock!(engine);
+            let mutex_lock = engine_lock!(engine, write);
             for (pool_name, pool_uuid, pool) in mutex_lock.pools() {
                 udev.register_pool(&pool_name, pool_uuid, pool)
             }

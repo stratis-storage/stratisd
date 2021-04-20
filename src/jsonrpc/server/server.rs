@@ -280,20 +280,6 @@ impl StratisServer {
     }
 }
 
-pub struct FdRef(RawFd);
-
-impl FdRef {
-    pub fn new(fd: RawFd) -> FdRef {
-        FdRef(fd)
-    }
-}
-
-impl AsRawFd for FdRef {
-    fn as_raw_fd(&self) -> RawFd {
-        self.0
-    }
-}
-
 fn handle_cmsgs(mut cmsgs: Vec<ControlMessageOwned>) -> StratisResult<Option<RawFd>> {
     if cmsgs.len() > 1 {
         cmsgs
@@ -366,7 +352,7 @@ fn try_sendmsg(fd: RawFd, ret: &StratisRet) -> StratisResult<()> {
 }
 
 pub struct StratisUnixRequest {
-    fd: Arc<AsyncFd<FdRef>>,
+    fd: Arc<AsyncFd<RawFd>>,
 }
 
 impl Future for StratisUnixRequest {
@@ -385,12 +371,12 @@ impl Future for StratisUnixRequest {
 }
 
 pub struct StratisUnixResponse {
-    fd: Arc<AsyncFd<FdRef>>,
+    fd: Arc<AsyncFd<RawFd>>,
     ret: StratisRet,
 }
 
 impl StratisUnixResponse {
-    pub fn new(fd: Arc<AsyncFd<FdRef>>, ret: StratisRet) -> StratisUnixResponse {
+    pub fn new(fd: Arc<AsyncFd<RawFd>>, ret: StratisRet) -> StratisUnixResponse {
         StratisUnixResponse { fd, ret }
     }
 }
@@ -411,7 +397,7 @@ impl Future for StratisUnixResponse {
 }
 
 pub struct StratisUnixListener {
-    fd: AsyncFd<FdRef>,
+    fd: AsyncFd<RawFd>,
 }
 
 impl StratisUnixListener {
@@ -438,7 +424,7 @@ impl StratisUnixListener {
         bind(fd, &SockAddr::new_unix(path.as_ref())?)?;
         listen(fd, 0)?;
         Ok(StratisUnixListener {
-            fd: AsyncFd::new(FdRef::new(fd))?,
+            fd: AsyncFd::new(fd)?,
         })
     }
 }
@@ -450,7 +436,7 @@ fn try_accept(fd: RawFd) -> StratisResult<StratisUnixRequest> {
     })?;
     fcntl(fd, FcntlArg::F_SETFL(flags | OFlag::O_NONBLOCK))?;
     Ok(StratisUnixRequest {
-        fd: Arc::new(AsyncFd::new(FdRef::new(fd))?),
+        fd: Arc::new(AsyncFd::new(fd)?),
     })
 }
 

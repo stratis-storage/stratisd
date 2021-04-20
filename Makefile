@@ -298,7 +298,9 @@ docs/stratisd.8: docs/stratisd.txt
 	a2x -f manpage docs/stratisd.txt
 
 clippy:
-	RUSTFLAGS="${DENY}" cargo clippy --all-targets --all-features -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
+	RUSTFLAGS="${DENY}" cargo clippy --all-targets -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
+	RUSTFLAGS="${DENY}" cargo clippy --all-targets --no-default-features --features min -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
+	RUSTFLAGS="${DENY}" cargo clippy --all-targets --no-default-features --features min,systemd_compat -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
 
 compare-fedora:
 	${PWD}/code_maintenance/compare_fedora_versions || [ $$? -lt 16 ]

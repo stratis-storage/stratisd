@@ -226,9 +226,9 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
         }
 
         #[cfg(not(feature = "systemd_compat"))]
-        return Err(Box::new(ExecutableError(format!(
-            "systemd compatibility disabled for this build"
-        ))));
+        return Err(Box::new(ExecutableError(
+            "systemd compatibility disabled for this build".into(),
+        )));
     } else {
         return Err(Box::new(ExecutableError(format!(
             "{} is not a recognized executable name",

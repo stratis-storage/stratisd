@@ -16,11 +16,14 @@ use serde_json::Value;
 use devicemapper::{Bytes, Sectors};
 
 use crate::{
-    engine::types::{
-        BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid,
-        Key, KeyDescription, LockedPoolInfo, MappingCreateAction, MappingDeleteAction, Name,
-        PoolUuid, RenameAction, ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction,
-        UdevEngineEvent, UnlockMethod,
+    engine::{
+        structures::Locked,
+        types::{
+            BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo,
+            FilesystemUuid, Key, KeyDescription, LockedPoolInfo, MappingCreateAction,
+            MappingDeleteAction, Name, PoolUuid, RenameAction, ReportType, SetCreateAction,
+            SetDeleteAction, SetUnlockAction, UdevEngineEvent, UnlockMethod,
+        },
     },
     stratis::StratisResult,
 };
@@ -108,7 +111,7 @@ pub trait BlockDev: Debug {
     fn is_encrypted(&self) -> bool;
 }
 
-pub trait Pool: Debug {
+pub trait Pool: Debug + Send + Sync {
     /// Initialize the cache with the provided cache block devices.
     /// Returns a list of the the block devices that were actually added as cache
     /// devices. In practice, this will have three types of return values:
@@ -291,7 +294,10 @@ pub trait Engine: Debug + Report + Send + Sync {
     /// and its UUID.
     ///
     /// Precondition: the subsystem of the device evented on is "block".
-    fn handle_event(&mut self, event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &dyn Pool)>;
+    fn handle_event(
+        &mut self,
+        event: &UdevEngineEvent,
+    ) -> Option<(Name, PoolUuid, Locked<dyn Pool>)>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.
@@ -321,10 +327,7 @@ pub trait Engine: Debug + Report + Send + Sync {
     ) -> StratisResult<SetUnlockAction<DevUuid>>;
 
     /// Find the pool designated by uuid.
-    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)>;
-
-    /// Get a mutable referent to the pool designated by uuid.
-    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut dyn Pool)>;
+    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, Locked<dyn Pool>)>;
 
     /// Get a mapping of encrypted pool UUIDs for pools that have not yet
     /// been set up and need to be unlocked to their encryption infos.
@@ -336,10 +339,7 @@ pub trait Engine: Debug + Report + Send + Sync {
     }
 
     /// Get all pools belonging to this engine.
-    fn pools(&self) -> Vec<(Name, PoolUuid, &dyn Pool)>;
-
-    /// Get mutable references to all pools belonging to this engine.
-    fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut dyn Pool)>;
+    fn pools(&self) -> Vec<(Name, PoolUuid, Locked<dyn Pool>)>;
 
     /// Notify the engine that an event has occurred on the DM file descriptor.
     fn evented(&mut self) -> StratisResult<()>;

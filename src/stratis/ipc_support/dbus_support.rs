@@ -22,17 +22,18 @@ pub async fn setup(
     engine: Locked<dyn Engine>,
     receiver: UnboundedReceiver<UdevEngineEvent>,
 ) -> StratisResult<()> {
-    let (conn, mut udev, mut tree) = create_dbus_handlers(engine.clone(), receiver)
-        .await
-        .map(|(conn, udev, tree)| {
-            let mutex_lock = engine_lock!(engine, write);
-            for (pool_name, pool_uuid, pool) in mutex_lock.pools() {
-                udev.register_pool(&pool_name, pool_uuid, pool)
+    let (conn, mut udev, mut tree) = match create_dbus_handlers(engine.clone(), receiver).await {
+        Ok((conn, udev, tree)) => {
+            let lock = engine.read().await;
+            for (pool_name, pool_uuid, pool) in lock.pools() {
+                let pool_ref = &*pool.read().await;
+                udev.register_pool(&pool_name, pool_uuid, pool_ref)
             }
             info!("D-Bus API is available");
             (conn, udev, tree)
-        })
-        .map_err(|err| -> StratisError { err.into() })?;
+        }
+        Err(err) => return Err(StratisError::from(err)),
+    };
 
     let mut tree_handle = task::spawn(async move {
         loop {

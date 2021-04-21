@@ -105,6 +105,7 @@ pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
         | StratisError::Udev(_)
         | StratisError::Crypt(_)
         | StratisError::Null(_)
+        | StratisError::Join(_)
         | StratisError::Recv(_) => DbusErrorEnum::ERROR,
     };
     let description = match *err {

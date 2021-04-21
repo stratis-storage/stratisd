@@ -69,48 +69,43 @@ impl StratisParams {
             }
             StratisParamType::PoolCreate(name, paths, encryption_info) => {
                 expects_fd!(self.fd_opt, PoolCreate, false, false);
-                let path_ref: Vec<_> = paths.iter().map(|p| p.as_path()).collect();
                 StratisRet::PoolCreate(stratis_result_to_return(
-                    pool::pool_create(engine, name.as_str(), path_ref.as_slice(), encryption_info)
-                        .await,
+                    pool::pool_create(engine, name, paths, encryption_info).await,
                     false,
                 ))
             }
             StratisParamType::PoolRename(name, new_name) => {
                 expects_fd!(self.fd_opt, PoolRename, false, false);
                 StratisRet::PoolRename(stratis_result_to_return(
-                    pool::pool_rename(engine, name.as_str(), new_name.as_str()).await,
+                    pool::pool_rename(engine, name, new_name).await,
                     false,
                 ))
             }
             StratisParamType::PoolAddData(name, paths) => {
                 expects_fd!(self.fd_opt, PoolAddData, false, false);
-                let path_ref: Vec<_> = paths.iter().map(|p| p.as_path()).collect();
                 StratisRet::PoolInitCache(stratis_result_to_return(
-                    pool::pool_add_data(engine, name.as_str(), path_ref.as_slice()).await,
+                    pool::pool_add_data(engine, name, paths).await,
                     false,
                 ))
             }
             StratisParamType::PoolInitCache(name, paths) => {
                 expects_fd!(self.fd_opt, PoolInitCache, false, false);
-                let path_ref: Vec<_> = paths.iter().map(|p| p.as_path()).collect();
                 StratisRet::PoolInitCache(stratis_result_to_return(
-                    pool::pool_init_cache(engine, name.as_str(), path_ref.as_slice()).await,
+                    pool::pool_init_cache(engine, name, paths).await,
                     false,
                 ))
             }
             StratisParamType::PoolAddCache(name, paths) => {
                 expects_fd!(self.fd_opt, PoolAddCache, false, false);
-                let path_ref: Vec<_> = paths.iter().map(|p| p.as_path()).collect();
                 StratisRet::PoolAddCache(stratis_result_to_return(
-                    pool::pool_add_cache(engine, name.as_str(), path_ref.as_slice()).await,
+                    pool::pool_add_cache(engine, name, paths).await,
                     false,
                 ))
             }
             StratisParamType::PoolDestroy(name) => {
                 expects_fd!(self.fd_opt, PoolDestroy, false, false);
                 StratisRet::PoolDestroy(stratis_result_to_return(
-                    pool::pool_destroy(engine, name.as_str()).await,
+                    pool::pool_destroy(engine, name).await,
                     false,
                 ))
             }
@@ -170,7 +165,7 @@ impl StratisParams {
             StratisParamType::FsCreate(pool_name, fs_name) => {
                 expects_fd!(self.fd_opt, FsCreate, false, false);
                 StratisRet::FsCreate(stratis_result_to_return(
-                    filesystem::filesystem_create(engine, &pool_name, &fs_name).await,
+                    filesystem::filesystem_create(engine, pool_name, fs_name).await,
                     false,
                 ))
             }
@@ -189,14 +184,14 @@ impl StratisParams {
             StratisParamType::FsDestroy(pool_name, fs_name) => {
                 expects_fd!(self.fd_opt, FsDestroy, false, false);
                 StratisRet::FsDestroy(stratis_result_to_return(
-                    filesystem::filesystem_destroy(engine, &pool_name, &fs_name).await,
+                    filesystem::filesystem_destroy(engine, pool_name, &fs_name).await,
                     false,
                 ))
             }
             StratisParamType::FsRename(pool_name, fs_name, new_fs_name) => {
                 expects_fd!(self.fd_opt, FsRename, false, false);
                 StratisRet::FsRename(stratis_result_to_return(
-                    filesystem::filesystem_rename(engine, &pool_name, &fs_name, &new_fs_name).await,
+                    filesystem::filesystem_rename(engine, pool_name, fs_name, new_fs_name).await,
                     false,
                 ))
             }

@@ -24,7 +24,7 @@ use crate::{
             metadata::StratisIdentifiers,
             pool::StratPool,
         },
-        structures::Table,
+        structures::{Locked, Table},
         types::{DevUuid, LockedPoolInfo, Name, PoolUuid, UdevEngineEvent, UnlockMethod},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -80,7 +80,7 @@ impl LiminalDevices {
     /// Unlock the liminal encrypted devices that correspond to the given pool UUID.
     pub fn unlock_pool(
         &mut self,
-        pools: &Table<PoolUuid, StratPool>,
+        pools: &Table<PoolUuid, Locked<StratPool>>,
         pool_uuid: PoolUuid,
         unlock_method: UnlockMethod,
     ) -> StratisResult<Vec<DevUuid>> {
@@ -125,7 +125,7 @@ impl LiminalDevices {
             }
             None => match pools.get_by_uuid(pool_uuid) {
                 Some((_, pool)) => {
-                    if pool.is_encrypted() {
+                    if lock!(pool, read).is_encrypted() {
                         vec![]
                     } else {
                         return Err(StratisError::Engine(
@@ -236,7 +236,7 @@ impl LiminalDevices {
     ///               self.hopeless_device_sets.get(pool_uuid).is_none()
     fn try_setup_pool(
         &mut self,
-        pools: &Table<PoolUuid, StratPool>,
+        pools: &Table<PoolUuid, Locked<StratPool>>,
         pool_uuid: PoolUuid,
         infos: DeviceSet,
     ) -> Option<(Name, StratPool)> {
@@ -250,7 +250,7 @@ impl LiminalDevices {
         // Precondition: every device represented by an item in infos has
         // already been determined to belong to the pool with pool_uuid.
         fn setup_pool(
-            pools: &Table<PoolUuid, StratPool>,
+            pools: &Table<PoolUuid, Locked<StratPool>>,
             pool_uuid: PoolUuid,
             infos: &HashMap<DevUuid, &LStratisInfo>,
         ) -> Result<(Name, StratPool), Destination> {
@@ -385,7 +385,7 @@ impl LiminalDevices {
     /// constructing the pool, retain the set of devices.
     pub fn block_evaluate(
         &mut self,
-        pools: &Table<PoolUuid, StratPool>,
+        pools: &Table<PoolUuid, Locked<StratPool>>,
         event: &UdevEngineEvent,
     ) -> Option<(PoolUuid, Name, StratPool)> {
         let event_type = event.event_type();
@@ -395,7 +395,7 @@ impl LiminalDevices {
                 let pool_uuid = stratis_identifiers.pool_uuid;
                 let device_uuid = stratis_identifiers.device_uuid;
                 if let Some((_, pool)) = pools.get_by_uuid(pool_uuid) {
-                    if pool.get_strat_blockdev(device_uuid).is_none() {
+                    if lock!(pool, read).get_strat_blockdev(device_uuid).is_none() {
                         warn!("Found a device with {} that identifies itself as belonging to pool with UUID {}, but that pool is already up and running and does not appear to contain the device",
                               info,
                               pool_uuid);
@@ -437,7 +437,7 @@ impl LiminalDevices {
                 let pool_uuid = stratis_identifiers.pool_uuid;
                 let device_uuid = stratis_identifiers.device_uuid;
                 if let Some((_, pool)) = pools.get_by_uuid(pool_uuid) {
-                    if pool.get_strat_blockdev(device_uuid).is_some() {
+                    if lock!(pool, read).get_strat_blockdev(device_uuid).is_some() {
                         warn!("udev reports that a device with {} that appears to belong to a pool with UUID {} has just been removed; this is likely to result in data loss",
                               info,
                               pool_uuid);

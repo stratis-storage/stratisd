@@ -37,8 +37,8 @@ pub fn bind_clevis(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let mut lock = engine_lock!(dbus_context.engine, write);
-    let (_, pool) = get_mut_pool!(lock; pool_uuid; default_return; return_message);
+    let lock = lock!(dbus_context.engine, read);
+    let (_, pool) = get_pool!(lock; pool_uuid; default_return; return_message);
 
     let json: Value = match serde_json::from_str(&json_string) {
         Ok(j) => j,
@@ -47,7 +47,7 @@ pub fn bind_clevis(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
             return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };
-    let msg = match log_action!(pool.bind_clevis(pin.as_str(), &json)) {
+    let msg = match log_action!(lock!(pool, write).bind_clevis(pin.as_str(), &json)) {
         Ok(CreateAction::Identity) => return_message.append3(false, msg_code_ok(), msg_string_ok()),
         Ok(CreateAction::Created(_)) => {
             return_message.append3(true, msg_code_ok(), msg_string_ok())
@@ -79,10 +79,10 @@ pub fn unbind_clevis(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let mut lock = engine_lock!(dbus_context.engine, write);
-    let (_, pool) = get_mut_pool!(lock; pool_uuid; default_return; return_message);
+    let lock = lock!(dbus_context.engine, read);
+    let (_, pool) = get_pool!(lock; pool_uuid; default_return; return_message);
 
-    let msg = match log_action!(pool.unbind_clevis()) {
+    let msg = match log_action!(lock!(pool, write).unbind_clevis()) {
         Ok(DeleteAction::Identity) => return_message.append3(false, msg_code_ok(), msg_string_ok()),
         Ok(DeleteAction::Deleted(_)) => {
             return_message.append3(true, msg_code_ok(), msg_string_ok())

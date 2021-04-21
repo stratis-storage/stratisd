@@ -21,15 +21,7 @@ macro_rules! get_pool {
     ($s:ident; $uuid:ident) => {
         $s.pools
             .get_by_uuid($uuid)
-            .map(|(name, p)| (name.clone(), p as &dyn $crate::engine::Pool))
-    };
-}
-
-macro_rules! get_mut_pool {
-    ($s:ident; $uuid:ident) => {
-        $s.pools
-            .get_mut_by_uuid($uuid)
-            .map(|(name, p)| (name.clone(), p as &mut dyn $crate::engine::Pool))
+            .map(|(name, p)| (name.clone(), p.clone().into_dyn_pool()))
     };
 }
 

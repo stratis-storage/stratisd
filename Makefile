@@ -28,6 +28,10 @@ endif
 
 RELEASE_VERSION ?= 9.9.9
 
+MIN_FEATURES = --no-default-features --features min
+SYSTEMD_FEATURES = --no-default-features --features min,systemd_compat
+EXTRAS_FEATURES =  --features extras
+
 RUST_2018_IDIOMS = -D bare-trait-objects \
                    -D ellipsis-inclusive-range-patterns
 
@@ -183,35 +187,34 @@ build-tests:
 build-extras:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build --features extras ${TARGET_ARGS}
+	cargo build ${EXTRAS_FEATURES} ${TARGET_ARGS}
 
 build-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
 	cargo build --bin=stratis-min --bin=stratisd-min --bin=stratis-utils \
-	--no-default-features --features min,systemd_compat ${TARGET_ARGS}
+	${SYSTEMD_FEATURES} ${TARGET_ARGS}
 
 release-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
 	cargo build --release --bin=stratis-min --bin=stratisd-min \
-	--bin=stratis-utils --no-default-features \
-	--features min,systemd_compat ${TARGET_ARGS}
+	--bin=stratis-utils ${SYSTEMD_FEATURES} ${TARGET_ARGS}
 
 stratis-dumpmetadata:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build --bin=stratis_dumpmetadata --features extras ${TARGET_ARGS}
+	cargo build --bin=stratis_dumpmetadata ${EXTRAS_FEATURES} ${TARGET_ARGS}
 
 stratis-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build --bin=stratis-min --features min ${TARGET_ARGS}
+	cargo build --bin=stratis-min ${MIN_FEATURES} ${TARGET_ARGS}
 
 stratisd-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build --bin=stratisd-min --features min,systemd_compat ${TARGET_ARGS}
+	cargo build --bin=stratisd-min ${SYSTEMD_FEATURES} ${TARGET_ARGS}
 
 install-cfg: docs/stratisd.8
 	install -Dpm0644 -t $(DESTDIR)$(DATADIR)/dbus-1/system.d stratisd.conf
@@ -298,7 +301,9 @@ docs/stratisd.8: docs/stratisd.txt
 	a2x -f manpage docs/stratisd.txt
 
 clippy:
-	RUSTFLAGS="${DENY}" cargo clippy --all-targets --all-features -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
+	RUSTFLAGS="${DENY}" cargo clippy --all-targets -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
+	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${MIN_FEATURES} -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
+	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${SYSTEMD_FEATURES} -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
 
 compare-fedora:
 	${PWD}/code_maintenance/compare_fedora_versions || [ $$? -lt 16 ]

@@ -161,10 +161,7 @@ impl Engine for StratEngine {
             Some((
                 pool_name,
                 pool_uuid,
-                self.pools
-                    .get_mut_by_uuid(pool_uuid)
-                    .expect("just_inserted")
-                    .1 as &mut dyn Pool,
+                self.pools.get_by_uuid(pool_uuid).expect("just_inserted").1 as &dyn Pool,
             ))
         } else {
             None

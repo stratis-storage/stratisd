@@ -51,12 +51,13 @@ where
         Pool
     );
 
-    let lock = engine_lock!(dbus_context.engine, read);
+    let lock = lock!(dbus_context.engine, read);
     let (pool_name, pool) = lock
         .get_pool(pool_uuid)
         .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
+    let pool_lock = lock!(pool, read);
 
-    closure((pool_name, pool_uuid, pool))
+    closure((pool_name, pool_uuid, &*pool_lock))
 }
 
 pub fn get_pool_encryption_key_desc(
@@ -141,18 +142,30 @@ pub fn add_blockdevs(m: &MethodInfo<MTSync<TData>, TData>, op: BlockDevOp) -> Me
         return_message
     );
 
-    let mut lock = engine_lock!(dbus_context.engine, write);
-    let (pool_name, pool) = get_mut_pool!(lock; pool_uuid; default_return; return_message);
+    let lock = lock!(dbus_context.engine, read);
+    let (pool_name, pool) = get_pool!(lock; pool_uuid; default_return; return_message);
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
     let result = match op {
-        BlockDevOp::InitCache => log_action!(pool.init_cache(pool_uuid, &*pool_name, &blockdevs)),
+        BlockDevOp::InitCache => {
+            log_action!(lock!(pool, write).init_cache(pool_uuid, &*pool_name, &blockdevs))
+        }
         BlockDevOp::AddCache => {
-            log_action!(pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Cache))
+            log_action!(lock!(pool, write).add_blockdevs(
+                pool_uuid,
+                &*pool_name,
+                &blockdevs,
+                BlockDevTier::Cache
+            ))
         }
         BlockDevOp::AddData => {
-            log_action!(pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Data))
+            log_action!(lock!(pool, write).add_blockdevs(
+                pool_uuid,
+                &*pool_name,
+                &blockdevs,
+                BlockDevTier::Data
+            ))
         }
     };
     let msg = match result.map(|bds| bds.changed()) {
@@ -171,7 +184,8 @@ pub fn add_blockdevs(m: &MethodInfo<MTSync<TData>, TData>, op: BlockDevOp) -> Me
                             BlockDevOp::AddData => BlockDevTier::Data,
                             _ => BlockDevTier::Cache,
                         },
-                        pool.get_blockdev(*uuid)
+                        lock!(pool, read)
+                            .get_blockdev(*uuid)
                             .expect("just inserted by add_blockdevs")
                             .1,
                     )

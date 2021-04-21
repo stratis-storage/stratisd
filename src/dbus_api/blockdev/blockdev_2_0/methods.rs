@@ -40,12 +40,15 @@ pub fn set_user_info(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let mut lock = engine_lock!(dbus_context.engine, write);
-    let (pool_name, pool) = get_mut_pool!(lock; pool_uuid; default_return; return_message);
+    let lock = lock!(dbus_context.engine, read);
+    let (pool_name, pool) = get_pool!(lock; pool_uuid; default_return; return_message);
 
     let blockdev_uuid = typed_uuid!(blockdev_data.uuid; Dev; default_return; return_message);
-    let result =
-        pool.set_blockdev_user_info(&pool_name, blockdev_uuid, tuple_to_option(new_id_spec));
+    let result = lock!(pool, write).set_blockdev_user_info(
+        &pool_name,
+        blockdev_uuid,
+        tuple_to_option(new_id_spec),
+    );
     let msg = match log_action!(result) {
         Ok(RenameAction::NoSource) => {
             let error_message = format!(

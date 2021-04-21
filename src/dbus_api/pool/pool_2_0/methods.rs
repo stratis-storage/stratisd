@@ -47,10 +47,10 @@ pub fn create_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult 
         return_message
     );
 
-    let mut lock = engine_lock!(dbus_context.engine, write);
-    let (pool_name, pool) = get_mut_pool!(lock; pool_uuid; default_return; return_message);
+    let lock = lock!(dbus_context.engine, read);
+    let (pool_name, pool) = get_pool!(lock; pool_uuid; default_return; return_message);
 
-    let result = log_action!(pool.create_filesystems(
+    let result = log_action!(lock!(pool, write).create_filesystems(
         &pool_name,
         pool_uuid,
         &filesystems
@@ -71,7 +71,8 @@ pub fn create_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult 
             let v = newly_created_filesystems
                 .iter()
                 .map(|&(name, uuid)| {
-                    let filesystem = pool
+                    let pool_lock = lock!(pool, read);
+                    let filesystem = pool_lock
                         .get_filesystem(uuid)
                         .expect("just inserted by create_filesystems")
                         .1;
@@ -125,8 +126,8 @@ pub fn destroy_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
         return_message
     );
 
-    let mut lock = engine_lock!(dbus_context.engine, write);
-    let (pool_name, pool) = get_mut_pool!(lock; pool_uuid; default_return; return_message);
+    let lock = lock!(dbus_context.engine, read);
+    let (pool_name, pool) = get_pool!(lock; pool_uuid; default_return; return_message);
 
     let mut filesystem_map: HashMap<FilesystemUuid, dbus::Path<'static>> = HashMap::new();
     for path in filesystems {
@@ -140,7 +141,7 @@ pub fn destroy_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
         }
     }
 
-    let result = log_action!(pool.destroy_filesystems(
+    let result = log_action!(lock!(pool, write).destroy_filesystems(
         &pool_name,
         &filesystem_map.keys().cloned().collect::<Vec<_>>(),
     ));
@@ -209,10 +210,11 @@ pub fn snapshot_filesystem(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
         }
     };
 
-    let mut lock = engine_lock!(dbus_context.engine, write);
-    let (pool_name, pool) = get_mut_pool!(lock; pool_uuid; default_return; return_message);
+    let lock = lock!(dbus_context.engine, read);
+    let (pool_name, pool) = get_pool!(lock; pool_uuid; default_return; return_message);
 
-    let msg = match log_action!(pool.snapshot_filesystem(
+    let mut pool_lock = lock!(pool, write);
+    let msg = match log_action!(pool_lock.snapshot_filesystem(
         &pool_name,
         pool_uuid,
         fs_uuid,
@@ -270,9 +272,10 @@ pub fn add_cachedevs(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     );
     let cache_initialized = {
         let dbus_context = m.tree.get_data();
-        let lock = engine_lock!(dbus_context.engine, read);
+        let lock = lock!(dbus_context.engine, read);
         let (_, pool) = get_pool!(lock; pool_uuid; default_return; return_message);
-        pool.has_cache()
+        let has_cache = lock!(pool, read).has_cache();
+        has_cache
     };
     add_blockdevs(
         m,
@@ -306,9 +309,8 @@ pub fn rename_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let msg = match log_action!(
-        engine_lock!(dbus_context.engine, write).rename_pool(pool_uuid, new_name)
-    ) {
+    let msg = match log_action!(lock!(dbus_context.engine, write).rename_pool(pool_uuid, new_name))
+    {
         Ok(RenameAction::NoSource) => {
             let error_message = format!("engine doesn't know about pool {}", pool_uuid);
             let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, error_message);

@@ -18,7 +18,7 @@ pub fn engine_state_report(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
     let default_return = String::new();
 
     let dbus_context = m.tree.get_data();
-    let lock = engine_lock!(dbus_context.engine, read);
+    let lock = lock!(dbus_context.engine, read);
 
     let msg = match serde_json::to_string(&lock.engine_state_report()) {
         Ok(string) => return_message.append3(string, msg_code_ok(), msg_string_ok()),

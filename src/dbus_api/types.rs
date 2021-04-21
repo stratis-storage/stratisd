@@ -86,9 +86,8 @@ impl Debug for DbusContext {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "DbusContext {{ next_index: {:?}, engine: Locked<dyn Engine>, \
-            sender: {:?} }}",
-            self.next_index, self.sender,
+            "DbusContext {{ next_index: {:?}, engine: {:?}, sender: {:?} }}",
+            self.next_index, self.engine, self.sender,
         )
     }
 }

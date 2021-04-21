@@ -86,22 +86,6 @@ macro_rules! get_pool {
     };
 }
 
-/// Macro for early return with Ok dbus message on failure to get mutable pool.
-macro_rules! get_mut_pool {
-    ($engine:expr; $uuid:ident; $default:expr; $message:expr) => {
-        if let Some(pool) = $engine.get_mut_pool($uuid) {
-            pool
-        } else {
-            let message = format!("engine does not know about pool with uuid {}", $uuid);
-            let (rc, rs) = (
-                $crate::dbus_api::types::DbusErrorEnum::INTERNAL_ERROR as u16,
-                message,
-            );
-            return Ok(vec![$message.append3($default, rc, rs)]);
-        }
-    };
-}
-
 // Macro for formatting a Uuid object for transport on the D-Bus as a string
 macro_rules! uuid_to_string {
     ($uuid:expr) => {

@@ -15,7 +15,7 @@ use crate::{
         engine::{Engine, KeyActions, Pool, Report},
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         sim_engine::{keys::SimKeyActions, pool::SimPool},
-        structures::Table,
+        structures::{Locked, Table},
         types::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, LockedPoolInfo, Name, PoolUuid,
             RenameAction, ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
@@ -26,7 +26,7 @@ use crate::{
 
 #[derive(Debug, Default)]
 pub struct SimEngine {
-    pools: Table<PoolUuid, SimPool>,
+    pools: Table<PoolUuid, Locked<SimPool>>,
     key_handler: SimKeyActions,
 }
 
@@ -41,7 +41,7 @@ impl<'a> Into<Value> for &'a SimEngine {
                         "pool_uuid": uuid.to_string(),
                         "name": name.to_string(),
                     });
-                    let pool_json = pool.into();
+                    let pool_json = (&*lock!(pool, read)).into();
                     if let (Value::Object(mut map), Value::Object(submap)) = (json, pool_json) {
                         map.extend(submap.into_iter());
                         Value::Object(map)
@@ -99,7 +99,9 @@ impl Engine for SimEngine {
         }
 
         match self.pools.get_by_name(name) {
-            Some((_, pool)) => create_pool_idempotent_or_err(pool, name, blockdev_paths),
+            Some((_, pool)) => {
+                create_pool_idempotent_or_err(&*lock!(pool, read), name, blockdev_paths)
+            }
             None => {
                 if blockdev_paths.is_empty() {
                     Err(StratisError::Engine(
@@ -113,7 +115,7 @@ impl Engine for SimEngine {
                     let (pool_uuid, pool) = SimPool::new(&devices, redundancy, encryption_info);
 
                     self.pools
-                        .insert(Name::new(name.to_owned()), pool_uuid, pool);
+                        .insert(Name::new(name.to_owned()), pool_uuid, Locked::new(pool));
 
                     Ok(CreateAction::Created(pool_uuid))
                 }
@@ -121,13 +123,16 @@ impl Engine for SimEngine {
         }
     }
 
-    fn handle_event(&mut self, _event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &dyn Pool)> {
+    fn handle_event(
+        &mut self,
+        _event: &UdevEngineEvent,
+    ) -> Option<(Name, PoolUuid, Locked<dyn Pool>)> {
         None
     }
 
     fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {
         if let Some((_, pool)) = self.pools.get_by_uuid(uuid) {
-            if pool.has_filesystems() {
+            if lock!(pool, read).has_filesystems() {
                 return Err(StratisError::Engine(
                     ErrorEnum::Busy,
                     "filesystems remaining on pool".into(),
@@ -136,11 +141,14 @@ impl Engine for SimEngine {
         } else {
             return Ok(DeleteAction::Identity);
         }
-        self.pools
-            .remove_by_uuid(uuid)
-            .expect("Must succeed since self.pool.get_by_uuid() returned a value")
-            .1
-            .destroy()?;
+        lock!(
+            self.pools
+                .remove_by_uuid(uuid)
+                .expect("Must succeed since self.pool.get_by_uuid() returned a value")
+                .1,
+            write
+        )
+        .destroy()?;
         Ok(DeleteAction::Deleted(uuid))
     }
 
@@ -169,29 +177,18 @@ impl Engine for SimEngine {
         Ok(SetUnlockAction::empty())
     }
 
-    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)> {
+    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, Locked<dyn Pool>)> {
         get_pool!(self; uuid)
-    }
-
-    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut dyn Pool)> {
-        get_mut_pool!(self; uuid)
     }
 
     fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo> {
         HashMap::new()
     }
 
-    fn pools(&self) -> Vec<(Name, PoolUuid, &dyn Pool)> {
+    fn pools(&self) -> Vec<(Name, PoolUuid, Locked<dyn Pool>)> {
         self.pools
             .iter()
-            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &dyn Pool))
-            .collect()
-    }
-
-    fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut dyn Pool)> {
-        self.pools
-            .iter_mut()
-            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &mut dyn Pool))
+            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool.clone().into_dyn_pool()))
             .collect()
     }
 
@@ -289,8 +286,9 @@ mod tests {
             .changed()
             .unwrap();
         {
-            let pool = engine.get_mut_pool(uuid).unwrap().1;
-            pool.create_filesystems(pool_name, uuid, &[("test", None)])
+            let pool = engine.get_pool(uuid).unwrap().1;
+            lock!(pool, write)
+                .create_filesystems(pool_name, uuid, &[("test", None)])
                 .unwrap();
         }
         assert_matches!(engine.destroy_pool(uuid), Err(_));
@@ -351,7 +349,9 @@ mod tests {
                 )
                 .unwrap()
                 .changed()
-                .map(|uuid| engine.get_pool(uuid).unwrap().1.blockdevs().len()),
+                .map(|uuid| lock!(engine.get_pool(uuid).unwrap().1, read)
+                    .blockdevs()
+                    .len()),
             Some(1)
         );
     }

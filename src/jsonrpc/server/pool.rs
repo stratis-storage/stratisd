@@ -2,15 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{os::unix::io::RawFd, path::Path};
-
-use tokio::task::block_in_place;
+use std::{os::unix::io::RawFd, path::PathBuf};
 
 use crate::{
-    engine::{
-        BlockDevTier, CreateAction, DeleteAction, EncryptionInfo, Engine, EngineAction, Locked,
-        PoolUuid, RenameAction, UnlockMethod,
-    },
+    engine::{BlockDevTier, EncryptionInfo, Engine, EngineAction, Locked, PoolUuid, UnlockMethod},
     jsonrpc::{
         interface::PoolListType,
         server::{
@@ -34,15 +29,18 @@ pub async fn pool_unlock(
         }
     }
 
-    let mut lock = engine.write().await;
     match pool_uuid {
-        Some(u) => block_in_place(|| Ok(lock.unlock_pool(u, unlock_method)?.changed().is_some())),
-        None => {
+        Some(u) => spawn_blocking!({
+            let mut lock = lock!(engine, write);
+            lock.unlock_pool(u, unlock_method).map(|a| a.is_changed())
+        }),
+        None => spawn_blocking!({
+            let mut lock = lock!(engine, write);
             let changed = lock
                 .locked_pools()
                 .into_iter()
                 .fold(false, |acc, (uuid, _)| {
-                    let res = block_in_place(|| lock.unlock_pool(uuid, unlock_method));
+                    let res = lock.unlock_pool(uuid, unlock_method);
                     if let Ok(ok) = res {
                         acc || ok.is_changed()
                     } else {
@@ -50,70 +48,79 @@ pub async fn pool_unlock(
                     }
                 });
             Ok(changed)
-        }
+        }),
     }
 }
 
 // stratis-min pool create
 pub async fn pool_create(
     engine: Locked<dyn Engine>,
-    name: &str,
-    blockdev_paths: &[&Path],
+    name: String,
+    blockdev_paths: Vec<PathBuf>,
     enc_info: EncryptionInfo,
 ) -> StratisResult<bool> {
-    let mut lock = engine.write().await;
-    Ok(
-        match block_in_place(|| lock.create_pool(name, blockdev_paths, None, &enc_info))? {
-            CreateAction::Created(_) => true,
-            CreateAction::Identity => false,
-        },
-    )
+    spawn_blocking!({
+        let mut lock = lock!(engine, write);
+        let paths = blockdev_paths
+            .iter()
+            .map(|p| p.as_path())
+            .collect::<Vec<_>>();
+        lock.create_pool(name.as_str(), paths.as_slice(), None, &enc_info)
+            .map(|a| a.is_changed())
+    })
 }
 
 // stratis-min pool destroy
-pub async fn pool_destroy(engine: Locked<dyn Engine>, name: &str) -> StratisResult<bool> {
-    let mut lock = engine.write().await;
-    let (uuid, _) = name_to_uuid_and_pool(&mut *lock, name)
-        .ok_or_else(|| StratisError::Error(format!("No pool found with name {}", name)))?;
-    Ok(match block_in_place(|| lock.destroy_pool(uuid))? {
-        DeleteAction::Deleted(_) => true,
-        DeleteAction::Identity => false,
+pub async fn pool_destroy(engine: Locked<dyn Engine>, name: String) -> StratisResult<bool> {
+    spawn_blocking!({
+        let mut lock = lock!(engine, write);
+        let (uuid, _) = name_to_uuid_and_pool(&*lock, name.as_str())
+            .ok_or_else(|| StratisError::Error(format!("No pool found with name {}", name)))?;
+        lock.destroy_pool(uuid).map(|a| a.is_changed())
     })
 }
 
 // stratis-min pool init-cache
 pub async fn pool_init_cache(
     engine: Locked<dyn Engine>,
-    name: &str,
-    paths: &[&Path],
+    name: String,
+    paths: Vec<PathBuf>,
 ) -> StratisResult<bool> {
-    let mut lock = engine.write().await;
-    let (uuid, pool) = name_to_uuid_and_pool(&mut *lock, name)
+    let lock = engine.read().await;
+    let (uuid, pool) = name_to_uuid_and_pool(&*lock, &name)
         .ok_or_else(|| StratisError::Error(format!("No pool found with name {}", name)))?;
-    block_in_place(|| Ok(pool.init_cache(uuid, name, paths)?.is_changed()))
+    spawn_blocking!({
+        let mut pool_lock = lock!(pool, write);
+        pool_lock
+            .init_cache(
+                uuid,
+                &name,
+                paths.iter().map(|p| &**p).collect::<Vec<_>>().as_slice(),
+            )
+            .map(|a| a.is_changed())
+    })
 }
 
 // stratis-min pool rename
 pub async fn pool_rename(
     engine: Locked<dyn Engine>,
-    current_name: &str,
-    new_name: &str,
+    current_name: String,
+    new_name: String,
 ) -> StratisResult<bool> {
-    let mut lock = engine.write().await;
-    let (uuid, _) = name_to_uuid_and_pool(&mut *lock, current_name)
-        .ok_or_else(|| StratisError::Error(format!("No pool found with name {}", current_name)))?;
-    Ok(match block_in_place(|| lock.rename_pool(uuid, new_name))? {
-        RenameAction::Identity => false,
-        RenameAction::Renamed(_) => true,
-        RenameAction::NoSource => unreachable!(),
+    spawn_blocking!({
+        let mut lock = lock!(engine, write);
+        let (uuid, _) = name_to_uuid_and_pool(&*lock, &current_name).ok_or_else(|| {
+            StratisError::Error(format!("No pool found with name {}", current_name))
+        })?;
+        lock.rename_pool(uuid, &new_name).map(|a| a.is_changed())
     })
 }
 
 // stratis-min pool add-data
 pub async fn pool_add_data(
     engine: Locked<dyn Engine>,
-    name: &str,
-    blockdevs: &[&Path],
+    name: String,
+    blockdevs: Vec<PathBuf>,
 ) -> StratisResult<bool> {
     add_blockdevs(engine, name, blockdevs, BlockDevTier::Data).await
 }
@@ -121,61 +128,56 @@ pub async fn pool_add_data(
 // stratis-min pool add-cache
 pub async fn pool_add_cache(
     engine: Locked<dyn Engine>,
-    name: &str,
-    blockdevs: &[&Path],
+    name: String,
+    blockdevs: Vec<PathBuf>,
 ) -> StratisResult<bool> {
     add_blockdevs(engine, name, blockdevs, BlockDevTier::Cache).await
 }
 
 async fn add_blockdevs(
     engine: Locked<dyn Engine>,
-    name: &str,
-    blockdevs: &[&Path],
+    name: String,
+    blockdevs: Vec<PathBuf>,
     tier: BlockDevTier,
 ) -> StratisResult<bool> {
-    let mut lock = engine.write().await;
-    let (uuid, pool) = name_to_uuid_and_pool(&mut *lock, name)
+    let lock = engine.read().await;
+    let (uuid, pool) = name_to_uuid_and_pool(&*lock, name.as_str())
         .ok_or_else(|| StratisError::Error(format!("No pool found with name {}", name)))?;
-    block_in_place(|| {
-        Ok(pool
-            .add_blockdevs(uuid, name, blockdevs, tier)?
-            .is_changed())
+    spawn_blocking!({
+        let paths = blockdevs.iter().map(|p| p.as_path()).collect::<Vec<_>>();
+        lock!(pool, write)
+            .add_blockdevs(uuid, name.as_str(), paths.as_slice(), tier)
+            .map(|a| a.is_changed())
     })
 }
 
 // stratis-min pool [list]
 pub async fn pool_list(engine: Locked<dyn Engine>) -> PoolListType {
     let lock = engine.read().await;
-    lock.pools()
-        .iter()
-        .map(|(n, u, p)| {
+    let (mut name_vec, mut size_vec, mut pool_props_vec, mut uuid_vec) =
+        (Vec::new(), Vec::new(), Vec::new(), Vec::new());
+    for (n, u, p) in lock.pools().iter() {
+        let pool_lock = p.read().await;
+        let (s, p) = (
             (
-                n.to_string(),
-                (
-                    *p.total_physical_size().bytes(),
-                    p.total_physical_used().ok().map(|u| *u.bytes()),
-                ),
-                (p.has_cache(), p.is_encrypted()),
-                u,
-            )
-        })
-        .fold(
-            (Vec::new(), Vec::new(), Vec::new(), Vec::new()),
-            |(mut name_vec, mut size_vec, mut pool_props_vec, mut uuid_vec), (n, s, p, u)| {
-                name_vec.push(n);
-                size_vec.push(s);
-                pool_props_vec.push(p);
-                uuid_vec.push(*u);
-                (name_vec, size_vec, pool_props_vec, uuid_vec)
-            },
-        )
+                *pool_lock.total_physical_size().bytes(),
+                pool_lock.total_physical_used().ok().map(|u| *u.bytes()),
+            ),
+            (pool_lock.has_cache(), pool_lock.is_encrypted()),
+        );
+        name_vec.push(n.to_string());
+        size_vec.push(s);
+        pool_props_vec.push(p);
+        uuid_vec.push(*u);
+    }
+    (name_vec, size_vec, pool_props_vec, uuid_vec)
 }
 
 // stratis-min pool is-encrypted
 pub async fn pool_is_encrypted(engine: Locked<dyn Engine>, uuid: PoolUuid) -> StratisResult<bool> {
     let lock = engine.read().await;
     if let Some((_, pool)) = lock.get_pool(uuid) {
-        Ok(pool.is_encrypted())
+        Ok(pool.read().await.is_encrypted())
     } else if lock.locked_pools().get(&uuid).is_some() {
         Ok(true)
     } else {
@@ -205,7 +207,7 @@ pub async fn pool_is_locked(engine: Locked<dyn Engine>, uuid: PoolUuid) -> Strat
 pub async fn pool_is_bound(engine: Locked<dyn Engine>, uuid: PoolUuid) -> StratisResult<bool> {
     let lock = engine.read().await;
     if let Some((_, pool)) = lock.get_pool(uuid) {
-        Ok(pool.encryption_info().clevis_info.is_some())
+        Ok(pool.read().await.encryption_info().clevis_info.is_some())
     } else if let Some(info) = lock.locked_pools().get(&uuid) {
         Ok(info.info.clevis_info.is_some())
     } else {
@@ -223,7 +225,12 @@ pub async fn pool_has_passphrase(
 ) -> StratisResult<bool> {
     let lock = engine.read().await;
     if let Some((_, pool)) = lock.get_pool(uuid) {
-        Ok(pool.encryption_info().key_description.is_some())
+        Ok(pool
+            .read()
+            .await
+            .encryption_info()
+            .key_description
+            .is_some())
     } else if let Some(info) = lock.locked_pools().get(&uuid) {
         Ok(info.info.key_description.is_some())
     } else {
@@ -242,6 +249,8 @@ pub async fn pool_clevis_pin(
     let lock = engine.read().await;
     if let Some((_, pool)) = lock.get_pool(uuid) {
         Ok(pool
+            .read()
+            .await
             .encryption_info()
             .clevis_info
             .as_ref()

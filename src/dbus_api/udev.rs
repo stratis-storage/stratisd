@@ -41,7 +41,8 @@ impl DbusUdevHandler {
         let optional_pool_info = lock.handle_event(&udev_event);
 
         if let Some((pool_name, pool_uuid, pool)) = optional_pool_info {
-            self.register_pool(&pool_name, pool_uuid, pool)
+            let pool_ref = &*pool.read().await;
+            self.register_pool(&pool_name, pool_uuid, pool_ref)
         }
 
         Ok(())

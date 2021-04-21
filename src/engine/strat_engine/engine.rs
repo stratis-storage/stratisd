@@ -19,7 +19,7 @@ use crate::{
             liminal::{find_all, LiminalDevices},
             pool::StratPool,
         },
-        structures::Table,
+        structures::{Locked, Table},
         types::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, LockedPoolInfo, RenameAction,
             ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
@@ -31,7 +31,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct StratEngine {
-    pools: Table<PoolUuid, StratPool>,
+    pools: Table<PoolUuid, Locked<StratPool>>,
 
     // Maps pool UUIDs to information about sets of devices that are
     // associated with that UUID but have not been converted into a pool.
@@ -67,7 +67,7 @@ impl StratEngine {
         let mut liminal_devices = LiminalDevices::default();
         let mut pools = Table::default();
         for (pool_name, pool_uuid, pool) in liminal_devices.setup_pools(find_all()?) {
-            pools.insert(pool_name, pool_uuid, pool);
+            pools.insert(pool_name, pool_uuid, Locked::new(pool));
         }
 
         Ok(StratEngine {
@@ -84,8 +84,9 @@ impl StratEngine {
     #[cfg(test)]
     pub fn teardown(self) -> StratisResult<()> {
         let mut untorndown_pools = Vec::new();
-        for (_, uuid, mut pool) in self.pools {
-            pool.teardown()
+        for (_, uuid, pool) in self.pools {
+            lock!(pool, write)
+                .teardown()
                 .unwrap_or_else(|_| untorndown_pools.push(uuid));
         }
         if untorndown_pools.is_empty() {
@@ -114,7 +115,7 @@ impl<'a> Into<Value> for &'a StratEngine {
                         });
                         if let Value::Object(ref mut map) = json {
                             map.extend(
-                                if let Value::Object(map) = <&StratPool as Into<Value>>::into(pool) {
+                                if let Value::Object(map) = <&StratPool as Into<Value>>::into(&*lock!(pool, read)) {
                                     map.into_iter()
                                 } else {
                                     unreachable!("StratPool conversion returns a JSON object");
@@ -153,15 +154,24 @@ impl Report for StratEngine {
 }
 
 impl Engine for StratEngine {
-    fn handle_event(&mut self, event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &dyn Pool)> {
+    fn handle_event(
+        &mut self,
+        event: &UdevEngineEvent,
+    ) -> Option<(Name, PoolUuid, Locked<dyn Pool>)> {
         if let Some((pool_uuid, pool_name, pool)) =
             self.liminal_devices.block_evaluate(&self.pools, event)
         {
-            self.pools.insert(pool_name.clone(), pool_uuid, pool);
+            self.pools
+                .insert(pool_name.clone(), pool_uuid, Locked::new(pool));
             Some((
                 pool_name,
                 pool_uuid,
-                self.pools.get_by_uuid(pool_uuid).expect("just_inserted").1 as &dyn Pool,
+                self.pools
+                    .get_by_uuid(pool_uuid)
+                    .expect("just_inserted")
+                    .1
+                    .clone()
+                    .into_dyn_pool(),
             ))
         } else {
             None
@@ -182,7 +192,9 @@ impl Engine for StratEngine {
         validate_paths(blockdev_paths)?;
 
         match self.pools.get_by_name(name) {
-            Some((_, pool)) => create_pool_idempotent_or_err(pool, name, blockdev_paths),
+            Some((_, pool)) => {
+                create_pool_idempotent_or_err(&*lock!(pool, read), name, blockdev_paths)
+            }
             None => {
                 if blockdev_paths.is_empty() {
                     Err(StratisError::Engine(
@@ -194,7 +206,7 @@ impl Engine for StratEngine {
                         StratPool::initialize(name, blockdev_paths, redundancy, encryption_info)?;
 
                     let name = Name::new(name.to_owned());
-                    self.pools.insert(name, uuid, pool);
+                    self.pools.insert(name, uuid, Locked::new(pool));
                     Ok(CreateAction::Created(uuid))
                 }
             }
@@ -203,7 +215,7 @@ impl Engine for StratEngine {
 
     fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {
         if let Some((_, pool)) = self.pools.get_by_uuid(uuid) {
-            if pool.has_filesystems() {
+            if lock!(pool, read).has_filesystems() {
                 return Err(StratisError::Engine(
                     ErrorEnum::Busy,
                     "filesystems remaining on pool".into(),
@@ -213,12 +225,13 @@ impl Engine for StratEngine {
             return Ok(DeleteAction::Identity);
         }
 
-        let (pool_name, mut pool) = self
+        let (pool_name, pool) = self
             .pools
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
 
-        if let Err(err) = pool.destroy() {
+        let pool_res = lock!(pool, write).destroy();
+        if let Err(err) = pool_res {
             self.pools.insert(pool_name, uuid, pool);
             Err(err)
         } else {
@@ -234,19 +247,20 @@ impl Engine for StratEngine {
         validate_name(new_name)?;
         let old_name = rename_pool_pre_idem!(self; uuid; new_name);
 
-        let (_, mut pool) = self
+        let (_, pool) = self
             .pools
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
 
         let new_name = Name::new(new_name.to_owned());
-        if let Err(err) = pool.write_metadata(&new_name) {
+        let pool_res = lock!(pool, write).write_metadata(&new_name);
+        if let Err(err) = pool_res {
             self.pools.insert(old_name, uuid, pool);
             Err(err)
         } else {
             self.pools.insert(new_name, uuid, pool);
             let (new_name, pool) = self.pools.get_by_uuid(uuid).expect("Inserted above");
-            pool.udev_pool_change(&new_name);
+            lock!(pool, read).udev_pool_change(&new_name);
             Ok(RenameAction::Renamed(uuid))
         }
     }
@@ -262,29 +276,18 @@ impl Engine for StratEngine {
         Ok(SetUnlockAction::new(unlocked))
     }
 
-    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)> {
+    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, Locked<dyn Pool>)> {
         get_pool!(self; uuid)
-    }
-
-    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut dyn Pool)> {
-        get_mut_pool!(self; uuid)
     }
 
     fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo> {
         self.liminal_devices.locked_pools()
     }
 
-    fn pools(&self) -> Vec<(Name, PoolUuid, &dyn Pool)> {
+    fn pools(&self) -> Vec<(Name, PoolUuid, Locked<dyn Pool>)> {
         self.pools
             .iter()
-            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &dyn Pool))
-            .collect()
-    }
-
-    fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut dyn Pool)> {
-        self.pools
-            .iter_mut()
-            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &mut dyn Pool))
+            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool.clone().into_dyn_pool()))
             .collect()
     }
 
@@ -301,7 +304,7 @@ impl Engine for StratEngine {
             .collect();
 
         for (pool_name, pool_uuid, pool) in self.pools.iter_mut() {
-            let dev_names = pool.get_eventing_dev_names(*pool_uuid);
+            let dev_names = lock!(pool, read).get_eventing_dev_names(*pool_uuid);
             let event_nrs = device_list
                 .iter()
                 .filter_map(|(dm_name, event_nr)| {
@@ -318,7 +321,7 @@ impl Engine for StratEngine {
                 // so that if another event comes in on any pool, this method
                 // will retry eventing as the event number will be higher than
                 // what was previously recorded.
-                pool.event_on(*pool_uuid, pool_name)?;
+                lock!(pool, write).event_on(*pool_uuid, pool_name)?;
             }
             self.watched_dev_last_event_nrs
                 .insert(*pool_uuid, event_nrs);
@@ -368,12 +371,12 @@ mod test {
         let fs_name1 = "testfs1";
         let fs_name2 = "testfs2";
         let (_, pool) = engine.pools.get_mut_by_uuid(uuid1).unwrap();
-        let fs_uuid1 = pool
+        let fs_uuid1 = lock!(pool, write)
             .create_filesystems(name1, uuid1, &[(fs_name1, None)])
             .unwrap()
             .changed()
             .unwrap();
-        let fs_uuid2 = pool
+        let fs_uuid2 = lock!(pool, write)
             .create_filesystems(name1, uuid1, &[(fs_name2, None)])
             .unwrap()
             .changed()
@@ -394,25 +397,27 @@ mod test {
         assert!(Path::new(&format!("/dev/stratis/{}/{}", name2, fs_name1)).exists());
         assert!(Path::new(&format!("/dev/stratis/{}/{}", name2, fs_name2)).exists());
 
-        let (_, pool) = engine.pools.get_mut_by_uuid(uuid1).unwrap();
-        pool.destroy_filesystems(
-            name2,
-            fs_uuid1
-                .into_iter()
-                .map(|(_, u)| u)
-                .collect::<Vec<_>>()
-                .as_slice(),
-        )
-        .unwrap();
-        pool.destroy_filesystems(
-            name2,
-            fs_uuid2
-                .into_iter()
-                .map(|(_, u)| u)
-                .collect::<Vec<_>>()
-                .as_slice(),
-        )
-        .unwrap();
+        let (_, pool) = engine.pools.get_by_uuid(uuid1).unwrap();
+        lock!(pool, write)
+            .destroy_filesystems(
+                name2,
+                fs_uuid1
+                    .into_iter()
+                    .map(|(_, u)| u)
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            )
+            .unwrap();
+        lock!(pool, write)
+            .destroy_filesystems(
+                name2,
+                fs_uuid2
+                    .into_iter()
+                    .map(|(_, u)| u)
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            )
+            .unwrap();
 
         assert_eq!(action, RenameAction::Renamed(uuid1));
         engine.teardown().unwrap();

@@ -38,11 +38,11 @@ pub fn rename_filesystem(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let mut mutex_lock = engine_lock!(dbus_context.engine, write);
-    let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
+    let lock = lock!(dbus_context.engine, read);
+    let (pool_name, pool) = get_pool!(lock; pool_uuid; default_return; return_message);
 
     let uuid = typed_uuid!(filesystem_data.uuid; Fs; default_return; return_message);
-    let msg = match log_action!(pool.rename_filesystem(&pool_name, uuid, new_name)) {
+    let msg = match log_action!(lock!(pool, write).rename_filesystem(&pool_name, uuid, new_name)) {
         Ok(RenameAction::NoSource) => {
             let error_message = format!(
                 "pool {} doesn't know about filesystem {}",

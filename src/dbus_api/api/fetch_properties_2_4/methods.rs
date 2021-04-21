@@ -32,7 +32,7 @@ pub fn locked_pools_with_devs(
 ) -> Result<LockedPoolsWithDevs, String> {
     let dbus_context = info.tree.get_data();
 
-    let engine = engine_lock!(dbus_context.engine, read);
+    let engine = lock!(dbus_context.engine, read);
     Ok(engine
         .locked_pools()
         .into_iter()

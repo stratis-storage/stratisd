@@ -32,7 +32,7 @@ pub fn get_report(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     };
 
     let dbus_context = m.tree.get_data();
-    let lock = engine_lock!(dbus_context.engine, read);
+    let lock = lock!(dbus_context.engine, read);
 
     let msg = match serde_json::to_string(&lock.get_report(report_type)) {
         Ok(string) => return_message.append3(string, msg_code_ok(), msg_string_ok()),

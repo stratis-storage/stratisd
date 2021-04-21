@@ -46,12 +46,13 @@ where
         Pool
     );
 
-    let lock = engine_lock!(dbus_context.engine, read);
+    let lock = lock!(dbus_context.engine, read);
     let (pool_name, pool) = lock
         .get_pool(pool_uuid)
         .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
     let filesystem_uuid = typed_uuid_string_err!(filesystem_data.uuid; Fs);
-    let (fs_name, fs) = pool
+    let pool_lock = lock!(pool, read);
+    let (fs_name, fs) = pool_lock
         .get_filesystem(filesystem_uuid)
         .ok_or_else(|| format!("no name for filesystem with uuid {}", &filesystem_uuid))?;
     closure((pool_name, fs_name, fs))

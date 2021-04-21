@@ -10,11 +10,12 @@ use serde_json::{json, Map, Value};
 use libstratis::{
     engine::{EncryptionInfo, KeyDescription, PoolUuid, UnlockMethod, CLEVIS_TANG_TRUST_URL},
     jsonrpc::client::{filesystem, key, pool, report},
-    stratis::StratisError,
+    stratis::{StratisError, VERSION},
 };
 
 fn parse_args() -> App<'static, 'static> {
     App::new("stratis-min")
+        .version(VERSION)
         .arg(
             Arg::with_name("debug")
                 .long("--debug")

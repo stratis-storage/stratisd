@@ -19,13 +19,14 @@ use nix::{
     unistd::getpid,
 };
 
-use libstratis::stratis::{run, StratisError, StratisResult};
+use libstratis::stratis::{run, StratisError, StratisResult, VERSION};
 
 const STRATISD_PID_PATH: &str = "/run/stratisd.pid";
 const STRATISD_MIN_PID_PATH: &str = "/run/stratisd-min.pid";
 
 fn parse_args() -> App<'static, 'static> {
     App::new("stratisd-min")
+        .version(VERSION)
         .arg(
             Arg::with_name("log_level")
                 .empty_values(false)

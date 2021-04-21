@@ -38,18 +38,26 @@ def _do_updates(explicit_dependencies, cargo_tree):
         frozenset(explicit_dependencies.keys()) - frozenset(cargo_tree.keys()),
         frozenset(cargo_tree.keys()) - frozenset(explicit_dependencies.keys()),
     )
+
+    update_failed = False
     for (crate, version) in explicit_dependencies.items():
         current_version = cargo_tree[crate]
-        subprocess.run(
-            [
-                "cargo",
-                "update",
-                "-p",
-                "%s:%s" % (crate, current_version),
-                "--precise=%s" % version,
-            ],
-            check=True,
-        )
+        try:
+            subprocess.run(
+                [
+                    "cargo",
+                    "update",
+                    "-p",
+                    "%s:%s" % (crate, current_version),
+                    "--precise=%s" % version,
+                ],
+                check=True,
+            )
+        except subprocess.CalledProcessError as err:
+            update_failed = True
+            print(err, file=sys.stderr)
+
+    return "Failed to set the versions of some crates" if update_failed else None
 
 
 def main():
@@ -70,7 +78,7 @@ def main():
     # Read the dependency versions specified in Cargo.lock from Cargo.toml
     current_dependencies = build_cargo_tree_dict()
 
-    _do_updates(explicit_dependencies, current_dependencies)
+    return _do_updates(explicit_dependencies, current_dependencies)
 
 
 if __name__ == "__main__":

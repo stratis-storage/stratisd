@@ -21,6 +21,12 @@ jobs:
           - task: make -f Makefile compare-fedora
             toolchain: 1.51.0  # CURRENT DEVELOPMENT TOOLCHAIN
             components: cargo
+          - task: make -f Makefile verify-dependency-bounds
+            toolchain: 1.51.0  # CURRENT DEVELOPMENT TOOLCHAIN
+            components: cargo
+          - task: make -f Makefile audit
+            toolchain: 1.51.0  # CURRENT DEVELOPMENT TOOLCHAIN
+            components: cargo
     runs-on: ubuntu-18.04
     container:
       image: fedora:32

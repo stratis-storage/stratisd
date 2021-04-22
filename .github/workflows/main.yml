@@ -266,21 +266,11 @@ jobs:
     strategy:
       matrix:
         include:
-          # Allowed so as not to make an extra step for external contributors.
-          - task: make -f Makefile verify-dependency-bounds
-            toolchain: 1.51.0  # RECOMMENDED DEVELOPMENT TOOLCHAIN
-            components: cargo
           # Allowed because a failure may occur after a new Rust stable
           # version is released.
           - task: make -f Makefile clippy
             toolchain: stable
             components: clippy
-          # Run audit on Rust stable.  Make it an allowed failure, because:
-          # * It takes 9 minutes, the longest of any task.
-          # * It should be an advisory, and should not gate our development.
-          - task: make -f Makefile audit
-            toolchain: stable
-            components: cargo
     runs-on: ubuntu-18.04
     container:
       image: fedora:32

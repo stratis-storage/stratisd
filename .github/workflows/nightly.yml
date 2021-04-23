@@ -42,6 +42,7 @@ jobs:
           dbus-devel
           libblkid-devel
           make
+          openssl-devel
           python-requests
           python-semantic_version
           systemd-devel

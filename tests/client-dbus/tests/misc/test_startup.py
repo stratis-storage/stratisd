@@ -46,6 +46,7 @@ class TestUniqueInstance(unittest.TestCase):
         )
 
         while not psutil.pid_exists(process.pid):
+            print("Waiting for initial process %s to be present" % process.pid)
             pass
 
         def cleanup():

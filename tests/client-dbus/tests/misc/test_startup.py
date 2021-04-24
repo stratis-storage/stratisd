@@ -40,8 +40,7 @@ class TestUniqueInstance(unittest.TestCase):
         """
         process = subprocess.Popen(
             [_STRATISD, "--sim"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.STDOUT,
             close_fds=True,
             env=os.environ,
         )

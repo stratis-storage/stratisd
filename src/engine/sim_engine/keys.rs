@@ -6,7 +6,7 @@ use std::{collections::HashMap, os::unix::io::RawFd};
 
 use crate::{
     engine::{
-        engine::KeyActions,
+        engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
         shared,
         types::{Key, KeyDescription, MappingCreateAction, MappingDeleteAction},
     },
@@ -34,8 +34,9 @@ impl KeyActions for SimKeyActions {
         key_desc: &KeyDescription,
         key_fd: RawFd,
     ) -> StratisResult<MappingCreateAction<Key>> {
-        let mut memory = Vec::new();
-        let _ = shared::set_key_shared(key_fd, &mut memory)?;
+        let mut memory = vec![0; MAX_STRATIS_PASS_SIZE];
+        let bytes_written = shared::set_key_shared(key_fd, &mut memory)?;
+        memory.truncate(bytes_written);
 
         match self.read(key_desc) {
             Some(key_data) => {

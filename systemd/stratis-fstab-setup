@@ -32,3 +32,5 @@ if $(stratis-min pool is-locked "$POOL_UUID"); then
 		fi
 	fi
 fi
+
+udevadm settle

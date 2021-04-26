@@ -5,13 +5,13 @@
 use tokio::{select, sync::mpsc::UnboundedReceiver, task::JoinHandle};
 
 use crate::{
-    engine::{Engine, Locked, UdevEngineEvent},
+    engine::{Engine, Lockable, UdevEngineEvent},
     jsonrpc::run_server,
     stratis::{StratisError, StratisResult},
 };
 
 fn handle_udev(
-    engine: Locked<dyn Engine>,
+    engine: Lockable<dyn Engine>,
     mut recv: UnboundedReceiver<UdevEngineEvent>,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
@@ -30,7 +30,7 @@ fn handle_udev(
 }
 
 pub async fn setup(
-    engine: Locked<dyn Engine>,
+    engine: Lockable<dyn Engine>,
     recv: UnboundedReceiver<UdevEngineEvent>,
 ) -> StratisResult<()> {
     let mut udev_join = handle_udev(engine.clone(), recv);

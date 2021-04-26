@@ -5,13 +5,15 @@
 use std::os::unix::io::RawFd;
 
 use crate::{
-    engine::{Engine, KeyDescription, Locked, MappingCreateAction, MappingDeleteAction, PoolUuid},
+    engine::{
+        Engine, KeyDescription, Lockable, MappingCreateAction, MappingDeleteAction, PoolUuid,
+    },
     stratis::StratisResult,
 };
 
 // stratis-min key set
 pub async fn key_set(
-    engine: Locked<dyn Engine>,
+    engine: Lockable<dyn Engine>,
     key_desc: &KeyDescription,
     key_fd: RawFd,
 ) -> StratisResult<Option<bool>> {
@@ -31,7 +33,7 @@ pub async fn key_set(
 
 // stratis-min key unset
 pub async fn key_unset(
-    engine: Locked<dyn Engine>,
+    engine: Lockable<dyn Engine>,
     key_desc: &KeyDescription,
 ) -> StratisResult<bool> {
     Ok(
@@ -43,7 +45,7 @@ pub async fn key_unset(
 }
 
 // stratis-min key [list]
-pub async fn key_list(engine: Locked<dyn Engine>) -> StratisResult<Vec<KeyDescription>> {
+pub async fn key_list(engine: Lockable<dyn Engine>) -> StratisResult<Vec<KeyDescription>> {
     Ok(engine
         .read()
         .await
@@ -54,7 +56,7 @@ pub async fn key_list(engine: Locked<dyn Engine>) -> StratisResult<Vec<KeyDescri
 }
 
 pub async fn key_get_desc(
-    engine: Locked<dyn Engine>,
+    engine: Lockable<dyn Engine>,
     pool_uuid: PoolUuid,
 ) -> Option<KeyDescription> {
     let locked_pools = engine.read().await.locked_pools();

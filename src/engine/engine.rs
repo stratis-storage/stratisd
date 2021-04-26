@@ -17,7 +17,7 @@ use devicemapper::{Bytes, Sectors};
 
 use crate::{
     engine::{
-        structures::Locked,
+        structures::Lockable,
         types::{
             BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo,
             FilesystemUuid, Key, KeyDescription, LockedPoolInfo, MappingCreateAction,
@@ -297,7 +297,7 @@ pub trait Engine: Debug + Report + Send + Sync {
     fn handle_event(
         &mut self,
         event: &UdevEngineEvent,
-    ) -> Option<(Name, PoolUuid, Locked<dyn Pool>)>;
+    ) -> Option<(Name, PoolUuid, Lockable<dyn Pool>)>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.
@@ -327,7 +327,7 @@ pub trait Engine: Debug + Report + Send + Sync {
     ) -> StratisResult<SetUnlockAction<DevUuid>>;
 
     /// Find the pool designated by uuid.
-    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, Locked<dyn Pool>)>;
+    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, Lockable<dyn Pool>)>;
 
     /// Get a mapping of encrypted pool UUIDs for pools that have not yet
     /// been set up and need to be unlocked to their encryption infos.
@@ -339,7 +339,7 @@ pub trait Engine: Debug + Report + Send + Sync {
     }
 
     /// Get all pools belonging to this engine.
-    fn pools(&self) -> Vec<(Name, PoolUuid, Locked<dyn Pool>)>;
+    fn pools(&self) -> Vec<(Name, PoolUuid, Lockable<dyn Pool>)>;
 
     /// Notify the engine that an event has occurred on the DM file descriptor.
     fn evented(&mut self) -> StratisResult<()>;

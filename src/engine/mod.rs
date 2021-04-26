@@ -9,7 +9,7 @@ pub use self::{
         blkdev_size, crypt_metadata_size, get_dm, get_dm_init, StratEngine, StratKeyActions, BDA,
         CLEVIS_TANG_TRUST_URL,
     },
-    structures::Locked,
+    structures::Lockable,
     types::{
         BlockDevState, BlockDevTier, CreateAction, DeleteAction, DevUuid, EncryptionInfo,
         EngineAction, FilesystemUuid, KeyDescription, MappingCreateAction, MappingDeleteAction,

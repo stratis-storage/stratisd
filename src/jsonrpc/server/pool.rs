@@ -5,7 +5,9 @@
 use std::{os::unix::io::RawFd, path::PathBuf};
 
 use crate::{
-    engine::{BlockDevTier, EncryptionInfo, Engine, EngineAction, Locked, PoolUuid, UnlockMethod},
+    engine::{
+        BlockDevTier, EncryptionInfo, Engine, EngineAction, Lockable, PoolUuid, UnlockMethod,
+    },
     jsonrpc::{
         interface::PoolListType,
         server::{
@@ -18,7 +20,7 @@ use crate::{
 
 // stratis-min pool unlock
 pub async fn pool_unlock(
-    engine: Locked<dyn Engine>,
+    engine: Lockable<dyn Engine>,
     unlock_method: UnlockMethod,
     pool_uuid: Option<PoolUuid>,
     prompt: Option<RawFd>,
@@ -54,7 +56,7 @@ pub async fn pool_unlock(
 
 // stratis-min pool create
 pub async fn pool_create(
-    engine: Locked<dyn Engine>,
+    engine: Lockable<dyn Engine>,
     name: String,
     blockdev_paths: Vec<PathBuf>,
     enc_info: EncryptionInfo,
@@ -71,7 +73,7 @@ pub async fn pool_create(
 }
 
 // stratis-min pool destroy
-pub async fn pool_destroy(engine: Locked<dyn Engine>, name: String) -> StratisResult<bool> {
+pub async fn pool_destroy(engine: Lockable<dyn Engine>, name: String) -> StratisResult<bool> {
     spawn_blocking!({
         let mut lock = lock!(engine, write);
         let (uuid, _) = name_to_uuid_and_pool(&*lock, name.as_str())
@@ -82,7 +84,7 @@ pub async fn pool_destroy(engine: Locked<dyn Engine>, name: String) -> StratisRe
 
 // stratis-min pool init-cache
 pub async fn pool_init_cache(
-    engine: Locked<dyn Engine>,
+    engine: Lockable<dyn Engine>,
     name: String,
     paths: Vec<PathBuf>,
 ) -> StratisResult<bool> {
@@ -103,7 +105,7 @@ pub async fn pool_init_cache(
 
 // stratis-min pool rename
 pub async fn pool_rename(
-    engine: Locked<dyn Engine>,
+    engine: Lockable<dyn Engine>,
     current_name: String,
     new_name: String,
 ) -> StratisResult<bool> {
@@ -118,7 +120,7 @@ pub async fn pool_rename(
 
 // stratis-min pool add-data
 pub async fn pool_add_data(
-    engine: Locked<dyn Engine>,
+    engine: Lockable<dyn Engine>,
     name: String,
     blockdevs: Vec<PathBuf>,
 ) -> StratisResult<bool> {
@@ -127,7 +129,7 @@ pub async fn pool_add_data(
 
 // stratis-min pool add-cache
 pub async fn pool_add_cache(
-    engine: Locked<dyn Engine>,
+    engine: Lockable<dyn Engine>,
     name: String,
     blockdevs: Vec<PathBuf>,
 ) -> StratisResult<bool> {
@@ -135,7 +137,7 @@ pub async fn pool_add_cache(
 }
 
 async fn add_blockdevs(
-    engine: Locked<dyn Engine>,
+    engine: Lockable<dyn Engine>,
     name: String,
     blockdevs: Vec<PathBuf>,
     tier: BlockDevTier,
@@ -152,7 +154,7 @@ async fn add_blockdevs(
 }
 
 // stratis-min pool [list]
-pub async fn pool_list(engine: Locked<dyn Engine>) -> PoolListType {
+pub async fn pool_list(engine: Lockable<dyn Engine>) -> PoolListType {
     let lock = engine.read().await;
     let (mut name_vec, mut size_vec, mut pool_props_vec, mut uuid_vec) =
         (Vec::new(), Vec::new(), Vec::new(), Vec::new());
@@ -174,7 +176,10 @@ pub async fn pool_list(engine: Locked<dyn Engine>) -> PoolListType {
 }
 
 // stratis-min pool is-encrypted
-pub async fn pool_is_encrypted(engine: Locked<dyn Engine>, uuid: PoolUuid) -> StratisResult<bool> {
+pub async fn pool_is_encrypted(
+    engine: Lockable<dyn Engine>,
+    uuid: PoolUuid,
+) -> StratisResult<bool> {
     let lock = engine.read().await;
     if let Some((_, pool)) = lock.get_pool(uuid) {
         Ok(pool.read().await.is_encrypted())
@@ -189,7 +194,7 @@ pub async fn pool_is_encrypted(engine: Locked<dyn Engine>, uuid: PoolUuid) -> St
 }
 
 // stratis-min pool is-locked
-pub async fn pool_is_locked(engine: Locked<dyn Engine>, uuid: PoolUuid) -> StratisResult<bool> {
+pub async fn pool_is_locked(engine: Lockable<dyn Engine>, uuid: PoolUuid) -> StratisResult<bool> {
     let lock = engine.read().await;
     if lock.get_pool(uuid).is_some() {
         Ok(false)
@@ -204,7 +209,7 @@ pub async fn pool_is_locked(engine: Locked<dyn Engine>, uuid: PoolUuid) -> Strat
 }
 
 // stratis-min pool is-bound
-pub async fn pool_is_bound(engine: Locked<dyn Engine>, uuid: PoolUuid) -> StratisResult<bool> {
+pub async fn pool_is_bound(engine: Lockable<dyn Engine>, uuid: PoolUuid) -> StratisResult<bool> {
     let lock = engine.read().await;
     if let Some((_, pool)) = lock.get_pool(uuid) {
         Ok(pool.read().await.encryption_info().clevis_info.is_some())
@@ -220,7 +225,7 @@ pub async fn pool_is_bound(engine: Locked<dyn Engine>, uuid: PoolUuid) -> Strati
 
 // stratis-min pool has-passphrase
 pub async fn pool_has_passphrase(
-    engine: Locked<dyn Engine>,
+    engine: Lockable<dyn Engine>,
     uuid: PoolUuid,
 ) -> StratisResult<bool> {
     let lock = engine.read().await;
@@ -243,7 +248,7 @@ pub async fn pool_has_passphrase(
 
 // stratis-min pool clevis-pin
 pub async fn pool_clevis_pin(
-    engine: Locked<dyn Engine>,
+    engine: Lockable<dyn Engine>,
     uuid: PoolUuid,
 ) -> StratisResult<Option<String>> {
     let lock = engine.read().await;

@@ -297,18 +297,18 @@ where
 }
 
 #[derive(Debug)]
-pub struct Locked<T: ?Sized>(Arc<RwLock<T>>);
+pub struct Lockable<T: ?Sized>(Arc<RwLock<T>>);
 
-impl<T> Locked<T>
+impl<T> Lockable<T>
 where
     T: Send + Sync,
 {
     pub fn new(inner: T) -> Self {
-        Locked(Arc::new(RwLock::new(inner)))
+        Lockable(Arc::new(RwLock::new(inner)))
     }
 }
 
-impl<T> Locked<T>
+impl<T> Lockable<T>
 where
     T: ?Sized,
 {
@@ -321,30 +321,30 @@ where
     }
 }
 
-impl<T> Locked<T>
+impl<T> Lockable<T>
 where
     T: Engine + 'static,
 {
-    pub fn into_dyn_engine(self) -> Locked<dyn Engine> {
-        Locked(self.0 as Arc<RwLock<dyn Engine>>)
+    pub fn into_dyn_engine(self) -> Lockable<dyn Engine> {
+        Lockable(self.0 as Arc<RwLock<dyn Engine>>)
     }
 }
 
-impl<T> Locked<T>
+impl<T> Lockable<T>
 where
     T: Pool + 'static,
 {
-    pub fn into_dyn_pool(self) -> Locked<dyn Pool> {
-        Locked(self.0 as Arc<RwLock<dyn Pool>>)
+    pub fn into_dyn_pool(self) -> Lockable<dyn Pool> {
+        Lockable(self.0 as Arc<RwLock<dyn Pool>>)
     }
 }
 
-impl<T> Clone for Locked<T>
+impl<T> Clone for Lockable<T>
 where
     T: ?Sized,
 {
     fn clone(&self) -> Self {
-        Locked(Arc::clone(&self.0))
+        Lockable(Arc::clone(&self.0))
     }
 }
 

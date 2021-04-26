@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use crate::{
-    engine::{Engine, Locked, Pool, PoolUuid},
+    engine::{Engine, Lockable, Pool, PoolUuid},
     jsonrpc::consts::{OP_ERR, OP_OK, OP_OK_STR},
     stratis::StratisResult,
 };
@@ -67,7 +67,7 @@ pub fn stratis_result_to_return<T>(result: StratisResult<T>, default_value: T) -
 pub fn name_to_uuid_and_pool(
     engine: &dyn Engine,
     name: &str,
-) -> Option<(PoolUuid, Locked<dyn Pool>)> {
+) -> Option<(PoolUuid, Lockable<dyn Pool>)> {
     let mut uuids_pools_for_name = engine
         .pools()
         .into_iter()

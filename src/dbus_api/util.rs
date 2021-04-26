@@ -22,7 +22,7 @@ use crate::{
         types::{DbusContext, DbusErrorEnum, TData},
         udev::DbusUdevHandler,
     },
-    engine::{Engine, Locked, UdevEngineEvent},
+    engine::{Engine, Lockable, UdevEngineEvent},
     stratis::{ErrorEnum, StratisError},
 };
 
@@ -169,7 +169,7 @@ pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTSync<TData>, TData>) -> Res
 /// * received by the DbusUdevHandler from the udev thread,
 /// * sent by the DbusContext to the DbusTreeHandler
 pub async fn create_dbus_handlers(
-    engine: Locked<dyn Engine>,
+    engine: Lockable<dyn Engine>,
     udev_receiver: UnboundedReceiver<UdevEngineEvent>,
 ) -> Result<(DbusConnectionHandler, DbusUdevHandler, DbusTreeHandler), dbus::Error> {
     let (io, conn) = new_system_sync()?;

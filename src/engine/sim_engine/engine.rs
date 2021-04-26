@@ -15,7 +15,7 @@ use crate::{
         engine::{Engine, KeyActions, Pool, Report},
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         sim_engine::{keys::SimKeyActions, pool::SimPool},
-        structures::{Locked, Table},
+        structures::{Lockable, Table},
         types::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, LockedPoolInfo, Name, PoolUuid,
             RenameAction, ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
@@ -26,7 +26,7 @@ use crate::{
 
 #[derive(Debug, Default)]
 pub struct SimEngine {
-    pools: Table<PoolUuid, Locked<SimPool>>,
+    pools: Table<PoolUuid, Lockable<SimPool>>,
     key_handler: SimKeyActions,
 }
 
@@ -115,7 +115,7 @@ impl Engine for SimEngine {
                     let (pool_uuid, pool) = SimPool::new(&devices, redundancy, encryption_info);
 
                     self.pools
-                        .insert(Name::new(name.to_owned()), pool_uuid, Locked::new(pool));
+                        .insert(Name::new(name.to_owned()), pool_uuid, Lockable::new(pool));
 
                     Ok(CreateAction::Created(pool_uuid))
                 }
@@ -126,7 +126,7 @@ impl Engine for SimEngine {
     fn handle_event(
         &mut self,
         _event: &UdevEngineEvent,
-    ) -> Option<(Name, PoolUuid, Locked<dyn Pool>)> {
+    ) -> Option<(Name, PoolUuid, Lockable<dyn Pool>)> {
         None
     }
 
@@ -177,7 +177,7 @@ impl Engine for SimEngine {
         Ok(SetUnlockAction::empty())
     }
 
-    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, Locked<dyn Pool>)> {
+    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, Lockable<dyn Pool>)> {
         get_pool!(self; uuid)
     }
 
@@ -185,7 +185,7 @@ impl Engine for SimEngine {
         HashMap::new()
     }
 
-    fn pools(&self) -> Vec<(Name, PoolUuid, Locked<dyn Pool>)> {
+    fn pools(&self) -> Vec<(Name, PoolUuid, Lockable<dyn Pool>)> {
         self.pools
             .iter()
             .map(|(name, uuid, pool)| (name.clone(), *uuid, pool.clone().into_dyn_pool()))

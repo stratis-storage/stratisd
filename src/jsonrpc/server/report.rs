@@ -4,9 +4,9 @@
 
 use serde_json::Value;
 
-use crate::engine::{Engine, Locked};
+use crate::engine::{Engine, Lockable};
 
 #[inline]
-pub async fn report(engine: Locked<dyn Engine>) -> Value {
+pub async fn report(engine: Lockable<dyn Engine>) -> Value {
     engine.read().await.engine_state_report()
 }

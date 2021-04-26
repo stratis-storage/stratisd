@@ -5,14 +5,14 @@
 use chrono::SecondsFormat;
 
 use crate::{
-    engine::{Engine, EngineAction, Locked, Name},
+    engine::{Engine, EngineAction, Lockable, Name},
     jsonrpc::{interface::FsListType, server::utils::name_to_uuid_and_pool},
     stratis::{StratisError, StratisResult},
 };
 
 // stratis-min filesystem create
 pub async fn filesystem_create(
-    engine: Locked<dyn Engine>,
+    engine: Lockable<dyn Engine>,
     pool_name: String,
     name: String,
 ) -> StratisResult<bool> {
@@ -28,7 +28,7 @@ pub async fn filesystem_create(
 }
 
 // stratis-min filesystem [list]
-pub async fn filesystem_list(engine: Locked<dyn Engine>) -> FsListType {
+pub async fn filesystem_list(engine: Lockable<dyn Engine>) -> FsListType {
     let lock = engine.read().await;
     let mut vecs = (
         Vec::new(),
@@ -54,7 +54,7 @@ pub async fn filesystem_list(engine: Locked<dyn Engine>) -> FsListType {
 
 // stratis-min filesystem destroy
 pub async fn filesystem_destroy(
-    engine: Locked<dyn Engine>,
+    engine: Lockable<dyn Engine>,
     pool_name: String,
     fs_name: &str,
 ) -> StratisResult<bool> {
@@ -76,7 +76,7 @@ pub async fn filesystem_destroy(
 
 // stratis-min filesystem rename
 pub async fn filesystem_rename(
-    engine: Locked<dyn Engine>,
+    engine: Lockable<dyn Engine>,
     pool_name: String,
     fs_name: String,
     new_fs_name: String,

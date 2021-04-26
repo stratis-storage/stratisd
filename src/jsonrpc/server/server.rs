@@ -34,7 +34,7 @@ use tokio::{io::unix::AsyncFd, task::JoinHandle};
 #[cfg(feature = "systemd_compat")]
 use crate::systemd;
 use crate::{
-    engine::{Engine, Locked},
+    engine::{Engine, Lockable},
     jsonrpc::{
         consts::RPC_SOCKADDR,
         interface::{StratisParamType, StratisParams, StratisRet},
@@ -44,7 +44,7 @@ use crate::{
 };
 
 impl StratisParams {
-    async fn process(self, engine: Locked<dyn Engine>) -> StratisRet {
+    async fn process(self, engine: Lockable<dyn Engine>) -> StratisRet {
         match self.type_ {
             StratisParamType::KeySet(key_desc) => {
                 let fd = expects_fd!(self.fd_opt, KeySet, None, true);
@@ -212,12 +212,12 @@ impl StratisParams {
 }
 
 pub struct StratisServer {
-    engine: Locked<dyn Engine>,
+    engine: Lockable<dyn Engine>,
     listener: StratisUnixListener,
 }
 
 impl StratisServer {
-    pub fn new<P>(engine: Locked<dyn Engine>, path: P) -> StratisResult<StratisServer>
+    pub fn new<P>(engine: Lockable<dyn Engine>, path: P) -> StratisResult<StratisServer>
     where
         P: AsRef<Path>,
     {
@@ -454,7 +454,7 @@ impl Stream for StratisUnixListener {
     }
 }
 
-pub fn run_server(engine: Locked<dyn Engine>) -> JoinHandle<()> {
+pub fn run_server(engine: Lockable<dyn Engine>) -> JoinHandle<()> {
     tokio::spawn(async move {
         match StratisServer::new(engine, RPC_SOCKADDR) {
             Ok(server) => server.run().await,

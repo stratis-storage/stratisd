@@ -19,7 +19,7 @@ use crate::{
             liminal::{find_all, LiminalDevices},
             pool::StratPool,
         },
-        structures::{Locked, Table},
+        structures::{Lockable, Table},
         types::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, LockedPoolInfo, RenameAction,
             ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
@@ -31,7 +31,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct StratEngine {
-    pools: Table<PoolUuid, Locked<StratPool>>,
+    pools: Table<PoolUuid, Lockable<StratPool>>,
 
     // Maps pool UUIDs to information about sets of devices that are
     // associated with that UUID but have not been converted into a pool.
@@ -67,7 +67,7 @@ impl StratEngine {
         let mut liminal_devices = LiminalDevices::default();
         let mut pools = Table::default();
         for (pool_name, pool_uuid, pool) in liminal_devices.setup_pools(find_all()?) {
-            pools.insert(pool_name, pool_uuid, Locked::new(pool));
+            pools.insert(pool_name, pool_uuid, Lockable::new(pool));
         }
 
         Ok(StratEngine {
@@ -157,12 +157,12 @@ impl Engine for StratEngine {
     fn handle_event(
         &mut self,
         event: &UdevEngineEvent,
-    ) -> Option<(Name, PoolUuid, Locked<dyn Pool>)> {
+    ) -> Option<(Name, PoolUuid, Lockable<dyn Pool>)> {
         if let Some((pool_uuid, pool_name, pool)) =
             self.liminal_devices.block_evaluate(&self.pools, event)
         {
             self.pools
-                .insert(pool_name.clone(), pool_uuid, Locked::new(pool));
+                .insert(pool_name.clone(), pool_uuid, Lockable::new(pool));
             Some((
                 pool_name,
                 pool_uuid,
@@ -206,7 +206,7 @@ impl Engine for StratEngine {
                         StratPool::initialize(name, blockdev_paths, redundancy, encryption_info)?;
 
                     let name = Name::new(name.to_owned());
-                    self.pools.insert(name, uuid, Locked::new(pool));
+                    self.pools.insert(name, uuid, Lockable::new(pool));
                     Ok(CreateAction::Created(uuid))
                 }
             }
@@ -276,7 +276,7 @@ impl Engine for StratEngine {
         Ok(SetUnlockAction::new(unlocked))
     }
 
-    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, Locked<dyn Pool>)> {
+    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, Lockable<dyn Pool>)> {
         get_pool!(self; uuid)
     }
 
@@ -284,7 +284,7 @@ impl Engine for StratEngine {
         self.liminal_devices.locked_pools()
     }
 
-    fn pools(&self) -> Vec<(Name, PoolUuid, Locked<dyn Pool>)> {
+    fn pools(&self) -> Vec<(Name, PoolUuid, Lockable<dyn Pool>)> {
         self.pools
             .iter()
             .map(|(name, uuid, pool)| (name.clone(), *uuid, pool.clone().into_dyn_pool()))

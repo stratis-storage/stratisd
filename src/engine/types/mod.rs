@@ -138,16 +138,6 @@ impl<'a> TryFrom<&'a str> for UnlockMethod {
     }
 }
 
-/// See Design Doc section 10.2.1 for more details.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum BlockDevState {
-    Missing = 0,
-    Bad = 1,
-    Spare = 2,
-    NotInUse = 3,
-    InUse = 4,
-}
-
 /// Blockdev tier. Used to distinguish between blockdevs used for
 /// data and blockdevs used for a cache.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

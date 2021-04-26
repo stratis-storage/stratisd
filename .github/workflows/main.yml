@@ -260,41 +260,6 @@ jobs:
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
-  # ALLOWED FAILURES
-  allowed_failures:
-    continue-on-error: true
-    strategy:
-      matrix:
-        include:
-          # Allowed because a failure may occur after a new Rust stable
-          # version is released.
-          - task: make -f Makefile clippy
-            toolchain: stable
-            components: clippy
-    runs-on: ubuntu-18.04
-    container:
-      image: fedora:32
-      options: --privileged -v /dev:/dev
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install dependencies
-        run: >
-          dnf install -y
-          clang
-          curl
-          cryptsetup-devel
-          dbus-devel
-          libblkid-devel
-          make
-          systemd-devel
-      - uses: actions-rs/toolchain@v1
-        with:
-          components: ${{ matrix.components }}
-          toolchain: ${{ matrix.toolchain }}
-          override: true
-      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
-        run: ${{ matrix.task }}
-
   python-checks:
     strategy:
       matrix:

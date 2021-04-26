@@ -5,7 +5,6 @@
 use std::{
     collections::HashMap,
     error::Error,
-    ffi::CString,
     fs::OpenOptions,
     io::{self, Read, Write},
     path::Path,
@@ -25,11 +24,7 @@ impl Log for SystemdLogger {
     }
 
     fn log(&self, record: &Record<'_>) {
-        let cstring = match CString::new(record.args().to_string()) {
-            Ok(s) => s,
-            Err(_) => return,
-        };
-        unsafe { systemd::syslog(record.level() as libc::c_int, cstring.as_ptr()) }
+        systemd::syslog(record)
     }
 
     fn flush(&self) {}

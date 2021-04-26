@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #[cfg(feature = "systemd_compat")]
-use std::{ffi::CString, io};
+use std::collections::HashMap;
 use std::{
     fs::{create_dir_all, remove_file},
     future::Future,
@@ -231,13 +231,13 @@ impl StratisServer {
             listener: StratisUnixListener::bind(path)?,
         };
         #[cfg(feature = "systemd_compat")]
-        {
-            let cstring = CString::new("READY=1")?;
-            let ret = unsafe { systemd::sd_notify(0, cstring.as_ptr()) };
-            if ret < 0 {
-                return Err(StratisError::Io(io::Error::from_raw_os_error(-ret)));
-            }
-        }
+        systemd::notify(
+            false,
+            [("READY", "1")]
+                .iter()
+                .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+                .collect::<HashMap<String, String>>(),
+        )?;
         Ok(server)
     }
 

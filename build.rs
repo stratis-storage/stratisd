@@ -23,8 +23,7 @@ fn main() {
     #[cfg(feature = "systemd_compat")]
     {
         let bindings = Builder::default()
-            .header("/usr/include/systemd/sd-daemon.h")
-            .header("/usr/include/systemd/sd-journal.h")
+            .header("systemd-header.h")
             .generate()
             .expect("Could not generate bindings for systemd");
 

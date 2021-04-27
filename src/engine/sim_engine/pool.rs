@@ -3,32 +3,28 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    cell::RefCell,
+    borrow::Cow,
     collections::{hash_map::RandomState, HashMap, HashSet},
     iter::FromIterator,
     path::Path,
-    rc::Rc,
     vec::Vec,
 };
 
 use serde_json::{Map, Value};
-use uuid::Uuid;
 
 use devicemapper::{Sectors, IEC};
 
 use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
-        event::get_engine_listener_list,
         shared::{init_cache_idempotent_or_err, validate_name, validate_paths},
-        sim_engine::{blockdev::SimDev, filesystem::SimFilesystem, randomization::Randomizer},
+        sim_engine::{blockdev::SimDev, filesystem::SimFilesystem},
         structures::Table,
         types::{
-            BlockDevTier, CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid,
-            MaybeDbusPath, Name, PoolUuid, Redundancy, RenameAction, SetCreateAction,
-            SetDeleteAction,
+            BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo,
+            FilesystemUuid, Key, KeyDescription, Name, PoolUuid, Redundancy, RenameAction,
+            SetCreateAction, SetDeleteAction,
         },
-        EngineEvent,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -37,32 +33,27 @@ use crate::{
 pub struct SimPool {
     block_devs: HashMap<DevUuid, SimDev>,
     cache_devs: HashMap<DevUuid, SimDev>,
-    filesystems: Table<SimFilesystem>,
+    filesystems: Table<FilesystemUuid, SimFilesystem>,
     redundancy: Redundancy,
-    rdm: Rc<RefCell<Randomizer>>,
-    dbus_path: MaybeDbusPath,
 }
 
 impl SimPool {
     pub fn new(
-        rdm: &Rc<RefCell<Randomizer>>,
         paths: &[&Path],
         redundancy: Redundancy,
-        enc_info: Option<EncryptionInfo>,
+        enc_info: &EncryptionInfo,
     ) -> (PoolUuid, SimPool) {
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
         let device_pairs = devices
             .iter()
-            .map(|p| SimDev::new(Rc::clone(rdm), p, enc_info.as_ref()));
+            .map(|p| SimDev::new(p, Cow::Borrowed(enc_info)));
         (
-            Uuid::new_v4(),
+            PoolUuid::new_v4(),
             SimPool {
-                block_devs: HashMap::from_iter(device_pairs),
+                block_devs: device_pairs.collect(),
                 cache_devs: HashMap::new(),
                 filesystems: Table::default(),
                 redundancy,
-                rdm: Rc::clone(rdm),
-                dbus_path: MaybeDbusPath(None),
             },
         )
     }
@@ -84,30 +75,43 @@ impl SimPool {
     }
 
     fn datadevs_encrypted(&self) -> bool {
-        self.encryption_info().is_some()
+        self.encryption_info().is_encrypted()
     }
 
     pub fn destroy(&mut self) -> StratisResult<()> {
         Ok(())
     }
 
-    fn encryption_info_impl(&self) -> Option<&EncryptionInfo> {
+    fn encryption_info_impl(&self) -> &EncryptionInfo {
         self.block_devs
             .iter()
             .next()
-            .and_then(|(_, bd)| bd.encryption_info())
+            .map(|(_, bd)| bd.encryption_info())
+            .expect("Pool must contain at least one blockdev")
     }
 
-    fn add_clevis_info(&mut self, pin: String, config: Value) {
+    fn add_clevis_info(&mut self, pin: &str, config: &Value) {
         self.block_devs
             .iter_mut()
-            .for_each(|(_, bd)| bd.set_clevis_info(pin.clone(), config.clone()))
+            .for_each(|(_, bd)| bd.set_clevis_info(pin, config))
     }
 
     fn clear_clevis_info(&mut self) {
         self.block_devs
             .iter_mut()
             .for_each(|(_, bd)| bd.unset_clevis_info())
+    }
+
+    fn add_key_desc(&mut self, key_desc: &KeyDescription) {
+        self.block_devs
+            .iter_mut()
+            .for_each(|(_, bd)| bd.set_key_desc(key_desc))
+    }
+
+    fn clear_key_desc(&mut self) {
+        self.block_devs
+            .iter_mut()
+            .for_each(|(_, bd)| bd.unset_key_desc())
     }
 }
 
@@ -119,7 +123,7 @@ impl<'a> Into<Value> for &'a SimPool {
                 self.filesystems.iter()
                     .map(|(name, uuid, _)| json!({
                         "name": name.to_string(),
-                        "uuid": uuid.to_simple_ref().to_string(),
+                        "uuid": uuid.to_string(),
                     }))
                     .collect()
             ),
@@ -128,7 +132,7 @@ impl<'a> Into<Value> for &'a SimPool {
                     self.block_devs.iter()
                         .map(|(uuid, dev)| {
                             let mut json = Map::new();
-                            json.insert("uuid".to_string(), Value::from(uuid.to_simple_ref().to_string()));
+                            json.insert("uuid".to_string(), Value::from(uuid.to_string()));
                             if let Value::Object(map) = dev.into() {
                                 json.extend(map.into_iter());
                             } else {
@@ -142,7 +146,7 @@ impl<'a> Into<Value> for &'a SimPool {
                     self.cache_devs.iter()
                         .map(|(uuid, dev)| {
                             let mut json = Map::new();
-                            json.insert("uuid".to_string(), Value::from(uuid.to_simple_ref().to_string()));
+                            json.insert("uuid".to_string(), Value::from(uuid.to_string()));
                             if let Value::Object(map) = dev.into() {
                                 json.extend(map.into_iter());
                             } else {
@@ -181,7 +185,7 @@ impl Pool for SimPool {
             }
             let blockdev_pairs: Vec<_> = blockdevs
                 .iter()
-                .map(|p| SimDev::new(Rc::clone(&self.rdm), p, None))
+                .map(|p| SimDev::new(p, Cow::Owned(EncryptionInfo::default())))
                 .collect();
             let blockdev_uuids: Vec<_> = blockdev_pairs.iter().map(|(uuid, _)| *uuid).collect();
             self.cache_devs.extend(blockdev_pairs);
@@ -191,17 +195,18 @@ impl Pool for SimPool {
                 blockdevs,
                 self.cache_devs
                     .iter()
-                    .map(|(_, bd)| bd.devnode().physical_path().to_owned()),
+                    .map(|(_, bd)| bd.devnode().to_owned()),
             )
         }
     }
 
     fn create_filesystems<'a, 'b>(
         &'a mut self,
+        _pool_name: &str,
         _pool_uuid: PoolUuid,
         specs: &[(&'b str, Option<Sectors>)],
     ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid)>> {
-        let names: HashMap<_, _> = HashMap::from_iter(specs.iter().map(|&tup| (tup.0, tup.1)));
+        let names: HashMap<_, _> = specs.iter().map(|&tup| (tup.0, tup.1)).collect();
 
         names.iter().fold(Ok(()), |res, (name, _)| {
             res.and_then(|()| validate_name(name))
@@ -210,7 +215,7 @@ impl Pool for SimPool {
         let mut result = Vec::new();
         for name in names.keys() {
             if !self.filesystems.contains_name(name) {
-                let uuid = Uuid::new_v4();
+                let uuid = FilesystemUuid::new_v4();
                 let new_filesystem = SimFilesystem::new();
                 self.filesystems
                     .insert(Name::new((&**name).to_owned()), uuid, new_filesystem);
@@ -248,11 +253,10 @@ impl Pool for SimPool {
             .iter()
             .map(|p| {
                 SimDev::new(
-                    Rc::clone(&self.rdm),
                     p,
                     match tier {
                         BlockDevTier::Data => self.encryption_info(),
-                        BlockDevTier::Cache => None,
+                        BlockDevTier::Cache => Cow::Owned(EncryptionInfo::default()),
                     },
                 )
             })
@@ -263,13 +267,10 @@ impl Pool for SimPool {
             BlockDevTier::Data => &mut self.block_devs,
         };
 
-        let filter: Vec<_> = the_vec
-            .values()
-            .map(|d| d.devnode().physical_path())
-            .collect();
+        let filter: Vec<_> = the_vec.values().map(|d| d.devnode()).collect();
         let filtered_device_pairs: Vec<_> = device_pairs
             .into_iter()
-            .filter(|(_, sd)| !filter.contains(&sd.devnode().physical_path()))
+            .filter(|(_, sd)| !filter.contains(&sd.devnode()))
             .collect();
 
         let ret_uuids = filtered_device_pairs
@@ -280,24 +281,27 @@ impl Pool for SimPool {
         Ok(SetCreateAction::new(ret_uuids))
     }
 
-    fn bind_clevis(&mut self, pin: String, clevis_info: Value) -> StratisResult<CreateAction<()>> {
+    fn bind_clevis(
+        &mut self,
+        pin: &str,
+        clevis_info: &Value,
+    ) -> StratisResult<CreateAction<Clevis>> {
         let encryption_info = self.encryption_info();
-        let clevis_info_current = encryption_info.and_then(|info| info.clevis_info.as_ref());
-        if encryption_info.is_some() {
-            if let Some(info) = clevis_info_current {
-                let clevis_tuple = (pin, clevis_info);
-                if info == &clevis_tuple {
+        let clevis_info_current = encryption_info.clevis_info.as_ref();
+        if self.is_encrypted() {
+            if let Some((current_pin, current_info)) = clevis_info_current {
+                if (current_pin.as_str(), current_info) == (pin, clevis_info) {
                     Ok(CreateAction::Identity)
                 } else {
                     Err(StratisError::Error(format!(
-                        "This pool is already bound with clevis pin and config {:?};
-                        this differs from the requested pin and config {:?}",
-                        info, clevis_tuple,
+                        "This pool is already bound with clevis pin {} and config {};
+                        this differs from the requested pin {} and config {}",
+                        current_pin, current_info, pin, clevis_info,
                     )))
                 }
             } else {
                 self.add_clevis_info(pin, clevis_info);
-                Ok(CreateAction::Created(()))
+                Ok(CreateAction::Created(Clevis))
             }
         } else {
             Err(StratisError::Error(
@@ -306,13 +310,74 @@ impl Pool for SimPool {
         }
     }
 
-    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<()>> {
+    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<Clevis>> {
         let encryption_info = self.encryption_info();
-        let clevis_info = encryption_info.and_then(|info| info.clevis_info.as_ref());
-        if encryption_info.is_some() {
-            Ok(if clevis_info.is_some() {
+
+        if encryption_info.key_description.is_none() {
+            return Err(StratisError::Error(
+                "This device is not bound to a keyring passphrase; refusing to remove \
+                the only unlocking method"
+                    .to_string(),
+            ));
+        }
+
+        if encryption_info.is_encrypted() {
+            Ok(if encryption_info.clevis_info.is_some() {
                 self.clear_clevis_info();
-                DeleteAction::Deleted(())
+                DeleteAction::Deleted(Clevis)
+            } else {
+                DeleteAction::Identity
+            })
+        } else {
+            Err(StratisError::Error(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ))
+        }
+    }
+
+    fn bind_keyring(
+        &mut self,
+        key_description: &KeyDescription,
+    ) -> StratisResult<CreateAction<Key>> {
+        let encryption_info = self.encryption_info();
+        if encryption_info.is_encrypted() {
+            if let Some(ref kd) = encryption_info.key_description {
+                if key_description == kd {
+                    Ok(CreateAction::Identity)
+                } else {
+                    Err(StratisError::Error(format!(
+                        "This pool is already bound with key description {};
+                        this differs from the requested key description {}",
+                        kd.as_application_str(),
+                        key_description.as_application_str(),
+                    )))
+                }
+            } else {
+                self.add_key_desc(key_description);
+                Ok(CreateAction::Created(Key))
+            }
+        } else {
+            Err(StratisError::Error(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ))
+        }
+    }
+
+    fn unbind_keyring(&mut self) -> StratisResult<DeleteAction<Key>> {
+        let encryption_info = self.encryption_info();
+
+        if encryption_info.clevis_info.is_none() {
+            return Err(StratisError::Error(
+                "This device is not bound to Clevis; refusing to remove the only \
+                unlocking method"
+                    .to_string(),
+            ));
+        }
+
+        if self.is_encrypted() {
+            Ok(if encryption_info.key_description.is_some() {
+                self.clear_key_desc();
+                DeleteAction::Deleted(Key)
             } else {
                 DeleteAction::Identity
             })
@@ -345,18 +410,12 @@ impl Pool for SimPool {
     ) -> StratisResult<RenameAction<FilesystemUuid>> {
         validate_name(new_name)?;
 
-        let old_name = rename_filesystem_pre_idem!(self; uuid; new_name);
+        rename_filesystem_pre_idem!(self; uuid; new_name);
 
         let (_, filesystem) = self
             .filesystems
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.filesystems.get_by_uuid() returned a value");
-
-        get_engine_listener_list().notify(&EngineEvent::FilesystemRenamed {
-            dbus_path: filesystem.get_dbus_path(),
-            from: &*old_name,
-            to: &*new_name,
-        });
 
         self.filesystems
             .insert(Name::new(new_name.to_owned()), uuid, filesystem);
@@ -366,6 +425,7 @@ impl Pool for SimPool {
 
     fn snapshot_filesystem(
         &mut self,
+        _pool_name: &str,
         _pool_uuid: PoolUuid,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
@@ -376,7 +436,7 @@ impl Pool for SimPool {
             return Ok(CreateAction::Identity);
         }
 
-        let uuid = Uuid::new_v4();
+        let uuid = FilesystemUuid::new_v4();
         let snapshot = match self.get_filesystem(origin_uuid) {
             Some(_filesystem) => SimFilesystem::new(),
             None => {
@@ -431,6 +491,21 @@ impl Pool for SimPool {
         self.filesystems
             .get_mut_by_uuid(uuid)
             .map(|(name, p)| (name, p as &mut dyn Filesystem))
+    }
+
+    fn get_filesystem_by_name(&self, name: &Name) -> Option<(FilesystemUuid, &dyn Filesystem)> {
+        self.filesystems
+            .get_by_name(name)
+            .map(|(uuid, p)| (uuid, p as &dyn Filesystem))
+    }
+
+    fn get_mut_filesystem_by_name(
+        &mut self,
+        name: &Name,
+    ) -> Option<(FilesystemUuid, &mut dyn Filesystem)> {
+        self.filesystems
+            .get_mut_by_name(name)
+            .map(|(uuid, p)| (uuid, p as &mut dyn Filesystem))
     }
 
     fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &dyn BlockDev)> {
@@ -493,14 +568,6 @@ impl Pool for SimPool {
         ))
     }
 
-    fn set_dbus_path(&mut self, path: MaybeDbusPath) {
-        self.dbus_path = path
-    }
-
-    fn get_dbus_path(&self) -> &MaybeDbusPath {
-        &self.dbus_path
-    }
-
     fn has_cache(&self) -> bool {
         !self.cache_devs.is_empty()
     }
@@ -509,8 +576,8 @@ impl Pool for SimPool {
         self.datadevs_encrypted()
     }
 
-    fn encryption_info(&self) -> Option<&EncryptionInfo> {
-        self.encryption_info_impl()
+    fn encryption_info(&self) -> Cow<EncryptionInfo> {
+        Cow::Borrowed(self.encryption_info_impl())
     }
 }
 
@@ -518,8 +585,6 @@ impl Pool for SimPool {
 mod tests {
 
     use std::path::Path;
-
-    use uuid::Uuid;
 
     use crate::engine::Engine;
 
@@ -539,14 +604,14 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         assert_matches!(
-            pool.rename_filesystem(pool_name, Uuid::new_v4(), "new_name"),
+            pool.rename_filesystem(pool_name, FilesystemUuid::new_v4(), "new_name"),
             Ok(RenameAction::NoSource)
         );
     }
@@ -561,14 +626,14 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         let infos = pool
-            .create_filesystems(uuid, &[("old_name", None)])
+            .create_filesystems(pool_name, uuid, &[("old_name", None)])
             .unwrap()
             .changed()
             .unwrap();
@@ -591,14 +656,14 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         let results = pool
-            .create_filesystems(uuid, &[(old_name, None), (new_name, None)])
+            .create_filesystems(pool_name, uuid, &[(old_name, None), (new_name, None)])
             .unwrap()
             .changed()
             .unwrap();
@@ -620,14 +685,14 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         assert_matches!(
-            pool.rename_filesystem(pool_name, Uuid::new_v4(), new_name),
+            pool.rename_filesystem(pool_name, FilesystemUuid::new_v4(), new_name),
             Ok(RenameAction::NoSource)
         );
     }
@@ -642,7 +707,7 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
@@ -664,14 +729,14 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         assert_matches!(
-            pool.destroy_filesystems(pool_name, &[Uuid::new_v4()]),
+            pool.destroy_filesystems(pool_name, &[FilesystemUuid::new_v4()]),
             Ok(_)
         );
     }
@@ -686,14 +751,14 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         let fs_results = pool
-            .create_filesystems(uuid, &[("fs_name", None)])
+            .create_filesystems(pool_name, uuid, &[("fs_name", None)])
             .unwrap()
             .changed()
             .unwrap();
@@ -714,13 +779,13 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
-        let fs = pool.create_filesystems(uuid, &[]).unwrap();
+        let fs = pool.create_filesystems(pool_name, uuid, &[]).unwrap();
         assert!(!fs.is_changed())
     }
 
@@ -734,14 +799,14 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         assert!(match pool
-            .create_filesystems(uuid, &[("name", None)])
+            .create_filesystems(pool_name, uuid, &[("name", None)])
             .ok()
             .and_then(|fs| fs.changed())
         {
@@ -761,14 +826,17 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
-        pool.create_filesystems(uuid, &[(fs_name, None)]).unwrap();
-        let set_create_action = pool.create_filesystems(uuid, &[(fs_name, None)]).unwrap();
+        pool.create_filesystems(pool_name, uuid, &[(fs_name, None)])
+            .unwrap();
+        let set_create_action = pool
+            .create_filesystems(pool_name, uuid, &[(fs_name, None)])
+            .unwrap();
         assert!(!set_create_action.is_changed());
     }
 
@@ -783,14 +851,14 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
             .unwrap();
         let pool = engine.get_mut_pool(uuid).unwrap().1;
         assert!(match pool
-            .create_filesystems(uuid, &[(fs_name, None), (fs_name, None)])
+            .create_filesystems(pool_name, uuid, &[(fs_name, None), (fs_name, None)])
             .ok()
             .and_then(|fs| fs.changed())
         {
@@ -808,7 +876,7 @@ mod tests {
                 "pool_name",
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()

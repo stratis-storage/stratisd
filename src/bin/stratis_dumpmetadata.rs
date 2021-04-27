@@ -10,9 +10,25 @@ use std::{
     vec::Vec,
 };
 
+use env_logger::Builder;
+
 use serde_json::Value;
 
 use libstratis::engine::BDA;
+
+/// Configure and initialize the logger.
+/// Read log configuration parameters from the environment if RUST_LOG
+/// is set. Otherwise, just accept the default configuration, which is
+/// to log at the severity of error only.
+fn initialize_log() {
+    let mut builder = Builder::new();
+
+    if let Ok(s) = env::var("RUST_LOG") {
+        builder.parse_filters(&s);
+    }
+
+    builder.init()
+}
 
 fn run(devpath: &str) -> Result<(), String> {
     let mut devfile = OpenOptions::new()
@@ -54,6 +70,8 @@ fn main() {
         process::exit(2);
     }
     let devpath = &args[1];
+
+    initialize_log();
 
     match run(devpath) {
         Ok(()) => {}

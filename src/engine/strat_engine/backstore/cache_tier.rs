@@ -227,11 +227,12 @@ impl Recordable<CacheTierSave> for CacheTier {
 #[cfg(test)]
 mod tests {
 
-    use uuid::Uuid;
-
-    use crate::engine::strat_engine::{
-        metadata::MDADataSize,
-        tests::{loopbacked, real},
+    use crate::engine::{
+        strat_engine::{
+            metadata::MDADataSize,
+            tests::{loopbacked, real},
+        },
+        types::EncryptionInfo,
     };
 
     use super::*;
@@ -244,9 +245,15 @@ mod tests {
 
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
-        let pool_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
 
-        let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MDADataSize::default(), None).unwrap();
+        let mgr = BlockDevMgr::initialize(
+            pool_uuid,
+            paths1,
+            MDADataSize::default(),
+            &EncryptionInfo::default(),
+        )
+        .unwrap();
 
         let mut cache_tier = CacheTier::new(mgr).unwrap();
 
@@ -298,10 +305,5 @@ mod tests {
     #[test]
     fn real_cache_test_add() {
         real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), cache_test_add);
-    }
-
-    #[test]
-    fn travis_cache_test_add() {
-        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(2, 3, None), cache_test_add);
     }
 }

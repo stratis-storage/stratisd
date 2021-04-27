@@ -1,0 +1,8 @@
+#!/usr/bin/sh
+
+make fmt-travis && make build && make build-extras && make build-min && make test && make clippy && make yamllint || exit 1
+
+export PYTHONPATH=$PWD/tests/client-dbus/src
+
+cd tests/client-dbus && make fmt-travis && make lint || exit 1
+cd ../../code_maintenance && make fmt-travis && make lint || exit 1

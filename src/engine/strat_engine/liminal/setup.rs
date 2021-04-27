@@ -17,13 +17,13 @@ use devicemapper::Sectors;
 use crate::{
     engine::{
         strat_engine::{
-            backstore::StratBlockDev,
+            backstore::{CryptHandle, StratBlockDev},
             device::blkdev_size,
             liminal::device_info::LStratisInfo,
             metadata::BDA,
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
         },
-        types::{BlockDevPath, BlockDevTier, DevUuid},
+        types::{BlockDevTier, DevUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -38,9 +38,18 @@ use crate::{
 /// is returned.
 pub fn get_bdas(infos: &HashMap<DevUuid, &LStratisInfo>) -> StratisResult<HashMap<DevUuid, BDA>> {
     fn read_bda(info: &LStratisInfo) -> StratisResult<BDA> {
-        BDA::load(&mut OpenOptions::new().read(true).open(&info.ids.devnode)?)?.ok_or_else(|| {
-            StratisError::Error(format!("Failed to read BDA from device: {}", info.ids))
-        })
+        OpenOptions::new()
+            .read(true)
+            .open(&info.ids.devnode)
+            .map_err(StratisError::from)
+            .and_then(|mut f| BDA::load(&mut f))
+            .and_then(|res| res.ok_or_else(|| StratisError::Error("No BDA found".to_string())))
+            .map_err(|e| {
+                StratisError::Error(format!(
+                    "Failed to read BDA from device {}: {}",
+                    info.ids, e
+                ))
+            })
     }
 
     infos
@@ -218,24 +227,21 @@ pub fn get_blockdevs(
         // conclusion is metadata corruption.
         let segments = segment_table.get(&dev_uuid);
 
-        let (path, encryption_info) = match &info.luks {
-            Some(luks) => (
-                BlockDevPath::mapped_device_path(&luks.ids.devnode, &info.ids.devnode)?,
-                Some(&luks.encryption_info),
-            ),
-            None => (BlockDevPath::physical_device_path(&info.ids.devnode), None),
+        let physical_path = match &info.luks {
+            Some(luks) => &luks.ids.devnode,
+            None => &info.ids.devnode,
         };
-
+        let handle = CryptHandle::setup(physical_path)?;
         Ok((
             tier,
             StratBlockDev::new(
                 info.ids.device_number,
-                path,
+                physical_path,
                 bda,
                 segments.unwrap_or(&vec![]),
                 bd_save.user_info.clone(),
                 bd_save.hardware_info.clone(),
-                encryption_info.cloned(),
+                handle,
             )?,
         ))
     }
@@ -278,7 +284,7 @@ pub fn get_blockdevs(
         if !duplicate_uuids.is_empty() {
             let err_msg = format!(
                 "The following list of Stratis UUIDs were each claimed by more than one Stratis device: {}",
-                duplicate_uuids.iter().map(|u| u.to_simple_ref().to_string()).collect::<Vec<_>>().join(", ")
+                duplicate_uuids.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(", ")
             );
             return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
         }
@@ -287,8 +293,8 @@ pub fn get_blockdevs(
         if uuids != recorded_uuids {
             let err_msg = format!(
                 "UUIDs of devices found ({}) did not correspond with UUIDs specified in the metadata for this group of devices ({})",
-                uuids.iter().map(|u| u.to_simple_ref().to_string()).collect::<Vec<_>>().join(", "),
-                recorded_uuids.iter().map(|u| u.to_simple_ref().to_string()).collect::<Vec<_>>().join(", "),
+                uuids.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(", "),
+                recorded_uuids.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(", "),
             );
             return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
         }

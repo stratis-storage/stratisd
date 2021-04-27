@@ -1,0 +1,85 @@
+#!/usr/bin/python3
+#
+# Copyright 2020 Red Hat, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""
+Verify that the lower bounds set on dependencies in Cargo.toml are not
+incorrect by being too low.
+"""
+
+
+# isort: STDLIB
+import argparse
+import subprocess
+import sys
+
+# isort: LOCAL
+from _utils import build_cargo_metadata, build_cargo_tree_dict
+
+
+def _do_updates(explicit_dependencies, cargo_tree):
+    """
+    Emit commands that update dependencies to the lowest allowed by Cargo.toml.
+    """
+    assert frozenset(explicit_dependencies.keys()) == frozenset(
+        cargo_tree.keys()
+    ), "in Cargo.toml but not in 'cargo tree' output: %s, vice-versa: %s" % (
+        frozenset(explicit_dependencies.keys()) - frozenset(cargo_tree.keys()),
+        frozenset(cargo_tree.keys()) - frozenset(explicit_dependencies.keys()),
+    )
+
+    update_failed = False
+    for (crate, version) in explicit_dependencies.items():
+        current_version = cargo_tree[crate]
+        try:
+            subprocess.run(
+                [
+                    "cargo",
+                    "update",
+                    "-p",
+                    "%s:%s" % (crate, current_version),
+                    "--precise=%s" % version,
+                ],
+                check=True,
+            )
+        except subprocess.CalledProcessError as err:
+            update_failed = True
+            print(err, file=sys.stderr)
+
+    return "Failed to set the versions of some crates" if update_failed else None
+
+
+def main():
+    """
+    The main method
+    """
+    parser = argparse.ArgumentParser(
+        description=(
+            "Lowers all dependencies in Cargo.lock to the versions specified "
+            "in Cargo.toml."
+        )
+    )
+    parser.parse_args()
+
+    # Read the dependency versions specified in Cargo.toml
+    explicit_dependencies = build_cargo_metadata()
+
+    # Read the dependency versions specified in Cargo.lock from Cargo.toml
+    current_dependencies = build_cargo_tree_dict()
+
+    return _do_updates(explicit_dependencies, current_dependencies)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

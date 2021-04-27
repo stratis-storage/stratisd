@@ -19,6 +19,7 @@ tests/test_config.json
 # python files
 *.pyc
 *.egg-info
+__pycache__
 
 # working directories
 .cache

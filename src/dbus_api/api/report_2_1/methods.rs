@@ -4,10 +4,8 @@
 
 use std::convert::TryFrom;
 
-use dbus::{
-    tree::{MTFn, MethodInfo, MethodResult},
-    Message,
-};
+use dbus::Message;
+use dbus_tree::{MTSync, MethodInfo, MethodResult};
 
 use crate::{
     dbus_api::{
@@ -17,7 +15,7 @@ use crate::{
     engine::ReportType,
 };
 
-pub fn get_report(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn get_report(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
     let report_name: &str = get_next_arg(&mut iter, 0)?;
@@ -34,9 +32,9 @@ pub fn get_report(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     };
 
     let dbus_context = m.tree.get_data();
-    let engine = dbus_context.engine.borrow();
+    let mutex_lock = mutex_lock!(dbus_context.engine);
 
-    let msg = match serde_json::to_string(&engine.get_report(report_type)) {
+    let msg = match serde_json::to_string(&mutex_lock.get_report(report_type)) {
         Ok(string) => return_message.append3(string, msg_code_ok(), msg_string_ok()),
         Err(e) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e.into());

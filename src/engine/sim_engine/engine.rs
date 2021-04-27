@@ -3,35 +3,30 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    cell::RefCell,
     collections::{hash_map::RandomState, HashMap, HashSet},
     iter::FromIterator,
     path::Path,
-    rc::Rc,
 };
 
 use serde_json::{json, Value};
 
 use crate::{
     engine::{
-        engine::{Engine, Eventable, KeyActions, Pool, Report},
-        event::get_engine_listener_list,
+        engine::{Engine, KeyActions, Pool, Report},
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
-        sim_engine::{keys::SimKeyActions, pool::SimPool, randomization::Randomizer},
+        sim_engine::{keys::SimKeyActions, pool::SimPool},
         structures::Table,
         types::{
-            CreateAction, DeleteAction, DevUuid, EncryptionInfo, KeyDescription, Name, PoolUuid,
-            RenameAction, ReportType, SetUnlockAction, UnlockMethod,
+            CreateAction, DeleteAction, DevUuid, EncryptionInfo, LockedPoolInfo, Name, PoolUuid,
+            RenameAction, ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
         },
-        EngineEvent,
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
 
 #[derive(Debug, Default)]
 pub struct SimEngine {
-    pools: Table<SimPool>,
-    rdm: Rc<RefCell<Randomizer>>,
+    pools: Table<PoolUuid, SimPool>,
     key_handler: SimKeyActions,
 }
 
@@ -43,7 +38,7 @@ impl<'a> Into<Value> for &'a SimEngine {
             "pools": Value::Array(
                 self.pools.iter().map(|(name, uuid, pool)| {
                     let json = json!({
-                        "pool_uuid": uuid.to_simple_ref().to_string(),
+                        "pool_uuid": uuid.to_string(),
                         "name": name.to_string(),
                     });
                     let pool_json = pool.into();
@@ -63,13 +58,16 @@ impl<'a> Into<Value> for &'a SimEngine {
 }
 
 impl Report for SimEngine {
+    fn engine_state_report(&self) -> Value {
+        self.into()
+    }
+
     fn get_report(&self, report_type: ReportType) -> Value {
         match report_type {
             ReportType::ErroredPoolDevices => json!({
                 "errored_pools": json!([]),
                 "hopeless_devices": json!([]),
             }),
-            ReportType::EngineState => self.into(),
         }
     }
 }
@@ -80,7 +78,7 @@ impl Engine for SimEngine {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
-        key_desc: Option<KeyDescription>,
+        encryption_info: &EncryptionInfo,
     ) -> StratisResult<CreateAction<PoolUuid>> {
         let redundancy = calculate_redundancy!(redundancy);
 
@@ -88,7 +86,7 @@ impl Engine for SimEngine {
 
         validate_paths(blockdev_paths)?;
 
-        if let Some(ref key_desc) = key_desc {
+        if let Some(ref key_desc) = encryption_info.key_description {
             if !self.key_handler.contains_key(key_desc) {
                 return Err(StratisError::Engine(
                     ErrorEnum::NotFound,
@@ -112,19 +110,7 @@ impl Engine for SimEngine {
                     let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
                     let devices = device_set.into_iter().cloned().collect::<Vec<&Path>>();
 
-                    let (pool_uuid, pool) = SimPool::new(
-                        &Rc::clone(&self.rdm),
-                        &devices,
-                        redundancy,
-                        key_desc.map(|kd| EncryptionInfo {
-                            key_description: kd,
-                            clevis_info: None,
-                        }),
-                    );
-
-                    if self.rdm.borrow_mut().throw_die() {
-                        return Err(StratisError::Engine(ErrorEnum::Error, "X".into()));
-                    }
+                    let (pool_uuid, pool) = SimPool::new(&devices, redundancy, encryption_info);
 
                     self.pools
                         .insert(Name::new(name.to_owned()), pool_uuid, pool);
@@ -135,7 +121,7 @@ impl Engine for SimEngine {
         }
     }
 
-    fn handle_event(&mut self, _event: &libudev::Event) -> Option<(Name, PoolUuid, &mut dyn Pool)> {
+    fn handle_event(&mut self, _event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &dyn Pool)> {
         None
     }
 
@@ -163,18 +149,12 @@ impl Engine for SimEngine {
         uuid: PoolUuid,
         new_name: &str,
     ) -> StratisResult<RenameAction<PoolUuid>> {
-        let old_name = rename_pool_pre_idem!(self; uuid; new_name);
+        rename_pool_pre_idem!(self; uuid; new_name);
 
         let (_, pool) = self
             .pools
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
-
-        get_engine_listener_list().notify(&EngineEvent::PoolRenamed {
-            dbus_path: pool.get_dbus_path(),
-            from: &*old_name,
-            to: &*new_name,
-        });
 
         self.pools
             .insert(Name::new(new_name.to_owned()), uuid, pool);
@@ -197,14 +177,8 @@ impl Engine for SimEngine {
         get_mut_pool!(self; uuid)
     }
 
-    fn locked_pools(&self) -> HashMap<PoolUuid, EncryptionInfo> {
+    fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo> {
         HashMap::new()
-    }
-
-    /// Set properties of the simulator
-    fn configure_simulator(&mut self, denominator: u32) -> StratisResult<()> {
-        self.rdm.borrow_mut().set_probability(denominator);
-        Ok(())
     }
 
     fn pools(&self) -> Vec<(Name, PoolUuid, &dyn Pool)> {
@@ -221,10 +195,6 @@ impl Engine for SimEngine {
             .collect()
     }
 
-    fn get_eventable(&self) -> Option<&'static dyn Eventable> {
-        None
-    }
-
     fn evented(&mut self) -> StratisResult<()> {
         Ok(())
     }
@@ -236,15 +206,16 @@ impl Engine for SimEngine {
     fn get_key_handler_mut(&mut self) -> &mut dyn KeyActions {
         &mut self.key_handler as &mut dyn KeyActions
     }
+
+    fn is_sim(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(test)]
 mod tests {
 
     use std::{self, path::Path};
-
-    use proptest::prelude::any;
-    use uuid::Uuid;
 
     use crate::{
         engine::{
@@ -256,27 +227,16 @@ mod tests {
 
     use super::*;
 
-    proptest! {
-        #[test]
-        /// This method should always return Ok.
-        fn configure_simulator_runs(denominator in any::<u32>()) {
-            prop_assert!(SimEngine::default()
-                .configure_simulator(denominator)
-                .is_ok())
-        }
-
-    }
-
     #[test]
     /// When an engine has no pools, any name lookup should fail
     fn get_pool_err() {
-        assert_matches!(SimEngine::default().get_pool(Uuid::new_v4()), None);
+        assert_matches!(SimEngine::default().get_pool(PoolUuid::new_v4()), None);
     }
 
     #[test]
     /// When an engine has no pools, destroying any pool must succeed
     fn destroy_pool_empty() {
-        assert_matches!(SimEngine::default().destroy_pool(Uuid::new_v4()), Ok(_));
+        assert_matches!(SimEngine::default().destroy_pool(PoolUuid::new_v4()), Ok(_));
     }
 
     #[test]
@@ -288,7 +248,7 @@ mod tests {
                 "name",
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
@@ -301,7 +261,12 @@ mod tests {
     fn destroy_pool_w_devices() {
         let mut engine = SimEngine::default();
         let uuid = engine
-            .create_pool("name", strs_to_paths!(["/s/d"]), None, None)
+            .create_pool(
+                "name",
+                strs_to_paths!(["/s/d"]),
+                None,
+                &EncryptionInfo::default(),
+            )
             .unwrap()
             .changed()
             .unwrap();
@@ -314,13 +279,19 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, strs_to_paths!(["/s/d"]), None, None)
+            .create_pool(
+                pool_name,
+                strs_to_paths!(["/s/d"]),
+                None,
+                &EncryptionInfo::default(),
+            )
             .unwrap()
             .changed()
             .unwrap();
         {
             let pool = engine.get_mut_pool(uuid).unwrap().1;
-            pool.create_filesystems(uuid, &[("test", None)]).unwrap();
+            pool.create_filesystems(pool_name, uuid, &[("test", None)])
+                .unwrap();
         }
         assert_matches!(engine.destroy_pool(uuid), Err(_));
     }
@@ -332,9 +303,11 @@ mod tests {
         let name = "name";
         let mut engine = SimEngine::default();
         let devices = strs_to_paths!(["/s/d"]);
-        engine.create_pool(name, devices, None, None).unwrap();
+        engine
+            .create_pool(name, devices, None, &EncryptionInfo::default())
+            .unwrap();
         assert_matches!(
-            engine.create_pool(name, devices, None, None),
+            engine.create_pool(name, devices, None, &EncryptionInfo::default()),
             Ok(CreateAction::Identity)
         );
     }
@@ -345,14 +318,19 @@ mod tests {
         let name = "name";
         let mut engine = SimEngine::default();
         engine
-            .create_pool(name, strs_to_paths!(["/s/d"]), None, None)
+            .create_pool(
+                name,
+                strs_to_paths!(["/s/d"]),
+                None,
+                &EncryptionInfo::default(),
+            )
             .unwrap();
         assert_matches!(
             engine.create_pool(
                 name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             ),
             Err(StratisError::Engine(ErrorEnum::Invalid, _))
         );
@@ -365,7 +343,12 @@ mod tests {
         let mut engine = SimEngine::default();
         assert_matches!(
             engine
-                .create_pool("name", strs_to_paths!([path, path]), None, None)
+                .create_pool(
+                    "name",
+                    strs_to_paths!([path, path]),
+                    None,
+                    &EncryptionInfo::default()
+                )
                 .unwrap()
                 .changed()
                 .map(|uuid| engine.get_pool(uuid).unwrap().1.blockdevs().len()),
@@ -382,7 +365,7 @@ mod tests {
                 "name",
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 Some(std::u16::MAX),
-                None,
+                &EncryptionInfo::default(),
             ),
             Err(_)
         );
@@ -393,7 +376,7 @@ mod tests {
     fn rename_empty() {
         let mut engine = SimEngine::default();
         assert_matches!(
-            engine.rename_pool(Uuid::new_v4(), "new_name"),
+            engine.rename_pool(PoolUuid::new_v4(), "new_name"),
             Ok(RenameAction::NoSource)
         );
     }
@@ -408,7 +391,7 @@ mod tests {
                 name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
@@ -428,7 +411,7 @@ mod tests {
                 "old_name",
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
@@ -449,7 +432,7 @@ mod tests {
                 "old_name",
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap()
             .changed()
@@ -459,7 +442,7 @@ mod tests {
                 new_name,
                 strs_to_paths!(["/dev/four", "/dev/five", "/dev/six"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap();
         assert_matches!(
@@ -478,11 +461,11 @@ mod tests {
                 new_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
+                &EncryptionInfo::default(),
             )
             .unwrap();
         assert_matches!(
-            engine.rename_pool(Uuid::new_v4(), new_name),
+            engine.rename_pool(PoolUuid::new_v4(), new_name),
             Ok(RenameAction::NoSource)
         );
     }

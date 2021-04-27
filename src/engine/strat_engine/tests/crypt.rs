@@ -48,10 +48,9 @@ where
 /// Insert and clean up a single key for the lifetime of the test.
 pub fn insert_and_cleanup_key<F>(physical_paths: &[&Path], test: F)
 where
-    F: Fn(&[&Path], &KeyDescription, Option<()>) -> std::result::Result<(), Box<dyn Error>>,
+    F: Fn(&[&Path], &KeyDescription, ()) -> std::result::Result<(), Box<dyn Error>>,
 {
-    insert_and_cleanup_key_shared::<F, Option<()>, ()>(physical_paths, test, Option::<()>::None)
-        .unwrap();
+    insert_and_cleanup_key_shared::<F, (), ()>(physical_paths, test, ()).unwrap();
 }
 
 /// Keep the key description the same but change the data to a different key
@@ -59,10 +58,10 @@ where
 /// into a bad state.
 pub fn insert_and_cleanup_two_keys<FR, F, R>(physical_paths: &[&Path], test_one: FR, test_two: F)
 where
-    FR: Fn(&[&Path], &KeyDescription, Option<()>) -> Result<R, Box<dyn Error>>,
+    FR: Fn(&[&Path], &KeyDescription, ()) -> Result<R, Box<dyn Error>>,
     F: Fn(&[&Path], &KeyDescription, R) -> Result<(), Box<dyn Error>>,
 {
     let return_value =
-        insert_and_cleanup_key_shared::<FR, Option<()>, R>(physical_paths, test_one, None).unwrap();
+        insert_and_cleanup_key_shared::<FR, (), R>(physical_paths, test_one, ()).unwrap();
     insert_and_cleanup_key_shared::<F, R, ()>(physical_paths, test_two, return_value).unwrap();
 }

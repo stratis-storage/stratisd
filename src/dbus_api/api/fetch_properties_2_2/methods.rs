@@ -6,13 +6,13 @@ use std::collections::HashMap;
 
 use dbus::{
     arg::{RefArg, Variant},
-    tree::{MTFn, MethodInfo, MethodResult},
     Message,
 };
+use dbus_tree::{MTSync, MethodInfo, MethodResult};
 use itertools::Itertools;
 
 use crate::dbus_api::{
-    api::shared::{list_keys, locked_pool_uuids},
+    api::shared::{list_keys, locked_pool_uuids, locked_pools},
     consts,
     types::TData,
     util::result_to_tuple,
@@ -24,26 +24,10 @@ const ALL_PROPERTIES: [&str; 3] = [
     consts::LOCKED_POOL_UUIDS,
 ];
 
-pub fn locked_pools(
-    info: &MethodInfo<MTFn<TData>, TData>,
-) -> Result<HashMap<String, String>, String> {
-    let dbus_context = info.tree.get_data();
-
-    let engine = dbus_context.engine.borrow();
-    Ok(engine
-        .locked_pools()
-        .into_iter()
-        .map(|(u, info)| {
-            (
-                u.to_simple_ref().to_string(),
-                info.key_description.as_application_str().to_string(),
-            )
-        })
-        .collect())
-}
-
+#[allow(unknown_lints)]
+#[allow(clippy::unnecessary_wraps)]
 fn get_properties_shared(
-    m: &MethodInfo<MTFn<TData>, TData>,
+    m: &MethodInfo<MTSync<TData>, TData>,
     properties: &mut dyn Iterator<Item = String>,
 ) -> MethodResult {
     let message: &Message = m.msg;

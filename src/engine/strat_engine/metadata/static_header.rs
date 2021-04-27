@@ -11,7 +11,6 @@ use std::{
 use byteorder::{ByteOrder, LittleEndian};
 use crc::crc32;
 use serde_json::Value;
-use uuid::Uuid;
 
 use devicemapper::{Sectors, IEC, SECTOR_SIZE};
 
@@ -19,7 +18,8 @@ use crate::{
     engine::{
         strat_engine::{
             metadata::sizes::{
-                static_header_size, BDAExtendedSize, BlockdevSize, MDASize, ReservedSize,
+                static_header_size, BDAExtendedSize, BlockdevSize, MDADataSize, MDASize,
+                ReservedSize,
             },
             writing::SyncAll,
         },
@@ -61,8 +61,7 @@ impl fmt::Display for StratisIdentifiers {
         write!(
             f,
             "Stratis pool UUID: \"{}\", Stratis device UUID: \"{}\"",
-            self.pool_uuid.to_simple_ref(),
-            self.device_uuid.to_simple_ref()
+            self.pool_uuid, self.device_uuid,
         )
     }
 }
@@ -70,8 +69,8 @@ impl fmt::Display for StratisIdentifiers {
 impl<'a> Into<Value> for &'a StratisIdentifiers {
     fn into(self) -> Value {
         json!({
-            "pool_uuid": Value::from(self.pool_uuid.to_simple_ref().to_string()),
-            "device_uuid": Value::from(self.device_uuid.to_simple_ref().to_string())
+            "pool_uuid": Value::from(self.pool_uuid.to_string()),
+            "device_uuid": Value::from(self.device_uuid.to_string())
         })
     }
 }
@@ -108,14 +107,14 @@ pub struct StaticHeader {
 impl StaticHeader {
     pub fn new(
         identifiers: StratisIdentifiers,
-        mda_size: MDASize,
+        mda_data_size: MDADataSize,
         blkdev_size: BlockdevSize,
         initialization_time: u64,
     ) -> StaticHeader {
         StaticHeader {
             blkdev_size,
             identifiers,
-            mda_size,
+            mda_size: mda_data_size.region_size().mda_size(),
             reserved_size: ReservedSize::new(RESERVED_SECTORS),
             flags: 0,
             initialization_time,
@@ -189,7 +188,7 @@ impl StaticHeader {
             f.write_all(&zeroed[..bytes!(static_header_size::POST_SIGBLOCK_PADDING_SECTORS)])?;
             f.sync_all()?;
             Ok(())
-        };
+        }
 
         if which == MetadataLocation::Both || which == MetadataLocation::First {
             write_region(f, &signature_block, &zeroed)?;
@@ -375,20 +374,8 @@ impl StaticHeader {
         buf[4..20].clone_from_slice(STRAT_MAGIC);
         LittleEndian::write_u64(&mut buf[20..28], *self.blkdev_size.sectors());
         buf[28] = STRAT_SIGBLOCK_VERSION;
-        buf[32..64].clone_from_slice(
-            self.identifiers
-                .pool_uuid
-                .to_simple_ref()
-                .to_string()
-                .as_bytes(),
-        );
-        buf[64..96].clone_from_slice(
-            self.identifiers
-                .device_uuid
-                .to_simple_ref()
-                .to_string()
-                .as_bytes(),
-        );
+        buf[32..64].clone_from_slice(uuid_to_string!(self.identifiers.pool_uuid).as_bytes());
+        buf[64..96].clone_from_slice(uuid_to_string!(self.identifiers.device_uuid).as_bytes());
         LittleEndian::write_u64(&mut buf[96..104], *self.mda_size.sectors());
         LittleEndian::write_u64(&mut buf[104..112], *self.reserved_size.sectors());
         LittleEndian::write_u64(&mut buf[120..128], self.initialization_time);
@@ -429,8 +416,8 @@ impl StaticHeader {
             ));
         }
 
-        let pool_uuid = Uuid::parse_str(from_utf8(&buf[32..64])?)?;
-        let dev_uuid = Uuid::parse_str(from_utf8(&buf[64..96])?)?;
+        let pool_uuid = PoolUuid::parse_str(from_utf8(&buf[32..64])?)?;
+        let dev_uuid = DevUuid::parse_str(from_utf8(&buf[64..96])?)?;
 
         let mda_size = MDASize(Sectors(LittleEndian::read_u64(&buf[96..104])));
 
@@ -462,7 +449,6 @@ pub mod tests {
     use std::io::Cursor;
 
     use proptest::{option, prelude::BoxedStrategy, strategy::Strategy};
-    use uuid::Uuid;
 
     use chrono::Utc;
 
@@ -500,17 +486,14 @@ pub mod tests {
     /// Return a static header with random block device and MDA size.
     /// The block device is less than the minimum, for efficiency in testing.
     pub fn random_static_header(blkdev_size: u64, mda_size_factor: u32) -> StaticHeader {
-        let pool_uuid = Uuid::new_v4();
-        let dev_uuid = Uuid::new_v4();
-        let mda_size = MDADataSize::new(
-            MDADataSize::default().bytes() + Bytes(u64::from(mda_size_factor * 4)),
-        )
-        .region_size()
-        .mda_size();
-        let blkdev_size = (Bytes(IEC::Mi) + Sectors(blkdev_size).bytes()).sectors();
+        let pool_uuid = PoolUuid::new_v4();
+        let dev_uuid = DevUuid::new_v4();
+        let mda_data_size =
+            MDADataSize::new(MDADataSize::default().bytes() + Bytes::from(mda_size_factor * 4));
+        let blkdev_size = (Bytes::from(IEC::Mi) + Sectors(blkdev_size).bytes()).sectors();
         StaticHeader::new(
             StratisIdentifiers::new(pool_uuid, dev_uuid),
-            mda_size,
+            mda_data_size,
             BlockdevSize::new(blkdev_size),
             Utc::now().timestamp() as u64,
         )
@@ -628,8 +611,14 @@ pub mod tests {
         let sh = random_static_header(10000, 4);
 
         let ts = Utc::now().timestamp() as u64;
-        let sh_older = StaticHeader::new(sh.identifiers, sh.mda_size, sh.blkdev_size, ts);
-        let sh_newer = StaticHeader::new(sh.identifiers, sh.mda_size, sh.blkdev_size, ts + 1);
+        let sh_older = StaticHeader {
+            initialization_time: ts,
+            ..sh
+        };
+        let sh_newer = StaticHeader {
+            initialization_time: ts + 1,
+            ..sh
+        };
         assert_ne!(sh_older, sh_newer);
 
         let buf_size = bytes!(static_header_size::STATIC_HEADER_SECTORS);

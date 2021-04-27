@@ -13,7 +13,11 @@ mod devices;
 mod range_alloc;
 mod shared;
 
-pub use self::{backstore::Backstore, blockdev::StratBlockDev, crypt::CryptHandle};
+pub use self::{
+    backstore::Backstore,
+    blockdev::StratBlockDev,
+    crypt::{crypt_metadata_size, CryptActivationHandle, CryptHandle, CLEVIS_TANG_TRUST_URL},
+};
 
 #[cfg(test)]
 pub use self::devices::{initialize_devices, process_and_verify_devices};

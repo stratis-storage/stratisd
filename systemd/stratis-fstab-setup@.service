@@ -1,0 +1,9 @@
+[Unit]
+Description=Set up Stratis filesystems in /etc/fstab
+Documentation=man:stratisd(8)
+DefaultDependencies=no
+Requires=stratisd-min-postinitrd.service
+
+[Service]
+ExecStart=/usr/lib/systemd/stratis-fstab-setup %i
+Type=oneshot

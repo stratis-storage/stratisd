@@ -15,7 +15,7 @@ use crate::{
     engine::{
         engine::Pool,
         strat_engine::{
-            backstore::CryptHandle,
+            backstore::CryptActivationHandle,
             liminal::{
                 device_info::{DeviceBag, DeviceSet, LInfo, LLuksInfo, LStratisInfo},
                 identify::{identify_block_device, DeviceInfo, LuksInfo, StratisInfo},
@@ -25,7 +25,7 @@ use crate::{
             pool::StratPool,
         },
         structures::Table,
-        types::{DevUuid, EncryptionInfo, Name, PoolUuid, UnlockMethod},
+        types::{DevUuid, LockedPoolInfo, Name, PoolUuid, UdevEngineEvent, UnlockMethod},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -80,13 +80,12 @@ impl LiminalDevices {
     /// Unlock the liminal encrypted devices that correspond to the given pool UUID.
     pub fn unlock_pool(
         &mut self,
-        pools: &Table<StratPool>,
+        pools: &Table<PoolUuid, StratPool>,
         pool_uuid: PoolUuid,
         unlock_method: UnlockMethod,
     ) -> StratisResult<Vec<DevUuid>> {
         fn handle_luks(luks_info: &LLuksInfo, unlock_method: UnlockMethod) -> StratisResult<()> {
-            if let Some(mut handle) = CryptHandle::setup(&luks_info.ids.devnode)? {
-                handle.activate(unlock_method)?;
+            if CryptActivationHandle::setup(&luks_info.ids.devnode, unlock_method)?.is_some() {
                 Ok(())
             } else {
                 Err(StratisError::Engine(
@@ -107,7 +106,7 @@ impl LiminalDevices {
                         ErrorEnum::Error,
                         format!(
                             "Attempted to unlock set of devices belonging to an unencrypted pool with UUID {}",
-                            pool_uuid.to_simple_ref(),
+                            pool_uuid,
                         ),
                     ));
                 }
@@ -133,7 +132,7 @@ impl LiminalDevices {
                             ErrorEnum::Error,
                             format!(
                                 "Pool with UUID {} is not encrypted and cannot be unlocked.",
-                                pool_uuid.to_simple_ref()
+                                pool_uuid,
                             ),
                         ));
                     }
@@ -143,7 +142,7 @@ impl LiminalDevices {
                         ErrorEnum::Error,
                         format!(
                             "No devices with UUID {} have been registered with stratisd.",
-                            pool_uuid.to_simple_ref(),
+                            pool_uuid,
                         ),
                     ))
                 }
@@ -157,12 +156,10 @@ impl LiminalDevices {
     /// locked to their encryption info in the set of pools that are not yet set up.
     // Precondition: All devices for a given errored pool have been determined to have
     // the same  encryption info.
-    pub fn locked_pools(&self) -> HashMap<PoolUuid, EncryptionInfo> {
+    pub fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo> {
         self.errored_pool_devices
             .iter()
-            .filter_map(|(pool_uuid, map)| {
-                map.encryption_info().map(|info| (*pool_uuid, info.clone()))
-            })
+            .filter_map(|(pool_uuid, map)| map.locked_pool_info().map(|info| (*pool_uuid, info)))
             .collect()
     }
 
@@ -239,7 +236,7 @@ impl LiminalDevices {
     ///               self.hopeless_device_sets.get(pool_uuid).is_none()
     fn try_setup_pool(
         &mut self,
-        pools: &Table<StratPool>,
+        pools: &Table<PoolUuid, StratPool>,
         pool_uuid: PoolUuid,
         infos: DeviceSet,
     ) -> Option<(Name, StratPool)> {
@@ -253,7 +250,7 @@ impl LiminalDevices {
         // Precondition: every device represented by an item in infos has
         // already been determined to belong to the pool with pool_uuid.
         fn setup_pool(
-            pools: &Table<StratPool>,
+            pools: &Table<PoolUuid, StratPool>,
             pool_uuid: PoolUuid,
             infos: &HashMap<DevUuid, &LStratisInfo>,
         ) -> Result<(Name, StratPool), Destination> {
@@ -261,7 +258,7 @@ impl LiminalDevices {
                 Err(err) => Err(
                     Destination::Errored(format!(
                         "There was an error encountered when reading the BDAs for the devices found for pool with UUID {}: {}",
-                        pool_uuid.to_simple_ref(),
+                        pool_uuid,
                         err))),
                 Ok(infos) => Ok(infos),
             }?;
@@ -281,12 +278,12 @@ impl LiminalDevices {
                 Err(err) => return Err(
                     Destination::Errored(format!(
                         "There was an error encountered when reading the metadata for the devices found for pool with UUID {}: {}",
-                        pool_uuid.to_simple_ref(),
+                        pool_uuid,
                         err))),
                 Ok(None) => return Err(
                     Destination::Errored(format!(
                         "No metadata found on devices associated with pool UUID {}",
-                        pool_uuid.to_simple_ref()))),
+                        pool_uuid))),
                 Ok(Some((timestamp, metadata))) => (timestamp, metadata),
             };
 
@@ -294,16 +291,16 @@ impl LiminalDevices {
                 return Err(
                     Destination::Errored(format!(
                         "There is a pool name conflict. The devices currently being processed have been identified as belonging to the pool with UUID {} and name {}, but a pool with the same name and UUID {} is already active",
-                        pool_uuid.to_simple_ref(),
+                        pool_uuid,
                         &metadata.name,
-                        uuid.to_simple_ref())));
+                        uuid)));
             }
 
             let (datadevs, cachedevs) = match get_blockdevs(&metadata.backstore, infos, bdas) {
                 Err(err) => return Err(
                     Destination::Errored(format!(
                         "There was an error encountered when calculating the block devices for pool with UUID {} and name {}: {}",
-                        pool_uuid.to_simple_ref(),
+                        pool_uuid,
                         &metadata.name,
                         err))),
                 Ok((datadevs, cachedevs)) => (datadevs, cachedevs),
@@ -312,7 +309,7 @@ impl LiminalDevices {
             if datadevs.get(0).is_none() {
                 return Err(Destination::Hopeless(format!(
                     "There do not appear to be any data devices in the set with pool UUID {}",
-                    pool_uuid.to_simple_ref()
+                    pool_uuid
                 )));
             }
 
@@ -321,7 +318,7 @@ impl LiminalDevices {
             // check again here.
             let num_with_luks = datadevs
                 .iter()
-                .filter_map(|sbd| sbd.encryption_info())
+                .filter(|sbd| sbd.encryption_info().is_encrypted())
                 .count();
 
             if num_with_luks != 0 && num_with_luks != datadevs.len() {
@@ -333,15 +330,14 @@ impl LiminalDevices {
                 return Err(
                     Destination::Errored(format!(
                             "Some data devices in the set belonging to pool with UUID {} and name {} appear to be encrypted devices managed by Stratis, and some do not",
-                            pool_uuid.to_simple_ref(),
+                            pool_uuid,
                             &metadata.name)));
             }
 
             StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata).map_err(|err| {
                 Destination::Errored(format!(
                     "An attempt to set up pool with UUID {} from the assembled devices failed: {}",
-                    pool_uuid.to_simple_ref(),
-                    err
+                    pool_uuid, err
                 ))
             })
         }
@@ -360,8 +356,7 @@ impl LiminalDevices {
             Ok((pool_name, pool)) => {
                 info!(
                     "Pool with name \"{}\" and UUID \"{}\" set up",
-                    pool_name,
-                    pool_uuid.to_simple_ref()
+                    pool_name, pool_uuid
                 );
                 Some((pool_name, pool))
             }
@@ -390,12 +385,12 @@ impl LiminalDevices {
     /// constructing the pool, retain the set of devices.
     pub fn block_evaluate(
         &mut self,
-        pools: &Table<StratPool>,
-        event: &libudev::Event,
+        pools: &Table<PoolUuid, StratPool>,
+        event: &UdevEngineEvent,
     ) -> Option<(PoolUuid, Name, StratPool)> {
         let event_type = event.event_type();
         if event_type == libudev::EventType::Add || event_type == libudev::EventType::Change {
-            identify_block_device(event.device()).and_then(move |info| {
+            identify_block_device(event).and_then(move |info| {
                 let stratis_identifiers = info.stratis_identifiers();
                 let pool_uuid = stratis_identifiers.pool_uuid;
                 let device_uuid = stratis_identifiers.device_uuid;
@@ -403,7 +398,7 @@ impl LiminalDevices {
                     if pool.get_strat_blockdev(device_uuid).is_none() {
                         warn!("Found a device with {} that identifies itself as belonging to pool with UUID {}, but that pool is already up and running and does not appear to contain the device",
                               info,
-                              pool_uuid.to_simple_ref());
+                              pool_uuid);
                     }
                     // FIXME: There might be something to check if the device is
                     // included in the pool, but that is less clear.
@@ -437,7 +432,7 @@ impl LiminalDevices {
                 }
             })
         } else if event_type == libudev::EventType::Remove {
-            identify_block_device(event.device()).and_then(move |info| {
+            identify_block_device(event).and_then(move |info| {
                 let stratis_identifiers = info.stratis_identifiers();
                 let pool_uuid = stratis_identifiers.pool_uuid;
                 let device_uuid = stratis_identifiers.device_uuid;
@@ -445,7 +440,7 @@ impl LiminalDevices {
                     if pool.get_strat_blockdev(device_uuid).is_some() {
                         warn!("udev reports that a device with {} that appears to belong to a pool with UUID {} has just been removed; this is likely to result in data loss",
                               info,
-                              pool_uuid.to_simple_ref());
+                              pool_uuid);
                     }
                     None
                 } else if let Some(mut set) = self.hopeless_device_sets.remove(&pool_uuid) {
@@ -478,7 +473,7 @@ impl<'a> Into<Value> for &'a LiminalDevices {
                     .iter()
                     .map(|(uuid, map)| {
                         json!({
-                            "pool_uuid": uuid.to_simple_ref().to_string(),
+                            "pool_uuid": uuid.to_string(),
                             "devices": <&DeviceSet as Into<Value>>::into(&map),
                         })
                     })
@@ -489,7 +484,7 @@ impl<'a> Into<Value> for &'a LiminalDevices {
                     .iter()
                     .map(|(uuid, set)| {
                         json!({
-                            "pool_uuid": uuid.to_simple_ref().to_string(),
+                            "pool_uuid": uuid.to_string(),
                             "devices": <&DeviceBag as Into<Value>>::into(&set),
                         })
                     })

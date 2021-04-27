@@ -217,3 +217,28 @@ macro_rules! convert_test {
         <$to_type as std::convert::TryFrom<$from_type>>::try_from($expr).unwrap()
     };
 }
+
+// Macro for formatting a Uuid object for use in a device name or in
+// a signature buffer.
+macro_rules! uuid_to_string {
+    ($uuid:expr) => {
+        $uuid.to_simple_ref().to_string()
+    };
+}
+
+#[cfg(test)]
+// Macro for allowing a delay for certain operations in tests
+macro_rules! retry_operation {
+    ($expr:expr) => {
+        for i in 0.. {
+            match ($expr, i) {
+                (Ok(_), _) => break,
+                (Err(e), i) if i == 3 => Err(e).unwrap(),
+                (Err(e), _) => {
+                    debug!("Waiting on {} that returned error {}", stringify!($expr), e);
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1));
+        }
+    };
+}

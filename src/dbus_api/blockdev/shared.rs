@@ -2,11 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus::{
-    arg::IterAppend,
-    tree::{MTFn, MethodErr, PropInfo, Tree},
-    Path,
-};
+use dbus::{arg::IterAppend, Path};
+use dbus_tree::{MTSync, MethodErr, PropInfo, Tree};
 
 use crate::{
     dbus_api::types::TData,
@@ -16,7 +13,7 @@ use crate::{
 /// Perform an operation on a `BlockDev` object for a given
 /// DBus implicit argument that is a block device
 pub fn blockdev_operation<F, R>(
-    tree: &Tree<MTFn<TData>, TData>,
+    tree: &Tree<MTSync<TData>, TData>,
     object_path: &Path<'static>,
     closure: F,
 ) -> Result<R, String>
@@ -34,23 +31,27 @@ where
         .get_data()
         .as_ref()
         .ok_or_else(|| format!("no data for object path {}", object_path))?;
+    let blockdev_uuid = typed_uuid_string_err!(blockdev_data.uuid; Dev);
 
     let pool_path = tree
         .get(&blockdev_data.parent)
         .ok_or_else(|| format!("no path for parent object path {}", &blockdev_data.parent))?;
 
-    let pool_uuid = pool_path
-        .get_data()
-        .as_ref()
-        .ok_or_else(|| format!("no data for object path {}", object_path))?
-        .uuid;
+    let pool_uuid = typed_uuid_string_err!(
+        pool_path
+            .get_data()
+            .as_ref()
+            .ok_or_else(|| format!("no data for object path {}", object_path))?
+            .uuid;
+        Pool
+    );
 
-    let engine = dbus_context.engine.borrow();
-    let (_, pool) = engine
+    let mutex_lock = mutex_lock!(dbus_context.engine);
+    let (_, pool) = mutex_lock
         .get_pool(pool_uuid)
         .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
     let (tier, blockdev) = pool
-        .get_blockdev(blockdev_data.uuid)
+        .get_blockdev(blockdev_uuid)
         .ok_or_else(|| format!("no blockdev with uuid {}", blockdev_data.uuid))?;
     closure(tier, blockdev)
 }
@@ -60,7 +61,7 @@ where
 /// blockdev and obtains the property from the blockdev.
 pub fn get_blockdev_property<F, R>(
     i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
+    p: &PropInfo<MTSync<TData>, TData>,
     getter: F,
 ) -> Result<(), MethodErr>
 where
@@ -77,7 +78,18 @@ where
 /// Generate D-Bus representation of devnode property.
 #[inline]
 pub fn blockdev_devnode_prop(dev: &dyn BlockDev) -> String {
-    dev.devnode().user_path().display().to_string()
+    let pathbuf = match dev.user_path() {
+        Ok(path) => path,
+        Err(e) => {
+            warn!(
+                "Failed to canonicalize metadata path for block device: {}; \
+                falling back on non-canonicalized path",
+                e
+            );
+            dev.metadata_path().to_owned()
+        }
+    };
+    pathbuf.display().to_string()
 }
 
 /// Generate D-Bus representation of hardware info property.
@@ -109,5 +121,5 @@ pub fn blockdev_tier_prop(tier: BlockDevTier) -> u16 {
 // Generate a D-Bus representation of the physical path
 #[inline]
 pub fn blockdev_physical_path_prop(dev: &dyn BlockDev) -> String {
-    dev.devnode().physical_path().display().to_string()
+    dev.devnode().display().to_string()
 }

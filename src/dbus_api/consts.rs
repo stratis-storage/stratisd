@@ -11,21 +11,26 @@ pub const MANAGER_INTERFACE_NAME: &str = "org.storage.stratis2.Manager";
 pub const MANAGER_INTERFACE_NAME_2_1: &str = "org.storage.stratis2.Manager.r1";
 pub const MANAGER_INTERFACE_NAME_2_2: &str = "org.storage.stratis2.Manager.r2";
 pub const MANAGER_INTERFACE_NAME_2_3: &str = "org.storage.stratis2.Manager.r3";
+pub const MANAGER_INTERFACE_NAME_2_4: &str = "org.storage.stratis2.Manager.r4";
 pub const REPORT_INTERFACE_NAME_2_1: &str = "org.storage.stratis2.Report.r1";
+pub const REPORT_INTERFACE_NAME_2_4: &str = "org.storage.stratis2.Report.r4";
 
 pub const PROPERTY_FETCH_INTERFACE_NAME: &str = "org.storage.stratis2.FetchProperties";
 pub const PROPERTY_FETCH_INTERFACE_NAME_2_1: &str = "org.storage.stratis2.FetchProperties.r1";
 pub const PROPERTY_FETCH_INTERFACE_NAME_2_2: &str = "org.storage.stratis2.FetchProperties.r2";
 pub const PROPERTY_FETCH_INTERFACE_NAME_2_3: &str = "org.storage.stratis2.FetchProperties.r3";
+pub const PROPERTY_FETCH_INTERFACE_NAME_2_4: &str = "org.storage.stratis2.FetchProperties.r4";
 
 pub const KEY_LIST_PROP: &str = "KeyList";
 
 pub const LOCKED_POOL_UUIDS: &str = "LockedPoolUuids";
 pub const LOCKED_POOLS: &str = "LockedPools";
+pub const LOCKED_POOL_DEVS: &str = "LockedPoolsWithDevs";
 
 pub const POOL_INTERFACE_NAME: &str = "org.storage.stratis2.pool";
 pub const POOL_INTERFACE_NAME_2_1: &str = "org.storage.stratis2.pool.r1";
 pub const POOL_INTERFACE_NAME_2_3: &str = "org.storage.stratis2.pool.r3";
+pub const POOL_INTERFACE_NAME_2_4: &str = "org.storage.stratis2.pool.r4";
 pub const POOL_NAME_PROP: &str = "Name";
 pub const POOL_UUID_PROP: &str = "Uuid";
 pub const POOL_HAS_CACHE_PROP: &str = "HasCache";
@@ -36,6 +41,7 @@ pub const POOL_TOTAL_USED_PROP: &str = "TotalPhysicalUsed";
 pub const POOL_CLEVIS_INFO: &str = "ClevisInfo";
 
 pub const FILESYSTEM_INTERFACE_NAME: &str = "org.storage.stratis2.filesystem";
+pub const FILESYSTEM_INTERFACE_NAME_2_4: &str = "org.storage.stratis2.filesystem.r4";
 pub const FILESYSTEM_NAME_PROP: &str = "Name";
 pub const FILESYSTEM_UUID_PROP: &str = "Uuid";
 pub const FILESYSTEM_USED_PROP: &str = "Used";
@@ -45,6 +51,7 @@ pub const FILESYSTEM_CREATED_PROP: &str = "Created";
 
 pub const BLOCKDEV_INTERFACE_NAME: &str = "org.storage.stratis2.blockdev";
 pub const BLOCKDEV_INTERFACE_NAME_2_2: &str = "org.storage.stratis2.blockdev.r2";
+pub const BLOCKDEV_INTERFACE_NAME_2_4: &str = "org.storage.stratis2.blockdev.r4";
 pub const BLOCKDEV_DEVNODE_PROP: &str = "Devnode";
 pub const BLOCKDEV_HARDWARE_INFO_PROP: &str = "HardwareInfo";
 pub const BLOCKDEV_USER_INFO_PROP: &str = "UserInfo";

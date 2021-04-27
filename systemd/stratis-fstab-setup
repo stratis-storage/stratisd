@@ -1,0 +1,36 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+	echo Pool UUID required as an argument. >&2
+	exit 1
+fi
+
+POOL_UUID="$1"
+
+i=0
+while ! stratis-min pool is-locked "$POOL_UUID" >/dev/null; do
+	echo Waiting on pool with UUID $POOL_UUID...
+	sleep 1
+	if [ "$i" = 5 ]; then
+		break
+	fi
+	i=$(($i + 1))
+done
+
+if $(stratis-min pool is-locked "$POOL_UUID"); then
+	if $(stratis-min pool is-bound "$POOL_UUID"); then
+		if ! stratis-min pool unlock clevis "$POOL_UUID"; then
+			echo Failed to unlock pool with UUID $POOL_UUID using Clevis. >&2
+			exit 1
+		fi
+	else
+		if ! systemd-ask-password \
+			"Enter password for pool with UUID $POOL_UUID" \
+			| stratis-min pool unlock keyring "$POOL_UUID"; then
+			echo Failed to unlock pool with UUID $POOL_UUID using Clevis. >&2
+			exit 1
+		fi
+	fi
+fi
+
+udevadm settle

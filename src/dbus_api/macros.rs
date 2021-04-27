@@ -36,9 +36,43 @@ macro_rules! get_parent {
     };
 }
 
+macro_rules! typed_uuid_string_err {
+    ($uuid:expr; $type:ident) => {
+        match $uuid {
+            $crate::engine::StratisUuid::$type(uuid) => uuid,
+            ref u => {
+                return Err(format!(
+                    "expected {} UUID but found UUID with type {:?}",
+                    stringify!($type),
+                    u,
+                ))
+            }
+        }
+    };
+}
+
+macro_rules! typed_uuid {
+    ($uuid:expr; $type:ident; $default:expr; $message:expr) => {
+        if let $crate::engine::StratisUuid::$type(uuid) = $uuid {
+            uuid
+        } else {
+            let message = format!(
+                "expected {} UUID but found UUID with type {:?}",
+                stringify!($type),
+                $uuid,
+            );
+            let (rc, rs) = (
+                $crate::dbus_api::types::DbusErrorEnum::INTERNAL_ERROR as u16,
+                message,
+            );
+            return Ok(vec![$message.append3($default, rc, rs)]);
+        }
+    };
+}
+
 /// Macro for early return with Ok dbus message on failure to get immutable pool.
 macro_rules! get_pool {
-    ($engine:ident; $uuid:ident; $default:expr; $message:expr) => {
+    ($engine:expr; $uuid:ident; $default:expr; $message:expr) => {
         if let Some(pool) = $engine.get_pool($uuid) {
             pool
         } else {
@@ -54,7 +88,7 @@ macro_rules! get_pool {
 
 /// Macro for early return with Ok dbus message on failure to get mutable pool.
 macro_rules! get_mut_pool {
-    ($engine:ident; $uuid:ident; $default:expr; $message:expr) => {
+    ($engine:expr; $uuid:ident; $default:expr; $message:expr) => {
         if let Some(pool) = $engine.get_mut_pool($uuid) {
             pool
         } else {
@@ -78,20 +112,20 @@ macro_rules! uuid_to_string {
 macro_rules! properties_footer {
     () => {
         pub fn get_all_properties(
-            m: &dbus::tree::MethodInfo<
-                dbus::tree::MTFn<$crate::dbus_api::types::TData>,
+            m: &dbus_tree::MethodInfo<
+                dbus_tree::MTSync<$crate::dbus_api::types::TData>,
                 $crate::dbus_api::types::TData,
             >,
-        ) -> dbus::tree::MethodResult {
+        ) -> dbus_tree::MethodResult {
             get_properties_shared(m, &mut ALL_PROPERTIES.iter().map(|&s| s.to_string()))
         }
 
         pub fn get_properties(
-            m: &dbus::tree::MethodInfo<
-                dbus::tree::MTFn<$crate::dbus_api::types::TData>,
+            m: &dbus_tree::MethodInfo<
+                dbus_tree::MTSync<$crate::dbus_api::types::TData>,
                 $crate::dbus_api::types::TData,
             >,
-        ) -> dbus::tree::MethodResult {
+        ) -> dbus_tree::MethodResult {
             let message: &dbus::Message = m.msg;
             let mut iter = message.iter_init();
             let mut properties: dbus::arg::Array<String, _> =
@@ -108,12 +142,12 @@ macro_rules! initial_properties {
                 ($iface, vec![
                     $(
                         ($prop, Variant(
-                            Box::new($val) as Box<dyn dbus::arg::RefArg>
+                            Box::new($val) as Box<dyn dbus::arg::RefArg + std::marker::Send + std::marker::Sync>
                         )),
                     )*
                 ]
                 .into_iter()
-                .map(|(s, v): (&str, dbus::arg::Variant<Box<dyn dbus::arg::RefArg>>)| {
+                .map(|(s, v): (&str, dbus::arg::Variant<Box<dyn dbus::arg::RefArg + std::marker::Send + std::marker::Sync>>)| {
                     (s.to_string(), v)
                 })
                 .collect()),
@@ -128,5 +162,15 @@ macro_rules! initial_properties {
                 .map(|s| (s, std::collections::HashMap::new()))
         );
         interfaces
+    }};
+}
+
+macro_rules! log_action {
+    ($action:expr) => {{
+        let action = $action;
+        if let Ok(ref a) = action {
+            log::info!("{}", a);
+        }
+        action
     }};
 }

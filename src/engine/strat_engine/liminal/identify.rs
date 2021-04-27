@@ -58,7 +58,7 @@ use crate::engine::{
             STRATIS_FS_TYPE,
         },
     },
-    types::{EncryptionInfo, PoolUuid},
+    types::{EncryptionInfo, PoolUuid, UdevEngineDevice, UdevEngineEvent},
 };
 
 /// A miscellaneous group of identifiers found when identifying a LUKS
@@ -160,7 +160,7 @@ impl fmt::Display for DeviceInfo {
 // A wrapper for obtaining the device number as a devicemapper Device
 // which interprets absence of the value as an error, which it is in this
 // context.
-fn device_to_devno_wrapper(device: &libudev::Device) -> Result<Device, String> {
+fn device_to_devno_wrapper(device: &UdevEngineDevice) -> Result<Device, String> {
     device
         .devnum()
         .ok_or_else(|| "udev entry did not contain a device number".into())
@@ -200,7 +200,7 @@ fn device_identifiers_wrapper(
 }
 
 /// Process a device which udev information indicates is a LUKS device.
-fn process_luks_device(dev: &libudev::Device) -> Option<LuksInfo> {
+fn process_luks_device(dev: &UdevEngineDevice) -> Option<LuksInfo> {
     match dev.devnode() {
         Some(devnode) => match device_to_devno_wrapper(dev) {
             Err(err) => {
@@ -221,27 +221,14 @@ fn process_luks_device(dev: &libudev::Device) -> Option<LuksInfo> {
                             );
                     None
                 }
-                Ok(Some(mut handle)) => match handle.clevis_info() {
-                    Ok(clevis_info) => Some(LuksInfo {
-                        info: StratisInfo {
-                            identifiers: *handle.device_identifiers(),
-                            device_number,
-                            devnode: handle.physical_device_path().to_path_buf(),
-                        },
-                        encryption_info: EncryptionInfo {
-                            key_description: handle.key_description().clone(),
-                            clevis_info,
-                        },
-                    }),
-                    Err(err) => {
-                        warn!(
-                                "There was a problem decoding the Clevis info on device {}, disregarding the device: {}",
-                                devnode.display(),
-                                err
-                                );
-                        None
-                    }
-                },
+                Ok(Some(handle)) => Some(LuksInfo {
+                    info: StratisInfo {
+                        identifiers: *handle.device_identifiers(),
+                        device_number,
+                        devnode: handle.luks2_device_path().to_path_buf(),
+                    },
+                    encryption_info: handle.encryption_info().to_owned(),
+                }),
             },
         },
         None => {
@@ -252,7 +239,7 @@ fn process_luks_device(dev: &libudev::Device) -> Option<LuksInfo> {
 }
 
 /// Process a device which udev information indicates is a Stratis device.
-fn process_stratis_device(dev: &libudev::Device) -> Option<StratisInfo> {
+fn process_stratis_device(dev: &UdevEngineDevice) -> Option<StratisInfo> {
     match dev.devnode() {
         Some(devnode) => {
             match (
@@ -293,7 +280,7 @@ fn find_all_luks_devices() -> libudev::Result<HashMap<PoolUuid, Vec<LuksInfo>>> 
 
     let pool_map = enumerator
         .scan_devices()?
-        .filter_map(|dev| identify_luks_device(&dev))
+        .filter_map(|dev| identify_luks_device(&UdevEngineDevice::from(&dev)))
         .fold(HashMap::new(), |mut acc, info| {
             acc.entry(info.info.identifiers.pool_uuid)
                 .or_insert_with(Vec::new)
@@ -310,7 +297,7 @@ fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, Vec<StratisIn
 
     let pool_map = enumerator
         .scan_devices()?
-        .filter_map(|dev| identify_stratis_device(&dev))
+        .filter_map(|dev| identify_stratis_device(&UdevEngineDevice::from(&dev)))
         .fold(HashMap::new(), |mut acc, info| {
             acc.entry(info.identifiers.pool_uuid)
                 .or_insert_with(Vec::new)
@@ -323,7 +310,7 @@ fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, Vec<StratisIn
 // Identify a device that udev enumeration has already picked up as a LUKS
 // device. Return None if the device does not, after all, appear to be a LUKS
 // device belonging to Stratis. Log anything unusual at an appropriate level.
-fn identify_luks_device(dev: &libudev::Device) -> Option<LuksInfo> {
+fn identify_luks_device(dev: &UdevEngineDevice) -> Option<LuksInfo> {
     let initialized = dev.is_initialized();
     if !initialized {
         warn!("Found a udev entry for a device identified as a Stratis device, but udev also identified it as uninitialized, disregarding the device");
@@ -357,7 +344,7 @@ fn identify_luks_device(dev: &libudev::Device) -> Option<LuksInfo> {
 // Identify a device that udev enumeration has already picked up as a Stratis
 // device. Return None if the device does not, after all, appear to be a Stratis
 // device. Log anything unusual at an appropriate level.
-fn identify_stratis_device(dev: &libudev::Device) -> Option<StratisInfo> {
+fn identify_stratis_device(dev: &UdevEngineDevice) -> Option<StratisInfo> {
     let initialized = dev.is_initialized();
     if !initialized {
         warn!("Found a udev entry for a device identified as a Stratis device, but udev also identified it as uninitialized, disregarding the device");
@@ -391,14 +378,14 @@ fn identify_stratis_device(dev: &libudev::Device) -> Option<StratisInfo> {
 /// Identify a block device in the context where a udev event has been
 /// captured for some block device. Return None if the device does not
 /// appear to be a Stratis device. Log at an appropriate level on all errors.
-pub fn identify_block_device(dev: &libudev::Device) -> Option<DeviceInfo> {
-    let initialized = dev.is_initialized();
+pub fn identify_block_device(event: &UdevEngineEvent) -> Option<DeviceInfo> {
+    let initialized = event.device().is_initialized();
     if !initialized {
         debug!("Found a udev entry for a device identified as a block device, but udev also identified it as uninitialized, disregarding the device");
         return None;
     };
 
-    match decide_ownership(dev) {
+    match decide_ownership(event.device()) {
         Err(err) => {
             warn!(
                 "Could not determine ownership of a udev block device, disregarding the device: {}",
@@ -407,8 +394,10 @@ pub fn identify_block_device(dev: &libudev::Device) -> Option<DeviceInfo> {
             None
         }
         Ok(ownership) => match ownership {
-            UdevOwnership::Stratis => process_stratis_device(dev).map(DeviceInfo::Stratis),
-            UdevOwnership::Luks => process_luks_device(dev).map(DeviceInfo::Luks),
+            UdevOwnership::Stratis => {
+                process_stratis_device(event.device()).map(DeviceInfo::Stratis)
+            }
+            UdevOwnership::Luks => process_luks_device(event.device()).map(DeviceInfo::Luks),
             _ => None,
         },
     }
@@ -448,8 +437,6 @@ mod tests {
 
     use std::{collections::HashSet, error::Error};
 
-    use uuid::Uuid;
-
     use crate::{
         engine::{
             strat_engine::{
@@ -460,6 +447,7 @@ mod tests {
                 udev::block_device_apply,
             },
             types::{EncryptionInfo, KeyDescription},
+            BlockDev,
         },
         stratis::StratisError,
     };
@@ -479,60 +467,58 @@ mod tests {
         fn luks_device_test(
             paths: &[&Path],
             key_description: &KeyDescription,
-            _: Option<()>,
+            _: (),
         ) -> Result<(), Box<dyn Error>> {
-            let pool_uuid = Uuid::new_v4();
+            let pool_uuid = PoolUuid::new_v4();
 
             let devices = initialize_devices(
                 process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?,
                 pool_uuid,
                 MDADataSize::default(),
-                Some(EncryptionInfo {
-                    key_description: key_description.clone(),
+                &EncryptionInfo {
+                    key_description: Some(key_description.clone()),
                     clevis_info: None,
-                }),
+                },
             )?;
 
-            for devnode in devices.iter().map(|sbd| sbd.devnode()) {
-                let info =
-                    block_device_apply(devnode.physical_path(), |dev| process_luks_device(dev))?
-                        .ok_or_else(|| {
-                            StratisError::Error(
-                                "No device with specified devnode found in udev database".into(),
-                            )
-                        })?
-                        .ok_or_else(|| {
-                            StratisError::Error(
-                                "No LUKS information for Stratis found on specified device".into(),
-                            )
-                        })?;
+            for dev in devices {
+                let info = block_device_apply(dev.physical_path(), |dev| process_luks_device(dev))?
+                    .ok_or_else(|| {
+                        StratisError::Error(
+                            "No device with specified devnode found in udev database".into(),
+                        )
+                    })?
+                    .ok_or_else(|| {
+                        StratisError::Error(
+                            "No LUKS information for Stratis found on specified device".into(),
+                        )
+                    })?;
 
                 if info.info.identifiers.pool_uuid != pool_uuid {
                     return Err(Box::new(StratisError::Error(format!(
                         "Discovered pool UUID {} != expected pool UUID {}",
-                        info.info.identifiers.pool_uuid.to_simple_ref(),
-                        pool_uuid.to_simple_ref()
+                        info.info.identifiers.pool_uuid, pool_uuid
                     ))));
                 }
 
-                if info.info.devnode != devnode.physical_path() {
+                if info.info.devnode != dev.physical_path() {
                     return Err(Box::new(StratisError::Error(format!(
                         "Discovered device node {} != expected device node {}",
                         info.info.devnode.display(),
-                        devnode.physical_path().display()
+                        dev.physical_path().display()
                     ))));
                 }
 
-                if &info.encryption_info.key_description != key_description {
+                if info.encryption_info.key_description.as_ref() != Some(key_description) {
                     return Err(Box::new(StratisError::Error(format!(
-                        "Discovered key description {} != expected key description {}",
-                        info.encryption_info.key_description.as_application_str(),
-                        key_description.as_application_str()
+                        "Discovered key description {:?} != expected key description {:?}",
+                        info.encryption_info.key_description,
+                        Some(key_description.as_application_str())
                     ))));
                 }
 
                 let info =
-                    block_device_apply(devnode.physical_path(), |dev| process_stratis_device(dev))?
+                    block_device_apply(dev.physical_path(), |dev| process_stratis_device(dev))?
                         .ok_or_else(|| {
                             StratisError::Error(
                                 "No device with specified devnode found in udev database".into(),
@@ -546,7 +532,7 @@ mod tests {
                 }
 
                 let info =
-                    block_device_apply(devnode.user_path(), |dev| process_stratis_device(dev))?
+                    block_device_apply(&dev.user_path()?, |dev| process_stratis_device(dev))?
                         .ok_or_else(|| {
                             StratisError::Error(
                                 "No device with specified devnode found in udev database".into(),
@@ -558,13 +544,13 @@ mod tests {
                             )
                         })?;
 
-                if info.identifiers.pool_uuid != pool_uuid || info.devnode != devnode.user_path() {
+                if info.identifiers.pool_uuid != pool_uuid || info.devnode != dev.user_path()? {
                     return Err(Box::new(StratisError::Error(format!(
                         "Wrong identifiers and devnode found on Stratis block device: found: pool UUID: {}, device node; {} != expected: pool UUID: {}, device node: {}",
-                        info.identifiers.pool_uuid.to_simple_ref(),
+                        info.identifiers.pool_uuid,
                         info.devnode.display(),
                         pool_uuid,
-                        devnode.metadata_path().display()),
+                        dev.user_path()?.display()),
                     )));
                 }
             }
@@ -590,26 +576,18 @@ mod tests {
         );
     }
 
-    #[test]
-    fn travis_test_process_luks_device_initialized() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Exactly(1, None),
-            test_process_luks_device_initialized,
-        );
-    }
-
     /// Test that the process_*_device methods return the expected
     /// pool UUID and device node for initialized paths.
     fn test_process_device_initialized(paths: &[&Path]) {
         assert!(!paths.is_empty());
 
-        let pool_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
 
         initialize_devices(
             process_and_verify_devices(pool_uuid, &HashSet::new(), paths).unwrap(),
             pool_uuid,
             MDADataSize::default(),
-            None,
+            &EncryptionInfo::default(),
         )
         .unwrap();
 
@@ -646,14 +624,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn travis_test_process_device_initialized() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Exactly(1, None),
-            test_process_device_initialized,
-        );
-    }
-
     /// Test that the process_*_device methods return None if the device is
     /// not a Stratis device. Strictly speaking, the methods are only supposed
     /// to be called in particular contexts, the situation where the device
@@ -681,7 +651,7 @@ mod tests {
         }
 
         for path in paths {
-            create_fs(path, None).unwrap();
+            create_fs(path, None, false).unwrap();
             assert_eq!(
                 block_device_apply(path, |dev| process_stratis_device(dev))
                     .unwrap()
@@ -709,14 +679,6 @@ mod tests {
     fn real_test_process_device_uninitialized() {
         real::test_with_spec(
             &real::DeviceLimits::Exactly(1, None, None),
-            test_process_device_uninitialized,
-        );
-    }
-
-    #[test]
-    fn travis_test_process_device_uninitialized() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Exactly(1, None),
             test_process_device_uninitialized,
         );
     }

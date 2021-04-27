@@ -6,11 +6,17 @@ on:
   push:
     branches:
       - master
-      - develop-2.2.1
+      - develop-2.3.0
+    paths-ignore:
+      - 'CHANGES.txt'
+      - '**/README.md'
   pull_request:
     branches:
       - master
-      - develop-2.2.1
+      - develop-2.3.0
+    paths-ignore:
+      - 'CHANGES.txt'
+      - '**/README.md'
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -22,72 +28,235 @@ jobs:
         include:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
           - task: make -f Makefile fmt-travis
-            toolchain: 1.48.0
+            toolchain: 1.51.0
             components: rustfmt
+            image: ubuntu:groovy
           - task: make -f Makefile clippy
-            toolchain: 1.48.0
+            toolchain: 1.51.0
             components: clippy
+            image: ubuntu:groovy
+          - task: make -f Makefile fmt-travis
+            toolchain: 1.51.0
+            components: rustfmt
+            image: fedora:32
+          - task: make -f Makefile clippy
+            toolchain: 1.51.0
+            components: clippy
+            image: fedora:32
           # MANDATORY TESTING ON STABLE
           - task: make -f Makefile build
             toolchain: stable
             components: cargo
-          - task: make -f Makefile build-no-default
+            image: ubuntu:groovy
+          - task: make -f Makefile build-min
             toolchain: stable
             components: cargo
+            image: ubuntu:groovy
           - task: make -f Makefile build-extras
             toolchain: stable
             components: cargo
+            image: ubuntu:groovy
           - task: make -f Makefile docs-travis
             toolchain: stable
             components: cargo
+            image: ubuntu:groovy
           - task: make -f Makefile test
             toolchain: stable
             components: cargo
-          - task: >
-              sudo
-              PATH=$GITHUB_WORKSPACE/.cargo/bin:$PATH
-              RUST_LOG=libstratis=info
-              make -f Makefile test-travis
-            toolchain: stable
-            components: cargo
+            image: ubuntu:groovy
           - task: make -f Makefile release
             toolchain: stable
             components: cargo
-    runs-on: ubuntu-latest
+            image: ubuntu:groovy
+          - task: make -f Makefile release-min
+            toolchain: stable
+            components: cargo
+            image: ubuntu:groovy
+          - task: make -f Makefile build
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+          - task: make -f Makefile build-min
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+          - task: make -f Makefile build-extras
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+          - task: make -f Makefile docs-travis
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+          - task: make -f Makefile test
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+          - task: make -f Makefile release
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+          - task: make -f Makefile release-min
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+    runs-on: ubuntu-18.04
+    container:
+      image: ${{ matrix.image }}
+      options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
+      - name: Install dependencies for Ubuntu
+        run: apt-get -q update
+        if: matrix.image == 'ubuntu:groovy'
+      - name: Install dependencies for Ubuntu
+        run: >
+          DEBIAN_FRONTEND=noninteractive
+          apt-get install -y
+          clang
+          curl
+          libblkid-dev
+          libcryptsetup-dev
+          libdbus-1-dev
+          libsystemd-dev
+          libudev-dev
+          make
+        if: matrix.image == 'ubuntu:groovy'
+      - name: Install dependencies for Fedora
+        run: >
+          dnf install -y
+          clang
+          curl
+          cryptsetup-devel
+          dbus-devel
+          libblkid-devel
+          make
+          systemd-devel
+        if: matrix.image == 'fedora:32'
       - uses: actions-rs/toolchain@v1
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
           override: true
-      - name: Install dependencies
-        run: |
-          sudo apt-get -q update
-          sudo apt-get -y install libdbus-1-dev libudev-dev libdbus-glib-1-dev
-      - name: Install dependencies
+      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
+        run: ${{ matrix.task }}
+
+  # TESTS WITH UDEV
+  checks_with_udev:
+    strategy:
+      matrix:
+        include:
+          # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
+          - task: RUST_LOG=libstratis=debug make -f Makefile test-loop
+            toolchain: stable
+            components: cargo
+            image: ubuntu:groovy
+          - task: RUST_LOG=libstratis=debug make -f Makefile test-loop
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+    runs-on: ubuntu-18.04
+    container:
+      image: ${{ matrix.image }}
+      options: --privileged -v /dev:/dev
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies for Ubuntu
+        run: apt-get -q update
+        if: matrix.image == 'ubuntu:groovy'
+      - name: Install dependencies for Ubuntu
         run: >
-          sudo
-          add-apt-repository -y
-          "deb http://us.archive.ubuntu.com/ubuntu/ eoan main"
-      - name: Install dependencies
-        run: |
-          sudo apt-get -q update
-          # Update to a more recent version of blkid
-          sudo apt-get -y install util-linux libblkid-dev
-          # cryptsetup-bin conflicts with custom built cryptsetup
-          sudo apt-get remove cryptsetup-bin
-          sudo apt-get -y install libargon2-0 libjson-c3
-      - name: Install dependencies
+          DEBIAN_FRONTEND=noninteractive
+          apt-get install -y
+          asciidoc
+          clang
+          curl
+          libblkid-dev
+          libcryptsetup-dev
+          libdbus-1-dev
+          libsystemd-dev
+          libudev-dev
+          make
+          systemd
+          thin-provisioning-tools
+          udev
+          xfsprogs
+        if: matrix.image == 'ubuntu:groovy'
+      - name: Install dependencies for Fedora
         run: >
-          wget
-          "https://github.com/jbaublitz/stratisd/raw/deb/cryptsetup_2.3.0-1_amd64.deb"
-      - name: Install dependencies
-        run: |
-          sudo dpkg -i ./cryptsetup_2.3.0-1_amd64.deb
-          # Linking fails if libcryptsetup 2.2 is present - must force
-          # remove due to system dependencies
-          sudo dpkg --purge --force-all libcryptsetup12
+          dnf install -y
+          asciidoc
+          clang
+          cryptsetup-devel
+          curl
+          device-mapper-persistent-data
+          dbus-devel
+          libblkid-devel
+          make
+          systemd-devel
+          systemd-udev
+          xfsprogs
+        if: matrix.image == 'fedora:32'
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: ${{ matrix.components }}
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+      - name: Install all necessary Stratis files
+        run: make install
+      - name: Start udev
+        run: /usr/lib/systemd/systemd-udevd &
+      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
+        run: ${{ matrix.task }}
+
+  # TESTS WITH TANG
+  checks_with_tang:
+    strategy:
+      matrix:
+        include:
+          # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
+          - task: >-
+              TANG_URL=tang
+              RUST_LOG=libstratis=debug
+              make -f Makefile test-clevis-loop
+            toolchain: stable
+            components: cargo
+            image: fedora:32
+    runs-on: ubuntu-18.04
+    container:
+      image: ${{ matrix.image }}
+      options: --privileged -v /dev:/dev
+    services:
+      tang:
+        image: docker.pkg.github.com/stratis-storage/stratisd/tang:32
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+        options: --privileged -p 80:80
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies for Fedora
+        run: >
+          dnf install -y
+          clang
+          cryptsetup-devel
+          clevis
+          clevis-luks
+          curl
+          device-mapper-persistent-data
+          dbus-devel
+          libblkid-devel
+          make
+          systemd-devel
+          systemd-udev
+          xfsprogs
+      - name: Start udev
+        run: /usr/lib/systemd/systemd-udevd &
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: ${{ matrix.components }}
+          toolchain: ${{ matrix.toolchain }}
+          override: true
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
@@ -102,46 +271,27 @@ jobs:
           - task: make -f Makefile clippy
             toolchain: stable
             components: clippy
-          # Run audit on Rust stable.  Make it an allowed failure, because:
-          # * It takes 9 minutes, the longest of any task.
-          # * It should be an advisory, and should not gate our development.
-          - task: make -f Makefile audit
-            toolchain: stable
-            components: cargo
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
+    container:
+      image: fedora:32
+      options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
+      - name: Install dependencies
+        run: >
+          dnf install -y
+          clang
+          curl
+          cryptsetup-devel
+          dbus-devel
+          libblkid-devel
+          make
+          systemd-devel
       - uses: actions-rs/toolchain@v1
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
           override: true
-      - name: Install dependencies
-        run: |
-          sudo apt-get -q update
-          sudo apt-get -y install libdbus-1-dev libudev-dev libdbus-glib-1-dev
-      - name: Install dependencies
-        run: >
-          sudo add-apt-repository -y
-          "deb http://us.archive.ubuntu.com/ubuntu/ eoan main"
-      - name: Install dependencies
-        run: |
-          sudo apt-get -q update
-          # Update to a more recent version of blkid
-          sudo apt-get -y install util-linux libblkid-dev
-          # cryptsetup-bin conflicts with custom built cryptsetup
-          sudo apt-get remove cryptsetup-bin
-          sudo apt-get -y install libargon2-0 libjson-c3
-      - name: Install dependencies
-        run: >
-          wget
-          "https://github.com/jbaublitz/stratisd/raw/deb/cryptsetup_2.3.0-1_amd64.deb"
-      - name: Install dependencies
-        run: |
-          sudo dpkg -i ./cryptsetup_2.3.0-1_amd64.deb
-          # Linking fails if libcryptsetup 2.2 is present - must force
-          # remove due to system dependencies
-          sudo dpkg --purge --force-all libcryptsetup12
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
@@ -150,24 +300,26 @@ jobs:
       matrix:
         include:
           # MANDATORY PYTHON CHECKS ON RECOMMENDED DEVELOPMENT INTERPRETER
-          - python-version: 3.7.9
+          - python-version: 3.8.6
             dependencies: >
               pylint==2.4.4
               dbus-client-gen==0.4
               dbus-python-client-gen==0.7
               psutil==5.6.7
               pyudev==0.22.0
-              networkx==2.3
               requests==2.22.0
-              semantic_version==2.6.0
+              semantic_version==2.8.4
+              PyGithub==1.45
             task: >
+              (cd code_maintenance; make -f Makefile lint) &&
               (cd developer_tools; make -f Makefile lint) &&
               (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
-          - python-version: 3.7.9
-            dependencies: black==19.10b0 isort==4.3.21
+          - python-version: 3.8.6
+            dependencies: black==20.8b1 isort==4.3.21
             task: >
-              (cd developer_tools; make fmt-travis) &&
-              (cd tests/client-dbus; make fmt-travis)
+              (cd code_maintenance; make -f Makefile fmt-travis) &&
+              (cd developer_tools; make -f Makefile fmt-travis) &&
+              (cd tests/client-dbus; make -f Makefile fmt-travis)
           # MANDATORY PYTHON CHECKS ON LOWEST SUPPORTED INTERPRETER
           - python-version: 3.6.8
             dependencies: >
@@ -175,14 +327,11 @@ jobs:
               dbus-client-gen==0.4
               dbus-python-client-gen==0.7
               psutil==5.4.3
-              pyudev==0.22.0
-              networkx==2.3
-              requests==2.20.0
-              semantic_version==2.6.0
+              pyudev==0.21.0
             task: >
               (cd developer_tools; make -f Makefile lint) &&
               (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
@@ -200,14 +349,14 @@ jobs:
   yamllint:
     env:
       TASK: yamllint
-      PYTHON: 3.7.6
-    runs-on: ubuntu-latest
+      PYTHON: 3.8.6
+    runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
         with:
           python-version: ${{ env.PYTHON }}
       - name: Install dependencies
-        run: pip3 install yamllint==1.23.0
+        run: pip3 install yamllint==1.26.0
       - name: Run yamllint
         run: make -f Makefile $TASK

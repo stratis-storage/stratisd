@@ -6,7 +6,6 @@ use std::{
     collections::{hash_map::RandomState, HashSet},
     fs::File,
     io::Read,
-    iter::FromIterator,
     os::unix::io::{AsRawFd, FromRawFd, RawFd},
     path::{Path, PathBuf},
 };
@@ -42,7 +41,7 @@ pub fn create_pool_idempotent_or_err(
         .iter()
         .filter_map(|(_, tier, bd)| {
             if *tier == BlockDevTier::Data {
-                Some(bd.devnode().physical_path().to_owned())
+                Some(bd.devnode().to_owned())
             } else {
                 None
             }
@@ -78,8 +77,8 @@ pub fn init_cache_idempotent_or_err<I>(
 where
     I: Iterator<Item = PathBuf>,
 {
-    let input_devices = HashSet::from_iter(blockdev_paths.iter().map(|p| p.to_path_buf()));
-    let existing_devices = HashSet::<_, RandomState>::from_iter(existing_iter);
+    let input_devices: HashSet<_> = blockdev_paths.iter().map(|p| p.to_path_buf()).collect();
+    let existing_devices = existing_iter.collect();
     if input_devices == existing_devices {
         Ok(SetCreateAction::empty())
     } else {
@@ -114,7 +113,7 @@ pub fn set_key_shared(key_fd: RawFd) -> StratisResult<SizedKeyMemory> {
                 ErrorEnum::Invalid,
                 format!(
                     "Provided key exceeded maximum allow length of {}",
-                    Bytes(MAX_STRATIS_PASS_SIZE as u64)
+                    Bytes::from(MAX_STRATIS_PASS_SIZE)
                 ),
             ));
         }

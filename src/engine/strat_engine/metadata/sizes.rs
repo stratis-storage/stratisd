@@ -48,7 +48,7 @@ pub mod mda_size {
     use devicemapper::{Bytes, Sectors};
 
     pub const _MDA_REGION_HDR_SIZE: usize = 32;
-    const MDA_REGION_HDR_SIZE: Bytes = Bytes(_MDA_REGION_HDR_SIZE as u64);
+    const MDA_REGION_HDR_SIZE: Bytes = Bytes(_MDA_REGION_HDR_SIZE as u128);
 
     // The minimum size allocated for variable length metadata
     pub const MIN_MDA_DATA_REGION_SIZE: Bytes = Bytes(260_064);
@@ -237,6 +237,12 @@ pub mod blkdev_size {
 
         pub fn sectors(self) -> Sectors {
             self.0
+        }
+    }
+
+    impl Default for BlockdevSize {
+        fn default() -> BlockdevSize {
+            BlockdevSize(Sectors(0))
         }
     }
 }

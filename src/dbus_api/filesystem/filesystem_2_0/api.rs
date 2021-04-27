@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus::tree::{Access, EmitsChangedSignal, Factory, MTFn, Method, Property};
+use dbus_tree::{Access, EmitsChangedSignal, Factory, MTSync, Method, Property};
 
 use crate::dbus_api::{
     consts,
@@ -14,7 +14,7 @@ use crate::dbus_api::{
     util::{get_parent, get_uuid},
 };
 
-pub fn rename_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+pub fn rename_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
     f.method("SetName", (), rename_filesystem)
         .in_arg(("name", "s"))
         // b: true if UUID of changed resource has been returned
@@ -26,35 +26,35 @@ pub fn rename_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TDa
         .out_arg(("return_string", "s"))
 }
 
-pub fn devnode_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {
+pub fn devnode_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
     f.property::<&str, _>(consts::FILESYSTEM_DEVNODE_PROP, ())
         .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::Const)
+        .emits_changed(EmitsChangedSignal::Invalidates)
         .on_get(get_filesystem_devnode)
 }
 
-pub fn name_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {
+pub fn name_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
     f.property::<&str, _>(consts::FILESYSTEM_NAME_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_filesystem_name)
 }
 
-pub fn pool_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {
+pub fn pool_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
     f.property::<&dbus::Path, _>(consts::FILESYSTEM_POOL_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_parent)
 }
 
-pub fn uuid_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {
+pub fn uuid_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
     f.property::<&str, _>(consts::FILESYSTEM_UUID_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_uuid)
 }
 
-pub fn created_property(f: &Factory<MTFn<TData>, TData>) -> Property<MTFn<TData>, TData> {
+pub fn created_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
     f.property::<&str, _>("Created", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)

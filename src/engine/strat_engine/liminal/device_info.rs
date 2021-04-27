@@ -16,7 +16,7 @@ use crate::engine::{
         liminal::identify::{DeviceInfo, LuksInfo, StratisInfo},
         metadata::StratisIdentifiers,
     },
-    types::{DevUuid, EncryptionInfo},
+    types::{DevUuid, EncryptionInfo, LockedPoolDevice, LockedPoolInfo},
 };
 
 /// Info for a discovered Luks Device belonging to Stratis.
@@ -259,6 +259,8 @@ impl LInfo {
         // Returns true if the information found via udev for two devices is
         // compatible, otherwise false.
         // Precondition: Stratis identifiers of devices are the same
+        #[allow(unknown_lints)]
+        #[allow(clippy::suspicious_operation_groupings)]
         fn luks_luks_compatible(info_1: &LLuksInfo, info_2: &LuksInfo) -> bool {
             assert_eq!(info_1.ids.identifiers, info_2.info.identifiers);
             info_1.ids.device_number == info_2.info.device_number
@@ -406,6 +408,51 @@ impl DeviceSet {
             .iter()
             .filter_map(|(_, info)| info.encryption_info())
             .next()
+    }
+
+    /// The encryption information and devices registered for this locked pools to be
+    /// exported over the API. If none of the infos correspond to a Stratis managed
+    /// encrypted device, None.
+    ///
+    /// This method filters out Stratis devices that have no detected associated
+    /// LUKS2 device. This could happen for encrypted devices if the LUKS2 device
+    /// is detected after the unlocked Stratis device but should eventually become
+    /// consistent.
+    pub fn locked_pool_info(&self) -> Option<LockedPoolInfo> {
+        let encryption_info = self
+            .internal
+            .iter()
+            .filter_map(|(_, info)| info.encryption_info())
+            .next();
+        encryption_info.and_then(|info| {
+            let devices = self
+                .internal
+                .iter()
+                .map(|(uuid, l)| {
+                    let devnode = match l {
+                        LInfo::Stratis(strat_info) => {
+                            strat_info.luks.as_ref().map(|l| l.ids.devnode.clone())
+                        }
+                        LInfo::Luks(luks_info) => Some(luks_info.ids.devnode.clone()),
+                    };
+                    devnode.map(|devnode| LockedPoolDevice {
+                        devnode,
+                        uuid: *uuid,
+                    })
+                })
+                .fold(Some(Vec::new()), |vec, dev_info| {
+                    vec.and_then(|mut v| {
+                        dev_info.map(|d| {
+                            v.push(d);
+                            v
+                        })
+                    })
+                });
+            devices.map(|d| LockedPoolInfo {
+                info: info.clone(),
+                devices: d,
+            })
+        })
     }
 
     /// Process the data from a remove udev event. Since remove events are

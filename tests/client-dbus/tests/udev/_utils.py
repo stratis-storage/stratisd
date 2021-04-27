@@ -23,6 +23,7 @@ import string
 import subprocess
 import sys
 import time
+import unittest
 from tempfile import NamedTemporaryFile
 
 # isort: THIRDPARTY
@@ -43,8 +44,10 @@ from stratisd_client_dbus import (
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from ._dm import _get_stratis_devices, remove_stratis_setup
+from ._loopback import LoopBackDevices
 
 _STRATISD = os.environ["STRATISD"]
+_STRATIS_PREDICT_USAGE = os.environ["STRATIS_PREDICT_USAGE"]
 
 CRYPTO_LUKS_FS_TYPE = "crypto_LUKS"
 STRATIS_FS_TYPE = "stratis"
@@ -82,6 +85,7 @@ def create_pool(name, devices, *, key_description=None):
             "key_desc": (False, "")
             if key_description is None
             else (True, key_description),
+            "clevis_info": (False, ("", "")),
         },
     )
 
@@ -415,3 +419,49 @@ class OptionalKeyServiceContextManager:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self._keys.__exit__(exc_type, exc_val, exc_tb)
         self._ctxt_manager.__exit__(exc_type, exc_val, exc_tb)
+
+
+class UdevTest(unittest.TestCase):
+    """
+    Do some setup and teardown of loopbacked devices and what not.
+    """
+
+    def setUp(self):
+        self._lb_mgr = LoopBackDevices()
+        self.addCleanup(self._clean_up)
+
+    def _clean_up(self):
+        """
+        Cleans up the test environment
+        :return: None
+        """
+        stratisds = list(processes("stratisd"))
+        for process in stratisds:
+            process.terminate()
+        psutil.wait_procs(stratisds)
+
+        remove_stratis_dm_devices()
+        self._lb_mgr.destroy_all()
+
+    def wait_for_pools(self, expected_num, *, name=None):
+        """
+        Returns a list of all pools found by GetManagedObjects, or a list
+        of pools with names matching the specified name, if passed.
+        :param int expected_num: the number of pools expected
+        :param name: filter for pool name
+        :type name: str or NoneType
+        :return: list of pool information found
+        :rtype: list of (str * MOPool)
+        """
+        found_num = None
+
+        end_time = time.time() + 10.0
+
+        while time.time() < end_time and not expected_num == found_num:
+            known_pools = get_pools(name=name)
+            found_num = len(known_pools)
+            time.sleep(1)
+
+        self.assertEqual(found_num, expected_num)
+
+        return known_pools

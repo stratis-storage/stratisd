@@ -6,9 +6,9 @@ use std::collections::HashMap;
 
 use dbus::{
     arg::{RefArg, Variant},
-    tree::{MTFn, MethodInfo, MethodResult},
     Message,
 };
+use dbus_tree::{MTSync, MethodInfo, MethodResult};
 use itertools::Itertools;
 
 use crate::dbus_api::{
@@ -17,8 +17,10 @@ use crate::dbus_api::{
 
 const ALL_PROPERTIES: [&str; 1] = [consts::BLOCKDEV_TOTAL_SIZE_PROP];
 
+#[allow(unknown_lints)]
+#[allow(clippy::unnecessary_wraps)]
 fn get_properties_shared(
-    m: &MethodInfo<MTFn<TData>, TData>,
+    m: &MethodInfo<MTSync<TData>, TData>,
     properties: &mut dyn Iterator<Item = String>,
 ) -> MethodResult {
     let message: &Message = m.msg;
@@ -26,24 +28,20 @@ fn get_properties_shared(
 
     let return_message = message.method_return();
 
-    let return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> =
-        properties
-            .unique()
-            .filter_map(|prop| match prop.as_str() {
-                consts::BLOCKDEV_TOTAL_SIZE_PROP => Some((
-                    prop,
-                    result_to_tuple(blockdev_operation(
-                        m.tree,
-                        object_path.get_name(),
-                        |_, bd| {
-                            Ok((u128::from(*bd.size()) * devicemapper::SECTOR_SIZE as u128)
-                                .to_string())
-                        },
-                    )),
+    let return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = properties
+        .unique()
+        .filter_map(|prop| match prop.as_str() {
+            consts::BLOCKDEV_TOTAL_SIZE_PROP => Some((
+                prop,
+                result_to_tuple(blockdev_operation(
+                    m.tree,
+                    object_path.get_name(),
+                    |_, bd| Ok((*bd.size().bytes()).to_string()),
                 )),
-                _ => None,
-            })
-            .collect();
+            )),
+            _ => None,
+        })
+        .collect();
 
     Ok(vec![return_message.append1(return_value)])
 }

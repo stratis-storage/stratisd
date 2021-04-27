@@ -4,7 +4,7 @@
 
 // Code to handle the backing store of a pool.
 
-use std::{cmp, path::Path};
+use std::{borrow::Cow, cmp, path::Path};
 
 use chrono::{DateTime, Utc};
 use serde_json::Value;
@@ -178,13 +178,13 @@ impl Backstore {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         mda_data_size: MDADataSize,
-        key_desc: Option<&KeyDescription>,
+        encryption_info: &EncryptionInfo,
     ) -> StratisResult<Backstore> {
         let data_tier = DataTier::new(BlockDevMgr::initialize(
             pool_uuid,
             paths,
             mda_data_size,
-            key_desc,
+            encryption_info,
         )?);
 
         Ok(Backstore {
@@ -224,7 +224,12 @@ impl Backstore {
                 // If it is desired to change a cache dev to a data dev, it
                 // should be removed and then re-added in order to ensure
                 // that the MDA region is set to the correct size.
-                let bdm = BlockDevMgr::initialize(pool_uuid, paths, MDADataSize::default(), None)?;
+                let bdm = BlockDevMgr::initialize(
+                    pool_uuid,
+                    paths,
+                    MDADataSize::default(),
+                    &EncryptionInfo::default(),
+                )?;
 
                 let cache_tier = CacheTier::new(bdm)?;
 
@@ -526,10 +531,9 @@ impl Backstore {
         // will be allocated incorrectly from the cap device.
         assert!(
             self.next <= size,
-            format!(
-                "next index, {}, is greater than the total size available {}",
-                self.next, size
-            )
+            "next index, {}, is greater than the total size available {}",
+            self.next,
+            size
         );
         size - self.next
     }
@@ -648,7 +652,7 @@ impl Backstore {
         self.data_tier.block_mgr.is_encrypted()
     }
 
-    pub fn data_tier_encryption_info(&self) -> Option<&EncryptionInfo> {
+    pub fn data_tier_encryption_info(&self) -> Cow<EncryptionInfo> {
         self.data_tier.block_mgr.encryption_info()
     }
 
@@ -656,12 +660,20 @@ impl Backstore {
         self.cache_tier.is_some()
     }
 
-    pub fn bind_clevis(&mut self, pin: String, clevis_info: Value) -> StratisResult<bool> {
+    pub fn bind_clevis(&mut self, pin: &str, clevis_info: &Value) -> StratisResult<bool> {
         self.data_tier.block_mgr.bind_clevis(pin, clevis_info)
     }
 
     pub fn unbind_clevis(&mut self) -> StratisResult<bool> {
         self.data_tier.block_mgr.unbind_clevis()
+    }
+
+    pub fn bind_keyring(&mut self, key_description: &KeyDescription) -> StratisResult<bool> {
+        self.data_tier.block_mgr.bind_keyring(key_description)
+    }
+
+    pub fn unbind_keyring(&mut self) -> StratisResult<bool> {
+        self.data_tier.block_mgr.unbind_keyring()
     }
 }
 
@@ -699,8 +711,6 @@ impl Recordable<BackstoreSave> for Backstore {
 #[cfg(test)]
 mod tests {
     use std::fs::OpenOptions;
-
-    use uuid::Uuid;
 
     use devicemapper::{CacheDevStatus, DataBlocks, IEC};
 
@@ -753,9 +763,14 @@ mod tests {
         let (cachedevpaths, paths) = paths.split_at(1);
         let (datadevpaths, initdatapaths) = paths.split_at(1);
 
-        let pool_uuid = Uuid::new_v4();
-        let mut backstore =
-            Backstore::initialize(pool_uuid, initdatapaths, MDADataSize::default(), None).unwrap();
+        let pool_uuid = PoolUuid::new_v4();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            initdatapaths,
+            MDADataSize::default(),
+            &EncryptionInfo::default(),
+        )
+        .unwrap();
 
         invariant(&backstore);
 
@@ -832,14 +847,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn travis_test_add_cache_devs() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(4, 5, None),
-            test_add_cache_devs,
-        );
-    }
-
     /// Create a backstore.
     /// Request a amount that can not be allocated because the modulus is
     /// bigger than the reqested amount.
@@ -848,9 +855,14 @@ mod tests {
     fn test_request(paths: &[&Path]) {
         assert!(!paths.is_empty());
 
-        let pool_uuid = Uuid::new_v4();
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
+        let pool_uuid = PoolUuid::new_v4();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            paths,
+            MDADataSize::default(),
+            &EncryptionInfo::default(),
+        )
+        .unwrap();
 
         assert_matches!(
             backstore
@@ -895,11 +907,6 @@ mod tests {
         real::test_with_spec(&real::DeviceLimits::AtLeast(1, None, None), test_request);
     }
 
-    #[test]
-    fn travis_test_request() {
-        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_request);
-    }
-
     /// Create a backstore.
     /// Initialize a cache and verify that there is a new device representing
     /// the cache.
@@ -908,10 +915,15 @@ mod tests {
 
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
-        let pool_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
 
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths1, MDADataSize::default(), None).unwrap();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            paths1,
+            MDADataSize::default(),
+            &EncryptionInfo::default(),
+        )
+        .unwrap();
 
         for path in paths1 {
             assert_eq!(
@@ -959,10 +971,5 @@ mod tests {
     #[test]
     fn real_test_setup() {
         real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_setup);
-    }
-
-    #[test]
-    fn travis_test_setup() {
-        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(2, 3, None), test_setup);
     }
 }

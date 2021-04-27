@@ -3,11 +3,11 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use chrono::{DateTime, TimeZone, Utc};
-use uuid::Uuid;
+use data_encoding::BASE32_NOPAD;
 
 use std::{
-    fs::File,
-    io::Read,
+    fs::{File, OpenOptions},
+    io::{Read, Write},
     path::{Path, PathBuf},
     thread::sleep,
     time::Duration,
@@ -33,7 +33,7 @@ use crate::{
             serde_structs::FilesystemSave,
             thinpool::{thinpool::DATA_LOWATER, DATA_BLOCK_SIZE},
         },
-        types::{FilesystemUuid, MaybeDbusPath, Name, PoolUuid},
+        types::{FilesystemUuid, Name, PoolUuid, StratisUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -50,7 +50,6 @@ pub const FILESYSTEM_LOWATER: Sectors = Sectors(4 * (DATA_LOWATER.0 * DATA_BLOCK
 pub struct StratFilesystem {
     thin_dev: ThinDev,
     created: DateTime<Utc>,
-    dbus_path: MaybeDbusPath,
 }
 
 impl StratFilesystem {
@@ -61,7 +60,7 @@ impl StratFilesystem {
         size: Option<Sectors>,
         id: ThinDevId,
     ) -> StratisResult<(FilesystemUuid, StratFilesystem)> {
-        let fs_uuid = Uuid::new_v4();
+        let fs_uuid = FilesystemUuid::new_v4();
         let (dm_name, dm_uuid) = format_thin_ids(pool_uuid, ThinRole::Filesystem(fs_uuid));
         let mut thin_dev = ThinDev::new(
             get_dm(),
@@ -72,7 +71,7 @@ impl StratFilesystem {
             id,
         )?;
 
-        if let Err(err) = create_fs(&thin_dev.devnode(), Some(fs_uuid)) {
+        if let Err(err) = create_fs(&thin_dev.devnode(), Some(StratisUuid::Fs(fs_uuid)), false) {
             udev_settle().unwrap_or_else(|err| {
                 warn!("{}", err);
                 sleep(Duration::from_secs(5));
@@ -95,7 +94,6 @@ impl StratFilesystem {
             StratFilesystem {
                 thin_dev,
                 created: Utc::now(),
-                dbus_path: MaybeDbusPath(None),
             },
         ))
     }
@@ -118,8 +116,45 @@ impl StratFilesystem {
         Ok(StratFilesystem {
             thin_dev,
             created: Utc.timestamp(fssave.created as i64, 0),
-            dbus_path: MaybeDbusPath(None),
         })
+    }
+
+    /// Send a synthetic udev change event to the devicemapper device representing
+    /// the filesystem.
+    pub fn udev_fs_change(&self, pool_name: &str, fs_uuid: FilesystemUuid, fs_name: &str) {
+        fn udev_change_event(
+            thin_dev: &ThinDev,
+            pool_name: &str,
+            fs_uuid: FilesystemUuid,
+            fs_name: &str,
+        ) -> StratisResult<()> {
+            let device = thin_dev.device();
+            let uevent_file = [
+                "/sys/dev/block",
+                &format!("{}:{}", device.major, device.minor),
+                "uevent",
+            ]
+            .iter()
+            .collect::<PathBuf>();
+            OpenOptions::new()
+                .write(true)
+                .open(&uevent_file)?
+                .write_all(
+                    format!(
+                        "{} {} STRATISPOOLNAME={} STRATISFSNAME={}",
+                        devlinks::UEVENT_CHANGE_EVENT,
+                        fs_uuid,
+                        BASE32_NOPAD.encode(pool_name.as_bytes()),
+                        BASE32_NOPAD.encode(fs_name.as_bytes()),
+                    )
+                    .as_bytes(),
+                )?;
+            Ok(())
+        }
+
+        if let Err(e) = udev_change_event(&self.thin_dev, pool_name, fs_uuid, fs_name) {
+            warn!("Failed to notify udev to perform symlink operation: {}", e);
+        }
     }
 
     /// Create a snapshot of the filesystem. Return the resulting filesystem/ThinDev
@@ -176,7 +211,6 @@ impl StratFilesystem {
                 Ok(StratFilesystem {
                     thin_dev,
                     created: Utc::now(),
-                    dbus_path: MaybeDbusPath(None),
                 })
             }
             Err(e) => Err(StratisError::Engine(
@@ -324,14 +358,6 @@ impl Filesystem for StratFilesystem {
             }
         }
     }
-
-    fn set_dbus_path(&mut self, path: MaybeDbusPath) {
-        self.dbus_path = path
-    }
-
-    fn get_dbus_path(&self) -> &MaybeDbusPath {
-        &self.dbus_path
-    }
 }
 
 /// Return total bytes allocated to the filesystem, total bytes used by data/metadata
@@ -345,7 +371,7 @@ pub fn fs_usage(mount_point: &Path) -> StratisResult<(Bytes, Bytes)> {
         stat.blocks_free() as u64,
     );
     Ok((
-        Bytes(block_size * blocks),
-        Bytes(block_size * (blocks - blocks_free)),
+        Bytes::from(block_size * blocks),
+        Bytes::from(block_size * (blocks - blocks_free)),
     ))
 }

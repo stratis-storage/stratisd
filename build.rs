@@ -1,3 +1,8 @@
+#[cfg(feature = "systemd_compat")]
+use std::{env, path::PathBuf};
+
+#[cfg(feature = "systemd_compat")]
+use bindgen::Builder;
 use pkg_config::Config;
 
 fn main() {
@@ -13,5 +18,21 @@ fn main() {
             "At least version 2.32.0 of blkid is required to compile stratisd: {}",
             e
         );
+    }
+
+    #[cfg(feature = "systemd_compat")]
+    {
+        let bindings = Builder::default()
+            .header("systemd-header.h")
+            .generate()
+            .expect("Could not generate bindings for systemd");
+
+        let mut path = PathBuf::from(env::var("OUT_DIR").unwrap());
+        path.push("bindings.rs");
+        bindings
+            .write_to_file(&path)
+            .expect("Failed to write bindings to file");
+
+        println!("cargo:rustc-link-lib=systemd");
     }
 }

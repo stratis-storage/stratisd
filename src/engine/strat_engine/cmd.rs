@@ -16,14 +16,22 @@
 
 use std::{
     collections::HashMap,
+    io::{Read, Write},
     path::{Path, PathBuf},
-    process::Command,
+    process::{Command, Stdio},
 };
 
+use libc::c_uint;
+use libcryptsetup_rs::SafeMemHandle;
 use serde_json::Value;
-use uuid::Uuid;
 
-use crate::stratis::{StratisError, StratisResult};
+use crate::{
+    engine::{
+        engine::MAX_STRATIS_PASS_SIZE,
+        types::{FilesystemUuid, SizedKeyMemory, StratisUuid},
+    },
+    stratis::{StratisError, StratisResult},
+};
 
 const BINARIES_PATHS: [&str; 4] = ["/usr/sbin", "/sbin", "/usr/bin", "/bin"];
 
@@ -49,9 +57,49 @@ const UDEVADM: &str = "udevadm";
 const XFS_DB: &str = "xfs_db";
 const XFS_GROWFS: &str = "xfs_growfs";
 const CLEVIS: &str = "clevis";
+const CLEVIS_LIB: &str = "clevis-luks-common-functions";
 const CLEVIS_BIND: &str = "clevis-luks-bind";
 const CLEVIS_UNBIND: &str = "clevis-luks-unbind";
 const CLEVIS_UNLOCK: &str = "clevis-luks-unlock";
+const CLEVIS_DECRYPT: &str = "clevis-decrypt";
+const CLEVIS_DECRYPT_TANG: &str = "clevis-decrypt-tang";
+const CLEVIS_DECRYPT_TPM2: &str = "clevis-decrypt-tpm2";
+const CLEVIS_ENCRYPT_TANG: &str = "clevis-encrypt-tang";
+const CLEVIS_ENCRYPT_TPM2: &str = "clevis-encrypt-tpm2";
+const JOSE: &str = "jose";
+const JQ: &str = "jq";
+const CRYPTSETUP: &str = "cryptsetup";
+const CURL: &str = "curl";
+const TPM2_CREATEPRIMARY: &str = "tpm2_createprimary";
+const TPM2_UNSEAL: &str = "tpm2_unseal";
+const TPM2_LOAD: &str = "tpm2_load";
+const MKTEMP: &str = "mktemp";
+
+// This list of executables required for Clevis to function properly is based
+// off of the Clevis dracut module and the Stratis dracut module for supporting
+// Clevis in the initramfs. This list is the complete list of executables required
+// in the initramfs and so we must check that all of these are present for proper
+// Clevis support outside of the initramfs as well.
+const CLEVIS_EXEC_NAMES: &[&str] = &[
+    CLEVIS,
+    CLEVIS_BIND,
+    CLEVIS_UNBIND,
+    CLEVIS_UNLOCK,
+    CLEVIS_LIB,
+    CLEVIS_DECRYPT,
+    CLEVIS_DECRYPT_TANG,
+    CLEVIS_DECRYPT_TPM2,
+    CLEVIS_ENCRYPT_TANG,
+    CLEVIS_ENCRYPT_TPM2,
+    JOSE,
+    JQ,
+    CRYPTSETUP,
+    CURL,
+    TPM2_CREATEPRIMARY,
+    TPM2_UNSEAL,
+    TPM2_LOAD,
+    MKTEMP,
+];
 
 lazy_static! {
     static ref BINARIES: HashMap<String, Option<PathBuf>> = [
@@ -61,14 +109,31 @@ lazy_static! {
         (UDEVADM.to_string(), find_binary(UDEVADM)),
         (XFS_DB.to_string(), find_binary(XFS_DB)),
         (XFS_GROWFS.to_string(), find_binary(XFS_GROWFS)),
-        (CLEVIS.to_string(), find_binary(CLEVIS)),
-        (CLEVIS_BIND.to_string(), find_binary(CLEVIS_BIND)),
-        (CLEVIS_UNBIND.to_string(), find_binary(CLEVIS_UNBIND)),
-        (CLEVIS_UNLOCK.to_string(), find_binary(CLEVIS_UNLOCK)),
     ]
     .iter()
     .cloned()
     .collect();
+    static ref CLEVIS_BINARIES: Option<(PathBuf, PathBuf)> = CLEVIS_EXEC_NAMES
+        .iter()
+        .fold(Some(HashMap::new()), |hm, name| {
+            match (hm, find_binary(name)) {
+                (None, _) => None,
+                (Some(mut hm), Some(path)) => {
+                    hm.insert((*name).to_string(), path);
+                    Some(hm)
+                }
+                (_, None) => {
+                    info!(
+                        "Clevis executable {} not found; disabling Clevis support",
+                        name
+                    );
+                    None
+                }
+            }
+        })
+        .and_then(|mut hm| hm
+            .remove(CLEVIS)
+            .and_then(|c| hm.remove(JOSE).map(|j| (c, j))));
 }
 
 /// Verify that all binaries that the engine might invoke are available at some
@@ -129,9 +194,34 @@ fn get_executable(name: &str) -> &Path {
         .expect("verify_binaries() was previously called and returned no error")
 }
 
+/// Get an absolute path for the Clevis executable or return an error if Clevis
+/// support is disabled.
+fn get_clevis_executable() -> StratisResult<&'static Path> {
+    Ok(CLEVIS_BINARIES.as_ref().map(|(c, _)| c).ok_or_else(|| {
+        StratisError::Error(format!(
+            "Clevis has been disabled due to some of the required executables not \
+            being found on this system. Required executables are: {:?}",
+            CLEVIS_EXEC_NAMES,
+        ))
+    })?)
+}
+
+/// Get an absolute path for the jose executable or return an error if Clevis
+/// support is disabled.
+fn get_jose_executable() -> StratisResult<&'static Path> {
+    Ok(CLEVIS_BINARIES.as_ref().map(|(_, j)| j).ok_or_else(|| {
+        StratisError::Error(format!(
+            "Clevis has been disabled due to some of the required executables not \
+            being found on this system. Required executables are: {:?}",
+            CLEVIS_EXEC_NAMES,
+        ))
+    })?)
+}
+
 /// Create a filesystem on devnode. If uuid specified, set the UUID of the
-/// filesystem on creation.
-pub fn create_fs(devnode: &Path, uuid: Option<Uuid>) -> StratisResult<()> {
+/// filesystem on creation. `noalign` should be `true` when creating small metadata filesystems
+/// like the MDV.
+pub fn create_fs(devnode: &Path, uuid: Option<StratisUuid>, noalign: bool) -> StratisResult<()> {
     let mut command = Command::new(get_executable(MKFS_XFS).as_os_str());
     command.arg("-f");
     command.arg("-q");
@@ -140,6 +230,10 @@ pub fn create_fs(devnode: &Path, uuid: Option<Uuid>) -> StratisResult<()> {
     if let Some(uuid) = uuid {
         command.arg("-m");
         command.arg(format!("uuid={}", uuid));
+    }
+    if noalign {
+        command.arg("-d");
+        command.arg("noalign");
     }
     execute_cmd(&mut command)
 }
@@ -155,7 +249,7 @@ pub fn xfs_growfs(mount_point: &Path) -> StratisResult<()> {
 }
 
 /// Set a new UUID for filesystem on the devnode.
-pub fn set_uuid(devnode: &Path, uuid: Uuid) -> StratisResult<()> {
+pub fn set_uuid(devnode: &Path, uuid: FilesystemUuid) -> StratisResult<()> {
     execute_cmd(
         Command::new(get_executable(XFS_DB).as_os_str())
             .arg("-x")
@@ -193,11 +287,12 @@ pub fn udev_settle() -> StratisResult<()> {
 pub fn clevis_luks_bind(
     dev_path: &Path,
     keyfile_path: &Path,
+    slot: c_uint,
     pin: &str,
     json: &Value,
     yes: bool,
 ) -> StratisResult<()> {
-    let mut cmd = Command::new(CLEVIS);
+    let mut cmd = Command::new(get_clevis_executable()?);
 
     cmd.arg("luks").arg("bind");
 
@@ -209,6 +304,8 @@ pub fn clevis_luks_bind(
         .arg(dev_path.display().to_string())
         .arg("-k")
         .arg(keyfile_path)
+        .arg("-t")
+        .arg(slot.to_string())
         .arg(pin)
         .arg(json.to_string());
 
@@ -218,7 +315,7 @@ pub fn clevis_luks_bind(
 /// Unbind a LUKS device using clevis.
 pub fn clevis_luks_unbind(dev_path: &Path, keyslot: libc::c_uint) -> StratisResult<()> {
     execute_cmd(
-        Command::new(CLEVIS)
+        Command::new(get_clevis_executable()?)
             .arg("luks")
             .arg("unbind")
             .arg("-d")
@@ -232,7 +329,7 @@ pub fn clevis_luks_unbind(dev_path: &Path, keyslot: libc::c_uint) -> StratisResu
 /// Unlock a device using the clevis CLI.
 pub fn clevis_luks_unlock(dev_path: &Path, dm_name: &str) -> StratisResult<()> {
     execute_cmd(
-        Command::new(CLEVIS)
+        Command::new(get_clevis_executable()?)
             .arg("luks")
             .arg("unlock")
             .arg("-d")
@@ -240,4 +337,68 @@ pub fn clevis_luks_unlock(dev_path: &Path, dm_name: &str) -> StratisResult<()> {
             .arg("-n")
             .arg(dm_name),
     )
+}
+
+/// Safely query clevis for the decrypted passphrase stored on a LUKS2 volume.
+pub fn clevis_decrypt(jwe: &Value) -> StratisResult<SizedKeyMemory> {
+    let mut jose_child = Command::new(get_jose_executable()?)
+        .arg("jwe")
+        .arg("fmt")
+        .arg("-i-")
+        .arg("-c")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()?;
+    let mut jose_stdin = jose_child.stdin.take().ok_or_else(|| {
+        StratisError::Error(
+            "Could not communicate with executable {} through stdin; Stratis will \
+            not be able to decrypt the Clevis passphrase"
+                .to_string(),
+        )
+    })?;
+    jose_stdin.write_all(jwe.to_string().as_bytes())?;
+
+    jose_child.wait()?;
+
+    let mut jose_output = String::new();
+    jose_child
+        .stdout
+        .ok_or_else(|| {
+            StratisError::Error(
+                "Spawned jose process had no stdout; cannot continue with password \
+            decryption"
+                    .to_string(),
+            )
+        })?
+        .read_to_string(&mut jose_output)?;
+
+    let mut clevis_child = Command::new(get_clevis_executable()?)
+        .arg("decrypt")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()?;
+    let mut clevis_stdin = clevis_child.stdin.take().ok_or_else(|| {
+        StratisError::Error(
+            "Could not communicate with executable clevis through stdin; Stratis will \
+            not be able to decrypt the Clevis passphrase"
+                .to_string(),
+        )
+    })?;
+    clevis_stdin.write_all(jose_output.as_bytes())?;
+    drop(clevis_stdin);
+
+    clevis_child.wait()?;
+
+    let mut mem = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
+    let bytes_read = clevis_child
+        .stdout
+        .ok_or_else(|| {
+            StratisError::Error(
+                "Spawned clevis process had no stdout; cannot continue with password \
+            decryption"
+                    .to_string(),
+            )
+        })?
+        .read(mem.as_mut())?;
+    Ok(SizedKeyMemory::new(mem, bytes_read))
 }

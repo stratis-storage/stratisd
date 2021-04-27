@@ -167,11 +167,12 @@ impl Recordable<DataTierSave> for DataTier {
 #[cfg(test)]
 mod tests {
 
-    use uuid::Uuid;
-
-    use crate::engine::strat_engine::{
-        metadata::MDADataSize,
-        tests::{loopbacked, real},
+    use crate::engine::{
+        strat_engine::{
+            metadata::MDADataSize,
+            tests::{loopbacked, real},
+        },
+        types::EncryptionInfo,
     };
 
     use super::*;
@@ -183,9 +184,15 @@ mod tests {
         assert!(paths.len() > 1);
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
-        let pool_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
 
-        let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MDADataSize::default(), None).unwrap();
+        let mgr = BlockDevMgr::initialize(
+            pool_uuid,
+            paths1,
+            MDADataSize::default(),
+            &EncryptionInfo::default(),
+        )
+        .unwrap();
 
         let mut data_tier = DataTier::new(mgr);
 
@@ -237,14 +244,6 @@ mod tests {
     fn real_test_add_and_alloc() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(2, None, None),
-            test_add_and_alloc,
-        );
-    }
-
-    #[test]
-    fn travis_test_add_and_alloc() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, None),
             test_add_and_alloc,
         );
     }

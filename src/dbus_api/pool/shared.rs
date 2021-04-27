@@ -6,9 +6,9 @@ use std::path::Path;
 
 use dbus::{
     arg::{Array, IterAppend},
-    tree::{MTFn, MethodErr, MethodInfo, MethodResult, PropInfo, Tree},
     Message,
 };
+use dbus_tree::{MTSync, MethodErr, MethodInfo, MethodResult, PropInfo, Tree};
 
 use crate::{
     dbus_api::{
@@ -28,7 +28,7 @@ pub enum BlockDevOp {
 }
 
 pub fn pool_operation<F, R>(
-    tree: &Tree<MTFn<TData>, TData>,
+    tree: &Tree<MTSync<TData>, TData>,
     object_path: &dbus::Path<'static>,
     closure: F,
 ) -> Result<R, String>
@@ -42,14 +42,17 @@ where
         .get(object_path)
         .expect("implicit argument must be in tree");
 
-    let pool_uuid = pool_path
-        .get_data()
-        .as_ref()
-        .ok_or_else(|| format!("no data for object path {}", object_path))?
-        .uuid;
+    let pool_uuid = typed_uuid_string_err!(
+        pool_path
+            .get_data()
+            .as_ref()
+            .ok_or_else(|| format!("no data for object path {}", object_path))?
+            .uuid;
+        Pool
+    );
 
-    let engine = dbus_context.engine.borrow();
-    let (pool_name, pool) = engine
+    let mutex_lock = mutex_lock!(dbus_context.engine);
+    let (pool_name, pool) = mutex_lock
         .get_pool(pool_uuid)
         .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
 
@@ -57,47 +60,47 @@ where
 }
 
 pub fn get_pool_encryption_key_desc(
-    m: &MethodInfo<MTFn<TData>, TData>,
+    m: &MethodInfo<MTSync<TData>, TData>,
 ) -> Result<(bool, String), String> {
     pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
         Ok(option_to_tuple(
             pool.encryption_info()
-                .map(|i| i.key_description.as_application_str().to_string()),
+                .key_description
+                .as_ref()
+                .map(|kd| kd.as_application_str().to_string()),
             String::new(),
         ))
     })
 }
 
-pub fn get_pool_has_cache(m: &MethodInfo<MTFn<TData>, TData>) -> Result<bool, String> {
+pub fn get_pool_has_cache(m: &MethodInfo<MTSync<TData>, TData>) -> Result<bool, String> {
     pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
         Ok(pool.has_cache())
     })
 }
 
-pub fn get_pool_total_size(m: &MethodInfo<MTFn<TData>, TData>) -> Result<String, String> {
+pub fn get_pool_total_size(m: &MethodInfo<MTSync<TData>, TData>) -> Result<String, String> {
     pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
-        Ok(
-            (u128::from(*pool.total_physical_size()) * devicemapper::SECTOR_SIZE as u128)
-                .to_string(),
-        )
+        Ok((*pool.total_physical_size().bytes()).to_string())
     })
 }
 
-pub fn get_pool_total_used(m: &MethodInfo<MTFn<TData>, TData>) -> Result<String, String> {
+pub fn get_pool_total_used(m: &MethodInfo<MTSync<TData>, TData>) -> Result<String, String> {
     pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
         pool.total_physical_used()
             .map_err(|e| e.to_string())
-            .map(|size| (u128::from(*size) * devicemapper::SECTOR_SIZE as u128).to_string())
+            .map(|size| (*size.bytes()).to_string())
     })
 }
 
 pub fn get_pool_clevis_info(
-    m: &MethodInfo<MTFn<TData>, TData>,
+    m: &MethodInfo<MTSync<TData>, TData>,
 ) -> Result<(bool, (String, String)), String> {
     pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
         Ok(option_to_tuple(
             pool.encryption_info()
-                .and_then(|i| i.clevis_info.as_ref())
+                .clevis_info
+                .as_ref()
                 .map(|(pin, config)| (pin.to_owned(), config.to_string())),
             (String::new(), String::new()),
         ))
@@ -116,7 +119,7 @@ pub fn get_pool_clevis_info(
 // requires discovering the state of the cache, whether initialized or not,
 // in order to figure out which method to dispatch to. We would like to find
 // a third approach, which doesn't have the flaws of the two we've tried.
-pub fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, op: BlockDevOp) -> MethodResult {
+pub fn add_blockdevs(m: &MethodInfo<MTSync<TData>, TData>, op: BlockDevOp) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -131,20 +134,25 @@ pub fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, op: BlockDevOp) -> Meth
         .tree
         .get(object_path)
         .expect("implicit argument must be in tree");
-    let pool_uuid = get_data!(pool_path; default_return; return_message).uuid;
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
 
-    let mut engine = dbus_context.engine.borrow_mut();
-    let (pool_name, pool) = get_mut_pool!(engine; pool_uuid; default_return; return_message);
+    let mut mutex_lock = mutex_lock!(dbus_context.engine);
+    let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
     let result = match op {
-        BlockDevOp::InitCache => pool.init_cache(pool_uuid, &*pool_name, &blockdevs),
+        BlockDevOp::InitCache => log_action!(pool.init_cache(pool_uuid, &*pool_name, &blockdevs)),
         BlockDevOp::AddCache => {
-            pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Cache)
+            log_action!(pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Cache))
         }
         BlockDevOp::AddData => {
-            pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Data)
+            log_action!(pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Data))
         }
     };
     let msg = match result.map(|bds| bds.changed()) {
@@ -163,7 +171,7 @@ pub fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, op: BlockDevOp) -> Meth
                             BlockDevOp::AddData => BlockDevTier::Data,
                             _ => BlockDevTier::Cache,
                         },
-                        pool.get_mut_blockdev(*uuid)
+                        pool.get_blockdev(*uuid)
                             .expect("just inserted by add_blockdevs")
                             .1,
                     )
@@ -187,7 +195,7 @@ pub fn add_blockdevs(m: &MethodInfo<MTFn<TData>, TData>, op: BlockDevOp) -> Meth
 /// Pool and obtains the property from the pool.
 pub fn get_pool_property<F, R>(
     i: &mut IterAppend,
-    p: &PropInfo<MTFn<TData>, TData>,
+    p: &PropInfo<MTSync<TData>, TData>,
     getter: F,
 ) -> Result<(), MethodErr>
 where

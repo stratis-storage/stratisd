@@ -20,8 +20,10 @@ Test unique stratis instance.
 # isort: STDLIB
 import os
 import subprocess
-import sys
 import unittest
+
+# isort: THIRDPARTY
+import psutil
 
 _STRATISD = os.environ["STRATISD"]
 
@@ -44,6 +46,9 @@ class TestUniqueInstance(unittest.TestCase):
             env=os.environ,
         )
 
+        while not psutil.pid_exists(process.pid):
+            pass
+
         def cleanup():
             process.terminate()
             process.wait()
@@ -54,17 +59,14 @@ class TestUniqueInstance(unittest.TestCase):
         """
         Verify that a second stratisd instance can not be started.
         """
+        env = dict(os.environ)
+        env["RUST_LOG"] = env.get("RUST_LOG", "") + ",nix::fcntl=debug"
         process = subprocess.Popen(
             [_STRATISD, "--sim"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
             universal_newlines=True,
             close_fds=True,
-            env=os.environ,
+            env=env,
         )
-        (_, stderr) = process.communicate()
+        (_, _) = process.communicate()
         self.assertEqual(process.returncode, 1)
-        self.assertNotEqual(stderr, "")
-
-        print("Stderr from this invocation of stratisd:", file=sys.stdout, flush=True)
-        print(stderr, file=sys.stdout, flush=True)

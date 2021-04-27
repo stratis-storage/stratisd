@@ -2,13 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, iter::FromIterator, path::Path, vec::Vec};
+use std::{borrow::Cow, collections::HashMap, path::Path, vec::Vec};
 
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
-use uuid::Uuid;
 
-use devicemapper::{DmName, DmNameBuf, Sectors};
+use devicemapper::{DmNameBuf, Sectors};
 
 use crate::{
     engine::{
@@ -17,14 +16,13 @@ use crate::{
         strat_engine::{
             backstore::{Backstore, StratBlockDev},
             metadata::MDADataSize,
-            names::KeyDescription,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
         types::{
-            BlockDevTier, CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid,
-            MaybeDbusPath, Name, PoolUuid, Redundancy, RenameAction, SetCreateAction,
-            SetDeleteAction,
+            BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo,
+            FilesystemUuid, Key, KeyDescription, Name, PoolUuid, Redundancy, RenameAction,
+            SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -44,19 +42,19 @@ fn next_index(flex_devs: &FlexDevsSave) -> Sectors {
         flex_devs
             .meta_dev
             .last()
-            .unwrap_or_else(|| panic!(expect_msg)),
+            .unwrap_or_else(|| panic!("{}", expect_msg)),
         flex_devs
             .thin_meta_dev
             .last()
-            .unwrap_or_else(|| panic!(expect_msg)),
+            .unwrap_or_else(|| panic!("{}", expect_msg)),
         flex_devs
             .thin_data_dev
             .last()
-            .unwrap_or_else(|| panic!(expect_msg)),
+            .unwrap_or_else(|| panic!("{}", expect_msg)),
         flex_devs
             .thin_meta_dev_spare
             .last()
-            .unwrap_or_else(|| panic!(expect_msg)),
+            .unwrap_or_else(|| panic!("{}", expect_msg)),
     ]
     .iter()
     .max_by_key(|x| x.0)
@@ -135,7 +133,6 @@ pub struct StratPool {
     backstore: Backstore,
     redundancy: Redundancy,
     thin_pool: ThinPool,
-    dbus_path: MaybeDbusPath,
 }
 
 impl StratPool {
@@ -147,15 +144,15 @@ impl StratPool {
         name: &str,
         paths: &[&Path],
         redundancy: Redundancy,
-        key_desc: Option<&KeyDescription>,
+        encryption_info: &EncryptionInfo,
     ) -> StratisResult<(PoolUuid, StratPool)> {
-        let pool_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
 
         // FIXME: Initializing with the minimum MDA size is not necessarily
         // enough. If there are enough devices specified, more space will be
         // required.
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), key_desc)?;
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), encryption_info)?;
 
         let thinpool = ThinPool::new(
             pool_uuid,
@@ -178,7 +175,6 @@ impl StratPool {
             backstore,
             redundancy,
             thin_pool: thinpool,
-            dbus_path: MaybeDbusPath(None),
         };
 
         pool.write_metadata(&Name::new(name.to_owned()))?;
@@ -208,7 +204,10 @@ impl StratPool {
 
         let mut backstore =
             Backstore::setup(uuid, &metadata.backstore, datadevs, cachedevs, timestamp)?;
+        let pool_name = &metadata.name;
+
         let mut thinpool = ThinPool::setup(
+            pool_name,
             uuid,
             &metadata.thinpool_dev,
             &metadata.flex_devs,
@@ -221,16 +220,20 @@ impl StratPool {
             backstore,
             redundancy: Redundancy::NONE,
             thin_pool: thinpool,
-            dbus_path: MaybeDbusPath(None),
         };
-
-        let pool_name = &metadata.name;
 
         if changed {
             pool.write_metadata(pool_name)?;
         }
 
         Ok((Name::new(pool_name.to_owned()), pool))
+    }
+
+    /// Send a synthetic udev change event to every filesystem on the given pool.
+    pub fn udev_pool_change(&self, pool_name: &str) {
+        for (name, uuid, fs) in self.thin_pool.filesystems() {
+            fs.udev_fs_change(pool_name, uuid, &name);
+        }
     }
 
     /// Write current metadata to pool members.
@@ -258,17 +261,7 @@ impl StratPool {
     /// Called when a DM device in this pool has generated an event.
     // TODO: Just check the device that evented. Currently checks
     // everything.
-    pub fn event_on(
-        &mut self,
-        pool_uuid: PoolUuid,
-        pool_name: &Name,
-        dm_name: &DmName,
-    ) -> StratisResult<()> {
-        assert!(self
-            .thin_pool
-            .get_eventing_dev_names(pool_uuid)
-            .iter()
-            .any(|x| dm_name == &**x));
+    pub fn event_on(&mut self, pool_uuid: PoolUuid, pool_name: &Name) -> StratisResult<()> {
         if self.thin_pool.check(pool_uuid, &mut self.backstore)? {
             self.write_metadata(pool_name)?;
         }
@@ -313,13 +306,13 @@ impl<'a> Into<Value> for &'a StratPool {
     // Precondition: (&ThinPool).into() pattern matches Value::Object(_)
     // Precondition: (&Backstore).into() pattern matches Value::Object(_)
     fn into(self) -> Value {
-        let mut map = Map::from_iter(
+        let mut map: Map<_, _> =
             if let Value::Object(map) = <&ThinPool as Into<Value>>::into(&self.thin_pool) {
                 map.into_iter()
             } else {
                 unreachable!("ThinPool conversion returns a JSON object")
-            },
-        );
+            }
+            .collect();
         map.extend(
             if let Value::Object(map) = <&Backstore as Into<Value>>::into(&self.backstore) {
                 map.into_iter()
@@ -368,24 +361,49 @@ impl Pool for StratPool {
                 self.backstore
                     .cachedevs()
                     .into_iter()
-                    .map(|(_, bd)| bd.devnode().physical_path().to_owned()),
+                    .map(|(_, bd)| bd.physical_path().to_owned()),
             )
         }
     }
 
-    fn bind_clevis(&mut self, pin: String, clevis_info: Value) -> StratisResult<CreateAction<()>> {
+    fn bind_clevis(
+        &mut self,
+        pin: &str,
+        clevis_info: &Value,
+    ) -> StratisResult<CreateAction<Clevis>> {
         let changed = self.backstore.bind_clevis(pin, clevis_info)?;
         if changed {
-            Ok(CreateAction::Created(()))
+            Ok(CreateAction::Created(Clevis))
         } else {
             Ok(CreateAction::Identity)
         }
     }
 
-    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<()>> {
+    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<Clevis>> {
         let changed = self.backstore.unbind_clevis()?;
         if changed {
-            Ok(DeleteAction::Deleted(()))
+            Ok(DeleteAction::Deleted(Clevis))
+        } else {
+            Ok(DeleteAction::Identity)
+        }
+    }
+
+    fn bind_keyring(
+        &mut self,
+        key_description: &KeyDescription,
+    ) -> StratisResult<CreateAction<Key>> {
+        let changed = self.backstore.bind_keyring(key_description)?;
+        if changed {
+            Ok(CreateAction::Created(Key))
+        } else {
+            Ok(CreateAction::Identity)
+        }
+    }
+
+    fn unbind_keyring(&mut self) -> StratisResult<DeleteAction<Key>> {
+        let changed = self.backstore.unbind_keyring()?;
+        if changed {
+            Ok(DeleteAction::Deleted(Key))
         } else {
             Ok(DeleteAction::Identity)
         }
@@ -393,10 +411,11 @@ impl Pool for StratPool {
 
     fn create_filesystems<'a, 'b>(
         &'a mut self,
+        pool_name: &str,
         pool_uuid: PoolUuid,
         specs: &[(&'b str, Option<Sectors>)],
     ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid)>> {
-        let names: HashMap<_, _> = HashMap::from_iter(specs.iter().map(|&tup| (tup.0, tup.1)));
+        let names: HashMap<_, _> = specs.iter().map(|&tup| (tup.0, tup.1)).collect();
 
         names.iter().fold(Ok(()), |res, (name, _)| {
             res.and_then(|()| validate_name(name))
@@ -406,7 +425,9 @@ impl Pool for StratPool {
         let mut result = Vec::new();
         for (name, size) in names {
             if self.thin_pool.get_mut_filesystem_by_name(name).is_none() {
-                let fs_uuid = self.thin_pool.create_filesystem(pool_uuid, name, size)?;
+                let fs_uuid = self
+                    .thin_pool
+                    .create_filesystem(pool_name, pool_uuid, name, size)?;
                 result.push((name, fs_uuid));
             }
         }
@@ -426,7 +447,7 @@ impl Pool for StratPool {
         let bdev_info = if tier == BlockDevTier::Cache && !self.has_cache() {
             return Err(StratisError::Error(format!(
                             "No cache has been initialized for pool with UUID {} and name {}; it is therefore impossible to add additional devices to the cache",
-                            pool_uuid.to_simple_ref(),
+                            pool_uuid,
                             pool_name)
                 ));
         } else if paths.is_empty() {
@@ -505,6 +526,7 @@ impl Pool for StratPool {
 
     fn snapshot_filesystem(
         &mut self,
+        pool_name: &str,
         pool_uuid: PoolUuid,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
@@ -520,7 +542,7 @@ impl Pool for StratPool {
         }
 
         self.thin_pool
-            .snapshot_filesystem(pool_uuid, origin_uuid, snapshot_name)
+            .snapshot_filesystem(pool_name, pool_uuid, origin_uuid, snapshot_name)
             .map(CreateAction::Created)
     }
 
@@ -541,11 +563,19 @@ impl Pool for StratPool {
     }
 
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)> {
-        self.thin_pool.filesystems()
+        self.thin_pool
+            .filesystems()
+            .into_iter()
+            .map(|(n, u, f)| (n, u, f as &dyn Filesystem))
+            .collect()
     }
 
     fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut dyn Filesystem)> {
-        self.thin_pool.filesystems_mut()
+        self.thin_pool
+            .filesystems_mut()
+            .into_iter()
+            .map(|(n, u, f)| (n, u, f as &mut dyn Filesystem))
+            .collect()
     }
 
     fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &dyn Filesystem)> {
@@ -558,6 +588,21 @@ impl Pool for StratPool {
         self.thin_pool
             .get_mut_filesystem_by_uuid(uuid)
             .map(|(name, fs)| (name, fs as &mut dyn Filesystem))
+    }
+
+    fn get_filesystem_by_name(&self, fs_name: &Name) -> Option<(FilesystemUuid, &dyn Filesystem)> {
+        self.thin_pool
+            .get_filesystem_by_name(fs_name)
+            .map(|(uuid, fs)| (uuid, fs as &dyn Filesystem))
+    }
+
+    fn get_mut_filesystem_by_name(
+        &mut self,
+        fs_name: &Name,
+    ) -> Option<(FilesystemUuid, &mut dyn Filesystem)> {
+        self.thin_pool
+            .get_mut_filesystem_by_name(fs_name)
+            .map(|(uuid, fs)| (uuid, fs as &mut dyn Filesystem))
     }
 
     fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &dyn BlockDev)> {
@@ -603,15 +648,6 @@ impl Pool for StratPool {
         }
     }
 
-    fn set_dbus_path(&mut self, path: MaybeDbusPath) {
-        self.thin_pool.set_dbus_path(path.clone());
-        self.dbus_path = path
-    }
-
-    fn get_dbus_path(&self) -> &MaybeDbusPath {
-        &self.dbus_path
-    }
-
     fn has_cache(&self) -> bool {
         self.backstore.has_cache()
     }
@@ -620,7 +656,7 @@ impl Pool for StratPool {
         self.datadevs_encrypted()
     }
 
-    fn encryption_info(&self) -> Option<&EncryptionInfo> {
+    fn encryption_info(&self) -> Cow<EncryptionInfo> {
         self.backstore.data_tier_encryption_info()
     }
 }
@@ -650,7 +686,7 @@ mod tests {
             .backstore
             .blockdevs()
             .iter()
-            .all(|(_, _, bd)| bd.devnode().user_path().is_absolute()))
+            .all(|(_, _, bd)| bd.user_path().unwrap().is_absolute()))
     }
 
     /// Verify that a pool with no devices does not have the minimum amount of
@@ -658,7 +694,12 @@ mod tests {
     fn test_empty_pool(paths: &[&Path]) {
         assert_eq!(paths.len(), 0);
         assert_matches!(
-            StratPool::initialize("stratis_test_pool", paths, Redundancy::NONE, None),
+            StratPool::initialize(
+                "stratis_test_pool",
+                paths,
+                Redundancy::NONE,
+                &EncryptionInfo::default()
+            ),
             Err(_)
         );
     }
@@ -682,14 +723,16 @@ mod tests {
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let name = "stratis-test-pool";
-        let (uuid, mut pool) = StratPool::initialize(name, paths2, Redundancy::NONE, None).unwrap();
+        let (uuid, mut pool) =
+            StratPool::initialize(name, paths2, Redundancy::NONE, &EncryptionInfo::default())
+                .unwrap();
         invariant(&pool, name);
 
         let metadata1 = pool.record(name);
         assert_matches!(metadata1.backstore.cache_tier, None);
 
         let (_, fs_uuid) = pool
-            .create_filesystems(uuid, &[("stratis-filesystem", None)])
+            .create_filesystems(name, uuid, &[("stratis-filesystem", None)])
             .unwrap()
             .changed()
             .and_then(|mut fs| fs.pop())
@@ -766,12 +809,13 @@ mod tests {
 
         let name = "stratis-test-pool";
         let (pool_uuid, mut pool) =
-            StratPool::initialize(name, paths1, Redundancy::NONE, None).unwrap();
+            StratPool::initialize(name, paths1, Redundancy::NONE, &EncryptionInfo::default())
+                .unwrap();
         invariant(&pool, name);
 
         let fs_name = "stratis_test_filesystem";
         let (_, fs_uuid) = pool
-            .create_filesystems(pool_uuid, &[(fs_name, None)])
+            .create_filesystems(name, pool_uuid, &[(fs_name, None)])
             .unwrap()
             .changed()
             .and_then(|mut fs| fs.pop())
@@ -789,7 +833,7 @@ mod tests {
             let buf = &[1u8; SECTOR_SIZE];
 
             let mut amount_written = Sectors(0);
-            let buffer_length = Bytes(buffer_length).sectors();
+            let buffer_length = Bytes::from(buffer_length).sectors();
             while match pool.thin_pool.state() {
                 Some(ThinPoolStatus::Working(working)) => {
                     working.summary == ThinPoolStatusSummary::Good
@@ -823,7 +867,7 @@ mod tests {
     #[test]
     fn loop_test_add_datadevs() {
         loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, Some((4u64 * Bytes(IEC::Gi)).sectors())),
+            &loopbacked::DeviceLimits::Range(2, 3, Some(Bytes::from(IEC::Gi * 4).sectors())),
             test_add_datadevs,
         );
     }
@@ -833,8 +877,8 @@ mod tests {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(
                 2,
-                Some((2u64 * Bytes(IEC::Gi)).sectors()),
-                Some((4u64 * Bytes(IEC::Gi)).sectors()),
+                Some(Bytes::from(IEC::Gi * 2).sectors()),
+                Some(Bytes::from(IEC::Gi * 4).sectors()),
             ),
             test_add_datadevs,
         );

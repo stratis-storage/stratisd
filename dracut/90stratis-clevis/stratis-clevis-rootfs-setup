@@ -1,0 +1,25 @@
+#!/bin/bash
+
+if [ -z "$STRATIS_ROOTFS_UUID" ]; then
+	echo STRATIS_ROOTFS_UUID is a required environment variable. >&2
+	exit 1
+fi
+
+i=0
+while ! stratis-min pool is-locked "$STRATIS_ROOTFS_UUID" >/dev/null; do
+	echo Waiting on pool with UUID $STRATIS_ROOTFS_UUID...
+	sleep 1
+	if [ "$i" = 5 ]; then
+		break
+	fi
+	i=$(($i + 1))
+done
+
+if $(stratis-min pool is-locked "$STRATIS_ROOTFS_UUID"); then
+	if $(stratis-min pool is-bound "$STRATIS_ROOTFS_UUID"); then
+		if ! stratis-min pool unlock clevis "$STRATIS_ROOTFS_UUID"; then
+			echo Failed to unlock pool with UUID $STRATIS_ROOTFS_UUID using Clevis >&2
+			exit 1
+		fi
+	fi
+fi

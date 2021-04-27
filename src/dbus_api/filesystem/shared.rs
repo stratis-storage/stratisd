@@ -3,10 +3,8 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use chrono::SecondsFormat;
-use dbus::{
-    tree::{MTFn, Tree},
-    Path,
-};
+use dbus::Path;
+use dbus_tree::{MTSync, Tree};
 
 use crate::{
     dbus_api::types::TData,
@@ -16,7 +14,7 @@ use crate::{
 /// Get execute a given closure providing a filesystem object and return
 /// the calculated value
 pub fn filesystem_operation<F, R>(
-    tree: &Tree<MTFn<TData>, TData>,
+    tree: &Tree<MTSync<TData>, TData>,
     object_path: &Path<'static>,
     closure: F,
 ) -> Result<R, String>
@@ -39,17 +37,20 @@ where
         .get(&filesystem_data.parent)
         .ok_or_else(|| format!("no path for parent object path {}", &filesystem_data.parent))?;
 
-    let pool_uuid = pool_path
-        .get_data()
-        .as_ref()
-        .ok_or_else(|| format!("no data for object path {}", object_path))?
-        .uuid;
+    let pool_uuid = typed_uuid_string_err!(
+        pool_path
+            .get_data()
+            .as_ref()
+            .ok_or_else(|| format!("no data for object path {}", object_path))?
+            .uuid;
+        Pool
+    );
 
-    let engine = dbus_context.engine.borrow();
-    let (pool_name, pool) = engine
+    let mutex_lock = mutex_lock!(dbus_context.engine);
+    let (pool_name, pool) = mutex_lock
         .get_pool(pool_uuid)
         .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
-    let filesystem_uuid = filesystem_data.uuid;
+    let filesystem_uuid = typed_uuid_string_err!(filesystem_data.uuid; Fs);
     let (fs_name, fs) = pool
         .get_filesystem(filesystem_uuid)
         .ok_or_else(|| format!("no name for filesystem with uuid {}", &filesystem_uuid))?;

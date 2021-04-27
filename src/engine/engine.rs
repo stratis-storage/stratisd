@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
+    borrow::Cow,
     collections::HashMap,
     fmt::Debug,
     os::unix::io::RawFd,
@@ -11,15 +12,15 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use serde_json::Value;
-use uuid::Uuid;
 
 use devicemapper::{Bytes, Sectors};
 
 use crate::{
     engine::types::{
-        BlockDevPath, BlockDevTier, CreateAction, DeleteAction, DevUuid, EncryptionInfo,
-        FilesystemUuid, KeyDescription, MappingCreateAction, MaybeDbusPath, Name, PoolUuid,
-        RenameAction, ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, UnlockMethod,
+        BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid,
+        Key, KeyDescription, LockedPoolInfo, MappingCreateAction, MappingDeleteAction, Name,
+        PoolUuid, RenameAction, ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction,
+        UdevEngineEvent, UnlockMethod,
     },
     stratis::StratisResult,
 };
@@ -33,20 +34,10 @@ pub trait KeyActions {
     /// containing a `bool` which indicates whether a key with the requested
     /// key description was in the keyring and the key data was updated.
     ///
-    /// If `interactive` is `Some(_)`, the end of a passphrase should be delimited
-    /// by a newline.
-    ///
-    /// If `interactive` is `Some(true)`, stratisd will change the terminal settings
-    /// on the interactive file descriptor to prompt the user without echo and with
-    /// a few additional security measures. This requires that stdin is a terminal.
-    ///
-    /// If `interactive` is `Some(false)`, it is up to the user to remove the echo
-    /// property on the file descriptor and any other settings that they require.
-    ///
     /// Successful return values:
     /// * `Ok(MappingCreateAction::Identity)`: The key was already in the keyring
     /// with the appropriate key description and key data.
-    /// * `Ok(MappingCreateAction::Created(()))`: The key was newly added to the
+    /// * `Ok(MappingCreateAction::Created(_))`: The key was newly added to the
     /// keyring.
     /// * `Ok(MappingCreateAction::Changed)`: The key description was already present
     /// in the keyring but the key data was updated.
@@ -54,7 +45,7 @@ pub trait KeyActions {
         &mut self,
         key_desc: &KeyDescription,
         key_fd: RawFd,
-    ) -> StratisResult<MappingCreateAction<()>>;
+    ) -> StratisResult<MappingCreateAction<Key>>;
 
     /// Return a list of all key descriptions of keys added to the keyring by
     /// Stratis that are still valid.
@@ -62,11 +53,17 @@ pub trait KeyActions {
 
     /// Unset a key with the given key description in the root persistent kernel
     /// keyring.
-    fn unset(&mut self, key_desc: &KeyDescription) -> StratisResult<DeleteAction<()>>;
+    fn unset(&mut self, key_desc: &KeyDescription) -> StratisResult<MappingDeleteAction<Key>>;
 }
 
 /// An interface for reporting internal engine state.
 pub trait Report {
+    /// Supported engine state report.
+    ///
+    /// NOTE: The JSON schema for this report is not guaranteed to be stable.
+    fn engine_state_report(&self) -> Value;
+
+    /// Unsupported reports. The available reports and JSON schemas of these reports may change.
     fn get_report(&self, report_type: ReportType) -> Value;
 }
 
@@ -82,17 +79,17 @@ pub trait Filesystem: Debug {
 
     /// The amount of data stored on the filesystem, including overhead.
     fn used(&self) -> StratisResult<Bytes>;
-
-    /// Set dbus path associated with the Pool.
-    fn set_dbus_path(&mut self, path: MaybeDbusPath);
-
-    /// Get dbus path associated with the Pool.
-    fn get_dbus_path(&self) -> &MaybeDbusPath;
 }
 
 pub trait BlockDev: Debug {
-    /// Get the structure representing block device paths.
-    fn devnode(&self) -> &BlockDevPath;
+    /// Get the device path for the block device.
+    fn devnode(&self) -> &Path;
+
+    /// Get the canonicalized path to display to the user representing this block device.
+    fn user_path(&self) -> StratisResult<PathBuf>;
+
+    /// Get the path to the device on which the Stratis metadata is stored.
+    fn metadata_path(&self) -> &Path;
 
     /// Get the user-settable string associated with this blockdev.
     fn user_info(&self) -> Option<&str>;
@@ -106,12 +103,6 @@ pub trait BlockDev: Debug {
 
     /// The total size of the device, including space not usable for data.
     fn size(&self) -> Sectors;
-
-    /// Set dbus path associated with the BlockDev.
-    fn set_dbus_path(&mut self, path: MaybeDbusPath);
-
-    /// Get dbus path associated with the BlockDev.
-    fn get_dbus_path(&self) -> &MaybeDbusPath;
 
     /// Get the status of whether a block device is encrypted or not.
     fn is_encrypted(&self) -> bool;
@@ -146,6 +137,7 @@ pub trait Pool: Debug {
     /// times, the size associated with the last item is used.
     fn create_filesystems<'a, 'b>(
         &'a mut self,
+        pool_name: &str,
         pool_uuid: PoolUuid,
         specs: &[(&'b str, Option<Sectors>)],
     ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid)>>;
@@ -166,10 +158,21 @@ pub trait Pool: Debug {
 
     /// Bind all devices in the given pool for automated unlocking
     /// using clevis.
-    fn bind_clevis(&mut self, pin: String, clevis_info: Value) -> StratisResult<CreateAction<()>>;
+    fn bind_clevis(
+        &mut self,
+        pin: &str,
+        clevis_info: &Value,
+    ) -> StratisResult<CreateAction<Clevis>>;
 
     /// Unbind all devices in the given pool from using clevis.
-    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<()>>;
+    fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<Clevis>>;
+
+    /// Bind all devices in the given pool for unlocking using a passphrase
+    /// in the kernel keyring.
+    fn bind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<CreateAction<Key>>;
+
+    /// Unbind all devices in the given pool from the registered keyring passphrase.
+    fn unbind_keyring(&mut self) -> StratisResult<DeleteAction<Key>>;
 
     /// Ensures that all designated filesystems are gone from pool.
     /// Returns a list of the filesystems found, and actually destroyed.
@@ -197,6 +200,7 @@ pub trait Pool: Debug {
     /// Create a CoW snapshot of the origin
     fn snapshot_filesystem(
         &mut self,
+        pool_name: &str,
         pool_uuid: PoolUuid,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
@@ -228,9 +232,18 @@ pub trait Pool: Debug {
     /// Get the mutable filesystem in this pool with this UUID.
     fn get_mut_filesystem(&mut self, uuid: FilesystemUuid) -> Option<(Name, &mut dyn Filesystem)>;
 
+    /// Get the filesystem in this pool with this name.
+    fn get_filesystem_by_name(&self, name: &Name) -> Option<(FilesystemUuid, &dyn Filesystem)>;
+
+    /// Get the mutable filesystem in this pool with this name.
+    fn get_mut_filesystem_by_name(
+        &mut self,
+        name: &Name,
+    ) -> Option<(FilesystemUuid, &mut dyn Filesystem)>;
+
     /// Get _all_ the blockdevs that belong to this pool.
     /// All really means all. For example, it does not exclude cache blockdevs.
-    fn blockdevs(&self) -> Vec<(Uuid, BlockDevTier, &dyn BlockDev)>;
+    fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &dyn BlockDev)>;
 
     /// Get all the blockdevs belonging to this pool as mutable references.
     fn blockdevs_mut(&mut self) -> Vec<(DevUuid, BlockDevTier, &mut dyn BlockDev)>;
@@ -250,12 +263,6 @@ pub trait Pool: Debug {
         user_info: Option<&str>,
     ) -> StratisResult<RenameAction<DevUuid>>;
 
-    /// Set dbus path associated with the Pool.
-    fn set_dbus_path(&mut self, path: MaybeDbusPath);
-
-    /// Get dbus path associated with the Pool.
-    fn get_dbus_path(&self) -> &MaybeDbusPath;
-
     /// true if the pool has a cache, otherwise false
     fn has_cache(&self) -> bool;
 
@@ -263,10 +270,10 @@ pub trait Pool: Debug {
     fn is_encrypted(&self) -> bool;
 
     /// Get all encryption information for this pool.
-    fn encryption_info(&self) -> Option<&EncryptionInfo>;
+    fn encryption_info(&self) -> Cow<EncryptionInfo>;
 }
 
-pub trait Engine: Debug + Report {
+pub trait Engine: Debug + Report + Send {
     /// Create a Stratis pool.
     /// Returns the UUID of the newly created pool.
     /// Returns an error if the redundancy code does not correspond to a
@@ -276,7 +283,7 @@ pub trait Engine: Debug + Report {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
-        key_desc: Option<KeyDescription>,
+        encryption_info: &EncryptionInfo,
     ) -> StratisResult<CreateAction<PoolUuid>>;
 
     /// Handle a libudev event.
@@ -284,7 +291,7 @@ pub trait Engine: Debug + Report {
     /// and its UUID.
     ///
     /// Precondition: the subsystem of the device evented on is "block".
-    fn handle_event(&mut self, event: &libudev::Event) -> Option<(Name, PoolUuid, &mut dyn Pool)>;
+    fn handle_event(&mut self, event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &dyn Pool)>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.
@@ -321,11 +328,12 @@ pub trait Engine: Debug + Report {
 
     /// Get a mapping of encrypted pool UUIDs for pools that have not yet
     /// been set up and need to be unlocked to their encryption infos.
-    fn locked_pools(&self) -> HashMap<PoolUuid, EncryptionInfo>;
+    fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo>;
 
-    /// Configure the simulator, for the real engine, this is a null op.
-    /// denominator: the probably of failure is 1/denominator.
-    fn configure_simulator(&mut self, denominator: u32) -> StratisResult<()>;
+    /// Configure the simulator. Obsolete.
+    fn configure_simulator(&mut self, _: u32) -> StratisResult<()> {
+        Ok(())
+    }
 
     /// Get all pools belonging to this engine.
     fn pools(&self) -> Vec<(Name, PoolUuid, &dyn Pool)>;
@@ -333,11 +341,7 @@ pub trait Engine: Debug + Report {
     /// Get mutable references to all pools belonging to this engine.
     fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut dyn Pool)>;
 
-    /// If the engine would like to include an event in the message loop, it
-    /// may return an Eventable from this method.
-    fn get_eventable(&self) -> Option<&'static dyn Eventable>;
-
-    /// Notify the engine that an event has occurred on the Eventable.
+    /// Notify the engine that an event has occurred on the DM file descriptor.
     fn evented(&mut self) -> StratisResult<()>;
 
     /// Get the handler for kernel keyring operations.
@@ -345,15 +349,7 @@ pub trait Engine: Debug + Report {
 
     /// Get the handler for kernel keyring operations mutably.
     fn get_key_handler_mut(&mut self) -> &mut dyn KeyActions;
-}
 
-/// Allows an Engine to include a fd in the event loop. See
-/// Engine::get_eventable() and Engine::evented().
-pub trait Eventable {
-    /// Get fd the engine would like to monitor for activity
-    fn get_pollable_fd(&self) -> RawFd;
-
-    /// Assuming level-triggered semantics, clear the event that caused the
-    /// Eventable to trigger.
-    fn clear_event(&self) -> StratisResult<()>;
+    /// Return true if this engine is the simulator engine, otherwise false.
+    fn is_sim(&self) -> bool;
 }

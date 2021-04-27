@@ -8,6 +8,19 @@
 //! effect of the action at the time the action is requested. The action was
 //! completed succesfully; this type indicates what changes had to be made.
 
+use std::fmt::{self, Display};
+
+use crate::engine::{
+    engine::Filesystem,
+    types::{DevUuid, FilesystemUuid, PoolUuid},
+};
+
+/// Return value indicating key operation
+pub struct Key;
+
+/// Return value indicating clevis operation
+pub struct Clevis;
+
 /// A trait for a generic kind of action. Defines the type of the thing to
 /// be changed, and also a method to indicate what changed.
 pub trait EngineAction {
@@ -44,6 +57,81 @@ impl<T> EngineAction for CreateAction<T> {
     }
 }
 
+impl Display for CreateAction<PoolUuid> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            CreateAction::Created(uuid) => {
+                write!(f, "Pool with UUID {} was created successfully", uuid)
+            }
+            CreateAction::Identity => {
+                write!(
+                    f,
+                    "The pool requested for creation is already present; no action taken"
+                )
+            }
+        }
+    }
+}
+
+impl Display for CreateAction<Clevis> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            CreateAction::Created(Clevis) => {
+                write!(
+                    f,
+                    "Pool successfully bound to an unlocking mechanism using clevis"
+                )
+            }
+            CreateAction::Identity => {
+                write!(
+                    f,
+                    "The pool requested for clevis binding is already bound; no action taken"
+                )
+            }
+        }
+    }
+}
+
+impl Display for CreateAction<Key> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            CreateAction::Created(Key) => {
+                write!(
+                    f,
+                    "Pool successfully bound to a passphrase in the kernel keyring"
+                )
+            }
+            CreateAction::Identity => {
+                write!(
+                    f,
+                    "The pool requested for keyring binding is already bound; no action taken"
+                )
+            }
+        }
+    }
+}
+
+impl Display for CreateAction<(FilesystemUuid, &mut dyn Filesystem)> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            CreateAction::Created((uuid, fs)) => {
+                write!(
+                    f,
+                    "Snapshot with UUID {} was created successfully from filesystem with path {}",
+                    uuid,
+                    fs.devnode().display()
+                )
+            }
+            CreateAction::Identity => {
+                write!(
+                    f,
+                    "The snapshot requested for creation is already present; no action taken"
+                )
+            }
+        }
+    }
+}
+
 /// Idempotent type representing a create action for a mapping from a key to a value
 #[derive(Debug, PartialEq, Eq)]
 pub enum MappingCreateAction<T> {
@@ -55,17 +143,75 @@ pub enum MappingCreateAction<T> {
     ValueChanged(T),
 }
 
+impl Display for MappingCreateAction<Key> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            MappingCreateAction::Created(Key) => write!(f, "Set a new key successfully"),
+            MappingCreateAction::Identity => {
+                write!(f, "The requested key already exists; no action was taken")
+            }
+            MappingCreateAction::ValueChanged(Key) => write!(
+                f,
+                "An existing key was updated with a new value successfully"
+            ),
+        }
+    }
+}
+
 impl<T> EngineAction for MappingCreateAction<T> {
     type Return = T;
 
     fn is_changed(&self) -> bool {
-        matches!(*self, MappingCreateAction::Created(_) | MappingCreateAction::ValueChanged(_))
+        matches!(
+            *self,
+            MappingCreateAction::Created(_) | MappingCreateAction::ValueChanged(_)
+        )
     }
 
     fn changed(self) -> Option<T> {
         match self {
             MappingCreateAction::Created(t) | MappingCreateAction::ValueChanged(t) => Some(t),
             _ => None,
+        }
+    }
+}
+
+/// Idempotent type representing a delete action for a mapping from a key to a value
+#[derive(Debug, PartialEq, Eq)]
+pub enum MappingDeleteAction<T> {
+    /// The key and the value were deleted.
+    Deleted(T),
+    /// The key did not exist.
+    Identity,
+}
+
+impl<T> EngineAction for MappingDeleteAction<T> {
+    type Return = T;
+
+    fn is_changed(&self) -> bool {
+        matches!(*self, MappingDeleteAction::Deleted(_))
+    }
+
+    fn changed(self) -> Option<T> {
+        match self {
+            MappingDeleteAction::Deleted(t) => Some(t),
+            _ => None,
+        }
+    }
+}
+
+impl Display for MappingDeleteAction<Key> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            MappingDeleteAction::Deleted(_) => {
+                write!(f, "A key was deleted successfully")
+            }
+            MappingDeleteAction::Identity => {
+                write!(
+                    f,
+                    "The key requested for deletion is already absent; no action taken"
+                )
+            }
         }
     }
 }
@@ -106,6 +252,27 @@ impl<T> EngineAction for SetUnlockAction<T> {
     }
 }
 
+impl Display for SetUnlockAction<DevUuid> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.unlocked.is_empty() {
+            write!(
+                f,
+                "No new devices were able to be unlocked; no action was taken"
+            )
+        } else {
+            write!(
+                f,
+                "The devices with UUIDs {} were successfully unlocked",
+                self.unlocked
+                    .iter()
+                    .map(|uuid| uuid.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 /// An action which may create multiple things.
 pub struct SetCreateAction<T> {
@@ -138,6 +305,48 @@ impl<T> EngineAction for SetCreateAction<T> {
     }
 }
 
+impl Display for SetCreateAction<(&str, FilesystemUuid)> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.changed.is_empty() {
+            write!(
+                f,
+                "The requested filesystems already exist; no action taken"
+            )
+        } else {
+            write!(
+                f,
+                "The following filesystems {} were successfully created",
+                self.changed
+                    .iter()
+                    .map(|(n, u)| format!("name: {}, UUID: {}", n, u))
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            )
+        }
+    }
+}
+
+impl Display for SetCreateAction<DevUuid> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.changed.is_empty() {
+            write!(
+                f,
+                "The requested filesystems already exist; no action taken"
+            )
+        } else {
+            write!(
+                f,
+                "The following devices with UUIDs {} were successfully added to a pool",
+                self.changed
+                    .iter()
+                    .map(|u| u.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 /// An action which may rename a single thing.
 pub enum RenameAction<T> {
@@ -160,6 +369,60 @@ impl<T> EngineAction for RenameAction<T> {
         match self {
             RenameAction::Renamed(t) => Some(t),
             _ => None,
+        }
+    }
+}
+
+impl Display for RenameAction<DevUuid> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            RenameAction::Identity => {
+                write!(
+                    f,
+                    "Device is already named the target name; no action taken"
+                )
+            }
+            RenameAction::Renamed(uuid) => {
+                write!(f, "Device with UUID {} was successfully renamed", uuid)
+            }
+            RenameAction::NoSource => {
+                write!(f, "The device requested to be renamed does not exist")
+            }
+        }
+    }
+}
+
+impl Display for RenameAction<FilesystemUuid> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            RenameAction::Identity => {
+                write!(
+                    f,
+                    "Filesystem is already named the target name; no action taken"
+                )
+            }
+            RenameAction::Renamed(uuid) => {
+                write!(f, "Filesystem with UUID {} was successfully renamed", uuid)
+            }
+            RenameAction::NoSource => {
+                write!(f, "The filesystem requested to be renamed does not exist")
+            }
+        }
+    }
+}
+
+impl Display for RenameAction<PoolUuid> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            RenameAction::Identity => {
+                write!(f, "Pool is already named the target name; no action taken")
+            }
+            RenameAction::Renamed(uuid) => {
+                write!(f, "Pool with UUID {} was successfully renamed", uuid)
+            }
+            RenameAction::NoSource => {
+                write!(f, "The pool requested to be renamed does not exist")
+            }
         }
     }
 }
@@ -188,5 +451,106 @@ impl<T> EngineAction for DeleteAction<T> {
     }
 }
 
-/// An action which may delete multiple things.
-pub type SetDeleteAction<T> = SetCreateAction<T>;
+impl Display for DeleteAction<PoolUuid> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            DeleteAction::Deleted(uuid) => {
+                write!(f, "Pool with UUID {} was deleted successfully", uuid)
+            }
+            DeleteAction::Identity => {
+                write!(
+                    f,
+                    "The pool requested for deletion is already absent; no action taken"
+                )
+            }
+        }
+    }
+}
+
+impl Display for DeleteAction<Clevis> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            DeleteAction::Deleted(_) => {
+                write!(f, "A clevis binding was successfully removed from a pool")
+            }
+            DeleteAction::Identity => {
+                write!(
+                    f,
+                    "The clevis binding requested for removal is already absent; no action taken"
+                )
+            }
+        }
+    }
+}
+
+impl Display for DeleteAction<Key> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            DeleteAction::Deleted(_) => {
+                write!(
+                    f,
+                    "Bindings to a passphrase in the kernel keyring were removed successfully"
+                )
+            }
+            DeleteAction::Identity => {
+                write!(
+                    f,
+                    "The keyring bindings requested for removal are already absent; no action taken"
+                )
+            }
+        }
+    }
+}
+
+/// An action which may create multiple things.
+#[derive(Debug, PartialEq, Eq)]
+pub struct SetDeleteAction<T> {
+    changed: Vec<T>,
+}
+
+impl<T> SetDeleteAction<T> {
+    pub fn new(changed: Vec<T>) -> Self {
+        SetDeleteAction { changed }
+    }
+
+    pub fn empty() -> Self {
+        SetDeleteAction { changed: vec![] }
+    }
+}
+
+impl<T> EngineAction for SetDeleteAction<T> {
+    type Return = Vec<T>;
+
+    fn is_changed(&self) -> bool {
+        !self.changed.is_empty()
+    }
+
+    fn changed(self) -> Option<Vec<T>> {
+        if self.changed.is_empty() {
+            None
+        } else {
+            Some(self.changed)
+        }
+    }
+}
+
+impl Display for SetDeleteAction<FilesystemUuid> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.changed.is_empty() {
+            write!(
+                f,
+                "The requested filesystems are already absent; no action taken"
+            )
+        } else {
+            write!(
+                f,
+                "Filesystems with UUIDs {} were successfully deleted",
+                self.changed
+                    .iter()
+                    .map(|u| u.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        }
+    }
+}

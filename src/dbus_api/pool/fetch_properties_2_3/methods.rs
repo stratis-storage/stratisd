@@ -6,9 +6,9 @@ use std::collections::HashMap;
 
 use dbus::{
     arg::{RefArg, Variant},
-    tree::{MTFn, MethodInfo, MethodResult},
     Message,
 };
+use dbus_tree::{MTSync, MethodInfo, MethodResult};
 use itertools::Itertools;
 
 use crate::dbus_api::{
@@ -29,8 +29,10 @@ const ALL_PROPERTIES: [&str; 5] = [
     consts::POOL_CLEVIS_INFO,
 ];
 
+#[allow(unknown_lints)]
+#[allow(clippy::unnecessary_wraps)]
 fn get_properties_shared(
-    m: &MethodInfo<MTFn<TData>, TData>,
+    m: &MethodInfo<MTSync<TData>, TData>,
     properties: &mut dyn Iterator<Item = String>,
 ) -> MethodResult {
     let message: &Message = m.msg;

@@ -12,7 +12,6 @@ use std::{
 };
 
 use serde_json::Value;
-use uuid::Uuid;
 
 use devicemapper::{
     device_exists, DataBlocks, Device, DmDevice, DmName, DmNameBuf, FlakeyTargetParams, LinearDev,
@@ -23,11 +22,9 @@ use devicemapper::{
 use crate::{
     engine::{
         engine::Filesystem,
-        event::{get_engine_listener_list, EngineEvent},
         strat_engine::{
             backstore::Backstore,
             cmd::{thin_check, thin_repair, udev_settle},
-            devlinks,
             dm::get_dm,
             names::{
                 format_flex_ids, format_thin_ids, format_thinpool_ids, FlexRole, ThinPoolRole,
@@ -38,7 +35,7 @@ use crate::{
             writing::wipe_sectors,
         },
         structures::Table,
-        types::{FilesystemUuid, MaybeDbusPath, Name, PoolUuid},
+        types::{FilesystemUuid, Name, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -51,6 +48,9 @@ const INITIAL_META_SIZE: MetaBlocks = MetaBlocks(4 * IEC::Ki);
 const MIN_META_SEGMENT_SIZE: MetaBlocks = MetaBlocks(4 * IEC::Ki);
 const INITIAL_DATA_SIZE: DataBlocks = DataBlocks(768);
 const INITIAL_MDV_SIZE: Sectors = Sectors(32 * IEC::Ki); // 16 MiB
+
+// The maximum allowable size of the thinpool metadata device
+const MAX_META_SIZE: MetaBlocks = MetaBlocks(255 * ((1 << 14) - 64));
 
 const SPACE_CRIT_PCT: u8 = 95;
 
@@ -267,14 +267,13 @@ pub struct ThinPool {
     thin_pool: ThinPoolDev,
     segments: Segments,
     id_gen: ThinDevIdPool,
-    filesystems: Table<StratFilesystem>,
+    filesystems: Table<FilesystemUuid, StratFilesystem>,
     mdv: MetadataVol,
     /// The single DM device that the backstore presents as its upper-most
     /// layer. All DM components obtain their storage from this layer.
     /// The device will change if the backstore adds or removes a cache.
     backstore_device: Device,
     thin_pool_status: Option<ThinPoolStatus>,
-    dbus_path: MaybeDbusPath,
 }
 
 impl ThinPool {
@@ -382,7 +381,6 @@ impl ThinPool {
             mdv,
             backstore_device,
             thin_pool_status: None,
-            dbus_path: MaybeDbusPath(None),
         })
     }
 
@@ -394,6 +392,7 @@ impl ThinPool {
     /// the problem by running thin_repair. If failure recurs, return an
     /// error.
     pub fn setup(
+        pool_name: &str,
         pool_uuid: PoolUuid,
         thin_pool_save: &ThinPoolDevSave,
         flex_devs: &FlexDevsSave,
@@ -454,7 +453,10 @@ impl ThinPool {
             .iter()
             .filter_map(
                 |fssave| match StratFilesystem::setup(pool_uuid, &thinpool_dev, fssave) {
-                    Ok(fs) => Some((Name::new(fssave.name.to_owned()), fssave.uuid, fs)),
+                    Ok(fs) => {
+                        fs.udev_fs_change(pool_name, fssave.uuid, &fssave.name);
+                        Some((Name::new(fssave.name.to_owned()), fssave.uuid, fs))
+                    },
                     Err(err) => {
                         warn!(
                             "Filesystem specified by metadata {:?} could not be setup, reason: {:?}",
@@ -492,7 +494,6 @@ impl ThinPool {
             mdv,
             backstore_device,
             thin_pool_status: None,
-            dbus_path: MaybeDbusPath(None),
         })
     }
 
@@ -526,8 +527,11 @@ impl ThinPool {
             let usage = &status.usage;
 
             // Ensure meta subdevice is approx. 1/1000th of total usable
-            // size
-            let target_meta_size = (backstore.datatier_usable_size() / 1000u16).metablocks();
+            // size, but no larger than the maximum allowed by devicemapper.
+            let target_meta_size = min(
+                (backstore.datatier_usable_size() / 1000u16).metablocks(),
+                MAX_META_SIZE,
+            );
             if usage.total_meta < target_meta_size {
                 let meta_request = target_meta_size - usage.total_meta;
 
@@ -687,10 +691,9 @@ impl ThinPool {
     ) -> StratisResult<Sectors> {
         assert!(modulus != Sectors(0));
         let sub_device_str = if data { "data" } else { "metadata" };
-        let pool_uuid_str = pool_uuid.to_simple_ref();
         info!(
             "Attempting to extend thinpool {} sub-device belonging to pool {} by {}",
-            sub_device_str, pool_uuid_str, extend_size,
+            sub_device_str, pool_uuid, extend_size,
         );
 
         let result = if let Some(region) = backstore.request(pool_uuid, extend_size, modulus)? {
@@ -719,12 +722,12 @@ impl ThinPool {
                 if (extend_size / modulus) * modulus == actual_extend_size {
                     info!(
                         "Extended thinpool {} sub-device belonging to pool with uuid {} by {}",
-                        sub_device_str, pool_uuid_str, actual_extend_size
+                        sub_device_str, pool_uuid, actual_extend_size
                     );
                 } else {
                     warn!("Insufficient free space available in backstore; extended thinpool {} sub-device belonging to pool with uuid {} by {}, request was {}",
                       sub_device_str,
-                      pool_uuid_str,
+                      pool_uuid,
                       actual_extend_size,
                       extend_size);
                 }
@@ -732,7 +735,7 @@ impl ThinPool {
             Err(ref err) => {
                 error!("Attempted to extend thinpool {} sub-device belonging to pool with uuid {} by {} but failed with error: {:?}",
                        sub_device_str,
-                       pool_uuid_str,
+                       pool_uuid,
                        extend_size,
                        err);
             }
@@ -808,17 +811,17 @@ impl ThinPool {
         !self.filesystems.is_empty()
     }
 
-    pub fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)> {
+    pub fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &StratFilesystem)> {
         self.filesystems
             .iter()
-            .map(|(name, uuid, x)| (name.clone(), *uuid, x as &dyn Filesystem))
+            .map(|(name, uuid, x)| (name.clone(), *uuid, x))
             .collect()
     }
 
-    pub fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut dyn Filesystem)> {
+    pub fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut StratFilesystem)> {
         self.filesystems
             .iter_mut()
-            .map(|(name, uuid, x)| (name.clone(), *uuid, x as &mut dyn Filesystem))
+            .map(|(name, uuid, x)| (name.clone(), *uuid, x))
             .collect()
     }
 
@@ -826,6 +829,7 @@ impl ThinPool {
     /// already be in use.
     pub fn create_filesystem(
         &mut self,
+        pool_name: &str,
         pool_uuid: PoolUuid,
         name: &str,
         size: Option<Sectors>,
@@ -847,6 +851,11 @@ impl ThinPool {
             return Err(err);
         }
         self.filesystems.insert(name, fs_uuid, new_filesystem);
+        let (name, fs) = self
+            .filesystems
+            .get_by_uuid(fs_uuid)
+            .expect("Inserted above");
+        fs.udev_fs_change(&pool_name, fs_uuid, &name);
 
         Ok(fs_uuid)
     }
@@ -855,11 +864,12 @@ impl ThinPool {
     /// must exist.  Returns the Uuid of the new filesystem.
     pub fn snapshot_filesystem(
         &mut self,
+        pool_name: &str,
         pool_uuid: PoolUuid,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
     ) -> StratisResult<(FilesystemUuid, &mut dyn Filesystem)> {
-        let snapshot_fs_uuid = Uuid::new_v4();
+        let snapshot_fs_uuid = FilesystemUuid::new_v4();
         let (snapshot_dm_name, snapshot_dm_uuid) =
             format_thin_ids(pool_uuid, ThinRole::Filesystem(snapshot_fs_uuid));
         let snapshot_id = self.id_gen.new_id()?;
@@ -885,6 +895,11 @@ impl ThinPool {
             .save_fs(&new_fs_name, snapshot_fs_uuid, &new_filesystem)?;
         self.filesystems
             .insert(new_fs_name, snapshot_fs_uuid, new_filesystem);
+        let (new_fs_name, fs) = self
+            .filesystems
+            .get_by_uuid(snapshot_fs_uuid)
+            .expect("Inserted above");
+        fs.udev_fs_change(&pool_name, snapshot_fs_uuid, &new_fs_name);
         Ok((
             snapshot_fs_uuid,
             self.filesystems
@@ -945,7 +960,7 @@ impl ThinPool {
         pool_name: &str,
         uuid: FilesystemUuid,
         new_name: &str,
-    ) -> StratisResult<Option<Uuid>> {
+    ) -> StratisResult<Option<FilesystemUuid>> {
         let old_name = rename_filesystem_pre!(self; uuid; new_name);
         let new_name = Name::new(new_name.to_owned());
 
@@ -959,27 +974,27 @@ impl ThinPool {
             self.filesystems.insert(old_name, uuid, filesystem);
             Err(err)
         } else {
-            get_engine_listener_list().notify(&EngineEvent::FilesystemRenamed {
-                dbus_path: filesystem.get_dbus_path(),
-                from: &*old_name,
-                to: &*new_name,
-            });
-            self.filesystems.insert(new_name.clone(), uuid, filesystem);
-            if let Err(e) = devlinks::filesystem_renamed(pool_name, &old_name) {
-                warn!("Filesystem rename symlink action failed: {}", e);
-            };
+            self.filesystems.insert(new_name, uuid, filesystem);
+            let (new_name, fs) = self.filesystems.get_by_uuid(uuid).expect("Inserted above");
+            fs.udev_fs_change(pool_name, uuid, &new_name);
             Ok(Some(uuid))
         }
     }
 
     /// The names of DM devices belonging to this pool that may generate events
     pub fn get_eventing_dev_names(&self, pool_uuid: PoolUuid) -> Vec<DmNameBuf> {
-        vec![
+        let mut eventing = vec![
             format_flex_ids(pool_uuid, FlexRole::ThinMeta).0,
             format_flex_ids(pool_uuid, FlexRole::ThinData).0,
             format_flex_ids(pool_uuid, FlexRole::MetadataVolume).0,
             format_thinpool_ids(pool_uuid, ThinPoolRole::Pool).0,
-        ]
+        ];
+        eventing.extend(
+            self.filesystems
+                .iter()
+                .map(|(_, uuid, _)| format_thin_ids(pool_uuid, ThinRole::Filesystem(*uuid)).0),
+        );
+        eventing
     }
 
     /// Suspend the thinpool
@@ -1074,10 +1089,6 @@ impl ThinPool {
 
         Ok(true)
     }
-
-    pub fn set_dbus_path(&mut self, path: MaybeDbusPath) {
-        self.dbus_path = path
-    }
 }
 
 impl<'a> Into<Value> for &'a ThinPool {
@@ -1087,7 +1098,7 @@ impl<'a> Into<Value> for &'a ThinPool {
                 self.filesystems.iter()
                     .map(|(name, uuid, _)| json!({
                         "name": name.to_string(),
-                        "uuid": uuid.to_simple_ref().to_string(),
+                        "uuid": uuid.to_string(),
                     }))
                     .collect()
             )
@@ -1190,14 +1201,17 @@ mod tests {
     };
 
     use nix::mount::{mount, umount, MsFlags};
-    use uuid::Uuid;
 
     use devicemapper::{Bytes, SECTOR_SIZE};
 
-    use crate::engine::strat_engine::{
-        metadata::MDADataSize,
-        tests::{loopbacked, real},
-        writing::SyncAll,
+    use crate::engine::{
+        strat_engine::{
+            cmd,
+            metadata::MDADataSize,
+            tests::{loopbacked, real},
+            writing::SyncAll,
+        },
+        types::EncryptionInfo,
     };
 
     use crate::engine::strat_engine::thinpool::filesystem::{fs_usage, FILESYSTEM_LOWATER};
@@ -1207,6 +1221,22 @@ mod tests {
     #[allow(clippy::cast_possible_truncation)]
     const BYTES_PER_WRITE: usize = 2 * IEC::Ki as usize * SECTOR_SIZE as usize;
 
+    // Check expected size of thin pool after one file creation in order
+    // to verify expected size required by one thin device remains constant.
+    // If the value of the expected size changes, update to a new value and
+    // notify blivet.
+    macro_rules! check_expected_filesystem_size {
+        ($p:ident) => {
+            match $p.thin_pool.status(get_dm()).unwrap() {
+                ThinPoolStatus::Working(status) => {
+                    assert_eq!(status.usage.used_data, DataBlocks(546));
+                }
+                ThinPoolStatus::Error => panic!("Could not obtain status for thinpool."),
+                ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail  Expected working."),
+            }
+        };
+    }
+
     /// Test greedy allocation.
     /// Verify that ThinPool::new() allocates nearly everything available.
     /// Verify that meta and data devices are roughly in their correct
@@ -1214,10 +1244,15 @@ mod tests {
     /// FIXME: This is a temporary test; it should be removed when greedy
     /// allocation is removed.
     fn test_greedy_allocation(paths: &[&Path]) {
-        let pool_uuid = Uuid::new_v4();
+        let pool_uuid = PoolUuid::new_v4();
 
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            paths,
+            MDADataSize::default(),
+            &EncryptionInfo::default(),
+        )
+        .unwrap();
 
         let mut pool = ThinPool::new(
             pool_uuid,
@@ -1255,10 +1290,16 @@ mod tests {
 
     /// Verify that a full pool extends properly when additional space is added.
     fn test_full_pool(paths: &[&Path]) {
-        let pool_uuid = Uuid::new_v4();
+        let pool_name = "pool";
+        let pool_uuid = PoolUuid::new_v4();
         let (first_path, remaining_paths) = paths.split_at(1);
-        let mut backstore =
-            Backstore::initialize(pool_uuid, first_path, MDADataSize::default(), None).unwrap();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            first_path,
+            MDADataSize::default(),
+            &EncryptionInfo::default(),
+        )
+        .unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1268,8 +1309,11 @@ mod tests {
         .unwrap();
 
         let fs_uuid = pool
-            .create_filesystem(pool_uuid, "stratis_test_filesystem", None)
+            .create_filesystem(pool_name, pool_uuid, "stratis_test_filesystem", None)
             .unwrap();
+
+        check_expected_filesystem_size!(pool);
+
         let write_buf = &[8u8; BYTES_PER_WRITE];
         let source_tmp_dir = tempfile::Builder::new()
             .prefix("stratis_testing")
@@ -1341,7 +1385,7 @@ mod tests {
     #[test]
     fn loop_test_full_pool() {
         loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Exactly(2, Some(Bytes(IEC::Gi).sectors())),
+            &loopbacked::DeviceLimits::Exactly(2, Some(Bytes::from(IEC::Gi).sectors())),
             test_full_pool,
         );
     }
@@ -1351,8 +1395,8 @@ mod tests {
         real::test_with_spec(
             &real::DeviceLimits::Exactly(
                 2,
-                Some(Bytes(IEC::Gi).sectors()),
-                Some(Bytes(IEC::Gi * 4).sectors()),
+                Some(Bytes::from(IEC::Gi).sectors()),
+                Some(Bytes::from(IEC::Gi * 4).sectors()),
             ),
             test_full_pool,
         );
@@ -1360,9 +1404,15 @@ mod tests {
 
     /// Verify a snapshot has the same files and same contents as the origin.
     fn test_filesystem_snapshot(paths: &[&Path]) {
-        let pool_uuid = Uuid::new_v4();
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
+        let pool_name = "pool";
+        let pool_uuid = PoolUuid::new_v4();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            paths,
+            MDADataSize::default(),
+            &EncryptionInfo::default(),
+        )
+        .unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1371,9 +1421,16 @@ mod tests {
         )
         .unwrap();
 
+        let filesystem_name = "stratis_test_filesystem";
         let fs_uuid = pool
-            .create_filesystem(pool_uuid, "stratis_test_filesystem", None)
+            .create_filesystem(pool_name, pool_uuid, filesystem_name, None)
             .unwrap();
+
+        check_expected_filesystem_size!(pool);
+
+        cmd::udev_settle().unwrap();
+
+        assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, filesystem_name)).exists());
 
         let write_buf = &[8u8; SECTOR_SIZE];
         let file_count = 10;
@@ -1420,9 +1477,17 @@ mod tests {
         )
         .unwrap();
 
+        let snapshot_name = "test_snapshot";
         let (_, snapshot_filesystem) = pool
-            .snapshot_filesystem(pool_uuid, fs_uuid, "test_snapshot")
+            .snapshot_filesystem(pool_name, pool_uuid, fs_uuid, snapshot_name)
             .unwrap();
+
+        cmd::udev_settle().unwrap();
+
+        // Assert both symlinks are still present.
+        assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, filesystem_name)).exists());
+        assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, snapshot_name)).exists());
+
         let mut read_buf = [0u8; SECTOR_SIZE];
         let snapshot_tmp_dir = tempfile::Builder::new()
             .prefix("stratis_testing")
@@ -1470,9 +1535,14 @@ mod tests {
         let name1 = "name1";
         let name2 = "name2";
 
-        let pool_uuid = Uuid::new_v4();
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
+        let pool_uuid = PoolUuid::new_v4();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            paths,
+            MDADataSize::default(),
+            &EncryptionInfo::default(),
+        )
+        .unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1482,15 +1552,32 @@ mod tests {
         .unwrap();
 
         let pool_name = "stratis_test_pool";
-        let fs_uuid = pool.create_filesystem(pool_uuid, name1, None).unwrap();
+        let fs_uuid = pool
+            .create_filesystem(pool_name, pool_uuid, name1, None)
+            .unwrap();
+
+        check_expected_filesystem_size!(pool);
+
+        cmd::udev_settle().unwrap();
+
+        assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, name1)).exists());
 
         let action = pool.rename_filesystem(pool_name, fs_uuid, name2).unwrap();
+
+        cmd::udev_settle().unwrap();
+
+        // Check that the symlink has been renamed.
+        assert!(!Path::new(&format!("/dev/stratis/{}/{}", pool_name, name1)).exists());
+        assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, name2)).exists());
+
         assert_matches!(action, Some(_));
         let flexdevs: FlexDevsSave = pool.record();
         let thinpoolsave: ThinPoolDevSave = pool.record();
-        pool.teardown().unwrap();
 
-        let pool = ThinPool::setup(pool_uuid, &thinpoolsave, &flexdevs, &backstore).unwrap();
+        retry_operation!(pool.teardown());
+
+        let pool =
+            ThinPool::setup(pool_name, pool_uuid, &thinpoolsave, &flexdevs, &backstore).unwrap();
 
         assert_eq!(&*pool.get_filesystem_by_uuid(fs_uuid).unwrap().0, name2);
     }
@@ -1515,9 +1602,15 @@ mod tests {
     /// down does not fail. Clutter the original pool with a filesystem with
     /// some data on it.
     fn test_pool_setup(paths: &[&Path]) {
-        let pool_uuid = Uuid::new_v4();
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
+        let pool_name = "pool";
+        let pool_uuid = PoolUuid::new_v4();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            paths,
+            MDADataSize::default(),
+            &EncryptionInfo::default(),
+        )
+        .unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1526,7 +1619,11 @@ mod tests {
         )
         .unwrap();
 
-        let fs_uuid = pool.create_filesystem(pool_uuid, "fsname", None).unwrap();
+        let fs_uuid = pool
+            .create_filesystem(pool_name, pool_uuid, "fsname", None)
+            .unwrap();
+
+        check_expected_filesystem_size!(pool);
 
         let tmp_dir = tempfile::Builder::new()
             .prefix("stratis_testing")
@@ -1555,8 +1652,14 @@ mod tests {
         }
         let thinpooldevsave: ThinPoolDevSave = pool.record();
 
-        let new_pool =
-            ThinPool::setup(pool_uuid, &thinpooldevsave, &pool.record(), &backstore).unwrap();
+        let new_pool = ThinPool::setup(
+            pool_name,
+            pool_uuid,
+            &thinpooldevsave,
+            &pool.record(),
+            &backstore,
+        )
+        .unwrap();
 
         assert!(new_pool.get_filesystem_by_uuid(fs_uuid).is_some());
     }
@@ -1577,9 +1680,14 @@ mod tests {
     /// from the thinpool, by attempting to reinstantiate it using the
     /// same thin id and verifying that it fails.
     fn test_thindev_destroy(paths: &[&Path]) {
-        let pool_uuid = Uuid::new_v4();
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
+        let pool_uuid = PoolUuid::new_v4();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            paths,
+            MDADataSize::default(),
+            &EncryptionInfo::default(),
+        )
+        .unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1589,8 +1697,13 @@ mod tests {
         .unwrap();
         let pool_name = "stratis_test_pool";
         let fs_name = "stratis_test_filesystem";
-        let fs_uuid = pool.create_filesystem(pool_uuid, fs_name, None).unwrap();
-        pool.destroy_filesystem(pool_name, fs_uuid).unwrap();
+        let fs_uuid = pool
+            .create_filesystem(pool_name, pool_uuid, fs_name, None)
+            .unwrap();
+
+        check_expected_filesystem_size!(pool);
+
+        retry_operation!(pool.destroy_filesystem(pool_name, fs_uuid));
         let flexdevs: FlexDevsSave = pool.record();
         let thinpooldevsave: ThinPoolDevSave = pool.record();
         pool.teardown().unwrap();
@@ -1598,7 +1711,14 @@ mod tests {
         // Check that destroyed fs is not present in MDV. If the record
         // had been left on the MDV that didn't match a thin_id in the
         // thinpool, ::setup() will fail.
-        let pool = ThinPool::setup(pool_uuid, &thinpooldevsave, &flexdevs, &backstore).unwrap();
+        let pool = ThinPool::setup(
+            pool_name,
+            pool_uuid,
+            &thinpooldevsave,
+            &flexdevs,
+            &backstore,
+        )
+        .unwrap();
 
         assert_matches!(pool.get_filesystem_by_uuid(fs_uuid), None);
     }
@@ -1628,9 +1748,15 @@ mod tests {
     /// by tearing down/reconstructing the pool and verify the thindev size is updated.
     fn test_thindev_expand(paths: &[&Path]) {
         let start_thindev_size: Sectors;
-        let pool_uuid = Uuid::new_v4();
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
+        let pool_name = "pool";
+        let pool_uuid = PoolUuid::new_v4();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            paths,
+            MDADataSize::default(),
+            &EncryptionInfo::default(),
+        )
+        .unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1641,12 +1767,13 @@ mod tests {
 
         // Create a filesystem as small as possible.  Allocate 1 MiB bigger than
         // the low water mark.
-        let fs_size = FILESYSTEM_LOWATER + Bytes(IEC::Mi).sectors();
+        let fs_size = FILESYSTEM_LOWATER + Bytes::from(IEC::Mi).sectors();
 
         let fs_name = "stratis_test_filesystem";
         let fs_uuid = pool
-            .create_filesystem(pool_uuid, fs_name, Some(fs_size))
+            .create_filesystem(pool_name, pool_uuid, fs_name, Some(fs_size))
             .unwrap();
+
         let tmp_dir = tempfile::Builder::new()
             .prefix("stratis_testing")
             .tempdir()
@@ -1668,7 +1795,7 @@ mod tests {
         }
         // Write 2 MiB of data. The filesystem's free space is now 1 MiB
         // below FILESYSTEM_LOWATER.
-        let write_size = Bytes(IEC::Mi * 2).sectors();
+        let write_size = Bytes::from(IEC::Mi * 2).sectors();
         let buf = &[1u8; SECTOR_SIZE];
         for i in 0..*write_size {
             let file_path = tmp_dir.path().join(format!("stratis_test{}.txt", i));
@@ -1692,7 +1819,8 @@ mod tests {
         let flexdevs: FlexDevsSave = pool.record();
         let thinpoolsave: ThinPoolDevSave = pool.record();
         pool.teardown().unwrap();
-        let mut pool = ThinPool::setup(pool_uuid, &thinpoolsave, &flexdevs, &backstore).unwrap();
+        let mut pool =
+            ThinPool::setup(pool_name, pool_uuid, &thinpoolsave, &flexdevs, &backstore).unwrap();
         let filesystem = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap().1;
         let thindev_size = filesystem.thindev_size();
         assert!(thindev_size > start_thindev_size)
@@ -1718,9 +1846,15 @@ mod tests {
     /// Suspend twice in succession and then resume twice in succession
     /// to check idempotency.
     fn test_suspend_resume(paths: &[&Path]) {
-        let pool_uuid = Uuid::new_v4();
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
+        let pool_name = "pool";
+        let pool_uuid = PoolUuid::new_v4();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            paths,
+            MDADataSize::default(),
+            &EncryptionInfo::default(),
+        )
+        .unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1729,7 +1863,7 @@ mod tests {
         )
         .unwrap();
 
-        pool.create_filesystem(pool_uuid, "stratis_test_filesystem", None)
+        pool.create_filesystem(pool_name, pool_uuid, "stratis_test_filesystem", None)
             .unwrap();
 
         pool.suspend().unwrap();
@@ -1763,9 +1897,15 @@ mod tests {
 
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
-        let pool_uuid = Uuid::new_v4();
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths2, MDADataSize::default(), None).unwrap();
+        let pool_name = "pool";
+        let pool_uuid = PoolUuid::new_v4();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            paths2,
+            MDADataSize::default(),
+            &EncryptionInfo::default(),
+        )
+        .unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::default(),
@@ -1775,8 +1915,10 @@ mod tests {
         .unwrap();
 
         let fs_uuid = pool
-            .create_filesystem(pool_uuid, "stratis_test_filesystem", None)
+            .create_filesystem(pool_name, pool_uuid, "stratis_test_filesystem", None)
             .unwrap();
+
+        check_expected_filesystem_size!(pool);
 
         let tmp_dir = tempfile::Builder::new()
             .prefix("stratis_testing")

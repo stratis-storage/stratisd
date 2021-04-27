@@ -4,29 +4,27 @@
 
 use std::convert::TryFrom;
 
-use dbus::{
-    tree::{MTFn, MethodInfo, MethodResult},
-    Message,
-};
+use dbus::Message;
+use dbus_tree::{MTSync, MethodInfo, MethodResult};
 
 use crate::{
     dbus_api::{
         api::shared::{create_pool_shared, set_key_shared, unlock_pool_shared},
-        types::TData,
+        types::{CreatePoolParams, TData},
         util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
     },
-    engine::{DeleteAction, KeyDescription},
+    engine::{KeyDescription, MappingDeleteAction},
 };
 
-pub fn create_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
-    create_pool_shared(m, true)
+pub fn create_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+    create_pool_shared(m, CreatePoolParams::KeyDesc)
 }
 
-pub fn set_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn set_key(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     set_key_shared(m)
 }
 
-pub fn unset_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn unset_key(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -36,9 +34,7 @@ pub fn unset_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     let default_return = false;
     let return_message = message.method_return();
 
-    let msg = match dbus_context
-        .engine
-        .borrow_mut()
+    let msg = match log_action!(mutex_lock!(dbus_context.engine)
         .get_key_handler_mut()
         .unset(&match KeyDescription::try_from(key_desc_str) {
             Ok(kd) => kd,
@@ -46,9 +42,9 @@ pub fn unset_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
                 let (rc, rs) = engine_to_dbus_err_tuple(&e);
                 return Ok(vec![return_message.append3(default_return, rc, rs)]);
             }
-        }) {
+        })) {
         Ok(idem_resp) => {
-            let return_value = matches!(idem_resp, DeleteAction::Deleted(()));
+            let return_value = matches!(idem_resp, MappingDeleteAction::Deleted(_));
             return_message.append3(return_value, msg_code_ok(), msg_string_ok())
         }
         Err(e) => {
@@ -59,6 +55,6 @@ pub fn unset_key(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-pub fn unlock_pool(m: &MethodInfo<MTFn<TData>, TData>) -> MethodResult {
+pub fn unlock_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     unlock_pool_shared(m, false)
 }

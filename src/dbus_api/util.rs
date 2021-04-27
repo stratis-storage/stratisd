@@ -2,20 +2,27 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus::{
-    arg::{ArgType, Iter, IterAppend, RefArg, Variant},
-    ffidisp::{stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged, Connection},
-    message::SignalArgs,
-    tree::{MTFn, MethodErr, PropInfo},
+use std::sync::Arc;
+
+use dbus::arg::{ArgType, Iter, IterAppend, RefArg, Variant};
+use dbus_tokio::connection::new_system_sync;
+use dbus_tree::{MTSync, MethodErr, PropInfo};
+use tokio::sync::{
+    mpsc::{unbounded_channel, UnboundedReceiver},
+    Mutex, RwLock,
 };
 
 use devicemapper::DmError;
 
 use crate::{
     dbus_api::{
+        api::get_base_tree,
+        connection::{DbusConnectionHandler, DbusTreeHandler},
         consts,
         types::{DbusContext, DbusErrorEnum, TData},
+        udev::DbusUdevHandler,
     },
+    engine::{Engine, UdevEngineEvent},
     stratis::{ErrorEnum, StratisError},
 };
 
@@ -92,10 +99,13 @@ pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
         StratisError::Uuid(_)
         | StratisError::Utf8(_)
         | StratisError::Serde(_)
+        | StratisError::Decode(_)
         | StratisError::DM(_)
         | StratisError::Dbus(_)
         | StratisError::Udev(_)
-        | StratisError::Crypt(_) => DbusErrorEnum::ERROR,
+        | StratisError::Crypt(_)
+        | StratisError::Null(_)
+        | StratisError::Recv(_) => DbusErrorEnum::ERROR,
     };
     let description = match *err {
         StratisError::DM(DmError::Core(ref err)) => err.to_string(),
@@ -115,7 +125,7 @@ pub fn msg_string_ok() -> String {
 }
 
 /// Get the UUID for an object path.
-pub fn get_uuid(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
+pub fn get_uuid(i: &mut IterAppend, p: &PropInfo<MTSync<TData>, TData>) -> Result<(), MethodErr> {
     let object_path = p.path.get_name();
     let path = p
         .tree
@@ -132,7 +142,7 @@ pub fn get_uuid(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<
 }
 
 /// Get the parent object path for an object path.
-pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Result<(), MethodErr> {
+pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTSync<TData>, TData>) -> Result<(), MethodErr> {
     let object_path = p.path.get_name();
     let path = p
         .tree
@@ -148,27 +158,30 @@ pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTFn<TData>, TData>) -> Resul
     Ok(())
 }
 
-/// Place a property changed signal on the D-Bus for the given property name
-/// and value and for all interfaces specified.
-pub fn prop_changed_dispatch<T: 'static>(
-    conn: &Connection,
-    prop_name: &str,
-    new_value: T,
-    path: &dbus::Path,
-    interfaces: &[String],
-) -> Result<(), ()>
-where
-    T: RefArg,
-{
-    let mut prop_changed: PropertiesPropertiesChanged = Default::default();
-    prop_changed
-        .changed_properties
-        .insert(prop_name.into(), Variant(Box::new(new_value)));
+/// Create both ends of the D-Bus processing handlers.
+/// Returns a triple:
+/// 1. A DbusConnectionHandler which may be used to process D-Bus methods calls
+/// 2. A DbusUdevHandler which may be used to handle detected udev events
+/// 3. A DbusTreeHandler which may be used to update the D-Bus tree
+///
+/// Messages may be:
+/// * received by the DbusUdevHandler from the udev thread,
+/// * sent by the DbusContext to the DbusTreeHandler
+pub async fn create_dbus_handlers(
+    engine: Arc<Mutex<dyn Engine>>,
+    udev_receiver: UnboundedReceiver<UdevEngineEvent>,
+) -> Result<(DbusConnectionHandler, DbusUdevHandler, DbusTreeHandler), dbus::Error> {
+    let (io, conn) = new_system_sync()?;
+    tokio::spawn(io);
+    let (sender, receiver) = unbounded_channel();
+    let (tree, object_path) = get_base_tree(DbusContext::new(engine, sender, Arc::clone(&conn)));
+    let dbus_context = tree.get_data().clone();
+    conn.request_name(consts::STRATIS_BASE_SERVICE, false, true, true)
+        .await?;
 
-    for interface in interfaces {
-        prop_changed.interface_name = interface.to_owned();
-        conn.send(prop_changed.to_emit_message(path))?;
-    }
-
-    Ok(())
+    let tree = Arc::new(RwLock::new(tree));
+    let connection = DbusConnectionHandler::new(Arc::clone(&conn), Arc::clone(&tree));
+    let udev = DbusUdevHandler::new(udev_receiver, object_path, dbus_context);
+    let tree = DbusTreeHandler::new(tree, receiver, conn);
+    Ok((connection, udev, tree))
 }

@@ -1,0 +1,8 @@
+FROM fedora:32
+
+RUN dnf install -y systemd tang
+RUN systemctl enable tangd.socket
+
+EXPOSE 80
+
+CMD /usr/lib/systemd/systemd

@@ -2,14 +2,14 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus::tree::{Factory, MTFn, Method};
+use dbus_tree::{Factory, MTSync, Method};
 
 use crate::dbus_api::{
     api::manager_2_1::methods::{create_pool, set_key, unlock_pool, unset_key},
     types::TData,
 };
 
-pub fn create_pool_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+pub fn create_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
     f.method("CreatePool", (), create_pool)
         .in_arg(("name", "s"))
         .in_arg(("redundancy", "(bq)"))
@@ -31,7 +31,7 @@ pub fn create_pool_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>
         .out_arg(("return_string", "s"))
 }
 
-pub fn set_key_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+pub fn set_key_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
     f.method("SetKey", (), set_key)
         .in_arg(("key_desc", "s"))
         .in_arg(("key_fd", "h"))
@@ -46,7 +46,7 @@ pub fn set_key_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TD
         .out_arg(("return_string", "s"))
 }
 
-pub fn unset_key_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+pub fn unset_key_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
     f.method("UnsetKey", (), unset_key)
         .in_arg(("key_desc", "s"))
         // b: true if the key was unset from the keyring. false if the key
@@ -58,7 +58,7 @@ pub fn unset_key_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, 
         .out_arg(("return_string", "s"))
 }
 
-pub fn unlock_pool_method(f: &Factory<MTFn<TData>, TData>) -> Method<MTFn<TData>, TData> {
+pub fn unlock_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
     f.method("UnlockPool", (), unlock_pool)
         .in_arg(("pool_uuid", "s"))
         // b: true if some encrypted devices were newly opened.

@@ -22,6 +22,7 @@ use nix::{
 use libstratis::stratis::{run, StratisError, StratisResult, VERSION};
 
 const STRATISD_PID_PATH: &str = "/run/stratisd.pid";
+const STRATISD_MIN_PID_PATH: &str = "/run/stratisd-min.pid";
 
 /// Configure and initialize the logger.
 /// If optional log_level argument is set, use that to set the log level
@@ -64,7 +65,7 @@ fn trylock_pid_file() -> StratisResult<File> {
                 STRATISD_PID_PATH, err
             ))
         })?;
-    match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
+    let stratisd_file = match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
         Ok(_) => {
             f.write_all(getpid().to_string().as_bytes())?;
             Ok(f)
@@ -81,11 +82,34 @@ fn trylock_pid_file() -> StratisResult<File> {
                 buf
             )))
         }
-    }
+    };
+
+    let f = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(STRATISD_MIN_PID_PATH)
+        .map_err(|err| {
+            StratisError::Error(format!(
+                "Failed to create or open the stratisd-min PID file at {}: {}",
+                STRATISD_MIN_PID_PATH, err
+            ))
+        })?;
+    match flock(f.as_raw_fd(), FlockArg::LockExclusive) {
+        Ok(_) => drop(f),
+        Err(e) => {
+            return Err(StratisError::Error(format!(
+                "Failed to wait on stratisd-min to exit: {}",
+                e
+            )))
+        }
+    };
+
+    stratisd_file
 }
 
 fn main() {
-    let matches = App::new("stratis")
+    let matches = App::new("stratisd")
         .version(VERSION)
         .about("Stratis storage management")
         .arg(

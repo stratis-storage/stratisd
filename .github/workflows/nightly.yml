@@ -4,13 +4,13 @@ name: stratisd nightly
 # yamllint disable-line rule:truthy
 on:
   schedule:
-    - cron: 0 0 * * *
+    - cron: 15 3 * * *
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 jobs:
-  dependencies:
+  allowed_failures:
     continue-on-error: true
     strategy:
       matrix:
@@ -27,6 +27,11 @@ jobs:
           - task: make -f Makefile audit
             toolchain: 1.51.0  # CURRENT DEVELOPMENT TOOLCHAIN
             components: cargo
+          # Allowed because a failure may occur after a new Rust stable
+          # version is released.
+          - task: make -f Makefile clippy
+            toolchain: stable
+            components: clippy
     runs-on: ubuntu-18.04
     container:
       image: fedora:32
@@ -50,5 +55,6 @@ jobs:
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
+          override: true
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}

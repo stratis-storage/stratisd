@@ -150,7 +150,9 @@ YAML linter: yamllint (1.26.0)
   https://github.com/stratis-storage/stratisd/pull/2434
 
 - Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/2559
   https://github.com/stratis-storage/stratisd/pull/2552
+  https://github.com/stratis-storage/stratisd/pull/2550
   https://github.com/stratis-storage/stratisd/pull/2549
   https://github.com/stratis-storage/stratisd/pull/2548
   https://github.com/stratis-storage/stratisd/pull/2545

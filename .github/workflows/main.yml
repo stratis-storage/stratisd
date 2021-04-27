@@ -6,14 +6,14 @@ on:
   push:
     branches:
       - master
-      - develop-2.3.0
+      - develop-2.4.0
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'
   pull_request:
     branches:
       - master
-      - develop-2.3.0
+      - develop-2.4.0
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'

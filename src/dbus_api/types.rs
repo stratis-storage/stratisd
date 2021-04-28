@@ -84,12 +84,11 @@ pub struct DbusContext {
 
 impl Debug for DbusContext {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "DbusContext {{ next_index: {:?}, engine: Arc<Mutex<dyn Engine>>, \
-            sender: {:?} }}",
-            self.next_index, self.sender,
-        )
+        f.debug_struct("DbusContext")
+            .field("next_index", &self.next_index)
+            .field("engine", &"Arc<Mutex<dyn Engine>>")
+            .field("sender", &self.sender)
+            .finish()
     }
 }
 

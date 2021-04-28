@@ -4,7 +4,7 @@
 
 use std::{
     convert::TryFrom,
-    fmt::{self, Debug},
+    fmt::Debug,
     io,
     path::{Path, PathBuf},
     sync::Arc,
@@ -517,25 +517,12 @@ impl CryptActivationHandle {
 /// * CryptInitializer will ensure that the newly formatted device is activated.
 /// * CryptActivationHandle requires the user to activate a device to yield a CryptHandle.
 /// * CryptHandle::setup() fails if the device is not active.
+#[derive(Debug)]
 pub struct CryptHandle {
     path: Arc<BlockDevPath>,
     identifiers: StratisIdentifiers,
     encryption_info: EncryptionInfo,
     name: String,
-}
-
-impl Debug for CryptHandle {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "CryptHandle {{ device: CryptDevice, physical_path: {}, identifiers: {}, \
-            encryption_info: {}, name: {} }}",
-            self.luks2_device_path().display(),
-            self.identifiers,
-            self.encryption_info,
-            self.name,
-        )
-    }
 }
 
 impl CryptHandle {

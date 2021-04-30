@@ -5,6 +5,9 @@ name: stratisd nightly
 on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:           
+  pull_request:
+    branches:
+      - develop-2.4.0
 
 jobs:
   # Nightly to show us in advance what will change in Python utilities in

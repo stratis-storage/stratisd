@@ -67,8 +67,7 @@ jobs:
       matrix:
         include:
           # PYTHON CHECKS ON NEXT FEDORA PYTHON AND PYTHON TOOLS VERSION
-          - python-version: 3.9.4
-            dependencies: >
+          - dependencies: >
               pylint
               python3-dbus-client-gen
               python3-dbus-python-client-gen
@@ -82,8 +81,7 @@ jobs:
               (cd code_maintenance; make -f Makefile lint) &&
               (cd developer_tools; make -f Makefile lint) &&
               (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
-          - python-version: 3.9.4
-            dependencies: black python3-isort
+          - dependencies: black python3-isort
             image: fedora:33
             task: >
               (cd code_maintenance; make -f Makefile fmt-travis) &&

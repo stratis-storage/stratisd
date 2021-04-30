@@ -62,6 +62,7 @@ jobs:
   # Nightly to show us in advance what will change in Python utilities in
   # the next version of Fedora
   next-fedora-python-checks:
+    continue-on-error: true
     strategy:
       matrix:
         include:

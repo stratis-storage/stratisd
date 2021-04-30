@@ -50,5 +50,6 @@ class EncryptionMethod(Enum):
     KEYRING = "keyring"
     CLEVIS = "clevis"
 
-    def __str__(self):
+    # self.value is of type str
+    def __str__(self):  # pylint: disable=invalid-str-returned
         return self.value

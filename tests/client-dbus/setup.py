@@ -6,6 +6,7 @@ import sys
 import setuptools
 
 if sys.version_info[0] < 3:
+    # isort: STDLIB
     from codecs import open
 
 

@@ -1,0 +1,50 @@
+---
+name: stratisd nightly
+
+# yamllint disable-line rule:truthy
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:           
+
+jobs:
+  # Nightly to show us in advance what will change in Python utilities in
+  # the next version of Fedora
+  next-fedora-python-checks:
+    continue-on-error: true
+    strategy:
+      matrix:
+        include:
+          # PYTHON CHECKS ON NEXT FEDORA PYTHON AND PYTHON TOOLS VERSION
+          - python-version: 3.9.4
+            dependencies: >
+              python3-pylint
+              python3-dbus-client-gen
+              python3-dbus-python-client-gen
+              python3-psutil
+              python3-pyudev
+              python3-requests
+              python3-semantic_version
+              python3-pygithub
+            image: fedora:33
+            task: >
+              (cd code_maintenance; make -f Makefile lint) &&
+              (cd developer_tools; make -f Makefile lint) &&
+              (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
+          - python-version: 3.9.4
+            dependencies: black python3-isort
+            image: fedora:33
+            task: >
+              (cd code_maintenance; make -f Makefile fmt-travis) &&
+              (cd developer_tools; make -f Makefile fmt-travis) &&
+              (cd tests/client-dbus; make -f Makefile fmt-travis)
+    runs-on: ubuntu-18.04
+    container: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: dnf install -y ${{ matrix.dependencies }}
+      - name: Run test
+        run: ${{ matrix.task }}

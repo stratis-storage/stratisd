@@ -8,8 +8,10 @@ use std::{
     fmt::Debug,
     os::unix::io::RawFd,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 
@@ -28,11 +30,14 @@ use crate::{
     stratis::StratisResult,
 };
 
+/// Type representing an engine in other modules.
+pub type EngineType = Arc<dyn Engine>;
+
 pub const DEV_PATH: &str = "/dev/stratis";
 /// The maximum size of pool passphrases stored in the kernel keyring
 pub const MAX_STRATIS_PASS_SIZE: usize = 512 / 8;
 
-pub trait KeyActions {
+pub trait KeyActions: Send + Sync {
     /// Set a key in the kernel keyring. The output is an idempotent return type
     /// containing a `bool` which indicates whether a key with the requested
     /// key description was in the keyring and the key data was updated.
@@ -60,14 +65,15 @@ pub trait KeyActions {
 }
 
 /// An interface for reporting internal engine state.
+#[async_trait]
 pub trait Report {
     /// Supported engine state report.
     ///
     /// NOTE: The JSON schema for this report is not guaranteed to be stable.
-    fn engine_state_report(&self) -> Value;
+    async fn engine_state_report(&self) -> Value;
 
     /// Unsupported reports. The available reports and JSON schemas of these reports may change.
-    fn get_report(&self, report_type: ReportType) -> Value;
+    async fn get_report(&self, report_type: ReportType) -> Value;
 }
 
 pub trait Filesystem: Debug {
@@ -276,13 +282,14 @@ pub trait Pool: Debug + Send + Sync {
     fn encryption_info(&self) -> Cow<EncryptionInfo>;
 }
 
+#[async_trait]
 pub trait Engine: Debug + Report + Send + Sync {
     /// Create a Stratis pool.
     /// Returns the UUID of the newly created pool.
     /// Returns an error if the redundancy code does not correspond to a
     /// supported redundancy.
-    fn create_pool(
-        &mut self,
+    async fn create_pool(
+        &self,
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
@@ -294,22 +301,22 @@ pub trait Engine: Debug + Report + Send + Sync {
     /// and its UUID.
     ///
     /// Precondition: the subsystem of the device evented on is "block".
-    fn handle_event(
-        &mut self,
+    async fn handle_event(
+        &self,
         event: &UdevEngineEvent,
     ) -> Option<(Name, PoolUuid, Lockable<dyn Pool>)>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.
     /// Returns true if some action was necessary, otherwise false.
-    fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>>;
+    async fn destroy_pool(&self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>>;
 
     /// Rename pool with uuid to new_name.
     /// Raises an error if the mapping can't be applied because
     /// new_name is already in use.
     /// Returns true if it was necessary to perform an action, false if not.
-    fn rename_pool(
-        &mut self,
+    async fn rename_pool(
+        &self,
         uuid: PoolUuid,
         new_name: &str,
     ) -> StratisResult<RenameAction<PoolUuid>>;
@@ -320,35 +327,32 @@ pub trait Engine: Debug + Report + Send + Sync {
     /// in the unlocked state. If some devices are able to be unlocked
     /// and some fail, an error is returned as all devices should be able to
     /// be unlocked if the necessary key is in the keyring.
-    fn unlock_pool(
-        &mut self,
+    async fn unlock_pool(
+        &self,
         uuid: PoolUuid,
         unlock_method: UnlockMethod,
     ) -> StratisResult<SetUnlockAction<DevUuid>>;
 
     /// Find the pool designated by uuid.
-    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, Lockable<dyn Pool>)>;
+    async fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, Lockable<dyn Pool>)>;
 
     /// Get a mapping of encrypted pool UUIDs for pools that have not yet
     /// been set up and need to be unlocked to their encryption infos.
-    fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo>;
+    async fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo>;
 
     /// Configure the simulator. Obsolete.
-    fn configure_simulator(&mut self, _: u32) -> StratisResult<()> {
+    fn configure_simulator(&self, _: u32) -> StratisResult<()> {
         Ok(())
     }
 
     /// Get all pools belonging to this engine.
-    fn pools(&self) -> Vec<(Name, PoolUuid, Lockable<dyn Pool>)>;
+    async fn pools(&self) -> Vec<(Name, PoolUuid, Lockable<dyn Pool>)>;
 
     /// Notify the engine that an event has occurred on the DM file descriptor.
-    fn evented(&mut self) -> StratisResult<()>;
+    async fn evented(&self) -> StratisResult<()>;
 
     /// Get the handler for kernel keyring operations.
-    fn get_key_handler(&self) -> &dyn KeyActions;
-
-    /// Get the handler for kernel keyring operations mutably.
-    fn get_key_handler_mut(&mut self) -> &mut dyn KeyActions;
+    fn get_key_handler(&self) -> Lockable<dyn KeyActions>;
 
     /// Return true if this engine is the simulator engine, otherwise false.
     fn is_sim(&self) -> bool;

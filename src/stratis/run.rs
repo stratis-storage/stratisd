@@ -12,7 +12,7 @@ use std::sync::{
 use tokio::{runtime::Builder, select, signal, sync::mpsc::unbounded_channel, task};
 
 use crate::{
-    engine::{Engine, Lockable, SimEngine, StratEngine, UdevEngineEvent},
+    engine::{Engine, SimEngine, StratEngine, UdevEngineEvent},
     stratis::{
         dm::dm_event_thread, errors::StratisResult, ipc_support::setup, stratis::VERSION,
         udev_monitor::udev_thread,
@@ -52,20 +52,20 @@ pub fn run(sim: bool) -> StratisResult<()> {
         })
         .build()?;
     runtime.block_on(async move {
-        let engine: Lockable<dyn Engine> = {
+        let engine: Arc<dyn Engine> = {
             info!("stratis daemon version {} started", VERSION);
             if sim {
                 info!("Using SimEngine");
-                Lockable::new(SimEngine::default()).into_dyn_engine()
+                Arc::new(SimEngine::default()) as Arc<dyn Engine>
             } else {
                 info!("Using StratEngine");
-                Lockable::new(match StratEngine::initialize() {
+                Arc::new(match StratEngine::initialize() {
                     Ok(engine) => engine,
                     Err(e) => {
                         error!("Failed to start up stratisd engine: {}; exiting", e);
                         return Err(e);
                     }
-                }).into_dyn_engine()
+                }) as Arc<dyn Engine>
             }
         };
 
@@ -74,7 +74,7 @@ pub fn run(sim: bool) -> StratisResult<()> {
 
         let udev_arc_clone = Arc::clone(&should_exit);
         let join_udev = task::spawn_blocking(move || udev_thread(sender, udev_arc_clone));
-        let join_ipc = task::spawn(setup(engine.clone(), receiver));
+        let join_ipc = task::spawn(setup(Arc::clone(&engine), receiver));
         let join_signal = task::spawn(signal_thread(Arc::clone(&should_exit)));
         let join_dm = task::spawn(dm_event_thread(if sim {
             None

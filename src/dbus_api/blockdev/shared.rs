@@ -4,6 +4,7 @@
 
 use dbus::{arg::IterAppend, Path};
 use dbus_tree::{MTSync, MethodErr, PropInfo, Tree};
+use futures::executor::block_on;
 
 use crate::{
     dbus_api::types::TData,
@@ -46,9 +47,7 @@ where
         Pool
     );
 
-    let lock = lock!(dbus_context.engine, read);
-    let (_, pool) = lock
-        .get_pool(pool_uuid)
+    let (_, pool) = block_on(dbus_context.engine.get_pool(pool_uuid))
         .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
     let pool_lock = lock!(pool, read);
     let (tier, blockdev) = pool_lock

@@ -73,7 +73,7 @@ macro_rules! typed_uuid {
 /// Macro for early return with Ok dbus message on failure to get immutable pool.
 macro_rules! get_pool {
     ($engine:expr; $uuid:ident; $default:expr; $message:expr) => {
-        if let Some(pool) = $engine.get_pool($uuid) {
+        if let Some(pool) = futures::executor::block_on($engine.get_pool($uuid)) {
             pool
         } else {
             let message = format!("engine does not know about pool with uuid {}", $uuid);

@@ -19,7 +19,7 @@ use dbus::{
 use dbus_tree::{DataType, MTSync, ObjectPath};
 use tokio::sync::mpsc::UnboundedSender as TokioSender;
 
-use crate::engine::{Engine, Lockable, StratisUuid};
+use crate::engine::{Engine, StratisUuid};
 
 /// Type for interfaces parameter for `ObjectManagerInterfacesAdded`.
 pub type InterfacesAdded = HashMap<String, HashMap<String, Variant<Box<dyn RefArg + Send + Sync>>>>;
@@ -77,7 +77,7 @@ impl OPContext {
 #[derive(Clone)]
 pub struct DbusContext {
     next_index: Arc<AtomicU64>,
-    pub(super) engine: Lockable<dyn Engine>,
+    pub(super) engine: Arc<dyn Engine>,
     pub(super) sender: TokioSender<DbusAction>,
     connection: Arc<SyncConnection>,
 }
@@ -94,7 +94,7 @@ impl Debug for DbusContext {
 
 impl DbusContext {
     pub fn new(
-        engine: Lockable<dyn Engine>,
+        engine: Arc<dyn Engine>,
         sender: TokioSender<DbusAction>,
         connection: Arc<SyncConnection>,
     ) -> DbusContext {

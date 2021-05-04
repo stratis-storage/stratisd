@@ -5,20 +5,21 @@
 use chrono::SecondsFormat;
 
 use crate::{
-    engine::{Engine, EngineAction, Lockable, Name},
+    engine::{EngineAction, EngineType, Name},
     jsonrpc::{interface::FsListType, server::utils::name_to_uuid_and_pool},
     stratis::{StratisError, StratisResult},
 };
 
 // stratis-min filesystem create
 pub async fn filesystem_create(
-    engine: Lockable<dyn Engine>,
+    engine: EngineType,
     pool_name: String,
     name: String,
 ) -> StratisResult<bool> {
-    let lock = engine.read().await;
-    let (pool_uuid, pool) = name_to_uuid_and_pool(&*lock, &pool_name)
+    let (pool_uuid, pool) = name_to_uuid_and_pool(engine, &pool_name)
+        .await
         .ok_or_else(|| StratisError::Error(format!("No pool named {} found", pool_name)))?;
+
     spawn_blocking!({
         let mut pool_lock = lock!(pool, write);
         pool_lock
@@ -28,8 +29,8 @@ pub async fn filesystem_create(
 }
 
 // stratis-min filesystem [list]
-pub async fn filesystem_list(engine: Lockable<dyn Engine>) -> FsListType {
-    let lock = engine.read().await;
+pub async fn filesystem_list(engine: EngineType) -> FsListType {
+    let pools = engine.pools().await;
     let mut vecs = (
         Vec::new(),
         Vec::new(),
@@ -38,7 +39,7 @@ pub async fn filesystem_list(engine: Lockable<dyn Engine>) -> FsListType {
         Vec::new(),
         Vec::new(),
     );
-    for (name, _, pool) in lock.pools() {
+    for (name, _, pool) in pools {
         for (fs_name, uuid, fs) in pool.read().await.filesystems() {
             vecs.0.push(name.to_string());
             vecs.1.push(fs_name.to_string());
@@ -54,12 +55,12 @@ pub async fn filesystem_list(engine: Lockable<dyn Engine>) -> FsListType {
 
 // stratis-min filesystem destroy
 pub async fn filesystem_destroy(
-    engine: Lockable<dyn Engine>,
+    engine: EngineType,
     pool_name: String,
     fs_name: &str,
 ) -> StratisResult<bool> {
-    let lock = engine.read().await;
-    let (_, pool) = name_to_uuid_and_pool(&*lock, &pool_name)
+    let (_, pool) = name_to_uuid_and_pool(engine, &pool_name)
+        .await
         .ok_or_else(|| StratisError::Error(format!("No pool named {} found", pool_name)))?;
     let (uuid, _) = pool
         .read()
@@ -76,13 +77,13 @@ pub async fn filesystem_destroy(
 
 // stratis-min filesystem rename
 pub async fn filesystem_rename(
-    engine: Lockable<dyn Engine>,
+    engine: EngineType,
     pool_name: String,
     fs_name: String,
     new_fs_name: String,
 ) -> StratisResult<bool> {
-    let lock = engine.read().await;
-    let (_, pool) = name_to_uuid_and_pool(&*lock, &pool_name)
+    let (_, pool) = name_to_uuid_and_pool(engine, &pool_name)
+        .await
         .ok_or_else(|| StratisError::Error(format!("No pool named {} found", pool_name)))?;
     let name = Name::new(fs_name);
     let (uuid, _) = pool

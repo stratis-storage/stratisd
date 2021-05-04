@@ -34,15 +34,15 @@ pub fn unset_key(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let default_return = false;
     let return_message = message.method_return();
 
-    let msg = match log_action!(lock!(dbus_context.engine, write)
-        .get_key_handler_mut()
-        .unset(&match KeyDescription::try_from(key_desc_str) {
+    let msg = match log_action!(lock!(dbus_context.engine.get_key_handler(), write).unset(
+        &match KeyDescription::try_from(key_desc_str) {
             Ok(kd) => kd,
             Err(e) => {
                 let (rc, rs) = engine_to_dbus_err_tuple(&e);
                 return Ok(vec![return_message.append3(default_return, rc, rs)]);
             }
-        })) {
+        }
+    )) {
         Ok(idem_resp) => {
             let return_value = matches!(idem_resp, MappingDeleteAction::Deleted(_));
             return_message.append3(return_value, msg_code_ok(), msg_string_ok())

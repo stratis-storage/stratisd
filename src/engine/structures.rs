@@ -3,9 +3,11 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
+    any::type_name,
     collections::{hash_map, HashMap},
     fmt,
     iter::IntoIterator,
+    ops::{Deref, DerefMut},
     sync::Arc,
 };
 
@@ -13,7 +15,7 @@ use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::engine::{
     types::{AsUuid, Name},
-    Engine, Pool,
+    KeyActions, Pool,
 };
 
 /// Map UUID and name to T items.
@@ -296,15 +298,76 @@ where
     }
 }
 
+/// Wrapper around RwLockReadGuard. This wrapper provides additional
+/// debug logging.
+pub struct LockableReadGuard<'a, T: ?Sized>(RwLockReadGuard<'a, T>);
+
+impl<T> Deref for LockableReadGuard<'_, T>
+where
+    T: ?Sized,
+{
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &*self.0
+    }
+}
+
+impl<T> Drop for LockableReadGuard<'_, T>
+where
+    T: ?Sized,
+{
+    fn drop(&mut self) {
+        debug!("Read lock on {} dropped", type_name::<T>());
+    }
+}
+
+/// Wrapper around RwLockWriteGuard. This wrapper provides additional
+/// debug logging.
+pub struct LockableWriteGuard<'a, T: ?Sized>(RwLockWriteGuard<'a, T>);
+
+impl<T> Deref for LockableWriteGuard<'_, T>
+where
+    T: ?Sized,
+{
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &*self.0
+    }
+}
+
+impl<T> DerefMut for LockableWriteGuard<'_, T>
+where
+    T: ?Sized,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut *self.0
+    }
+}
+
+impl<T> Drop for LockableWriteGuard<'_, T>
+where
+    T: ?Sized,
+{
+    fn drop(&mut self) {
+        debug!("Write lock on {} dropped", type_name::<T>());
+    }
+}
+
 #[derive(Debug)]
-pub struct Lockable<T: ?Sized>(Arc<RwLock<T>>);
+pub struct Lockable<T: ?Sized> {
+    lock: Arc<RwLock<T>>,
+}
 
 impl<T> Lockable<T>
 where
     T: Send + Sync,
 {
     pub fn new(inner: T) -> Self {
-        Lockable(Arc::new(RwLock::new(inner)))
+        Lockable {
+            lock: Arc::new(RwLock::new(inner)),
+        }
     }
 }
 
@@ -312,21 +375,18 @@ impl<T> Lockable<T>
 where
     T: ?Sized,
 {
-    pub async fn read(&self) -> RwLockReadGuard<'_, T> {
-        self.0.read().await
+    pub async fn read(&self) -> LockableReadGuard<'_, T> {
+        debug!("Acquiring read lock acquired on {}...", type_name::<T>());
+        let guard = LockableReadGuard(self.lock.read().await);
+        debug!("Read lock acquired on {}", type_name::<T>());
+        guard
     }
 
-    pub async fn write(&self) -> RwLockWriteGuard<'_, T> {
-        self.0.write().await
-    }
-}
-
-impl<T> Lockable<T>
-where
-    T: Engine + 'static,
-{
-    pub fn into_dyn_engine(self) -> Lockable<dyn Engine> {
-        Lockable(self.0 as Arc<RwLock<dyn Engine>>)
+    pub async fn write(&self) -> LockableWriteGuard<'_, T> {
+        debug!("Acquiring write lock acquired on {}...", type_name::<T>());
+        let guard = LockableWriteGuard(self.lock.write().await);
+        debug!("Write lock acquired on {}", type_name::<T>());
+        guard
     }
 }
 
@@ -335,7 +395,20 @@ where
     T: Pool + 'static,
 {
     pub fn into_dyn_pool(self) -> Lockable<dyn Pool> {
-        Lockable(self.0 as Arc<RwLock<dyn Pool>>)
+        Lockable {
+            lock: self.lock as Arc<RwLock<dyn Pool>>,
+        }
+    }
+}
+
+impl<T> Lockable<T>
+where
+    T: KeyActions + 'static,
+{
+    pub fn into_dyn_key_handler(self) -> Lockable<dyn KeyActions> {
+        Lockable {
+            lock: self.lock as Arc<RwLock<dyn KeyActions>>,
+        }
     }
 }
 
@@ -344,7 +417,9 @@ where
     T: ?Sized,
 {
     fn clone(&self) -> Self {
-        Lockable(Arc::clone(&self.0))
+        Lockable {
+            lock: Arc::clone(&self.lock),
+        }
     }
 }
 

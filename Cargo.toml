@@ -28,6 +28,7 @@ required-features = ["min"]
 name = "stratis-utils"
 
 [dependencies]
+async-trait = "0.1.50"
 base64 = "0.13.0"
 byteorder = "1.2.3"
 chrono = "0.4.1"

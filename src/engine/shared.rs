@@ -18,6 +18,7 @@ use devicemapper::Bytes;
 use crate::{
     engine::{
         engine::{Pool, MAX_STRATIS_PASS_SIZE},
+        structures::Lockable,
         types::{BlockDevTier, CreateAction, DevUuid, PoolUuid, SetCreateAction},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
@@ -27,8 +28,8 @@ use crate::{
 /// existing pool. Returns an error if the specifications of the requested
 /// pool differ from the specifications of the existing pool, otherwise
 /// returns Ok(CreateAction::Identity).
-pub fn create_pool_idempotent_or_err(
-    pool: &dyn Pool,
+pub async fn create_pool_idempotent_or_err(
+    pool: Lockable<dyn Pool>,
     pool_name: &str,
     blockdev_paths: &[&Path],
 ) -> StratisResult<CreateAction<PoolUuid>> {
@@ -36,6 +37,8 @@ pub fn create_pool_idempotent_or_err(
         blockdev_paths.iter().map(|p| p.to_path_buf()).collect();
 
     let existing_paths: HashSet<PathBuf, _> = pool
+        .read()
+        .await
         .blockdevs()
         .iter()
         .filter_map(|(_, tier, bd)| {

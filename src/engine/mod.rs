@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 pub use self::{
-    engine::{BlockDev, Engine, Filesystem, KeyActions, Pool, Report},
+    engine::{BlockDev, Engine, EngineType, Filesystem, KeyActions, Pool, Report},
     sim_engine::SimEngine,
     strat_engine::{
         blkdev_size, crypt_metadata_size, get_dm, get_dm_init, StratEngine, StratKeyActions, BDA,

@@ -9,6 +9,7 @@ use dbus::{
     Message,
 };
 use dbus_tree::{MTSync, MethodInfo, MethodResult};
+use futures::executor::block_on;
 
 use crate::{
     dbus_api::{
@@ -79,8 +80,7 @@ pub fn create_pool_shared(
 
     let object_path = m.path.get_name();
     let dbus_context = m.tree.get_data();
-    let mut lock = lock!(dbus_context.engine, write);
-    let result = log_action!(lock.create_pool(
+    let result = log_action!(block_on(dbus_context.engine.create_pool(
         name,
         &devs.map(|x| Path::new(x)).collect::<Vec<&Path>>(),
         tuple_to_option(redundancy_tuple),
@@ -88,13 +88,14 @@ pub fn create_pool_shared(
             key_description: key_desc,
             clevis_info,
         }
-    ));
+    )));
 
     let msg = match result {
         Ok(pool_uuid_action) => {
             let results = match pool_uuid_action {
                 CreateAction::Created(uuid) => {
-                    let (_, pool) = get_pool!(lock; uuid; default_return; return_message);
+                    let (_, pool) =
+                        get_pool!(dbus_context.engine; uuid; default_return; return_message);
 
                     let pool_object_path: dbus::Path = create_dbus_pool(
                         dbus_context,
@@ -134,8 +135,7 @@ pub fn create_pool_shared(
 pub fn list_keys(info: &MethodInfo<MTSync<TData>, TData>) -> Result<Vec<String>, String> {
     let dbus_context = info.tree.get_data();
 
-    let lock = lock!(dbus_context.engine, read);
-    lock.get_key_handler()
+    lock!(dbus_context.engine.get_key_handler(), read)
         .list()
         .map(|v| {
             v.into_iter()
@@ -156,7 +156,7 @@ pub fn set_key_shared(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let default_return = (false, false);
     let return_message = message.method_return();
 
-    let msg = match log_action!(lock!(dbus_context.engine, write).get_key_handler_mut().set(
+    let msg = match log_action!(lock!(dbus_context.engine.get_key_handler(), write).set(
         &match KeyDescription::try_from(key_desc_str) {
             Ok(kd) => kd,
             Err(e) => {
@@ -185,9 +185,7 @@ pub fn set_key_shared(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
 pub fn locked_pool_uuids(info: &MethodInfo<MTSync<TData>, TData>) -> Result<Vec<String>, String> {
     let dbus_context = info.tree.get_data();
 
-    let lock = lock!(dbus_context.engine, read);
-    Ok(lock
-        .locked_pools()
+    Ok(block_on(dbus_context.engine.locked_pools())
         .into_iter()
         .map(|(u, _)| uuid_to_string!(u))
         .collect())
@@ -198,9 +196,7 @@ pub fn locked_pools(
 ) -> Result<HashMap<String, String>, String> {
     let dbus_context = info.tree.get_data();
 
-    let engine = lock!(dbus_context.engine, read);
-    Ok(engine
-        .locked_pools()
+    Ok(block_on(dbus_context.engine.locked_pools())
         .into_iter()
         .map(|(u, info)| {
             (
@@ -251,9 +247,9 @@ pub fn unlock_pool_shared(
         UnlockMethod::Keyring
     };
 
-    let msg = match log_action!(
-        lock!(dbus_context.engine, write).unlock_pool(pool_uuid, unlock_method)
-    ) {
+    let msg = match log_action!(block_on(
+        dbus_context.engine.unlock_pool(pool_uuid, unlock_method)
+    )) {
         Ok(unlock_action) => match unlock_action.changed() {
             Some(vec) => {
                 let str_uuids: Vec<_> = vec.into_iter().map(|u| uuid_to_string!(u)).collect();

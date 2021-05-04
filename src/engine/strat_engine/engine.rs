@@ -4,6 +4,7 @@
 
 use std::{clone::Clone, collections::HashMap, path::Path};
 
+use async_trait::async_trait;
 use serde_json::Value;
 
 use devicemapper::DmNameBuf;
@@ -31,18 +32,18 @@ use crate::{
 
 #[derive(Debug)]
 pub struct StratEngine {
-    pools: Table<PoolUuid, Lockable<StratPool>>,
+    pools: Lockable<Table<PoolUuid, Lockable<StratPool>>>,
 
     // Maps pool UUIDs to information about sets of devices that are
     // associated with that UUID but have not been converted into a pool.
-    liminal_devices: LiminalDevices,
+    liminal_devices: Lockable<LiminalDevices>,
 
     // Maps name of DM devices we are watching to the most recent event number
     // we've handled for each
-    watched_dev_last_event_nrs: HashMap<PoolUuid, HashMap<DmNameBuf, u32>>,
+    watched_dev_last_event_nrs: Lockable<HashMap<PoolUuid, HashMap<DmNameBuf, u32>>>,
 
     // Handler for key operations
-    key_handler: StratKeyActions,
+    key_handler: Lockable<StratKeyActions>,
 
     // TODO: Remove this code when Clevis supports reading keys from the
     // kernel keyring.
@@ -71,10 +72,10 @@ impl StratEngine {
         }
 
         Ok(StratEngine {
-            pools,
-            liminal_devices,
-            watched_dev_last_event_nrs: HashMap::new(),
-            key_handler: StratKeyActions,
+            pools: Lockable::new(pools),
+            liminal_devices: Lockable::new(liminal_devices),
+            watched_dev_last_event_nrs: Lockable::new(HashMap::new()),
+            key_handler: Lockable::new(StratKeyActions),
             key_fs: MemoryFilesystem::new()?,
         })
     }
@@ -84,7 +85,8 @@ impl StratEngine {
     #[cfg(test)]
     pub fn teardown(self) -> StratisResult<()> {
         let mut untorndown_pools = Vec::new();
-        for (_, uuid, pool) in self.pools {
+        let pools_lock = lock!(self.pools, read);
+        for (_, uuid, pool) in pools_lock.iter() {
             lock!(pool, write)
                 .teardown()
                 .unwrap_or_else(|_| untorndown_pools.push(uuid));
@@ -101,37 +103,38 @@ impl StratEngine {
     }
 }
 
-impl<'a> Into<Value> for &'a StratEngine {
+#[async_trait]
+impl Report for StratEngine {
     // Precondition: (&StratPool).into() pattern matches Value::Object(_)
     // Precondition: (&LiminalDevices).into() pattern matches Value::Object(_)
-    fn into(self) -> Value {
+    async fn engine_state_report(&self) -> Value {
         let json = json!({
-            "pools": Value::Array(
-                self.pools.iter()
-                    .map(|(name, uuid, pool)| {
-                        let mut json = json!({
-                            "uuid": Value::from(uuid.to_string()),
-                            "name": Value::from(name.to_string()),
-                        });
-                        if let Value::Object(ref mut map) = json {
-                            map.extend(
-                                if let Value::Object(map) = <&StratPool as Into<Value>>::into(&*lock!(pool, read)) {
-                                    map.into_iter()
-                                } else {
-                                    unreachable!("StratPool conversion returns a JSON object");
-                                }
-                            );
-                        } else {
-                            unreachable!("json!() always creates a JSON object")
-                        }
-                        json
-                    })
-                    .collect()
-            ),
+            "pools": Value::Array({
+                let mut pools = Vec::new();
+                for (name, uuid, pool) in self.pools.read().await.iter() {
+                    let mut json = json!({
+                        "uuid": Value::from(uuid.to_string()),
+                        "name": Value::from(name.to_string()),
+                    });
+                    if let Value::Object(ref mut map) = json {
+                        map.extend(
+                            if let Value::Object(map) = <&StratPool as Into<Value>>::into(&*pool.read().await) {
+                                map.into_iter()
+                            } else {
+                                unreachable!("StratPool conversion returns a JSON object");
+                            }
+                        );
+                    } else {
+                        unreachable!("json!() always creates a JSON object")
+                    }
+                    pools.push(json);
+                }
+                pools
+            }),
         });
         if let (Value::Object(mut j), Value::Object(map)) = (
             json,
-            <&LiminalDevices as Into<Value>>::into(&self.liminal_devices),
+            <&LiminalDevices as Into<Value>>::into(&*lock!(self.liminal_devices, read)),
         ) {
             j.extend(map.into_iter());
             Value::Object(j)
@@ -139,34 +142,37 @@ impl<'a> Into<Value> for &'a StratEngine {
             unreachable!("json!() and LiminalDevices::into() always return JSON object");
         }
     }
-}
 
-impl Report for StratEngine {
-    fn engine_state_report(&self) -> Value {
-        self.into()
-    }
-
-    fn get_report(&self, report_type: ReportType) -> Value {
+    async fn get_report(&self, report_type: ReportType) -> Value {
         match report_type {
-            ReportType::ErroredPoolDevices => (&self.liminal_devices).into(),
+            ReportType::ErroredPoolDevices => (&*self.liminal_devices.read().await).into(),
         }
     }
 }
 
+#[async_trait]
 impl Engine for StratEngine {
-    fn handle_event(
-        &mut self,
+    async fn handle_event(
+        &self,
         event: &UdevEngineEvent,
     ) -> Option<(Name, PoolUuid, Lockable<dyn Pool>)> {
-        if let Some((pool_uuid, pool_name, pool)) =
-            self.liminal_devices.block_evaluate(&self.pools, event)
-        {
+        let pools_lock = self.pools.read().await;
+        let pool_info = self
+            .liminal_devices
+            .write()
+            .await
+            .block_evaluate(&*pools_lock, event);
+        if let Some((pool_uuid, pool_name, pool)) = pool_info {
             self.pools
+                .write()
+                .await
                 .insert(pool_name.clone(), pool_uuid, Lockable::new(pool));
             Some((
                 pool_name,
                 pool_uuid,
                 self.pools
+                    .read()
+                    .await
                     .get_by_uuid(pool_uuid)
                     .expect("just_inserted")
                     .1
@@ -178,8 +184,8 @@ impl Engine for StratEngine {
         }
     }
 
-    fn create_pool(
-        &mut self,
+    async fn create_pool(
+        &self,
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
@@ -191,31 +197,35 @@ impl Engine for StratEngine {
 
         validate_paths(blockdev_paths)?;
 
-        match self.pools.get_by_name(name) {
-            Some((_, pool)) => {
-                create_pool_idempotent_or_err(&*lock!(pool, read), name, blockdev_paths)
-            }
-            None => {
-                if blockdev_paths.is_empty() {
-                    Err(StratisError::Engine(
-                        ErrorEnum::Invalid,
-                        "At least one blockdev is required to create a pool.".to_string(),
-                    ))
-                } else {
-                    let (uuid, pool) =
-                        StratPool::initialize(name, blockdev_paths, redundancy, encryption_info)?;
+        let pool = self
+            .pools
+            .read()
+            .await
+            .get_by_name(name)
+            .map(|(_, p)| p.clone());
+        if let Some(pool) = pool {
+            create_pool_idempotent_or_err(pool.into_dyn_pool(), name, blockdev_paths).await
+        } else if blockdev_paths.is_empty() {
+            Err(StratisError::Engine(
+                ErrorEnum::Invalid,
+                "At least one blockdev is required to create a pool.".to_string(),
+            ))
+        } else {
+            let (uuid, pool) =
+                StratPool::initialize(name, blockdev_paths, redundancy, encryption_info)?;
 
-                    let name = Name::new(name.to_owned());
-                    self.pools.insert(name, uuid, Lockable::new(pool));
-                    Ok(CreateAction::Created(uuid))
-                }
-            }
+            let name = Name::new(name.to_owned());
+            self.pools
+                .write()
+                .await
+                .insert(name, uuid, Lockable::new(pool));
+            Ok(CreateAction::Created(uuid))
         }
     }
 
-    fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {
-        if let Some((_, pool)) = self.pools.get_by_uuid(uuid) {
-            if lock!(pool, read).has_filesystems() {
+    async fn destroy_pool(&self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {
+        if let Some((_, pool)) = self.pools.read().await.get_by_uuid(uuid) {
+            if pool.read().await.has_filesystems() {
                 return Err(StratisError::Engine(
                     ErrorEnum::Busy,
                     "filesystems remaining on pool".into(),
@@ -225,73 +235,83 @@ impl Engine for StratEngine {
             return Ok(DeleteAction::Identity);
         }
 
-        let (pool_name, pool) = self
-            .pools
+        let mut pool_lock = self.pools.write().await;
+        let (pool_name, pool) = pool_lock
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
 
-        let pool_res = lock!(pool, write).destroy();
+        let pool_clone = pool.clone();
+        let pool_res = spawn_blocking!(lock!(pool_clone, write).destroy());
         if let Err(err) = pool_res {
-            self.pools.insert(pool_name, uuid, pool);
+            pool_lock.insert(pool_name, uuid, pool);
             Err(err)
         } else {
             Ok(DeleteAction::Deleted(uuid))
         }
     }
 
-    fn rename_pool(
-        &mut self,
+    async fn rename_pool(
+        &self,
         uuid: PoolUuid,
         new_name: &str,
     ) -> StratisResult<RenameAction<PoolUuid>> {
         validate_name(new_name)?;
         let old_name = rename_pool_pre_idem!(self; uuid; new_name);
 
-        let (_, pool) = self
-            .pools
+        let mut pool_lock = self.pools.write().await;
+        let (_, pool) = pool_lock
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
+        let pool_clone = pool.clone();
 
         let new_name = Name::new(new_name.to_owned());
-        let pool_res = lock!(pool, write).write_metadata(&new_name);
+        let new_name_clone = new_name.clone();
+        let pool_res = spawn_blocking!(lock!(pool_clone, write).write_metadata(&new_name_clone));
         if let Err(err) = pool_res {
-            self.pools.insert(old_name, uuid, pool);
+            pool_lock.insert(old_name, uuid, pool);
             Err(err)
         } else {
-            self.pools.insert(new_name, uuid, pool);
-            let (new_name, pool) = self.pools.get_by_uuid(uuid).expect("Inserted above");
-            lock!(pool, read).udev_pool_change(&new_name);
+            pool_lock.insert(new_name.clone(), uuid, pool.clone());
+            drop(pool_lock);
+
+            pool.read().await.udev_pool_change(&new_name);
             Ok(RenameAction::Renamed(uuid))
         }
     }
 
-    fn unlock_pool(
-        &mut self,
+    async fn unlock_pool(
+        &self,
         pool_uuid: PoolUuid,
         unlock_method: UnlockMethod,
     ) -> StratisResult<SetUnlockAction<DevUuid>> {
-        let unlocked = self
-            .liminal_devices
-            .unlock_pool(&self.pools, pool_uuid, unlock_method)?;
+        let liminal_devices = self.liminal_devices.clone();
+        let pools = self.pools.clone();
+        let unlocked = spawn_blocking!(lock!(liminal_devices, write).unlock_pool(
+            &*lock!(pools, read),
+            pool_uuid,
+            unlock_method,
+        ))?;
         Ok(SetUnlockAction::new(unlocked))
     }
 
-    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, Lockable<dyn Pool>)> {
+    async fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, Lockable<dyn Pool>)> {
         get_pool!(self; uuid)
     }
 
-    fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo> {
-        self.liminal_devices.locked_pools()
+    async fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo> {
+        self.liminal_devices.read().await.locked_pools()
     }
 
-    fn pools(&self) -> Vec<(Name, PoolUuid, Lockable<dyn Pool>)> {
+    async fn pools(&self) -> Vec<(Name, PoolUuid, Lockable<dyn Pool>)> {
         self.pools
+            .read()
+            .await
             .iter()
             .map(|(name, uuid, pool)| (name.clone(), *uuid, pool.clone().into_dyn_pool()))
             .collect()
     }
 
-    fn evented(&mut self) -> StratisResult<()> {
+    async fn evented(&self) -> StratisResult<()> {
         let device_list: HashMap<_, _> = get_dm()
             .list_devices()?
             .into_iter()
@@ -303,8 +323,9 @@ impl Engine for StratEngine {
             })
             .collect();
 
-        for (pool_name, pool_uuid, pool) in self.pools.iter_mut() {
-            let dev_names = lock!(pool, read).get_eventing_dev_names(*pool_uuid);
+        let pool_lock = self.pools.read().await;
+        for (pool_name, pool_uuid, pool) in pool_lock.iter() {
+            let dev_names = pool.read().await.get_eventing_dev_names(*pool_uuid);
             let event_nrs = device_list
                 .iter()
                 .filter_map(|(dm_name, event_nr)| {
@@ -316,26 +337,27 @@ impl Engine for StratEngine {
                 })
                 .collect::<HashMap<_, _>>();
 
-            if self.watched_dev_last_event_nrs.get(pool_uuid) != Some(&event_nrs) {
+            if self.watched_dev_last_event_nrs.read().await.get(pool_uuid) != Some(&event_nrs) {
                 // Return error early before updating the watched event numbers
                 // so that if another event comes in on any pool, this method
                 // will retry eventing as the event number will be higher than
                 // what was previously recorded.
-                lock!(pool, write).event_on(*pool_uuid, pool_name)?;
+                let pool = pool.clone();
+                let pool_uuid = *pool_uuid;
+                let pool_name = pool_name.clone();
+                spawn_blocking!(lock!(pool, write).event_on(pool_uuid, &pool_name))?;
             }
             self.watched_dev_last_event_nrs
+                .write()
+                .await
                 .insert(*pool_uuid, event_nrs);
         }
 
         Ok(())
     }
 
-    fn get_key_handler(&self) -> &dyn KeyActions {
-        &self.key_handler as &dyn KeyActions
-    }
-
-    fn get_key_handler_mut(&mut self) -> &mut dyn KeyActions {
-        &mut self.key_handler as &mut dyn KeyActions
+    fn get_key_handler(&self) -> Lockable<dyn KeyActions> {
+        self.key_handler.clone().into_dyn_key_handler()
     }
 
     fn is_sim(&self) -> bool {
@@ -346,6 +368,7 @@ impl Engine for StratEngine {
 #[cfg(test)]
 mod test {
     use devicemapper::Sectors;
+    use futures::executor::block_on;
 
     use crate::engine::{
         strat_engine::{
@@ -359,18 +382,17 @@ mod test {
 
     /// Verify that a pool rename causes the pool metadata to get the new name.
     fn test_pool_rename(paths: &[&Path]) {
-        let mut engine = StratEngine::initialize().unwrap();
+        let engine = StratEngine::initialize().unwrap();
 
         let name1 = "name1";
-        let uuid1 = engine
-            .create_pool(name1, paths, None, &EncryptionInfo::default())
+        let uuid1 = block_on(engine.create_pool(name1, paths, None, &EncryptionInfo::default()))
             .unwrap()
             .changed()
             .unwrap();
 
         let fs_name1 = "testfs1";
         let fs_name2 = "testfs2";
-        let (_, pool) = engine.pools.get_mut_by_uuid(uuid1).unwrap();
+        let (_, pool) = block_on(engine.get_pool(uuid1)).unwrap();
         let fs_uuid1 = lock!(pool, write)
             .create_filesystems(name1, uuid1, &[(fs_name1, None)])
             .unwrap()
@@ -388,7 +410,7 @@ mod test {
         assert!(Path::new(&format!("/dev/stratis/{}/{}", name1, fs_name2)).exists());
 
         let name2 = "name2";
-        let action = engine.rename_pool(uuid1, name2).unwrap();
+        let action = block_on(engine.rename_pool(uuid1, name2)).unwrap();
 
         cmd::udev_settle().unwrap();
 
@@ -397,7 +419,7 @@ mod test {
         assert!(Path::new(&format!("/dev/stratis/{}/{}", name2, fs_name1)).exists());
         assert!(Path::new(&format!("/dev/stratis/{}/{}", name2, fs_name2)).exists());
 
-        let (_, pool) = engine.pools.get_by_uuid(uuid1).unwrap();
+        let (_, pool) = block_on(engine.get_pool(uuid1)).unwrap();
         lock!(pool, write)
             .destroy_filesystems(
                 name2,
@@ -423,7 +445,7 @@ mod test {
         engine.teardown().unwrap();
 
         let engine = StratEngine::initialize().unwrap();
-        let pool_name: String = engine.get_pool(uuid1).unwrap().0.to_owned();
+        let pool_name: String = block_on(engine.get_pool(uuid1)).unwrap().0.to_owned();
         assert_eq!(pool_name, name2);
     }
 
@@ -457,38 +479,36 @@ mod test {
 
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
-        let mut engine = StratEngine::initialize().unwrap();
+        let engine = StratEngine::initialize().unwrap();
 
         let name1 = "name1";
-        let uuid1 = engine
-            .create_pool(name1, paths1, None, &EncryptionInfo::default())
+        let uuid1 = block_on(engine.create_pool(name1, paths1, None, &EncryptionInfo::default()))
             .unwrap()
             .changed()
             .unwrap();
 
         let name2 = "name2";
-        let uuid2 = engine
-            .create_pool(name2, paths2, None, &EncryptionInfo::default())
+        let uuid2 = block_on(engine.create_pool(name2, paths2, None, &EncryptionInfo::default()))
             .unwrap()
             .changed()
             .unwrap();
 
-        assert!(engine.get_pool(uuid1).is_some());
-        assert!(engine.get_pool(uuid2).is_some());
+        assert!(block_on(engine.get_pool(uuid1)).is_some());
+        assert!(block_on(engine.get_pool(uuid2)).is_some());
 
         engine.teardown().unwrap();
 
         let engine = StratEngine::initialize().unwrap();
 
-        assert!(engine.get_pool(uuid1).is_some());
-        assert!(engine.get_pool(uuid2).is_some());
+        assert!(block_on(engine.get_pool(uuid1)).is_some());
+        assert!(block_on(engine.get_pool(uuid2)).is_some());
 
         engine.teardown().unwrap();
 
         let engine = StratEngine::initialize().unwrap();
 
-        assert!(engine.get_pool(uuid1).is_some());
-        assert!(engine.get_pool(uuid2).is_some());
+        assert!(block_on(engine.get_pool(uuid1)).is_some());
+        assert!(block_on(engine.get_pool(uuid2)).is_some());
 
         engine.teardown().unwrap();
     }

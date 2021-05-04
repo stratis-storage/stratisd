@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use crate::{
-    engine::{Engine, Lockable, Pool, PoolUuid},
+    engine::{EngineType, Lockable, Pool, PoolUuid},
     jsonrpc::consts::{OP_ERR, OP_OK, OP_OK_STR},
     stratis::StratisResult,
 };
@@ -46,15 +46,6 @@ macro_rules! expects_fd {
     };
 }
 
-macro_rules! spawn_blocking {
-    ($op:expr) => {
-        tokio::task::spawn_blocking(move || $op)
-            .await
-            .map_err(StratisError::from)
-            .and_then(|res| res)
-    };
-}
-
 pub fn stratis_result_to_return<T>(result: StratisResult<T>, default_value: T) -> (T, u16, String) {
     match result {
         Ok(r) => (r, OP_OK, OP_OK_STR.to_string()),
@@ -64,12 +55,13 @@ pub fn stratis_result_to_return<T>(result: StratisResult<T>, default_value: T) -
 
 /// Convert a string representing the name of a pool to the UUID and stratisd
 /// data structure representing the pool state.
-pub fn name_to_uuid_and_pool(
-    engine: &dyn Engine,
+pub async fn name_to_uuid_and_pool(
+    engine: EngineType,
     name: &str,
 ) -> Option<(PoolUuid, Lockable<dyn Pool>)> {
     let mut uuids_pools_for_name = engine
         .pools()
+        .await
         .into_iter()
         .filter_map(|(n, u, p)| if &*n == name { Some((u, p)) } else { None })
         .collect::<Vec<_>>();

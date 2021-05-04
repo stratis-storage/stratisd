@@ -583,33 +583,29 @@ impl Pool for SimPool {
 
 #[cfg(test)]
 mod tests {
-
     use std::path::Path;
 
-    use crate::engine::Engine;
+    use futures::executor::block_on;
 
-    use crate::engine::sim_engine::SimEngine;
-
-    use crate::engine::types::EngineAction;
+    use crate::engine::{sim_engine::SimEngine, types::EngineAction, Engine};
 
     use super::*;
 
     #[test]
     /// Renaming a filesystem on an empty pool always works
     fn rename_empty() {
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine
-            .create_pool(
-                pool_name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                &EncryptionInfo::default(),
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        let pool = engine.get_pool(uuid).unwrap().1;
+        let uuid = block_on(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            &EncryptionInfo::default(),
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let pool = block_on(engine.get_pool(uuid)).unwrap().1;
         assert_matches!(
             lock!(pool, write).rename_filesystem(pool_name, FilesystemUuid::new_v4(), "new_name"),
             Ok(RenameAction::NoSource)
@@ -619,19 +615,18 @@ mod tests {
     #[test]
     /// Renaming a filesystem to another filesystem should work if new name not taken
     fn rename_happens() {
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine
-            .create_pool(
-                pool_name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                &EncryptionInfo::default(),
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        let pool = engine.get_pool(uuid).unwrap().1;
+        let uuid = block_on(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            &EncryptionInfo::default(),
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let pool = block_on(engine.get_pool(uuid)).unwrap().1;
         let infos = lock!(pool, write)
             .create_filesystems(pool_name, uuid, &[("old_name", None)])
             .unwrap()
@@ -650,19 +645,18 @@ mod tests {
     fn rename_fails() {
         let old_name = "old_name";
         let new_name = "new_name";
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine
-            .create_pool(
-                pool_name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                &EncryptionInfo::default(),
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        let pool = engine.get_pool(uuid).unwrap().1;
+        let uuid = block_on(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            &EncryptionInfo::default(),
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let pool = block_on(engine.get_pool(uuid)).unwrap().1;
         let results = lock!(pool, write)
             .create_filesystems(pool_name, uuid, &[(old_name, None), (new_name, None)])
             .unwrap()
@@ -679,19 +673,18 @@ mod tests {
     /// Renaming should succeed if old_name absent, new present
     fn rename_no_op() {
         let new_name = "new_name";
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine
-            .create_pool(
-                pool_name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                &EncryptionInfo::default(),
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        let pool = engine.get_pool(uuid).unwrap().1;
+        let uuid = block_on(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            &EncryptionInfo::default(),
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let pool = block_on(engine.get_pool(uuid)).unwrap().1;
         assert_matches!(
             lock!(pool, write).rename_filesystem(pool_name, FilesystemUuid::new_v4(), new_name),
             Ok(RenameAction::NoSource)
@@ -701,19 +694,18 @@ mod tests {
     #[test]
     /// Removing an empty list of filesystems should always succeed
     fn destroy_fs_empty() {
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine
-            .create_pool(
-                pool_name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                &EncryptionInfo::default(),
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        let pool = engine.get_pool(uuid).unwrap().1;
+        let uuid = block_on(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            &EncryptionInfo::default(),
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let pool = block_on(engine.get_pool(uuid)).unwrap().1;
         assert!(
             match lock!(pool, write).destroy_filesystems(pool_name, &[]) {
                 Ok(uuids) => !uuids.is_changed(),
@@ -725,19 +717,18 @@ mod tests {
     #[test]
     /// Removing a non-empty list of filesystems should succeed on empty pool
     fn destroy_fs_some() {
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine
-            .create_pool(
-                pool_name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                &EncryptionInfo::default(),
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        let pool = engine.get_pool(uuid).unwrap().1;
+        let uuid = block_on(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            &EncryptionInfo::default(),
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let pool = block_on(engine.get_pool(uuid)).unwrap().1;
         assert_matches!(
             lock!(pool, write).destroy_filesystems(pool_name, &[FilesystemUuid::new_v4()]),
             Ok(_)
@@ -747,19 +738,18 @@ mod tests {
     #[test]
     /// Removing a non-empty list of filesystems should succeed on any pool
     fn destroy_fs_any() {
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine
-            .create_pool(
-                pool_name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                &EncryptionInfo::default(),
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        let pool = engine.get_pool(uuid).unwrap().1;
+        let uuid = block_on(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            &EncryptionInfo::default(),
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let pool = block_on(engine.get_pool(uuid)).unwrap().1;
         let fs_results = lock!(pool, write)
             .create_filesystems(pool_name, uuid, &[("fs_name", None)])
             .unwrap()
@@ -777,19 +767,18 @@ mod tests {
     #[test]
     /// Creating an empty list of filesystems should succeed, always
     fn create_fs_none() {
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine
-            .create_pool(
-                pool_name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                &EncryptionInfo::default(),
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        let pool = engine.get_pool(uuid).unwrap().1;
+        let uuid = block_on(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            &EncryptionInfo::default(),
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let pool = block_on(engine.get_pool(uuid)).unwrap().1;
         let fs = lock!(pool, write)
             .create_filesystems(pool_name, uuid, &[])
             .unwrap();
@@ -799,19 +788,18 @@ mod tests {
     #[test]
     /// Creating a non-empty list of filesystems always succeeds.
     fn create_fs_some() {
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine
-            .create_pool(
-                pool_name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                &EncryptionInfo::default(),
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        let pool = engine.get_pool(uuid).unwrap().1;
+        let uuid = block_on(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            &EncryptionInfo::default(),
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let pool = block_on(engine.get_pool(uuid)).unwrap().1;
         assert!(match lock!(pool, write)
             .create_filesystems(pool_name, uuid, &[("name", None)])
             .ok()
@@ -826,19 +814,18 @@ mod tests {
     /// Creating a an already existing filesystem fails.
     fn create_fs_conflict() {
         let fs_name = "fs_name";
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine
-            .create_pool(
-                pool_name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                &EncryptionInfo::default(),
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        let pool = engine.get_pool(uuid).unwrap().1;
+        let uuid = block_on(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            &EncryptionInfo::default(),
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let pool = block_on(engine.get_pool(uuid)).unwrap().1;
         lock!(pool, write)
             .create_filesystems(pool_name, uuid, &[(fs_name, None)])
             .unwrap();
@@ -852,19 +839,18 @@ mod tests {
     /// Requesting identical filesystems succeeds.
     fn create_fs_dups() {
         let fs_name = "fs_name";
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine
-            .create_pool(
-                pool_name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                &EncryptionInfo::default(),
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        let pool = engine.get_pool(uuid).unwrap().1;
+        let uuid = block_on(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            &EncryptionInfo::default(),
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let pool = block_on(engine.get_pool(uuid)).unwrap().1;
         assert!(match lock!(pool, write)
             .create_filesystems(pool_name, uuid, &[(fs_name, None), (fs_name, None)])
             .ok()
@@ -878,18 +864,17 @@ mod tests {
     #[test]
     /// Adding a list of devices to an empty pool should yield list.
     fn add_device_empty() {
-        let mut engine = SimEngine::default();
-        let uuid = engine
-            .create_pool(
-                "pool_name",
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                &EncryptionInfo::default(),
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        let (pool_name, pool) = engine.get_pool(uuid).unwrap();
+        let engine = SimEngine::default();
+        let uuid = block_on(engine.create_pool(
+            "pool_name",
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            &EncryptionInfo::default(),
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let (pool_name, pool) = block_on(engine.get_pool(uuid)).unwrap();
         let devices = [Path::new("/s/a"), Path::new("/s/b")];
         assert!(match lock!(pool, write)
             .add_blockdevs(uuid, &*pool_name, &devices, BlockDevTier::Data)

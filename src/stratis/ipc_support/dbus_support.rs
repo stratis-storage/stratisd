@@ -15,13 +15,13 @@ use tokio::{select, sync::mpsc::UnboundedReceiver, task};
 
 use crate::{
     dbus_api::create_dbus_handlers,
-    engine::{Engine, UdevEngineEvent},
+    engine::{EngineType, UdevEngineEvent},
     stratis::{StratisError, StratisResult},
 };
 
 /// Set up the cooperating D-Bus threads.
 pub async fn setup(
-    engine: Arc<dyn Engine>,
+    engine: EngineType,
     receiver: UnboundedReceiver<UdevEngineEvent>,
 ) -> StratisResult<()> {
     let (conn, mut udev, mut tree) = match create_dbus_handlers(Arc::clone(&engine), receiver).await

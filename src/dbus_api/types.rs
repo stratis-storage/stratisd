@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
+    any::type_name,
     collections::HashMap,
     fmt::{self, Debug},
     sync::{
@@ -19,7 +20,7 @@ use dbus::{
 use dbus_tree::{DataType, MTSync, ObjectPath};
 use tokio::sync::mpsc::UnboundedSender as TokioSender;
 
-use crate::engine::{Engine, StratisUuid};
+use crate::engine::{EngineType, StratisUuid};
 
 /// Type for interfaces parameter for `ObjectManagerInterfacesAdded`.
 pub type InterfacesAdded = HashMap<String, HashMap<String, Variant<Box<dyn RefArg + Send + Sync>>>>;
@@ -77,7 +78,7 @@ impl OPContext {
 #[derive(Clone)]
 pub struct DbusContext {
     next_index: Arc<AtomicU64>,
-    pub(super) engine: Arc<dyn Engine>,
+    pub(super) engine: EngineType,
     pub(super) sender: TokioSender<DbusAction>,
     connection: Arc<SyncConnection>,
 }
@@ -86,7 +87,7 @@ impl Debug for DbusContext {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("DbusContext")
             .field("next_index", &self.next_index)
-            .field("engine", &"Locked<dyn Engine>")
+            .field("engine", &type_name::<EngineType>())
             .field("sender", &self.sender)
             .finish()
     }
@@ -94,7 +95,7 @@ impl Debug for DbusContext {
 
 impl DbusContext {
     pub fn new(
-        engine: Arc<dyn Engine>,
+        engine: EngineType,
         sender: TokioSender<DbusAction>,
         connection: Arc<SyncConnection>,
     ) -> DbusContext {

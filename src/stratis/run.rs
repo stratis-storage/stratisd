@@ -12,7 +12,7 @@ use std::sync::{
 use tokio::{runtime::Builder, select, signal, sync::mpsc::unbounded_channel, task};
 
 use crate::{
-    engine::{Engine, SimEngine, StratEngine, UdevEngineEvent},
+    engine::{EngineType, SimEngine, StratEngine, UdevEngineEvent},
     stratis::{
         dm::dm_event_thread, errors::StratisResult, ipc_support::setup, stratis::VERSION,
         udev_monitor::udev_thread,
@@ -52,11 +52,11 @@ pub fn run(sim: bool) -> StratisResult<()> {
         })
         .build()?;
     runtime.block_on(async move {
-        let engine: Arc<dyn Engine> = {
+        let engine: EngineType = {
             info!("stratis daemon version {} started", VERSION);
             if sim {
                 info!("Using SimEngine");
-                Arc::new(SimEngine::default()) as Arc<dyn Engine>
+                Arc::new(SimEngine::default()) as EngineType
             } else {
                 info!("Using StratEngine");
                 Arc::new(match StratEngine::initialize() {
@@ -65,7 +65,7 @@ pub fn run(sim: bool) -> StratisResult<()> {
                         error!("Failed to start up stratisd engine: {}; exiting", e);
                         return Err(e);
                     }
-                }) as Arc<dyn Engine>
+                }) as EngineType
             }
         };
 

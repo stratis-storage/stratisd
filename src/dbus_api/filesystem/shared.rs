@@ -5,6 +5,7 @@
 use chrono::SecondsFormat;
 use dbus::Path;
 use dbus_tree::{MTSync, Tree};
+use futures::executor::block_on;
 
 use crate::{
     dbus_api::types::TData,
@@ -46,9 +47,7 @@ where
         Pool
     );
 
-    let lock = lock!(dbus_context.engine, read);
-    let (pool_name, pool) = lock
-        .get_pool(pool_uuid)
+    let (pool_name, pool) = block_on(dbus_context.engine.get_pool(pool_uuid))
         .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
     let filesystem_uuid = typed_uuid_string_err!(filesystem_data.uuid; Fs);
     let pool_lock = lock!(pool, read);

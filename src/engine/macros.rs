@@ -20,6 +20,8 @@ macro_rules! calculate_redundancy {
 macro_rules! get_pool {
     ($s:ident; $uuid:ident) => {
         $s.pools
+            .read()
+            .await
             .get_by_uuid($uuid)
             .map(|(name, p)| (name.clone(), p.clone().into_dyn_pool()))
     };
@@ -86,7 +88,7 @@ macro_rules! rename_filesystem_pre_idem {
 macro_rules! rename_pool_pre_idem {
     ($s:ident; $uuid:ident; $new_name:ident) => {{
         rename_pre_idem!(
-            $s.pools;
+            $s.pools.read().await;
             $uuid;
             $new_name
         )

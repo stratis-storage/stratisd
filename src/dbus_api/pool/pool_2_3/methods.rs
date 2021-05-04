@@ -37,8 +37,7 @@ pub fn bind_clevis(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let lock = lock!(dbus_context.engine, read);
-    let (_, pool) = get_pool!(lock; pool_uuid; default_return; return_message);
+    let (_, pool) = get_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
 
     let json: Value = match serde_json::from_str(&json_string) {
         Ok(j) => j,
@@ -79,8 +78,7 @@ pub fn unbind_clevis(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let lock = lock!(dbus_context.engine, read);
-    let (_, pool) = get_pool!(lock; pool_uuid; default_return; return_message);
+    let (_, pool) = get_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
 
     let msg = match log_action!(lock!(pool, write).unbind_clevis()) {
         Ok(DeleteAction::Identity) => return_message.append3(false, msg_code_ok(), msg_string_ok()),

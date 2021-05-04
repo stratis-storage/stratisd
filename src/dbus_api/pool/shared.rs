@@ -9,6 +9,7 @@ use dbus::{
     Message,
 };
 use dbus_tree::{MTSync, MethodErr, MethodInfo, MethodResult, PropInfo, Tree};
+use futures::executor::block_on;
 
 use crate::{
     dbus_api::{
@@ -51,9 +52,7 @@ where
         Pool
     );
 
-    let lock = lock!(dbus_context.engine, read);
-    let (pool_name, pool) = lock
-        .get_pool(pool_uuid)
+    let (pool_name, pool) = block_on(dbus_context.engine.get_pool(pool_uuid))
         .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
     let pool_lock = lock!(pool, read);
 
@@ -142,8 +141,8 @@ pub fn add_blockdevs(m: &MethodInfo<MTSync<TData>, TData>, op: BlockDevOp) -> Me
         return_message
     );
 
-    let lock = lock!(dbus_context.engine, read);
-    let (pool_name, pool) = get_pool!(lock; pool_uuid; default_return; return_message);
+    let (pool_name, pool) =
+        get_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 

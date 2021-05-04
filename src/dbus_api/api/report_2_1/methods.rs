@@ -6,6 +6,7 @@ use std::convert::TryFrom;
 
 use dbus::Message;
 use dbus_tree::{MTSync, MethodInfo, MethodResult};
+use futures::executor::block_on;
 
 use crate::{
     dbus_api::{
@@ -32,9 +33,8 @@ pub fn get_report(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     };
 
     let dbus_context = m.tree.get_data();
-    let lock = lock!(dbus_context.engine, read);
 
-    let msg = match serde_json::to_string(&lock.get_report(report_type)) {
+    let msg = match serde_json::to_string(&block_on(dbus_context.engine.get_report(report_type))) {
         Ok(string) => return_message.append3(string, msg_code_ok(), msg_string_ok()),
         Err(e) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e.into());

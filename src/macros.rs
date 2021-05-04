@@ -8,3 +8,13 @@ macro_rules! lock {
         futures::executor::block_on($rwlock.$method())
     };
 }
+
+/// Spawn blocking in an async context for a method that returns a result.
+macro_rules! spawn_blocking {
+    ($op:expr) => {
+        tokio::task::spawn_blocking(move || $op)
+            .await
+            .map_err($crate::stratis::StratisError::from)
+            .and_then(|res| res)
+    };
+}

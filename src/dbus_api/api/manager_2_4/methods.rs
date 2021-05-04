@@ -4,6 +4,7 @@
 
 use dbus::Message;
 use dbus_tree::{MTSync, MethodInfo, MethodResult};
+use futures::executor::block_on;
 
 use crate::dbus_api::{
     api::shared::create_pool_shared,
@@ -18,9 +19,8 @@ pub fn engine_state_report(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
     let default_return = String::new();
 
     let dbus_context = m.tree.get_data();
-    let lock = lock!(dbus_context.engine, read);
 
-    let msg = match serde_json::to_string(&lock.engine_state_report()) {
+    let msg = match serde_json::to_string(&block_on(dbus_context.engine.engine_state_report())) {
         Ok(string) => return_message.append3(string, msg_code_ok(), msg_string_ok()),
         Err(e) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e.into());

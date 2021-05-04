@@ -5,23 +5,21 @@
 use std::os::unix::io::RawFd;
 
 use crate::{
-    engine::{
-        Engine, KeyDescription, Lockable, MappingCreateAction, MappingDeleteAction, PoolUuid,
-    },
+    engine::{EngineType, KeyDescription, MappingCreateAction, MappingDeleteAction, PoolUuid},
     stratis::StratisResult,
 };
 
 // stratis-min key set
 pub async fn key_set(
-    engine: Lockable<dyn Engine>,
+    engine: EngineType,
     key_desc: &KeyDescription,
     key_fd: RawFd,
 ) -> StratisResult<Option<bool>> {
     Ok(
         match engine
+            .get_key_handler()
             .write()
             .await
-            .get_key_handler_mut()
             .set(key_desc, key_fd)?
         {
             MappingCreateAction::Created(_) => Some(false),
@@ -32,12 +30,9 @@ pub async fn key_set(
 }
 
 // stratis-min key unset
-pub async fn key_unset(
-    engine: Lockable<dyn Engine>,
-    key_desc: &KeyDescription,
-) -> StratisResult<bool> {
+pub async fn key_unset(engine: EngineType, key_desc: &KeyDescription) -> StratisResult<bool> {
     Ok(
-        match engine.write().await.get_key_handler_mut().unset(key_desc)? {
+        match engine.get_key_handler().write().await.unset(key_desc)? {
             MappingDeleteAction::Deleted(_) => true,
             MappingDeleteAction::Identity => false,
         },
@@ -45,21 +40,18 @@ pub async fn key_unset(
 }
 
 // stratis-min key [list]
-pub async fn key_list(engine: Lockable<dyn Engine>) -> StratisResult<Vec<KeyDescription>> {
+pub async fn key_list(engine: EngineType) -> StratisResult<Vec<KeyDescription>> {
     Ok(engine
+        .get_key_handler()
         .read()
         .await
-        .get_key_handler()
         .list()?
         .into_iter()
         .collect())
 }
 
-pub async fn key_get_desc(
-    engine: Lockable<dyn Engine>,
-    pool_uuid: PoolUuid,
-) -> Option<KeyDescription> {
-    let locked_pools = engine.read().await.locked_pools();
+pub async fn key_get_desc(engine: EngineType, pool_uuid: PoolUuid) -> Option<KeyDescription> {
+    let locked_pools = engine.locked_pools().await;
     locked_pools
         .get(&pool_uuid)
         .and_then(|info| info.info.key_description.to_owned())

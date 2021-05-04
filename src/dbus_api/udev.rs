@@ -37,8 +37,7 @@ impl DbusUdevHandler {
         let udev_event = self.receiver.recv().await.ok_or_else(|| {
             StratisError::Error("Channel from udev handler to D-Bus handler was shut".to_string())
         })?;
-        let mut lock = self.dbus_context.engine.write().await;
-        let optional_pool_info = lock.handle_event(&udev_event);
+        let optional_pool_info = self.dbus_context.engine.handle_event(&udev_event).await;
 
         if let Some((pool_name, pool_uuid, pool)) = optional_pool_info {
             let pool_ref = &*pool.read().await;

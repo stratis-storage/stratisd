@@ -18,3 +18,10 @@ macro_rules! spawn_blocking {
             .and_then(|res| res)
     };
 }
+
+#[cfg(test)]
+macro_rules! block_on {
+    ($op:expr) => {
+        tokio::runtime::Runtime::new().unwrap().block_on($op)
+    };
+}

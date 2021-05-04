@@ -410,7 +410,7 @@ mod test {
         assert!(Path::new(&format!("/dev/stratis/{}/{}", name1, fs_name2)).exists());
 
         let name2 = "name2";
-        let action = block_on(engine.rename_pool(uuid1, name2)).unwrap();
+        let action = block_on!(engine.rename_pool(uuid1, name2)).unwrap();
 
         cmd::udev_settle().unwrap();
 

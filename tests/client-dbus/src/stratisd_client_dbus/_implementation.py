@@ -22,7 +22,7 @@ import xml.etree.ElementTree as ET
 from dbus_client_gen import managed_object_class, mo_query_builder
 from dbus_python_client_gen import make_class
 
-from ._data import SPECS
+from ._introspect import SPECS
 
 _POOL_SPEC = ET.fromstring(SPECS["org.storage.stratis2.pool.r4"])
 _FILESYSTEM_SPEC = ET.fromstring(SPECS["org.storage.stratis2.filesystem.r4"])

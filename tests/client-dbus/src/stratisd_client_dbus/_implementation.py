@@ -22,11 +22,19 @@ import xml.etree.ElementTree as ET
 from dbus_client_gen import managed_object_class, mo_query_builder
 from dbus_python_client_gen import make_class
 
+from ._constants import (
+    BLOCKDEV_INTERFACE,
+    FETCH_PROPERTIES_INTERFACE,
+    FILESYSTEM_INTERFACE,
+    MANAGER_INTERFACE,
+    POOL_INTERFACE,
+    REPORT_INTERFACE,
+)
 from ._introspect import SPECS
 
-_POOL_SPEC = ET.fromstring(SPECS["org.storage.stratis2.pool.r4"])
-_FILESYSTEM_SPEC = ET.fromstring(SPECS["org.storage.stratis2.filesystem.r4"])
-_BLOCKDEV_SPEC = ET.fromstring(SPECS["org.storage.stratis2.blockdev.r4"])
+_POOL_SPEC = ET.fromstring(SPECS[POOL_INTERFACE])
+_FILESYSTEM_SPEC = ET.fromstring(SPECS[FILESYSTEM_INTERFACE])
+_BLOCKDEV_SPEC = ET.fromstring(SPECS[BLOCKDEV_INTERFACE])
 
 pools = mo_query_builder(_POOL_SPEC)
 filesystems = mo_query_builder(_FILESYSTEM_SPEC)
@@ -42,15 +50,11 @@ ObjectManager = make_class(
     ET.fromstring(SPECS["org.freedesktop.DBus.ObjectManager"]),
     TIME_OUT,
 )
-Report = make_class(
-    "Report", ET.fromstring(SPECS["org.storage.stratis2.Report.r4"]), TIME_OUT
-)
-Manager = make_class(
-    "Manager", ET.fromstring(SPECS["org.storage.stratis2.Manager.r4"]), TIME_OUT
-)
+Report = make_class("Report", ET.fromstring(SPECS[REPORT_INTERFACE]), TIME_OUT)
+Manager = make_class("Manager", ET.fromstring(SPECS[MANAGER_INTERFACE]), TIME_OUT)
 FetchProperties = make_class(
     "FetchProperties",
-    ET.fromstring(SPECS["org.storage.stratis2.FetchProperties.r4"]),
+    ET.fromstring(SPECS[FETCH_PROPERTIES_INTERFACE]),
     TIME_OUT,
 )
 Filesystem = make_class("Filesystem", _FILESYSTEM_SPEC, TIME_OUT)

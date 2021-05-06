@@ -81,13 +81,13 @@ pub fn create_dbus_filesystem<'a>(
         );
 
     let path = object_path.get_name().to_owned();
-    let interfaces = get_initial_properties(parent, pool_name, name, uuid, filesystem);
+    let interfaces = get_all_properties(parent, pool_name, name, uuid, filesystem);
     dbus_context.push_add(object_path, interfaces);
     path
 }
 
-/// Get the initial state of all properties associated with a filesystem object.
-pub fn get_initial_properties(
+/// Get the state of all properties associated with a filesystem object.
+pub fn get_all_properties(
     parent: dbus::Path<'static>,
     pool_name: &Name,
     fs_name: &Name,
@@ -96,6 +96,13 @@ pub fn get_initial_properties(
 ) -> InterfacesAdded {
     initial_properties! {
         consts::FILESYSTEM_INTERFACE_NAME => {
+            consts::FILESYSTEM_NAME_PROP => shared::fs_name_prop(fs_name),
+            consts::FILESYSTEM_UUID_PROP => uuid_to_string!(fs_uuid),
+            consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop(fs, pool_name, fs_name),
+            consts::FILESYSTEM_POOL_PROP => parent.clone(),
+            consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop(fs)
+        },
+        consts::FILESYSTEM_INTERFACE_NAME_2_4 => {
             consts::FILESYSTEM_NAME_PROP => shared::fs_name_prop(fs_name),
             consts::FILESYSTEM_UUID_PROP => uuid_to_string!(fs_uuid),
             consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop(fs, pool_name, fs_name),

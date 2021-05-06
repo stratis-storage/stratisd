@@ -6,7 +6,7 @@ use std::{
     any::type_name,
     collections::{hash_map, HashMap},
     fmt,
-    iter::IntoIterator,
+    iter::{FromIterator, IntoIterator},
     ops::{Deref, DerefMut},
     sync::Arc,
 };
@@ -153,6 +153,22 @@ where
 
     fn into_iter(self) -> IterMut<'a, U, T> {
         self.iter_mut()
+    }
+}
+
+impl<U, T> FromIterator<(Name, U, T)> for Table<U, T>
+where
+    U: AsUuid,
+{
+    fn from_iter<I>(i: I) -> Self
+    where
+        I: IntoIterator<Item = (Name, U, T)>,
+    {
+        i.into_iter()
+            .fold(Table::default(), |mut table, (name, uuid, t)| {
+                table.insert(name, uuid, t);
+                table
+            })
     }
 }
 

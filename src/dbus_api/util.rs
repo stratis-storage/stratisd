@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use dbus::arg::{ArgType, Iter, IterAppend, RefArg, Variant};
 use dbus_tokio::connection::new_system_sync;
@@ -19,7 +19,10 @@ use crate::{
         api::get_base_tree,
         connection::{DbusConnectionHandler, DbusTreeHandler},
         consts,
-        types::{DbusContext, DbusErrorEnum, TData},
+        types::{
+            DbusContext, DbusErrorEnum, DbusInterfacesAdded, InterfacesAdded, PropertiesSignature,
+            TData,
+        },
         udev::DbusUdevHandler,
     },
     engine::{EngineType, UdevEngineEvent},
@@ -185,4 +188,42 @@ pub async fn create_dbus_handlers(
     let udev = DbusUdevHandler::new(udev_receiver, object_path, dbus_context);
     let tree = DbusTreeHandler::new(tree, receiver, conn);
     Ok((connection, udev, tree))
+}
+
+/// Convert `InterfacesAdded` to `PropertiesSignature`. This nests the properties in a `HashMap`
+/// with the object path.
+pub fn interfaces_added_to_properties(
+    path: &dbus::Path<'static>,
+    interfaces: InterfacesAdded,
+) -> PropertiesSignature {
+    let mut properties = HashMap::new();
+    properties.insert(
+        path.clone(),
+        interfaces
+            .into_iter()
+            .map(|(k, map)| {
+                let new_map: HashMap<String, Variant<Box<dyn RefArg>>> = map
+                    .into_iter()
+                    .map(|(subk, var)| (subk, Variant(var.0 as Box<dyn RefArg>)))
+                    .collect();
+                (k, new_map)
+            })
+            .collect(),
+    );
+    properties
+}
+
+/// Convert `InterfacesAdded` to a type that can be sent over D-Bus. This simply involves
+/// removing the type restriction for `Send` and `Sync`.
+pub fn interfaces_added_remove_send_sync(interfaces: InterfacesAdded) -> DbusInterfacesAdded {
+    interfaces
+        .into_iter()
+        .map(|(k, map)| {
+            let new_map: HashMap<String, Variant<Box<dyn RefArg>>> = map
+                .into_iter()
+                .map(|(subk, var)| (subk, Variant(var.0 as Box<dyn RefArg>)))
+                .collect();
+            (k, new_map)
+        })
+        .collect()
 }

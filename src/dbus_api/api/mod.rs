@@ -39,7 +39,10 @@ pub fn get_base_tree<'a>(
     let obj_path = f
         .object_path(consts::STRATIS_BASE_PATH, None)
         .introspectable()
-        .object_manager()
+        .add(
+            f.interface("org.freedesktop.DBus.ObjectManager", ())
+                .add_m(shared::get_managed_objects(&f)),
+        )
         .add(
             f.interface(consts::MANAGER_INTERFACE_NAME, ())
                 .add_m(manager_2_0::create_pool_method(&f))

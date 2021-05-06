@@ -123,13 +123,13 @@ pub fn create_dbus_pool<'a>(
         );
 
     let path = object_path.get_name().to_owned();
-    let interfaces = get_initial_properties(name, uuid, pool);
+    let interfaces = get_all_properties(name, uuid, pool);
     dbus_context.push_add(object_path, interfaces);
     path
 }
 
-/// Get the initial state of all properties associated with a pool object.
-pub fn get_initial_properties(
+/// Get all properties associated with a pool object.
+pub fn get_all_properties(
     pool_name: &Name,
     pool_uuid: PoolUuid,
     pool: &dyn Pool,
@@ -140,6 +140,16 @@ pub fn get_initial_properties(
             consts::POOL_UUID_PROP => uuid_to_string!(pool_uuid)
         },
         consts::POOL_INTERFACE_NAME_2_1 => {
+            consts::POOL_NAME_PROP => shared::pool_name_prop(pool_name),
+            consts::POOL_UUID_PROP => uuid_to_string!(pool_uuid),
+            consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop(pool)
+        },
+        consts::POOL_INTERFACE_NAME_2_3 => {
+            consts::POOL_NAME_PROP => shared::pool_name_prop(pool_name),
+            consts::POOL_UUID_PROP => uuid_to_string!(pool_uuid),
+            consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop(pool)
+        },
+        consts::POOL_INTERFACE_NAME_2_4 => {
             consts::POOL_NAME_PROP => shared::pool_name_prop(pool_name),
             consts::POOL_UUID_PROP => uuid_to_string!(pool_uuid),
             consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop(pool)

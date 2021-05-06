@@ -8,21 +8,24 @@ use dbus::{
     arg::{Array, OwnedFd},
     Message,
 };
-use dbus_tree::{MTSync, MethodInfo, MethodResult};
+use dbus_tree::{Factory, MTSync, Method, MethodInfo, MethodResult};
 use futures::executor::block_on;
 
 use crate::{
     dbus_api::{
-        blockdev::create_dbus_blockdev,
-        pool::create_dbus_pool,
-        types::{CreatePoolParams, TData},
+        blockdev::{self, create_dbus_blockdev},
+        filesystem,
+        pool::{self, create_dbus_pool},
+        types::{CreatePoolParams, PropertiesSignature, TData},
         util::{
-            engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok, tuple_to_option,
+            engine_to_dbus_err_tuple, get_next_arg, interfaces_added_to_properties, msg_code_ok,
+            msg_string_ok, tuple_to_option,
         },
     },
     engine::{
-        CreateAction, EncryptionInfo, EngineAction, KeyDescription, MappingCreateAction, Name,
-        PoolUuid, UnlockMethod,
+        CreateAction, DevUuid, EncryptionInfo, EngineAction, FilesystemUuid, KeyDescription,
+        LockableReadGuard, MappingCreateAction, Name, Pool, PoolUuid, StratisUuid, Table,
+        UnlockMethod,
     },
     stratis::{ErrorEnum, StratisError},
 };
@@ -263,4 +266,124 @@ pub fn unlock_pool_shared(
         }
     };
     Ok(vec![msg])
+}
+
+/// Optimized GetManagedObject implementation
+pub fn get_managed_objects(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
+    fn get_pool_properties(
+        locks: &Table<PoolUuid, LockableReadGuard<'_, dyn Pool>>,
+        path: &dbus::Path<'static>,
+        pool_uuid: PoolUuid,
+    ) -> Option<PropertiesSignature> {
+        locks.get_by_uuid(pool_uuid).map(|(n, guard)| {
+            interfaces_added_to_properties(path, pool::get_all_properties(&n, pool_uuid, &**guard))
+        })
+    }
+
+    fn get_fs_properties(
+        locks: &Table<PoolUuid, LockableReadGuard<'_, dyn Pool>>,
+        path: &dbus::Path<'static>,
+        parent_path: &dbus::Path<'static>,
+        pool_uuid: PoolUuid,
+        fs_uuid: FilesystemUuid,
+    ) -> Option<PropertiesSignature> {
+        locks
+            .get_by_uuid(pool_uuid)
+            .map(|(n, guard)| (n, &**guard))
+            .and_then(|(pool_name, pool)| {
+                pool.get_filesystem(fs_uuid)
+                    .map(|(fs_name, fs)| (pool_name, fs_name, fs_uuid, fs))
+            })
+            .map(|(pool_name, fs_name, fs_uuid, fs)| {
+                interfaces_added_to_properties(
+                    path,
+                    filesystem::get_all_properties(
+                        parent_path.clone(),
+                        &pool_name,
+                        &fs_name,
+                        fs_uuid,
+                        fs,
+                    ),
+                )
+            })
+    }
+
+    fn get_blockdev_properties(
+        locks: &Table<PoolUuid, LockableReadGuard<'_, dyn Pool>>,
+        path: &dbus::Path<'static>,
+        parent_path: &dbus::Path<'static>,
+        pool_uuid: PoolUuid,
+        dev_uuid: DevUuid,
+    ) -> Option<PropertiesSignature> {
+        locks
+            .get_by_uuid(pool_uuid)
+            .map(|(_, guard)| &**guard)
+            .and_then(|pool| pool.get_blockdev(dev_uuid))
+            .map(|(tier, dev)| {
+                interfaces_added_to_properties(
+                    path,
+                    blockdev::get_all_properties(parent_path.clone(), dev_uuid, tier, dev),
+                )
+            })
+    }
+
+    fn pool_uuid_from_stratis_uuid(uuid: StratisUuid) -> Option<PoolUuid> {
+        match uuid {
+            StratisUuid::Pool(u) => Some(u),
+            _ => None,
+        }
+    }
+
+    fn get_managed_objects(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+        let pools = block_on(m.tree.get_data().engine.pools());
+
+        let read_locks = pools
+            .iter()
+            .map(|(n, u, p)| (n.clone(), *u, block_on(p.read())))
+            .collect();
+
+        let properties = m
+            .tree
+            .iter()
+            .filter_map(|op| {
+                op.get_data().as_ref().and_then(|data| match data.uuid {
+                    StratisUuid::Pool(uuid) => {
+                        get_pool_properties(&read_locks, op.get_name(), uuid)
+                    }
+                    StratisUuid::Fs(uuid) => get_fs_properties(
+                        &read_locks,
+                        op.get_name(),
+                        &data.parent,
+                        m.tree
+                            .get(&data.parent)
+                            .and_then(|op| op.get_data().as_ref())
+                            .map(|d| d.uuid)
+                            .and_then(pool_uuid_from_stratis_uuid)
+                            .expect("Parents of filesystems must be pools"),
+                        uuid,
+                    ),
+                    StratisUuid::Dev(uuid) => get_blockdev_properties(
+                        &read_locks,
+                        op.get_name(),
+                        &data.parent,
+                        m.tree
+                            .get(&data.parent)
+                            .and_then(|op| op.get_data().as_ref())
+                            .map(|d| d.uuid)
+                            .and_then(pool_uuid_from_stratis_uuid)
+                            .expect("Parents of blockdevs must be pools"),
+                        uuid,
+                    ),
+                })
+            })
+            .fold(HashMap::new(), |mut full_properties, partial| {
+                full_properties.extend(partial.into_iter());
+                full_properties
+            });
+
+        Ok(vec![m.msg.method_return().append1(properties)])
+    }
+
+    f.method("GetManagedObjects", (), get_managed_objects)
+        .out_arg("a{oa{sa{sv}}}")
 }

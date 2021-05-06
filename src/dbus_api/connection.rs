@@ -28,6 +28,7 @@ use crate::{
     dbus_api::{
         consts,
         types::{DbusAction, InterfacesAdded, InterfacesRemoved, TData},
+        util::interfaces_added_remove_send_sync,
     },
     engine::StratisUuid,
     stratis::{StratisError, StratisResult},
@@ -186,16 +187,7 @@ impl DbusTreeHandler {
             .send(
                 ObjectManagerInterfacesAdded {
                     object,
-                    interfaces: interfaces
-                        .into_iter()
-                        .map(|(k, map)| {
-                            let new_map: HashMap<String, Variant<Box<dyn RefArg>>> = map
-                                .into_iter()
-                                .map(|(subk, var)| (subk, Variant(var.0 as Box<dyn RefArg>)))
-                                .collect();
-                            (k, new_map)
-                        })
-                        .collect(),
+                    interfaces: interfaces_added_remove_send_sync(interfaces),
                 }
                 .to_emit_message(&Path::from(consts::STRATIS_BASE_PATH)),
             )

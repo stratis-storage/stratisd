@@ -98,13 +98,13 @@ pub fn create_dbus_blockdev<'a>(
         );
 
     let path = object_path.get_name().to_owned();
-    let interfaces = get_initial_properties(parent, uuid, tier, blockdev);
+    let interfaces = get_all_properties(parent, uuid, tier, blockdev);
     dbus_context.push_add(object_path, interfaces);
     path
 }
 
-/// Get the initial state of all properties associated with a blockdev object.
-pub fn get_initial_properties(
+/// Get all properties associated with a blockdev object.
+pub fn get_all_properties(
     parent: dbus::Path<'static>,
     dev_uuid: DevUuid,
     tier: BlockDevTier,
@@ -116,11 +116,21 @@ pub fn get_initial_properties(
             consts::BLOCKDEV_HARDWARE_INFO_PROP => shared::blockdev_hardware_info_prop(dev),
             consts::BLOCKDEV_USER_INFO_PROP => shared::blockdev_user_info_prop(dev),
             consts::BLOCKDEV_INIT_TIME_PROP => shared::blockdev_init_time_prop(dev),
-            consts::BLOCKDEV_POOL_PROP => parent.to_owned(),
+            consts::BLOCKDEV_POOL_PROP => parent.clone(),
             consts::BLOCKDEV_UUID_PROP => uuid_to_string!(dev_uuid),
             consts::BLOCKDEV_TIER_PROP => shared::blockdev_tier_prop(tier)
         },
         consts::BLOCKDEV_INTERFACE_NAME_2_2 => {
+            consts::BLOCKDEV_DEVNODE_PROP => shared::blockdev_devnode_prop(dev),
+            consts::BLOCKDEV_HARDWARE_INFO_PROP => shared::blockdev_hardware_info_prop(dev),
+            consts::BLOCKDEV_USER_INFO_PROP => shared::blockdev_user_info_prop(dev),
+            consts::BLOCKDEV_INIT_TIME_PROP => shared::blockdev_init_time_prop(dev),
+            consts::BLOCKDEV_POOL_PROP => parent.clone(),
+            consts::BLOCKDEV_UUID_PROP => uuid_to_string!(dev_uuid),
+            consts::BLOCKDEV_TIER_PROP => shared::blockdev_tier_prop(tier),
+            consts::BLOCKDEV_PHYSICAL_PATH_PROP => shared::blockdev_physical_path_prop(dev)
+        },
+        consts::BLOCKDEV_INTERFACE_NAME_2_4 => {
             consts::BLOCKDEV_DEVNODE_PROP => shared::blockdev_devnode_prop(dev),
             consts::BLOCKDEV_HARDWARE_INFO_PROP => shared::blockdev_hardware_info_prop(dev),
             consts::BLOCKDEV_USER_INFO_PROP => shared::blockdev_user_info_prop(dev),

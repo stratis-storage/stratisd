@@ -22,8 +22,14 @@ use tokio::sync::mpsc::UnboundedSender as TokioSender;
 
 use crate::engine::{EngineType, StratisUuid};
 
+/// Type for properties sent back by `GetManagedObjects`.
+pub type PropertiesSignature =
+    HashMap<dbus::Path<'static>, HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>>;
+
 /// Type for interfaces parameter for `ObjectManagerInterfacesAdded`.
 pub type InterfacesAdded = HashMap<String, HashMap<String, Variant<Box<dyn RefArg + Send + Sync>>>>;
+/// Type for interfaces parameter for `ObjectManagerInterfacesAdded` that can be serialized.
+pub type DbusInterfacesAdded = HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>;
 /// Type for interfaces parameter for `ObjectManagerInterfacesRemoved`.
 pub type InterfacesRemoved = Vec<String>;
 

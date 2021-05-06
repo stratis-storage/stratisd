@@ -87,7 +87,7 @@ uuid!(pub FilesystemUuid);
 
 uuid!(pub PoolUuid);
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum StratisUuid {
     Dev(DevUuid),
     Fs(FilesystemUuid),

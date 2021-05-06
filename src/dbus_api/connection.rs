@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, ffi::CString, sync::Arc};
 
 use dbus::{
     arg::{RefArg, Variant},
@@ -277,18 +277,36 @@ impl DbusConnectionHandler {
             let connection = Arc::clone(&self.connection);
             spawn_blocking(move || {
                 let lock = block_on(tree.read());
-                if let Some(msgs) = lock.handle(&msg) {
-                    for msg in msgs {
-                        if connection.send(msg).is_err() {
-                            warn!("Failed to send reply to D-Bus client");
-                        }
+                let msgs = if let Some(msgs) = lock.handle(&msg) {
+                    if msgs.is_empty() {
+                        vec![msg.error(
+                            &"org.freedesktop.DBus.Error.Failed".into(),
+                            &CString::new(
+                                "Failed to return any message in response to D-Bus method call"
+                                    .as_bytes(),
+                            )
+                            .expect("is obviously valid"),
+                        )]
+                    } else {
+                        msgs
                     }
                 } else {
-                    let reply = default_reply(&msg);
-                    if let Some(r) = reply {
-                        if connection.send(r).is_err() {
-                            warn!("Failed to send reply to D-Bus client");
-                        }
+                    vec![default_reply(&msg).unwrap_or_else(|| {
+                        msg.error(
+                            &"org.freedesktop.DBus.Error.Failed".into(),
+                            &CString::new(
+                                "No default message provided by D-Bus library".as_bytes(),
+                            )
+                            .expect("is obviously valid"),
+                        )
+                    })]
+                };
+
+                assert!(!msgs.is_empty());
+
+                for msg in msgs {
+                    if connection.send(msg).is_err() {
+                        warn!("Failed to send reply to D-Bus client");
                     }
                 }
             });

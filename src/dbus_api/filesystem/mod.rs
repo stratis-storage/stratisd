@@ -99,6 +99,13 @@ pub fn get_initial_properties(
             consts::FILESYSTEM_NAME_PROP => shared::fs_name_prop(fs_name),
             consts::FILESYSTEM_UUID_PROP => uuid_to_string!(fs_uuid),
             consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop(fs, pool_name, fs_name),
+            consts::FILESYSTEM_POOL_PROP => parent.clone(),
+            consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop(fs)
+        },
+        consts::FILESYSTEM_INTERFACE_NAME => {
+            consts::FILESYSTEM_NAME_PROP => shared::fs_name_prop(fs_name),
+            consts::FILESYSTEM_UUID_PROP => uuid_to_string!(fs_uuid),
+            consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop(fs, pool_name, fs_name),
             consts::FILESYSTEM_POOL_PROP => parent,
             consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop(fs)
         }

@@ -130,7 +130,7 @@ pub fn get_initial_properties(
             consts::BLOCKDEV_TIER_PROP => shared::blockdev_tier_prop(tier),
             consts::BLOCKDEV_PHYSICAL_PATH_PROP => shared::blockdev_physical_path_prop(dev)
         },
-        consts::BLOCKDEV_INTERFACE_NAME_2_2 => {
+        consts::BLOCKDEV_INTERFACE_NAME_2_4 => {
             consts::BLOCKDEV_DEVNODE_PROP => shared::blockdev_devnode_prop(dev),
             consts::BLOCKDEV_HARDWARE_INFO_PROP => shared::blockdev_hardware_info_prop(dev),
             consts::BLOCKDEV_USER_INFO_PROP => shared::blockdev_user_info_prop(dev),

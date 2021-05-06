@@ -60,11 +60,21 @@ impl StaticHeaderResult {
     /// Returns StaticHeader fields
     /// Returns an additional bytes buffer if print_bytes flag is True
     pub fn fmt_metadata(&self, print_bytes: bool) -> String {
-        let mut result = String::from("\n\nHeader:\n")
+        let mut result = String::from("\nHeader:\n")
             + self
                 .header
                 .as_ref()
-                .map_or(String::from("\nNone"), |sh| format!("\n{:#?}", sh))
+                .map_or(String::from("Unreadable\n"), |h| {
+                    h.as_ref().map_or_else(
+                        |e| format!("Error: {}\n", e),
+                        |s| {
+                            s.as_ref()
+                                .map_or(String::from("No signature buffer\n"), |sh| {
+                                    format!("{:#?}\n", sh)
+                                })
+                        },
+                    )
+                })
                 .as_str();
         if print_bytes {
             result += "\n\nBytes:\n\n";

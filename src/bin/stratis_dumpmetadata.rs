@@ -26,16 +26,22 @@ fn run(devpath: &str, print_bytes: bool) -> Result<(), String> {
         .map_err(|the_io_error| format!("Error opening device: {}", the_io_error))?;
 
     let read_results = StaticHeader::read_sigblocks(&mut devfile);
-    println!(
-        "{}",
-        StaticHeaderResult::fmt_metadata(&read_results.0, print_bytes)
-    );
-    if read_results.0 != read_results.1 {
+    if read_results.0 == read_results.1 {
         println!(
-            "\n\n(Second sigblock differs)\n {}",
+            "Signature block: \n{}",
+            StaticHeaderResult::fmt_metadata(&read_results.0, print_bytes)
+        );
+    } else {
+        println!(
+            "Signature block 1: \n{}",
+            StaticHeaderResult::fmt_metadata(&read_results.0, print_bytes)
+        );
+        println!(
+            "Signature block 2: \n{}",
             StaticHeaderResult::fmt_metadata(&read_results.1, print_bytes)
         );
     }
+
     let header =
         StaticHeader::repair_sigblocks(&mut devfile, read_results, StaticHeader::do_nothing)
             .map_err(|repair_error| format!("No valid StaticHeader found: {}", repair_error))?

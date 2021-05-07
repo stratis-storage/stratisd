@@ -69,6 +69,8 @@ pub fn fetch_properties_interfaces() -> Vec<String> {
         PROPERTY_FETCH_INTERFACE_NAME,
         PROPERTY_FETCH_INTERFACE_NAME_2_1,
         PROPERTY_FETCH_INTERFACE_NAME_2_2,
+        PROPERTY_FETCH_INTERFACE_NAME_2_3,
+        PROPERTY_FETCH_INTERFACE_NAME_2_4,
     ]
     .iter()
     .map(|s| (*s).to_string())
@@ -82,6 +84,7 @@ pub fn standard_pool_interfaces() -> Vec<String> {
         POOL_INTERFACE_NAME,
         POOL_INTERFACE_NAME_2_1,
         POOL_INTERFACE_NAME_2_3,
+        POOL_INTERFACE_NAME_2_4,
     ]
     .iter()
     .map(|s| (*s).to_string())
@@ -91,7 +94,7 @@ pub fn standard_pool_interfaces() -> Vec<String> {
 /// Get a list of all the standard filesystem interfaces; i.e., all the
 /// revisions of org.storage.stratis2.filesystem.
 pub fn standard_filesystem_interfaces() -> Vec<String> {
-    [FILESYSTEM_INTERFACE_NAME]
+    [FILESYSTEM_INTERFACE_NAME, FILESYSTEM_INTERFACE_NAME_2_4]
         .iter()
         .map(|s| (*s).to_string())
         .collect()
@@ -100,10 +103,14 @@ pub fn standard_filesystem_interfaces() -> Vec<String> {
 /// Get a list of all the standard blockdev interfaces; i.e., all the
 /// revisions of org.storage.stratis2.blockdev.
 pub fn standard_blockdev_interfaces() -> Vec<String> {
-    [BLOCKDEV_INTERFACE_NAME]
-        .iter()
-        .map(|s| (*s).to_string())
-        .collect()
+    [
+        BLOCKDEV_INTERFACE_NAME,
+        BLOCKDEV_INTERFACE_NAME_2_2,
+        BLOCKDEV_INTERFACE_NAME_2_4,
+    ]
+    .iter()
+    .map(|s| (*s).to_string())
+    .collect()
 }
 
 /// Get a list of all interfaces supported by a pool object.

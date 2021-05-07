@@ -143,6 +143,16 @@ pub fn get_initial_properties(
             consts::POOL_NAME_PROP => shared::pool_name_prop(pool_name),
             consts::POOL_UUID_PROP => uuid_to_string!(pool_uuid),
             consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop(pool)
+        },
+        consts::POOL_INTERFACE_NAME_2_3 => {
+            consts::POOL_NAME_PROP => shared::pool_name_prop(pool_name),
+            consts::POOL_UUID_PROP => uuid_to_string!(pool_uuid),
+            consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop(pool)
+        },
+        consts::POOL_INTERFACE_NAME_2_4 => {
+            consts::POOL_NAME_PROP => shared::pool_name_prop(pool_name),
+            consts::POOL_UUID_PROP => uuid_to_string!(pool_uuid),
+            consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop(pool)
         }
     }
 }

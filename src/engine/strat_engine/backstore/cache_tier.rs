@@ -76,8 +76,8 @@ impl CacheTier {
 
         Ok(CacheTier {
             block_mgr,
-            meta_segments,
             cache_segments,
+            meta_segments,
         })
     }
 
@@ -176,8 +176,8 @@ impl CacheTier {
 
         Ok(CacheTier {
             block_mgr,
-            meta_segments,
             cache_segments,
+            meta_segments,
         })
     }
 

@@ -17,3 +17,14 @@ General constants.
 
 SERVICE = "org.storage.stratis2"
 TOP_OBJECT = "/org/storage/stratis2"
+
+REVISION_NUMBER = 4
+
+REVISION = "r%s" % REVISION_NUMBER
+
+BLOCKDEV_INTERFACE = "org.storage.stratis2.blockdev.%s" % REVISION
+FETCH_PROPERTIES_INTERFACE = "org.storage.stratis2.FetchProperties.%s" % REVISION
+FILESYSTEM_INTERFACE = "org.storage.stratis2.filesystem.%s" % REVISION
+MANAGER_INTERFACE = "org.storage.stratis2.Manager.%s" % REVISION
+POOL_INTERFACE = "org.storage.stratis2.pool.%s" % REVISION
+REPORT_INTERFACE = "org.storage.stratis2.Report.%s" % REVISION

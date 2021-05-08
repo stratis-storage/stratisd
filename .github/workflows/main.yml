@@ -285,6 +285,9 @@ jobs:
               (cd code_maintenance; make -f Makefile fmt-travis) &&
               (cd developer_tools; make -f Makefile fmt-travis) &&
               (cd tests/client-dbus; make -f Makefile fmt-travis)
+          - dependencies: yamllint
+            image: fedora:32
+            task: make -f Makefile yamllint
           # MANDATORY PYTHON CHECKS ON LOWEST SUPPORTED INTERPRETER
           - dependencies: >
               pylint
@@ -308,19 +311,3 @@ jobs:
           ${{ matrix.dependencies }}
       - name: Run test
         run: ${{ matrix.task }}
-
-  # VERIFICATION OF TEST INFRASTRUCTURE
-  yamllint:
-    env:
-      TASK: yamllint
-      PYTHON: 3.8.6
-    runs-on: ubuntu-18.04
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-        with:
-          python-version: ${{ env.PYTHON }}
-      - name: Install dependencies
-        run: pip3 install yamllint==1.26.0
-      - name: Run yamllint
-        run: make -f Makefile $TASK

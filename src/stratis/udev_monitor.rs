@@ -8,9 +8,15 @@ use std::os::unix::io::{AsRawFd, RawFd};
 
 use libudev::Event;
 use nix::poll::{poll, PollFd, PollFlags};
-use tokio::sync::{broadcast::Receiver, mpsc::UnboundedSender};
+use tokio::sync::{
+    broadcast::{error::TryRecvError, Receiver},
+    mpsc::UnboundedSender,
+};
 
-use crate::{engine::UdevEngineEvent, stratis::errors::StratisResult};
+use crate::{
+    engine::UdevEngineEvent,
+    stratis::errors::{StratisError, StratisResult},
+};
 
 // Poll for udev events.
 // Check for exit condition and return if true.
@@ -25,10 +31,18 @@ pub fn udev_thread(
     loop {
         match poll(&mut pollers, 100)? {
             0 => {
-                if let Ok(true) = should_exit.try_recv() {
-                    info!("udev thread was notified to exit");
-                    return Ok(());
-                }
+                match should_exit.try_recv() {
+                    Ok(true) => {
+                        info!("udev thread was notified to exit");
+                        return Ok(());
+                    }
+                    Err(TryRecvError::Closed) | Err(TryRecvError::Lagged(_)) => {
+                        return Err(StratisError::Error(
+                            "udev processing thread can no longer be notified to exit; shutting down...".to_string()
+                        ));
+                    }
+                    _ => (),
+                };
             }
             _ => {
                 if let Some(ref e) = udev.poll() {

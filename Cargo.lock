@@ -65,12 +65,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "base64"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
-
-[[package]]
 name = "bindgen"
 version = "0.57.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -585,7 +579,6 @@ dependencies = [
 name = "libstratis"
 version = "2.4.0"
 dependencies = [
- "base64",
  "bindgen",
  "byteorder",
  "chrono",
@@ -616,14 +609,11 @@ dependencies = [
  "rand 0.8.3",
  "regex",
  "rpassword",
- "semver",
  "serde",
  "serde_derive",
  "serde_json",
  "sha-1",
  "tempfile",
- "termios",
- "timerfd",
  "tokio",
  "uuid",
 ]
@@ -1183,15 +1173,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "termios"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "411c5bf740737c7918b8b1fe232dca4dc9f8e754b8ad5e20966814001ed0ac6b"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "textwrap"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1208,15 +1189,6 @@ checksum = "ca8a50ef2360fbd1eeb0ecd46795a87a19024eb4b53c5dc916ca1fd95fe62438"
 dependencies = [
  "libc",
  "winapi",
-]
-
-[[package]]
-name = "timerfd"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0bb53e6628675d73224925201a9a41f01c8d31108fdccb983975a1c1449dfc91"
-dependencies = [
- "libc",
 ]
 
 [[package]]

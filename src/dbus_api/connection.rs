@@ -62,7 +62,7 @@ impl DbusTreeHandler {
     }
 
     /// Process a D-Bus action (add/remove) request.
-    pub fn process_dbus_actions(mut self) -> StratisResult<()> {
+    pub fn process_dbus_actions(&mut self) -> StratisResult<()> {
         loop {
             if self.should_exit.load(Ordering::SeqCst) {
                 info!("Dbus tree handler notified to exit...");

@@ -30,7 +30,7 @@ pub async fn setup(
     should_exit: Arc<AtomicBool>,
 ) -> StratisResult<()> {
     let should_exit_clone = Arc::clone(&should_exit);
-    let (conn, mut udev, tree) = spawn_blocking(move || {
+    let (conn, mut udev, mut tree) = spawn_blocking(move || {
         create_dbus_handlers(engine.clone(), receiver, should_exit_clone)
             .map(|(conn, udev, tree)| {
                 let mutex_lock = engine.blocking_lock();

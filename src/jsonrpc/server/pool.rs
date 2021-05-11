@@ -2,14 +2,14 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{os::unix::io::RawFd, path::Path, sync::Arc};
+use std::{os::unix::io::RawFd, path::Path};
 
-use tokio::{sync::Mutex, task::block_in_place};
+use tokio::task::block_in_place;
 
 use crate::{
     engine::{
-        BlockDevTier, CreateAction, DeleteAction, EncryptionInfo, Engine, EngineAction, PoolUuid,
-        RenameAction, UnlockMethod,
+        BlockDevTier, CreateAction, DeleteAction, EncryptionInfo, EngineAction, LockableEngine,
+        PoolUuid, RenameAction, UnlockMethod,
     },
     jsonrpc::{
         interface::PoolListType,
@@ -23,14 +23,14 @@ use crate::{
 
 // stratis-min pool unlock
 pub async fn pool_unlock(
-    engine: Arc<Mutex<dyn Engine>>,
+    engine: LockableEngine,
     unlock_method: UnlockMethod,
     pool_uuid: Option<PoolUuid>,
     prompt: Option<RawFd>,
 ) -> StratisResult<bool> {
     if let Some(uuid) = pool_uuid {
-        if let (Some(fd), Some(kd)) = (prompt, key_get_desc(Arc::clone(&engine), uuid).await) {
-            key_set(Arc::clone(&engine), &kd, fd).await?;
+        if let (Some(fd), Some(kd)) = (prompt, key_get_desc(engine.clone(), uuid).await) {
+            key_set(engine.clone(), &kd, fd).await?;
         }
     }
 
@@ -56,7 +56,7 @@ pub async fn pool_unlock(
 
 // stratis-min pool create
 pub async fn pool_create(
-    engine: Arc<Mutex<dyn Engine>>,
+    engine: LockableEngine,
     name: &str,
     blockdev_paths: &[&Path],
     enc_info: EncryptionInfo,
@@ -71,7 +71,7 @@ pub async fn pool_create(
 }
 
 // stratis-min pool destroy
-pub async fn pool_destroy(engine: Arc<Mutex<dyn Engine>>, name: &str) -> StratisResult<bool> {
+pub async fn pool_destroy(engine: LockableEngine, name: &str) -> StratisResult<bool> {
     let mut lock = engine.lock().await;
     let (uuid, _) = name_to_uuid_and_pool(&mut *lock, name)
         .ok_or_else(|| StratisError::Error(format!("No pool found with name {}", name)))?;
@@ -83,7 +83,7 @@ pub async fn pool_destroy(engine: Arc<Mutex<dyn Engine>>, name: &str) -> Stratis
 
 // stratis-min pool init-cache
 pub async fn pool_init_cache(
-    engine: Arc<Mutex<dyn Engine>>,
+    engine: LockableEngine,
     name: &str,
     paths: &[&Path],
 ) -> StratisResult<bool> {
@@ -95,7 +95,7 @@ pub async fn pool_init_cache(
 
 // stratis-min pool rename
 pub async fn pool_rename(
-    engine: Arc<Mutex<dyn Engine>>,
+    engine: LockableEngine,
     current_name: &str,
     new_name: &str,
 ) -> StratisResult<bool> {
@@ -111,7 +111,7 @@ pub async fn pool_rename(
 
 // stratis-min pool add-data
 pub async fn pool_add_data(
-    engine: Arc<Mutex<dyn Engine>>,
+    engine: LockableEngine,
     name: &str,
     blockdevs: &[&Path],
 ) -> StratisResult<bool> {
@@ -120,7 +120,7 @@ pub async fn pool_add_data(
 
 // stratis-min pool add-cache
 pub async fn pool_add_cache(
-    engine: Arc<Mutex<dyn Engine>>,
+    engine: LockableEngine,
     name: &str,
     blockdevs: &[&Path],
 ) -> StratisResult<bool> {
@@ -128,7 +128,7 @@ pub async fn pool_add_cache(
 }
 
 async fn add_blockdevs(
-    engine: Arc<Mutex<dyn Engine>>,
+    engine: LockableEngine,
     name: &str,
     blockdevs: &[&Path],
     tier: BlockDevTier,
@@ -144,7 +144,7 @@ async fn add_blockdevs(
 }
 
 // stratis-min pool [list]
-pub async fn pool_list(engine: Arc<Mutex<dyn Engine>>) -> PoolListType {
+pub async fn pool_list(engine: LockableEngine) -> PoolListType {
     let lock = engine.lock().await;
     lock.pools()
         .iter()
@@ -172,10 +172,7 @@ pub async fn pool_list(engine: Arc<Mutex<dyn Engine>>) -> PoolListType {
 }
 
 // stratis-min pool is-encrypted
-pub async fn pool_is_encrypted(
-    engine: Arc<Mutex<dyn Engine>>,
-    uuid: PoolUuid,
-) -> StratisResult<bool> {
+pub async fn pool_is_encrypted(engine: LockableEngine, uuid: PoolUuid) -> StratisResult<bool> {
     let lock = engine.lock().await;
     if let Some((_, pool)) = lock.get_pool(uuid) {
         Ok(pool.is_encrypted())
@@ -190,7 +187,7 @@ pub async fn pool_is_encrypted(
 }
 
 // stratis-min pool is-locked
-pub async fn pool_is_locked(engine: Arc<Mutex<dyn Engine>>, uuid: PoolUuid) -> StratisResult<bool> {
+pub async fn pool_is_locked(engine: LockableEngine, uuid: PoolUuid) -> StratisResult<bool> {
     let lock = engine.lock().await;
     if lock.get_pool(uuid).is_some() {
         Ok(false)
@@ -205,7 +202,7 @@ pub async fn pool_is_locked(engine: Arc<Mutex<dyn Engine>>, uuid: PoolUuid) -> S
 }
 
 // stratis-min pool is-bound
-pub async fn pool_is_bound(engine: Arc<Mutex<dyn Engine>>, uuid: PoolUuid) -> StratisResult<bool> {
+pub async fn pool_is_bound(engine: LockableEngine, uuid: PoolUuid) -> StratisResult<bool> {
     let lock = engine.lock().await;
     if let Some((_, pool)) = lock.get_pool(uuid) {
         Ok(pool.encryption_info().clevis_info.is_some())
@@ -220,10 +217,7 @@ pub async fn pool_is_bound(engine: Arc<Mutex<dyn Engine>>, uuid: PoolUuid) -> St
 }
 
 // stratis-min pool has-passphrase
-pub async fn pool_has_passphrase(
-    engine: Arc<Mutex<dyn Engine>>,
-    uuid: PoolUuid,
-) -> StratisResult<bool> {
+pub async fn pool_has_passphrase(engine: LockableEngine, uuid: PoolUuid) -> StratisResult<bool> {
     let lock = engine.lock().await;
     if let Some((_, pool)) = lock.get_pool(uuid) {
         Ok(pool.encryption_info().key_description.is_some())
@@ -239,7 +233,7 @@ pub async fn pool_has_passphrase(
 
 // stratis-min pool clevis-pin
 pub async fn pool_clevis_pin(
-    engine: Arc<Mutex<dyn Engine>>,
+    engine: LockableEngine,
     uuid: PoolUuid,
 ) -> StratisResult<Option<String>> {
     let lock = engine.lock().await;

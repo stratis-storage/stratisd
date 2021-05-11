@@ -47,7 +47,7 @@ pub fn create_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult 
         return_message
     );
 
-    let mut mutex_lock = mutex_lock!(dbus_context.engine);
+    let mut mutex_lock = dbus_context.engine.blocking_lock();
     let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
     let result = log_action!(pool.create_filesystems(
@@ -125,7 +125,7 @@ pub fn destroy_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
         return_message
     );
 
-    let mut mutex_lock = mutex_lock!(dbus_context.engine);
+    let mut mutex_lock = dbus_context.engine.blocking_lock();
     let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
     let mut filesystem_map: HashMap<FilesystemUuid, dbus::Path<'static>> = HashMap::new();
@@ -209,7 +209,7 @@ pub fn snapshot_filesystem(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
         }
     };
 
-    let mut mutex_lock = mutex_lock!(dbus_context.engine);
+    let mut mutex_lock = dbus_context.engine.blocking_lock();
     let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
     let msg = match log_action!(pool.snapshot_filesystem(
@@ -270,7 +270,7 @@ pub fn add_cachedevs(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     );
     let cache_initialized = {
         let dbus_context = m.tree.get_data();
-        let mutex_lock = mutex_lock!(dbus_context.engine);
+        let mutex_lock = dbus_context.engine.blocking_lock();
         let (_, pool) = get_pool!(mutex_lock; pool_uuid; default_return; return_message);
         pool.has_cache()
     };
@@ -306,7 +306,11 @@ pub fn rename_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let msg = match log_action!(mutex_lock!(dbus_context.engine).rename_pool(pool_uuid, new_name)) {
+    let msg = match log_action!(dbus_context
+        .engine
+        .blocking_lock()
+        .rename_pool(pool_uuid, new_name))
+    {
         Ok(RenameAction::NoSource) => {
             let error_message = format!("engine doesn't know about pool {}", pool_uuid);
             let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, error_message);

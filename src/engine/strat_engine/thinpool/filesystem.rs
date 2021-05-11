@@ -234,7 +234,7 @@ impl StratFilesystem {
                     if free_bytes.sectors() < FILESYSTEM_LOWATER {
                         let mut table = self.thin_dev.table().table.clone();
                         table.length =
-                            self.thin_dev.size() + self.extend_size(self.thin_dev.size());
+                            self.thin_dev.size() + Self::extend_size(self.thin_dev.size());
                         if self.thin_dev.set_table(get_dm(), table).is_err() {
                             return Ok(false);
                         }
@@ -260,7 +260,7 @@ impl StratFilesystem {
     /// Return an extend size for the thindev under the filesystem
     /// TODO: returning the current size will double the space provisioned to
     /// the thin device.  We should determine if this is a reasonable value.
-    fn extend_size(&self, current_size: Sectors) -> Sectors {
+    fn extend_size(current_size: Sectors) -> Sectors {
         current_size
     }
 

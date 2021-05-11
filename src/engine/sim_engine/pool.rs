@@ -78,6 +78,7 @@ impl SimPool {
         self.encryption_info().is_encrypted()
     }
 
+    #[allow(clippy::unused_self)]
     pub fn destroy(&mut self) -> StratisResult<()> {
         Ok(())
     }

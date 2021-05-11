@@ -127,7 +127,6 @@ impl CryptInitializer {
 
     /// Initialize with a passphrase in the kernel keyring only.
     fn initialize_with_keyring(
-        &self,
         device: &mut CryptDevice,
         key_description: &KeyDescription,
     ) -> StratisResult<()> {
@@ -187,7 +186,7 @@ impl CryptInitializer {
         key_description: &KeyDescription,
         (pin, json, yes): (&str, &Value, bool),
     ) -> StratisResult<()> {
-        self.initialize_with_keyring(&mut device, key_description)?;
+        Self::initialize_with_keyring(&mut device, key_description)?;
 
         let fs = MemoryPrivateFilesystem::new()?;
         fs.key_op(key_description, |kf| {
@@ -228,7 +227,7 @@ impl CryptInitializer {
                 self.acquire_crypt_device()?
             }
             (Some(kd), _) => {
-                self.initialize_with_keyring(&mut device, kd)?;
+                Self::initialize_with_keyring(&mut device, kd)?;
                 device
             }
             (_, Some(ci)) => {

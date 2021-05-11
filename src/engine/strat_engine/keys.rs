@@ -388,7 +388,6 @@ impl StratKeyActions {
     /// of the key. This method is only useful for testing stratisd internally. It
     /// is not useful for testing using D-Bus.
     pub fn set_no_fd(
-        &mut self,
         key_desc: &KeyDescription,
         key: SizedKeyMemory,
     ) -> StratisResult<MappingCreateAction<Key>> {

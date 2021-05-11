@@ -2,17 +2,17 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{
-    collections::HashMap,
-    sync::{atomic::AtomicBool, Arc},
-};
+use std::{collections::HashMap, sync::Arc};
 
 use dbus::{
     arg::{ArgType, Iter, IterAppend, RefArg, Variant},
     blocking::SyncConnection,
 };
 use dbus_tree::{MTSync, MethodErr, PropInfo};
-use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver};
+use tokio::sync::{
+    broadcast::Sender,
+    mpsc::{unbounded_channel, UnboundedReceiver},
+};
 
 use devicemapper::DmError;
 
@@ -173,7 +173,7 @@ pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTSync<TData>, TData>) -> Res
 pub fn create_dbus_handlers(
     engine: LockableEngine,
     udev_receiver: UnboundedReceiver<UdevEngineEvent>,
-    should_exit: Arc<AtomicBool>,
+    trigger: Sender<bool>,
 ) -> Result<(DbusConnectionHandler, DbusUdevHandler, DbusTreeHandler), dbus::Error> {
     let conn = Arc::new(SyncConnection::new_system()?);
     let (sender, receiver) = unbounded_channel();
@@ -183,9 +183,9 @@ pub fn create_dbus_handlers(
 
     let tree = Lockable::new_shared(tree);
     let connection =
-        DbusConnectionHandler::new(Arc::clone(&conn), tree.clone(), Arc::clone(&should_exit));
+        DbusConnectionHandler::new(Arc::clone(&conn), tree.clone(), trigger.subscribe());
     let udev = DbusUdevHandler::new(udev_receiver, object_path, dbus_context);
-    let tree = DbusTreeHandler::new(tree, receiver, conn, should_exit);
+    let tree = DbusTreeHandler::new(tree, receiver, conn, trigger.subscribe());
     Ok((connection, udev, tree))
 }
 

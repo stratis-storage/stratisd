@@ -9,11 +9,9 @@
 // and one for the unsupported version. Also, Default is not really a
 // helpful concept here.
 
-use std::sync::{atomic::AtomicBool, Arc};
-
 use tokio::{
     select,
-    sync::mpsc::UnboundedReceiver,
+    sync::{broadcast::Sender, mpsc::UnboundedReceiver},
     task::{self, spawn_blocking},
 };
 
@@ -27,11 +25,10 @@ use crate::{
 pub async fn setup(
     engine: LockableEngine,
     receiver: UnboundedReceiver<UdevEngineEvent>,
-    should_exit: Arc<AtomicBool>,
+    trigger: Sender<bool>,
 ) -> StratisResult<()> {
-    let should_exit_clone = Arc::clone(&should_exit);
-    let (conn, mut udev, mut tree) = spawn_blocking(move || {
-        create_dbus_handlers(engine.clone(), receiver, should_exit_clone)
+    let (mut conn, mut udev, mut tree) = spawn_blocking(move || {
+        create_dbus_handlers(engine.clone(), receiver, trigger)
             .map(|(conn, udev, tree)| {
                 let mutex_lock = engine.blocking_lock();
                 for (pool_name, pool_uuid, pool) in mutex_lock.pools() {

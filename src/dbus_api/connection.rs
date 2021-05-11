@@ -2,14 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{
-    collections::HashMap,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-    time::Duration,
-};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use dbus::{
     arg::{RefArg, Variant},
@@ -24,8 +17,18 @@ use dbus::{
     message::{MatchRule, SignalArgs},
     Path,
 };
-use futures::executor::block_on;
-use tokio::{sync::mpsc::UnboundedReceiver, task::spawn_blocking, time::timeout};
+use futures::{
+    executor::block_on,
+    future::{select, Either},
+    pin_mut,
+};
+use tokio::{
+    sync::{
+        broadcast::{error::TryRecvError, Receiver},
+        mpsc::UnboundedReceiver,
+    },
+    task::spawn_blocking,
+};
 
 use crate::{
     dbus_api::{
@@ -43,7 +46,7 @@ pub struct DbusTreeHandler {
     tree: LockableTree,
     receiver: UnboundedReceiver<DbusAction>,
     connection: Arc<SyncConnection>,
-    should_exit: Arc<AtomicBool>,
+    should_exit: Receiver<bool>,
 }
 
 impl DbusTreeHandler {
@@ -51,7 +54,7 @@ impl DbusTreeHandler {
         tree: LockableTree,
         receiver: UnboundedReceiver<DbusAction>,
         connection: Arc<SyncConnection>,
-        should_exit: Arc<AtomicBool>,
+        should_exit: Receiver<bool>,
     ) -> Self {
         DbusTreeHandler {
             tree,
@@ -64,19 +67,55 @@ impl DbusTreeHandler {
     /// Process a D-Bus action (add/remove) request.
     pub fn process_dbus_actions(&mut self) -> StratisResult<()> {
         loop {
-            if self.should_exit.load(Ordering::SeqCst) {
-                info!("Dbus tree handler notified to exit...");
-                break;
-            }
-            let action = match block_on(timeout(Duration::from_millis(100), self.receiver.recv())) {
-                Ok(a) => a.ok_or_else(|| {
-                    StratisError::Error(
-                        "The channel from the D-Bus request handler to the D-Bus object handler was closed".to_string()
-                    )
-                })?,
-                Err(_) => continue,
+            let (action, mut write_lock) = {
+                let recv_fut = self.receiver.recv();
+                let should_exit_fut = self.should_exit.recv();
+
+                pin_mut!(recv_fut);
+                pin_mut!(should_exit_fut);
+
+                let (action, should_exit_fut) = match block_on(select(recv_fut, should_exit_fut)) {
+                    Either::Left((a, se)) => {
+                        (
+                            a.ok_or_else(|| {
+                                StratisError::Error(
+                                    "The channel from the D-Bus request handler to the D-Bus object handler was closed".to_string()
+                                )
+                            })?,
+                            se
+                        )
+                    },
+                    Either::Right((Ok(true), _)) => {
+                        info!("D-Bus tree handler was notified to exit");
+                        break;
+                    },
+                    Either::Right((Err(_), _)) => {
+                        warn!("D-Bus tree handler can no longer be notified to exit; shutting down...");
+                        break;
+                    },
+                    _ => continue,
+                };
+
+                let write_fut = self.tree.write();
+
+                pin_mut!(write_fut);
+
+                let write_lock = match block_on(select(write_fut, should_exit_fut)) {
+                    Either::Left((wl, _)) => wl,
+                    Either::Right((Ok(true), _)) => {
+                        info!("D-Bus tree handler was notified to exit");
+                        break;
+                    }
+                    Either::Right((Err(_), _)) => {
+                        warn!("D-Bus tree handler can no longer be notified to exit; shutting down...");
+                        break;
+                    }
+                    _ => continue,
+                };
+
+                (action, write_lock)
             };
-            let mut write_lock = self.tree.blocking_write();
+
             match action {
                 DbusAction::Add(path, interfaces) => {
                     let path_name = path.get_name().clone();
@@ -259,14 +298,14 @@ impl DbusTreeHandler {
 pub struct DbusConnectionHandler {
     connection: Arc<SyncConnection>,
     tree: LockableTree,
-    should_exit: Arc<AtomicBool>,
+    should_exit: Receiver<bool>,
 }
 
 impl DbusConnectionHandler {
     pub(super) fn new(
         connection: Arc<SyncConnection>,
         tree: LockableTree,
-        should_exit: Arc<AtomicBool>,
+        should_exit: Receiver<bool>,
     ) -> DbusConnectionHandler {
         DbusConnectionHandler {
             connection,
@@ -278,7 +317,7 @@ impl DbusConnectionHandler {
     /// Handle a D-Bus action passed from a D-Bus connection.
     /// Spawn a new thread for every D-Bus method call.
     /// Every method call requires a read lock on the D-Bus tree.
-    pub fn process_dbus_requests(&self) -> StratisResult<()> {
+    pub fn process_dbus_requests(&mut self) -> StratisResult<()> {
         let tree = self.tree.clone();
         let connection = Arc::clone(&self.connection);
         let _ = self.connection.start_receive(
@@ -308,9 +347,16 @@ impl DbusConnectionHandler {
         );
         loop {
             self.connection.process(Duration::from_millis(100))?;
-            if self.should_exit.load(Ordering::SeqCst) {
-                info!("D-Bus connection handler thread notified to exit");
-                break;
+            match self.should_exit.try_recv() {
+                Ok(true) => {
+                    info!("D-Bus connection handler thread notified to exit");
+                    break;
+                }
+                Err(TryRecvError::Lagged(_)) | Err(TryRecvError::Closed) => {
+                    warn!("D-Bus connection handler can't be notified to exit. Shutting down...");
+                    break;
+                }
+                _ => (),
             }
         }
 

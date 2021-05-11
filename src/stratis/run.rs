@@ -4,12 +4,17 @@
 
 //! Main loop
 
-use std::sync::{
-    atomic::{AtomicBool, AtomicUsize, Ordering},
-    Arc,
-};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
-use tokio::{runtime::Builder, select, signal, sync::mpsc::unbounded_channel, task};
+use tokio::{
+    runtime::Builder,
+    select, signal,
+    sync::{
+        broadcast::{channel, Sender},
+        mpsc::unbounded_channel,
+    },
+    task,
+};
 
 use crate::{
     engine::{Lockable, LockableEngine, SimEngine, StratEngine, UdevEngineEvent},
@@ -20,11 +25,16 @@ use crate::{
 };
 
 // Waits for SIGINT. If received, sets should_exit to true.
-async fn signal_thread(should_exit: Arc<AtomicBool>) {
+async fn signal_thread(trigger: Sender<bool>) {
     if let Err(e) = signal::ctrl_c().await {
         error!("Failure while listening for signals: {}", e);
     }
-    should_exit.store(true, Ordering::Relaxed);
+    if let Err(e) = trigger.send(true) {
+        warn!(
+            "Failed to notify blocking stratisd threads to shut down: {}",
+            e
+        );
+    }
 }
 
 /// Set up all sorts of signal and event handling mechanisms.
@@ -69,13 +79,12 @@ pub fn run(sim: bool) -> StratisResult<()> {
             }
         };
 
-        let should_exit = Arc::new(AtomicBool::new(false));
+        let (trigger, should_exit) = channel(2);
         let (sender, receiver) = unbounded_channel::<UdevEngineEvent>();
 
-        let udev_arc_clone = Arc::clone(&should_exit);
-        let join_udev = task::spawn_blocking(move || udev_thread(sender, udev_arc_clone));
-        let join_ipc = task::spawn(setup(engine.clone(), receiver, Arc::clone(&should_exit)));
-        let join_signal = task::spawn(signal_thread(Arc::clone(&should_exit)));
+        let join_udev = task::spawn_blocking(move || udev_thread(sender, should_exit));
+        let join_ipc = task::spawn(setup(engine.clone(), receiver, trigger.clone()));
+        let join_signal = task::spawn(signal_thread(trigger.clone()));
         let join_dm = task::spawn(dm_event_thread(if sim {
             None
         } else {
@@ -107,7 +116,9 @@ pub fn run(sim: bool) -> StratisResult<()> {
                 info!("Caught SIGINT; exiting...");
             }
         }
-        should_exit.store(true, Ordering::Relaxed);
+        if let Err(e) = trigger.send(true) {
+            warn!("Failed to notify blocking stratisd threads to shut down: {}", e);
+        }
         Ok(())
     })?;
     Ok(())

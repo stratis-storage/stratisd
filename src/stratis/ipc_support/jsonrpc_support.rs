@@ -2,9 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::sync::{atomic::AtomicBool, Arc};
-
-use tokio::{select, sync::mpsc::UnboundedReceiver, task::JoinHandle};
+use tokio::{
+    select,
+    sync::{broadcast::Sender, mpsc::UnboundedReceiver},
+    task::JoinHandle,
+};
 
 use crate::{
     engine::{LockableEngine, UdevEngineEvent},
@@ -34,7 +36,7 @@ fn handle_udev(
 pub async fn setup(
     engine: LockableEngine,
     recv: UnboundedReceiver<UdevEngineEvent>,
-    _: Arc<AtomicBool>,
+    _: Sender<bool>,
 ) -> StratisResult<()> {
     let mut udev_join = handle_udev(engine.clone(), recv);
     let mut server_join = run_server(engine);

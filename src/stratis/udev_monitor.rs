@@ -4,17 +4,11 @@
 
 //! Support for monitoring udev events.
 
-use std::{
-    os::unix::io::{AsRawFd, RawFd},
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-};
+use std::os::unix::io::{AsRawFd, RawFd};
 
 use libudev::Event;
 use nix::poll::{poll, PollFd, PollFlags};
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::{broadcast::Receiver, mpsc::UnboundedSender};
 
 use crate::{engine::UdevEngineEvent, stratis::errors::StratisResult};
 
@@ -22,7 +16,7 @@ use crate::{engine::UdevEngineEvent, stratis::errors::StratisResult};
 // Check for exit condition and return if true.
 pub fn udev_thread(
     sender: UnboundedSender<UdevEngineEvent>,
-    should_exit: Arc<AtomicBool>,
+    mut should_exit: Receiver<bool>,
 ) -> StratisResult<()> {
     let context = libudev::Context::new()?;
     let mut udev = UdevMonitor::create(&context)?;
@@ -31,7 +25,7 @@ pub fn udev_thread(
     loop {
         match poll(&mut pollers, 100)? {
             0 => {
-                if should_exit.load(Ordering::Relaxed) {
+                if let Ok(true) = should_exit.try_recv() {
                     info!("udev thread was notified to exit");
                     return Ok(());
                 }

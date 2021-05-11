@@ -9,50 +9,54 @@
 // and one for the unsupported version. Also, Default is not really a
 // helpful concept here.
 
-use std::sync::Arc;
+use std::sync::{atomic::AtomicBool, Arc};
 
 use tokio::{
     select,
-    sync::{mpsc::UnboundedReceiver, Mutex},
-    task,
+    sync::mpsc::UnboundedReceiver,
+    task::{self, spawn_blocking},
 };
 
 use crate::{
     dbus_api::create_dbus_handlers,
-    engine::{Engine, UdevEngineEvent},
+    engine::{LockableEngine, UdevEngineEvent},
     stratis::{StratisError, StratisResult},
 };
 
 /// Set up the cooperating D-Bus threads.
 pub async fn setup(
-    engine: Arc<Mutex<dyn Engine>>,
+    engine: LockableEngine,
     receiver: UnboundedReceiver<UdevEngineEvent>,
+    should_exit: Arc<AtomicBool>,
 ) -> StratisResult<()> {
-    let (conn, mut udev, mut tree) = create_dbus_handlers(Arc::clone(&engine), receiver)
-        .await
-        .map(|(conn, udev, tree)| {
-            let mutex_lock = mutex_lock!(engine);
-            for (pool_name, pool_uuid, pool) in mutex_lock.pools() {
-                udev.register_pool(&pool_name, pool_uuid, pool)
-            }
-            info!("D-Bus API is available");
-            (conn, udev, tree)
-        })
-        .map_err(|err| -> StratisError { err.into() })?;
+    let should_exit_clone = Arc::clone(&should_exit);
+    let (conn, mut udev, tree) = spawn_blocking(move || {
+        create_dbus_handlers(engine.clone(), receiver, should_exit_clone)
+            .map(|(conn, udev, tree)| {
+                let mutex_lock = engine.blocking_lock();
+                for (pool_name, pool_uuid, pool) in mutex_lock.pools() {
+                    udev.register_pool(&pool_name, pool_uuid, pool)
+                }
+                info!("D-Bus API is available");
+                (conn, udev, tree)
+            })
+            .map_err(StratisError::from)
+    })
+    .await
+    .map_err(StratisError::from)
+    .and_then(|res| res)?;
 
-    let mut tree_handle = task::spawn(async move {
-        loop {
-            if let Err(e) = tree.process_dbus_actions().await {
-                error!(
-                    "Failed to process D-Bus object path addition or removal: {}; \
-                    exiting D-Bus thread",
-                    e,
-                );
-                return;
-            }
+    let mut tree_handle = task::spawn_blocking(move || {
+        if let Err(e) = tree.process_dbus_actions() {
+            error!(
+                "Failed to process D-Bus object path addition or removal: {}; \
+                exiting D-Bus thread",
+                e,
+            );
+            return;
         }
     });
-    let mut conn_handle = task::spawn(async move { conn.process_dbus_requests().await });
+    let mut conn_handle = task::spawn_blocking(move || conn.process_dbus_requests());
     let mut udev_handle = task::spawn(async move {
         loop {
             if let Err(e) = udev.handle_udev_event().await {

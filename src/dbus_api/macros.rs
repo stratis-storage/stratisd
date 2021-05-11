@@ -155,7 +155,7 @@ macro_rules! initial_properties {
         ]
         .into_iter()
         .map(|(s, v)| (s.to_string(), v))
-        .collect::<$crate::dbus_api::types::InterfacesAdded>();
+        .collect::<$crate::dbus_api::types::InterfacesAddedThreadSafe>();
         interfaces.extend(
             $crate::dbus_api::consts::fetch_properties_interfaces()
                 .into_iter()

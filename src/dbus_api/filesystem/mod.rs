@@ -8,7 +8,7 @@ use dbus_tree::Factory;
 use crate::{
     dbus_api::{
         consts,
-        types::{DbusContext, InterfacesAdded, OPContext},
+        types::{DbusContext, InterfacesAddedThreadSafe, OPContext},
         util::make_object_path,
     },
     engine::{Filesystem, FilesystemUuid, Name, StratisUuid},
@@ -81,19 +81,19 @@ pub fn create_dbus_filesystem<'a>(
         );
 
     let path = object_path.get_name().to_owned();
-    let interfaces = get_initial_properties(parent, pool_name, name, uuid, filesystem);
+    let interfaces = get_fs_properties(parent, pool_name, name, uuid, filesystem);
     dbus_context.push_add(object_path, interfaces);
     path
 }
 
 /// Get the initial state of all properties associated with a filesystem object.
-pub fn get_initial_properties(
+pub fn get_fs_properties(
     parent: dbus::Path<'static>,
     pool_name: &Name,
     fs_name: &Name,
     fs_uuid: FilesystemUuid,
     fs: &dyn Filesystem,
-) -> InterfacesAdded {
+) -> InterfacesAddedThreadSafe {
     initial_properties! {
         consts::FILESYSTEM_INTERFACE_NAME => {
             consts::FILESYSTEM_NAME_PROP => shared::fs_name_prop(fs_name),

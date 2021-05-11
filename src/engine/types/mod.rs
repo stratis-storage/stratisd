@@ -16,14 +16,19 @@ use std::{
 
 use libudev::EventType;
 use serde::{Deserialize, Serialize};
+use tokio::sync::Mutex;
 use uuid::Uuid;
 
-pub use crate::engine::types::{
-    actions::{
-        Clevis, CreateAction, DeleteAction, EngineAction, Key, MappingCreateAction,
-        MappingDeleteAction, RenameAction, SetCreateAction, SetDeleteAction, SetUnlockAction,
+pub use crate::engine::{
+    engine::Engine,
+    structures::Lockable,
+    types::{
+        actions::{
+            Clevis, CreateAction, DeleteAction, EngineAction, Key, MappingCreateAction,
+            MappingDeleteAction, RenameAction, SetCreateAction, SetDeleteAction, SetUnlockAction,
+        },
+        keys::{EncryptionInfo, KeyDescription, SizedKeyMemory},
     },
-    keys::{EncryptionInfo, KeyDescription, SizedKeyMemory},
 };
 use crate::stratis::{ErrorEnum, StratisError, StratisResult};
 
@@ -66,6 +71,9 @@ macro_rules! uuid {
         impl $crate::engine::types::AsUuid for $ident {}
     }
 }
+
+/// An engine that can be locked for synchronization.
+pub type LockableEngine = Lockable<Arc<Mutex<dyn Engine>>>;
 
 pub trait AsUuid:
     Copy

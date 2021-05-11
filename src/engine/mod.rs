@@ -11,9 +11,9 @@ pub use self::{
     },
     types::{
         BlockDevTier, CreateAction, DeleteAction, DevUuid, EncryptionInfo, EngineAction,
-        FilesystemUuid, KeyDescription, MappingCreateAction, MappingDeleteAction, Name, PoolUuid,
-        Redundancy, RenameAction, ReportType, SetCreateAction, SetDeleteAction, StratisUuid,
-        UdevEngineEvent, UnlockMethod,
+        FilesystemUuid, KeyDescription, Lockable, LockableEngine, MappingCreateAction,
+        MappingDeleteAction, Name, PoolUuid, Redundancy, RenameAction, ReportType, SetCreateAction,
+        SetDeleteAction, StratisUuid, UdevEngineEvent, UnlockMethod,
     },
 };
 

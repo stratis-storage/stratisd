@@ -2,22 +2,18 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::sync::Arc;
+use std::sync::{atomic::AtomicBool, Arc};
 
-use tokio::{
-    select,
-    sync::{mpsc::UnboundedReceiver, Mutex},
-    task::JoinHandle,
-};
+use tokio::{select, sync::mpsc::UnboundedReceiver, task::JoinHandle};
 
 use crate::{
-    engine::{Engine, UdevEngineEvent},
+    engine::{LockableEngine, UdevEngineEvent},
     jsonrpc::run_server,
     stratis::{StratisError, StratisResult},
 };
 
 fn handle_udev(
-    engine: Arc<Mutex<dyn Engine>>,
+    engine: LockableEngine,
     mut recv: UnboundedReceiver<UdevEngineEvent>,
 ) -> JoinHandle<()> {
     tokio::spawn(async move {
@@ -36,10 +32,11 @@ fn handle_udev(
 }
 
 pub async fn setup(
-    engine: Arc<Mutex<dyn Engine>>,
+    engine: LockableEngine,
     recv: UnboundedReceiver<UdevEngineEvent>,
+    _: Arc<AtomicBool>,
 ) -> StratisResult<()> {
-    let mut udev_join = handle_udev(Arc::clone(&engine), recv);
+    let mut udev_join = handle_udev(engine.clone(), recv);
     let mut server_join = run_server(engine);
 
     select! {

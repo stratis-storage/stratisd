@@ -87,6 +87,9 @@ jobs:
               (cd code_maintenance; make -f Makefile fmt-travis) &&
               (cd developer_tools; make -f Makefile fmt-travis) &&
               (cd tests/client-dbus; make -f Makefile fmt-travis)
+          - dependencies: yamllint
+            image: fedora:33
+            task: make -f Makefile yamllint
     runs-on: ubuntu-18.04
     container: ${{ matrix.image }}
     steps:

@@ -24,7 +24,8 @@ use crate::{
     },
 };
 
-// Waits for SIGINT. If received, sets should_exit to true.
+// Waits for SIGINT. If received, sends true to all blocking calls in blocking
+// threads which will then terminate.
 async fn signal_thread(trigger: Sender<bool>) {
     if let Err(e) = signal::ctrl_c().await {
         error!("Failure while listening for signals: {}", e);

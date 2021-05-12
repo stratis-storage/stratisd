@@ -22,7 +22,7 @@ use crate::{
 // Check for exit condition and return if true.
 pub fn udev_thread(
     sender: UnboundedSender<UdevEngineEvent>,
-    mut should_exit: Receiver<bool>,
+    mut should_exit: Receiver<()>,
 ) -> StratisResult<()> {
     let context = libudev::Context::new()?;
     let mut udev = UdevMonitor::create(&context)?;
@@ -32,7 +32,7 @@ pub fn udev_thread(
         match poll(&mut pollers, 100)? {
             0 => {
                 match should_exit.try_recv() {
-                    Ok(true) => {
+                    Ok(()) => {
                         info!("udev thread was notified to exit");
                         return Ok(());
                     }

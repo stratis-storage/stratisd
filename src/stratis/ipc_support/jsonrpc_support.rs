@@ -36,7 +36,7 @@ fn handle_udev(
 pub async fn setup(
     engine: LockableEngine,
     recv: UnboundedReceiver<UdevEngineEvent>,
-    _: Sender<bool>,
+    _: Sender<()>,
 ) -> StratisResult<()> {
     let mut udev_join = handle_udev(engine.clone(), recv);
     let mut server_join = run_server(engine);

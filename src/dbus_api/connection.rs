@@ -48,7 +48,7 @@ pub struct DbusTreeHandler {
     tree: LockableTree,
     receiver: UnboundedReceiver<DbusAction>,
     connection: Arc<SyncConnection>,
-    should_exit: Receiver<bool>,
+    should_exit: Receiver<()>,
 }
 
 impl DbusTreeHandler {
@@ -56,7 +56,7 @@ impl DbusTreeHandler {
         tree: LockableTree,
         receiver: UnboundedReceiver<DbusAction>,
         connection: Arc<SyncConnection>,
-        should_exit: Receiver<bool>,
+        should_exit: Receiver<()>,
     ) -> Self {
         DbusTreeHandler {
             tree,
@@ -87,15 +87,15 @@ impl DbusTreeHandler {
                             se
                         )
                     },
-                    Either::Right((Ok(true), _)) => {
+                    Either::Right((Ok(()), _)) => {
                         info!("D-Bus tree handler was notified to exit");
                         break;
                     },
                     Either::Right((Err(_), _)) => {
-                        warn!("D-Bus tree handler can no longer be notified to exit; shutting down...");
-                        break;
+                        return Err(StratisError::Error(
+                            "D-Bus tree handler can no longer be notified to exit; shutting down...".to_string()
+                        ));
                     },
-                    _ => continue,
                 };
 
                 let write_fut = self.tree.write();
@@ -104,15 +104,15 @@ impl DbusTreeHandler {
 
                 let write_lock = match block_on(select(write_fut, should_exit_fut)) {
                     Either::Left((wl, _)) => wl,
-                    Either::Right((Ok(true), _)) => {
+                    Either::Right((Ok(()), _)) => {
                         info!("D-Bus tree handler was notified to exit");
                         break;
                     }
                     Either::Right((Err(_), _)) => {
-                        warn!("D-Bus tree handler can no longer be notified to exit; shutting down...");
-                        break;
+                        return Err(StratisError::Error(
+                            "D-Bus tree handler can no longer be notified to exit; shutting down...".to_string()
+                        ));
                     }
-                    _ => continue,
                 };
 
                 (action, write_lock)
@@ -303,14 +303,14 @@ impl DbusTreeHandler {
 pub struct DbusConnectionHandler {
     connection: Arc<SyncConnection>,
     tree: LockableTree,
-    should_exit: Receiver<bool>,
+    should_exit: Receiver<()>,
 }
 
 impl DbusConnectionHandler {
     pub(super) fn new(
         connection: Arc<SyncConnection>,
         tree: LockableTree,
-        should_exit: Receiver<bool>,
+        should_exit: Receiver<()>,
     ) -> DbusConnectionHandler {
         DbusConnectionHandler {
             connection,
@@ -353,13 +353,13 @@ impl DbusConnectionHandler {
         loop {
             self.connection.process(Duration::from_millis(100))?;
             match self.should_exit.try_recv() {
-                Ok(true) => {
+                Ok(()) => {
                     info!("D-Bus connection handler thread notified to exit");
                     break;
                 }
                 Err(TryRecvError::Lagged(_)) | Err(TryRecvError::Closed) => {
                     return Err(StratisError::Error(
-                        "D-Bus connection handler can't be notified to exit. Shutting down..."
+                        "D-Bus connection handler can't be notified to exit; shutting down..."
                             .to_string(),
                     ));
                 }

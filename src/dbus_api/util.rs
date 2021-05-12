@@ -173,7 +173,7 @@ pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTSync<TData>, TData>) -> Res
 pub fn create_dbus_handlers(
     engine: LockableEngine,
     udev_receiver: UnboundedReceiver<UdevEngineEvent>,
-    trigger: Sender<bool>,
+    trigger: Sender<()>,
 ) -> Result<(DbusConnectionHandler, DbusUdevHandler, DbusTreeHandler), dbus::Error> {
     let conn = Arc::new(SyncConnection::new_system()?);
     let (sender, receiver) = unbounded_channel();

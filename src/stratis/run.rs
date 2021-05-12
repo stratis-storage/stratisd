@@ -26,11 +26,11 @@ use crate::{
 
 // Waits for SIGINT. If received, sends true to all blocking calls in blocking
 // threads which will then terminate.
-async fn signal_thread(trigger: Sender<bool>) {
+async fn signal_thread(trigger: Sender<()>) {
     if let Err(e) = signal::ctrl_c().await {
         error!("Failure while listening for signals: {}", e);
     }
-    if let Err(e) = trigger.send(true) {
+    if let Err(e) = trigger.send(()) {
         warn!(
             "Failed to notify blocking stratisd threads to shut down: {}",
             e
@@ -117,7 +117,7 @@ pub fn run(sim: bool) -> StratisResult<()> {
                 info!("Caught SIGINT; exiting...");
             }
         }
-        if let Err(e) = trigger.send(true) {
+        if let Err(e) = trigger.send(()) {
             warn!("Failed to notify blocking stratisd threads to shut down: {}", e);
         }
         Ok(())

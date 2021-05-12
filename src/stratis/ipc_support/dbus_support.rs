@@ -25,7 +25,7 @@ use crate::{
 pub async fn setup(
     engine: LockableEngine,
     receiver: UnboundedReceiver<UdevEngineEvent>,
-    trigger: Sender<bool>,
+    trigger: Sender<()>,
 ) -> StratisResult<()> {
     let (mut conn, mut udev, mut tree) = spawn_blocking(move || {
         create_dbus_handlers(engine.clone(), receiver, trigger)

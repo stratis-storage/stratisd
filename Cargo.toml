@@ -28,7 +28,6 @@ required-features = ["min"]
 name = "stratis-utils"
 
 [dependencies]
-base64 = "0.13.0"
 byteorder = "1.2.3"
 chrono = "0.4.1"
 clap = "2.23.0"
@@ -47,14 +46,11 @@ log = "0.4.8"
 nix = "0.20.0"
 rand = "0.8.0"
 regex = "1.4.0"
-semver = "0.11.0"
 serde = "1.0.119"
 serde_derive = "1.0.119"
 serde_json = "1.0.50"
 sha-1 = "0.9.0"
 tempfile = "3.0.2"
-termios = "0.3.0"
-timerfd = "1.0.0"
 
 [dependencies.libcryptsetup-rs]
 version = "0.4.3"

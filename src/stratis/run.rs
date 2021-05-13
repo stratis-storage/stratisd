@@ -9,10 +9,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::{
     runtime::Builder,
     select, signal,
-    sync::{
-        broadcast::{channel, Sender},
-        mpsc::unbounded_channel,
-    },
+    sync::{broadcast::channel, mpsc::unbounded_channel},
     task,
 };
 
@@ -26,15 +23,9 @@ use crate::{
 
 // Waits for SIGINT. If received, sends true to all blocking calls in blocking
 // threads which will then terminate.
-async fn signal_thread(trigger: Sender<()>) {
+async fn signal_thread() {
     if let Err(e) = signal::ctrl_c().await {
         error!("Failure while listening for signals: {}", e);
-    }
-    if let Err(e) = trigger.send(()) {
-        warn!(
-            "Failed to notify blocking stratisd threads to shut down: {}",
-            e
-        );
     }
 }
 
@@ -80,12 +71,12 @@ pub fn run(sim: bool) -> StratisResult<()> {
             }
         };
 
-        let (trigger, should_exit) = channel(2);
+        let (trigger, should_exit) = channel(1);
         let (sender, receiver) = unbounded_channel::<UdevEngineEvent>();
 
         let join_udev = task::spawn_blocking(move || udev_thread(sender, should_exit));
         let join_ipc = task::spawn(setup(engine.clone(), receiver, trigger.clone()));
-        let join_signal = task::spawn(signal_thread(trigger.clone()));
+        let join_signal = task::spawn(signal_thread());
         let join_dm = task::spawn(dm_event_thread(if sim {
             None
         } else {
@@ -98,7 +89,7 @@ pub fn run(sim: bool) -> StratisResult<()> {
                     error!("The udev thread exited with an error: {}; shutting down stratisd...", e);
                     return Err(e);
                 } else {
-                    error!("The udev thread exited; shutting down stratisd...");
+                    info!("The udev thread exited; shutting down stratisd...");
                 }
             }
             res = join_ipc => {
@@ -106,7 +97,7 @@ pub fn run(sim: bool) -> StratisResult<()> {
                     error!("The IPC thread exited with an error: {}; shutting down stratisd...", e);
                     return Err(e);
                 } else {
-                    error!("The IPC thread exited; shutting down stratisd...");
+                    info!("The IPC thread exited; shutting down stratisd...");
                 }
             }
             Ok(Err(e)) = join_dm => {

@@ -32,7 +32,10 @@ pub async fn dm_event_thread(engine: Option<LockableEngine>) -> StratisResult<()
                 lock.evented()?;
             }
         }
-        None => Ok(()),
+        None => {
+            info!("devicemapper event monitoring disabled in sim engine");
+            Ok(())
+        }
     }
 }
 

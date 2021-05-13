@@ -8,7 +8,7 @@ use dbus_tree::Factory;
 use crate::{
     dbus_api::{
         consts,
-        types::{DbusContext, InterfacesAdded, OPContext},
+        types::{DbusContext, InterfacesAddedThreadSafe, OPContext},
         util::make_object_path,
     },
     engine::{BlockDev, BlockDevTier, DevUuid, StratisUuid},
@@ -98,18 +98,18 @@ pub fn create_dbus_blockdev<'a>(
         );
 
     let path = object_path.get_name().to_owned();
-    let interfaces = get_initial_properties(parent, uuid, tier, blockdev);
+    let interfaces = get_blockdev_properties(parent, uuid, tier, blockdev);
     dbus_context.push_add(object_path, interfaces);
     path
 }
 
 /// Get the initial state of all properties associated with a blockdev object.
-pub fn get_initial_properties(
+pub fn get_blockdev_properties(
     parent: dbus::Path<'static>,
     dev_uuid: DevUuid,
     tier: BlockDevTier,
     dev: &dyn BlockDev,
-) -> InterfacesAdded {
+) -> InterfacesAddedThreadSafe {
     initial_properties! {
         consts::BLOCKDEV_INTERFACE_NAME => {
             consts::BLOCKDEV_DEVNODE_PROP => shared::blockdev_devnode_prop(dev),

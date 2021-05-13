@@ -229,17 +229,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dbus-tokio"
-version = "0.7.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8b4083ad3ad374032aaacf18c4cce2c65c3ba5d4e576a037339a8b6cd0b4509c"
-dependencies = [
- "dbus",
- "libc",
- "tokio",
-]
-
-[[package]]
 name = "dbus-tree"
 version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -586,7 +575,6 @@ dependencies = [
  "crc",
  "data-encoding",
  "dbus",
- "dbus-tokio",
  "dbus-tree",
  "devicemapper",
  "either",

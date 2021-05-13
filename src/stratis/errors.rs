@@ -30,6 +30,7 @@ pub enum StratisError {
     Crypt(libcryptsetup_rs::LibcryptErr),
     Recv(sync::mpsc::RecvError),
     Null(std::ffi::NulError),
+    Join(tokio::task::JoinError),
 
     #[cfg(feature = "dbus_enabled")]
     Dbus(dbus::Error),
@@ -51,6 +52,7 @@ impl fmt::Display for StratisError {
             StratisError::Crypt(ref err) => write!(f, "Cryptsetup error: {}", err),
             StratisError::Recv(ref err) => write!(f, "Synchronization channel error: {}", err),
             StratisError::Null(ref err) => write!(f, "C string conversion error: {}", err),
+            StratisError::Join(ref err) => write!(f, "Failed to join thread: {}", err),
 
             #[cfg(feature = "dbus_enabled")]
             StratisError::Dbus(ref err) => {
@@ -75,11 +77,18 @@ impl Error for StratisError {
             StratisError::Crypt(ref err) => Some(err),
             StratisError::Recv(ref err) => Some(err),
             StratisError::Null(ref err) => Some(err),
+            StratisError::Join(ref err) => Some(err),
 
             #[cfg(feature = "dbus_enabled")]
             StratisError::Dbus(ref err) => Some(err),
             StratisError::Udev(ref err) => Some(err),
         }
+    }
+}
+
+impl From<tokio::task::JoinError> for StratisError {
+    fn from(err: tokio::task::JoinError) -> StratisError {
+        StratisError::Join(err)
     }
 }
 

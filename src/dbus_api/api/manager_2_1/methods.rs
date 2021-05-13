@@ -34,7 +34,9 @@ pub fn unset_key(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let default_return = false;
     let return_message = message.method_return();
 
-    let msg = match log_action!(mutex_lock!(dbus_context.engine)
+    let msg = match log_action!(dbus_context
+        .engine
+        .blocking_lock()
         .get_key_handler_mut()
         .unset(&match KeyDescription::try_from(key_desc_str) {
             Ok(kd) => kd,

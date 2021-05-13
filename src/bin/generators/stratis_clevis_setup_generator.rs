@@ -4,7 +4,7 @@
 
 use std::{error::Error, path::PathBuf};
 
-use log::info;
+use log::{error, warn};
 use uuid::Uuid;
 
 use super::lib;
@@ -31,9 +31,7 @@ RemainAfterExit=yes
     )
 }
 
-pub fn generator(early_dir: String) -> Result<(), Box<dyn Error>> {
-    lib::setup_logger()?;
-
+fn generator_with_err(early_dir: String) -> Result<(), Box<dyn Error>> {
     let kernel_cmdline = lib::get_kernel_cmdline()?;
 
     let pool_uuid_key = "stratis.rootfs.pool_uuid";
@@ -44,7 +42,7 @@ pub fn generator(early_dir: String) -> Result<(), Box<dyn Error>> {
     {
         Some(uuid) => uuid,
         None => {
-            info!(
+            warn!(
                 "{} kernel command line parameter not found; disabling generator",
                 pool_uuid_key
             );
@@ -57,5 +55,16 @@ pub fn generator(early_dir: String) -> Result<(), Box<dyn Error>> {
     let mut path = PathBuf::from(early_dir);
     path.push("stratis-clevis-setup.service");
     lib::write_unit_file(&path, file_contents)?;
+
     Ok(())
+}
+
+pub fn generator(early_dir: String) -> Result<(), Box<dyn Error>> {
+    lib::setup_logger()?;
+
+    let res = generator_with_err(early_dir);
+    if let Err(ref e) = res {
+        error!("systemd generator failed with error: {}", e);
+    }
+    res
 }

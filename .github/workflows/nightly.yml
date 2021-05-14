@@ -100,5 +100,7 @@ jobs:
           make
           python-unversioned-command
           ${{ matrix.dependencies }}
+      - name: Display Python version
+        run: python --version
       - name: Run test
         run: ${{ matrix.task }}

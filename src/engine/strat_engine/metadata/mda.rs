@@ -270,12 +270,10 @@ impl MDARegions {
     /// attribute must be no greater than the region allocated for it.
     pub fn invariant(&self) {
         let space_for_data = self.region_size.data_size().bytes();
-        for mda in self.mda_headers.iter() {
-            if let Some(mda) = mda {
-                let data_len = mda.used.bytes();
-                assert_ne!(data_len, Bytes(0));
-                assert!(data_len <= space_for_data);
-            }
+        for mda in self.mda_headers.iter().flatten() {
+            let data_len = mda.used.bytes();
+            assert_ne!(data_len, Bytes(0));
+            assert!(data_len <= space_for_data);
         }
     }
 }

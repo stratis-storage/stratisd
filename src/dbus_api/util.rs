@@ -2,14 +2,16 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
-use dbus::arg::{ArgType, Iter, IterAppend, RefArg, Variant};
-use dbus_tokio::connection::new_system_sync;
+use dbus::{
+    arg::{ArgType, Iter, IterAppend, RefArg, Variant},
+    blocking::SyncConnection,
+};
 use dbus_tree::{MTSync, MethodErr, PropInfo};
 use tokio::sync::{
+    broadcast::Sender,
     mpsc::{unbounded_channel, UnboundedReceiver},
-    Mutex, RwLock,
 };
 
 use devicemapper::DmError;
@@ -19,10 +21,10 @@ use crate::{
         api::get_base_tree,
         connection::{DbusConnectionHandler, DbusTreeHandler},
         consts,
-        types::{DbusContext, DbusErrorEnum, TData},
+        types::{DbusContext, DbusErrorEnum, InterfacesAdded, InterfacesAddedThreadSafe, TData},
         udev::DbusUdevHandler,
     },
-    engine::{Engine, UdevEngineEvent},
+    engine::{Lockable, LockableEngine, UdevEngineEvent},
     stratis::{ErrorEnum, StratisError},
 };
 
@@ -105,6 +107,7 @@ pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
         | StratisError::Udev(_)
         | StratisError::Crypt(_)
         | StratisError::Null(_)
+        | StratisError::Join(_)
         | StratisError::Recv(_) => DbusErrorEnum::ERROR,
     };
     let description = match *err {
@@ -167,21 +170,35 @@ pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTSync<TData>, TData>) -> Res
 /// Messages may be:
 /// * received by the DbusUdevHandler from the udev thread,
 /// * sent by the DbusContext to the DbusTreeHandler
-pub async fn create_dbus_handlers(
-    engine: Arc<Mutex<dyn Engine>>,
+pub fn create_dbus_handlers(
+    engine: LockableEngine,
     udev_receiver: UnboundedReceiver<UdevEngineEvent>,
+    trigger: Sender<()>,
 ) -> Result<(DbusConnectionHandler, DbusUdevHandler, DbusTreeHandler), dbus::Error> {
-    let (io, conn) = new_system_sync()?;
-    tokio::spawn(io);
+    let conn = Arc::new(SyncConnection::new_system()?);
     let (sender, receiver) = unbounded_channel();
     let (tree, object_path) = get_base_tree(DbusContext::new(engine, sender, Arc::clone(&conn)));
     let dbus_context = tree.get_data().clone();
-    conn.request_name(consts::STRATIS_BASE_SERVICE, false, true, true)
-        .await?;
+    conn.request_name(consts::STRATIS_BASE_SERVICE, false, true, true)?;
 
-    let tree = Arc::new(RwLock::new(tree));
-    let connection = DbusConnectionHandler::new(Arc::clone(&conn), Arc::clone(&tree));
+    let tree = Lockable::new_shared(tree);
+    let connection =
+        DbusConnectionHandler::new(Arc::clone(&conn), tree.clone(), trigger.subscribe());
     let udev = DbusUdevHandler::new(udev_receiver, object_path, dbus_context);
-    let tree = DbusTreeHandler::new(tree, receiver, conn);
+    let tree = DbusTreeHandler::new(tree, receiver, conn, trigger.subscribe());
     Ok((connection, udev, tree))
+}
+
+/// This method converts the thread safe representation of D-Bus property maps to a type
+/// that can be sent over the D-Bus.
+pub fn thread_safe_to_dbus_sendable(ia: InterfacesAddedThreadSafe) -> InterfacesAdded {
+    ia.into_iter()
+        .map(|(k, map)| {
+            let new_map: HashMap<String, Variant<Box<dyn RefArg>>> = map
+                .into_iter()
+                .map(|(subk, var)| (subk, Variant(var.0 as Box<dyn RefArg>)))
+                .collect();
+            (k, new_map)
+        })
+        .collect()
 }

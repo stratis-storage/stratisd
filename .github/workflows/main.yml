@@ -6,14 +6,14 @@ on:
   push:
     branches:
       - master
-      - develop-2.3.0
+      - develop-2.4.0
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'
   pull_request:
     branches:
       - master
-      - develop-2.3.0
+      - develop-2.4.0
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'
@@ -260,103 +260,56 @@ jobs:
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
-  # ALLOWED FAILURES
-  allowed_failures:
-    continue-on-error: true
+  python-checks:
     strategy:
       matrix:
         include:
-          # Allowed because a failure may occur after a new Rust stable
-          # version is released.
-          - task: make -f Makefile clippy
-            toolchain: stable
-            components: clippy
+          # PYTHON CHECKS ON CURRENT FEDORA AND PYTHON TOOLS VERSION
+          - dependencies: >
+              pylint
+              python3-dbus-client-gen
+              python3-dbus-python-client-gen
+              python3-psutil
+              python3-pyudev
+              python3-requests
+              python3-semantic_version
+              python3-pygithub
+            image: fedora:32
+            task: >
+              (cd code_maintenance; make -f Makefile lint) &&
+              (cd developer_tools; make -f Makefile lint) &&
+              (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
+          - dependencies: black python3-isort
+            image: fedora:32
+            task: >
+              (cd code_maintenance; make -f Makefile fmt-travis) &&
+              (cd developer_tools; make -f Makefile fmt-travis) &&
+              (cd tests/client-dbus; make -f Makefile fmt-travis)
+          - dependencies: yamllint
+            image: fedora:32
+            task: make -f Makefile yamllint
+          # MANDATORY PYTHON CHECKS ON LOWEST SUPPORTED INTERPRETER
+          - dependencies: >
+              pylint
+              python3-dbus-client-gen
+              python3-dbus-python-client-gen
+              python3-psutil
+              python3-pyudev
+            image: fedora:29
+            task: >
+              (cd developer_tools; make -f Makefile lint) &&
+              (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
     runs-on: ubuntu-18.04
-    container:
-      image: fedora:32
-      options: --privileged -v /dev:/dev
+    container: ${{ matrix.image }}
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies
         run: >
           dnf install -y
-          clang
-          curl
-          cryptsetup-devel
-          dbus-devel
-          libblkid-devel
           make
-          systemd-devel
-      - uses: actions-rs/toolchain@v1
-        with:
-          components: ${{ matrix.components }}
-          toolchain: ${{ matrix.toolchain }}
-          override: true
-      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
-        run: ${{ matrix.task }}
-
-  python-checks:
-    strategy:
-      matrix:
-        include:
-          # MANDATORY PYTHON CHECKS ON RECOMMENDED DEVELOPMENT INTERPRETER
-          - python-version: 3.8.6
-            dependencies: >
-              pylint==2.4.4
-              dbus-client-gen==0.4
-              dbus-python-client-gen==0.7
-              psutil==5.6.7
-              pyudev==0.22.0
-              requests==2.22.0
-              semantic_version==2.8.4
-              PyGithub==1.45
-            task: >
-              (cd code_maintenance; make -f Makefile lint) &&
-              (cd developer_tools; make -f Makefile lint) &&
-              (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
-          - python-version: 3.8.6
-            dependencies: black==20.8b1 isort==4.3.21
-            task: >
-              (cd code_maintenance; make -f Makefile fmt-travis) &&
-              (cd developer_tools; make -f Makefile fmt-travis) &&
-              (cd tests/client-dbus; make -f Makefile fmt-travis)
-          # MANDATORY PYTHON CHECKS ON LOWEST SUPPORTED INTERPRETER
-          - python-version: 3.6.8
-            dependencies: >
-              pylint==2.4.4
-              dbus-client-gen==0.4
-              dbus-python-client-gen==0.7
-              psutil==5.4.3
-              pyudev==0.21.0
-            task: >
-              (cd developer_tools; make -f Makefile lint) &&
-              (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
-    runs-on: ubuntu-18.04
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install dependencies
-        run: |
-          sudo apt-get -q update
-          sudo apt-get -y install libdbus-1-dev libudev-dev libdbus-glib-1-dev
-          pip3 install ${{ matrix.dependencies }}
+          python-unversioned-command
+          ${{ matrix.dependencies }}
+      - name: Display Python version
+        run: python --version
       - name: Run test
         run: ${{ matrix.task }}
-
-  # VERIFICATION OF TEST INFRASTRUCTURE
-  yamllint:
-    env:
-      TASK: yamllint
-      PYTHON: 3.8.6
-    runs-on: ubuntu-18.04
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-        with:
-          python-version: ${{ env.PYTHON }}
-      - name: Install dependencies
-        run: pip3 install yamllint==1.26.0
-      - name: Run yamllint
-        run: make -f Makefile $TASK

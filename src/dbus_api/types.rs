@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
+    any::type_name,
     collections::HashMap,
     fmt::{self, Debug},
     sync::{
@@ -13,16 +14,28 @@ use std::{
 
 use dbus::{
     arg::{RefArg, Variant},
-    nonblock::SyncConnection,
+    blocking::SyncConnection,
     Path,
 };
-use dbus_tree::{DataType, MTSync, ObjectPath};
-use tokio::sync::{mpsc::UnboundedSender as TokioSender, Mutex};
+use dbus_tree::{DataType, MTSync, ObjectPath, Tree};
+use tokio::sync::{mpsc::UnboundedSender as TokioSender, RwLock};
 
-use crate::engine::{Engine, StratisUuid};
+use crate::engine::{Lockable, LockableEngine, StratisUuid};
 
-/// Type for interfaces parameter for `ObjectManagerInterfacesAdded`.
-pub type InterfacesAdded = HashMap<String, HashMap<String, Variant<Box<dyn RefArg + Send + Sync>>>>;
+/// Type for lockable D-Bus tree object.
+pub type LockableTree = Lockable<Arc<RwLock<Tree<MTSync<TData>, TData>>>>;
+
+/// Type for return value of `GetManagedObjects`.
+pub type GetManagedObjects =
+    HashMap<dbus::Path<'static>, HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>>;
+
+/// Type for interfaces parameter for `ObjectManagerInterfacesAdded`. This type cannot be sent
+/// over the D-Bus but it is safe to send across threads.
+pub type InterfacesAddedThreadSafe =
+    HashMap<String, HashMap<String, Variant<Box<dyn RefArg + Send + Sync>>>>;
+/// Type for interfaces parameter for `ObjectManagerInterfacesAdded` that can be written to the
+/// D-Bus.
+pub type InterfacesAdded = HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>;
 /// Type for interfaces parameter for `ObjectManagerInterfacesRemoved`.
 pub type InterfacesRemoved = Vec<String>;
 
@@ -53,7 +66,7 @@ impl DbusErrorEnum {
 
 #[derive(Debug)]
 pub enum DbusAction {
-    Add(ObjectPath<MTSync<TData>, TData>, InterfacesAdded),
+    Add(ObjectPath<MTSync<TData>, TData>, InterfacesAddedThreadSafe),
     Remove(Path<'static>, InterfacesRemoved),
     FsNameChange(Path<'static>, String),
     PoolNameChange(Path<'static>, String),
@@ -77,25 +90,24 @@ impl OPContext {
 #[derive(Clone)]
 pub struct DbusContext {
     next_index: Arc<AtomicU64>,
-    pub(super) engine: Arc<Mutex<dyn Engine>>,
+    pub(super) engine: LockableEngine,
     pub(super) sender: TokioSender<DbusAction>,
     connection: Arc<SyncConnection>,
 }
 
 impl Debug for DbusContext {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "DbusContext {{ next_index: {:?}, engine: Arc<Mutex<dyn Engine>>, \
-            sender: {:?} }}",
-            self.next_index, self.sender,
-        )
+        f.debug_struct("DbusContext")
+            .field("next_index", &self.next_index)
+            .field("engine", &type_name::<LockableEngine>())
+            .field("sender", &self.sender)
+            .finish()
     }
 }
 
 impl DbusContext {
     pub fn new(
-        engine: Arc<Mutex<dyn Engine>>,
+        engine: LockableEngine,
         sender: TokioSender<DbusAction>,
         connection: Arc<SyncConnection>,
     ) -> DbusContext {
@@ -118,7 +130,7 @@ impl DbusContext {
     pub fn push_add(
         &self,
         object_path: ObjectPath<MTSync<TData>, TData>,
-        interfaces: InterfacesAdded,
+        interfaces: InterfacesAddedThreadSafe,
     ) {
         let object_path_name = object_path.get_name().clone();
         if let Err(e) = self.sender.send(DbusAction::Add(object_path, interfaces)) {

@@ -40,7 +40,7 @@ pub fn set_user_info(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let mut mutex_lock = mutex_lock!(dbus_context.engine);
+    let mut mutex_lock = dbus_context.engine.blocking_lock();
     let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
     let blockdev_uuid = typed_uuid!(blockdev_data.uuid; Dev; default_return; return_message);

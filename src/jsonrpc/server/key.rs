@@ -2,18 +2,16 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{os::unix::io::RawFd, sync::Arc};
-
-use tokio::sync::Mutex;
+use std::os::unix::io::RawFd;
 
 use crate::{
-    engine::{Engine, KeyDescription, MappingCreateAction, MappingDeleteAction, PoolUuid},
+    engine::{KeyDescription, LockableEngine, MappingCreateAction, MappingDeleteAction, PoolUuid},
     stratis::StratisResult,
 };
 
 // stratis-min key set
 pub async fn key_set(
-    engine: Arc<Mutex<dyn Engine>>,
+    engine: LockableEngine,
     key_desc: &KeyDescription,
     key_fd: RawFd,
 ) -> StratisResult<Option<bool>> {
@@ -32,10 +30,7 @@ pub async fn key_set(
 }
 
 // stratis-min key unset
-pub async fn key_unset(
-    engine: Arc<Mutex<dyn Engine>>,
-    key_desc: &KeyDescription,
-) -> StratisResult<bool> {
+pub async fn key_unset(engine: LockableEngine, key_desc: &KeyDescription) -> StratisResult<bool> {
     Ok(
         match engine.lock().await.get_key_handler_mut().unset(key_desc)? {
             MappingDeleteAction::Deleted(_) => true,
@@ -45,7 +40,7 @@ pub async fn key_unset(
 }
 
 // stratis-min key [list]
-pub async fn key_list(engine: Arc<Mutex<dyn Engine>>) -> StratisResult<Vec<KeyDescription>> {
+pub async fn key_list(engine: LockableEngine) -> StratisResult<Vec<KeyDescription>> {
     Ok(engine
         .lock()
         .await
@@ -55,10 +50,7 @@ pub async fn key_list(engine: Arc<Mutex<dyn Engine>>) -> StratisResult<Vec<KeyDe
         .collect())
 }
 
-pub async fn key_get_desc(
-    engine: Arc<Mutex<dyn Engine>>,
-    pool_uuid: PoolUuid,
-) -> Option<KeyDescription> {
+pub async fn key_get_desc(engine: LockableEngine, pool_uuid: PoolUuid) -> Option<KeyDescription> {
     let locked_pools = engine.lock().await.locked_pools();
     locked_pools
         .get(&pool_uuid)

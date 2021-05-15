@@ -43,13 +43,17 @@ CLIPPY_CARGO = -D clippy::cargo_common_metadata \
 
 # Explicitly allow these lints because they don't seem helpful
 # doc_markdown: we would rather have useful than well-formatted docs
+# from_over_into: preferring from over into is very awkward with JSON report
 # map_err_ignore: we generally drop the errors for a reason
 # option_if_let_else: causing problems with if-else chains
 # similar_names: judges "yes" and "res" to be too similar
+# upper_case_acronyms: We use upper case for initialisms, e.g., BDA
 CLIPPY_PEDANTIC_USELESS = -A clippy::doc_markdown \
+                          -A clippy::from_over_into \
                           -A clippy::map_err_ignore \
                           -A clippy::option_if_let_else \
-                          -A clippy::similar_names
+                          -A clippy::similar_names \
+                          -A clippy::upper_case_acronyms \
 
 # Clippy allow/deny adjudications for pedantic lints
 #
@@ -75,7 +79,6 @@ CLIPPY_PEDANTIC = -D clippy::await_holding_lock \
                   -A clippy::filter_map \
                   -A clippy::filter_map_next \
                   -D clippy::fn_params_excessive_bools \
-                  -A clippy::from_over_into \
                   -A clippy::if_not_else \
                   -D clippy::implicit_hasher \
                   -D clippy::implicit_saturating_sub \
@@ -126,8 +129,7 @@ CLIPPY_PEDANTIC = -D clippy::await_holding_lock \
                   -D clippy::unreadable_literal \
                   -D clippy::unsafe_derive_deserialize \
                   -A clippy::unseparated_literal_suffix \
-                  -A clippy::unused_self \
-                  -A clippy::upper_case_acronyms \
+                  -D clippy::unused_self \
                   -D clippy::used_underscore_binding \
                   -D clippy::used_underscore_binding \
                   -D clippy::verbose_bit_mask \

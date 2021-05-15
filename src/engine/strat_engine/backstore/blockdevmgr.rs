@@ -49,9 +49,9 @@ impl Segment {
     /// Create a new Segment with given attributes
     pub fn new(device: Device, start: Sectors, length: Sectors) -> Segment {
         Segment {
-            device,
             start,
             length,
+            device,
         }
     }
 }

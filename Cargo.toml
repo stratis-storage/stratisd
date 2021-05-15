@@ -1,6 +1,6 @@
 [package]
 name = "libstratis"
-version = "2.4.0"
+version = "2.4.1"
 authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.com>"]
 edition = "2018"
 build = "build.rs"
@@ -28,7 +28,6 @@ required-features = ["min"]
 name = "stratis-utils"
 
 [dependencies]
-base64 = "0.13.0"
 byteorder = "1.2.3"
 chrono = "0.4.1"
 clap = "2.23.0"
@@ -40,21 +39,18 @@ env_logger="0.8.0"
 futures = "0.3.5"
 itertools = "0.10.0"
 lazy_static = "1.2.0"
-libc = "0.2.87"
+libc = "0.2.94"
 libmount = "0.1.9"
 libudev = "0.2.0"
 log = "0.4.8"
 nix = "0.20.0"
 rand = "0.8.0"
 regex = "1.4.0"
-semver = "0.11.0"
 serde = "1.0.119"
 serde_derive = "1.0.119"
 serde_json = "1.0.50"
 sha-1 = "0.9.0"
 tempfile = "3.0.2"
-termios = "0.3.0"
-timerfd = "1.0.0"
 
 [dependencies.libcryptsetup-rs]
 version = "0.4.3"
@@ -71,10 +67,6 @@ optional = true
 
 [dependencies.dbus-tree]
 version = "0.9.0"
-optional = true
-
-[dependencies.dbus-tokio]
-version = "0.7.0"
 optional = true
 
 [dependencies.libdbus-sys]
@@ -104,7 +96,7 @@ proptest = "0.10.0"
 
 [features]
 default = ["dbus_enabled"]
-dbus_enabled = ["dbus", "dbus-tree", "dbus-tokio", "libdbus-sys"]
+dbus_enabled = ["dbus", "dbus-tree", "libdbus-sys"]
 extras = []
 min = ["rpassword"]
 systemd_compat = ["bindgen"]

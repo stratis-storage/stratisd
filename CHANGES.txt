@@ -1,5 +1,5 @@
-stratisd 2.4.1 (UNRELEASED)
-===========================
+stratisd 2.4.1
+==============
 Recommended Rust toolchain version: 1.51.0
 Lowest supported Rust toolchain version: 1.49
 
@@ -28,6 +28,7 @@ Lowest supported Python interpreter: 3.6.8
   https://github.com/stratis-storage/stratisd/pull/2583
   https://github.com/stratis-storage/stratisd/pull/2582
   https://github.com/stratis-storage/stratisd/pull/2581
+  https://github.com/stratis-storage/stratisd/pull/2577
   https://github.com/stratis-storage/stratisd/pull/2576
   https://github.com/stratis-storage/stratisd/pull/2575
   https://github.com/stratis-storage/stratisd/pull/2572

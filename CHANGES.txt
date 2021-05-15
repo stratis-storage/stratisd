@@ -1,3 +1,42 @@
+stratisd 2.4.1 (UNRELEASED)
+===========================
+Recommended Rust toolchain version: 1.51.0
+Lowest supported Rust toolchain version: 1.49
+
+Recommended development platform for Python development: Fedora 32
+Lowest supported Python interpreter: 3.6.8
+
+- Expose signals associated with r4 interfaces on the D-Bus:
+  https://github.com/stratis-storage/stratisd/pull/2580
+
+- Add additional logging to systemd generators:
+  https://github.com/stratis-storage/stratisd/pull/2592
+
+- Drop dependency on dbus-tokio in message handling thread:
+  https://github.com/stratis-storage/stratisd/pull/2591
+
+- Split crypt.rs file into several smaller files:
+  https://github.com/stratis-storage/stratisd/issues/2505
+  https://github.com/stratis-storage/stratisd/pull/2565
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/2594
+  https://github.com/stratis-storage/stratisd/pull/2593
+  https://github.com/stratis-storage/stratisd/pull/2588
+  https://github.com/stratis-storage/stratisd/pull/2587
+  https://github.com/stratis-storage/stratisd/pull/2584
+  https://github.com/stratis-storage/stratisd/pull/2583
+  https://github.com/stratis-storage/stratisd/pull/2582
+  https://github.com/stratis-storage/stratisd/pull/2581
+  https://github.com/stratis-storage/stratisd/pull/2576
+  https://github.com/stratis-storage/stratisd/pull/2575
+  https://github.com/stratis-storage/stratisd/pull/2572
+  https://github.com/stratis-storage/stratisd/pull/2563
+  https://github.com/stratis-storage/stratisd/pull/2562
+  https://github.com/stratis-storage/stratisd/pull/2561
+  https://github.com/stratis-storage/stratisd/pull/2560
+
+
 stratisd 2.4.0
 ==============
 Recommended Rust toolchain version: 1.51.0

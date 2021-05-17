@@ -28,19 +28,19 @@ jobs:
         include:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
           - task: make -f Makefile fmt-travis
-            toolchain: 1.51.0
+            toolchain: 1.52.1
             components: rustfmt
             image: ubuntu:groovy
           - task: make -f Makefile clippy
-            toolchain: 1.51.0
+            toolchain: 1.52.1
             components: clippy
             image: ubuntu:groovy
           - task: make -f Makefile fmt-travis
-            toolchain: 1.51.0
+            toolchain: 1.52.1
             components: rustfmt
             image: fedora:32
           - task: make -f Makefile clippy
-            toolchain: 1.51.0
+            toolchain: 1.52.1
             components: clippy
             image: fedora:32
           # MANDATORY TESTING ON STABLE

@@ -46,10 +46,18 @@ mailing list, if preferred.
 
 ### Setting up for development
 
-#### Development Compiler
-The version of the compiler recommended for development is 1.52.1. Other
-versions of the compiler may disagree with the CI tasks on some points,
-so should be avoided.
+#### Development Toolchain
+stratisd can be built using a range of Rust toolchain versions. The
+recommended development toolchain usually tracks the Rust stable version,
+although it may lag it slightly. stratisd is guaranteed to be able to be
+built on its lowest supported toolchain, which may lag the recommended
+development toolchain by a few minor versions.
+
+Contributors should use the recommended development toolchain if possible, since
+the CI makes use of the Rust linter and formatter for that version. The
+recommended development toolchain version can be determined by inspecting the
+CI configuration files for the project.
+
 
 #### Building
 Stratisd requires Rust and Cargo to build. These may be available via

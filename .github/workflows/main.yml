@@ -313,3 +313,55 @@ jobs:
         run: python --version
       - name: Run test
         run: ${{ matrix.task }}
+
+  stratis-cli-checks:
+    runs-on: ubuntu-18.04
+    container: fedora:32
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies
+        run: >
+          dnf install -y
+          asciidoc
+          clang
+          cryptsetup-devel
+          dbus-daemon
+          dbus-tools
+          dbus-devel
+          libblkid-devel
+          git
+          make
+          python3-coverage
+          python3-dbus-client-gen
+          python3-dbus-python-client-gen
+          python3-justbytes
+          python3-dateutil
+          python3-psutil
+          python3-semantic_version
+          systemd-devel
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: cargo
+          toolchain: 1.52.1
+          override: true
+      - name: Build stratisd
+        run: PROFILEDIR=debug make -f Makefile install
+      - name: Check out stratis-cli
+        run: git clone https://github.com/stratis-storage/stratis-cli.git
+      - name: Set up for D-Bus
+        run: |
+          mkdir -p /var/lib/dbus
+          dbus-uuidgen > /var/lib/dbus/machine-id
+          mkdir -p /var/run/dbus
+      - name: Start D-Bus
+        run: >
+          dbus-daemon
+          --config-file=/usr/share/dbus-1/system.conf
+          --print-address
+      - name: Run test
+        run: >
+          RUST_LOG=libstratis=debug,stratisd=debug
+          STRATISD=/usr/libexec/stratisd
+          PYTHONPATH=./src
+          make dbus-tests
+        working-directory: ./stratis-cli

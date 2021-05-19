@@ -21,6 +21,7 @@ to the versions of dependencies available on Fedora Rawhide.
 
 # isort: STDLIB
 import argparse
+import json
 import sys
 
 # isort: LOCAL
@@ -50,22 +51,21 @@ def main():
     # Build koji dict
     koji_repo_dict = build_koji_repo_dict(frozenset(explicit_dependencies.keys()))
 
-    exit_code = 0x0
-
+    result = {"missing": [], "high": [], "low": []}
     for crate, version in explicit_dependencies.items():
         koji_version = koji_repo_dict.get(crate)
         if koji_version is None:
-            print("No Fedora package for crate %s found" % crate, file=sys.stdout)
-            exit_code |= 0x4
+            print("No Fedora package for crate %s found" % crate, file=sys.stderr)
+            result["missing"].append(crate)
             continue
 
         if koji_version < version:
             print(
                 "Version %s of crate %s higher than maximum %s that is available on Fedora"
                 % (version, crate, koji_version),
-                file=sys.stdout,
+                file=sys.stderr,
             )
-            exit_code |= 0x8
+            result["high"].append(crate)
             continue
 
         exclusive_upper_bound = (
@@ -76,11 +76,12 @@ def main():
             print(
                 "Version %s of crate %s is available in Fedora. Requires update in Cargo.toml"
                 % (koji_version, crate),
-                file=sys.stdout,
+                file=sys.stderr,
             )
-            exit_code |= 0x10
+            result["low"].append(crate)
 
-    return exit_code
+    print(json.dumps(result), file=sys.stdout)
+    return 1 if any(x != [] for x in result.values()) else 0
 
 
 if __name__ == "__main__":

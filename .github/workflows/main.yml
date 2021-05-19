@@ -62,6 +62,7 @@ jobs:
         run: >
           RUST_LOG=libstratis=debug,stratisd=debug
           STRATISD=/usr/libexec/stratisd
+          STRATIS_PREDICT_USAGE=/usr/bin/stratis-predict-usage
           PYTHONPATH=./src
           make tests
         working-directory: ./tests/client-dbus

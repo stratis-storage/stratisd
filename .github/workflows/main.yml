@@ -342,7 +342,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           components: cargo
-          toolchain: 1.52.1
+          toolchain: 1.52.1  # CURRENT DEVELOPMENT
           override: true
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile install
@@ -365,3 +365,60 @@ jobs:
           PYTHONPATH=./src
           make dbus-tests
         working-directory: ./stratis-cli
+
+  # PYTHON-BASED TESTS WITH UDEV
+  python-based-tests:
+    runs-on: ubuntu-18.04
+    container:
+      image: fedora:32
+      options: --privileged -v /dev:/dev
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies for Fedora
+        run: >
+          dnf install -y
+          asciidoc
+          clang
+          cryptsetup-devel
+          curl
+          dbus-daemon
+          dbus-devel
+          dbus-tools
+          device-mapper-persistent-data
+          libblkid-devel
+          make
+          python3-dbus
+          python3-dbus-client-gen
+          python3-dbus-python-client-gen
+          python3-psutil
+          python3-pyudev
+          systemd-devel
+          systemd-udev
+          xfsprogs
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: cargo
+          toolchain: 1.52.1  # CURRENT DEVELOPMENT
+          override: true
+      - name: Install all necessary Stratis files
+        run: PROFILEDIR=debug make -f Makefile install
+      - name: Start udev
+        run: /usr/lib/systemd/systemd-udevd &
+      - name: Set up for D-Bus
+        run: |
+          mkdir -p /var/lib/dbus
+          dbus-uuidgen > /var/lib/dbus/machine-id
+          mkdir -p /var/run/dbus
+      - name: Start D-Bus
+        run: >
+          dbus-daemon
+          --config-file=/usr/share/dbus-1/system.conf
+          --print-address
+      - name: Run tests
+        run: >
+          RUST_LOG=libstratis=debug,stratisd=debug
+          STRATISD=/usr/libexec/stratisd
+          STRATIS_PREDICT_USAGE=/usr/bin/stratis-predict-usage
+          PYTHONPATH=./src
+          make tests
+        working-directory: ./tests/client-dbus

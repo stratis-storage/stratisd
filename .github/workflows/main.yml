@@ -342,7 +342,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           components: cargo
-          toolchain: 1.52.1
+          toolchain: 1.52.1  # CURRENT DEVELOPMENT
           override: true
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile install

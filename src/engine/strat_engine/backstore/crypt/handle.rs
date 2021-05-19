@@ -4,6 +4,7 @@
 
 use std::{fmt::Debug, path::Path};
 
+use either::Either;
 use serde_json::Value;
 
 use devicemapper::Sectors;
@@ -203,6 +204,23 @@ impl CryptHandle {
         Ok(())
     }
 
+    pub fn rebind_keyring(&mut self, new_key_desc: &KeyDescription) -> StratisResult<()> {
+        let mut device = self.acquire_crypt_device()?;
+
+        let old_key_description = self.encryption_info
+            .key_description
+            .as_ref()
+            .ok_or_else(|| {
+                StratisError::Error("Cannot change key description because this device is not bound to a passphrase in the kernel keyring".to_string())
+            })?;
+        add_keyring_keyslot(
+            &mut device,
+            new_key_desc,
+            Some(Either::Right(old_key_description)),
+        )?;
+        Ok(())
+    }
+
     /// Add a keyring binding to the underlying LUKS2 volume.
     pub fn bind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<()> {
         let mut device = self.acquire_crypt_device()?;
@@ -215,7 +233,7 @@ impl CryptHandle {
             )
         })?;
 
-        add_keyring_keyslot(&mut device, key_desc, Some(key))?;
+        add_keyring_keyslot(&mut device, key_desc, Some(Either::Left(key)))?;
 
         self.metadata_handle.encryption_info.key_description = Some(key_desc.clone());
         Ok(())

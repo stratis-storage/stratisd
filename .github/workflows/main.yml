@@ -365,3 +365,47 @@ jobs:
           PYTHONPATH=./src
           make dbus-tests
         working-directory: ./stratis-cli
+
+  # PYTHON-BASED TESTS WITH UDEV
+  python-based-tests:
+    runs-on: ubuntu-18.04
+    container:
+      image: fedora:32
+      options: --privileged -v /dev:/dev
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies for Fedora
+        run: >
+          dnf install -y
+          asciidoc
+          clang
+          cryptsetup-devel
+          curl
+          device-mapper-persistent-data
+          dbus-devel
+          libblkid-devel
+          make
+          python3-dbus
+          python3-dbus-client-gen
+          python3-dbus-python-client-gen
+          python3-psutil
+          python3-pyudev
+          systemd-devel
+          systemd-udev
+          xfsprogs
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: cargo
+          toolchain: 1.52.1
+          override: true
+      - name: Install all necessary Stratis files
+        run: PROFILEDIR=debug make -f Makefile install
+      - name: Start udev
+        run: /usr/lib/systemd/systemd-udevd &
+      - name: Run tests
+        run: >
+          RUST_LOG=libstratis=debug,stratisd=debug
+          STRATISD=/usr/libexec/stratisd
+          PYTHONPATH=./src
+          make tests
+        working-directory: ./tests/client-dbus

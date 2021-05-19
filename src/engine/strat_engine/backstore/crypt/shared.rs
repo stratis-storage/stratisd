@@ -118,35 +118,52 @@ pub fn acquire_crypt_device(physical_path: &Path) -> StratisResult<CryptDevice> 
     })
 }
 
-// Precondition: if clevis_pass.is_none(), device must have the volume key stored
-// in memory (this is automatically done when formatting a LUKS2 device).
-pub fn add_keyring_keyslot(
-    device: &mut CryptDevice,
-    key_description: &KeyDescription,
-    clevis_pass: Option<SizedKeyMemory>,
-) -> StratisResult<()> {
+/// Get the passphrase associated with a given key desription.
+fn key_desc_to_passphrase(key_description: &KeyDescription) -> StratisResult<SizedKeyMemory> {
     let key_option = log_on_failure!(
         read_key(key_description),
         "Failed to read key with key description {} from keyring",
         key_description.as_application_str()
     );
-    let key = if let Some(key) = key_option {
-        key
+    if let Some(key) = key_option {
+        Ok(key)
     } else {
-        return Err(StratisError::Error(format!(
+        Err(StratisError::Error(format!(
             "Key with key description {} was not found",
             key_description.as_application_str(),
-        )));
-    };
+        )))
+    }
+}
 
-    let keyslot = match clevis_pass {
-        Some(ref pass) => {
+// Precondition: if clevis_pass.is_none(), device must have the volume key stored
+// in memory (this is automatically done when formatting a LUKS2 device).
+pub fn add_keyring_keyslot(
+    device: &mut CryptDevice,
+    key_description: &KeyDescription,
+    pass: Option<Either<SizedKeyMemory, &KeyDescription>>,
+) -> StratisResult<()> {
+    let key = key_desc_to_passphrase(key_description)?;
+    let keyslot = match pass {
+        Some(Either::Left(ref pass)) => {
             log_on_failure!(
                 device
                     .keyslot_handle()
-                    .add_by_passphrase(None, pass.as_ref(), key.as_ref(),),
+                    .add_by_passphrase(None, pass.as_ref(), key.as_ref()),
                 "Failed to initialize keyslot with existing Clevis key"
             )
+        }
+        Some(Either::Right(ref kd)) => {
+            let pass = key_desc_to_passphrase(kd)?;
+            log_on_failure!(
+                device.keyslot_handle().change_by_passphrase(
+                    None,
+                    None,
+                    pass.as_ref(),
+                    key.as_ref()
+                ),
+                "Failed to change passphrase for encrypted device"
+            ) as c_uint
+            // The above cast is a work around for bug in libcryptsetup-rs
         }
         None => {
             log_on_failure!(

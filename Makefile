@@ -312,7 +312,7 @@ clippy:
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${SYSTEMD_FEATURES} -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
 
 compare-fedora:
-	${PWD}/code_maintenance/compare_fedora_versions || [ $$? -lt 16 ]
+	${PWD}/code_maintenance/compare_fedora_versions
 
 set-lower-bounds:
 	${PWD}/code_maintenance/set_lower_bounds

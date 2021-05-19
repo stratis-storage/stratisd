@@ -18,7 +18,9 @@ pub use self::{
     handle::CryptHandle,
     initialize::CryptInitializer,
     metadata_handle::CryptMetadataHandle,
-    shared::{crypt_metadata_size, interpret_clevis_config},
+    shared::{
+        back_up_luks_header, crypt_metadata_size, interpret_clevis_config, restore_luks_header,
+    },
 };
 
 #[cfg(test)]

@@ -21,8 +21,8 @@ use crate::{
         },
         types::{
             BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo,
-            FilesystemUuid, Key, KeyDescription, Name, PoolUuid, Redundancy, RenameAction,
-            SetCreateAction, SetDeleteAction,
+            FilesystemUuid, Key, KeyDescription, Name, PoolUuid, Redundancy, RegenAction,
+            RenameAction, SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -405,6 +405,21 @@ impl Pool for StratPool {
         } else {
             Ok(DeleteAction::Identity)
         }
+    }
+
+    fn rebind_keyring(
+        &mut self,
+        new_key_desc: &KeyDescription,
+    ) -> StratisResult<RenameAction<Key>> {
+        match self.backstore.rebind_keyring(new_key_desc)? {
+            Some(true) => Ok(RenameAction::Renamed(Key)),
+            Some(false) => Ok(RenameAction::Identity),
+            None => Ok(RenameAction::NoSource),
+        }
+    }
+
+    fn rebind_clevis(&mut self) -> StratisResult<RegenAction> {
+        self.backstore.rebind_clevis().map(|_| RegenAction)
     }
 
     fn create_filesystems<'a, 'b>(

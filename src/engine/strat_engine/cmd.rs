@@ -66,6 +66,7 @@ const CLEVIS_DECRYPT_TANG: &str = "clevis-decrypt-tang";
 const CLEVIS_DECRYPT_TPM2: &str = "clevis-decrypt-tpm2";
 const CLEVIS_ENCRYPT_TANG: &str = "clevis-encrypt-tang";
 const CLEVIS_ENCRYPT_TPM2: &str = "clevis-encrypt-tpm2";
+const CLEVIS_REGEN: &str = "clevis-luks-regen";
 const JOSE: &str = "jose";
 const JQ: &str = "jq";
 const CRYPTSETUP: &str = "cryptsetup";
@@ -91,6 +92,7 @@ const CLEVIS_EXEC_NAMES: &[&str] = &[
     CLEVIS_DECRYPT_TPM2,
     CLEVIS_ENCRYPT_TANG,
     CLEVIS_ENCRYPT_TPM2,
+    CLEVIS_REGEN,
     JOSE,
     JQ,
     CRYPTSETUP,
@@ -399,4 +401,18 @@ pub fn clevis_decrypt(jwe: &Value) -> StratisResult<SizedKeyMemory> {
         })?
         .read(mem.as_mut())?;
     Ok(SizedKeyMemory::new(mem, bytes_read))
+}
+
+/// Regenerate the bindings for a device using the clevis CLI.
+pub fn clevis_luks_regen(dev_path: &Path, keyslot: c_uint) -> StratisResult<()> {
+    execute_cmd(
+        Command::new(get_clevis_executable()?)
+            .arg("luks")
+            .arg("regen")
+            .arg("-d")
+            .arg(dev_path.display().to_string())
+            .arg("-s")
+            .arg(keyslot.to_string())
+            .arg("-q"),
+    )
 }

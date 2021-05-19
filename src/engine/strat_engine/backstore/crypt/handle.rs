@@ -4,6 +4,7 @@
 
 use std::{fmt::Debug, path::Path};
 
+use either::Either;
 use serde_json::Value;
 
 use devicemapper::Sectors;
@@ -21,7 +22,7 @@ use crate::{
                     setup_crypt_handle,
                 },
             },
-            cmd::{clevis_decrypt, clevis_luks_bind, clevis_luks_unbind},
+            cmd::{clevis_decrypt, clevis_luks_bind, clevis_luks_regen, clevis_luks_unbind},
             keys::MemoryPrivateFilesystem,
             metadata::StratisIdentifiers,
         },
@@ -203,6 +204,40 @@ impl CryptHandle {
         Ok(())
     }
 
+    /// Change the key description and passphrase that a device is bound to
+    ///
+    /// This method needs to re-read the cached Clevis information because
+    /// the config may change specifically in the case where a new thumbprint
+    /// is provided if Tang keys are rotated.
+    pub fn rebind_clevis(&mut self) -> StratisResult<()> {
+        fn regenerate_cached_clevis_info(dev_path: &Path) -> StratisResult<(String, Value)> {
+            clevis_info_from_metadata(&mut acquire_crypt_device(dev_path)?)?.ok_or_else(|| {
+                StratisError::Msg(format!(
+                    "Did not find Clevis metadata on device {}",
+                    dev_path.display()
+                ))
+            })
+        }
+
+        if self.encryption_info().clevis_info.is_none() {
+            return Err(StratisError::Msg(
+                "No Clevis binding found; cannot regenerate the Clevis binding if the device does not already have a Clevis binding".to_string(),
+            ));
+        }
+
+        let keyslot = self
+            .keyslots(CLEVIS_LUKS_TOKEN_ID)?
+            .and_then(|vec| vec.into_iter().next())
+            .ok_or_else(|| {
+                StratisError::Msg("Clevis binding found but no keyslot was associated".to_string())
+            })?;
+        clevis_luks_regen(self.luks2_device_path(), keyslot)?;
+
+        regenerate_cached_clevis_info(self.luks2_device_path()).map(|(pin, cfg)| {
+            self.metadata_handle.encryption_info.clevis_info = Some((pin, cfg));
+        })
+    }
+
     /// Add a keyring binding to the underlying LUKS2 volume.
     pub fn bind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<()> {
         let mut device = self.acquire_crypt_device()?;
@@ -215,7 +250,7 @@ impl CryptHandle {
             )
         })?;
 
-        add_keyring_keyslot(&mut device, key_desc, Some(key))?;
+        add_keyring_keyslot(&mut device, key_desc, Some(Either::Left(key)))?;
 
         self.metadata_handle.encryption_info.key_description = Some(key_desc.clone());
         Ok(())
@@ -247,6 +282,25 @@ impl CryptHandle {
 
         self.metadata_handle.encryption_info.key_description = None;
 
+        Ok(())
+    }
+
+    /// Change the key description and passphrase that a device is bound to
+    pub fn rebind_keyring(&mut self, new_key_desc: &KeyDescription) -> StratisResult<()> {
+        let mut device = self.acquire_crypt_device()?;
+
+        let old_key_description = self.encryption_info()
+            .key_description
+            .as_ref()
+            .ok_or_else(|| {
+                StratisError::Msg("Cannot change passphrase because this device is not bound to a passphrase in the kernel keyring".to_string())
+            })?;
+        add_keyring_keyslot(
+            &mut device,
+            new_key_desc,
+            Some(Either::Right(old_key_description)),
+        )?;
+        self.metadata_handle.encryption_info.key_description = Some(new_key_desc.clone());
         Ok(())
     }
 

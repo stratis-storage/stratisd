@@ -7,12 +7,14 @@
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
-    path::{Path, PathBuf},
+    fs,
+    path::Path,
 };
 
 use chrono::{DateTime, Duration, Utc};
 use rand::{seq::IteratorRandom, thread_rng};
 use serde_json::Value;
+use tempfile::TempDir;
 
 use devicemapper::{Bytes, Device, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine};
 
@@ -21,7 +23,10 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
-                crypt::{interpret_clevis_config, CryptActivationHandle},
+                crypt::{
+                    back_up_luks_header, interpret_clevis_config, restore_luks_header,
+                    CryptActivationHandle,
+                },
                 devices::{initialize_devices, process_and_verify_devices, wipe_blockdevs},
             },
             metadata::MDADataSize,
@@ -467,8 +472,7 @@ impl BlockDevMgr {
         operation_loop(
             self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
             |blockdev| blockdev.bind_clevis(pin, clevis_info),
-            |blockdev| blockdev,
-            |blockdev| blockdev.unbind_clevis(),
+            |_, blockdev| blockdev.unbind_clevis(),
         )?;
 
         Ok(true)
@@ -497,8 +501,7 @@ impl BlockDevMgr {
         operation_loop(
             self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
             |blockdev| blockdev.unbind_clevis(),
-            |blockdev| blockdev,
-            |blockdev| blockdev.bind_clevis(&pin, &clevis_info),
+            |_, blockdev| blockdev.bind_clevis(&pin, &clevis_info),
         )?;
 
         Ok(true)
@@ -545,8 +548,7 @@ impl BlockDevMgr {
         operation_loop(
             self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
             |blockdev| blockdev.bind_keyring(key_desc),
-            |blockdev| blockdev,
-            |blockdev| blockdev.unbind_keyring(),
+            |_, blockdev| blockdev.unbind_keyring(),
         )?;
 
         Ok(true)
@@ -576,39 +578,120 @@ impl BlockDevMgr {
         operation_loop(
             self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
             |blockdev| blockdev.unbind_keyring(),
-            |blockdev| blockdev,
-            |blockdev| blockdev.bind_keyring(&key_desc),
+            |_, blockdev| blockdev.bind_keyring(&key_desc),
         )?;
 
         Ok(true)
     }
+
+    /// Change the keyring passphrase associated with the block devices in
+    /// this pool.
+    ///
+    /// Returns:
+    /// * Ok(None) if the pool is not currently bound to a keyring passphrase.
+    /// * Ok(Some(true)) if the pool was successfully bound to the new key description.
+    /// * Ok(Some(false)) if the pool is already bound to this key description.
+    /// * Err(_) if an operation fails while changing the passphrase.
+    pub fn rebind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<Option<bool>> {
+        let encryption_info = self.encryption_info();
+        if !encryption_info.is_encrypted() {
+            return Err(StratisError::Msg(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ));
+        } else if encryption_info.key_description.as_ref() == Some(key_desc) {
+            return Ok(Some(false));
+        }
+
+        let old_key_desc = match encryption_info.key_description {
+            Some(ref kd) => kd.clone(),
+            None => return Ok(None),
+        };
+
+        operation_loop(
+            self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
+            |blockdev| blockdev.rebind_keyring(key_desc),
+            |_, blockdev| blockdev.rebind_keyring(&old_key_desc),
+        )?;
+
+        Ok(Some(true))
+    }
+
+    /// Regenerate the Clevis bindings with the block devices in this pool using
+    /// the same configuration.
+    ///
+    /// The method for this rollback caches the initial Clevis metadata and
+    /// reverts all of the devices if there is a failure.
+    ///
+    /// This method returns StratisResult<()> because the Clevis regen command
+    /// will always change the metadata when successful. The command is not idempotent
+    /// so this method will either fail to regenerate the bindings or it will
+    /// result in a metadata change.
+    pub fn rebind_clevis(&mut self) -> StratisResult<()> {
+        fn rebind_clevis_with_tmp_files(
+            bd: &mut BlockDevMgr,
+            tmp_dir: &TempDir,
+        ) -> StratisResult<()> {
+            let mut original_headers = Vec::new();
+            let blockdevs = bd.blockdevs_mut();
+            for (_, blockdev) in blockdevs.iter() {
+                original_headers.push(back_up_luks_header(blockdev.physical_path(), tmp_dir)?);
+            }
+
+            operation_loop(
+                blockdevs.into_iter().map(|(_, bd)| bd),
+                |blockdev| blockdev.rebind_clevis(),
+                |index, blockdev| {
+                    restore_luks_header(blockdev.physical_path(), &original_headers[index])
+                },
+            )?;
+
+            Ok(())
+        }
+
+        let encryption_info = self.encryption_info();
+        if !encryption_info.is_encrypted() {
+            return Err(StratisError::Msg(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ));
+        } else if encryption_info.clevis_info.is_none() {
+            return Err(StratisError::Msg(
+                "Requested pool is not already bound to Clevis".to_string(),
+            ));
+        }
+
+        let tmp_dir = TempDir::new()?;
+        let res = rebind_clevis_with_tmp_files(self, &tmp_dir);
+        if let Err(e) = fs::remove_dir_all(tmp_dir.path()) {
+            warn!(
+                "Leaked temporary files at path {}: {}",
+                tmp_dir.path().display(),
+                e
+            );
+        }
+
+        res
+    }
 }
 
-fn operation_loop<'a, I, A, C, R, RI>(
-    blockdevs: I,
-    action: A,
-    input_calculation: C,
-    rollback: R,
-) -> StratisResult<()>
+fn operation_loop<'a, I, A, R>(blockdevs: I, action: A, rollback: R) -> StratisResult<()>
 where
     I: IntoIterator<Item = &'a mut StratBlockDev>,
     A: Fn(&mut StratBlockDev) -> StratisResult<()>,
-    C: Fn(&'a mut StratBlockDev) -> RI,
-    R: Fn(RI) -> StratisResult<()>,
+    R: Fn(usize, &mut StratBlockDev) -> StratisResult<()>,
 {
-    fn rollback_loop<R, RI>(
-        rollback_record: Vec<(RI, PathBuf)>,
+    fn rollback_loop<R>(
+        rollback_record: Vec<&mut StratBlockDev>,
         rollback: R,
         causal_error: StratisError,
     ) -> StratisError
     where
-        R: Fn(RI) -> StratisResult<()>,
+        R: Fn(usize, &mut StratBlockDev) -> StratisResult<()>,
     {
-        for (rollback_input, path) in rollback_record {
-            if let Err(e) = rollback(rollback_input) {
+        for (index, blockdev) in rollback_record.into_iter().enumerate() {
+            if let Err(e) = rollback(index, blockdev) {
                 warn!(
                     "Failed to roll back device operation for device {}: {}",
-                    path.display(),
+                    blockdev.physical_path().display(),
                     e,
                 );
                 return StratisError::RollbackError {
@@ -626,9 +709,7 @@ where
         if let Err(error) = action(blockdev_ref) {
             return Err(rollback_loop(rollback_record, rollback, error));
         } else {
-            let path = blockdev_ref.physical_path().to_owned();
-            let input = input_calculation(blockdev_ref);
-            rollback_record.push((input, path));
+            rollback_record.push(blockdev_ref);
         }
     }
     Ok(())

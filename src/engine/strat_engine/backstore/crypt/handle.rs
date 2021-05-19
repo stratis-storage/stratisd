@@ -211,7 +211,7 @@ impl CryptHandle {
             .key_description
             .as_ref()
             .ok_or_else(|| {
-                StratisError::Error("Cannot change key description because this device is not bound to a passphrase in the kernel keyring".to_string())
+                StratisError::Error("Cannot change passphrase because this device is not bound to a passphrase in the kernel keyring".to_string())
             })?;
         add_keyring_keyslot(
             &mut device,

@@ -104,3 +104,73 @@ jobs:
         run: python --version
       - name: Run test
         run: ${{ matrix.task }}
+
+  legacy-cli-checks:
+    strategy:
+      matrix:
+        include:
+          - image: fedora:32
+            tag: v2.0.0
+          - image: fedora:32
+            tag: v2.0.1
+          - image: fedora:33
+            tag: v2.1.0
+          - image: fedora:33
+            tag: v2.1.1
+          - image: fedora:34
+            tag: v2.2.1
+          - image: fedora:34
+            tag: v2.3.0
+    runs-on: ubuntu-18.04
+    container: fedora:32  # CURRENT DEVELOPMENT PLATFORM
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies for Fedora
+        run: >
+          dnf install -y
+          asciidoc
+          clang
+          cryptsetup-devel
+          dbus-daemon
+          dbus-tools
+          dbus-devel
+          libblkid-devel
+          git
+          make
+          pytest
+          python3-dbus-client-gen
+          python3-dbus-python-client-gen
+          python3-justbytes
+          python3-dateutil
+          python3-psutil
+          python3-semantic_version
+          systemd-devel
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: cargo
+          toolchain: 1.52.1  # CURRENT DEVELOPMENT
+          override: true
+      - name: Install all necessary Stratis files
+        run: PROFILEDIR=debug make -f Makefile install
+      - name: Set up for D-Bus
+        run: |
+          mkdir -p /var/lib/dbus
+          dbus-uuidgen > /var/lib/dbus/machine-id
+          mkdir -p /var/run/dbus
+      - name: Start D-Bus
+        run: >
+          dbus-daemon
+          --config-file=/usr/share/dbus-1/system.conf
+          --print-address
+      - name: Clone stratis-cli
+        run: git clone https://github.com/stratis-storage/stratis-cli.git
+      - name: Checkout tag
+        run: git checkout tags/${{ matrix.tag }} -b ${{ matrix.tag }}
+        working-directory: ./stratis-cli
+      - name: Test stratisd using stratis-cli version ${{ matrix.tag }}
+        run: >
+          RUST_LOG=libstratis=debug,stratisd=debug
+          STRATISD=/usr/libexec/stratisd
+          PYTHONPATH=./src
+          make dbus-tests
+        working-directory: ./stratis-cli

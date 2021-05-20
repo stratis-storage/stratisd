@@ -676,7 +676,7 @@ impl Backstore {
         self.data_tier.block_mgr.unbind_keyring()
     }
 
-    pub fn rebind_keyring(&mut self, new_key_desc: &KeyDescription) -> StratisResult<bool> {
+    pub fn rebind_keyring(&mut self, new_key_desc: &KeyDescription) -> StratisResult<Option<bool>> {
         self.data_tier.block_mgr.rebind_keyring(new_key_desc)
     }
 }

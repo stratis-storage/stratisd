@@ -413,11 +413,10 @@ impl Pool for StratPool {
         &mut self,
         new_key_desc: &KeyDescription,
     ) -> StratisResult<RenameAction<Key>> {
-        let changed = self.backstore.rebind_keyring(new_key_desc)?;
-        if changed {
-            Ok(RenameAction::Renamed(Key))
-        } else {
-            Ok(RenameAction::Identity)
+        match self.backstore.rebind_keyring(new_key_desc)? {
+            Some(true) => Ok(RenameAction::Renamed(Key)),
+            Some(false) => Ok(RenameAction::Identity),
+            None => Ok(RenameAction::NoSource),
         }
     }
 

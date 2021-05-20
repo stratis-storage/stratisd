@@ -427,6 +427,28 @@ impl Display for RenameAction<PoolUuid> {
     }
 }
 
+impl Display for RenameAction<Key> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            RenameAction::Identity => {
+                write!(
+                    f,
+                    "Requested passphrase in change passphrase operation was the same as the original"
+                )
+            }
+            RenameAction::Renamed(_) => {
+                write!(f, "Passphrase was successfully changed")
+            }
+            RenameAction::NoSource => {
+                write!(
+                    f,
+                    "Could not change the passphrase as no passphrase is currently set"
+                )
+            }
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 /// A single delete action.
 pub enum DeleteAction<T> {

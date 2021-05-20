@@ -55,6 +55,15 @@ pub fn create_dbus_filesystem<'a>(
                 .add_p(filesystem_2_0::created_property(&f)),
         )
         .add(
+            f.interface(consts::FILESYSTEM_INTERFACE_NAME_2_5, ())
+                .add_m(filesystem_2_0::rename_method(&f))
+                .add_p(filesystem_2_0::devnode_property(&f))
+                .add_p(filesystem_2_0::name_property(&f))
+                .add_p(filesystem_2_0::pool_property(&f))
+                .add_p(filesystem_2_0::uuid_property(&f))
+                .add_p(filesystem_2_0::created_property(&f)),
+        )
+        .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME, ())
                 .add_m(fetch_properties_2_0::get_all_properties_method(&f))
                 .add_m(fetch_properties_2_0::get_properties_method(&f)),
@@ -76,6 +85,11 @@ pub fn create_dbus_filesystem<'a>(
         )
         .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_4, ())
+                .add_m(fetch_properties_2_0::get_all_properties_method(&f))
+                .add_m(fetch_properties_2_0::get_properties_method(&f)),
+        )
+        .add(
+            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_5, ())
                 .add_m(fetch_properties_2_0::get_all_properties_method(&f))
                 .add_m(fetch_properties_2_0::get_properties_method(&f)),
         );
@@ -103,6 +117,13 @@ pub fn get_fs_properties(
             consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop(fs)
         },
         consts::FILESYSTEM_INTERFACE_NAME_2_4 => {
+            consts::FILESYSTEM_NAME_PROP => shared::fs_name_prop(fs_name),
+            consts::FILESYSTEM_UUID_PROP => uuid_to_string!(fs_uuid),
+            consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop(fs, pool_name, fs_name),
+            consts::FILESYSTEM_POOL_PROP => parent.clone(),
+            consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop(fs)
+        },
+        consts::FILESYSTEM_INTERFACE_NAME_2_5 => {
             consts::FILESYSTEM_NAME_PROP => shared::fs_name_prop(fs_name),
             consts::FILESYSTEM_UUID_PROP => uuid_to_string!(fs_uuid),
             consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop(fs, pool_name, fs_name),

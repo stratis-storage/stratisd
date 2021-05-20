@@ -584,6 +584,61 @@ impl BlockDevMgr {
         }
         Ok(true)
     }
+
+    /// Change the keyring passphrase associated with the block devices in
+    /// this pool.
+    pub fn rebind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<bool> {
+        fn try_rollback(
+            blockdevs: Vec<&mut StratBlockDev>,
+            old_key_desc: KeyDescription,
+            causal_error: StratisError,
+        ) -> StratisError {
+            for blockdev in blockdevs {
+                if let Err(e) = blockdev.rebind_keyring(&old_key_desc) {
+                    return StratisError::Error(format!(
+                        "Failed to roll back passphrase change operation: {}; the original cause of the roll back was: {}",
+                        e, causal_error,
+                    ));
+                }
+            }
+
+            info!("Succesfully rolled back failed passphrase change");
+            causal_error
+        }
+
+        let encryption_info = self.encryption_info();
+        if !encryption_info.is_encrypted() {
+            return Err(StratisError::Error(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ));
+        } else if encryption_info.key_description.as_ref() == Some(key_desc) {
+            return Ok(false);
+        }
+
+        let old_key_desc = match encryption_info.key_description {
+            Some(ref kd) => kd.clone(),
+            None => return Err(StratisError::Error(
+                "Cannot change the passphrase for this device as it is not currently bound to a keyring passphrase".to_string(),
+            )),
+        };
+
+        let mut rollback_record = Vec::new();
+        for blockdev in self.blockdevs_mut().into_iter().map(|(_, bd)| bd) {
+            let res = blockdev.rebind_keyring(key_desc);
+            if let Err(e) = res {
+                if rollback_record.is_empty() {
+                    return Err(e);
+                } else {
+                    warn!("Failed to change the passphrase for blockdev {}: {}; attempting to roll back", blockdev.physical_path().display(), e);
+                    return Err(try_rollback(rollback_record, old_key_desc, e));
+                }
+            } else {
+                rollback_record.push(blockdev)
+            }
+        }
+
+        Ok(true)
+    }
 }
 
 fn bind_loop<'a, I, B, U>(blockdevs: I, bind: B, unbind: U) -> StratisResult<()>

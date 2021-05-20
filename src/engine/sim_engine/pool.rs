@@ -389,6 +389,33 @@ impl Pool for SimPool {
         }
     }
 
+    fn rebind_keyring(
+        &mut self,
+        new_key_desc: &KeyDescription,
+    ) -> StratisResult<RenameAction<Key>> {
+        let encryption_info = self.encryption_info();
+
+        if encryption_info.key_description.is_none() {
+            return Err(StratisError::Error(
+                "This device is not bound to a keyring passphrase; cannot change the passphrase"
+                    .to_string(),
+            ));
+        }
+
+        if self.is_encrypted() {
+            Ok(if encryption_info.key_description.is_some() {
+                self.add_key_desc(new_key_desc);
+                RenameAction::Renamed(Key)
+            } else {
+                RenameAction::Identity
+            })
+        } else {
+            Err(StratisError::Error(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ))
+        }
+    }
+
     fn destroy_filesystems<'a>(
         &'a mut self,
         _pool_name: &str,

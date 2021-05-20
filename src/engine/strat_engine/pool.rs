@@ -409,6 +409,18 @@ impl Pool for StratPool {
         }
     }
 
+    fn rebind_keyring(
+        &mut self,
+        new_key_desc: &KeyDescription,
+    ) -> StratisResult<RenameAction<Key>> {
+        let changed = self.backstore.rebind_keyring(new_key_desc)?;
+        if changed {
+            Ok(RenameAction::Renamed(Key))
+        } else {
+            Ok(RenameAction::Identity)
+        }
+    }
+
     fn create_filesystems<'a, 'b>(
         &'a mut self,
         pool_name: &str,

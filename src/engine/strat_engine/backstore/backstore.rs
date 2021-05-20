@@ -674,6 +674,10 @@ impl Backstore {
     pub fn unbind_keyring(&mut self) -> StratisResult<bool> {
         self.data_tier.block_mgr.unbind_keyring()
     }
+
+    pub fn rebind_keyring(&mut self, new_key_desc: &KeyDescription) -> StratisResult<bool> {
+        self.data_tier.block_mgr.rebind_keyring(new_key_desc)
+    }
 }
 
 impl<'a> Into<Value> for &'a Backstore {

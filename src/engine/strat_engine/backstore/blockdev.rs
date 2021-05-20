@@ -269,6 +269,15 @@ impl StratBlockDev {
         })?;
         crypt_handle.unbind_keyring()
     }
+
+    /// Change the passphrase for a block device to a passphrase represented by a
+    /// key description in the kernel keyring.
+    pub fn rebind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<()> {
+        let crypt_handle = self.crypt_handle.as_mut().ok_or_else(|| {
+            StratisError::Error("This device does not appear to be encrypted".to_string())
+        })?;
+        crypt_handle.rebind_keyring(key_desc)
+    }
 }
 
 impl<'a> Into<Value> for &'a StratBlockDev {

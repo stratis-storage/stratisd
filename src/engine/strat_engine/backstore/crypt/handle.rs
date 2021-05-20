@@ -204,23 +204,6 @@ impl CryptHandle {
         Ok(())
     }
 
-    pub fn rebind_keyring(&mut self, new_key_desc: &KeyDescription) -> StratisResult<()> {
-        let mut device = self.acquire_crypt_device()?;
-
-        let old_key_description = self.encryption_info
-            .key_description
-            .as_ref()
-            .ok_or_else(|| {
-                StratisError::Error("Cannot change passphrase because this device is not bound to a passphrase in the kernel keyring".to_string())
-            })?;
-        add_keyring_keyslot(
-            &mut device,
-            new_key_desc,
-            Some(Either::Right(old_key_description)),
-        )?;
-        Ok(())
-    }
-
     /// Add a keyring binding to the underlying LUKS2 volume.
     pub fn bind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<()> {
         let mut device = self.acquire_crypt_device()?;
@@ -265,6 +248,25 @@ impl CryptHandle {
 
         self.metadata_handle.encryption_info.key_description = None;
 
+        Ok(())
+    }
+
+    /// Change the key description and passphrase that a device is bound to
+    pub fn rebind_keyring(&mut self, new_key_desc: &KeyDescription) -> StratisResult<()> {
+        let mut device = self.acquire_crypt_device()?;
+
+        let old_key_description = self.encryption_info
+            .key_description
+            .as_ref()
+            .ok_or_else(|| {
+                StratisError::Error("Cannot change passphrase because this device is not bound to a passphrase in the kernel keyring".to_string())
+            })?;
+        add_keyring_keyslot(
+            &mut device,
+            new_key_desc,
+            Some(Either::Right(old_key_description)),
+        )?;
+        self.encryption_info.key_description = Some(new_key_desc.clone());
         Ok(())
     }
 

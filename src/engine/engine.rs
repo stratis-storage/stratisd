@@ -171,6 +171,10 @@ pub trait Pool: Debug {
     /// Unbind all devices in the given pool from the registered keyring passphrase.
     fn unbind_keyring(&mut self) -> StratisResult<DeleteAction<Key>>;
 
+    /// Change the key description and passphrase associated with a pool.
+    fn rebind_keyring(&mut self, new_key_desc: &KeyDescription)
+        -> StratisResult<RenameAction<Key>>;
+
     /// Ensures that all designated filesystems are gone from pool.
     /// Returns a list of the filesystems found, and actually destroyed.
     /// This list will be a subset of the uuids passed in fs_uuids.

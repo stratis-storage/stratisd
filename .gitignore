@@ -38,3 +38,4 @@ proptest-regression*
 
 # cargo-vendor
 vendor
+*vendor.tar.gz

@@ -585,7 +585,13 @@ impl BlockDevMgr {
 
     /// Change the keyring passphrase associated with the block devices in
     /// this pool.
-    pub fn rebind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<bool> {
+    ///
+    /// Returns:
+    /// * Ok(None) if the pool is not currently bound to a keyring passphrase.
+    /// * Ok(Some(true)) if the pool was successfully bound to the new key description.
+    /// * Ok(Some(false)) if the pool is already bound to this key description.
+    /// * Err(_) if an operation fails while changing the passphrase.
+    pub fn rebind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<Option<bool>> {
         fn try_rollback(
             blockdevs: Vec<&mut StratBlockDev>,
             old_key_desc: KeyDescription,
@@ -610,14 +616,12 @@ impl BlockDevMgr {
                 "Requested pool does not appear to be encrypted".to_string(),
             ));
         } else if encryption_info.key_description.as_ref() == Some(key_desc) {
-            return Ok(false);
+            return Ok(Some(false));
         }
 
         let old_key_desc = match encryption_info.key_description {
             Some(ref kd) => kd.clone(),
-            None => return Err(StratisError::Error(
-                "Cannot change the passphrase for this device as it is not currently bound to a keyring passphrase".to_string(),
-            )),
+            None => return Ok(None),
         };
 
         let mut rollback_record = Vec::new();
@@ -635,7 +639,7 @@ impl BlockDevMgr {
             }
         }
 
-        Ok(true)
+        Ok(Some(true))
     }
 }
 

@@ -382,16 +382,11 @@ impl BlockDevMgr {
     }
 
     pub fn encryption_info(&self) -> Cow<EncryptionInfo> {
-        let mut iter = self.block_devs.iter().map(|bd| bd.encryption_info());
-        let info = iter
+        self.block_devs
+            .iter()
+            .map(|bd| bd.encryption_info())
             .next()
-            .expect("At least one blockdev in the given manager");
-
-        // Liminal device code will not set up a pool with devices with
-        // different encryption information.
-        assert!(iter.all(|elem| info == elem));
-
-        info
+            .expect("At least one blockdev in the given manager")
     }
 
     pub fn is_encrypted(&self) -> bool {

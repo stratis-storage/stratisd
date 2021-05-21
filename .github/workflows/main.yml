@@ -357,9 +357,16 @@ jobs:
 
   # PYTHON-BASED TESTS WITH UDEV
   python-based-tests:
+    strategy:
+      matrix:
+        include:
+          # MANDATORY CHECKS USING CURRENT DEVELOPMENT ENVIRONMENT
+          - image: fedora:33
+          # MANDATORY CHECKS USING LOWEST SUPPORTED ENVIRONMENT PROXY
+          - image: fedora:30
     runs-on: ubuntu-18.04
     container:
-      image: fedora:33
+      image: ${{ matrix.image }}
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2

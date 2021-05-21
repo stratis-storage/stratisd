@@ -288,17 +288,6 @@ jobs:
           - dependencies: yamllint
             image: fedora:33
             task: make -f Makefile yamllint
-          # MANDATORY PYTHON CHECKS ON LOWEST SUPPORTED INTERPRETER
-          - dependencies: >
-              pylint
-              python3-dbus-client-gen
-              python3-dbus-python-client-gen
-              python3-psutil
-              python3-pyudev
-            image: fedora:29
-            task: >
-              (cd developer_tools; make -f Makefile lint) &&
-              (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
     runs-on: ubuntu-18.04
     container: ${{ matrix.image }}
     steps:
@@ -368,9 +357,16 @@ jobs:
 
   # PYTHON-BASED TESTS WITH UDEV
   python-based-tests:
+    strategy:
+      matrix:
+        include:
+          # MANDATORY CHECKS USING CURRENT DEVELOPMENT ENVIRONMENT
+          - image: fedora:33
+          # MANDATORY CHECKS USING LOWEST SUPPORTED ENVIRONMENT PROXY
+          - image: fedora:30
     runs-on: ubuntu-18.04
     container:
-      image: fedora:33
+      image: ${{ matrix.image }}
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2

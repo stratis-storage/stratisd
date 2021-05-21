@@ -81,7 +81,6 @@ def create_pool(name, devices, *, key_description=None):
             "name": name,
             "redundancy": (True, 0),
             "devices": devices,
-            # pylint: disable=bad-continuation
             "key_desc": (False, "")
             if key_description is None
             else (True, key_description),
@@ -263,7 +262,7 @@ class _Service:
 
         dbus_interface_present = False
         limit = time.time() + 120.0
-        while (  # pylint: disable=bad-continuation
+        while (
             time.time() <= limit
             and not dbus_interface_present
             and service.poll() is None

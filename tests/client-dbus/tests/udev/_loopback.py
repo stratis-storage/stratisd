@@ -80,7 +80,6 @@ class LoopBackDevices:
         context = pyudev.Context()
         for _ in range(10):
             if expected_device_files <= frozenset(
-                # pylint: disable=bad-continuation
                 [x.device_node for x in context.list_devices(subsystem="block")]
             ):
                 return

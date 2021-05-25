@@ -305,7 +305,7 @@ jobs:
 
   stratis-cli-checks:
     runs-on: ubuntu-18.04
-    container: fedora:33
+    container: fedora:30  # LOWEST SUPPORTED ENVIRONMENT PROXY
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies
@@ -331,7 +331,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           components: cargo
-          toolchain: 1.52.1  # CURRENT DEVELOPMENT
+          toolchain: 1.49.0  # LOWEST SUPPORTED RUST TOOLCHAIN
           override: true
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile install
@@ -347,7 +347,7 @@ jobs:
           dbus-daemon
           --config-file=/usr/share/dbus-1/system.conf
           --print-address
-      - name: Run test
+      - name: Run stratis-cli tests
         run: >
           RUST_LOG=libstratis=debug,stratisd=debug
           STRATISD=/usr/libexec/stratisd
@@ -362,8 +362,10 @@ jobs:
         include:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT ENVIRONMENT
           - image: fedora:33
+            toolchain: 1.52.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           # MANDATORY CHECKS USING LOWEST SUPPORTED ENVIRONMENT PROXY
           - image: fedora:30
+            toolchain: 1.49.0  # LOWEST SUPPORTED RUST TOOLCHAIN
     runs-on: ubuntu-18.04
     container:
       image: ${{ matrix.image }}
@@ -394,7 +396,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           components: cargo
-          toolchain: 1.52.1  # CURRENT DEVELOPMENT
+          toolchain: ${{ matrix.toolchain }}
           override: true
       - name: Install all necessary Stratis files
         run: PROFILEDIR=debug make -f Makefile install
@@ -410,7 +412,7 @@ jobs:
           dbus-daemon
           --config-file=/usr/share/dbus-1/system.conf
           --print-address
-      - name: Run tests
+      - name: Tests on ${{ matrix.image }} using Rust ${{ matrix.toolchain }}
         run: >
           RUST_LOG=libstratis=debug,stratisd=debug
           STRATISD=/usr/libexec/stratisd

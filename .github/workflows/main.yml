@@ -38,11 +38,11 @@ jobs:
           - task: make -f Makefile fmt-travis
             toolchain: 1.52.1
             components: rustfmt
-            image: fedora:32
+            image: fedora:33
           - task: make -f Makefile clippy
             toolchain: 1.52.1
             components: clippy
-            image: fedora:32
+            image: fedora:33
           # MANDATORY TESTING ON STABLE
           - task: make -f Makefile build
             toolchain: stable
@@ -75,31 +75,31 @@ jobs:
           - task: make -f Makefile build
             toolchain: stable
             components: cargo
-            image: fedora:32
+            image: fedora:33
           - task: make -f Makefile build-min
             toolchain: stable
             components: cargo
-            image: fedora:32
+            image: fedora:33
           - task: make -f Makefile build-extras
             toolchain: stable
             components: cargo
-            image: fedora:32
+            image: fedora:33
           - task: make -f Makefile docs-travis
             toolchain: stable
             components: cargo
-            image: fedora:32
+            image: fedora:33
           - task: make -f Makefile test
             toolchain: stable
             components: cargo
-            image: fedora:32
+            image: fedora:33
           - task: make -f Makefile release
             toolchain: stable
             components: cargo
-            image: fedora:32
+            image: fedora:33
           - task: make -f Makefile release-min
             toolchain: stable
             components: cargo
-            image: fedora:32
+            image: fedora:33
     runs-on: ubuntu-18.04
     container:
       image: ${{ matrix.image }}
@@ -132,7 +132,7 @@ jobs:
           libblkid-devel
           make
           systemd-devel
-        if: matrix.image == 'fedora:32'
+        if: matrix.image == 'fedora:33'
       - uses: actions-rs/toolchain@v1
         with:
           components: ${{ matrix.components }}
@@ -154,7 +154,7 @@ jobs:
           - task: RUST_LOG=libstratis=debug make -f Makefile test-loop
             toolchain: stable
             components: cargo
-            image: fedora:32
+            image: fedora:33
     runs-on: ubuntu-18.04
     container:
       image: ${{ matrix.image }}
@@ -196,7 +196,7 @@ jobs:
           systemd-devel
           systemd-udev
           xfsprogs
-        if: matrix.image == 'fedora:32'
+        if: matrix.image == 'fedora:33'
       - uses: actions-rs/toolchain@v1
         with:
           components: ${{ matrix.components }}
@@ -221,7 +221,7 @@ jobs:
               make -f Makefile test-clevis-loop
             toolchain: stable
             components: cargo
-            image: fedora:32
+            image: fedora:33
     runs-on: ubuntu-18.04
     container:
       image: ${{ matrix.image }}
@@ -274,31 +274,20 @@ jobs:
               python3-requests
               python3-semantic_version
               python3-pygithub
-            image: fedora:32
+            image: fedora:33
             task: >
               (cd code_maintenance; make -f Makefile lint) &&
               (cd developer_tools; make -f Makefile lint) &&
               (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
           - dependencies: black python3-isort
-            image: fedora:32
+            image: fedora:33
             task: >
               (cd code_maintenance; make -f Makefile fmt-travis) &&
               (cd developer_tools; make -f Makefile fmt-travis) &&
               (cd tests/client-dbus; make -f Makefile fmt-travis)
           - dependencies: yamllint
-            image: fedora:32
+            image: fedora:33
             task: make -f Makefile yamllint
-          # MANDATORY PYTHON CHECKS ON LOWEST SUPPORTED INTERPRETER
-          - dependencies: >
-              pylint
-              python3-dbus-client-gen
-              python3-dbus-python-client-gen
-              python3-psutil
-              python3-pyudev
-            image: fedora:29
-            task: >
-              (cd developer_tools; make -f Makefile lint) &&
-              (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
     runs-on: ubuntu-18.04
     container: ${{ matrix.image }}
     steps:
@@ -316,7 +305,7 @@ jobs:
 
   stratis-cli-checks:
     runs-on: ubuntu-18.04
-    container: fedora:32
+    container: fedora:33
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies
@@ -368,9 +357,16 @@ jobs:
 
   # PYTHON-BASED TESTS WITH UDEV
   python-based-tests:
+    strategy:
+      matrix:
+        include:
+          # MANDATORY CHECKS USING CURRENT DEVELOPMENT ENVIRONMENT
+          - image: fedora:33
+          # MANDATORY CHECKS USING LOWEST SUPPORTED ENVIRONMENT PROXY
+          - image: fedora:30
     runs-on: ubuntu-18.04
     container:
-      image: fedora:32
+      image: ${{ matrix.image }}
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2

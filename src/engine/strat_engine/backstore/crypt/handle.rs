@@ -24,7 +24,7 @@ use crate::{
                     ensure_wiped, get_keyslot_number, interpret_clevis_config, setup_crypt_handle,
                 },
             },
-            cmd::{clevis_decrypt, clevis_luks_bind, clevis_luks_unbind},
+            cmd::{clevis_decrypt, clevis_luks_bind, clevis_luks_regen, clevis_luks_unbind},
             keys::MemoryPrivateFilesystem,
             metadata::StratisIdentifiers,
         },
@@ -199,6 +199,37 @@ impl CryptHandle {
             );
         }
         self.encryption_info.clevis_info = None;
+        Ok(())
+    }
+
+    /// Change the key description and passphrase that a device is bound to
+    pub fn rebind_clevis(&mut self) -> StratisResult<()> {
+        if self.encryption_info.clevis_info.is_none() {
+            return Err(StratisError::Error(
+                "No Clevis binding found; cannot regenerate the Clevis binding if the device does not already have a Clevis binding".to_string(),
+            ));
+        }
+
+        let keyslot = self
+            .keyslots(CLEVIS_LUKS_TOKEN_ID)?
+            .and_then(|vec| vec.into_iter().next())
+            .ok_or_else(|| {
+                StratisError::Error(
+                    "Clevis binding found but no keyslot was associated".to_string(),
+                )
+            })?;
+        clevis_luks_regen(self.luks2_device_path(), keyslot)?;
+
+        let mut device = self.acquire_crypt_device()?;
+        self.encryption_info.clevis_info =
+            Some(clevis_info_from_metadata(&mut device).and_then(|opt| {
+                opt.ok_or_else(|| {
+                    StratisError::Error(
+                        "Expected Clevis binding after regeneration operation but not was found"
+                            .to_string(),
+                    )
+                })
+            })?);
         Ok(())
     }
 

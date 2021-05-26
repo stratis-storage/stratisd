@@ -18,9 +18,6 @@ jobs:
           - task: cargo update --locked
             toolchain: 1.52.1  # CURRENT DEVELOPMENT TOOLCHAIN
             components: cargo
-          - task: make -f Makefile compare-fedora
-            toolchain: 1.52.1  # CURRENT DEVELOPMENT TOOLCHAIN
-            components: cargo
           - task: make -f Makefile verify-dependency-bounds
             toolchain: 1.52.1  # CURRENT DEVELOPMENT TOOLCHAIN
             components: cargo
@@ -176,3 +173,35 @@ jobs:
           PYTHONPATH=./src
           make dbus-tests
         working-directory: ./stratis-cli
+
+  checks-with-ci-repo:
+    continue-on-error: true
+    runs-on: ubuntu-18.04
+    container:
+      image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
+      options: --privileged -v /dev:/dev
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies for Fedora
+        run: >
+          dnf install -y
+          clang
+          curl
+          cryptsetup-devel
+          dbus-devel
+          git
+          libblkid-devel
+          make
+          openssl-devel
+          python-requests
+          python-semantic_version
+          systemd-devel
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: cargo
+          toolchain: 1.52.1  # CURRENT DEVELOPMENT TOOLCHAIN
+          override: true
+      - name: Check out ci repo
+        run: git clone https://github.com/stratis-storage/ci.git
+      - name: Compare Fedora versions
+        run: ./ci/dependency_management/compare_fedora_versions

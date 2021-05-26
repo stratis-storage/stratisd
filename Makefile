@@ -311,9 +311,6 @@ clippy:
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${MIN_FEATURES} -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${SYSTEMD_FEATURES} -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
 
-compare-fedora:
-	${PWD}/code_maintenance/compare_fedora_versions
-
 set-lower-bounds:
 	${PWD}/code_maintenance/set_lower_bounds
 
@@ -345,7 +342,6 @@ verify-dependency-bounds: build-all set-lower-bounds build-all
 	clean-cfg
 	clean-primary
 	clippy
-	compare-fedora
 	create-release
 	docs-rust
 	docs-travis

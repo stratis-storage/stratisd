@@ -13,9 +13,46 @@ use env_logger::Builder;
 
 use clap::{App, Arg};
 
+use pretty_hex::pretty_hex;
+
 use serde_json::Value;
 
 use libstratis::engine::{StaticHeader, StaticHeaderResult, BDA};
+
+/// Format metadata on a given device
+/// Returns StaticHeader fields
+/// Returns an additional bytes buffer if print_bytes flag is True
+fn fmt_metadata(shr: &StaticHeaderResult, print_bytes: bool) -> String {
+    let mut result = String::from("\nHeader:\n")
+        + shr
+            .header
+            .as_ref()
+            .map_or(String::from("Unreadable\n"), |h| {
+                h.as_ref().map_or_else(
+                    |e| format!("Error: {}\n", e),
+                    |s| {
+                        s.as_ref()
+                            .map_or(String::from("No signature buffer\n"), |sh| {
+                                format!("{:#?}\n", sh)
+                            })
+                    },
+                )
+            })
+            .as_str();
+    if print_bytes {
+        result += "\n\nBytes:\n\n";
+        match &shr.bytes {
+            Ok(ref boxed) => {
+                result += pretty_hex(boxed.as_ref()).as_str();
+            }
+            Err(e) => {
+                result += e.to_string().as_str();
+            }
+        }
+    }
+
+    result
+}
 
 /// Configure and initialize the logger.
 /// Read log configuration parameters from the environment if RUST_LOG
@@ -46,16 +83,16 @@ fn run(devpath: &str, print_bytes: bool) -> Result<(), String> {
     if read_results.0 == read_results.1 {
         println!(
             "Signature block: \n{}",
-            StaticHeaderResult::fmt_metadata(&read_results.0, print_bytes)
+            fmt_metadata(&read_results.0, print_bytes)
         );
     } else {
         println!(
             "Signature block 1: \n{}",
-            StaticHeaderResult::fmt_metadata(&read_results.0, print_bytes)
+            fmt_metadata(&read_results.0, print_bytes)
         );
         println!(
             "Signature block 2: \n{}",
-            StaticHeaderResult::fmt_metadata(&read_results.1, print_bytes)
+            fmt_metadata(&read_results.1, print_bytes)
         );
     }
 

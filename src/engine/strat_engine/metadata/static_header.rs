@@ -10,7 +10,6 @@ use std::{
 
 use byteorder::{ByteOrder, LittleEndian};
 use crc::crc32;
-use pretty_hex::pretty_hex;
 use serde_json::Value;
 
 use devicemapper::{Sectors, IEC, SECTOR_SIZE};
@@ -41,9 +40,9 @@ const STRAT_SIGBLOCK_VERSION: u8 = 1;
 #[derive(Debug)]
 pub struct StaticHeaderResult {
     /// The bytes read
-    bytes: StratisResult<Box<[u8; bytes!(static_header_size::SIGBLOCK_SECTORS)]>>,
+    pub bytes: StratisResult<Box<[u8; bytes!(static_header_size::SIGBLOCK_SECTORS)]>>,
     /// The header parsed from the bytes
-    header: Option<StratisResult<Option<StaticHeader>>>,
+    pub header: Option<StratisResult<Option<StaticHeader>>>,
 }
 
 impl PartialEq for StaticHeaderResult {
@@ -52,43 +51,6 @@ impl PartialEq for StaticHeaderResult {
             (Some(Ok(Some(sh0))), Some(Ok(Some(sh1)))) => sh0 == sh1,
             _ => false,
         }
-    }
-}
-
-impl StaticHeaderResult {
-    /// Format metadata on a given device
-    /// Returns StaticHeader fields
-    /// Returns an additional bytes buffer if print_bytes flag is True
-    pub fn fmt_metadata(&self, print_bytes: bool) -> String {
-        let mut result = String::from("\nHeader:\n")
-            + self
-                .header
-                .as_ref()
-                .map_or(String::from("Unreadable\n"), |h| {
-                    h.as_ref().map_or_else(
-                        |e| format!("Error: {}\n", e),
-                        |s| {
-                            s.as_ref()
-                                .map_or(String::from("No signature buffer\n"), |sh| {
-                                    format!("{:#?}\n", sh)
-                                })
-                        },
-                    )
-                })
-                .as_str();
-        if print_bytes {
-            result += "\n\nBytes:\n\n";
-            match &self.bytes {
-                Ok(ref boxed) => {
-                    result += pretty_hex(boxed.as_ref()).as_str();
-                }
-                Err(e) => {
-                    result += e.to_string().as_str();
-                }
-            }
-        }
-
-        result
     }
 }
 

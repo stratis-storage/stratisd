@@ -44,7 +44,6 @@ libmount = "0.1.9"
 libudev = "0.2.0"
 log = "0.4.8"
 nix = "0.20.0"
-pretty-hex = "0.2.0"
 rand = "0.8.0"
 regex = "1.4.0"
 serde = "1.0.119"
@@ -74,6 +73,10 @@ optional = true
 version = "0.2.1"
 optional = true
 
+[dependencies.pretty-hex]
+version = "0.2.0"
+optional = true
+
 [dependencies.rpassword]
 version = "5.0.0"
 optional = true
@@ -98,6 +101,6 @@ proptest = "0.10.0"
 [features]
 default = ["dbus_enabled"]
 dbus_enabled = ["dbus", "dbus-tree", "libdbus-sys"]
-extras = []
+extras = ["pretty-hex"]
 min = ["rpassword"]
 systemd_compat = ["bindgen"]

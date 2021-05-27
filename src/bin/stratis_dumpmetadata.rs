@@ -103,7 +103,8 @@ fn run(devpath: &str, print_bytes: bool) -> Result<(), String> {
     let bda = BDA::load(header, &mut devfile)
         .map_err(|bda_load_error| format!("BDA detected but error found: {}", bda_load_error))?
         .ok_or_else(|| "No Stratis BDA metadata found".to_string())?;
-    println!("{:#?}", bda);
+
+    println!("\n{:#?}", bda);
 
     devfile
         .seek(SeekFrom::Start(0))
@@ -112,7 +113,8 @@ fn run(devpath: &str, print_bytes: bool) -> Result<(), String> {
     let loaded_state = bda
         .load_state(&mut devfile)
         .map_err(|stateload_err| format!("Error during load state: {}", stateload_err))?;
-    println!("Pool metadata:");
+
+    println!("\nPool metadata:");
     if let Some(loaded_state) = loaded_state {
         let state_json: Value = serde_json::from_slice(&loaded_state)
             .map_err(|extract_err| format!("Error during state JSON extract: {}", extract_err))?;

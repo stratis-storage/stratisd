@@ -21,7 +21,10 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
-                crypt::{interpret_clevis_config, CryptActivationHandle},
+                crypt::{
+                    get_clevis_token_metadata, interpret_clevis_config, set_clevis_token_metadata,
+                    CryptActivationHandle,
+                },
                 devices::{initialize_devices, process_and_verify_devices, wipe_blockdevs},
             },
             metadata::MDADataSize,
@@ -599,7 +602,7 @@ impl BlockDevMgr {
         ) -> StratisError {
             for blockdev in blockdevs {
                 if let Err(e) = blockdev.rebind_keyring(&old_key_desc) {
-                    return StratisError::Error(format!(
+                    return StratisError::Msg(format!(
                         "Failed to roll back passphrase change operation: {}; the original cause of the roll back was: {}",
                         e, causal_error,
                     ));
@@ -612,7 +615,7 @@ impl BlockDevMgr {
 
         let encryption_info = self.encryption_info();
         if !encryption_info.is_encrypted() {
-            return Err(StratisError::Error(
+            return Err(StratisError::Msg(
                 "Requested pool does not appear to be encrypted".to_string(),
             ));
         } else if encryption_info.key_description.as_ref() == Some(key_desc) {
@@ -640,6 +643,63 @@ impl BlockDevMgr {
         }
 
         Ok(Some(true))
+    }
+
+    /// Regenerate the Clevis bindings with the block devices in this pool using
+    /// the same configuration.
+    ///
+    /// The method for this rollback caches the initial Clevis metadata and
+    /// reverts all of the devices if there is a failure.
+    pub fn rebind_clevis(&mut self) -> StratisResult<()> {
+        fn try_rollback(
+            blockdevs: Vec<(&Path, Value)>,
+            causal_error: StratisError,
+        ) -> StratisError {
+            for (path, clevis_token) in blockdevs {
+                if let Err(e) = set_clevis_token_metadata(path, &clevis_token) {
+                    return StratisError::Msg(format!(
+                        "Failed to roll back Clevis binding regeneration operation: {}; the original cause of the roll back was: {}",
+                        e, causal_error,
+                    ));
+                }
+            }
+
+            info!("Succesfully rolled back failed Clevis binding regeneration");
+            causal_error
+        }
+
+        let encryption_info = self.encryption_info();
+        if !encryption_info.is_encrypted() {
+            return Err(StratisError::Msg(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ));
+        } else if encryption_info.clevis_info.is_none() {
+            return Err(StratisError::Msg(
+                "Requested pool is not already bound to Clevis".to_string(),
+            ));
+        }
+
+        let mut rollback_record = Vec::new();
+        for blockdev in self.blockdevs_mut().into_iter().map(|(_, bd)| bd) {
+            let res = get_clevis_token_metadata(blockdev.physical_path()).and_then(|token| {
+                blockdev.rebind_clevis()?;
+                Ok(token)
+            });
+
+            match res {
+                Ok(token) => rollback_record.push((blockdev.physical_path(), token)),
+                Err(e) => {
+                    if rollback_record.is_empty() {
+                        return Err(e);
+                    } else {
+                        warn!("Failed to regenerate the clevis bindings for blockdev {}: {}; attempting to roll back", blockdev.physical_path().display(), e);
+                        return Err(try_rollback(rollback_record, e));
+                    }
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 

@@ -25,7 +25,8 @@ pub use crate::engine::{
     types::{
         actions::{
             Clevis, CreateAction, DeleteAction, EngineAction, Key, MappingCreateAction,
-            MappingDeleteAction, RenameAction, SetCreateAction, SetDeleteAction, SetUnlockAction,
+            MappingDeleteAction, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
+            SetUnlockAction,
         },
         keys::{EncryptionInfo, KeyDescription, SizedKeyMemory},
     },

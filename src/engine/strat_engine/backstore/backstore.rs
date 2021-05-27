@@ -678,6 +678,10 @@ impl Backstore {
     pub fn rebind_keyring(&mut self, new_key_desc: &KeyDescription) -> StratisResult<Option<bool>> {
         self.data_tier.block_mgr.rebind_keyring(new_key_desc)
     }
+
+    pub fn rebind_clevis(&mut self) -> StratisResult<()> {
+        self.data_tier.block_mgr.rebind_clevis()
+    }
 }
 
 impl<'a> Into<Value> for &'a Backstore {

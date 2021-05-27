@@ -325,7 +325,10 @@ build-all:
 # than is actually reqired. Use build-all target to set up for cargo-tree
 # and also to test that everything still compiles when the versions are set
 # to their precise values.
-verify-dependency-bounds: build-all set-lower-bounds build-all
+verify-dependency-bounds:
+	$(MAKE) build-all
+	$(MAKE) set-lower-bounds
+	$(MAKE) build-all
 
 
 .PHONY:

@@ -410,7 +410,7 @@ pub fn clevis_luks_regen(dev_path: &Path, keyslot: c_uint) -> StratisResult<()> 
     execute_cmd(
         Command::new(get_clevis_executable()?)
             .arg("luks")
-            .arg("unlock")
+            .arg("regen")
             .arg("-d")
             .arg(dev_path.display().to_string())
             .arg("-s")

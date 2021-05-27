@@ -255,6 +255,14 @@ impl StratBlockDev {
         })?;
         crypt_handle.rebind_keyring(key_desc)
     }
+
+    /// Regenerate the Clevis bindings for a block device.
+    pub fn rebind_clevis(&mut self) -> StratisResult<()> {
+        let crypt_handle = self.crypt_handle.as_mut().ok_or_else(|| {
+            StratisError::Error("This device does not appear to be encrypted".to_string())
+        })?;
+        crypt_handle.rebind_clevis()
+    }
 }
 
 impl<'a> Into<Value> for &'a StratBlockDev {

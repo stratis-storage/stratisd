@@ -203,6 +203,11 @@ impl CryptHandle {
     }
 
     /// Change the key description and passphrase that a device is bound to
+    ///
+    /// This method does not need to re-read the cached Clevis information because
+    /// the config will not change and we do not cache all of the metadata
+    /// information that is stored on the device like the JWE. We only cache
+    /// the initial config which will remain unchanged.
     pub fn rebind_clevis(&mut self) -> StratisResult<()> {
         if self.encryption_info.clevis_info.is_none() {
             return Err(StratisError::Error(
@@ -220,16 +225,6 @@ impl CryptHandle {
             })?;
         clevis_luks_regen(self.luks2_device_path(), keyslot)?;
 
-        let mut device = self.acquire_crypt_device()?;
-        self.encryption_info.clevis_info =
-            Some(clevis_info_from_metadata(&mut device).and_then(|opt| {
-                opt.ok_or_else(|| {
-                    StratisError::Error(
-                        "Expected Clevis binding after regeneration operation but not was found"
-                            .to_string(),
-                    )
-                })
-            })?);
         Ok(())
     }
 

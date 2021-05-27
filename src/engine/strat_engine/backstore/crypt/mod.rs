@@ -16,7 +16,10 @@ pub use self::{
     consts::CLEVIS_TANG_TRUST_URL,
     handle::CryptHandle,
     initialize::CryptInitializer,
-    shared::{crypt_metadata_size, interpret_clevis_config},
+    shared::{
+        crypt_metadata_size, get_clevis_token_metadata, interpret_clevis_config,
+        set_clevis_token_metadata,
+    },
 };
 
 #[cfg(test)]

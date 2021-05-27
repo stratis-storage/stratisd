@@ -277,13 +277,11 @@ jobs:
             image: fedora:33
             task: >
               (cd code_maintenance; make -f Makefile lint) &&
-              (cd developer_tools; make -f Makefile lint) &&
               (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
           - dependencies: black python3-isort
             image: fedora:33
             task: >
               (cd code_maintenance; make -f Makefile fmt-travis) &&
-              (cd developer_tools; make -f Makefile fmt-travis) &&
               (cd tests/client-dbus; make -f Makefile fmt-travis)
           - dependencies: yamllint
             image: fedora:33

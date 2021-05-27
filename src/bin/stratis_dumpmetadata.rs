@@ -96,15 +96,18 @@ fn main() {
                 .required(true)
                 .help("Print metadata of given device"),
         )
-        .arg(Arg::with_name("print_bytes").help("Print byte buffer of device"))
+        .arg(
+            Arg::with_name("print_bytes")
+                .long("print-bytes")
+                .short("b")
+                .help("Print byte buffer of device"),
+        )
         .get_matches();
     let devpath = matches.value_of("dev").unwrap();
 
-    let print_bytes: bool = matches!(matches.value_of("print_bytes"), Some("print_bytes"));
-
     initialize_log();
 
-    match run(devpath, print_bytes) {
+    match run(devpath, matches.is_present("print_bytes")) {
         Ok(()) => {}
         Err(e) => {
             eprintln!("Error encountered: {}", e);

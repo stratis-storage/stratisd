@@ -753,8 +753,9 @@ pub mod tests {
             let mut buf = Cursor::new(vec![0; buf_size]);
             sh_older.write(&mut buf, older_location).unwrap();
             sh_newer.write(&mut buf, newer_location).unwrap();
-            let read_results = StaticHeader::read_sigblocks(&mut buf);
             assert_ne!(buf.get_ref(), reference_buf.get_ref());
+
+            let read_results = StaticHeader::read_sigblocks(&mut buf);
             assert_eq!(
                 StaticHeader::repair_sigblocks(&mut buf, read_results, StaticHeader::write_header)
                     .unwrap()

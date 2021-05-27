@@ -15,7 +15,7 @@ use sha1::{Digest, Sha1};
 
 use libcryptsetup_rs::{
     c_uint, CryptActivateFlags, CryptDeactivateFlags, CryptDevice, CryptInit, CryptStatusInfo,
-    CryptVolumeKeyFlags, CryptWipePattern, EncryptionFormat, LibcryptErr,
+    CryptVolumeKeyFlags, CryptWipePattern, EncryptionFormat, LibcryptErr, TokenInput,
 };
 
 use crate::{
@@ -944,4 +944,21 @@ fn identifiers_from_metadata(device: &mut CryptDevice) -> StratisResult<StratisI
 // Bytes occupied by crypt metadata
 pub fn crypt_metadata_size() -> u64 {
     2 * DEFAULT_CRYPT_METADATA_SIZE + DEFAULT_CRYPT_KEYSLOTS_SIZE
+}
+
+/// Read the full Clevis token metadata from the device path provided.
+pub fn get_clevis_token_metadata(dev_path: &Path) -> StratisResult<Value> {
+    acquire_crypt_device(dev_path)?
+        .token_handle()
+        .json_get(CLEVIS_LUKS_TOKEN_ID)
+        .map_err(StratisError::from)
+}
+
+/// Write the full Clevis token metadata from the device path provided.
+pub fn set_clevis_token_metadata(dev_path: &Path, clevis_token: &Value) -> StratisResult<()> {
+    acquire_crypt_device(dev_path)?
+        .token_handle()
+        .json_set(TokenInput::ReplaceToken(CLEVIS_LUKS_TOKEN_ID, clevis_token))
+        .map(|_| ())
+        .map_err(StratisError::from)
 }

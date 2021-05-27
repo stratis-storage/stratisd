@@ -205,9 +205,14 @@ impl CryptHandle {
     }
 
     /// Change the key description and passphrase that a device is bound to
+    ///
+    /// This method does not need to re-read the cached Clevis information because
+    /// the config will not change and we do not cache all of the metadata
+    /// information that is stored on the device like the JWE. We only cache
+    /// the initial config which will remain unchanged.
     pub fn rebind_clevis(&mut self) -> StratisResult<()> {
-        if self.encryption_info.clevis_info.is_none() {
-            return Err(StratisError::Error(
+        if self.encryption_info().clevis_info.is_none() {
+            return Err(StratisError::Msg(
                 "No Clevis binding found; cannot regenerate the Clevis binding if the device does not already have a Clevis binding".to_string(),
             ));
         }
@@ -216,22 +221,10 @@ impl CryptHandle {
             .keyslots(CLEVIS_LUKS_TOKEN_ID)?
             .and_then(|vec| vec.into_iter().next())
             .ok_or_else(|| {
-                StratisError::Error(
-                    "Clevis binding found but no keyslot was associated".to_string(),
-                )
+                StratisError::Msg("Clevis binding found but no keyslot was associated".to_string())
             })?;
         clevis_luks_regen(self.luks2_device_path(), keyslot)?;
 
-        let mut device = self.acquire_crypt_device()?;
-        self.encryption_info.clevis_info =
-            Some(clevis_info_from_metadata(&mut device).and_then(|opt| {
-                opt.ok_or_else(|| {
-                    StratisError::Error(
-                        "Expected Clevis binding after regeneration operation but not was found"
-                            .to_string(),
-                    )
-                })
-            })?);
         Ok(())
     }
 
@@ -286,18 +279,18 @@ impl CryptHandle {
     pub fn rebind_keyring(&mut self, new_key_desc: &KeyDescription) -> StratisResult<()> {
         let mut device = self.acquire_crypt_device()?;
 
-        let old_key_description = self.encryption_info
+        let old_key_description = self.encryption_info()
             .key_description
             .as_ref()
             .ok_or_else(|| {
-                StratisError::Error("Cannot change passphrase because this device is not bound to a passphrase in the kernel keyring".to_string())
+                StratisError::Msg("Cannot change passphrase because this device is not bound to a passphrase in the kernel keyring".to_string())
             })?;
         add_keyring_keyslot(
             &mut device,
             new_key_desc,
             Some(Either::Right(old_key_description)),
         )?;
-        self.encryption_info.key_description = Some(new_key_desc.clone());
+        self.metadata_handle.encryption_info.key_description = Some(new_key_desc.clone());
         Ok(())
     }
 

@@ -449,6 +449,28 @@ impl Display for RenameAction<Key> {
     }
 }
 
+impl Display for RenameAction<Clevis> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            RenameAction::Identity => {
+                write!(
+                    f,
+                    "Clevis bindings regeneration resulted in no changes to the metadata",
+                )
+            }
+            RenameAction::Renamed(_) => {
+                write!(f, "Clevis bindings were successfully regenerated")
+            }
+            RenameAction::NoSource => {
+                write!(
+                    f,
+                    "Could not change the Clevis bindings as this pool is not bound to Clevis"
+                )
+            }
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 /// A single delete action.
 pub enum DeleteAction<T> {
@@ -574,5 +596,17 @@ impl Display for SetDeleteAction<FilesystemUuid> {
                     .join(", ")
             )
         }
+    }
+}
+
+/// ACtion indicating a Clevis binding regeneration
+pub struct RegenAction;
+
+impl Display for RegenAction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "The Clevis bindings were successfully regenerated using the same configuration that was originally supplied"
+        )
     }
 }

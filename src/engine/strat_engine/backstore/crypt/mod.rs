@@ -18,7 +18,10 @@ pub use self::{
     handle::CryptHandle,
     initialize::CryptInitializer,
     metadata_handle::CryptMetadataHandle,
-    shared::{crypt_metadata_size, interpret_clevis_config},
+    shared::{
+        crypt_metadata_size, get_clevis_token_metadata, interpret_clevis_config,
+        set_clevis_token_metadata,
+    },
 };
 
 #[cfg(test)]

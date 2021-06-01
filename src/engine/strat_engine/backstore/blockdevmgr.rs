@@ -7,7 +7,7 @@
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use chrono::{DateTime, Duration, Utc};
@@ -466,9 +466,10 @@ impl BlockDevMgr {
             }
         }
 
-        bind_loop(
+        operation_loop(
             self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
             |blockdev| blockdev.bind_clevis(pin, clevis_info),
+            |blockdev| blockdev,
             |blockdev| blockdev.unbind_clevis(),
         )?;
 
@@ -484,25 +485,24 @@ impl BlockDevMgr {
     /// or unbinding failed.
     pub fn unbind_clevis(&mut self) -> StratisResult<bool> {
         let encryption_info = self.encryption_info();
-        if !encryption_info.is_encrypted() {
+        let (pin, clevis_info) = if !encryption_info.is_encrypted() {
             return Err(StratisError::Error(
                 "Requested pool does not appear to be encrypted".to_string(),
             ));
-        } else if encryption_info.clevis_info.is_none() {
+        } else if let Some((pin, clevis_info)) = encryption_info.clevis_info.clone() {
+            (pin, clevis_info)
+        } else {
+            // is encrypted and Clevis info is None
             return Ok(false);
-        }
+        };
 
-        for blockdev in self.blockdevs_mut().into_iter().map(|(_, bd)| bd) {
-            let res = blockdev.unbind_clevis();
-            if let Err(ref e) = res {
-                warn!(
-                    "Failed to unbind from the tang server using clevis: {}. \
-                    This operation cannot be rolled back automatically.",
-                    e,
-                );
-            }
-            res?
-        }
+        operation_loop(
+            self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
+            |blockdev| blockdev.unbind_clevis(),
+            |blockdev| blockdev,
+            |blockdev| blockdev.bind_clevis(&pin, &clevis_info),
+        )?;
+
         Ok(true)
     }
 
@@ -544,9 +544,10 @@ impl BlockDevMgr {
             }
         }
 
-        bind_loop(
+        operation_loop(
             self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
             |blockdev| blockdev.bind_keyring(key_desc),
+            |blockdev| blockdev,
             |blockdev| blockdev.unbind_keyring(),
         )?;
 
@@ -563,57 +564,72 @@ impl BlockDevMgr {
     /// or unbinding failed.
     pub fn unbind_keyring(&mut self) -> StratisResult<bool> {
         let encryption_info = self.encryption_info();
-        if !encryption_info.is_encrypted() {
+        let key_desc = if !encryption_info.is_encrypted() {
             return Err(StratisError::Error(
                 "Requested pool does not appear to be encrypted".to_string(),
             ));
-        } else if encryption_info.key_description.is_none() {
+        } else if let Some(key_desc) = encryption_info.key_description.clone() {
+            key_desc
+        } else {
+            // is encrypted and key description is None
             return Ok(false);
-        }
+        };
 
-        for blockdev in self.blockdevs_mut().into_iter().map(|(_, bd)| bd) {
-            let res = blockdev.unbind_keyring();
-            if let Err(ref e) = res {
-                warn!(
-                    "Failed to unbind from the passphrase in the kernel keyring: {}. \
-                    This operation cannot be rolled back automatically.",
-                    e,
-                );
-            }
-            res?
-        }
+        operation_loop(
+            self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
+            |blockdev| blockdev.unbind_keyring(),
+            |blockdev| blockdev,
+            |blockdev| blockdev.bind_keyring(&key_desc),
+        )?;
+
         Ok(true)
     }
 }
 
-fn bind_loop<'a, I, B, U>(blockdevs: I, bind: B, unbind: U) -> StratisResult<()>
+fn operation_loop<'a, I, A, C, R, RI>(
+    blockdevs: I,
+    action: A,
+    input_calculation: C,
+    rollback: R,
+) -> StratisResult<()>
 where
     I: IntoIterator<Item = &'a mut StratBlockDev>,
-    B: Fn(&mut StratBlockDev) -> StratisResult<()>,
-    U: Fn(&mut StratBlockDev) -> StratisResult<()>,
+    A: Fn(&mut StratBlockDev) -> StratisResult<()>,
+    C: Fn(&'a mut StratBlockDev) -> RI,
+    R: Fn(RI) -> StratisResult<()>,
 {
-    fn rollback_loop<U>(rollback_record: Vec<&mut StratBlockDev>, unbind: U)
+    fn rollback_loop<R, RI>(
+        rollback_record: Vec<(RI, PathBuf)>,
+        rollback: R,
+        causal_error: StratisError,
+    ) -> StratisError
     where
-        U: Fn(&mut StratBlockDev) -> StratisResult<()>,
+        R: Fn(RI) -> StratisResult<()>,
     {
-        rollback_record.into_iter().for_each(|blockdev| {
-            if let Err(e) = unbind(blockdev) {
+        for (rollback_input, path) in rollback_record {
+            if let Err(e) = rollback(rollback_input) {
                 warn!(
-                    "Failed to unbind device {} during rollback: {}",
-                    blockdev.physical_path().display(),
+                    "Failed to roll back device operation for device {}: {}",
+                    path.display(),
                     e,
                 );
+                return StratisError::Error(format!(
+                    "Rollback failed with error: {}; the original error that caused the rollback is {}", e, causal_error
+                ));
             }
-        });
+        }
+
+        causal_error
     }
 
     let mut rollback_record = Vec::new();
     for blockdev_ref in blockdevs {
-        if let Err(e) = bind(blockdev_ref) {
-            rollback_loop(rollback_record, unbind);
-            return Err(e);
+        if let Err(error) = action(blockdev_ref) {
+            return Err(rollback_loop(rollback_record, rollback, error));
         } else {
-            rollback_record.push(blockdev_ref);
+            let path = blockdev_ref.physical_path().to_owned();
+            let input = input_calculation(blockdev_ref);
+            rollback_record.push((input, path));
         }
     }
     Ok(())

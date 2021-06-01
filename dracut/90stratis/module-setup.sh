@@ -11,6 +11,7 @@ check() {
 	    xfs_admin \
 	    xfs_growfs \
 	    xfs_db \
+	    udevadm \
 	    plymouth \
 	    /usr/sbin/plymouthd \
 	    /usr/lib/udev/stratis-str-cmp \
@@ -41,6 +42,7 @@ install() {
 	    xfs_admin \
 	    xfs_growfs \
 	    xfs_db \
+	    udevadm \
 	    plymouth \
 	    /usr/sbin/plymouthd \
 	    /usr/lib/udev/stratis-str-cmp

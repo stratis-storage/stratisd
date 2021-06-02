@@ -40,6 +40,7 @@ pub enum StratisError {
     #[cfg(feature = "dbus_enabled")]
     Dbus(dbus::Error),
     Udev(libudev::Error),
+    DisableActions(Box<StratisError>),
 }
 
 impl fmt::Display for StratisError {
@@ -96,6 +97,11 @@ impl fmt::Display for StratisError {
                 write!(f, "Dbus error: {}", err.message().unwrap_or("Unknown"))
             }
             StratisError::Udev(ref err) => write!(f, "Udev error: {}", err),
+            StratisError::DisableActions(ref err) => write!(
+                f,
+                "Error that prevents further modifications to the pool: {}",
+                err
+            ),
         }
     }
 }

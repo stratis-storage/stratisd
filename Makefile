@@ -19,11 +19,9 @@ BINDIR ?= $(PREFIX)/bin
 PROFILEDIR ?= release
 
 ifeq ($(PROFILEDIR), debug)
-  PROFILETARGET = build
-  PROFILEMINTARGET = build-min
+  RELEASE_FLAG =
 else
-  PROFILETARGET = release
-  PROFILEMINTARGET = release-min
+  RELEASE_FLAG = --release
 endif
 
 RELEASE_VERSION ?= 9.9.9
@@ -179,44 +177,41 @@ fmt-travis:
 build:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build ${TARGET_ARGS}
+	cargo build ${RELEASE_FLAG} ${TARGET_ARGS}
 
 build-tests:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo test --no-run ${TARGET_ARGS}
+	cargo test ${RELEASE_FLAG} --no-run ${TARGET_ARGS}
 
 build-extras:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build ${EXTRAS_FEATURES} ${TARGET_ARGS}
+	cargo build ${RELEASE_FLAG} ${EXTRAS_FEATURES} ${TARGET_ARGS}
 
 build-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build --bin=stratis-min --bin=stratisd-min --bin=stratis-utils \
-	${SYSTEMD_FEATURES} ${TARGET_ARGS}
-
-release-min:
-	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
-	cargo build --release --bin=stratis-min --bin=stratisd-min \
+	cargo build ${RELEASE_FLAG} --bin=stratis-min --bin=stratisd-min \
 	--bin=stratis-utils ${SYSTEMD_FEATURES} ${TARGET_ARGS}
 
 stratis-dumpmetadata:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build --bin=stratis_dumpmetadata ${EXTRAS_FEATURES} ${TARGET_ARGS}
+	cargo build ${RELEASE_FLAG} \
+	--bin=stratis_dumpmetadata ${EXTRAS_FEATURES} ${TARGET_ARGS}
 
 stratis-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build --bin=stratis-min ${MIN_FEATURES} ${TARGET_ARGS}
+	cargo build ${RELEASE_FLAG} \
+	--bin=stratis-min ${MIN_FEATURES} ${TARGET_ARGS}
 
 stratisd-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build --bin=stratisd-min ${SYSTEMD_FEATURES} ${TARGET_ARGS}
+	cargo build ${RELEASE_FLAG} \
+	--bin=stratisd-min ${SYSTEMD_FEATURES} ${TARGET_ARGS}
 
 install-cfg: docs/stratisd.8
 	install -Dpm0644 -t $(DESTDIR)$(DATADIR)/dbus-1/system.d stratisd.conf
@@ -235,7 +230,7 @@ install-cfg: docs/stratisd.8
 	install -Dpm0644 -t $(DESTDIR)$(UNITDIR) systemd/stratisd-min-postinitrd.service
 	install -Dpm0644 -t $(DESTDIR)$(UNITDIR) systemd/stratis-fstab-setup@.service
 
-install: $(PROFILETARGET) $(PROFILEMINTARGET) install-cfg
+install: build build-min install-cfg
 	install -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd
 	install -Dpm0755 -t $(DESTDIR)$(UDEVDIR) target/$(PROFILEDIR)/stratis-utils
 	mv -fv $(DESTDIR)$(UDEVDIR)/stratis-utils $(DESTDIR)$(UDEVDIR)/stratis-str-cmp
@@ -277,23 +272,25 @@ clean-primary:
 # remove installed items
 clean: clean-cfg clean-ancillary clean-primary
 
-release:
-	RUSTFLAGS="${DENY}" cargo build --release
-
 test-loop:
-	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test loop_ -- --skip clevis_loop_
+	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 \
+        cargo test ${RELEASE_FLAG} loop_ -- --skip clevis_loop_
 
 test-real:
-	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test real_ -- --skip clevis_real_
+	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 \
+        cargo test ${RELEASE_FLAG} real_ -- --skip clevis_real_
 
 test:
-	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 cargo test --all-features -- --skip real_ --skip loop_ --skip clevis_
+	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 \
+	cargo test ${RELEASE_FLAG} --all-features -- --skip real_ --skip loop_ --skip clevis_
 
 test-clevis-real:
-	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test clevis_real_
+	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 \
+	cargo test ${RELEASE_FLAG} clevis_real_
 
 test-clevis-loop:
-	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test clevis_loop_
+	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 \
+        cargo test ${RELEASE_FLAG} clevis_loop_
 
 yamllint:
 	yamllint --strict .github/workflows/*.yml
@@ -319,7 +316,7 @@ set-lower-bounds:
 build-all:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build --all-targets --all-features
+	cargo build ${RELEASE_FLAG} --all-targets --all-features
 
 # Verify that the dependency bounds set in Cargo.toml are not lower
 # than is actually reqired. Use build-all target to set up for cargo-tree
@@ -351,8 +348,6 @@ verify-dependency-bounds:
 	install-cfg
 	license
 	outdated
-	release
-	release-min
 	set-lower-bounds
 	test
 	test-loop

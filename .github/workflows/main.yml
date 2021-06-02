@@ -44,6 +44,26 @@ jobs:
             components: clippy
             image: fedora:33
           # MANDATORY TESTING ON STABLE
+          - task: PROFILEDIR=debug make -f Makefile build
+            toolchain: stable
+            components: cargo
+            image: ubuntu:groovy
+          - task: PROFILEDIR=debug make -f Makefile build-min
+            toolchain: stable
+            components: cargo
+            image: ubuntu:groovy
+          - task: PROFILEDIR=DEBUG make -f Makefile build-extras
+            toolchain: stable
+            components: cargo
+            image: ubuntu:groovy
+          - task: make -f Makefile docs-travis
+            toolchain: stable
+            components: cargo
+            image: ubuntu:groovy
+          - task: PROFILEDIR=debug make -f Makefile test
+            toolchain: stable
+            components: cargo
+            image: ubuntu:groovy
           - task: make -f Makefile build
             toolchain: stable
             components: cargo
@@ -52,35 +72,15 @@ jobs:
             toolchain: stable
             components: cargo
             image: ubuntu:groovy
-          - task: make -f Makefile build-extras
-            toolchain: stable
-            components: cargo
-            image: ubuntu:groovy
-          - task: make -f Makefile docs-travis
-            toolchain: stable
-            components: cargo
-            image: ubuntu:groovy
-          - task: make -f Makefile test
-            toolchain: stable
-            components: cargo
-            image: ubuntu:groovy
-          - task: make -f Makefile release
-            toolchain: stable
-            components: cargo
-            image: ubuntu:groovy
-          - task: make -f Makefile release-min
-            toolchain: stable
-            components: cargo
-            image: ubuntu:groovy
-          - task: make -f Makefile build
+          - task: PROFILEDIR=debug make -f Makefile build
             toolchain: stable
             components: cargo
             image: fedora:33
-          - task: make -f Makefile build-min
+          - task: PROFILEDIR=debug make -f Makefile build-min
             toolchain: stable
             components: cargo
             image: fedora:33
-          - task: make -f Makefile build-extras
+          - task: PROFILEDIR=debug make -f Makefile build-extras
             toolchain: stable
             components: cargo
             image: fedora:33
@@ -88,15 +88,15 @@ jobs:
             toolchain: stable
             components: cargo
             image: fedora:33
-          - task: make -f Makefile test
+          - task: PROFILEDIR=debug make -f Makefile test
             toolchain: stable
             components: cargo
             image: fedora:33
-          - task: make -f Makefile release
+          - task: PROFILEDIR=debug make -f Makefile build
             toolchain: stable
             components: cargo
             image: fedora:33
-          - task: make -f Makefile release-min
+          - task: PROFILEDIR=debug make -f Makefile build-min
             toolchain: stable
             components: cargo
             image: fedora:33
@@ -147,11 +147,17 @@ jobs:
       matrix:
         include:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
-          - task: RUST_LOG=libstratis=debug make -f Makefile test-loop
+          - task: >
+              RUST_LOG=libstratis=debug
+              PROFILEDIR=debug
+              make -f Makefile test-loop
             toolchain: stable
             components: cargo
             image: ubuntu:groovy
-          - task: RUST_LOG=libstratis=debug make -f Makefile test-loop
+          - task: >
+              RUST_LOG=libstratis=debug
+              PROFILEDIR=debug
+              make -f Makefile test-loop
             toolchain: stable
             components: cargo
             image: fedora:33
@@ -218,6 +224,7 @@ jobs:
           - task: >-
               TANG_URL=tang
               RUST_LOG=libstratis=debug
+              PROFILEDIR=debug
               make -f Makefile test-clevis-loop
             toolchain: stable
             components: cargo

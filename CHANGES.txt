@@ -1,3 +1,39 @@
+stratisd 2.4.2
+==============
+Recommended Rust toolchain version: 1.52.1
+Lowest supported Rust toolchain version: 1.49
+
+Recommended development platform for Python development: Fedora 33
+Lowest supported Python interpreter: 3.6.8
+
+- Add additional command-line dependencies to dracut module:
+  https://github.com/stratis-storage/stratisd/pull/2627
+
+- Improve unsupported tool stratis-dumpmetadata:
+  https://github.com/stratis-storage/stratisd/issues/2133
+  https://github.com/stratis-storage/stratisd/pull/2626
+
+- Remove an assertion that is invalid:
+  https://github.com/stratis-storage/stratisd/pull/2612
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/2624
+  https://github.com/stratis-storage/stratisd/pull/2621
+  https://github.com/stratis-storage/stratisd/pull/2620
+  https://github.com/stratis-storage/stratisd/pull/2618
+  https://github.com/stratis-storage/stratisd/pull/2617
+  https://github.com/stratis-storage/stratisd/pull/2616
+  https://github.com/stratis-storage/stratisd/pull/2615
+  https://github.com/stratis-storage/stratisd/pull/2609
+  https://github.com/stratis-storage/stratisd/pull/2608
+  https://github.com/stratis-storage/stratisd/pull/2607
+  https://github.com/stratis-storage/stratisd/pull/2603
+  https://github.com/stratis-storage/stratisd/pull/2602
+  https://github.com/stratis-storage/stratisd/pull/2601
+  https://github.com/stratis-storage/stratisd/pull/2600
+  https://github.com/stratis-storage/stratisd/pull/2598
+
+
 stratisd 2.4.1
 ==============
 Recommended Rust toolchain version: 1.51.0

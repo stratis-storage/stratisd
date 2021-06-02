@@ -269,6 +269,7 @@ jobs:
               pylint
               python3-requests
               python3-pygithub
+              python3-semantic_version
             image: fedora:33
             task: make -f Makefile lint
             working-directory: ./code_maintenance

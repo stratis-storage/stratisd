@@ -324,3 +324,12 @@ impl Deref for DevicePath {
         self.0.as_path()
     }
 }
+
+/// Represents what actions this pool can accept.
+#[derive(Debug)]
+pub enum ActionAvailability {
+    Full,
+    // FIXME: To be used eventually
+    #[allow(dead_code)]
+    ReadOnly,
+}

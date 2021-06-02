@@ -3,7 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    borrow::Cow,
     collections::HashMap,
     fmt::Debug,
     os::unix::io::RawFd,
@@ -17,10 +16,11 @@ use devicemapper::{Bytes, Sectors};
 
 use crate::{
     engine::types::{
-        BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid,
-        Key, KeyDescription, LockedPoolInfo, MappingCreateAction, MappingDeleteAction, Name,
-        PoolUuid, RegenAction, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
-        SetUnlockAction, UdevEngineEvent, UnlockMethod,
+        ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
+        EncryptionInfo, FilesystemUuid, Key, KeyDescription, LockedPoolInfo, MappingCreateAction,
+        MappingDeleteAction, Name, PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction,
+        ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, UdevEngineEvent,
+        UnlockMethod,
     },
     stratis::StratisResult,
 };
@@ -256,7 +256,12 @@ pub trait Pool: Debug {
     fn is_encrypted(&self) -> bool;
 
     /// Get all encryption information for this pool.
-    fn encryption_info(&self) -> Cow<EncryptionInfo>;
+    fn encryption_info(&self) -> Option<PoolEncryptionInfo>;
+
+    /// Get the pool state for the given pool. The state indicates which actions
+    /// will be disabled or enabled. Disabled actions are triggered by failures
+    /// caught by stratisd.
+    fn avail_actions(&self) -> ActionAvailability;
 }
 
 pub trait Engine: Debug + Report + Send {
@@ -269,7 +274,7 @@ pub trait Engine: Debug + Report + Send {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
-        encryption_info: &EncryptionInfo,
+        encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<CreateAction<PoolUuid>>;
 
     /// Handle a libudev event.

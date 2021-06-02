@@ -369,9 +369,9 @@ mod tests {
             )
             .initialize(
                 Some(key_desc),
-                Some((
-                    "tang",
-                    &json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true}),
+                Some(&(
+                    "tang".to_string(),
+                    json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true}),
                 )),
             )?;
 
@@ -410,9 +410,9 @@ mod tests {
         )
         .initialize(
             None,
-            Some((
-                "tang",
-                &json!({"url": env::var("TANG_URL").unwrap(), "stratis:tang:trust_url": true}),
+            Some(&(
+                "tang".to_string(),
+                json!({"url": env::var("TANG_URL").unwrap(), "stratis:tang:trust_url": true}),
             )),
         )
         .unwrap();

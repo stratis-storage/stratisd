@@ -8,7 +8,7 @@ use either::Either;
 use serde_json::Value;
 
 use devicemapper::Sectors;
-use libcryptsetup_rs::{c_uint, CryptDevice, TokenInput};
+use libcryptsetup_rs::{c_uint, CryptDevice, EncryptionFormat, TokenInput};
 
 use crate::{
     engine::{
@@ -148,8 +148,7 @@ impl CryptHandle {
         let key_desc = self
             .metadata_handle
             .encryption_info
-            .key_description
-            .as_ref()
+            .key_description()
             .ok_or_else(|| {
                 StratisError::Msg(
                     "Clevis binding requires a registered key description for the device \
@@ -168,7 +167,11 @@ impl CryptHandle {
                 yes,
             )
         })?;
-        self.metadata_handle.encryption_info.clevis_info = Some((pin.to_string(), json_owned));
+        self.metadata_handle.encryption_info = self
+            .metadata_handle
+            .encryption_info
+            .clone()
+            .set_clevis_info((pin.to_string(), json_owned));
         Ok(())
     }
 
@@ -177,7 +180,7 @@ impl CryptHandle {
         if self
             .metadata_handle
             .encryption_info
-            .key_description
+            .key_description()
             .is_none()
         {
             return Err(StratisError::Msg(
@@ -200,7 +203,11 @@ impl CryptHandle {
                 self.luks2_device_path().display()
             );
         }
-        self.metadata_handle.encryption_info.clevis_info = None;
+        self.metadata_handle.encryption_info = self
+            .metadata_handle
+            .encryption_info
+            .clone()
+            .unset_clevis_info();
         Ok(())
     }
 
@@ -210,32 +217,43 @@ impl CryptHandle {
     /// the config may change specifically in the case where a new thumbprint
     /// is provided if Tang keys are rotated.
     pub fn rebind_clevis(&mut self) -> StratisResult<()> {
-        fn regenerate_cached_clevis_info(dev_path: &Path) -> StratisResult<(String, Value)> {
-            clevis_info_from_metadata(&mut acquire_crypt_device(dev_path)?)?.ok_or_else(|| {
-                StratisError::Msg(format!(
-                    "Did not find Clevis metadata on device {}",
-                    dev_path.display()
-                ))
-            })
-        }
-
-        if self.encryption_info().clevis_info.is_none() {
+        if self.metadata_handle.encryption_info.clevis_info().is_none() {
             return Err(StratisError::Msg(
                 "No Clevis binding found; cannot regenerate the Clevis binding if the device does not already have a Clevis binding".to_string(),
             ));
         }
 
-        let keyslot = self
-            .keyslots(CLEVIS_LUKS_TOKEN_ID)?
+        let mut device = self.acquire_crypt_device()?;
+        let keyslot = get_keyslot_number(&mut device, CLEVIS_LUKS_TOKEN_ID)?
             .and_then(|vec| vec.into_iter().next())
             .ok_or_else(|| {
                 StratisError::Msg("Clevis binding found but no keyslot was associated".to_string())
             })?;
-        clevis_luks_regen(self.luks2_device_path(), keyslot)?;
 
-        regenerate_cached_clevis_info(self.luks2_device_path()).map(|(pin, cfg)| {
-            self.metadata_handle.encryption_info.clevis_info = Some((pin, cfg));
-        })
+        clevis_luks_regen(self.luks2_device_path(), keyslot)?;
+        // Need to reload LUKS2 metadata after Clevis metadata modification.
+        if let Err(e) = device
+            .context_handle()
+            .load::<()>(Some(EncryptionFormat::Luks2), None)
+        {
+            return Err(StratisError::Chained(
+                "Failed to reload crypt device state after modification to Clevis data".to_string(),
+                Box::new(StratisError::from(e)),
+            ));
+        }
+
+        let (pin, config) = clevis_info_from_metadata(&mut device)?.ok_or_else(|| {
+            StratisError::Msg(format!(
+                "Did not find Clevis metadata on device {}",
+                self.luks2_device_path().display()
+            ))
+        })?;
+        self.metadata_handle.encryption_info = self
+            .metadata_handle
+            .encryption_info
+            .clone()
+            .set_clevis_info((pin, config));
+        Ok(())
     }
 
     /// Add a keyring binding to the underlying LUKS2 volume.
@@ -252,13 +270,17 @@ impl CryptHandle {
 
         add_keyring_keyslot(&mut device, key_desc, Some(Either::Left(key)))?;
 
-        self.metadata_handle.encryption_info.key_description = Some(key_desc.clone());
+        self.metadata_handle.encryption_info = self
+            .metadata_handle
+            .encryption_info
+            .clone()
+            .set_key_desc(key_desc.clone());
         Ok(())
     }
 
     /// Add a keyring binding to the underlying LUKS2 volume.
     pub fn unbind_keyring(&mut self) -> StratisResult<()> {
-        if self.metadata_handle.encryption_info.clevis_info.is_none() {
+        if self.metadata_handle.encryption_info.clevis_info().is_none() {
             return Err(StratisError::Msg(
                 "No Clevis binding was found; removing the keyring binding would \
                 remove the ability to open this device; aborting"
@@ -280,7 +302,11 @@ impl CryptHandle {
             .token_handle()
             .json_set(TokenInput::RemoveToken(LUKS2_TOKEN_ID))?;
 
-        self.metadata_handle.encryption_info.key_description = None;
+        self.metadata_handle.encryption_info = self
+            .metadata_handle
+            .encryption_info
+            .clone()
+            .unset_key_desc();
 
         Ok(())
     }
@@ -289,9 +315,8 @@ impl CryptHandle {
     pub fn rebind_keyring(&mut self, new_key_desc: &KeyDescription) -> StratisResult<()> {
         let mut device = self.acquire_crypt_device()?;
 
-        let old_key_description = self.encryption_info()
-            .key_description
-            .as_ref()
+        let old_key_description = self.metadata_handle.encryption_info
+            .key_description()
             .ok_or_else(|| {
                 StratisError::Msg("Cannot change passphrase because this device is not bound to a passphrase in the kernel keyring".to_string())
             })?;
@@ -300,7 +325,11 @@ impl CryptHandle {
             new_key_desc,
             Some(Either::Right(old_key_description)),
         )?;
-        self.metadata_handle.encryption_info.key_description = Some(new_key_desc.clone());
+        self.metadata_handle.encryption_info = self
+            .metadata_handle
+            .encryption_info
+            .clone()
+            .set_key_desc(new_key_desc.clone());
         Ok(())
     }
 

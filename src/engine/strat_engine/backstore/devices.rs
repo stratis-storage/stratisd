@@ -12,7 +12,6 @@ use std::{
 
 use chrono::Utc;
 use itertools::Itertools;
-use serde_json::Value;
 
 use devicemapper::{Bytes, Device, Sectors, IEC};
 
@@ -31,7 +30,7 @@ use crate::{
             names::KeyDescription,
             udev::{block_device_apply, decide_ownership, get_udev_property, UdevOwnership},
         },
-        types::{DevUuid, DevicePath, EncryptionInfo, PoolUuid},
+        types::{ClevisInfo, DevUuid, DevicePath, EncryptionInfo, PoolUuid},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -387,7 +386,7 @@ pub fn initialize_devices(
     devices: Vec<DeviceInfo>,
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
-    encryption_info: &EncryptionInfo,
+    encryption_info: Option<&EncryptionInfo>,
 ) -> StratisResult<Vec<StratBlockDev>> {
     /// Map a major/minor device number of a physical device
     /// to the corresponding major/minor number of the encrypted
@@ -409,7 +408,7 @@ pub fn initialize_devices(
         pool_uuid: PoolUuid,
         dev_uuid: DevUuid,
         key_description: Option<&KeyDescription>,
-        enable_clevis: Option<(&str, &Value)>,
+        enable_clevis: Option<&ClevisInfo>,
     ) -> StratisResult<(CryptHandle, Device, Sectors)> {
         let handle = CryptInitializer::new(
             DevicePath::new(physical_path.to_owned())?,
@@ -536,19 +535,16 @@ pub fn initialize_devices(
         dev_info: &DeviceInfo,
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
-        encryption_info: &EncryptionInfo,
+        encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<StratBlockDev> {
         let dev_uuid = DevUuid::new_v4();
-        let (handle, devno, blockdev_size) = if encryption_info.is_encrypted() {
+        let (handle, devno, blockdev_size) = if let Some(ei) = encryption_info {
             initialize_encrypted(
                 &dev_info.devnode,
                 pool_uuid,
                 dev_uuid,
-                encryption_info.key_description.as_ref(),
-                encryption_info
-                    .clevis_info
-                    .as_ref()
-                    .map(|(pin, json)| (pin.as_str(), json)),
+                ei.key_description(),
+                ei.clevis_info(),
             )
             .map(|(handle, devno, devsize)| {
                 debug!(
@@ -695,10 +691,9 @@ mod tests {
             dev_infos,
             pool_uuid,
             MDADataSize::default(),
-            &EncryptionInfo {
-                key_description: key_description.cloned(),
-                clevis_info: None,
-            },
+            key_description
+                .map(|kd| EncryptionInfo::KeyDesc(kd.clone()))
+                .as_ref(),
         )?;
 
         if blockdevs.len() != paths.len() {
@@ -948,10 +943,9 @@ mod tests {
             dev_infos,
             pool_uuid,
             MDADataSize::default(),
-            &EncryptionInfo {
-                key_description: key_desc.cloned(),
-                clevis_info: None,
-            },
+            key_desc
+                .map(|kd| EncryptionInfo::KeyDesc(kd.clone()))
+                .as_ref(),
         )
         .is_ok()
         {

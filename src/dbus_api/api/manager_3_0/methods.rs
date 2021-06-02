@@ -54,7 +54,7 @@ pub fn destroy_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
         }
     };
 
-    let msg = match log_action!(dbus_context.engine.blocking_lock().destroy_pool(pool_uuid)) {
+    let msg = match handle_action!(dbus_context.engine.blocking_lock().destroy_pool(pool_uuid)) {
         Ok(DeleteAction::Deleted(uuid)) => {
             dbus_context.push_remove(&pool_path, consts::pool_interface_list());
             return_message.append3(
@@ -86,7 +86,7 @@ pub fn unset_key(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let default_return = false;
     let return_message = message.method_return();
 
-    let msg = match log_action!(dbus_context
+    let msg = match handle_action!(dbus_context
         .engine
         .blocking_lock()
         .get_key_handler_mut()
@@ -124,7 +124,7 @@ pub fn set_key(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let default_return = (false, false);
     let return_message = message.method_return();
 
-    let msg = match log_action!(dbus_context
+    let msg = match handle_action!(dbus_context
         .engine
         .blocking_lock()
         .get_key_handler_mut()
@@ -190,7 +190,7 @@ pub fn unlock_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
         }
     };
 
-    let msg = match log_action!(dbus_context
+    let msg = match handle_action!(dbus_context
         .engine
         .blocking_lock()
         .unlock_pool(pool_uuid, unlock_method))
@@ -282,14 +282,11 @@ pub fn create_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let object_path = m.path.get_name();
     let dbus_context = m.tree.get_data();
     let mut mutex_lock = dbus_context.engine.blocking_lock();
-    let result = log_action!(mutex_lock.create_pool(
+    let result = handle_action!(mutex_lock.create_pool(
         name,
         &devs.map(|x| Path::new(x)).collect::<Vec<&Path>>(),
         tuple_to_option(redundancy_tuple),
-        &EncryptionInfo {
-            key_description: key_desc,
-            clevis_info,
-        }
+        EncryptionInfo::from_options((key_desc, clevis_info)).as_ref(),
     ));
 
     let msg = match result {

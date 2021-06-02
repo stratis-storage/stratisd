@@ -214,6 +214,7 @@ SPECS = {
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>
     <property name="Name" type="s" access="read" />
+    <property name="AvailableActions" type="s" access="read" />
     <property name="Uuid" type="s" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>

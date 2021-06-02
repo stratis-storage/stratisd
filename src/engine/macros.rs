@@ -233,3 +233,14 @@ macro_rules! retry_operation {
         }
     };
 }
+
+macro_rules! pool_enc_to_enc {
+    ($ei_option:expr) => {
+        match $ei_option {
+            Some(pei) => Some($crate::engine::types::EncryptionInfo::try_from(
+                pei.clone(),
+            )?),
+            None => None,
+        }
+    };
+}

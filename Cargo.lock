@@ -1142,9 +1142,19 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "sha2",
+ "stratisd_proc_macros",
  "tempfile",
  "tokio",
  "uuid",
+]
+
+[[package]]
+name = "stratisd_proc_macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

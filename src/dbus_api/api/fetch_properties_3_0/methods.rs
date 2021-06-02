@@ -15,7 +15,7 @@ use crate::dbus_api::{
     api::shared::list_keys,
     consts,
     types::TData,
-    util::{option_to_tuple, result_to_tuple},
+    util::{result_option_to_tuple, result_to_tuple},
 };
 
 const ALL_PROPERTIES: [&str; 2] = [consts::KEY_LIST_PROP, consts::LOCKED_POOL_DEVS];
@@ -37,22 +37,22 @@ pub fn locked_pools_with_devs(
                 vec![
                     (
                         "key_description".to_string(),
-                        Variant(Box::new(option_to_tuple(
+                        Variant(Box::new(result_option_to_tuple(
                             locked
                                 .info
-                                .key_description
-                                .map(|kd| kd.as_application_str().to_string()),
+                                .key_description()
+                                .map(|opt| opt.map(|kd| kd.as_application_str().to_string())),
                             String::new(),
                         )) as Box<dyn RefArg>),
                     ),
                     (
                         "clevis_info".to_string(),
-                        Variant(Box::new(option_to_tuple(
+                        Variant(Box::new(result_option_to_tuple(
                             locked
                                 .info
-                                .clevis_info
-                                .map(|(pin, info)| (pin, info.to_string())),
-                            (String::new(), "{}".to_string()),
+                                .clevis_info()
+                                .map(|opt| opt.map(|(pin, cfg)| (pin.to_owned(), cfg.to_string()))),
+                            (String::new(), String::new()),
                         )) as Box<dyn RefArg>),
                     ),
                     (

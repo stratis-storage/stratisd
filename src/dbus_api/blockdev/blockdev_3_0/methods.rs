@@ -44,7 +44,7 @@ pub fn set_user_info(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let blockdev_uuid = typed_uuid!(blockdev_data.uuid; Dev; default_return; return_message);
     let result =
         pool.set_blockdev_user_info(&pool_name, blockdev_uuid, tuple_to_option(new_id_spec));
-    let msg = match log_action!(result) {
+    let msg = match handle_action!(result, dbus_context, pool_path.get_name()) {
         Ok(RenameAction::NoSource) => {
             let error_message = format!(
                 "pool doesn't know about block device {}",

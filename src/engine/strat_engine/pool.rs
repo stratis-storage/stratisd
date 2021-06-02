@@ -2,12 +2,13 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{borrow::Cow, path::Path, vec::Vec};
+use std::{path::Path, vec::Vec};
 
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
 
 use devicemapper::{Bytes, DmNameBuf, Sectors};
+use stratisd_proc_macros::strat_pool_impl_gen;
 
 use crate::{
     engine::{
@@ -23,9 +24,9 @@ use crate::{
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
         types::{
-            BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo,
-            FilesystemUuid, Key, KeyDescription, Name, PoolUuid, Redundancy, RegenAction,
-            RenameAction, SetCreateAction, SetDeleteAction,
+            ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
+            EncryptionInfo, FilesystemUuid, Key, KeyDescription, Name, PoolEncryptionInfo,
+            PoolUuid, Redundancy, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -136,8 +137,10 @@ pub struct StratPool {
     backstore: Backstore,
     redundancy: Redundancy,
     thin_pool: ThinPool,
+    action_avail: ActionAvailability,
 }
 
+#[strat_pool_impl_gen]
 impl StratPool {
     /// Initialize a Stratis Pool.
     /// 1. Initialize the block devices specified by paths.
@@ -147,7 +150,7 @@ impl StratPool {
         name: &str,
         paths: &[&Path],
         redundancy: Redundancy,
-        encryption_info: &EncryptionInfo,
+        encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = PoolUuid::new_v4();
 
@@ -178,6 +181,7 @@ impl StratPool {
             backstore,
             redundancy,
             thin_pool: thinpool,
+            action_avail: ActionAvailability::Full,
         };
 
         pool.write_metadata(&Name::new(name.to_owned()))?;
@@ -202,6 +206,7 @@ impl StratPool {
         cachedevs: Vec<StratBlockDev>,
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
+        action_avail: ActionAvailability,
     ) -> StratisResult<(Name, StratPool)> {
         check_metadata(metadata)?;
 
@@ -223,6 +228,7 @@ impl StratPool {
             backstore,
             redundancy: Redundancy::NONE,
             thin_pool: thinpool,
+            action_avail,
         };
 
         if changed {
@@ -240,6 +246,7 @@ impl StratPool {
     }
 
     /// Write current metadata to pool members.
+    #[pool_mutating_action("NoRequests")]
     pub fn write_metadata(&mut self, name: &str) -> StratisResult<()> {
         let data = serde_json::to_string(&self.record(name))?;
         self.backstore.save_state(data.as_bytes())
@@ -264,6 +271,7 @@ impl StratPool {
     /// Called when a DM device in this pool has generated an event.
     // TODO: Just check the device that evented. Currently checks
     // everything.
+    #[pool_mutating_action("NoPoolChanges")]
     pub fn event_on(&mut self, pool_uuid: PoolUuid, pool_name: &Name) -> StratisResult<()> {
         if self.thin_pool.check(pool_uuid, &mut self.backstore)? {
             self.write_metadata(pool_name)?;
@@ -288,20 +296,47 @@ impl StratPool {
         self.backstore.get_blockdev_by_uuid(uuid)
     }
 
+    #[pool_mutating_action("NoRequests")]
     pub fn get_mut_strat_blockdev(
         &mut self,
         uuid: DevUuid,
-    ) -> Option<(BlockDevTier, &mut StratBlockDev)> {
-        self.backstore.get_mut_blockdev_by_uuid(uuid)
+    ) -> StratisResult<Option<(BlockDevTier, &mut StratBlockDev)>> {
+        Ok(self.backstore.get_mut_blockdev_by_uuid(uuid))
     }
 
     /// Destroy the pool.
     /// Precondition: All filesystems belonging to this pool must be
     /// unmounted.
+    ///
+    /// This method is not a mutating action as the pool should be allowed
+    /// to be destroyed even if the metadata is inconsistent.
     pub fn destroy(&mut self) -> StratisResult<()> {
         self.thin_pool.teardown()?;
         self.backstore.destroy()?;
         Ok(())
+    }
+
+    #[cfg(test)]
+    #[pool_mutating_action("NoRequests")]
+    #[pool_rollback]
+    pub fn return_rollback_failure(&mut self) -> StratisResult<()> {
+        Err(StratisError::RollbackError {
+            causal_error: Box::new(StratisError::Msg("Causal error".to_string())),
+            rollback_error: Box::new(StratisError::Msg("Rollback error".to_string())),
+        })
+    }
+
+    #[cfg(test)]
+    #[pool_mutating_action("NoRequests")]
+    #[pool_rollback]
+    pub fn return_rollback_failure_chain(&mut self) -> StratisResult<()> {
+        Err(StratisError::Chained(
+            "Chained error".to_string(),
+            Box::new(StratisError::RollbackError {
+                causal_error: Box::new(StratisError::Msg("Causal error".to_string())),
+                rollback_error: Box::new(StratisError::Msg("Rollback error".to_string())),
+            }),
+        ))
     }
 }
 
@@ -323,11 +358,17 @@ impl<'a> Into<Value> for &'a StratPool {
                 unreachable!("Backstore conversion returns a JSON object")
             },
         );
+        map.insert(
+            "available_actions".to_string(),
+            Value::from(self.action_avail.to_string()),
+        );
         Value::from(map)
     }
 }
 
+#[strat_pool_impl_gen]
 impl Pool for StratPool {
+    #[pool_mutating_action("NoRequests")]
     fn init_cache(
         &mut self,
         pool_uuid: PoolUuid,
@@ -367,6 +408,8 @@ impl Pool for StratPool {
         }
     }
 
+    #[pool_mutating_action("NoRequests")]
+    #[pool_rollback]
     fn bind_clevis(
         &mut self,
         pin: &str,
@@ -380,6 +423,8 @@ impl Pool for StratPool {
         }
     }
 
+    #[pool_mutating_action("NoRequests")]
+    #[pool_rollback]
     fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<Clevis>> {
         let changed = self.backstore.unbind_clevis()?;
         if changed {
@@ -389,6 +434,8 @@ impl Pool for StratPool {
         }
     }
 
+    #[pool_mutating_action("NoRequests")]
+    #[pool_rollback]
     fn bind_keyring(
         &mut self,
         key_description: &KeyDescription,
@@ -401,6 +448,8 @@ impl Pool for StratPool {
         }
     }
 
+    #[pool_mutating_action("NoRequests")]
+    #[pool_rollback]
     fn unbind_keyring(&mut self) -> StratisResult<DeleteAction<Key>> {
         let changed = self.backstore.unbind_keyring()?;
         if changed {
@@ -410,6 +459,8 @@ impl Pool for StratPool {
         }
     }
 
+    #[pool_mutating_action("NoRequests")]
+    #[pool_rollback]
     fn rebind_keyring(
         &mut self,
         new_key_desc: &KeyDescription,
@@ -421,16 +472,19 @@ impl Pool for StratPool {
         }
     }
 
+    #[pool_mutating_action("NoRequests")]
+    #[pool_rollback]
     fn rebind_clevis(&mut self) -> StratisResult<RegenAction> {
         self.backstore.rebind_clevis().map(|_| RegenAction)
     }
 
-    fn create_filesystems<'a, 'b>(
-        &'a mut self,
+    #[pool_mutating_action("NoRequests")]
+    fn create_filesystems<'a>(
+        &mut self,
         pool_name: &str,
         pool_uuid: PoolUuid,
-        specs: &[(&'b str, Option<Bytes>)],
-    ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid, Sectors)>> {
+        specs: &[(&'a str, Option<Bytes>)],
+    ) -> StratisResult<SetCreateAction<(&'a str, FilesystemUuid, Sectors)>> {
         let spec_map = validate_filesystem_size_specs(specs)?;
 
         spec_map.iter().fold(Ok(()), |res, (name, size)| {
@@ -467,6 +521,7 @@ impl Pool for StratPool {
         Ok(SetCreateAction::new(result))
     }
 
+    #[pool_mutating_action("NoRequests")]
     fn add_blockdevs(
         &mut self,
         pool_uuid: PoolUuid,
@@ -523,8 +578,9 @@ impl Pool for StratPool {
         bdev_info
     }
 
-    fn destroy_filesystems<'a>(
-        &'a mut self,
+    #[pool_mutating_action("NoRequests")]
+    fn destroy_filesystems(
+        &mut self,
         pool_name: &str,
         fs_uuids: &[FilesystemUuid],
     ) -> StratisResult<SetDeleteAction<FilesystemUuid>> {
@@ -538,6 +594,7 @@ impl Pool for StratPool {
         Ok(SetDeleteAction::new(removed))
     }
 
+    #[pool_mutating_action("NoRequests")]
     fn rename_filesystem(
         &mut self,
         pool_name: &str,
@@ -555,13 +612,14 @@ impl Pool for StratPool {
         }
     }
 
-    fn snapshot_filesystem(
-        &mut self,
+    #[pool_mutating_action("NoRequests")]
+    fn snapshot_filesystem<'a>(
+        &'a mut self,
         pool_name: &str,
         pool_uuid: PoolUuid,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<CreateAction<(FilesystemUuid, &mut dyn Filesystem)>> {
+    ) -> StratisResult<CreateAction<(FilesystemUuid, &'a mut dyn Filesystem)>> {
         validate_name(snapshot_name)?;
 
         if self
@@ -626,6 +684,7 @@ impl Pool for StratPool {
             .map(|(t, b)| (t, b as &dyn BlockDev))
     }
 
+    #[pool_mutating_action("NoRequests")]
     fn set_blockdev_user_info(
         &mut self,
         pool_name: &str,
@@ -651,8 +710,12 @@ impl Pool for StratPool {
         self.datadevs_encrypted()
     }
 
-    fn encryption_info(&self) -> Cow<EncryptionInfo> {
+    fn encryption_info(&self) -> Option<PoolEncryptionInfo> {
         self.backstore.data_tier_encryption_info()
+    }
+
+    fn avail_actions(&self) -> ActionAvailability {
+        self.action_avail.clone()
     }
 }
 
@@ -668,7 +731,10 @@ mod tests {
     use devicemapper::{Bytes, ThinPoolStatus, ThinPoolStatusSummary, IEC, SECTOR_SIZE};
 
     use crate::engine::{
-        strat_engine::tests::{loopbacked, real},
+        strat_engine::{
+            cmd::udev_settle,
+            tests::{loopbacked, real},
+        },
         types::{EngineAction, Redundancy},
     };
 
@@ -677,6 +743,20 @@ mod tests {
     fn invariant(pool: &StratPool, pool_name: &str) {
         check_metadata(&pool.record(&Name::new(pool_name.into()))).unwrap();
         assert!(!(pool.is_encrypted() && pool.backstore.has_cache()));
+        if pool.avail_actions() == ActionAvailability::NoRequests {
+            assert!(
+                pool.encryption_info().is_some()
+                    && pool
+                        .encryption_info()
+                        .map(|ei| { ei.is_inconsistent() })
+                        .unwrap_or(false)
+            );
+        } else if pool.avail_actions() == ActionAvailability::Full {
+            assert!(!pool
+                .encryption_info()
+                .map(|ei| ei.is_inconsistent())
+                .unwrap_or(false));
+        }
         assert!(pool
             .backstore
             .blockdevs()
@@ -689,12 +769,7 @@ mod tests {
     fn test_empty_pool(paths: &[&Path]) {
         assert_eq!(paths.len(), 0);
         assert_matches!(
-            StratPool::initialize(
-                "stratis_test_pool",
-                paths,
-                Redundancy::NONE,
-                &EncryptionInfo::default()
-            ),
+            StratPool::initialize("stratis_test_pool", paths, Redundancy::NONE, None),
             Err(_)
         );
     }
@@ -718,9 +793,7 @@ mod tests {
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let name = "stratis-test-pool";
-        let (uuid, mut pool) =
-            StratPool::initialize(name, paths2, Redundancy::NONE, &EncryptionInfo::default())
-                .unwrap();
+        let (uuid, mut pool) = StratPool::initialize(name, paths2, Redundancy::NONE, None).unwrap();
         invariant(&pool, name);
 
         let metadata1 = pool.record(name);
@@ -804,8 +877,7 @@ mod tests {
 
         let name = "stratis-test-pool";
         let (pool_uuid, mut pool) =
-            StratPool::initialize(name, paths1, Redundancy::NONE, &EncryptionInfo::default())
-                .unwrap();
+            StratPool::initialize(name, paths1, Redundancy::NONE, None).unwrap();
         invariant(&pool, name);
 
         let fs_name = "stratis_test_filesystem";
@@ -876,6 +948,51 @@ mod tests {
                 Some(Bytes::from(IEC::Gi * 4).sectors()),
             ),
             test_add_datadevs,
+        );
+    }
+
+    /// Test that rollback errors are properly detected an maintenance mode
+    /// is set accordingly.
+    fn test_maintenance_mode(paths: &[&Path]) {
+        assert!(paths.len() > 1);
+
+        let name = "stratis-test-pool";
+        let (_, mut pool) = StratPool::initialize(name, paths, Redundancy::NONE, None).unwrap();
+        invariant(&pool, name);
+
+        assert_eq!(pool.action_avail, ActionAvailability::Full);
+        assert!(pool.return_rollback_failure().is_err());
+        assert_eq!(pool.action_avail, ActionAvailability::NoRequests);
+
+        pool.destroy().unwrap();
+        udev_settle().unwrap();
+
+        let name = "stratis-test-pool";
+        let (_, mut pool) = StratPool::initialize(name, paths, Redundancy::NONE, None).unwrap();
+        invariant(&pool, name);
+
+        assert_eq!(pool.action_avail, ActionAvailability::Full);
+        assert!(pool.return_rollback_failure_chain().is_err());
+        assert_eq!(pool.action_avail, ActionAvailability::NoRequests);
+    }
+
+    #[test]
+    fn loop_test_maintenance_mode() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, Some(Bytes::from(IEC::Gi * 4).sectors())),
+            test_maintenance_mode,
+        );
+    }
+
+    #[test]
+    fn real_test_mainenance_mode() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(
+                2,
+                Some(Bytes::from(IEC::Gi * 2).sectors()),
+                Some(Bytes::from(IEC::Gi * 4).sectors()),
+            ),
+            test_maintenance_mode,
         );
     }
 }

@@ -561,7 +561,7 @@ dependencies = [
 
 [[package]]
 name = "libstratis"
-version = "2.4.2"
+version = "2.5.0"
 dependencies = [
  "bindgen",
  "byteorder",

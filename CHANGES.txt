@@ -1,5 +1,5 @@
-stratisd 2.4.2 (UNRELEASED)
-===========================
+stratisd 2.4.2
+==============
 Recommended Rust toolchain version: 1.52.1
 Lowest supported Rust toolchain version: 1.49
 

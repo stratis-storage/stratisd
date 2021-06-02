@@ -20,9 +20,9 @@ use crate::{
             thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
         types::{
-            BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo,
-            FilesystemUuid, Key, KeyDescription, Name, PoolUuid, Redundancy, RenameAction,
-            SetCreateAction, SetDeleteAction,
+            ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
+            EncryptionInfo, FilesystemUuid, Key, KeyDescription, Name, PoolUuid, Redundancy,
+            RenameAction, SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -133,6 +133,7 @@ pub struct StratPool {
     backstore: Backstore,
     redundancy: Redundancy,
     thin_pool: ThinPool,
+    action_avail: ActionAvailability,
 }
 
 impl StratPool {
@@ -175,6 +176,7 @@ impl StratPool {
             backstore,
             redundancy,
             thin_pool: thinpool,
+            action_avail: ActionAvailability::Full,
         };
 
         pool.write_metadata(&Name::new(name.to_owned()))?;
@@ -220,6 +222,9 @@ impl StratPool {
             backstore,
             redundancy: Redundancy::NONE,
             thin_pool: thinpool,
+            // FIXME: Should determine whether all metadata is consistent and
+            // mark pool appropriately if not.
+            action_avail: ActionAvailability::Full,
         };
 
         if changed {

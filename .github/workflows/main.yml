@@ -267,25 +267,34 @@ jobs:
           # PYTHON CHECKS ON CURRENT FEDORA AND PYTHON TOOLS VERSION
           - dependencies: >
               pylint
+              python3-requests
+              python3-pygithub
+              python3-semantic_version
+            image: fedora:33
+            task: make -f Makefile lint
+            working-directory: ./code_maintenance
+          - dependencies: >
+              pylint
               python3-dbus-client-gen
               python3-dbus-python-client-gen
               python3-psutil
               python3-pyudev
-              python3-requests
               python3-semantic_version
-              python3-pygithub
             image: fedora:33
-            task: >
-              (cd code_maintenance; make -f Makefile lint) &&
-              (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
+            task: PYTHONPATH=./src make -f Makefile lint
+            working-directory: ./tests/client-dbus
           - dependencies: black python3-isort
             image: fedora:33
-            task: >
-              (cd code_maintenance; make -f Makefile fmt-travis) &&
-              (cd tests/client-dbus; make -f Makefile fmt-travis)
+            task: make -f Makefile fmt-travis
+            working-directory: ./code_maintenance
+          - dependencies: black python3-isort
+            image: fedora:33
+            task: make -f Makefile fmt-travis
+            working-directory: ./tests/client-dbus
           - dependencies: yamllint
             image: fedora:33
             task: make -f Makefile yamllint
+            working-directory: .
     runs-on: ubuntu-18.04
     container: ${{ matrix.image }}
     steps:
@@ -300,6 +309,7 @@ jobs:
         run: python --version
       - name: Run test
         run: ${{ matrix.task }}
+        working-directory: ${{ matrix.working-directory }}
 
   stratis-cli-checks:
     runs-on: ubuntu-18.04

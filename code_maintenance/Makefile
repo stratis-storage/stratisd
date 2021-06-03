@@ -1,9 +1,8 @@
 .PHONY: lint
 lint:
-	./check.py check.py
-	./check.py create_release.py
-	./check.py set_lower_bounds 
-	./check.py _utils.py
+	pylint create_release.py
+	pylint set_lower_bounds
+	pylint _utils.py
 
 .PHONY: fmt
 fmt:

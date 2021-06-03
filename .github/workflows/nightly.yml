@@ -18,7 +18,7 @@ jobs:
           - task: cargo update --locked
             toolchain: 1.52.1  # CURRENT DEVELOPMENT TOOLCHAIN
             components: cargo
-          - task: make -f Makefile verify-dependency-bounds
+          - task: PROFILEDIR=debug make -f Makefile verify-dependency-bounds
             toolchain: 1.52.1  # CURRENT DEVELOPMENT TOOLCHAIN
             components: cargo
           - task: make -f Makefile audit

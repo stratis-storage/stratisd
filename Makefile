@@ -214,7 +214,6 @@ stratisd-min:
 	--bin=stratisd-min ${SYSTEMD_FEATURES} ${TARGET_ARGS}
 
 install-cfg: docs/stratisd.8
-	install -Dpm0644 -t $(DESTDIR)$(DATADIR)/dbus-1/system.d stratisd.conf
 	install -Dpm0644 -t $(DESTDIR)$(MANDIR)/man8 docs/stratisd.8
 	install -Dpm0644 -t $(DESTDIR)$(UDEVDIR)/rules.d udev/61-stratisd.rules
 	install -Dpm0644 -t $(DESTDIR)$(UNITDIR) systemd/stratisd.service

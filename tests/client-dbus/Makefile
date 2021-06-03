@@ -11,12 +11,12 @@ misc-tests:
 
 .PHONY: fmt
 fmt:
-	isort --recursive src tests
+	isort src tests
 	black .
 
 .PHONY: fmt-travis
 fmt-travis:
-	isort --recursive --diff --check-only src tests
+	isort --diff --check-only src tests
 	black . --check
 
 .PHONY: udev-tests

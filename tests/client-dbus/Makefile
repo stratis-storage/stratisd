@@ -11,12 +11,12 @@ misc-tests:
 
 .PHONY: fmt
 fmt:
-	isort --recursive check.py src tests
+	isort --recursive src tests
 	black .
 
 .PHONY: fmt-travis
 fmt-travis:
-	isort --recursive --diff --check-only check.py src tests
+	isort --recursive --diff --check-only src tests
 	black . --check
 
 .PHONY: udev-tests

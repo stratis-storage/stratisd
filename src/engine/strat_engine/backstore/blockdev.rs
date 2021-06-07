@@ -175,6 +175,11 @@ impl StratBlockDev {
         self.used.available()
     }
 
+    /// The number of Sectors on this device which have been allocated.
+    pub fn used(&self) -> Sectors {
+        self.used.used()
+    }
+
     /// The total size of the Stratis block device.
     pub fn total_size(&self) -> BlockdevSize {
         let size = self.used.size();

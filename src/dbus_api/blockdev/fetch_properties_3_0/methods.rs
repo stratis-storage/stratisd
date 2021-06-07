@@ -15,7 +15,10 @@ use crate::dbus_api::{
     blockdev::shared::blockdev_operation, consts, types::TData, util::result_to_tuple,
 };
 
-const ALL_PROPERTIES: [&str; 1] = [consts::BLOCKDEV_TOTAL_SIZE_PROP];
+const ALL_PROPERTIES: [&str; 2] = [
+    consts::BLOCKDEV_TOTAL_SIZE_ALLOCATED_PROP,
+    consts::BLOCKDEV_TOTAL_SIZE_PROP,
+];
 
 fn get_properties_shared(
     m: &MethodInfo<MTSync<TData>, TData>,
@@ -35,6 +38,14 @@ fn get_properties_shared(
                     m.tree,
                     object_path.get_name(),
                     |_, bd| Ok((*bd.size().bytes()).to_string()),
+                )),
+            )),
+            consts::BLOCKDEV_TOTAL_SIZE_ALLOCATED_PROP => Some((
+                prop,
+                result_to_tuple(blockdev_operation(
+                    m.tree,
+                    object_path.get_name(),
+                    |_, bd| Ok((*bd.allocated().bytes()).to_string()),
                 )),
             )),
             _ => None,

@@ -68,6 +68,7 @@ pub const BLOCKDEV_TIER_PROP: &str = "Tier";
 pub const BLOCKDEV_PHYSICAL_PATH_PROP: &str = "PhysicalPath";
 
 pub const BLOCKDEV_TOTAL_SIZE_PROP: &str = "TotalPhysicalSize";
+pub const BLOCKDEV_TOTAL_SIZE_ALLOCATED_PROP: &str = "TotalPhysicalSizeAllocated";
 
 /// Get a list of all the FetchProperties interfaces
 pub fn fetch_properties_interfaces() -> Vec<String> {

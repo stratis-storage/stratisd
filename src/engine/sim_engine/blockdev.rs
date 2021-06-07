@@ -69,6 +69,10 @@ impl BlockDev for SimDev {
     fn is_encrypted(&self) -> bool {
         self.encryption_info.is_encrypted()
     }
+
+    fn allocated(&self) -> Sectors {
+        Bytes::from(IEC::Mi).sectors()
+    }
 }
 
 impl SimDev {

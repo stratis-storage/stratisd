@@ -71,6 +71,7 @@ pub struct StratBlockDev {
     user_info: Option<String>,
     hardware_info: Option<String>,
     underlying_device: UnderlyingDevice,
+    real_size: BlockdevSize,
 }
 
 impl StratBlockDev {
@@ -95,6 +96,7 @@ impl StratBlockDev {
     ///
     /// Precondition: segments in other_segments do not overlap with Stratis
     /// metadata region.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         dev: Device,
         bda: BDA,
@@ -102,6 +104,7 @@ impl StratBlockDev {
         user_info: Option<String>,
         hardware_info: Option<String>,
         underlying_device: UnderlyingDevice,
+        real_size: BlockdevSize,
     ) -> StratisResult<StratBlockDev> {
         let mut segments = vec![(Sectors(0), bda.extended_size().sectors())];
         segments.extend(other_segments);
@@ -115,6 +118,7 @@ impl StratBlockDev {
             user_info,
             hardware_info,
             underlying_device,
+            real_size,
         })
     }
 

@@ -20,7 +20,7 @@ use crate::{
             backstore::{CryptHandle, StratBlockDev, UnderlyingDevice},
             device::blkdev_size,
             liminal::device_info::LStratisInfo,
-            metadata::{StaticHeader, BDA},
+            metadata::{BlockdevSize, StaticHeader, BDA},
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
         },
         types::{ActionAvailability, BlockDevTier, DevUuid, DevicePath, PoolEncryptionInfo},
@@ -200,8 +200,8 @@ pub fn get_blockdevs(
         // Return an error if apparent size of Stratis block device appears to
         // have decreased since metadata was recorded or if size of block
         // device could not be obtained.
-        blkdev_size(&OpenOptions::new().read(true).open(&info.ids.devnode)?).and_then(
-            |actual_size| {
+        let real_size = blkdev_size(&OpenOptions::new().read(true).open(&info.ids.devnode)?)
+            .and_then(|actual_size| {
                 let actual_size_sectors = actual_size.sectors();
                 let recorded_size = bda.dev_size().sectors();
                 if actual_size_sectors < recorded_size {
@@ -213,10 +213,9 @@ pub fn get_blockdevs(
                     );
                     Err(StratisError::Msg(err_msg))
                 } else {
-                    Ok(())
+                    Ok(BlockdevSize::new(actual_size.sectors()))
                 }
-            },
-        )?;
+            })?;
 
         let dev_uuid = bda.dev_uuid();
 
@@ -261,6 +260,7 @@ pub fn get_blockdevs(
                     Some(handle) => UnderlyingDevice::Encrypted(handle),
                     None => UnderlyingDevice::Unencrypted(DevicePath::new(physical_path)?),
                 },
+                real_size,
             )?,
         ))
     }

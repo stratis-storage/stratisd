@@ -11,8 +11,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  allowed_failures:
-    continue-on-error: true
+  release_vendor:
     runs-on: ubuntu-18.04
     container:
       image: fedora:33

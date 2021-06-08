@@ -1,0 +1,20 @@
+---
+name: stratisd release
+
+# yamllint disable-line rule:truthy
+on:
+  release:
+    types:
+      - created
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  release_vendor:
+    runs-on: ubuntu-18.04
+    container:
+      image: fedora:33
+    steps:
+      - name: Test git status
+        run: git log -1

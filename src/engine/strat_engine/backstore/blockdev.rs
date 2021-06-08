@@ -348,6 +348,10 @@ impl BlockDev for StratBlockDev {
     fn allocated(&self) -> Sectors {
         self.used.used()
     }
+
+    fn real_size(&self) -> Sectors {
+        self.real_size.sectors()
+    }
 }
 
 impl Recordable<BaseBlockDevSave> for StratBlockDev {

@@ -106,6 +106,10 @@ pub trait BlockDev: Debug {
 
     /// The total number of sectors allocated from this block device
     fn allocated(&self) -> Sectors;
+
+    /// The real size of this block device in sectors. Greater than or equal
+    /// to the value of size.
+    fn real_size(&self) -> Sectors;
 }
 
 pub trait Pool: Debug {

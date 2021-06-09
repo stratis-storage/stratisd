@@ -428,3 +428,37 @@ jobs:
           PYTHONPATH=./src
           make udev-tests
         working-directory: ./tests/client-dbus
+
+  checks-with-ci-repo:
+    runs-on: ubuntu-18.04
+    container:
+      image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies for Fedora
+        run: >
+          dnf install -y
+          clang
+          curl
+          cryptsetup-devel
+          dbus-devel
+          git
+          jq
+          libblkid-devel
+          make
+          openssl-devel
+          python-requests
+          python-semantic_version
+          systemd-devel
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: cargo
+          toolchain: 1.52.1  # CURRENT DEVELOPMENT TOOLCHAIN
+          override: true
+      - name: Check out ci repo
+        run: git clone https://github.com/stratis-storage/ci.git
+      - name: Run check-fedora-versions target
+        run: >
+          COMPARE_FEDORA_VERSIONS=./compare_fedora_versions
+          make -f ../../Makefile check-fedora-versions
+        working-directory: ./ci/dependency_management

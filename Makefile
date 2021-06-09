@@ -330,6 +330,13 @@ verify-dependency-bounds:
 	$(MAKE) set-lower-bounds
 	$(MAKE) build-all
 
+# Check that there are no dependencies missing in Fedora or ones that require
+# versions higher than those available in Fedora. There is no reason to fail
+# if our versions are too low, as we can bump versions at our leisure, so
+# do not check the value of the low key. The jq filter can be updated if we
+# deliberately choose a too high or a missing dependency.
+check-fedora-versions:
+	`${COMPARE_FEDORA_VERSIONS} | jq '[.missing == [], .high == []] | all'`
 
 .PHONY:
 	audit
@@ -337,6 +344,7 @@ verify-dependency-bounds:
 	build
 	build-all
 	build-min
+	check-fedora-versions
 	clean
 	clean-ancillary
 	clean-cfg

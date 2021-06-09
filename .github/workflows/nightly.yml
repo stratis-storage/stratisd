@@ -187,7 +187,6 @@ jobs:
     runs-on: ubuntu-18.04
     container:
       image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
-      options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies for Fedora
@@ -212,4 +211,5 @@ jobs:
       - name: Check out ci repo
         run: git clone https://github.com/stratis-storage/ci.git
       - name: Compare Fedora versions
-        run: ./ci/dependency_management/compare_fedora_versions
+        run: compare_fedora_versions
+        working-directory: ./ci/dependency_management

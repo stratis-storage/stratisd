@@ -433,6 +433,15 @@ jobs:
         working-directory: ./tests/client-dbus
 
   checks-with-ci-repo:
+    strategy:
+      matrix:
+        include:
+          - task: >
+              SET_LOWER_BOUNDS=./set_lower_bounds
+              make -f ../../Makefile verify-dependency-bounds
+          - task: >
+              COMPARE_FEDORA_VERSIONS=./compare_fedora_versions
+              make -f ../../Makefile check-fedora-versions
     runs-on: ubuntu-18.04
     container:
       image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
@@ -460,8 +469,6 @@ jobs:
           override: true
       - name: Check out ci repo
         run: git clone https://github.com/stratis-storage/ci.git
-      - name: Run check-fedora-versions target
-        run: >
-          COMPARE_FEDORA_VERSIONS=./compare_fedora_versions
-          make -f ../../Makefile check-fedora-versions
+      - name: Run ${{ matrix.task }}
+        run: ${{ matrix.task }}
         working-directory: ./ci/dependency_management

@@ -311,24 +311,18 @@ clippy:
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${MIN_FEATURES} -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${SYSTEMD_FEATURES} -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
 
-set-lower-bounds:
-	${PWD}/code_maintenance/set_lower_bounds
-
-# Note that this target is really just a helper target for the
-# verify-dependency-bounds target.
-build-all:
-	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
-	cargo build --all-targets --all-features
-
 # Verify that the dependency bounds set in Cargo.toml are not lower
 # than is actually reqired. Use build-all target to set up for cargo-tree
 # and also to test that everything still compiles when the versions are set
 # to their precise values.
 verify-dependency-bounds:
-	$(MAKE) build-all
-	$(MAKE) set-lower-bounds
-	$(MAKE) build-all
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY}" \
+	cargo build --all-targets --all-features
+	${SET_LOWER_BOUNDS}
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY}" \
+	cargo build --all-targets --all-features
 
 # Check that there are no dependencies missing in Fedora or ones that require
 # versions higher than those available in Fedora. There is no reason to fail

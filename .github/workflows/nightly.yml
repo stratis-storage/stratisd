@@ -18,9 +18,6 @@ jobs:
           - task: cargo update --locked
             toolchain: 1.52.1  # CURRENT DEVELOPMENT TOOLCHAIN
             components: cargo
-          - task: make -f Makefile verify-dependency-bounds
-            toolchain: 1.52.1  # CURRENT DEVELOPMENT TOOLCHAIN
-            components: cargo
           - task: make -f Makefile audit
             toolchain: 1.52.1  # CURRENT DEVELOPMENT TOOLCHAIN
             components: cargo
@@ -183,6 +180,10 @@ jobs:
         working-directory: ./stratis-cli
 
   checks-with-ci-repo:
+    strategy:
+      matrix:
+        include:
+          - task: ./compare_fedora_versions
     continue-on-error: true
     runs-on: ubuntu-18.04
     container:
@@ -210,6 +211,6 @@ jobs:
           override: true
       - name: Check out ci repo
         run: git clone https://github.com/stratis-storage/ci.git
-      - name: Compare Fedora versions
-        run: compare_fedora_versions
+      - name: ${{ matrix.task }}
+        run: ${{ matrix.task }}
         working-directory: ./ci/dependency_management

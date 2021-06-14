@@ -336,7 +336,6 @@ check-fedora-versions:
 	audit
 	bloat
 	build
-	build-all
 	build-min
 	check-fedora-versions
 	clean
@@ -355,7 +354,6 @@ check-fedora-versions:
 	outdated
 	release
 	release-min
-	set-lower-bounds
 	test
 	test-loop
 	test-real

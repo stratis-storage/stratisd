@@ -35,7 +35,10 @@ use crate::{
             keys,
             metadata::StratisIdentifiers,
         },
-        types::{DevUuid, EncryptionInfo, KeyDescription, PoolUuid, SizedKeyMemory, UnlockMethod},
+        types::{
+            DevUuid, DevicePath, EncryptionInfo, KeyDescription, PoolUuid, SizedKeyMemory,
+            UnlockMethod,
+        },
     },
     stratis::{StratisError, StratisResult},
 };
@@ -235,8 +238,8 @@ pub fn setup_crypt_handle(
     };
 
     Ok(Some(CryptHandle::new(
-        physical_path.to_owned(),
-        activated_path,
+        DevicePath::new(physical_path.to_owned())?,
+        DevicePath::new(activated_path)?,
         identifiers,
         EncryptionInfo {
             key_description,

@@ -15,7 +15,7 @@ mod shared;
 
 pub use self::{
     backstore::Backstore,
-    blockdev::StratBlockDev,
+    blockdev::{StratBlockDev, UnderlyingDevice},
     crypt::{crypt_metadata_size, CryptActivationHandle, CryptHandle, CLEVIS_TANG_TRUST_URL},
 };
 

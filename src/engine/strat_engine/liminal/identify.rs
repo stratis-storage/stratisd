@@ -447,7 +447,6 @@ mod tests {
                 udev::block_device_apply,
             },
             types::{EncryptionInfo, KeyDescription},
-            BlockDev,
         },
         stratis::StratisError,
     };
@@ -532,7 +531,7 @@ mod tests {
                 }
 
                 let info =
-                    block_device_apply(&dev.user_path()?, |dev| process_stratis_device(dev))?
+                    block_device_apply(dev.metadata_path(), |dev| process_stratis_device(dev))?
                         .ok_or_else(|| {
                             StratisError::Error(
                                 "No device with specified devnode found in udev database".into(),
@@ -544,13 +543,13 @@ mod tests {
                             )
                         })?;
 
-                if info.identifiers.pool_uuid != pool_uuid || info.devnode != dev.user_path()? {
+                if info.identifiers.pool_uuid != pool_uuid || info.devnode != dev.metadata_path() {
                     return Err(Box::new(StratisError::Error(format!(
                         "Wrong identifiers and devnode found on Stratis block device: found: pool UUID: {}, device node; {} != expected: pool UUID: {}, device node: {}",
                         info.identifiers.pool_uuid,
                         info.devnode.display(),
                         pool_uuid,
-                        dev.user_path()?.display()),
+                        dev.metadata_path().display()),
                     )));
                 }
             }

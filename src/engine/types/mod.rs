@@ -226,50 +226,6 @@ impl<'a> TryFrom<&'a str> for ReportType {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct BlockDevPath {
-    /// Path to the device represented by this data structure.
-    path: PathBuf,
-    /// Reference to the path of the child device of this device.
-    child_paths: Vec<Arc<BlockDevPath>>,
-}
-
-impl BlockDevPath {
-    /// Create a new node in the graph representing a device with no children.
-    pub fn leaf(path: PathBuf) -> Arc<Self> {
-        Arc::new(BlockDevPath {
-            path,
-            child_paths: vec![],
-        })
-    }
-
-    /// Create a new node in the graph representing the devices and their children.
-    pub fn node_with_children<I>(path: PathBuf, child_paths: I) -> Arc<Self>
-    where
-        I: IntoIterator<Item = Arc<Self>>,
-    {
-        Arc::new(BlockDevPath {
-            path,
-            child_paths: child_paths.into_iter().collect(),
-        })
-    }
-
-    /// Get the path of the device associated with the current structure.
-    pub fn path(&self) -> &Path {
-        self.path.as_path()
-    }
-
-    /// Get the child nodes of this node in the tree.
-    pub fn children(&self) -> impl Iterator<Item = Arc<Self>> + '_ {
-        self.child_paths.iter().cloned()
-    }
-
-    /// Paths of the child devices of this node in the graph.
-    pub fn child_paths(&self) -> impl Iterator<Item = &Path> + '_ {
-        self.child_paths.iter().map(|child| child.path())
-    }
-}
-
 pub struct LockedPoolDevice {
     pub devnode: PathBuf,
     pub uuid: DevUuid,
@@ -349,5 +305,22 @@ impl<'a> From<&'a libudev::Device<'a>> for UdevEngineDevice {
                 .map(|prop| (Box::from(prop.name()), Box::from(prop.value())))
                 .collect(),
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct DevicePath(PathBuf);
+
+impl DevicePath {
+    pub fn new(path: PathBuf) -> StratisResult<Self> {
+        Ok(DevicePath(path.canonicalize()?))
+    }
+}
+
+impl Deref for DevicePath {
+    type Target = Path;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.as_path()
     }
 }

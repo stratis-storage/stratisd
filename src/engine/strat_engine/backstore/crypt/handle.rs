@@ -2,11 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{
-    fmt::Debug,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{fmt::Debug, path::Path};
 
 use serde_json::Value;
 
@@ -27,7 +23,7 @@ use crate::{
             keys::MemoryPrivateFilesystem,
             metadata::StratisIdentifiers,
         },
-        types::{BlockDevPath, EncryptionInfo, KeyDescription, SizedKeyMemory},
+        types::{DevicePath, EncryptionInfo, KeyDescription, SizedKeyMemory},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -41,7 +37,8 @@ use crate::{
 /// * CryptHandle::setup() fails if the device is not active.
 #[derive(Debug)]
 pub struct CryptHandle {
-    path: Arc<BlockDevPath>,
+    physical_path: DevicePath,
+    activated_path: DevicePath,
     identifiers: StratisIdentifiers,
     encryption_info: EncryptionInfo,
     name: String,
@@ -49,18 +46,15 @@ pub struct CryptHandle {
 
 impl CryptHandle {
     pub(super) fn new(
-        physical_path: PathBuf,
-        activated_path: PathBuf,
+        physical_path: DevicePath,
+        activated_path: DevicePath,
         identifiers: StratisIdentifiers,
         encryption_info: EncryptionInfo,
         name: String,
     ) -> CryptHandle {
-        let path = BlockDevPath::node_with_children(
-            activated_path,
-            vec![BlockDevPath::leaf(physical_path)],
-        );
         CryptHandle {
-            path,
+            physical_path,
+            activated_path,
             identifiers,
             encryption_info,
             name,
@@ -101,31 +95,17 @@ impl CryptHandle {
         &self.encryption_info
     }
 
-    /// Get a reference to the `BlockDevPath` node representing the physical device.
-    pub fn get_physical_path_ref(&self) -> Arc<BlockDevPath> {
-        self.path
-            .children()
-            .next()
-            .expect("crypt devices have exactly one child")
-    }
-
     /// Return the path to the device node of the underlying storage device
-    /// for the encrypted device. If storage layers are added between
-    /// the crypt device and the physical device, this method will still work
-    /// properly as it will provide the path to the device that exposes the LUKS2
-    /// metadata.
+    /// for the encrypted device.
     pub fn luks2_device_path(&self) -> &Path {
-        self.path
-            .child_paths()
-            .next()
-            .expect("crypt devices have exactly one child")
+        &*self.physical_path
     }
 
     /// Return the path to the device node of the decrypted contents of the encrypted
     /// storage device. In an encrypted pool, this is the path that can be used to read
     /// the Stratis blockdev metatdata.
     pub fn activated_device_path(&self) -> &Path {
-        self.path.path()
+        &*self.activated_path
     }
 
     /// Get the Stratis device identifiers for a given encrypted device.

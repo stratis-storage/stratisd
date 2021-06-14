@@ -30,12 +30,16 @@ use crate::{
                     STRATIS_TOKEN_TYPE, TOKEN_KEYSLOTS_KEY, TOKEN_TYPE_KEY,
                 },
                 handle::CryptHandle,
+                metadata_handle::CryptMetadataHandle,
             },
             cmd::clevis_luks_unlock,
             keys,
             metadata::StratisIdentifiers,
         },
-        types::{DevUuid, EncryptionInfo, KeyDescription, PoolUuid, SizedKeyMemory, UnlockMethod},
+        types::{
+            DevUuid, DevicePath, EncryptionInfo, KeyDescription, PoolUuid, SizedKeyMemory,
+            UnlockMethod,
+        },
     },
     stratis::{StratisError, StratisResult},
 };
@@ -177,27 +181,30 @@ pub fn add_keyring_keyslot(
     Ok(())
 }
 
-/// Set up a handle to a crypt device using either Clevis or the keyring to activate
-/// the device.
-pub fn setup_crypt_handle(
-    physical_path: &Path,
-    unlock_method: Option<UnlockMethod>,
-) -> StratisResult<Option<CryptHandle>> {
+/// Set up a libcryptsetup device handle on a device that may or may not be a LUKS2
+/// device.
+pub fn setup_crypt_device(physical_path: &Path) -> StratisResult<Option<CryptDevice>> {
     let device_result = device_from_physical_path(physical_path);
-    let mut device = match device_result {
-        Ok(None) => return Ok(None),
+    match device_result {
+        Ok(None) => Ok(None),
         Ok(Some(mut dev)) => {
             if !is_encrypted_stratis_device(&mut dev) {
-                return Ok(None);
+                Ok(None)
             } else {
-                dev
+                Ok(Some(dev))
             }
         }
-        Err(e) => return Err(e),
-    };
+        Err(e) => Err(e),
+    }
+}
 
-    let identifiers = identifiers_from_metadata(&mut device)?;
-    let key_description = key_desc_from_metadata(&mut device);
+/// Set up a handle to a crypt device for accessing metadata on the device.
+pub fn setup_crypt_metadata_handle(
+    device: &mut CryptDevice,
+    physical_path: &Path,
+) -> StratisResult<Option<CryptMetadataHandle>> {
+    let identifiers = identifiers_from_metadata(device)?;
+    let key_description = key_desc_from_metadata(device);
     let key_description = match key_description
         .as_ref()
         .map(|kd| KeyDescription::from_system_key_desc(kd))
@@ -217,32 +224,56 @@ pub fn setup_crypt_handle(
         }
         None => None,
     };
-    let clevis_info = clevis_info_from_metadata(&mut device)?;
-    let name = name_from_metadata(&mut device)?;
+    let clevis_info = clevis_info_from_metadata(device)?;
+
+    Ok(Some(CryptMetadataHandle::new(
+        DevicePath::new(physical_path.to_owned())?,
+        identifiers,
+        EncryptionInfo {
+            key_description,
+            clevis_info,
+        },
+    )))
+}
+
+/// Set up a handle to a crypt device using either Clevis or the keyring to activate
+/// the device.
+pub fn setup_crypt_handle(
+    device: &mut CryptDevice,
+    physical_path: &Path,
+    unlock_method: Option<UnlockMethod>,
+) -> StratisResult<Option<CryptHandle>> {
+    let metadata_handle = match setup_crypt_metadata_handle(device, physical_path)? {
+        Some(handle) => handle,
+        None => return Ok(None),
+    };
+
+    let name = name_from_metadata(device)?;
 
     let activated_path = match unlock_method {
         Some(UnlockMethod::Keyring) => {
             activate(Either::Left((
-                &mut device,
-                key_description.as_ref()
+                device,
+                metadata_handle.encryption_info().key_description.as_ref()
                     .ok_or_else(|| {
                         StratisError::Error("Unlock action was specified to be keyring but not key description is present in the metadata".to_string())
                     })?,
             )), &name)?
         }
         Some(UnlockMethod::Clevis) => activate(Either::Right(physical_path), &name)?,
-        None => [DEVICEMAPPER_PATH, &name].iter().collect(),
+        None => {
+            if let Ok(CryptStatusInfo::Active) | Ok(CryptStatusInfo::Busy) = libcryptsetup_rs::status(Some(device), &name) {
+                [DEVICEMAPPER_PATH, &name].iter().collect()
+            } else {
+                return Err(StratisError::Error("Found a crypt device but it is not activated and no unlock method was provided".to_string()));
+            }
+        },
     };
 
-    Ok(Some(CryptHandle::new(
-        physical_path.to_owned(),
-        activated_path,
-        identifiers,
-        EncryptionInfo {
-            key_description,
-            clevis_info,
-        },
+    Ok(Some(CryptHandle::new_with_metadata_handle(
+        DevicePath::new(activated_path)?,
         name,
+        metadata_handle,
     )))
 }
 

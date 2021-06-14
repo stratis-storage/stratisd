@@ -12,12 +12,9 @@ use serde_json::{Map, Value};
 
 use devicemapper::{Bytes, Sectors, IEC};
 
-use crate::{
-    engine::{
-        engine::BlockDev,
-        types::{DevUuid, EncryptionInfo, KeyDescription},
-    },
-    stratis::StratisResult,
+use crate::engine::{
+    engine::BlockDev,
+    types::{DevUuid, EncryptionInfo, KeyDescription},
 };
 
 #[derive(Debug)]
@@ -40,10 +37,6 @@ impl SimDev {
 impl BlockDev for SimDev {
     fn devnode(&self) -> &Path {
         self.devnode()
-    }
-
-    fn user_path(&self) -> StratisResult<PathBuf> {
-        Ok(self.devnode.clone())
     }
 
     fn metadata_path(&self) -> &Path {

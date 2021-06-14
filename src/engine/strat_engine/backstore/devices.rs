@@ -20,7 +20,7 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::{
-                blockdev::StratBlockDev,
+                blockdev::{StratBlockDev, UnderlyingDevice},
                 crypt::{CryptHandle, CryptInitializer},
             },
             device::blkdev_size,
@@ -31,7 +31,7 @@ use crate::{
             names::KeyDescription,
             udev::{block_device_apply, decide_ownership, get_udev_property, UdevOwnership},
         },
-        types::{DevUuid, EncryptionInfo, PoolUuid},
+        types::{DevUuid, DevicePath, EncryptionInfo, PoolUuid},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -420,8 +420,12 @@ pub fn initialize_devices(
         key_description: Option<&KeyDescription>,
         enable_clevis: Option<(&str, &Value)>,
     ) -> StratisResult<(CryptHandle, Device, Sectors)> {
-        let mut handle = CryptInitializer::new(physical_path.to_owned(), pool_uuid, dev_uuid)
-            .initialize(key_description, enable_clevis)?;
+        let mut handle = CryptInitializer::new(
+            DevicePath::new(physical_path.to_owned())?,
+            pool_uuid,
+            dev_uuid,
+        )
+        .initialize(key_description, enable_clevis)?;
 
         let device_size = match handle.logical_device_size() {
             Ok(size) => size,
@@ -442,30 +446,27 @@ pub fn initialize_devices(
     }
 
     fn initialize_stratis_metadata(
-        physical_path: &Path,
+        underlying_device: UnderlyingDevice,
         devno: Device,
         pool_uuid: PoolUuid,
         dev_uuid: DevUuid,
         sizes: (MDADataSize, BlockdevSize),
         id_wwn: &Option<StratisResult<String>>,
-        crypt_handle: Option<CryptHandle>,
     ) -> StratisResult<StratBlockDev> {
         let (mda_data_size, data_size) = sizes;
-        let metadata_path = match crypt_handle {
-            Some(ref ch) => ch.activated_device_path(),
-            None => physical_path,
-        };
-        let mut f = OpenOptions::new().write(true).open(metadata_path)?;
+        let mut f = OpenOptions::new()
+            .write(true)
+            .open(underlying_device.metadata_path())?;
 
         // NOTE: Encrypted devices will discard the hardware ID as encrypted devices
         // are always represented as logical, software-based devicemapper devices
         // which will never have a hardware ID.
-        let hw_id = match (crypt_handle.is_some(), id_wwn) {
+        let hw_id = match (underlying_device.crypt_handle().is_some(), id_wwn) {
             (true, _) => None,
             (_, Some(Ok(ref hw_id))) => Some(hw_id.to_owned()),
             (_, Some(Err(_))) => {
                 warn!("Value for ID_WWN for device {} obtained from the udev database could not be decoded; inserting device into pool with UUID {} anyway",
-                      physical_path.display(),
+                      underlying_device.physical_path().display(),
                       pool_uuid);
                 None
             }
@@ -481,7 +482,7 @@ pub fn initialize_devices(
 
         bda.initialize(&mut f)?;
 
-        StratBlockDev::new(devno, physical_path, bda, &[], None, hw_id, crypt_handle)
+        StratBlockDev::new(devno, bda, &[], None, hw_id, underlying_device)
     }
 
     /// Clean up an encrypted device after initialization failure.
@@ -568,13 +569,15 @@ pub fn initialize_devices(
         let physical_path = &dev_info.devnode;
         let is_encrypted = handle.is_some();
         let blockdev = initialize_stratis_metadata(
-            physical_path,
+            match handle {
+                Some(handle) => UnderlyingDevice::Encrypted(handle),
+                None => UnderlyingDevice::Unencrypted(DevicePath::new(physical_path.to_owned())?),
+            },
             devno,
             pool_uuid,
             dev_uuid,
             (mda_data_size, BlockdevSize::new(blockdev_size)),
             &dev_info.id_wwn,
-            handle,
         );
         if blockdev.is_err() {
             if is_encrypted {

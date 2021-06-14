@@ -17,13 +17,13 @@ use devicemapper::Sectors;
 use crate::{
     engine::{
         strat_engine::{
-            backstore::{CryptHandle, StratBlockDev},
+            backstore::{CryptHandle, StratBlockDev, UnderlyingDevice},
             device::blkdev_size,
             liminal::device_info::LStratisInfo,
             metadata::{StaticHeader, BDA},
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
         },
-        types::{BlockDevTier, DevUuid},
+        types::{BlockDevTier, DevUuid, DevicePath},
     },
     stratis::{ErrorEnum, StratisError, StratisResult},
 };
@@ -254,12 +254,16 @@ pub fn get_blockdevs(
             tier,
             StratBlockDev::new(
                 info.ids.device_number,
-                physical_path,
                 bda,
                 segments.unwrap_or(&vec![]),
                 bd_save.user_info.clone(),
                 bd_save.hardware_info.clone(),
-                handle,
+                match handle {
+                    Some(handle) => UnderlyingDevice::Encrypted(handle),
+                    None => {
+                        UnderlyingDevice::Unencrypted(DevicePath::new(physical_path.to_owned())?)
+                    }
+                },
             )?,
         ))
     }

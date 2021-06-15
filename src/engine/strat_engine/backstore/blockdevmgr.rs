@@ -7,7 +7,7 @@
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 use chrono::{DateTime, Duration, Utc};
@@ -470,8 +470,7 @@ impl BlockDevMgr {
         operation_loop(
             self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
             |blockdev| blockdev.bind_clevis(pin, clevis_info),
-            |blockdev| blockdev,
-            |blockdev| blockdev.unbind_clevis(),
+            |_, blockdev| blockdev.unbind_clevis(),
         )?;
 
         Ok(true)
@@ -500,8 +499,7 @@ impl BlockDevMgr {
         operation_loop(
             self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
             |blockdev| blockdev.unbind_clevis(),
-            |blockdev| blockdev,
-            |blockdev| blockdev.bind_clevis(&pin, &clevis_info),
+            |_, blockdev| blockdev.bind_clevis(&pin, &clevis_info),
         )?;
 
         Ok(true)
@@ -548,8 +546,7 @@ impl BlockDevMgr {
         operation_loop(
             self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
             |blockdev| blockdev.bind_keyring(key_desc),
-            |blockdev| blockdev,
-            |blockdev| blockdev.unbind_keyring(),
+            |_, blockdev| blockdev.unbind_keyring(),
         )?;
 
         Ok(true)
@@ -579,8 +576,7 @@ impl BlockDevMgr {
         operation_loop(
             self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
             |blockdev| blockdev.unbind_keyring(),
-            |blockdev| blockdev,
-            |blockdev| blockdev.bind_keyring(&key_desc),
+            |_, blockdev| blockdev.bind_keyring(&key_desc),
         )?;
 
         Ok(true)
@@ -595,24 +591,6 @@ impl BlockDevMgr {
     /// * Ok(Some(false)) if the pool is already bound to this key description.
     /// * Err(_) if an operation fails while changing the passphrase.
     pub fn rebind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<Option<bool>> {
-        fn try_rollback(
-            blockdevs: Vec<&mut StratBlockDev>,
-            old_key_desc: KeyDescription,
-            causal_error: StratisError,
-        ) -> StratisError {
-            for blockdev in blockdevs {
-                if let Err(e) = blockdev.rebind_keyring(&old_key_desc) {
-                    return StratisError::Msg(format!(
-                        "Failed to roll back passphrase change operation: {}; the original cause of the roll back was: {}",
-                        e, causal_error,
-                    ));
-                }
-            }
-
-            info!("Succesfully rolled back failed passphrase change");
-            causal_error
-        }
-
         let encryption_info = self.encryption_info();
         if !encryption_info.is_encrypted() {
             return Err(StratisError::Msg(
@@ -627,20 +605,11 @@ impl BlockDevMgr {
             None => return Ok(None),
         };
 
-        let mut rollback_record = Vec::new();
-        for blockdev in self.blockdevs_mut().into_iter().map(|(_, bd)| bd) {
-            let res = blockdev.rebind_keyring(key_desc);
-            if let Err(e) = res {
-                if rollback_record.is_empty() {
-                    return Err(e);
-                } else {
-                    warn!("Failed to change the passphrase for blockdev {}: {}; attempting to roll back", blockdev.physical_path().display(), e);
-                    return Err(try_rollback(rollback_record, old_key_desc, e));
-                }
-            } else {
-                rollback_record.push(blockdev)
-            }
-        }
+        operation_loop(
+            self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
+            |blockdev| blockdev.rebind_keyring(key_desc),
+            |_, blockdev| blockdev.rebind_keyring(&old_key_desc),
+        )?;
 
         Ok(Some(true))
     }
@@ -651,23 +620,6 @@ impl BlockDevMgr {
     /// The method for this rollback caches the initial Clevis metadata and
     /// reverts all of the devices if there is a failure.
     pub fn rebind_clevis(&mut self) -> StratisResult<()> {
-        fn try_rollback(
-            blockdevs: Vec<(&Path, Value)>,
-            causal_error: StratisError,
-        ) -> StratisError {
-            for (path, clevis_token) in blockdevs {
-                if let Err(e) = set_clevis_token_metadata(path, &clevis_token) {
-                    return StratisError::Msg(format!(
-                        "Failed to roll back Clevis binding regeneration operation: {}; the original cause of the roll back was: {}",
-                        e, causal_error,
-                    ));
-                }
-            }
-
-            info!("Succesfully rolled back failed Clevis binding regeneration");
-            causal_error
-        }
-
         let encryption_info = self.encryption_info();
         if !encryption_info.is_encrypted() {
             return Err(StratisError::Msg(
@@ -679,55 +631,42 @@ impl BlockDevMgr {
             ));
         }
 
-        let mut rollback_record = Vec::new();
-        for blockdev in self.blockdevs_mut().into_iter().map(|(_, bd)| bd) {
-            let res = get_clevis_token_metadata(blockdev.physical_path()).and_then(|token| {
-                blockdev.rebind_clevis()?;
-                Ok(token)
-            });
-
-            match res {
-                Ok(token) => rollback_record.push((blockdev.physical_path(), token)),
-                Err(e) => {
-                    if rollback_record.is_empty() {
-                        return Err(e);
-                    } else {
-                        warn!("Failed to regenerate the clevis bindings for blockdev {}: {}; attempting to roll back", blockdev.physical_path().display(), e);
-                        return Err(try_rollback(rollback_record, e));
-                    }
-                }
-            }
+        let mut original_tokens = Vec::new();
+        for (_, blockdev) in self.blockdevs() {
+            original_tokens.push(get_clevis_token_metadata(blockdev.physical_path())?);
         }
+
+        operation_loop(
+            self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
+            |blockdev| blockdev.rebind_clevis(),
+            |index, blockdev| {
+                set_clevis_token_metadata(blockdev.physical_path(), &original_tokens[index])
+            },
+        )?;
 
         Ok(())
     }
 }
 
-fn operation_loop<'a, I, A, C, R, RI>(
-    blockdevs: I,
-    action: A,
-    input_calculation: C,
-    rollback: R,
-) -> StratisResult<()>
+fn operation_loop<'a, I, A, R>(blockdevs: I, action: A, rollback: R) -> StratisResult<()>
 where
     I: IntoIterator<Item = &'a mut StratBlockDev>,
     A: Fn(&mut StratBlockDev) -> StratisResult<()>,
-    C: Fn(&'a mut StratBlockDev) -> RI,
-    R: Fn(RI) -> StratisResult<()>,
+    R: Fn(usize, &mut StratBlockDev) -> StratisResult<()>,
 {
-    fn rollback_loop<R, RI>(
-        rollback_record: Vec<(RI, PathBuf)>,
+    fn rollback_loop<R>(
+        rollback_record: Vec<&mut StratBlockDev>,
         rollback: R,
         causal_error: StratisError,
     ) -> StratisError
     where
-        R: Fn(RI) -> StratisResult<()>,
+        R: Fn(usize, &mut StratBlockDev) -> StratisResult<()>,
     {
-        for (rollback_input, path) in rollback_record {
-            if let Err(e) = rollback(rollback_input) {
+        for (index, blockdev) in rollback_record.into_iter().enumerate() {
+            if let Err(e) = rollback(index, blockdev) {
                 warn!(
                     "Failed to roll back device operation for device {}: {}",
-                    path.display(),
+                    blockdev.physical_path().display(),
                     e,
                 );
                 return StratisError::RollbackError {
@@ -745,9 +684,7 @@ where
         if let Err(error) = action(blockdev_ref) {
             return Err(rollback_loop(rollback_record, rollback, error));
         } else {
-            let path = blockdev_ref.physical_path().to_owned();
-            let input = input_calculation(blockdev_ref);
-            rollback_record.push((input, path));
+            rollback_record.push(blockdev_ref);
         }
     }
     Ok(())

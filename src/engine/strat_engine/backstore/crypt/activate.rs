@@ -14,7 +14,7 @@ use crate::{
                 handle::CryptHandle,
                 shared::{
                     acquire_crypt_device, check_luks2_token, get_keyslot_number,
-                    key_desc_from_metadata, setup_crypt_handle,
+                    key_desc_from_metadata, setup_crypt_device, setup_crypt_handle,
                 },
             },
             cmd::clevis_decrypt,
@@ -109,6 +109,9 @@ impl CryptActivationHandle {
         physical_path: &Path,
         unlock_method: UnlockMethod,
     ) -> StratisResult<Option<CryptHandle>> {
-        setup_crypt_handle(physical_path, Some(unlock_method))
+        match setup_crypt_device(physical_path)? {
+            Some(ref mut device) => setup_crypt_handle(device, physical_path, Some(unlock_method)),
+            None => Ok(None),
+        }
     }
 }

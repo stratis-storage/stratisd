@@ -51,7 +51,7 @@ use devicemapper::Device;
 
 use crate::engine::{
     strat_engine::{
-        backstore::CryptHandle,
+        backstore::CryptMetadataHandle,
         metadata::{device_identifiers, StratisIdentifiers},
         udev::{
             block_enumerator, decide_ownership, UdevOwnership, CRYPTO_FS_TYPE, FS_TYPE_KEY,
@@ -211,7 +211,7 @@ fn process_luks_device(dev: &UdevEngineDevice) -> Option<LuksInfo> {
                 );
                 None
             }
-            Ok(device_number) => match CryptHandle::setup(devnode) {
+            Ok(device_number) => match CryptMetadataHandle::setup(devnode) {
                 Ok(None) => None,
                 Err(err) => {
                     warn!(

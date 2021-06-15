@@ -9,6 +9,7 @@ mod activate;
 mod consts;
 mod handle;
 mod initialize;
+mod metadata_handle;
 mod shared;
 
 pub use self::{
@@ -16,6 +17,7 @@ pub use self::{
     consts::CLEVIS_TANG_TRUST_URL,
     handle::CryptHandle,
     initialize::CryptInitializer,
+    metadata_handle::CryptMetadataHandle,
     shared::{crypt_metadata_size, interpret_clevis_config},
 };
 

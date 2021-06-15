@@ -3,6 +3,11 @@ else
   TARGET_ARGS = --target=${TARGET}
 endif
 
+ifeq ($(origin MANIFEST_PATH), undefined)
+else
+  MANIFEST_PATH_ARGS = --manifest-path=${MANIFEST_PATH}
+endif
+
 DESTDIR ?=
 PREFIX ?= /usr
 LIBEXECDIR ?= $(PREFIX)/libexec
@@ -319,7 +324,7 @@ verify-dependency-bounds:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
 	cargo build --all-targets --all-features
-	${SET_LOWER_BOUNDS}
+	${SET_LOWER_BOUNDS} ${MANIFEST_PATH_ARGS}
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
 	cargo build --all-targets --all-features
@@ -330,7 +335,8 @@ verify-dependency-bounds:
 # do not check the value of the low key. The jq filter can be updated if we
 # deliberately choose a too high or a missing dependency.
 check-fedora-versions:
-	`${COMPARE_FEDORA_VERSIONS} | jq '[.missing == [], .high == []] | all'`
+	`${COMPARE_FEDORA_VERSIONS} ${MANIFEST_PATH_ARGS} \
+		| jq '[.missing == [], .high == []] | all'`
 
 .PHONY:
 	audit

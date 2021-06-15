@@ -183,7 +183,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - task: ./compare_fedora_versions
+          - task: ./compare_fedora_versions --manifest-path=../../Cargo.toml
     continue-on-error: true
     runs-on: ubuntu-18.04
     container:

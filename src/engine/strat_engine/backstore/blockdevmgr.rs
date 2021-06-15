@@ -632,12 +632,13 @@ impl BlockDevMgr {
         }
 
         let mut original_tokens = Vec::new();
-        for (_, blockdev) in self.blockdevs() {
+        let blockdevs = self.blockdevs_mut();
+        for (_, blockdev) in blockdevs.iter() {
             original_tokens.push(get_clevis_token_metadata(blockdev.physical_path())?);
         }
 
         operation_loop(
-            self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
+            blockdevs.into_iter().map(|(_, bd)| bd),
             |blockdev| blockdev.rebind_clevis(),
             |index, blockdev| {
                 set_clevis_token_metadata(blockdev.physical_path(), &original_tokens[index])

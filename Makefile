@@ -165,6 +165,10 @@ bloat: ${HOME}/.cargo/bin/cargo-bloat
 audit: ${HOME}/.cargo/bin/cargo-audit
 	PATH=${HOME}/.cargo/bin:${PATH} cargo audit -D warnings
 
+vendored-tar-file:
+	cargo vendor
+	tar -czvf stratisd-${RELEASE_VERSION}-vendor.tar.gz vendor
+
 ${PWD}/stratisd-vendor.tar.gz:
 	cargo vendor
 	tar -czvf stratisd-vendor.tar.gz vendor
@@ -365,5 +369,6 @@ check-fedora-versions:
 	test-real
 	test-clevis-loop
 	test-clevis-real
+	vendored-tar-file
 	verify-dependency-bounds
 	yamllint

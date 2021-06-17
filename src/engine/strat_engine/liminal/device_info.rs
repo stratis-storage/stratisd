@@ -259,7 +259,6 @@ impl LInfo {
         // Returns true if the information found via udev for two devices is
         // compatible, otherwise false.
         // Precondition: Stratis identifiers of devices are the same
-        #[allow(unknown_lints)]
         #[allow(clippy::suspicious_operation_groupings)]
         fn luks_luks_compatible(info_1: &LLuksInfo, info_2: &LuksInfo) -> bool {
             assert_eq!(info_1.ids.identifiers, info_2.info.identifiers);

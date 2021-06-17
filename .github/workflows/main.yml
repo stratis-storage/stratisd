@@ -43,61 +43,60 @@ jobs:
             toolchain: 1.52.1
             components: clippy
             image: fedora:33
-          # MANDATORY TESTING ON STABLE
           - task: make -f Makefile build
-            toolchain: stable
+            toolchain: 1.52.1
             components: cargo
             image: ubuntu:groovy
           - task: make -f Makefile build-min
-            toolchain: stable
+            toolchain: 1.52.1
             components: cargo
             image: ubuntu:groovy
           - task: make -f Makefile build-extras
-            toolchain: stable
+            toolchain: 1.52.1
             components: cargo
             image: ubuntu:groovy
           - task: make -f Makefile docs-travis
-            toolchain: stable
+            toolchain: 1.52.1
             components: cargo
             image: ubuntu:groovy
           - task: make -f Makefile test
-            toolchain: stable
+            toolchain: 1.52.1
             components: cargo
             image: ubuntu:groovy
           - task: make -f Makefile release
-            toolchain: stable
+            toolchain: 1.52.1
             components: cargo
             image: ubuntu:groovy
           - task: make -f Makefile release-min
-            toolchain: stable
+            toolchain: 1.52.1
             components: cargo
             image: ubuntu:groovy
           - task: make -f Makefile build
-            toolchain: stable
+            toolchain: 1.52.1
             components: cargo
             image: fedora:33
           - task: make -f Makefile build-min
-            toolchain: stable
+            toolchain: 1.52.1
             components: cargo
             image: fedora:33
           - task: make -f Makefile build-extras
-            toolchain: stable
+            toolchain: 1.52.1
             components: cargo
             image: fedora:33
           - task: make -f Makefile docs-travis
-            toolchain: stable
+            toolchain: 1.52.1
             components: cargo
             image: fedora:33
           - task: make -f Makefile test
-            toolchain: stable
+            toolchain: 1.52.1
             components: cargo
             image: fedora:33
           - task: make -f Makefile release
-            toolchain: stable
+            toolchain: 1.52.1
             components: cargo
             image: fedora:33
           - task: make -f Makefile release-min
-            toolchain: stable
+            toolchain: 1.52.1
             components: cargo
             image: fedora:33
     runs-on: ubuntu-18.04
@@ -148,11 +147,11 @@ jobs:
         include:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
           - task: RUST_LOG=libstratis=debug make -f Makefile test-loop
-            toolchain: stable
+            toolchain: 1.52.1
             components: cargo
             image: ubuntu:groovy
           - task: RUST_LOG=libstratis=debug make -f Makefile test-loop
-            toolchain: stable
+            toolchain: 1.52.1
             components: cargo
             image: fedora:33
     runs-on: ubuntu-18.04
@@ -219,7 +218,7 @@ jobs:
               TANG_URL=tang
               RUST_LOG=libstratis=debug
               make -f Makefile test-clevis-loop
-            toolchain: stable
+            toolchain: 1.52.1
             components: cargo
             image: fedora:33
     runs-on: ubuntu-18.04

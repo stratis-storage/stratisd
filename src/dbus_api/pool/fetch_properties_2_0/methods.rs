@@ -20,7 +20,6 @@ use crate::dbus_api::{
 
 const ALL_PROPERTIES: [&str; 2] = [consts::POOL_TOTAL_SIZE_PROP, consts::POOL_TOTAL_USED_PROP];
 
-#[allow(unknown_lints)]
 #[allow(clippy::unnecessary_wraps)]
 fn get_properties_shared(
     m: &MethodInfo<MTSync<TData>, TData>,

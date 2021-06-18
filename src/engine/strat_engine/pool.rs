@@ -8,6 +8,7 @@ use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
 
 use devicemapper::{Bytes, DmNameBuf, Sectors};
+use stratisd_proc_macros::strat_pool_impl_gen;
 
 use crate::{
     engine::{
@@ -139,6 +140,7 @@ pub struct StratPool {
     action_avail: ActionAvailability,
 }
 
+#[strat_pool_impl_gen]
 impl StratPool {
     /// Initialize a Stratis Pool.
     /// 1. Initialize the block devices specified by paths.
@@ -245,6 +247,7 @@ impl StratPool {
     }
 
     /// Write current metadata to pool members.
+    #[pool_mutating_action]
     pub fn write_metadata(&mut self, name: &str) -> StratisResult<()> {
         let data = serde_json::to_string(&self.record(name))?;
         self.backstore.save_state(data.as_bytes())
@@ -269,6 +272,7 @@ impl StratPool {
     /// Called when a DM device in this pool has generated an event.
     // TODO: Just check the device that evented. Currently checks
     // everything.
+    #[pool_mutating_action]
     pub fn event_on(&mut self, pool_uuid: PoolUuid, pool_name: &Name) -> StratisResult<()> {
         if self.thin_pool.check(pool_uuid, &mut self.backstore)? {
             self.write_metadata(pool_name)?;
@@ -293,16 +297,18 @@ impl StratPool {
         self.backstore.get_blockdev_by_uuid(uuid)
     }
 
+    #[pool_mutating_action]
     pub fn get_mut_strat_blockdev(
         &mut self,
         uuid: DevUuid,
-    ) -> Option<(BlockDevTier, &mut StratBlockDev)> {
-        self.backstore.get_mut_blockdev_by_uuid(uuid)
+    ) -> StratisResult<Option<(BlockDevTier, &mut StratBlockDev)>> {
+        Ok(self.backstore.get_mut_blockdev_by_uuid(uuid))
     }
 
     /// Destroy the pool.
     /// Precondition: All filesystems belonging to this pool must be
     /// unmounted.
+    #[pool_mutating_action]
     pub fn destroy(&mut self) -> StratisResult<()> {
         self.thin_pool.teardown()?;
         self.backstore.destroy()?;
@@ -332,7 +338,9 @@ impl<'a> Into<Value> for &'a StratPool {
     }
 }
 
+#[strat_pool_impl_gen]
 impl Pool for StratPool {
+    #[pool_mutating_action]
     fn init_cache(
         &mut self,
         pool_uuid: PoolUuid,
@@ -372,6 +380,7 @@ impl Pool for StratPool {
         }
     }
 
+    #[pool_mutating_action]
     fn bind_clevis(
         &mut self,
         pin: &str,
@@ -385,6 +394,7 @@ impl Pool for StratPool {
         }
     }
 
+    #[pool_mutating_action]
     fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<Clevis>> {
         let changed = self.backstore.unbind_clevis()?;
         if changed {
@@ -394,6 +404,7 @@ impl Pool for StratPool {
         }
     }
 
+    #[pool_mutating_action]
     fn bind_keyring(
         &mut self,
         key_description: &KeyDescription,
@@ -406,6 +417,7 @@ impl Pool for StratPool {
         }
     }
 
+    #[pool_mutating_action]
     fn unbind_keyring(&mut self) -> StratisResult<DeleteAction<Key>> {
         let changed = self.backstore.unbind_keyring()?;
         if changed {
@@ -415,6 +427,7 @@ impl Pool for StratPool {
         }
     }
 
+    #[pool_mutating_action]
     fn rebind_keyring(
         &mut self,
         new_key_desc: &KeyDescription,
@@ -426,10 +439,12 @@ impl Pool for StratPool {
         }
     }
 
+    #[pool_mutating_action]
     fn rebind_clevis(&mut self) -> StratisResult<RegenAction> {
         self.backstore.rebind_clevis().map(|_| RegenAction)
     }
 
+    #[pool_mutating_action]
     fn create_filesystems<'a, 'b>(
         &'a mut self,
         pool_name: &str,
@@ -472,6 +487,7 @@ impl Pool for StratPool {
         Ok(SetCreateAction::new(result))
     }
 
+    #[pool_mutating_action]
     fn add_blockdevs(
         &mut self,
         pool_uuid: PoolUuid,
@@ -528,6 +544,7 @@ impl Pool for StratPool {
         bdev_info
     }
 
+    #[pool_mutating_action]
     fn destroy_filesystems<'a>(
         &'a mut self,
         pool_name: &str,
@@ -543,6 +560,7 @@ impl Pool for StratPool {
         Ok(SetDeleteAction::new(removed))
     }
 
+    #[pool_mutating_action]
     fn rename_filesystem(
         &mut self,
         pool_name: &str,
@@ -560,6 +578,7 @@ impl Pool for StratPool {
         }
     }
 
+    #[pool_mutating_action]
     fn snapshot_filesystem(
         &mut self,
         pool_name: &str,

@@ -207,7 +207,7 @@ mod tests {
             let pool_uuid = PoolUuid::new_v4();
             let dev_uuid = DevUuid::new_v4();
 
-            let mut handle =
+            let handle =
                 CryptInitializer::new(DevicePath::new(path.to_path_buf())?, pool_uuid, dev_uuid)
                     .initialize(Some(key_desc), None)?;
             let logical_path = handle.activated_device_path();
@@ -302,8 +302,8 @@ mod tests {
 
             handle.deactivate()?;
 
-            let mut handle = CryptActivationHandle::setup(path, UnlockMethod::Keyring)?
-                .ok_or_else(|| {
+            let handle =
+                CryptActivationHandle::setup(path, UnlockMethod::Keyring)?.ok_or_else(|| {
                     Box::new(io::Error::new(
                         io::ErrorKind::Other,
                         format!(

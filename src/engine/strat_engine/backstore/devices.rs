@@ -420,7 +420,7 @@ pub fn initialize_devices(
         key_description: Option<&KeyDescription>,
         enable_clevis: Option<(&str, &Value)>,
     ) -> StratisResult<(CryptHandle, Device, Sectors)> {
-        let mut handle = CryptInitializer::new(
+        let handle = CryptInitializer::new(
             DevicePath::new(physical_path.to_owned())?,
             pool_uuid,
             dev_uuid,
@@ -486,7 +486,7 @@ pub fn initialize_devices(
     }
 
     /// Clean up an encrypted device after initialization failure.
-    fn clean_up_encrypted(mut handle: CryptHandle) {
+    fn clean_up_encrypted(handle: CryptHandle) {
         if let Err(e) = handle.wipe() {
             warn!(
                 "Failed to clean up encrypted device {}; cleanup \

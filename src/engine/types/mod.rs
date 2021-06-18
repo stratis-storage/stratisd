@@ -327,7 +327,7 @@ impl Deref for DevicePath {
 }
 
 /// Represents what actions this pool can accept.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum ActionAvailability {
     Full,
     // FIXME: To be used eventually

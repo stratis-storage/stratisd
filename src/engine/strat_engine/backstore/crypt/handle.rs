@@ -127,12 +127,12 @@ impl CryptHandle {
     }
 
     /// Get the keyslot associated with the given token ID.
-    pub fn keyslots(&mut self, token_id: c_uint) -> StratisResult<Option<Vec<c_uint>>> {
+    pub fn keyslots(&self, token_id: c_uint) -> StratisResult<Option<Vec<c_uint>>> {
         get_keyslot_number(&mut self.acquire_crypt_device()?, token_id)
     }
 
     /// Get info for the clevis binding.
-    pub fn clevis_info(&mut self) -> StratisResult<Option<(String, Value)>> {
+    pub fn clevis_info(&self) -> StratisResult<Option<(String, Value)>> {
         clevis_info_from_metadata(&mut self.acquire_crypt_device()?)
     }
 
@@ -268,21 +268,22 @@ impl CryptHandle {
 
     /// Deactivate the device referenced by the current device handle.
     #[cfg(test)]
-    pub fn deactivate(&mut self) -> StratisResult<()> {
-        let name = self.name.to_owned();
-        super::shared::ensure_inactive(&mut self.acquire_crypt_device()?, &name)
+    pub fn deactivate(&self) -> StratisResult<()> {
+        super::shared::ensure_inactive(&mut self.acquire_crypt_device()?, &self.name)
     }
 
     /// Wipe all LUKS2 metadata on the device safely using libcryptsetup.
-    pub fn wipe(&mut self) -> StratisResult<()> {
-        let path = self.luks2_device_path().to_owned();
-        let name = self.name.to_owned();
-        ensure_wiped(&mut self.acquire_crypt_device()?, &path, &name)
+    pub fn wipe(&self) -> StratisResult<()> {
+        ensure_wiped(
+            &mut self.acquire_crypt_device()?,
+            &self.luks2_device_path(),
+            &self.name,
+        )
     }
 
     /// Get the size of the logical device built on the underlying encrypted physical
     /// device. `devicemapper` will return the size in terms of number of sectors.
-    pub fn logical_device_size(&mut self) -> StratisResult<Sectors> {
+    pub fn logical_device_size(&self) -> StratisResult<Sectors> {
         let name = self.name.clone();
         let active_device = log_on_failure!(
             self.acquire_crypt_device()?

@@ -49,12 +49,14 @@ CLIPPY_CARGO = -D clippy::cargo_common_metadata \
 # Explicitly allow these lints because they don't seem helpful
 # doc_markdown: we would rather have useful than well-formatted docs
 # from_over_into: preferring from over into is very awkward with JSON report
+# manual_filter_map: sometimes map() after filter_map() is clearer
 # map_err_ignore: we generally drop the errors for a reason
 # option_if_let_else: causing problems with if-else chains
 # similar_names: judges "yes" and "res" to be too similar
 # upper_case_acronyms: We use upper case for initialisms, e.g., BDA
 CLIPPY_PEDANTIC_USELESS = -A clippy::doc_markdown \
                           -A clippy::from_over_into \
+                          -A clippy::manual_filter_map \
                           -A clippy::map_err_ignore \
                           -A clippy::option_if_let_else \
                           -A clippy::similar_names \
@@ -81,7 +83,6 @@ CLIPPY_PEDANTIC = -D clippy::await_holding_lock \
                   -D clippy::explicit_deref_methods \
                   -D clippy::explicit_into_iter_loop \
                   -A clippy::explicit_iter_loop \
-                  -A clippy::filter_map \
                   -A clippy::filter_map_next \
                   -D clippy::fn_params_excessive_bools \
                   -A clippy::if_not_else \

@@ -17,6 +17,7 @@ use crate::{
 mod blockdev_2_0;
 mod blockdev_2_2;
 mod fetch_properties_2_0;
+mod fetch_properties_2_5;
 mod shared;
 
 pub fn create_dbus_blockdev<'a>(
@@ -110,8 +111,8 @@ pub fn create_dbus_blockdev<'a>(
         )
         .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_5, ())
-                .add_m(fetch_properties_2_0::get_all_properties_method(&f))
-                .add_m(fetch_properties_2_0::get_properties_method(&f)),
+                .add_m(fetch_properties_2_5::get_all_properties_method(&f))
+                .add_m(fetch_properties_2_5::get_properties_method(&f)),
         );
 
     let path = object_path.get_name().to_owned();

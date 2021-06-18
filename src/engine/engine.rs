@@ -85,9 +85,6 @@ pub trait BlockDev: Debug {
     /// Get the device path for the block device.
     fn devnode(&self) -> &Path;
 
-    /// Get the canonicalized path to display to the user representing this block device.
-    fn user_path(&self) -> StratisResult<PathBuf>;
-
     /// Get the path to the device on which the Stratis metadata is stored.
     fn metadata_path(&self) -> &Path;
 

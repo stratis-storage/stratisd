@@ -34,20 +34,24 @@ use crate::{
             metadata::StratisIdentifiers,
             names::format_crypt_name,
         },
-        types::{DevUuid, EncryptionInfo, KeyDescription, PoolUuid},
+        types::{DevUuid, DevicePath, EncryptionInfo, KeyDescription, PoolUuid},
     },
     stratis::StratisResult,
 };
 
 /// Handle for initialization actions on a physical device.
 pub struct CryptInitializer {
-    physical_path: PathBuf,
+    physical_path: DevicePath,
     identifiers: StratisIdentifiers,
     activation_name: String,
 }
 
 impl CryptInitializer {
-    pub fn new(physical_path: PathBuf, pool_uuid: PoolUuid, dev_uuid: DevUuid) -> CryptInitializer {
+    pub fn new(
+        physical_path: DevicePath,
+        pool_uuid: PoolUuid,
+        dev_uuid: DevUuid,
+    ) -> CryptInitializer {
         CryptInitializer {
             physical_path,
             activation_name: format_crypt_name(&dev_uuid),
@@ -99,20 +103,18 @@ impl CryptInitializer {
             }
         };
 
-        result
-            .and_then(|activated_path| {
-                Ok(CryptHandle::new(
-                    self.physical_path.clone(),
-                    activated_path,
-                    self.identifiers,
-                    EncryptionInfo {
-                        key_description: key_description.cloned(),
-                        clevis_info: clevis_info_from_metadata(&mut device)?,
-                    },
-                    self.activation_name.clone(),
-                ))
-            })
-            .map_err(|e| {
+        match result {
+            Ok(activated_path) => Ok(CryptHandle::new(
+                self.physical_path,
+                DevicePath::new(activated_path)?,
+                self.identifiers,
+                EncryptionInfo {
+                    key_description: key_description.cloned(),
+                    clevis_info: clevis_info_from_metadata(&mut device)?,
+                },
+                self.activation_name,
+            )),
+            Err(e) => {
                 if let Err(err) =
                     Self::rollback(&mut device, &self.physical_path, self.activation_name)
                 {
@@ -121,8 +123,9 @@ impl CryptInitializer {
                         err
                     );
                 }
-                e
-            })
+                Err(e)
+            }
+        }
     }
 
     /// Initialize with a passphrase in the kernel keyring only.

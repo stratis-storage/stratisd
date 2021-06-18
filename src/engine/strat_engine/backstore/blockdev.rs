@@ -4,12 +4,7 @@
 
 // Code to handle a single block device.
 
-use std::{
-    borrow::Cow,
-    fs::OpenOptions,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{borrow::Cow, fs::OpenOptions, path::Path};
 
 use chrono::{DateTime, TimeZone, Utc};
 use serde_json::Value;
@@ -27,20 +22,55 @@ use crate::{
             metadata::{disown_device, BDAExtendedSize, BlockdevSize, MDADataSize, BDA},
             serde_structs::{BaseBlockDevSave, Recordable},
         },
-        types::{BlockDevPath, DevUuid, EncryptionInfo, KeyDescription, PoolUuid},
+        types::{DevUuid, DevicePath, EncryptionInfo, KeyDescription, PoolUuid},
     },
     stratis::{StratisError, StratisResult},
 };
 
 #[derive(Debug)]
+pub enum UnderlyingDevice {
+    Encrypted(CryptHandle),
+    Unencrypted(DevicePath),
+}
+
+impl UnderlyingDevice {
+    pub fn physical_path(&self) -> &Path {
+        match self {
+            UnderlyingDevice::Encrypted(handle) => handle.luks2_device_path(),
+            UnderlyingDevice::Unencrypted(path) => &*path,
+        }
+    }
+
+    pub fn metadata_path(&self) -> &Path {
+        match self {
+            UnderlyingDevice::Encrypted(handle) => handle.activated_device_path(),
+            UnderlyingDevice::Unencrypted(path) => &*path,
+        }
+    }
+
+    pub fn crypt_handle(&self) -> Option<&CryptHandle> {
+        match self {
+            UnderlyingDevice::Encrypted(handle) => Some(handle),
+            UnderlyingDevice::Unencrypted(_) => None,
+        }
+    }
+
+    pub fn crypt_handle_mut(&mut self) -> Option<&mut CryptHandle> {
+        match self {
+            UnderlyingDevice::Encrypted(handle) => Some(handle),
+            UnderlyingDevice::Unencrypted(_) => None,
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct StratBlockDev {
     dev: Device,
-    devnode: Arc<BlockDevPath>,
     bda: BDA,
     used: RangeAllocator,
     user_info: Option<String>,
     hardware_info: Option<String>,
-    crypt_handle: Option<CryptHandle>,
+    underlying_device: UnderlyingDevice,
 }
 
 impl StratBlockDev {
@@ -67,12 +97,11 @@ impl StratBlockDev {
     /// metadata region.
     pub fn new(
         dev: Device,
-        devnode: &Path,
         bda: BDA,
         other_segments: &[(Sectors, Sectors)],
         user_info: Option<String>,
         hardware_info: Option<String>,
-        crypt_handle: Option<CryptHandle>,
+        underlying_device: UnderlyingDevice,
     ) -> StratisResult<StratBlockDev> {
         let mut segments = vec![(Sectors(0), bda.extended_size().sectors())];
         segments.extend(other_segments);
@@ -81,15 +110,11 @@ impl StratBlockDev {
 
         Ok(StratBlockDev {
             dev,
-            devnode: match crypt_handle {
-                Some(ref ch) => ch.get_physical_path_ref(),
-                None => BlockDevPath::leaf(devnode.to_owned()),
-            },
             bda,
             used: allocator,
             user_info,
             hardware_info,
-            crypt_handle,
+            underlying_device,
         })
     }
 
@@ -100,17 +125,14 @@ impl StratBlockDev {
 
     /// Returns the physical path of the block device structure.
     pub fn physical_path(&self) -> &Path {
-        &self.devnode.path()
+        &self.devnode()
     }
 
     /// Returns the path to the unencrypted metadata stored on the block device structure.
     /// On encrypted devices, this will point to a devicemapper device set up by libcryptsetup.
     /// On unencrypted devices, this will be the same as the physical device.
     pub fn metadata_path(&self) -> &Path {
-        match self.crypt_handle {
-            Some(ref crypt_handle) => crypt_handle.activated_device_path(),
-            None => self.devnode.path(),
-        }
+        self.underlying_device.metadata_path()
     }
 
     /// Remove information that identifies this device as belonging to Stratis
@@ -127,20 +149,22 @@ impl StratBlockDev {
     ///               self.devnode.physical_path() has been encrypted with
     ///               aes-xts-plain64 encryption.
     pub fn disown(&mut self) -> StratisResult<()> {
-        if let Some(ref mut handle) = self.crypt_handle {
+        if let Some(ref mut handle) = self.underlying_device.crypt_handle_mut() {
             handle.wipe()?;
         } else {
-            disown_device(&mut OpenOptions::new().write(true).open(self.devnode.path())?)?;
+            disown_device(
+                &mut OpenOptions::new()
+                    .write(true)
+                    .open(self.underlying_device.physical_path())?,
+            )?;
         }
         Ok(())
     }
 
     pub fn save_state(&mut self, time: &DateTime<Utc>, metadata: &[u8]) -> StratisResult<()> {
-        let metadata_path = match self.crypt_handle {
-            Some(ref handle) => handle.activated_device_path(),
-            None => self.devnode.path(),
-        };
-        let mut f = OpenOptions::new().write(true).open(metadata_path)?;
+        let mut f = OpenOptions::new()
+            .write(true)
+            .open(self.underlying_device.metadata_path())?;
         self.bda.save_state(time, metadata, &mut f)
     }
 
@@ -195,10 +219,9 @@ impl StratBlockDev {
         set_blockdev_user_info!(self; user_info)
     }
 
-    /// Get the structure containing paths (such as physical and logical device
-    /// paths) for the device.
-    pub fn devnode(&self) -> &BlockDevPath {
-        &self.devnode
+    /// Get the physical path for a block device.
+    pub fn devnode(&self) -> &Path {
+        &self.underlying_device.physical_path()
     }
 
     /// Get the encryption_info stored on the given encrypted blockdev.
@@ -207,7 +230,7 @@ impl StratBlockDev {
     /// If the device is not encrypted, it must return an owned `EncryptionInfo`
     /// structure.
     pub fn encryption_info(&self) -> Cow<EncryptionInfo> {
-        match self.crypt_handle {
+        match self.underlying_device.crypt_handle() {
             Some(ref ch) => Cow::Borrowed(ch.encryption_info()),
             None => Cow::Owned(EncryptionInfo::default()),
         }
@@ -215,7 +238,7 @@ impl StratBlockDev {
 
     /// Bind encrypted device using the given clevis configuration.
     pub fn bind_clevis(&mut self, pin: &str, clevis_info: &Value) -> StratisResult<()> {
-        let crypt_handle = self.crypt_handle.as_mut().ok_or_else(|| {
+        let crypt_handle = self.underlying_device.crypt_handle_mut().ok_or_else(|| {
             StratisError::Error("This device does not appear to be encrypted".to_string())
         })?;
         crypt_handle.clevis_bind(pin, clevis_info)
@@ -223,7 +246,7 @@ impl StratBlockDev {
 
     /// Unbind encrypted device using the given clevis configuration.
     pub fn unbind_clevis(&mut self) -> StratisResult<()> {
-        let crypt_handle = self.crypt_handle.as_mut().ok_or_else(|| {
+        let crypt_handle = self.underlying_device.crypt_handle_mut().ok_or_else(|| {
             StratisError::Error("This device does not appear to be encrypted".to_string())
         })?;
         crypt_handle.clevis_unbind()
@@ -232,7 +255,7 @@ impl StratBlockDev {
     /// Bind a block device to a passphrase represented by a key description
     /// in the kernel keyring.
     pub fn bind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<()> {
-        let crypt_handle = self.crypt_handle.as_mut().ok_or_else(|| {
+        let crypt_handle = self.underlying_device.crypt_handle_mut().ok_or_else(|| {
             StratisError::Error("This device does not appear to be encrypted".to_string())
         })?;
         crypt_handle.bind_keyring(key_desc)
@@ -241,7 +264,7 @@ impl StratBlockDev {
     /// Unbind a block device from a passphrase represented by a key description
     /// in the kernel keyring.
     pub fn unbind_keyring(&mut self) -> StratisResult<()> {
-        let crypt_handle = self.crypt_handle.as_mut().ok_or_else(|| {
+        let crypt_handle = self.underlying_device.crypt_handle_mut().ok_or_else(|| {
             StratisError::Error("This device does not appear to be encrypted".to_string())
         })?;
         crypt_handle.unbind_keyring()
@@ -251,11 +274,15 @@ impl StratBlockDev {
 impl<'a> Into<Value> for &'a StratBlockDev {
     fn into(self) -> Value {
         let mut json = json!({
-            "path": self.devnode.path(),
+            "path": self.underlying_device.physical_path(),
             "uuid": self.bda.dev_uuid().to_string(),
         });
         let map = json.as_object_mut().expect("just created above");
-        if let Some(encryption_info) = self.crypt_handle.as_ref().map(|ch| ch.encryption_info()) {
+        if let Some(encryption_info) = self
+            .underlying_device
+            .crypt_handle()
+            .map(|ch| ch.encryption_info())
+        {
             if let Value::Object(enc_map) = <&EncryptionInfo as Into<Value>>::into(encryption_info)
             {
                 map.extend(enc_map);
@@ -269,11 +296,7 @@ impl<'a> Into<Value> for &'a StratBlockDev {
 
 impl BlockDev for StratBlockDev {
     fn devnode(&self) -> &Path {
-        self.devnode.path()
-    }
-
-    fn user_path(&self) -> StratisResult<PathBuf> {
-        Ok(self.metadata_path().canonicalize()?)
+        self.devnode()
     }
 
     fn metadata_path(&self) -> &Path {

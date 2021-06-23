@@ -16,10 +16,10 @@ jobs:
       matrix:
         include:
           - task: cargo update --locked
-            toolchain: 1.52.1  # CURRENT DEVELOPMENT TOOLCHAIN
+            toolchain: 1.53.0  # CURRENT DEVELOPMENT TOOLCHAIN
             components: cargo
           - task: make -f Makefile audit
-            toolchain: 1.52.1  # CURRENT DEVELOPMENT TOOLCHAIN
+            toolchain: 1.53.0  # CURRENT DEVELOPMENT TOOLCHAIN
             components: cargo
           # Allowed because a failure may occur after a new Rust stable
           # version is released.
@@ -152,7 +152,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           components: cargo
-          toolchain: 1.52.1  # CURRENT DEVELOPMENT
+          toolchain: 1.53.0  # CURRENT DEVELOPMENT
           override: true
       - name: Install all necessary Stratis files
         run: PROFILEDIR=debug make -f Makefile install
@@ -207,7 +207,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           components: cargo
-          toolchain: 1.52.1  # CURRENT DEVELOPMENT TOOLCHAIN
+          toolchain: 1.53.0  # CURRENT DEVELOPMENT TOOLCHAIN
           override: true
       - name: Check out ci repo
         run: git clone https://github.com/stratis-storage/ci.git

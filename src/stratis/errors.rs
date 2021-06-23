@@ -159,12 +159,6 @@ impl From<libudev::Error> for StratisError {
     }
 }
 
-impl<T> From<sync::PoisonError<T>> for StratisError {
-    fn from(err: sync::PoisonError<T>) -> StratisError {
-        StratisError::Error(err.to_string())
-    }
-}
-
 impl From<sync::mpsc::RecvError> for StratisError {
     fn from(err: sync::mpsc::RecvError) -> StratisError {
         StratisError::Recv(err)

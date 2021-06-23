@@ -74,7 +74,7 @@ pub async fn pool_create(
 pub async fn pool_destroy(engine: LockableEngine, name: &str) -> StratisResult<bool> {
     let mut lock = engine.lock().await;
     let (uuid, _) = name_to_uuid_and_pool(&mut *lock, name)
-        .ok_or_else(|| StratisError::Error(format!("No pool found with name {}", name)))?;
+        .ok_or_else(|| StratisError::Msg(format!("No pool found with name {}", name)))?;
     Ok(match block_in_place(|| lock.destroy_pool(uuid))? {
         DeleteAction::Deleted(_) => true,
         DeleteAction::Identity => false,
@@ -89,7 +89,7 @@ pub async fn pool_init_cache(
 ) -> StratisResult<bool> {
     let mut lock = engine.lock().await;
     let (uuid, pool) = name_to_uuid_and_pool(&mut *lock, name)
-        .ok_or_else(|| StratisError::Error(format!("No pool found with name {}", name)))?;
+        .ok_or_else(|| StratisError::Msg(format!("No pool found with name {}", name)))?;
     block_in_place(|| Ok(pool.init_cache(uuid, name, paths)?.is_changed()))
 }
 
@@ -101,7 +101,7 @@ pub async fn pool_rename(
 ) -> StratisResult<bool> {
     let mut lock = engine.lock().await;
     let (uuid, _) = name_to_uuid_and_pool(&mut *lock, current_name)
-        .ok_or_else(|| StratisError::Error(format!("No pool found with name {}", current_name)))?;
+        .ok_or_else(|| StratisError::Msg(format!("No pool found with name {}", current_name)))?;
     Ok(match block_in_place(|| lock.rename_pool(uuid, new_name))? {
         RenameAction::Identity => false,
         RenameAction::Renamed(_) => true,
@@ -135,7 +135,7 @@ async fn add_blockdevs(
 ) -> StratisResult<bool> {
     let mut lock = engine.lock().await;
     let (uuid, pool) = name_to_uuid_and_pool(&mut *lock, name)
-        .ok_or_else(|| StratisError::Error(format!("No pool found with name {}", name)))?;
+        .ok_or_else(|| StratisError::Msg(format!("No pool found with name {}", name)))?;
     block_in_place(|| {
         Ok(pool
             .add_blockdevs(uuid, name, blockdevs, tier)?
@@ -179,7 +179,7 @@ pub async fn pool_is_encrypted(engine: LockableEngine, uuid: PoolUuid) -> Strati
     } else if lock.locked_pools().get(&uuid).is_some() {
         Ok(true)
     } else {
-        Err(StratisError::Error(format!(
+        Err(StratisError::Msg(format!(
             "Pool with UUID {} not found",
             uuid.to_simple_ref()
         )))
@@ -194,7 +194,7 @@ pub async fn pool_is_locked(engine: LockableEngine, uuid: PoolUuid) -> StratisRe
     } else if lock.locked_pools().get(&uuid).is_some() {
         Ok(true)
     } else {
-        Err(StratisError::Error(format!(
+        Err(StratisError::Msg(format!(
             "Pool with UUID {} not found",
             uuid.to_simple_ref()
         )))
@@ -209,7 +209,7 @@ pub async fn pool_is_bound(engine: LockableEngine, uuid: PoolUuid) -> StratisRes
     } else if let Some(info) = lock.locked_pools().get(&uuid) {
         Ok(info.info.clevis_info.is_some())
     } else {
-        Err(StratisError::Error(format!(
+        Err(StratisError::Msg(format!(
             "Pool with UUID {} not found",
             uuid.to_simple_ref()
         )))
@@ -224,7 +224,7 @@ pub async fn pool_has_passphrase(engine: LockableEngine, uuid: PoolUuid) -> Stra
     } else if let Some(info) = lock.locked_pools().get(&uuid) {
         Ok(info.info.key_description.is_some())
     } else {
-        Err(StratisError::Error(format!(
+        Err(StratisError::Msg(format!(
             "Pool with UUID {} not found",
             uuid.to_simple_ref()
         )))
@@ -246,7 +246,7 @@ pub async fn pool_clevis_pin(
     } else if let Some(info) = lock.locked_pools().get(&uuid) {
         Ok(info.info.clevis_info.as_ref().map(|(pin, _)| pin.clone()))
     } else {
-        Err(StratisError::Error(format!(
+        Err(StratisError::Msg(format!(
             "Pool with UUID {} not found",
             uuid.to_simple_ref()
         )))

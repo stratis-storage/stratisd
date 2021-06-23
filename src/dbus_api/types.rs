@@ -44,22 +44,13 @@ pub type InterfacesRemoved = Vec<String>;
 pub enum DbusErrorEnum {
     OK = 0,
     ERROR = 1,
-
-    ALREADY_EXISTS = 2,
-    BUSY = 3,
-    INTERNAL_ERROR = 4,
-    NOTFOUND = 5,
 }
 
 impl DbusErrorEnum {
     pub fn get_error_string(self) -> &'static str {
         match self {
             DbusErrorEnum::OK => "Ok",
-            DbusErrorEnum::ERROR => "A general error happened",
-            DbusErrorEnum::ALREADY_EXISTS => "Already exists",
-            DbusErrorEnum::BUSY => "Operation can not be performed at this time",
-            DbusErrorEnum::INTERNAL_ERROR => "Internal error",
-            DbusErrorEnum::NOTFOUND => "Not found",
+            DbusErrorEnum::ERROR => "An error occurred",
         }
     }
 }

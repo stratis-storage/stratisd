@@ -37,7 +37,7 @@ use crate::{
         structures::Table,
         types::{FilesystemUuid, Name, PoolUuid},
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::{StratisError, StratisResult},
 };
 
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2 * IEC::Ki);
@@ -296,7 +296,7 @@ impl ThinPool {
             Some(sl) => sl,
             None => {
                 let err_msg = "Could not allocate sufficient space for thinpool devices.";
-                return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
+                return Err(StratisError::Msg(err_msg.into()));
             }
         };
 
@@ -476,7 +476,7 @@ impl ThinPool {
                 // TODO: Recover here. Failing the entire pool setup because
                 // of this is too harsh.
                 let err_msg = "filesystems with duplicate UUID or name specified in metadata";
-                return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg.into()));
+                return Err(StratisError::Msg(err_msg.into()));
             }
         }
 
@@ -754,7 +754,7 @@ impl ThinPool {
                     "Unknown status for thin pool device with \"{}\"",
                     thin_pool_identifiers(&self.thin_pool)
                 );
-                return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
+                return Err(StratisError::Msg(err_msg));
             }
             Some(status) => match status {
                 ThinPoolStatus::Working(status) => (
@@ -766,14 +766,14 @@ impl ThinPool {
                         "Devicemapper could not obtain status for devicemapper thin pool device with \"{}\"",
                         thin_pool_identifiers(&self.thin_pool)
                     );
-                    return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
+                    return Err(StratisError::Msg(err_msg));
                 }
                 ThinPoolStatus::Fail => {
                     let err_msg = format!(
                         "The thinpool device with \"{}\" has failed",
                         thin_pool_identifiers(&self.thin_pool)
                     );
-                    return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
+                    return Err(StratisError::Msg(err_msg));
                 }
             },
         };
@@ -884,8 +884,7 @@ impl ThinPool {
                 snapshot_id,
             )?,
             None => {
-                return Err(StratisError::Engine(
-                    ErrorEnum::Error,
+                return Err(StratisError::Msg(
                     "snapshot_filesystem failed, filesystem not found".into(),
                 ));
             }
@@ -1001,14 +1000,19 @@ impl ThinPool {
         self.thin_pool.suspend(get_dm(), true)?;
         // If MDV suspend fails, resume the thin pool and return the error
         if let Err(err) = self.mdv.suspend() {
-            self.thin_pool.resume(get_dm()).map_err(|e| {
-                StratisError::Error(format!(
-                    "Suspending the MDV failed: {}. MDV suspend clean up action \
-                     of resuming the thin pool also failed: {}.",
-                    err, e
+            if let Err(e) = self.thin_pool.resume(get_dm()) {
+                Err(StratisError::Chained(
+                    "Suspending the MDV failed and MDV suspend clean up action of resuming the thin pool also failed".to_string(),
+                    // NOTE: This should potentially put the pool in maintenance-only
+                    // mode. For now, this will have no effect.
+                    Box::new(StratisError::NoActionRollbackError{
+                        causal_error: Box::new(err),
+                        rollback_error: Box::new(StratisError::from(e)),
+                    }),
                 ))
-            })?;
-            Err(err)
+            } else {
+                Err(err)
+            }
         } else {
             Ok(())
         }

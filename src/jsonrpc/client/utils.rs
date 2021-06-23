@@ -17,7 +17,7 @@ macro_rules! do_request {
         )? {
             ret
         } else {
-            return Err($crate::stratis::StratisError::Error(
+            return Err($crate::stratis::StratisError::Msg(
                 "Request and response types did not match".to_string(),
             ));
         }
@@ -35,7 +35,7 @@ macro_rules! do_request {
         )? {
             ret
         } else {
-            return Err($crate::stratis::StratisError::Error(
+            return Err($crate::stratis::StratisError::Msg(
                 "Request and response types did not match".to_string(),
             ));
         }
@@ -51,7 +51,7 @@ macro_rules! do_request {
         )? {
             ret
         } else {
-            return Err($crate::stratis::StratisError::Error(
+            return Err($crate::stratis::StratisError::Msg(
                 "Request and response types did not match".to_string(),
             ));
         }
@@ -63,9 +63,9 @@ macro_rules! do_request_standard {
     ($request:ident, $($arg:expr),+; $fd:expr) => {{
         let (changed, rc, rs) = $crate::do_request!($request, $($arg),+; $fd);
         if rc != 0 {
-            Err($crate::stratis::StratisError::Error(rs))
+            Err($crate::stratis::StratisError::Msg(rs))
         } else if !changed {
-            Err($crate::stratis::StratisError::Error(
+            Err($crate::stratis::StratisError::Msg(
                 "The requested action had no effect".to_string(),
             ))
         } else {
@@ -75,9 +75,9 @@ macro_rules! do_request_standard {
     ($request:ident, $($arg:expr ),+) => {{
         let (changed, rc, rs) = $crate::do_request!($request, $($arg),+);
         if rc != 0 {
-            Err($crate::stratis::StratisError::Error(rs))
+            Err($crate::stratis::StratisError::Msg(rs))
         } else if !changed {
-            Err($crate::stratis::StratisError::Error(
+            Err($crate::stratis::StratisError::Msg(
                 "The requested action had no effect".to_string(),
             ))
         } else {
@@ -87,9 +87,9 @@ macro_rules! do_request_standard {
     ($request:ident) => {{
         let (changed, rc, rs) = $crate::do_request!($request);
         if rc != 0 {
-            Err($crate::stratis::StratisError::Error(rs))
+            Err($crate::stratis::StratisError::Msg(rs))
         } else if !changed {
-            Err($crate::stratis::StratisError::Error(
+            Err($crate::stratis::StratisError::Msg(
                 "The requested action had no effect".to_string(),
             ))
         } else {
@@ -137,7 +137,7 @@ macro_rules! print_table {
                 }
             });
         if !lengths_same {
-            return Err($crate::stratis::StratisError::Error(
+            return Err($crate::stratis::StratisError::Msg(
                 "All values parameters must be the same length".to_string()
             ));
         }

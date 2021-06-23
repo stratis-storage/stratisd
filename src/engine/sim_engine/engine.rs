@@ -21,7 +21,7 @@ use crate::{
             RenameAction, ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
         },
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::{StratisError, StratisResult},
 };
 
 #[derive(Debug, Default)]
@@ -88,13 +88,10 @@ impl Engine for SimEngine {
 
         if let Some(ref key_desc) = encryption_info.key_description {
             if !self.key_handler.contains_key(key_desc) {
-                return Err(StratisError::Engine(
-                    ErrorEnum::NotFound,
-                    format!(
-                        "Key {} was not found in the keyring",
-                        key_desc.as_application_str()
-                    ),
-                ));
+                return Err(StratisError::Msg(format!(
+                    "Key {} was not found in the keyring",
+                    key_desc.as_application_str()
+                )));
             }
         }
 
@@ -102,8 +99,7 @@ impl Engine for SimEngine {
             Some((_, pool)) => create_pool_idempotent_or_err(pool, name, blockdev_paths),
             None => {
                 if blockdev_paths.is_empty() {
-                    Err(StratisError::Engine(
-                        ErrorEnum::Invalid,
+                    Err(StratisError::Msg(
                         "At least one blockdev is required to create a pool.".to_string(),
                     ))
                 } else {
@@ -128,10 +124,7 @@ impl Engine for SimEngine {
     fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {
         if let Some((_, pool)) = self.pools.get_by_uuid(uuid) {
             if pool.has_filesystems() {
-                return Err(StratisError::Engine(
-                    ErrorEnum::Busy,
-                    "filesystems remaining on pool".into(),
-                ));
+                return Err(StratisError::Msg("filesystems remaining on pool".into()));
             };
         } else {
             return Ok(DeleteAction::Identity);
@@ -217,12 +210,9 @@ mod tests {
 
     use std::{self, path::Path};
 
-    use crate::{
-        engine::{
-            types::{EngineAction, RenameAction},
-            Engine,
-        },
-        stratis::{ErrorEnum, StratisError},
+    use crate::engine::{
+        types::{EngineAction, RenameAction},
+        Engine,
     };
 
     use super::*;
@@ -332,7 +322,7 @@ mod tests {
                 None,
                 &EncryptionInfo::default(),
             ),
-            Err(StratisError::Engine(ErrorEnum::Invalid, _))
+            Err(_)
         );
     }
 
@@ -445,10 +435,7 @@ mod tests {
                 &EncryptionInfo::default(),
             )
             .unwrap();
-        assert_matches!(
-            engine.rename_pool(uuid, new_name),
-            Err(StratisError::Engine(ErrorEnum::AlreadyExists, _))
-        );
+        assert_matches!(engine.rename_pool(uuid, new_name), Err(_));
     }
 
     #[test]

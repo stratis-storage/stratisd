@@ -35,7 +35,7 @@ impl DbusUdevHandler {
     /// Process udev events that were detected on the udev socket.
     pub async fn handle_udev_event(&mut self) -> StratisResult<()> {
         let udev_event = self.receiver.recv().await.ok_or_else(|| {
-            StratisError::Error("Channel from udev handler to D-Bus handler was shut".to_string())
+            StratisError::Msg("Channel from udev handler to D-Bus handler was shut".to_string())
         })?;
         let mut mutex_lock = self.dbus_context.engine.lock().await;
         let optional_pool_info = mutex_lock.handle_event(&udev_event);

@@ -12,7 +12,7 @@ use serde_json::{Map, Value};
 
 use libcryptsetup_rs::SafeMemHandle;
 
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
+use crate::stratis::{StratisError, StratisResult};
 
 /// A handle for memory designed to safely handle Stratis passphrases. It can
 /// be coerced to a slice reference for use in read-only operations.
@@ -135,10 +135,10 @@ impl TryFrom<String> for KeyDescription {
 
     fn try_from(s: String) -> StratisResult<KeyDescription> {
         if s.contains(';') {
-            Err(StratisError::Engine(
-                ErrorEnum::Invalid,
-                format!("Key description {} contains a ';'", s),
-            ))
+            Err(StratisError::Msg(format!(
+                "Key description {} contains a ';'",
+                s
+            )))
         } else {
             Ok(KeyDescription(s))
         }

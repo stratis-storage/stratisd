@@ -30,7 +30,7 @@ pub use crate::engine::{
         keys::{EncryptionInfo, KeyDescription, SizedKeyMemory},
     },
 };
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
+use crate::stratis::{StratisError, StratisResult};
 
 mod actions;
 mod keys;
@@ -138,7 +138,7 @@ impl<'a> TryFrom<&'a str> for UnlockMethod {
         match s {
             "keyring" => Ok(UnlockMethod::Keyring),
             "clevis" => Ok(UnlockMethod::Clevis),
-            _ => Err(StratisError::Error(format!(
+            _ => Err(StratisError::Msg(format!(
                 "{} is an invalid unlock method",
                 s
             ))),
@@ -218,10 +218,10 @@ impl<'a> TryFrom<&'a str> for ReportType {
     fn try_from(name: &str) -> StratisResult<ReportType> {
         match name {
             "errored_pool_report" => Ok(ReportType::ErroredPoolDevices),
-            _ => Err(StratisError::Engine(
-                ErrorEnum::NotFound,
-                format!("Report name {} not understood", name),
-            )),
+            _ => Err(StratisError::Msg(format!(
+                "Report name {} not understood",
+                name
+            ))),
         }
     }
 }
@@ -308,7 +308,7 @@ impl<'a> From<&'a libudev::Device<'a>> for UdevEngineDevice {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DevicePath(PathBuf);
 
 impl DevicePath {

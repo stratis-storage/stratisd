@@ -29,7 +29,7 @@ use crate::{
         },
         types::{DevUuid, EncryptionInfo, KeyDescription, PoolUuid},
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::{StratisError, StratisResult},
 };
 
 const MAX_NUM_TO_WRITE: usize = 10;
@@ -173,8 +173,7 @@ impl BlockDevMgr {
     pub fn add(&mut self, pool_uuid: PoolUuid, paths: &[&Path]) -> StratisResult<Vec<DevUuid>> {
         let this_pool_uuid = self.block_devs.get(0).map(|bd| bd.pool_uuid());
         if this_pool_uuid.is_some() && this_pool_uuid != Some(pool_uuid) {
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
+            return Err(StratisError::Msg(
                 format!("block devices being managed have pool UUID {} but new devices are to be added with pool UUID {}",
                         this_pool_uuid.expect("guarded by if-expression"),
                         pool_uuid)
@@ -195,8 +194,7 @@ impl BlockDevMgr {
                 encryption_info.clevis_info.is_some(),
             )
         {
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
+            return Err(StratisError::Msg(
                 "Neither the key in the kernel keyring nor Clevis could be used to perform encryption operations on the devices in the pool; check that either the appropriate key in the keyring is set or that the Clevis key storage method is available".to_string(),
             ));
         }
@@ -242,10 +240,10 @@ impl BlockDevMgr {
                 }
             }
             if !found {
-                return Err(StratisError::Engine(
-                    ErrorEnum::Error,
-                    format!("Blockdev corresponding to UUID: {} not found.", uuid),
-                ));
+                return Err(StratisError::Msg(format!(
+                    "Blockdev corresponding to UUID: {} not found.",
+                    uuid
+                )));
             }
         }
         wipe_blockdevs(&mut removed)?;
@@ -331,7 +329,7 @@ impl BlockDevMgr {
             Ok(())
         } else {
             let err_msg = "Failed to save metadata to even one device in pool";
-            Err(StratisError::Engine(ErrorEnum::Error, err_msg.into()))
+            Err(StratisError::Msg(err_msg.into()))
         }
     }
 
@@ -435,7 +433,7 @@ impl BlockDevMgr {
     pub fn bind_clevis(&mut self, pin: &str, clevis_info: &Value) -> StratisResult<bool> {
         let encryption_info = self.encryption_info();
         if !encryption_info.is_encrypted() {
-            return Err(StratisError::Error(
+            return Err(StratisError::Msg(
                 "Requested pool does not appear to be encrypted".to_string(),
             ));
         };
@@ -458,9 +456,9 @@ impl BlockDevMgr {
             {
                 return Ok(false);
             } else {
-                return Err(StratisError::Error(format!(
+                return Err(StratisError::Msg(format!(
                     "Block devices have already been bound with pin {} and config {}; \
-                    requested pin {} and config {} can't be applied",
+                        requested pin {} and config {} can't be applied",
                     existing_pin, existing_info, pin, parsed_config,
                 )));
             }
@@ -486,7 +484,7 @@ impl BlockDevMgr {
     pub fn unbind_clevis(&mut self) -> StratisResult<bool> {
         let encryption_info = self.encryption_info();
         let (pin, clevis_info) = if !encryption_info.is_encrypted() {
-            return Err(StratisError::Error(
+            return Err(StratisError::Msg(
                 "Requested pool does not appear to be encrypted".to_string(),
             ));
         } else if let Some((pin, clevis_info)) = encryption_info.clevis_info.clone() {
@@ -517,7 +515,7 @@ impl BlockDevMgr {
     pub fn bind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<bool> {
         let encryption_info = self.encryption_info();
         if !encryption_info.is_encrypted() {
-            return Err(StratisError::Error(
+            return Err(StratisError::Msg(
                 "Requested pool does not appear to be encrypted".to_string(),
             ));
         };
@@ -527,17 +525,17 @@ impl BlockDevMgr {
                 if self.can_unlock(true, false) {
                     return Ok(false);
                 } else {
-                    return Err(StratisError::Error(format!(
+                    return Err(StratisError::Msg(format!(
                         "Key description {} is registered in the metadata but the \
-                        associated passphrase can't unlock the device; the \
-                        associated passphrase may have changed since binding",
+                            associated passphrase can't unlock the device; the \
+                            associated passphrase may have changed since binding",
                         key_desc.as_application_str(),
                     )));
                 }
             } else {
-                return Err(StratisError::Error(format!(
+                return Err(StratisError::Msg(format!(
                     "Block devices have already been bound with key description {}; \
-                    requested key description {} can't be applied",
+                        requested key description {} can't be applied",
                     key_desc.as_application_str(),
                     kd.as_application_str(),
                 )));
@@ -565,7 +563,7 @@ impl BlockDevMgr {
     pub fn unbind_keyring(&mut self) -> StratisResult<bool> {
         let encryption_info = self.encryption_info();
         let key_desc = if !encryption_info.is_encrypted() {
-            return Err(StratisError::Error(
+            return Err(StratisError::Msg(
                 "Requested pool does not appear to be encrypted".to_string(),
             ));
         } else if let Some(key_desc) = encryption_info.key_description.clone() {
@@ -613,9 +611,10 @@ where
                     path.display(),
                     e,
                 );
-                return StratisError::Error(format!(
-                    "Rollback failed with error: {}; the original error that caused the rollback is {}", e, causal_error
-                ));
+                return StratisError::RollbackError {
+                    causal_error: Box::new(causal_error),
+                    rollback_error: Box::new(e),
+                };
             }
         }
 
@@ -712,7 +711,7 @@ mod tests {
             )?;
 
             if bdm.add(pool_uuid, &paths[2..3]).is_err() {
-                Err(Box::new(StratisError::Error(
+                Err(Box::new(StratisError::Msg(
                     "Adding a blockdev with the same key to an encrypted pool should succeed"
                         .to_string(),
                 )))
@@ -769,7 +768,7 @@ mod tests {
         ) -> Result<(), Box<dyn Error>> {
             let (pool_uuid, mut bdm) = data;
             if bdm.add(pool_uuid, &paths[2..3]).is_ok() {
-                Err(Box::new(StratisError::Error(
+                Err(Box::new(StratisError::Msg(
                     "Adding a blockdev with a new key to an encrypted pool should fail".to_string(),
                 )))
             } else {
@@ -929,28 +928,28 @@ mod tests {
                 "tang",
                 &json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true}),
             )? {
-                return Err(Box::new(StratisError::Error(
+                return Err(Box::new(StratisError::Msg(
                     "Clevis bind idempotence test failed".to_string(),
                 )));
             }
             if mgr.bind_keyring(key_desc)? {
-                return Err(Box::new(StratisError::Error(
+                return Err(Box::new(StratisError::Msg(
                     "Keyring bind idempotence test failed".to_string(),
                 )));
             }
 
             if !(mgr.unbind_clevis()?) {
-                return Err(Box::new(StratisError::Error(
+                return Err(Box::new(StratisError::Msg(
                     "Clevis unbind test failed".to_string(),
                 )));
             }
             if mgr.unbind_clevis()? {
-                return Err(Box::new(StratisError::Error(
+                return Err(Box::new(StratisError::Msg(
                     "Clevis unbind idempotence test failed".to_string(),
                 )));
             }
             if mgr.unbind_keyring().is_ok() {
-                return Err(Box::new(StratisError::Error(
+                return Err(Box::new(StratisError::Msg(
                     "Keyring unbind check test failed".to_string(),
                 )));
             }
@@ -959,28 +958,28 @@ mod tests {
                 "tang",
                 &json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true}),
             )?) {
-                return Err(Box::new(StratisError::Error(
+                return Err(Box::new(StratisError::Msg(
                     "Clevis bind test failed".to_string(),
                 )));
             }
             if !(mgr.unbind_keyring()?) {
-                return Err(Box::new(StratisError::Error(
+                return Err(Box::new(StratisError::Msg(
                     "Keyring unbind test failed".to_string(),
                 )));
             }
             if mgr.unbind_keyring()? {
-                return Err(Box::new(StratisError::Error(
+                return Err(Box::new(StratisError::Msg(
                     "Keyring unbind idempotence test failed".to_string(),
                 )));
             }
             if mgr.unbind_clevis().is_ok() {
-                return Err(Box::new(StratisError::Error(
+                return Err(Box::new(StratisError::Msg(
                     "Clevis unbind check test failed".to_string(),
                 )));
             }
 
             if !(mgr.bind_keyring(key_desc)?) {
-                return Err(Box::new(StratisError::Error(
+                return Err(Box::new(StratisError::Msg(
                     "Keyring bind test failed".to_string(),
                 )));
             }
@@ -1031,7 +1030,7 @@ mod tests {
             );
 
             if matches!(res, Ok(_)) {
-                return Err(Box::new(StratisError::Error(
+                return Err(Box::new(StratisError::Msg(
                     "Initialization should fail".to_string(),
                 )));
             }

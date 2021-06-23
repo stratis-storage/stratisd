@@ -6,20 +6,25 @@ use std::{error::Error, fmt, io, str, sync};
 
 pub type StratisResult<T> = Result<T, StratisError>;
 
-#[derive(Debug, Clone)]
-pub enum ErrorEnum {
-    Error,
-
-    AlreadyExists,
-    Busy,
-    Invalid,
-    NotFound,
-}
-
 #[derive(Debug)]
 pub enum StratisError {
-    Error(String),
-    Engine(ErrorEnum, String),
+    Msg(String),
+    Chained(String, Box<StratisError>),
+    /// This variant is for rollback operations like wiping block devices
+    /// where the operation may continue even if there are failures
+    /// as there is no action to be taken in the event of failures. We
+    /// just need to report all of the failures to the users.
+    BestEffortError(String, Vec<StratisError>),
+    RollbackError {
+        causal_error: Box<StratisError>,
+        rollback_error: Box<StratisError>,
+    },
+    /// This variant should be used for failed roll back that does not
+    /// prompt any action in stratisd but needs to be reported to the user.
+    NoActionRollbackError {
+        causal_error: Box<StratisError>,
+        rollback_error: Box<StratisError>,
+    },
     Io(io::Error),
     Nix(nix::Error),
     Uuid(uuid::Error),
@@ -40,8 +45,36 @@ pub enum StratisError {
 impl fmt::Display for StratisError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            StratisError::Error(ref s) => write!(f, "Error: {}", s),
-            StratisError::Engine(_, ref msg) => write!(f, "Engine error: {}", msg),
+            StratisError::Msg(ref s) => write!(f, "{}", s),
+            StratisError::Chained(ref s, ref chained) => write!(f, "{}; {}", s, chained),
+            StratisError::BestEffortError(ref s, ref errs) => {
+                if errs.is_empty() {
+                    write!(f, "{}", s)
+                } else {
+                    let errs_string = errs
+                        .iter()
+                        .map(|err| err.to_string())
+                        .collect::<Vec<_>>()
+                        .join("; ");
+                    write!(f, "{}; {}", s, errs_string)
+                }
+            }
+            StratisError::RollbackError {
+                ref causal_error,
+                ref rollback_error,
+            } => {
+                write!(f, "Rollback failed; causal_error: {}, rollback error: {}; putting pool in maintenance mode", causal_error, rollback_error)
+            }
+            StratisError::NoActionRollbackError {
+                ref causal_error,
+                ref rollback_error,
+            } => {
+                write!(
+                    f,
+                    "Rollback failed; causal_error: {}, rollback error: {}",
+                    causal_error, rollback_error
+                )
+            }
             StratisError::Io(ref err) => write!(f, "IO error: {}", err),
             StratisError::Nix(ref err) => write!(f, "Nix error: {}", err),
             StratisError::Uuid(ref err) => write!(f, "Uuid error: {}", err),
@@ -66,7 +99,15 @@ impl fmt::Display for StratisError {
 impl Error for StratisError {
     fn cause(&self) -> Option<&dyn Error> {
         match *self {
-            StratisError::Error(_) | StratisError::Engine(_, _) => None,
+            StratisError::Msg(_) => None,
+            StratisError::Chained(_, ref chained) => Some(chained),
+            StratisError::RollbackError {
+                ref causal_error, ..
+            } => Some(causal_error),
+            StratisError::NoActionRollbackError {
+                ref causal_error, ..
+            } => Some(causal_error),
+            StratisError::BestEffortError(_, _) => None,
             StratisError::Io(ref err) => Some(err),
             StratisError::Nix(ref err) => Some(err),
             StratisError::Uuid(ref err) => Some(err),

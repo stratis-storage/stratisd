@@ -25,7 +25,7 @@ use crate::{
         CreateAction, DevUuid, EncryptionInfo, Engine, EngineAction, FilesystemUuid,
         KeyDescription, MappingCreateAction, Name, PoolUuid, StratisUuid, UnlockMethod,
     },
-    stratis::{ErrorEnum, StratisError},
+    stratis::StratisError,
 };
 
 type EncryptionParams = (Option<(bool, String)>, Option<(bool, (String, String))>);
@@ -237,9 +237,9 @@ pub fn unlock_pool_shared(
     let pool_uuid = match pool_uuid_result {
         Ok(uuid) => uuid,
         Err(e) => {
-            let e = StratisError::Engine(
-                ErrorEnum::Invalid,
-                format!("Malformed UUID passed to UnlockPool: {}", e),
+            let e = StratisError::Chained(
+                "Malformed UUID passed to UnlockPool".to_string(),
+                Box::new(e),
             );
             let (rc, rs) = engine_to_dbus_err_tuple(&e);
             return Ok(vec![return_message.append3(default_return, rc, rs)]);

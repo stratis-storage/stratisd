@@ -16,7 +16,7 @@ use crate::{
 };
 
 /// Handle for reading metadata of a device that does not need to be active.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CryptMetadataHandle {
     pub(super) physical_path: DevicePath,
     pub(super) identifiers: StratisIdentifiers,

@@ -39,7 +39,7 @@ use crate::{
         strat_engine::names::KeyDescription,
         types::{Key, MappingCreateAction, MappingDeleteAction, SizedKeyMemory},
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::{StratisError, StratisResult},
 };
 
 const INIT_MNT_NS_PATH: &str = "/proc/1/ns/mnt";
@@ -85,12 +85,8 @@ fn search_key(
     keyring_id: KeySerial,
     key_desc: &KeyDescription,
 ) -> StratisResult<Option<KeySerial>> {
-    let key_desc_cstring = CString::new(key_desc.to_system_string()).map_err(|_| {
-        StratisError::Engine(
-            ErrorEnum::Invalid,
-            "Invalid key description provided".to_string(),
-        )
-    })?;
+    let key_desc_cstring = CString::new(key_desc.to_system_string())
+        .map_err(|_| StratisError::Msg("Invalid key description provided".to_string()))?;
 
     let key_id = unsafe {
         syscall(
@@ -188,12 +184,8 @@ fn set_key(
     key_data: SizedKeyMemory,
     keyring_id: KeySerial,
 ) -> StratisResult<()> {
-    let key_desc_cstring = CString::new(key_desc.to_system_string()).map_err(|_| {
-        StratisError::Engine(
-            ErrorEnum::Invalid,
-            "Invalid key description provided".to_string(),
-        )
-    })?;
+    let key_desc_cstring = CString::new(key_desc.to_system_string())
+        .map_err(|_| StratisError::Msg("Invalid key description provided".to_string()))?;
     // Add a key to the kernel keyring
     if unsafe {
         libc::syscall(
@@ -254,8 +246,7 @@ fn parse_keyctl_describe_string(key_str: &str) -> StratisResult<String> {
         .next()
         .map(|s| s.to_string())
         .ok_or_else(|| {
-            StratisError::Engine(
-                ErrorEnum::Invalid,
+            StratisError::Msg(
                 "Invalid format returned from the kernel query for the key description".to_string(),
             )
         })
@@ -344,7 +335,7 @@ impl KeyIdList {
             }
 
             if keyctl_buffer.is_empty() {
-                return Err(StratisError::Error(format!(
+                return Err(StratisError::Msg(format!(
                     "Kernel key description for key {} appeared to be entirely empty",
                     id
                 )));
@@ -352,9 +343,9 @@ impl KeyIdList {
 
             let keyctl_str =
                 str::from_utf8(&keyctl_buffer[..keyctl_buffer.len() - 1]).map_err(|e| {
-                    StratisError::Engine(
-                        ErrorEnum::Invalid,
-                        format!("Kernel key description was not valid UTF8: {}", e),
+                    StratisError::Chained(
+                        "Kernel key description was not valid UTF8".to_string(),
+                        Box::new(StratisError::from(e)),
                     )
                 })?;
             let parsed_string = parse_keyctl_describe_string(keyctl_str)?;
@@ -547,7 +538,7 @@ impl MemoryPrivateFilesystem {
         }
         // Check that the namespace is now different.
         if is_in_root_namespace()? {
-            return Err(StratisError::Error(
+            return Err(StratisError::Msg(
                 "It was detected that the in-memory key files would have ended up \
                 visible on the host system; aborting operation prior to generating \
                 in memory key file"

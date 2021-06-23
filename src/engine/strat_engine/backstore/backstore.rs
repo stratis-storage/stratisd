@@ -28,7 +28,7 @@ use crate::{
         },
         types::{BlockDevTier, DevUuid, EncryptionInfo, KeyDescription, PoolUuid},
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::{StratisError, StratisResult},
 };
 
 /// Use a cache block size that the kernel docs indicate is the largest
@@ -149,7 +149,7 @@ impl Backstore {
                 }
                 None => {
                     let err_msg = "Cachedevs exist, but cache metdata does not exist";
-                    return Err(StratisError::Engine(ErrorEnum::Error, err_msg.into()));
+                    return Err(StratisError::Msg(err_msg.into()));
                 }
             }
         } else {
@@ -213,8 +213,7 @@ impl Backstore {
             Some(_) => unreachable!("self.cache.is_none()"),
             None => {
                 if paths.is_empty() {
-                    return Err(StratisError::Engine(
-                        ErrorEnum::Invalid,
+                    return Err(StratisError::Msg(
                         "Must initialize cache with at least one blockdev.".to_string(),
                     ));
                 }
@@ -624,7 +623,7 @@ impl Backstore {
     ///
     /// * Ok(Some(uuid)) provides the uuid of the changed blockdev
     /// * Ok(None) is returned if the blockdev was unchanged
-    /// * Err(StratisError::Engine(ErrorEnum::NotFound, _)) is returned if the UUID
+    /// * Err(StratisError::Engine(_)) is returned if the UUID
     /// does not correspond to a blockdev
     pub fn set_blockdev_user_info(
         &mut self,
@@ -633,10 +632,10 @@ impl Backstore {
     ) -> StratisResult<Option<DevUuid>> {
         self.get_mut_blockdev_by_uuid(uuid).map_or_else(
             || {
-                Err(StratisError::Engine(
-                    ErrorEnum::NotFound,
-                    format!("Blockdev with a UUID of {} was not found", uuid),
-                ))
+                Err(StratisError::Msg(format!(
+                    "Blockdev with a UUID of {} was not found",
+                    uuid
+                )))
             },
             |(_, b)| {
                 if b.set_user_info(user_info) {

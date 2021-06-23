@@ -52,7 +52,7 @@ pub fn set_user_info(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
                 "pool doesn't know about block device {}",
                 blockdev_data.uuid
             );
-            let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, error_message);
+            let (rc, rs) = (DbusErrorEnum::ERROR as u16, error_message);
             return_message.append3(default_return, rc, rs)
         }
         Ok(RenameAction::Renamed(uuid)) => return_message.append3(

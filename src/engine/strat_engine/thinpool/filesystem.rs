@@ -35,7 +35,7 @@ use crate::{
         },
         types::{FilesystemUuid, Name, PoolUuid, StratisUuid},
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::{StratisError, StratisResult},
 };
 
 const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
@@ -213,13 +213,10 @@ impl StratFilesystem {
                     created: Utc::now(),
                 })
             }
-            Err(e) => Err(StratisError::Engine(
-                ErrorEnum::Error,
-                format!(
-                    "failed to create {} snapshot for {} - {}",
-                    snapshot_name, snapshot_fs_name, e
-                ),
-            )),
+            Err(e) => Err(StratisError::Msg(format!(
+                "failed to create {} snapshot for {} - {}",
+                snapshot_name, snapshot_fs_name, e
+            ))),
         }
     }
 
@@ -251,7 +248,7 @@ impl StratFilesystem {
                     "Unable to get status for filesystem thin device {}",
                     self.thin_dev.device()
                 );
-                Err(StratisError::Engine(ErrorEnum::Error, error_msg))
+                Err(StratisError::Msg(error_msg))
             }
             ThinStatus::Fail => Ok(false),
         }
@@ -316,7 +313,7 @@ impl StratFilesystem {
                 }
                 Err(e) => {
                     let error_msg = format!("Error during parsing {:?}: {:?}", *self, e);
-                    return Err(StratisError::Engine(ErrorEnum::Error, error_msg));
+                    return Err(StratisError::Msg(error_msg));
                 }
             }
         }
@@ -350,11 +347,11 @@ impl Filesystem for StratFilesystem {
                     "Unable to get status for filesystem thin device {}",
                     self.thin_dev.device()
                 );
-                Err(StratisError::Engine(ErrorEnum::Error, error_msg))
+                Err(StratisError::Msg(error_msg))
             }
             ThinStatus::Fail => {
                 let error_msg = format!("ThinDev {} is in a failed state", self.thin_dev.device());
-                Err(StratisError::Engine(ErrorEnum::Error, error_msg))
+                Err(StratisError::Msg(error_msg))
             }
         }
     }

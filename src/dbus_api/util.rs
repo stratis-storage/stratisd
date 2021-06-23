@@ -25,7 +25,7 @@ use crate::{
         udev::DbusUdevHandler,
     },
     engine::{Lockable, LockableEngine, UdevEngineEvent},
-    stratis::{ErrorEnum, StratisError},
+    stratis::StratisError,
 };
 
 /// Convert a tuple as option to an Option type
@@ -87,34 +87,11 @@ pub fn make_object_path(context: &DbusContext) -> String {
 /// Translates an engine error to the (errorcode, string) tuple that Stratis
 /// D-Bus methods return.
 pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
-    let error = match *err {
-        StratisError::Error(_) => DbusErrorEnum::ERROR,
-        StratisError::Engine(ref e, _) => match *e {
-            ErrorEnum::Error => DbusErrorEnum::ERROR,
-            ErrorEnum::AlreadyExists => DbusErrorEnum::ALREADY_EXISTS,
-            ErrorEnum::Busy => DbusErrorEnum::BUSY,
-            ErrorEnum::Invalid => DbusErrorEnum::ERROR,
-            ErrorEnum::NotFound => DbusErrorEnum::NOTFOUND,
-        },
-        StratisError::Io(_) => DbusErrorEnum::ERROR,
-        StratisError::Nix(_) => DbusErrorEnum::ERROR,
-        StratisError::Uuid(_)
-        | StratisError::Utf8(_)
-        | StratisError::Serde(_)
-        | StratisError::Decode(_)
-        | StratisError::DM(_)
-        | StratisError::Dbus(_)
-        | StratisError::Udev(_)
-        | StratisError::Crypt(_)
-        | StratisError::Null(_)
-        | StratisError::Join(_)
-        | StratisError::Recv(_) => DbusErrorEnum::ERROR,
-    };
     let description = match *err {
         StratisError::DM(DmError::Core(ref err)) => err.to_string(),
         ref err => err.to_string(),
     };
-    (error as u16, description)
+    (DbusErrorEnum::ERROR as u16, description)
 }
 
 /// Convenience function to get the error value for "OK"

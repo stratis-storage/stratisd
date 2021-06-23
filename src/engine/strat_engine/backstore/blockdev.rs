@@ -70,7 +70,7 @@ pub struct StratBlockDev {
     used: RangeAllocator,
     user_info: Option<String>,
     hardware_info: Option<String>,
-    underlying_device: UnderlyingDevice,
+    pub(super) underlying_device: UnderlyingDevice,
 }
 
 impl StratBlockDev {
@@ -239,7 +239,7 @@ impl StratBlockDev {
     /// Bind encrypted device using the given clevis configuration.
     pub fn bind_clevis(&mut self, pin: &str, clevis_info: &Value) -> StratisResult<()> {
         let crypt_handle = self.underlying_device.crypt_handle_mut().ok_or_else(|| {
-            StratisError::Error("This device does not appear to be encrypted".to_string())
+            StratisError::Msg("This device does not appear to be encrypted".to_string())
         })?;
         crypt_handle.clevis_bind(pin, clevis_info)
     }
@@ -247,7 +247,7 @@ impl StratBlockDev {
     /// Unbind encrypted device using the given clevis configuration.
     pub fn unbind_clevis(&mut self) -> StratisResult<()> {
         let crypt_handle = self.underlying_device.crypt_handle_mut().ok_or_else(|| {
-            StratisError::Error("This device does not appear to be encrypted".to_string())
+            StratisError::Msg("This device does not appear to be encrypted".to_string())
         })?;
         crypt_handle.clevis_unbind()
     }
@@ -256,7 +256,7 @@ impl StratBlockDev {
     /// in the kernel keyring.
     pub fn bind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<()> {
         let crypt_handle = self.underlying_device.crypt_handle_mut().ok_or_else(|| {
-            StratisError::Error("This device does not appear to be encrypted".to_string())
+            StratisError::Msg("This device does not appear to be encrypted".to_string())
         })?;
         crypt_handle.bind_keyring(key_desc)
     }
@@ -265,7 +265,7 @@ impl StratBlockDev {
     /// in the kernel keyring.
     pub fn unbind_keyring(&mut self) -> StratisResult<()> {
         let crypt_handle = self.underlying_device.crypt_handle_mut().ok_or_else(|| {
-            StratisError::Error("This device does not appear to be encrypted".to_string())
+            StratisError::Msg("This device does not appear to be encrypted".to_string())
         })?;
         crypt_handle.unbind_keyring()
     }

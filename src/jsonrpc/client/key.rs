@@ -30,9 +30,9 @@ pub fn key_set(key_desc: KeyDescription, keyfile_path: Option<&str>) -> StratisR
         }
     };
     if rc != 0 {
-        Err(StratisError::Error(rs))
+        Err(StratisError::Msg(rs))
     } else if changed.is_none() {
-        Err(StratisError::Error(
+        Err(StratisError::Msg(
             "The requested action had no effect".to_string(),
         ))
     } else {
@@ -47,7 +47,7 @@ pub fn key_unset(key_desc: KeyDescription) -> StratisResult<()> {
 pub fn key_list() -> StratisResult<()> {
     let (info, rc, rs): (Vec<KeyDescription>, u16, String) = do_request!(KeyList);
     if rc != 0 {
-        Err(StratisError::Error(rs))
+        Err(StratisError::Msg(rs))
     } else {
         let key_desc_strings = info
             .into_iter()

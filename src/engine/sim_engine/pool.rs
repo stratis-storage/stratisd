@@ -26,7 +26,7 @@ use crate::{
             SetCreateAction, SetDeleteAction,
         },
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::{StratisError, StratisResult},
 };
 
 #[derive(Debug)]
@@ -172,15 +172,13 @@ impl Pool for SimPool {
         validate_paths(blockdevs)?;
 
         if self.is_encrypted() {
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
+            return Err(StratisError::Msg(
                 "Use of a cache is not supported with an encrypted pool".to_string(),
             ));
         }
         if !self.has_cache() {
             if blockdevs.is_empty() {
-                return Err(StratisError::Engine(
-                    ErrorEnum::Invalid,
+                return Err(StratisError::Msg(
                     "At least one blockdev path is required to initialize a cache.".to_string(),
                 ));
             }
@@ -237,8 +235,7 @@ impl Pool for SimPool {
         validate_paths(paths)?;
 
         if tier == BlockDevTier::Cache && !self.has_cache() {
-            return Err(StratisError::Engine(
-                    ErrorEnum::Invalid,
+            return Err(StratisError::Msg(
                     "The cache has not been initialized; you must use init_cache first to initialize the cache.".to_string(),
                 ));
         }
@@ -294,9 +291,9 @@ impl Pool for SimPool {
                 if (current_pin.as_str(), current_info) == (pin, clevis_info) {
                     Ok(CreateAction::Identity)
                 } else {
-                    Err(StratisError::Error(format!(
+                    Err(StratisError::Msg(format!(
                         "This pool is already bound with clevis pin {} and config {};
-                        this differs from the requested pin {} and config {}",
+                            this differs from the requested pin {} and config {}",
                         current_pin, current_info, pin, clevis_info,
                     )))
                 }
@@ -305,7 +302,7 @@ impl Pool for SimPool {
                 Ok(CreateAction::Created(Clevis))
             }
         } else {
-            Err(StratisError::Error(
+            Err(StratisError::Msg(
                 "Requested pool does not appear to be encrypted".to_string(),
             ))
         }
@@ -315,7 +312,7 @@ impl Pool for SimPool {
         let encryption_info = self.encryption_info();
 
         if encryption_info.key_description.is_none() {
-            return Err(StratisError::Error(
+            return Err(StratisError::Msg(
                 "This device is not bound to a keyring passphrase; refusing to remove \
                 the only unlocking method"
                     .to_string(),
@@ -330,7 +327,7 @@ impl Pool for SimPool {
                 DeleteAction::Identity
             })
         } else {
-            Err(StratisError::Error(
+            Err(StratisError::Msg(
                 "Requested pool does not appear to be encrypted".to_string(),
             ))
         }
@@ -346,9 +343,9 @@ impl Pool for SimPool {
                 if key_description == kd {
                     Ok(CreateAction::Identity)
                 } else {
-                    Err(StratisError::Error(format!(
+                    Err(StratisError::Msg(format!(
                         "This pool is already bound with key description {};
-                        this differs from the requested key description {}",
+                            this differs from the requested key description {}",
                         kd.as_application_str(),
                         key_description.as_application_str(),
                     )))
@@ -358,7 +355,7 @@ impl Pool for SimPool {
                 Ok(CreateAction::Created(Key))
             }
         } else {
-            Err(StratisError::Error(
+            Err(StratisError::Msg(
                 "Requested pool does not appear to be encrypted".to_string(),
             ))
         }
@@ -368,7 +365,7 @@ impl Pool for SimPool {
         let encryption_info = self.encryption_info();
 
         if encryption_info.clevis_info.is_none() {
-            return Err(StratisError::Error(
+            return Err(StratisError::Msg(
                 "This device is not bound to Clevis; refusing to remove the only \
                 unlocking method"
                     .to_string(),
@@ -383,7 +380,7 @@ impl Pool for SimPool {
                 DeleteAction::Identity
             })
         } else {
-            Err(StratisError::Error(
+            Err(StratisError::Msg(
                 "Requested pool does not appear to be encrypted".to_string(),
             ))
         }
@@ -441,10 +438,7 @@ impl Pool for SimPool {
         let snapshot = match self.get_filesystem(origin_uuid) {
             Some(_filesystem) => SimFilesystem::new(),
             None => {
-                return Err(StratisError::Engine(
-                    ErrorEnum::NotFound,
-                    origin_uuid.to_string(),
-                ));
+                return Err(StratisError::Msg(origin_uuid.to_string()));
             }
         };
         self.filesystems
@@ -671,7 +665,7 @@ mod tests {
         let old_uuid = results.iter().find(|x| x.0 == old_name).unwrap().1;
         assert_matches!(
             pool.rename_filesystem(pool_name, old_uuid, new_name),
-            Err(StratisError::Engine(ErrorEnum::AlreadyExists, _))
+            Err(_)
         );
     }
 

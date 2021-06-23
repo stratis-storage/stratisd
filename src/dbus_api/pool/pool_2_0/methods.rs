@@ -204,7 +204,7 @@ pub fn snapshot_filesystem(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
         ),
         None => {
             let message = format!("no data for object path {}", filesystem);
-            let (rc, rs) = (DbusErrorEnum::NOTFOUND as u16, message);
+            let (rc, rs) = (DbusErrorEnum::ERROR as u16, message);
             return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };
@@ -313,7 +313,7 @@ pub fn rename_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     {
         Ok(RenameAction::NoSource) => {
             let error_message = format!("engine doesn't know about pool {}", pool_uuid);
-            let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, error_message);
+            let (rc, rs) = (DbusErrorEnum::ERROR as u16, error_message);
             return_message.append3(default_return, rc, rs)
         }
         Ok(RenameAction::Identity) => {

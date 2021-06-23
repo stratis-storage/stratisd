@@ -44,11 +44,11 @@ pub async fn setup(
     select! {
         res = &mut udev_join => {
             error!("The JSON RPC udev handling thread exited...");
-            res.map_err(|e| StratisError::Error(e.to_string()))
+            res.map_err(StratisError::from)
         }
         res = &mut server_join => {
             error!("The server handler thread exited...");
-            res.map_err(|e| StratisError::Error(e.to_string()))
+            res.map_err(StratisError::from)
         }
     }
 }

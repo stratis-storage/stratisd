@@ -19,7 +19,7 @@ macro_rules! log_on_failure {
 macro_rules! check_key {
     ($condition:expr, $key:tt, $value:tt) => {
         if $condition {
-            return Err($crate::stratis::StratisError::Error(format!(
+            return Err($crate::stratis::StratisError::Msg(format!(
                 "Stratis token key '{}' requires a value of '{}'",
                 $key, $value,
             )));
@@ -32,7 +32,7 @@ macro_rules! check_and_get_key {
         if let Some(v) = $get {
             v
         } else {
-            return Err($crate::stratis::StratisError::Error(format!(
+            return Err($crate::stratis::StratisError::Msg(format!(
                 "Stratis token is missing key '{}' or the value is of the wrong type",
                 $key
             )));
@@ -41,7 +41,7 @@ macro_rules! check_and_get_key {
     ($get:expr, $func:expr, $key:tt, $ty:ty) => {
         if let Some(ref v) = $get {
             $func(v).map_err(|e| {
-                $crate::stratis::StratisError::Error(format!(
+                $crate::stratis::StratisError::Msg(format!(
                     "Failed to convert value for key '{}' to type {}: {}",
                     $key,
                     stringify!($ty),
@@ -49,7 +49,7 @@ macro_rules! check_and_get_key {
                 ))
             })?
         } else {
-            return Err($crate::stratis::StratisError::Error(format!(
+            return Err($crate::stratis::StratisError::Msg(format!(
                 "Stratis token is missing key '{}' or the value is of the wrong type",
                 $key
             )));

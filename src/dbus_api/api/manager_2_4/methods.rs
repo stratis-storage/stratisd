@@ -7,8 +7,8 @@ use dbus_tree::{MTSync, MethodInfo, MethodResult};
 
 use crate::dbus_api::{
     api::shared::create_pool_shared,
-    types::{CreatePoolParams, TData},
-    util::{engine_to_dbus_err_tuple, msg_code_ok, msg_string_ok},
+    types::{CreatePoolParams, DbusErrorEnum, TData, OK_STRING},
+    util::engine_to_dbus_err_tuple,
 };
 
 pub fn engine_state_report(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
@@ -21,7 +21,9 @@ pub fn engine_state_report(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
     let lock = dbus_context.engine.blocking_lock();
 
     let msg = match serde_json::to_string(&lock.engine_state_report()) {
-        Ok(string) => return_message.append3(string, msg_code_ok(), msg_string_ok()),
+        Ok(string) => {
+            return_message.append3(string, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
         Err(e) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e.into());
             return_message.append3(default_return, rc, rs)

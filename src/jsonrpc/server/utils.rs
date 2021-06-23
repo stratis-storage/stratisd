@@ -13,7 +13,7 @@ macro_rules! expects_fd {
         match $fd_opt {
             Some(fd) => fd,
             None => {
-                let res = Err($crate::stratis::StratisError::Error(
+                let res = Err($crate::stratis::StratisError::Msg(
                     "Method expected a file descriptor and did not receive one".to_string(),
                 ));
                 return $crate::jsonrpc::interface::StratisRet::$ret(
@@ -32,7 +32,7 @@ macro_rules! expects_fd {
                         fd, e,
                     );
                 }
-                let res = Err($crate::stratis::StratisError::Error(
+                let res = Err($crate::stratis::StratisError::Msg(
                     "Method did not expect a file descriptor and received one \
                     anyway; file descriptor has been closed"
                         .to_string(),

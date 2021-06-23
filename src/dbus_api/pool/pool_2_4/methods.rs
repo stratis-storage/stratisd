@@ -9,8 +9,8 @@ use dbus_tree::{MTSync, MethodInfo, MethodResult};
 
 use crate::{
     dbus_api::{
-        types::TData,
-        util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
+        types::{DbusErrorEnum, TData, OK_STRING},
+        util::{engine_to_dbus_err_tuple, get_next_arg},
     },
     engine::{CreateAction, DeleteAction, KeyDescription},
 };
@@ -48,9 +48,11 @@ pub fn bind_keyring(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let (_, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
     let msg = match log_action!(pool.bind_keyring(&key_desc)) {
-        Ok(CreateAction::Identity) => return_message.append3(false, msg_code_ok(), msg_string_ok()),
+        Ok(CreateAction::Identity) => {
+            return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
         Ok(CreateAction::Created(_)) => {
-            return_message.append3(true, msg_code_ok(), msg_string_ok())
+            return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(e) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e);
@@ -83,9 +85,11 @@ pub fn unbind_keyring(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let (_, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
     let msg = match log_action!(pool.unbind_keyring()) {
-        Ok(DeleteAction::Identity) => return_message.append3(false, msg_code_ok(), msg_string_ok()),
+        Ok(DeleteAction::Identity) => {
+            return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
         Ok(DeleteAction::Deleted(_)) => {
-            return_message.append3(true, msg_code_ok(), msg_string_ok())
+            return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(e) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e);

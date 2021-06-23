@@ -7,10 +7,8 @@ use dbus_tree::{MTSync, MethodInfo, MethodResult};
 
 use crate::{
     dbus_api::{
-        types::{DbusErrorEnum, TData},
-        util::{
-            engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok, tuple_to_option,
-        },
+        types::{DbusErrorEnum, TData, OK_STRING},
+        util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
     engine::{DevUuid, RenameAction},
 };
@@ -52,17 +50,19 @@ pub fn set_user_info(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
                 "pool doesn't know about block device {}",
                 blockdev_data.uuid
             );
-            let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, error_message);
+            let (rc, rs) = (DbusErrorEnum::ERROR as u16, error_message);
             return_message.append3(default_return, rc, rs)
         }
         Ok(RenameAction::Renamed(uuid)) => return_message.append3(
             (true, uuid_to_string!(uuid)),
-            msg_code_ok(),
-            msg_string_ok(),
+            DbusErrorEnum::OK as u16,
+            OK_STRING.to_string(),
         ),
-        Ok(RenameAction::Identity) => {
-            return_message.append3(default_return, msg_code_ok(), msg_string_ok())
-        }
+        Ok(RenameAction::Identity) => return_message.append3(
+            default_return,
+            DbusErrorEnum::OK as u16,
+            OK_STRING.to_string(),
+        ),
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append3(default_return, rc, rs)

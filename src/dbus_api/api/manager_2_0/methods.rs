@@ -9,8 +9,8 @@ use crate::{
     dbus_api::{
         api::shared::create_pool_shared,
         consts,
-        types::{CreatePoolParams, TData},
-        util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
+        types::{CreatePoolParams, DbusErrorEnum, TData, OK_STRING},
+        util::{engine_to_dbus_err_tuple, get_next_arg},
     },
     engine::{DeleteAction, PoolUuid},
 };
@@ -40,8 +40,8 @@ pub fn destroy_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
         None => {
             return Ok(vec![return_message.append3(
                 default_return,
-                msg_code_ok(),
-                msg_string_ok(),
+                DbusErrorEnum::OK as u16,
+                OK_STRING.to_string(),
             )]);
         }
     };
@@ -51,13 +51,15 @@ pub fn destroy_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
             dbus_context.push_remove(&pool_path, consts::pool_interface_list());
             return_message.append3(
                 (true, uuid_to_string!(uuid)),
-                msg_code_ok(),
-                msg_string_ok(),
+                DbusErrorEnum::OK as u16,
+                OK_STRING.to_string(),
             )
         }
-        Ok(DeleteAction::Identity) => {
-            return_message.append3(default_return, msg_code_ok(), msg_string_ok())
-        }
+        Ok(DeleteAction::Identity) => return_message.append3(
+            default_return,
+            DbusErrorEnum::OK as u16,
+            OK_STRING.to_string(),
+        ),
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append3(default_return, rc, rs)
@@ -79,7 +81,7 @@ pub fn configure_simulator(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
     let result = mutex_lock.configure_simulator(denominator);
 
     let msg = match result {
-        Ok(_) => return_message.append2(msg_code_ok(), msg_string_ok()),
+        Ok(_) => return_message.append2(DbusErrorEnum::OK as u16, OK_STRING.to_string()),
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append2(rc, rs)

@@ -483,25 +483,25 @@ mod tests {
             for dev in devices {
                 let info = block_device_apply(dev.physical_path(), |dev| process_luks_device(dev))?
                     .ok_or_else(|| {
-                        StratisError::Error(
+                        StratisError::Msg(
                             "No device with specified devnode found in udev database".into(),
                         )
                     })?
                     .ok_or_else(|| {
-                        StratisError::Error(
+                        StratisError::Msg(
                             "No LUKS information for Stratis found on specified device".into(),
                         )
                     })?;
 
                 if info.info.identifiers.pool_uuid != pool_uuid {
-                    return Err(Box::new(StratisError::Error(format!(
+                    return Err(Box::new(StratisError::Msg(format!(
                         "Discovered pool UUID {} != expected pool UUID {}",
                         info.info.identifiers.pool_uuid, pool_uuid
                     ))));
                 }
 
                 if info.info.devnode != dev.physical_path() {
-                    return Err(Box::new(StratisError::Error(format!(
+                    return Err(Box::new(StratisError::Msg(format!(
                         "Discovered device node {} != expected device node {}",
                         info.info.devnode.display(),
                         dev.physical_path().display()
@@ -509,7 +509,7 @@ mod tests {
                 }
 
                 if info.encryption_info.key_description.as_ref() != Some(key_description) {
-                    return Err(Box::new(StratisError::Error(format!(
+                    return Err(Box::new(StratisError::Msg(format!(
                         "Discovered key description {:?} != expected key description {:?}",
                         info.encryption_info.key_description,
                         Some(key_description.as_application_str())
@@ -519,12 +519,12 @@ mod tests {
                 let info =
                     block_device_apply(dev.physical_path(), |dev| process_stratis_device(dev))?
                         .ok_or_else(|| {
-                            StratisError::Error(
+                            StratisError::Msg(
                                 "No device with specified devnode found in udev database".into(),
                             )
                         })?;
                 if info.is_some() {
-                    return Err(Box::new(StratisError::Error(
+                    return Err(Box::new(StratisError::Msg(
                         "Encrypted block device was incorrectly identified as a Stratis device"
                             .to_string(),
                     )));
@@ -533,18 +533,18 @@ mod tests {
                 let info =
                     block_device_apply(dev.metadata_path(), |dev| process_stratis_device(dev))?
                         .ok_or_else(|| {
-                            StratisError::Error(
+                            StratisError::Msg(
                                 "No device with specified devnode found in udev database".into(),
                             )
                         })?
                         .ok_or_else(|| {
-                            StratisError::Error(
+                            StratisError::Msg(
                                 "No Stratis metadata found on specified device".into(),
                             )
                         })?;
 
                 if info.identifiers.pool_uuid != pool_uuid || info.devnode != dev.metadata_path() {
-                    return Err(Box::new(StratisError::Error(format!(
+                    return Err(Box::new(StratisError::Msg(format!(
                         "Wrong identifiers and devnode found on Stratis block device: found: pool UUID: {}, device node; {} != expected: pool UUID: {}, device node: {}",
                         info.identifiers.pool_uuid,
                         info.devnode.display(),

@@ -27,7 +27,7 @@ use crate::{
         structures::Table,
         types::{DevUuid, LockedPoolInfo, Name, PoolUuid, UdevEngineEvent, UnlockMethod},
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::{StratisError, StratisResult},
 };
 
 /// On an error, whether this set of devices is hopeless or just errored
@@ -88,22 +88,18 @@ impl LiminalDevices {
             if CryptActivationHandle::setup(&luks_info.ids.devnode, unlock_method)?.is_some() {
                 Ok(())
             } else {
-                Err(StratisError::Engine(
-                    ErrorEnum::Invalid,
-                    format!(
-                        "Block device {} does not appear to be formatted with
+                Err(StratisError::Msg(format!(
+                    "Block device {} does not appear to be formatted with
                         the proper Stratis LUKS2 metadata.",
-                        luks_info.ids.devnode.display(),
-                    ),
-                ))
+                    luks_info.ids.devnode.display(),
+                )))
             }
         }
 
         let unlocked = match self.errored_pool_devices.get(&pool_uuid) {
             Some(map) => {
                 if map.all_unencrypted() {
-                    return Err(StratisError::Engine(
-                        ErrorEnum::Error,
+                    return Err(StratisError::Msg(
                         format!(
                             "Attempted to unlock set of devices belonging to an unencrypted pool with UUID {}",
                             pool_uuid,
@@ -128,23 +124,17 @@ impl LiminalDevices {
                     if pool.is_encrypted() {
                         vec![]
                     } else {
-                        return Err(StratisError::Engine(
-                            ErrorEnum::Error,
-                            format!(
-                                "Pool with UUID {} is not encrypted and cannot be unlocked.",
-                                pool_uuid,
-                            ),
-                        ));
+                        return Err(StratisError::Msg(format!(
+                            "Pool with UUID {} is not encrypted and cannot be unlocked.",
+                            pool_uuid,
+                        )));
                     }
                 }
                 None => {
-                    return Err(StratisError::Engine(
-                        ErrorEnum::Error,
-                        format!(
-                            "No devices with UUID {} have been registered with stratisd.",
-                            pool_uuid,
-                        ),
-                    ))
+                    return Err(StratisError::Msg(format!(
+                        "No devices with UUID {} have been registered with stratisd.",
+                        pool_uuid,
+                    )))
                 }
             },
         };

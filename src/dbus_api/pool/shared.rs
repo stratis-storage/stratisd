@@ -13,10 +13,8 @@ use dbus_tree::{MTSync, MethodErr, MethodInfo, MethodResult, PropInfo, Tree};
 use crate::{
     dbus_api::{
         blockdev::create_dbus_blockdev,
-        types::TData,
-        util::{
-            engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok, option_to_tuple,
-        },
+        types::{DbusErrorEnum, TData, OK_STRING},
+        util::{engine_to_dbus_err_tuple, get_next_arg, option_to_tuple},
     },
     engine::{BlockDevTier, EngineAction, Name, Pool, PoolUuid},
 };
@@ -178,9 +176,17 @@ pub fn add_blockdevs(m: &MethodInfo<MTSync<TData>, TData>, op: BlockDevOp) -> Me
                 })
                 .collect::<Vec<_>>();
 
-            return_message.append3((true, return_value), msg_code_ok(), msg_string_ok())
+            return_message.append3(
+                (true, return_value),
+                DbusErrorEnum::OK as u16,
+                OK_STRING.to_string(),
+            )
         }
-        Ok(None) => return_message.append3(default_return, msg_code_ok(), msg_string_ok()),
+        Ok(None) => return_message.append3(
+            default_return,
+            DbusErrorEnum::OK as u16,
+            OK_STRING.to_string(),
+        ),
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append3(default_return, rc, rs)

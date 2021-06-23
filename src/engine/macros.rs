@@ -8,10 +8,7 @@ macro_rules! calculate_redundancy {
             None | Some(0) => $crate::engine::Redundancy::NONE,
             Some(n) => {
                 let message = format!("code {} does not correspond to any redundancy", n);
-                return Err($crate::stratis::StratisError::Engine(
-                    $crate::stratis::ErrorEnum::Error,
-                    message,
-                ));
+                return Err($crate::stratis::StratisError::Msg(message));
             }
         }
     };
@@ -45,10 +42,7 @@ macro_rules! rename_pre {
         }
 
         if $s.contains_name($new_name) {
-            return Err($crate::stratis::StratisError::Engine(
-                $crate::stratis::ErrorEnum::AlreadyExists,
-                $new_name.into(),
-            ));
+            return Err($crate::stratis::StratisError::Msg($new_name.into()));
         }
         old_name
     }};
@@ -191,7 +185,7 @@ macro_rules! convert_int {
     ($expr:expr, $from_type:ty, $to_type:ty) => {{
         let expr = $expr;
         <$to_type as std::convert::TryFrom<$from_type>>::try_from(expr).map_err(|_| {
-            $crate::stratis::StratisError::Error(format!(
+            $crate::stratis::StratisError::Msg(format!(
                 "Failed to convert integer {} from {} to {}",
                 expr,
                 stringify!($from_type),

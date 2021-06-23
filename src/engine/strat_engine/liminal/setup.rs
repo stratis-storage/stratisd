@@ -25,7 +25,7 @@ use crate::{
         },
         types::{BlockDevTier, DevUuid, DevicePath},
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::{StratisError, StratisResult},
 };
 
 /// Given infos for each device, read and store the BDA.
@@ -51,7 +51,7 @@ pub fn get_bdas(infos: &HashMap<DevUuid, &LStratisInfo>) -> StratisResult<HashMa
                 ) {
                     Ok(Some(header)) => header,
                     Ok(None) => {
-                        return Err(StratisError::Error(format!(
+                        return Err(StratisError::Msg(format!(
                             "Failed to find valid Stratis signature in header from device: {}",
                             info.ids
                         )))
@@ -61,9 +61,9 @@ pub fn get_bdas(infos: &HashMap<DevUuid, &LStratisInfo>) -> StratisResult<HashMa
 
                 BDA::load(header, &mut f)
             })
-            .and_then(|res| res.ok_or_else(|| StratisError::Error("No BDA found".to_string())))
+            .and_then(|res| res.ok_or_else(|| StratisError::Msg("No BDA found".to_string())))
             .map_err(|e| {
-                StratisError::Error(format!(
+                StratisError::Msg(format!(
                     "Failed to read BDA from device {}: {}",
                     info.ids, e
                 ))
@@ -126,8 +126,7 @@ pub fn get_metadata(
         })
         .next()
         .ok_or_else(|| {
-            StratisError::Engine(
-                ErrorEnum::NotFound,
+            StratisError::Msg(
                 "timestamp indicates data was written, but no data successfully read".into(),
             )
         })
@@ -207,12 +206,12 @@ pub fn get_blockdevs(
                 let recorded_size = bda.dev_size().sectors();
                 if actual_size_sectors < recorded_size {
                     let err_msg = format!(
-                    "Stratis device with {} had recorded size {}, but actual size is less at {}",
-                    info.ids,
-                    recorded_size,
-                    actual_size_sectors
-                );
-                    Err(StratisError::Engine(ErrorEnum::Error, err_msg))
+                        "Stratis device with {} had recorded size {}, but actual size is less at {}",
+                        info.ids,
+                        recorded_size,
+                        actual_size_sectors
+                    );
+                    Err(StratisError::Msg(err_msg))
                 } else {
                     Ok(())
                 }
@@ -236,7 +235,7 @@ pub fn get_blockdevs(
                     "Stratis device with {} had no record in pool metadata",
                     info.ids
                 );
-                StratisError::Engine(ErrorEnum::NotFound, err_msg)
+                StratisError::Msg(err_msg)
             })?;
 
         // This should always succeed since the actual size is at
@@ -308,7 +307,7 @@ pub fn get_blockdevs(
                 "The following list of Stratis UUIDs were each claimed by more than one Stratis device: {}",
                 duplicate_uuids.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(", ")
             );
-            return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
+            return Err(StratisError::Msg(err_msg));
         }
 
         let recorded_uuids: HashSet<_> = dev_map.keys().cloned().collect();
@@ -318,7 +317,7 @@ pub fn get_blockdevs(
                 uuids.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(", "),
                 recorded_uuids.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(", "),
             );
-            return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
+            return Err(StratisError::Msg(err_msg));
         }
 
         // Sort the devices according to their original location in the
@@ -330,23 +329,17 @@ pub fn get_blockdevs(
     }
 
     let datadevs = check_and_sort_devs(datadevs, &recorded_data_map).map_err(|err| {
-        StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!(
-                "Data devices did not appear consistent with metadata: {}",
-                err
-            ),
-        )
+        StratisError::Msg(format!(
+            "Data devices did not appear consistent with metadata: {}",
+            err
+        ))
     })?;
 
     let cachedevs = check_and_sort_devs(cachedevs, &recorded_cache_map).map_err(|err| {
-        StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!(
-                "Cache devices did not appear consistent with metadata: {}",
-                err
-            ),
-        )
+        StratisError::Msg(format!(
+            "Cache devices did not appear consistent with metadata: {}",
+            err
+        ))
     })?;
 
     Ok((datadevs, cachedevs))

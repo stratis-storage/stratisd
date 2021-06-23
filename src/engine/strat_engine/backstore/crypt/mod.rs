@@ -127,7 +127,7 @@ mod tests {
 
             for path in paths {
                 if !CryptActivationHandle::can_unlock(path, true, false) {
-                    return Err(Box::new(StratisError::Error(
+                    return Err(Box::new(StratisError::Msg(
                         "All devices should be able to be unlocked".to_string(),
                     )));
                 }
@@ -139,7 +139,7 @@ mod tests {
 
             for path in paths {
                 if !CryptActivationHandle::can_unlock(path, true, false) {
-                    return Err(Box::new(StratisError::Error(
+                    return Err(Box::new(StratisError::Msg(
                         "All devices should be able to be unlocked".to_string(),
                     )));
                 }
@@ -151,7 +151,7 @@ mod tests {
 
             for path in paths {
                 if CryptActivationHandle::can_unlock(path, true, false) {
-                    return Err(Box::new(StratisError::Error(
+                    return Err(Box::new(StratisError::Msg(
                         "All devices should no longer be able to be unlocked".to_string(),
                     )));
                 }
@@ -199,7 +199,7 @@ mod tests {
             _: (),
         ) -> std::result::Result<(), Box<dyn Error>> {
             let path = paths.get(0).ok_or_else(|| {
-                Box::new(StratisError::Error(
+                Box::new(StratisError::Msg(
                     "This test only accepts a single device".to_string(),
                 ))
             })?;
@@ -362,7 +362,7 @@ mod tests {
             let path = paths
                 .get(0)
                 .copied()
-                .ok_or_else(|| StratisError::Error("Expected exactly one path".to_string()))?;
+                .ok_or_else(|| StratisError::Msg("Expected exactly one path".to_string()))?;
             let handle = CryptInitializer::new(
                 DevicePath::new(path.to_owned())?,
                 PoolUuid::new_v4(),

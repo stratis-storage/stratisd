@@ -13,8 +13,8 @@ use crate::{
         consts::filesystem_interface_list,
         filesystem::create_dbus_filesystem,
         pool::shared::{add_blockdevs, BlockDevOp},
-        types::{DbusErrorEnum, TData},
-        util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
+        types::{DbusErrorEnum, TData, OK_STRING},
+        util::{engine_to_dbus_err_tuple, get_next_arg},
     },
     engine::{CreateAction, EngineAction, FilesystemUuid, Name, PoolUuid, RenameAction},
 };
@@ -98,8 +98,8 @@ pub fn create_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult 
 
     Ok(vec![return_message.append3(
         return_value,
-        msg_code_ok(),
-        msg_string_ok(),
+        DbusErrorEnum::OK as u16,
+        OK_STRING.to_string(),
     )])
 }
 
@@ -162,7 +162,11 @@ pub fn destroy_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
             } else {
                 Vec::new()
             };
-            return_message.append3((true, uuid_vec), msg_code_ok(), msg_string_ok())
+            return_message.append3(
+                (true, uuid_vec),
+                DbusErrorEnum::OK as u16,
+                OK_STRING.to_string(),
+            )
         }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
@@ -204,7 +208,7 @@ pub fn snapshot_filesystem(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
         ),
         None => {
             let message = format!("no data for object path {}", filesystem);
-            let (rc, rs) = (DbusErrorEnum::NOTFOUND as u16, message);
+            let (rc, rs) = (DbusErrorEnum::ERROR as u16, message);
             return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };
@@ -227,11 +231,17 @@ pub fn snapshot_filesystem(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
                 uuid,
                 fs,
             );
-            return_message.append3((true, fs_object_path), msg_code_ok(), msg_string_ok())
+            return_message.append3(
+                (true, fs_object_path),
+                DbusErrorEnum::OK as u16,
+                OK_STRING.to_string(),
+            )
         }
-        Ok(CreateAction::Identity) => {
-            return_message.append3(default_return, msg_code_ok(), msg_string_ok())
-        }
+        Ok(CreateAction::Identity) => return_message.append3(
+            default_return,
+            DbusErrorEnum::OK as u16,
+            OK_STRING.to_string(),
+        ),
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
             return_message.append3(default_return, rc, rs)
@@ -313,18 +323,20 @@ pub fn rename_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     {
         Ok(RenameAction::NoSource) => {
             let error_message = format!("engine doesn't know about pool {}", pool_uuid);
-            let (rc, rs) = (DbusErrorEnum::INTERNAL_ERROR as u16, error_message);
+            let (rc, rs) = (DbusErrorEnum::ERROR as u16, error_message);
             return_message.append3(default_return, rc, rs)
         }
-        Ok(RenameAction::Identity) => {
-            return_message.append3(default_return, msg_code_ok(), msg_string_ok())
-        }
+        Ok(RenameAction::Identity) => return_message.append3(
+            default_return,
+            DbusErrorEnum::OK as u16,
+            OK_STRING.to_string(),
+        ),
         Ok(RenameAction::Renamed(uuid)) => {
             dbus_context.push_pool_name_change(object_path, new_name);
             return_message.append3(
                 (true, uuid_to_string!(uuid)),
-                msg_code_ok(),
-                msg_string_ok(),
+                DbusErrorEnum::OK as u16,
+                OK_STRING.to_string(),
             )
         }
         Err(err) => {

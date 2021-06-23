@@ -114,9 +114,9 @@ impl<'a> TryFrom<&'a Value> for StratisLuks2Token {
 /// around device_from_physical_path removing the Option type.
 pub fn acquire_crypt_device(physical_path: &Path) -> StratisResult<CryptDevice> {
     device_from_physical_path(physical_path)?.ok_or_else(|| {
-        StratisError::Error(format!(
+        StratisError::Msg(format!(
             "Physical device {} underneath encrypted Stratis has been \
-                determined not to be formatted as a LUKS2 Stratis device",
+                    determined not to be formatted as a LUKS2 Stratis device",
             physical_path.display(),
         ))
     })
@@ -137,7 +137,7 @@ pub fn add_keyring_keyslot(
     let key = if let Some(key) = key_option {
         key
     } else {
-        return Err(StratisError::Error(format!(
+        return Err(StratisError::Msg(format!(
             "Key with key description {} was not found",
             key_description.as_application_str(),
         )));
@@ -211,7 +211,7 @@ pub fn setup_crypt_metadata_handle(
     {
         Some(Some(Ok(description))) => Some(description),
         Some(Some(Err(e))) => {
-            return Err(StratisError::Error(format!(
+            return Err(StratisError::Msg(format!(
                 "key description {} found on devnode {} is not a valid Stratis key description: {}",
                 key_description.expect("key_desc_from_metadata determined to be Some(_) above"),
                 physical_path.display(),
@@ -256,7 +256,9 @@ pub fn setup_crypt_handle(
                 device,
                 metadata_handle.encryption_info().key_description.as_ref()
                     .ok_or_else(|| {
-                        StratisError::Error("Unlock action was specified to be keyring but not key description is present in the metadata".to_string())
+                        StratisError::Msg(
+                            "Unlock action was specified to be keyring but not key description is present in the metadata".to_string(),
+                        )
                     })?,
             )), &name)?
         }
@@ -265,7 +267,9 @@ pub fn setup_crypt_handle(
             if let Ok(CryptStatusInfo::Active) | Ok(CryptStatusInfo::Busy) = libcryptsetup_rs::status(Some(device), &name) {
                 [DEVICEMAPPER_PATH, &name].iter().collect()
             } else {
-                return Err(StratisError::Error("Found a crypt device but it is not activated and no unlock method was provided".to_string()));
+                return Err(StratisError::Msg(
+                    "Found a crypt device but it is not activated and no unlock method was provided".to_string(),
+                ));
             }
         },
     };
@@ -337,7 +341,7 @@ pub fn interpret_clevis_config(pin: &str, clevis_config: &mut Value) -> StratisR
                 .and_then(|v| v.as_bool())
                 .unwrap_or(false)
         } else {
-            return Err(StratisError::Error(format!(
+            return Err(StratisError::Msg(format!(
                 "configuration for Clevis is is not in JSON object format: {}",
                 clevis_config
             )));
@@ -356,10 +360,10 @@ fn tang_dispatch(json: &Value) -> StratisResult<Value> {
         .and_then(|map| map.get("tang"))
         .and_then(|val| val.as_object())
         .ok_or_else(|| {
-            StratisError::Error("Expected an object for value of clevis.tang".to_string())
+            StratisError::Msg("Expected an object for value of clevis.tang".to_string())
         })?;
     let url = object.get("url").and_then(|s| s.as_str()).ok_or_else(|| {
-        StratisError::Error("Expected a string for value of clevis.tang.url".to_string())
+        StratisError::Msg("Expected a string for value of clevis.tang.url".to_string())
     })?;
 
     let keys = object
@@ -367,20 +371,20 @@ fn tang_dispatch(json: &Value) -> StratisResult<Value> {
         .and_then(|adv| adv.get("keys"))
         .and_then(|keys| keys.as_array())
         .ok_or_else(|| {
-            StratisError::Error("Expected an array for value of clevis.tang.adv.keys".to_string())
+            StratisError::Msg("Expected an array for value of clevis.tang.adv.keys".to_string())
         })?;
     let mut key = keys
         .iter()
         .cloned()
         .find(|obj| obj.get("key_ops") == Some(&Value::Array(vec![Value::from("verify")])))
         .ok_or_else(|| {
-            StratisError::Error("Verification key not found in clevis metadata".to_string())
+            StratisError::Msg("Verification key not found in clevis metadata".to_string())
         })?;
 
     let map = if let Some(m) = key.as_object_mut() {
         m
     } else {
-        return Err(StratisError::Error(
+        return Err(StratisError::Msg(
             "Key value is not in JSON object format".to_string(),
         ));
     };
@@ -403,20 +407,20 @@ fn sss_dispatch(json: &Value) -> StratisResult<Value> {
         .and_then(|map| map.get("sss"))
         .and_then(|val| val.as_object())
         .ok_or_else(|| {
-            StratisError::Error("Expected an object for value of clevis.sss".to_string())
+            StratisError::Msg("Expected an object for value of clevis.sss".to_string())
         })?;
 
     let threshold = object
         .get("t")
         .and_then(|val| val.as_u64())
         .ok_or_else(|| {
-            StratisError::Error("Expected an int for value of clevis.sss.t".to_string())
+            StratisError::Msg("Expected an int for value of clevis.sss.t".to_string())
         })?;
     let jwes = object
         .get("jwe")
         .and_then(|val| val.as_array())
         .ok_or_else(|| {
-            StratisError::Error("Expected an array for value of clevis.sss.jwe".to_string())
+            StratisError::Msg("Expected an array for value of clevis.sss.jwe".to_string())
         })?;
 
     let mut sss_map = Map::new();
@@ -429,9 +433,9 @@ fn sss_dispatch(json: &Value) -> StratisResult<Value> {
             // as written by clevis. The base64 encoded string delimits the end
             // of the JSON blob with a period.
             let json_s = s.splitn(2, '.').next().ok_or_else(|| {
-                StratisError::Error(format!(
+                StratisError::Msg(format!(
                     "Splitting string {} on character '.' did not result in \
-                    at least one string segment.",
+                        at least one string segment.",
                     s,
                 ))
             })?;
@@ -445,16 +449,16 @@ fn sss_dispatch(json: &Value) -> StratisResult<Value> {
                     pin_map.insert(pin, Value::from(vec![value]));
                 }
                 _ => {
-                    return Err(StratisError::Error(format!(
+                    return Err(StratisError::Msg(format!(
                         "There appears to be a data type that is not an array in \
-                        the data structure being used to construct the sss JSON config
-                        under pin name {}",
+                            the data structure being used to construct the sss JSON config
+                            under pin name {}",
                         pin,
                     )))
                 }
             };
         } else {
-            return Err(StratisError::Error(
+            return Err(StratisError::Msg(
                 "Expected a string for each value in the array at clevis.sss.jwe".to_string(),
             ));
         }
@@ -470,13 +474,13 @@ fn pin_dispatch(decoded_jwe: &Value) -> StratisResult<(String, Value)> {
         .get("clevis")
         .and_then(|map| map.get("pin"))
         .ok_or_else(|| {
-            StratisError::Error("Key .clevis.pin not found in clevis JSON token".to_string())
+            StratisError::Msg("Key .clevis.pin not found in clevis JSON token".to_string())
         })?;
     match pin_value.as_str() {
         Some("tang") => tang_dispatch(decoded_jwe).map(|val| ("tang".to_owned(), val)),
         Some("sss") => sss_dispatch(decoded_jwe).map(|val| ("sss".to_owned(), val)),
         Some("tpm2") => Ok(("tpm2".to_owned(), json!({}))),
-        _ => Err(StratisError::Error("Unsupported clevis pin".to_string())),
+        _ => Err(StratisError::Msg("Unsupported clevis pin".to_string())),
     }
 }
 
@@ -495,19 +499,19 @@ fn is_encrypted_stratis_device(device: &mut CryptDevice) -> bool {
         let luks_token = device.token_handle().json_get(LUKS2_TOKEN_ID).ok();
         let clevis_token = device.token_handle().json_get(CLEVIS_LUKS_TOKEN_ID).ok();
         if stratis_token.is_none() || (luks_token.is_none() && clevis_token.is_none()) {
-            return Err(StratisError::Error(
+            return Err(StratisError::Msg(
                 "Device appears to be missing some of the required Stratis LUKS2 tokens"
                     .to_string(),
             ));
         }
         if let Some(ref lt) = luks_token {
             if !luks2_token_type_is_valid(lt) {
-                return Err(StratisError::Error("LUKS2 token is invalid".to_string()));
+                return Err(StratisError::Msg("LUKS2 token is invalid".to_string()));
             }
         }
         if let Some(ref st) = stratis_token {
             if !stratis_token_is_valid(st) {
-                return Err(StratisError::Error("Stratis token is invalid".to_string()));
+                return Err(StratisError::Msg("Stratis token is invalid".to_string()));
             }
         }
         Ok(())
@@ -542,7 +546,7 @@ fn device_is_active(device: Option<&mut CryptDevice>, device_name: &str) -> Stra
                 activation appears to have failed",
                 device_name,
             );
-            Err(StratisError::Error(format!(
+            Err(StratisError::Msg(format!(
                 "Device {} was activated but is reporting that it is inactive",
                 device_name,
             )))
@@ -553,12 +557,12 @@ fn device_is_active(device: Option<&mut CryptDevice>, device_name: &str) -> Stra
                 device activation appears to have failed",
                 device_name,
             );
-            Err(StratisError::Error(format!(
+            Err(StratisError::Msg(format!(
                 "Device {} was activated but is reporting an invalid status",
                 device_name,
             )))
         }
-        Err(e) => Err(StratisError::Error(format!(
+        Err(e) => Err(StratisError::Msg(format!(
             "Failed to fetch status for device name {}: {}",
             device_name, e,
         ))),
@@ -594,7 +598,7 @@ pub fn activate(
         Either::Left((device, kd)) => {
             let key_description_missing = keys::search_key_persistent(kd)
                 .map_err(|_| {
-                    StratisError::Error(format!(
+                    StratisError::Msg(format!(
                         "Searching the persistent keyring for the key description {} failed.",
                         kd.as_application_str(),
                     ))
@@ -605,7 +609,7 @@ pub fn activate(
                     "Key description {} was not found in the keyring",
                     kd.as_application_str()
                 );
-                return Err(StratisError::Error(format!(
+                return Err(StratisError::Msg(format!(
                     "The key description \"{}\" is not currently set.",
                     kd.as_application_str(),
                 )));
@@ -650,7 +654,7 @@ pub fn get_keyslot_number(
     let vec = json
         .get(TOKEN_KEYSLOTS_KEY)
         .and_then(|k| k.as_array())
-        .ok_or_else(|| StratisError::Error("keyslots value was malformed".to_string()))?;
+        .ok_or_else(|| StratisError::Msg("keyslots value was malformed".to_string()))?;
     Ok(Some(
         vec.iter()
             .filter_map(|int_val| {
@@ -844,14 +848,23 @@ fn name_from_metadata(device: &mut CryptDevice) -> StratisResult<String> {
     );
     let name = log_on_failure!(
         json.get(STRATIS_TOKEN_DEVNAME_KEY)
-            .and_then(|type_val| type_val.as_str())
-            .map(|type_str| type_str.to_string())
             .ok_or_else(|| {
-                StratisError::Error(
-                    "Malformed or missing JSON value for activation_name".to_string(),
-                )
-            }),
-        "Could not get value for key activation_name from Stratis JSON token"
+                StratisError::Msg(format!(
+                    "Missing JSON value for {}",
+                    STRATIS_TOKEN_DEVNAME_KEY
+                ))
+            })
+            .and_then(|type_val| {
+                type_val.as_str().ok_or_else(|| {
+                    StratisError::Msg(format!(
+                        "Malformed JSON value for {}",
+                        STRATIS_TOKEN_DEVNAME_KEY
+                    ))
+                })
+            })
+            .map(|type_str| type_str.to_string()),
+        "Could not get value for key {} from Stratis JSON token",
+        STRATIS_TOKEN_DEVNAME_KEY
     );
     Ok(name)
 }
@@ -870,25 +883,41 @@ fn identifiers_from_metadata(device: &mut CryptDevice) -> StratisResult<StratisI
     );
     let pool_uuid = log_on_failure!(
         json.get(STRATIS_TOKEN_POOL_UUID_KEY)
-            .and_then(|type_val| type_val.as_str())
-            .and_then(|type_str| PoolUuid::parse_str(type_str).ok())
             .ok_or_else(|| {
-                StratisError::Error(
-                    "Malformed or missing JSON value for activation_name".to_string(),
-                )
-            }),
+                StratisError::Msg(format!(
+                    "Missing JSON value for {}",
+                    STRATIS_TOKEN_POOL_UUID_KEY
+                ))
+            })
+            .and_then(|type_val| {
+                type_val.as_str().ok_or_else(|| {
+                    StratisError::Msg(format!(
+                        "Malformed JSON value for {}",
+                        STRATIS_TOKEN_POOL_UUID_KEY
+                    ))
+                })
+            })
+            .and_then(|type_str| PoolUuid::parse_str(type_str)),
         "Could not get value for key {} from Stratis JSON token",
         STRATIS_TOKEN_POOL_UUID_KEY
     );
     let dev_uuid = log_on_failure!(
         json.get(STRATIS_TOKEN_DEV_UUID_KEY)
-            .and_then(|type_val| type_val.as_str())
-            .and_then(|type_str| DevUuid::parse_str(type_str).ok())
             .ok_or_else(|| {
-                StratisError::Error(
-                    "Malformed or missing JSON value for activation_name".to_string(),
-                )
-            }),
+                StratisError::Msg(format!(
+                    "Missing JSON value for {}",
+                    STRATIS_TOKEN_DEV_UUID_KEY
+                ))
+            })
+            .and_then(|type_val| {
+                type_val.as_str().ok_or_else(|| {
+                    StratisError::Msg(format!(
+                        "Malformed JSON value for {}",
+                        STRATIS_TOKEN_DEV_UUID_KEY
+                    ))
+                })
+            })
+            .and_then(|type_str| DevUuid::parse_str(type_str).map_err(StratisError::from)),
         "Could not get value for key {} from Stratis JSON token",
         STRATIS_TOKEN_DEV_UUID_KEY
     );

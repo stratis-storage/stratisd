@@ -11,7 +11,7 @@ use devicemapper::Sectors;
 
 use crate::{
     engine::strat_engine::metadata::BlockdevSize,
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::{StratisError, StratisResult},
 };
 
 #[derive(Debug)]
@@ -111,23 +111,17 @@ impl PerDevSegments {
         let end = if let Some(end) = start.checked_add(len) {
             end
         } else {
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
-                format!(
-                    "range ({}, {}) extends beyond maximum possible size",
-                    start, len
-                ),
-            ));
+            return Err(StratisError::Msg(format!(
+                "range ({}, {}) extends beyond maximum possible size",
+                start, len
+            )));
         };
 
         if end > self.limit {
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
-                format!(
-                    "range ({}, {}) extends beyond limit {}",
-                    start, len, self.limit
-                ),
-            ));
+            return Err(StratisError::Msg(format!(
+                "range ({}, {}) extends beyond limit {}",
+                start, len, self.limit
+            )));
         };
 
         let res: (Sectors, Sectors) = (start, len);
@@ -135,13 +129,10 @@ impl PerDevSegments {
         let (lhs, (new_start, new_len)) = if let Some(prev) = prev {
             let prev_len: Sectors = *self.used.get(&prev).expect("see precondition");
             if prev + prev_len > start {
-                return Err(StratisError::Engine(
-                    ErrorEnum::Invalid,
-                    format!(
-                        "range to add ({}, {}) overlaps previous range ({}, {})",
-                        start, len, prev, prev_len
-                    ),
-                ));
+                return Err(StratisError::Msg(format!(
+                    "range to add ({}, {}) overlaps previous range ({}, {})",
+                    start, len, prev, prev_len
+                )));
             }
 
             if prev + prev_len == start {
@@ -155,13 +146,10 @@ impl PerDevSegments {
 
         let (res, rhs) = if let Some(next) = next {
             if new_start + new_len > next {
-                return Err(StratisError::Engine(
-                    ErrorEnum::Invalid,
-                    format!(
-                        "range to add ({}, {}) overlaps subsequent range starting at {}",
-                        new_start, new_len, next
-                    ),
-                ));
+                return Err(StratisError::Msg(format!(
+                    "range to add ({}, {}) overlaps subsequent range starting at {}",
+                    new_start, new_len, next
+                )));
             }
 
             let next_len: Sectors = *self.used.get(&next).expect("see precondition");
@@ -186,13 +174,10 @@ impl PerDevSegments {
         let &(start, len) = range;
 
         if start > self.limit {
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
-                format!(
-                    "value specified for start of range, {}, exceeds limit, {}",
-                    start, self.limit
-                ),
-            ));
+            return Err(StratisError::Msg(format!(
+                "value specified for start of range, {}, exceeds limit, {}",
+                start, self.limit
+            )));
         }
 
         if len == Sectors(0) {
@@ -244,8 +229,7 @@ impl PerDevSegments {
     /// objects have the same limit, for simplicity.
     pub fn union(&self, other: &PerDevSegments) -> StratisResult<PerDevSegments> {
         if self.limit != other.limit {
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
+            return Err(StratisError::Msg(
                 "limits differ between PerDevSegments structs, can not do a union".into(),
             ));
         }

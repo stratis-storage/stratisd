@@ -80,7 +80,7 @@ impl DbusTreeHandler {
                     Either::Left((a, se)) => {
                         (
                             a.ok_or_else(|| {
-                                StratisError::Error(
+                                StratisError::Msg(
                                     "The channel from the D-Bus request handler to the D-Bus object handler was closed".to_string()
                                 )
                             })?,
@@ -92,7 +92,7 @@ impl DbusTreeHandler {
                         break;
                     },
                     Either::Right((Err(_), _)) => {
-                        return Err(StratisError::Error(
+                        return Err(StratisError::Msg(
                             "D-Bus tree handler can no longer be notified to exit; shutting down...".to_string()
                         ));
                     },
@@ -109,7 +109,7 @@ impl DbusTreeHandler {
                         break;
                     }
                     Either::Right((Err(_), _)) => {
-                        return Err(StratisError::Error(
+                        return Err(StratisError::Msg(
                             "D-Bus tree handler can no longer be notified to exit; shutting down...".to_string()
                         ));
                     }
@@ -358,7 +358,7 @@ impl DbusConnectionHandler {
                     break;
                 }
                 Err(TryRecvError::Lagged(_)) | Err(TryRecvError::Closed) => {
-                    return Err(StratisError::Error(
+                    return Err(StratisError::Msg(
                         "D-Bus connection handler can't be notified to exit; shutting down..."
                             .to_string(),
                     ));

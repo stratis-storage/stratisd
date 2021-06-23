@@ -20,7 +20,7 @@ use crate::{
         },
         types::{BlockDevTier, DevUuid, PoolUuid},
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::{StratisError, StratisResult},
 };
 
 /// This is a temporary maximum cache size. In the future it will be possible
@@ -56,7 +56,7 @@ impl CacheTier {
                 "{} unallocated to device; probable metadata corruption",
                 block_mgr.avail_space()
             );
-            return Err(StratisError::Engine(ErrorEnum::Error, err_msg));
+            return Err(StratisError::Msg(err_msg));
         }
 
         let uuid_to_devno = block_mgr.uuid_to_devno();
@@ -115,13 +115,10 @@ impl CacheTier {
             > MAX_CACHE_SIZE
         {
             self.block_mgr.remove_blockdevs(&uuids)?;
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
-                format!(
-                    "The size of the cache sub-device may not exceed {}",
-                    MAX_CACHE_SIZE
-                ),
-            ));
+            return Err(StratisError::Msg(format!(
+                "The size of the cache sub-device may not exceed {}",
+                MAX_CACHE_SIZE
+            )));
         }
 
         let segments = self
@@ -158,13 +155,10 @@ impl CacheTier {
         // can be increased dynamically.
         if avail_space - meta_space > MAX_CACHE_SIZE {
             block_mgr.destroy_all()?;
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
-                format!(
-                    "The size of the cache sub-device may not exceed {}",
-                    MAX_CACHE_SIZE
-                ),
-            ));
+            return Err(StratisError::Msg(format!(
+                "The size of the cache sub-device may not exceed {}",
+                MAX_CACHE_SIZE
+            )));
         }
 
         let mut segments = block_mgr

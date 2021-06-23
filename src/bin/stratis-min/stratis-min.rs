@@ -171,7 +171,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             };
             let prompt = args.is_present("prompt");
             if prompt && unlock_method == UnlockMethod::Clevis {
-                return Err(Box::new(StratisError::Error(
+                return Err(Box::new(StratisError::Msg(
                     "--prompt and an unlock_method of clevis are mutally exclusive".to_string(),
                 )));
             }

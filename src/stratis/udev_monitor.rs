@@ -37,7 +37,7 @@ pub fn udev_thread(
                         return Ok(());
                     }
                     Err(TryRecvError::Closed) | Err(TryRecvError::Lagged(_)) => {
-                        return Err(StratisError::Error(
+                        return Err(StratisError::Msg(
                             "udev processing thread can no longer be notified to exit; shutting down...".to_string()
                         ));
                     }

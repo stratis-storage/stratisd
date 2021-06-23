@@ -33,7 +33,7 @@ use crate::{
         },
         types::{DevUuid, DevicePath, EncryptionInfo, PoolUuid},
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::{StratisError, StratisResult},
 };
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u128);
@@ -54,29 +54,23 @@ fn udev_info(
     })
     .and_then(|res| {
         res.ok_or_else(|| {
-            StratisError::Engine(
-                ErrorEnum::NotFound,
-                format!(
-                    "Block device {} could not be found in the udev database",
-                    devnode.display()
-                ),
-            )
+            StratisError::Msg(format!(
+                "Block device {} could not be found in the udev database",
+                devnode.display()
+            ))
         })
     })
     .map_err(|err| {
-        StratisError::Engine(
-            ErrorEnum::NotFound,
-            format!(
-                "Could not obtain udev information for block device {}: {}",
-                devnode.display(),
-                err
-            ),
-        )
+        StratisError::Msg(format!(
+            "Could not obtain udev information for block device {}: {}",
+            devnode.display(),
+            err
+        ))
     })
     .and_then(|(ownership, devnum, id_wwn)| {
         devnum
             .ok_or_else(|| {
-                StratisError::Error(format!(
+                StratisError::Msg(format!(
                     "Insufficient information: no device number found for device {} using udev",
                     devnode.display()
                 ))
@@ -87,7 +81,7 @@ fn udev_info(
         ownership
             .map(|ownership| (ownership, devnum, id_wwn))
             .map_err(|err| {
-                StratisError::Error(format!(
+                StratisError::Msg(format!(
                     "Could not obtain ownership information for device {} using udev: {}",
                     devnode.display(),
                     err
@@ -118,7 +112,7 @@ fn dev_info(
                 devnode.display(),
                 ownership
             );
-            Err(StratisError::Engine(ErrorEnum::Invalid, err_str))
+            Err(StratisError::Msg(err_str))
         }
         UdevOwnership::Stratis | UdevOwnership::Unowned => {
             let mut f = OpenOptions::new().read(true).write(true).open(&devnode)?;
@@ -138,7 +132,7 @@ fn dev_info(
                     devnode.display(),
                     err
                 );
-                StratisError::Engine(ErrorEnum::Invalid, error_message)
+                StratisError::Msg(error_message)
             })?;
 
             if ownership == UdevOwnership::Stratis && stratis_identifiers.is_none() {
@@ -146,7 +140,7 @@ fn dev_info(
                     "udev identified device {} as a Stratis device but device metadata does not show that it is a Stratis device",
                     devnode.display()
                 );
-                return Err(StratisError::Engine(ErrorEnum::Invalid, error_message));
+                return Err(StratisError::Msg(error_message));
             }
 
             Ok((hw_id, dev_size, stratis_identifiers, devnum))
@@ -206,7 +200,7 @@ fn process_devices(
                 "At least one of the devices specified was unsuitable for initialization: {}",
                 err
             );
-            StratisError::Engine(ErrorEnum::Invalid, error_message)
+            StratisError::Msg(error_message)
         })?;
 
     let duplicate_device_number_messages: Vec<String> = infos
@@ -228,13 +222,10 @@ fn process_devices(
         .collect();
 
     if !duplicate_device_number_messages.is_empty() {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!(
-                "At least two of the devices specified have the same device number: {}",
-                duplicate_device_number_messages.join("; ")
-            ),
-        ));
+        return Err(StratisError::Msg(format!(
+            "At least two of the devices specified have the same device number: {}",
+            duplicate_device_number_messages.join("; ")
+        )));
     }
 
     Ok(infos)
@@ -308,7 +299,7 @@ fn check_device_ids(
             "Some devices specified appear to be already in use by other Stratis pools: {}",
             error_string
         );
-        return Err(StratisError::Engine(ErrorEnum::Invalid, error_message));
+        return Err(StratisError::Msg(error_message));
     }
 
     if let Some(mut this_pool) = this_pool {
@@ -331,7 +322,7 @@ fn check_device_ids(
                     .join(", "),
                 pool_uuid
             );
-            return Err(StratisError::Engine(ErrorEnum::Invalid, error_message));
+            return Err(StratisError::Msg(error_message));
         }
 
         if !included.is_empty() {
@@ -375,7 +366,7 @@ pub fn process_and_verify_devices(
                             info.devnode.display(),
                             info.size,
                             MIN_DEV_SIZE);
-                        Err(StratisError::Engine(ErrorEnum::Invalid, error_message))
+                        Err(StratisError::Msg(error_message))
                     } else { Ok(info) }
                 })
                 .collect()
@@ -486,33 +477,47 @@ pub fn initialize_devices(
     }
 
     /// Clean up an encrypted device after initialization failure.
-    fn clean_up_encrypted(handle: CryptHandle) {
+    fn clean_up_encrypted(handle: &mut CryptHandle, causal_error: StratisError) -> StratisError {
         if let Err(e) = handle.wipe() {
-            warn!(
-                "Failed to clean up encrypted device {}; cleanup \
-                was attempted because initialization of the device \
-                failed; clean up failure cause: {}",
+            let msg = format!(
+                "Failed to clean up encrypted device {}; cleanup was attempted because initialization of the device failed",
                 handle.luks2_device_path().display(),
-                e,
             );
+            warn!("{}; clean up failure cause: {}", msg, e,);
+            StratisError::Chained(
+                msg,
+                Box::new(StratisError::NoActionRollbackError {
+                    causal_error: Box::new(causal_error),
+                    rollback_error: Box::new(e),
+                }),
+            )
+        } else {
+            causal_error
         }
     }
 
     /// Clean up an unencrypted device after initialization failure.
-    fn clean_up_unencrypted(path: &Path) {
+    fn clean_up_unencrypted(path: &Path, causal_error: StratisError) -> StratisError {
         if let Err(e) = OpenOptions::new()
             .write(true)
             .open(path)
             .map_err(StratisError::from)
             .and_then(|mut f| disown_device(&mut f))
         {
-            warn!(
-                "Failed to clean up unencrypted device {}; cleanup was \
-                attempted because initialization of the device failed; \
-                clean up failure cause: {}",
+            let msg = format!(
+                "Failed to clean up unencrypted device {}; cleanup was attempted because initialization of the device failed",
                 path.display(),
-                e,
             );
+            warn!("{}; clean up failure cause: {}", msg, e,);
+            StratisError::Chained(
+                msg,
+                Box::new(StratisError::NoActionRollbackError {
+                    causal_error: Box::new(causal_error),
+                    rollback_error: Box::new(e),
+                }),
+            )
+        } else {
+            causal_error
         }
     }
 
@@ -567,48 +572,39 @@ pub fn initialize_devices(
         };
 
         let physical_path = &dev_info.devnode;
-        let is_encrypted = handle.is_some();
-        let blockdev = initialize_stratis_metadata(
-            match handle {
-                Some(handle) => UnderlyingDevice::Encrypted(handle),
-                None => UnderlyingDevice::Unencrypted(DevicePath::new(physical_path.to_owned())?),
-            },
-            devno,
-            pool_uuid,
-            dev_uuid,
-            (mda_data_size, BlockdevSize::new(blockdev_size)),
-            &dev_info.id_wwn,
-        );
-        if blockdev.is_err() {
-            if is_encrypted {
-                let handle = match CryptHandle::setup(physical_path) {
-                    Ok(Some(h)) => h,
-                    Ok(None) => {
-                        let error = format!(
-                            "Device {} appears not to be encrypted; cannot roll back encryption \
-                            operation",
-                            physical_path.display(),
-                        );
-                        warn!("{}", error);
-                        return Err(StratisError::Error(error));
-                    }
-                    Err(e) => {
-                        warn!(
-                            "Failed to clean up encrypted device after a failure to write \
-                            Stratis metadata to the initialized encrypted device {}; the \
-                            cause of the failure: {}",
-                            physical_path.display(),
-                            e,
-                        );
-                        return Err(e);
-                    }
-                };
-                clean_up_encrypted(handle);
-            } else {
-                clean_up_unencrypted(physical_path);
+        match handle {
+            Some(handle) => {
+                let mut handle_clone = handle.clone();
+                let blockdev = initialize_stratis_metadata(
+                    UnderlyingDevice::Encrypted(handle),
+                    devno,
+                    pool_uuid,
+                    dev_uuid,
+                    (mda_data_size, BlockdevSize::new(blockdev_size)),
+                    &dev_info.id_wwn,
+                );
+                if let Err(err) = blockdev {
+                    Err(clean_up_encrypted(&mut handle_clone, err))
+                } else {
+                    blockdev
+                }
+            }
+            None => {
+                let blockdev = initialize_stratis_metadata(
+                    UnderlyingDevice::Unencrypted(DevicePath::new(physical_path.to_owned())?),
+                    devno,
+                    pool_uuid,
+                    dev_uuid,
+                    (mda_data_size, BlockdevSize::new(blockdev_size)),
+                    &dev_info.id_wwn,
+                );
+                if let Err(err) = blockdev {
+                    Err(clean_up_unencrypted(physical_path, err))
+                } else {
+                    blockdev
+                }
             }
         }
-        blockdev
     }
 
     let mut initialized_blockdevs: Vec<StratBlockDev> = Vec::new();
@@ -644,16 +640,18 @@ pub fn wipe_blockdevs(blockdevs: &mut [StratBlockDev]) -> StratisResult<()> {
     if unerased_devnodes.is_empty() {
         Ok(())
     } else {
-        let err_msg = format!(
-            "Failed to wipe already initialized devnodes; {}",
+        let errors =
             unerased_devnodes
                 .into_iter()
-                .map(|(devnode, error)| {
-                    format!("Failed to wipe blockdev {}: {}", devnode.display(), error)
-                })
-                .fold(String::new(), |error, next| error + next.as_str()),
-        );
-        Err(StratisError::Engine(ErrorEnum::Error, err_msg))
+                .fold(Vec::new(), |mut errs, (devnode, next_error)| {
+                    errs.push(StratisError::Chained(
+                        format!("Failed to wipe block device {}", devnode.display(),),
+                        Box::new(next_error),
+                    ));
+                    errs
+                });
+        let err_msg = "Failed to wipe already initialized devnodes".to_string();
+        Err(StratisError::BestEffortError(err_msg, errors))
     }
 }
 
@@ -680,7 +678,7 @@ mod tests {
         let infos: Vec<_> = process_devices(paths)?;
 
         if infos.len() != paths.len() {
-            return Err(Box::new(StratisError::Error(
+            return Err(Box::new(StratisError::Msg(
                 "Some duplicate devices were found".to_string(),
             )));
         }
@@ -688,7 +686,7 @@ mod tests {
         let dev_infos = check_device_ids(pool_uuid, &HashSet::new(), infos)?;
 
         if dev_infos.len() != paths.len() {
-            return Err(Box::new(StratisError::Error(
+            return Err(Box::new(StratisError::Msg(
                 "Some devices were filtered from the specified set".to_string(),
             )));
         }
@@ -704,7 +702,7 @@ mod tests {
         )?;
 
         if blockdevs.len() != paths.len() {
-            return Err(Box::new(StratisError::Error(
+            return Err(Box::new(StratisError::Msg(
                 "Fewer blockdevices were created than were requested".to_string(),
             )));
         }
@@ -726,7 +724,7 @@ mod tests {
             .collect::<StratisResult<Vec<Option<StratisIdentifiers>>>>()?;
 
         if stratis_identifiers.iter().any(Option::is_none) {
-            return Err(Box::new(StratisError::Error(
+            return Err(Box::new(StratisError::Msg(
                 "Some device which should have had Stratis identifiers on it did not".to_string(),
             )));
         }
@@ -735,7 +733,7 @@ mod tests {
             .iter()
             .any(|x| x.expect("returned in line above if any are None").pool_uuid != pool_uuid)
         {
-            return Err(Box::new(StratisError::Error(
+            return Err(Box::new(StratisError::Msg(
                 "Some device had the wrong pool UUID".to_string(),
             )));
         }
@@ -759,7 +757,7 @@ mod tests {
         )?
         .is_empty()
         {
-            return Err(Box::new(StratisError::Error(
+            return Err(Box::new(StratisError::Msg(
                 "Failed to eliminate devices already initialized for this pool from list of devices to initialize".to_string()
             )));
         }
@@ -775,7 +773,7 @@ mod tests {
         )
         .is_ok()
         {
-            return Err(Box::new(StratisError::Error(
+            return Err(Box::new(StratisError::Msg(
                 "Failed to return an error when some device processed was not in the set of already initialized devices".to_string()
             )));
         }
@@ -791,20 +789,20 @@ mod tests {
         )
         .is_ok()
         {
-            return Err(Box::new(StratisError::Error(
+            return Err(Box::new(StratisError::Msg(
                 "Failed to return an error when processing devices for a pool UUID which is not the same as that for which the devices were initialized".to_string()
             )));
         }
 
         let result = process_and_verify_devices(pool_uuid, &initialized_uuids, paths);
         if key_description.is_some() && result.is_ok() {
-            return Err(Box::new(StratisError::Error(
+            return Err(Box::new(StratisError::Msg(
                 "Failed to return an error when encountering devices that are LUKS2".to_string(),
             )));
         }
 
         if key_description.is_none() && !result?.is_empty() {
-            return Err(Box::new(StratisError::Error(
+            return Err(Box::new(StratisError::Msg(
                         "Failed to filter all previously initialized devices which should have all been eliminated on the basis of already belonging to pool with the given pool UUID".to_string()
                 )));
         }
@@ -814,12 +812,12 @@ mod tests {
         for path in paths {
             if key_description.is_some() {
                 if CryptHandle::setup(path)?.is_some() {
-                    return Err(Box::new(StratisError::Error(
+                    return Err(Box::new(StratisError::Msg(
                         "LUKS2 metadata on Stratis devices was not successfully wiped".to_string(),
                     )));
                 }
             } else if device_identifiers(&mut OpenOptions::new().read(true).open(path)?)? != None {
-                return Err(Box::new(StratisError::Error(
+                return Err(Box::new(StratisError::Msg(
                     "Metadata on Stratis devices was not successfully wiped".to_string(),
                 )));
             }
@@ -911,7 +909,7 @@ mod tests {
         key_desc: Option<&KeyDescription>,
     ) -> Result<(), Box<dyn Error>> {
         if paths.len() <= 1 {
-            return Err(Box::new(StratisError::Error(
+            return Err(Box::new(StratisError::Msg(
                 "Test requires more than one device".to_string(),
             )));
         }
@@ -920,7 +918,7 @@ mod tests {
         let pool_uuid = PoolUuid::new_v4();
 
         if infos.len() != paths.len() {
-            return Err(Box::new(StratisError::Error(
+            return Err(Box::new(StratisError::Msg(
                 "Some duplicate devices were found".to_string(),
             )));
         }
@@ -928,7 +926,7 @@ mod tests {
         let mut dev_infos = check_device_ids(pool_uuid, &HashSet::new(), infos)?;
 
         if dev_infos.len() != paths.len() {
-            return Err(Box::new(StratisError::Error(
+            return Err(Box::new(StratisError::Msg(
                 "Some devices were filtered from the specified set".to_string(),
             )));
         }
@@ -958,7 +956,7 @@ mod tests {
         )
         .is_ok()
         {
-            return Err(Box::new(StratisError::Error(
+            return Err(Box::new(StratisError::Msg(
                 "Initialization should not have succeeded".to_string(),
             )));
         }
@@ -970,7 +968,7 @@ mod tests {
         for path in paths {
             if key_desc.is_some() {
                 if CryptHandle::setup(path)?.is_some() {
-                    return Err(Box::new(StratisError::Error(format!(
+                    return Err(Box::new(StratisError::Msg(format!(
                         "Device {} should have no LUKS2 metadata",
                         path.display()
                     ))));
@@ -980,7 +978,7 @@ mod tests {
                 match device_identifiers(&mut f) {
                     Ok(None) => (),
                     _ => {
-                        return Err(Box::new(StratisError::Error(format!(
+                        return Err(Box::new(StratisError::Msg(format!(
                             "Device {} should have returned nothing for device identifiers",
                             path.display()
                         ))))

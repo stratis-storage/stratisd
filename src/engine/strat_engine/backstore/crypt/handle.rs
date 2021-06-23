@@ -37,7 +37,10 @@ use crate::{
 /// * CryptInitializer will ensure that the newly formatted device is activated.
 /// * CryptActivationHandle requires the user to activate a device to yield a CryptHandle.
 /// * CryptHandle::setup() fails if the device is not active.
-#[derive(Debug)]
+///
+/// `Clone` is derived for this data structure because `CryptHandle` acquires
+/// a next crypt device context for each operation.
+#[derive(Debug, Clone)]
 pub struct CryptHandle {
     activated_path: DevicePath,
     name: String,
@@ -147,7 +150,7 @@ impl CryptHandle {
             .key_description
             .as_ref()
             .ok_or_else(|| {
-                StratisError::Error(
+                StratisError::Msg(
                     "Clevis binding requires a registered key description for the device \
                     but none was found"
                         .to_string(),
@@ -176,7 +179,7 @@ impl CryptHandle {
             .key_description
             .is_none()
         {
-            return Err(StratisError::Error(
+            return Err(StratisError::Msg(
                 "No kernel keyring binding found; removing the Clevis binding \
                 would remove the ability to open this device; aborting"
                     .to_string(),
@@ -184,7 +187,7 @@ impl CryptHandle {
         }
 
         let keyslots = self.keyslots(CLEVIS_LUKS_TOKEN_ID)?.ok_or_else(|| {
-            StratisError::Error(format!(
+            StratisError::Msg(format!(
                 "Token slot {} appears to be empty; could not determine keyslots",
                 CLEVIS_LUKS_TOKEN_ID,
             ))
@@ -204,7 +207,7 @@ impl CryptHandle {
     pub fn bind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<()> {
         let mut device = self.acquire_crypt_device()?;
         let key = Self::clevis_decrypt(&mut device)?.ok_or_else(|| {
-            StratisError::Error(
+            StratisError::Msg(
                 "The Clevis token appears to have been wiped outside of \
                     Stratis; cannot add a keyring key binding without an existing \
                     passphrase to unlock the device"
@@ -221,7 +224,7 @@ impl CryptHandle {
     /// Add a keyring binding to the underlying LUKS2 volume.
     pub fn unbind_keyring(&mut self) -> StratisResult<()> {
         if self.metadata_handle.encryption_info.clevis_info.is_none() {
-            return Err(StratisError::Error(
+            return Err(StratisError::Msg(
                 "No Clevis binding was found; removing the keyring binding would \
                 remove the ability to open this device; aborting"
                     .to_string(),
@@ -230,7 +233,7 @@ impl CryptHandle {
 
         let mut device = self.acquire_crypt_device()?;
         let keyslots = get_keyslot_number(&mut device, LUKS2_TOKEN_ID)?
-            .ok_or_else(|| StratisError::Error("No LUKS2 keyring token was found".to_string()))?;
+            .ok_or_else(|| StratisError::Msg("No LUKS2 keyring token was found".to_string()))?;
         for keyslot in keyslots {
             log_on_failure!(
                 device.keyslot_handle().destroy(keyslot),
@@ -257,9 +260,9 @@ impl CryptHandle {
             .as_object_mut()
             .and_then(|map| map.remove("jwe"))
             .ok_or_else(|| {
-                StratisError::Error(format!(
+                StratisError::Msg(format!(
                     "Token slot {} is occupied but does not appear to be a Clevis \
-                    token; aborting",
+                        token; aborting",
                     CLEVIS_LUKS_TOKEN_ID,
                 ))
             })?;

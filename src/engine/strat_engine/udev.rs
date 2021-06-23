@@ -43,11 +43,13 @@ where
         value
             .to_str()
             .ok_or_else(|| {
-                StratisError::Error(format!(
-                    "Unable to convert udev property value with key {} to a string, lossy value is {}",
-                    property_name,
-                    value.to_string_lossy()
-                ))
+                StratisError::Msg(
+                    format!(
+                        "Unable to convert udev property value with key {} to a string, lossy value is {}",
+                        property_name,
+                        value.to_string_lossy()
+                    ),
+                )
             })
             .map(|value| value.into())
     })
@@ -146,10 +148,10 @@ pub fn decide_ownership(device: &UdevEngineDevice) -> StratisResult<UdevOwnershi
         })
     }()
     .map_err(|err| {
-        StratisError::Error(format!(
-            "Could not determine ownership of a device from a udev database entry: {}",
-            err
-        ))
+        StratisError::Chained(
+            "Could not determine ownership of a device from a udev database entry".to_string(),
+            Box::new(err),
+        )
     })
 }
 

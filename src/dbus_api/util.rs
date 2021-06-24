@@ -101,7 +101,7 @@ pub fn msg_code_ok() -> u16 {
 
 /// Convenience function to get the error string for "OK"
 pub fn msg_string_ok() -> String {
-    DbusErrorEnum::OK.get_error_string().to_owned()
+    "Ok".to_string()
 }
 
 /// Get the UUID for an object path.

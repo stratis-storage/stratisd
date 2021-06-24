@@ -46,15 +46,6 @@ pub enum DbusErrorEnum {
     ERROR = 1,
 }
 
-impl DbusErrorEnum {
-    pub fn get_error_string(self) -> &'static str {
-        match self {
-            DbusErrorEnum::OK => "Ok",
-            DbusErrorEnum::ERROR => "An error occurred",
-        }
-    }
-}
-
 #[derive(Debug)]
 pub enum DbusAction {
     Add(ObjectPath<MTSync<TData>, TData>, InterfacesAddedThreadSafe),

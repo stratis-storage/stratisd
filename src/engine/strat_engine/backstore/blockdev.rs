@@ -70,7 +70,7 @@ pub struct StratBlockDev {
     used: RangeAllocator,
     user_info: Option<String>,
     hardware_info: Option<String>,
-    pub(super) underlying_device: UnderlyingDevice,
+    underlying_device: UnderlyingDevice,
 }
 
 impl StratBlockDev {

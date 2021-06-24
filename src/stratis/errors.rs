@@ -97,7 +97,7 @@ impl fmt::Display for StratisError {
 }
 
 impl Error for StratisError {
-    fn cause(&self) -> Option<&dyn Error> {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
         match *self {
             StratisError::Msg(_) => None,
             StratisError::Chained(_, ref chained) => Some(chained),

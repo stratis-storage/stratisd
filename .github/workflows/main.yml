@@ -456,7 +456,6 @@ jobs:
           cryptsetup-devel
           dbus-devel
           git
-          jq
           libblkid-devel
           make
           openssl-devel

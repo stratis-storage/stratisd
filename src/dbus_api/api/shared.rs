@@ -15,10 +15,12 @@ use crate::{
         blockdev::{create_dbus_blockdev, get_blockdev_properties},
         filesystem::get_fs_properties,
         pool::{create_dbus_pool, get_pool_properties},
-        types::{CreatePoolParams, GetManagedObjects, InterfacesAddedThreadSafe, TData},
+        types::{
+            CreatePoolParams, DbusErrorEnum, GetManagedObjects, InterfacesAddedThreadSafe, TData,
+            OK_STRING,
+        },
         util::{
-            engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok,
-            thread_safe_to_dbus_sendable, tuple_to_option,
+            engine_to_dbus_err_tuple, get_next_arg, thread_safe_to_dbus_sendable, tuple_to_option,
         },
     },
     engine::{
@@ -123,7 +125,7 @@ pub fn create_pool_shared(
                 }
                 CreateAction::Identity => default_return,
             };
-            return_message.append3(results, msg_code_ok(), msg_string_ok())
+            return_message.append3(results, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(x) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&x);
@@ -179,7 +181,11 @@ pub fn set_key_shared(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
                 MappingCreateAction::ValueChanged(_) => (true, true),
                 MappingCreateAction::Identity => default_return,
             };
-            return_message.append3(return_value, msg_code_ok(), msg_string_ok())
+            return_message.append3(
+                return_value,
+                DbusErrorEnum::OK as u16,
+                OK_STRING.to_string(),
+            )
         }
         Err(e) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e);
@@ -266,9 +272,17 @@ pub fn unlock_pool_shared(
         Ok(unlock_action) => match unlock_action.changed() {
             Some(vec) => {
                 let str_uuids: Vec<_> = vec.into_iter().map(|u| uuid_to_string!(u)).collect();
-                return_message.append3((true, str_uuids), msg_code_ok(), msg_string_ok())
+                return_message.append3(
+                    (true, str_uuids),
+                    DbusErrorEnum::OK as u16,
+                    OK_STRING.to_string(),
+                )
             }
-            None => return_message.append3(default_return, msg_code_ok(), msg_string_ok()),
+            None => return_message.append3(
+                default_return,
+                DbusErrorEnum::OK as u16,
+                OK_STRING.to_string(),
+            ),
         },
         Err(e) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e);

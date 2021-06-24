@@ -7,8 +7,8 @@ use dbus_tree::{MTSync, MethodInfo, MethodResult};
 
 use crate::{
     dbus_api::{
-        types::{DbusErrorEnum, TData},
-        util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
+        types::{DbusErrorEnum, TData, OK_STRING},
+        util::{engine_to_dbus_err_tuple, get_next_arg},
     },
     engine::{FilesystemUuid, RenameAction},
 };
@@ -51,15 +51,17 @@ pub fn rename_filesystem(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
             let (rc, rs) = (DbusErrorEnum::ERROR as u16, error_message);
             return_message.append3(default_return, rc, rs)
         }
-        Ok(RenameAction::Identity) => {
-            return_message.append3(default_return, msg_code_ok(), msg_string_ok())
-        }
+        Ok(RenameAction::Identity) => return_message.append3(
+            default_return,
+            DbusErrorEnum::OK as u16,
+            OK_STRING.to_string(),
+        ),
         Ok(RenameAction::Renamed(uuid)) => {
             dbus_context.push_filesystem_name_change(object_path, new_name);
             return_message.append3(
                 (true, uuid_to_string!(uuid)),
-                msg_code_ok(),
-                msg_string_ok(),
+                DbusErrorEnum::OK as u16,
+                OK_STRING.to_string(),
             )
         }
         Err(err) => {

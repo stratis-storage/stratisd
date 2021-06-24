@@ -94,16 +94,6 @@ pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
     (DbusErrorEnum::ERROR as u16, description)
 }
 
-/// Convenience function to get the error value for "OK"
-pub fn msg_code_ok() -> u16 {
-    DbusErrorEnum::OK as u16
-}
-
-/// Convenience function to get the error string for "OK"
-pub fn msg_string_ok() -> String {
-    "Ok".to_string()
-}
-
 /// Get the UUID for an object path.
 pub fn get_uuid(i: &mut IterAppend, p: &PropInfo<MTSync<TData>, TData>) -> Result<(), MethodErr> {
     let object_path = p.path.get_name();

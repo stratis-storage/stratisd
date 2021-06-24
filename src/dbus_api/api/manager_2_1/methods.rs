@@ -10,8 +10,8 @@ use dbus_tree::{MTSync, MethodInfo, MethodResult};
 use crate::{
     dbus_api::{
         api::shared::{create_pool_shared, set_key_shared, unlock_pool_shared},
-        types::{CreatePoolParams, TData},
-        util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
+        types::{CreatePoolParams, DbusErrorEnum, TData, OK_STRING},
+        util::{engine_to_dbus_err_tuple, get_next_arg},
     },
     engine::{KeyDescription, MappingDeleteAction},
 };
@@ -47,7 +47,11 @@ pub fn unset_key(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
         })) {
         Ok(idem_resp) => {
             let return_value = matches!(idem_resp, MappingDeleteAction::Deleted(_));
-            return_message.append3(return_value, msg_code_ok(), msg_string_ok())
+            return_message.append3(
+                return_value,
+                DbusErrorEnum::OK as u16,
+                OK_STRING.to_string(),
+            )
         }
         Err(e) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e);

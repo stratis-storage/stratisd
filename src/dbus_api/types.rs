@@ -46,6 +46,8 @@ pub enum DbusErrorEnum {
     ERROR = 1,
 }
 
+pub const OK_STRING: &str = "Ok";
+
 #[derive(Debug)]
 pub enum DbusAction {
     Add(ObjectPath<MTSync<TData>, TData>, InterfacesAddedThreadSafe),

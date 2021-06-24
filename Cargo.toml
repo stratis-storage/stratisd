@@ -9,6 +9,18 @@ license-file = "LICENSE"
 repository = "https://github.com/stratis-storage/stratisd/"
 keywords = ["Linux", "filesystem", "storage"]
 categories = ["filesystem"]
+exclude = [
+	"code_maintenance",
+	"container_files",
+	"docs",
+	"dracut",
+	"systemd",
+	"tests",
+	"udev",
+	"Makefile",
+	"org.storage.stratis2.service",
+	"stratisd.conf"
+]
 
 [[bin]]
 name = "stratis_dumpmetadata"

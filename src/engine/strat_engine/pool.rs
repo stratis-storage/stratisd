@@ -511,16 +511,13 @@ impl Pool for StratPool {
         new_name: &str,
     ) -> StratisResult<RenameAction<FilesystemUuid>> {
         validate_name(new_name)?;
-        match self.thin_pool.rename_filesystem(pool_name, uuid, new_name) {
-            Ok(Some(uuid)) => Ok(RenameAction::Renamed(uuid)),
-            Ok(None) => Ok(RenameAction::Identity),
-            Err(e) => {
-                if let StratisError::Engine(ErrorEnum::NotFound, _) = e {
-                    Ok(RenameAction::NoSource)
-                } else {
-                    Err(e)
-                }
-            }
+        match self
+            .thin_pool
+            .rename_filesystem(pool_name, uuid, new_name)?
+        {
+            Some(true) => Ok(RenameAction::Renamed(uuid)),
+            Some(false) => Ok(RenameAction::Identity),
+            None => Ok(RenameAction::NoSource),
         }
     }
 

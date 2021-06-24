@@ -949,18 +949,16 @@ impl ThinPool {
 
     /// Rename a filesystem within the thin pool.
     ///
-    /// * Ok(Some(uuid)) provides the uuid of the renamed filesystem
-    /// * Ok(None) is returned if the source and target filesystem names are the same
-    /// * Err(StratisError::Engine(ErrorEnum::NotFound, _)) is returned if the source
-    /// filesystem name does not exist
-    /// * Err(StratisError::Engine(ErrorEnum::AlreadyExists, _)) is returned if the target
-    /// filesystem name already exists
+    /// * Ok(Some(true)) is returned if the filesystem was successfully renamed.
+    /// * Ok(Some(false)) is returned if the source and target filesystem names are the same
+    /// * Ok(None) is returned if the source filesystem name does not exist
+    /// * An error is returned if the target filesystem name already exists
     pub fn rename_filesystem(
         &mut self,
         pool_name: &str,
         uuid: FilesystemUuid,
         new_name: &str,
-    ) -> StratisResult<Option<FilesystemUuid>> {
+    ) -> StratisResult<Option<bool>> {
         let old_name = rename_filesystem_pre!(self; uuid; new_name);
         let new_name = Name::new(new_name.to_owned());
 
@@ -977,7 +975,7 @@ impl ThinPool {
             self.filesystems.insert(new_name, uuid, filesystem);
             let (new_name, fs) = self.filesystems.get_by_uuid(uuid).expect("Inserted above");
             fs.udev_fs_change(pool_name, uuid, &new_name);
-            Ok(Some(uuid))
+            Ok(Some(true))
         }
     }
 

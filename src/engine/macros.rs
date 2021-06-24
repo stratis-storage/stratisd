@@ -60,11 +60,8 @@ macro_rules! rename_filesystem_pre {
             $s.filesystems;
             $uuid;
             $new_name;
-            Err($crate::stratis::StratisError::Engine(
-                $crate::stratis::ErrorEnum::NotFound,
-                format!("Filesystem not found with UUID of {}", $uuid),
-            ));
-            Ok(None)
+            Ok(None);
+            Ok(Some(false))
         )
     }}
 }

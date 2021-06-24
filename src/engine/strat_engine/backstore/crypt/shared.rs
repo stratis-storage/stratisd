@@ -11,7 +11,7 @@ use std::{
 use data_encoding::BASE64URL_NOPAD;
 use either::Either;
 use serde_json::{Map, Value};
-use sha1::{Digest, Sha1};
+use sha2::{Digest, Sha256};
 
 use libcryptsetup_rs::{
     c_uint, CryptActivateFlags, CryptDeactivateFlags, CryptDevice, CryptInit, CryptStatusInfo,
@@ -357,7 +357,7 @@ fn tang_dispatch(json: &Value) -> StratisResult<Value> {
     map.remove("alg");
 
     let thp = key.to_string();
-    let mut hasher = Sha1::new();
+    let mut hasher = Sha256::new();
     hasher.update(thp.as_bytes());
     let array = hasher.finalize();
     let thp = BASE64URL_NOPAD.encode(array.as_slice());

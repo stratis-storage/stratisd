@@ -1011,10 +1011,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "sha-1"
-version = "0.9.6"
+name = "sha2"
+version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8c4cfa741c5832d0ef7fab46cabed29c2aae926db0b11bb2069edd8db5e64e16"
+checksum = "b362ae5752fd2137731f9fa25fd4d9058af34666ca1966fb969119cc35719f12"
 dependencies = [
  "block-buffer",
  "cfg-if 1.0.0",
@@ -1081,7 +1081,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "sha-1",
+ "sha2",
  "tempfile",
  "tokio",
  "uuid",

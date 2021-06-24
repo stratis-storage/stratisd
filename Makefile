@@ -335,13 +335,11 @@ verify-dependency-bounds:
 	cargo build --all-targets --all-features
 
 # Check that there are no dependencies missing in Fedora or ones that require
-# versions higher than those available in Fedora. There is no reason to fail
-# if our versions are too low, as we can bump versions at our leisure, so
-# do not check the value of the low key. The jq filter can be updated if we
-# deliberately choose a too high or a missing dependency.
+# versions higher than those available in Fedora.  If any crates have
+# versions that are too low, specify those crates via the --ignore-low
+# command-line option.
 check-fedora-versions:
-	`${COMPARE_FEDORA_VERSIONS} ${MANIFEST_PATH_ARGS} \
-		| jq '[.missing == [], .high == []] | all'`
+	${COMPARE_FEDORA_VERSIONS} ${MANIFEST_PATH_ARGS}
 
 .PHONY:
 	audit

@@ -328,11 +328,11 @@ clippy:
 verify-dependency-bounds:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build --all-targets --all-features
+	cargo build ${MANIFEST_PATH_ARGS} --all-targets --all-features
 	${SET_LOWER_BOUNDS} ${MANIFEST_PATH_ARGS}
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build --all-targets --all-features
+	cargo build ${MANIFEST_PATH_ARGS} --all-targets --all-features
 
 # Check that there are no dependencies missing in Fedora or ones that require
 # versions higher than those available in Fedora.  If any crates have

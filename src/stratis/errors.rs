@@ -96,36 +96,7 @@ impl fmt::Display for StratisError {
     }
 }
 
-impl Error for StratisError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match *self {
-            StratisError::Msg(_) => None,
-            StratisError::Chained(_, ref chained) => Some(chained),
-            StratisError::RollbackError {
-                ref causal_error, ..
-            } => Some(causal_error),
-            StratisError::NoActionRollbackError {
-                ref causal_error, ..
-            } => Some(causal_error),
-            StratisError::BestEffortError(_, _) => None,
-            StratisError::Io(ref err) => Some(err),
-            StratisError::Nix(ref err) => Some(err),
-            StratisError::Uuid(ref err) => Some(err),
-            StratisError::Utf8(ref err) => Some(err),
-            StratisError::Serde(ref err) => Some(err),
-            StratisError::Decode(ref err) => Some(err),
-            StratisError::DM(ref err) => Some(err),
-            StratisError::Crypt(ref err) => Some(err),
-            StratisError::Recv(ref err) => Some(err),
-            StratisError::Null(ref err) => Some(err),
-            StratisError::Join(ref err) => Some(err),
-
-            #[cfg(feature = "dbus_enabled")]
-            StratisError::Dbus(ref err) => Some(err),
-            StratisError::Udev(ref err) => Some(err),
-        }
-    }
-}
+impl Error for StratisError {}
 
 impl From<tokio::task::JoinError> for StratisError {
     fn from(err: tokio::task::JoinError) -> StratisError {

@@ -21,7 +21,7 @@ See [https://stratis-storage.github.io/](https://stratis-storage.github.io/).
 ### Communication channels
 
 If you have questions, please don't hesitate to ask them, either on the mailing list or
-IRC! :smiley:
+IRC.
 
 #### Mailing list
 

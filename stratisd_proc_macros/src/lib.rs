@@ -23,7 +23,7 @@ fn add_method_guards(method: &mut ImplItemMethod) {
                 if &ident.to_string() == "StratisResult" {
                     parse::<Stmt>(TokenStream::from(quote! {
                         if self.action_avail != crate::engine::types::ActionAvailability::Full {
-                            return Err(crate::stratis::StratisError::Error(format!(
+                            return Err(crate::stratis::StratisError::Msg(format!(
                                 "Pool is in state {:?} where mutable actions cannot be performed until the issue is resolved manually",
                                 self.action_avail
                             )));

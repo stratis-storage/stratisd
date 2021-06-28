@@ -11,7 +11,7 @@ macro_rules! get_data {
         } else {
             let message = format!("no data for object path {}", $path.get_name());
             let (rc, rs) = (
-                $crate::dbus_api::types::DbusErrorEnum::INTERNAL_ERROR as u16,
+                $crate::dbus_api::types::DbusErrorEnum::ERROR as u16,
                 message,
             );
             return Ok(vec![$message.append3($default, rc, rs)]);
@@ -28,7 +28,7 @@ macro_rules! get_parent {
         } else {
             let message = format!("no path for object path {}", $data.parent);
             let (rc, rs) = (
-                $crate::dbus_api::types::DbusErrorEnum::INTERNAL_ERROR as u16,
+                $crate::dbus_api::types::DbusErrorEnum::ERROR as u16,
                 message,
             );
             return Ok(vec![$message.append3($default, rc, rs)]);
@@ -62,7 +62,7 @@ macro_rules! typed_uuid {
                 $uuid,
             );
             let (rc, rs) = (
-                $crate::dbus_api::types::DbusErrorEnum::INTERNAL_ERROR as u16,
+                $crate::dbus_api::types::DbusErrorEnum::ERROR as u16,
                 message,
             );
             return Ok(vec![$message.append3($default, rc, rs)]);
@@ -78,7 +78,7 @@ macro_rules! get_pool {
         } else {
             let message = format!("engine does not know about pool with uuid {}", $uuid);
             let (rc, rs) = (
-                $crate::dbus_api::types::DbusErrorEnum::INTERNAL_ERROR as u16,
+                $crate::dbus_api::types::DbusErrorEnum::ERROR as u16,
                 message,
             );
             return Ok(vec![$message.append3($default, rc, rs)]);
@@ -94,7 +94,7 @@ macro_rules! get_mut_pool {
         } else {
             let message = format!("engine does not know about pool with uuid {}", $uuid);
             let (rc, rs) = (
-                $crate::dbus_api::types::DbusErrorEnum::INTERNAL_ERROR as u16,
+                $crate::dbus_api::types::DbusErrorEnum::ERROR as u16,
                 message,
             );
             return Ok(vec![$message.append3($default, rc, rs)]);

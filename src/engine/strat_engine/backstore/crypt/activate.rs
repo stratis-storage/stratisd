@@ -69,7 +69,7 @@ impl CryptActivationHandle {
                             is unable to open the encrypted device"
                         );
                     } else {
-                        return Err(StratisError::Error(
+                        return Err(StratisError::Msg(
                             "Clevis JWE was found in the Stratis metadata but was \
                             not associated with any keyslots"
                                 .to_string(),

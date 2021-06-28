@@ -9,7 +9,7 @@ use tokio::io::unix::AsyncFd;
 
 use crate::{
     engine::{get_dm, get_dm_init, LockableEngine},
-    stratis::errors::{ErrorEnum, StratisError, StratisResult},
+    stratis::errors::{StratisError, StratisResult},
 };
 
 const REQUIRED_DM_MINOR_VERSION: u32 = 37;
@@ -49,7 +49,7 @@ fn setup_dm() -> StratisResult<AsyncFd<RawFd>> {
             "Requires DM minor version {} but kernel only supports {}",
             REQUIRED_DM_MINOR_VERSION, minor_dm_version
         );
-        Err(StratisError::Engine(ErrorEnum::Error, err_msg))
+        Err(StratisError::Msg(err_msg))
     } else {
         let fd = get_dm().as_raw_fd();
         fcntl(

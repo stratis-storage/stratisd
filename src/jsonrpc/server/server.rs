@@ -298,7 +298,7 @@ fn handle_cmsgs(mut cmsgs: Vec<ControlMessageOwned>) -> StratisResult<Option<Raw
                     }
                 }
             });
-        return Err(StratisError::Error(
+        return Err(StratisError::Msg(
             "Unix packet contained more than one ancillary data message".to_string(),
         ));
     }
@@ -311,7 +311,7 @@ fn handle_cmsgs(mut cmsgs: Vec<ControlMessageOwned>) -> StratisResult<Option<Raw
                         warn!("Failed to close file descriptor {}: {}", fd, e);
                     }
                 }
-                return Err(StratisError::Error(
+                return Err(StratisError::Msg(
                     "Received more than one file descriptor".to_string(),
                 ));
             } else {
@@ -418,7 +418,7 @@ impl StratisUnixListener {
             None,
         )?;
         let flags = OFlag::from_bits(fcntl(fd, FcntlArg::F_GETFL)?).ok_or_else(|| {
-            StratisError::Error("Unrecognized flag types returned from fcntl".to_string())
+            StratisError::Msg("Unrecognized flag types returned from fcntl".to_string())
         })?;
         fcntl(fd, FcntlArg::F_SETFL(flags | OFlag::O_NONBLOCK))?;
         bind(fd, &SockAddr::new_unix(path.as_ref())?)?;
@@ -432,7 +432,7 @@ impl StratisUnixListener {
 fn try_accept(fd: RawFd) -> StratisResult<StratisUnixRequest> {
     let fd = accept(fd)?;
     let flags = OFlag::from_bits(fcntl(fd, FcntlArg::F_GETFL)?).ok_or_else(|| {
-        StratisError::Error("Unrecognized flag types returned from fcntl".to_string())
+        StratisError::Msg("Unrecognized flag types returned from fcntl".to_string())
     })?;
     fcntl(fd, FcntlArg::F_SETFL(flags | OFlag::O_NONBLOCK))?;
     Ok(StratisUnixRequest {

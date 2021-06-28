@@ -25,7 +25,7 @@ use crate::{
             SetCreateAction, SetDeleteAction,
         },
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::{StratisError, StratisResult},
 };
 
 /// Get the index which indicates the start of unallocated space in the cap
@@ -75,7 +75,7 @@ fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
             "{} used in thinpool, but {} allocated from backstore cap device",
             next, allocated_from_cap
         );
-        return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
+        return Err(StratisError::Msg(err_msg));
     }
 
     // If the total length of the allocations in the flex devs, does not
@@ -94,7 +94,7 @@ fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
                 "{} used in thinpool, but {} given up by cache for pool {}",
                 total_allocated, next, metadata.name
             );
-            return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
+            return Err(StratisError::Msg(err_msg));
         }
     }
 
@@ -113,7 +113,7 @@ fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
                 "no segments allocated to the cap device for pool {}",
                 metadata.name
             );
-            return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
+            return Err(StratisError::Msg(err_msg));
         }
 
         if next > total_allocated {
@@ -121,7 +121,7 @@ fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
                 "{} allocated to cap device, but {} allocated to flex devs",
                 next, total_allocated
             );
-            return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
+            return Err(StratisError::Msg(err_msg));
         }
     }
 
@@ -334,15 +334,13 @@ impl Pool for StratPool {
         validate_paths(blockdevs)?;
 
         if self.is_encrypted() {
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
+            return Err(StratisError::Msg(
                 "Use of a cache is not supported with an encrypted pool".to_string(),
             ));
         }
         if !self.has_cache() {
             if blockdevs.is_empty() {
-                return Err(StratisError::Engine(
-                    ErrorEnum::Invalid,
+                return Err(StratisError::Msg(
                     "At least one blockdev path is required to initialize a cache.".to_string(),
                 ));
             }
@@ -445,11 +443,13 @@ impl Pool for StratPool {
         validate_paths(paths)?;
 
         let bdev_info = if tier == BlockDevTier::Cache && !self.has_cache() {
-            return Err(StratisError::Error(format!(
-                            "No cache has been initialized for pool with UUID {} and name {}; it is therefore impossible to add additional devices to the cache",
-                            pool_uuid,
-                            pool_name)
-                ));
+            return Err(StratisError::Msg(
+                format!(
+                    "No cache has been initialized for pool with UUID {} and name {}; it is therefore impossible to add additional devices to the cache",
+                    pool_uuid,
+                    pool_name
+                )
+            ));
         } else if paths.is_empty() {
             //TODO: Substitute is_empty check with process_and_verify_devices
             return Ok(SetCreateAction::new(vec![]));

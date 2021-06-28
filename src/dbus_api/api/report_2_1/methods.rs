@@ -9,8 +9,8 @@ use dbus_tree::{MTSync, MethodInfo, MethodResult};
 
 use crate::{
     dbus_api::{
-        types::TData,
-        util::{engine_to_dbus_err_tuple, get_next_arg, msg_code_ok, msg_string_ok},
+        types::{DbusErrorEnum, TData, OK_STRING},
+        util::{engine_to_dbus_err_tuple, get_next_arg},
     },
     engine::ReportType,
 };
@@ -35,7 +35,9 @@ pub fn get_report(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let mutex_lock = dbus_context.engine.blocking_lock();
 
     let msg = match serde_json::to_string(&mutex_lock.get_report(report_type)) {
-        Ok(string) => return_message.append3(string, msg_code_ok(), msg_string_ok()),
+        Ok(string) => {
+            return_message.append3(string, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
         Err(e) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e.into());
             return_message.append3(default_return, rc, rs)

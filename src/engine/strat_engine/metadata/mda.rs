@@ -18,7 +18,7 @@ use crate::{
         metadata::sizes::{mda_size, MDADataSize, MDARegionSize, MDASize},
         writing::SyncAll,
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::{StratisError, StratisResult},
 };
 
 const STRAT_REGION_HDR_VERSION: u8 = 1;
@@ -154,10 +154,7 @@ impl MDARegions {
         F: Seek + SyncAll,
     {
         if self.last_update_time() >= Some(time) {
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
-                "Overwriting newer data".into(),
-            ));
+            return Err(StratisError::Msg("Overwriting newer data".into()));
         }
 
         let used = Bytes::from(data.len());
@@ -167,7 +164,7 @@ impl MDARegions {
                 "metadata length {} exceeds region available {}",
                 used, max_available
             );
-            return Err(StratisError::Engine(ErrorEnum::Invalid, err_msg));
+            return Err(StratisError::Msg(err_msg));
         }
 
         let header = MDAHeader {
@@ -348,28 +345,25 @@ impl MDAHeader {
     /// timestamp region in the buffer is 0.
     fn from_buf(buf: &[u8; mda_size::_MDA_REGION_HDR_SIZE]) -> StratisResult<Option<MDAHeader>> {
         if LittleEndian::read_u32(&buf[..4]) != crc32::checksum_castagnoli(&buf[4..]) {
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
-                "MDA region header CRC".into(),
-            ));
+            return Err(StratisError::Msg("MDA region header CRC".into()));
         }
 
         // Even though hdr_version is positioned later in struct, check it
         // right after the CRC
         let hdr_version = buf[28];
         if hdr_version != STRAT_REGION_HDR_VERSION {
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
-                format!("Unknown region header version: {}", hdr_version),
-            ));
+            return Err(StratisError::Msg(format!(
+                "Unknown region header version: {}",
+                hdr_version
+            )));
         }
 
         let metadata_version = buf[29];
         if metadata_version != STRAT_METADATA_VERSION {
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
-                format!("Unknown metadata version: {}", metadata_version),
-            ));
+            return Err(StratisError::Msg(format!(
+                "Unknown metadata version: {}",
+                metadata_version
+            )));
         }
 
         Ok(MDAHeader::parse_buf(buf))
@@ -410,10 +404,7 @@ impl MDAHeader {
         f.read_exact(&mut data_buf)?;
 
         if self.data_crc != crc32::checksum_castagnoli(&data_buf) {
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
-                "MDA region data CRC".into(),
-            ));
+            return Err(StratisError::Msg("MDA region data CRC".into()));
         }
 
         Ok(data_buf)

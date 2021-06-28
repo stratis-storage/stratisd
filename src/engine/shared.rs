@@ -21,7 +21,7 @@ use crate::{
         engine::{Pool, MAX_STRATIS_PASS_SIZE},
         types::{BlockDevTier, CreateAction, DevUuid, PoolUuid, SetCreateAction, SizedKeyMemory},
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::{StratisError, StratisResult},
 };
 
 /// Called when the name of a requested pool coincides with the name of an
@@ -59,10 +59,9 @@ pub fn create_pool_idempotent_or_err(
             .difference(&input_devices)
             .map(|path| path.display().to_string())
             .collect::<Vec<_>>();
-        Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            create_pool_generate_error_string!(pool_name, in_input, in_pool),
-        ))
+        Err(StratisError::Msg(create_pool_generate_error_string!(
+            pool_name, in_input, in_pool
+        )))
     }
 }
 
@@ -90,10 +89,9 @@ where
             .difference(&input_devices)
             .map(|path| path.display().to_string())
             .collect::<Vec<_>>();
-        Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            init_cache_generate_error_string!(in_input, in_pool),
-        ))
+        Err(StratisError::Msg(init_cache_generate_error_string!(
+            in_input, in_pool
+        )))
     }
 }
 
@@ -109,13 +107,10 @@ pub fn set_key_shared(key_fd: RawFd) -> StratisResult<SizedKeyMemory> {
         let mut pollers = [PollFd::new(key_file.as_raw_fd(), PollFlags::POLLIN)];
         let num_events = poll(&mut pollers, 0)?;
         if num_events > 0 {
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
-                format!(
-                    "Provided key exceeded maximum allow length of {}",
-                    Bytes::from(MAX_STRATIS_PASS_SIZE)
-                ),
-            ));
+            return Err(StratisError::Msg(format!(
+                "Provided key exceeded maximum allow length of {}",
+                Bytes::from(MAX_STRATIS_PASS_SIZE)
+            )));
         }
     }
 
@@ -127,62 +122,56 @@ pub fn set_key_shared(key_fd: RawFd) -> StratisResult<SizedKeyMemory> {
 /// Validate a str for use as a Pool or Filesystem name.
 pub fn validate_name(name: &str) -> StratisResult<()> {
     if name.contains('\u{0}') {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name contains NULL characters : {}", name),
-        ));
+        return Err(StratisError::Msg(format!(
+            "Name contains NULL characters: {}",
+            name
+        )));
     }
     if name == "." || name == ".." {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name is . or .. : {}", name),
-        ));
+        return Err(StratisError::Msg(format!("Name is . or .. : {}", name)));
     }
     // Linux has a maximum filename length of 255 bytes
     if name.len() > 255 {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name has more than 255 bytes : {}", name),
-        ));
+        return Err(StratisError::Msg(format!(
+            "Name has more than 255 bytes: {}",
+            name
+        )));
     }
     if name.len() != name.trim().len() {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name contains leading or trailing space : {}", name),
-        ));
+        return Err(StratisError::Msg(format!(
+            "Name contains leading or trailing space: {}",
+            name
+        )));
     }
     if name.chars().any(|c| c.is_control()) {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name contains control characters : {}", name),
-        ));
+        return Err(StratisError::Msg(format!(
+            "Name contains control characters: {}",
+            name
+        )));
     }
     lazy_static! {
         static ref NAME_UDEVREGEX: Regex =
             Regex::new(r"[[:ascii:]&&[^0-9A-Za-z#+-.:=@_/]]+").expect("regex is valid");
     }
     if NAME_UDEVREGEX.is_match(name) {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!(
-                "Name contains characters not allowed in udev symlinks : {}",
-                name
-            ),
-        ));
+        return Err(StratisError::Msg(format!(
+            "Name contains characters not allowed in udev symlinks: {}",
+            name
+        )));
     }
 
     let name_path = Path::new(name);
     if name_path.components().count() != 1 {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name is a path with 0 or more than 1 components : {}", name),
-        ));
+        return Err(StratisError::Msg(format!(
+            "Name is a path with 0 or more than 1 components: {}",
+            name
+        )));
     }
     if name_path.is_absolute() {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name is an absolute path : {}", name),
-        ));
+        return Err(StratisError::Msg(format!(
+            "Name is an absolute path: {}",
+            name
+        )));
     }
     Ok(())
 }
@@ -197,17 +186,14 @@ pub fn validate_paths(paths: &[&Path]) -> StratisResult<()> {
     if non_absolute_paths.is_empty() {
         Ok(())
     } else {
-        Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!(
-                "Paths{{{}}} are not absolute",
-                non_absolute_paths
-                    .iter()
-                    .map(|p| p.display().to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ),
-        ))
+        Err(StratisError::Msg(format!(
+            "Paths{{{}}} are not absolute",
+            non_absolute_paths
+                .iter()
+                .map(|p| p.display().to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )))
     }
 }
 

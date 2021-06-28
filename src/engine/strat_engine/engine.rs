@@ -26,7 +26,7 @@ use crate::{
         },
         Engine, Name, Pool, PoolUuid, Report,
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::{StratisError, StratisResult},
 };
 
 #[derive(Debug)]
@@ -95,7 +95,7 @@ impl StratEngine {
                 "Failed to teardown already set up pools: {:?}",
                 untorndown_pools
             );
-            Err(StratisError::Engine(ErrorEnum::Error, err_msg))
+            Err(StratisError::Msg(err_msg))
         }
     }
 }
@@ -185,8 +185,7 @@ impl Engine for StratEngine {
             Some((_, pool)) => create_pool_idempotent_or_err(pool, name, blockdev_paths),
             None => {
                 if blockdev_paths.is_empty() {
-                    Err(StratisError::Engine(
-                        ErrorEnum::Invalid,
+                    Err(StratisError::Msg(
                         "At least one blockdev is required to create a pool.".to_string(),
                     ))
                 } else {
@@ -204,10 +203,7 @@ impl Engine for StratEngine {
     fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {
         if let Some((_, pool)) = self.pools.get_by_uuid(uuid) {
             if pool.has_filesystems() {
-                return Err(StratisError::Engine(
-                    ErrorEnum::Busy,
-                    "filesystems remaining on pool".into(),
-                ));
+                return Err(StratisError::Msg("filesystems remaining on pool".into()));
             };
         } else {
             return Ok(DeleteAction::Identity);

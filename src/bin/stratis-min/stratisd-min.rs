@@ -57,10 +57,13 @@ fn trylock_pid_file() -> StratisResult<File> {
         .create(true)
         .open(STRATISD_MIN_PID_PATH)
         .map_err(|err| {
-            StratisError::Error(format!(
-                "Failed to create or open the stratisd-min PID file at {}: {}",
-                STRATISD_MIN_PID_PATH, err
-            ))
+            StratisError::Chained(
+                format!(
+                    "Failed to create or open the stratisd-min PID file at {}",
+                    STRATISD_MIN_PID_PATH
+                ),
+                Box::new(StratisError::from(err)),
+            )
         })?;
     let stratisd_min_file = match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
         Ok(_) => {
@@ -74,7 +77,7 @@ fn trylock_pid_file() -> StratisResult<File> {
                 buf = "<unreadable>".to_string();
             }
 
-            return Err(StratisError::Error(format!(
+            return Err(StratisError::Msg(format!(
                 "Daemon already running with supposed pid: {}",
                 buf
             )));
@@ -87,10 +90,13 @@ fn trylock_pid_file() -> StratisResult<File> {
         .create(true)
         .open(STRATISD_PID_PATH)
         .map_err(|err| {
-            StratisError::Error(format!(
-                "Failed to create or open the stratisd PID file at {}: {}",
-                STRATISD_PID_PATH, err
-            ))
+            StratisError::Chained(
+                format!(
+                    "Failed to create or open the stratisd PID file at {}",
+                    STRATISD_PID_PATH
+                ),
+                Box::new(StratisError::from(err)),
+            )
         })?;
     match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
         Ok(_) => drop(f),
@@ -101,7 +107,7 @@ fn trylock_pid_file() -> StratisResult<File> {
                 buf = "<unreadable>".to_string();
             }
 
-            return Err(StratisError::Error(format!(
+            return Err(StratisError::Msg(format!(
                 "stratisd is already running with supposed pid: {}",
                 buf
             )));

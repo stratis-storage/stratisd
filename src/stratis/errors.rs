@@ -63,7 +63,11 @@ impl fmt::Display for StratisError {
                 ref causal_error,
                 ref rollback_error,
             } => {
-                write!(f, "Rollback failed; causal_error: {}, rollback error: {}; putting pool in maintenance mode", causal_error, rollback_error)
+                write!(
+                    f,
+                    "Rollback failed; causal_error: {}, rollback error: {}",
+                    causal_error, rollback_error
+                )
             }
             StratisError::NoActionRollbackError {
                 ref causal_error,

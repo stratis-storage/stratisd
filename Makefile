@@ -347,8 +347,10 @@ verify-dependency-bounds:
 # versions higher than those available in Fedora.  If any crates have
 # versions that are too low, specify those crates via the --ignore-low
 # command-line option.
+# NOTE: The missing package will be able to be removed after it is uploaded to
+# crates.io.
 check-fedora-versions:
-	${COMPARE_FEDORA_VERSIONS} ${MANIFEST_PATH_ARGS}
+	${COMPARE_FEDORA_VERSIONS} ${MANIFEST_PATH_ARGS} --ignore-missing=stratisd_proc_macros
 
 .PHONY:
 	audit

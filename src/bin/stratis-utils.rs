@@ -21,7 +21,7 @@ use devicemapper::{Bytes, Sectors};
 
 #[cfg(feature = "systemd_compat")]
 use crate::generators::{stratis_clevis_setup_generator, stratis_setup_generator};
-use libstratis::{
+use stratisd::{
     engine::{blkdev_size, crypt_metadata_size, BDA},
     stratis::StratisResult,
 };

@@ -19,7 +19,7 @@ use nix::{
     unistd::getpid,
 };
 
-use libstratis::stratis::{run, StratisError, StratisResult, VERSION};
+use stratisd::stratis::{run, StratisError, StratisResult, VERSION};
 
 const STRATISD_PID_PATH: &str = "/run/stratisd.pid";
 const STRATISD_MIN_PID_PATH: &str = "/run/stratisd-min.pid";

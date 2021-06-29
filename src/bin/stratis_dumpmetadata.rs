@@ -17,7 +17,7 @@ use pretty_hex::pretty_hex;
 
 use serde_json::Value;
 
-use libstratis::engine::{StaticHeader, StaticHeaderResult, BDA};
+use stratisd::engine::{StaticHeader, StaticHeaderResult, BDA};
 
 /// Format metadata on a given device
 /// Returns StaticHeader fields

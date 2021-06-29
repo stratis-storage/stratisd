@@ -560,49 +560,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "libstratis"
-version = "2.5.0"
-dependencies = [
- "bindgen",
- "byteorder",
- "chrono",
- "clap",
- "crc",
- "data-encoding",
- "dbus",
- "dbus-tree",
- "devicemapper",
- "either",
- "env_logger",
- "error-chain",
- "futures",
- "itertools",
- "lazy_static",
- "libc",
- "libcryptsetup-rs",
- "libdbus-sys",
- "libmount",
- "libudev",
- "log",
- "loopdev",
- "matches",
- "nix 0.20.0",
- "pkg-config",
- "pretty-hex",
- "proptest",
- "rand",
- "regex",
- "rpassword",
- "serde",
- "serde_derive",
- "serde_json",
- "sha-1",
- "tempfile",
- "tokio",
- "uuid",
-]
-
-[[package]]
 name = "libudev"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1086,6 +1043,49 @@ name = "slab"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f173ac3d1a7e3b28003f40de0b5ce7fe2710f9b9dc3fc38664cebee46b3b6527"
+
+[[package]]
+name = "stratisd"
+version = "2.5.0"
+dependencies = [
+ "bindgen",
+ "byteorder",
+ "chrono",
+ "clap",
+ "crc",
+ "data-encoding",
+ "dbus",
+ "dbus-tree",
+ "devicemapper",
+ "either",
+ "env_logger",
+ "error-chain",
+ "futures",
+ "itertools",
+ "lazy_static",
+ "libc",
+ "libcryptsetup-rs",
+ "libdbus-sys",
+ "libmount",
+ "libudev",
+ "log",
+ "loopdev",
+ "matches",
+ "nix 0.20.0",
+ "pkg-config",
+ "pretty-hex",
+ "proptest",
+ "rand",
+ "regex",
+ "rpassword",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "sha-1",
+ "tempfile",
+ "tokio",
+ "uuid",
+]
 
 [[package]]
 name = "strsim"

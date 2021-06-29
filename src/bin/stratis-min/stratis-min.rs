@@ -7,7 +7,7 @@ use std::{convert::TryFrom, error::Error, path::PathBuf};
 use clap::{App, Arg, ArgGroup, ArgMatches, SubCommand};
 use serde_json::{json, Map, Value};
 
-use libstratis::{
+use stratisd::{
     engine::{EncryptionInfo, KeyDescription, PoolUuid, UnlockMethod, CLEVIS_TANG_TRUST_URL},
     jsonrpc::client::{filesystem, key, pool, report},
     stratis::{StratisError, VERSION},

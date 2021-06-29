@@ -13,7 +13,7 @@ else
   FEDORA_RELEASE_ARGS = --release=${FEDORA_RELEASE}
 endif
 
-IGNORE_ARGS ?=
+IGNORE_ARGS ?= --ignore-missing=stratisd_proc_macros
 
 DESTDIR ?=
 PREFIX ?= /usr

@@ -1,5 +1,5 @@
 [package]
-name = "libstratis"
+name = "stratisd"
 version = "2.5.0"
 authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.com>"]
 edition = "2018"

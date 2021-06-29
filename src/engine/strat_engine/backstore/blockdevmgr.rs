@@ -619,6 +619,11 @@ impl BlockDevMgr {
     ///
     /// The method for this rollback caches the initial Clevis metadata and
     /// reverts all of the devices if there is a failure.
+    ///
+    /// This method returns StratisResult<()> because the Clevis regen command
+    /// will always change the metadata when successful. The command is not idempotent
+    /// so this method will either fail to regenerate the bindings or it will
+    /// result in a metadata change.
     pub fn rebind_clevis(&mut self) -> StratisResult<()> {
         let encryption_info = self.encryption_info();
         if !encryption_info.is_encrypted() {

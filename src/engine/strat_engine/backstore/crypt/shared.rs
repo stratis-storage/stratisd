@@ -167,7 +167,10 @@ pub fn add_keyring_keyslot(
                 ),
                 "Failed to change passphrase for encrypted device"
             ) as c_uint
-            // The above cast is a work around for bug in libcryptsetup-rs
+            // The above cast is a work around for bug in libcryptsetup-rs.
+            // The change_by_passphrase method should return a c_uint instead
+            // of a c_int as a negative error code will be converted into an
+            // error type.
         }
         None => {
             log_on_failure!(

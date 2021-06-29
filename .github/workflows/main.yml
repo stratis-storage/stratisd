@@ -434,8 +434,16 @@ jobs:
         include:
           - task: >
               SET_LOWER_BOUNDS=./set_lower_bounds
+              MANIFEST_PATH=../../stratisd_proc_macros/Cargo.toml
+              make -f ../../Makefile verify-dependency-bounds
+          - task: >
+              SET_LOWER_BOUNDS=./set_lower_bounds
               MANIFEST_PATH=../../Cargo.toml
               make -f ../../Makefile verify-dependency-bounds
+          - task: >
+              COMPARE_FEDORA_VERSIONS=./compare_fedora_versions
+              MANIFEST_PATH=../../stratisd_proc_macros/Cargo.toml
+              make -f ../../Makefile check-fedora-versions
           - task: >
               COMPARE_FEDORA_VERSIONS=./compare_fedora_versions
               MANIFEST_PATH=../../Cargo.toml

@@ -18,7 +18,8 @@ use crate::{
                 metadata_handle::CryptMetadataHandle,
                 shared::{
                     acquire_crypt_device, add_keyring_keyslot, clevis_info_from_metadata,
-                    ensure_wiped, get_keyslot_number, interpret_clevis_config, setup_crypt_device,
+                    ensure_wiped, get_clevis_token_metadata, get_keyslot_number,
+                    interpret_clevis_config, set_clevis_token_metadata, setup_crypt_device,
                     setup_crypt_handle,
                 },
             },
@@ -211,11 +212,22 @@ impl CryptHandle {
     /// information that is stored on the device like the JWE. We only cache
     /// the initial config which will remain unchanged.
     pub fn rebind_clevis(&mut self) -> StratisResult<()> {
+        fn regenerate_cached_clevis_info(dev_path: &Path) -> StratisResult<(String, Value)> {
+            clevis_info_from_metadata(&mut acquire_crypt_device(dev_path)?)?.ok_or_else(|| {
+                StratisError::Msg(format!(
+                    "Did not find Clevis metadata on device {}",
+                    dev_path.display()
+                ))
+            })
+        }
+
         if self.encryption_info().clevis_info.is_none() {
             return Err(StratisError::Msg(
                 "No Clevis binding found; cannot regenerate the Clevis binding if the device does not already have a Clevis binding".to_string(),
             ));
         }
+
+        let original_token = get_clevis_token_metadata(self.luks2_device_path())?;
 
         let keyslot = self
             .keyslots(CLEVIS_LUKS_TOKEN_ID)?
@@ -225,7 +237,24 @@ impl CryptHandle {
             })?;
         clevis_luks_regen(self.luks2_device_path(), keyslot)?;
 
-        Ok(())
+        match regenerate_cached_clevis_info(self.luks2_device_path()) {
+            Ok((pin, cfg)) => {
+                self.metadata_handle.encryption_info.clevis_info = Some((pin, cfg));
+                Ok(())
+            }
+            Err(cause_e) => {
+                if let Err(rb_e) =
+                    set_clevis_token_metadata(self.luks2_device_path(), &original_token)
+                {
+                    Err(StratisError::RollbackError {
+                        causal_error: Box::new(cause_e),
+                        rollback_error: Box::new(rb_e),
+                    })
+                } else {
+                    Err(cause_e)
+                }
+            }
+        }
     }
 
     /// Add a keyring binding to the underlying LUKS2 volume.

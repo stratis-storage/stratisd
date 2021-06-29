@@ -5,13 +5,18 @@
 use std::iter::once;
 
 use proc_macro::TokenStream;
+use proc_macro2::{Group, Span, TokenStream as TokenStream2, TokenTree};
 use quote::quote;
 use syn::{
-    parse, parse_str, Attribute, ImplItem, ImplItemMethod, Item, Meta, Path, PathSegment,
-    ReturnType, Stmt, Type, TypePath,
+    parse, parse_str, punctuated::Punctuated, token::Comma, Attribute, Block, FnArg, Ident,
+    ImplItem, ImplItemMethod, Item, Meta, Pat, PatIdent, PatType, Path, PathSegment, Receiver,
+    ReturnType, Stmt, Token, Type, TypePath,
 };
 
 /// Add guard for mutating actions when the pool is in maintenance mode.
+///
+/// This method adds a statement that returns an error if the pool is set
+/// to maintenance-only mode.
 fn add_method_guards(method: &mut ImplItemMethod) {
     let stmt = if let ReturnType::Type(_, ty) = &method.sig.output {
         if let Type::Path(TypePath {
@@ -53,11 +58,142 @@ fn add_method_guards(method: &mut ImplItemMethod) {
     method.block.stmts = stmts;
 }
 
-/// Determine whether a method should be marked as a mutating action based on the attributes.
-///
-/// The attribute that will cause a method to be marked as performing a mutating action is
-/// `#[pool_mutating_action]`.
-fn is_mutating_action(attrs: &mut Vec<Attribute>) -> bool {
+/// Process the arguments in the argument list. There is special handling for
+/// receivers. Typed `self` parameters are not currently supported in this macro
+/// but support can be added if needed.
+fn process_arguments(fn_arg: &FnArg) -> (Ident, PatType) {
+    match fn_arg {
+        FnArg::Receiver(Receiver {
+            reference,
+            mutability,
+            ..
+        }) => {
+            let reference = reference.as_ref().map(|(r, lt)| quote! { #r #lt });
+
+            let mutability = mutability.map(|m| quote! { #m });
+
+            let self_ident = Ident::new("self", Span::call_site());
+            let pool_ident = Ident::new("pool", Span::call_site());
+
+            (
+                self_ident,
+                PatType {
+                    attrs: Vec::new(),
+                    pat: Box::new(Pat::from(PatIdent {
+                        attrs: Vec::new(),
+                        by_ref: None,
+                        mutability: None,
+                        ident: pool_ident,
+                        subpat: None,
+                    })),
+                    colon_token: Token![:](Span::call_site()),
+                    ty: Box::new(
+                        parse::<Type>(TokenStream::from(quote! {
+                            #reference #mutability crate::engine::strat_engine::pool::StratPool
+                        }))
+                        .expect("Valid type"),
+                    ),
+                },
+            )
+        }
+        FnArg::Typed(typed) => {
+            let ident = if let Pat::Ident(PatIdent { ref ident, .. }) = *typed.pat {
+                if *ident == "self" {
+                    panic!("Typed self parameters are not currently supported");
+                } else {
+                    ident.clone()
+                }
+            } else {
+                panic!("Unrecognized argument format");
+            };
+
+            (ident, typed.clone())
+        }
+    }
+}
+
+/// Replace all uses of the `self` keyword with the ident `pool`. This is necessary
+/// for wrapped methods as they do not take a `self` reference.
+fn process_token_stream(token: TokenTree) -> TokenTree {
+    if let TokenTree::Ident(ref i) = token {
+        if *i == "self" {
+            TokenTree::from(Ident::new("pool", Span::call_site()))
+        } else {
+            token
+        }
+    } else if let TokenTree::Group(grp) = token {
+        let delimiter = grp.delimiter();
+        let tstream = grp
+            .stream()
+            .into_iter()
+            .map(process_token_stream)
+            .collect::<TokenStream2>();
+        TokenTree::Group(Group::new(delimiter, tstream))
+    } else {
+        token
+    }
+}
+
+/// Take the body of the method and wrap it in an inner method, replacing the
+/// body with a check for an error that puts the pool in maintenance-only mode.
+fn wrap_method(f: &mut ImplItemMethod) {
+    let wrapped_ident = Ident::new(
+        format!("{}_wrapped", f.sig.ident.clone()).as_str(),
+        Span::call_site(),
+    );
+    let mut wrapped_sig = f.sig.clone();
+    wrapped_sig.ident = wrapped_ident.clone();
+
+    let (args, arg_idents) = f.sig.inputs.iter().map(process_arguments).fold(
+        (Vec::new(), Vec::new()),
+        |(mut args, mut arg_idents), (ident, arg)| {
+            args.push(arg);
+            arg_idents.push(ident);
+            (args, arg_idents)
+        },
+    );
+    let stmts = f.block.stmts.drain(..).collect::<Vec<_>>();
+
+    wrapped_sig.inputs = args
+        .into_iter()
+        .map(FnArg::Typed)
+        .collect::<Punctuated<FnArg, Comma>>();
+
+    let method_body_tokens = quote! {
+        #( #stmts )*
+    }
+    .into_iter()
+    .map(process_token_stream)
+    .collect::<TokenStream2>();
+
+    let stmt = parse::<Stmt>(TokenStream::from(quote! {
+        #wrapped_sig {
+            #method_body_tokens
+        }
+    }))
+    .expect("Could not parse generated method as a statement");
+
+    let tokens = quote! { {
+        #stmt
+
+        match #wrapped_ident(#( #arg_idents),*) {
+            Ok(ret) => Ok(ret),
+            Err(e) => {
+                if let StratisError::RollbackError {
+                    ..
+                } = e {
+                    self.action_avail = crate::engine::types::ActionAvailability::ReadOnly;
+                }
+                Err(e)
+            }
+        }
+    } };
+    f.block = parse::<Block>(TokenStream::from(tokens))
+        .expect("Could not parse generated method body as a block");
+}
+
+/// Determine whether a method has the given attribute.
+fn has_attribute(attrs: &mut Vec<Attribute>, attribute: &str) -> bool {
     let mut return_value = false;
     let mut index = None;
     for (i, attr) in attrs.iter().enumerate() {
@@ -65,9 +201,7 @@ fn is_mutating_action(attrs: &mut Vec<Attribute>) -> bool {
             .parse_meta()
             .unwrap_or_else(|_| panic!("Attribute {:?} cannot be parsed", attr))
         {
-            if path
-                == parse_str("pool_mutating_action").expect("pool_mutating_action is valid path")
-            {
+            if path == parse_str(attribute).expect("pool_mutating_action is valid path") {
                 index = Some(i);
                 return_value = true;
             }
@@ -77,6 +211,23 @@ fn is_mutating_action(attrs: &mut Vec<Attribute>) -> bool {
         attrs.remove(i);
     }
     return_value
+}
+
+/// Determine whether a method should be marked as a mutating action based on the attributes.
+///
+/// The attribute that will cause a method to be marked as performing a mutating action is
+/// `#[pool_mutating_action]`.
+fn is_mutating_action(attrs: &mut Vec<Attribute>) -> bool {
+    has_attribute(attrs, "pool_mutating_action")
+}
+
+/// Determine whether a method should be marked as needing to handle failed rollback
+/// based on the attributes.
+///
+/// The attribute that will cause a method to be marked as potentially causing a failed
+/// rollback is `#[pool_rollback]`.
+fn performs_rollback(attrs: &mut Vec<Attribute>) -> bool {
+    has_attribute(attrs, "pool_rollback")
 }
 
 /// Process impl item that was provided to the attribute procedural macro.
@@ -90,6 +241,10 @@ fn process_item(mut item: Item) -> Item {
         if let ImplItem::Method(ref mut f) = impl_item {
             if is_mutating_action(&mut f.attrs) {
                 add_method_guards(f);
+            }
+
+            if performs_rollback(&mut f.attrs) {
+                wrap_method(f);
             }
         }
     }

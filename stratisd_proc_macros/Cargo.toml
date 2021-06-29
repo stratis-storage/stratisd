@@ -8,6 +8,7 @@ license-file = "LICENSE"
 repository = "https://github.com/stratis-storage/stratisd/"
 keywords = ["Linux", "filesystem", "storage"]
 categories = ["filesystem"]
+readme = "README.md"
 
 [lib]
 proc-macro = true

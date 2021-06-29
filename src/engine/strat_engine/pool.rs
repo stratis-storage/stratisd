@@ -378,6 +378,7 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action]
+    #[pool_rollback]
     fn bind_clevis(
         &mut self,
         pin: &str,
@@ -392,6 +393,7 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action]
+    #[pool_rollback]
     fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<Clevis>> {
         let changed = self.backstore.unbind_clevis()?;
         if changed {
@@ -402,6 +404,7 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action]
+    #[pool_rollback]
     fn bind_keyring(
         &mut self,
         key_description: &KeyDescription,
@@ -415,6 +418,7 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action]
+    #[pool_rollback]
     fn unbind_keyring(&mut self) -> StratisResult<DeleteAction<Key>> {
         let changed = self.backstore.unbind_keyring()?;
         if changed {
@@ -442,12 +446,12 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action]
-    fn create_filesystems<'a, 'b>(
-        &'a mut self,
+    fn create_filesystems<'a>(
+        &mut self,
         pool_name: &str,
         pool_uuid: PoolUuid,
-        specs: &[(&'b str, Option<Sectors>)],
-    ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid)>> {
+        specs: &[(&'a str, Option<Sectors>)],
+    ) -> StratisResult<SetCreateAction<(&'a str, FilesystemUuid)>> {
         let names: HashMap<_, _> = specs.iter().map(|&tup| (tup.0, tup.1)).collect();
 
         names.iter().fold(Ok(()), |res, (name, _)| {
@@ -526,8 +530,8 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action]
-    fn destroy_filesystems<'a>(
-        &'a mut self,
+    fn destroy_filesystems(
+        &mut self,
         pool_name: &str,
         fs_uuids: &[FilesystemUuid],
     ) -> StratisResult<SetDeleteAction<FilesystemUuid>> {
@@ -560,13 +564,13 @@ impl Pool for StratPool {
     }
 
     #[pool_mutating_action]
-    fn snapshot_filesystem(
-        &mut self,
+    fn snapshot_filesystem<'a>(
+        &'a mut self,
         pool_name: &str,
         pool_uuid: PoolUuid,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<CreateAction<(FilesystemUuid, &mut dyn Filesystem)>> {
+    ) -> StratisResult<CreateAction<(FilesystemUuid, &'a mut dyn Filesystem)>> {
         validate_name(snapshot_name)?;
 
         if self

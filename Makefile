@@ -185,12 +185,18 @@ create-release: ${PWD}/stratisd-vendor.tar.gz
 	rm -rf vendor
 	rm stratisd-${RELEASE_VERSION}-vendor.tar.gz
 
-fmt:
+fmt: fmt-macros
 	cargo fmt
 	shfmt -l -w .
 
-fmt-travis:
+fmt-macros:
+	cd stratisd_proc_macros && cargo fmt
+
+fmt-travis: fmt-macros-travis
 	cargo fmt -- --check
+
+fmt-macros-travis:
+	cd stratisd_proc_macros && cargo fmt -- --check
 
 fmt-shell:
 	shfmt -l -w .
@@ -328,7 +334,10 @@ docs-rust:
 docs/stratisd.8: docs/stratisd.txt
 	a2x -f manpage docs/stratisd.txt
 
-clippy:
+clippy-macros:
+	cd stratisd_proc_macros && RUSTFLAGS="${DENY}" cargo clippy --all-targets --all-features -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
+
+clippy: clippy-macros
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${MIN_FEATURES} -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${SYSTEMD_FEATURES} -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
@@ -365,6 +374,7 @@ check-fedora-versions: test-compare-fedora-versions
 	clean-cfg
 	clean-primary
 	clippy
+	clippy-macros
 	create-release
 	docs-rust
 	docs-travis
@@ -372,6 +382,8 @@ check-fedora-versions: test-compare-fedora-versions
 	fmt-shell
 	fmt-shell-ci
 	fmt-travis
+	fmt-macros
+	fmt-macros-travis
 	install
 	install-cfg
 	license

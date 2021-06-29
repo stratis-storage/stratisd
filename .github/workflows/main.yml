@@ -448,6 +448,10 @@ jobs:
         include:
           - task: >
               SET_LOWER_BOUNDS=./set_lower_bounds
+              MANIFEST_PATH=../../stratisd_proc_macros/Cargo.toml
+              make -f ../../Makefile verify-dependency-bounds
+          - task: >
+              SET_LOWER_BOUNDS=./set_lower_bounds
               MANIFEST_PATH=../../Cargo.toml
               make -f ../../Makefile verify-dependency-bounds
     runs-on: ubuntu-18.04

@@ -8,6 +8,11 @@ else
   MANIFEST_PATH_ARGS = --manifest-path=${MANIFEST_PATH}
 endif
 
+ifeq ($(origin FEDORA_RELEASE), undefined)
+else
+  FEDORA_RELEASE_ARGS = --release=${FEDORA_RELEASE}
+endif
+
 DESTDIR ?=
 PREFIX ?= /usr
 LIBEXECDIR ?= $(PREFIX)/libexec
@@ -339,7 +344,7 @@ verify-dependency-bounds:
 # versions that are too low, specify those crates via the --ignore-low
 # command-line option.
 check-fedora-versions:
-	${COMPARE_FEDORA_VERSIONS} ${MANIFEST_PATH_ARGS}
+	${COMPARE_FEDORA_VERSIONS} ${MANIFEST_PATH_ARGS} ${FEDORA_RELEASE_ARGS}
 
 .PHONY:
 	audit

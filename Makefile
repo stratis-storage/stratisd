@@ -8,7 +8,7 @@ else
   MANIFEST_PATH_ARGS = --manifest-path=${MANIFEST_PATH}
 endif
 
-ifeq ($(origin FEDORA_RLEASE), undefined)
+ifeq ($(origin FEDORA_RELEASE), undefined)
 else
   FEDORA_RELEASE_ARGS = --release=${FEDORA_RELEASE}
 endif

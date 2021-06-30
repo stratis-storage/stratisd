@@ -165,11 +165,22 @@ macro_rules! initial_properties {
     }};
 }
 
-macro_rules! log_action {
+macro_rules! handle_action {
     ($action:expr) => {{
         let action = $action;
         if let Ok(ref a) = action {
             log::info!("{}", a);
+        }
+        action
+    }};
+    ($action:expr, $dbus_cxt:expr, $path:expr) => {{
+        let action = $action;
+        if let Ok(ref a) = action {
+            log::info!("{}", a);
+        } else if let Err(ref e) = action {
+            if e.contains_rollback_error() {
+                $dbus_cxt.push_maintenance_mode($path)
+            }
         }
         action
     }};

@@ -21,6 +21,7 @@ pub const POOL_NAME_PROP: &str = "Name";
 pub const POOL_UUID_PROP: &str = "Uuid";
 pub const POOL_HAS_CACHE_PROP: &str = "HasCache";
 pub const POOL_ENCRYPTED_PROP: &str = "Encrypted";
+pub const POOL_MAINTENANCE_PROP: &str = "MaintenanceMode";
 pub const POOL_ENCRYPTION_KEY_DESC: &str = "KeyDescription";
 pub const POOL_TOTAL_SIZE_PROP: &str = "TotalPhysicalSize";
 pub const POOL_TOTAL_USED_PROP: &str = "TotalPhysicalUsed";

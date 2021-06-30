@@ -329,7 +329,5 @@ impl Deref for DevicePath {
 #[derive(Debug, PartialEq)]
 pub enum ActionAvailability {
     Full,
-    // FIXME: To be used eventually
-    #[allow(dead_code)]
     ReadOnly,
 }

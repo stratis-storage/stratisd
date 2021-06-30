@@ -232,6 +232,27 @@ impl DbusTreeHandler {
                     }
                 }
             }
+            DbusAction::PoolMaintenanceMode(item, val) => {
+                let mut changed = HashMap::new();
+                changed.insert(
+                    consts::POOL_MAINTENANCE_PROP.into(),
+                    Variant(Box::new(val) as Box<(dyn RefArg + 'static)>),
+                );
+
+                if self
+                    .property_changed_invalidated_signal(
+                        &item,
+                        changed,
+                        vec![],
+                        &consts::standard_pool_interfaces(),
+                    )
+                    .is_err()
+                {
+                    warn!(
+                        "Signal on pool maintenance mode change was not sent to the D-Bus client"
+                    );
+                }
+            }
         }
     }
 

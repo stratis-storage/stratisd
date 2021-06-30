@@ -47,7 +47,7 @@ pub fn rebind_keyring(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let mut mutex_lock = dbus_context.engine.blocking_lock();
     let (_, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
-    let msg = match log_action!(pool.rebind_keyring(&key_desc)) {
+    let msg = match handle_action!(pool.rebind_keyring(&key_desc)) {
         Ok(RenameAction::Identity) => {
             return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
@@ -92,7 +92,7 @@ pub fn rebind_clevis(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let mut mutex_lock = dbus_context.engine.blocking_lock();
     let (_, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
-    let msg = match log_action!(pool.rebind_clevis()) {
+    let msg = match handle_action!(pool.rebind_clevis()) {
         Ok(_) => return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string()),
         Err(e) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e);

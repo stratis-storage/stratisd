@@ -114,7 +114,8 @@ pub fn create_dbus_pool<'a>(
                 .add_m(pool_2_0::rename_method(&f))
                 .add_p(pool_2_0::name_property(&f))
                 .add_p(pool_2_0::uuid_property(&f))
-                .add_p(pool_2_1::encrypted_property(&f)),
+                .add_p(pool_2_1::encrypted_property(&f))
+                .add_p(pool_2_5::maintenance_property(&f)),
         )
         .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME, ())

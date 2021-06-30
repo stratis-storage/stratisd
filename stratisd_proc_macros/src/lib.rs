@@ -179,9 +179,7 @@ fn wrap_method(f: &mut ImplItemMethod) {
         match #wrapped_ident(#( #arg_idents),*) {
             Ok(ret) => Ok(ret),
             Err(e) => {
-                if let StratisError::RollbackError {
-                    ..
-                } = e {
+                if e.contains_rollback_error() {
                     self.action_avail = crate::engine::types::ActionAvailability::ReadOnly;
                 }
                 Err(e)

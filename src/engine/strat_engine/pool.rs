@@ -227,8 +227,8 @@ impl StratPool {
             backstore,
             redundancy: Redundancy::NONE,
             thin_pool: thinpool,
-            // FIXME: Should determine whether all metadata is consistent and
-            // mark pool appropriately if not.
+            // This should always be Full as liminal device code will not set up
+            // a pool with inconsistent metadata.
             action_avail: ActionAvailability::Full,
         };
 
@@ -308,11 +308,36 @@ impl StratPool {
     /// Destroy the pool.
     /// Precondition: All filesystems belonging to this pool must be
     /// unmounted.
-    #[pool_mutating_action]
+    ///
+    /// This method is not a mutating action as the pool should be allowed
+    /// to be destroyed even if the metadata is inconsistent.
     pub fn destroy(&mut self) -> StratisResult<()> {
         self.thin_pool.teardown()?;
         self.backstore.destroy()?;
         Ok(())
+    }
+
+    #[cfg(test)]
+    #[pool_mutating_action]
+    #[pool_rollback]
+    pub fn return_rollback_failure(&mut self) -> StratisResult<()> {
+        Err(StratisError::RollbackError {
+            causal_error: Box::new(StratisError::Msg("Causal error".to_string())),
+            rollback_error: Box::new(StratisError::Msg("Rollback error".to_string())),
+        })
+    }
+
+    #[cfg(test)]
+    #[pool_mutating_action]
+    #[pool_rollback]
+    pub fn return_rollback_failure_chain(&mut self) -> StratisResult<()> {
+        Err(StratisError::Chained(
+            "Chained error".to_string(),
+            Box::new(StratisError::RollbackError {
+                causal_error: Box::new(StratisError::Msg("Causal error".to_string())),
+                rollback_error: Box::new(StratisError::Msg("Rollback error".to_string())),
+            }),
+        ))
     }
 }
 
@@ -333,6 +358,10 @@ impl<'a> Into<Value> for &'a StratPool {
             } else {
                 unreachable!("Backstore conversion returns a JSON object")
             },
+        );
+        map.insert(
+            "maintenance_mode".to_string(),
+            Value::from(self.action_avail != ActionAvailability::Full),
         );
         Value::from(map)
     }
@@ -682,6 +711,13 @@ impl Pool for StratPool {
     fn encryption_info(&self) -> Cow<EncryptionInfo> {
         self.backstore.data_tier_encryption_info()
     }
+
+    fn in_maintenance_mode(&self) -> bool {
+        match self.action_avail {
+            ActionAvailability::Full => false,
+            ActionAvailability::ReadOnly => true,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -904,6 +940,54 @@ mod tests {
                 Some(Bytes::from(IEC::Gi * 4).sectors()),
             ),
             test_add_datadevs,
+        );
+    }
+
+    /// Test that rollback errors are properly detected an maintenance mode
+    /// is set accordingly.
+    fn test_maintenance_mode(paths: &[&Path]) {
+        assert!(paths.len() > 1);
+
+        let name = "stratis-test-pool";
+        let (_, mut pool) =
+            StratPool::initialize(name, paths, Redundancy::NONE, &EncryptionInfo::default())
+                .unwrap();
+        invariant(&pool, name);
+
+        assert_eq!(pool.action_avail, ActionAvailability::Full);
+        assert!(pool.return_rollback_failure().is_err());
+        assert_eq!(pool.action_avail, ActionAvailability::ReadOnly);
+
+        pool.destroy().unwrap();
+
+        let name = "stratis-test-pool";
+        let (_, mut pool) =
+            StratPool::initialize(name, paths, Redundancy::NONE, &EncryptionInfo::default())
+                .unwrap();
+        invariant(&pool, name);
+
+        assert_eq!(pool.action_avail, ActionAvailability::Full);
+        assert!(pool.return_rollback_failure_chain().is_err());
+        assert_eq!(pool.action_avail, ActionAvailability::ReadOnly);
+    }
+
+    #[test]
+    fn loop_test_maintenance_mode() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, Some(Bytes::from(IEC::Gi * 4).sectors())),
+            test_maintenance_mode,
+        );
+    }
+
+    #[test]
+    fn real_test_mainenance_mode() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(
+                2,
+                Some(Bytes::from(IEC::Gi * 2).sectors()),
+                Some(Bytes::from(IEC::Gi * 4).sectors()),
+            ),
+            test_maintenance_mode,
         );
     }
 }

@@ -139,13 +139,21 @@ pub fn add_blockdevs(m: &MethodInfo<MTSync<TData>, TData>, op: BlockDevOp) -> Me
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
     let result = match op {
-        BlockDevOp::InitCache => log_action!(pool.init_cache(pool_uuid, &*pool_name, &blockdevs)),
-        BlockDevOp::AddCache => {
-            log_action!(pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Cache))
-        }
-        BlockDevOp::AddData => {
-            log_action!(pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Data))
-        }
+        BlockDevOp::InitCache => handle_action!(
+            pool.init_cache(pool_uuid, &*pool_name, &blockdevs),
+            dbus_context,
+            pool_path.get_name()
+        ),
+        BlockDevOp::AddCache => handle_action!(
+            pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Cache),
+            dbus_context,
+            pool_path.get_name()
+        ),
+        BlockDevOp::AddData => handle_action!(
+            pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Data),
+            dbus_context,
+            pool_path.get_name()
+        ),
     };
     let msg = match result.map(|bds| bds.changed()) {
         Ok(Some(uuids)) => {
@@ -218,4 +226,10 @@ pub fn pool_name_prop(name: &Name) -> String {
 #[inline]
 pub fn pool_enc_prop(pool: &dyn Pool) -> bool {
     pool.is_encrypted()
+}
+
+/// Generate D-Bus representation of maintenance-only mode property.
+#[inline]
+pub fn pool_maintenance_prop(pool: &dyn Pool) -> bool {
+    pool.in_maintenance_mode()
 }

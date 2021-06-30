@@ -40,7 +40,26 @@ pub enum StratisError {
     #[cfg(feature = "dbus_enabled")]
     Dbus(dbus::Error),
     Udev(libudev::Error),
-    DisableActions(Box<StratisError>),
+}
+
+impl StratisError {
+    /// Check whether an error chain contains a rollback error anywhere in the
+    /// chain. This is used when deciding whether to put the pool in maintenance-only
+    /// mode.
+    pub fn contains_rollback_error(&self) -> bool {
+        match self {
+            StratisError::Chained(_, c) => c.contains_rollback_error(),
+            StratisError::BestEffortError(_, errs) => {
+                errs.iter().any(|e| e.contains_rollback_error())
+            }
+            StratisError::RollbackError { .. } => true,
+            StratisError::NoActionRollbackError {
+                causal_error,
+                rollback_error,
+            } => causal_error.contains_rollback_error() || rollback_error.contains_rollback_error(),
+            _ => false,
+        }
+    }
 }
 
 impl fmt::Display for StratisError {
@@ -97,11 +116,6 @@ impl fmt::Display for StratisError {
                 write!(f, "Dbus error: {}", err.message().unwrap_or("Unknown"))
             }
             StratisError::Udev(ref err) => write!(f, "Udev error: {}", err),
-            StratisError::DisableActions(ref err) => write!(
-                f,
-                "Error that prevents further modifications to the pool: {}",
-                err
-            ),
         }
     }
 }

@@ -587,6 +587,10 @@ impl Pool for SimPool {
     fn encryption_info(&self) -> Cow<EncryptionInfo> {
         Cow::Borrowed(self.encryption_info_impl())
     }
+
+    fn in_maintenance_mode(&self) -> bool {
+        false
+    }
 }
 
 #[cfg(test)]

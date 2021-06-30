@@ -84,7 +84,7 @@ pub fn create_pool_shared(
     let object_path = m.path.get_name();
     let dbus_context = m.tree.get_data();
     let mut mutex_lock = dbus_context.engine.blocking_lock();
-    let result = log_action!(mutex_lock.create_pool(
+    let result = handle_action!(mutex_lock.create_pool(
         name,
         &devs.map(|x| Path::new(x)).collect::<Vec<&Path>>(),
         tuple_to_option(redundancy_tuple),
@@ -161,7 +161,7 @@ pub fn set_key_shared(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let default_return = (false, false);
     let return_message = message.method_return();
 
-    let msg = match log_action!(dbus_context
+    let msg = match handle_action!(dbus_context
         .engine
         .blocking_lock()
         .get_key_handler_mut()
@@ -264,7 +264,7 @@ pub fn unlock_pool_shared(
         UnlockMethod::Keyring
     };
 
-    let msg = match log_action!(dbus_context
+    let msg = match handle_action!(dbus_context
         .engine
         .blocking_lock()
         .unlock_pool(pool_uuid, unlock_method))

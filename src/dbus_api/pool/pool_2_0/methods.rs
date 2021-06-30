@@ -50,13 +50,17 @@ pub fn create_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult 
     let mut mutex_lock = dbus_context.engine.blocking_lock();
     let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
-    let result = log_action!(pool.create_filesystems(
-        &pool_name,
-        pool_uuid,
-        &filesystems
-            .map(|x| (x, None))
-            .collect::<Vec<(&str, Option<Sectors>)>>(),
-    ));
+    let result = handle_action!(
+        pool.create_filesystems(
+            &pool_name,
+            pool_uuid,
+            &filesystems
+                .map(|x| (x, None))
+                .collect::<Vec<(&str, Option<Sectors>)>>(),
+        ),
+        dbus_context,
+        pool_path.get_name()
+    );
 
     let infos = match result {
         Ok(created_set) => created_set.changed(),
@@ -140,10 +144,14 @@ pub fn destroy_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
         }
     }
 
-    let result = log_action!(pool.destroy_filesystems(
-        &pool_name,
-        &filesystem_map.keys().cloned().collect::<Vec<_>>(),
-    ));
+    let result = handle_action!(
+        pool.destroy_filesystems(
+            &pool_name,
+            &filesystem_map.keys().cloned().collect::<Vec<_>>(),
+        ),
+        dbus_context,
+        pool_path.get_name()
+    );
     let msg = match result {
         Ok(uuids) => {
             // Only get changed values here as non-existant filesystems will have been filtered out
@@ -216,12 +224,11 @@ pub fn snapshot_filesystem(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
     let mut mutex_lock = dbus_context.engine.blocking_lock();
     let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
-    let msg = match log_action!(pool.snapshot_filesystem(
-        &pool_name,
-        pool_uuid,
-        fs_uuid,
-        snapshot_name
-    )) {
+    let msg = match handle_action!(
+        pool.snapshot_filesystem(&pool_name, pool_uuid, fs_uuid, snapshot_name),
+        dbus_context,
+        pool_path.get_name()
+    ) {
         Ok(CreateAction::Created((uuid, fs))) => {
             let fs_object_path: dbus::Path = create_dbus_filesystem(
                 dbus_context,
@@ -316,11 +323,14 @@ pub fn rename_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
         return_message
     );
 
-    let msg = match log_action!(dbus_context
-        .engine
-        .blocking_lock()
-        .rename_pool(pool_uuid, new_name))
-    {
+    let msg = match handle_action!(
+        dbus_context
+            .engine
+            .blocking_lock()
+            .rename_pool(pool_uuid, new_name),
+        dbus_context,
+        pool_path.get_name()
+    ) {
         Ok(RenameAction::NoSource) => {
             let error_message = format!("engine doesn't know about pool {}", pool_uuid);
             let (rc, rs) = (DbusErrorEnum::ERROR as u16, error_message);

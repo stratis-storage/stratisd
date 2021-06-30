@@ -276,6 +276,10 @@ pub trait Pool: Debug {
 
     /// Get all encryption information for this pool.
     fn encryption_info(&self) -> Cow<EncryptionInfo>;
+
+    /// Pool is in maintenance-only mode and will reject mutating actions with
+    /// an error.
+    fn in_maintenance_mode(&self) -> bool;
 }
 
 pub trait Engine: Debug + Report + Send {

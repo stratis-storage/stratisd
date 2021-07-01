@@ -158,6 +158,9 @@ ${HOME}/.cargo/bin/cargo-bloat:
 ${HOME}/.cargo/bin/cargo-audit:
 	cargo install cargo-audit
 
+${HOME}/.cargo/bin/cargo-expand:
+	cargo install cargo-expand
+
 outdated: ${HOME}/.cargo/bin/cargo-outdated
 	PATH=${HOME}/.cargo/bin:${PATH} cargo outdated
 
@@ -170,6 +173,9 @@ bloat: ${HOME}/.cargo/bin/cargo-bloat
 
 audit: ${HOME}/.cargo/bin/cargo-audit
 	PATH=${HOME}/.cargo/bin:${PATH} cargo audit -D warnings
+
+expand: ${HOME}/.cargo/bin/cargo-expand
+	PATH=${HOME}/.cargo/bin:${PATH} cargo expand --lib=libstratisd engine::strat_engine::pool
 
 vendored-tar-file:
 	cargo vendor
@@ -371,6 +377,7 @@ check-fedora-versions: test-compare-fedora-versions
 	create-release
 	docs-rust
 	docs-travis
+	expand
 	fmt
 	fmt-travis
 	fmt-macros

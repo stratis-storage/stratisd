@@ -339,6 +339,11 @@ verify-dependency-bounds:
 	RUSTFLAGS="${DENY}" \
 	cargo build ${MANIFEST_PATH_ARGS} --all-targets --all-features
 
+COMPARE_FEDORA_VERSIONS ?=
+test-compare-fedora-versions:
+	echo "Testing that COMPARE_FEDORA_VERSIONS environment variable is set to a valid path"
+	test -e "${COMPARE_FEDORA_VERSIONS}"
+
 check-fedora-versions: test-compare-fedora-versions
 	${COMPARE_FEDORA_VERSIONS} ${MANIFEST_PATH_ARGS} ${FEDORA_RELEASE_ARGS}
 
@@ -369,6 +374,7 @@ check-fedora-versions: test-compare-fedora-versions
 	test-real
 	test-clevis-loop
 	test-clevis-real
+	test-compare-fedora-versions
 	vendored-tar-file
 	verify-dependency-bounds
 	yamllint

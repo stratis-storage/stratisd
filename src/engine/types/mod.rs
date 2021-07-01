@@ -327,8 +327,30 @@ impl Deref for DevicePath {
 }
 
 /// Represents what actions this pool can accept.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
 pub enum ActionAvailability {
-    Full,
-    ReadOnly,
+    /// Full set of actions may be taken
+    Full = 0,
+    /// No requests via an IPC mechanism may be taken
+    NoRequests = 1,
+    /// No changes may be made to the pool including background changes
+    /// like reacting to devicemapper events
+    NoPoolChanges = 2,
+    /// The pool should not accept
+    ReadOnly = 3,
+}
+
+impl Display for ActionAvailability {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                ActionAvailability::Full => "fully_operational",
+                ActionAvailability::NoRequests => "no_ipc_requests",
+                ActionAvailability::NoPoolChanges => "no_pool_changes",
+                ActionAvailability::ReadOnly => "no_write_io",
+            }
+        )
+    }
 }

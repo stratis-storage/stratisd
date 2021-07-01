@@ -228,8 +228,8 @@ pub fn pool_enc_prop(pool: &dyn Pool) -> bool {
     pool.is_encrypted()
 }
 
-/// Generate D-Bus representation of maintenance-only mode property.
+/// Generate D-Bus representation of pool state property.
 #[inline]
-pub fn pool_maintenance_prop(pool: &dyn Pool) -> bool {
-    pool.in_maintenance_mode()
+pub fn pool_state_prop(pool: &dyn Pool) -> String {
+    pool.pool_state().to_string()
 }

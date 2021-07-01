@@ -178,8 +178,8 @@ macro_rules! handle_action {
         if let Ok(ref a) = action {
             log::info!("{}", a);
         } else if let Err(ref e) = action {
-            if e.contains_rollback_error() {
-                $dbus_cxt.push_maintenance_mode($path)
+            if let Some(state) = e.error_to_pool_state() {
+                $dbus_cxt.push_pool_state($path, state)
             }
         }
         action

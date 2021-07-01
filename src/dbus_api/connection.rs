@@ -232,11 +232,11 @@ impl DbusTreeHandler {
                     }
                 }
             }
-            DbusAction::PoolMaintenanceMode(item, val) => {
+            DbusAction::PoolState(item, val) => {
                 let mut changed = HashMap::new();
                 changed.insert(
-                    consts::POOL_MAINTENANCE_PROP.into(),
-                    Variant(Box::new(val) as Box<(dyn RefArg + 'static)>),
+                    consts::POOL_STATE_PROP.into(),
+                    Variant(Box::new(val.to_string()) as Box<(dyn RefArg + 'static)>),
                 );
 
                 if self

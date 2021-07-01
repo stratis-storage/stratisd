@@ -9,7 +9,7 @@ use crate::dbus_api::{
         consts,
         pool_2_5::{
             methods::{rebind_clevis, rebind_keyring},
-            props::get_pool_maintenance,
+            props::get_pool_state,
         },
     },
     types::TData,
@@ -36,9 +36,9 @@ pub fn rebind_clevis_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<
         .out_arg(("return_string", "s"))
 }
 
-pub fn maintenance_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
-    f.property::<bool, _>(consts::POOL_MAINTENANCE_PROP, ())
+pub fn state_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
+    f.property::<String, _>(consts::POOL_STATE_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)
-        .on_get(get_pool_maintenance)
+        .on_get(get_pool_state)
 }

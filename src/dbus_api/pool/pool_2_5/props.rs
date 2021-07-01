@@ -10,9 +10,9 @@ use crate::dbus_api::{
     types::TData,
 };
 
-pub fn get_pool_maintenance(
+pub fn get_pool_state(
     i: &mut IterAppend,
     p: &PropInfo<MTSync<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    get_pool_property(i, p, |(_, _, pool)| Ok(shared::pool_maintenance_prop(pool)))
+    get_pool_property(i, p, |(_, _, pool)| Ok(shared::pool_state_prop(pool)))
 }

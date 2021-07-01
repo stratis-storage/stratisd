@@ -17,10 +17,10 @@ use devicemapper::{Bytes, Sectors};
 
 use crate::{
     engine::types::{
-        BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid,
-        Key, KeyDescription, LockedPoolInfo, MappingCreateAction, MappingDeleteAction, Name,
-        PoolUuid, RegenAction, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
-        SetUnlockAction, UdevEngineEvent, UnlockMethod,
+        ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
+        EncryptionInfo, FilesystemUuid, Key, KeyDescription, LockedPoolInfo, MappingCreateAction,
+        MappingDeleteAction, Name, PoolUuid, RegenAction, RenameAction, ReportType,
+        SetCreateAction, SetDeleteAction, SetUnlockAction, UdevEngineEvent, UnlockMethod,
     },
     stratis::StratisResult,
 };
@@ -258,9 +258,10 @@ pub trait Pool: Debug {
     /// Get all encryption information for this pool.
     fn encryption_info(&self) -> Cow<EncryptionInfo>;
 
-    /// Pool is in maintenance-only mode and will reject mutating actions with
-    /// an error.
-    fn in_maintenance_mode(&self) -> bool;
+    /// Get the pool state for the given pool. The state indicates which actions
+    /// will be disabled or enabled. Disabled actions are triggered by failures
+    /// caught by stratisd.
+    fn pool_state(&self) -> ActionAvailability;
 }
 
 pub trait Engine: Debug + Report + Send {

@@ -53,7 +53,7 @@ pub fn create_dbus_pool<'a>(
                 .add_p(pool_3_0::name_property(&f))
                 .add_p(pool_3_0::uuid_property(&f))
                 .add_p(pool_3_0::encrypted_property(&f))
-                .add_p(pool_3_0::pool_maintenance_property(&f)),
+                .add_p(pool_3_0::state_property(&f)),
         )
         .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_3_0, ())

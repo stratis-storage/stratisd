@@ -712,11 +712,8 @@ impl Pool for StratPool {
         self.backstore.data_tier_encryption_info()
     }
 
-    fn in_maintenance_mode(&self) -> bool {
-        match self.action_avail {
-            ActionAvailability::Full => false,
-            ActionAvailability::ReadOnly => true,
-        }
+    fn pool_state(&self) -> ActionAvailability {
+        self.action_avail.clone()
     }
 }
 

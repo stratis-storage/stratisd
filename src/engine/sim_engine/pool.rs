@@ -24,9 +24,9 @@ use crate::{
         sim_engine::{blockdev::SimDev, filesystem::SimFilesystem},
         structures::Table,
         types::{
-            BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo,
-            FilesystemUuid, Key, KeyDescription, Name, PoolUuid, Redundancy, RegenAction,
-            RenameAction, SetCreateAction, SetDeleteAction,
+            ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
+            EncryptionInfo, FilesystemUuid, Key, KeyDescription, Name, PoolUuid, Redundancy,
+            RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -632,8 +632,8 @@ impl Pool for SimPool {
         Cow::Borrowed(self.encryption_info_impl())
     }
 
-    fn in_maintenance_mode(&self) -> bool {
-        false
+    fn pool_state(&self) -> ActionAvailability {
+        ActionAvailability::Full
     }
 }
 

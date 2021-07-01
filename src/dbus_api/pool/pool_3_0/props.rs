@@ -24,9 +24,9 @@ pub fn get_pool_encrypted(
     get_pool_property(i, p, |(_, _, pool)| Ok(shared::pool_enc_prop(pool)))
 }
 
-pub fn get_pool_maintainence(
+pub fn get_pool_state(
     i: &mut IterAppend,
     p: &PropInfo<MTSync<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    get_pool_property(i, p, |(_, _, pool)| Ok(shared::pool_maintenance_prop(pool)))
+    get_pool_property(i, p, |(_, _, pool)| Ok(shared::pool_state_prop(pool)))
 }

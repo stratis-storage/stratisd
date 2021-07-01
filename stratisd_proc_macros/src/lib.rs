@@ -179,8 +179,8 @@ fn wrap_method(f: &mut ImplItemMethod) {
         match #wrapped_ident(#( #arg_idents),*) {
             Ok(ret) => Ok(ret),
             Err(e) => {
-                if e.contains_rollback_error() {
-                    self.action_avail = crate::engine::types::ActionAvailability::ReadOnly;
+                if let Some(state) = e.error_to_pool_state() {
+                    self.action_avail = state;
                 }
                 Err(e)
             }

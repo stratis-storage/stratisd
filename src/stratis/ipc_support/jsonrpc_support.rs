@@ -28,6 +28,8 @@ fn handle_udev(
                 }
             };
             let mut lock = engine.lock().await;
+            // Return value should be ignored as JSON RPC does not keep a record
+            // of data structure information in the IPC layer.
             let _ = lock.handle_event(&udev_event);
         }
     })

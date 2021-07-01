@@ -19,17 +19,24 @@ const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 // Accepts None as an argument; this indicates that devicemapper events are
 // to be ignored.
 pub async fn dm_event_thread(engine: Option<LockableEngine>) -> StratisResult<()> {
+    async fn process_dm_event(engine: &LockableEngine, fd: &AsyncFd<RawFd>) -> StratisResult<()> {
+        {
+            let mut guard = fd.readable().await?;
+            guard.clear_ready();
+        }
+        get_dm().arm_poll()?;
+        let mut lock = engine.lock().await;
+        lock.evented()?;
+        Ok(())
+    }
+
     match engine {
         Some(engine) => {
             let fd = setup_dm()?;
             loop {
-                {
-                    let mut guard = fd.readable().await?;
-                    guard.clear_ready();
+                if let Err(e) = process_dm_event(&engine, &fd).await {
+                    warn!("Failed to process devicemapper event: {}", e);
                 }
-                get_dm().arm_poll()?;
-                let mut lock = engine.lock().await;
-                lock.evented()?;
             }
         }
         None => {

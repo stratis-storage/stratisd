@@ -351,7 +351,9 @@ impl DbusConnectionHandler {
             }),
         );
         loop {
-            self.connection.process(Duration::from_millis(100))?;
+            if let Err(e) = self.connection.process(Duration::from_millis(100)) {
+                warn!("Failed to process D-Bus request: {}", e);
+            }
             match self.should_exit.try_recv() {
                 Ok(()) => {
                     info!("D-Bus connection handler thread notified to exit");

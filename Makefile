@@ -8,6 +8,11 @@ else
   MANIFEST_PATH_ARGS = --manifest-path=${MANIFEST_PATH}
 endif
 
+ifeq ($(origin FEDORA_RELEASE), undefined)
+else
+  FEDORA_RELEASE_ARGS = --release=${FEDORA_RELEASE}
+endif
+
 DESTDIR ?=
 PREFIX ?= /usr
 LIBEXECDIR ?= $(PREFIX)/libexec
@@ -334,12 +339,13 @@ verify-dependency-bounds:
 	RUSTFLAGS="${DENY}" \
 	cargo build ${MANIFEST_PATH_ARGS} --all-targets --all-features
 
-# Check that there are no dependencies missing in Fedora or ones that require
-# versions higher than those available in Fedora.  If any crates have
-# versions that are too low, specify those crates via the --ignore-low
-# command-line option.
-check-fedora-versions:
-	${COMPARE_FEDORA_VERSIONS} ${MANIFEST_PATH_ARGS}
+COMPARE_FEDORA_VERSIONS ?=
+test-compare-fedora-versions:
+	echo "Testing that COMPARE_FEDORA_VERSIONS environment variable is set to a valid path"
+	test -e "${COMPARE_FEDORA_VERSIONS}"
+
+check-fedora-versions: test-compare-fedora-versions
+	${COMPARE_FEDORA_VERSIONS} ${MANIFEST_PATH_ARGS} ${FEDORA_RELEASE_ARGS}
 
 .PHONY:
 	audit
@@ -368,6 +374,7 @@ check-fedora-versions:
 	test-real
 	test-clevis-loop
 	test-clevis-real
+	test-compare-fedora-versions
 	vendored-tar-file
 	verify-dependency-bounds
 	yamllint

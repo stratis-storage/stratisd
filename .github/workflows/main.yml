@@ -344,6 +344,17 @@ jobs:
         run: PROFILEDIR=debug make -f Makefile install
       - name: Check out stratis-cli
         run: git clone https://github.com/stratis-storage/stratis-cli.git
+      - name: Switch to target stratis-cli branch
+        run: |
+          git config user.email "you@example.com"
+          git config user.name "Your Name"
+          git checkout -b mulkieran-issue-project-316 develop-2.4.1
+        working-directory: ./stratis-cli
+      - name: SWitch to target stratis-cli branch-2
+        run: >
+          git pull https://github.com/mulkieran/stratis-cli.git
+          issue-project-316
+        working-directory: ./stratis-cli
       - name: Set up for D-Bus
         run: |
           mkdir -p /var/lib/dbus

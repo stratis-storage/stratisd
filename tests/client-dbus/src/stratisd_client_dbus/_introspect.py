@@ -4,8 +4,8 @@ SPECS = {
     <method name="GetManagedObjects" />
   </interface>
 """,
-    "org.storage.stratis2.FetchProperties.r5": """
-<interface name="org.storage.stratis2.FetchProperties.r5">
+    "org.storage.stratis3.FetchProperties.r0": """
+<interface name="org.storage.stratis3.FetchProperties.r0">
     <method name="GetAllProperties">
       <arg name="results" type="a{s(bv)}" direction="out" />
     </method>
@@ -15,8 +15,8 @@ SPECS = {
     </method>
   </interface>
 """,
-    "org.storage.stratis2.Manager.r5": """
-<interface name="org.storage.stratis2.Manager.r5">
+    "org.storage.stratis3.Manager.r0": """
+<interface name="org.storage.stratis3.Manager.r0">
     <method name="ConfigureSimulator">
       <arg name="denominator" type="u" direction="in" />
       <arg name="return_code" type="q" direction="out" />
@@ -69,8 +69,8 @@ SPECS = {
     </property>
   </interface>
 """,
-    "org.storage.stratis2.Report.r5": """
-<interface name="org.storage.stratis2.Report.r5">
+    "org.storage.stratis3.Report.r0": """
+<interface name="org.storage.stratis3.Report.r0">
     <method name="GetReport">
       <arg name="name" type="s" direction="in" />
       <arg name="result" type="s" direction="out" />
@@ -79,8 +79,8 @@ SPECS = {
     </method>
   </interface>
 """,
-    "org.storage.stratis2.blockdev.r5": """
-<interface name="org.storage.stratis2.blockdev.r5">
+    "org.storage.stratis3.blockdev.r0": """
+<interface name="org.storage.stratis3.blockdev.r0">
     <method name="SetUserInfo">
       <arg name="id" type="(bs)" direction="in" />
       <arg name="changed" type="(bs)" direction="out" />
@@ -113,8 +113,8 @@ SPECS = {
     </property>
   </interface>
 """,
-    "org.storage.stratis2.filesystem.r5": """
-<interface name="org.storage.stratis2.filesystem.r5">
+    "org.storage.stratis3.filesystem.r0": """
+<interface name="org.storage.stratis3.filesystem.r0">
     <method name="SetName">
       <arg name="name" type="s" direction="in" />
       <arg name="result" type="(bs)" direction="out" />
@@ -136,8 +136,8 @@ SPECS = {
     </property>
   </interface>
 """,
-    "org.storage.stratis2.pool.r5": """
-<interface name="org.storage.stratis2.pool.r5">
+    "org.storage.stratis3.pool.r0": """
+<interface name="org.storage.stratis3.pool.r0">
     <method name="AddCacheDevs">
       <arg name="devices" type="as" direction="in" />
       <arg name="results" type="(bao)" direction="out" />

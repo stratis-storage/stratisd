@@ -19,8 +19,7 @@ pub use self::{
     initialize::CryptInitializer,
     metadata_handle::CryptMetadataHandle,
     shared::{
-        crypt_metadata_size, get_clevis_token_metadata, interpret_clevis_config,
-        set_clevis_token_metadata,
+        back_up_luks_header, crypt_metadata_size, interpret_clevis_config, restore_luks_header,
     },
 };
 

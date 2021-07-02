@@ -7,12 +7,14 @@
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
+    fs,
     path::Path,
 };
 
 use chrono::{DateTime, Duration, Utc};
 use rand::{seq::IteratorRandom, thread_rng};
 use serde_json::Value;
+use tempfile::TempDir;
 
 use devicemapper::{Bytes, Device, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine};
 
@@ -22,7 +24,7 @@ use crate::{
             backstore::{
                 blockdev::StratBlockDev,
                 crypt::{
-                    get_clevis_token_metadata, interpret_clevis_config, set_clevis_token_metadata,
+                    back_up_luks_header, interpret_clevis_config, restore_luks_header,
                     CryptActivationHandle,
                 },
                 devices::{initialize_devices, process_and_verify_devices, wipe_blockdevs},
@@ -625,6 +627,27 @@ impl BlockDevMgr {
     /// so this method will either fail to regenerate the bindings or it will
     /// result in a metadata change.
     pub fn rebind_clevis(&mut self) -> StratisResult<()> {
+        fn rebind_clevis_with_tmp_files(
+            bd: &mut BlockDevMgr,
+            tmp_dir: &TempDir,
+        ) -> StratisResult<()> {
+            let mut original_headers = Vec::new();
+            let blockdevs = bd.blockdevs_mut();
+            for (_, blockdev) in blockdevs.iter() {
+                original_headers.push(back_up_luks_header(blockdev.physical_path(), tmp_dir)?);
+            }
+
+            operation_loop(
+                blockdevs.into_iter().map(|(_, bd)| bd),
+                |blockdev| blockdev.rebind_clevis(),
+                |index, blockdev| {
+                    restore_luks_header(blockdev.physical_path(), &original_headers[index])
+                },
+            )?;
+
+            Ok(())
+        }
+
         let encryption_info = self.encryption_info();
         if !encryption_info.is_encrypted() {
             return Err(StratisError::Msg(
@@ -636,21 +659,17 @@ impl BlockDevMgr {
             ));
         }
 
-        let mut original_tokens = Vec::new();
-        let blockdevs = self.blockdevs_mut();
-        for (_, blockdev) in blockdevs.iter() {
-            original_tokens.push(get_clevis_token_metadata(blockdev.physical_path())?);
+        let tmp_dir = TempDir::new()?;
+        let res = rebind_clevis_with_tmp_files(self, &tmp_dir);
+        if let Err(e) = fs::remove_dir_all(tmp_dir.path()) {
+            warn!(
+                "Leaked temporary files at path {}: {}",
+                tmp_dir.path().display(),
+                e
+            );
         }
 
-        operation_loop(
-            blockdevs.into_iter().map(|(_, bd)| bd),
-            |blockdev| blockdev.rebind_clevis(),
-            |index, blockdev| {
-                set_clevis_token_metadata(blockdev.physical_path(), &original_tokens[index])
-            },
-        )?;
-
-        Ok(())
+        res
     }
 }
 

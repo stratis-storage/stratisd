@@ -12,10 +12,11 @@ use data_encoding::BASE64URL_NOPAD;
 use either::Either;
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
+use tempfile::TempDir;
 
 use libcryptsetup_rs::{
     c_uint, CryptActivateFlags, CryptDeactivateFlags, CryptDevice, CryptInit, CryptStatusInfo,
-    CryptVolumeKeyFlags, CryptWipePattern, EncryptionFormat, LibcryptErr, TokenInput,
+    CryptVolumeKeyFlags, CryptWipePattern, EncryptionFormat, LibcryptErr,
 };
 
 use crate::{
@@ -949,19 +950,22 @@ pub fn crypt_metadata_size() -> u64 {
     2 * DEFAULT_CRYPT_METADATA_SIZE + DEFAULT_CRYPT_KEYSLOTS_SIZE
 }
 
-/// Read the full Clevis token metadata from the device path provided.
-pub fn get_clevis_token_metadata(dev_path: &Path) -> StratisResult<Value> {
+/// Back up the LUKS2 header to a temporary file.
+pub fn back_up_luks_header(dev_path: &Path, tmp_dir: &TempDir) -> StratisResult<PathBuf> {
+    let file_name = dev_path.display().to_string().replace("/", "_");
+    let pathbuf = vec![tmp_dir.path(), &Path::new(&file_name)]
+        .into_iter()
+        .collect::<PathBuf>();
     acquire_crypt_device(dev_path)?
-        .token_handle()
-        .json_get(CLEVIS_LUKS_TOKEN_ID)
-        .map_err(StratisError::from)
+        .backup_handle()
+        .header_backup(EncryptionFormat::Luks2, &pathbuf)?;
+    Ok(pathbuf)
 }
 
-/// Write the full Clevis token metadata from the device path provided.
-pub fn set_clevis_token_metadata(dev_path: &Path, clevis_token: &Value) -> StratisResult<()> {
+/// Restore the LUKS2 header from a temporary file.
+pub fn restore_luks_header(dev_path: &Path, backup_path: &Path) -> StratisResult<()> {
     acquire_crypt_device(dev_path)?
-        .token_handle()
-        .json_set(TokenInput::ReplaceToken(CLEVIS_LUKS_TOKEN_ID, clevis_token))
-        .map(|_| ())
-        .map_err(StratisError::from)
+        .backup_handle()
+        .header_restore(EncryptionFormat::Luks2, backup_path)?;
+    Ok(())
 }

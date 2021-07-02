@@ -17,7 +17,7 @@ mod manager_2_1;
 mod manager_2_2;
 mod manager_2_3;
 mod manager_2_4;
-mod report_2_1;
+mod report_3_0;
 mod shared;
 
 pub fn get_base_tree<'a>(
@@ -128,16 +128,8 @@ pub fn get_base_tree<'a>(
                 .add_m(fetch_properties_2_4::get_properties_method(&f)),
         )
         .add(
-            f.interface(consts::REPORT_INTERFACE_NAME_2_1, ())
-                .add_m(report_2_1::get_report_method(&f)),
-        )
-        .add(
-            f.interface(consts::REPORT_INTERFACE_NAME_2_4, ())
-                .add_m(report_2_1::get_report_method(&f)),
-        )
-        .add(
             f.interface(consts::REPORT_INTERFACE_NAME_3_0, ())
-                .add_m(report_2_1::get_report_method(&f)),
+                .add_m(report_3_0::get_report_method(&f)),
         );
 
     let path = obj_path.get_name().to_owned();

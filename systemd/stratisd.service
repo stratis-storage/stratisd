@@ -4,7 +4,7 @@ Documentation=man:stratisd(8)
 DefaultDependencies=no
 
 [Service]
-BusName=org.storage.stratis2
+BusName=org.storage.stratis3
 Type=dbus
 Environment="RUST_BACKTRACE=1"
 ExecStart=/usr/libexec/stratisd --log-level debug

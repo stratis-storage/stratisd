@@ -4,7 +4,7 @@
 
 use dbus_tree::{Factory, MTSync, Method};
 
-use crate::dbus_api::{api::report_2_1::methods::get_report, types::TData};
+use crate::dbus_api::{api::report_3_0::methods::get_report, types::TData};
 
 pub fn get_report_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
     f.method("GetReport", (), get_report)

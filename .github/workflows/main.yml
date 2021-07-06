@@ -428,6 +428,20 @@ jobs:
           make udev-tests
         working-directory: ./tests/client-dbus
 
+  shell-checks:
+    runs-on: ubuntu-18.04
+    container:
+      image: fedora:33
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies
+        run: >
+          dnf install -y
+          make
+          shfmt
+      - name: Run shell check
+        run: make -f Makefile fmt-shell-ci
+
   checks-with-ci-repo:
     strategy:
       matrix:

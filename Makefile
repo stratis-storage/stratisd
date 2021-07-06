@@ -187,9 +187,16 @@ create-release: ${PWD}/stratisd-vendor.tar.gz
 
 fmt:
 	cargo fmt
+	shfmt -l -w .
 
 fmt-travis:
 	cargo fmt -- --check
+
+fmt-shell:
+	shfmt -l -w .
+
+fmt-shell-ci:
+	shfmt -d .
 
 build:
 	PKG_CONFIG_ALLOW_CROSS=1 \
@@ -362,6 +369,8 @@ check-fedora-versions: test-compare-fedora-versions
 	docs-rust
 	docs-travis
 	fmt
+	fmt-shell
+	fmt-shell-ci
 	fmt-travis
 	install
 	install-cfg

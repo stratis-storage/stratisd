@@ -15,11 +15,6 @@ pub const MANAGER_INTERFACE_NAME_2_4: &str = "org.storage.stratis2.Manager.r4";
 pub const MANAGER_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.Manager.r0";
 pub const REPORT_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.Report.r0";
 
-pub const PROPERTY_FETCH_INTERFACE_NAME: &str = "org.storage.stratis2.FetchProperties";
-pub const PROPERTY_FETCH_INTERFACE_NAME_2_1: &str = "org.storage.stratis2.FetchProperties.r1";
-pub const PROPERTY_FETCH_INTERFACE_NAME_2_2: &str = "org.storage.stratis2.FetchProperties.r2";
-pub const PROPERTY_FETCH_INTERFACE_NAME_2_3: &str = "org.storage.stratis2.FetchProperties.r3";
-pub const PROPERTY_FETCH_INTERFACE_NAME_2_4: &str = "org.storage.stratis2.FetchProperties.r4";
 pub const PROPERTY_FETCH_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.FetchProperties.r0";
 
 pub const KEY_LIST_PROP: &str = "KeyList";
@@ -69,17 +64,10 @@ pub const BLOCKDEV_TOTAL_SIZE_PROP: &str = "TotalPhysicalSize";
 
 /// Get a list of all the FetchProperties interfaces
 pub fn fetch_properties_interfaces() -> Vec<String> {
-    [
-        PROPERTY_FETCH_INTERFACE_NAME,
-        PROPERTY_FETCH_INTERFACE_NAME_2_1,
-        PROPERTY_FETCH_INTERFACE_NAME_2_2,
-        PROPERTY_FETCH_INTERFACE_NAME_2_3,
-        PROPERTY_FETCH_INTERFACE_NAME_2_4,
-        PROPERTY_FETCH_INTERFACE_NAME_3_0,
-    ]
-    .iter()
-    .map(|s| (*s).to_string())
-    .collect()
+    [PROPERTY_FETCH_INTERFACE_NAME_3_0]
+        .iter()
+        .map(|s| (*s).to_string())
+        .collect()
 }
 
 /// Get a list of all the standard pool interfaces; i.e., all the revisions of

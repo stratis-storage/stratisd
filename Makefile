@@ -191,6 +191,11 @@ fmt:
 
 fmt-travis:
 	cargo fmt -- --check
+
+fmt-shell:
+	shfmt -l -w .
+
+fmt-shell-ci:
 	shfmt -d .
 
 build:
@@ -364,6 +369,8 @@ check-fedora-versions: test-compare-fedora-versions
 	docs-rust
 	docs-travis
 	fmt
+	fmt-shell
+	fmt-shell-ci
 	fmt-travis
 	install
 	install-cfg

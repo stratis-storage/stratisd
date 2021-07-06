@@ -282,11 +282,11 @@ jobs:
             image: fedora:33
             task: PYTHONPATH=./src make -f Makefile lint
             working-directory: ./tests/client-dbus
-          - dependencies: black python3-isort shfmt
+          - dependencies: black python3-isort
             image: fedora:33
             task: make -f Makefile fmt-travis
             working-directory: ./code_maintenance
-          - dependencies: black python3-isort shfmt
+          - dependencies: black python3-isort
             image: fedora:33
             task: make -f Makefile fmt-travis
             working-directory: ./tests/client-dbus
@@ -427,6 +427,20 @@ jobs:
           PYTHONPATH=./src
           make udev-tests
         working-directory: ./tests/client-dbus
+
+  shell-checks:
+    runs-on: ubuntu-18.04
+    container:
+      image: fedora:33
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies
+        run: >
+          dnf install -y
+          make
+          shfmt
+      - name: Run shell check
+        run: make -f Makefile fmt-shell-ci
 
   checks-with-ci-repo:
     strategy:

@@ -247,7 +247,7 @@ impl StratPool {
     }
 
     /// Write current metadata to pool members.
-    #[pool_mutating_action]
+    #[pool_mutating_action("NoRequests")]
     pub fn write_metadata(&mut self, name: &str) -> StratisResult<()> {
         let data = serde_json::to_string(&self.record(name))?;
         self.backstore.save_state(data.as_bytes())
@@ -272,7 +272,7 @@ impl StratPool {
     /// Called when a DM device in this pool has generated an event.
     // TODO: Just check the device that evented. Currently checks
     // everything.
-    #[pool_mutating_action]
+    #[pool_mutating_action("NoRequests")]
     pub fn event_on(&mut self, pool_uuid: PoolUuid, pool_name: &Name) -> StratisResult<()> {
         if self.thin_pool.check(pool_uuid, &mut self.backstore)? {
             self.write_metadata(pool_name)?;
@@ -297,7 +297,7 @@ impl StratPool {
         self.backstore.get_blockdev_by_uuid(uuid)
     }
 
-    #[pool_mutating_action]
+    #[pool_mutating_action("NoRequests")]
     pub fn get_mut_strat_blockdev(
         &mut self,
         uuid: DevUuid,
@@ -318,7 +318,7 @@ impl StratPool {
     }
 
     #[cfg(test)]
-    #[pool_mutating_action]
+    #[pool_mutating_action("NoRequests")]
     #[pool_rollback]
     pub fn return_rollback_failure(&mut self) -> StratisResult<()> {
         Err(StratisError::RollbackError {
@@ -328,7 +328,7 @@ impl StratPool {
     }
 
     #[cfg(test)]
-    #[pool_mutating_action]
+    #[pool_mutating_action("NoRequests")]
     #[pool_rollback]
     pub fn return_rollback_failure_chain(&mut self) -> StratisResult<()> {
         Err(StratisError::Chained(
@@ -369,7 +369,7 @@ impl<'a> Into<Value> for &'a StratPool {
 
 #[strat_pool_impl_gen]
 impl Pool for StratPool {
-    #[pool_mutating_action]
+    #[pool_mutating_action("NoRequests")]
     fn init_cache(
         &mut self,
         pool_uuid: PoolUuid,
@@ -409,7 +409,7 @@ impl Pool for StratPool {
         }
     }
 
-    #[pool_mutating_action]
+    #[pool_mutating_action("NoRequests")]
     #[pool_rollback]
     fn bind_clevis(
         &mut self,
@@ -424,7 +424,7 @@ impl Pool for StratPool {
         }
     }
 
-    #[pool_mutating_action]
+    #[pool_mutating_action("NoRequests")]
     #[pool_rollback]
     fn unbind_clevis(&mut self) -> StratisResult<DeleteAction<Clevis>> {
         let changed = self.backstore.unbind_clevis()?;
@@ -435,7 +435,7 @@ impl Pool for StratPool {
         }
     }
 
-    #[pool_mutating_action]
+    #[pool_mutating_action("NoRequests")]
     #[pool_rollback]
     fn bind_keyring(
         &mut self,
@@ -449,7 +449,7 @@ impl Pool for StratPool {
         }
     }
 
-    #[pool_mutating_action]
+    #[pool_mutating_action("NoRequests")]
     #[pool_rollback]
     fn unbind_keyring(&mut self) -> StratisResult<DeleteAction<Key>> {
         let changed = self.backstore.unbind_keyring()?;
@@ -460,7 +460,8 @@ impl Pool for StratPool {
         }
     }
 
-    #[pool_mutating_action]
+    #[pool_mutating_action("NoRequests")]
+    #[pool_rollback]
     fn rebind_keyring(
         &mut self,
         new_key_desc: &KeyDescription,
@@ -472,12 +473,13 @@ impl Pool for StratPool {
         }
     }
 
-    #[pool_mutating_action]
+    #[pool_mutating_action("NoRequests")]
+    #[pool_rollback]
     fn rebind_clevis(&mut self) -> StratisResult<RegenAction> {
         self.backstore.rebind_clevis().map(|_| RegenAction)
     }
 
-    #[pool_mutating_action]
+    #[pool_mutating_action("NoRequests")]
     fn create_filesystems<'a>(
         &mut self,
         pool_name: &str,
@@ -520,7 +522,7 @@ impl Pool for StratPool {
         Ok(SetCreateAction::new(result))
     }
 
-    #[pool_mutating_action]
+    #[pool_mutating_action("NoRequests")]
     fn add_blockdevs(
         &mut self,
         pool_uuid: PoolUuid,
@@ -577,7 +579,7 @@ impl Pool for StratPool {
         bdev_info
     }
 
-    #[pool_mutating_action]
+    #[pool_mutating_action("NoRequests")]
     fn destroy_filesystems(
         &mut self,
         pool_name: &str,
@@ -593,7 +595,7 @@ impl Pool for StratPool {
         Ok(SetDeleteAction::new(removed))
     }
 
-    #[pool_mutating_action]
+    #[pool_mutating_action("NoRequests")]
     fn rename_filesystem(
         &mut self,
         pool_name: &str,
@@ -611,7 +613,7 @@ impl Pool for StratPool {
         }
     }
 
-    #[pool_mutating_action]
+    #[pool_mutating_action("NoRequests")]
     fn snapshot_filesystem<'a>(
         &'a mut self,
         pool_name: &str,
@@ -683,6 +685,7 @@ impl Pool for StratPool {
             .map(|(t, b)| (t, b as &dyn BlockDev))
     }
 
+    #[pool_mutating_action("NoRequests")]
     fn set_blockdev_user_info(
         &mut self,
         pool_name: &str,

@@ -9,15 +9,15 @@ use proc_macro2::{Group, Span, TokenStream as TokenStream2, TokenTree};
 use quote::quote;
 use syn::{
     parse, parse_str, punctuated::Punctuated, token::Comma, Attribute, Block, FnArg, Ident,
-    ImplItem, ImplItemMethod, Item, Meta, Pat, PatIdent, PatType, Path, PathSegment, Receiver,
-    ReturnType, Stmt, Token, Type, TypePath,
+    ImplItem, ImplItemMethod, Item, Lit, Meta, MetaList, NestedMeta, Pat, PatIdent, PatType, Path,
+    PathSegment, Receiver, ReturnType, Stmt, Token, Type, TypePath,
 };
 
 /// Add guard for mutating actions when the pool is in maintenance mode.
 ///
 /// This method adds a statement that returns an error if the pool is set
 /// to maintenance-only mode.
-fn add_method_guards(method: &mut ImplItemMethod) {
+fn add_method_guards(method: &mut ImplItemMethod, level: Ident) {
     let stmt = if let ReturnType::Type(_, ty) = &method.sig.output {
         if let Type::Path(TypePath {
             path: Path { segments, .. },
@@ -27,7 +27,7 @@ fn add_method_guards(method: &mut ImplItemMethod) {
             if let Some(PathSegment { ident, .. }) = segments.iter().last() {
                 if &ident.to_string() == "StratisResult" {
                     parse::<Stmt>(TokenStream::from(quote! {
-                        if self.action_avail != crate::engine::types::ActionAvailability::Full {
+                        if self.action_avail >= crate::engine::types::ActionAvailability::#level {
                             return Err(crate::stratis::StratisError::Msg(format!(
                                 "Pool is in state {:?} where mutable actions cannot be performed until the issue is resolved manually",
                                 self.action_avail
@@ -190,6 +190,42 @@ fn wrap_method(f: &mut ImplItemMethod) {
         .expect("Could not parse generated method body as a block");
 }
 
+/// Get the pool state level at which a pool operation ceases to be accepted.
+fn get_attr_level(attrs: &mut Vec<Attribute>) -> Option<Ident> {
+    let mut return_value = None;
+    let mut index = None;
+    for (i, attr) in attrs.iter().enumerate() {
+        if let Meta::List(MetaList {
+            ref path,
+            ref nested,
+            ..
+        }) = attr
+            .parse_meta()
+            .unwrap_or_else(|_| panic!("Attribute {:?} cannot be parsed", attr))
+        {
+            if path
+                == &parse_str("pool_mutating_action").expect("pool_mutating_action is valid path")
+            {
+                for nested_meta in nested.iter() {
+                    if let NestedMeta::Lit(Lit::Str(litstr)) = nested_meta {
+                        index = Some(i);
+                        return_value =
+                            Some(parse_str::<Ident>(&litstr.value()).unwrap_or_else(|_| {
+                                panic!("{} is not a valid identifier", litstr.value())
+                            }));
+                    } else {
+                        panic!("pool_mutating_action attribute must be in form #[pool_mutating_action(\"REJECTION LEVEL\")]");
+                    }
+                }
+            }
+        }
+    }
+    if let Some(i) = index {
+        attrs.remove(i);
+    }
+    return_value
+}
+
 /// Determine whether a method has the given attribute.
 fn has_attribute(attrs: &mut Vec<Attribute>, attribute: &str) -> bool {
     let mut return_value = false;
@@ -211,14 +247,6 @@ fn has_attribute(attrs: &mut Vec<Attribute>, attribute: &str) -> bool {
     return_value
 }
 
-/// Determine whether a method should be marked as a mutating action based on the attributes.
-///
-/// The attribute that will cause a method to be marked as performing a mutating action is
-/// `#[pool_mutating_action]`.
-fn is_mutating_action(attrs: &mut Vec<Attribute>) -> bool {
-    has_attribute(attrs, "pool_mutating_action")
-}
-
 /// Determine whether a method should be marked as needing to handle failed rollback
 /// based on the attributes.
 ///
@@ -237,8 +265,8 @@ fn process_item(mut item: Item) -> Item {
 
     for impl_item in i.items.iter_mut() {
         if let ImplItem::Method(ref mut f) = impl_item {
-            if is_mutating_action(&mut f.attrs) {
-                add_method_guards(f);
+            if let Some(level) = get_attr_level(&mut f.attrs) {
+                add_method_guards(f, level);
             }
 
             if performs_rollback(&mut f.attrs) {

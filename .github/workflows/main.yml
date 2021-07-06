@@ -29,7 +29,7 @@ jobs:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
           - task: make -f Makefile fmt-travis
             toolchain: 1.53.0
-            components: rustfmt
+            components: rustfmt shfmt
             image: ubuntu:groovy
           - task: make -f Makefile clippy
             toolchain: 1.53.0
@@ -37,7 +37,7 @@ jobs:
             image: ubuntu:groovy
           - task: make -f Makefile fmt-travis
             toolchain: 1.53.0
-            components: rustfmt
+            components: rustfmt shfmt
             image: fedora:33
           - task: make -f Makefile clippy
             toolchain: 1.53.0
@@ -282,11 +282,11 @@ jobs:
             image: fedora:33
             task: PYTHONPATH=./src make -f Makefile lint
             working-directory: ./tests/client-dbus
-          - dependencies: black python3-isort
+          - dependencies: black python3-isort shfmt
             image: fedora:33
             task: make -f Makefile fmt-travis
             working-directory: ./code_maintenance
-          - dependencies: black python3-isort
+          - dependencies: black python3-isort shfmt
             image: fedora:33
             task: make -f Makefile fmt-travis
             working-directory: ./tests/client-dbus

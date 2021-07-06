@@ -14,9 +14,7 @@ use crate::{
     engine::{Name, Pool, PoolUuid, StratisUuid},
 };
 
-mod fetch_properties_2_0;
-mod fetch_properties_2_1;
-mod fetch_properties_2_3;
+mod fetch_properties_3_0;
 mod pool_2_0;
 mod pool_2_1;
 mod pool_2_3;
@@ -117,34 +115,9 @@ pub fn create_dbus_pool<'a>(
                 .add_p(pool_2_1::encrypted_property(&f)),
         )
         .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME, ())
-                .add_m(fetch_properties_2_0::get_all_properties_method(&f))
-                .add_m(fetch_properties_2_0::get_properties_method(&f)),
-        )
-        .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_1, ())
-                .add_m(fetch_properties_2_1::get_all_properties_method(&f))
-                .add_m(fetch_properties_2_1::get_properties_method(&f)),
-        )
-        .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_2, ())
-                .add_m(fetch_properties_2_1::get_all_properties_method(&f))
-                .add_m(fetch_properties_2_1::get_properties_method(&f)),
-        )
-        .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_3, ())
-                .add_m(fetch_properties_2_3::get_all_properties_method(&f))
-                .add_m(fetch_properties_2_3::get_properties_method(&f)),
-        )
-        .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_4, ())
-                .add_m(fetch_properties_2_3::get_all_properties_method(&f))
-                .add_m(fetch_properties_2_3::get_properties_method(&f)),
-        )
-        .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_3_0, ())
-                .add_m(fetch_properties_2_3::get_all_properties_method(&f))
-                .add_m(fetch_properties_2_3::get_properties_method(&f)),
+                .add_m(fetch_properties_3_0::get_all_properties_method(&f))
+                .add_m(fetch_properties_3_0::get_properties_method(&f)),
         );
 
     let path = object_path.get_name().to_owned();

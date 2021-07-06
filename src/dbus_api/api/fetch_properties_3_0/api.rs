@@ -5,7 +5,7 @@
 use dbus_tree::{Factory, MTSync, Method};
 
 use crate::dbus_api::{
-    api::fetch_properties_2_2::methods::{get_all_properties, get_properties},
+    api::fetch_properties_3_0::methods::{get_all_properties, get_properties},
     types::TData,
 };
 

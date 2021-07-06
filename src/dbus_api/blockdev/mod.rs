@@ -16,7 +16,7 @@ use crate::{
 
 mod blockdev_2_0;
 mod blockdev_2_2;
-mod fetch_properties_2_0;
+mod fetch_properties_3_0;
 mod shared;
 
 pub fn create_dbus_blockdev<'a>(
@@ -84,34 +84,9 @@ pub fn create_dbus_blockdev<'a>(
                 .add_p(blockdev_2_2::physical_path_property(&f)),
         )
         .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME, ())
-                .add_m(fetch_properties_2_0::get_all_properties_method(&f))
-                .add_m(fetch_properties_2_0::get_properties_method(&f)),
-        )
-        .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_1, ())
-                .add_m(fetch_properties_2_0::get_all_properties_method(&f))
-                .add_m(fetch_properties_2_0::get_properties_method(&f)),
-        )
-        .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_2, ())
-                .add_m(fetch_properties_2_0::get_all_properties_method(&f))
-                .add_m(fetch_properties_2_0::get_properties_method(&f)),
-        )
-        .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_3, ())
-                .add_m(fetch_properties_2_0::get_all_properties_method(&f))
-                .add_m(fetch_properties_2_0::get_properties_method(&f)),
-        )
-        .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_4, ())
-                .add_m(fetch_properties_2_0::get_all_properties_method(&f))
-                .add_m(fetch_properties_2_0::get_properties_method(&f)),
-        )
-        .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_3_0, ())
-                .add_m(fetch_properties_2_0::get_all_properties_method(&f))
-                .add_m(fetch_properties_2_0::get_properties_method(&f)),
+                .add_m(fetch_properties_3_0::get_all_properties_method(&f))
+                .add_m(fetch_properties_3_0::get_properties_method(&f)),
         );
 
     let path = object_path.get_name().to_owned();

@@ -9,9 +9,7 @@ use crate::dbus_api::{
     types::{DbusContext, TData},
 };
 
-mod fetch_properties_2_1;
-mod fetch_properties_2_2;
-mod fetch_properties_2_4;
+mod fetch_properties_3_0;
 mod manager_2_0;
 mod manager_2_1;
 mod manager_2_2;
@@ -103,29 +101,9 @@ pub fn get_base_tree<'a>(
                 .add_p(manager_2_0::version_property(&f)),
         )
         .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_1, ())
-                .add_m(fetch_properties_2_1::get_all_properties_method(&f))
-                .add_m(fetch_properties_2_1::get_properties_method(&f)),
-        )
-        .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_2, ())
-                .add_m(fetch_properties_2_2::get_all_properties_method(&f))
-                .add_m(fetch_properties_2_2::get_properties_method(&f)),
-        )
-        .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_3, ())
-                .add_m(fetch_properties_2_2::get_all_properties_method(&f))
-                .add_m(fetch_properties_2_2::get_properties_method(&f)),
-        )
-        .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_4, ())
-                .add_m(fetch_properties_2_4::get_all_properties_method(&f))
-                .add_m(fetch_properties_2_4::get_properties_method(&f)),
-        )
-        .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_3_0, ())
-                .add_m(fetch_properties_2_4::get_all_properties_method(&f))
-                .add_m(fetch_properties_2_4::get_properties_method(&f)),
+                .add_m(fetch_properties_3_0::get_all_properties_method(&f))
+                .add_m(fetch_properties_3_0::get_properties_method(&f)),
         )
         .add(
             f.interface(consts::REPORT_INTERFACE_NAME_3_0, ())

@@ -25,8 +25,8 @@ if $(stratis-min pool is-locked "$POOL_UUID"); then
 		fi
 	else
 		if ! systemd-ask-password \
-			"Enter password for pool with UUID $POOL_UUID" \
-			| stratis-min pool unlock keyring "$POOL_UUID"; then
+			"Enter password for pool with UUID $POOL_UUID" |
+			stratis-min pool unlock keyring "$POOL_UUID"; then
 			echo Failed to unlock pool with UUID $POOL_UUID using Clevis. >&2
 			exit 1
 		fi

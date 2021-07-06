@@ -29,7 +29,7 @@ jobs:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
           - task: make -f Makefile fmt-travis
             toolchain: 1.53.0
-            components: rustfmt shfmt
+            components: rustfmt
             image: ubuntu:groovy
           - task: make -f Makefile clippy
             toolchain: 1.53.0
@@ -37,7 +37,7 @@ jobs:
             image: ubuntu:groovy
           - task: make -f Makefile fmt-travis
             toolchain: 1.53.0
-            components: rustfmt shfmt
+            components: rustfmt
             image: fedora:33
           - task: make -f Makefile clippy
             toolchain: 1.53.0

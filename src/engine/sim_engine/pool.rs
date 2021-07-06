@@ -469,38 +469,16 @@ impl Pool for SimPool {
             .collect()
     }
 
-    fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut dyn Filesystem)> {
-        self.filesystems
-            .iter_mut()
-            .map(|(name, uuid, x)| (name.clone(), *uuid, x as &mut dyn Filesystem))
-            .collect()
-    }
-
     fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &dyn Filesystem)> {
         self.filesystems
             .get_by_uuid(uuid)
             .map(|(name, p)| (name, p as &dyn Filesystem))
     }
 
-    fn get_mut_filesystem(&mut self, uuid: FilesystemUuid) -> Option<(Name, &mut dyn Filesystem)> {
-        self.filesystems
-            .get_mut_by_uuid(uuid)
-            .map(|(name, p)| (name, p as &mut dyn Filesystem))
-    }
-
     fn get_filesystem_by_name(&self, name: &Name) -> Option<(FilesystemUuid, &dyn Filesystem)> {
         self.filesystems
             .get_by_name(name)
             .map(|(uuid, p)| (uuid, p as &dyn Filesystem))
-    }
-
-    fn get_mut_filesystem_by_name(
-        &mut self,
-        name: &Name,
-    ) -> Option<(FilesystemUuid, &mut dyn Filesystem)> {
-        self.filesystems
-            .get_mut_by_name(name)
-            .map(|(uuid, p)| (uuid, p as &mut dyn Filesystem))
     }
 
     fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &dyn BlockDev)> {
@@ -516,19 +494,6 @@ impl Pool for SimPool {
             .collect()
     }
 
-    fn blockdevs_mut(&mut self) -> Vec<(DevUuid, BlockDevTier, &mut dyn BlockDev)> {
-        self.block_devs
-            .iter_mut()
-            .map(|(uuid, dev)| (uuid, BlockDevTier::Data, dev))
-            .chain(
-                self.cache_devs
-                    .iter_mut()
-                    .map(|(uuid, dev)| (uuid, BlockDevTier::Cache, dev)),
-            )
-            .map(|(uuid, tier, b)| (*uuid, tier, b as &mut dyn BlockDev))
-            .collect()
-    }
-
     fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &dyn BlockDev)> {
         self.block_devs
             .get(&uuid)
@@ -538,11 +503,6 @@ impl Pool for SimPool {
                     .get(&uuid)
                     .map(|bd| (BlockDevTier::Cache, bd as &dyn BlockDev))
             })
-    }
-
-    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut dyn BlockDev)> {
-        self.get_mut_blockdev_internal(uuid)
-            .map(|(tier, bd)| (tier, bd as &mut dyn BlockDev))
     }
 
     fn set_blockdev_user_info(

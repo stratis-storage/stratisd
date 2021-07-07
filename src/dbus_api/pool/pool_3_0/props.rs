@@ -10,6 +10,13 @@ use crate::dbus_api::{
     types::TData,
 };
 
+pub fn get_pool_name(
+    i: &mut IterAppend,
+    p: &PropInfo<MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
+    get_pool_property(i, p, |(name, _, _)| Ok(shared::pool_name_prop(&name)))
+}
+
 pub fn get_pool_encrypted(
     i: &mut IterAppend,
     p: &PropInfo<MTSync<TData>, TData>,

@@ -2,10 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, convert::TryFrom};
 
 use dbus::{arg::Array, Message};
 use dbus_tree::{MTSync, MethodInfo, MethodResult};
+use serde_json::Value;
+
 use devicemapper::Sectors;
 
 use crate::{
@@ -16,7 +18,11 @@ use crate::{
         types::{DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg},
     },
-    engine::{CreateAction, EngineAction, FilesystemUuid, Name, PoolUuid, RenameAction},
+    engine::{
+        CreateAction, DeleteAction, EngineAction, FilesystemUuid, KeyDescription, Name, PoolUuid,
+        RenameAction,
+    },
+    stratis::StratisError,
 };
 
 pub fn create_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
@@ -255,45 +261,6 @@ pub fn add_datadevs(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     add_blockdevs(m, BlockDevOp::AddData)
 }
 
-/// This method supports a method for adding cachedevs to a pool where,
-/// if there was no previously existing cache, the addition of the cache
-/// devices caused a cache to be automatically constructed. The newer
-/// version of the interface requires initializing the cache in a distinct
-/// step and the engine's Pool trait is designed to accomodate that
-/// interface. For this reason, this method contains an extra step:
-/// it must determine whether or not the cache is already initialized in
-/// order to specify which Pool trait method must be invoked.
-pub fn add_cachedevs(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
-    let message: &Message = m.msg;
-    let return_message = message.method_return();
-    let object_path = m.path.get_name();
-    let default_return: (bool, Vec<dbus::Path>) = (false, Vec::new());
-    let pool_path = m
-        .tree
-        .get(object_path)
-        .expect("implicit argument must be in tree");
-    let pool_uuid = typed_uuid!(
-        get_data!(pool_path; default_return; return_message).uuid;
-        Pool;
-        default_return;
-        return_message
-    );
-    let cache_initialized = {
-        let dbus_context = m.tree.get_data();
-        let mutex_lock = dbus_context.engine.blocking_lock();
-        let (_, pool) = get_pool!(mutex_lock; pool_uuid; default_return; return_message);
-        pool.has_cache()
-    };
-    add_blockdevs(
-        m,
-        if cache_initialized {
-            BlockDevOp::AddCache
-        } else {
-            BlockDevOp::InitCache
-        },
-    )
-}
-
 pub fn rename_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
@@ -341,6 +308,269 @@ pub fn rename_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
         }
         Err(err) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&err);
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+    Ok(vec![msg])
+}
+
+pub fn init_cache(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+    add_blockdevs(m, BlockDevOp::InitCache)
+}
+
+pub fn add_cachedevs(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+    add_blockdevs(m, BlockDevOp::AddCache)
+}
+
+pub fn bind_clevis(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+    let pin: String = get_next_arg(&mut iter, 0)?;
+    let json_string: String = get_next_arg(&mut iter, 1)?;
+
+    let dbus_context = m.tree.get_data();
+    let object_path = m.path.get_name();
+    let return_message = message.method_return();
+    let default_return = false;
+
+    let pool_path = m
+        .tree
+        .get(object_path)
+        .expect("implicit argument must be in tree");
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
+
+    let mut mutex_lock = dbus_context.engine.blocking_lock();
+    let (_, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
+
+    let json: Value = match serde_json::from_str(&json_string) {
+        Ok(j) => j,
+        Err(e) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&StratisError::Serde(e));
+            return Ok(vec![return_message.append3(default_return, rc, rs)]);
+        }
+    };
+    let msg = match log_action!(pool.bind_clevis(pin.as_str(), &json)) {
+        Ok(CreateAction::Identity) => {
+            return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
+        Ok(CreateAction::Created(_)) => {
+            return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
+        Err(e) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&e);
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+    Ok(vec![msg])
+}
+
+pub fn unbind_clevis(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+
+    let dbus_context = m.tree.get_data();
+    let object_path = m.path.get_name();
+    let return_message = message.method_return();
+    let default_return = false;
+
+    let pool_path = m
+        .tree
+        .get(object_path)
+        .expect("implicit argument must be in tree");
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
+
+    let mut mutex_lock = dbus_context.engine.blocking_lock();
+    let (_, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
+
+    let msg = match log_action!(pool.unbind_clevis()) {
+        Ok(DeleteAction::Identity) => {
+            return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
+        Ok(DeleteAction::Deleted(_)) => {
+            return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
+        Err(e) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&e);
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+    Ok(vec![msg])
+}
+
+pub fn bind_keyring(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+    let key_desc_str: String = get_next_arg(&mut iter, 0)?;
+
+    let dbus_context = m.tree.get_data();
+    let object_path = m.path.get_name();
+    let return_message = message.method_return();
+    let default_return = false;
+
+    let key_desc = match KeyDescription::try_from(key_desc_str) {
+        Ok(kd) => kd,
+        Err(e) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&e);
+            return Ok(vec![return_message.append3(default_return, rc, rs)]);
+        }
+    };
+
+    let pool_path = m
+        .tree
+        .get(object_path)
+        .expect("implicit argument must be in tree");
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
+
+    let mut mutex_lock = dbus_context.engine.blocking_lock();
+    let (_, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
+
+    let msg = match log_action!(pool.bind_keyring(&key_desc)) {
+        Ok(CreateAction::Identity) => {
+            return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
+        Ok(CreateAction::Created(_)) => {
+            return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
+        Err(e) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&e);
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+    Ok(vec![msg])
+}
+
+pub fn unbind_keyring(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+
+    let dbus_context = m.tree.get_data();
+    let object_path = m.path.get_name();
+    let return_message = message.method_return();
+    let default_return = false;
+
+    let pool_path = m
+        .tree
+        .get(object_path)
+        .expect("implicit argument must be in tree");
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
+
+    let mut mutex_lock = dbus_context.engine.blocking_lock();
+    let (_, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
+
+    let msg = match log_action!(pool.unbind_keyring()) {
+        Ok(DeleteAction::Identity) => {
+            return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
+        Ok(DeleteAction::Deleted(_)) => {
+            return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
+        Err(e) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&e);
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+    Ok(vec![msg])
+}
+
+pub fn rebind_keyring(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+    let key_desc_str: String = get_next_arg(&mut iter, 0)?;
+
+    let dbus_context = m.tree.get_data();
+    let object_path = m.path.get_name();
+    let return_message = message.method_return();
+    let default_return = false;
+
+    let key_desc = match KeyDescription::try_from(key_desc_str) {
+        Ok(kd) => kd,
+        Err(e) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&e);
+            return Ok(vec![return_message.append3(default_return, rc, rs)]);
+        }
+    };
+
+    let pool_path = m
+        .tree
+        .get(object_path)
+        .expect("implicit argument must be in tree");
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
+
+    let mut mutex_lock = dbus_context.engine.blocking_lock();
+    let (_, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
+
+    let msg = match log_action!(pool.rebind_keyring(&key_desc)) {
+        Ok(RenameAction::Identity) => {
+            return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
+        Ok(RenameAction::Renamed(_)) => {
+            return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
+        Ok(RenameAction::NoSource) => {
+            let error_message = format!(
+                "pool with UUID {} is not currently bound to a keyring passphrase",
+                pool_uuid
+            );
+            let (rc, rs) = (DbusErrorEnum::ERROR as u16, error_message);
+            return_message.append3(default_return, rc, rs)
+        }
+        Err(e) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&e);
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+    Ok(vec![msg])
+}
+
+pub fn rebind_clevis(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+
+    let dbus_context = m.tree.get_data();
+    let object_path = m.path.get_name();
+    let return_message = message.method_return();
+    let default_return = false;
+
+    let pool_path = m
+        .tree
+        .get(object_path)
+        .expect("implicit argument must be in tree");
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
+
+    let mut mutex_lock = dbus_context.engine.blocking_lock();
+    let (_, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
+
+    let msg = match log_action!(pool.rebind_clevis()) {
+        Ok(_) => return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string()),
+        Err(e) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&e);
             return_message.append3(default_return, rc, rs)
         }
     };

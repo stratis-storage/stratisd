@@ -23,10 +23,6 @@ pub const LOCKED_POOL_UUIDS: &str = "LockedPoolUuids";
 pub const LOCKED_POOLS: &str = "LockedPools";
 pub const LOCKED_POOL_DEVS: &str = "LockedPoolsWithDevs";
 
-pub const POOL_INTERFACE_NAME: &str = "org.storage.stratis2.pool";
-pub const POOL_INTERFACE_NAME_2_1: &str = "org.storage.stratis2.pool.r1";
-pub const POOL_INTERFACE_NAME_2_3: &str = "org.storage.stratis2.pool.r3";
-pub const POOL_INTERFACE_NAME_2_4: &str = "org.storage.stratis2.pool.r4";
 pub const POOL_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.pool.r0";
 pub const POOL_NAME_PROP: &str = "Name";
 pub const POOL_UUID_PROP: &str = "Uuid";
@@ -68,16 +64,10 @@ pub fn fetch_properties_interfaces() -> Vec<String> {
 /// Get a list of all the standard pool interfaces; i.e., all the revisions of
 /// org.storage.stratis2.pool.
 pub fn standard_pool_interfaces() -> Vec<String> {
-    [
-        POOL_INTERFACE_NAME,
-        POOL_INTERFACE_NAME_2_1,
-        POOL_INTERFACE_NAME_2_3,
-        POOL_INTERFACE_NAME_2_4,
-        POOL_INTERFACE_NAME_3_0,
-    ]
-    .iter()
-    .map(|s| (*s).to_string())
-    .collect()
+    [POOL_INTERFACE_NAME_3_0]
+        .iter()
+        .map(|s| (*s).to_string())
+        .collect()
 }
 
 /// Get a list of all the standard filesystem interfaces; i.e., all the

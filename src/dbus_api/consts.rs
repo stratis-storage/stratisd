@@ -7,11 +7,6 @@ use crate::dbus_api::types::InterfacesRemoved;
 pub const STRATIS_BASE_PATH: &str = "/org/storage/stratis3";
 pub const STRATIS_BASE_SERVICE: &str = "org.storage.stratis3";
 
-pub const MANAGER_INTERFACE_NAME: &str = "org.storage.stratis2.Manager";
-pub const MANAGER_INTERFACE_NAME_2_1: &str = "org.storage.stratis2.Manager.r1";
-pub const MANAGER_INTERFACE_NAME_2_2: &str = "org.storage.stratis2.Manager.r2";
-pub const MANAGER_INTERFACE_NAME_2_3: &str = "org.storage.stratis2.Manager.r3";
-pub const MANAGER_INTERFACE_NAME_2_4: &str = "org.storage.stratis2.Manager.r4";
 pub const MANAGER_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.Manager.r0";
 pub const REPORT_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.Report.r0";
 

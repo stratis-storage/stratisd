@@ -2,22 +2,20 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::convert::TryFrom;
+
 use dbus::Message;
 use dbus_tree::{MTSync, MethodInfo, MethodResult};
 
 use crate::{
     dbus_api::{
-        api::shared::create_pool_shared,
+        api::shared::{create_pool_shared, set_key_shared, unlock_pool_shared},
         consts,
         types::{CreatePoolParams, DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg},
     },
-    engine::{DeleteAction, PoolUuid},
+    engine::{DeleteAction, KeyDescription, MappingDeleteAction, PoolUuid},
 };
-
-pub fn create_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
-    create_pool_shared(m, CreatePoolParams::Neither)
-}
 
 pub fn destroy_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
@@ -88,4 +86,75 @@ pub fn configure_simulator(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
         }
     };
     Ok(vec![msg])
+}
+
+pub fn unset_key(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+
+    let key_desc_str: String = get_next_arg(&mut iter, 0)?;
+
+    let dbus_context = m.tree.get_data();
+    let default_return = false;
+    let return_message = message.method_return();
+
+    let msg = match log_action!(dbus_context
+        .engine
+        .blocking_lock()
+        .get_key_handler_mut()
+        .unset(&match KeyDescription::try_from(key_desc_str) {
+            Ok(kd) => kd,
+            Err(e) => {
+                let (rc, rs) = engine_to_dbus_err_tuple(&e);
+                return Ok(vec![return_message.append3(default_return, rc, rs)]);
+            }
+        })) {
+        Ok(idem_resp) => {
+            let return_value = matches!(idem_resp, MappingDeleteAction::Deleted(_));
+            return_message.append3(
+                return_value,
+                DbusErrorEnum::OK as u16,
+                OK_STRING.to_string(),
+            )
+        }
+        Err(e) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&e);
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+    Ok(vec![msg])
+}
+
+pub fn set_key(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+    set_key_shared(m)
+}
+
+pub fn unlock_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+    unlock_pool_shared(m, true)
+}
+
+pub fn engine_state_report(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+
+    let return_message = message.method_return();
+    let default_return = String::new();
+
+    let dbus_context = m.tree.get_data();
+    let lock = dbus_context.engine.blocking_lock();
+
+    let msg = match serde_json::to_string(&lock.engine_state_report()) {
+        Ok(string) => {
+            return_message.append3(string, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
+        Err(e) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&e.into());
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+
+    Ok(vec![msg])
+}
+
+pub fn create_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+    create_pool_shared(m, CreatePoolParams::Both)
 }

@@ -15,10 +15,7 @@ use crate::{
         blockdev::{create_dbus_blockdev, get_blockdev_properties},
         filesystem::get_fs_properties,
         pool::{create_dbus_pool, get_pool_properties},
-        types::{
-            CreatePoolParams, DbusErrorEnum, GetManagedObjects, InterfacesAddedThreadSafe, TData,
-            OK_STRING,
-        },
+        types::{DbusErrorEnum, GetManagedObjects, InterfacesAddedThreadSafe, TData, OK_STRING},
         util::{
             engine_to_dbus_err_tuple, get_next_arg, thread_safe_to_dbus_sendable, tuple_to_option,
         },
@@ -35,24 +32,17 @@ type EncryptionParams = (Option<(bool, String)>, Option<(bool, (String, String))
 /// Shared code for the creation of pools using the D-Bus API without the option
 /// for a key description or with an optional key description in later versions of
 /// the interface.
-pub fn create_pool_shared(
-    m: &MethodInfo<MTSync<TData>, TData>,
-    has_additional_params: CreatePoolParams,
-) -> MethodResult {
+pub fn create_pool_shared(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
     let name: &str = get_next_arg(&mut iter, 0)?;
     let redundancy_tuple: (bool, u16) = get_next_arg(&mut iter, 1)?;
     let devs: Array<&str, _> = get_next_arg(&mut iter, 2)?;
-    let (key_desc_tuple, clevis_tuple): EncryptionParams = match has_additional_params {
-        CreatePoolParams::Neither => (None, None),
-        CreatePoolParams::KeyDesc => (Some(get_next_arg(&mut iter, 3)?), None),
-        CreatePoolParams::Both => (
-            Some(get_next_arg(&mut iter, 3)?),
-            Some(get_next_arg(&mut iter, 4)?),
-        ),
-    };
+    let (key_desc_tuple, clevis_tuple): EncryptionParams = (
+        Some(get_next_arg(&mut iter, 3)?),
+        Some(get_next_arg(&mut iter, 4)?),
+    );
 
     let return_message = message.method_return();
 

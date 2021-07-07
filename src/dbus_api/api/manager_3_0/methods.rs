@@ -11,7 +11,7 @@ use crate::{
     dbus_api::{
         api::shared::{create_pool_shared, set_key_shared, unlock_pool_shared},
         consts,
-        types::{CreatePoolParams, DbusErrorEnum, TData, OK_STRING},
+        types::{DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg},
     },
     engine::{DeleteAction, KeyDescription, MappingDeleteAction, PoolUuid},
@@ -156,5 +156,5 @@ pub fn engine_state_report(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
 }
 
 pub fn create_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
-    create_pool_shared(m, CreatePoolParams::Both)
+    create_pool_shared(m)
 }

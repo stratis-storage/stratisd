@@ -732,7 +732,10 @@ mod tests {
     use devicemapper::{Bytes, ThinPoolStatus, ThinPoolStatusSummary, IEC, SECTOR_SIZE};
 
     use crate::engine::{
-        strat_engine::tests::{loopbacked, real},
+        strat_engine::{
+            cmd::udev_settle,
+            tests::{loopbacked, real},
+        },
         types::{EngineAction, Redundancy},
     };
 
@@ -959,6 +962,7 @@ mod tests {
         assert_eq!(pool.action_avail, ActionAvailability::NoRequests);
 
         pool.destroy().unwrap();
+        udev_settle().unwrap();
 
         let name = "stratis-test-pool";
         let (_, mut pool) =

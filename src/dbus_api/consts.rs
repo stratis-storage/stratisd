@@ -37,8 +37,6 @@ pub const POOL_TOTAL_SIZE_PROP: &str = "TotalPhysicalSize";
 pub const POOL_TOTAL_USED_PROP: &str = "TotalPhysicalUsed";
 pub const POOL_CLEVIS_INFO: &str = "ClevisInfo";
 
-pub const FILESYSTEM_INTERFACE_NAME: &str = "org.storage.stratis2.filesystem";
-pub const FILESYSTEM_INTERFACE_NAME_2_4: &str = "org.storage.stratis2.filesystem.r4";
 pub const FILESYSTEM_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.filesystem.r0";
 pub const FILESYSTEM_NAME_PROP: &str = "Name";
 pub const FILESYSTEM_UUID_PROP: &str = "Uuid";
@@ -88,14 +86,10 @@ pub fn standard_pool_interfaces() -> Vec<String> {
 /// Get a list of all the standard filesystem interfaces; i.e., all the
 /// revisions of org.storage.stratis2.filesystem.
 pub fn standard_filesystem_interfaces() -> Vec<String> {
-    [
-        FILESYSTEM_INTERFACE_NAME,
-        FILESYSTEM_INTERFACE_NAME_2_4,
-        FILESYSTEM_INTERFACE_NAME_3_0,
-    ]
-    .iter()
-    .map(|s| (*s).to_string())
-    .collect()
+    [FILESYSTEM_INTERFACE_NAME_3_0]
+        .iter()
+        .map(|s| (*s).to_string())
+        .collect()
 }
 
 /// Get a list of all the standard blockdev interfaces; i.e., all the

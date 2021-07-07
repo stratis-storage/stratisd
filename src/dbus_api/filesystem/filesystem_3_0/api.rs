@@ -6,7 +6,7 @@ use dbus_tree::{Access, EmitsChangedSignal, Factory, MTSync, Method, Property};
 
 use crate::dbus_api::{
     consts,
-    filesystem::filesystem_2_0::{
+    filesystem::filesystem_3_0::{
         methods::rename_filesystem,
         props::{get_filesystem_created, get_filesystem_devnode, get_filesystem_name},
     },

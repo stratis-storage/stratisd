@@ -45,3 +45,11 @@ pub fn get_blockdev_tier(
 ) -> Result<(), MethodErr> {
     get_blockdev_property(i, p, |t, _| Ok(shared::blockdev_tier_prop(t)))
 }
+
+/// Get the devnode for an object path.
+pub fn get_blockdev_physical_path(
+    i: &mut IterAppend,
+    p: &PropInfo<MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
+    get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_physical_path_prop(p)))
+}

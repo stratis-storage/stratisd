@@ -5,11 +5,11 @@
 use dbus_tree::{Access, EmitsChangedSignal, Factory, MTSync, Method, Property};
 
 use crate::dbus_api::{
-    blockdev::blockdev_2_0::{
+    blockdev::blockdev_3_0::{
         methods::set_user_info,
         props::{
             get_blockdev_devnode, get_blockdev_hardware_info, get_blockdev_initialization_time,
-            get_blockdev_tier, get_blockdev_user_info,
+            get_blockdev_physical_path, get_blockdev_tier, get_blockdev_user_info,
         },
     },
     consts,
@@ -78,4 +78,11 @@ pub fn tier_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_blockdev_tier)
+}
+
+pub fn physical_path_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
+    f.property::<&str, _>(consts::BLOCKDEV_PHYSICAL_PATH_PROP, ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::Const)
+        .on_get(get_blockdev_physical_path)
 }

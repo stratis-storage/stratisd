@@ -956,7 +956,7 @@ mod tests {
 
         assert_eq!(pool.action_avail, ActionAvailability::Full);
         assert!(pool.return_rollback_failure().is_err());
-        assert_eq!(pool.action_avail, ActionAvailability::ReadOnly);
+        assert_eq!(pool.action_avail, ActionAvailability::NoRequests);
 
         pool.destroy().unwrap();
 
@@ -968,7 +968,7 @@ mod tests {
 
         assert_eq!(pool.action_avail, ActionAvailability::Full);
         assert!(pool.return_rollback_failure_chain().is_err());
-        assert_eq!(pool.action_avail, ActionAvailability::ReadOnly);
+        assert_eq!(pool.action_avail, ActionAvailability::NoRequests);
     }
 
     #[test]

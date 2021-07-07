@@ -184,7 +184,9 @@ impl DataType for TData {
 
 /// Tri-state enum to determine CreatePool parameters accepted by the D-Bus method.
 pub enum CreatePoolParams {
+    #[allow(dead_code)]
     Neither,
+    #[allow(dead_code)]
     KeyDesc,
     Both,
 }

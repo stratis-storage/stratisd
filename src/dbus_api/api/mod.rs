@@ -10,11 +10,7 @@ use crate::dbus_api::{
 };
 
 mod fetch_properties_3_0;
-mod manager_2_0;
-mod manager_2_1;
-mod manager_2_2;
-mod manager_2_3;
-mod manager_2_4;
+mod manager_3_0;
 mod report_3_0;
 mod shared;
 
@@ -42,63 +38,15 @@ pub fn get_base_tree<'a>(
                 .add_m(shared::get_managed_objects_method(&f)),
         )
         .add(
-            f.interface(consts::MANAGER_INTERFACE_NAME, ())
-                .add_m(manager_2_0::create_pool_method(&f))
-                .add_m(manager_2_0::destroy_pool_method(&f))
-                .add_m(manager_2_0::configure_simulator_method(&f))
-                .add_p(manager_2_0::version_property(&f)),
-        )
-        .add(
-            f.interface(consts::MANAGER_INTERFACE_NAME_2_1, ())
-                .add_m(manager_2_1::create_pool_method(&f))
-                .add_m(manager_2_1::set_key_method(&f))
-                .add_m(manager_2_1::unset_key_method(&f))
-                .add_m(manager_2_1::unlock_pool_method(&f))
-                .add_m(manager_2_0::destroy_pool_method(&f))
-                .add_m(manager_2_0::configure_simulator_method(&f))
-                .add_p(manager_2_0::version_property(&f)),
-        )
-        .add(
-            f.interface(consts::MANAGER_INTERFACE_NAME_2_2, ())
-                .add_m(manager_2_1::create_pool_method(&f))
-                .add_m(manager_2_2::set_key_method(&f))
-                .add_m(manager_2_1::unset_key_method(&f))
-                .add_m(manager_2_1::unlock_pool_method(&f))
-                .add_m(manager_2_0::destroy_pool_method(&f))
-                .add_m(manager_2_0::configure_simulator_method(&f))
-                .add_p(manager_2_0::version_property(&f)),
-        )
-        .add(
-            f.interface(consts::MANAGER_INTERFACE_NAME_2_3, ())
-                .add_m(manager_2_1::create_pool_method(&f))
-                .add_m(manager_2_2::set_key_method(&f))
-                .add_m(manager_2_1::unset_key_method(&f))
-                .add_m(manager_2_3::unlock_pool_method(&f))
-                .add_m(manager_2_0::destroy_pool_method(&f))
-                .add_m(manager_2_0::configure_simulator_method(&f))
-                .add_p(manager_2_0::version_property(&f)),
-        )
-        .add(
-            f.interface(consts::MANAGER_INTERFACE_NAME_2_4, ())
-                .add_m(manager_2_4::create_pool_method(&f))
-                .add_m(manager_2_2::set_key_method(&f))
-                .add_m(manager_2_1::unset_key_method(&f))
-                .add_m(manager_2_3::unlock_pool_method(&f))
-                .add_m(manager_2_0::destroy_pool_method(&f))
-                .add_m(manager_2_0::configure_simulator_method(&f))
-                .add_m(manager_2_4::engine_state_report_method(&f))
-                .add_p(manager_2_0::version_property(&f)),
-        )
-        .add(
             f.interface(consts::MANAGER_INTERFACE_NAME_3_0, ())
-                .add_m(manager_2_4::create_pool_method(&f))
-                .add_m(manager_2_2::set_key_method(&f))
-                .add_m(manager_2_1::unset_key_method(&f))
-                .add_m(manager_2_3::unlock_pool_method(&f))
-                .add_m(manager_2_0::destroy_pool_method(&f))
-                .add_m(manager_2_0::configure_simulator_method(&f))
-                .add_m(manager_2_4::engine_state_report_method(&f))
-                .add_p(manager_2_0::version_property(&f)),
+                .add_m(manager_3_0::create_pool_method(&f))
+                .add_m(manager_3_0::set_key_method(&f))
+                .add_m(manager_3_0::unset_key_method(&f))
+                .add_m(manager_3_0::unlock_pool_method(&f))
+                .add_m(manager_3_0::destroy_pool_method(&f))
+                .add_m(manager_3_0::configure_simulator_method(&f))
+                .add_m(manager_3_0::engine_state_report_method(&f))
+                .add_p(manager_3_0::version_property(&f)),
         )
         .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_3_0, ())

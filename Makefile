@@ -187,7 +187,6 @@ create-release: ${PWD}/stratisd-vendor.tar.gz
 
 fmt:
 	cargo fmt
-	shfmt -l -w .
 
 fmt-travis:
 	cargo fmt -- --check

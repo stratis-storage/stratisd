@@ -45,9 +45,6 @@ pub const FILESYSTEM_DEVNODE_PROP: &str = "Devnode";
 pub const FILESYSTEM_POOL_PROP: &str = "Pool";
 pub const FILESYSTEM_CREATED_PROP: &str = "Created";
 
-pub const BLOCKDEV_INTERFACE_NAME: &str = "org.storage.stratis2.blockdev";
-pub const BLOCKDEV_INTERFACE_NAME_2_2: &str = "org.storage.stratis2.blockdev.r2";
-pub const BLOCKDEV_INTERFACE_NAME_2_4: &str = "org.storage.stratis2.blockdev.r4";
 pub const BLOCKDEV_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.blockdev.r0";
 pub const BLOCKDEV_DEVNODE_PROP: &str = "Devnode";
 pub const BLOCKDEV_HARDWARE_INFO_PROP: &str = "HardwareInfo";
@@ -95,15 +92,10 @@ pub fn standard_filesystem_interfaces() -> Vec<String> {
 /// Get a list of all the standard blockdev interfaces; i.e., all the
 /// revisions of org.storage.stratis2.blockdev.
 pub fn standard_blockdev_interfaces() -> Vec<String> {
-    [
-        BLOCKDEV_INTERFACE_NAME,
-        BLOCKDEV_INTERFACE_NAME_2_2,
-        BLOCKDEV_INTERFACE_NAME_2_4,
-        BLOCKDEV_INTERFACE_NAME_3_0,
-    ]
-    .iter()
-    .map(|s| (*s).to_string())
-    .collect()
+    [BLOCKDEV_INTERFACE_NAME_3_0]
+        .iter()
+        .map(|s| (*s).to_string())
+        .collect()
 }
 
 /// Get a list of all interfaces supported by a pool object.

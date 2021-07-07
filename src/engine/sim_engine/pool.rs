@@ -22,8 +22,8 @@ use crate::{
         structures::Table,
         types::{
             BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo,
-            FilesystemUuid, Key, KeyDescription, Name, PoolUuid, Redundancy, RenameAction,
-            SetCreateAction, SetDeleteAction,
+            FilesystemUuid, Key, KeyDescription, Name, PoolUuid, Redundancy, RegenAction,
+            RenameAction, SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -379,6 +379,61 @@ impl Pool for SimPool {
             } else {
                 DeleteAction::Identity
             })
+        } else {
+            Err(StratisError::Msg(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ))
+        }
+    }
+
+    fn rebind_keyring(
+        &mut self,
+        new_key_desc: &KeyDescription,
+    ) -> StratisResult<RenameAction<Key>> {
+        let encryption_info = self.encryption_info();
+
+        if encryption_info.key_description.is_none() {
+            return Err(StratisError::Msg(
+                "This device is not bound to a keyring passphrase; cannot change the passphrase"
+                    .to_string(),
+            ));
+        }
+
+        if self.is_encrypted() {
+            Ok(
+                if encryption_info.key_description.as_ref() != Some(new_key_desc) {
+                    self.add_key_desc(new_key_desc);
+                    RenameAction::Renamed(Key)
+                } else {
+                    RenameAction::Identity
+                },
+            )
+        } else {
+            Err(StratisError::Msg(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ))
+        }
+    }
+
+    // The sim engine does not store token info so this method will always return
+    // RenameAction::Identity.
+    fn rebind_clevis(&mut self) -> StratisResult<RegenAction> {
+        let encryption_info = self.encryption_info();
+
+        if encryption_info.clevis_info.is_none() {
+            return Err(StratisError::Msg(
+                "This device is not bound to Clevis; cannot regenerate bindings".to_string(),
+            ));
+        }
+
+        if self.is_encrypted() {
+            if encryption_info.clevis_info.is_some() {
+                Ok(RegenAction)
+            } else {
+                Err(StratisError::Msg(
+                    "Requested pool does not appear to have Clevis bindings".to_string(),
+                ))
+            }
         } else {
             Err(StratisError::Msg(
                 "Requested pool does not appear to be encrypted".to_string(),

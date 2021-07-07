@@ -12,6 +12,7 @@ use data_encoding::BASE64URL_NOPAD;
 use either::Either;
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
+use tempfile::TempDir;
 
 use libcryptsetup_rs::{
     c_uint, CryptActivateFlags, CryptDeactivateFlags, CryptDevice, CryptInit, CryptStatusInfo,
@@ -122,35 +123,55 @@ pub fn acquire_crypt_device(physical_path: &Path) -> StratisResult<CryptDevice> 
     })
 }
 
-// Precondition: if clevis_pass.is_none(), device must have the volume key stored
-// in memory (this is automatically done when formatting a LUKS2 device).
-pub fn add_keyring_keyslot(
-    device: &mut CryptDevice,
-    key_description: &KeyDescription,
-    clevis_pass: Option<SizedKeyMemory>,
-) -> StratisResult<()> {
+/// Get the passphrase associated with a given key desription.
+fn key_desc_to_passphrase(key_description: &KeyDescription) -> StratisResult<SizedKeyMemory> {
     let key_option = log_on_failure!(
         read_key(key_description),
         "Failed to read key with key description {} from keyring",
         key_description.as_application_str()
     );
-    let key = if let Some(key) = key_option {
-        key
+    if let Some(key) = key_option {
+        Ok(key)
     } else {
-        return Err(StratisError::Msg(format!(
+        Err(StratisError::Msg(format!(
             "Key with key description {} was not found",
             key_description.as_application_str(),
-        )));
-    };
+        )))
+    }
+}
 
-    let keyslot = match clevis_pass {
-        Some(ref pass) => {
+// Precondition: if clevis_pass.is_none(), device must have the volume key stored
+// in memory (this is automatically done when formatting a LUKS2 device).
+pub fn add_keyring_keyslot(
+    device: &mut CryptDevice,
+    key_description: &KeyDescription,
+    pass: Option<Either<SizedKeyMemory, &KeyDescription>>,
+) -> StratisResult<()> {
+    let key = key_desc_to_passphrase(key_description)?;
+    let keyslot = match pass {
+        Some(Either::Left(ref pass)) => {
             log_on_failure!(
                 device
                     .keyslot_handle()
-                    .add_by_passphrase(None, pass.as_ref(), key.as_ref(),),
+                    .add_by_passphrase(None, pass.as_ref(), key.as_ref()),
                 "Failed to initialize keyslot with existing Clevis key"
             )
+        }
+        Some(Either::Right(ref kd)) => {
+            let pass = key_desc_to_passphrase(kd)?;
+            log_on_failure!(
+                device.keyslot_handle().change_by_passphrase(
+                    None,
+                    None,
+                    pass.as_ref(),
+                    key.as_ref()
+                ),
+                "Failed to change passphrase for encrypted device"
+            ) as c_uint
+            // The above cast is a work around for bug in libcryptsetup-rs.
+            // The change_by_passphrase method should return a c_uint instead
+            // of a c_int as a negative error code will be converted into an
+            // error type.
         }
         None => {
             log_on_failure!(
@@ -927,4 +948,24 @@ fn identifiers_from_metadata(device: &mut CryptDevice) -> StratisResult<StratisI
 // Bytes occupied by crypt metadata
 pub fn crypt_metadata_size() -> u64 {
     2 * DEFAULT_CRYPT_METADATA_SIZE + DEFAULT_CRYPT_KEYSLOTS_SIZE
+}
+
+/// Back up the LUKS2 header to a temporary file.
+pub fn back_up_luks_header(dev_path: &Path, tmp_dir: &TempDir) -> StratisResult<PathBuf> {
+    let file_name = dev_path.display().to_string().replace("/", "_");
+    let pathbuf = vec![tmp_dir.path(), &Path::new(&file_name)]
+        .into_iter()
+        .collect::<PathBuf>();
+    acquire_crypt_device(dev_path)?
+        .backup_handle()
+        .header_backup(EncryptionFormat::Luks2, &pathbuf)?;
+    Ok(pathbuf)
+}
+
+/// Restore the LUKS2 header from a temporary file.
+pub fn restore_luks_header(dev_path: &Path, backup_path: &Path) -> StratisResult<()> {
+    acquire_crypt_device(dev_path)?
+        .backup_handle()
+        .header_restore(EncryptionFormat::Luks2, backup_path)?;
+    Ok(())
 }

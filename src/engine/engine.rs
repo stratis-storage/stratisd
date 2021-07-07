@@ -19,8 +19,8 @@ use crate::{
     engine::types::{
         BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid,
         Key, KeyDescription, LockedPoolInfo, MappingCreateAction, MappingDeleteAction, Name,
-        PoolUuid, RenameAction, ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction,
-        UdevEngineEvent, UnlockMethod,
+        PoolUuid, RegenAction, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
+        SetUnlockAction, UdevEngineEvent, UnlockMethod,
     },
     stratis::StratisResult,
 };
@@ -170,6 +170,13 @@ pub trait Pool: Debug {
 
     /// Unbind all devices in the given pool from the registered keyring passphrase.
     fn unbind_keyring(&mut self) -> StratisResult<DeleteAction<Key>>;
+
+    /// Change the key description and passphrase associated with a pool.
+    fn rebind_keyring(&mut self, new_key_desc: &KeyDescription)
+        -> StratisResult<RenameAction<Key>>;
+
+    /// Regenerate the Clevis bindings associated with a pool.
+    fn rebind_clevis(&mut self) -> StratisResult<RegenAction>;
 
     /// Ensures that all designated filesystems are gone from pool.
     /// Returns a list of the filesystems found, and actually destroyed.

@@ -2,9 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, convert::TryFrom, os::unix::io::AsRawFd, vec::Vec};
+use std::{collections::HashMap, convert::TryFrom, vec::Vec};
 
-use dbus::{arg::OwnedFd, Message};
+use dbus::Message;
 use dbus_tree::{Factory, MTSync, Method, MethodInfo, MethodResult, ObjectPath};
 
 use crate::{
@@ -15,10 +15,7 @@ use crate::{
         types::{DbusErrorEnum, GetManagedObjects, InterfacesAddedThreadSafe, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg, thread_safe_to_dbus_sendable},
     },
-    engine::{
-        DevUuid, Engine, EngineAction, FilesystemUuid, KeyDescription, MappingCreateAction,
-        PoolUuid, StratisUuid, UnlockMethod,
-    },
+    engine::{DevUuid, Engine, EngineAction, FilesystemUuid, PoolUuid, StratisUuid, UnlockMethod},
     stratis::StratisError,
 };
 
@@ -35,51 +32,6 @@ pub fn list_keys(info: &MethodInfo<MTSync<TData>, TData>) -> Result<Vec<String>,
                 .collect()
         })
         .map_err(|e| e.to_string())
-}
-
-pub fn set_key_shared(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
-    let message: &Message = m.msg;
-    let mut iter = message.iter_init();
-
-    let key_desc_str: String = get_next_arg(&mut iter, 0)?;
-    let key_fd: OwnedFd = get_next_arg(&mut iter, 1)?;
-
-    let dbus_context = m.tree.get_data();
-    let default_return = (false, false);
-    let return_message = message.method_return();
-
-    let msg = match log_action!(dbus_context
-        .engine
-        .blocking_lock()
-        .get_key_handler_mut()
-        .set(
-            &match KeyDescription::try_from(key_desc_str) {
-                Ok(kd) => kd,
-                Err(e) => {
-                    let (rc, rs) = engine_to_dbus_err_tuple(&e);
-                    return Ok(vec![return_message.append3(default_return, rc, rs)]);
-                }
-            },
-            key_fd.as_raw_fd(),
-        )) {
-        Ok(idem_resp) => {
-            let return_value = match idem_resp {
-                MappingCreateAction::Created(_) => (true, false),
-                MappingCreateAction::ValueChanged(_) => (true, true),
-                MappingCreateAction::Identity => default_return,
-            };
-            return_message.append3(
-                return_value,
-                DbusErrorEnum::OK as u16,
-                OK_STRING.to_string(),
-            )
-        }
-        Err(e) => {
-            let (rc, rs) = engine_to_dbus_err_tuple(&e);
-            return_message.append3(default_return, rc, rs)
-        }
-    };
-    Ok(vec![msg])
 }
 
 pub fn locked_pool_uuids(info: &MethodInfo<MTSync<TData>, TData>) -> Result<Vec<String>, String> {

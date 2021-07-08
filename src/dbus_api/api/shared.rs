@@ -2,9 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, convert::TryFrom, vec::Vec};
+use std::{collections::HashMap, vec::Vec};
 
-use dbus::Message;
 use dbus_tree::{Factory, MTSync, Method, MethodInfo, MethodResult, ObjectPath};
 
 use crate::{
@@ -12,11 +11,10 @@ use crate::{
         blockdev::get_blockdev_properties,
         filesystem::get_fs_properties,
         pool::get_pool_properties,
-        types::{DbusErrorEnum, GetManagedObjects, InterfacesAddedThreadSafe, TData, OK_STRING},
-        util::{engine_to_dbus_err_tuple, get_next_arg, thread_safe_to_dbus_sendable},
+        types::{GetManagedObjects, InterfacesAddedThreadSafe, TData},
+        util::thread_safe_to_dbus_sendable,
     },
-    engine::{DevUuid, Engine, EngineAction, FilesystemUuid, PoolUuid, StratisUuid, UnlockMethod},
-    stratis::StratisError,
+    engine::{DevUuid, Engine, FilesystemUuid, PoolUuid, StratisUuid},
 };
 
 pub fn list_keys(info: &MethodInfo<MTSync<TData>, TData>) -> Result<Vec<String>, String> {
@@ -64,66 +62,6 @@ pub fn locked_pools(
             )
         })
         .collect())
-}
-
-pub fn unlock_pool_shared(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
-    let message: &Message = m.msg;
-    let mut iter = message.iter_init();
-
-    let dbus_context = m.tree.get_data();
-    let default_return: (_, Vec<String>) = (false, Vec::new());
-    let return_message = message.method_return();
-
-    let pool_uuid_str: &str = get_next_arg(&mut iter, 0)?;
-    let pool_uuid_result = PoolUuid::parse_str(pool_uuid_str);
-    let pool_uuid = match pool_uuid_result {
-        Ok(uuid) => uuid,
-        Err(e) => {
-            let e = StratisError::Chained(
-                "Malformed UUID passed to UnlockPool".to_string(),
-                Box::new(e),
-            );
-            let (rc, rs) = engine_to_dbus_err_tuple(&e);
-            return Ok(vec![return_message.append3(default_return, rc, rs)]);
-        }
-    };
-    let unlock_method = {
-        let unlock_method_str: &str = get_next_arg(&mut iter, 1)?;
-        match UnlockMethod::try_from(unlock_method_str) {
-            Ok(um) => um,
-            Err(e) => {
-                let (rc, rs) = engine_to_dbus_err_tuple(&e);
-                return Ok(vec![return_message.append3(default_return, rc, rs)]);
-            }
-        }
-    };
-
-    let msg = match log_action!(dbus_context
-        .engine
-        .blocking_lock()
-        .unlock_pool(pool_uuid, unlock_method))
-    {
-        Ok(unlock_action) => match unlock_action.changed() {
-            Some(vec) => {
-                let str_uuids: Vec<_> = vec.into_iter().map(|u| uuid_to_string!(u)).collect();
-                return_message.append3(
-                    (true, str_uuids),
-                    DbusErrorEnum::OK as u16,
-                    OK_STRING.to_string(),
-                )
-            }
-            None => return_message.append3(
-                default_return,
-                DbusErrorEnum::OK as u16,
-                OK_STRING.to_string(),
-            ),
-        },
-        Err(e) => {
-            let (rc, rs) = engine_to_dbus_err_tuple(&e);
-            return_message.append3(default_return, rc, rs)
-        }
-    };
-    Ok(vec![msg])
 }
 
 pub fn get_managed_objects_method(

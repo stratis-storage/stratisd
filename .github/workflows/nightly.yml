@@ -106,3 +106,45 @@ jobs:
       - name: Run test
         run: ${{ matrix.task }}
         working-directory: ${{ matrix.working-directory }}
+
+  # RPM building tasks, for testing
+  packaging:
+    runs-on: ubuntu-18.04
+    container:
+      image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
+    steps:
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: cargo
+          toolchain: 1.53.0  # CURRENT DEVELOPMENT TOOLCHAIN
+      - name: Install dependencies
+        run: dnf install -y findutils git make tar util-linux
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Set release version
+        run: >
+          echo
+          "RELEASE_VERSION=$(git describe --abbrev=0 | colrm 1 1)"
+          >>
+          $GITHUB_ENV
+      - name: Make the tar file
+        run: |
+          RELEASE_VERSION=${{ env.RELEASE_VERSION }}
+          make -f Makefile vendored-tar-file
+      - name: Set name
+        run: >
+          echo
+          "NAME=$(find . -name 'stratisd-*-vendor.tar.gz' -printf '%f\n')"
+          >>
+          $GITHUB_ENV
+      - name: Set path
+        run: >
+          echo
+          "PATH=$(find . -name 'stratisd-*-vendor.tar.gz')"
+          >>
+          $GITHUB_ENV
+      - uses: actions/upload-artifact@v2
+        with:
+          name: ${{ env.NAME }}
+          path: ${{ env.PATH }}

@@ -332,10 +332,6 @@ clippy:
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${MIN_FEATURES} -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${SYSTEMD_FEATURES} -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
 
-# Verify that the dependency bounds set in Cargo.toml are not lower
-# than is actually reqired. Use build-all target to set up for cargo-tree
-# and also to test that everything still compiles when the versions are set
-# to their precise values.
 verify-dependency-bounds:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \

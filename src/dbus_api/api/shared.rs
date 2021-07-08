@@ -66,10 +66,7 @@ pub fn locked_pools(
         .collect())
 }
 
-pub fn unlock_pool_shared(
-    m: &MethodInfo<MTSync<TData>, TData>,
-    take_unlock_arg: bool,
-) -> MethodResult {
+pub fn unlock_pool_shared(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -90,7 +87,7 @@ pub fn unlock_pool_shared(
             return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };
-    let unlock_method = if take_unlock_arg {
+    let unlock_method = {
         let unlock_method_str: &str = get_next_arg(&mut iter, 1)?;
         match UnlockMethod::try_from(unlock_method_str) {
             Ok(um) => um,
@@ -99,8 +96,6 @@ pub fn unlock_pool_shared(
                 return Ok(vec![return_message.append3(default_return, rc, rs)]);
             }
         }
-    } else {
-        UnlockMethod::Keyring
     };
 
     let msg = match log_action!(dbus_context

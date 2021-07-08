@@ -182,7 +182,7 @@ pub fn set_key(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
 }
 
 pub fn unlock_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
-    unlock_pool_shared(m, true)
+    unlock_pool_shared(m)
 }
 
 pub fn engine_state_report(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {

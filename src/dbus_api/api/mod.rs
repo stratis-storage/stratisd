@@ -44,7 +44,6 @@ pub fn get_base_tree<'a>(
                 .add_m(manager_3_0::unset_key_method(&f))
                 .add_m(manager_3_0::unlock_pool_method(&f))
                 .add_m(manager_3_0::destroy_pool_method(&f))
-                .add_m(manager_3_0::configure_simulator_method(&f))
                 .add_m(manager_3_0::engine_state_report_method(&f))
                 .add_p(manager_3_0::version_property(&f)),
         )

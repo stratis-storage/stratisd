@@ -5,8 +5,8 @@
 // Code to handle a collection of block devices.
 
 use std::{
-    borrow::Cow,
     collections::{HashMap, HashSet},
+    convert::TryFrom,
     fs,
     path::Path,
 };
@@ -32,7 +32,7 @@ use crate::{
             metadata::MDADataSize,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
         },
-        types::{DevUuid, EncryptionInfo, KeyDescription, PoolUuid},
+        types::{DevUuid, EncryptionInfo, KeyDescription, PoolEncryptionInfo, PoolUuid},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -192,7 +192,7 @@ impl BlockDevMgr {
             .collect::<HashSet<_>>();
         let devices = process_and_verify_devices(pool_uuid, &current_uuids, paths)?;
 
-        let encryption_info = self.encryption_info();
+        let encryption_info = EncryptionInfo::try_from(self.encryption_info())?;
         if encryption_info.is_encrypted()
             && !self.can_unlock(
                 encryption_info.key_description.is_some(),
@@ -384,12 +384,13 @@ impl BlockDevMgr {
             .sum()
     }
 
-    pub fn encryption_info(&self) -> Cow<EncryptionInfo> {
-        self.block_devs
-            .iter()
-            .map(|bd| bd.encryption_info())
-            .next()
-            .expect("At least one blockdev in the given manager")
+    /// Get the encryption information for a whole pool.
+    pub fn encryption_info(&self) -> PoolEncryptionInfo {
+        PoolEncryptionInfo::from(
+            self.block_devs
+                .iter()
+                .map(|bd| bd.encryption_info().into_owned()),
+        )
     }
 
     pub fn is_encrypted(&self) -> bool {
@@ -418,7 +419,7 @@ impl BlockDevMgr {
             })
             .collect::<Vec<_>>();
         if encryption_infos.is_empty() {
-            assert_eq!(self.encryption_info().as_ref(), &EncryptionInfo::default());
+            assert_eq!(self.encryption_info(), PoolEncryptionInfo::default());
         } else {
             assert_eq!(encryption_infos.len(), self.block_devs.len());
 
@@ -436,7 +437,7 @@ impl BlockDevMgr {
     /// * Returns Err(_) if an inconsistency was found in the metadata across pools
     /// or binding failed.
     pub fn bind_clevis(&mut self, pin: &str, clevis_info: &Value) -> StratisResult<bool> {
-        let encryption_info = self.encryption_info();
+        let encryption_info = EncryptionInfo::try_from(self.encryption_info())?;
         if !encryption_info.is_encrypted() {
             return Err(StratisError::Msg(
                 "Requested pool does not appear to be encrypted".to_string(),
@@ -486,12 +487,12 @@ impl BlockDevMgr {
     /// * Returns Err(_) if an inconsistency was found in the metadata across pools
     /// or unbinding failed.
     pub fn unbind_clevis(&mut self) -> StratisResult<bool> {
-        let encryption_info = self.encryption_info();
+        let encryption_info = EncryptionInfo::try_from(self.encryption_info())?;
         let (pin, clevis_info) = if !encryption_info.is_encrypted() {
             return Err(StratisError::Msg(
                 "Requested pool does not appear to be encrypted".to_string(),
             ));
-        } else if let Some((pin, clevis_info)) = encryption_info.clevis_info.clone() {
+        } else if let Some((pin, clevis_info)) = encryption_info.clevis_info {
             (pin, clevis_info)
         } else {
             // is encrypted and Clevis info is None
@@ -516,7 +517,7 @@ impl BlockDevMgr {
     /// * Returns Err(_) if an inconsistency was found in the metadata across pools
     /// or binding failed.
     pub fn bind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<bool> {
-        let encryption_info = self.encryption_info();
+        let encryption_info = EncryptionInfo::try_from(self.encryption_info())?;
         if !encryption_info.is_encrypted() {
             return Err(StratisError::Msg(
                 "Requested pool does not appear to be encrypted".to_string(),
@@ -563,12 +564,12 @@ impl BlockDevMgr {
     /// * Returns Err(_) if an inconsistency was found in the metadata across pools
     /// or unbinding failed.
     pub fn unbind_keyring(&mut self) -> StratisResult<bool> {
-        let encryption_info = self.encryption_info();
+        let encryption_info = EncryptionInfo::try_from(self.encryption_info())?;
         let key_desc = if !encryption_info.is_encrypted() {
             return Err(StratisError::Msg(
                 "Requested pool does not appear to be encrypted".to_string(),
             ));
-        } else if let Some(key_desc) = encryption_info.key_description.clone() {
+        } else if let Some(key_desc) = encryption_info.key_description {
             key_desc
         } else {
             // is encrypted and key description is None
@@ -593,7 +594,7 @@ impl BlockDevMgr {
     /// * Ok(Some(false)) if the pool is already bound to this key description.
     /// * Err(_) if an operation fails while changing the passphrase.
     pub fn rebind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<Option<bool>> {
-        let encryption_info = self.encryption_info();
+        let encryption_info = EncryptionInfo::try_from(self.encryption_info())?;
         if !encryption_info.is_encrypted() {
             return Err(StratisError::Msg(
                 "Requested pool does not appear to be encrypted".to_string(),

@@ -7,8 +7,7 @@ use dbus_tree::{Access, EmitsChangedSignal, Factory, MTSync, Method, Property};
 use crate::dbus_api::{
     api::manager_3_0::{
         methods::{
-            configure_simulator, create_pool, destroy_pool, engine_state_report, set_key,
-            unlock_pool, unset_key,
+            create_pool, destroy_pool, engine_state_report, set_key, unlock_pool, unset_key,
         },
         props::get_version,
     },
@@ -24,15 +23,6 @@ pub fn destroy_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<T
         //
         // Rust representation: (bool, String)
         .out_arg(("result", "(bs)"))
-        .out_arg(("return_code", "q"))
-        .out_arg(("return_string", "s"))
-}
-
-pub fn configure_simulator_method(
-    f: &Factory<MTSync<TData>, TData>,
-) -> Method<MTSync<TData>, TData> {
-    f.method("ConfigureSimulator", (), configure_simulator)
-        .in_arg(("denominator", "u"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"))
 }

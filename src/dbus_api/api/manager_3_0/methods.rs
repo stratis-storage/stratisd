@@ -76,28 +76,6 @@ pub fn destroy_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-pub fn configure_simulator(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
-    let message = m.msg;
-    let mut iter = message.iter_init();
-
-    let return_message = message.method_return();
-
-    let denominator: u32 = get_next_arg(&mut iter, 0)?;
-
-    let dbus_context = m.tree.get_data();
-    let mut mutex_lock = dbus_context.engine.blocking_lock();
-    let result = mutex_lock.configure_simulator(denominator);
-
-    let msg = match result {
-        Ok(_) => return_message.append2(DbusErrorEnum::OK as u16, OK_STRING.to_string()),
-        Err(err) => {
-            let (rc, rs) = engine_to_dbus_err_tuple(&err);
-            return_message.append2(rc, rs)
-        }
-    };
-    Ok(vec![msg])
-}
-
 pub fn unset_key(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();

@@ -111,12 +111,6 @@ pub fn get_pool_clevis_info(
 /// data tier must already contain some block devices. The op parameter
 /// determines which method belonging to the engine's Pool interface must
 /// be invoked.
-// FIXME: We have tried two approaches for dispatching to the proper methods
-// in the Pool trait. The first had a lot of code duplication, which was
-// a drawback. This approach has significantly less code duplication, but
-// requires discovering the state of the cache, whether initialized or not,
-// in order to figure out which method to dispatch to. We would like to find
-// a third approach, which doesn't have the flaws of the two we've tried.
 pub fn add_blockdevs(m: &MethodInfo<MTSync<TData>, TData>, op: BlockDevOp) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();

@@ -80,11 +80,7 @@ pub fn create_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult 
     };
 
     let result = handle_action!(
-        pool.create_filesystems(
-            &pool_name,
-            pool_uuid,
-            &filesystem_specs
-        ),
+        pool.create_filesystems(&pool_name, pool_uuid, &filesystem_specs),
         dbus_context,
         pool_path.get_name()
     );

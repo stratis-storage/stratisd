@@ -28,7 +28,7 @@ pub use crate::engine::{
             MappingDeleteAction, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
             SetUnlockAction,
         },
-        keys::{EncryptionInfo, KeyDescription, SizedKeyMemory},
+        keys::{EncryptionInfo, KeyDescription, PoolEncryptionInfo, SizedKeyMemory},
     },
 };
 use crate::stratis::{StratisError, StratisResult};
@@ -353,4 +353,12 @@ impl Display for ActionAvailability {
             }
         )
     }
+}
+
+/// Indicates that a property that should be consistent across block devices
+/// in a pool may be inconsistent.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum MaybeInconsistent<T> {
+    Yes,
+    No(T),
 }

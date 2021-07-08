@@ -12,7 +12,10 @@ use serde_json::{Map, Value};
 
 use libcryptsetup_rs::SafeMemHandle;
 
-use crate::stratis::{StratisError, StratisResult};
+use crate::{
+    engine::types::MaybeInconsistent,
+    stratis::{StratisError, StratisResult},
+};
 
 /// A handle for memory designed to safely handle Stratis passphrases. It can
 /// be coerced to a slice reference for use in read-only operations.
@@ -112,6 +115,101 @@ impl<'a> Into<Value> for &'a EncryptionInfo {
             json.insert("clevis_config".to_string(), info.1.clone());
         }
         Value::from(json)
+    }
+}
+
+impl TryFrom<PoolEncryptionInfo> for EncryptionInfo {
+    type Error = StratisError;
+
+    fn try_from(pei: PoolEncryptionInfo) -> StratisResult<Self> {
+        let key_description = if let Some(MaybeInconsistent::Yes) = pei.key_description {
+            return Err(StratisError::Msg(
+                "Key description metadata for the pool is inconsistent; cannot continue"
+                    .to_string(),
+            ));
+        } else if let Some(MaybeInconsistent::No(kd)) = pei.key_description {
+            Some(kd)
+        } else {
+            None
+        };
+        let clevis_info = if let Some(MaybeInconsistent::Yes) = pei.clevis_info {
+            return Err(StratisError::Msg(
+                "Clevis info metadata for the pool is inconsistent; cannot continue".to_string(),
+            ));
+        } else if let Some(MaybeInconsistent::No(ci)) = pei.clevis_info {
+            Some(ci)
+        } else {
+            None
+        };
+        Ok(EncryptionInfo {
+            key_description,
+            clevis_info,
+        })
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub struct PoolEncryptionInfo {
+    pub key_description: Option<MaybeInconsistent<KeyDescription>>,
+    pub clevis_info: Option<MaybeInconsistent<(String, Value)>>,
+}
+
+impl PoolEncryptionInfo {
+    /// Reconcile two PoolEncryptionInfo records.
+    fn add_enc_info<I>(&mut self, info: I)
+    where
+        PoolEncryptionInfo: From<I>,
+    {
+        let pei = PoolEncryptionInfo::from(info);
+        match (self.key_description.as_ref(), pei.key_description.as_ref()) {
+            (Some(MaybeInconsistent::No(kd1)), Some(MaybeInconsistent::No(kd2))) => {
+                if kd1 != kd2 {
+                    self.key_description = Some(MaybeInconsistent::Yes);
+                }
+            }
+            (Some(MaybeInconsistent::Yes), _) => (),
+            (_, Some(MaybeInconsistent::Yes)) | (None, Some(_)) | (Some(_), None) => {
+                self.key_description = Some(MaybeInconsistent::Yes);
+            }
+            (None, None) => (),
+        };
+    }
+
+    pub fn is_encrypted(&self) -> bool {
+        self.key_description.is_some() || self.clevis_info.is_some()
+    }
+}
+
+impl Default for PoolEncryptionInfo {
+    fn default() -> Self {
+        PoolEncryptionInfo {
+            key_description: None,
+            clevis_info: None,
+        }
+    }
+}
+
+impl From<EncryptionInfo> for PoolEncryptionInfo {
+    fn from(enc_info: EncryptionInfo) -> Self {
+        PoolEncryptionInfo {
+            key_description: enc_info.key_description.map(MaybeInconsistent::No),
+            clevis_info: enc_info.clevis_info.map(MaybeInconsistent::No),
+        }
+    }
+}
+
+impl<I> From<I> for PoolEncryptionInfo
+where
+    I: Iterator<Item = EncryptionInfo>,
+{
+    fn from(mut iterator: I) -> Self {
+        match iterator.next() {
+            Some(ei) => iterator.fold(PoolEncryptionInfo::from(ei), |mut pool_enc_info, next| {
+                pool_enc_info.add_enc_info(next);
+                pool_enc_info
+            }),
+            None => PoolEncryptionInfo::default(),
+        }
     }
 }
 

@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{os::unix::io::RawFd, path::Path};
+use std::{convert::TryFrom, os::unix::io::RawFd, path::Path};
 
 use tokio::task::block_in_place;
 
@@ -238,8 +238,7 @@ pub async fn pool_clevis_pin(
 ) -> StratisResult<Option<String>> {
     let lock = engine.lock().await;
     if let Some((_, pool)) = lock.get_pool(uuid) {
-        Ok(pool
-            .encryption_info()
+        Ok(EncryptionInfo::try_from(pool.encryption_info())?
             .clevis_info
             .as_ref()
             .map(|(pin, _)| pin.clone()))

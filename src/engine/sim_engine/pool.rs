@@ -3,8 +3,8 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    borrow::Cow,
     collections::{hash_map::RandomState, HashMap, HashSet},
+    convert::TryFrom,
     iter::FromIterator,
     path::Path,
     vec::Vec,
@@ -25,8 +25,8 @@ use crate::{
         structures::Table,
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, Key, KeyDescription, Name, PoolUuid, Redundancy,
-            RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
+            EncryptionInfo, FilesystemUuid, Key, KeyDescription, Name, PoolEncryptionInfo,
+            PoolUuid, Redundancy, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -47,9 +47,7 @@ impl SimPool {
         enc_info: &EncryptionInfo,
     ) -> (PoolUuid, SimPool) {
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
-        let device_pairs = devices
-            .iter()
-            .map(|p| SimDev::new(p, Cow::Borrowed(enc_info)));
+        let device_pairs = devices.iter().map(|p| SimDev::new(p, enc_info.to_owned()));
         (
             PoolUuid::new_v4(),
             SimPool {
@@ -86,12 +84,12 @@ impl SimPool {
         Ok(())
     }
 
-    fn encryption_info_impl(&self) -> &EncryptionInfo {
-        self.block_devs
-            .iter()
-            .next()
-            .map(|(_, bd)| bd.encryption_info())
-            .expect("Pool must contain at least one blockdev")
+    fn encryption_info_impl(&self) -> PoolEncryptionInfo {
+        PoolEncryptionInfo::from(
+            self.block_devs
+                .iter()
+                .map(|(_, bd)| bd.encryption_info().clone()),
+        )
     }
 
     fn add_clevis_info(&mut self, pin: &str, config: &Value) {
@@ -195,7 +193,7 @@ impl Pool for SimPool {
             }
             let blockdev_pairs: Vec<_> = blockdevs
                 .iter()
-                .map(|p| SimDev::new(p, Cow::Owned(EncryptionInfo::default())))
+                .map(|p| SimDev::new(p, EncryptionInfo::default()))
                 .collect();
             let blockdev_uuids: Vec<_> = blockdev_pairs.iter().map(|(uuid, _)| *uuid).collect();
             self.cache_devs.extend(blockdev_pairs);
@@ -273,6 +271,7 @@ impl Pool for SimPool {
         }
 
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
+        let encryption_info = EncryptionInfo::try_from(self.encryption_info())?;
 
         let the_vec = match tier {
             BlockDevTier::Cache => &self.cache_devs,
@@ -287,8 +286,8 @@ impl Pool for SimPool {
                 SimDev::new(
                     p,
                     match tier {
-                        BlockDevTier::Data => self.encryption_info(),
-                        BlockDevTier::Cache => Cow::Owned(EncryptionInfo::default()),
+                        BlockDevTier::Data => encryption_info.clone(),
+                        BlockDevTier::Cache => EncryptionInfo::default(),
                     },
                 )
             })
@@ -314,7 +313,7 @@ impl Pool for SimPool {
         pin: &str,
         clevis_info: &Value,
     ) -> StratisResult<CreateAction<Clevis>> {
-        let encryption_info = self.encryption_info();
+        let encryption_info = EncryptionInfo::try_from(self.encryption_info())?;
         let clevis_info_current = encryption_info.clevis_info.as_ref();
         if self.is_encrypted() {
             if let Some((current_pin, current_info)) = clevis_info_current {
@@ -367,7 +366,7 @@ impl Pool for SimPool {
         &mut self,
         key_description: &KeyDescription,
     ) -> StratisResult<CreateAction<Key>> {
-        let encryption_info = self.encryption_info();
+        let encryption_info = EncryptionInfo::try_from(self.encryption_info())?;
         if encryption_info.is_encrypted() {
             if let Some(ref kd) = encryption_info.key_description {
                 if key_description == kd {
@@ -420,7 +419,7 @@ impl Pool for SimPool {
         &mut self,
         new_key_desc: &KeyDescription,
     ) -> StratisResult<RenameAction<Key>> {
-        let encryption_info = self.encryption_info();
+        let encryption_info = EncryptionInfo::try_from(self.encryption_info())?;
 
         if encryption_info.key_description.is_none() {
             return Err(StratisError::Msg(
@@ -628,8 +627,8 @@ impl Pool for SimPool {
         self.datadevs_encrypted()
     }
 
-    fn encryption_info(&self) -> Cow<EncryptionInfo> {
-        Cow::Borrowed(self.encryption_info_impl())
+    fn encryption_info(&self) -> PoolEncryptionInfo {
+        self.encryption_info_impl()
     }
 
     fn pool_state(&self) -> ActionAvailability {

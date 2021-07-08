@@ -332,7 +332,12 @@ clippy:
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${MIN_FEATURES} -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${SYSTEMD_FEATURES} -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
 
-verify-dependency-bounds:
+SET_LOWER_BOUNDS ?=
+test-set-lower-bounds:
+	echo "Testing that SET_LOWER_BOUNDS environment variable is set to a valid path"
+	test -e "${SET_LOWER_BOUNDS}"
+
+verify-dependency-bounds: test-set-lower-bounds
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
 	cargo build ${MANIFEST_PATH_ARGS} --all-targets --all-features
@@ -379,6 +384,7 @@ check-fedora-versions: test-compare-fedora-versions
 	test-clevis-loop
 	test-clevis-real
 	test-compare-fedora-versions
+	test-set-lower-bounds
 	vendored-tar-file
 	verify-dependency-bounds
 	yamllint

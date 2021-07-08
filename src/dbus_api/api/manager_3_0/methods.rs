@@ -12,7 +12,6 @@ use dbus_tree::{MTSync, MethodInfo, MethodResult};
 
 use crate::{
     dbus_api::{
-        api::shared::unlock_pool_shared,
         blockdev::create_dbus_blockdev,
         consts,
         pool::create_dbus_pool,
@@ -20,8 +19,8 @@ use crate::{
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
     engine::{
-        CreateAction, DeleteAction, EncryptionInfo, KeyDescription, MappingCreateAction,
-        MappingDeleteAction, Name, PoolUuid,
+        CreateAction, DeleteAction, EncryptionInfo, EngineAction, KeyDescription,
+        MappingCreateAction, MappingDeleteAction, Name, PoolUuid, UnlockMethod,
     },
     stratis::StratisError,
 };
@@ -182,7 +181,63 @@ pub fn set_key(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
 }
 
 pub fn unlock_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
-    unlock_pool_shared(m)
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+
+    let dbus_context = m.tree.get_data();
+    let default_return: (_, Vec<String>) = (false, Vec::new());
+    let return_message = message.method_return();
+
+    let pool_uuid_str: &str = get_next_arg(&mut iter, 0)?;
+    let pool_uuid_result = PoolUuid::parse_str(pool_uuid_str);
+    let pool_uuid = match pool_uuid_result {
+        Ok(uuid) => uuid,
+        Err(e) => {
+            let e = StratisError::Chained(
+                "Malformed UUID passed to UnlockPool".to_string(),
+                Box::new(e),
+            );
+            let (rc, rs) = engine_to_dbus_err_tuple(&e);
+            return Ok(vec![return_message.append3(default_return, rc, rs)]);
+        }
+    };
+    let unlock_method = {
+        let unlock_method_str: &str = get_next_arg(&mut iter, 1)?;
+        match UnlockMethod::try_from(unlock_method_str) {
+            Ok(um) => um,
+            Err(e) => {
+                let (rc, rs) = engine_to_dbus_err_tuple(&e);
+                return Ok(vec![return_message.append3(default_return, rc, rs)]);
+            }
+        }
+    };
+
+    let msg = match log_action!(dbus_context
+        .engine
+        .blocking_lock()
+        .unlock_pool(pool_uuid, unlock_method))
+    {
+        Ok(unlock_action) => match unlock_action.changed() {
+            Some(vec) => {
+                let str_uuids: Vec<_> = vec.into_iter().map(|u| uuid_to_string!(u)).collect();
+                return_message.append3(
+                    (true, str_uuids),
+                    DbusErrorEnum::OK as u16,
+                    OK_STRING.to_string(),
+                )
+            }
+            None => return_message.append3(
+                default_return,
+                DbusErrorEnum::OK as u16,
+                OK_STRING.to_string(),
+            ),
+        },
+        Err(e) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&e);
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+    Ok(vec![msg])
 }
 
 pub fn engine_state_report(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {

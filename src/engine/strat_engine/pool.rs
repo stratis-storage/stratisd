@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{borrow::Cow, collections::HashMap, path::Path, vec::Vec};
+use std::{collections::HashMap, path::Path, vec::Vec};
 
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
@@ -22,8 +22,8 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, Key, KeyDescription, Name, PoolUuid, Redundancy,
-            RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
+            EncryptionInfo, FilesystemUuid, Key, KeyDescription, Name, PoolEncryptionInfo,
+            PoolUuid, Redundancy, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -692,7 +692,7 @@ impl Pool for StratPool {
         self.datadevs_encrypted()
     }
 
-    fn encryption_info(&self) -> Cow<EncryptionInfo> {
+    fn encryption_info(&self) -> PoolEncryptionInfo {
         self.backstore.data_tier_encryption_info()
     }
 

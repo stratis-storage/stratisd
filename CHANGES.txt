@@ -6,6 +6,10 @@ Lowest supported Rust toolchain version: 1.49
 Recommended development platform for Python development: Fedora 33
 Lowest supported Python interpreter: 3.6.8
 
+- Add support for changing passphrases and regenerating Clevis bindings:
+  https://github.com/stratis-storage/stratisd/issues/2358
+  https://github.com/stratis-storage/stratisd/pull/2696
+
 - Change internal representation of stratisd errors; reduce possible codes
   returned over the D-Bus to 0 and 1:
   https://github.com/stratis-storage/stratisd/issues/2664
@@ -36,6 +40,13 @@ Lowest supported Python interpreter: 3.6.8
   https://github.com/stratis-storage/stratisd/pull/2637
 
 - Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/2702
+  https://github.com/stratis-storage/stratisd/pull/2699
+  https://github.com/stratis-storage/stratisd/pull/2698
+  https://github.com/stratis-storage/stratisd/pull/2697
+  https://github.com/stratis-storage/stratisd/pull/2695
+  https://github.com/stratis-storage/stratisd/pull/2694
+  https://github.com/stratis-storage/stratisd/pull/2693
   https://github.com/stratis-storage/stratisd/pull/2690
   https://github.com/stratis-storage/stratisd/pull/2681
   https://github.com/stratis-storage/stratisd/pull/2678

@@ -4,7 +4,7 @@
 
 // Code to handle the backing store of a pool.
 
-use std::{borrow::Cow, cmp, path::Path};
+use std::{cmp, path::Path};
 
 use chrono::{DateTime, Utc};
 use serde_json::Value;
@@ -26,7 +26,9 @@ use crate::{
             serde_structs::{BackstoreSave, CapSave, Recordable},
             writing::wipe_sectors,
         },
-        types::{BlockDevTier, DevUuid, EncryptionInfo, KeyDescription, PoolUuid},
+        types::{
+            BlockDevTier, DevUuid, EncryptionInfo, KeyDescription, PoolEncryptionInfo, PoolUuid,
+        },
     },
     stratis::{StratisError, StratisResult},
 };
@@ -651,7 +653,7 @@ impl Backstore {
         self.data_tier.block_mgr.is_encrypted()
     }
 
-    pub fn data_tier_encryption_info(&self) -> Cow<EncryptionInfo> {
+    pub fn data_tier_encryption_info(&self) -> PoolEncryptionInfo {
         self.data_tier.block_mgr.encryption_info()
     }
 

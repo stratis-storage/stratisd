@@ -165,11 +165,22 @@ macro_rules! initial_properties {
     }};
 }
 
-macro_rules! log_action {
+macro_rules! handle_action {
     ($action:expr) => {{
         let action = $action;
         if let Ok(ref a) = action {
             log::info!("{}", a);
+        }
+        action
+    }};
+    ($action:expr, $dbus_cxt:expr, $path:expr) => {{
+        let action = $action;
+        if let Ok(ref a) = action {
+            log::info!("{}", a);
+        } else if let Err(ref e) = action {
+            if let Some(state) = e.error_to_pool_state() {
+                $dbus_cxt.push_pool_state($path, state)
+            }
         }
         action
     }};

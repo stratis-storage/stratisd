@@ -1,0 +1,22 @@
+[package]
+name = "stratisd_proc_macros"
+version = "0.1.0"
+authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.com>"]
+edition = "2018"
+description = "Stratis daemon procedural macros"
+license-file = "LICENSE"
+repository = "https://github.com/stratis-storage/stratisd/"
+keywords = ["Linux", "filesystem", "storage"]
+categories = ["filesystem"]
+readme = "README.md"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0.27"
+quote = "1.0.9"
+
+[dependencies.syn]
+version = "1.0.73"
+features = ["full", "extra-traits"]

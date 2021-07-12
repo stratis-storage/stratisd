@@ -2,10 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{
-    borrow::Cow,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, TimeZone, Utc};
 use serde_json::{Map, Value};
@@ -66,7 +63,7 @@ impl BlockDev for SimDev {
 
 impl SimDev {
     /// Generates a new device from any devnode.
-    pub fn new(devnode: &Path, encryption_info: Cow<EncryptionInfo>) -> (DevUuid, SimDev) {
+    pub fn new(devnode: &Path, encryption_info: EncryptionInfo) -> (DevUuid, SimDev) {
         (
             DevUuid::new_v4(),
             SimDev {
@@ -74,7 +71,7 @@ impl SimDev {
                 user_info: None,
                 hardware_info: None,
                 initialization_time: Utc::now().timestamp() as u64,
-                encryption_info: encryption_info.into_owned(),
+                encryption_info,
             },
         )
     }

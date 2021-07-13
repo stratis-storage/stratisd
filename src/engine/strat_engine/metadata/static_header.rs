@@ -9,7 +9,7 @@ use std::{
 };
 
 use byteorder::{ByteOrder, LittleEndian};
-use crc::crc32;
+use crc::{Crc, CRC_32_ISCSI};
 use serde_json::Value;
 
 use devicemapper::{Sectors, IEC, SECTOR_SIZE};
@@ -33,6 +33,8 @@ const RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)); /
 const STRAT_MAGIC: &[u8] = b"!Stra0tis\x86\xff\x02^\x41rh";
 
 const STRAT_SIGBLOCK_VERSION: u8 = 1;
+
+const CASTAGNOLI: Crc<u32> = Crc::<u32>::new(&CRC_32_ISCSI);
 
 /// Data structure to hold results of reading and parsing a signature buffer.
 /// Invariant: bytes is Err <-> header == None, because if there was an error
@@ -484,8 +486,7 @@ impl StaticHeader {
         LittleEndian::write_u64(&mut buf[104..112], *self.reserved_size.sectors());
         LittleEndian::write_u64(&mut buf[120..128], self.initialization_time);
 
-        let hdr_crc =
-            crc32::checksum_castagnoli(&buf[4..bytes!(static_header_size::SIGBLOCK_SECTORS)]);
+        let hdr_crc = CASTAGNOLI.checksum(&buf[4..bytes!(static_header_size::SIGBLOCK_SECTORS)]);
         LittleEndian::write_u32(&mut buf[..4], hdr_crc);
         buf
     }
@@ -502,7 +503,7 @@ impl StaticHeader {
             return Ok(None);
         }
 
-        let crc = crc32::checksum_castagnoli(&buf[4..bytes!(static_header_size::SIGBLOCK_SECTORS)]);
+        let crc = CASTAGNOLI.checksum(&buf[4..bytes!(static_header_size::SIGBLOCK_SECTORS)]);
         if crc != LittleEndian::read_u32(&buf[..4]) {
             return Err(StratisError::Msg("header CRC invalid".into()));
         }

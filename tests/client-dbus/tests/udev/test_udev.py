@@ -45,7 +45,7 @@ from ._utils import (
     wait_for_udev_count,
 )
 
-LOCKED_POOL_UUIDS_PROP_NAME = "LockedPoolUuids"
+LOCKED_POOL_UUIDS_PROP_NAME = "LockedPoolsWithDevs"
 
 
 class UdevTest1(UdevTest):

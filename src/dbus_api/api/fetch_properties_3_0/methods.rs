@@ -12,18 +12,13 @@ use dbus_tree::{MTSync, MethodInfo, MethodResult};
 use itertools::Itertools;
 
 use crate::dbus_api::{
-    api::shared::{list_keys, locked_pool_uuids, locked_pools},
+    api::shared::list_keys,
     consts,
     types::TData,
     util::{option_to_tuple, result_to_tuple},
 };
 
-const ALL_PROPERTIES: [&str; 4] = [
-    consts::KEY_LIST_PROP,
-    consts::LOCKED_POOLS,
-    consts::LOCKED_POOL_UUIDS,
-    consts::LOCKED_POOL_DEVS,
-];
+const ALL_PROPERTIES: [&str; 2] = [consts::KEY_LIST_PROP, consts::LOCKED_POOL_DEVS];
 
 type LockedPoolsWithDevs = HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>;
 
@@ -99,8 +94,6 @@ fn get_properties_shared(
         .unique()
         .filter_map(|prop| match prop.as_str() {
             consts::KEY_LIST_PROP => Some((prop, result_to_tuple(list_keys(m)))),
-            consts::LOCKED_POOLS => Some((prop, result_to_tuple(locked_pools(m)))),
-            consts::LOCKED_POOL_UUIDS => Some((prop, result_to_tuple(locked_pool_uuids(m)))),
             consts::LOCKED_POOL_DEVS => Some((prop, result_to_tuple(locked_pools_with_devs(m)))),
             _ => None,
         })

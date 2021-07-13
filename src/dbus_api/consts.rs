@@ -14,8 +14,6 @@ pub const PROPERTY_FETCH_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.FetchP
 
 pub const KEY_LIST_PROP: &str = "KeyList";
 
-pub const LOCKED_POOL_UUIDS: &str = "LockedPoolUuids";
-pub const LOCKED_POOLS: &str = "LockedPools";
 pub const LOCKED_POOL_DEVS: &str = "LockedPoolsWithDevs";
 
 pub const POOL_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.pool.r0";

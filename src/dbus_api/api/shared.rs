@@ -32,38 +32,6 @@ pub fn list_keys(info: &MethodInfo<MTSync<TData>, TData>) -> Result<Vec<String>,
         .map_err(|e| e.to_string())
 }
 
-pub fn locked_pool_uuids(info: &MethodInfo<MTSync<TData>, TData>) -> Result<Vec<String>, String> {
-    let dbus_context = info.tree.get_data();
-
-    let mutex_lock = dbus_context.engine.blocking_lock();
-    Ok(mutex_lock
-        .locked_pools()
-        .into_iter()
-        .map(|(u, _)| uuid_to_string!(u))
-        .collect())
-}
-
-pub fn locked_pools(
-    info: &MethodInfo<MTSync<TData>, TData>,
-) -> Result<HashMap<String, String>, String> {
-    let dbus_context = info.tree.get_data();
-
-    let engine = dbus_context.engine.blocking_lock();
-    Ok(engine
-        .locked_pools()
-        .into_iter()
-        .map(|(u, info)| {
-            (
-                uuid_to_string!(u),
-                info.info
-                    .key_description
-                    .map(|kd| kd.as_application_str().to_string())
-                    .unwrap_or_else(String::new),
-            )
-        })
-        .collect())
-}
-
 pub fn get_managed_objects_method(
     f: &Factory<MTSync<TData>, TData>,
 ) -> Method<MTSync<TData>, TData> {

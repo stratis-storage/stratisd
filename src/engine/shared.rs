@@ -249,7 +249,7 @@ pub fn gather_encryption_info<'a, I>(len: usize, iterator: I) -> Option<PoolEncr
 where
     I: Iterator<Item = Option<&'a EncryptionInfo>>,
 {
-    let encryption_infos = iterator.filter_map(|ei| ei).collect::<Vec<_>>();
+    let encryption_infos = iterator.flatten().collect::<Vec<_>>();
 
     // Assert that all devices are either encrypted or unencrypted.
     assert!(encryption_infos.is_empty() || encryption_infos.len() == len);

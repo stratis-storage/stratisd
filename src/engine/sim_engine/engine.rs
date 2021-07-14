@@ -78,7 +78,7 @@ impl Engine for SimEngine {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
-        encryption_info: &EncryptionInfo,
+        encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
         let redundancy = calculate_redundancy!(redundancy);
 
@@ -86,7 +86,7 @@ impl Engine for SimEngine {
 
         validate_paths(blockdev_paths)?;
 
-        if let Some(ref key_desc) = encryption_info.key_description {
+        if let Some(ref key_desc) = encryption_info.and_then(|ei| ei.key_description()) {
             if !self.key_handler.contains_key(key_desc) {
                 return Err(StratisError::Msg(format!(
                     "Key {} was not found in the keyring",
@@ -238,7 +238,7 @@ mod tests {
                 "name",
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                &EncryptionInfo::default(),
+                None,
             )
             .unwrap()
             .changed()
@@ -251,12 +251,7 @@ mod tests {
     fn destroy_pool_w_devices() {
         let mut engine = SimEngine::default();
         let uuid = engine
-            .create_pool(
-                "name",
-                strs_to_paths!(["/s/d"]),
-                None,
-                &EncryptionInfo::default(),
-            )
+            .create_pool("name", strs_to_paths!(["/s/d"]), None, None)
             .unwrap()
             .changed()
             .unwrap();
@@ -269,12 +264,7 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(
-                pool_name,
-                strs_to_paths!(["/s/d"]),
-                None,
-                &EncryptionInfo::default(),
-            )
+            .create_pool(pool_name, strs_to_paths!(["/s/d"]), None, None)
             .unwrap()
             .changed()
             .unwrap();
@@ -293,11 +283,9 @@ mod tests {
         let name = "name";
         let mut engine = SimEngine::default();
         let devices = strs_to_paths!(["/s/d"]);
-        engine
-            .create_pool(name, devices, None, &EncryptionInfo::default())
-            .unwrap();
+        engine.create_pool(name, devices, None, None).unwrap();
         assert_matches!(
-            engine.create_pool(name, devices, None, &EncryptionInfo::default()),
+            engine.create_pool(name, devices, None, None),
             Ok(CreateAction::Identity)
         );
     }
@@ -308,19 +296,14 @@ mod tests {
         let name = "name";
         let mut engine = SimEngine::default();
         engine
-            .create_pool(
-                name,
-                strs_to_paths!(["/s/d"]),
-                None,
-                &EncryptionInfo::default(),
-            )
+            .create_pool(name, strs_to_paths!(["/s/d"]), None, None)
             .unwrap();
         assert_matches!(
             engine.create_pool(
                 name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                &EncryptionInfo::default(),
+                None,
             ),
             Err(_)
         );
@@ -333,12 +316,7 @@ mod tests {
         let mut engine = SimEngine::default();
         assert_matches!(
             engine
-                .create_pool(
-                    "name",
-                    strs_to_paths!([path, path]),
-                    None,
-                    &EncryptionInfo::default()
-                )
+                .create_pool("name", strs_to_paths!([path, path]), None, None)
                 .unwrap()
                 .changed()
                 .map(|uuid| engine.get_pool(uuid).unwrap().1.blockdevs().len()),
@@ -355,7 +333,7 @@ mod tests {
                 "name",
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 Some(std::u16::MAX),
-                &EncryptionInfo::default(),
+                None,
             ),
             Err(_)
         );
@@ -381,7 +359,7 @@ mod tests {
                 name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                &EncryptionInfo::default(),
+                None,
             )
             .unwrap()
             .changed()
@@ -401,7 +379,7 @@ mod tests {
                 "old_name",
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                &EncryptionInfo::default(),
+                None,
             )
             .unwrap()
             .changed()
@@ -422,7 +400,7 @@ mod tests {
                 "old_name",
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                &EncryptionInfo::default(),
+                None,
             )
             .unwrap()
             .changed()
@@ -432,7 +410,7 @@ mod tests {
                 new_name,
                 strs_to_paths!(["/dev/four", "/dev/five", "/dev/six"]),
                 None,
-                &EncryptionInfo::default(),
+                None,
             )
             .unwrap();
         assert_matches!(engine.rename_pool(uuid, new_name), Err(_));
@@ -448,7 +426,7 @@ mod tests {
                 new_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                &EncryptionInfo::default(),
+                None,
             )
             .unwrap();
         assert_matches!(

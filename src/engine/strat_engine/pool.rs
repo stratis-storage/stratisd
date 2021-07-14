@@ -150,7 +150,7 @@ impl StratPool {
         name: &str,
         paths: &[&Path],
         redundancy: Redundancy,
-        encryption_info: &EncryptionInfo,
+        encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = PoolUuid::new_v4();
 
@@ -711,7 +711,7 @@ impl Pool for StratPool {
         self.datadevs_encrypted()
     }
 
-    fn encryption_info(&self) -> PoolEncryptionInfo {
+    fn encryption_info(&self) -> Option<PoolEncryptionInfo> {
         self.backstore.data_tier_encryption_info()
     }
 
@@ -756,12 +756,7 @@ mod tests {
     fn test_empty_pool(paths: &[&Path]) {
         assert_eq!(paths.len(), 0);
         assert_matches!(
-            StratPool::initialize(
-                "stratis_test_pool",
-                paths,
-                Redundancy::NONE,
-                &EncryptionInfo::default()
-            ),
+            StratPool::initialize("stratis_test_pool", paths, Redundancy::NONE, None),
             Err(_)
         );
     }
@@ -785,9 +780,7 @@ mod tests {
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let name = "stratis-test-pool";
-        let (uuid, mut pool) =
-            StratPool::initialize(name, paths2, Redundancy::NONE, &EncryptionInfo::default())
-                .unwrap();
+        let (uuid, mut pool) = StratPool::initialize(name, paths2, Redundancy::NONE, None).unwrap();
         invariant(&pool, name);
 
         let metadata1 = pool.record(name);
@@ -871,8 +864,7 @@ mod tests {
 
         let name = "stratis-test-pool";
         let (pool_uuid, mut pool) =
-            StratPool::initialize(name, paths1, Redundancy::NONE, &EncryptionInfo::default())
-                .unwrap();
+            StratPool::initialize(name, paths1, Redundancy::NONE, None).unwrap();
         invariant(&pool, name);
 
         let fs_name = "stratis_test_filesystem";
@@ -952,9 +944,7 @@ mod tests {
         assert!(paths.len() > 1);
 
         let name = "stratis-test-pool";
-        let (_, mut pool) =
-            StratPool::initialize(name, paths, Redundancy::NONE, &EncryptionInfo::default())
-                .unwrap();
+        let (_, mut pool) = StratPool::initialize(name, paths, Redundancy::NONE, None).unwrap();
         invariant(&pool, name);
 
         assert_eq!(pool.action_avail, ActionAvailability::Full);
@@ -965,9 +955,7 @@ mod tests {
         udev_settle().unwrap();
 
         let name = "stratis-test-pool";
-        let (_, mut pool) =
-            StratPool::initialize(name, paths, Redundancy::NONE, &EncryptionInfo::default())
-                .unwrap();
+        let (_, mut pool) = StratPool::initialize(name, paths, Redundancy::NONE, None).unwrap();
         invariant(&pool, name);
 
         assert_eq!(pool.action_avail, ActionAvailability::Full);

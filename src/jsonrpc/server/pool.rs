@@ -29,7 +29,7 @@ pub async fn pool_unlock(
     prompt: Option<RawFd>,
 ) -> StratisResult<bool> {
     if let Some(uuid) = pool_uuid {
-        if let (Some(fd), Some(kd)) = (prompt, key_get_desc(engine.clone(), uuid).await) {
+        if let (Some(fd), Some(kd)) = (prompt, key_get_desc(engine.clone(), uuid).await?) {
             key_set(engine.clone(), &kd, fd).await?;
         }
     }
@@ -59,11 +59,11 @@ pub async fn pool_create(
     engine: LockableEngine,
     name: &str,
     blockdev_paths: &[&Path],
-    enc_info: EncryptionInfo,
+    enc_info: Option<&EncryptionInfo>,
 ) -> StratisResult<bool> {
     let mut lock = engine.lock().await;
     Ok(
-        match block_in_place(|| lock.create_pool(name, blockdev_paths, None, &enc_info))? {
+        match block_in_place(|| lock.create_pool(name, blockdev_paths, None, enc_info))? {
             CreateAction::Created(_) => true,
             CreateAction::Identity => false,
         },
@@ -205,9 +205,12 @@ pub async fn pool_is_locked(engine: LockableEngine, uuid: PoolUuid) -> StratisRe
 pub async fn pool_is_bound(engine: LockableEngine, uuid: PoolUuid) -> StratisResult<bool> {
     let lock = engine.lock().await;
     if let Some((_, pool)) = lock.get_pool(uuid) {
-        Ok(pool.encryption_info().clevis_info.is_some())
+        Ok(match pool.encryption_info() {
+            Some(ei) => ei.clevis_info()?.is_some(),
+            None => false,
+        })
     } else if let Some(info) = lock.locked_pools().get(&uuid) {
-        Ok(info.info.clevis_info.is_some())
+        Ok(info.info.clevis_info()?.is_some())
     } else {
         Err(StratisError::Msg(format!(
             "Pool with UUID {} not found",
@@ -220,9 +223,12 @@ pub async fn pool_is_bound(engine: LockableEngine, uuid: PoolUuid) -> StratisRes
 pub async fn pool_has_passphrase(engine: LockableEngine, uuid: PoolUuid) -> StratisResult<bool> {
     let lock = engine.lock().await;
     if let Some((_, pool)) = lock.get_pool(uuid) {
-        Ok(pool.encryption_info().key_description.is_some())
+        Ok(match pool.encryption_info() {
+            Some(ei) => ei.key_description()?.is_some(),
+            None => false,
+        })
     } else if let Some(info) = lock.locked_pools().get(&uuid) {
-        Ok(info.info.key_description.is_some())
+        Ok(info.info.key_description()?.is_some())
     } else {
         Err(StratisError::Msg(format!(
             "Pool with UUID {} not found",
@@ -238,12 +244,13 @@ pub async fn pool_clevis_pin(
 ) -> StratisResult<Option<String>> {
     let lock = engine.lock().await;
     if let Some((_, pool)) = lock.get_pool(uuid) {
-        Ok(EncryptionInfo::try_from(pool.encryption_info())?
-            .clevis_info
-            .as_ref()
-            .map(|(pin, _)| pin.clone()))
+        let encryption_info = match pool.encryption_info() {
+            Some(ei) => EncryptionInfo::try_from(ei)?,
+            None => return Ok(None),
+        };
+        Ok(encryption_info.clevis_info().map(|(pin, _)| pin.clone()))
     } else if let Some(info) = lock.locked_pools().get(&uuid) {
-        Ok(info.info.clevis_info.as_ref().map(|(pin, _)| pin.clone()))
+        Ok(info.info.clevis_info()?.map(|(pin, _)| pin.clone()))
     } else {
         Err(StratisError::Msg(format!(
             "Pool with UUID {} not found",

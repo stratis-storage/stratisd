@@ -25,8 +25,8 @@ use crate::{
                 },
                 handle::CryptHandle,
                 shared::{
-                    acquire_crypt_device, activate, add_keyring_keyslot, clevis_info_from_metadata,
-                    ensure_wiped, interpret_clevis_config, StratisLuks2Token,
+                    activate, add_keyring_keyslot, clevis_info_from_metadata, ensure_wiped,
+                    interpret_clevis_config, wipe_fallback, StratisLuks2Token,
                 },
             },
             cmd::clevis_luks_bind,
@@ -34,9 +34,9 @@ use crate::{
             metadata::StratisIdentifiers,
             names::format_crypt_name,
         },
-        types::{DevUuid, DevicePath, EncryptionInfo, KeyDescription, PoolUuid},
+        types::{ClevisInfo, DevUuid, DevicePath, EncryptionInfo, KeyDescription, PoolUuid},
     },
-    stratis::StratisResult,
+    stratis::{StratisError, StratisResult},
 };
 
 /// Handle for initialization actions on a physical device.
@@ -59,16 +59,11 @@ impl CryptInitializer {
         }
     }
 
-    /// Acquire a crypt device using the registered LUKS2 device path.
-    fn acquire_crypt_device(&self) -> StratisResult<CryptDevice> {
-        acquire_crypt_device(&self.physical_path)
-    }
-
     /// Initialize a device with the provided key description and Clevis info.
     pub fn initialize(
         self,
         key_description: Option<&KeyDescription>,
-        clevis_info: Option<(&str, &Value)>,
+        clevis_info: Option<&ClevisInfo>,
     ) -> StratisResult<CryptHandle> {
         let mut clevis_info_owned =
             clevis_info.map(|(pin, config)| (pin.to_owned(), config.clone()));
@@ -90,30 +85,23 @@ impl CryptInitializer {
             MetadataSize::try_from(DEFAULT_CRYPT_METADATA_SIZE)?,
             KeyslotsSize::try_from(DEFAULT_CRYPT_KEYSLOTS_SIZE)?,
         )?;
-        let result = self.initialize_with_err(device, key_description, clevis_parsed);
-        let mut device = match self.acquire_crypt_device() {
-            Ok(d) => d,
-            Err(e) => {
-                warn!(
-                    "Failed to roll back crypt device initialization; you \
-                    may need to manually wipe this device: {}",
-                    e,
-                );
-                return Err(e);
-            }
-        };
+        let result = self
+            .initialize_with_err(&mut device, key_description, clevis_parsed)
+            .and_then(|path| clevis_info_from_metadata(&mut device).map(|ci| (path, ci)));
 
         match result {
-            Ok(activated_path) => Ok(CryptHandle::new(
-                self.physical_path,
-                DevicePath::new(activated_path)?,
-                self.identifiers,
-                EncryptionInfo {
-                    key_description: key_description.cloned(),
-                    clevis_info: clevis_info_from_metadata(&mut device)?,
-                },
-                self.activation_name,
-            )),
+            Ok((activated_path, clevis_info)) => {
+                let encryption_info =
+                    EncryptionInfo::from_options((key_description.cloned(), clevis_info))
+                        .expect("Encrypted device must be provided encryption parameters");
+                Ok(CryptHandle::new(
+                    self.physical_path,
+                    DevicePath::new(activated_path)?,
+                    self.identifiers,
+                    encryption_info,
+                    self.activation_name,
+                ))
+            }
             Err(e) => {
                 if let Err(err) =
                     Self::rollback(&mut device, &self.physical_path, self.activation_name)
@@ -141,7 +129,7 @@ impl CryptInitializer {
     /// Initialize with Clevis only.
     fn initialize_with_clevis(
         &self,
-        mut device: CryptDevice,
+        device: &mut CryptDevice,
         (pin, json, yes): (&str, &Value, bool),
     ) -> StratisResult<()> {
         let fs = log_on_failure!(
@@ -163,7 +151,6 @@ impl CryptInitializer {
             ),
             "Failed to initialize keyslot with provided key in keyring"
         );
-        drop(device);
 
         clevis_luks_bind(
             &self.physical_path,
@@ -174,9 +161,15 @@ impl CryptInitializer {
             yes,
         )?;
 
-        // Need to reacquire device here to refresh the state of the device
+        // Need to reload device here to refresh the state of the device
         // after being modified by Clevis.
-        let mut device = self.acquire_crypt_device()?;
+        if let Err(e) = device
+            .context_handle()
+            .load::<()>(Some(EncryptionFormat::Luks2), None)
+        {
+            return Err(wipe_fallback(&self.physical_path, StratisError::from(e)));
+        }
+
         device.keyslot_handle().destroy(keyslot)?;
 
         Ok(())
@@ -185,11 +178,11 @@ impl CryptInitializer {
     /// Initialize with both a passphrase in the kernel keyring and Clevis.
     fn initialize_with_both(
         &self,
-        mut device: CryptDevice,
+        device: &mut CryptDevice,
         key_description: &KeyDescription,
         (pin, json, yes): (&str, &Value, bool),
     ) -> StratisResult<()> {
-        Self::initialize_with_keyring(&mut device, key_description)?;
+        Self::initialize_with_keyring(device, key_description)?;
 
         let fs = MemoryPrivateFilesystem::new()?;
         fs.key_op(key_description, |kf| {
@@ -203,12 +196,21 @@ impl CryptInitializer {
             )
         })?;
 
+        // Need to reload device here to refresh the state of the device
+        // after being modified by Clevis.
+        if let Err(e) = device
+            .context_handle()
+            .load::<()>(Some(EncryptionFormat::Luks2), None)
+        {
+            return Err(wipe_fallback(&self.physical_path, StratisError::from(e)));
+        }
+
         Ok(())
     }
 
     fn initialize_with_err(
         &self,
-        mut device: CryptDevice,
+        device: &mut CryptDevice,
         key_description: Option<&KeyDescription>,
         clevis_info: Option<(&str, &Value, bool)>,
     ) -> StratisResult<PathBuf> {
@@ -224,19 +226,10 @@ impl CryptInitializer {
             self.physical_path.display()
         );
 
-        let mut device = match (key_description, clevis_info) {
-            (Some(kd), Some(ci)) => {
-                self.initialize_with_both(device, kd, ci)?;
-                self.acquire_crypt_device()?
-            }
-            (Some(kd), _) => {
-                Self::initialize_with_keyring(&mut device, kd)?;
-                device
-            }
-            (_, Some(ci)) => {
-                self.initialize_with_clevis(device, ci)?;
-                self.acquire_crypt_device()?
-            }
+        match (key_description, clevis_info) {
+            (Some(kd), Some(ci)) => self.initialize_with_both(device, kd, ci)?,
+            (Some(kd), _) => Self::initialize_with_keyring(device, kd)?,
+            (_, Some(ci)) => self.initialize_with_clevis(device, ci)?,
             (_, _) => unreachable!(),
         };
 
@@ -255,7 +248,7 @@ impl CryptInitializer {
 
         activate(
             if let Some(kd) = key_description {
-                Either::Left((&mut device, kd))
+                Either::Left((device, kd))
             } else {
                 Either::Right(&self.physical_path)
             },

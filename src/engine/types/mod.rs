@@ -16,6 +16,7 @@ use std::{
 
 use libudev::EventType;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
@@ -72,6 +73,9 @@ macro_rules! uuid {
         impl $crate::engine::types::AsUuid for $ident {}
     }
 }
+
+/// Value representing Clevis config information.
+pub type ClevisInfo = (String, Value);
 
 /// An engine that can be locked for synchronization.
 pub type LockableEngine = Lockable<Arc<Mutex<dyn Engine>>>;
@@ -233,7 +237,7 @@ pub struct LockedPoolDevice {
 }
 
 pub struct LockedPoolInfo {
-    pub info: EncryptionInfo,
+    pub info: PoolEncryptionInfo,
     pub devices: Vec<LockedPoolDevice>,
 }
 

@@ -473,10 +473,7 @@ mod tests {
                 process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?,
                 pool_uuid,
                 MDADataSize::default(),
-                &EncryptionInfo {
-                    key_description: Some(key_description.clone()),
-                    clevis_info: None,
-                },
+                Some(&EncryptionInfo::KeyDesc(key_description.clone())),
             )?;
 
             for dev in devices {
@@ -507,10 +504,10 @@ mod tests {
                     ))));
                 }
 
-                if info.encryption_info.key_description.as_ref() != Some(key_description) {
+                if info.encryption_info.key_description() != Some(key_description) {
                     return Err(Box::new(StratisError::Msg(format!(
                         "Discovered key description {:?} != expected key description {:?}",
-                        info.encryption_info.key_description,
+                        info.encryption_info.key_description(),
                         Some(key_description.as_application_str())
                     ))));
                 }
@@ -585,7 +582,7 @@ mod tests {
             process_and_verify_devices(pool_uuid, &HashSet::new(), paths).unwrap(),
             pool_uuid,
             MDADataSize::default(),
-            &EncryptionInfo::default(),
+            None,
         )
         .unwrap();
 

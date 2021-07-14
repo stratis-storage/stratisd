@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    collections::{hash_map::RandomState, HashSet},
+    collections::{hash_map::RandomState, HashMap, HashSet},
     fs::File,
     io::Read,
     os::unix::io::{AsRawFd, FromRawFd, RawFd},
@@ -13,7 +13,7 @@ use std::{
 use nix::poll::{poll, PollFd, PollFlags};
 use regex::Regex;
 
-use devicemapper::Bytes;
+use devicemapper::{Bytes, Sectors, IEC, SECTOR_SIZE};
 use libcryptsetup_rs::SafeMemHandle;
 
 use crate::{
@@ -23,6 +23,15 @@ use crate::{
     },
     stratis::{StratisError, StratisResult},
 };
+
+#[cfg(not(test))]
+const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
+#[cfg(test)]
+pub const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
+
+// Maximum taken from "XFS Algorithms and Data Structured: 3rd edition"
+const MAX_THIN_DEV_SIZE: Sectors = Sectors(16 * IEC::Pi); // 8 EiB
+const MIN_THIN_DEV_SIZE: Sectors = Sectors(64 * IEC::Ki); // 32 MiB
 
 /// Called when the name of a requested pool coincides with the name of an
 /// existing pool. Returns an error if the specifications of the requested
@@ -195,6 +204,41 @@ pub fn validate_paths(paths: &[&Path]) -> StratisResult<()> {
                 .join(", ")
         )))
     }
+}
+
+pub fn validate_filesystem_size_specs<'a>(
+    specs: &[(&'a str, Option<Bytes>)],
+) -> StratisResult<HashMap<&'a str, Sectors>> {
+    specs
+        .iter()
+        .map(|&(name, size_opt)| {
+            size_opt
+                .map(|size| {
+                    let size_sectors = size.sectors();
+                    if size_sectors.bytes() != size {
+                        Err(StratisError::Msg(format!(
+                            "Requested size of filesystem {} must be divisble by {}",
+                            name, SECTOR_SIZE
+                        )))
+                    } else if size_sectors < MIN_THIN_DEV_SIZE {
+                        Err(StratisError::Msg(format!(
+                            "Requested size of filesystem {} is {} which is less than minimum required: {}",
+                            name, size_sectors, MIN_THIN_DEV_SIZE
+                        )))
+                    } else if size_sectors > MAX_THIN_DEV_SIZE {
+                        Err(StratisError::Msg(format!(
+                            "Requested size of filesystem {} is {} which is greater than maximum allowed: {}",
+                            name, size_sectors, MAX_THIN_DEV_SIZE
+                        )))
+                    } else {
+                        Ok(size_sectors)
+                    }
+                })
+                .transpose()
+                .map(|size_opt| size_opt.unwrap_or(DEFAULT_THIN_DEV_SIZE))
+                .map(|size| (name, size))
+        })
+        .collect::<StratisResult<HashMap<_, Sectors>>>()
 }
 
 #[cfg(test)]

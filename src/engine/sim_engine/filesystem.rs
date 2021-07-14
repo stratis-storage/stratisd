@@ -5,8 +5,9 @@
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
+use serde_json::{Map, Value};
 
-use devicemapper::Bytes;
+use devicemapper::{Bytes, Sectors};
 
 use crate::{engine::Filesystem, stratis::StratisResult};
 
@@ -14,14 +15,20 @@ use crate::{engine::Filesystem, stratis::StratisResult};
 pub struct SimFilesystem {
     rand: u32,
     created: DateTime<Utc>,
+    size: Sectors,
 }
 
 impl SimFilesystem {
-    pub fn new() -> SimFilesystem {
+    pub fn new(size: Sectors) -> SimFilesystem {
         SimFilesystem {
             rand: rand::random::<u32>(),
             created: Utc::now(),
+            size,
         }
+    }
+
+    pub fn size(&self) -> Sectors {
+        self.size
     }
 }
 
@@ -41,6 +48,22 @@ impl Filesystem for SimFilesystem {
     }
 
     fn used(&self) -> StratisResult<Bytes> {
-        Ok(Bytes(12_345_678))
+        Ok((self.size / 2u64).bytes())
+    }
+}
+
+impl<'a> Into<Value> for &'a SimFilesystem {
+    fn into(self) -> Value {
+        let mut json = Map::new();
+        json.insert("size".to_string(), Value::from(self.size().to_string()));
+        json.insert(
+            "used".to_string(),
+            Value::from(
+                self.used()
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|_| "Unavailable".to_string()),
+            ),
+        );
+        Value::from(json)
     }
 }

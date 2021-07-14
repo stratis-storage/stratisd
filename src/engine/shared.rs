@@ -19,7 +19,10 @@ use libcryptsetup_rs::SafeMemHandle;
 use crate::{
     engine::{
         engine::{Pool, MAX_STRATIS_PASS_SIZE},
-        types::{BlockDevTier, CreateAction, DevUuid, PoolUuid, SetCreateAction, SizedKeyMemory},
+        types::{
+            BlockDevTier, CreateAction, DevUuid, EncryptionInfo, PoolEncryptionInfo, PoolUuid,
+            SetCreateAction, SizedKeyMemory,
+        },
     },
     stratis::{StratisError, StratisResult},
 };
@@ -239,6 +242,23 @@ pub fn validate_filesystem_size_specs<'a>(
                 .map(|size| (name, size))
         })
         .collect::<StratisResult<HashMap<_, Sectors>>>()
+}
+
+/// Gather the encryption information from across multiple block devices.
+pub fn gather_encryption_info<'a, I>(len: usize, iterator: I) -> Option<PoolEncryptionInfo>
+where
+    I: Iterator<Item = Option<&'a EncryptionInfo>>,
+{
+    let encryption_infos = iterator.filter_map(|ei| ei).collect::<Vec<_>>();
+
+    // Assert that all devices are either encrypted or unencrypted.
+    assert!(encryption_infos.is_empty() || encryption_infos.len() == len);
+
+    if encryption_infos.get(0).is_none() {
+        None
+    } else {
+        Some(PoolEncryptionInfo::from(encryption_infos))
+    }
 }
 
 #[cfg(test)]

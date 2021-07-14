@@ -4,7 +4,8 @@
 
 use std::{
     convert::TryFrom,
-    io,
+    fs::OpenOptions,
+    io::{self, Write},
     path::{Path, PathBuf},
 };
 
@@ -247,13 +248,17 @@ pub fn setup_crypt_metadata_handle(
     };
     let clevis_info = clevis_info_from_metadata(device)?;
 
+    let encryption_info = match (key_description, clevis_info) {
+        (Some(kd), Some(ci)) => EncryptionInfo::Both(kd, ci),
+        (Some(kd), _) => EncryptionInfo::KeyDesc(kd),
+        (_, Some(ci)) => EncryptionInfo::ClevisInfo(ci),
+        (None, None) => return Ok(None),
+    };
+
     Ok(Some(CryptMetadataHandle::new(
         DevicePath::new(physical_path.to_owned())?,
         identifiers,
-        EncryptionInfo {
-            key_description,
-            clevis_info,
-        },
+        encryption_info,
     )))
 }
 
@@ -275,7 +280,7 @@ pub fn setup_crypt_handle(
         Some(UnlockMethod::Keyring) => {
             activate(Either::Left((
                 device,
-                metadata_handle.encryption_info().key_description.as_ref()
+                metadata_handle.encryption_info().key_description()
                     .ok_or_else(|| {
                         StratisError::Msg(
                             "Unlock action was specified to be keyring but not key description is present in the metadata".to_string(),
@@ -730,6 +735,36 @@ pub fn ensure_inactive(device: &mut CryptDevice, name: &str) -> StratisResult<()
 /// above the current value.
 fn ceiling_sector_size_alignment(bytes: u64) -> u64 {
     bytes + (SECTOR_SIZE - (bytes % SECTOR_SIZE))
+}
+
+/// Fallback method for wiping a crypt device where a handle to the encrypted device
+/// cannot be acquired.
+pub fn wipe_fallback(path: &Path, causal_error: StratisError) -> StratisError {
+    let mut file = match OpenOptions::new().write(true).open(path) {
+        Ok(f) => f,
+        Err(e) => {
+            return StratisError::NoActionRollbackError {
+                causal_error: Box::new(causal_error),
+                rollback_error: Box::new(StratisError::from(e)),
+            }
+        }
+    };
+    let size = match convert_int!(crypt_metadata_size(), u64, usize) {
+        Ok(s) => s,
+        Err(e) => {
+            return StratisError::NoActionRollbackError {
+                causal_error: Box::new(causal_error),
+                rollback_error: Box::new(e),
+            }
+        }
+    };
+    match file.write_all(vec![0; size].as_slice()) {
+        Ok(()) => causal_error,
+        Err(e) => StratisError::NoActionRollbackError {
+            causal_error: Box::new(causal_error),
+            rollback_error: Box::new(StratisError::from(e)),
+        },
+    }
 }
 
 /// Deactivate an encrypted Stratis device and wipe it. This is

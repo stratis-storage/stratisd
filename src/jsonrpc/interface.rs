@@ -38,7 +38,7 @@ pub enum StratisParamType {
     KeySet(KeyDescription),
     KeyUnset(KeyDescription),
     KeyList,
-    PoolCreate(String, Vec<PathBuf>, EncryptionInfo),
+    PoolCreate(String, Vec<PathBuf>, Option<EncryptionInfo>),
     PoolRename(String, String),
     PoolAddData(String, Vec<PathBuf>),
     PoolInitCache(String, Vec<PathBuf>),

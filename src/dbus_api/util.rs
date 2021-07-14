@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fmt::Display, sync::Arc};
 
 use dbus::{
     arg::{ArgType, Iter, IterAppend, RefArg, Variant},
@@ -57,6 +57,31 @@ where
     let (success, value) = match result {
         Ok(value) => (true, Variant(Box::new(value) as Box<dyn RefArg>)),
         Err(e) => (false, Variant(Box::new(e) as Box<dyn RefArg>)),
+    };
+    (success, value)
+}
+
+/// Map a result containing an option obtained for the FetchProperties interface to
+/// a value used to represent both the result and option.  An error in the result
+/// argument yields a false in the return value, indicating that the value
+/// returned is a string representation of the error encountered in
+/// obtaining the value, and not the value requested. If the first boolean is true,
+/// the variant will be a tuple of type (bool, T). If the second boolean if false,
+/// this indicates None. If it is true, the value for T is the Some(_) value.
+pub fn result_option_to_tuple<T, E>(
+    result: Result<Option<T>, E>,
+    default: T,
+) -> (bool, Variant<Box<dyn RefArg>>)
+where
+    T: RefArg + 'static,
+    E: Display,
+{
+    let (success, value) = match result {
+        Ok(value) => (
+            true,
+            Variant(Box::new(option_to_tuple(value, default)) as Box<dyn RefArg>),
+        ),
+        Err(e) => (false, Variant(Box::new(e.to_string()) as Box<dyn RefArg>)),
     };
     (success, value)
 }

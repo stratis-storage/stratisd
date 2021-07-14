@@ -286,10 +286,7 @@ pub fn create_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
         name,
         &devs.map(|x| Path::new(x)).collect::<Vec<&Path>>(),
         tuple_to_option(redundancy_tuple),
-        &EncryptionInfo {
-            key_description: key_desc,
-            clevis_info,
-        }
+        EncryptionInfo::from_options((key_desc, clevis_info)).as_ref(),
     ));
 
     let msg = match result {

@@ -221,12 +221,9 @@ impl Recordable<CacheTierSave> for CacheTier {
 #[cfg(test)]
 mod tests {
 
-    use crate::engine::{
-        strat_engine::{
-            metadata::MDADataSize,
-            tests::{loopbacked, real},
-        },
-        types::EncryptionInfo,
+    use crate::engine::strat_engine::{
+        metadata::MDADataSize,
+        tests::{loopbacked, real},
     };
 
     use super::*;
@@ -241,13 +238,7 @@ mod tests {
 
         let pool_uuid = PoolUuid::new_v4();
 
-        let mgr = BlockDevMgr::initialize(
-            pool_uuid,
-            paths1,
-            MDADataSize::default(),
-            &EncryptionInfo::default(),
-        )
-        .unwrap();
+        let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MDADataSize::default(), None).unwrap();
 
         let mut cache_tier = CacheTier::new(mgr).unwrap();
 

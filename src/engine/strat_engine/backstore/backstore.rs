@@ -180,7 +180,7 @@ impl Backstore {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         mda_data_size: MDADataSize,
-        encryption_info: &EncryptionInfo,
+        encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<Backstore> {
         let data_tier = DataTier::new(BlockDevMgr::initialize(
             pool_uuid,
@@ -225,12 +225,7 @@ impl Backstore {
                 // If it is desired to change a cache dev to a data dev, it
                 // should be removed and then re-added in order to ensure
                 // that the MDA region is set to the correct size.
-                let bdm = BlockDevMgr::initialize(
-                    pool_uuid,
-                    paths,
-                    MDADataSize::default(),
-                    &EncryptionInfo::default(),
-                )?;
+                let bdm = BlockDevMgr::initialize(pool_uuid, paths, MDADataSize::default(), None)?;
 
                 let cache_tier = CacheTier::new(bdm)?;
 
@@ -653,7 +648,7 @@ impl Backstore {
         self.data_tier.block_mgr.is_encrypted()
     }
 
-    pub fn data_tier_encryption_info(&self) -> PoolEncryptionInfo {
+    pub fn data_tier_encryption_info(&self) -> Option<PoolEncryptionInfo> {
         self.data_tier.block_mgr.encryption_info()
     }
 
@@ -773,13 +768,8 @@ mod tests {
         let (datadevpaths, initdatapaths) = paths.split_at(1);
 
         let pool_uuid = PoolUuid::new_v4();
-        let mut backstore = Backstore::initialize(
-            pool_uuid,
-            initdatapaths,
-            MDADataSize::default(),
-            &EncryptionInfo::default(),
-        )
-        .unwrap();
+        let mut backstore =
+            Backstore::initialize(pool_uuid, initdatapaths, MDADataSize::default(), None).unwrap();
 
         invariant(&backstore);
 
@@ -865,13 +855,8 @@ mod tests {
         assert!(!paths.is_empty());
 
         let pool_uuid = PoolUuid::new_v4();
-        let mut backstore = Backstore::initialize(
-            pool_uuid,
-            paths,
-            MDADataSize::default(),
-            &EncryptionInfo::default(),
-        )
-        .unwrap();
+        let mut backstore =
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
 
         assert_matches!(
             backstore
@@ -926,13 +911,8 @@ mod tests {
 
         let pool_uuid = PoolUuid::new_v4();
 
-        let mut backstore = Backstore::initialize(
-            pool_uuid,
-            paths1,
-            MDADataSize::default(),
-            &EncryptionInfo::default(),
-        )
-        .unwrap();
+        let mut backstore =
+            Backstore::initialize(pool_uuid, paths1, MDADataSize::default(), None).unwrap();
 
         for path in paths1 {
             assert_eq!(

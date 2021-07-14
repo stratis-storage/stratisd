@@ -16,7 +16,7 @@ use crate::{
         types::{DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg, option_to_tuple},
     },
-    engine::{BlockDevTier, EngineAction, MaybeInconsistent, Name, Pool, PoolUuid},
+    engine::{BlockDevTier, EngineAction, Name, Pool, PoolUuid},
 };
 
 pub enum BlockDevOp {
@@ -61,20 +61,14 @@ pub fn get_pool_encryption_key_desc(
     m: &MethodInfo<MTSync<TData>, TData>,
 ) -> Result<(bool, String), String> {
     pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
-        let key_description = match pool.encryption_info().key_description {
-            Some(MaybeInconsistent::Yes) => {
-                return Err(
-                    "The key description metadata is inconsistent across devices in the pool"
-                        .to_string(),
-                )
-            }
-            Some(MaybeInconsistent::No(kd)) => Some(kd),
-            None => None,
-        };
         Ok(option_to_tuple(
-            key_description
-                .as_ref()
-                .map(|kd| kd.as_application_str().to_string()),
+            match pool.encryption_info() {
+                Some(ei) => ei
+                    .key_description()
+                    .map_err(|e| e.to_string())?
+                    .map(|kd| kd.as_application_str().to_string()),
+                None => None,
+            },
             String::new(),
         ))
     })
@@ -104,17 +98,14 @@ pub fn get_pool_clevis_info(
     m: &MethodInfo<MTSync<TData>, TData>,
 ) -> Result<(bool, (String, String)), String> {
     pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
-        let clevis_info = match pool.encryption_info().clevis_info {
-            Some(MaybeInconsistent::Yes) => {
-                return Err("Clevis metadata is inconsistent across devices in the pool".to_string())
-            }
-            Some(MaybeInconsistent::No(ci)) => Some(ci),
-            None => None,
-        };
         Ok(option_to_tuple(
-            clevis_info
-                .as_ref()
-                .map(|(pin, config)| (pin.to_owned(), config.to_string())),
+            match pool.encryption_info() {
+                Some(ei) => ei
+                    .clevis_info()
+                    .map_err(|e| e.to_string())?
+                    .map(|(pin, config)| (pin.to_owned(), config.to_string())),
+                None => None,
+            },
             (String::new(), String::new()),
         ))
     })

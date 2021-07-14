@@ -50,9 +50,13 @@ pub async fn key_list(engine: LockableEngine) -> StratisResult<Vec<KeyDescriptio
         .collect())
 }
 
-pub async fn key_get_desc(engine: LockableEngine, pool_uuid: PoolUuid) -> Option<KeyDescription> {
+pub async fn key_get_desc(
+    engine: LockableEngine,
+    pool_uuid: PoolUuid,
+) -> StratisResult<Option<KeyDescription>> {
     let locked_pools = engine.lock().await.locked_pools();
-    locked_pools
-        .get(&pool_uuid)
-        .and_then(|info| info.info.key_description.to_owned())
+    match locked_pools.get(&pool_uuid) {
+        Some(info) => Ok(info.info.key_description()?.cloned()),
+        None => Ok(None),
+    }
 }

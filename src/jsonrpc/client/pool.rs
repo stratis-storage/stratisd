@@ -17,7 +17,7 @@ use crate::{
 pub fn pool_create(
     name: String,
     blockdevs: Vec<PathBuf>,
-    enc_info: EncryptionInfo,
+    enc_info: Option<EncryptionInfo>,
 ) -> StratisResult<()> {
     do_request_standard!(PoolCreate, name, blockdevs, enc_info)
 }

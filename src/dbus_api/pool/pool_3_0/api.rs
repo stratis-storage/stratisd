@@ -22,7 +22,7 @@ pub fn create_filesystems_method(
     f: &Factory<MTSync<TData>, TData>,
 ) -> Method<MTSync<TData>, TData> {
     f.method("CreateFilesystems", (), create_filesystems)
-        .in_arg(("specs", "as"))
+        .in_arg(("specs", "a(s(bs))"))
         // b: true if filesystems were created
         // a(os): Array of tuples with object paths and names
         //

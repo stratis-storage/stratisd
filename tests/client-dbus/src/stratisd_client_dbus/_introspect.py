@@ -159,7 +159,7 @@ SPECS = {
       <arg name="return_string" type="s" direction="out" />
     </method>
     <method name="CreateFilesystems">
-      <arg name="specs" type="as" direction="in" />
+      <arg name="specs" type="a(s(bs))" direction="in" />
       <arg name="results" type="(ba(os))" direction="out" />
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />

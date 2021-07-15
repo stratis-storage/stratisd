@@ -17,11 +17,6 @@ SPECS = {
 """,
     "org.storage.stratis3.Manager.r0": """
 <interface name="org.storage.stratis3.Manager.r0">
-    <method name="ConfigureSimulator">
-      <arg name="denominator" type="u" direction="in" />
-      <arg name="return_code" type="q" direction="out" />
-      <arg name="return_string" type="s" direction="out" />
-    </method>
     <method name="CreatePool">
       <arg name="name" type="s" direction="in" />
       <arg name="redundancy" type="(bq)" direction="in" />

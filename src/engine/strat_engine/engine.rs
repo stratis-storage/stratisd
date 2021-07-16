@@ -338,12 +338,15 @@ impl Engine for StratEngine {
 
 #[cfg(test)]
 mod test {
-    use devicemapper::Sectors;
+    use std::{env, error::Error};
+
+    use devicemapper::{Bytes, Sectors};
 
     use crate::engine::{
         strat_engine::{
+            backstore::crypt_metadata_size,
             cmd,
-            tests::{loopbacked, real},
+            tests::{dm_stratis_devices_remove, loopbacked, real, FailDevice},
         },
         types::EngineAction,
     };
@@ -492,5 +495,94 @@ mod test {
     #[test]
     fn real_test_setup() {
         real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_setup);
+    }
+
+    fn create_pool_and_test_rollback<F>(
+        name: &str,
+        paths_with_fail_device: &[&Path],
+        fail_device: &FailDevice,
+        encryption_info: &EncryptionInfo,
+        operation: F,
+    ) -> Result<(), Box<dyn Error>>
+    where
+        F: Fn(&mut dyn Pool) -> Result<(), Box<dyn Error>>,
+    {
+        let mut engine = StratEngine::initialize()?;
+
+        let uuid = engine
+            .create_pool(name, paths_with_fail_device, None, encryption_info)?
+            .changed()
+            .ok_or_else(|| {
+                Box::new(StratisError::Msg(
+                    "Pool should be newly created".to_string(),
+                ))
+            })?;
+        let (_, pool) = engine
+            .get_mut_pool(uuid)
+            .ok_or_else(|| Box::new(StratisError::Msg("Pool must be present".to_string())))?;
+
+        fail_device.start_failing(*Bytes(u128::from(crypt_metadata_size())).sectors())?;
+        if operation(pool).is_ok() {
+            return Err(Box::new(StratisError::Msg(
+                "Clevis initialization should have failed".to_string(),
+            )));
+        }
+
+        fail_device.stop_failing()?;
+
+        engine.teardown()?;
+        dm_stratis_devices_remove()?;
+
+        let mut engine = StratEngine::initialize()?;
+        engine.unlock_pool(uuid, UnlockMethod::Clevis)?;
+
+        engine.destroy_pool(uuid)?;
+        engine.teardown()?;
+
+        Ok(())
+    }
+
+    /// Test the creation of a pool, Clevis rebind, and unlock after rollback.
+    fn test_rollback(paths: &[&Path]) {
+        let mut paths_with_fail_device = paths.to_vec();
+        let last_device = paths_with_fail_device.pop().unwrap();
+        let fail_device = FailDevice::new(last_device, "stratis_fail_device").unwrap();
+        cmd::udev_settle().unwrap();
+        let fail_device_path = fail_device.as_path();
+        paths_with_fail_device.push(&fail_device_path);
+
+        let name = "pool";
+        let tang_url = env::var("TANG_URL").unwrap();
+
+        create_pool_and_test_rollback(
+            name,
+            paths_with_fail_device.as_slice(),
+            &fail_device,
+            &EncryptionInfo {
+                key_description: None,
+                clevis_info: Some((
+                    "tang".to_string(),
+                    json!({
+                        "url": tang_url,
+                        "stratis:tang:trust_url": true
+                    }),
+                )),
+            },
+            |pool| {
+                pool.rebind_clevis()?;
+                Ok(())
+            },
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn clevis_loop_test_rollback() {
+        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(2, 3, None), test_rollback);
+    }
+
+    #[test]
+    fn clevis_real_test_rollback() {
+        real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_rollback);
     }
 }

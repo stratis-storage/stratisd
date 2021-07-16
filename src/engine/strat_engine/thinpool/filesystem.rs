@@ -25,7 +25,6 @@ use nix::{
 use crate::{
     engine::{
         engine::Filesystem,
-        shared::DEFAULT_THIN_DEV_SIZE,
         strat_engine::{
             cmd::{create_fs, set_uuid, udev_settle, xfs_growfs},
             devlinks,
@@ -56,19 +55,13 @@ impl StratFilesystem {
     pub fn initialize(
         pool_uuid: PoolUuid,
         thinpool_dev: &ThinPoolDev,
-        size: Option<Sectors>,
+        size: Sectors,
         id: ThinDevId,
     ) -> StratisResult<(FilesystemUuid, StratFilesystem)> {
         let fs_uuid = FilesystemUuid::new_v4();
         let (dm_name, dm_uuid) = format_thin_ids(pool_uuid, ThinRole::Filesystem(fs_uuid));
-        let mut thin_dev = ThinDev::new(
-            get_dm(),
-            &dm_name,
-            Some(&dm_uuid),
-            size.unwrap_or(DEFAULT_THIN_DEV_SIZE),
-            thinpool_dev,
-            id,
-        )?;
+        let mut thin_dev =
+            ThinDev::new(get_dm(), &dm_name, Some(&dm_uuid), size, thinpool_dev, id)?;
 
         if let Err(err) = create_fs(&thin_dev.devnode(), Some(StratisUuid::Fs(fs_uuid)), false) {
             udev_settle().unwrap_or_else(|err| {
@@ -319,7 +312,7 @@ impl StratFilesystem {
 
         Ok(ret_vec)
     }
-    #[cfg(test)]
+
     pub fn thindev_size(&self) -> Sectors {
         self.thin_dev.size()
     }

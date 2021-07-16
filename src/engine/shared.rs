@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    collections::{hash_map::RandomState, HashSet},
+    collections::{hash_map::RandomState, HashMap, HashSet},
     fs::File,
     io::Read,
     os::unix::io::{AsRawFd, FromRawFd, RawFd},
@@ -13,7 +13,7 @@ use std::{
 use nix::poll::{poll, PollFd, PollFlags};
 use regex::Regex;
 
-use devicemapper::{Bytes, Sectors, IEC};
+use devicemapper::{Bytes, Sectors, IEC, SECTOR_SIZE};
 use libcryptsetup_rs::SafeMemHandle;
 
 use crate::{
@@ -197,6 +197,31 @@ pub fn validate_paths(paths: &[&Path]) -> StratisResult<()> {
                 .join(", ")
         )))
     }
+}
+
+pub fn validate_filesystem_size_specs<'a>(
+    specs: &[(&'a str, Option<Bytes>)],
+) -> StratisResult<HashMap<&'a str, Sectors>> {
+    specs
+        .iter()
+        .map(|&(name, size_opt)| {
+            size_opt
+                .map(|size| {
+                    let size_sectors = size.sectors();
+                    if size_sectors.bytes() != size {
+                        Err(StratisError::Msg(format!(
+                            "Requested size of filesystem {} must be divisble by {}",
+                            name, SECTOR_SIZE
+                        )))
+                    } else {
+                        Ok(size_sectors)
+                    }
+                })
+                .transpose()
+                .map(|size_opt| size_opt.unwrap_or(DEFAULT_THIN_DEV_SIZE))
+                .map(|size| (name, size))
+        })
+        .collect::<StratisResult<HashMap<_, Sectors>>>()
 }
 
 #[cfg(test)]

@@ -8,7 +8,7 @@ use dbus::{arg::Array, Message};
 use dbus_tree::{MTSync, MethodInfo, MethodResult};
 use serde_json::Value;
 
-use devicemapper::Sectors;
+use devicemapper::Bytes;
 
 use crate::{
     dbus_api::{
@@ -22,7 +22,7 @@ use crate::{
         CreateAction, DeleteAction, EngineAction, FilesystemUuid, KeyDescription, Name, PoolUuid,
         RenameAction,
     },
-    stratis::{StratisError, StratisResult},
+    stratis::StratisError,
 };
 
 pub fn create_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
@@ -60,21 +60,21 @@ pub fn create_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult 
         .map(|(name, size_opt)| {
             tuple_to_option(size_opt)
                 .map(|val| {
-                    val.parse::<u64>().map(Sectors).map_err(|_| {
-                        StratisError::Msg(format!(
+                    val.parse::<u128>().map_err(|_| {
+                        format!(
                             "Could not parse filesystem size string {} to integer value",
                             val
-                        ))
+                        )
                     })
                 })
                 .transpose()
-                .map(|size_opt| (name, size_opt))
+                .map(|size_opt| (name, size_opt.map(Bytes)))
         })
-        .collect::<StratisResult<Vec<(&str, Option<Sectors>)>>>()
+        .collect::<Result<Vec<(&str, Option<Bytes>)>, String>>()
     {
         Ok(val) => val,
         Err(err) => {
-            let (rc, rs) = engine_to_dbus_err_tuple(&err);
+            let (rc, rs) = (DbusErrorEnum::ERROR as u16, err);
             return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };

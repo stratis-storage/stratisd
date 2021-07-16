@@ -832,7 +832,7 @@ impl ThinPool {
         pool_name: &str,
         pool_uuid: PoolUuid,
         name: &str,
-        size: Option<Sectors>,
+        size: Sectors,
     ) -> StratisResult<FilesystemUuid> {
         let (fs_uuid, mut new_filesystem) =
             StratFilesystem::initialize(pool_uuid, &self.thin_pool, size, self.id_gen.new_id()?)?;
@@ -1207,6 +1207,7 @@ mod tests {
     use devicemapper::{Bytes, SECTOR_SIZE};
 
     use crate::engine::{
+        shared::DEFAULT_THIN_DEV_SIZE,
         strat_engine::{
             cmd,
             metadata::MDADataSize,
@@ -1311,7 +1312,12 @@ mod tests {
         .unwrap();
 
         let fs_uuid = pool
-            .create_filesystem(pool_name, pool_uuid, "stratis_test_filesystem", None)
+            .create_filesystem(
+                pool_name,
+                pool_uuid,
+                "stratis_test_filesystem",
+                DEFAULT_THIN_DEV_SIZE,
+            )
             .unwrap();
 
         check_expected_filesystem_size!(pool);
@@ -1425,7 +1431,7 @@ mod tests {
 
         let filesystem_name = "stratis_test_filesystem";
         let fs_uuid = pool
-            .create_filesystem(pool_name, pool_uuid, filesystem_name, None)
+            .create_filesystem(pool_name, pool_uuid, filesystem_name, DEFAULT_THIN_DEV_SIZE)
             .unwrap();
 
         check_expected_filesystem_size!(pool);
@@ -1555,7 +1561,7 @@ mod tests {
 
         let pool_name = "stratis_test_pool";
         let fs_uuid = pool
-            .create_filesystem(pool_name, pool_uuid, name1, None)
+            .create_filesystem(pool_name, pool_uuid, name1, DEFAULT_THIN_DEV_SIZE)
             .unwrap();
 
         check_expected_filesystem_size!(pool);
@@ -1622,7 +1628,7 @@ mod tests {
         .unwrap();
 
         let fs_uuid = pool
-            .create_filesystem(pool_name, pool_uuid, "fsname", None)
+            .create_filesystem(pool_name, pool_uuid, "fsname", DEFAULT_THIN_DEV_SIZE)
             .unwrap();
 
         check_expected_filesystem_size!(pool);
@@ -1700,7 +1706,7 @@ mod tests {
         let pool_name = "stratis_test_pool";
         let fs_name = "stratis_test_filesystem";
         let fs_uuid = pool
-            .create_filesystem(pool_name, pool_uuid, fs_name, None)
+            .create_filesystem(pool_name, pool_uuid, fs_name, DEFAULT_THIN_DEV_SIZE)
             .unwrap();
 
         check_expected_filesystem_size!(pool);
@@ -1773,7 +1779,7 @@ mod tests {
 
         let fs_name = "stratis_test_filesystem";
         let fs_uuid = pool
-            .create_filesystem(pool_name, pool_uuid, fs_name, Some(fs_size))
+            .create_filesystem(pool_name, pool_uuid, fs_name, fs_size)
             .unwrap();
 
         let tmp_dir = tempfile::Builder::new()
@@ -1865,8 +1871,13 @@ mod tests {
         )
         .unwrap();
 
-        pool.create_filesystem(pool_name, pool_uuid, "stratis_test_filesystem", None)
-            .unwrap();
+        pool.create_filesystem(
+            pool_name,
+            pool_uuid,
+            "stratis_test_filesystem",
+            DEFAULT_THIN_DEV_SIZE,
+        )
+        .unwrap();
 
         pool.suspend().unwrap();
         pool.suspend().unwrap();
@@ -1917,7 +1928,12 @@ mod tests {
         .unwrap();
 
         let fs_uuid = pool
-            .create_filesystem(pool_name, pool_uuid, "stratis_test_filesystem", None)
+            .create_filesystem(
+                pool_name,
+                pool_uuid,
+                "stratis_test_filesystem",
+                DEFAULT_THIN_DEV_SIZE,
+            )
             .unwrap();
 
         check_expected_filesystem_size!(pool);

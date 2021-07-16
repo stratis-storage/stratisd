@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
 
-use devicemapper::Bytes;
+use devicemapper::{Bytes, Sectors};
 
 use crate::{engine::Filesystem, stratis::StratisResult};
 
@@ -14,14 +14,20 @@ use crate::{engine::Filesystem, stratis::StratisResult};
 pub struct SimFilesystem {
     rand: u32,
     created: DateTime<Utc>,
+    size: Sectors,
 }
 
 impl SimFilesystem {
-    pub fn new() -> SimFilesystem {
+    pub fn new(size: Sectors) -> SimFilesystem {
         SimFilesystem {
             rand: rand::random::<u32>(),
             created: Utc::now(),
+            size,
         }
+    }
+
+    pub fn size(&self) -> Sectors {
+        self.size
     }
 }
 
@@ -41,6 +47,6 @@ impl Filesystem for SimFilesystem {
     }
 
     fn used(&self) -> StratisResult<Bytes> {
-        Ok(Bytes(12_345_678))
+        Ok((self.size / 2u64).bytes())
     }
 }

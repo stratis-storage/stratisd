@@ -12,12 +12,15 @@ use std::{
 
 use serde_json::{Map, Value};
 
-use devicemapper::{Sectors, IEC};
+use devicemapper::{Bytes, Sectors, IEC};
 
 use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
-        shared::{init_cache_idempotent_or_err, validate_name, validate_paths},
+        shared::{
+            init_cache_idempotent_or_err, validate_filesystem_size_specs, validate_name,
+            validate_paths,
+        },
         sim_engine::{blockdev::SimDev, filesystem::SimFilesystem},
         structures::Table,
         types::{
@@ -203,23 +206,37 @@ impl Pool for SimPool {
         &'a mut self,
         _pool_name: &str,
         _pool_uuid: PoolUuid,
-        specs: &[(&'b str, Option<Sectors>)],
+        specs: &[(&'b str, Option<Bytes>)],
     ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid)>> {
-        let names: HashMap<_, _> = specs.iter().map(|&tup| (tup.0, tup.1)).collect();
+        let spec_map = validate_filesystem_size_specs(specs)?;
 
-        names.iter().fold(Ok(()), |res, (name, _)| {
+        spec_map.iter().fold(Ok(()), |res, (name, size)| {
             res.and_then(|()| validate_name(name))
+                .and_then(|()| {
+                    if let Some((_, fs)) = self.filesystems.get_by_name(name) {
+                        if fs.size() == *size {
+                            Ok(())
+                        } else {
+                            Err(StratisError::Msg(format!(
+                                "Size {} of filesystem {} to be created conflicts with size {} for existing filesystem",
+                                size,
+                                name,
+                                fs.size()
+                            )))
+                        }
+                    } else {
+                        Ok(())
+                    }
+                })
         })?;
 
         let mut result = Vec::new();
-        for name in names.keys() {
-            if !self.filesystems.contains_name(name) {
-                let uuid = FilesystemUuid::new_v4();
-                let new_filesystem = SimFilesystem::new();
-                self.filesystems
-                    .insert(Name::new((&**name).to_owned()), uuid, new_filesystem);
-                result.push((*name, uuid));
-            }
+        for (name, size) in spec_map {
+            let uuid = FilesystemUuid::new_v4();
+            let new_filesystem = SimFilesystem::new(size);
+            self.filesystems
+                .insert(Name::new((name).to_owned()), uuid, new_filesystem);
+            result.push((name, uuid));
         }
 
         Ok(SetCreateAction::new(result))
@@ -488,17 +505,29 @@ impl Pool for SimPool {
     ) -> StratisResult<CreateAction<(FilesystemUuid, &mut dyn Filesystem)>> {
         validate_name(snapshot_name)?;
 
-        if self.filesystems.contains_name(snapshot_name) {
-            return Ok(CreateAction::Identity);
-        }
+        let target = self.filesystems.get_by_name(snapshot_name);
 
-        let uuid = FilesystemUuid::new_v4();
-        let snapshot = match self.get_filesystem(origin_uuid) {
-            Some(_filesystem) => SimFilesystem::new(),
+        let snapshot = match self.filesystems.get_by_uuid(origin_uuid) {
+            Some((_, filesystem)) => {
+                if let Some((_, target_fs)) = target {
+                    if target_fs.size() != filesystem.size() {
+                        return Err(StratisError::Msg(format!(
+                                    "Filesystem {} already exists and has size {} different from source filesystem size {}",
+                                    snapshot_name,
+                                    target_fs.size(),
+                                    filesystem.size())));
+                    } else {
+                        return Ok(CreateAction::Identity);
+                    }
+                }
+                SimFilesystem::new(filesystem.size())
+            }
             None => {
                 return Err(StratisError::Msg(origin_uuid.to_string()));
             }
         };
+
+        let uuid = FilesystemUuid::new_v4();
         self.filesystems
             .insert(Name::new(snapshot_name.to_owned()), uuid, snapshot);
         Ok(CreateAction::Created((

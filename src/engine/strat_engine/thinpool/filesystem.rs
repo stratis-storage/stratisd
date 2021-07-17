@@ -14,7 +14,7 @@ use chrono::{DateTime, TimeZone, Utc};
 use data_encoding::BASE32_NOPAD;
 
 use devicemapper::{
-    Bytes, DmDevice, DmName, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev, ThinStatus, IEC,
+    Bytes, DmDevice, DmName, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev, ThinStatus,
 };
 
 use nix::{
@@ -25,6 +25,7 @@ use nix::{
 use crate::{
     engine::{
         engine::Filesystem,
+        shared::DEFAULT_THIN_DEV_SIZE,
         strat_engine::{
             cmd::{create_fs, set_uuid, udev_settle, xfs_growfs},
             devlinks,
@@ -37,8 +38,6 @@ use crate::{
     },
     stratis::{StratisError, StratisResult},
 };
-
-const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
 const TEMP_MNT_POINT_PREFIX: &str = "stratis_mp_";
 

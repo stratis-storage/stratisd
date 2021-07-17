@@ -13,7 +13,7 @@ use std::{
 use nix::poll::{poll, PollFd, PollFlags};
 use regex::Regex;
 
-use devicemapper::Bytes;
+use devicemapper::{Bytes, Sectors, IEC};
 use libcryptsetup_rs::SafeMemHandle;
 
 use crate::{
@@ -23,6 +23,8 @@ use crate::{
     },
     stratis::{StratisError, StratisResult},
 };
+
+pub const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
 /// Called when the name of a requested pool coincides with the name of an
 /// existing pool. Returns an error if the specifications of the requested

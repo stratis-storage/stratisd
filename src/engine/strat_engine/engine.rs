@@ -346,9 +346,9 @@ mod test {
         strat_engine::{
             backstore::crypt_metadata_size,
             cmd,
-            tests::{dm_stratis_devices_remove, loopbacked, real, FailDevice},
+            tests::{crypt, dm_stratis_devices_remove, loopbacked, real, FailDevice},
         },
-        types::EngineAction,
+        types::{EngineAction, KeyDescription},
     };
 
     use super::*;
@@ -503,6 +503,7 @@ mod test {
         fail_device: &FailDevice,
         encryption_info: &EncryptionInfo,
         operation: F,
+        unlock_method: UnlockMethod,
     ) -> Result<(), Box<dyn Error>>
     where
         F: Fn(&mut dyn Pool) -> Result<(), Box<dyn Error>>,
@@ -534,7 +535,7 @@ mod test {
         dm_stratis_devices_remove()?;
 
         let mut engine = StratEngine::initialize()?;
-        engine.unlock_pool(uuid, UnlockMethod::Clevis)?;
+        engine.unlock_pool(uuid, unlock_method)?;
 
         engine.destroy_pool(uuid)?;
         engine.teardown()?;
@@ -542,8 +543,244 @@ mod test {
         Ok(())
     }
 
+    /// Test the creation of a pool with Clevis bindings, keyring bind, and unlock
+    /// after rollback.
+    fn test_keyring_bind_rollback(paths: &[&Path]) {
+        fn test(paths: &[&Path], key_desc: &KeyDescription) -> Result<(), Box<dyn Error>> {
+            let mut paths_with_fail_device = paths.to_vec();
+            let last_device = paths_with_fail_device.pop().ok_or_else(|| {
+                StratisError::Msg("Test requires at least one device".to_string())
+            })?;
+            let fail_device = FailDevice::new(last_device, "stratis_fail_device")?;
+            cmd::udev_settle()?;
+            let fail_device_path = fail_device.as_path();
+            paths_with_fail_device.push(&fail_device_path);
+
+            let name = "pool";
+            let tang_url = env::var("TANG_URL")?;
+
+            create_pool_and_test_rollback(
+                name,
+                paths_with_fail_device.as_slice(),
+                &fail_device,
+                &EncryptionInfo {
+                    key_description: None,
+                    clevis_info: Some((
+                        "tang".to_string(),
+                        json!({
+                            "url": tang_url,
+                            "stratis:tang:trust_url": true
+                        }),
+                    )),
+                },
+                |pool| {
+                    pool.bind_keyring(key_desc)?;
+                    Ok(())
+                },
+                UnlockMethod::Clevis,
+            )?;
+
+            Ok(())
+        }
+
+        crypt::insert_and_cleanup_key(paths, test)
+    }
+
+    #[test]
+    fn clevis_loop_test_keyring_bind_rollback() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, None),
+            test_keyring_bind_rollback,
+        );
+    }
+
+    #[test]
+    fn clevis_real_test_keyring_bind_rollback() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(2, None, None),
+            test_keyring_bind_rollback,
+        );
+    }
+
+    /// Test the creation of a pool with a passphrase, keyring rebind, and unlock
+    /// after rollback.
+    fn test_keyring_rebind_rollback(paths: &[&Path]) {
+        fn test(
+            paths: &[&Path],
+            key_desc1: &KeyDescription,
+            key_desc2: &KeyDescription,
+        ) -> Result<(), Box<dyn Error>> {
+            let mut paths_with_fail_device = paths.to_vec();
+            let last_device = paths_with_fail_device.pop().ok_or_else(|| {
+                StratisError::Msg("Test requires at least one device".to_string())
+            })?;
+            let fail_device = FailDevice::new(last_device, "stratis_fail_device")?;
+            cmd::udev_settle()?;
+            let fail_device_path = fail_device.as_path();
+            paths_with_fail_device.push(&fail_device_path);
+
+            let name = "pool";
+
+            create_pool_and_test_rollback(
+                name,
+                paths_with_fail_device.as_slice(),
+                &fail_device,
+                &EncryptionInfo {
+                    key_description: Some(key_desc1.to_owned()),
+                    clevis_info: None,
+                },
+                |pool| {
+                    pool.rebind_keyring(key_desc2)?;
+                    // Change the key to ensure that the second key description
+                    // is not the one that causes it to unlock successfully.
+                    crypt::change_key(key_desc2)?;
+                    Ok(())
+                },
+                UnlockMethod::Keyring,
+            )?;
+
+            Ok(())
+        }
+
+        crypt::insert_and_cleanup_two_keys(paths, test)
+    }
+
+    #[test]
+    fn loop_test_keyring_rebind_rollback() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, None),
+            test_keyring_rebind_rollback,
+        );
+    }
+
+    #[test]
+    fn real_test_keyring_rebind_rollback() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(2, None, None),
+            test_keyring_rebind_rollback,
+        );
+    }
+
+    /// Test the creation of a pool with a passphrase and Clevis bindings,
+    /// keyring unbind, and unlock after rollback.
+    fn test_keyring_unbind_rollback(paths: &[&Path]) {
+        fn test(paths: &[&Path], key_desc: &KeyDescription) -> Result<(), Box<dyn Error>> {
+            let mut paths_with_fail_device = paths.to_vec();
+            let last_device = paths_with_fail_device.pop().ok_or_else(|| {
+                StratisError::Msg("Test requires at least one device".to_string())
+            })?;
+            let fail_device = FailDevice::new(last_device, "stratis_fail_device")?;
+            cmd::udev_settle()?;
+            let fail_device_path = fail_device.as_path();
+            paths_with_fail_device.push(&fail_device_path);
+
+            let name = "pool";
+            let tang_url = env::var("TANG_URL")?;
+
+            create_pool_and_test_rollback(
+                name,
+                paths_with_fail_device.as_slice(),
+                &fail_device,
+                &EncryptionInfo {
+                    key_description: Some(key_desc.to_owned()),
+                    clevis_info: Some((
+                        "tang".to_string(),
+                        json!({
+                            "url": tang_url,
+                            "stratis:tang:trust_url": true
+                        }),
+                    )),
+                },
+                |pool| {
+                    pool.unbind_keyring()?;
+                    Ok(())
+                },
+                UnlockMethod::Keyring,
+            )?;
+
+            Ok(())
+        }
+
+        crypt::insert_and_cleanup_key(paths, test)
+    }
+
+    #[test]
+    fn clevis_loop_test_keyring_unbind_rollback() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, None),
+            test_keyring_unbind_rollback,
+        );
+    }
+
+    #[test]
+    fn clevis_real_test_keyring_unbind_rollback() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(2, None, None),
+            test_keyring_unbind_rollback,
+        );
+    }
+
+    /// Test the creation of a pool with a passphrase, Clevis bind, and unlock
+    /// after rollback.
+    fn test_clevis_bind_rollback(paths: &[&Path]) {
+        fn test(paths: &[&Path], key_desc: &KeyDescription) -> Result<(), Box<dyn Error>> {
+            let mut paths_with_fail_device = paths.to_vec();
+            let last_device = paths_with_fail_device.pop().ok_or_else(|| {
+                StratisError::Msg("Test requires at least one device".to_string())
+            })?;
+            let fail_device = FailDevice::new(last_device, "stratis_fail_device")?;
+            cmd::udev_settle()?;
+            let fail_device_path = fail_device.as_path();
+            paths_with_fail_device.push(&fail_device_path);
+
+            let name = "pool";
+            let tang_url = env::var("TANG_URL")?;
+
+            create_pool_and_test_rollback(
+                name,
+                paths_with_fail_device.as_slice(),
+                &fail_device,
+                &EncryptionInfo {
+                    key_description: Some(key_desc.to_owned()),
+                    clevis_info: None,
+                },
+                |pool| {
+                    pool.bind_clevis(
+                        "tang",
+                        &json!({
+                            "url": tang_url,
+                            "stratis:tang:trust_url": true
+                        }),
+                    )?;
+                    Ok(())
+                },
+                UnlockMethod::Keyring,
+            )?;
+
+            Ok(())
+        }
+
+        crypt::insert_and_cleanup_key(paths, test)
+    }
+
+    #[test]
+    fn clevis_loop_test_clevis_bind_rollback() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, None),
+            test_clevis_bind_rollback,
+        );
+    }
+
+    #[test]
+    fn clevis_real_test_clevis_bind_rollback() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(2, None, None),
+            test_clevis_bind_rollback,
+        );
+    }
+
     /// Test the creation of a pool, Clevis rebind, and unlock after rollback.
-    fn test_rollback(paths: &[&Path]) {
+    fn test_clevis_rebind_rollback(paths: &[&Path]) {
         let mut paths_with_fail_device = paths.to_vec();
         let last_device = paths_with_fail_device.pop().unwrap();
         let fail_device = FailDevice::new(last_device, "stratis_fail_device").unwrap();
@@ -572,17 +809,83 @@ mod test {
                 pool.rebind_clevis()?;
                 Ok(())
             },
+            UnlockMethod::Clevis,
         )
         .unwrap();
     }
 
     #[test]
-    fn clevis_loop_test_rollback() {
-        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(2, 3, None), test_rollback);
+    fn clevis_loop_test_clevis_rebind_rollback() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, None),
+            test_clevis_rebind_rollback,
+        );
     }
 
     #[test]
-    fn clevis_real_test_rollback() {
-        real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_rollback);
+    fn clevis_real_test_clevis_rebind_rollback() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(2, None, None),
+            test_clevis_rebind_rollback,
+        );
+    }
+
+    /// Test the creation of a pool with a passphrase and Clevis bindings,
+    /// Clevis unbind, and unlock after rollback.
+    fn test_clevis_unbind_rollback(paths: &[&Path]) {
+        fn test(paths: &[&Path], key_desc: &KeyDescription) -> Result<(), Box<dyn Error>> {
+            let mut paths_with_fail_device = paths.to_vec();
+            let last_device = paths_with_fail_device.pop().ok_or_else(|| {
+                StratisError::Msg("Test requires at least one device".to_string())
+            })?;
+            let fail_device = FailDevice::new(last_device, "stratis_fail_device")?;
+            cmd::udev_settle()?;
+            let fail_device_path = fail_device.as_path();
+            paths_with_fail_device.push(&fail_device_path);
+
+            let name = "pool";
+            let tang_url = env::var("TANG_URL")?;
+
+            create_pool_and_test_rollback(
+                name,
+                paths_with_fail_device.as_slice(),
+                &fail_device,
+                &EncryptionInfo {
+                    key_description: Some(key_desc.to_owned()),
+                    clevis_info: Some((
+                        "tang".to_string(),
+                        json!({
+                            "url": tang_url,
+                            "stratis:tang:trust_url": true
+                        }),
+                    )),
+                },
+                |pool| {
+                    pool.unbind_clevis()?;
+                    Ok(())
+                },
+                UnlockMethod::Clevis,
+            )?;
+
+            Ok(())
+        }
+
+        crypt::insert_and_cleanup_key(paths, test)
+    }
+
+    #[test]
+    fn clevis_loop_test_clevis_unbind_rollback() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, None),
+            test_clevis_unbind_rollback,
+        );
+    }
+
+    #[test]
+    fn clevis_real_test_clevis_unbind_rollback() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(2, None, None),
+            test_clevis_unbind_rollback,
+        );
     }
 }

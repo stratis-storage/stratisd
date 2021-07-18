@@ -775,11 +775,7 @@ mod tests {
     /// Test that the `BlockDevMgr` will add devices if the same key
     /// is used to encrypted the existing devices and the added devices.
     fn test_blockdevmgr_same_key(paths: &[&Path]) {
-        fn test_with_key(
-            paths: &[&Path],
-            key_desc: &KeyDescription,
-            _: (),
-        ) -> Result<(), Box<dyn Error>> {
+        fn test_with_key(paths: &[&Path], key_desc: &KeyDescription) -> Result<(), Box<dyn Error>> {
             let pool_uuid = PoolUuid::new_v4();
             let mut bdm = BlockDevMgr::initialize(
                 pool_uuid,
@@ -824,13 +820,9 @@ mod tests {
     /// is present in the keyring than was used to encrypted the existing
     /// devices.
     fn test_blockdevmgr_changed_key(paths: &[&Path]) {
-        fn test_with_first_key(
-            paths: &[&Path],
-            key_desc: &KeyDescription,
-            _: (),
-        ) -> Result<(PoolUuid, BlockDevMgr), Box<dyn Error>> {
+        fn test_with_key(paths: &[&Path], key_desc: &KeyDescription) -> Result<(), Box<dyn Error>> {
             let pool_uuid = PoolUuid::new_v4();
-            let bdm = BlockDevMgr::initialize(
+            let mut bdm = BlockDevMgr::initialize(
                 pool_uuid,
                 &paths[..2],
                 MDADataSize::default(),
@@ -839,15 +831,9 @@ mod tests {
                     clevis_info: None,
                 },
             )?;
-            Ok((pool_uuid, bdm))
-        }
 
-        fn test_with_second_key(
-            paths: &[&Path],
-            _: &KeyDescription,
-            data: (PoolUuid, BlockDevMgr),
-        ) -> Result<(), Box<dyn Error>> {
-            let (pool_uuid, mut bdm) = data;
+            crypt::change_key(&key_desc)?;
+
             if bdm.add(pool_uuid, &paths[2..3]).is_ok() {
                 Err(Box::new(StratisError::Msg(
                     "Adding a blockdev with a new key to an encrypted pool should fail".to_string(),
@@ -857,7 +843,7 @@ mod tests {
             }
         }
 
-        crypt::insert_and_cleanup_two_keys(paths, test_with_first_key, test_with_second_key);
+        crypt::insert_and_cleanup_key(paths, test_with_key);
     }
 
     #[test]
@@ -985,11 +971,7 @@ mod tests {
     }
 
     fn test_clevis_both_initialize(paths: &[&Path]) {
-        fn test_both(
-            paths: &[&Path],
-            key_desc: &KeyDescription,
-            _: (),
-        ) -> Result<(), Box<dyn Error>> {
+        fn test_both(paths: &[&Path], key_desc: &KeyDescription) -> Result<(), Box<dyn Error>> {
             let _memfs = MemoryFilesystem::new().unwrap();
             let mut mgr = BlockDevMgr::initialize(
                 PoolUuid::new_v4(),
@@ -1088,11 +1070,7 @@ mod tests {
     }
 
     fn test_clevis_both_rollback(paths: &[&Path]) {
-        fn test_both(
-            paths: &[&Path],
-            key_desc: &KeyDescription,
-            _: (),
-        ) -> Result<(), Box<dyn Error>> {
+        fn test_both(paths: &[&Path], key_desc: &KeyDescription) -> Result<(), Box<dyn Error>> {
             let mut paths_vec = paths.to_vec();
             let invalid_path = PathBuf::from("/i/am/not/a/path");
             paths_vec.push(invalid_path.as_path());

@@ -466,7 +466,6 @@ mod tests {
         fn luks_device_test(
             paths: &[&Path],
             key_description: &KeyDescription,
-            _: (),
         ) -> Result<(), Box<dyn Error>> {
             let pool_uuid = PoolUuid::new_v4();
 

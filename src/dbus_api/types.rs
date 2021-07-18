@@ -22,10 +22,7 @@ use dbus_tree::{DataType, MTSync, ObjectPath, Tree};
 use tokio::sync::{mpsc::UnboundedSender as TokioSender, RwLock, RwLockWriteGuard};
 
 use crate::{
-    dbus_api::{
-        connection::{DbusConnectionHandler, DbusTreeHandler},
-        udev::DbusUdevHandler,
-    },
+    dbus_api::{connection::DbusConnectionHandler, tree::DbusTreeHandler, udev::DbusUdevHandler},
     engine::{ActionAvailability, Engine, ExclusiveGuard, Lockable, LockableEngine, StratisUuid},
 };
 

@@ -19,8 +19,9 @@ use devicemapper::DmError;
 use crate::{
     dbus_api::{
         api::get_base_tree,
-        connection::{DbusConnectionHandler, DbusTreeHandler},
+        connection::DbusConnectionHandler,
         consts,
+        tree::DbusTreeHandler,
         types::{
             DbusContext, DbusErrorEnum, DbusHandlers, InterfacesAdded, InterfacesAddedThreadSafe,
             TData,

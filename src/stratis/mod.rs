@@ -14,4 +14,5 @@ mod ipc_support;
 mod run;
 #[allow(clippy::module_inception)]
 mod stratis;
+mod timer;
 mod udev_monitor;

@@ -9,7 +9,10 @@ use crate::{
         consts,
         filesystem::filesystem_3_0::{
             methods::rename_filesystem,
-            props::{get_filesystem_created, get_filesystem_devnode, get_filesystem_name},
+            props::{
+                get_filesystem_created, get_filesystem_devnode, get_filesystem_name,
+                get_filesystem_size,
+            },
         },
         types::TData,
         util::{get_parent, get_uuid},
@@ -92,4 +95,16 @@ where
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_filesystem_created)
+}
+
+pub fn size_property<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Property<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
+    f.property::<&str, _>(consts::FILESYSTEM_SIZE_PROP, ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::True)
+        .on_get(get_filesystem_size)
 }

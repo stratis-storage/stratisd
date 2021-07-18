@@ -19,14 +19,18 @@ use dbus::{
     Path,
 };
 use dbus_tree::{DataType, MTSync, ObjectPath, Tree};
-use tokio::sync::{mpsc::UnboundedSender as TokioSender, RwLock, RwLockWriteGuard};
+use tokio::sync::{
+    mpsc::UnboundedSender as TokioSender, RwLock, RwLockReadGuard, RwLockWriteGuard,
+};
+
+use devicemapper::Bytes;
 
 use crate::{
-    dbus_api::{
-        connection::{DbusConnectionHandler, DbusTreeHandler},
-        udev::DbusUdevHandler,
+    dbus_api::{connection::DbusConnectionHandler, tree::DbusTreeHandler, udev::DbusUdevHandler},
+    engine::{
+        ActionAvailability, ChangedProperties, Engine, ExclusiveGuard, FilesystemUuid, Lockable,
+        LockableEngine, SharedGuard, StratisUuid,
     },
-    engine::{ActionAvailability, Engine, ExclusiveGuard, Lockable, LockableEngine, StratisUuid},
 };
 
 /// Type for lockable D-Bus tree object.
@@ -36,6 +40,8 @@ pub type LockableTree<E> = Lockable<Arc<RwLock<Tree<MTSync<TData<E>>, TData<E>>>
 pub type GetManagedObjects =
     HashMap<dbus::Path<'static>, HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>>;
 
+/// Type representing an acquired read lock for the D-Bus tree.
+pub type TreeReadLock<'a, E> = SharedGuard<RwLockReadGuard<'a, Tree<MTSync<TData<E>>, TData<E>>>>;
 /// Type representing an acquired write lock for the D-Bus tree.
 pub type TreeWriteLock<'a, E> =
     ExclusiveGuard<RwLockWriteGuard<'a, Tree<MTSync<TData<E>>, TData<E>>>>;
@@ -79,6 +85,22 @@ pub enum DbusAction<E> {
     FsNameChange(Path<'static>, String),
     PoolNameChange(Path<'static>, String),
     PoolAvailActions(Path<'static>, ActionAvailability),
+    FsSizeChange(FilesystemUuid, Bytes),
+}
+
+impl<E> DbusAction<E>
+where
+    E: Engine,
+{
+    /// Convert changed properties to a series of D-Bus actions.
+    pub fn from_changed_properties(cp: ChangedProperties) -> Vec<Self> {
+        let mut actions = Vec::new();
+        let ChangedProperties { filesystem_props } = cp;
+        for (uuid, size) in filesystem_props {
+            actions.push(DbusAction::FsSizeChange(uuid, size));
+        }
+        actions
+    }
 }
 
 /// Context for an object path.

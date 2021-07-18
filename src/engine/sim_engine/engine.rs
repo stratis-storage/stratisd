@@ -17,8 +17,9 @@ use crate::{
         sim_engine::{keys::SimKeyActions, pool::SimPool},
         structures::Table,
         types::{
-            CreateAction, DeleteAction, DevUuid, EncryptionInfo, LockedPoolInfo, Name, PoolUuid,
-            RenameAction, ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
+            ChangedProperties, CreateAction, DeleteAction, DevUuid, EncryptionInfo, LockedPoolInfo,
+            Name, PoolUuid, RenameAction, ReportType, SetUnlockAction, UdevEngineEvent,
+            UnlockMethod,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -191,8 +192,18 @@ impl Engine for SimEngine {
             .collect()
     }
 
-    fn evented(&mut self) -> StratisResult<()> {
-        Ok(())
+    fn get_events(&mut self) -> StratisResult<Vec<PoolUuid>> {
+        Ok(Vec::new())
+    }
+
+    fn pool_evented(&mut self, _: Option<&Vec<PoolUuid>>) -> StratisResult<HashSet<PoolUuid>> {
+        Ok(HashSet::new())
+    }
+
+    fn fs_evented(&mut self, _: Option<&Vec<PoolUuid>>) -> StratisResult<ChangedProperties> {
+        Ok(ChangedProperties {
+            filesystem_props: HashMap::new(),
+        })
     }
 
     fn get_key_handler(&self) -> &Self::KeyActions {

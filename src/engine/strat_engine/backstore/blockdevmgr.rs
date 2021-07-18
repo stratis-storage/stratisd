@@ -33,7 +33,10 @@ use crate::{
             metadata::MDADataSize,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
         },
-        types::{DevUuid, EncryptionInfo, KeyDescription, PoolEncryptionInfo, PoolUuid},
+        types::{
+            ActionAvailability, DevUuid, EncryptionInfo, KeyDescription, PoolEncryptionInfo,
+            PoolUuid,
+        },
     },
     stratis::{StratisError, StratisResult},
 };
@@ -671,6 +674,7 @@ where
                 return StratisError::RollbackError {
                     causal_error: Box::new(causal_error),
                     rollback_error: Box::new(e),
+                    level: ActionAvailability::NoRequests,
                 };
             }
         }

@@ -20,6 +20,7 @@ pub enum StratisError {
     RollbackError {
         causal_error: Box<StratisError>,
         rollback_error: Box<StratisError>,
+        level: ActionAvailability,
     },
     /// This variant should be used for failed roll back that does not
     /// prompt any action in stratisd but needs to be reported to the user.
@@ -54,8 +55,8 @@ impl StratisError {
                 .iter()
                 .flat_map(|e| e.error_to_all_available_actions())
                 .collect::<HashSet<_>>(),
-            StratisError::RollbackError { .. } => {
-                once(ActionAvailability::NoRequests).collect::<HashSet<_>>()
+            StratisError::RollbackError { level, .. } => {
+                once(level).cloned().collect::<HashSet<_>>()
             }
             StratisError::NoActionRollbackError {
                 causal_error,
@@ -96,11 +97,12 @@ impl fmt::Display for StratisError {
             StratisError::RollbackError {
                 ref causal_error,
                 ref rollback_error,
+                ref level,
             } => {
                 write!(
                     f,
-                    "Rollback failed; causal_error: {}, rollback error: {}",
-                    causal_error, rollback_error
+                    "Rollback failed; causal_error: {}, rollback error: {}; putting pool in action availability state {}",
+                    causal_error, rollback_error, level,
                 )
             }
             StratisError::NoActionRollbackError {
@@ -231,6 +233,7 @@ mod tests {
                 Box::new(StratisError::RollbackError {
                     causal_error: Box::new(StratisError::Msg("Cause".to_string())),
                     rollback_error: Box::new(StratisError::Msg("Rollback".to_string())),
+                    level: ActionAvailability::NoRequests,
                 }),
             )
             .error_to_available_actions(),

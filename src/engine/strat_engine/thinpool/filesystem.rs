@@ -25,7 +25,7 @@ use nix::{
 
 use crate::{
     engine::{
-        engine::Filesystem,
+        engine::{DumpState, Filesystem, StateDiff},
         strat_engine::{
             cmd::{create_fs, set_uuid, udev_settle, xfs_growfs},
             devlinks,
@@ -34,7 +34,9 @@ use crate::{
             serde_structs::FilesystemSave,
             thinpool::{thinpool::DATA_LOWATER, DATA_BLOCK_SIZE},
         },
-        types::{FilesystemUuid, Name, PoolUuid, StratisUuid},
+        types::{
+            FilesystemUuid, Name, PoolUuid, StratFilesystemDiff, StratFilesystemState, StratisUuid,
+        },
     },
     stratis::{StratisError, StratisResult},
 };
@@ -215,10 +217,14 @@ impl StratFilesystem {
 
     /// check if filesystem is getting full and needs to be extended
     /// TODO: deal with the thindev in a Fail state.
-    pub fn check(&mut self) -> StratisResult<bool> {
+    /// TODO: Add rollback handling if the thin device is extended but the
+    /// filesystem cannot be.
+    /// TODO: Fix error handling to not swallow errors.
+    pub fn check(&mut self) -> StratisResult<StratFilesystemDiff> {
         match self.thin_dev.status(get_dm())? {
             ThinStatus::Working(_) => {
                 if let Some(mount_point) = self.mount_points()?.first() {
+                    let original_state = self.dump();
                     let (fs_total_bytes, fs_total_used_bytes) = fs_usage(mount_point)?;
                     let free_bytes = fs_total_bytes - fs_total_used_bytes;
                     if free_bytes.sectors() < FILESYSTEM_LOWATER {
@@ -226,15 +232,19 @@ impl StratFilesystem {
                         table.length =
                             self.thin_dev.size() + Self::extend_size(self.thin_dev.size());
                         if self.thin_dev.set_table(get_dm(), table).is_err() {
-                            return Ok(false);
+                            return Ok(StratFilesystemDiff::default());
                         }
                         if xfs_growfs(mount_point).is_err() {
-                            return Ok(true);
+                            Ok(StratFilesystemDiff::default())
+                        } else {
+                            Ok(original_state.diff(&self.dump()))
                         }
-                        return Ok(true);
+                    } else {
+                        Ok(StratFilesystemDiff::default())
                     }
+                } else {
+                    Ok(StratFilesystemDiff::default())
                 }
-                Ok(false)
             }
             ThinStatus::Error => {
                 let error_msg = format!(
@@ -243,7 +253,7 @@ impl StratFilesystem {
                 );
                 Err(StratisError::Msg(error_msg))
             }
-            ThinStatus::Fail => Ok(false),
+            ThinStatus::Fail => Ok(StratFilesystemDiff::default()),
         }
     }
 
@@ -347,6 +357,18 @@ impl Filesystem for StratFilesystem {
                 Err(StratisError::Msg(error_msg))
             }
         }
+    }
+
+    fn size(&self) -> Bytes {
+        self.thin_dev.size().bytes()
+    }
+}
+
+impl DumpState for StratFilesystem {
+    type State = StratFilesystemState;
+
+    fn dump(&self) -> Self::State {
+        StratFilesystemState::new(self.thin_dev.size().bytes())
     }
 }
 

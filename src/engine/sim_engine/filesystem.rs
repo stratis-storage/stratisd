@@ -50,6 +50,10 @@ impl Filesystem for SimFilesystem {
     fn used(&self) -> StratisResult<Bytes> {
         Ok((self.size / 2u64).bytes())
     }
+
+    fn size(&self) -> Bytes {
+        self.size.bytes()
+    }
 }
 
 impl<'a> Into<Value> for &'a SimFilesystem {

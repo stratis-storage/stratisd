@@ -24,9 +24,10 @@ use crate::{
             thinpool::{StratFilesystem, ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
         types::{
-            ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, Key, KeyDescription, Name, PoolEncryptionInfo,
-            PoolUuid, Redundancy, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
+            ActionAvailability, BlockDevTier, ChangedProperties, Clevis, CreateAction,
+            DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, Key, KeyDescription, Name,
+            PoolEncryptionInfo, PoolUuid, Redundancy, RegenAction, RenameAction, SetCreateAction,
+            SetDeleteAction,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -268,15 +269,33 @@ impl StratPool {
         self.thin_pool.get_eventing_dev_names(pool_uuid)
     }
 
-    /// Called when a DM device in this pool has generated an event.
+    /// Called when a DM device in this pool has generated an event. This method
+    /// handles checking pools.
     // TODO: Just check the device that evented. Currently checks
     // everything.
     #[pool_mutating_action("NoPoolChanges")]
-    pub fn event_on(&mut self, pool_uuid: PoolUuid, pool_name: &Name) -> StratisResult<()> {
+    pub fn event_on(&mut self, pool_uuid: PoolUuid, pool_name: &Name) -> StratisResult<bool> {
         if self.thin_pool.check(pool_uuid, &mut self.backstore)? {
             self.write_metadata(pool_name)?;
+            Ok(true)
+        } else {
+            Ok(false)
         }
-        Ok(())
+    }
+
+    /// Called when a DM device in this pool has generated an event. This method
+    /// handles checking filesystems.
+    #[pool_mutating_action("NoPoolChanges")]
+    pub fn fs_event_on(
+        &mut self,
+        pool_uuid: PoolUuid,
+        pool_name: &Name,
+    ) -> StratisResult<ChangedProperties> {
+        let changed = self.thin_pool.check_fs(pool_uuid)?;
+        if changed.is_changed() {
+            self.write_metadata(pool_name)?;
+        }
+        Ok(changed)
     }
 
     pub fn record(&self, name: &str) -> PoolSave {

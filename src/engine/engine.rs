@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fmt::Debug,
     os::unix::io::RawFd,
     path::{Path, PathBuf},
@@ -16,11 +16,11 @@ use devicemapper::{Bytes, Sectors};
 
 use crate::{
     engine::types::{
-        ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-        EncryptionInfo, FilesystemUuid, Key, KeyDescription, LockedPoolInfo, MappingCreateAction,
-        MappingDeleteAction, Name, PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction,
-        ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, UdevEngineEvent,
-        UnlockMethod,
+        ActionAvailability, BlockDevTier, ChangedProperties, Clevis, CreateAction, DeleteAction,
+        DevUuid, EncryptionInfo, FilesystemUuid, Key, KeyDescription, LockedPoolInfo,
+        MappingCreateAction, MappingDeleteAction, Name, PoolEncryptionInfo, PoolUuid, RegenAction,
+        RenameAction, ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction,
+        UdevEngineEvent, UnlockMethod,
     },
     stratis::StratisResult,
 };
@@ -79,6 +79,9 @@ pub trait Filesystem: Debug {
 
     /// The amount of data stored on the filesystem, including overhead.
     fn used(&self) -> StratisResult<Bytes>;
+
+    /// Get the size of the filesystem in bytes.
+    fn size(&self) -> Bytes;
 }
 
 pub trait BlockDev: Debug {
@@ -337,8 +340,16 @@ pub trait Engine: Debug + Report + Send {
     /// Get mutable references to all pools belonging to this engine.
     fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut Self::Pool)>;
 
-    /// Notify the engine that an event has occurred on the DM file descriptor.
-    fn evented(&mut self) -> StratisResult<()>;
+    /// Get the UUIDs of all pools that experienced an event.
+    fn get_events(&mut self) -> StratisResult<Vec<PoolUuid>>;
+
+    /// Notify the engine that an event has occurred on the DM file descriptor
+    /// and check pools for needed changes.
+    fn pool_evented(&mut self, pools: Option<&Vec<PoolUuid>>) -> StratisResult<HashSet<PoolUuid>>;
+
+    /// Notify the engine that an event has occurred on the DM file descriptor
+    /// and check filesystems for needed changes.
+    fn fs_evented(&mut self, pools: Option<&Vec<PoolUuid>>) -> StratisResult<ChangedProperties>;
 
     /// Get the handler for kernel keyring operations.
     fn get_key_handler(&self) -> &Self::KeyActions;
@@ -348,4 +359,23 @@ pub trait Engine: Debug + Report + Send {
 
     /// Return true if this engine is the simulator engine, otherwise false.
     fn is_sim(&self) -> bool;
+}
+
+/// Implements an interface for diffing two state structs.
+pub trait StateDiff {
+    type Diff;
+
+    /// Run the diff and return what has changed. The newer state should always be
+    /// the new_state argument as this method should always return the new values
+    /// for any properties that are inconsistent.
+    fn diff(&self, new_state: &Self) -> Self::Diff;
+}
+
+/// Dump all of the necessary state for the given data structure that may change.
+pub trait DumpState {
+    type State: StateDiff;
+
+    /// Return a structure that can be diffed and contains all of the values that
+    /// need to be checked in a diff and can change.
+    fn dump(&self) -> Self::State;
 }

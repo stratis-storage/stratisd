@@ -34,6 +34,7 @@ pub const FILESYSTEM_USED_PROP: &str = "Used";
 pub const FILESYSTEM_DEVNODE_PROP: &str = "Devnode";
 pub const FILESYSTEM_POOL_PROP: &str = "Pool";
 pub const FILESYSTEM_CREATED_PROP: &str = "Created";
+pub const FILESYSTEM_SIZE_PROP: &str = "Size";
 
 pub const BLOCKDEV_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.blockdev.r0";
 pub const BLOCKDEV_DEVNODE_PROP: &str = "Devnode";

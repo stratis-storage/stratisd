@@ -2,11 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use tokio::{
-    select,
-    sync::{broadcast::Sender, mpsc::UnboundedReceiver},
-    task::JoinHandle,
-};
+use tokio::{select, sync::mpsc::UnboundedReceiver, task::JoinHandle};
 
 use crate::{
     engine::{Engine, LockableEngine, UdevEngineEvent},
@@ -41,7 +37,6 @@ where
 pub async fn setup<E>(
     engine: LockableEngine<E>,
     recv: UnboundedReceiver<UdevEngineEvent>,
-    _: Sender<()>,
 ) -> StratisResult<()>
 where
     E: 'static + Engine,

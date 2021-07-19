@@ -12,6 +12,7 @@ use std::{
 
 use chrono::{DateTime, TimeZone, Utc};
 use data_encoding::BASE32_NOPAD;
+use serde_json::{Map, Value};
 
 use devicemapper::{
     Bytes, DmDevice, DmName, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev, ThinStatus,
@@ -363,4 +364,23 @@ pub fn fs_usage(mount_point: &Path) -> StratisResult<(Bytes, Bytes)> {
         Bytes::from(block_size * blocks),
         Bytes::from(block_size * (blocks - blocks_free)),
     ))
+}
+
+impl<'a> Into<Value> for &'a StratFilesystem {
+    fn into(self) -> Value {
+        let mut json = Map::new();
+        json.insert(
+            "size".to_string(),
+            Value::from(self.thindev_size().to_string()),
+        );
+        json.insert(
+            "used".to_string(),
+            Value::from(
+                self.used()
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|_| "Unavailable".to_string()),
+            ),
+        );
+        Value::from(json)
+    }
 }

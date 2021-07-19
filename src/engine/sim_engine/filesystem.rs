@@ -5,6 +5,7 @@
 use std::path::PathBuf;
 
 use chrono::{DateTime, Utc};
+use serde_json::{Map, Value};
 
 use devicemapper::{Bytes, Sectors};
 
@@ -48,5 +49,21 @@ impl Filesystem for SimFilesystem {
 
     fn used(&self) -> StratisResult<Bytes> {
         Ok((self.size / 2u64).bytes())
+    }
+}
+
+impl<'a> Into<Value> for &'a SimFilesystem {
+    fn into(self) -> Value {
+        let mut json = Map::new();
+        json.insert("size".to_string(), Value::from(self.size().to_string()));
+        json.insert(
+            "used".to_string(),
+            Value::from(
+                self.used()
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|_| "Unavailable".to_string()),
+            ),
+        );
+        Value::from(json)
     }
 }

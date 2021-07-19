@@ -11,7 +11,7 @@ use std::{
     time::Duration,
 };
 
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use devicemapper::{
     device_exists, DataBlocks, Device, DmDevice, DmName, DmNameBuf, FlakeyTargetParams, LinearDev,
@@ -1098,10 +1098,17 @@ impl<'a> Into<Value> for &'a ThinPool {
         json!({
             "filesystems": Value::Array(
                 self.filesystems.iter()
-                    .map(|(name, uuid, _)| json!({
-                        "name": name.to_string(),
-                        "uuid": uuid.to_string(),
-                    }))
+                    .map(|(name, uuid, fs)| {
+                        let mut json = Map::new();
+                        json.insert("name".to_string(), Value::from(name.to_string()));
+                        json.insert("uuid".to_string(), Value::from(uuid.to_string()));
+                        if let Value::Object(map) = fs.into() {
+                            json.extend(map.into_iter());
+                        } else {
+                                panic!("SimFilesystem::into() always returns JSON object")
+                        }
+                        Value::from(json)
+                    })
                     .collect()
             )
         })

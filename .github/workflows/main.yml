@@ -349,7 +349,7 @@ jobs:
         run: |
           git checkout -b mulkieran-issue-project-299 develop-2.4.1
           git pull https://github.com/mulkieran/stratis-cli.git issue-project-299
-
+        working-directory: ./stratis-cli
       - name: Set up for D-Bus
         run: |
           mkdir -p /var/lib/dbus

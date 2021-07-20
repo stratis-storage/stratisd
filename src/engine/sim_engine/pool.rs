@@ -240,11 +240,13 @@ impl Pool for SimPool {
 
         let mut result = Vec::new();
         for (name, size) in spec_map {
-            let uuid = FilesystemUuid::new_v4();
-            let new_filesystem = SimFilesystem::new(size);
-            self.filesystems
-                .insert(Name::new((name).to_owned()), uuid, new_filesystem);
-            result.push((name, uuid));
+            if !self.filesystems.contains_name(name) {
+                let uuid = FilesystemUuid::new_v4();
+                let new_filesystem = SimFilesystem::new(size);
+                self.filesystems
+                    .insert(Name::new((name).to_owned()), uuid, new_filesystem);
+                result.push((name, uuid));
+            }
         }
 
         Ok(SetCreateAction::new(result))

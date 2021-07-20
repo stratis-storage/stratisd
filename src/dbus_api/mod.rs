@@ -17,6 +17,6 @@ mod udev;
 mod util;
 
 pub use self::{
-    connection::DbusConnectionHandler, tree::DbusTreeHandler, udev::DbusUdevHandler,
-    util::create_dbus_handlers,
+    connection::DbusConnectionHandler, tree::DbusTreeHandler, types::DbusAction,
+    udev::DbusUdevHandler, util::create_dbus_handlers,
 };

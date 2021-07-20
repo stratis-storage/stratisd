@@ -5,8 +5,12 @@
 use std::os::unix::io::{AsRawFd, RawFd};
 
 use nix::fcntl::{fcntl, FcntlArg, OFlag};
+#[cfg(feature = "dbus_enabled")]
+use tokio::sync::mpsc::UnboundedSender;
 use tokio::{io::unix::AsyncFd, task::spawn};
 
+#[cfg(feature = "dbus_enabled")]
+use crate::dbus_api::DbusAction;
 use crate::{
     engine::{get_dm, get_dm_init, Engine, LockableEngine},
     stratis::errors::{StratisError, StratisResult},
@@ -18,7 +22,10 @@ const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 // to engine to handle event and waits until control is returned from engine.
 // Accepts None as an argument; this indicates that devicemapper events are
 // to be ignored.
-pub async fn dm_event_thread<E>(engine: Option<LockableEngine<E>>) -> StratisResult<()>
+pub async fn dm_event_thread<E>(
+    engine: Option<LockableEngine<E>>,
+    #[cfg(feature = "dbus_enabled")] _sender: UnboundedSender<DbusAction<E>>,
+) -> StratisResult<()>
 where
     E: 'static + Engine,
 {
@@ -31,6 +38,8 @@ where
     {
         {
             let mut guard = fd.readable().await?;
+            // Must clear readiness given that we never actually read any data
+            // from the devicemapper file descriptor.
             guard.clear_ready();
         }
         get_dm().arm_poll()?;

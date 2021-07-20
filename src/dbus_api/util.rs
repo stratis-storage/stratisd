@@ -16,7 +16,7 @@ use futures::{
 };
 use tokio::sync::{
     broadcast::{error::RecvError, Sender},
-    mpsc::{unbounded_channel, UnboundedReceiver},
+    mpsc::{UnboundedReceiver, UnboundedSender},
 };
 
 use devicemapper::DmError;
@@ -28,8 +28,8 @@ use crate::{
         consts,
         tree::DbusTreeHandler,
         types::{
-            DbusContext, DbusErrorEnum, DbusHandlers, InterfacesAdded, InterfacesAddedThreadSafe,
-            TData,
+            DbusAction, DbusContext, DbusErrorEnum, DbusHandlers, InterfacesAdded,
+            InterfacesAddedThreadSafe, TData,
         },
         udev::DbusUdevHandler,
     },
@@ -190,13 +190,17 @@ pub fn create_dbus_handlers<E>(
     engine: LockableEngine<E>,
     udev_receiver: UnboundedReceiver<UdevEngineEvent>,
     trigger: Sender<()>,
+    (tree_sender, tree_receiver): (
+        UnboundedSender<DbusAction<E>>,
+        UnboundedReceiver<DbusAction<E>>,
+    ),
 ) -> DbusHandlers<E>
 where
     E: 'static + Engine,
 {
     let conn = Arc::new(SyncConnection::new_system()?);
-    let (sender, receiver) = unbounded_channel();
-    let (tree, object_path) = get_base_tree(DbusContext::new(engine, sender, Arc::clone(&conn)));
+    let (tree, object_path) =
+        get_base_tree(DbusContext::new(engine, tree_sender, Arc::clone(&conn)));
     let dbus_context = tree.get_data().clone();
     conn.request_name(consts::STRATIS_BASE_SERVICE, false, true, true)?;
 
@@ -204,7 +208,7 @@ where
     let connection =
         DbusConnectionHandler::new(Arc::clone(&conn), tree.clone(), trigger.subscribe());
     let udev = DbusUdevHandler::new(udev_receiver, object_path, dbus_context);
-    let tree = DbusTreeHandler::new(tree, receiver, conn, trigger.subscribe());
+    let tree = DbusTreeHandler::new(tree, tree_receiver, conn, trigger.subscribe());
     Ok((connection, udev, tree))
 }
 

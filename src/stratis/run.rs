@@ -13,6 +13,8 @@ use tokio::{
     task,
 };
 
+#[cfg(feature = "dbus_enabled")]
+use crate::dbus_api::DbusAction;
 use crate::{
     engine::{Engine, Lockable, LockableEngine, SimEngine, StratEngine, UdevEngineEvent},
     stratis::{
@@ -61,16 +63,29 @@ pub fn run(sim: bool) -> StratisResult<()> {
     runtime.block_on(async move {
         async fn start_threads<E>(engine: LockableEngine<E>, sim: bool) -> StratisResult<()> where E: 'static + Engine {
             let (trigger, should_exit) = channel(1);
-            let (sender, receiver) = unbounded_channel::<UdevEngineEvent>();
+            let (udev_sender, udev_receiver) = unbounded_channel::<UdevEngineEvent>();
+            #[cfg(feature = "dbus_enabled")]
+            let (dbus_sender, dbus_receiver) = unbounded_channel::<DbusAction<E>>();
 
-            let join_udev = udev_thread(sender, should_exit);
-            let join_ipc = setup(engine.clone(), receiver, trigger.clone());
+            let join_udev = udev_thread(udev_sender, should_exit);
+            let join_ipc = setup(
+                engine.clone(),
+                udev_receiver,
+                #[cfg(feature = "dbus_enabled")]
+                trigger.clone(),
+                #[cfg(feature = "dbus_enabled")]
+                (dbus_sender.clone(), dbus_receiver),
+            );
             let join_signal = signal_thread();
-            let join_dm = dm_event_thread(if sim {
-                None
-            } else {
-                Some(engine.clone())
-            });
+            let join_dm = dm_event_thread(
+                if sim {
+                    None
+                } else {
+                    Some(engine.clone())
+                },
+                #[cfg(feature = "dbus_enabled")]
+                dbus_sender.clone(),
+            );
 
             select! {
                 res = join_udev => {
@@ -80,6 +95,7 @@ pub fn run(sim: bool) -> StratisResult<()> {
                     } else {
                         info!("The udev thread exited; shutting down stratisd...");
                     }
+
                 }
                 res = join_ipc => {
                     if let Err(e) = res {

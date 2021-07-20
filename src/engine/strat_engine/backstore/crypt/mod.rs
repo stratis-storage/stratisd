@@ -110,7 +110,6 @@ mod tests {
         fn crypt_test(
             paths: &[&Path],
             key_desc: &KeyDescription,
-            _: (),
         ) -> std::result::Result<(), Box<dyn Error>> {
             let mut handles = vec![];
 
@@ -198,7 +197,6 @@ mod tests {
         fn crypt_test(
             paths: &[&Path],
             key_desc: &KeyDescription,
-            _: (),
         ) -> std::result::Result<(), Box<dyn Error>> {
             let path = paths.get(0).ok_or_else(|| {
                 Box::new(StratisError::Msg(
@@ -358,7 +356,6 @@ mod tests {
         fn both_initialize(
             paths: &[&Path],
             key_desc: &KeyDescription,
-            _: (),
         ) -> Result<(), Box<dyn Error>> {
             let _memfs = MemoryFilesystem::new()?;
             let path = paths

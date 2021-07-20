@@ -12,56 +12,68 @@ use crate::engine::{
     types::SizedKeyMemory,
 };
 
+/// Generate a random key and associate it with the given key description.
+fn generate_random_key(key_desc: &KeyDescription) -> Result<(), Box<dyn Error>> {
+    let mut mem = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
+    File::open("/dev/urandom")?.read_exact(mem.as_mut())?;
+    let key_data = SizedKeyMemory::new(mem, MAX_STRATIS_PASS_SIZE);
+
+    StratKeyActions::set_no_fd(key_desc, key_data)?;
+    Ok(())
+}
+
+/// Set up a key in the kernel keyring and return the key description.
+fn set_up_key(desc_str: &str) -> KeyDescription {
+    let key_description = KeyDescription::try_from(desc_str.to_string()).expect("no semi-colons");
+
+    generate_random_key(&key_description).unwrap();
+
+    key_description
+}
+
 /// Takes physical device paths from loopback or real tests and passes
 /// them through to a compatible test definition. This method
 /// will also enrich the context passed to the test with a key description
 /// pointing to a key in the kernel keyring that has been randomly generated
 /// and added for this test. It will always be cleaned up after the test completes
 /// on both success and failure.
-fn insert_and_cleanup_key_shared<F, I, O>(
-    physical_paths: &[&Path],
-    test: F,
-    input: I,
-) -> Result<O, Box<dyn Error>>
-where
-    F: Fn(&[&Path], &KeyDescription, I) -> std::result::Result<O, Box<dyn Error>>,
-{
-    let mut key_handle = StratKeyActions;
-    let desc_str = "test-description-for-stratisd";
-    let key_description = KeyDescription::try_from(desc_str.to_string()).expect("no semi-colons");
-    let mut mem = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
-    File::open("/dev/urandom")
-        .unwrap()
-        .read_exact(mem.as_mut())
-        .unwrap();
-    let key_data = SizedKeyMemory::new(mem, MAX_STRATIS_PASS_SIZE);
-
-    StratKeyActions::set_no_fd(&key_description, key_data)?;
-
-    let result = test(physical_paths, &key_description, input);
-
-    key_handle.unset(&key_description)?;
-
-    result
-}
-
-/// Insert and clean up a single key for the lifetime of the test.
 pub fn insert_and_cleanup_key<F>(physical_paths: &[&Path], test: F)
 where
-    F: Fn(&[&Path], &KeyDescription, ()) -> std::result::Result<(), Box<dyn Error>>,
+    F: Fn(&[&Path], &KeyDescription) -> std::result::Result<(), Box<dyn Error>>,
 {
-    insert_and_cleanup_key_shared::<F, (), ()>(physical_paths, test, ()).unwrap();
+    let key_description = set_up_key("test-description-for-stratisd");
+
+    let result = test(physical_paths, &key_description);
+
+    StratKeyActions.unset(&key_description).unwrap();
+
+    result.unwrap()
+}
+
+/// Takes physical device paths from loopback or real tests and passes
+/// them through to a compatible test definition. This method
+/// will also enrich the context passed to the test with two different key
+/// descriptions pointing to keys in the kernel keyring that have been randomly
+/// generated and added for this test. They will always be cleaned up after the
+/// test completes on both success and failure.
+pub fn insert_and_cleanup_two_keys<F>(physical_paths: &[&Path], test: F)
+where
+    F: Fn(&[&Path], &KeyDescription, &KeyDescription) -> std::result::Result<(), Box<dyn Error>>,
+{
+    let key_description1 = set_up_key("test-description-for-stratisd-1");
+    let key_description2 = set_up_key("test-description-for-stratisd-2");
+
+    let result = test(physical_paths, &key_description1, &key_description2);
+
+    StratKeyActions.unset(&key_description1).unwrap();
+    StratKeyActions.unset(&key_description2).unwrap();
+
+    result.unwrap()
 }
 
 /// Keep the key description the same but change the data to a different key
 /// to test that stratisd can appropriately handle such a case without getting
 /// into a bad state.
-pub fn insert_and_cleanup_two_keys<FR, F, R>(physical_paths: &[&Path], test_one: FR, test_two: F)
-where
-    FR: Fn(&[&Path], &KeyDescription, ()) -> Result<R, Box<dyn Error>>,
-    F: Fn(&[&Path], &KeyDescription, R) -> Result<(), Box<dyn Error>>,
-{
-    let return_value =
-        insert_and_cleanup_key_shared::<FR, (), R>(physical_paths, test_one, ()).unwrap();
-    insert_and_cleanup_key_shared::<F, R, ()>(physical_paths, test_two, return_value).unwrap();
+pub fn change_key(key_desc: &KeyDescription) -> Result<(), Box<dyn Error>> {
+    generate_random_key(key_desc)
 }

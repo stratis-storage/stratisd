@@ -157,9 +157,9 @@ checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
 
 [[package]]
 name = "cc"
-version = "1.0.68"
+version = "1.0.69"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a72c244c1ff497a746a7e1fb3d14bd08420ecda70c8f25c7112f2781652d787"
+checksum = "e70cc2f62c6ce1868963827bd677764c62d07c3d9a3e1fb1177ee1a9ab199eb2"
 
 [[package]]
 name = "cexpr"
@@ -269,14 +269,16 @@ dependencies = [
 
 [[package]]
 name = "devicemapper"
-version = "0.29.1"
+version = "0.29.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "711d6f9cd96296e0bdb0722ace2d7d140ead8f590a0d274c4ba5312832305b64"
+checksum = "9f97661bd019b197592f3a42e98ff26b27f4ef86379c233a3c1661cb8ea0e70e"
 dependencies = [
+ "bindgen 0.57.0",
  "bitflags",
  "error-chain",
  "libc",
  "nix 0.20.0",
+ "semver",
  "serde",
 ]
 
@@ -1184,9 +1186,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "1.8.1"
+version = "1.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98c8b05dc14c75ea83d63dd391100353789f5f24b8b3866542a5e85c8be8e985"
+checksum = "c2602b8af3767c285202012822834005f596c811042315fa7e9f5b12b2a43207"
 dependencies = [
  "autocfg",
  "libc",

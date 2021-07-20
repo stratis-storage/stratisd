@@ -2,15 +2,20 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, fmt::Display, sync::Arc};
+use std::{collections::HashMap, fmt::Display, future::Future, sync::Arc};
 
 use dbus::{
     arg::{ArgType, Iter, IterAppend, RefArg, Variant},
     blocking::SyncConnection,
 };
 use dbus_tree::{MTSync, MethodErr, PropInfo};
+use futures::{
+    executor::block_on,
+    future::{select, Either},
+    pin_mut,
+};
 use tokio::sync::{
-    broadcast::Sender,
+    broadcast::{error::RecvError, Sender},
     mpsc::{unbounded_channel, UnboundedReceiver},
 };
 
@@ -29,7 +34,7 @@ use crate::{
         udev::DbusUdevHandler,
     },
     engine::{Engine, Lockable, LockableEngine, UdevEngineEvent},
-    stratis::StratisError,
+    stratis::{StratisError, StratisResult},
 };
 
 /// Convert a tuple as option to an Option type
@@ -215,4 +220,24 @@ pub fn thread_safe_to_dbus_sendable(ia: InterfacesAddedThreadSafe) -> Interfaces
             (k, new_map)
         })
         .collect()
+}
+
+pub fn poll_exit_and_future<E, F, R>(exit: E, future: F) -> StratisResult<Option<R>>
+where
+    E: Future<Output = Result<(), RecvError>>,
+    F: Future<Output = R>,
+{
+    pin_mut!(exit);
+    pin_mut!(future);
+
+    match block_on(select(exit, future)) {
+        Either::Left((Ok(()), _)) => {
+            info!("D-Bus tree handler was notified to exit");
+            Ok(None)
+        }
+        Either::Left((Err(_), _)) => Err(StratisError::Msg(
+            "D-Bus tree handler can no longer be notified to exit; shutting down...".to_string(),
+        )),
+        Either::Right((a, _)) => Ok(Some(a)),
+    }
 }

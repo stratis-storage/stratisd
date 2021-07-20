@@ -366,3 +366,8 @@ pub enum MaybeInconsistent<T> {
     Yes,
     No(T),
 }
+
+/// A set of properties that can change independently of IPC calls.
+pub struct ChangedProperties {
+    pub filesystem_sizes: Vec<(FilesystemUuid, u64)>,
+}

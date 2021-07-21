@@ -398,7 +398,7 @@ mod test {
             name2,
             fs_uuid1
                 .into_iter()
-                .map(|(_, u)| u)
+                .map(|(_, u, _)| u)
                 .collect::<Vec<_>>()
                 .as_slice(),
         )
@@ -407,7 +407,7 @@ mod test {
             name2,
             fs_uuid2
                 .into_iter()
-                .map(|(_, u)| u)
+                .map(|(_, u, _)| u)
                 .collect::<Vec<_>>()
                 .as_slice(),
         )

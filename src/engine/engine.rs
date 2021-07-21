@@ -137,7 +137,7 @@ pub trait Pool: Debug {
         pool_name: &str,
         pool_uuid: PoolUuid,
         specs: &[(&'b str, Option<Bytes>)],
-    ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid)>>;
+    ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid, Sectors)>>;
 
     /// Adds blockdevs specified by paths to pool.
     /// Returns a list of uuids corresponding to devices actually added.

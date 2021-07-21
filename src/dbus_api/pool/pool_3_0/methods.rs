@@ -93,7 +93,7 @@ pub fn create_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult 
         Some(ref newly_created_filesystems) => {
             let v = newly_created_filesystems
                 .iter()
-                .map(|&(name, uuid)| {
+                .map(|&(name, uuid, _)| {
                     let filesystem = pool
                         .get_filesystem(uuid)
                         .expect("just inserted by create_filesystems")

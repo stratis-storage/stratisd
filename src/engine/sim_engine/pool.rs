@@ -215,7 +215,7 @@ impl Pool for SimPool {
         _pool_name: &str,
         _pool_uuid: PoolUuid,
         specs: &[(&'b str, Option<Bytes>)],
-    ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid)>> {
+    ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid, Sectors)>> {
         let spec_map = validate_filesystem_size_specs(specs)?;
 
         spec_map.iter().fold(Ok(()), |res, (name, size)| {
@@ -245,7 +245,7 @@ impl Pool for SimPool {
                 let new_filesystem = SimFilesystem::new(size);
                 self.filesystems
                     .insert(Name::new((name).to_owned()), uuid, new_filesystem);
-                result.push((name, uuid));
+                result.push((name, uuid, size));
             }
         }
 

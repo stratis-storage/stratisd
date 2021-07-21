@@ -430,7 +430,7 @@ impl Pool for StratPool {
         pool_name: &str,
         pool_uuid: PoolUuid,
         specs: &[(&'b str, Option<Bytes>)],
-    ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid)>> {
+    ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid, Sectors)>> {
         let spec_map = validate_filesystem_size_specs(specs)?;
 
         spec_map.iter().fold(Ok(()), |res, (name, size)| {
@@ -460,7 +460,7 @@ impl Pool for StratPool {
                 let fs_uuid = self
                     .thin_pool
                     .create_filesystem(pool_name, pool_uuid, name, size)?;
-                result.push((name, fs_uuid));
+                result.push((name, fs_uuid, size));
             }
         }
 
@@ -726,7 +726,7 @@ mod tests {
         let metadata1 = pool.record(name);
         assert_matches!(metadata1.backstore.cache_tier, None);
 
-        let (_, fs_uuid) = pool
+        let (_, fs_uuid, _) = pool
             .create_filesystems(name, uuid, &[("stratis-filesystem", None)])
             .unwrap()
             .changed()
@@ -809,7 +809,7 @@ mod tests {
         invariant(&pool, name);
 
         let fs_name = "stratis_test_filesystem";
-        let (_, fs_uuid) = pool
+        let (_, fs_uuid, _) = pool
             .create_filesystems(name, pool_uuid, &[(fs_name, None)])
             .unwrap()
             .changed()

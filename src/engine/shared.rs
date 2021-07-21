@@ -29,6 +29,8 @@ const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 #[cfg(test)]
 pub const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
+const MIN_THIN_DEV_SIZE: Sectors = Sectors(64 * IEC::Ki); // 32 MiB
+
 /// Called when the name of a requested pool coincides with the name of an
 /// existing pool. Returns an error if the specifications of the requested
 /// pool differ from the specifications of the existing pool, otherwise
@@ -215,6 +217,11 @@ pub fn validate_filesystem_size_specs<'a>(
                         Err(StratisError::Msg(format!(
                             "Requested size of filesystem {} must be divisble by {}",
                             name, SECTOR_SIZE
+                        )))
+                    } else if size_sectors < MIN_THIN_DEV_SIZE {
+                        Err(StratisError::Msg(format!(
+                            "Requested size of filesystem {} is {} which is less than minimum required: {}",
+                            name, size_sectors, MIN_THIN_DEV_SIZE
                         )))
                     } else {
                         Ok(size_sectors)

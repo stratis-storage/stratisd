@@ -24,6 +24,9 @@ use crate::{
     stratis::{StratisError, StratisResult},
 };
 
+#[cfg(not(test))]
+const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
+#[cfg(test)]
 pub const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
 /// Called when the name of a requested pool coincides with the name of an

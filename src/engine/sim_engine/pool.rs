@@ -89,6 +89,7 @@ impl SimPool {
             self.block_devs.len(),
             self.block_devs.iter().map(|(_, bd)| bd.encryption_info()),
         )
+        .expect("sim engine cannot create pools with encrypted and unencrypted devices together")
     }
 
     fn add_clevis_info(&mut self, pin: &str, config: &Value) {

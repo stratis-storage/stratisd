@@ -245,19 +245,26 @@ pub fn validate_filesystem_size_specs<'a>(
 }
 
 /// Gather the encryption information from across multiple block devices.
-pub fn gather_encryption_info<'a, I>(len: usize, iterator: I) -> Option<PoolEncryptionInfo>
+pub fn gather_encryption_info<'a, I>(
+    len: usize,
+    iterator: I,
+) -> StratisResult<Option<PoolEncryptionInfo>>
 where
     I: Iterator<Item = Option<&'a EncryptionInfo>>,
 {
     let encryption_infos = iterator.flatten().collect::<Vec<_>>();
 
-    // Assert that all devices are either encrypted or unencrypted.
-    assert!(encryption_infos.is_empty() || encryption_infos.len() == len);
-
-    if encryption_infos.get(0).is_none() {
-        None
+    // Return error if not all devices are either encrypted or unencrypted.
+    if encryption_infos.is_empty() || encryption_infos.len() == len {
+        Ok(if encryption_infos.get(0).is_none() {
+            None
+        } else {
+            Some(PoolEncryptionInfo::from(encryption_infos))
+        })
     } else {
-        Some(PoolEncryptionInfo::from(encryption_infos))
+        Err(StratisError::Msg(
+            "All devices in a pool must be either encrypted or unencrypted; found a mixture of both".to_string()
+        ))
     }
 }
 

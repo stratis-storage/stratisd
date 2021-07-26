@@ -11,13 +11,16 @@ use std::{
 
 use serde_json::Value;
 
-use crate::engine::{
-    shared::gather_encryption_info,
-    strat_engine::{
-        liminal::identify::{DeviceInfo, LuksInfo, StratisInfo},
-        metadata::StratisIdentifiers,
+use crate::{
+    engine::{
+        shared::gather_encryption_info,
+        strat_engine::{
+            liminal::identify::{DeviceInfo, LuksInfo, StratisInfo},
+            metadata::StratisIdentifiers,
+        },
+        types::{DevUuid, EncryptionInfo, LockedPoolDevice, LockedPoolInfo, PoolEncryptionInfo},
     },
-    types::{DevUuid, EncryptionInfo, LockedPoolDevice, LockedPoolInfo, PoolEncryptionInfo},
+    stratis::StratisResult,
 };
 
 /// Info for a discovered LUKS device belonging to Stratis.
@@ -402,7 +405,7 @@ impl DeviceSet {
     }
 
     /// The unique encryption info for this set.
-    pub fn encryption_info(&self) -> Option<PoolEncryptionInfo> {
+    pub fn encryption_info(&self) -> StratisResult<Option<PoolEncryptionInfo>> {
         gather_encryption_info(
             self.internal.len(),
             self.internal.iter().map(|(_, info)| info.encryption_info()),
@@ -417,12 +420,14 @@ impl DeviceSet {
     /// LUKS2 device. This could happen for encrypted devices if the LUKS2 device
     /// is detected after the unlocked Stratis device but should eventually become
     /// consistent.
-    pub fn locked_pool_info(&self) -> Option<LockedPoolInfo> {
+    pub fn locked_pool_info(&self) -> StratisResult<Option<LockedPoolInfo>> {
         let encryption_info = gather_encryption_info(
             self.internal.len(),
             self.internal.iter().map(|(_, info)| info.encryption_info()),
-        );
-        encryption_info.and_then(|info| {
+        )
+        .ok()
+        .and_then(|info| info);
+        Ok(encryption_info.and_then(|info| {
             let devices = self
                 .internal
                 .iter()
@@ -450,7 +455,7 @@ impl DeviceSet {
                 info: info.clone(),
                 devices: d,
             })
-        })
+        }))
     }
 
     /// Process the data from a remove udev event. Since remove events are

@@ -98,12 +98,21 @@ impl LiminalDevices {
 
         let unlocked = match self.errored_pool_devices.get(&pool_uuid) {
             Some(map) => {
-                if map.all_unencrypted() {
+                let encryption_info = map.encryption_info();
+                if let Ok(None) = encryption_info {
                     return Err(StratisError::Msg(
                         format!(
                             "Attempted to unlock set of devices belonging to an unencrypted pool with UUID {}",
                             pool_uuid,
                         ),
+                    ));
+                } else if let Err(e) = encryption_info {
+                    return Err(StratisError::Chained(
+                        format!(
+                            "Error in the encryption information for pool with UUID {}",
+                            pool_uuid,
+                        ),
+                        Box::new(e),
                     ));
                 }
 
@@ -144,12 +153,13 @@ impl LiminalDevices {
 
     /// Get a mapping of pool UUIDs from all of the LUKS2 devices that are currently
     /// locked to their encryption info in the set of pools that are not yet set up.
-    // Precondition: All devices for a given errored pool have been determined to have
-    // the same  encryption info.
     pub fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo> {
         self.errored_pool_devices
             .iter()
-            .filter_map(|(pool_uuid, map)| map.locked_pool_info().map(|info| (*pool_uuid, info)))
+            .filter_map(|(pool_uuid, map)| match map.locked_pool_info() {
+                Ok(Some(info)) => Some((*pool_uuid, info)),
+                _ => None,
+            })
             .collect()
     }
 

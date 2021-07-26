@@ -129,7 +129,7 @@ jobs:
           >>
           $GITHUB_ENV
       - name: Make the tar file
-        run: |
+        run: >
           RELEASE_VERSION=${{ env.RELEASE_VERSION }}
           make -f Makefile vendored-tar-file
       - name: Set name

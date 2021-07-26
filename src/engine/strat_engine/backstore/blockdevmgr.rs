@@ -393,6 +393,7 @@ impl BlockDevMgr {
             self.block_devs.len(),
             self.block_devs.iter().map(|bd| bd.encryption_info()),
         )
+        .expect("Cannot create a pool out of both encrypted and unencrypted devices")
     }
 
     pub fn is_encrypted(&self) -> bool {

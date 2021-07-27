@@ -17,9 +17,9 @@ use crate::{
         strat_engine::{
             backstore::CryptActivationHandle,
             liminal::{
-                device_info::{DeviceBag, DeviceSet, LInfo, LLuksInfo, LStratisInfo},
+                device_info::{DeviceBag, DeviceSet, LInfo, LLuksInfo},
                 identify::{identify_block_device, DeviceInfo, LuksInfo, StratisInfo},
-                setup::{get_bdas, get_blockdevs, get_metadata},
+                setup::{get_bdas, get_blockdevs, get_metadata, get_pool_state},
             },
             metadata::StratisIdentifiers,
             pool::StratPool,
@@ -252,9 +252,19 @@ impl LiminalDevices {
         fn setup_pool(
             pools: &Table<PoolUuid, StratPool>,
             pool_uuid: PoolUuid,
-            infos: &HashMap<DevUuid, &LStratisInfo>,
+            device_set: &DeviceSet,
         ) -> Result<(Name, StratPool), Destination> {
-            let bdas = match get_bdas(infos) {
+            let infos = match device_set.as_opened_set() {
+                Some(i) => i,
+                None => {
+                    return Err(Destination::Errored(format!(
+                        "Some of the devices in pool with UUID {} are unopened",
+                        pool_uuid,
+                    )))
+                }
+            };
+
+            let bdas = match get_bdas(&infos) {
                 Err(err) => Err(
                     Destination::Errored(format!(
                         "There was an error encountered when reading the BDAs for the devices found for pool with UUID {}: {}",
@@ -274,7 +284,7 @@ impl LiminalDevices {
                         )));
             }
 
-            let (timestamp, metadata) = match get_metadata(infos, &bdas) {
+            let (timestamp, metadata) = match get_metadata(&infos, &bdas) {
                 Err(err) => return Err(
                     Destination::Errored(format!(
                         "There was an error encountered when reading the metadata for the devices found for pool with UUID {}: {}",
@@ -296,7 +306,7 @@ impl LiminalDevices {
                         uuid)));
             }
 
-            let (datadevs, cachedevs) = match get_blockdevs(&metadata.backstore, infos, bdas) {
+            let (datadevs, cachedevs) = match get_blockdevs(&metadata.backstore, &infos, bdas) {
                 Err(err) => return Err(
                     Destination::Errored(format!(
                         "There was an error encountered when calculating the block devices for pool with UUID {} and name {}: {}",
@@ -313,44 +323,34 @@ impl LiminalDevices {
                 )));
             }
 
-            // NOTE: DeviceSet provides infos variable in setup_pool. DeviceSet
-            // ensures that all encryption infos match so we do not need to
-            // check again here.
-            let num_with_luks = datadevs
-                .iter()
-                .filter(|sbd| sbd.encryption_info().is_some())
-                .count();
+            let encryption_info = match device_set.encryption_info() {
+                Ok(opt) => opt,
+                Err(_) => {
+                    // NOTE: This is not actually a hopeless situation. It may be
+                    // that a LUKS device owned by Stratis corresponding to a
+                    // Stratis device has just not been discovered yet. If it
+                    // is, the appropriate info will be updated, and setup may
+                    // yet succeed.
+                    return Err(
+                        Destination::Errored(format!(
+                                "Some data devices in the set belonging to pool with UUID {} and name {} appear to be encrypted devices managed by Stratis, and some do not",
+                                pool_uuid,
+                                &metadata.name)));
+                }
+            };
 
-            if num_with_luks != 0 && num_with_luks != datadevs.len() {
-                // NOTE: This is not actually a hopeless situation. It may be
-                // that a LUKS device owned by Stratis corresponding to a
-                // Stratis device has just not been discovered yet. If it
-                // is, the appropriate info will be updated, and setup may
-                // yet succeed.
-                return Err(
+            let state = get_pool_state(encryption_info);
+            StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata, state).map_err(
+                |err| {
                     Destination::Errored(format!(
-                            "Some data devices in the set belonging to pool with UUID {} and name {} appear to be encrypted devices managed by Stratis, and some do not",
-                            pool_uuid,
-                            &metadata.name)));
-            }
-
-            StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata).map_err(|err| {
-                Destination::Errored(format!(
                     "An attempt to set up pool with UUID {} from the assembled devices failed: {}",
                     pool_uuid, err
                 ))
-            })
+                },
+            )
         }
 
-        let opened = match infos.as_opened_set() {
-            Some(opened) => opened,
-            None => {
-                self.errored_pool_devices.insert(pool_uuid, infos);
-                return None;
-            }
-        };
-
-        let result = setup_pool(pools, pool_uuid, &opened);
+        let result = setup_pool(pools, pool_uuid, &infos);
 
         match result {
             Ok((pool_name, pool)) => {

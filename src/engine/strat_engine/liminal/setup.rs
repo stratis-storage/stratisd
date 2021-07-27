@@ -350,6 +350,7 @@ pub fn get_blockdevs(
 pub fn get_pool_state(info: Option<PoolEncryptionInfo>) -> ActionAvailability {
     if let Some(i) = info {
         if i.is_inconsistent() {
+            warn!("Metadata for encryption inconsistent across devices in pool; disabling mutating IPC requests for this pool");
             ActionAvailability::NoRequests
         } else {
             ActionAvailability::Full

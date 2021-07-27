@@ -206,6 +206,7 @@ impl StratPool {
         cachedevs: Vec<StratBlockDev>,
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
+        action_avail: ActionAvailability,
     ) -> StratisResult<(Name, StratPool)> {
         check_metadata(metadata)?;
 
@@ -227,9 +228,7 @@ impl StratPool {
             backstore,
             redundancy: Redundancy::NONE,
             thin_pool: thinpool,
-            // This should always be Full as liminal device code will not set up
-            // a pool with inconsistent metadata.
-            action_avail: ActionAvailability::Full,
+            action_avail,
         };
 
         if changed {

@@ -483,3 +483,27 @@ jobs:
       - name: Run ${{ matrix.task }}
         run: ${{ matrix.task }}
         working-directory: ./ci/dependency_management
+
+  expand-macros:
+    continue-on-error: true
+    runs-on: ubuntu-18.04
+    container:
+      image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: cargo, rustfmt
+          toolchain: nightly  # cargo expand can only be run on nightly
+          override: true
+      - name: Install dependencies for Fedora
+        run: >
+          dnf install -y
+          clang
+          cryptsetup-devel
+          dbus-devel
+          libblkid-devel
+          make
+          systemd-devel
+      - name: Run cargo expand test
+        run: make -f Makefile expand

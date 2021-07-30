@@ -14,14 +14,13 @@ use nix::poll::{poll, PollFd, PollFlags};
 use regex::Regex;
 
 use devicemapper::{Bytes, Sectors, IEC, SECTOR_SIZE};
-use libcryptsetup_rs::SafeMemHandle;
 
 use crate::{
     engine::{
         engine::{BlockDev, Pool, MAX_STRATIS_PASS_SIZE},
         types::{
-            BlockDevTier, CreateAction, DevUuid, EncryptionInfo, PoolEncryptionInfo, PoolUuid,
-            SetCreateAction, SizedKeyMemory,
+            BlockDevTier, CreateAction, DevUuid, EncryptionInfo, Name, PoolEncryptionInfo,
+            PoolUuid, SetCreateAction,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -42,7 +41,7 @@ const MIN_THIN_DEV_SIZE: Sectors = Sectors(64 * IEC::Ki); // 32 MiB
 /// returns Ok(CreateAction::Identity).
 pub fn create_pool_idempotent_or_err<P>(
     pool: &P,
-    pool_name: &str,
+    pool_name: &Name,
     blockdev_paths: &[&Path],
 ) -> StratisResult<CreateAction<PoolUuid>>
 where
@@ -112,11 +111,10 @@ where
 
 /// Shared implementation of setting keys in the keyring for both the strat_engine
 /// and sim_engine.
-pub fn set_key_shared(key_fd: RawFd) -> StratisResult<SizedKeyMemory> {
+pub fn set_key_shared(key_fd: RawFd, memory: &mut [u8]) -> StratisResult<usize> {
     let mut key_file = unsafe { File::from_raw_fd(key_fd) };
-    let mut memory = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
 
-    let bytes_read = key_file.read(memory.as_mut())?;
+    let bytes_read = key_file.read(memory)?;
 
     if bytes_read == MAX_STRATIS_PASS_SIZE {
         let mut pollers = [PollFd::new(key_file.as_raw_fd(), PollFlags::POLLIN)];
@@ -129,9 +127,7 @@ pub fn set_key_shared(key_fd: RawFd) -> StratisResult<SizedKeyMemory> {
         }
     }
 
-    let sized_memory = SizedKeyMemory::new(memory, bytes_read);
-
-    Ok(sized_memory)
+    Ok(bytes_read)
 }
 
 /// Validate a str for use as a Pool or Filesystem name.

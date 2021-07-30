@@ -8,6 +8,7 @@ use std::{
     collections::{HashMap, HashSet},
     fs::OpenOptions,
     path::{Path, PathBuf},
+    sync::Mutex,
 };
 
 use chrono::Utc;
@@ -37,6 +38,10 @@ use crate::{
 };
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u128);
+
+lazy_static! {
+    static ref BLOCKDEVS_IN_PROGRESS: Mutex<HashSet<PathBuf>> = Mutex::new(HashSet::new());
+}
 
 // Get information that can be obtained from udev for the block device
 // identified by devnode. Return an error if there was an error finding the
@@ -636,22 +641,51 @@ pub fn initialize_devices(
         }
     }
 
-    let mut initialized_blockdevs: Vec<StratBlockDev> = Vec::new();
-    for dev_info in devices {
-        match initialize_one(&dev_info, pool_uuid, mda_data_size, encryption_info) {
-            Ok(blockdev) => initialized_blockdevs.push(blockdev),
-            Err(err) => {
-                if let Err(err) = wipe_blockdevs(&mut initialized_blockdevs) {
-                    warn!("Failed to clean up some devices after initialization of device {} for pool with UUID {} failed: {}",
-                          dev_info.devnode.display(),
-                          pool_uuid,
-                          err);
+    /// Initialize all provided devices with Stratis metadata.
+    fn initialize_all(
+        devices: Vec<DeviceInfo>,
+        pool_uuid: PoolUuid,
+        mda_data_size: MDADataSize,
+        encryption_info: Option<&EncryptionInfo>,
+    ) -> StratisResult<Vec<StratBlockDev>> {
+        let mut initialized_blockdevs: Vec<StratBlockDev> = Vec::new();
+        for dev_info in devices {
+            match initialize_one(&dev_info, pool_uuid, mda_data_size, encryption_info) {
+                Ok(blockdev) => initialized_blockdevs.push(blockdev),
+                Err(err) => {
+                    if let Err(err) = wipe_blockdevs(&mut initialized_blockdevs) {
+                        warn!("Failed to clean up some devices after initialization of device {} for pool with UUID {} failed: {}",
+                              dev_info.devnode.display(),
+                              pool_uuid,
+                              err);
+                    }
+                    return Err(err);
                 }
-                return Err(err);
             }
         }
+        Ok(initialized_blockdevs)
     }
-    Ok(initialized_blockdevs)
+
+    let device_paths = devices
+        .iter()
+        .map(|d| d.devnode.clone())
+        .collect::<Vec<_>>();
+    {
+        let mut guard = (*BLOCKDEVS_IN_PROGRESS).lock().expect("Should not panic");
+        if device_paths.iter().any(|dev| guard.contains(dev)) {
+            return Err(StratisError::Msg(format!("An initialization operation is already in progress with at least one of the following devices: {:?}", device_paths)));
+        }
+        guard.extend(device_paths.iter().cloned());
+    }
+
+    let res = initialize_all(devices, pool_uuid, mda_data_size, encryption_info);
+
+    {
+        let mut guard = (*BLOCKDEVS_IN_PROGRESS).lock().expect("Should not panic");
+        guard.retain(|path| !device_paths.contains(path));
+    }
+
+    res
 }
 
 /// Wipe some blockdevs of their identifying headers.

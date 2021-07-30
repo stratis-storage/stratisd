@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 #[cfg(feature = "dbus_enabled")]
 use tokio::sync::mpsc::UnboundedSender;
@@ -10,31 +10,25 @@ use tokio::{task::spawn, time::sleep};
 
 #[cfg(feature = "dbus_enabled")]
 use crate::dbus_api::DbusAction;
-use crate::{
-    engine::{Engine, LockableEngine},
-    stratis::errors::StratisResult,
-};
+use crate::{engine::Engine, stratis::errors::StratisResult};
 
 /// Runs checks on thin pool usage and filesystem usage to determine whether either
 /// need to be extended.
 async fn check_pool_and_fs<E>(
-    engine: LockableEngine<E>,
+    engine: Arc<E>,
     #[cfg(feature = "dbus_enabled")] sender: UnboundedSender<DbusAction<E>>,
-) -> StratisResult<()>
-where
+) where
     E: Engine,
 {
     loop {
-        sleep(Duration::from_secs(10)).await;
-        let mut lock = engine.lock().await;
         #[cfg(feature = "min")]
         {
-            let _ = lock.pool_evented(None)?;
-            let _ = lock.fs_evented(None)?;
+            let _ = engine.pool_evented(None).await;
+            let _ = engine.fs_evented(None).await;
         }
         #[cfg(feature = "dbus_enabled")]
         {
-            let pool_diffs = lock.pool_evented(None)?;
+            let pool_diffs = engine.pool_evented(None).await;
             for action in DbusAction::from_pool_diffs(pool_diffs) {
                 if let Err(e) = sender.send(action) {
                     warn!(
@@ -43,7 +37,7 @@ where
                     );
                 }
             }
-            let fs_diffs = lock.fs_evented(None)?;
+            let fs_diffs = engine.fs_evented(None).await;
             for action in DbusAction::from_fs_diffs(fs_diffs) {
                 if let Err(e) = sender.send(action) {
                     warn!(
@@ -53,6 +47,7 @@ where
                 }
             }
         }
+        sleep(Duration::from_secs(10)).await;
     }
 }
 
@@ -60,7 +55,7 @@ where
 ///
 /// Currently runs a timer to check thin pool and filesystem usage.
 pub async fn run_timers<E>(
-    engine: LockableEngine<E>,
+    engine: Arc<E>,
     #[cfg(feature = "dbus_enabled")] sender: UnboundedSender<DbusAction<E>>,
 ) -> StratisResult<()>
 where
@@ -71,6 +66,6 @@ where
         #[cfg(feature = "dbus_enabled")]
         sender,
     ))
-    .await??;
+    .await?;
     Ok(())
 }

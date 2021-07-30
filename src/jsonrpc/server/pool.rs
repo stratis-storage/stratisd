@@ -2,28 +2,25 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{convert::TryFrom, os::unix::io::RawFd, path::Path};
+use std::{convert::TryFrom, os::unix::io::RawFd, path::Path, sync::Arc};
 
 use tokio::task::block_in_place;
 
 use crate::{
     engine::{
-        BlockDevTier, CreateAction, DeleteAction, EncryptionInfo, Engine, EngineAction,
-        LockableEngine, Pool, PoolUuid, RenameAction, UnlockMethod,
+        BlockDevTier, CreateAction, EncryptionInfo, Engine, EngineAction, LockKey, Name, Pool,
+        PoolUuid, RenameAction, UnlockMethod,
     },
     jsonrpc::{
         interface::PoolListType,
-        server::{
-            key::{key_get_desc, key_set},
-            utils::name_to_uuid_and_pool,
-        },
+        server::key::{key_get_desc, key_set},
     },
     stratis::{StratisError, StratisResult},
 };
 
 // stratis-min pool unlock
 pub async fn pool_unlock<E>(
-    engine: LockableEngine<E>,
+    engine: Arc<E>,
     unlock_method: UnlockMethod,
     pool_uuid: Option<PoolUuid>,
     prompt: Option<RawFd>,
@@ -37,21 +34,20 @@ where
         }
     }
 
-    let mut lock = engine.lock().await;
     match pool_uuid {
-        Some(u) => block_in_place(|| Ok(lock.unlock_pool(u, unlock_method)?.changed().is_some())),
+        Some(u) => Ok(engine
+            .unlock_pool(u, unlock_method)
+            .await?
+            .changed()
+            .is_some()),
         None => {
-            let changed = lock
-                .locked_pools()
-                .into_iter()
-                .fold(false, |acc, (uuid, _)| {
-                    let res = block_in_place(|| lock.unlock_pool(uuid, unlock_method));
-                    if let Ok(ok) = res {
-                        acc || ok.is_changed()
-                    } else {
-                        acc
-                    }
-                });
+            let mut changed = false;
+            for (uuid, _) in engine.locked_pools().await {
+                let res = engine.unlock_pool(uuid, unlock_method).await;
+                if let Ok(ok) = res {
+                    changed |= ok.is_changed()
+                }
+            }
             Ok(changed)
         }
     }
@@ -59,7 +55,7 @@ where
 
 // stratis-min pool create
 pub async fn pool_create<E>(
-    engine: LockableEngine<E>,
+    engine: Arc<E>,
     name: &str,
     blockdev_paths: &[&Path],
     enc_info: Option<&EncryptionInfo>,
@@ -67,9 +63,11 @@ pub async fn pool_create<E>(
 where
     E: Engine,
 {
-    let mut lock = engine.lock().await;
     Ok(
-        match block_in_place(|| lock.create_pool(name, blockdev_paths, None, enc_info))? {
+        match engine
+            .create_pool(name, blockdev_paths, None, enc_info)
+            .await?
+        {
             CreateAction::Created(_) => true,
             CreateAction::Identity => false,
         },
@@ -77,47 +75,46 @@ where
 }
 
 // stratis-min pool destroy
-pub async fn pool_destroy<E>(engine: LockableEngine<E>, name: &str) -> StratisResult<bool>
+pub async fn pool_destroy<E>(engine: Arc<E>, name: &str) -> StratisResult<bool>
 where
     E: Engine,
 {
-    let mut lock = engine.lock().await;
-    let (uuid, _) = name_to_uuid_and_pool(&mut *lock, name)
-        .ok_or_else(|| StratisError::Msg(format!("No pool found with name {}", name)))?;
-    Ok(match block_in_place(|| lock.destroy_pool(uuid))? {
-        DeleteAction::Deleted(_) => true,
-        DeleteAction::Identity => false,
-    })
+    let uuid = engine
+        .get_pool(LockKey::Name(Name::new(name.to_owned())))
+        .await
+        .map(|g| g.as_tuple().1)
+        .ok_or_else(|| StratisError::Msg(format!("No pool named {} found", name)))?;
+    Ok(engine.destroy_pool(uuid).await?.is_changed())
 }
 
 // stratis-min pool init-cache
-pub async fn pool_init_cache<E>(
-    engine: LockableEngine<E>,
-    name: &str,
-    paths: &[&Path],
-) -> StratisResult<bool>
+pub async fn pool_init_cache<E>(engine: Arc<E>, name: &str, paths: &[&Path]) -> StratisResult<bool>
 where
     E: Engine,
 {
-    let mut lock = engine.lock().await;
-    let (uuid, pool) = name_to_uuid_and_pool(&mut *lock, name)
-        .ok_or_else(|| StratisError::Msg(format!("No pool found with name {}", name)))?;
+    let guard = engine
+        .get_mut_pool(LockKey::Name(Name::new(name.to_owned())))
+        .await
+        .ok_or_else(|| StratisError::Msg(format!("No pool named {} found", name)))?;
+    let (_, uuid, pool) = guard.as_tuple();
     block_in_place(|| Ok(pool.init_cache(uuid, name, paths)?.is_changed()))
 }
 
 // stratis-min pool rename
 pub async fn pool_rename<E>(
-    engine: LockableEngine<E>,
+    engine: Arc<E>,
     current_name: &str,
     new_name: &str,
 ) -> StratisResult<bool>
 where
     E: Engine,
 {
-    let mut lock = engine.lock().await;
-    let (uuid, _) = name_to_uuid_and_pool(&mut *lock, current_name)
-        .ok_or_else(|| StratisError::Msg(format!("No pool found with name {}", current_name)))?;
-    Ok(match block_in_place(|| lock.rename_pool(uuid, new_name))? {
+    let uuid = engine
+        .get_pool(LockKey::Name(Name::new(current_name.to_owned())))
+        .await
+        .map(|g| g.as_tuple().1)
+        .ok_or_else(|| StratisError::Msg(format!("No pool named {} found", current_name)))?;
+    Ok(match engine.rename_pool(uuid, new_name).await? {
         RenameAction::Identity => false,
         RenameAction::Renamed(_) => true,
         RenameAction::NoSource => unreachable!(),
@@ -126,7 +123,7 @@ where
 
 // stratis-min pool add-data
 pub async fn pool_add_data<E>(
-    engine: LockableEngine<E>,
+    engine: Arc<E>,
     name: &str,
     blockdevs: &[&Path],
 ) -> StratisResult<bool>
@@ -138,7 +135,7 @@ where
 
 // stratis-min pool add-cache
 pub async fn pool_add_cache<E>(
-    engine: LockableEngine<E>,
+    engine: Arc<E>,
     name: &str,
     blockdevs: &[&Path],
 ) -> StratisResult<bool>
@@ -149,7 +146,7 @@ where
 }
 
 async fn add_blockdevs<E>(
-    engine: LockableEngine<E>,
+    engine: Arc<E>,
     name: &str,
     blockdevs: &[&Path],
     tier: BlockDevTier,
@@ -157,9 +154,11 @@ async fn add_blockdevs<E>(
 where
     E: Engine,
 {
-    let mut lock = engine.lock().await;
-    let (uuid, pool) = name_to_uuid_and_pool(&mut *lock, name)
-        .ok_or_else(|| StratisError::Msg(format!("No pool found with name {}", name)))?;
+    let guard = engine
+        .get_mut_pool(LockKey::Name(Name::new(name.to_owned())))
+        .await
+        .ok_or_else(|| StratisError::Msg(format!("No pool named {} found", name)))?;
+    let (_, uuid, pool) = guard.as_tuple();
     block_in_place(|| {
         Ok(pool
             .add_blockdevs(uuid, name, blockdevs, tier)?
@@ -168,12 +167,12 @@ where
 }
 
 // stratis-min pool [list]
-pub async fn pool_list<E>(engine: LockableEngine<E>) -> PoolListType
+pub async fn pool_list<E>(engine: Arc<E>) -> PoolListType
 where
     E: Engine,
 {
-    let lock = engine.lock().await;
-    lock.pools()
+    let guard = engine.pools().await;
+    guard
         .iter()
         .map(|(n, u, p)| {
             (
@@ -199,14 +198,14 @@ where
 }
 
 // stratis-min pool is-encrypted
-pub async fn pool_is_encrypted<E>(engine: LockableEngine<E>, uuid: PoolUuid) -> StratisResult<bool>
+pub async fn pool_is_encrypted<E>(engine: Arc<E>, uuid: PoolUuid) -> StratisResult<bool>
 where
     E: Engine,
 {
-    let lock = engine.lock().await;
-    if let Some((_, pool)) = lock.get_pool(uuid) {
+    let guard = engine.get_pool(LockKey::Uuid(uuid)).await;
+    if let Some((_, _, pool)) = guard.as_ref().map(|guard| guard.as_tuple()) {
         Ok(pool.is_encrypted())
-    } else if lock.locked_pools().get(&uuid).is_some() {
+    } else if engine.locked_pools().await.get(&uuid).is_some() {
         Ok(true)
     } else {
         Err(StratisError::Msg(format!(
@@ -217,14 +216,13 @@ where
 }
 
 // stratis-min pool is-locked
-pub async fn pool_is_locked<E>(engine: LockableEngine<E>, uuid: PoolUuid) -> StratisResult<bool>
+pub async fn pool_is_locked<E>(engine: Arc<E>, uuid: PoolUuid) -> StratisResult<bool>
 where
     E: Engine,
 {
-    let lock = engine.lock().await;
-    if lock.get_pool(uuid).is_some() {
+    if engine.get_pool(LockKey::Uuid(uuid)).await.is_some() {
         Ok(false)
-    } else if lock.locked_pools().get(&uuid).is_some() {
+    } else if engine.locked_pools().await.get(&uuid).is_some() {
         Ok(true)
     } else {
         Err(StratisError::Msg(format!(
@@ -235,17 +233,17 @@ where
 }
 
 // stratis-min pool is-bound
-pub async fn pool_is_bound<E>(engine: LockableEngine<E>, uuid: PoolUuid) -> StratisResult<bool>
+pub async fn pool_is_bound<E>(engine: Arc<E>, uuid: PoolUuid) -> StratisResult<bool>
 where
     E: Engine,
 {
-    let lock = engine.lock().await;
-    if let Some((_, pool)) = lock.get_pool(uuid) {
+    let guard = engine.get_pool(LockKey::Uuid(uuid)).await;
+    if let Some((_, _, pool)) = guard.as_ref().map(|guard| guard.as_tuple()) {
         Ok(match pool.encryption_info() {
             Some(ei) => ei.clevis_info()?.is_some(),
             None => false,
         })
-    } else if let Some(info) = lock.locked_pools().get(&uuid) {
+    } else if let Some(info) = engine.locked_pools().await.get(&uuid) {
         Ok(info.info.clevis_info()?.is_some())
     } else {
         Err(StratisError::Msg(format!(
@@ -256,20 +254,17 @@ where
 }
 
 // stratis-min pool has-passphrase
-pub async fn pool_has_passphrase<E>(
-    engine: LockableEngine<E>,
-    uuid: PoolUuid,
-) -> StratisResult<bool>
+pub async fn pool_has_passphrase<E>(engine: Arc<E>, uuid: PoolUuid) -> StratisResult<bool>
 where
     E: Engine,
 {
-    let lock = engine.lock().await;
-    if let Some((_, pool)) = lock.get_pool(uuid) {
+    let guard = engine.get_pool(LockKey::Uuid(uuid)).await;
+    if let Some((_, _, pool)) = guard.as_ref().map(|guard| guard.as_tuple()) {
         Ok(match pool.encryption_info() {
             Some(ei) => ei.key_description()?.is_some(),
             None => false,
         })
-    } else if let Some(info) = lock.locked_pools().get(&uuid) {
+    } else if let Some(info) = engine.locked_pools().await.get(&uuid) {
         Ok(info.info.key_description()?.is_some())
     } else {
         Err(StratisError::Msg(format!(
@@ -280,21 +275,18 @@ where
 }
 
 // stratis-min pool clevis-pin
-pub async fn pool_clevis_pin<E>(
-    engine: LockableEngine<E>,
-    uuid: PoolUuid,
-) -> StratisResult<Option<String>>
+pub async fn pool_clevis_pin<E>(engine: Arc<E>, uuid: PoolUuid) -> StratisResult<Option<String>>
 where
     E: Engine,
 {
-    let lock = engine.lock().await;
-    if let Some((_, pool)) = lock.get_pool(uuid) {
+    let guard = engine.get_pool(LockKey::Uuid(uuid)).await;
+    if let Some((_, _, pool)) = guard.as_ref().map(|guard| guard.as_tuple()) {
         let encryption_info = match pool.encryption_info() {
             Some(ei) => EncryptionInfo::try_from(ei)?,
             None => return Ok(None),
         };
         Ok(encryption_info.clevis_info().map(|(pin, _)| pin.clone()))
-    } else if let Some(info) = lock.locked_pools().get(&uuid) {
+    } else if let Some(info) = engine.locked_pools().await.get(&uuid) {
         Ok(info.info.clevis_info()?.map(|(pin, _)| pin.clone()))
     } else {
         Err(StratisError::Msg(format!(

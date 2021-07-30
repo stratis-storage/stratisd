@@ -646,30 +646,29 @@ mod tests {
 
     use std::path::Path;
 
-    use crate::engine::Engine;
-
-    use crate::engine::sim_engine::SimEngine;
-
-    use crate::engine::types::EngineAction;
+    use crate::engine::{
+        sim_engine::SimEngine,
+        types::{EngineAction, LockKey},
+        Engine,
+    };
 
     use super::*;
 
     #[test]
     /// Renaming a filesystem on an empty pool always works
     fn rename_empty() {
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine
-            .create_pool(
-                pool_name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                None,
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        let pool = engine.get_mut_pool(uuid).unwrap().1;
+        let uuid = test_async!(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
         assert_matches!(
             pool.rename_filesystem(pool_name, FilesystemUuid::new_v4(), "new_name"),
             Ok(RenameAction::NoSource)
@@ -679,19 +678,18 @@ mod tests {
     #[test]
     /// Renaming a filesystem to another filesystem should work if new name not taken
     fn rename_happens() {
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine
-            .create_pool(
-                pool_name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                None,
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        let pool = engine.get_mut_pool(uuid).unwrap().1;
+        let uuid = test_async!(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
         let infos = pool
             .create_filesystems(pool_name, uuid, &[("old_name", None)])
             .unwrap()
@@ -709,19 +707,18 @@ mod tests {
     fn rename_fails() {
         let old_name = "old_name";
         let new_name = "new_name";
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine
-            .create_pool(
-                pool_name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                None,
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        let pool = engine.get_mut_pool(uuid).unwrap().1;
+        let uuid = test_async!(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
         let results = pool
             .create_filesystems(pool_name, uuid, &[(old_name, None), (new_name, None)])
             .unwrap()
@@ -738,19 +735,18 @@ mod tests {
     /// Renaming should succeed if old_name absent, new present
     fn rename_no_op() {
         let new_name = "new_name";
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine
-            .create_pool(
-                pool_name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                None,
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        let pool = engine.get_mut_pool(uuid).unwrap().1;
+        let uuid = test_async!(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
         assert_matches!(
             pool.rename_filesystem(pool_name, FilesystemUuid::new_v4(), new_name),
             Ok(RenameAction::NoSource)
@@ -760,19 +756,18 @@ mod tests {
     #[test]
     /// Removing an empty list of filesystems should always succeed
     fn destroy_fs_empty() {
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine
-            .create_pool(
-                pool_name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                None,
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        let pool = engine.get_mut_pool(uuid).unwrap().1;
+        let uuid = test_async!(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
         assert!(match pool.destroy_filesystems(pool_name, &[]) {
             Ok(uuids) => !uuids.is_changed(),
             _ => false,
@@ -782,19 +777,18 @@ mod tests {
     #[test]
     /// Removing a non-empty list of filesystems should succeed on empty pool
     fn destroy_fs_some() {
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine
-            .create_pool(
-                pool_name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                None,
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        let pool = engine.get_mut_pool(uuid).unwrap().1;
+        let uuid = test_async!(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
         assert_matches!(
             pool.destroy_filesystems(pool_name, &[FilesystemUuid::new_v4()]),
             Ok(_)
@@ -804,19 +798,18 @@ mod tests {
     #[test]
     /// Removing a non-empty list of filesystems should succeed on any pool
     fn destroy_fs_any() {
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine
-            .create_pool(
-                pool_name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                None,
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        let pool = engine.get_mut_pool(uuid).unwrap().1;
+        let uuid = test_async!(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
         let fs_results = pool
             .create_filesystems(pool_name, uuid, &[("fs_name", None)])
             .unwrap()
@@ -832,19 +825,18 @@ mod tests {
     #[test]
     /// Creating an empty list of filesystems should succeed, always
     fn create_fs_none() {
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine
-            .create_pool(
-                pool_name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                None,
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        let pool = engine.get_mut_pool(uuid).unwrap().1;
+        let uuid = test_async!(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
         let fs = pool.create_filesystems(pool_name, uuid, &[]).unwrap();
         assert!(!fs.is_changed())
     }
@@ -852,19 +844,18 @@ mod tests {
     #[test]
     /// Creating a non-empty list of filesystems always succeeds.
     fn create_fs_some() {
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine
-            .create_pool(
-                pool_name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                None,
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        let pool = engine.get_mut_pool(uuid).unwrap().1;
+        let uuid = test_async!(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
         assert!(match pool
             .create_filesystems(pool_name, uuid, &[("name", None)])
             .ok()
@@ -879,19 +870,18 @@ mod tests {
     /// Creating a an already existing filesystem fails.
     fn create_fs_conflict() {
         let fs_name = "fs_name";
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine
-            .create_pool(
-                pool_name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                None,
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        let pool = engine.get_mut_pool(uuid).unwrap().1;
+        let uuid = test_async!(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
         pool.create_filesystems(pool_name, uuid, &[(fs_name, None)])
             .unwrap();
         let set_create_action = pool
@@ -904,19 +894,18 @@ mod tests {
     /// Requesting identical filesystems succeeds.
     fn create_fs_dups() {
         let fs_name = "fs_name";
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine
-            .create_pool(
-                pool_name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                None,
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        let pool = engine.get_mut_pool(uuid).unwrap().1;
+        let uuid = test_async!(engine.create_pool(
+            pool_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
         assert!(match pool
             .create_filesystems(pool_name, uuid, &[(fs_name, None), (fs_name, None)])
             .ok()
@@ -930,18 +919,18 @@ mod tests {
     #[test]
     /// Adding a list of devices to an empty pool should yield list.
     fn add_device_empty() {
-        let mut engine = SimEngine::default();
-        let uuid = engine
-            .create_pool(
-                "pool_name",
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                None,
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        let (pool_name, pool) = engine.get_mut_pool(uuid).unwrap();
+        let engine = SimEngine::default();
+        let uuid = test_async!(engine.create_pool(
+            "pool_name",
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        let guard = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
+        let (pool_name, _, pool) = guard.as_tuple();
         let devices = [Path::new("/s/a"), Path::new("/s/b")];
         assert!(match pool
             .add_blockdevs(uuid, &*pool_name, &devices, BlockDevTier::Data)

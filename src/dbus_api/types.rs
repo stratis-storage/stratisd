@@ -20,7 +20,7 @@ use dbus::{
 };
 use dbus_tree::{DataType, MTSync, ObjectPath, Tree};
 use tokio::sync::{
-    mpsc::UnboundedSender as TokioSender, RwLock, RwLockReadGuard, RwLockWriteGuard,
+    mpsc::UnboundedSender as TokioSender, OwnedRwLockReadGuard, OwnedRwLockWriteGuard, RwLock,
 };
 
 use devicemapper::Bytes;
@@ -28,9 +28,8 @@ use devicemapper::Bytes;
 use crate::{
     dbus_api::{connection::DbusConnectionHandler, tree::DbusTreeHandler, udev::DbusUdevHandler},
     engine::{
-        ActionAvailability, Engine, ExclusiveGuard, FilesystemUuid, Lockable, LockableEngine,
-        LockedPoolInfo, PoolEncryptionInfo, PoolUuid, SharedGuard, StratFilesystemDiff,
-        StratisUuid, ThinPoolDiff,
+        ActionAvailability, Engine, ExclusiveGuard, FilesystemUuid, Lockable, LockedPoolInfo,
+        PoolEncryptionInfo, PoolUuid, SharedGuard, StratFilesystemDiff, StratisUuid, ThinPoolDiff,
     },
 };
 
@@ -42,10 +41,9 @@ pub type GetManagedObjects =
     HashMap<dbus::Path<'static>, HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>>;
 
 /// Type representing an acquired read lock for the D-Bus tree.
-pub type TreeReadLock<'a, E> = SharedGuard<RwLockReadGuard<'a, Tree<MTSync<TData<E>>, TData<E>>>>;
+pub type TreeReadLock<E> = SharedGuard<OwnedRwLockReadGuard<Tree<MTSync<TData<E>>, TData<E>>>>;
 /// Type representing an acquired write lock for the D-Bus tree.
-pub type TreeWriteLock<'a, E> =
-    ExclusiveGuard<RwLockWriteGuard<'a, Tree<MTSync<TData<E>>, TData<E>>>>;
+pub type TreeWriteLock<E> = ExclusiveGuard<OwnedRwLockWriteGuard<Tree<MTSync<TData<E>>, TData<E>>>>;
 
 /// Type representing all of the handlers for driving the multithreaded D-Bus layer.
 pub type DbusHandlers<E> = Result<
@@ -150,7 +148,7 @@ impl OPContext {
 
 pub struct DbusContext<E> {
     next_index: Arc<AtomicU64>,
-    pub(super) engine: LockableEngine<E>,
+    pub(super) engine: Arc<E>,
     pub(super) sender: TokioSender<DbusAction<E>>,
     connection: Arc<SyncConnection>,
 }
@@ -170,7 +168,7 @@ impl<E> Debug for DbusContext<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("DbusContext")
             .field("next_index", &self.next_index)
-            .field("engine", &type_name::<LockableEngine<E>>())
+            .field("engine", &type_name::<Arc<E>>())
             .field("sender", &self.sender)
             .finish()
     }
@@ -181,7 +179,7 @@ where
     E: Engine,
 {
     pub fn new(
-        engine: LockableEngine<E>,
+        engine: Arc<E>,
         sender: TokioSender<DbusAction<E>>,
         connection: Arc<SyncConnection>,
     ) -> DbusContext<E> {

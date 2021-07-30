@@ -6,6 +6,7 @@ use std::{collections::HashMap, convert::TryFrom};
 
 use dbus::{arg::Array, Message};
 use dbus_tree::{MTSync, MethodInfo, MethodResult};
+use futures::executor::block_on;
 use serde_json::Value;
 
 use devicemapper::Bytes;
@@ -56,8 +57,8 @@ where
         return_message
     );
 
-    let mut mutex_lock = dbus_context.engine.blocking_lock();
-    let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
+    let guard = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let (pool_name, _, pool) = guard.as_tuple();
 
     let filesystem_specs = match filesystems
         .map(|(name, size_opt)| {
@@ -158,8 +159,8 @@ where
         return_message
     );
 
-    let mut mutex_lock = dbus_context.engine.blocking_lock();
-    let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
+    let guard = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let (pool_name, _, pool) = guard.as_tuple();
 
     let mut filesystem_map: HashMap<FilesystemUuid, dbus::Path<'static>> = HashMap::new();
     for path in filesystems {
@@ -253,8 +254,8 @@ where
         }
     };
 
-    let mut mutex_lock = dbus_context.engine.blocking_lock();
-    let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
+    let guard = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let (pool_name, _, pool) = guard.as_tuple();
 
     let msg = match handle_action!(
         pool.snapshot_filesystem(&pool_name, pool_uuid, fs_uuid, snapshot_name),
@@ -323,10 +324,7 @@ where
     );
 
     let msg = match handle_action!(
-        dbus_context
-            .engine
-            .blocking_lock()
-            .rename_pool(pool_uuid, new_name),
+        block_on(dbus_context.engine.rename_pool(pool_uuid, new_name)),
         dbus_context,
         pool_path.get_name()
     ) {
@@ -395,8 +393,7 @@ where
         return_message
     );
 
-    let mut mutex_lock = dbus_context.engine.blocking_lock();
-    let (_, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
+    let mut pool = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
 
     let json: Value = match serde_json::from_str(&json_string) {
         Ok(j) => j,
@@ -447,8 +444,7 @@ where
         return_message
     );
 
-    let mut mutex_lock = dbus_context.engine.blocking_lock();
-    let (_, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
+    let mut pool = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
 
     let msg = match handle_action!(pool.unbind_clevis(), dbus_context, pool_path.get_name()) {
         Ok(DeleteAction::Identity) => {
@@ -498,8 +494,7 @@ where
         return_message
     );
 
-    let mut mutex_lock = dbus_context.engine.blocking_lock();
-    let (_, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
+    let mut pool = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
 
     let msg = match handle_action!(
         pool.bind_keyring(&key_desc),
@@ -543,8 +538,7 @@ where
         return_message
     );
 
-    let mut mutex_lock = dbus_context.engine.blocking_lock();
-    let (_, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
+    let mut pool = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
 
     let msg = match handle_action!(pool.unbind_keyring(), dbus_context, pool_path.get_name()) {
         Ok(DeleteAction::Identity) => {
@@ -594,8 +588,7 @@ where
         return_message
     );
 
-    let mut mutex_lock = dbus_context.engine.blocking_lock();
-    let (_, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
+    let mut pool = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
 
     let msg = match handle_action!(
         pool.rebind_keyring(&key_desc),
@@ -647,8 +640,7 @@ where
         return_message
     );
 
-    let mut mutex_lock = dbus_context.engine.blocking_lock();
-    let (_, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
+    let mut pool = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
 
     let msg = match handle_action!(pool.rebind_clevis(), dbus_context, pool_path.get_name()) {
         Ok(_) => {

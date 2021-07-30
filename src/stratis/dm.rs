@@ -2,7 +2,10 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::{
+    os::unix::io::{AsRawFd, RawFd},
+    sync::Arc,
+};
 
 use nix::fcntl::{fcntl, FcntlArg, OFlag};
 #[cfg(feature = "dbus_enabled")]
@@ -12,7 +15,7 @@ use tokio::{io::unix::AsyncFd, task::spawn};
 #[cfg(feature = "dbus_enabled")]
 use crate::dbus_api::DbusAction;
 use crate::{
-    engine::{get_dm, get_dm_init, Engine, LockableEngine},
+    engine::{get_dm, get_dm_init, Engine},
     stratis::errors::{StratisError, StratisResult},
 };
 
@@ -23,14 +26,14 @@ const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 // Accepts None as an argument; this indicates that devicemapper events are
 // to be ignored.
 pub async fn dm_event_thread<E>(
-    engine: Option<LockableEngine<E>>,
+    engine: Option<Arc<E>>,
     #[cfg(feature = "dbus_enabled")] sender: UnboundedSender<DbusAction<E>>,
 ) -> StratisResult<()>
 where
     E: 'static + Engine,
 {
     async fn process_dm_event<E>(
-        engine: &LockableEngine<E>,
+        engine: &Arc<E>,
         #[cfg(feature = "dbus_enabled")] sender: &UnboundedSender<DbusAction<E>>,
         fd: &AsyncFd<RawFd>,
     ) -> StratisResult<()>
@@ -44,19 +47,18 @@ where
             guard.clear_ready();
         }
         get_dm().arm_poll()?;
-        let mut lock = engine.lock().await;
-        let evented = lock.get_events()?;
+        let evented = engine.get_events().await?;
 
         // NOTE: May need to change order of pool_evented() and fs_evented()
 
         #[cfg(feature = "min")]
         {
-            let _ = lock.pool_evented(Some(&evented))?;
-            let _ = lock.fs_evented(Some(&evented))?;
+            let _ = engine.pool_evented(Some(&evented)).await;
+            let _ = engine.fs_evented(Some(&evented)).await;
         }
         #[cfg(feature = "dbus_enabled")]
         {
-            let pool_diffs = lock.pool_evented(Some(&evented))?;
+            let pool_diffs = engine.pool_evented(Some(&evented)).await;
             for action in DbusAction::from_pool_diffs(pool_diffs) {
                 if let Err(e) = sender.send(action) {
                     warn!(
@@ -65,7 +67,7 @@ where
                     );
                 }
             }
-            let fs_diffs = lock.fs_evented(Some(&evented))?;
+            let fs_diffs = engine.fs_evented(Some(&evented)).await;
             for action in DbusAction::from_fs_diffs(fs_diffs) {
                 if let Err(e) = sender.send(action) {
                     warn!(
@@ -84,6 +86,7 @@ where
             Some(engine) => {
                 let fd = setup_dm()?;
                 loop {
+                    debug!("Starting handling of devicemapper event");
                     if let Err(e) = process_dm_event(
                         &engine,
                         #[cfg(feature = "dbus_enabled")]
@@ -94,6 +97,7 @@ where
                     {
                         warn!("Failed to process devicemapper event: {}", e);
                     }
+                    debug!("Finished handling of devicemapper event");
                 }
             }
             None => {

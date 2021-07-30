@@ -9,6 +9,7 @@ use dbus::{
     Message,
 };
 use dbus_tree::{MTSync, MethodErr, MethodInfo, MethodResult, PropInfo, Tree};
+use futures::executor::block_on;
 
 use crate::{
     dbus_api::{
@@ -17,7 +18,7 @@ use crate::{
         types::{DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg},
     },
-    engine::{BlockDevTier, Engine, EngineAction, Name, Pool, PoolUuid},
+    engine::{BlockDevTier, Engine, EngineAction, LockKey, Name, Pool, PoolUuid},
 };
 
 pub enum BlockDevOp {
@@ -51,10 +52,9 @@ where
         Pool
     );
 
-    let mutex_lock = dbus_context.engine.blocking_lock();
-    let (pool_name, pool) = mutex_lock
-        .get_pool(pool_uuid)
+    let guard = block_on(dbus_context.engine.get_pool(LockKey::Uuid(pool_uuid)))
         .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
+    let (pool_name, _, pool) = guard.as_tuple();
 
     closure((pool_name, pool_uuid, pool))
 }
@@ -93,8 +93,8 @@ where
         return_message
     );
 
-    let mut mutex_lock = dbus_context.engine.blocking_lock();
-    let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
+    let guard = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let (pool_name, _, pool) = guard.as_tuple();
 
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 

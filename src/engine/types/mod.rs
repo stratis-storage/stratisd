@@ -11,13 +11,11 @@ use std::{
     hash::Hash,
     ops::Deref,
     path::{Path, PathBuf},
-    sync::Arc,
 };
 
 use libudev::EventType;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tokio::sync::Mutex;
 use uuid::Uuid;
 
 use devicemapper::Bytes;
@@ -79,9 +77,6 @@ macro_rules! uuid {
 /// Value representing Clevis config information.
 pub type ClevisInfo = (String, Value);
 
-/// An engine that can be locked for synchronization.
-pub type LockableEngine<E> = Lockable<Arc<Mutex<E>>>;
-
 pub trait AsUuid:
     Copy
     + Clone
@@ -102,7 +97,7 @@ uuid!(pub FilesystemUuid);
 
 uuid!(pub PoolUuid);
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum StratisUuid {
     Dev(DevUuid),
     Fs(FilesystemUuid),
@@ -253,6 +248,11 @@ pub struct UdevEngineEvent {
 }
 
 impl UdevEngineEvent {
+    #[cfg(test)]
+    pub fn new(event_type: EventType, device: UdevEngineDevice) -> Self {
+        UdevEngineEvent { event_type, device }
+    }
+
     pub fn event_type(&self) -> EventType {
         self.event_type
     }
@@ -281,6 +281,21 @@ pub struct UdevEngineDevice {
 }
 
 impl UdevEngineDevice {
+    #[cfg(test)]
+    pub fn new(
+        is_initialized: bool,
+        devnode: Option<PathBuf>,
+        devnum: Option<libc::dev_t>,
+        properties: HashMap<Box<OsStr>, Box<OsStr>>,
+    ) -> Self {
+        UdevEngineDevice {
+            is_initialized,
+            devnode,
+            devnum,
+            properties,
+        }
+    }
+
     pub fn is_initialized(&self) -> bool {
         self.is_initialized
     }
@@ -397,4 +412,11 @@ impl StratFilesystemDiff {
     pub fn is_changed(&self) -> bool {
         self.size.is_some() || self.used.is_some()
     }
+}
+
+/// Represents either a name or a UUID.
+#[derive(Debug, Clone, PartialEq)]
+pub enum LockKey<U> {
+    Name(Name),
+    Uuid(U),
 }

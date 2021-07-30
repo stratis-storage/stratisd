@@ -169,15 +169,13 @@ impl StratPool {
             &mut backstore,
         );
 
-        let mut thinpool = match thinpool {
+        let thinpool = match thinpool {
             Ok(thinpool) => thinpool,
             Err(err) => {
                 let _ = backstore.destroy();
                 return Err(err);
             }
         };
-
-        thinpool.check(pool_uuid, &mut backstore)?;
 
         let mut pool = StratPool {
             backstore,
@@ -297,8 +295,6 @@ impl StratPool {
     ) -> StratisResult<HashMap<FilesystemUuid, StratFilesystemDiff>> {
         let changed = self.thin_pool.check_fs(pool_uuid)?;
         if !changed.is_empty() {
-            // Do we really need this if we call event_on after doing the
-            // filesystem checks?
             self.write_metadata(pool_name)?;
         }
         Ok(changed)

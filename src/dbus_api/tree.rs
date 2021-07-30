@@ -92,7 +92,7 @@ where
     /// Handle an object path being added to the tree of D-Bus objects.
     fn handle_add_action(
         &self,
-        mut write_lock: TreeWriteLock<'_, E>,
+        mut write_lock: TreeWriteLock<E>,
         path: ObjectPath<MTSync<TData<E>>, TData<E>>,
         interfaces: InterfacesAddedThreadSafe,
     ) {
@@ -106,7 +106,7 @@ where
     /// Handle an object path being removed from the tree of D-Bus objects.
     fn handle_remove_action(
         &self,
-        mut write_lock: TreeWriteLock<'_, E>,
+        mut write_lock: TreeWriteLock<E>,
         path: Path<'static>,
         interfaces: InterfacesRemoved,
     ) {
@@ -167,7 +167,7 @@ where
     /// Handle a pool name change in the engine.
     fn handle_pool_name_change(
         &self,
-        read_lock: TreeReadLock<'_, E>,
+        read_lock: TreeReadLock<E>,
         item: Path<'static>,
         new_name: String,
     ) {
@@ -324,7 +324,7 @@ where
     #[allow(clippy::option_option)]
     fn handle_fs_background_change(
         &self,
-        read_lock: TreeReadLock<'_, E>,
+        read_lock: TreeReadLock<E>,
         uuid: FilesystemUuid,
         new_size: Option<Bytes>,
         new_used: Option<Option<Bytes>>,
@@ -379,7 +379,7 @@ where
     #[allow(clippy::option_option)]
     fn handle_pool_background_change(
         &self,
-        read_lock: TreeReadLock<'_, E>,
+        read_lock: TreeReadLock<E>,
         uuid: PoolUuid,
         new_used: Option<Option<Bytes>>,
         new_alloc: Option<Bytes>,

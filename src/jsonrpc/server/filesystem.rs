@@ -2,27 +2,31 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::sync::Arc;
+
 use chrono::SecondsFormat;
 use tokio::task::block_in_place;
 
 use crate::{
-    engine::{Engine, EngineAction, Filesystem, LockableEngine, Name, Pool},
-    jsonrpc::{interface::FsListType, server::utils::name_to_uuid_and_pool},
+    engine::{Engine, EngineAction, Filesystem, LockKey, Name, Pool},
+    jsonrpc::interface::FsListType,
     stratis::{StratisError, StratisResult},
 };
 
 // stratis-min filesystem create
 pub async fn filesystem_create<E>(
-    engine: LockableEngine<E>,
+    engine: Arc<E>,
     pool_name: &str,
     name: &str,
 ) -> StratisResult<bool>
 where
     E: Engine,
 {
-    let mut lock = engine.lock().await;
-    let (pool_uuid, pool) = name_to_uuid_and_pool(&mut *lock, pool_name)
+    let guard = engine
+        .get_mut_pool(LockKey::Name(Name::new(pool_name.to_owned())))
+        .await
         .ok_or_else(|| StratisError::Msg(format!("No pool named {} found", pool_name)))?;
+    let (_, pool_uuid, pool) = guard.as_tuple();
     block_in_place(|| {
         Ok(pool
             .create_filesystems(pool_name, pool_uuid, &[(name, None)])?
@@ -31,12 +35,12 @@ where
 }
 
 // stratis-min filesystem [list]
-pub async fn filesystem_list<E>(engine: LockableEngine<E>) -> FsListType
+pub async fn filesystem_list<E>(engine: Arc<E>) -> FsListType
 where
     E: Engine,
 {
-    let lock = engine.lock().await;
-    lock.pools().into_iter().fold(
+    let guard = engine.pools().await;
+    guard.iter().fold(
         (
             Vec::new(),
             Vec::new(),
@@ -45,7 +49,7 @@ where
             Vec::new(),
             Vec::new(),
         ),
-        |mut acc, (name, _uuid, pool)| {
+        |mut acc, (name, _, pool)| {
             for (fs_name, uuid, fs) in pool.filesystems() {
                 acc.0.push(name.to_string());
                 acc.1.push(fs_name.to_string());
@@ -62,15 +66,16 @@ where
 
 // stratis-min filesystem destroy
 pub async fn filesystem_destroy<E>(
-    engine: LockableEngine<E>,
+    engine: Arc<E>,
     pool_name: &str,
     fs_name: &str,
 ) -> StratisResult<bool>
 where
     E: Engine,
 {
-    let mut lock = engine.lock().await;
-    let (_, pool) = name_to_uuid_and_pool(&mut *lock, pool_name)
+    let mut pool = engine
+        .get_mut_pool(LockKey::Name(Name::new(pool_name.to_owned())))
+        .await
         .ok_or_else(|| StratisError::Msg(format!("No pool named {} found", pool_name)))?;
     let (uuid, _) = pool
         .get_filesystem_by_name(&Name::new(fs_name.to_string()))
@@ -80,7 +85,7 @@ where
 
 // stratis-min filesystem rename
 pub async fn filesystem_rename<E>(
-    engine: LockableEngine<E>,
+    engine: Arc<E>,
     pool_name: &str,
     fs_name: &str,
     new_fs_name: &str,
@@ -88,8 +93,9 @@ pub async fn filesystem_rename<E>(
 where
     E: Engine,
 {
-    let mut lock = engine.lock().await;
-    let (_, pool) = name_to_uuid_and_pool(&mut *lock, pool_name)
+    let mut pool = engine
+        .get_mut_pool(LockKey::Name(Name::new(pool_name.to_owned())))
+        .await
         .ok_or_else(|| StratisError::Msg(format!("No pool named {} found", pool_name)))?;
     let (uuid, _) = pool
         .get_filesystem_by_name(&Name::new(fs_name.to_string()))

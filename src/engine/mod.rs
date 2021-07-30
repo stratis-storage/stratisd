@@ -9,13 +9,14 @@ pub use self::{
         blkdev_size, crypt_metadata_size, get_dm, get_dm_init, StaticHeader, StaticHeaderResult,
         StratEngine, StratKeyActions, BDA, CLEVIS_TANG_TRUST_URL,
     },
-    structures::{ExclusiveGuard, SharedGuard},
+    structures::{ExclusiveGuard, SharedGuard, Table},
     types::{
         ActionAvailability, BlockDevTier, ClevisInfo, CreateAction, DeleteAction, DevUuid,
-        EncryptionInfo, EngineAction, FilesystemUuid, KeyDescription, Lockable, LockableEngine,
-        LockedPoolInfo, MappingCreateAction, MappingDeleteAction, Name, PoolEncryptionInfo,
-        PoolUuid, Redundancy, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
-        StratFilesystemDiff, StratisUuid, ThinPoolDiff, UdevEngineEvent, UnlockMethod,
+        EncryptionInfo, EngineAction, FilesystemUuid, KeyDescription, LockKey, Lockable,
+        LockedPoolInfo, MappingCreateAction, MappingDeleteAction, MaybeInconsistent, Name,
+        PoolEncryptionInfo, PoolUuid, Redundancy, RenameAction, ReportType, SetCreateAction,
+        SetDeleteAction, StratFilesystemDiff, StratisUuid, ThinPoolDiff, UdevEngineEvent,
+        UnlockMethod,
     },
 };
 

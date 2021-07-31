@@ -13,6 +13,8 @@ else
   FEDORA_RELEASE_ARGS = --release=${FEDORA_RELEASE}
 endif
 
+IGNORE_ARGS ?=
+
 DESTDIR ?=
 PREFIX ?= /usr
 LIBEXECDIR ?= $(PREFIX)/libexec
@@ -352,7 +354,7 @@ test-compare-fedora-versions:
 	test -e "${COMPARE_FEDORA_VERSIONS}"
 
 check-fedora-versions: test-compare-fedora-versions
-	${COMPARE_FEDORA_VERSIONS} ${MANIFEST_PATH_ARGS} ${FEDORA_RELEASE_ARGS}
+	${COMPARE_FEDORA_VERSIONS} ${MANIFEST_PATH_ARGS} ${FEDORA_RELEASE_ARGS} ${IGNORE_ARGS}
 
 .PHONY:
 	audit

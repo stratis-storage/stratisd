@@ -125,7 +125,7 @@ impl StratBlockDev {
 
     /// Returns the physical path of the block device structure.
     pub fn physical_path(&self) -> &Path {
-        &self.devnode()
+        self.devnode()
     }
 
     /// Returns the path to the unencrypted metadata stored on the block device structure.
@@ -221,7 +221,7 @@ impl StratBlockDev {
 
     /// Get the physical path for a block device.
     pub fn devnode(&self) -> &Path {
-        &self.underlying_device.physical_path()
+        self.underlying_device.physical_path()
     }
 
     /// Get the encryption_info stored on the given encrypted blockdev.
@@ -231,7 +231,7 @@ impl StratBlockDev {
     /// structure.
     pub fn encryption_info(&self) -> Cow<EncryptionInfo> {
         match self.underlying_device.crypt_handle() {
-            Some(ref ch) => Cow::Borrowed(ch.encryption_info()),
+            Some(ch) => Cow::Borrowed(ch.encryption_info()),
             None => Cow::Owned(EncryptionInfo::default()),
         }
     }

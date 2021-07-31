@@ -832,7 +832,7 @@ mod tests {
                 },
             )?;
 
-            crypt::change_key(&key_desc)?;
+            crypt::change_key(key_desc)?;
 
             if bdm.add(pool_uuid, &paths[2..3]).is_ok() {
                 Err(Box::new(StratisError::Msg(

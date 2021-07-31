@@ -382,7 +382,7 @@ impl StratKeyActions {
         key_desc: &KeyDescription,
         key: SizedKeyMemory,
     ) -> StratisResult<MappingCreateAction<Key>> {
-        set_key_idem(&key_desc, key)
+        set_key_idem(key_desc, key)
     }
 }
 

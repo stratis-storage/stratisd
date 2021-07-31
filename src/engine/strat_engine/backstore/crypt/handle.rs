@@ -333,7 +333,7 @@ impl CryptHandle {
     pub fn wipe(&self) -> StratisResult<()> {
         ensure_wiped(
             &mut self.acquire_crypt_device()?,
-            &self.luks2_device_path(),
+            self.luks2_device_path(),
             &self.name,
         )
     }

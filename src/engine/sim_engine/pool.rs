@@ -250,7 +250,14 @@ impl Pool for SimPool {
 
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
 
-        let device_pairs: Vec<_> = devices
+        let the_vec = match tier {
+            BlockDevTier::Cache => &self.cache_devs,
+            BlockDevTier::Data => &self.block_devs,
+        };
+
+        let filter: Vec<_> = the_vec.values().map(|d| d.devnode()).collect();
+
+        let filtered_device_pairs: Vec<_> = devices
             .iter()
             .map(|p| {
                 SimDev::new(
@@ -261,16 +268,6 @@ impl Pool for SimPool {
                     },
                 )
             })
-            .collect();
-
-        let the_vec = match tier {
-            BlockDevTier::Cache => &mut self.cache_devs,
-            BlockDevTier::Data => &mut self.block_devs,
-        };
-
-        let filter: Vec<_> = the_vec.values().map(|d| d.devnode()).collect();
-        let filtered_device_pairs: Vec<_> = device_pairs
-            .into_iter()
             .filter(|(_, sd)| !filter.contains(&sd.devnode()))
             .collect();
 
@@ -278,6 +275,12 @@ impl Pool for SimPool {
             .iter()
             .map(|&(uuid, _)| uuid)
             .collect();
+
+        let the_vec = match tier {
+            BlockDevTier::Cache => &mut self.cache_devs,
+            BlockDevTier::Data => &mut self.block_devs,
+        };
+
         the_vec.extend(filtered_device_pairs);
         Ok(SetCreateAction::new(ret_uuids))
     }

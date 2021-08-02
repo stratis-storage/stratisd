@@ -743,6 +743,20 @@ mod tests {
     fn invariant(pool: &StratPool, pool_name: &str) {
         check_metadata(&pool.record(&Name::new(pool_name.into()))).unwrap();
         assert!(!(pool.is_encrypted() && pool.backstore.has_cache()));
+        if pool.pool_state() == ActionAvailability::NoRequests {
+            assert!(
+                pool.encryption_info().is_some()
+                    && pool
+                        .encryption_info()
+                        .map(|ei| { ei.is_inconsistent() })
+                        .unwrap_or(false)
+            );
+        } else if pool.pool_state() == ActionAvailability::Full {
+            assert!(!pool
+                .encryption_info()
+                .map(|ei| ei.is_inconsistent())
+                .unwrap_or(false));
+        }
         assert!(pool
             .backstore
             .blockdevs()

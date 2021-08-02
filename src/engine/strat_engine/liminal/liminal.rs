@@ -156,10 +156,7 @@ impl LiminalDevices {
     pub fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo> {
         self.errored_pool_devices
             .iter()
-            .filter_map(|(pool_uuid, map)| match map.locked_pool_info() {
-                Ok(Some(info)) => Some((*pool_uuid, info)),
-                _ => None,
-            })
+            .filter_map(|(pool_uuid, map)| map.locked_pool_info().map(|info| (*pool_uuid, info)))
             .collect()
     }
 

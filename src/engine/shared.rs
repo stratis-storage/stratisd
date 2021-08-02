@@ -255,12 +255,10 @@ where
     let encryption_infos = iterator.flatten().collect::<Vec<_>>();
 
     // Return error if not all devices are either encrypted or unencrypted.
-    if encryption_infos.is_empty() || encryption_infos.len() == len {
-        Ok(if encryption_infos.get(0).is_none() {
-            None
-        } else {
-            Some(PoolEncryptionInfo::from(encryption_infos))
-        })
+    if encryption_infos.is_empty() {
+        Ok(None)
+    } else if encryption_infos.len() == len {
+        Ok(Some(PoolEncryptionInfo::from(encryption_infos)))
     } else {
         Err(StratisError::Msg(
             "All devices in a pool must be either encrypted or unencrypted; found a mixture of both".to_string()

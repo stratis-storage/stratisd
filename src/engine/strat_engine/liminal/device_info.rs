@@ -343,17 +343,6 @@ impl Default for DeviceSet {
 }
 
 impl DeviceSet {
-    #[cfg(test)]
-    #[allow(dead_code)]
-    fn invariant(&self) {
-        let encryption_infos: HashSet<EncryptionInfo> = self
-            .internal
-            .iter()
-            .filter_map(|(_, info)| info.encryption_info().cloned())
-            .collect();
-        assert!(encryption_infos.is_empty() || encryption_infos.len() == 1);
-    }
-
     /// Create a new, empty DeviceSet
     pub fn new() -> DeviceSet {
         DeviceSet {
@@ -366,12 +355,6 @@ impl DeviceSet {
         Iter {
             items: self.internal.iter(),
         }
-    }
-
-    /// Returns true if every device in the set appears to represent an
-    /// unencrypted device.
-    pub fn all_unencrypted(&self) -> bool {
-        self.internal.iter().all(|(_, info)| !info.is_encrypted())
     }
 
     /// Returns true if some of the devices are encrypted and closed.
@@ -420,16 +403,20 @@ impl DeviceSet {
     /// LUKS2 device. This could happen for encrypted devices if the LUKS2 device
     /// is detected after the unlocked Stratis device but should eventually become
     /// consistent.
-    pub fn locked_pool_info(&self) -> StratisResult<Option<LockedPoolInfo>> {
-        let encryption_info = gather_encryption_info(
+    ///
+    /// Error from gather_encryption_info is converted into an option because
+    /// unlocked Stratis devices and LUKS2 devices on which the Stratis devices are
+    /// stored may appear at different times in udev. This is not necessarily
+    /// an error case and may resolve itself after more devices appear in udev.
+    pub fn locked_pool_info(&self) -> Option<LockedPoolInfo> {
+        gather_encryption_info(
             self.internal.len(),
             self.internal.iter().map(|(_, info)| info.encryption_info()),
         )
         .ok()
-        .and_then(|info| info);
-        Ok(encryption_info.and_then(|info| {
-            let devices = self
-                .internal
+        .and_then(|info| info)
+        .and_then(|info| {
+            self.internal
                 .iter()
                 .map(|(uuid, l)| {
                     let devnode = match l {
@@ -450,12 +437,12 @@ impl DeviceSet {
                             v
                         })
                     })
-                });
-            devices.map(|d| LockedPoolInfo {
-                info: info.clone(),
-                devices: d,
-            })
-        }))
+                })
+                .map(|d| LockedPoolInfo {
+                    info: info.clone(),
+                    devices: d,
+                })
+        })
     }
 
     /// Process the data from a remove udev event. Since remove events are

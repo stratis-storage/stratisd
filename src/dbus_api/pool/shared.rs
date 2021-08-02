@@ -237,5 +237,5 @@ pub fn pool_enc_prop(pool: &dyn Pool) -> bool {
 /// Generate D-Bus representation of pool state property.
 #[inline]
 pub fn pool_state_prop(pool: &dyn Pool) -> String {
-    pool.pool_state().to_string()
+    pool.state().to_string()
 }

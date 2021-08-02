@@ -714,7 +714,7 @@ impl Pool for StratPool {
         self.backstore.data_tier_encryption_info()
     }
 
-    fn pool_state(&self) -> ActionAvailability {
+    fn state(&self) -> ActionAvailability {
         self.action_avail.clone()
     }
 }
@@ -743,7 +743,7 @@ mod tests {
     fn invariant(pool: &StratPool, pool_name: &str) {
         check_metadata(&pool.record(&Name::new(pool_name.into()))).unwrap();
         assert!(!(pool.is_encrypted() && pool.backstore.has_cache()));
-        if pool.pool_state() == ActionAvailability::NoRequests {
+        if pool.state() == ActionAvailability::NoRequests {
             assert!(
                 pool.encryption_info().is_some()
                     && pool
@@ -751,7 +751,7 @@ mod tests {
                         .map(|ei| { ei.is_inconsistent() })
                         .unwrap_or(false)
             );
-        } else if pool.pool_state() == ActionAvailability::Full {
+        } else if pool.state() == ActionAvailability::Full {
             assert!(!pool
                 .encryption_info()
                 .map(|ei| ei.is_inconsistent())

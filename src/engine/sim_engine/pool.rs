@@ -628,7 +628,7 @@ impl Pool for SimPool {
         self.encryption_info()
     }
 
-    fn pool_state(&self) -> ActionAvailability {
+    fn state(&self) -> ActionAvailability {
         ActionAvailability::Full
     }
 }

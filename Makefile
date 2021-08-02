@@ -123,7 +123,6 @@ CLIPPY_PEDANTIC = -D clippy::await_holding_lock \
                   -A clippy::non_ascii_literal \
                   -A clippy::option_if_let_else \
                   -D clippy::option_option \
-                  -D clippy::pub_enum_variant_names \
                   -D clippy::range_minus_one \
                   -D clippy::range_plus_one \
                   -A clippy::redundant_closure_for_method_calls \

@@ -157,14 +157,14 @@ impl FailDevice {
     pub fn new(backing_device: &Path, test_device_name: &str) -> StratisResult<Self> {
         let dm = DM::new()?;
         let dm_name = DmName::new(test_device_name)?;
-        let dev_id = DevId::Name(&dm_name);
+        let dev_id = DevId::Name(dm_name);
 
         let size = {
             let file = File::open(backing_device)?;
             blkdev_size(&file)?
         };
 
-        dm.device_create(&dm_name, None, &DmOptions::new())?;
+        dm.device_create(dm_name, None, &DmOptions::new())?;
         dm.table_load(
             &dev_id,
             &[(
@@ -192,10 +192,10 @@ impl FailDevice {
 
     pub fn start_failing(&self, num_sectors_after_start: u64) -> StratisResult<()> {
         let dm_name = DmName::new(self.test_device_name.as_str())?;
-        let dev_id = DevId::Name(&dm_name);
+        let dev_id = DevId::Name(dm_name);
 
         self.dm_context
-            .device_suspend(&dev_id, &DmOptions::new().set_flags(DmFlags::DM_SUSPEND))?;
+            .device_suspend(&dev_id, DmOptions::new().set_flags(DmFlags::DM_SUSPEND))?;
         self.dm_context.table_load(
             &dev_id,
             &[
@@ -220,10 +220,10 @@ impl FailDevice {
 
     pub fn stop_failing(&self) -> StratisResult<()> {
         let dm_name = DmName::new(self.test_device_name.as_str())?;
-        let dev_id = DevId::Name(&dm_name);
+        let dev_id = DevId::Name(dm_name);
 
         self.dm_context
-            .device_suspend(&dev_id, &DmOptions::new().set_flags(DmFlags::DM_SUSPEND))?;
+            .device_suspend(&dev_id, DmOptions::new().set_flags(DmFlags::DM_SUSPEND))?;
         self.dm_context.table_load(
             &dev_id,
             &[(
@@ -242,7 +242,7 @@ impl FailDevice {
 impl Drop for FailDevice {
     fn drop(&mut self) {
         fn drop_fail(dev: &mut FailDevice) -> StratisResult<()> {
-            let dev_id = DevId::Name(&DmName::new(dev.test_device_name.as_str())?);
+            let dev_id = DevId::Name(DmName::new(dev.test_device_name.as_str())?);
 
             let (dev_info, _) = dev.dm_context.table_status(&dev_id, &DmOptions::new())?;
             if dev_info.flags() & DmFlags::DM_SUSPEND == DmFlags::DM_SUSPEND {

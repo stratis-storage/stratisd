@@ -29,6 +29,8 @@ const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 #[cfg(test)]
 pub const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
+// Maximum taken from "XFS Algorithms and Data Structured: 3rd edition"
+const MAX_THIN_DEV_SIZE: Sectors = Sectors(16 * IEC::Pi); // 8 EiB
 const MIN_THIN_DEV_SIZE: Sectors = Sectors(64 * IEC::Ki); // 32 MiB
 
 /// Called when the name of a requested pool coincides with the name of an
@@ -222,6 +224,11 @@ pub fn validate_filesystem_size_specs<'a>(
                         Err(StratisError::Msg(format!(
                             "Requested size of filesystem {} is {} which is less than minimum required: {}",
                             name, size_sectors, MIN_THIN_DEV_SIZE
+                        )))
+                    } else if size_sectors > MAX_THIN_DEV_SIZE {
+                        Err(StratisError::Msg(format!(
+                            "Requested size of filesystem {} is {} which is greater than maximum allowed: {}",
+                            name, size_sectors, MAX_THIN_DEV_SIZE
                         )))
                     } else {
                         Ok(size_sectors)

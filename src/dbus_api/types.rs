@@ -157,10 +157,10 @@ impl DbusContext {
     /// Send changed signal for pool Name property and invalidated signal for
     /// all Devnode properties of child filesystems.
     pub fn push_pool_name_change(&self, item: &Path<'static>, new_name: &str) {
-        if let Err(e) = self
-            .sender
-            .send(DbusAction::FsNameChange(item.clone(), new_name.to_string()))
-        {
+        if let Err(e) = self.sender.send(DbusAction::PoolNameChange(
+            item.clone(),
+            new_name.to_string(),
+        )) {
             warn!(
                 "D-Bus pool name change event could not be sent to the processing thread; \
                 no signal will be sent out for the name change of pool with path {} or any \

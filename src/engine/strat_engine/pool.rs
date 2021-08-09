@@ -360,7 +360,7 @@ impl<'a> Into<Value> for &'a StratPool {
         );
         map.insert(
             "maintenance_mode".to_string(),
-            Value::from(self.action_avail != ActionAvailability::Full),
+            Value::from(self.action_avail.to_string()),
         );
         Value::from(map)
     }

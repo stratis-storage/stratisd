@@ -189,7 +189,7 @@ impl TryFrom<PoolEncryptionInfo> for EncryptionInfo {
                 Ok(EncryptionInfo::Both(kd, ci))
             },
             _ => {
-                Err(StratisError::Msg("Cannot convert inconsistent pool metadata to a encryption information for a single device".to_string()))
+                Err(StratisError::Msg("Cannot determine encryption information from metadata that is inconsistent across devices in a pool".to_string()))
             }
         }
     }

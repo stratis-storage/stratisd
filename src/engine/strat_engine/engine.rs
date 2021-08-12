@@ -348,7 +348,7 @@ mod test {
             cmd,
             tests::{crypt, dm_stratis_devices_remove, loopbacked, real, FailDevice},
         },
-        types::{EngineAction, KeyDescription},
+        types::{ActionAvailability, EngineAction, KeyDescription},
     };
 
     use super::*;
@@ -526,6 +526,12 @@ mod test {
         if operation(pool).is_ok() {
             return Err(Box::new(StratisError::Msg(
                 "Clevis initialization should have failed".to_string(),
+            )));
+        }
+
+        if pool.avail_actions() != ActionAvailability::Full {
+            return Err(Box::new(StratisError::Msg(
+                "Pool should have rolled back the change entirely".to_string(),
             )));
         }
 

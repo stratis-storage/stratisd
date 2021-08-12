@@ -359,7 +359,7 @@ impl<'a> Into<Value> for &'a StratPool {
             },
         );
         map.insert(
-            "maintenance_mode".to_string(),
+            "available_actions".to_string(),
             Value::from(self.action_avail.to_string()),
         );
         Value::from(map)
@@ -714,7 +714,7 @@ impl Pool for StratPool {
         self.backstore.data_tier_encryption_info()
     }
 
-    fn state(&self) -> ActionAvailability {
+    fn avail_actions(&self) -> ActionAvailability {
         self.action_avail.clone()
     }
 }
@@ -743,7 +743,7 @@ mod tests {
     fn invariant(pool: &StratPool, pool_name: &str) {
         check_metadata(&pool.record(&Name::new(pool_name.into()))).unwrap();
         assert!(!(pool.is_encrypted() && pool.backstore.has_cache()));
-        if pool.state() == ActionAvailability::NoRequests {
+        if pool.avail_actions() == ActionAvailability::NoRequests {
             assert!(
                 pool.encryption_info().is_some()
                     && pool
@@ -751,7 +751,7 @@ mod tests {
                         .map(|ei| { ei.is_inconsistent() })
                         .unwrap_or(false)
             );
-        } else if pool.state() == ActionAvailability::Full {
+        } else if pool.avail_actions() == ActionAvailability::Full {
             assert!(!pool
                 .encryption_info()
                 .map(|ei| ei.is_inconsistent())

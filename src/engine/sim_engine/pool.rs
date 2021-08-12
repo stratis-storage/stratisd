@@ -122,6 +122,7 @@ impl SimPool {
 impl<'a> Into<Value> for &'a SimPool {
     fn into(self) -> Value {
         json!({
+            "available_actions": ActionAvailability::Full.to_string(),
             "filesystems": Value::Array(
                 self.filesystems.iter()
                     .map(|(name, uuid, fs)| {
@@ -628,7 +629,7 @@ impl Pool for SimPool {
         self.encryption_info()
     }
 
-    fn state(&self) -> ActionAvailability {
+    fn avail_actions(&self) -> ActionAvailability {
         ActionAvailability::Full
     }
 }

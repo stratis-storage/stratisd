@@ -2,17 +2,20 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{borrow::Cow, collections::HashMap, path::Path, vec::Vec};
+use std::{borrow::Cow, path::Path, vec::Vec};
 
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
 
-use devicemapper::{DmNameBuf, Sectors};
+use devicemapper::{Bytes, DmNameBuf, Sectors};
 
 use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
-        shared::{init_cache_idempotent_or_err, validate_name, validate_paths},
+        shared::{
+            init_cache_idempotent_or_err, validate_filesystem_size_specs, validate_name,
+            validate_paths,
+        },
         strat_engine::{
             backstore::{Backstore, StratBlockDev},
             metadata::MDADataSize,
@@ -426,22 +429,38 @@ impl Pool for StratPool {
         &'a mut self,
         pool_name: &str,
         pool_uuid: PoolUuid,
-        specs: &[(&'b str, Option<Sectors>)],
-    ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid)>> {
-        let names: HashMap<_, _> = specs.iter().map(|&tup| (tup.0, tup.1)).collect();
+        specs: &[(&'b str, Option<Bytes>)],
+    ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid, Sectors)>> {
+        let spec_map = validate_filesystem_size_specs(specs)?;
 
-        names.iter().fold(Ok(()), |res, (name, _)| {
+        spec_map.iter().fold(Ok(()), |res, (name, size)| {
             res.and_then(|()| validate_name(name))
+                .and_then(|()| {
+                    if let Some((_, fs)) = self.thin_pool.get_filesystem_by_name(name) {
+                        if fs.thindev_size() == *size {
+                            Ok(())
+                        } else {
+                            Err(StratisError::Msg(format!(
+                                "Size {} of filesystem {} to be created conflicts with size {} for existing filesystem",
+                                size,
+                                name,
+                                fs.thindev_size()
+                            )))
+                        }
+                    } else {
+                        Ok(())
+                    }
+                })
         })?;
 
         // TODO: Roll back on filesystem initialization failure.
         let mut result = Vec::new();
-        for (name, size) in names {
+        for (name, size) in spec_map {
             if self.thin_pool.get_mut_filesystem_by_name(name).is_none() {
                 let fs_uuid = self
                     .thin_pool
                     .create_filesystem(pool_name, pool_uuid, name, size)?;
-                result.push((name, fs_uuid));
+                result.push((name, fs_uuid, size));
             }
         }
 
@@ -707,7 +726,7 @@ mod tests {
         let metadata1 = pool.record(name);
         assert_matches!(metadata1.backstore.cache_tier, None);
 
-        let (_, fs_uuid) = pool
+        let (_, fs_uuid, _) = pool
             .create_filesystems(name, uuid, &[("stratis-filesystem", None)])
             .unwrap()
             .changed()
@@ -790,7 +809,7 @@ mod tests {
         invariant(&pool, name);
 
         let fs_name = "stratis_test_filesystem";
-        let (_, fs_uuid) = pool
+        let (_, fs_uuid, _) = pool
             .create_filesystems(name, pool_uuid, &[(fs_name, None)])
             .unwrap()
             .changed()

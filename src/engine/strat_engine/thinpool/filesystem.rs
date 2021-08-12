@@ -12,9 +12,10 @@ use std::{
 
 use chrono::{DateTime, TimeZone, Utc};
 use data_encoding::BASE32_NOPAD;
+use serde_json::{Map, Value};
 
 use devicemapper::{
-    Bytes, DmDevice, DmName, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev, ThinStatus, IEC,
+    Bytes, DmDevice, DmName, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev, ThinStatus,
 };
 
 use nix::{
@@ -38,8 +39,6 @@ use crate::{
     stratis::{StratisError, StratisResult},
 };
 
-const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
-
 const TEMP_MNT_POINT_PREFIX: &str = "stratis_mp_";
 
 /// Set the low water mark on the filesystem at 4 times the data low water.  The filesystem
@@ -57,19 +56,13 @@ impl StratFilesystem {
     pub fn initialize(
         pool_uuid: PoolUuid,
         thinpool_dev: &ThinPoolDev,
-        size: Option<Sectors>,
+        size: Sectors,
         id: ThinDevId,
     ) -> StratisResult<(FilesystemUuid, StratFilesystem)> {
         let fs_uuid = FilesystemUuid::new_v4();
         let (dm_name, dm_uuid) = format_thin_ids(pool_uuid, ThinRole::Filesystem(fs_uuid));
-        let mut thin_dev = ThinDev::new(
-            get_dm(),
-            &dm_name,
-            Some(&dm_uuid),
-            size.unwrap_or(DEFAULT_THIN_DEV_SIZE),
-            thinpool_dev,
-            id,
-        )?;
+        let mut thin_dev =
+            ThinDev::new(get_dm(), &dm_name, Some(&dm_uuid), size, thinpool_dev, id)?;
 
         if let Err(err) = create_fs(&thin_dev.devnode(), Some(StratisUuid::Fs(fs_uuid)), false) {
             udev_settle().unwrap_or_else(|err| {
@@ -320,7 +313,7 @@ impl StratFilesystem {
 
         Ok(ret_vec)
     }
-    #[cfg(test)]
+
     pub fn thindev_size(&self) -> Sectors {
         self.thin_dev.size()
     }
@@ -371,4 +364,23 @@ pub fn fs_usage(mount_point: &Path) -> StratisResult<(Bytes, Bytes)> {
         Bytes::from(block_size * blocks),
         Bytes::from(block_size * (blocks - blocks_free)),
     ))
+}
+
+impl<'a> Into<Value> for &'a StratFilesystem {
+    fn into(self) -> Value {
+        let mut json = Map::new();
+        json.insert(
+            "size".to_string(),
+            Value::from(self.thindev_size().to_string()),
+        );
+        json.insert(
+            "used".to_string(),
+            Value::from(
+                self.used()
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|_| "Unavailable".to_string()),
+            ),
+        );
+        Value::from(json)
+    }
 }

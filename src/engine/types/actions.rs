@@ -10,6 +10,8 @@
 
 use std::fmt::{self, Display};
 
+use devicemapper::Sectors;
+
 use crate::engine::{
     engine::Filesystem,
     types::{DevUuid, FilesystemUuid, PoolUuid},
@@ -305,7 +307,7 @@ impl<T> EngineAction for SetCreateAction<T> {
     }
 }
 
-impl Display for SetCreateAction<(&str, FilesystemUuid)> {
+impl Display for SetCreateAction<(&str, FilesystemUuid, Sectors)> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         if self.changed.is_empty() {
             write!(
@@ -318,7 +320,7 @@ impl Display for SetCreateAction<(&str, FilesystemUuid)> {
                 "The following filesystems {} were successfully created",
                 self.changed
                     .iter()
-                    .map(|(n, u)| format!("name: {}, UUID: {}", n, u))
+                    .map(|(n, u, s)| format!("name: {}, UUID: {}, size: {}", n, u, s))
                     .collect::<Vec<_>>()
                     .join("; ")
             )

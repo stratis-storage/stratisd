@@ -8,7 +8,7 @@ use dbus::{arg::Array, Message};
 use dbus_tree::{MTSync, MethodInfo, MethodResult};
 use serde_json::Value;
 
-use devicemapper::Sectors;
+use devicemapper::Bytes;
 
 use crate::{
     dbus_api::{
@@ -16,7 +16,7 @@ use crate::{
         filesystem::create_dbus_filesystem,
         pool::shared::{add_blockdevs, BlockDevOp},
         types::{DbusErrorEnum, TData, OK_STRING},
-        util::{engine_to_dbus_err_tuple, get_next_arg},
+        util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
     engine::{
         CreateAction, DeleteAction, EngineAction, FilesystemUuid, KeyDescription, Name, PoolUuid,
@@ -29,7 +29,7 @@ pub fn create_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult 
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let filesystems: Array<&str, _> = get_next_arg(&mut iter, 0)?;
+    let filesystems: Array<(&str, (bool, &str)), _> = get_next_arg(&mut iter, 0)?;
     let dbus_context = m.tree.get_data();
 
     let object_path = m.path.get_name();
@@ -56,13 +56,30 @@ pub fn create_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult 
     let mut mutex_lock = dbus_context.engine.blocking_lock();
     let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
-    let result = log_action!(pool.create_filesystems(
-        &pool_name,
-        pool_uuid,
-        &filesystems
-            .map(|x| (x, None))
-            .collect::<Vec<(&str, Option<Sectors>)>>(),
-    ));
+    let filesystem_specs = match filesystems
+        .map(|(name, size_opt)| {
+            tuple_to_option(size_opt)
+                .map(|val| {
+                    val.parse::<u128>().map_err(|_| {
+                        format!(
+                            "Could not parse filesystem size string {} to integer value",
+                            val
+                        )
+                    })
+                })
+                .transpose()
+                .map(|size_opt| (name, size_opt.map(Bytes)))
+        })
+        .collect::<Result<Vec<(&str, Option<Bytes>)>, String>>()
+    {
+        Ok(val) => val,
+        Err(err) => {
+            let (rc, rs) = (DbusErrorEnum::ERROR as u16, err);
+            return Ok(vec![return_message.append3(default_return, rc, rs)]);
+        }
+    };
+
+    let result = log_action!(pool.create_filesystems(&pool_name, pool_uuid, &filesystem_specs));
 
     let infos = match result {
         Ok(created_set) => created_set.changed(),
@@ -76,7 +93,7 @@ pub fn create_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult 
         Some(ref newly_created_filesystems) => {
             let v = newly_created_filesystems
                 .iter()
-                .map(|&(name, uuid)| {
+                .map(|&(name, uuid, _)| {
                     let filesystem = pool
                         .get_filesystem(uuid)
                         .expect("just inserted by create_filesystems")

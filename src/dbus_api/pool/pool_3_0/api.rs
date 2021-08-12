@@ -12,7 +12,7 @@ use crate::dbus_api::{
             destroy_filesystems, init_cache, rebind_clevis, rebind_keyring, rename_pool,
             snapshot_filesystem, unbind_clevis, unbind_keyring,
         },
-        props::{get_pool_encrypted, get_pool_name, get_pool_state},
+        props::{get_pool_avail_actions, get_pool_encrypted, get_pool_name},
     },
     types::TData,
     util::get_uuid,
@@ -130,11 +130,11 @@ pub fn encrypted_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<
         .on_get(get_pool_encrypted)
 }
 
-pub fn state_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
-    f.property::<String, _>(consts::POOL_STATE_PROP, ())
+pub fn avail_actions_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
+    f.property::<String, _>(consts::POOL_AVAIL_ACTIONS_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)
-        .on_get(get_pool_state)
+        .on_get(get_pool_avail_actions)
 }
 
 pub fn bind_clevis_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {

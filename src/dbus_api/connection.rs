@@ -235,7 +235,7 @@ impl DbusTreeHandler {
             DbusAction::PoolState(item, val) => {
                 let mut changed = HashMap::new();
                 changed.insert(
-                    consts::POOL_STATE_PROP.into(),
+                    consts::POOL_AVAIL_ACTIONS_PROP.into(),
                     Variant(Box::new(val.to_string()) as Box<(dyn RefArg + 'static)>),
                 );
 

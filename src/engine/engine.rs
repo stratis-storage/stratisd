@@ -261,7 +261,7 @@ pub trait Pool: Debug {
     /// Get the pool state for the given pool. The state indicates which actions
     /// will be disabled or enabled. Disabled actions are triggered by failures
     /// caught by stratisd.
-    fn state(&self) -> ActionAvailability;
+    fn avail_actions(&self) -> ActionAvailability;
 }
 
 pub trait Engine: Debug + Report + Send {

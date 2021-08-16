@@ -15,6 +15,8 @@ endif
 
 IGNORE_ARGS ?= --ignore-missing=stratisd_proc_macros
 
+VENDOR_OUTPUT_DIR ?= .
+
 DESTDIR ?=
 PREFIX ?= /usr
 LIBEXECDIR ?= $(PREFIX)/libexec
@@ -180,7 +182,7 @@ expand: ${HOME}/.cargo/bin/cargo-expand
 
 vendored-tar-file:
 	cargo vendor
-	tar -czvf stratisd-${RELEASE_VERSION}-vendor.tar.gz vendor
+	tar -czvf ${VENDOR_OUTPUT_DIR}/stratisd-${RELEASE_VERSION}-vendor.tar.gz vendor
 
 ${PWD}/stratisd-vendor.tar.gz:
 	cargo vendor

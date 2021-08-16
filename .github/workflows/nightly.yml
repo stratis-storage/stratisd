@@ -111,14 +111,25 @@ jobs:
   packaging:
     runs-on: ubuntu-18.04
     container:
-      image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:34  # LOWEST SUPPORTED RELEASE
     steps:
       - uses: actions-rs/toolchain@v1
         with:
           components: cargo
           toolchain: 1.54.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - name: Install dependencies
-        run: dnf install -y findutils git make tar util-linux
+        run: >
+          dnf install -y
+          fedpkg
+          findutils
+          git
+          make
+          rpm
+          rpmdevtools
+          tar
+          util-linux
+      - name: Check out Fedora repo
+        run: fedpkg clone stratisd ../stratisd-spec
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0
@@ -128,26 +139,24 @@ jobs:
           "RELEASE_VERSION=$(git describe --abbrev=0 | colrm 1 1)"
           >>
           $GITHUB_ENV
-      - name: Make the tar file
+      - name: Make the source tar file
+        run: >
+          tar czvf stratisd-spec/stratisd-${{ env.RELEASE_VERSION }}.tar.gz
+          --exclude-vcs
+          --exclude-vcs-ignore
+          stratisd
+        working-directory: ..
+      - name: Make the vendor tar file
         run: >
           RELEASE_VERSION=${{ env.RELEASE_VERSION }}
+          VENDOR_OUTPUT_DIR=../stratisd-spec
           make -f Makefile vendored-tar-file
-      - name: Set name
-        run: >
-          echo
-          "NAME=$(find . -name 'stratisd-*-vendor.tar.gz' -printf '%f\n')"
-          >>
-          $GITHUB_ENV
-      - name: Set path
-        run: >
-          echo
-          "PATH=$(find . -name 'stratisd-*-vendor.tar.gz')"
-          >>
-          $GITHUB_ENV
-      - uses: actions/upload-artifact@v2
-        with:
-          name: ${{ env.NAME }}
-          path: ${{ env.PATH }}
+      - name: Bump the release version in the spec
+        run: rpmdev-bumpspec
+        working-directory: ../stratisd-spec
+      - name: Compile the package
+        run: rpmbuild -bc *
+        working-directory: ../stratisd-spec
 
   checks-with-ci-repo:
     strategy:

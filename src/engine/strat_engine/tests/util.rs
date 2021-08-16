@@ -31,7 +31,6 @@ mod cleanup_errors {
     #[derive(Debug)]
     pub enum Error {
         Ioe(std::io::Error),
-        Mnt(libmount::mountinfo::ParseError),
         Nix(nix::Error),
         Msg(String),
         Chained(String, Box<Error>),
@@ -43,12 +42,6 @@ mod cleanup_errors {
     impl From<nix::Error> for Error {
         fn from(err: nix::Error) -> Error {
             Error::Nix(err)
-        }
-    }
-
-    impl From<libmount::mountinfo::ParseError> for Error {
-        fn from(err: libmount::mountinfo::ParseError) -> Error {
-            Error::Mnt(err)
         }
     }
 
@@ -74,7 +67,6 @@ mod cleanup_errors {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             match self {
                 Error::Ioe(err) => write!(f, "IO error: {}", err),
-                Error::Mnt(err) => write!(f, "mountinfo::ParseError: {}", err),
                 Error::Nix(err) => write!(f, "Nix error: {}", err),
                 Error::Msg(err) => write!(f, "{}", err),
                 Error::Chained(msg, err) => write!(f, "{}: {}", msg, err),

@@ -500,18 +500,6 @@ impl ThinPool {
     /// Returns a bool communicating if a configuration change requiring a
     /// metadata save has been made.
     pub fn check(&mut self, pool_uuid: PoolUuid, backstore: &mut Backstore) -> StratisResult<bool> {
-        let mut should_save = false;
-
-        // Re-run to ensure pool status is updated if we made any changes
-        while self.do_check(pool_uuid, backstore)? {
-            should_save = true;
-        }
-
-        Ok(should_save)
-    }
-
-    /// Do the real work of check().
-    fn do_check(&mut self, pool_uuid: PoolUuid, backstore: &mut Backstore) -> StratisResult<bool> {
         assert_eq!(
             backstore.device().expect(
                 "thinpool exists and has been allocated to, so backstore must have a cap device"
@@ -572,8 +560,6 @@ impl ThinPool {
             self.resume()?;
         }
 
-        self.set_state(thin_pool_status);
-
         for (name, uuid, fs) in self.filesystems.iter_mut() {
             let save_mdv = fs.check()?;
             if save_mdv {
@@ -583,6 +569,9 @@ impl ThinPool {
                 }
             }
         }
+
+        self.set_state(self.thin_pool.status(get_dm())?);
+
         Ok(should_save)
     }
 

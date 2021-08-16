@@ -44,7 +44,7 @@ const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u128);
 fn udev_info(
     devnode: &Path,
 ) -> StratisResult<(UdevOwnership, Device, Option<StratisResult<String>>)> {
-    block_device_apply(devnode, |d| {
+    block_device_apply(&DevicePath::new(devnode)?, |d| {
         (
             decide_ownership(d),
             d.devnum(),

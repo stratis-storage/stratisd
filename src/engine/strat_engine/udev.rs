@@ -3,10 +3,10 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 //! udev-related methods
-use std::{ffi::OsStr, fmt, path::Path};
+use std::{ffi::OsStr, fmt};
 
 use crate::{
-    engine::types::UdevEngineDevice,
+    engine::types::{DevicePath, UdevEngineDevice},
     stratis::{StratisError, StratisResult},
 };
 
@@ -162,18 +162,16 @@ pub fn decide_ownership(device: &UdevEngineDevice) -> StratisResult<UdevOwnershi
 /// the method itself.
 /// Note that this does require iterating through the blockdevs in the udev
 /// database, so it is essentially linear in the number of block devices.
-pub fn block_device_apply<F, U>(devnode: &Path, f: F) -> StratisResult<Option<U>>
+pub fn block_device_apply<F, U>(device_path: &DevicePath, f: F) -> StratisResult<Option<U>>
 where
     F: FnOnce(&UdevEngineDevice) -> U,
 {
-    let canonical = devnode.canonicalize()?;
-
     let context = libudev::Context::new()?;
     let mut enumerator = block_enumerator(&context)?;
 
     Ok(enumerator
         .scan_devices()?
         .filter(|dev| dev.is_initialized())
-        .find(|x| x.devnode().map_or(false, |d| canonical == d))
+        .find(|x| x.devnode().map_or(false, |d| **device_path == *d))
         .map(|ref d| f(&UdevEngineDevice::from(d))))
 }

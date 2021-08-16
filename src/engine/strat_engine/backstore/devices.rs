@@ -42,9 +42,9 @@ const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u128);
 // information or no udev entry corresponding to the devnode could be found.
 // Return an error if udev ownership could not be obtained.
 fn udev_info(
-    devnode: &Path,
+    devnode: &DevicePath,
 ) -> StratisResult<(UdevOwnership, Device, Option<StratisResult<String>>)> {
-    block_device_apply(&DevicePath::new(devnode)?, |d| {
+    block_device_apply(devnode, |d| {
         (
             decide_ownership(d),
             d.devnum(),
@@ -103,7 +103,7 @@ fn dev_info(
     Option<StratisIdentifiers>,
     Device,
 )> {
-    let (ownership, devnum, hw_id) = udev_info(devnode)?;
+    let (ownership, devnum, hw_id) = udev_info(&DevicePath::new(devnode)?)?;
     match ownership {
         UdevOwnership::Luks | UdevOwnership::MultipathMember | UdevOwnership::Theirs => {
             let err_str = format!(

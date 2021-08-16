@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{path::Path, vec::Vec};
+use std::{collections::HashMap, path::Path, vec::Vec};
 
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
@@ -268,15 +268,32 @@ impl StratPool {
         self.thin_pool.get_eventing_dev_names(pool_uuid)
     }
 
-    /// Called when a DM device in this pool has generated an event.
+    /// Called when a DM device in this pool has generated an event. This method
+    /// handles checking pools.
     // TODO: Just check the device that evented. Currently checks
     // everything.
     #[pool_mutating_action("NoPoolChanges")]
-    pub fn event_on(&mut self, pool_uuid: PoolUuid, pool_name: &Name) -> StratisResult<()> {
+    pub fn event_on(&mut self, pool_uuid: PoolUuid, pool_name: &Name) -> StratisResult<bool> {
         if self.thin_pool.check(pool_uuid, &mut self.backstore)? {
             self.write_metadata(pool_name)?;
+            Ok(true)
+        } else {
+            Ok(false)
         }
-        Ok(())
+    }
+
+    /// Called when a DM device in this pool has generated an event. This method
+    /// handles checking filesystems.
+    pub fn fs_event_on(
+        &mut self,
+        pool_uuid: PoolUuid,
+        pool_name: &Name,
+    ) -> StratisResult<HashMap<FilesystemUuid, Bytes>> {
+        let changed = self.thin_pool.check_fs(pool_uuid)?;
+        if !changed.is_empty() {
+            self.write_metadata(pool_name)?;
+        }
+        Ok(changed)
     }
 
     pub fn record(&self, name: &str) -> PoolSave {

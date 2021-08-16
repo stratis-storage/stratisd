@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fmt::Debug,
     os::unix::io::RawFd,
     path::{Path, PathBuf},
@@ -337,8 +337,19 @@ pub trait Engine: Debug + Report + Send {
     /// Get mutable references to all pools belonging to this engine.
     fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut Self::Pool)>;
 
-    /// Notify the engine that an event has occurred on the DM file descriptor.
-    fn evented(&mut self) -> StratisResult<()>;
+    /// Get the UUIDs of all pools that experienced an event.
+    fn get_events(&mut self) -> StratisResult<Vec<PoolUuid>>;
+
+    /// Notify the engine that an event has occurred on the DM file descriptor
+    /// and check pools for needed changes.
+    fn pool_evented(&mut self, pools: Option<&Vec<PoolUuid>>) -> StratisResult<HashSet<PoolUuid>>;
+
+    /// Notify the engine that an event has occurred on the DM file descriptor
+    /// and check filesystems for needed changes.
+    fn fs_evented(
+        &mut self,
+        pools: Option<&Vec<PoolUuid>>,
+    ) -> StratisResult<HashMap<FilesystemUuid, Bytes>>;
 
     /// Get the handler for kernel keyring operations.
     fn get_key_handler(&self) -> &Self::KeyActions;

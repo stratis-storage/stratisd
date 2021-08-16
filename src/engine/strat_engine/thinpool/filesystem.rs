@@ -215,7 +215,10 @@ impl StratFilesystem {
 
     /// check if filesystem is getting full and needs to be extended
     /// TODO: deal with the thindev in a Fail state.
-    pub fn check(&mut self) -> StratisResult<bool> {
+    /// TODO: Add rollback handling if the thin device is extended but the
+    /// filesystem cannot be.
+    /// TODO: Fix error handling to not swallow errors.
+    pub fn check(&mut self) -> StratisResult<Option<Bytes>> {
         match self.thin_dev.status(get_dm())? {
             ThinStatus::Working(_) => {
                 if let Some(mount_point) = self.mount_points()?.first() {
@@ -226,15 +229,19 @@ impl StratFilesystem {
                         table.length =
                             self.thin_dev.size() + Self::extend_size(self.thin_dev.size());
                         if self.thin_dev.set_table(get_dm(), table).is_err() {
-                            return Ok(false);
+                            return Ok(None);
                         }
                         if xfs_growfs(mount_point).is_err() {
-                            return Ok(true);
+                            Ok(None)
+                        } else {
+                            Ok(Some(self.thin_dev.size().bytes()))
                         }
-                        return Ok(true);
+                    } else {
+                        Ok(None)
                     }
+                } else {
+                    Ok(None)
                 }
-                Ok(false)
             }
             ThinStatus::Error => {
                 let error_msg = format!(
@@ -243,7 +250,7 @@ impl StratFilesystem {
                 );
                 Err(StratisError::Msg(error_msg))
             }
-            ThinStatus::Fail => Ok(false),
+            ThinStatus::Fail => Ok(None),
         }
     }
 

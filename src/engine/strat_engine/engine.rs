@@ -2,11 +2,14 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{clone::Clone, collections::HashMap, path::Path};
+use std::{
+    collections::{HashMap, HashSet},
+    path::Path,
+};
 
 use serde_json::Value;
 
-use devicemapper::DmNameBuf;
+use devicemapper::{Bytes, DmNameBuf};
 
 use crate::{
     engine::{
@@ -20,8 +23,8 @@ use crate::{
         },
         structures::Table,
         types::{
-            CreateAction, DeleteAction, DevUuid, EncryptionInfo, LockedPoolInfo, RenameAction,
-            ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
+            CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockedPoolInfo,
+            RenameAction, ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
         },
         Engine, Name, PoolUuid, Report,
     },
@@ -286,7 +289,7 @@ impl Engine for StratEngine {
             .collect()
     }
 
-    fn evented(&mut self) -> StratisResult<()> {
+    fn get_events(&mut self) -> StratisResult<Vec<PoolUuid>> {
         let device_list: HashMap<_, _> = get_dm()
             .list_devices()?
             .into_iter()
@@ -298,7 +301,8 @@ impl Engine for StratEngine {
             })
             .collect();
 
-        for (pool_name, pool_uuid, pool) in self.pools.iter_mut() {
+        let mut changed = Vec::new();
+        for (_, pool_uuid, pool) in self.pools.iter_mut() {
             let dev_names = pool.get_eventing_dev_names(*pool_uuid);
             let event_nrs = device_list
                 .iter()
@@ -312,17 +316,124 @@ impl Engine for StratEngine {
                 .collect::<HashMap<_, _>>();
 
             if self.watched_dev_last_event_nrs.get(pool_uuid) != Some(&event_nrs) {
-                // Return error early before updating the watched event numbers
-                // so that if another event comes in on any pool, this method
-                // will retry eventing as the event number will be higher than
-                // what was previously recorded.
-                pool.event_on(*pool_uuid, pool_name)?;
+                changed.push(*pool_uuid);
             }
+
             self.watched_dev_last_event_nrs
                 .insert(*pool_uuid, event_nrs);
         }
 
-        Ok(())
+        Ok(changed)
+    }
+
+    fn pool_evented(&mut self, pools: Option<&Vec<PoolUuid>>) -> StratisResult<HashSet<PoolUuid>> {
+        fn handle_eventing(
+            name: &Name,
+            uuid: PoolUuid,
+            pool: &mut StratPool,
+            changed: &mut HashSet<PoolUuid>,
+            errors: &mut Vec<StratisError>,
+        ) {
+            if let Err(e) = pool.event_on(uuid, name) {
+                errors.push(e);
+            } else {
+                changed.insert(uuid);
+            }
+        }
+
+        let mut changed = HashSet::new();
+        let mut errors = Vec::new();
+
+        match pools {
+            Some(ps) => {
+                for uuid in ps {
+                    if let Some((name, pool)) = self.pools.get_mut_by_uuid(*uuid) {
+                        handle_eventing(&name, *uuid, pool, &mut changed, &mut errors);
+                    } else {
+                        errors.push(StratisError::Msg(format!(
+                            "Pool with UUID {} could not be found",
+                            uuid
+                        )));
+                    }
+                }
+            }
+            None => {
+                for (name, uuid, pool) in self.pools.iter_mut() {
+                    handle_eventing(&name, *uuid, pool, &mut changed, &mut errors);
+                }
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(changed)
+        } else {
+            let msg = if changed.is_empty() {
+                "The following errors were reported while handling devicemapper eventing"
+                    .to_string()
+            } else {
+                format!("Operations on pools with UUIDs {:?} succeeded but the following errors were also reported while handling devicemapper eventing", changed)
+            };
+            Err(StratisError::BestEffortError(msg, errors))
+        }
+    }
+
+    fn fs_evented(
+        &mut self,
+        pools: Option<&Vec<PoolUuid>>,
+    ) -> StratisResult<HashMap<FilesystemUuid, Bytes>> {
+        let mut changed = HashMap::new();
+        let mut errors = Vec::new();
+
+        fn handle_eventing(
+            name: &Name,
+            uuid: PoolUuid,
+            pool: &mut StratPool,
+            changed: &mut HashMap<FilesystemUuid, Bytes>,
+            errors: &mut Vec<StratisError>,
+        ) {
+            match pool.fs_event_on(uuid, name) {
+                Ok(pool_changed) => {
+                    changed.extend(pool_changed);
+                }
+                Err(e) => {
+                    errors.push(e);
+                }
+            }
+        }
+
+        match pools {
+            Some(ps) => {
+                for uuid in ps {
+                    if let Some((name, pool)) = self.pools.get_mut_by_uuid(*uuid) {
+                        handle_eventing(&name, *uuid, pool, &mut changed, &mut errors);
+                    } else {
+                        errors.push(StratisError::Msg(format!(
+                            "Pool with UUID {} could not be found",
+                            uuid
+                        )));
+                    }
+                }
+            }
+            None => {
+                for (name, uuid, pool) in self.pools.iter_mut() {
+                    handle_eventing(&name, *uuid, pool, &mut changed, &mut errors);
+                }
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(changed)
+        } else {
+            let msg = if changed.is_empty() {
+                "The following errors were reported while handling devicemapper eventing for filesystems".to_string()
+            } else {
+                format!(
+                    "Operations on filesystems with UUIDs {:?} succeeded but the following errors were also reported while handling devicemapper eventing for filesystems",
+                    changed.keys().collect::<Vec<_>>(),
+                )
+            };
+            Err(StratisError::BestEffortError(msg, errors))
+        }
     }
 
     fn get_key_handler(&self) -> &Self::KeyActions {

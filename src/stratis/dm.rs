@@ -44,7 +44,9 @@ where
         }
         get_dm().arm_poll()?;
         let mut lock = engine.lock().await;
-        lock.evented()?;
+        let evented = lock.get_events()?;
+        let _ = lock.pool_evented(Some(&evented))?;
+        let _ = lock.fs_evented(Some(&evented))?;
         Ok(())
     }
 

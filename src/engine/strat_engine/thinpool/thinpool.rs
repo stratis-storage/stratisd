@@ -6,6 +6,7 @@
 
 use std::{
     cmp::{max, min},
+    collections::HashMap,
     fmt,
     thread::sleep,
     time::Duration,
@@ -14,9 +15,9 @@ use std::{
 use serde_json::{Map, Value};
 
 use devicemapper::{
-    device_exists, DataBlocks, Device, DmDevice, DmName, DmNameBuf, FlakeyTargetParams, LinearDev,
-    LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine, ThinDevId,
-    ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, IEC,
+    device_exists, Bytes, DataBlocks, Device, DmDevice, DmName, DmNameBuf, FlakeyTargetParams,
+    LinearDev, LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine,
+    ThinDevId, ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, IEC,
 };
 
 use crate::{
@@ -560,19 +561,31 @@ impl ThinPool {
             self.resume()?;
         }
 
+        self.set_state(self.thin_pool.status(get_dm())?);
+
+        Ok(should_save)
+    }
+
+    /// Check all filesystems on this thin pool and return which had their sizes
+    /// extended, if any. This method should not need to handle thin pool status
+    /// because it never alters the thin pool itself.
+    /// TODO: Put filesystem in read only if the MDV can't be saved after a pool
+    /// is extended.
+    pub fn check_fs(
+        &mut self,
+        pool_uuid: PoolUuid,
+    ) -> StratisResult<HashMap<FilesystemUuid, Bytes>> {
+        let mut updated = HashMap::new();
         for (name, uuid, fs) in self.filesystems.iter_mut() {
-            let save_mdv = fs.check()?;
-            if save_mdv {
+            if let Some(new_size) = fs.check()? {
+                updated.insert(*uuid, new_size);
                 if let Err(e) = self.mdv.save_fs(name, *uuid, fs) {
                     error!("Could not save MDV for fs with UUID {} and name {} belonging to pool with UUID {}, reason: {:?}",
                                 uuid, name, pool_uuid, e);
                 }
             }
         }
-
-        self.set_state(self.thin_pool.status(get_dm())?);
-
-        Ok(should_save)
+        Ok(updated)
     }
 
     /// Set the current status of the thin_pool device to thin_pool_status.

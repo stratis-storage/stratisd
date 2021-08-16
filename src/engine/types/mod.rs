@@ -313,7 +313,7 @@ impl<'a> From<&'a libudev::Device<'a>> for UdevEngineDevice {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct DevicePath(PathBuf);
 
 impl DevicePath {

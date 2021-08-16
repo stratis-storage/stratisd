@@ -96,14 +96,14 @@ fn udev_info(
 // device has been determined to be unowned.
 #[allow(clippy::type_complexity)]
 fn dev_info(
-    devnode: &Path,
+    devnode: &DevicePath,
 ) -> StratisResult<(
     Option<StratisResult<String>>,
     Bytes,
     Option<StratisIdentifiers>,
     Device,
 )> {
-    let (ownership, devnum, hw_id) = udev_info(&DevicePath::new(devnode)?)?;
+    let (ownership, devnum, hw_id) = udev_info(devnode)?;
     match ownership {
         UdevOwnership::Luks | UdevOwnership::MultipathMember | UdevOwnership::Theirs => {
             let err_str = format!(
@@ -114,7 +114,7 @@ fn dev_info(
             Err(StratisError::Msg(err_str))
         }
         UdevOwnership::Stratis | UdevOwnership::Unowned => {
-            let mut f = OpenOptions::new().read(true).write(true).open(&devnode)?;
+            let mut f = OpenOptions::new().read(true).write(true).open(&**devnode)?;
             let dev_size = blkdev_size(&f)?;
 
             // FIXME: Read device identifiers from either an Unowned or a
@@ -177,7 +177,12 @@ pub struct DeviceInfo {
 fn process_devices(
     paths: &[&Path],
 ) -> StratisResult<Vec<(DeviceInfo, Option<StratisIdentifiers>)>> {
-    let infos = paths
+    let canonical_paths = paths
+        .iter()
+        .map(|p| DevicePath::new(&p))
+        .collect::<StratisResult<Vec<DevicePath>>>()?;
+
+    let infos = canonical_paths
         .iter()
         .unique()
         .map(|devnode| {

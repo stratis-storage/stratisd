@@ -77,7 +77,8 @@ pub fn get_pool_properties(
         consts::POOL_INTERFACE_NAME_3_0 => {
             consts::POOL_NAME_PROP => shared::pool_name_prop(pool_name),
             consts::POOL_UUID_PROP => uuid_to_string!(pool_uuid),
-            consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop(pool)
+            consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop(pool),
+            consts::POOL_AVAIL_ACTIONS_PROP => shared::pool_avail_actions_prop(pool)
         }
     }
 }

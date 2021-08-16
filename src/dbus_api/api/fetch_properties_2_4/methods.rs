@@ -86,7 +86,6 @@ pub fn locked_pools_with_devs(
         .collect())
 }
 
-#[allow(clippy::unnecessary_wraps)]
 fn get_properties_shared(
     m: &MethodInfo<MTSync<TData>, TData>,
     properties: &mut dyn Iterator<Item = String>,

@@ -216,7 +216,6 @@ mod tests {
     use super::*;
 
     #[test]
-    #[allow(clippy::cognitive_complexity)]
     fn test_validate_name() {
         assert_matches!(validate_name(&'\u{0}'.to_string()), Err(_));
         assert_matches!(validate_name("./some"), Err(_));

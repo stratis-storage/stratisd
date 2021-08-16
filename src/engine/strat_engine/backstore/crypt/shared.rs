@@ -256,7 +256,7 @@ pub fn setup_crypt_metadata_handle(
     };
 
     Ok(Some(CryptMetadataHandle::new(
-        DevicePath::new(physical_path.to_owned())?,
+        DevicePath::new(physical_path)?,
         identifiers,
         encryption_info,
     )))
@@ -301,7 +301,7 @@ pub fn setup_crypt_handle(
     };
 
     Ok(Some(CryptHandle::new_with_metadata_handle(
-        DevicePath::new(activated_path)?,
+        DevicePath::new(&activated_path)?,
         name,
         metadata_handle,
     )))

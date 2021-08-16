@@ -317,7 +317,7 @@ impl<'a> From<&'a libudev::Device<'a>> for UdevEngineDevice {
 pub struct DevicePath(PathBuf);
 
 impl DevicePath {
-    pub fn new(path: PathBuf) -> StratisResult<Self> {
+    pub fn new(path: &Path) -> StratisResult<Self> {
         Ok(DevicePath(path.canonicalize()?))
     }
 }

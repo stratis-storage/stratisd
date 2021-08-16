@@ -1119,7 +1119,6 @@ dependencies = [
  "devicemapper",
  "either",
  "env_logger",
- "error-chain",
  "futures",
  "itertools",
  "lazy_static",

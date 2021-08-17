@@ -86,7 +86,7 @@ impl Engine for SimEngine {
 
         validate_paths(blockdev_paths)?;
 
-        if let Some(ref key_desc) = encryption_info.and_then(|ei| ei.key_description()) {
+        if let Some(key_desc) = encryption_info.and_then(|ei| ei.key_description()) {
             if !self.key_handler.contains_key(key_desc) {
                 return Err(StratisError::Msg(format!(
                     "Key {} was not found in the keyring",

@@ -497,7 +497,7 @@ impl BlockDevMgr {
             operation_loop(
                 self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
                 |blockdev| blockdev.unbind_clevis(),
-                |_, blockdev| blockdev.bind_clevis(&pin, &clevis_info),
+                |_, blockdev| blockdev.bind_clevis(pin, clevis_info),
             )?;
             Ok(true)
         } else {
@@ -576,7 +576,7 @@ impl BlockDevMgr {
             operation_loop(
                 self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
                 |blockdev| blockdev.unbind_keyring(),
-                |_, blockdev| blockdev.bind_keyring(&key_desc),
+                |_, blockdev| blockdev.bind_keyring(key_desc),
             )?;
             Ok(true)
         } else {
@@ -607,7 +607,7 @@ impl BlockDevMgr {
             Ok(Some(false))
         } else {
             match encryption_info.key_description() {
-                Some(ref kd) => {
+                Some(kd) => {
                     operation_loop(
                         self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
                         |blockdev| blockdev.rebind_keyring(key_desc),

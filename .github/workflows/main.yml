@@ -67,16 +67,16 @@ jobs:
           --exclude-vcs
           --exclude-vcs-ignore
           stratisd-${{ env.RELEASE_VERSION }}
-        working-directory: /github/home
+        working-directory: ..
       - name: Make the vendor tar file
         run: >
           RELEASE_VERSION=${{ env.RELEASE_VERSION }}
           VENDOR_OUTPUT_DIR=~/rpmbuild/SOURCES
           make -f Makefile vendored-tar-file
-        working-directory: /github/home/stratisd-${{ env.RELEASE_VERSION }}
+        working-directory: ../stratisd-${{ env.RELEASE_VERSION }}
       - name: Bump the release version in the spec
         run: rpmdev-bumpspec stratisd.spec
-        working-directory: /github/home/stratisd-spec
+        working-directory: ../stratisd-spec
       - name: Compile the package
         run: rpmbuild -bc stratisd.spec
-        working-directory: /github/home/stratisd-spec
+        working-directory: ../stratisd-spec

@@ -179,7 +179,7 @@ fn process_devices(
 ) -> StratisResult<Vec<(DeviceInfo, Option<StratisIdentifiers>)>> {
     let canonical_paths = paths
         .iter()
-        .map(|p| DevicePath::new(&p))
+        .map(|p| DevicePath::new(p))
         .collect::<StratisResult<Vec<DevicePath>>>()?;
 
     let infos = canonical_paths

@@ -57,7 +57,7 @@ jobs:
           >>
           $GITHUB_ENV
       - name: Create directories
-        run: mkdir -p ~/rpmbuild/{RPMS,SOURCES}
+        run: mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES}
       - name: Make the source tar file
         run: >
           tar czvf ~/rpmbuild/SOURCES/stratisd-${{ env.RELEASE_VERSION }}.tar.gz

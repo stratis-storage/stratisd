@@ -44,7 +44,7 @@ jobs:
           tar
           util-linux
       - name: Check out Fedora repo
-        run: fedpkg clone stratisd ../stratisd-spec
+        run: fedpkg clone --anonymous stratisd ../stratisd-spec
       - uses: actions/checkout@v2
         with:
           fetch-depth: 0

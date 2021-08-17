@@ -35,12 +35,14 @@ jobs:
       - name: Install dependencies
         run: >
           dnf install -y
+          dracut
           fedpkg
           findutils
           git
           make
           rpm
           rpmdevtools
+          rust-packaging
           tar
           util-linux
       - name: Check out Fedora repo

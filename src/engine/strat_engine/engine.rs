@@ -173,7 +173,7 @@ impl Engine for StratEngine {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
-        encryption_info: &EncryptionInfo,
+        encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
         let redundancy = calculate_redundancy!(redundancy);
 
@@ -348,7 +348,7 @@ mod test {
             cmd,
             tests::{crypt, dm_stratis_devices_remove, loopbacked, real, FailDevice},
         },
-        types::{EngineAction, KeyDescription},
+        types::{ActionAvailability, EngineAction, KeyDescription},
     };
 
     use super::*;
@@ -359,7 +359,7 @@ mod test {
 
         let name1 = "name1";
         let uuid1 = engine
-            .create_pool(name1, paths, None, &EncryptionInfo::default())
+            .create_pool(name1, paths, None, None)
             .unwrap()
             .changed()
             .unwrap();
@@ -455,14 +455,14 @@ mod test {
 
         let name1 = "name1";
         let uuid1 = engine
-            .create_pool(name1, paths1, None, &EncryptionInfo::default())
+            .create_pool(name1, paths1, None, None)
             .unwrap()
             .changed()
             .unwrap();
 
         let name2 = "name2";
         let uuid2 = engine
-            .create_pool(name2, paths2, None, &EncryptionInfo::default())
+            .create_pool(name2, paths2, None, None)
             .unwrap()
             .changed()
             .unwrap();
@@ -511,7 +511,7 @@ mod test {
         let mut engine = StratEngine::initialize()?;
 
         let uuid = engine
-            .create_pool(name, paths_with_fail_device, None, encryption_info)?
+            .create_pool(name, paths_with_fail_device, None, Some(encryption_info))?
             .changed()
             .ok_or_else(|| {
                 Box::new(StratisError::Msg(
@@ -526,6 +526,12 @@ mod test {
         if operation(pool).is_ok() {
             return Err(Box::new(StratisError::Msg(
                 "Clevis initialization should have failed".to_string(),
+            )));
+        }
+
+        if pool.avail_actions() != ActionAvailability::Full {
+            return Err(Box::new(StratisError::Msg(
+                "Pool should have rolled back the change entirely".to_string(),
             )));
         }
 
@@ -563,16 +569,13 @@ mod test {
                 name,
                 paths_with_fail_device.as_slice(),
                 &fail_device,
-                &EncryptionInfo {
-                    key_description: None,
-                    clevis_info: Some((
-                        "tang".to_string(),
-                        json!({
-                            "url": tang_url,
-                            "stratis:tang:trust_url": true
-                        }),
-                    )),
-                },
+                &EncryptionInfo::ClevisInfo((
+                    "tang".to_string(),
+                    json!({
+                        "url": tang_url,
+                        "stratis:tang:trust_url": true
+                    }),
+                )),
                 |pool| {
                     pool.bind_keyring(key_desc)?;
                     Ok(())
@@ -625,10 +628,7 @@ mod test {
                 name,
                 paths_with_fail_device.as_slice(),
                 &fail_device,
-                &EncryptionInfo {
-                    key_description: Some(key_desc1.to_owned()),
-                    clevis_info: None,
-                },
+                &EncryptionInfo::KeyDesc(key_desc1.to_owned()),
                 |pool| {
                     pool.rebind_keyring(key_desc2)?;
                     // Change the key to ensure that the second key description
@@ -681,16 +681,16 @@ mod test {
                 name,
                 paths_with_fail_device.as_slice(),
                 &fail_device,
-                &EncryptionInfo {
-                    key_description: Some(key_desc.to_owned()),
-                    clevis_info: Some((
+                &EncryptionInfo::Both(
+                    key_desc.to_owned(),
+                    (
                         "tang".to_string(),
                         json!({
                             "url": tang_url,
                             "stratis:tang:trust_url": true
                         }),
-                    )),
-                },
+                    ),
+                ),
                 |pool| {
                     pool.unbind_keyring()?;
                     Ok(())
@@ -740,10 +740,7 @@ mod test {
                 name,
                 paths_with_fail_device.as_slice(),
                 &fail_device,
-                &EncryptionInfo {
-                    key_description: Some(key_desc.to_owned()),
-                    clevis_info: None,
-                },
+                &EncryptionInfo::KeyDesc(key_desc.to_owned()),
                 |pool| {
                     pool.bind_clevis(
                         "tang",
@@ -795,16 +792,13 @@ mod test {
             name,
             paths_with_fail_device.as_slice(),
             &fail_device,
-            &EncryptionInfo {
-                key_description: None,
-                clevis_info: Some((
-                    "tang".to_string(),
-                    json!({
-                        "url": tang_url,
-                        "stratis:tang:trust_url": true
-                    }),
-                )),
-            },
+            &EncryptionInfo::ClevisInfo((
+                "tang".to_string(),
+                json!({
+                    "url": tang_url,
+                    "stratis:tang:trust_url": true
+                }),
+            )),
             |pool| {
                 pool.rebind_clevis()?;
                 Ok(())
@@ -850,16 +844,16 @@ mod test {
                 name,
                 paths_with_fail_device.as_slice(),
                 &fail_device,
-                &EncryptionInfo {
-                    key_description: Some(key_desc.to_owned()),
-                    clevis_info: Some((
+                &EncryptionInfo::Both(
+                    key_desc.to_owned(),
+                    (
                         "tang".to_string(),
                         json!({
                             "url": tang_url,
                             "stratis:tang:trust_url": true
                         }),
-                    )),
-                },
+                    ),
+                ),
                 |pool| {
                     pool.unbind_clevis()?;
                     Ok(())

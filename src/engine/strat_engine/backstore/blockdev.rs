@@ -4,7 +4,7 @@
 
 // Code to handle a single block device.
 
-use std::{borrow::Cow, fs::OpenOptions, path::Path};
+use std::{fs::OpenOptions, path::Path};
 
 use chrono::{DateTime, TimeZone, Utc};
 use serde_json::Value;
@@ -229,11 +229,10 @@ impl StratBlockDev {
     /// The `Cow` return type is required due to the optional `CryptHandle` type.
     /// If the device is not encrypted, it must return an owned `EncryptionInfo`
     /// structure.
-    pub fn encryption_info(&self) -> Cow<EncryptionInfo> {
-        match self.underlying_device.crypt_handle() {
-            Some(ch) => Cow::Borrowed(ch.encryption_info()),
-            None => Cow::Owned(EncryptionInfo::default()),
-        }
+    pub fn encryption_info(&self) -> Option<&EncryptionInfo> {
+        self.underlying_device
+            .crypt_handle()
+            .map(|ch| ch.encryption_info())
     }
 
     /// Bind encrypted device using the given clevis configuration.
@@ -339,7 +338,7 @@ impl BlockDev for StratBlockDev {
     }
 
     fn is_encrypted(&self) -> bool {
-        self.encryption_info().is_encrypted()
+        self.encryption_info().is_some()
     }
 }
 

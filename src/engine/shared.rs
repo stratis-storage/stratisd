@@ -19,7 +19,10 @@ use libcryptsetup_rs::SafeMemHandle;
 use crate::{
     engine::{
         engine::{Pool, MAX_STRATIS_PASS_SIZE},
-        types::{BlockDevTier, CreateAction, DevUuid, PoolUuid, SetCreateAction, SizedKeyMemory},
+        types::{
+            BlockDevTier, CreateAction, DevUuid, EncryptionInfo, PoolEncryptionInfo, PoolUuid,
+            SetCreateAction, SizedKeyMemory,
+        },
     },
     stratis::{StratisError, StratisResult},
 };
@@ -239,6 +242,28 @@ pub fn validate_filesystem_size_specs<'a>(
                 .map(|size| (name, size))
         })
         .collect::<StratisResult<HashMap<_, Sectors>>>()
+}
+
+/// Gather the encryption information from across multiple block devices.
+pub fn gather_encryption_info<'a, I>(
+    len: usize,
+    iterator: I,
+) -> StratisResult<Option<PoolEncryptionInfo>>
+where
+    I: Iterator<Item = Option<&'a EncryptionInfo>>,
+{
+    let encryption_infos = iterator.flatten().collect::<Vec<_>>();
+
+    // Return error if not all devices are either encrypted or unencrypted.
+    if encryption_infos.is_empty() {
+        Ok(None)
+    } else if encryption_infos.len() == len {
+        Ok(Some(PoolEncryptionInfo::from(encryption_infos)))
+    } else {
+        Err(StratisError::Msg(
+            "All devices in a pool must be either encrypted or unencrypted; found a mixture of both".to_string()
+        ))
+    }
 }
 
 #[cfg(test)]

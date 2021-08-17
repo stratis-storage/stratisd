@@ -20,7 +20,7 @@ use dbus::{
 use dbus_tree::{DataType, MTSync, ObjectPath, Tree};
 use tokio::sync::{mpsc::UnboundedSender as TokioSender, RwLock};
 
-use crate::engine::{Lockable, LockableEngine, StratisUuid};
+use crate::engine::{ActionAvailability, Lockable, LockableEngine, StratisUuid};
 
 /// Type for lockable D-Bus tree object.
 pub type LockableTree = Lockable<Arc<RwLock<Tree<MTSync<TData>, TData>>>>;
@@ -54,6 +54,7 @@ pub enum DbusAction {
     Remove(Path<'static>, InterfacesRemoved),
     FsNameChange(Path<'static>, String),
     PoolNameChange(Path<'static>, String),
+    PoolState(Path<'static>, ActionAvailability),
 }
 
 /// Context for an object path.
@@ -165,6 +166,21 @@ impl DbusContext {
                 "D-Bus pool name change event could not be sent to the processing thread; \
                 no signal will be sent out for the name change of pool with path {} or any \
                 of its child filesystems: {}",
+                item, e,
+            )
+        }
+    }
+
+    /// Send changed signal for pool state.
+    pub fn push_pool_state(&self, item: &Path<'static>, pool_state: ActionAvailability) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::PoolState(item.clone(), pool_state))
+        {
+            warn!(
+                "D-Bus pool state status change event could not be sent to
+                the processing thread; no signal will be sent out for the pool state 
+                status change of pool with path {}: {}",
                 item, e,
             )
         }

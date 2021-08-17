@@ -2,7 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{error::Error, fmt, io, str, sync};
+use std::{collections::HashSet, error::Error, fmt, io, iter::once, str, sync};
+
+use crate::engine::ActionAvailability;
 
 pub type StratisResult<T> = Result<T, StratisError>;
 
@@ -40,6 +42,36 @@ pub enum StratisError {
     #[cfg(feature = "dbus_enabled")]
     Dbus(dbus::Error),
     Udev(libudev::Error),
+}
+
+impl StratisError {
+    /// Determine all possible pool states that result from this error chain.
+    fn error_to_potential_pool_states(&self) -> HashSet<ActionAvailability> {
+        match self {
+            StratisError::Chained(_, c) => c.error_to_potential_pool_states(),
+            StratisError::BestEffortError(_, errs) => errs
+                .iter()
+                .flat_map(|e| e.error_to_potential_pool_states())
+                .collect::<HashSet<_>>(),
+            StratisError::RollbackError { .. } => {
+                once(ActionAvailability::NoRequests).collect::<HashSet<_>>()
+            }
+            StratisError::NoActionRollbackError {
+                causal_error,
+                rollback_error,
+            } => {
+                let mut states = causal_error.error_to_potential_pool_states();
+                states.extend(rollback_error.error_to_potential_pool_states());
+                states
+            }
+            _ => HashSet::new(),
+        }
+    }
+
+    /// Determine the most restrictive pool state required from
+    pub fn error_to_pool_state(&self) -> Option<ActionAvailability> {
+        self.error_to_potential_pool_states().into_iter().max()
+    }
 }
 
 impl fmt::Display for StratisError {
@@ -178,5 +210,29 @@ impl From<libudev::Error> for StratisError {
 impl From<sync::mpsc::RecvError> for StratisError {
     fn from(err: sync::mpsc::RecvError) -> StratisError {
         StratisError::Recv(err)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_error_to_pool_state() {
+        assert_eq!(
+            StratisError::Msg("Message".to_string()).error_to_pool_state(),
+            None
+        );
+        assert_eq!(
+            StratisError::Chained(
+                "Message".to_string(),
+                Box::new(StratisError::RollbackError {
+                    causal_error: Box::new(StratisError::Msg("Cause".to_string())),
+                    rollback_error: Box::new(StratisError::Msg("Rollback".to_string())),
+                }),
+            )
+            .error_to_pool_state(),
+            Some(ActionAvailability::NoRequests)
+        );
     }
 }

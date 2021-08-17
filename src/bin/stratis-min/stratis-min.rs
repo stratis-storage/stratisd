@@ -205,10 +205,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             pool::pool_create(
                 args.value_of("name").expect("required").to_string(),
                 paths,
-                EncryptionInfo {
-                    key_description,
-                    clevis_info,
-                },
+                EncryptionInfo::from_options((key_description, clevis_info)),
             )?;
             Ok(())
         } else if let Some(args) = subcommand.subcommand_matches("destroy") {

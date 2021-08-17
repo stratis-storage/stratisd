@@ -23,7 +23,7 @@ use crate::{
             metadata::{StaticHeader, BDA},
             serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
         },
-        types::{BlockDevTier, DevUuid, DevicePath},
+        types::{ActionAvailability, BlockDevTier, DevUuid, DevicePath, PoolEncryptionInfo},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -343,4 +343,19 @@ pub fn get_blockdevs(
     })?;
 
     Ok((datadevs, cachedevs))
+}
+
+/// Takes a set of information determined about the pool in liminal devices and
+/// determines what the state of the pool should be when it is set up.
+pub fn get_pool_state(info: Option<PoolEncryptionInfo>) -> ActionAvailability {
+    if let Some(i) = info {
+        if i.is_inconsistent() {
+            warn!("Metadata for encryption inconsistent across devices in pool; disabling mutating IPC requests for this pool");
+            ActionAvailability::NoRequests
+        } else {
+            ActionAvailability::Full
+        }
+    } else {
+        ActionAvailability::Full
+    }
 }

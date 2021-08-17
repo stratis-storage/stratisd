@@ -11,15 +11,19 @@ use std::{
 
 use serde_json::Value;
 
-use crate::engine::{
-    strat_engine::{
-        liminal::identify::{DeviceInfo, LuksInfo, StratisInfo},
-        metadata::StratisIdentifiers,
+use crate::{
+    engine::{
+        shared::gather_encryption_info,
+        strat_engine::{
+            liminal::identify::{DeviceInfo, LuksInfo, StratisInfo},
+            metadata::StratisIdentifiers,
+        },
+        types::{DevUuid, EncryptionInfo, LockedPoolDevice, LockedPoolInfo, PoolEncryptionInfo},
     },
-    types::{DevUuid, EncryptionInfo, LockedPoolDevice, LockedPoolInfo},
+    stratis::StratisResult,
 };
 
-/// Info for a discovered Luks Device belonging to Stratis.
+/// Info for a discovered LUKS device belonging to Stratis.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct LLuksInfo {
     /// Generic information + Stratis identifiers
@@ -339,17 +343,6 @@ impl Default for DeviceSet {
 }
 
 impl DeviceSet {
-    #[cfg(test)]
-    #[allow(dead_code)]
-    fn invariant(&self) {
-        let encryption_infos: HashSet<EncryptionInfo> = self
-            .internal
-            .iter()
-            .filter_map(|(_, info)| info.encryption_info().cloned())
-            .collect();
-        assert!(encryption_infos.is_empty() || encryption_infos.len() == 1);
-    }
-
     /// Create a new, empty DeviceSet
     pub fn new() -> DeviceSet {
         DeviceSet {
@@ -362,12 +355,6 @@ impl DeviceSet {
         Iter {
             items: self.internal.iter(),
         }
-    }
-
-    /// Returns true if every device in the set appears to represent an
-    /// unencrypted device.
-    pub fn all_unencrypted(&self) -> bool {
-        self.internal.iter().all(|(_, info)| !info.is_encrypted())
     }
 
     /// Returns true if some of the devices are encrypted and closed.
@@ -400,13 +387,12 @@ impl DeviceSet {
         }
     }
 
-    /// The unique encryption info for this set. If none of the infos
-    /// correspond to a Stratis managed encrypted device, None.
-    pub fn encryption_info(&self) -> Option<&EncryptionInfo> {
-        self.internal
-            .iter()
-            .filter_map(|(_, info)| info.encryption_info())
-            .next()
+    /// The unique encryption info for this set.
+    pub fn encryption_info(&self) -> StratisResult<Option<PoolEncryptionInfo>> {
+        gather_encryption_info(
+            self.internal.len(),
+            self.internal.iter().map(|(_, info)| info.encryption_info()),
+        )
     }
 
     /// The encryption information and devices registered for this locked pools to be
@@ -417,15 +403,20 @@ impl DeviceSet {
     /// LUKS2 device. This could happen for encrypted devices if the LUKS2 device
     /// is detected after the unlocked Stratis device but should eventually become
     /// consistent.
+    ///
+    /// Error from gather_encryption_info is converted into an option because
+    /// unlocked Stratis devices and LUKS2 devices on which the Stratis devices are
+    /// stored may appear at different times in udev. This is not necessarily
+    /// an error case and may resolve itself after more devices appear in udev.
     pub fn locked_pool_info(&self) -> Option<LockedPoolInfo> {
-        let encryption_info = self
-            .internal
-            .iter()
-            .filter_map(|(_, info)| info.encryption_info())
-            .next();
-        encryption_info.and_then(|info| {
-            let devices = self
-                .internal
+        gather_encryption_info(
+            self.internal.len(),
+            self.internal.iter().map(|(_, info)| info.encryption_info()),
+        )
+        .ok()
+        .and_then(|info| info)
+        .and_then(|info| {
+            self.internal
                 .iter()
                 .map(|(uuid, l)| {
                     let devnode = match l {
@@ -446,11 +437,11 @@ impl DeviceSet {
                             v
                         })
                     })
-                });
-            devices.map(|d| LockedPoolInfo {
-                info: info.clone(),
-                devices: d,
-            })
+                })
+                .map(|d| LockedPoolInfo {
+                    info: info.clone(),
+                    devices: d,
+                })
         })
     }
 
@@ -476,25 +467,6 @@ impl DeviceSet {
     pub fn process_info_add(&mut self, info: DeviceInfo) -> Result<(), DeviceBag> {
         let stratis_identifiers = info.stratis_identifiers();
         let device_uuid = stratis_identifiers.device_uuid;
-
-        // Note on efficiency:
-        // In theory, this search is O(n) in the number of devices in the set.
-        // In practice, it is probably O(1), because if the info has a key
-        // description, then it is likely that all the devices in the set also
-        // have a key description, so that the search for a device with a key
-        // description will stop at the first one.
-        if let Some(encryption_info) = info.encryption_info() {
-            if self
-                .encryption_info()
-                .filter(|&ei| ei != encryption_info)
-                .is_some()
-            {
-                let mut hopeless: HashSet<LInfo> =
-                    self.internal.drain().map(|(_, info)| info).collect();
-                hopeless.insert(info.into());
-                return Err(DeviceBag { internal: hopeless });
-            }
-        }
 
         match self.internal.remove(&device_uuid) {
             None => {

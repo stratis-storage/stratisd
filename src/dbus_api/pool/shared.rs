@@ -62,10 +62,13 @@ pub fn get_pool_encryption_key_desc(
 ) -> Result<(bool, String), String> {
     pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
         Ok(option_to_tuple(
-            pool.encryption_info()
-                .key_description
-                .as_ref()
-                .map(|kd| kd.as_application_str().to_string()),
+            match pool.encryption_info() {
+                Some(ei) => ei
+                    .key_description()
+                    .map_err(|e| e.to_string())?
+                    .map(|kd| kd.as_application_str().to_string()),
+                None => None,
+            },
             String::new(),
         ))
     })
@@ -96,10 +99,13 @@ pub fn get_pool_clevis_info(
 ) -> Result<(bool, (String, String)), String> {
     pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
         Ok(option_to_tuple(
-            pool.encryption_info()
-                .clevis_info
-                .as_ref()
-                .map(|(pin, config)| (pin.to_owned(), config.to_string())),
+            match pool.encryption_info() {
+                Some(ei) => ei
+                    .clevis_info()
+                    .map_err(|e| e.to_string())?
+                    .map(|(pin, config)| (pin.to_owned(), config.to_string())),
+                None => None,
+            },
             (String::new(), String::new()),
         ))
     })
@@ -139,13 +145,21 @@ pub fn add_blockdevs(m: &MethodInfo<MTSync<TData>, TData>, op: BlockDevOp) -> Me
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
     let result = match op {
-        BlockDevOp::InitCache => log_action!(pool.init_cache(pool_uuid, &*pool_name, &blockdevs)),
-        BlockDevOp::AddCache => {
-            log_action!(pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Cache))
-        }
-        BlockDevOp::AddData => {
-            log_action!(pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Data))
-        }
+        BlockDevOp::InitCache => handle_action!(
+            pool.init_cache(pool_uuid, &*pool_name, &blockdevs),
+            dbus_context,
+            pool_path.get_name()
+        ),
+        BlockDevOp::AddCache => handle_action!(
+            pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Cache),
+            dbus_context,
+            pool_path.get_name()
+        ),
+        BlockDevOp::AddData => handle_action!(
+            pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Data),
+            dbus_context,
+            pool_path.get_name()
+        ),
     };
     let msg = match result.map(|bds| bds.changed()) {
         Ok(Some(uuids)) => {
@@ -218,4 +232,10 @@ pub fn pool_name_prop(name: &Name) -> String {
 #[inline]
 pub fn pool_enc_prop(pool: &dyn Pool) -> bool {
     pool.is_encrypted()
+}
+
+/// Generate D-Bus representation of pool state property.
+#[inline]
+pub fn pool_avail_actions_prop(pool: &dyn Pool) -> String {
+    pool.avail_actions().to_string()
 }

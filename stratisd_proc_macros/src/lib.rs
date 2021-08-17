@@ -16,7 +16,7 @@ use syn::{
 /// Add guard for mutating actions when the pool is in maintenance mode.
 ///
 /// This method adds a statement that returns an error if the pool is set
-/// to maintenance-only mode.
+/// to limit available actions.
 fn add_method_guards(method: &mut ImplItemMethod, level: Ident) {
     let stmt = if let ReturnType::Type(_, ty) = &method.sig.output {
         if let Type::Path(TypePath {
@@ -135,7 +135,7 @@ fn process_token_stream(token: TokenTree) -> TokenTree {
 }
 
 /// Take the body of the method and wrap it in an inner method, replacing the
-/// body with a check for an error that puts the pool in maintenance-only mode.
+/// body with a check for an error that limits available actions.
 fn wrap_method(f: &mut ImplItemMethod) {
     let wrapped_ident = Ident::new(
         format!("{}_wrapped", f.sig.ident.clone()).as_str(),
@@ -179,7 +179,7 @@ fn wrap_method(f: &mut ImplItemMethod) {
         match #wrapped_ident(#( #arg_idents),*) {
             Ok(ret) => Ok(ret),
             Err(e) => {
-                if let Some(state) = e.error_to_pool_state() {
+                if let Some(state) = e.error_to_available_actions() {
                     self.action_avail = state;
                 }
                 Err(e)
@@ -190,7 +190,8 @@ fn wrap_method(f: &mut ImplItemMethod) {
         .expect("Could not parse generated method body as a block");
 }
 
-/// Get the pool state level at which a pool operation ceases to be accepted.
+/// Get the pool available action state level at which a pool operation ceases to be
+/// accepted.
 fn get_attr_level(attrs: &mut Vec<Attribute>) -> Option<Ident> {
     let mut return_value = None;
     let mut index = None;

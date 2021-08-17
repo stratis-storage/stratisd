@@ -70,5 +70,5 @@ jobs:
         run: rpmdev-bumpspec stratisd.spec
         working-directory: ../stratisd-spec
       - name: Compile the package
-        run: rpmbuild -bc *
+        run: rpmbuild -bc stratisd.spec
         working-directory: ../stratisd-spec

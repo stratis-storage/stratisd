@@ -16,6 +16,7 @@ check() {
 		clevis-luks-bind \
 		clevis-luks-unlock \
 		clevis-luks-unbind \
+		clevis-luks-regen \
 		clevis-encrypt-tang \
 		clevis-encrypt-tpm2 \
 		clevis-decrypt \
@@ -48,6 +49,7 @@ install() {
 		clevis-luks-bind \
 		clevis-luks-unlock \
 		clevis-luks-unbind \
+		clevis-luks-regen \
 		clevis-encrypt-tang \
 		clevis-encrypt-tpm2 \
 		clevis-decrypt \

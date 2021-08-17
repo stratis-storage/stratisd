@@ -178,8 +178,8 @@ macro_rules! handle_action {
         if let Ok(ref a) = action {
             log::info!("{}", a);
         } else if let Err(ref e) = action {
-            if let Some(state) = e.error_to_pool_state() {
-                $dbus_cxt.push_pool_state($path, state)
+            if let Some(state) = e.error_to_available_actions() {
+                $dbus_cxt.push_pool_avail_actions($path, state)
             }
         }
         action

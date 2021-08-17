@@ -45,13 +45,14 @@ pub enum StratisError {
 }
 
 impl StratisError {
-    /// Determine all possible pool states that result from this error chain.
-    fn error_to_potential_pool_states(&self) -> HashSet<ActionAvailability> {
+    /// Determine all possible pool action availability states that result from this
+    /// error chain.
+    fn error_to_all_available_actions(&self) -> HashSet<ActionAvailability> {
         match self {
-            StratisError::Chained(_, c) => c.error_to_potential_pool_states(),
+            StratisError::Chained(_, c) => c.error_to_all_available_actions(),
             StratisError::BestEffortError(_, errs) => errs
                 .iter()
-                .flat_map(|e| e.error_to_potential_pool_states())
+                .flat_map(|e| e.error_to_all_available_actions())
                 .collect::<HashSet<_>>(),
             StratisError::RollbackError { .. } => {
                 once(ActionAvailability::NoRequests).collect::<HashSet<_>>()
@@ -60,17 +61,18 @@ impl StratisError {
                 causal_error,
                 rollback_error,
             } => {
-                let mut states = causal_error.error_to_potential_pool_states();
-                states.extend(rollback_error.error_to_potential_pool_states());
+                let mut states = causal_error.error_to_all_available_actions();
+                states.extend(rollback_error.error_to_all_available_actions());
                 states
             }
             _ => HashSet::new(),
         }
     }
 
-    /// Determine the most restrictive pool state required from
-    pub fn error_to_pool_state(&self) -> Option<ActionAvailability> {
-        self.error_to_potential_pool_states().into_iter().max()
+    /// Determine the most restrictive pool action availability state required from
+    /// the set of all available action states.
+    pub fn error_to_available_actions(&self) -> Option<ActionAvailability> {
+        self.error_to_all_available_actions().into_iter().max()
     }
 }
 
@@ -218,9 +220,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_error_to_pool_state() {
+    fn test_error_to_available_actions() {
         assert_eq!(
-            StratisError::Msg("Message".to_string()).error_to_pool_state(),
+            StratisError::Msg("Message".to_string()).error_to_available_actions(),
             None
         );
         assert_eq!(
@@ -231,7 +233,7 @@ mod tests {
                     rollback_error: Box::new(StratisError::Msg("Rollback".to_string())),
                 }),
             )
-            .error_to_pool_state(),
+            .error_to_available_actions(),
             Some(ActionAvailability::NoRequests)
         );
     }

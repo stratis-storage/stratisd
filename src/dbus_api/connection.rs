@@ -232,7 +232,7 @@ impl DbusTreeHandler {
                     }
                 }
             }
-            DbusAction::PoolState(item, val) => {
+            DbusAction::PoolAvailActions(item, val) => {
                 let mut changed = HashMap::new();
                 changed.insert(
                     consts::POOL_AVAIL_ACTIONS_PROP.into(),
@@ -249,7 +249,7 @@ impl DbusTreeHandler {
                     .is_err()
                 {
                     warn!(
-                        "Signal on pool maintenance mode change was not sent to the D-Bus client"
+                        "Signal on pool available actions mode change was not sent to the D-Bus client"
                     );
                 }
             }

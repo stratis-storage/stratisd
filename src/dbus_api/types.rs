@@ -54,7 +54,7 @@ pub enum DbusAction {
     Remove(Path<'static>, InterfacesRemoved),
     FsNameChange(Path<'static>, String),
     PoolNameChange(Path<'static>, String),
-    PoolState(Path<'static>, ActionAvailability),
+    PoolAvailActions(Path<'static>, ActionAvailability),
 }
 
 /// Context for an object path.
@@ -171,16 +171,14 @@ impl DbusContext {
         }
     }
 
-    /// Send changed signal for pool state.
-    pub fn push_pool_state(&self, item: &Path<'static>, pool_state: ActionAvailability) {
+    /// Send changed signal for pool available actions state.
+    pub fn push_pool_avail_actions(&self, item: &Path<'static>, avail_actions: ActionAvailability) {
         if let Err(e) = self
             .sender
-            .send(DbusAction::PoolState(item.clone(), pool_state))
+            .send(DbusAction::PoolAvailActions(item.clone(), avail_actions))
         {
             warn!(
-                "D-Bus pool state status change event could not be sent to
-                the processing thread; no signal will be sent out for the pool state 
-                status change of pool with path {}: {}",
+                "D-Bus pool available actions status change event could not be sent to the processing thread; no signal will be sent out for the pool available actions status change of pool with path {}: {}",
                 item, e,
             )
         }

@@ -28,14 +28,11 @@ jobs:
     container:
       image: fedora:34  # LOWEST SUPPORTED RELEASE
     steps:
-      - uses: actions-rs/toolchain@v1
-        with:
-          components: cargo
-          toolchain: 1.54.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - name: Install dependencies
         run: >
           dnf install -y
           asciidoc
+          cargo
           cryptsetup-devel
           dracut
           fedpkg
@@ -45,6 +42,7 @@ jobs:
           make
           rpm
           rpmdevtools
+          rust
           rust-packaging
           tar
           util-linux

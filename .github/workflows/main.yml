@@ -39,6 +39,7 @@ jobs:
           fedpkg
           findutils
           git
+          cryptsetup-devel
           make
           rpm
           rpmdevtools

@@ -3,10 +3,10 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 //! udev-related methods
-use std::{ffi::OsStr, fmt, path::Path};
+use std::{ffi::OsStr, fmt};
 
 use crate::{
-    engine::types::UdevEngineDevice,
+    engine::types::{DevicePath, UdevEngineDevice},
     stratis::{StratisError, StratisResult},
 };
 
@@ -157,23 +157,24 @@ pub fn decide_ownership(device: &UdevEngineDevice) -> StratisResult<UdevOwnershi
 
 /// Locate a udev block device with the specified devnode and apply a function
 /// to that device, returning the result.
-/// This approach is necessitated by the libudev lifetimes, which do not allow
-/// returning anything directly obtained from the enumerator value created in
-/// the method itself.
 /// Note that this does require iterating through the blockdevs in the udev
 /// database, so it is essentially linear in the number of block devices.
-pub fn block_device_apply<F, U>(devnode: &Path, f: F) -> StratisResult<Option<U>>
+/// This approach was initially required because udev lifetimes did not allow
+/// the object representing the device to be returned from a method. This is
+/// now unnecessary; the method could simply return a UdevEngineDevice.
+/// It was decided not to take that step as, at some point in the future, it
+/// might be reasonable to revert to an approach which reads the udev device
+/// object and applies a function only to selected properties or attributes.
+pub fn block_device_apply<F, U>(device_path: &DevicePath, f: F) -> StratisResult<Option<U>>
 where
     F: FnOnce(&UdevEngineDevice) -> U,
 {
-    let canonical = devnode.canonicalize()?;
-
     let context = libudev::Context::new()?;
     let mut enumerator = block_enumerator(&context)?;
 
     Ok(enumerator
         .scan_devices()?
         .filter(|dev| dev.is_initialized())
-        .find(|x| x.devnode().map_or(false, |d| canonical == d))
+        .find(|x| x.devnode().map_or(false, |d| **device_path == *d))
         .map(|ref d| f(&UdevEngineDevice::from(d))))
 }

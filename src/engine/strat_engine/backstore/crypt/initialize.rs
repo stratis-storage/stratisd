@@ -96,7 +96,7 @@ impl CryptInitializer {
                         .expect("Encrypted device must be provided encryption parameters");
                 Ok(CryptHandle::new(
                     self.physical_path,
-                    DevicePath::new(activated_path)?,
+                    DevicePath::new(&activated_path)?,
                     self.identifiers,
                     encryption_info,
                     self.activation_name,

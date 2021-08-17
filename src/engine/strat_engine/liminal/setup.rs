@@ -259,9 +259,7 @@ pub fn get_blockdevs(
                 bd_save.hardware_info.clone(),
                 match handle {
                     Some(handle) => UnderlyingDevice::Encrypted(handle),
-                    None => {
-                        UnderlyingDevice::Unencrypted(DevicePath::new(physical_path.to_owned())?)
-                    }
+                    None => UnderlyingDevice::Unencrypted(DevicePath::new(physical_path)?),
                 },
             )?,
         ))

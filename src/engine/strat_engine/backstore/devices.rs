@@ -42,7 +42,7 @@ const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u128);
 // information or no udev entry corresponding to the devnode could be found.
 // Return an error if udev ownership could not be obtained.
 fn udev_info(
-    devnode: &Path,
+    devnode: &DevicePath,
 ) -> StratisResult<(UdevOwnership, Device, Option<StratisResult<String>>)> {
     block_device_apply(devnode, |d| {
         (
@@ -96,7 +96,7 @@ fn udev_info(
 // device has been determined to be unowned.
 #[allow(clippy::type_complexity)]
 fn dev_info(
-    devnode: &Path,
+    devnode: &DevicePath,
 ) -> StratisResult<(
     Option<StratisResult<String>>,
     Bytes,
@@ -114,7 +114,7 @@ fn dev_info(
             Err(StratisError::Msg(err_str))
         }
         UdevOwnership::Stratis | UdevOwnership::Unowned => {
-            let mut f = OpenOptions::new().read(true).write(true).open(&devnode)?;
+            let mut f = OpenOptions::new().read(true).write(true).open(&**devnode)?;
             let dev_size = blkdev_size(&f)?;
 
             // FIXME: Read device identifiers from either an Unowned or a
@@ -177,7 +177,12 @@ pub struct DeviceInfo {
 fn process_devices(
     paths: &[&Path],
 ) -> StratisResult<Vec<(DeviceInfo, Option<StratisIdentifiers>)>> {
-    let infos = paths
+    let canonical_paths = paths
+        .iter()
+        .map(|p| DevicePath::new(&p))
+        .collect::<StratisResult<Vec<DevicePath>>>()?;
+
+    let infos = canonical_paths
         .iter()
         .unique()
         .map(|devnode| {
@@ -410,12 +415,8 @@ pub fn initialize_devices(
         key_description: Option<&KeyDescription>,
         enable_clevis: Option<&ClevisInfo>,
     ) -> StratisResult<(CryptHandle, Device, Sectors)> {
-        let handle = CryptInitializer::new(
-            DevicePath::new(physical_path.to_owned())?,
-            pool_uuid,
-            dev_uuid,
-        )
-        .initialize(key_description, enable_clevis)?;
+        let handle = CryptInitializer::new(DevicePath::new(physical_path)?, pool_uuid, dev_uuid)
+            .initialize(key_description, enable_clevis)?;
 
         let device_size = match handle.logical_device_size() {
             Ok(size) => size,
@@ -587,7 +588,7 @@ pub fn initialize_devices(
             }
             None => {
                 let blockdev = initialize_stratis_metadata(
-                    UnderlyingDevice::Unencrypted(DevicePath::new(physical_path.to_owned())?),
+                    UnderlyingDevice::Unencrypted(DevicePath::new(physical_path)?),
                     devno,
                     pool_uuid,
                     dev_uuid,

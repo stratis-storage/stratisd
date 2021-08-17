@@ -313,11 +313,11 @@ impl<'a> From<&'a libudev::Device<'a>> for UdevEngineDevice {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct DevicePath(PathBuf);
 
 impl DevicePath {
-    pub fn new(path: PathBuf) -> StratisResult<Self> {
+    pub fn new(path: &Path) -> StratisResult<Self> {
         Ok(DevicePath(path.canonicalize()?))
     }
 }

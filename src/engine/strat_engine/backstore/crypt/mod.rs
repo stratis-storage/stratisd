@@ -73,12 +73,8 @@ mod tests {
         let pool_uuid = PoolUuid::new_v4();
         let dev_uuid = DevUuid::new_v4();
 
-        let result = CryptInitializer::new(
-            DevicePath::new(path.to_path_buf()).unwrap(),
-            pool_uuid,
-            dev_uuid,
-        )
-        .initialize(Some(&key_description), None);
+        let result = CryptInitializer::new(DevicePath::new(path).unwrap(), pool_uuid, dev_uuid)
+            .initialize(Some(&key_description), None);
 
         // Initialization cannot occur with a non-existent key
         assert!(result.is_err());
@@ -117,12 +113,8 @@ mod tests {
             for path in paths {
                 let dev_uuid = DevUuid::new_v4();
 
-                let handle = CryptInitializer::new(
-                    DevicePath::new(path.to_path_buf())?,
-                    pool_uuid,
-                    dev_uuid,
-                )
-                .initialize(Some(key_desc), None)?;
+                let handle = CryptInitializer::new(DevicePath::new(path)?, pool_uuid, dev_uuid)
+                    .initialize(Some(key_desc), None)?;
                 handles.push(handle);
             }
 
@@ -207,9 +199,8 @@ mod tests {
             let pool_uuid = PoolUuid::new_v4();
             let dev_uuid = DevUuid::new_v4();
 
-            let handle =
-                CryptInitializer::new(DevicePath::new(path.to_path_buf())?, pool_uuid, dev_uuid)
-                    .initialize(Some(key_desc), None)?;
+            let handle = CryptInitializer::new(DevicePath::new(path)?, pool_uuid, dev_uuid)
+                .initialize(Some(key_desc), None)?;
             let logical_path = handle.activated_device_path();
 
             const WINDOW_SIZE: usize = 1024 * 1024;
@@ -363,7 +354,7 @@ mod tests {
                 .copied()
                 .ok_or_else(|| StratisError::Msg("Expected exactly one path".to_string()))?;
             let handle = CryptInitializer::new(
-                DevicePath::new(path.to_owned())?,
+                DevicePath::new(path)?,
                 PoolUuid::new_v4(),
                 DevUuid::new_v4(),
             )
@@ -404,7 +395,7 @@ mod tests {
         let _memfs = MemoryFilesystem::new().unwrap();
         let path = paths[0];
         let handle = CryptInitializer::new(
-            DevicePath::new(path.to_owned()).unwrap(),
+            DevicePath::new(path).unwrap(),
             PoolUuid::new_v4(),
             DevUuid::new_v4(),
         )

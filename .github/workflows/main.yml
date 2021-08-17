@@ -58,21 +58,24 @@ jobs:
           $GITHUB_ENV
       - name: Create directories
         run: mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES}
+      - name: Rename stratisd directory
+        run: mv stratisd stratisd-${{ env.RELEASE_VERSION }}
       - name: Make the source tar file
         run: >
           tar czvf ~/rpmbuild/SOURCES/stratisd-${{ env.RELEASE_VERSION }}.tar.gz
           --exclude-vcs
           --exclude-vcs-ignore
-          stratisd
-        working-directory: ..
+          stratisd-${{ env.RELEASE_VERSION }}
+        working-directory: /github/home
       - name: Make the vendor tar file
         run: >
           RELEASE_VERSION=${{ env.RELEASE_VERSION }}
           VENDOR_OUTPUT_DIR=~/rpmbuild/SOURCES
           make -f Makefile vendored-tar-file
+        working-directory: /github/home/stratisd-${{ env.RELEASE_VERSION }}
       - name: Bump the release version in the spec
         run: rpmdev-bumpspec stratisd.spec
-        working-directory: ../stratisd-spec
+        working-directory: /home/github/stratisd-spec
       - name: Compile the package
         run: rpmbuild -bc stratisd.spec
-        working-directory: ../stratisd-spec
+        working-directory: /home/github/stratisd-spec

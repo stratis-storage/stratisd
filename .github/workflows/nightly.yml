@@ -152,7 +152,7 @@ jobs:
           VENDOR_OUTPUT_DIR=../stratisd-spec
           make -f Makefile vendored-tar-file
       - name: Bump the release version in the spec
-        run: rpmdev-bumpspec
+        run: rpmdev-bumpspec stratisd.spec
         working-directory: ../stratisd-spec
       - name: Compile the package
         run: rpmbuild -bc *

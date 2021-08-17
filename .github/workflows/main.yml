@@ -56,7 +56,7 @@ jobs:
           $GITHUB_ENV
       - name: Make the source tar file
         run: >
-          tar czvf stratisd-spec/stratisd-${{ env.RELEASE_VERSION }}.tar.gz
+          tar czvf ~/rpmbuild/SOURCES/stratisd-${{ env.RELEASE_VERSION }}.tar.gz
           --exclude-vcs
           --exclude-vcs-ignore
           stratisd
@@ -64,7 +64,7 @@ jobs:
       - name: Make the vendor tar file
         run: >
           RELEASE_VERSION=${{ env.RELEASE_VERSION }}
-          VENDOR_OUTPUT_DIR=../stratisd-spec
+          VENDOR_OUTPUT_DIR=~/rpmbuild/SOURCES
           make -f Makefile vendored-tar-file
       - name: Bump the release version in the spec
         run: rpmdev-bumpspec stratisd.spec

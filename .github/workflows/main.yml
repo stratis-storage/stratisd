@@ -54,6 +54,8 @@ jobs:
           "RELEASE_VERSION=$(git describe --abbrev=0 | colrm 1 1)"
           >>
           $GITHUB_ENV
+      - name: Create directories
+        run: mkdir -p ~/rpmbuild/{RPMS,SOURCES}
       - name: Make the source tar file
         run: >
           tar czvf ~/rpmbuild/SOURCES/stratisd-${{ env.RELEASE_VERSION }}.tar.gz

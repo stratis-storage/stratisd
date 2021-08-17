@@ -35,11 +35,12 @@ jobs:
       - name: Install dependencies
         run: >
           dnf install -y
+          cryptsetup-devel
           dracut
           fedpkg
           findutils
           git
-          cryptsetup-devel
+          libblkid-devel
           make
           rpm
           rpmdevtools

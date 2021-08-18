@@ -42,10 +42,8 @@ jobs:
           make
           rpm
           rpmdevtools
-          rust
           rust-packaging
           rust-srpm-macros
-          rust-std-static
           tar
           util-linux
       - name: Check out Fedora repo
@@ -81,8 +79,14 @@ jobs:
         run: rpmdev-bumpspec stratisd.spec
         working-directory: ../stratisd-spec
       - name: Build the source package
-        run: rpmbuild -bs --nodeps stratisd.spec
-        working-directory: ../stratisd-spec
-      - name: Build the source package
-        run: rpmbuild -br --nodeps stratisd.spec
-        working-directory: ../stratisd-spec
+        # yamllint disable rule:line-length
+        run: >
+          rpmbuild -bs --nodeps stratisd-spec/stratisd.spec
+          dnf builddep ~/rpmbuild/SRPMS/stratisd-${{ env.RELEASE_VERSION }}*src.rpm
+        working-directory: ..
+      - name: Build the source package with dynamic build dependencies
+        # yamllint disable rule:line-length
+        run: >
+          rpmbuild -br --nodeps stratisd-spec/stratisd.spec
+          dnf builddep ~/rpmbuild/SRPMS/stratisd-${{ env.RELEASE_VERSION }}*buildreqs.nosrc.rpm
+        working-directory: ..

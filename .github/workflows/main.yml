@@ -34,7 +34,6 @@ jobs:
           asciidoc
           cargo
           cryptsetup-devel
-          dracut
           fedpkg
           findutils
           git
@@ -43,7 +42,6 @@ jobs:
           rpm
           rpmdevtools
           rust-packaging
-          rust-srpm-macros
           tar
           util-linux
       - name: Check out Fedora repo
@@ -87,6 +85,12 @@ jobs:
       - name: Build the source package with dynamic build dependencies
         # yamllint disable rule:line-length
         run: |
-          rpmbuild -br --nodeps stratisd-spec/stratisd.spec
+          rpmbuild -br --nodeps stratisd-spec/stratisd.spec;
+          dnf builddep ~/rpmbuild/SRPMS/stratisd-${{ env.RELEASE_VERSION }}*buildreqs.nosrc.rpm
+        working-directory: ..
+      - name: Build the source package with dynamic build dependencies
+        # yamllint disable rule:line-length
+        run: |
+          rpmbuild -br --nodeps stratisd-spec/stratisd.spec;
           dnf builddep ~/rpmbuild/SRPMS/stratisd-${{ env.RELEASE_VERSION }}*buildreqs.nosrc.rpm
         working-directory: ..

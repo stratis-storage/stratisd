@@ -80,17 +80,17 @@ jobs:
         # yamllint disable rule:line-length
         run: |
           rpmbuild -bs --nodeps stratisd-spec/stratisd.spec
-          dnf builddep ~/rpmbuild/SRPMS/stratisd-${{ env.RELEASE_VERSION }}*src.rpm
+          dnf -y builddep ~/rpmbuild/SRPMS/stratisd-${{ env.RELEASE_VERSION }}*src.rpm
         working-directory: ..
       - name: Build the source package with dynamic build dependencies
         # yamllint disable rule:line-length
         run: |
           rpmbuild -br --nodeps stratisd-spec/stratisd.spec;
-          dnf builddep ~/rpmbuild/SRPMS/stratisd-${{ env.RELEASE_VERSION }}*buildreqs.nosrc.rpm
+          dnf -y builddep ~/rpmbuild/SRPMS/stratisd-${{ env.RELEASE_VERSION }}*buildreqs.nosrc.rpm
         working-directory: ..
       - name: Build the source package with dynamic build dependencies
         # yamllint disable rule:line-length
         run: |
           rpmbuild -br --nodeps stratisd-spec/stratisd.spec;
-          dnf builddep ~/rpmbuild/SRPMS/stratisd-${{ env.RELEASE_VERSION }}*buildreqs.nosrc.rpm
+          dnf -y builddep ~/rpmbuild/SRPMS/stratisd-${{ env.RELEASE_VERSION }}*buildreqs.nosrc.rpm
         working-directory: ..

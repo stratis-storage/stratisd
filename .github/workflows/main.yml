@@ -45,9 +45,11 @@ jobs:
           rust
           rust-bindgen-devel
           rust-byteorder-devel
+          rust-chrono-devel
           rust-clap-devel
           rust-crc-devel
           rust-data-encoding-devel
+          rust-dbus-tree-devel
           rust-devicemapper-devel
           rust-either-devel
           rust-env_logger-devel
@@ -62,6 +64,7 @@ jobs:
           rust-log-devel
           rust-nix-devel
           rust-packaging
+          rust-pkg-config-devel
           rust-rand-devel
           rust-regex-devel
           rust-serde-devel
@@ -69,7 +72,7 @@ jobs:
           rust-serde_json-devel
           rust-sha2-devel
           rust-tempfile-devel
-          rust-tokio-default-devel
+          rust-tokio-devel
           rust-tokio-macros-devel
           rust-tokio-net-devel
           rust-tokio-rt-devel

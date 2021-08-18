@@ -45,6 +45,7 @@ jobs:
           rust
           rust-packaging
           rust-srpm-macros
+          rust-std-static
           tar
           util-linux
       - name: Check out Fedora repo

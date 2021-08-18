@@ -58,7 +58,6 @@ jobs:
           rust-lazy_static-devel
           rust-libc-devel
           rust-libcryptsetup-rs-devel
-          rust-libcryptsetup-rs-mutex-devel
           rust-libmount-devel
           rust-libudev-devel
           rust-log-devel
@@ -74,14 +73,7 @@ jobs:
           rust-tempfile-devel
           rust-tokio-devel
           rust-tokio-macros-devel
-          rust-tokio-net-devel
-          rust-tokio-rt-devel
-          rust-tokio-rt-multi-thread-devel
-          rust-tokio-signal-devel
-          rust-tokio-sync-devel
           rust-uuid-devel
-          rust-uuid-serde-devel
-          rust-uuid-v4-devel
           tar
           util-linux
       - name: Check out Fedora repo

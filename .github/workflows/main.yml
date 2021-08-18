@@ -146,11 +146,11 @@ jobs:
       matrix:
         include:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
-          - task: RUST_LOG=libstratis=debug make -f Makefile test-loop
+          - task: RUST_LOG=stratisd=debug make -f Makefile test-loop
             toolchain: 1.54.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
             image: ubuntu:groovy
-          - task: RUST_LOG=libstratis=debug make -f Makefile test-loop
+          - task: RUST_LOG=stratisd=debug make -f Makefile test-loop
             toolchain: 1.54.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
             image: fedora:33
@@ -216,7 +216,7 @@ jobs:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
           - task: >-
               TANG_URL=tang
-              RUST_LOG=libstratis=debug
+              RUST_LOG=stratisd=debug
               make -f Makefile test-clevis-loop
             toolchain: 1.54.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
@@ -356,7 +356,7 @@ jobs:
           --print-address
       - name: Run stratis-cli tests
         run: >
-          RUST_LOG=libstratis=debug,stratisd=debug
+          RUST_LOG=stratisd=debug
           STRATISD=/usr/libexec/stratisd
           PYTHONPATH=./src
           make dbus-tests
@@ -421,7 +421,7 @@ jobs:
           --print-address
       - name: Tests on ${{ matrix.image }} using Rust ${{ matrix.toolchain }}
         run: >
-          RUST_LOG=libstratis=debug,stratisd=debug
+          RUST_LOG=stratisd=debug
           STRATISD=/usr/libexec/stratisd
           STRATIS_PREDICT_USAGE=/usr/bin/stratis-predict-usage
           PYTHONPATH=./src

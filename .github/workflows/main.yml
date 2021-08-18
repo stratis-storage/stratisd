@@ -81,8 +81,8 @@ jobs:
         run: rpmdev-bumpspec stratisd.spec
         working-directory: ../stratisd-spec
       - name: Build the source package
-        run: rpmbuild -bs stratisd.spec
+        run: rpmbuild -bs --nodeps stratisd.spec
         working-directory: ../stratisd-spec
       - name: Build the source package
-        run: rpmbuild -br stratisd.spec
+        run: rpmbuild -br --nodeps stratisd.spec
         working-directory: ../stratisd-spec

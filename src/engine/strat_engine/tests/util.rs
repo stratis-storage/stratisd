@@ -24,13 +24,58 @@ use crate::{
 };
 
 mod cleanup_errors {
-    error_chain! {
-        foreign_links {
-            Ioe(std::io::Error);
-            Mnt(libmount::mountinfo::ParseError);
-            Nix(nix::Error);
+    use std::fmt;
+
+    use devicemapper::DmError;
+
+    #[derive(Debug)]
+    pub enum Error {
+        Ioe(std::io::Error),
+        Nix(nix::Error),
+        Msg(String),
+        Chained(String, Box<Error>),
+        Dm(DmError),
+    }
+
+    pub type Result<T> = std::result::Result<T, Error>;
+
+    impl From<nix::Error> for Error {
+        fn from(err: nix::Error) -> Error {
+            Error::Nix(err)
         }
     }
+
+    impl From<std::io::Error> for Error {
+        fn from(err: std::io::Error) -> Error {
+            Error::Ioe(err)
+        }
+    }
+
+    impl From<String> for Error {
+        fn from(err: String) -> Error {
+            Error::Msg(err)
+        }
+    }
+
+    impl From<DmError> for Error {
+        fn from(err: DmError) -> Error {
+            Error::Dm(err)
+        }
+    }
+
+    impl fmt::Display for Error {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            match self {
+                Error::Ioe(err) => write!(f, "IO error: {}", err),
+                Error::Nix(err) => write!(f, "Nix error: {}", err),
+                Error::Msg(err) => write!(f, "{}", err),
+                Error::Chained(msg, err) => write!(f, "{}: {}", msg, err),
+                Error::Dm(err) => write!(f, "DM error: {}", err),
+            }
+        }
+    }
+
+    impl std::error::Error for Error {}
 }
 
 use self::cleanup_errors::{Error, Result};
@@ -44,8 +89,10 @@ pub fn dm_stratis_devices_remove() -> Result<()> {
         let mut remain = get_dm()
             .list_devices()
             .map_err(|e| {
-                let err_msg = "failed while listing DM devices, giving up";
-                Error::with_chain(e, err_msg)
+                Error::Chained(
+                    "failed while listing DM devices, giving up".into(),
+                    Box::new(e.into()),
+                )
             })?
             .iter()
             .map(|d| &d.0)
@@ -105,7 +152,7 @@ pub fn dm_stratis_devices_remove() -> Result<()> {
 
     || -> Result<()> {
         udev_settle().unwrap();
-        get_dm_init().map_err(|err| Error::with_chain(err, "Unable to initialize DM"))?;
+        get_dm_init().map_err(|_| Error::Msg("Unable to initialize DM".into()))?;
         do_while_progress().and_then(|remain| {
             if !remain.is_empty() {
                 Err(format!("Some Stratis DM devices remaining: {:?}", remain).into())
@@ -114,7 +161,12 @@ pub fn dm_stratis_devices_remove() -> Result<()> {
             }
         })
     }()
-    .map_err(|e| e.chain_err(|| "Failed to ensure removal of all Stratis DM devices"))
+    .map_err(|e| {
+        Error::Chained(
+            "Failed to ensure removal of all test-generated DM devices".into(),
+            Box::new(e),
+        )
+    })
 }
 
 /// Try and un-mount any filesystems that have the name stratis in the mount point, returning
@@ -135,7 +187,12 @@ fn stratis_filesystems_unmount() -> Result<()> {
 
         Ok(())
     }()
-    .map_err(|e| e.chain_err(|| "Failed to ensure all Stratis filesystems were unmounted"))
+    .map_err(|e| {
+        Error::Chained(
+            "Failed to ensure all Stratis filesystems were unmounted".into(),
+            Box::new(e),
+        )
+    })
 }
 
 /// When a unit test panics we can leave the system in an inconsistent state.  This function

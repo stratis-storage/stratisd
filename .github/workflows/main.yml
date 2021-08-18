@@ -43,37 +43,8 @@ jobs:
           rpm
           rpmdevtools
           rust
-          rust-bindgen-devel
-          rust-byteorder-devel
-          rust-chrono-devel
-          rust-clap-devel
-          rust-crc-devel
-          rust-data-encoding-devel
-          rust-dbus-tree-devel
-          rust-devicemapper-devel
-          rust-either-devel
-          rust-env_logger-devel
-          rust-futures-devel
-          rust-itertools-devel
-          rust-lazy_static-devel
-          rust-libc-devel
-          rust-libcryptsetup-rs-devel
-          rust-libmount-devel
-          rust-libudev-devel
-          rust-log-devel
-          rust-nix-devel
           rust-packaging
-          rust-pkg-config-devel
-          rust-rand-devel
-          rust-regex-devel
-          rust-serde-devel
-          rust-serde_derive-devel
-          rust-serde_json-devel
-          rust-sha2-devel
-          rust-tempfile-devel
-          rust-tokio-devel
-          rust-tokio-macros-devel
-          rust-uuid-devel
+          rust-srpm-macros
           tar
           util-linux
       - name: Check out Fedora repo

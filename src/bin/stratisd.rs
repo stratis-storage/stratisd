@@ -39,11 +39,6 @@ fn initialize_log(log_level: Option<&str>) {
             LevelFilter::from_str(log_level)
                 .expect("argument parser only accepts valid log levels"),
         );
-        builder.filter(
-            Some("libstratis"),
-            LevelFilter::from_str(log_level)
-                .expect("argument parser only accepts valid log levels"),
-        );
     } else if let Ok(s) = env::var("RUST_LOG") {
         builder.parse_filters(&s);
     }

@@ -60,7 +60,7 @@ jobs:
           >>
           $GITHUB_ENV
       - name: Create directories
-        run: mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES}
+        run: mkdir -p ~/rpmbuild/{BUILD,RPMS,SOURCES,SRPMS}
       - name: Rename stratisd directory
         run: cp -r stratisd stratisd-${{ env.RELEASE_VERSION }}
         working-directory: ..

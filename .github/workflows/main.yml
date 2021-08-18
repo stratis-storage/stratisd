@@ -80,6 +80,9 @@ jobs:
       - name: Bump the release version in the spec
         run: rpmdev-bumpspec stratisd.spec
         working-directory: ../stratisd-spec
-      - name: Compile the package
-        run: rpmbuild -bc stratisd.spec
+      - name: Build the source package
+        run: rpmbuild -bs stratisd.spec
+        working-directory: ../stratisd-spec
+      - name: Build the source package
+        run: rpmbuild -br stratisd.spec
         working-directory: ../stratisd-spec

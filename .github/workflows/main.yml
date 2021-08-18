@@ -80,13 +80,13 @@ jobs:
         working-directory: ../stratisd-spec
       - name: Build the source package
         # yamllint disable rule:line-length
-        run: >
+        run: |
           rpmbuild -bs --nodeps stratisd-spec/stratisd.spec
           dnf builddep ~/rpmbuild/SRPMS/stratisd-${{ env.RELEASE_VERSION }}*src.rpm
         working-directory: ..
       - name: Build the source package with dynamic build dependencies
         # yamllint disable rule:line-length
-        run: >
+        run: |
           rpmbuild -br --nodeps stratisd-spec/stratisd.spec
           dnf builddep ~/rpmbuild/SRPMS/stratisd-${{ env.RELEASE_VERSION }}*buildreqs.nosrc.rpm
         working-directory: ..

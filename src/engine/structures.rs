@@ -14,10 +14,7 @@ use std::{
 use futures::executor::block_on;
 use tokio::sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-use crate::engine::{
-    engine::Engine,
-    types::{AsUuid, Name},
-};
+use crate::engine::types::{AsUuid, Name};
 
 /// Map UUID and name to T items.
 pub struct Table<U, T> {
@@ -350,12 +347,9 @@ impl<G> Drop for ExclusiveGuard<G> {
 
 pub struct Lockable<T>(T);
 
-impl<T> Lockable<Arc<Mutex<T>>>
-where
-    T: 'static + Engine,
-{
-    pub fn new_exclusive(t: T) -> Lockable<Arc<Mutex<dyn Engine>>> {
-        Lockable(Arc::new(Mutex::new(t)) as Arc<Mutex<dyn Engine>>)
+impl<T> Lockable<Arc<Mutex<T>>> {
+    pub fn new_exclusive(t: T) -> Lockable<Arc<Mutex<T>>> {
+        Lockable(Arc::new(Mutex::new(t)))
     }
 }
 

@@ -12,7 +12,7 @@ use stratisd_proc_macros::strat_pool_impl_gen;
 
 use crate::{
     engine::{
-        engine::{BlockDev, Filesystem, Pool},
+        engine::Pool,
         shared::{
             init_cache_idempotent_or_err, validate_filesystem_size_specs, validate_name,
             validate_paths,
@@ -21,7 +21,7 @@ use crate::{
             backstore::{Backstore, StratBlockDev},
             metadata::MDADataSize,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
-            thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
+            thinpool::{StratFilesystem, ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
@@ -368,6 +368,9 @@ impl<'a> Into<Value> for &'a StratPool {
 
 #[strat_pool_impl_gen]
 impl Pool for StratPool {
+    type Filesystem = StratFilesystem;
+    type BlockDev = StratBlockDev;
+
     #[pool_mutating_action("NoRequests")]
     fn init_cache(
         &mut self,
@@ -619,7 +622,7 @@ impl Pool for StratPool {
         pool_uuid: PoolUuid,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<CreateAction<(FilesystemUuid, &'a mut dyn Filesystem)>> {
+    ) -> StratisResult<CreateAction<(FilesystemUuid, &'a mut Self::Filesystem)>> {
         validate_name(snapshot_name)?;
 
         if self
@@ -651,37 +654,39 @@ impl Pool for StratPool {
             .map(|v| v + self.backstore.datatier_metadata_size())
     }
 
-    fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)> {
+    fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Self::Filesystem)> {
         self.thin_pool
             .filesystems()
             .into_iter()
-            .map(|(n, u, f)| (n, u, f as &dyn Filesystem))
+            .map(|(n, u, f)| (n, u, f))
             .collect()
     }
 
-    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &dyn Filesystem)> {
+    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &Self::Filesystem)> {
         self.thin_pool
             .get_filesystem_by_uuid(uuid)
-            .map(|(name, fs)| (name, fs as &dyn Filesystem))
+            .map(|(name, fs)| (name, fs))
     }
 
-    fn get_filesystem_by_name(&self, fs_name: &Name) -> Option<(FilesystemUuid, &dyn Filesystem)> {
+    fn get_filesystem_by_name(
+        &self,
+        fs_name: &Name,
+    ) -> Option<(FilesystemUuid, &Self::Filesystem)> {
         self.thin_pool
             .get_filesystem_by_name(fs_name)
-            .map(|(uuid, fs)| (uuid, fs as &dyn Filesystem))
+            .map(|(uuid, fs)| (uuid, fs))
     }
 
-    fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &dyn BlockDev)> {
+    fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &Self::BlockDev)> {
         self.backstore
             .blockdevs()
             .iter()
-            .map(|&(u, t, b)| (u, t, b as &dyn BlockDev))
+            .map(|&(u, t, b)| (u, t, b))
             .collect()
     }
 
-    fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &dyn BlockDev)> {
-        self.get_strat_blockdev(uuid)
-            .map(|(t, b)| (t, b as &dyn BlockDev))
+    fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &Self::BlockDev)> {
+        self.get_strat_blockdev(uuid).map(|(t, b)| (t, b))
     }
 
     #[pool_mutating_action("NoRequests")]
@@ -731,6 +736,7 @@ mod tests {
     use devicemapper::{Bytes, ThinPoolStatus, ThinPoolStatusSummary, IEC, SECTOR_SIZE};
 
     use crate::engine::{
+        engine::Filesystem,
         strat_engine::{
             cmd::udev_settle,
             tests::{loopbacked, real},

@@ -14,10 +14,13 @@ use crate::{
         types::{GetManagedObjects, InterfacesAddedThreadSafe, TData},
         util::thread_safe_to_dbus_sendable,
     },
-    engine::{DevUuid, Engine, FilesystemUuid, PoolUuid, StratisUuid},
+    engine::{DevUuid, Engine, FilesystemUuid, KeyActions, Pool, PoolUuid, StratisUuid},
 };
 
-pub fn list_keys(info: &MethodInfo<MTSync<TData>, TData>) -> Result<Vec<String>, String> {
+pub fn list_keys<E>(info: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> Result<Vec<String>, String>
+where
+    E: 'static + Engine,
+{
     let dbus_context = info.tree.get_data();
 
     let mutex_lock = dbus_context.engine.blocking_lock();
@@ -32,9 +35,12 @@ pub fn list_keys(info: &MethodInfo<MTSync<TData>, TData>) -> Result<Vec<String>,
         .map_err(|e| e.to_string())
 }
 
-pub fn get_managed_objects_method(
-    f: &Factory<MTSync<TData>, TData>,
-) -> Method<MTSync<TData>, TData> {
+pub fn get_managed_objects_method<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Method<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     fn properties_to_get_managed_objects(
         path: dbus::Path<'static>,
         ia: InterfacesAddedThreadSafe,
@@ -44,51 +50,66 @@ pub fn get_managed_objects_method(
         gmo
     }
 
-    fn pool_properties(
+    fn pool_properties<E>(
         path: &dbus::Path<'static>,
-        engine: &dyn Engine,
+        engine: &E,
         pool_uuid: PoolUuid,
-    ) -> Option<GetManagedObjects> {
+    ) -> Option<GetManagedObjects>
+    where
+        E: 'static + Engine,
+    {
         engine.get_pool(pool_uuid).map(|(ref n, p)| {
-            properties_to_get_managed_objects(path.clone(), get_pool_properties(n, pool_uuid, p))
+            properties_to_get_managed_objects(
+                path.clone(),
+                get_pool_properties::<E>(n, pool_uuid, p),
+            )
         })
     }
 
-    fn fs_properties(
+    fn fs_properties<E>(
         parent_path: &dbus::Path<'static>,
         path: &dbus::Path<'static>,
-        engine: &dyn Engine,
+        engine: &E,
         pool_uuid: PoolUuid,
         fs_uuid: FilesystemUuid,
-    ) -> Option<GetManagedObjects> {
+    ) -> Option<GetManagedObjects>
+    where
+        E: 'static + Engine,
+    {
         engine.get_pool(pool_uuid).and_then(|(ref p_n, p)| {
             p.get_filesystem(fs_uuid).map(|(ref fs_n, f)| {
                 properties_to_get_managed_objects(
                     path.clone(),
-                    get_fs_properties(parent_path.clone(), p_n, fs_n, fs_uuid, f),
+                    get_fs_properties::<E>(parent_path.clone(), p_n, fs_n, fs_uuid, f),
                 )
             })
         })
     }
 
-    fn blockdev_properties(
+    fn blockdev_properties<E>(
         parent_path: &dbus::Path<'static>,
         path: &dbus::Path<'static>,
-        engine: &dyn Engine,
+        engine: &E,
         pool_uuid: PoolUuid,
         uuid: DevUuid,
-    ) -> Option<GetManagedObjects> {
+    ) -> Option<GetManagedObjects>
+    where
+        E: 'static + Engine,
+    {
         engine.get_pool(pool_uuid).and_then(|(_, p)| {
             p.get_blockdev(uuid).map(|(bd_tier, bd)| {
                 properties_to_get_managed_objects(
                     path.clone(),
-                    get_blockdev_properties(parent_path.clone(), uuid, bd_tier, bd),
+                    get_blockdev_properties::<E>(parent_path.clone(), uuid, bd_tier, bd),
                 )
             })
         })
     }
 
-    fn parent_pool_uuid(op: Option<&ObjectPath<MTSync<TData>, TData>>) -> Option<PoolUuid> {
+    fn parent_pool_uuid<E>(op: Option<&ObjectPath<MTSync<TData<E>>, TData<E>>>) -> Option<PoolUuid>
+    where
+        E: 'static + Engine,
+    {
         op.and_then(|o| {
             o.get_data().as_ref().and_then(|data| match data.uuid {
                 StratisUuid::Pool(p) => Some(p),
@@ -97,7 +118,10 @@ pub fn get_managed_objects_method(
         })
     }
 
-    fn get_managed_objects(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+    fn get_managed_objects<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+    where
+        E: 'static + Engine,
+    {
         let dbus_context = m.tree.get_data();
         let engine = dbus_context.engine.blocking_lock();
 

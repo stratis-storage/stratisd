@@ -113,7 +113,10 @@ impl Display for CreateAction<Key> {
     }
 }
 
-impl Display for CreateAction<(FilesystemUuid, &mut dyn Filesystem)> {
+impl<F> Display for CreateAction<(FilesystemUuid, &mut F)>
+where
+    F: Filesystem,
+{
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             CreateAction::Created((uuid, fs)) => {

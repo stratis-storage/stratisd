@@ -11,20 +11,26 @@ use dbus::{
 use dbus_tree::{MTSync, MethodInfo, MethodResult};
 use itertools::Itertools;
 
-use crate::dbus_api::{
-    api::shared::list_keys,
-    consts,
-    types::TData,
-    util::{result_option_to_tuple, result_to_tuple},
+use crate::{
+    dbus_api::{
+        api::shared::list_keys,
+        consts,
+        types::TData,
+        util::{result_option_to_tuple, result_to_tuple},
+    },
+    engine::Engine,
 };
 
 const ALL_PROPERTIES: [&str; 2] = [consts::KEY_LIST_PROP, consts::LOCKED_POOL_DEVS];
 
 type LockedPoolsWithDevs = HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>;
 
-pub fn locked_pools_with_devs(
-    info: &MethodInfo<MTSync<TData>, TData>,
-) -> Result<LockedPoolsWithDevs, String> {
+pub fn locked_pools_with_devs<E>(
+    info: &MethodInfo<MTSync<TData<E>>, TData<E>>,
+) -> Result<LockedPoolsWithDevs, String>
+where
+    E: 'static + Engine,
+{
     let dbus_context = info.tree.get_data();
 
     let engine = dbus_context.engine.blocking_lock();
@@ -81,10 +87,13 @@ pub fn locked_pools_with_devs(
         .collect())
 }
 
-fn get_properties_shared(
-    m: &MethodInfo<MTSync<TData>, TData>,
+fn get_properties_shared<E>(
+    m: &MethodInfo<MTSync<TData<E>>, TData<E>>,
     properties: &mut dyn Iterator<Item = String>,
-) -> MethodResult {
+) -> MethodResult
+where
+    E: 'static + Engine,
+{
     let message: &Message = m.msg;
 
     let return_message = message.method_return();

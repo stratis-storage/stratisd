@@ -8,7 +8,7 @@ use nix::fcntl::{fcntl, FcntlArg, OFlag};
 use tokio::{io::unix::AsyncFd, task::spawn};
 
 use crate::{
-    engine::{get_dm, get_dm_init, LockableEngine},
+    engine::{get_dm, get_dm_init, Engine, LockableEngine},
     stratis::errors::{StratisError, StratisResult},
 };
 
@@ -18,8 +18,17 @@ const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 // to engine to handle event and waits until control is returned from engine.
 // Accepts None as an argument; this indicates that devicemapper events are
 // to be ignored.
-pub async fn dm_event_thread(engine: Option<LockableEngine>) -> StratisResult<()> {
-    async fn process_dm_event(engine: &LockableEngine, fd: &AsyncFd<RawFd>) -> StratisResult<()> {
+pub async fn dm_event_thread<E>(engine: Option<LockableEngine<E>>) -> StratisResult<()>
+where
+    E: 'static + Engine,
+{
+    async fn process_dm_event<E>(
+        engine: &LockableEngine<E>,
+        fd: &AsyncFd<RawFd>,
+    ) -> StratisResult<()>
+    where
+        E: Engine,
+    {
         {
             let mut guard = fd.readable().await?;
             guard.clear_ready();

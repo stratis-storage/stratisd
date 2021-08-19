@@ -17,16 +17,19 @@ use tokio::{
 
 use crate::{
     dbus_api::create_dbus_handlers,
-    engine::{LockableEngine, UdevEngineEvent},
+    engine::{Engine, LockableEngine, UdevEngineEvent},
     stratis::{StratisError, StratisResult},
 };
 
 /// Set up the cooperating D-Bus threads.
-pub async fn setup(
-    engine: LockableEngine,
+pub async fn setup<E>(
+    engine: LockableEngine<E>,
     receiver: UnboundedReceiver<UdevEngineEvent>,
     trigger: Sender<()>,
-) -> StratisResult<()> {
+) -> StratisResult<()>
+where
+    E: 'static + Engine,
+{
     let (mut conn, mut udev, mut tree) = spawn_blocking(move || {
         create_dbus_handlers(engine.clone(), receiver, trigger)
             .map(|(conn, udev, tree)| {

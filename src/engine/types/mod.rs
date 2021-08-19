@@ -78,7 +78,7 @@ macro_rules! uuid {
 pub type ClevisInfo = (String, Value);
 
 /// An engine that can be locked for synchronization.
-pub type LockableEngine = Lockable<Arc<Mutex<dyn Engine>>>;
+pub type LockableEngine<E> = Lockable<Arc<Mutex<E>>>;
 
 pub trait AsUuid:
     Copy

@@ -21,7 +21,6 @@ use devicemapper::{
 
 use crate::{
     engine::{
-        engine::Filesystem,
         strat_engine::{
             backstore::Backstore,
             cmd::{thin_check, thin_repair, udev_settle},
@@ -868,7 +867,7 @@ impl ThinPool {
         pool_uuid: PoolUuid,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<(FilesystemUuid, &mut dyn Filesystem)> {
+    ) -> StratisResult<(FilesystemUuid, &mut StratFilesystem)> {
         let snapshot_fs_uuid = FilesystemUuid::new_v4();
         let (snapshot_dm_name, snapshot_dm_uuid) =
             format_thin_ids(pool_uuid, ThinRole::Filesystem(snapshot_fs_uuid));
@@ -1215,6 +1214,7 @@ mod tests {
     use devicemapper::{Bytes, SECTOR_SIZE};
 
     use crate::engine::{
+        engine::Filesystem,
         shared::DEFAULT_THIN_DEV_SIZE,
         strat_engine::{
             cmd,

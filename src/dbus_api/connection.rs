@@ -38,23 +38,26 @@ use crate::{
         types::{DbusAction, InterfacesAddedThreadSafe, InterfacesRemoved, LockableTree, TData},
         util::thread_safe_to_dbus_sendable,
     },
-    engine::{ExclusiveGuard, StratisUuid},
+    engine::{Engine, ExclusiveGuard, StratisUuid},
     stratis::{StratisError, StratisResult},
 };
 
 /// Handler for a D-Bus tree.
 /// Proceses messages specifying tree mutations.
-pub struct DbusTreeHandler {
-    tree: LockableTree,
-    receiver: UnboundedReceiver<DbusAction>,
+pub struct DbusTreeHandler<E> {
+    tree: LockableTree<E>,
+    receiver: UnboundedReceiver<DbusAction<E>>,
     connection: Arc<SyncConnection>,
     should_exit: Receiver<()>,
 }
 
-impl DbusTreeHandler {
+impl<E> DbusTreeHandler<E>
+where
+    E: Engine,
+{
     pub fn new(
-        tree: LockableTree,
-        receiver: UnboundedReceiver<DbusAction>,
+        tree: LockableTree<E>,
+        receiver: UnboundedReceiver<DbusAction<E>>,
         connection: Arc<SyncConnection>,
         should_exit: Receiver<()>,
     ) -> Self {
@@ -127,8 +130,8 @@ impl DbusTreeHandler {
     /// handle.
     fn handle_dbus_action(
         &self,
-        action: DbusAction,
-        mut write_lock: ExclusiveGuard<RwLockWriteGuard<Tree<MTSync<TData>, TData>>>,
+        action: DbusAction<E>,
+        mut write_lock: ExclusiveGuard<RwLockWriteGuard<Tree<MTSync<TData<E>>, TData<E>>>>,
     ) {
         match action {
             DbusAction::Add(path, interfaces) => {
@@ -321,18 +324,21 @@ impl DbusTreeHandler {
 /// Handler for a D-Bus receiving connection.
 /// stratisd has exactly one connection handler, but this handler spawns
 /// a thread for every D-Bus method.
-pub struct DbusConnectionHandler {
+pub struct DbusConnectionHandler<E> {
     connection: Arc<SyncConnection>,
-    tree: LockableTree,
+    tree: LockableTree<E>,
     should_exit: Receiver<()>,
 }
 
-impl DbusConnectionHandler {
+impl<E> DbusConnectionHandler<E>
+where
+    E: 'static + Engine,
+{
     pub(super) fn new(
         connection: Arc<SyncConnection>,
-        tree: LockableTree,
+        tree: LockableTree<E>,
         should_exit: Receiver<()>,
-    ) -> DbusConnectionHandler {
+    ) -> DbusConnectionHandler<E> {
         DbusConnectionHandler {
             connection,
             tree,

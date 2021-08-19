@@ -19,15 +19,19 @@ use crate::{
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
     engine::{
-        CreateAction, DeleteAction, EncryptionInfo, EngineAction, KeyDescription,
-        MappingCreateAction, MappingDeleteAction, Name, PoolUuid, UnlockMethod,
+        CreateAction, DeleteAction, EncryptionInfo, Engine, EngineAction, KeyActions,
+        KeyDescription, MappingCreateAction, MappingDeleteAction, Name, Pool, PoolUuid,
+        UnlockMethod,
     },
     stratis::StratisError,
 };
 
 type EncryptionParams = (Option<(bool, String)>, Option<(bool, (String, String))>);
 
-pub fn destroy_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+pub fn destroy_pool<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+where
+    E: 'static + Engine,
+{
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -76,7 +80,10 @@ pub fn destroy_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-pub fn unset_key(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+pub fn unset_key<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+where
+    E: 'static + Engine,
+{
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -113,7 +120,10 @@ pub fn unset_key(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-pub fn set_key(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+pub fn set_key<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+where
+    E: 'static + Engine,
+{
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -158,7 +168,10 @@ pub fn set_key(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-pub fn unlock_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+pub fn unlock_pool<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+where
+    E: 'static + Engine,
+{
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -218,7 +231,10 @@ pub fn unlock_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-pub fn engine_state_report(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+pub fn engine_state_report<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+where
+    E: 'static + Engine,
+{
     let message: &Message = m.msg;
 
     let return_message = message.method_return();
@@ -240,7 +256,10 @@ pub fn engine_state_report(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
     Ok(vec![msg])
 }
 
-pub fn create_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+pub fn create_pool<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+where
+    E: 'static + Engine,
+{
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 

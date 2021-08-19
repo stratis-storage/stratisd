@@ -12,10 +12,13 @@ use crate::{
         types::{DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg},
     },
-    engine::ReportType,
+    engine::{Engine, ReportType},
 };
 
-pub fn get_report(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+pub fn get_report<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+where
+    E: Engine,
+{
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
     let report_name: &str = get_next_arg(&mut iter, 0)?;

@@ -4,23 +4,29 @@
 
 use dbus_tree::{Access, EmitsChangedSignal, Factory, MTSync, Method, Property};
 
-use crate::dbus_api::{
-    consts,
-    pool::pool_3_0::{
-        methods::{
-            add_cachedevs, add_datadevs, bind_clevis, bind_keyring, create_filesystems,
-            destroy_filesystems, init_cache, rebind_clevis, rebind_keyring, rename_pool,
-            snapshot_filesystem, unbind_clevis, unbind_keyring,
+use crate::{
+    dbus_api::{
+        consts,
+        pool::pool_3_0::{
+            methods::{
+                add_cachedevs, add_datadevs, bind_clevis, bind_keyring, create_filesystems,
+                destroy_filesystems, init_cache, rebind_clevis, rebind_keyring, rename_pool,
+                snapshot_filesystem, unbind_clevis, unbind_keyring,
+            },
+            props::{get_pool_avail_actions, get_pool_encrypted, get_pool_name},
         },
-        props::{get_pool_avail_actions, get_pool_encrypted, get_pool_name},
+        types::TData,
+        util::get_uuid,
     },
-    types::TData,
-    util::get_uuid,
+    engine::Engine,
 };
 
-pub fn create_filesystems_method(
-    f: &Factory<MTSync<TData>, TData>,
-) -> Method<MTSync<TData>, TData> {
+pub fn create_filesystems_method<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Method<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.method("CreateFilesystems", (), create_filesystems)
         .in_arg(("specs", "a(s(bs))"))
         // b: true if filesystems were created
@@ -32,9 +38,12 @@ pub fn create_filesystems_method(
         .out_arg(("return_string", "s"))
 }
 
-pub fn destroy_filesystems_method(
-    f: &Factory<MTSync<TData>, TData>,
-) -> Method<MTSync<TData>, TData> {
+pub fn destroy_filesystems_method<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Method<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.method("DestroyFilesystems", (), destroy_filesystems)
         .in_arg(("filesystems", "ao"))
         // b: true if filesystems were destroyed
@@ -46,9 +55,12 @@ pub fn destroy_filesystems_method(
         .out_arg(("return_string", "s"))
 }
 
-pub fn snapshot_filesystem_method(
-    f: &Factory<MTSync<TData>, TData>,
-) -> Method<MTSync<TData>, TData> {
+pub fn snapshot_filesystem_method<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Method<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.method("SnapshotFilesystem", (), snapshot_filesystem)
         .in_arg(("origin", "o"))
         .in_arg(("snapshot_name", "s"))
@@ -61,7 +73,12 @@ pub fn snapshot_filesystem_method(
         .out_arg(("return_string", "s"))
 }
 
-pub fn add_blockdevs_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
+pub fn add_blockdevs_method<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Method<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.method("AddDataDevs", (), add_datadevs)
         .in_arg(("devices", "as"))
         // b: Indicates if any data devices were added
@@ -73,7 +90,12 @@ pub fn add_blockdevs_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<
         .out_arg(("return_string", "s"))
 }
 
-pub fn rename_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
+pub fn rename_method<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Method<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.method("SetName", (), rename_pool)
         .in_arg(("name", "s"))
         // b: false if no pool was renamed
@@ -85,21 +107,36 @@ pub fn rename_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>,
         .out_arg(("return_string", "s"))
 }
 
-pub fn name_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
+pub fn name_property<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Property<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.property::<&str, _>(consts::POOL_NAME_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_pool_name)
 }
 
-pub fn uuid_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
+pub fn uuid_property<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Property<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.property::<&str, _>(consts::POOL_UUID_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_uuid)
 }
 
-pub fn init_cache_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
+pub fn init_cache_method<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Method<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.method("InitCache", (), init_cache)
         .in_arg(("devices", "as"))
         // b: Indicates if any cache devices were added
@@ -111,7 +148,12 @@ pub fn init_cache_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TDa
         .out_arg(("return_string", "s"))
 }
 
-pub fn add_cachedevs_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
+pub fn add_cachedevs_method<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Method<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.method("AddCacheDevs", (), add_cachedevs)
         .in_arg(("devices", "as"))
         // b: Indicates if any cache devices were added
@@ -123,21 +165,36 @@ pub fn add_cachedevs_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<
         .out_arg(("return_string", "s"))
 }
 
-pub fn encrypted_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
+pub fn encrypted_property<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Property<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.property::<bool, _>(consts::POOL_ENCRYPTED_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_pool_encrypted)
 }
 
-pub fn avail_actions_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
+pub fn avail_actions_property<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Property<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.property::<String, _>(consts::POOL_AVAIL_ACTIONS_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_pool_avail_actions)
 }
 
-pub fn bind_clevis_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
+pub fn bind_clevis_method<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Method<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.method("Bind", (), bind_clevis)
         .in_arg(("pin", "s"))
         .in_arg(("json", "s"))
@@ -149,7 +206,12 @@ pub fn bind_clevis_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TD
         .out_arg(("return_string", "s"))
 }
 
-pub fn unbind_clevis_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
+pub fn unbind_clevis_method<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Method<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.method("Unbind", (), unbind_clevis)
         // b: Indicates if clevis bindings were removed
         //
@@ -159,7 +221,12 @@ pub fn unbind_clevis_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<
         .out_arg(("return_string", "s"))
 }
 
-pub fn bind_keyring_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
+pub fn bind_keyring_method<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Method<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.method("BindKeyring", (), bind_keyring)
         .in_arg(("key_desc", "s"))
         // b: Indicates if new keyring bindings were added
@@ -170,7 +237,12 @@ pub fn bind_keyring_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<T
         .out_arg(("return_string", "s"))
 }
 
-pub fn unbind_keyring_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
+pub fn unbind_keyring_method<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Method<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.method("UnbindKeyring", (), unbind_keyring)
         // b: Indicates if keyring bindings were removed
         //
@@ -180,7 +252,12 @@ pub fn unbind_keyring_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync
         .out_arg(("return_string", "s"))
 }
 
-pub fn rebind_keyring_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
+pub fn rebind_keyring_method<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Method<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.method("RebindKeyring", (), rebind_keyring)
         .in_arg(("key_desc", "s"))
         // b: Indicates if keyring bindings were changed
@@ -191,7 +268,12 @@ pub fn rebind_keyring_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync
         .out_arg(("return_string", "s"))
 }
 
-pub fn rebind_clevis_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
+pub fn rebind_clevis_method<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Method<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.method("RebindClevis", (), rebind_clevis)
         // b: Indicates if Clevis bindings were changed
         //

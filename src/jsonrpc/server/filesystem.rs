@@ -6,17 +6,20 @@ use chrono::SecondsFormat;
 use tokio::task::block_in_place;
 
 use crate::{
-    engine::{EngineAction, LockableEngine, Name},
+    engine::{Engine, EngineAction, Filesystem, LockableEngine, Name, Pool},
     jsonrpc::{interface::FsListType, server::utils::name_to_uuid_and_pool},
     stratis::{StratisError, StratisResult},
 };
 
 // stratis-min filesystem create
-pub async fn filesystem_create(
-    engine: LockableEngine,
+pub async fn filesystem_create<E>(
+    engine: LockableEngine<E>,
     pool_name: &str,
     name: &str,
-) -> StratisResult<bool> {
+) -> StratisResult<bool>
+where
+    E: Engine,
+{
     let mut lock = engine.lock().await;
     let (pool_uuid, pool) = name_to_uuid_and_pool(&mut *lock, pool_name)
         .ok_or_else(|| StratisError::Msg(format!("No pool named {} found", pool_name)))?;
@@ -28,7 +31,10 @@ pub async fn filesystem_create(
 }
 
 // stratis-min filesystem [list]
-pub async fn filesystem_list(engine: LockableEngine) -> FsListType {
+pub async fn filesystem_list<E>(engine: LockableEngine<E>) -> FsListType
+where
+    E: Engine,
+{
     let lock = engine.lock().await;
     lock.pools().into_iter().fold(
         (
@@ -55,11 +61,14 @@ pub async fn filesystem_list(engine: LockableEngine) -> FsListType {
 }
 
 // stratis-min filesystem destroy
-pub async fn filesystem_destroy(
-    engine: LockableEngine,
+pub async fn filesystem_destroy<E>(
+    engine: LockableEngine<E>,
     pool_name: &str,
     fs_name: &str,
-) -> StratisResult<bool> {
+) -> StratisResult<bool>
+where
+    E: Engine,
+{
     let mut lock = engine.lock().await;
     let (_, pool) = name_to_uuid_and_pool(&mut *lock, pool_name)
         .ok_or_else(|| StratisError::Msg(format!("No pool named {} found", pool_name)))?;
@@ -70,12 +79,15 @@ pub async fn filesystem_destroy(
 }
 
 // stratis-min filesystem rename
-pub async fn filesystem_rename(
-    engine: LockableEngine,
+pub async fn filesystem_rename<E>(
+    engine: LockableEngine<E>,
     pool_name: &str,
     fs_name: &str,
     new_fs_name: &str,
-) -> StratisResult<bool> {
+) -> StratisResult<bool>
+where
+    E: Engine,
+{
     let mut lock = engine.lock().await;
     let (_, pool) = name_to_uuid_and_pool(&mut *lock, pool_name)
         .ok_or_else(|| StratisError::Msg(format!("No pool named {} found", pool_name)))?;

@@ -9,15 +9,18 @@ use tokio::{
 };
 
 use crate::{
-    engine::{LockableEngine, UdevEngineEvent},
+    engine::{Engine, LockableEngine, UdevEngineEvent},
     jsonrpc::run_server,
     stratis::{StratisError, StratisResult},
 };
 
-fn handle_udev(
-    engine: LockableEngine,
+fn handle_udev<E>(
+    engine: LockableEngine<E>,
     mut recv: UnboundedReceiver<UdevEngineEvent>,
-) -> JoinHandle<()> {
+) -> JoinHandle<()>
+where
+    E: 'static + Engine,
+{
     tokio::spawn(async move {
         loop {
             let udev_event = match recv.recv().await {
@@ -35,11 +38,14 @@ fn handle_udev(
     })
 }
 
-pub async fn setup(
-    engine: LockableEngine,
+pub async fn setup<E>(
+    engine: LockableEngine<E>,
     recv: UnboundedReceiver<UdevEngineEvent>,
     _: Sender<()>,
-) -> StratisResult<()> {
+) -> StratisResult<()>
+where
+    E: 'static + Engine,
+{
     let mut udev_join = handle_udev(engine.clone(), recv);
     let mut server_join = run_server(engine);
 

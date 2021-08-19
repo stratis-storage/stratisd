@@ -4,9 +4,12 @@
 
 use dbus_tree::{Factory, MTSync, Tree};
 
-use crate::dbus_api::{
-    consts,
-    types::{DbusContext, TData},
+use crate::{
+    dbus_api::{
+        consts,
+        types::{DbusContext, TData},
+    },
+    engine::Engine,
 };
 
 mod fetch_properties_3_0;
@@ -14,9 +17,12 @@ mod manager_3_0;
 mod report_3_0;
 mod shared;
 
-pub fn get_base_tree<'a>(
-    dbus_context: DbusContext,
-) -> (Tree<MTSync<TData>, TData>, dbus::Path<'a>) {
+pub fn get_base_tree<'a, E>(
+    dbus_context: DbusContext<E>,
+) -> (Tree<MTSync<TData<E>>, TData<E>>, dbus::Path<'a>)
+where
+    E: 'static + Engine,
+{
     let f = Factory::new_sync();
 
     let base_tree = f.tree(dbus_context);

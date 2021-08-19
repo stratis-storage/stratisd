@@ -4,17 +4,25 @@
 
 use dbus_tree::{Access, EmitsChangedSignal, Factory, MTSync, Method, Property};
 
-use crate::dbus_api::{
-    api::manager_3_0::{
-        methods::{
-            create_pool, destroy_pool, engine_state_report, set_key, unlock_pool, unset_key,
+use crate::{
+    dbus_api::{
+        api::manager_3_0::{
+            methods::{
+                create_pool, destroy_pool, engine_state_report, set_key, unlock_pool, unset_key,
+            },
+            props::get_version,
         },
-        props::get_version,
+        types::TData,
     },
-    types::TData,
+    engine::Engine,
 };
 
-pub fn destroy_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
+pub fn destroy_pool_method<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Method<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.method("DestroyPool", (), destroy_pool)
         .in_arg(("pool", "o"))
         // In order from left to right:
@@ -27,13 +35,23 @@ pub fn destroy_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<T
         .out_arg(("return_string", "s"))
 }
 
-pub fn version_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
+pub fn version_property<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Property<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.property::<&str, _>("Version", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_version)
 }
-pub fn unset_key_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
+pub fn unset_key_method<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Method<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.method("UnsetKey", (), unset_key)
         .in_arg(("key_desc", "s"))
         // b: true if the key was unset from the keyring. false if the key
@@ -45,7 +63,12 @@ pub fn unset_key_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TDat
         .out_arg(("return_string", "s"))
 }
 
-pub fn set_key_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
+pub fn set_key_method<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Method<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.method("SetKey", (), set_key)
         .in_arg(("key_desc", "s"))
         .in_arg(("key_fd", "h"))
@@ -60,7 +83,12 @@ pub fn set_key_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>
         .out_arg(("return_string", "s"))
 }
 
-pub fn unlock_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
+pub fn unlock_pool_method<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Method<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.method("UnlockPool", (), unlock_pool)
         .in_arg(("pool_uuid", "s"))
         .in_arg(("unlock_method", "s"))
@@ -74,9 +102,12 @@ pub fn unlock_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TD
         .out_arg(("return_string", "s"))
 }
 
-pub fn engine_state_report_method(
-    f: &Factory<MTSync<TData>, TData>,
-) -> Method<MTSync<TData>, TData> {
+pub fn engine_state_report_method<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Method<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.method("EngineStateReport", (), engine_state_report)
         // s: JSON engine state report as a string.
         //
@@ -86,7 +117,12 @@ pub fn engine_state_report_method(
         .out_arg(("return_string", "s"))
 }
 
-pub fn create_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
+pub fn create_pool_method<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Method<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.method("CreatePool", (), create_pool)
         .in_arg(("name", "s"))
         .in_arg(("redundancy", "(bq)"))

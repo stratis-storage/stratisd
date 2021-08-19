@@ -21,10 +21,13 @@ use crate::{
         api::get_base_tree,
         connection::{DbusConnectionHandler, DbusTreeHandler},
         consts,
-        types::{DbusContext, DbusErrorEnum, InterfacesAdded, InterfacesAddedThreadSafe, TData},
+        types::{
+            DbusContext, DbusErrorEnum, DbusHandlers, InterfacesAdded, InterfacesAddedThreadSafe,
+            TData,
+        },
         udev::DbusUdevHandler,
     },
-    engine::{Lockable, LockableEngine, UdevEngineEvent},
+    engine::{Engine, Lockable, LockableEngine, UdevEngineEvent},
     stratis::StratisError,
 };
 
@@ -101,7 +104,10 @@ where
 
 /// Generate a new object path which is guaranteed unique wrt. all previously
 /// generated object paths.
-pub fn make_object_path(context: &DbusContext) -> String {
+pub fn make_object_path<E>(context: &DbusContext<E>) -> String
+where
+    E: Engine,
+{
     format!(
         "{}/{}",
         consts::STRATIS_BASE_PATH,
@@ -120,7 +126,13 @@ pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
 }
 
 /// Get the UUID for an object path.
-pub fn get_uuid(i: &mut IterAppend, p: &PropInfo<MTSync<TData>, TData>) -> Result<(), MethodErr> {
+pub fn get_uuid<E>(
+    i: &mut IterAppend,
+    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+) -> Result<(), MethodErr>
+where
+    E: Engine,
+{
     let object_path = p.path.get_name();
     let path = p
         .tree
@@ -137,7 +149,13 @@ pub fn get_uuid(i: &mut IterAppend, p: &PropInfo<MTSync<TData>, TData>) -> Resul
 }
 
 /// Get the parent object path for an object path.
-pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTSync<TData>, TData>) -> Result<(), MethodErr> {
+pub fn get_parent<E>(
+    i: &mut IterAppend,
+    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+) -> Result<(), MethodErr>
+where
+    E: Engine,
+{
     let object_path = p.path.get_name();
     let path = p
         .tree
@@ -162,11 +180,14 @@ pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTSync<TData>, TData>) -> Res
 /// Messages may be:
 /// * received by the DbusUdevHandler from the udev thread,
 /// * sent by the DbusContext to the DbusTreeHandler
-pub fn create_dbus_handlers(
-    engine: LockableEngine,
+pub fn create_dbus_handlers<E>(
+    engine: LockableEngine<E>,
     udev_receiver: UnboundedReceiver<UdevEngineEvent>,
     trigger: Sender<()>,
-) -> Result<(DbusConnectionHandler, DbusUdevHandler, DbusTreeHandler), dbus::Error> {
+) -> DbusHandlers<E>
+where
+    E: 'static + Engine,
+{
     let conn = Arc::new(SyncConnection::new_system()?);
     let (sender, receiver) = unbounded_channel();
     let (tree, object_path) = get_base_tree(DbusContext::new(engine, sender, Arc::clone(&conn)));

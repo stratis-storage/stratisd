@@ -11,16 +11,20 @@ use dbus::{
 use dbus_tree::{MTSync, MethodInfo, MethodResult};
 use itertools::Itertools;
 
-use crate::dbus_api::{
-    blockdev::shared::blockdev_operation, consts, types::TData, util::result_to_tuple,
+use crate::{
+    dbus_api::{blockdev::shared::blockdev_operation, consts, types::TData, util::result_to_tuple},
+    engine::{BlockDev, Engine},
 };
 
 const ALL_PROPERTIES: [&str; 1] = [consts::BLOCKDEV_TOTAL_SIZE_PROP];
 
-fn get_properties_shared(
-    m: &MethodInfo<MTSync<TData>, TData>,
+fn get_properties_shared<E>(
+    m: &MethodInfo<MTSync<TData<E>>, TData<E>>,
     properties: &mut dyn Iterator<Item = String>,
-) -> MethodResult {
+) -> MethodResult
+where
+    E: Engine,
+{
     let message: &Message = m.msg;
     let object_path = &m.path;
 

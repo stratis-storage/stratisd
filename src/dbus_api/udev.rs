@@ -9,21 +9,24 @@ use crate::{
         blockdev::create_dbus_blockdev, filesystem::create_dbus_filesystem, pool::create_dbus_pool,
         types::DbusContext,
     },
-    engine::{Name, Pool, PoolUuid, UdevEngineEvent},
+    engine::{Engine, Name, Pool, PoolUuid, UdevEngineEvent},
     stratis::{StratisError, StratisResult},
 };
 
-pub struct DbusUdevHandler {
+pub struct DbusUdevHandler<E> {
     pub(super) receiver: UnboundedReceiver<UdevEngineEvent>,
     pub(super) path: dbus::Path<'static>,
-    pub(super) dbus_context: DbusContext,
+    pub(super) dbus_context: DbusContext<E>,
 }
 
-impl DbusUdevHandler {
+impl<E> DbusUdevHandler<E>
+where
+    E: 'static + Engine,
+{
     pub fn new(
         receiver: UnboundedReceiver<UdevEngineEvent>,
         path: dbus::Path<'static>,
-        dbus_context: DbusContext,
+        dbus_context: DbusContext<E>,
     ) -> Self {
         DbusUdevHandler {
             receiver,
@@ -48,7 +51,7 @@ impl DbusUdevHandler {
     }
 
     /// Register a pool in the engine with D-Bus.
-    pub fn register_pool(&self, pool_name: &Name, pool_uuid: PoolUuid, pool: &dyn Pool) {
+    pub fn register_pool(&self, pool_name: &Name, pool_uuid: PoolUuid, pool: &E::Pool) {
         let pool_path = create_dbus_pool(
             &self.dbus_context,
             self.path.clone(),

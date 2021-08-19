@@ -9,6 +9,7 @@ Type=dbus
 Environment="RUST_BACKTRACE=1"
 ExecStart=/usr/libexec/stratisd --log-level debug
 KillSignal=SIGINT
+KillMode=process
 Restart=on-abort
 
 [Install]

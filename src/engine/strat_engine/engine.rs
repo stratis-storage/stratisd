@@ -359,7 +359,7 @@ impl Engine for StratEngine {
             }
             None => {
                 for (name, uuid, pool) in self.pools.iter_mut() {
-                    handle_eventing(&name, *uuid, pool, &mut changed, &mut errors);
+                    handle_eventing(name, *uuid, pool, &mut changed, &mut errors);
                 }
             }
         }
@@ -392,8 +392,8 @@ impl Engine for StratEngine {
             errors: &mut Vec<StratisError>,
         ) {
             match pool.fs_event_on(uuid, name) {
-                Ok(pool_changed) => {
-                    changed.extend(pool_changed);
+                Ok(fs_changed) => {
+                    changed.extend(fs_changed);
                 }
                 Err(e) => {
                     errors.push(e);
@@ -416,7 +416,7 @@ impl Engine for StratEngine {
             }
             None => {
                 for (name, uuid, pool) in self.pools.iter_mut() {
-                    handle_eventing(&name, *uuid, pool, &mut changed, &mut errors);
+                    handle_eventing(name, *uuid, pool, &mut changed, &mut errors);
                 }
             }
         }

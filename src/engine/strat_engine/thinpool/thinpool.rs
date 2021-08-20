@@ -15,9 +15,9 @@ use std::{
 use serde_json::{Map, Value};
 
 use devicemapper::{
-    device_exists, Bytes, DataBlocks, Device, DmDevice, DmName, DmNameBuf, FlakeyTargetParams,
-    LinearDev, LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine,
-    ThinDevId, ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, IEC,
+    device_exists, DataBlocks, Device, DmDevice, DmName, DmNameBuf, FlakeyTargetParams, LinearDev,
+    LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine, ThinDevId,
+    ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, IEC,
 };
 
 use crate::{
@@ -35,7 +35,7 @@ use crate::{
             writing::wipe_sectors,
         },
         structures::Table,
-        types::{FilesystemUuid, Name, PoolUuid},
+        types::{ChangedProperties, FilesystemUuid, Name, PoolUuid},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -571,10 +571,7 @@ impl ThinPool {
     /// because it never alters the thin pool itself.
     /// TODO: Put filesystem in read only if the MDV can't be saved after a pool
     /// is extended.
-    pub fn check_fs(
-        &mut self,
-        pool_uuid: PoolUuid,
-    ) -> StratisResult<HashMap<FilesystemUuid, Bytes>> {
+    pub fn check_fs(&mut self, pool_uuid: PoolUuid) -> StratisResult<ChangedProperties> {
         let mut updated = HashMap::new();
         for (name, uuid, fs) in self.filesystems.iter_mut() {
             if let Some(new_size) = fs.check()? {
@@ -585,7 +582,9 @@ impl ThinPool {
                 }
             }
         }
-        Ok(updated)
+        Ok(ChangedProperties {
+            filesystem_sizes: updated,
+        })
     }
 
     /// Set the current status of the thin_pool device to thin_pool_status.
@@ -1793,6 +1792,7 @@ mod tests {
         let (orig_fs_total_bytes, _) = fs_usage(tmp_dir.path()).unwrap();
         // Simulate handling a DM event by running a pool check.
         pool.check(pool_uuid, &mut backstore).unwrap();
+        pool.check_fs(pool_uuid).unwrap();
         let (fs_total_bytes, _) = fs_usage(tmp_dir.path()).unwrap();
         assert!(fs_total_bytes > orig_fs_total_bytes);
         umount(tmp_dir.path()).unwrap();

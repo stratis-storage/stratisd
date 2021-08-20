@@ -23,6 +23,8 @@ use tokio::sync::{
     mpsc::UnboundedSender as TokioSender, RwLock, RwLockReadGuard, RwLockWriteGuard,
 };
 
+use devicemapper::Bytes;
+
 use crate::{
     dbus_api::{connection::DbusConnectionHandler, tree::DbusTreeHandler, udev::DbusUdevHandler},
     engine::{
@@ -83,7 +85,7 @@ pub enum DbusAction<E> {
     FsNameChange(Path<'static>, String),
     PoolNameChange(Path<'static>, String),
     PoolAvailActions(Path<'static>, ActionAvailability),
-    FsSizeChange(FilesystemUuid, u64),
+    FsSizeChange(FilesystemUuid, Bytes),
 }
 
 impl<E> DbusAction<E>

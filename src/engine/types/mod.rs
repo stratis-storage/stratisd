@@ -4,7 +4,7 @@
 
 use std::{
     borrow::Borrow,
-    collections::HashMap,
+    collections::{hash_map, HashMap},
     convert::TryFrom,
     ffi::OsStr,
     fmt::{self, Debug, Display},
@@ -19,6 +19,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::sync::Mutex;
 use uuid::Uuid;
+
+use devicemapper::Bytes;
 
 pub use crate::engine::{
     engine::Engine,
@@ -369,5 +371,30 @@ pub enum MaybeInconsistent<T> {
 
 /// A set of properties that can change independently of IPC calls.
 pub struct ChangedProperties {
-    pub filesystem_sizes: Vec<(FilesystemUuid, u64)>,
+    pub filesystem_sizes: HashMap<FilesystemUuid, Bytes>,
+}
+
+impl ChangedProperties {
+    /// Returns a boolean indicating whether any properties were changed.
+    pub fn is_changed(&self) -> bool {
+        !self.filesystem_sizes.is_empty()
+    }
+}
+
+impl IntoIterator for ChangedProperties {
+    type Item = (FilesystemUuid, Bytes);
+    type IntoIter = hash_map::IntoIter<FilesystemUuid, Bytes>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.filesystem_sizes.into_iter()
+    }
+}
+
+impl Extend<(FilesystemUuid, Bytes)> for ChangedProperties {
+    fn extend<I>(&mut self, iter: I)
+    where
+        I: IntoIterator<Item = (FilesystemUuid, Bytes)>,
+    {
+        self.filesystem_sizes.extend(iter)
+    }
 }

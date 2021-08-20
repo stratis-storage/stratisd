@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, path::Path, vec::Vec};
+use std::{path::Path, vec::Vec};
 
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
@@ -24,9 +24,10 @@ use crate::{
             thinpool::{StratFilesystem, ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
         types::{
-            ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, Key, KeyDescription, Name, PoolEncryptionInfo,
-            PoolUuid, Redundancy, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
+            ActionAvailability, BlockDevTier, ChangedProperties, Clevis, CreateAction,
+            DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, Key, KeyDescription, Name,
+            PoolEncryptionInfo, PoolUuid, Redundancy, RegenAction, RenameAction, SetCreateAction,
+            SetDeleteAction,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -288,9 +289,9 @@ impl StratPool {
         &mut self,
         pool_uuid: PoolUuid,
         pool_name: &Name,
-    ) -> StratisResult<HashMap<FilesystemUuid, Bytes>> {
+    ) -> StratisResult<ChangedProperties> {
         let changed = self.thin_pool.check_fs(pool_uuid)?;
-        if !changed.is_empty() {
+        if changed.is_changed() {
             self.write_metadata(pool_name)?;
         }
         Ok(changed)

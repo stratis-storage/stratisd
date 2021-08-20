@@ -34,7 +34,7 @@ use crate::{
 };
 
 /// Handler for a D-Bus tree.
-/// Proceses messages specifying tree mutations.
+/// Processes messages specifying tree mutations or traversals.
 pub struct DbusTreeHandler<E> {
     tree: LockableTree<E>,
     receiver: UnboundedReceiver<DbusAction<E>>,

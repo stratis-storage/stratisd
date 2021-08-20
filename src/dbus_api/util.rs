@@ -21,7 +21,10 @@ use crate::{
         api::get_base_tree,
         connection::{DbusConnectionHandler, DbusTreeHandler},
         consts,
-        types::{DbusContext, DbusErrorEnum, InterfacesAdded, InterfacesAddedThreadSafe, TData},
+        types::{
+            DbusContext, DbusErrorEnum, DbusHandlers, InterfacesAdded, InterfacesAddedThreadSafe,
+            TData,
+        },
         udev::DbusUdevHandler,
     },
     engine::{Engine, Lockable, LockableEngine, UdevEngineEvent},
@@ -181,14 +184,7 @@ pub fn create_dbus_handlers<E>(
     engine: LockableEngine<E>,
     udev_receiver: UnboundedReceiver<UdevEngineEvent>,
     trigger: Sender<()>,
-) -> Result<
-    (
-        DbusConnectionHandler<E>,
-        DbusUdevHandler<E>,
-        DbusTreeHandler<E>,
-    ),
-    dbus::Error,
->
+) -> DbusHandlers<E>
 where
     E: 'static + Engine,
 {

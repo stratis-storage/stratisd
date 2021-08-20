@@ -21,8 +21,12 @@ use dbus::{
 use dbus_tree::{DataType, MTSync, ObjectPath, Tree};
 use tokio::sync::{mpsc::UnboundedSender as TokioSender, RwLock, RwLockWriteGuard};
 
-use crate::engine::{
-    ActionAvailability, Engine, ExclusiveGuard, Lockable, LockableEngine, StratisUuid,
+use crate::{
+    dbus_api::{
+        connection::{DbusConnectionHandler, DbusTreeHandler},
+        udev::DbusUdevHandler,
+    },
+    engine::{ActionAvailability, Engine, ExclusiveGuard, Lockable, LockableEngine, StratisUuid},
 };
 
 /// Type for lockable D-Bus tree object.
@@ -35,6 +39,16 @@ pub type GetManagedObjects =
 /// Type representing an acquired write lock for the D-Bus tree.
 pub type TreeWriteLock<'a, E> =
     ExclusiveGuard<RwLockWriteGuard<'a, Tree<MTSync<TData<E>>, TData<E>>>>;
+
+/// Type representing all of the handlers for driving the multithreaded D-Bus layer.
+pub type DbusHandlers<E> = Result<
+    (
+        DbusConnectionHandler<E>,
+        DbusUdevHandler<E>,
+        DbusTreeHandler<E>,
+    ),
+    dbus::Error,
+>;
 
 /// Type for interfaces parameter for `ObjectManagerInterfacesAdded`. This type cannot be sent
 /// over the D-Bus but it is safe to send across threads.

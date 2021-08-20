@@ -103,6 +103,13 @@ pub trait BlockDev: Debug {
 
     /// Get the status of whether a block device is encrypted or not.
     fn is_encrypted(&self) -> bool;
+
+    /// The total number of sectors allocated from this block device
+    fn allocated(&self) -> Sectors;
+
+    /// The real size of this block device in sectors. Greater than or equal
+    /// to the value of size.
+    fn real_size(&self) -> Sectors;
 }
 
 pub trait Pool: Debug {

@@ -473,7 +473,7 @@ pub fn initialize_devices(
 
         bda.initialize(&mut f)?;
 
-        StratBlockDev::new(devno, bda, &[], None, hw_id, underlying_device)
+        StratBlockDev::new(devno, bda, &[], None, hw_id, underlying_device, data_size)
     }
 
     /// Clean up an encrypted device after initialization failure.

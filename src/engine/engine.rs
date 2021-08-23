@@ -16,11 +16,11 @@ use devicemapper::{Bytes, Sectors};
 
 use crate::{
     engine::types::{
-        ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-        EncryptionInfo, FilesystemUuid, Key, KeyDescription, LockedPoolInfo, MappingCreateAction,
-        MappingDeleteAction, Name, PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction,
-        ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, UdevEngineEvent,
-        UnlockMethod,
+        ActionAvailability, BlockDevTier, ChangedProperties, Clevis, CreateAction, DeleteAction,
+        DevUuid, EncryptionInfo, FilesystemUuid, Key, KeyDescription, LockedPoolInfo,
+        MappingCreateAction, MappingDeleteAction, Name, PoolEncryptionInfo, PoolUuid, RegenAction,
+        RenameAction, ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction,
+        UdevEngineEvent, UnlockMethod,
     },
     stratis::StratisResult,
 };
@@ -346,10 +346,7 @@ pub trait Engine: Debug + Report + Send {
 
     /// Notify the engine that an event has occurred on the DM file descriptor
     /// and check filesystems for needed changes.
-    fn fs_evented(
-        &mut self,
-        pools: Option<&Vec<PoolUuid>>,
-    ) -> StratisResult<HashMap<FilesystemUuid, Bytes>>;
+    fn fs_evented(&mut self, pools: Option<&Vec<PoolUuid>>) -> StratisResult<ChangedProperties>;
 
     /// Get the handler for kernel keyring operations.
     fn get_key_handler(&self) -> &Self::KeyActions;

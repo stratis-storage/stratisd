@@ -10,8 +10,6 @@ use std::{
 
 use serde_json::{json, Value};
 
-use devicemapper::Bytes;
-
 use crate::{
     engine::{
         engine::{Engine, Report},
@@ -19,7 +17,7 @@ use crate::{
         sim_engine::{keys::SimKeyActions, pool::SimPool},
         structures::Table,
         types::{
-            CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockedPoolInfo,
+            ChangedProperties, CreateAction, DeleteAction, DevUuid, EncryptionInfo, LockedPoolInfo,
             Name, PoolUuid, RenameAction, ReportType, SetUnlockAction, UdevEngineEvent,
             UnlockMethod,
         },
@@ -202,11 +200,10 @@ impl Engine for SimEngine {
         Ok(HashSet::new())
     }
 
-    fn fs_evented(
-        &mut self,
-        _: Option<&Vec<PoolUuid>>,
-    ) -> StratisResult<HashMap<FilesystemUuid, Bytes>> {
-        Ok(HashMap::new())
+    fn fs_evented(&mut self, _: Option<&Vec<PoolUuid>>) -> StratisResult<ChangedProperties> {
+        Ok(ChangedProperties {
+            filesystem_sizes: HashMap::new(),
+        })
     }
 
     fn get_key_handler(&self) -> &Self::KeyActions {

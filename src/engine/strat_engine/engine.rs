@@ -9,7 +9,7 @@ use std::{
 
 use serde_json::Value;
 
-use devicemapper::{Bytes, DmNameBuf};
+use devicemapper::DmNameBuf;
 
 use crate::{
     engine::{
@@ -23,7 +23,7 @@ use crate::{
         },
         structures::Table,
         types::{
-            CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockedPoolInfo,
+            ChangedProperties, CreateAction, DeleteAction, DevUuid, EncryptionInfo, LockedPoolInfo,
             RenameAction, ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
         },
         Engine, Name, PoolUuid, Report,
@@ -377,18 +377,17 @@ impl Engine for StratEngine {
         }
     }
 
-    fn fs_evented(
-        &mut self,
-        pools: Option<&Vec<PoolUuid>>,
-    ) -> StratisResult<HashMap<FilesystemUuid, Bytes>> {
-        let mut changed = HashMap::new();
+    fn fs_evented(&mut self, pools: Option<&Vec<PoolUuid>>) -> StratisResult<ChangedProperties> {
+        let mut changed = ChangedProperties {
+            filesystem_sizes: HashMap::new(),
+        };
         let mut errors = Vec::new();
 
         fn handle_eventing(
             name: &Name,
             uuid: PoolUuid,
             pool: &mut StratPool,
-            changed: &mut HashMap<FilesystemUuid, Bytes>,
+            changed: &mut ChangedProperties,
             errors: &mut Vec<StratisError>,
         ) {
             match pool.fs_event_on(uuid, name) {
@@ -424,13 +423,13 @@ impl Engine for StratEngine {
         if errors.is_empty() {
             Ok(changed)
         } else {
-            let msg = if changed.is_empty() {
-                "The following errors were reported while handling devicemapper eventing for filesystems".to_string()
-            } else {
+            let msg = if changed.is_changed() {
                 format!(
                     "Operations on filesystems with UUIDs {:?} succeeded but the following errors were also reported while handling devicemapper eventing for filesystems",
-                    changed.keys().collect::<Vec<_>>(),
+                    changed.filesystem_sizes.keys().collect::<Vec<_>>(),
                 )
+            } else {
+                "The following errors were reported while handling devicemapper eventing for filesystems".to_string()
             };
             Err(StratisError::BestEffortError(msg, errors))
         }

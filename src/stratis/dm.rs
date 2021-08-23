@@ -24,13 +24,14 @@ const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 // to be ignored.
 pub async fn dm_event_thread<E>(
     engine: Option<LockableEngine<E>>,
-    #[cfg(feature = "dbus_enabled")] _sender: UnboundedSender<DbusAction<E>>,
+    #[cfg(feature = "dbus_enabled")] sender: UnboundedSender<DbusAction<E>>,
 ) -> StratisResult<()>
 where
     E: 'static + Engine,
 {
     async fn process_dm_event<E>(
         engine: &LockableEngine<E>,
+        #[cfg(feature = "dbus_enabled")] sender: &UnboundedSender<DbusAction<E>>,
         fd: &AsyncFd<RawFd>,
     ) -> StratisResult<()>
     where
@@ -45,17 +46,40 @@ where
         get_dm().arm_poll()?;
         let mut lock = engine.lock().await;
         let evented = lock.get_events()?;
+        // Return result currently not needed.
+        // NOTE: May need to change order of pool_evented() and fs_evented()
         let _ = lock.pool_evented(Some(&evented))?;
+        #[cfg(feature = "min")]
         let _ = lock.fs_evented(Some(&evented))?;
+        #[cfg(feature = "dbus_enabled")]
+        {
+            let props_changed = lock.fs_evented(Some(&evented))?;
+            for action in DbusAction::from_changed_properties(props_changed) {
+                if let Err(e) = sender.send(action) {
+                    warn!(
+                        "Failed to update D-Bus layer with changed engine properties: {}",
+                        e
+                    );
+                }
+            }
+        }
+
         Ok(())
     }
 
-    spawn(async {
+    spawn(async move {
         match engine {
             Some(engine) => {
                 let fd = setup_dm()?;
                 loop {
-                    if let Err(e) = process_dm_event(&engine, &fd).await {
+                    if let Err(e) = process_dm_event(
+                        &engine,
+                        #[cfg(feature = "dbus_enabled")]
+                        &sender,
+                        &fd,
+                    )
+                    .await
+                    {
                         warn!("Failed to process devicemapper event: {}", e);
                     }
                 }

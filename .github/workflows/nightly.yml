@@ -63,14 +63,6 @@ jobs:
           # PYTHON CHECKS ON NEXT FEDORA PYTHON AND PYTHON TOOLS VERSION
           - dependencies: >
               pylint
-              python3-requests
-              python3-pygithub
-              python3-semantic_version
-            image: fedora:34
-            task: make -f Makefile lint
-            working-directory: ./code_maintenance
-          - dependencies: >
-              pylint
               python3-dbus-client-gen
               python3-dbus-python-client-gen
               python3-psutil
@@ -79,10 +71,6 @@ jobs:
             image: fedora:34
             task: PYTHONPATH=./src make -f Makefile lint
             working-directory: ./tests/client-dbus
-          - dependencies: black python3-isort
-            image: fedora:34
-            task: make -f Makefile fmt-travis
-            working-directory: ./code_maintenance
           - dependencies: black python3-isort
             image: fedora:34
             task: make -f Makefile fmt-travis

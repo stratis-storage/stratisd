@@ -4,7 +4,7 @@
 
 use std::{
     borrow::Borrow,
-    collections::{hash_map, HashMap},
+    collections::HashMap,
     convert::TryFrom,
     ffi::OsStr,
     fmt::{self, Debug, Display},
@@ -23,7 +23,7 @@ use uuid::Uuid;
 use devicemapper::Bytes;
 
 pub use crate::engine::{
-    engine::Engine,
+    engine::{Engine, StateDiff},
     structures::Lockable,
     types::{
         actions::{
@@ -370,31 +370,56 @@ pub enum MaybeInconsistent<T> {
 }
 
 /// A set of properties that can change independently of IPC calls.
+#[derive(Default)]
 pub struct ChangedProperties {
-    pub filesystem_sizes: HashMap<FilesystemUuid, Bytes>,
+    // NOTE: Bytes will eventually become a more general structure if more information
+    // needs to be sent to the D-Bus layer.
+    pub filesystem_props: HashMap<FilesystemUuid, Bytes>,
+    // NOTE: Any additional properties should be specified similarly (HashMap between
+    // UUIDs and a set of properties that have changed.
 }
 
 impl ChangedProperties {
     /// Returns a boolean indicating whether any properties were changed.
     pub fn is_changed(&self) -> bool {
-        !self.filesystem_sizes.is_empty()
+        !self.filesystem_props.is_empty()
+    }
+
+    /// Add a new record for filesystem properties that have changed.
+    pub fn add_fs_prop(&mut self, uuid: FilesystemUuid, diff: StratFilesystemDiff) {
+        if let Some(bytes) = diff.0 {
+            self.filesystem_props.insert(uuid, bytes);
+        }
+    }
+
+    /// Merge two ChangedProperties structs.
+    pub fn merge(&mut self, other: Self) -> &mut Self {
+        self.filesystem_props.extend(other.filesystem_props);
+        self
     }
 }
 
-impl IntoIterator for ChangedProperties {
-    type Item = (FilesystemUuid, Bytes);
-    type IntoIter = hash_map::IntoIter<FilesystemUuid, Bytes>;
+/// Represents the difference between two dumped states for a filesystem.
+#[derive(Default)]
+pub struct StratFilesystemDiff(Option<Bytes>);
 
-    fn into_iter(self) -> Self::IntoIter {
-        self.filesystem_sizes.into_iter()
+/// Represents the state of the Stratis filesystem at a given moment in time.
+pub struct StratFilesystemState(Bytes);
+
+impl StratFilesystemState {
+    pub fn new(size: Bytes) -> Self {
+        StratFilesystemState(size)
     }
 }
 
-impl Extend<(FilesystemUuid, Bytes)> for ChangedProperties {
-    fn extend<I>(&mut self, iter: I)
-    where
-        I: IntoIterator<Item = (FilesystemUuid, Bytes)>,
-    {
-        self.filesystem_sizes.extend(iter)
+impl StateDiff for StratFilesystemState {
+    type Diff = StratFilesystemDiff;
+
+    fn diff(&self, new_state: &Self) -> Self::Diff {
+        StratFilesystemDiff(if self.0 != new_state.0 {
+            Some(new_state.0)
+        } else {
+            None
+        })
     }
 }

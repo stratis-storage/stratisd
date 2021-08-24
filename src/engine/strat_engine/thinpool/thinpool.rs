@@ -6,7 +6,6 @@
 
 use std::{
     cmp::{max, min},
-    collections::HashMap,
     fmt,
     thread::sleep,
     time::Duration,
@@ -572,19 +571,16 @@ impl ThinPool {
     /// TODO: Put filesystem in read only if the MDV can't be saved after a pool
     /// is extended.
     pub fn check_fs(&mut self, pool_uuid: PoolUuid) -> StratisResult<ChangedProperties> {
-        let mut updated = HashMap::new();
+        let mut updated = ChangedProperties::default();
         for (name, uuid, fs) in self.filesystems.iter_mut() {
-            if let Some(new_size) = fs.check()? {
-                updated.insert(*uuid, new_size);
-                if let Err(e) = self.mdv.save_fs(name, *uuid, fs) {
-                    error!("Could not save MDV for fs with UUID {} and name {} belonging to pool with UUID {}, reason: {:?}",
-                                uuid, name, pool_uuid, e);
-                }
+            let prop_diff = fs.check()?;
+            updated.add_fs_prop(*uuid, prop_diff);
+            if let Err(e) = self.mdv.save_fs(name, *uuid, fs) {
+                error!("Could not save MDV for fs with UUID {} and name {} belonging to pool with UUID {}, reason: {:?}",
+                            uuid, name, pool_uuid, e);
             }
         }
-        Ok(ChangedProperties {
-            filesystem_sizes: updated,
-        })
+        Ok(updated)
     }
 
     /// Set the current status of the thin_pool device to thin_pool_status.

@@ -34,7 +34,9 @@ use crate::{
             serde_structs::FilesystemSave,
             thinpool::{thinpool::DATA_LOWATER, DATA_BLOCK_SIZE},
         },
-        types::{FilesystemUuid, Name, PoolUuid, StratisUuid},
+        types::{
+            FilesystemUuid, Name, PoolUuid, StratFilesystemDiff, StratFilesystemState, StratisUuid,
+        },
     },
     stratis::{StratisError, StratisResult},
 };
@@ -218,7 +220,7 @@ impl StratFilesystem {
     /// TODO: Add rollback handling if the thin device is extended but the
     /// filesystem cannot be.
     /// TODO: Fix error handling to not swallow errors.
-    pub fn check(&mut self) -> StratisResult<Option<Bytes>> {
+    pub fn check(&mut self) -> StratisResult<StratFilesystemDiff> {
         match self.thin_dev.status(get_dm())? {
             ThinStatus::Working(_) => {
                 if let Some(mount_point) = self.mount_points()?.first() {
@@ -230,18 +232,18 @@ impl StratFilesystem {
                         table.length =
                             self.thin_dev.size() + Self::extend_size(self.thin_dev.size());
                         if self.thin_dev.set_table(get_dm(), table).is_err() {
-                            return Ok(None);
+                            return Ok(StratFilesystemDiff::default());
                         }
                         if xfs_growfs(mount_point).is_err() {
-                            Ok(None)
+                            Ok(StratFilesystemDiff::default())
                         } else {
-                            Ok(original_state.diff(&self.dump()).map(|(_, new)| new))
+                            Ok(original_state.diff(&self.dump()))
                         }
                     } else {
-                        Ok(None)
+                        Ok(StratFilesystemDiff::default())
                     }
                 } else {
-                    Ok(None)
+                    Ok(StratFilesystemDiff::default())
                 }
             }
             ThinStatus::Error => {
@@ -251,7 +253,7 @@ impl StratFilesystem {
                 );
                 Err(StratisError::Msg(error_msg))
             }
-            ThinStatus::Fail => Ok(None),
+            ThinStatus::Fail => Ok(StratFilesystemDiff::default()),
         }
     }
 
@@ -362,26 +364,11 @@ impl Filesystem for StratFilesystem {
     }
 }
 
-/// Represents the state of the Stratis filesystem at a given moment in time.
-pub struct StratFilesystemState(Bytes);
-
-impl StateDiff for StratFilesystemState {
-    type Diff = Option<(Bytes, Bytes)>;
-
-    fn diff(&self, other: &Self) -> Self::Diff {
-        if self.0 != other.0 {
-            Some((self.0, other.0))
-        } else {
-            None
-        }
-    }
-}
-
 impl DumpState for StratFilesystem {
     type State = StratFilesystemState;
 
     fn dump(&self) -> Self::State {
-        StratFilesystemState(self.thin_dev.size().bytes())
+        StratFilesystemState::new(self.thin_dev.size().bytes())
     }
 }
 

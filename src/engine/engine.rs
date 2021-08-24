@@ -365,8 +365,10 @@ pub trait Engine: Debug + Report + Send {
 pub trait StateDiff {
     type Diff;
 
-    /// Run the diff and return what has changed.
-    fn diff(&self, other: &Self) -> Self::Diff;
+    /// Run the diff and return what has changed. The newer state should always be
+    /// the new_state argument as this method should always return the new values
+    /// for any properties that are inconsistent.
+    fn diff(&self, new_state: &Self) -> Self::Diff;
 }
 
 /// Dump all of the necessary state for the given data structure that may change.

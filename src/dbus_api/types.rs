@@ -95,8 +95,8 @@ where
     /// Convert changed properties to a series of D-Bus actions.
     pub fn from_changed_properties(cp: ChangedProperties) -> Vec<Self> {
         let mut actions = Vec::new();
-        let ChangedProperties { filesystem_sizes } = cp;
-        for (uuid, size) in filesystem_sizes {
+        let ChangedProperties { filesystem_props } = cp;
+        for (uuid, size) in filesystem_props {
             actions.push(DbusAction::FsSizeChange(uuid, size));
         }
         actions

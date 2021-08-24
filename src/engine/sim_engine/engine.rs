@@ -202,7 +202,7 @@ impl Engine for SimEngine {
 
     fn fs_evented(&mut self, _: Option<&Vec<PoolUuid>>) -> StratisResult<ChangedProperties> {
         Ok(ChangedProperties {
-            filesystem_sizes: HashMap::new(),
+            filesystem_props: HashMap::new(),
         })
     }
 

@@ -379,7 +379,7 @@ impl Engine for StratEngine {
 
     fn fs_evented(&mut self, pools: Option<&Vec<PoolUuid>>) -> StratisResult<ChangedProperties> {
         let mut changed = ChangedProperties {
-            filesystem_sizes: HashMap::new(),
+            filesystem_props: HashMap::new(),
         };
         let mut errors = Vec::new();
 
@@ -391,8 +391,8 @@ impl Engine for StratEngine {
             errors: &mut Vec<StratisError>,
         ) {
             match pool.fs_event_on(uuid, name) {
-                Ok(fs_changed) => {
-                    changed.extend(fs_changed);
+                Ok(newly_changed) => {
+                    changed.merge(newly_changed);
                 }
                 Err(e) => {
                     errors.push(e);
@@ -426,7 +426,7 @@ impl Engine for StratEngine {
             let msg = if changed.is_changed() {
                 format!(
                     "Operations on filesystems with UUIDs {:?} succeeded but the following errors were also reported while handling devicemapper eventing for filesystems",
-                    changed.filesystem_sizes.keys().collect::<Vec<_>>(),
+                    changed.filesystem_props.keys().collect::<Vec<_>>(),
                 )
             } else {
                 "The following errors were reported while handling devicemapper eventing for filesystems".to_string()

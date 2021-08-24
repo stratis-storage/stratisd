@@ -25,7 +25,7 @@ use nix::{
 
 use crate::{
     engine::{
-        engine::Filesystem,
+        engine::{DumpState, Filesystem, StateDiff},
         strat_engine::{
             cmd::{create_fs, set_uuid, udev_settle, xfs_growfs},
             devlinks,
@@ -222,6 +222,7 @@ impl StratFilesystem {
         match self.thin_dev.status(get_dm())? {
             ThinStatus::Working(_) => {
                 if let Some(mount_point) = self.mount_points()?.first() {
+                    let original_state = self.dump();
                     let (fs_total_bytes, fs_total_used_bytes) = fs_usage(mount_point)?;
                     let free_bytes = fs_total_bytes - fs_total_used_bytes;
                     if free_bytes.sectors() < FILESYSTEM_LOWATER {
@@ -234,7 +235,7 @@ impl StratFilesystem {
                         if xfs_growfs(mount_point).is_err() {
                             Ok(None)
                         } else {
-                            Ok(Some(self.thin_dev.size().bytes()))
+                            Ok(original_state.diff(&self.dump()).map(|(_, new)| new))
                         }
                     } else {
                         Ok(None)
@@ -354,6 +355,29 @@ impl Filesystem for StratFilesystem {
                 Err(StratisError::Msg(error_msg))
             }
         }
+    }
+}
+
+/// Represents the state of the Stratis filesystem at a given moment in time.
+pub struct StratFilesystemState(Bytes);
+
+impl StateDiff for StratFilesystemState {
+    type Diff = Option<(Bytes, Bytes)>;
+
+    fn diff(&self, other: &Self) -> Self::Diff {
+        if self.0 != other.0 {
+            Some((self.0, other.0))
+        } else {
+            None
+        }
+    }
+}
+
+impl DumpState for StratFilesystem {
+    type State = StratFilesystemState;
+
+    fn dump(&self) -> Self::State {
+        StratFilesystemState(self.thin_dev.size().bytes())
     }
 }
 

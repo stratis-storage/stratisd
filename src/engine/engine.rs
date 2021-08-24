@@ -357,3 +357,20 @@ pub trait Engine: Debug + Report + Send {
     /// Return true if this engine is the simulator engine, otherwise false.
     fn is_sim(&self) -> bool;
 }
+
+/// Implements an interface for diffing two state structs.
+pub trait StateDiff {
+    type Diff;
+
+    /// Run the diff and return what has changed.
+    fn diff(&self, other: &Self) -> Self::Diff;
+}
+
+/// Dump all of the necessary state for the given data structure that may change.
+pub trait DumpState {
+    type State: StateDiff;
+
+    /// Return a structure that can be diffed and contains all of the values that
+    /// need to be checked in a diff and can change.
+    fn dump(&self) -> Self::State;
+}

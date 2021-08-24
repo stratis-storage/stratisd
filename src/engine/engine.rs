@@ -79,6 +79,9 @@ pub trait Filesystem: Debug {
 
     /// The amount of data stored on the filesystem, including overhead.
     fn used(&self) -> StratisResult<Bytes>;
+
+    /// Get the size of the filesystem in bytes.
+    fn size(&self) -> Bytes;
 }
 
 pub trait BlockDev: Debug {

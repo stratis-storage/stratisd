@@ -356,6 +356,10 @@ impl Filesystem for StratFilesystem {
             }
         }
     }
+
+    fn size(&self) -> Bytes {
+        self.thin_dev.size().bytes()
+    }
 }
 
 /// Represents the state of the Stratis filesystem at a given moment in time.

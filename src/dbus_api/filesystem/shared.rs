@@ -87,3 +87,9 @@ where
 {
     fs.created().to_rfc3339_opts(SecondsFormat::Secs, true)
 }
+
+/// Generate D-Bus representation of filesystem size property.
+#[inline]
+pub fn fs_size_prop(fs: &dyn Filesystem) -> String {
+    (*fs.size()).to_string()
+}

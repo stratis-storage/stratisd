@@ -180,12 +180,6 @@ ${PWD}/stratisd-vendor.tar.gz:
 	cargo vendor
 	tar -czvf stratisd-vendor.tar.gz vendor
 
-create-release: ${PWD}/stratisd-vendor.tar.gz
-	mv ${PWD}/stratisd-vendor.tar.gz ${PWD}/stratisd-${RELEASE_VERSION}-vendor.tar.gz
-	${PWD}/code_maintenance/create_release.py ${RELEASE_VERSION}
-	rm -rf vendor
-	rm stratisd-${RELEASE_VERSION}-vendor.tar.gz
-
 fmt:
 	cargo fmt
 
@@ -366,7 +360,6 @@ check-fedora-versions: test-compare-fedora-versions
 	clean-cfg
 	clean-primary
 	clippy
-	create-release
 	docs-rust
 	docs-travis
 	fmt

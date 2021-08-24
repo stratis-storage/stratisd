@@ -19,7 +19,7 @@ use crate::{
     engine::{Engine, Lockable, LockableEngine, SimEngine, StratEngine, UdevEngineEvent},
     stratis::{
         dm::dm_event_thread, errors::StratisResult, ipc_support::setup, stratis::VERSION,
-        udev_monitor::udev_thread,
+        timer::run_timers, udev_monitor::udev_thread,
     },
 };
 
@@ -86,6 +86,11 @@ pub fn run(sim: bool) -> StratisResult<()> {
                 #[cfg(feature = "dbus_enabled")]
                 dbus_sender.clone(),
             );
+            let join_timer = run_timers(
+                engine,
+                #[cfg(feature = "dbus_enabled")]
+                dbus_sender,
+            );
 
             select! {
                 res = join_udev => {
@@ -107,6 +112,14 @@ pub fn run(sim: bool) -> StratisResult<()> {
                 Err(e) = join_dm => {
                     error!("The devicemapper thread exited with an error: {}; shutting down stratisd...", e);
                     return Err(e);
+                },
+                res = join_timer => {
+                    if let Err(e) = res {
+                        error!("The timer thread exited with an error: {}; shutting down stratisd...", e);
+                        return Err(e);
+                    } else {
+                        info!("The timer thread exited; shutting down stratisd...");
+                    }
                 },
                 _ = join_signal => {
                     info!("Caught SIGINT; exiting...");

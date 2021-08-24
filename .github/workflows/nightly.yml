@@ -53,48 +53,6 @@ jobs:
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
-  # Nightly to show us in advance what will change in Python utilities in
-  # the next version of Fedora
-  next-fedora-python-checks:
-    continue-on-error: true
-    strategy:
-      matrix:
-        include:
-          # PYTHON CHECKS ON NEXT FEDORA PYTHON AND PYTHON TOOLS VERSION
-          - dependencies: >
-              pylint
-              python3-dbus-client-gen
-              python3-dbus-python-client-gen
-              python3-psutil
-              python3-pyudev
-              python3-semantic_version
-            image: fedora:34
-            task: PYTHONPATH=./src make -f Makefile lint
-            working-directory: ./tests/client-dbus
-          - dependencies: black python3-isort
-            image: fedora:34
-            task: make -f Makefile fmt-travis
-            working-directory: ./tests/client-dbus
-          - dependencies: yamllint
-            image: fedora:34
-            task: make -f Makefile yamllint
-            working-directory: .
-    runs-on: ubuntu-18.04
-    container: ${{ matrix.image }}
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install dependencies
-        run: >
-          dnf install -y
-          make
-          python-unversioned-command
-          ${{ matrix.dependencies }}
-      - name: Display Python version
-        run: python --version
-      - name: Run test
-        run: ${{ matrix.task }}
-        working-directory: ${{ matrix.working-directory }}
-
   # RPM building tasks, for testing
   packaging:
     runs-on: ubuntu-18.04

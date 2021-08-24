@@ -269,7 +269,14 @@ where
                 self.handle_pool_avail_actions_change(item, new_avail_actions);
                 Ok(Some(()))
             }
-            DbusAction::FsSizeChange(_, _) => unimplemented!(),
+            DbusAction::FsSizeChange(uuid, new_size) => {
+                // TODO: Add filesystem property handling
+                info!(
+                    "Filesystem with UUID {} changed size to {} bytes",
+                    uuid, *new_size
+                );
+                Ok(Some(()))
+            }
         }
     }
 

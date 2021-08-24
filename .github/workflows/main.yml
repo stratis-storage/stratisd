@@ -38,11 +38,11 @@ jobs:
           - task: make -f Makefile fmt-travis
             toolchain: 1.54.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: rustfmt
-            image: fedora:33
+            image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
           - task: make -f Makefile clippy
             toolchain: 1.54.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: clippy
-            image: fedora:33
+            image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
           - task: make -f Makefile build
             toolchain: 1.54.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
@@ -74,31 +74,31 @@ jobs:
           - task: make -f Makefile build
             toolchain: 1.54.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-            image: fedora:33
+            image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
           - task: make -f Makefile build-min
             toolchain: 1.54.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-            image: fedora:33
+            image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
           - task: make -f Makefile build-extras
             toolchain: 1.54.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-            image: fedora:33
+            image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
           - task: make -f Makefile docs-travis
             toolchain: 1.54.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-            image: fedora:33
+            image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
           - task: make -f Makefile test
             toolchain: 1.54.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-            image: fedora:33
+            image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
           - task: make -f Makefile release
             toolchain: 1.54.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-            image: fedora:33
+            image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
           - task: make -f Makefile release-min
             toolchain: 1.54.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-            image: fedora:33
+            image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
     runs-on: ubuntu-18.04
     container:
       image: ${{ matrix.image }}
@@ -153,7 +153,7 @@ jobs:
           - task: RUST_LOG=stratisd=debug make -f Makefile test-loop
             toolchain: 1.54.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-            image: fedora:33
+            image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
     runs-on: ubuntu-18.04
     container:
       image: ${{ matrix.image }}
@@ -220,7 +220,7 @@ jobs:
               make -f Makefile test-clevis-loop
             toolchain: 1.54.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-            image: fedora:33
+            image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
     runs-on: ubuntu-18.04
     container:
       image: ${{ matrix.image }}
@@ -271,15 +271,15 @@ jobs:
               python3-psutil
               python3-pyudev
               python3-semantic_version
-            image: fedora:33
+            image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
             task: PYTHONPATH=./src make -f Makefile lint
             working-directory: ./tests/client-dbus
           - dependencies: black python3-isort
-            image: fedora:33
+            image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
             task: make -f Makefile fmt-travis
             working-directory: ./tests/client-dbus
           - dependencies: yamllint
-            image: fedora:33
+            image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
             task: make -f Makefile yamllint
             working-directory: .
     runs-on: ubuntu-18.04
@@ -359,11 +359,11 @@ jobs:
       matrix:
         include:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT ENVIRONMENT
-          - image: fedora:33
+          - image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
             toolchain: 1.54.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             skip_value: 0
           # MANDATORY CHECKS USING LOWEST SUPPORTED ENVIRONMENT PROXY
-          - image: fedora:30
+          - image: fedora:30  # LOWEST DEVELOPMENT ENVIRONMENT
             toolchain: 1.54.0  # LOWEST SUPPORTED RUST TOOLCHAIN
             skip_value: 1
     runs-on: ubuntu-18.04
@@ -425,7 +425,7 @@ jobs:
   shell-checks:
     runs-on: ubuntu-18.04
     container:
-      image: fedora:33
+      image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies

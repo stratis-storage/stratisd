@@ -23,10 +23,15 @@ use crate::{
 
 // Waits for SIGINT. If received, sends true to all blocking calls in blocking
 // threads which will then terminate.
-async fn signal_thread() {
-    if let Err(e) = signal::ctrl_c().await {
-        error!("Failure while listening for signals: {}", e);
-    }
+async fn signal_thread() -> StratisResult<()> {
+    task::spawn(async {
+        if let Err(e) = signal::ctrl_c().await {
+            error!("Failure while listening for signals: {}", e);
+        }
+    })
+    .await?;
+
+    Ok(())
 }
 
 /// Set up all sorts of signal and event handling mechanisms.
@@ -74,18 +79,18 @@ pub fn run(sim: bool) -> StratisResult<()> {
         let (trigger, should_exit) = channel(1);
         let (sender, receiver) = unbounded_channel::<UdevEngineEvent>();
 
-        let join_udev = task::spawn_blocking(move || udev_thread(sender, should_exit));
-        let join_ipc = task::spawn(setup(engine.clone(), receiver, trigger.clone()));
-        let join_signal = task::spawn(signal_thread());
-        let join_dm = task::spawn(dm_event_thread(if sim {
+        let join_udev = udev_thread(sender, should_exit);
+        let join_ipc = setup(engine.clone(), receiver, trigger.clone());
+        let join_signal = signal_thread();
+        let join_dm = dm_event_thread(if sim {
             None
         } else {
             Some(engine.clone())
-        }));
+        });
 
         select! {
             res = join_udev => {
-                if let Ok(Err(e)) = res {
+                if let Err(e) = res {
                     error!("The udev thread exited with an error: {}; shutting down stratisd...", e);
                     return Err(e);
                 } else {
@@ -93,14 +98,14 @@ pub fn run(sim: bool) -> StratisResult<()> {
                 }
             }
             res = join_ipc => {
-                if let Ok(Err(e)) = res {
+                if let Err(e) = res {
                     error!("The IPC thread exited with an error: {}; shutting down stratisd...", e);
                     return Err(e);
                 } else {
                     info!("The IPC thread exited; shutting down stratisd...");
                 }
             }
-            Ok(Err(e)) = join_dm => {
+            Err(e) = join_dm => {
                 error!("The devicemapper thread exited with an error: {}; shutting down stratisd...", e);
                 return Err(e);
             }

@@ -5,7 +5,7 @@
 use std::os::unix::io::{AsRawFd, RawFd};
 
 use nix::fcntl::{fcntl, FcntlArg, OFlag};
-use tokio::io::unix::AsyncFd;
+use tokio::{io::unix::AsyncFd, task::spawn};
 
 use crate::{
     engine::{get_dm, get_dm_init, LockableEngine},
@@ -30,20 +30,25 @@ pub async fn dm_event_thread(engine: Option<LockableEngine>) -> StratisResult<()
         Ok(())
     }
 
-    match engine {
-        Some(engine) => {
-            let fd = setup_dm()?;
-            loop {
-                if let Err(e) = process_dm_event(&engine, &fd).await {
-                    warn!("Failed to process devicemapper event: {}", e);
+    spawn(async {
+        match engine {
+            Some(engine) => {
+                let fd = setup_dm()?;
+                loop {
+                    if let Err(e) = process_dm_event(&engine, &fd).await {
+                        warn!("Failed to process devicemapper event: {}", e);
+                    }
                 }
             }
+            None => {
+                info!("devicemapper event monitoring disabled in sim engine");
+                Result::<_, StratisError>::Ok(())
+            }
         }
-        None => {
-            info!("devicemapper event monitoring disabled in sim engine");
-            Ok(())
-        }
-    }
+    })
+    .await??;
+
+    Ok(())
 }
 
 /// Set the devicemapper file descriptor to nonblocking and create an asynchronous

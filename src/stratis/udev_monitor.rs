@@ -8,9 +8,12 @@ use std::os::unix::io::{AsRawFd, RawFd};
 
 use libudev::Event;
 use nix::poll::{poll, PollFd, PollFlags};
-use tokio::sync::{
-    broadcast::{error::TryRecvError, Receiver},
-    mpsc::UnboundedSender,
+use tokio::{
+    sync::{
+        broadcast::{error::TryRecvError, Receiver},
+        mpsc::UnboundedSender,
+    },
+    task::spawn_blocking,
 };
 
 use crate::{
@@ -20,43 +23,48 @@ use crate::{
 
 // Poll for udev events.
 // Check for exit condition and return if true.
-pub fn udev_thread(
+pub async fn udev_thread(
     sender: UnboundedSender<UdevEngineEvent>,
     mut should_exit: Receiver<()>,
 ) -> StratisResult<()> {
-    let context = libudev::Context::new()?;
-    let mut udev = UdevMonitor::create(&context)?;
+    spawn_blocking(move || {
+        let context = libudev::Context::new()?;
+        let mut udev = UdevMonitor::create(&context)?;
 
-    let mut pollers = [PollFd::new(udev.as_raw_fd(), PollFlags::POLLIN)];
-    loop {
-        match poll(&mut pollers, 100)? {
-            0 => {
-                match should_exit.try_recv() {
-                    Ok(()) => {
-                        info!("udev thread was notified to exit");
-                        return Ok(());
-                    }
-                    Err(TryRecvError::Closed) | Err(TryRecvError::Lagged(_)) => {
-                        return Err(StratisError::Msg(
-                            "udev processing thread can no longer be notified to exit; shutting down...".to_string()
-                        ));
-                    }
-                    _ => (),
-                };
-            }
-            _ => {
-                if let Some(ref e) = udev.poll() {
-                    if let Err(e) = sender.send(UdevEngineEvent::from(e)) {
-                        warn!(
-                            "udev event could not be sent to engine thread: {}; the \
-                            engine was not notified of this udev event",
-                            e,
-                        );
+
+        let mut pollers = [PollFd::new(udev.as_raw_fd(), PollFlags::POLLIN)];
+        loop {
+            match poll(&mut pollers, 100)? {
+                0 => {
+                    match should_exit.try_recv() {
+                        Ok(()) => {
+                            info!("udev thread was notified to exit");
+                            return Ok(());
+                        }
+                        Err(TryRecvError::Closed) | Err(TryRecvError::Lagged(_)) => {
+                            return Err(StratisError::Msg(
+                                "udev processing thread can no longer be notified to exit; shutting down...".to_string()
+                            ));
+                        }
+                        _ => (),
+                    };
+                }
+                _ => {
+                    if let Some(ref e) = udev.poll() {
+                        if let Err(e) = sender.send(UdevEngineEvent::from(e)) {
+                            warn!(
+                                "udev event could not be sent to engine thread: {}; the \
+                                engine was not notified of this udev event",
+                                e,
+                            );
+                        }
                     }
                 }
             }
         }
-    }
+    })
+    .await??;
+    Ok(())
 }
 
 /// A facility for listening for and handling udev events that stratisd

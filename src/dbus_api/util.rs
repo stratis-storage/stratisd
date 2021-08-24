@@ -240,7 +240,7 @@ where
             Ok(None)
         }
         Either::Left((Err(_), _)) => Err(StratisError::Msg(
-            "D-Bus tree handler can no longer be notified to exit; shutting down...".to_string(),
+            "Checking the shutdown signal failed so stratisd can no longer be notified to shut down; exiting now...".to_string(),
         )),
         Either::Right((a, _)) => Ok(Some(a)),
     }

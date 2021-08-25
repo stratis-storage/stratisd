@@ -320,8 +320,8 @@ jobs:
           python3-dbus-python-client-gen
           python3-justbytes
           python3-dateutil
+          python3-packaging
           python3-psutil
-          python3-semantic_version
           systemd-devel
       - uses: actions-rs/toolchain@v1
         with:

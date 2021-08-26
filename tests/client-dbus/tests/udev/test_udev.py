@@ -539,8 +539,8 @@ class UdevTest5(UdevTest):
             # Dynamically rename all active pools to a randomly chosen name,
             # then generate synthetic add events for every loopbacked device.
             # After num_pools - 1 iterations, all pools should have been set up.
-            for pool_count in range(num_pools - 1):
-                current_pools = self.wait_for_pools(pool_count + 1)
+            for pool_count in range(1, num_pools):
+                current_pools = self.wait_for_pools(pool_count)
 
                 # Rename all active pools to a randomly selected new name
                 for object_path, _ in current_pools:
@@ -552,7 +552,7 @@ class UdevTest5(UdevTest):
 
                 settle()
 
-                self.wait_for_pools(len(current_pools) + 1)
+                self.wait_for_pools(pool_count + 1)
 
             self.wait_for_pools(num_pools)
 

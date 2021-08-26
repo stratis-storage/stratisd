@@ -17,6 +17,8 @@ Used to test behavior of the udev device discovery mechanism.
 
 # isort: STDLIB
 import random
+from os import environ
+from unittest import skipIf
 
 # isort: LOCAL
 from stratisd_client_dbus import (
@@ -432,6 +434,10 @@ class UdevTest4(UdevTest):
         self._simple_event_test(key_spec=("test_key_desc", "test_key"))
 
 
+@skipIf(
+    int(environ.get("SKIP_DUPLICATE_NAMES_TEST", "0")) == 1,
+    "See: https://github.com/stratis-storage/stratisd/issues/2719",
+)
 class UdevTest5(UdevTest):
     """
     Test correct handling of pools with duplicate pool names.
@@ -539,8 +545,8 @@ class UdevTest5(UdevTest):
             # Dynamically rename all active pools to a randomly chosen name,
             # then generate synthetic add events for every loopbacked device.
             # After num_pools - 1 iterations, all pools should have been set up.
-            for pool_count in range(num_pools - 1):
-                current_pools = self.wait_for_pools(pool_count + 1)
+            for pool_count in range(1, num_pools):
+                current_pools = self.wait_for_pools(pool_count)
 
                 # Rename all active pools to a randomly selected new name
                 for object_path, _ in current_pools:
@@ -552,7 +558,7 @@ class UdevTest5(UdevTest):
 
                 settle()
 
-                self.wait_for_pools(len(current_pools) + 1)
+                self.wait_for_pools(pool_count + 1)
 
             self.wait_for_pools(num_pools)
 

@@ -17,7 +17,8 @@ Used to test behavior of the udev device discovery mechanism.
 
 # isort: STDLIB
 import random
-from unittest import skip
+from os import environ
+from unittest import skipIf
 
 # isort: LOCAL
 from stratisd_client_dbus import (
@@ -433,7 +434,10 @@ class UdevTest4(UdevTest):
         self._simple_event_test(key_spec=("test_key_desc", "test_key"))
 
 
-@skip("See: https://github.com/stratis-storage/stratisd/issues/2719")
+@skipIf(
+    int(environ.get("SKIP_DUPLICATE_NAMES_TEST", "0")) == 1,
+    "See: https://github.com/stratis-storage/stratisd/issues/2719",
+)
 class UdevTest5(UdevTest):
     """
     Test correct handling of pools with duplicate pool names.

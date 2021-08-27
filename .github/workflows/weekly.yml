@@ -23,19 +23,19 @@ jobs:
               python3-psutil
               python3-pyudev
               python3-semantic_version
-            image: fedora:34
             task: PYTHONPATH=./src make -f Makefile lint
             working-directory: ./tests/client-dbus
           - dependencies: black python3-isort
-            image: fedora:34
             task: make -f Makefile fmt-travis
             working-directory: ./tests/client-dbus
           - dependencies: yamllint
-            image: fedora:34
             task: make -f Makefile yamllint
             working-directory: .
+          - dependencies: shfmt
+            task: make -f Makefile fmt-shell-ci
+            working-directory: .
     runs-on: ubuntu-18.04
-    container: ${{ matrix.image }}
+    container: fedora:34
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies
@@ -46,6 +46,6 @@ jobs:
           ${{ matrix.dependencies }}
       - name: Display Python version
         run: python --version
-      - name: Run test
+      - name: ${{ matrix.task }}
         run: ${{ matrix.task }}
         working-directory: ${{ matrix.working-directory }}

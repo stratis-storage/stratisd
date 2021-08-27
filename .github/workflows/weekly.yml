@@ -31,6 +31,9 @@ jobs:
           - dependencies: yamllint
             task: make -f Makefile yamllint
             working-directory: .
+          - dependencies: shfmt
+            task: make -f Makefile fmt-shell-ci
+            working-directory: .
     runs-on: ubuntu-18.04
     container: fedora:34
     steps:

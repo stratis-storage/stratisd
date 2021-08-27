@@ -61,12 +61,12 @@ class TestUniqueInstance(unittest.TestCase):
         """
         env = dict(os.environ)
         env["RUST_LOG"] = env.get("RUST_LOG", "") + ",nix::fcntl=debug"
-        process = subprocess.Popen(
+        with subprocess.Popen(
             [_STRATISD, "--sim"],
             stderr=subprocess.STDOUT,
             universal_newlines=True,
             close_fds=True,
             env=env,
-        )
-        (_, _) = process.communicate()
-        self.assertEqual(process.returncode, 1)
+        ) as process:
+            (_, _) = process.communicate()
+            self.assertEqual(process.returncode, 1)

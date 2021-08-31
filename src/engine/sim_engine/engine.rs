@@ -6,28 +6,44 @@ use std::{
     collections::{hash_map::RandomState, HashMap, HashSet},
     iter::FromIterator,
     path::Path,
+    sync::Arc,
 };
 
+use async_trait::async_trait;
+use futures::executor::block_on;
 use serde_json::{json, Value};
+use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
     engine::{
         engine::{Engine, Report},
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         sim_engine::{keys::SimKeyActions, pool::SimPool},
-        structures::Table,
+        structures::{
+            AllLockReadGuard, AllLockWriteGuard, AllOrSomeLock, ExclusiveGuard, Lockable,
+            SharedGuard, SomeLockReadGuard, SomeLockWriteGuard,
+        },
         types::{
-            CreateAction, DeleteAction, DevUuid, EncryptionInfo, LockedPoolInfo, Name, PoolUuid,
-            RenameAction, ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
+            CreateAction, DeleteAction, DevUuid, EncryptionInfo, LockKey, LockedPoolInfo, Name,
+            PoolUuid, RenameAction, ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
         },
     },
     stratis::{StratisError, StratisResult},
 };
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct SimEngine {
-    pools: Table<PoolUuid, SimPool>,
-    key_handler: SimKeyActions,
+    pools: AllOrSomeLock<PoolUuid, SimPool>,
+    key_handler: Lockable<Arc<RwLock<SimKeyActions>>>,
+}
+
+impl Default for SimEngine {
+    fn default() -> Self {
+        SimEngine {
+            pools: AllOrSomeLock::default(),
+            key_handler: Lockable::new_shared(SimKeyActions::default()),
+        }
+    }
 }
 
 impl<'a> Into<Value> for &'a SimEngine {
@@ -36,7 +52,7 @@ impl<'a> Into<Value> for &'a SimEngine {
     fn into(self) -> Value {
         json!({
             "pools": Value::Array(
-                self.pools.iter().map(|(name, uuid, pool)| {
+                block_on(self.pools.read_all()).iter().map(|(name, uuid, pool)| {
                     let json = json!({
                         "pool_uuid": uuid.to_string(),
                         "name": name.to_string(),
@@ -72,12 +88,13 @@ impl Report for SimEngine {
     }
 }
 
+#[async_trait]
 impl Engine for SimEngine {
     type Pool = SimPool;
     type KeyActions = SimKeyActions;
 
-    fn create_pool(
-        &mut self,
+    async fn create_pool(
+        &self,
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
@@ -86,11 +103,12 @@ impl Engine for SimEngine {
         let redundancy = calculate_redundancy!(redundancy);
 
         validate_name(name)?;
+        let name = Name::new(name.to_owned());
 
         validate_paths(blockdev_paths)?;
 
         if let Some(key_desc) = encryption_info.and_then(|ei| ei.key_description()) {
-            if !self.key_handler.contains_key(key_desc) {
+            if !self.key_handler.read().await.contains_key(key_desc) {
                 return Err(StratisError::Msg(format!(
                     "Key {} was not found in the keyring",
                     key_desc.as_application_str()
@@ -98,8 +116,9 @@ impl Engine for SimEngine {
             }
         }
 
-        match self.pools.get_by_name(name) {
-            Some((_, pool)) => create_pool_idempotent_or_err(pool, name, blockdev_paths),
+        let guard = self.pools.read(LockKey::Name(name.clone())).await;
+        match guard.as_ref().map(|g| g.as_tuple()) {
+            Some((_, _, pool)) => create_pool_idempotent_or_err(pool, &name, blockdev_paths),
             None => {
                 if blockdev_paths.is_empty() {
                     Err(StratisError::Msg(
@@ -111,8 +130,11 @@ impl Engine for SimEngine {
 
                     let (pool_uuid, pool) = SimPool::new(&devices, redundancy, encryption_info);
 
-                    self.pools
-                        .insert(Name::new(name.to_owned()), pool_uuid, pool);
+                    self.pools.write_all().await.insert(
+                        Name::new(name.to_owned()),
+                        pool_uuid,
+                        pool,
+                    );
 
                     Ok(CreateAction::Created(pool_uuid))
                 }
@@ -120,87 +142,94 @@ impl Engine for SimEngine {
         }
     }
 
-    fn handle_event(&mut self, _event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &Self::Pool)> {
+    async fn handle_event(
+        &self,
+        _event: &UdevEngineEvent,
+    ) -> Option<SomeLockReadGuard<PoolUuid, Self::Pool>> {
         None
     }
 
-    fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {
-        if let Some((_, pool)) = self.pools.get_by_uuid(uuid) {
+    async fn destroy_pool(&self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {
+        if let Some(pool) = self.pools.read(LockKey::Uuid(uuid)).await {
             if pool.has_filesystems() {
                 return Err(StratisError::Msg("filesystems remaining on pool".into()));
-            };
+            }
+            drop(pool);
+            self.pools
+                .write_all()
+                .await
+                .remove_by_uuid(uuid)
+                .expect("Must succeed since self.pool.get_by_uuid() returned a value")
+                .1
+                .destroy()?;
+            Ok(DeleteAction::Deleted(uuid))
         } else {
-            return Ok(DeleteAction::Identity);
+            Ok(DeleteAction::Identity)
         }
-        self.pools
-            .remove_by_uuid(uuid)
-            .expect("Must succeed since self.pool.get_by_uuid() returned a value")
-            .1
-            .destroy()?;
-        Ok(DeleteAction::Deleted(uuid))
     }
 
-    fn rename_pool(
-        &mut self,
+    async fn rename_pool(
+        &self,
         uuid: PoolUuid,
         new_name: &str,
     ) -> StratisResult<RenameAction<PoolUuid>> {
-        rename_pool_pre_idem!(self; uuid; new_name);
+        let new_name = Name::new(new_name.to_owned());
+        rename_pool_pre_idem!(self; uuid; new_name.clone());
 
-        let (_, pool) = self
-            .pools
+        let mut guard = self.pools.write_all().await;
+
+        let (_, pool) = guard
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
 
-        self.pools
-            .insert(Name::new(new_name.to_owned()), uuid, pool);
+        guard.insert(new_name, uuid, pool);
         Ok(RenameAction::Renamed(uuid))
     }
 
-    fn unlock_pool(
-        &mut self,
+    async fn unlock_pool(
+        &self,
         _pool_uuid: PoolUuid,
         _unlock_method: UnlockMethod,
     ) -> StratisResult<SetUnlockAction<DevUuid>> {
         Ok(SetUnlockAction::empty())
     }
 
-    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &Self::Pool)> {
-        get_pool!(self; uuid)
+    async fn get_pool(
+        &self,
+        key: LockKey<PoolUuid>,
+    ) -> Option<SomeLockReadGuard<PoolUuid, Self::Pool>> {
+        get_pool!(self; key)
     }
 
-    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut Self::Pool)> {
-        get_mut_pool!(self; uuid)
+    async fn get_mut_pool(
+        &self,
+        key: LockKey<PoolUuid>,
+    ) -> Option<SomeLockWriteGuard<PoolUuid, Self::Pool>> {
+        get_mut_pool!(self; key)
     }
 
-    fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo> {
+    async fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo> {
         HashMap::new()
     }
 
-    fn pools(&self) -> Vec<(Name, PoolUuid, &Self::Pool)> {
-        self.pools
-            .iter()
-            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool))
-            .collect()
+    async fn pools(&self) -> AllLockReadGuard<PoolUuid, Self::Pool> {
+        self.pools.read_all().await
     }
 
-    fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut Self::Pool)> {
-        self.pools
-            .iter_mut()
-            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool))
-            .collect()
+    async fn pools_mut(&self) -> AllLockWriteGuard<PoolUuid, Self::Pool> {
+        self.pools.write_all().await
     }
 
-    fn evented(&mut self) -> StratisResult<()> {
+    async fn evented(&self) -> StratisResult<()> {
         Ok(())
     }
 
-    fn get_key_handler(&self) -> &Self::KeyActions {
-        &self.key_handler
+    async fn get_key_handler(&self) -> SharedGuard<RwLockReadGuard<Self::KeyActions>> {
+        self.key_handler.read().await
     }
 
-    fn get_key_handler_mut(&mut self) -> &mut Self::KeyActions {
-        &mut self.key_handler
+    async fn get_key_handler_mut(&self) -> ExclusiveGuard<RwLockWriteGuard<Self::KeyActions>> {
+        self.key_handler.write().await
     }
 
     fn is_sim(&self) -> bool {
@@ -223,60 +252,59 @@ mod tests {
     #[test]
     /// When an engine has no pools, any name lookup should fail
     fn get_pool_err() {
-        assert_matches!(SimEngine::default().get_pool(PoolUuid::new_v4()), None);
+        assert!(
+            test_async!(SimEngine::default().get_pool(LockKey::Uuid(PoolUuid::new_v4()))).is_none()
+        );
     }
 
     #[test]
     /// When an engine has no pools, destroying any pool must succeed
     fn destroy_pool_empty() {
-        assert_matches!(SimEngine::default().destroy_pool(PoolUuid::new_v4()), Ok(_));
+        assert!(test_async!(SimEngine::default().destroy_pool(PoolUuid::new_v4())).is_ok());
     }
 
     #[test]
     /// Destroying an empty pool should succeed.
     fn destroy_empty_pool() {
-        let mut engine = SimEngine::default();
-        let uuid = engine
-            .create_pool(
-                "name",
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                None,
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        assert_matches!(engine.destroy_pool(uuid), Ok(_));
+        let engine = SimEngine::default();
+        let uuid = test_async!(engine.create_pool(
+            "name",
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        assert!(test_async!(engine.destroy_pool(uuid)).is_ok());
     }
 
     #[test]
     /// Destroying a pool with devices should succeed
     fn destroy_pool_w_devices() {
-        let mut engine = SimEngine::default();
-        let uuid = engine
-            .create_pool("name", strs_to_paths!(["/s/d"]), None, None)
+        let engine = SimEngine::default();
+        let uuid = test_async!(engine.create_pool("name", strs_to_paths!(["/s/d"]), None, None))
             .unwrap()
             .changed()
             .unwrap();
-        assert_matches!(engine.destroy_pool(uuid), Ok(_));
+        assert!(test_async!(engine.destroy_pool(uuid)).is_ok());
     }
 
     #[test]
     /// Destroying a pool with filesystems should fail
     fn destroy_pool_w_filesystem() {
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = engine
-            .create_pool(pool_name, strs_to_paths!(["/s/d"]), None, None)
+        let uuid = test_async!(engine.create_pool(pool_name, strs_to_paths!(["/s/d"]), None, None))
             .unwrap()
             .changed()
             .unwrap();
         {
-            let pool = engine.get_mut_pool(uuid).unwrap().1;
+            let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
             pool.create_filesystems(pool_name, uuid, &[("test", None)])
                 .unwrap();
         }
-        assert_matches!(engine.destroy_pool(uuid), Err(_));
+        assert!(test_async!(engine.destroy_pool(uuid)).is_err());
     }
 
     #[test]
@@ -284,11 +312,11 @@ mod tests {
     /// identity.
     fn create_pool_name_collision() {
         let name = "name";
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         let devices = strs_to_paths!(["/s/d"]);
-        engine.create_pool(name, devices, None, None).unwrap();
+        test_async!(engine.create_pool(name, devices, None, None)).unwrap();
         assert_matches!(
-            engine.create_pool(name, devices, None, None),
+            test_async!(engine.create_pool(name, devices, None, None)),
             Ok(CreateAction::Identity)
         );
     }
@@ -297,32 +325,30 @@ mod tests {
     /// Creating a new pool with the same name and different arguments should fail
     fn create_pool_name_collision_different_args() {
         let name = "name";
-        let mut engine = SimEngine::default();
-        engine
-            .create_pool(name, strs_to_paths!(["/s/d"]), None, None)
-            .unwrap();
-        assert_matches!(
-            engine.create_pool(
-                name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                None,
-            ),
-            Err(_)
-        );
+        let engine = SimEngine::default();
+        test_async!(engine.create_pool(name, strs_to_paths!(["/s/d"]), None, None)).unwrap();
+        assert!(test_async!(engine.create_pool(
+            name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
+        ))
+        .is_err());
     }
 
     #[test]
     /// Creating a pool with duplicate devices should succeed
     fn create_pool_duplicate_devices() {
         let path = "/s/d";
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         assert_matches!(
-            engine
-                .create_pool("name", strs_to_paths!([path, path]), None, None)
+            test_async!(engine.create_pool("name", strs_to_paths!([path, path]), None, None))
                 .unwrap()
                 .changed()
-                .map(|uuid| engine.get_pool(uuid).unwrap().1.blockdevs().len()),
+                .map(|uuid| test_async!(engine.get_pool(LockKey::Uuid(uuid)))
+                    .unwrap()
+                    .blockdevs()
+                    .len()),
             Some(1)
         );
     }
@@ -330,24 +356,22 @@ mod tests {
     #[test]
     /// Creating a pool with an impossible raid level should fail
     fn create_pool_max_u16_raid() {
-        let mut engine = SimEngine::default();
-        assert_matches!(
-            engine.create_pool(
-                "name",
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                Some(std::u16::MAX),
-                None,
-            ),
-            Err(_)
-        );
+        let engine = SimEngine::default();
+        assert!(test_async!(engine.create_pool(
+            "name",
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            Some(std::u16::MAX),
+            None,
+        ))
+        .is_err());
     }
 
     #[test]
     /// Renaming a pool on an empty engine always works
     fn rename_empty() {
-        let mut engine = SimEngine::default();
+        let engine = SimEngine::default();
         assert_matches!(
-            engine.rename_pool(PoolUuid::new_v4(), "new_name"),
+            test_async!(engine.rename_pool(PoolUuid::new_v4(), "new_name")),
             Ok(RenameAction::NoSource)
         );
     }
@@ -356,19 +380,18 @@ mod tests {
     /// Renaming a pool to itself always works
     fn rename_identity() {
         let name = "name";
-        let mut engine = SimEngine::default();
-        let uuid = engine
-            .create_pool(
-                name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                None,
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
+        let engine = SimEngine::default();
+        let uuid = test_async!(engine.create_pool(
+            name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
         assert_eq!(
-            engine.rename_pool(uuid, name).unwrap(),
+            test_async!(engine.rename_pool(uuid, name)).unwrap(),
             RenameAction::Identity
         );
     }
@@ -376,19 +399,18 @@ mod tests {
     #[test]
     /// Renaming a pool to another pool should work if new name not taken
     fn rename_happens() {
-        let mut engine = SimEngine::default();
-        let uuid = engine
-            .create_pool(
-                "old_name",
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                None,
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
+        let engine = SimEngine::default();
+        let uuid = test_async!(engine.create_pool(
+            "old_name",
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
         assert_eq!(
-            engine.rename_pool(uuid, "new_name").unwrap(),
+            test_async!(engine.rename_pool(uuid, "new_name")).unwrap(),
             RenameAction::Renamed(uuid)
         );
     }
@@ -397,43 +419,40 @@ mod tests {
     /// Renaming a pool to another pool should fail if new name taken
     fn rename_fails() {
         let new_name = "new_name";
-        let mut engine = SimEngine::default();
-        let uuid = engine
-            .create_pool(
-                "old_name",
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                None,
-            )
-            .unwrap()
-            .changed()
-            .unwrap();
-        engine
-            .create_pool(
-                new_name,
-                strs_to_paths!(["/dev/four", "/dev/five", "/dev/six"]),
-                None,
-                None,
-            )
-            .unwrap();
-        assert_matches!(engine.rename_pool(uuid, new_name), Err(_));
+        let engine = SimEngine::default();
+        let uuid = test_async!(engine.create_pool(
+            "old_name",
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
+        ))
+        .unwrap()
+        .changed()
+        .unwrap();
+        test_async!(engine.create_pool(
+            new_name,
+            strs_to_paths!(["/dev/four", "/dev/five", "/dev/six"]),
+            None,
+            None,
+        ))
+        .unwrap();
+        assert!(test_async!(engine.rename_pool(uuid, new_name)).is_err());
     }
 
     #[test]
     /// Renaming should succeed if old_name absent, new present
     fn rename_no_op() {
         let new_name = "new_name";
-        let mut engine = SimEngine::default();
-        engine
-            .create_pool(
-                new_name,
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
-                None,
-            )
-            .unwrap();
+        let engine = SimEngine::default();
+        test_async!(engine.create_pool(
+            new_name,
+            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
+            None,
+            None,
+        ))
+        .unwrap();
         assert_matches!(
-            engine.rename_pool(PoolUuid::new_v4(), new_name),
+            test_async!(engine.rename_pool(PoolUuid::new_v4(), new_name)),
             Ok(RenameAction::NoSource)
         );
     }

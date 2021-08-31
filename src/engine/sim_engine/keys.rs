@@ -16,7 +16,7 @@ use crate::{
 };
 
 #[derive(Debug, Default)]
-pub struct SimKeyActions(HashMap<KeyDescription, SizedKeyMemory>);
+pub struct SimKeyActions(HashMap<KeyDescription, Vec<u8>>);
 
 impl SimKeyActions {
     pub fn contains_key(&self, key_desc: &KeyDescription) -> bool {
@@ -43,11 +43,13 @@ impl KeyActions for SimKeyActions {
         key_desc: &KeyDescription,
         key_fd: RawFd,
     ) -> StratisResult<MappingCreateAction<Key>> {
-        let memory = shared::set_key_shared(key_fd)?;
+        let mut memory = vec![0; MAX_STRATIS_PASS_SIZE];
+        let size = shared::set_key_shared(key_fd, memory.as_mut_slice())?;
+        memory.truncate(size);
 
         match self.read(key_desc) {
             Ok(Some(key_data)) => {
-                if key_data.as_ref() == memory.as_ref() {
+                if key_data.as_ref() == memory.as_slice() {
                     Ok(MappingCreateAction::Identity)
                 } else {
                     self.0.insert((*key_desc).clone(), memory);

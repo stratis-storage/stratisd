@@ -4,7 +4,10 @@
 
 //! Main loop
 
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 
 use tokio::{
     runtime::Builder,
@@ -14,7 +17,7 @@ use tokio::{
 };
 
 use crate::{
-    engine::{Engine, Lockable, LockableEngine, SimEngine, StratEngine, UdevEngineEvent},
+    engine::{Engine, SimEngine, StratEngine, UdevEngineEvent},
     stratis::{
         dm::dm_event_thread, errors::StratisResult, ipc_support::setup, stratis::VERSION,
         udev_monitor::udev_thread,
@@ -59,17 +62,17 @@ pub fn run(sim: bool) -> StratisResult<()> {
         })
         .build()?;
     runtime.block_on(async move {
-        async fn start_threads<E>(engine: LockableEngine<E>, sim: bool) -> StratisResult<()> where E: 'static + Engine {
+        async fn start_threads<E>(engine: Arc<E>, sim: bool) -> StratisResult<()> where E: 'static + Engine {
             let (trigger, should_exit) = channel(1);
             let (sender, receiver) = unbounded_channel::<UdevEngineEvent>();
 
             let join_udev = udev_thread(sender, should_exit);
-            let join_ipc = setup(engine.clone(), receiver, trigger.clone());
+            let join_ipc = setup(Arc::clone(&engine), receiver, trigger.clone());
             let join_signal = signal_thread();
             let join_dm = dm_event_thread(if sim {
                 None
             } else {
-                Some(engine.clone())
+                Some(engine)
             });
 
             select! {
@@ -107,11 +110,11 @@ pub fn run(sim: bool) -> StratisResult<()> {
         info!("stratis daemon version {} started", VERSION);
         if sim {
             info!("Using SimEngine");
-            start_threads(Lockable::new_exclusive(SimEngine::default()), sim).await
+            start_threads(Arc::new(SimEngine::default()), sim).await
         } else {
             info!("Using StratEngine");
             start_threads(
-                Lockable::new_exclusive(match StratEngine::initialize() {
+                Arc::new(match StratEngine::initialize() {
                     Ok(engine) => engine,
                     Err(e) => {
                         error!("Failed to start up stratisd engine: {}; exiting", e);

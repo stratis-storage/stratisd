@@ -35,9 +35,8 @@ where
     };
 
     let dbus_context = m.tree.get_data();
-    let mutex_lock = dbus_context.engine.blocking_lock();
 
-    let msg = match serde_json::to_string(&mutex_lock.get_report(report_type)) {
+    let msg = match serde_json::to_string(&dbus_context.engine.get_report(report_type)) {
         Ok(string) => {
             return_message.append3(string, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }

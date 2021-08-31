@@ -2,6 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::sync::Arc;
+
 use tokio::{
     select,
     sync::{broadcast::Sender, mpsc::UnboundedReceiver},
@@ -9,15 +11,12 @@ use tokio::{
 };
 
 use crate::{
-    engine::{Engine, LockableEngine, UdevEngineEvent},
+    engine::{Engine, UdevEngineEvent},
     jsonrpc::run_server,
     stratis::{StratisError, StratisResult},
 };
 
-fn handle_udev<E>(
-    engine: LockableEngine<E>,
-    mut recv: UnboundedReceiver<UdevEngineEvent>,
-) -> JoinHandle<()>
+fn handle_udev<E>(engine: Arc<E>, mut recv: UnboundedReceiver<UdevEngineEvent>) -> JoinHandle<()>
 where
     E: 'static + Engine,
 {
@@ -30,16 +29,15 @@ where
                     return;
                 }
             };
-            let mut lock = engine.lock().await;
             // Return value should be ignored as JSON RPC does not keep a record
             // of data structure information in the IPC layer.
-            let _ = lock.handle_event(&udev_event);
+            let _ = engine.handle_event(&udev_event);
         }
     })
 }
 
 pub async fn setup<E>(
-    engine: LockableEngine<E>,
+    engine: Arc<E>,
     recv: UnboundedReceiver<UdevEngineEvent>,
     _: Sender<()>,
 ) -> StratisResult<()>

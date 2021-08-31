@@ -9,6 +9,7 @@ use dbus::{
     Message,
 };
 use dbus_tree::{MTSync, MethodInfo, MethodResult};
+use futures::executor::block_on;
 use itertools::Itertools;
 
 use crate::{
@@ -33,9 +34,7 @@ where
 {
     let dbus_context = info.tree.get_data();
 
-    let engine = dbus_context.engine.blocking_lock();
-    Ok(engine
-        .locked_pools()
+    Ok(block_on(dbus_context.engine.locked_pools())
         .into_iter()
         .map(|(u, locked)| {
             (

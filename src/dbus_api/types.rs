@@ -26,7 +26,7 @@ use crate::{
         connection::{DbusConnectionHandler, DbusTreeHandler},
         udev::DbusUdevHandler,
     },
-    engine::{ActionAvailability, Engine, ExclusiveGuard, Lockable, LockableEngine, StratisUuid},
+    engine::{ActionAvailability, Engine, ExclusiveGuard, Lockable, StratisUuid},
 };
 
 /// Type for lockable D-Bus tree object.
@@ -98,7 +98,7 @@ impl OPContext {
 
 pub struct DbusContext<E> {
     next_index: Arc<AtomicU64>,
-    pub(super) engine: LockableEngine<E>,
+    pub(super) engine: Arc<E>,
     pub(super) sender: TokioSender<DbusAction<E>>,
     connection: Arc<SyncConnection>,
 }
@@ -118,7 +118,7 @@ impl<E> Debug for DbusContext<E> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("DbusContext")
             .field("next_index", &self.next_index)
-            .field("engine", &type_name::<LockableEngine<E>>())
+            .field("engine", &type_name::<Arc<E>>())
             .field("sender", &self.sender)
             .finish()
     }
@@ -129,7 +129,7 @@ where
     E: Engine,
 {
     pub fn new(
-        engine: LockableEngine<E>,
+        engine: Arc<E>,
         sender: TokioSender<DbusAction<E>>,
         connection: Arc<SyncConnection>,
     ) -> DbusContext<E> {

@@ -5,6 +5,7 @@
 use std::{collections::HashMap, vec::Vec};
 
 use dbus_tree::{Factory, MTSync, Method, MethodInfo, MethodResult, ObjectPath};
+use futures::executor::block_on;
 
 use crate::{
     dbus_api::{
@@ -14,7 +15,7 @@ use crate::{
         types::{GetManagedObjects, InterfacesAddedThreadSafe, TData},
         util::thread_safe_to_dbus_sendable,
     },
-    engine::{DevUuid, Engine, FilesystemUuid, KeyActions, Pool, PoolUuid, StratisUuid},
+    engine::{DevUuid, Engine, FilesystemUuid, KeyActions, Pool, PoolUuid, StratisUuid, Table},
 };
 
 pub fn list_keys<E>(info: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> Result<Vec<String>, String>
@@ -23,9 +24,7 @@ where
 {
     let dbus_context = info.tree.get_data();
 
-    let mutex_lock = dbus_context.engine.blocking_lock();
-    mutex_lock
-        .get_key_handler()
+    block_on(dbus_context.engine.get_key_handler())
         .list()
         .map(|v| {
             v.into_iter()
@@ -52,16 +51,16 @@ where
 
     fn pool_properties<E>(
         path: &dbus::Path<'static>,
-        engine: &E,
+        table: &Table<PoolUuid, E::Pool>,
         pool_uuid: PoolUuid,
     ) -> Option<GetManagedObjects>
     where
         E: 'static + Engine,
     {
-        engine.get_pool(pool_uuid).map(|(ref n, p)| {
+        table.get_by_uuid(pool_uuid).map(|(n, p)| {
             properties_to_get_managed_objects(
                 path.clone(),
-                get_pool_properties::<E>(n, pool_uuid, p),
+                get_pool_properties::<E>(&n, pool_uuid, p),
             )
         })
     }
@@ -69,18 +68,18 @@ where
     fn fs_properties<E>(
         parent_path: &dbus::Path<'static>,
         path: &dbus::Path<'static>,
-        engine: &E,
+        table: &Table<PoolUuid, E::Pool>,
         pool_uuid: PoolUuid,
         fs_uuid: FilesystemUuid,
     ) -> Option<GetManagedObjects>
     where
         E: 'static + Engine,
     {
-        engine.get_pool(pool_uuid).and_then(|(ref p_n, p)| {
+        table.get_by_uuid(pool_uuid).and_then(|(p_n, p)| {
             p.get_filesystem(fs_uuid).map(|(ref fs_n, f)| {
                 properties_to_get_managed_objects(
                     path.clone(),
-                    get_fs_properties::<E>(parent_path.clone(), p_n, fs_n, fs_uuid, f),
+                    get_fs_properties::<E>(parent_path.clone(), &p_n, fs_n, fs_uuid, f),
                 )
             })
         })
@@ -89,14 +88,14 @@ where
     fn blockdev_properties<E>(
         parent_path: &dbus::Path<'static>,
         path: &dbus::Path<'static>,
-        engine: &E,
+        table: &Table<PoolUuid, E::Pool>,
         pool_uuid: PoolUuid,
         uuid: DevUuid,
     ) -> Option<GetManagedObjects>
     where
         E: 'static + Engine,
     {
-        engine.get_pool(pool_uuid).and_then(|(_, p)| {
+        table.get_by_uuid(pool_uuid).and_then(|(_, p)| {
             p.get_blockdev(uuid).map(|(bd_tier, bd)| {
                 properties_to_get_managed_objects(
                     path.clone(),
@@ -123,26 +122,27 @@ where
         E: 'static + Engine,
     {
         let dbus_context = m.tree.get_data();
-        let engine = dbus_context.engine.blocking_lock();
+
+        let table = block_on(dbus_context.engine.pools());
 
         let properties: GetManagedObjects = m
             .tree
             .iter()
             .filter_map(|op| {
                 op.get_data().as_ref().and_then(|data| match data.uuid {
-                    StratisUuid::Pool(uuid) => pool_properties(op.get_name(), &*engine, uuid),
-                    StratisUuid::Fs(uuid) => fs_properties(
+                    StratisUuid::Pool(uuid) => pool_properties::<E>(op.get_name(), &table, uuid),
+                    StratisUuid::Fs(uuid) => fs_properties::<E>(
                         &data.parent,
                         op.get_name(),
-                        &*engine,
+                        &table,
                         parent_pool_uuid(m.tree.get(&data.parent).map(|p| &**p))
                             .expect("Parent must be present and be pool"),
                         uuid,
                     ),
-                    StratisUuid::Dev(uuid) => blockdev_properties(
+                    StratisUuid::Dev(uuid) => blockdev_properties::<E>(
                         &data.parent,
                         op.get_name(),
-                        &*engine,
+                        &table,
                         parent_pool_uuid(m.tree.get(&data.parent).map(|p| &**p))
                             .expect("Parent must be present and be pool"),
                         uuid,

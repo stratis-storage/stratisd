@@ -73,7 +73,9 @@ macro_rules! typed_uuid {
 /// Macro for early return with Ok dbus message on failure to get immutable pool.
 macro_rules! get_pool {
     ($engine:expr; $uuid:ident; $default:expr; $message:expr) => {
-        if let Some(pool) = $engine.get_pool($uuid) {
+        if let Some(pool) =
+            futures::executor::block_on($engine.get_pool($crate::engine::LockKey::Uuid($uuid)))
+        {
             pool
         } else {
             let message = format!("engine does not know about pool with uuid {}", $uuid);
@@ -89,7 +91,9 @@ macro_rules! get_pool {
 /// Macro for early return with Ok dbus message on failure to get mutable pool.
 macro_rules! get_mut_pool {
     ($engine:expr; $uuid:ident; $default:expr; $message:expr) => {
-        if let Some(pool) = $engine.get_mut_pool($uuid) {
+        if let Some(pool) =
+            futures::executor::block_on($engine.get_mut_pool($crate::engine::LockKey::Uuid($uuid)))
+        {
             pool
         } else {
             let message = format!("engine does not know about pool with uuid {}", $uuid);

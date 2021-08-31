@@ -9,6 +9,8 @@
 // and one for the unsupported version. Also, Default is not really a
 // helpful concept here.
 
+use std::sync::Arc;
+
 use tokio::{
     select,
     sync::{broadcast::Sender, mpsc::UnboundedReceiver},
@@ -17,34 +19,28 @@ use tokio::{
 
 use crate::{
     dbus_api::create_dbus_handlers,
-    engine::{Engine, LockableEngine, UdevEngineEvent},
+    engine::{Engine, UdevEngineEvent},
     stratis::{StratisError, StratisResult},
 };
 
 /// Set up the cooperating D-Bus threads.
 pub async fn setup<E>(
-    engine: LockableEngine<E>,
+    engine: Arc<E>,
     receiver: UnboundedReceiver<UdevEngineEvent>,
     trigger: Sender<()>,
 ) -> StratisResult<()>
 where
     E: 'static + Engine,
 {
-    let (mut conn, mut udev, mut tree) = spawn_blocking(move || {
-        create_dbus_handlers(engine.clone(), receiver, trigger)
-            .map(|(conn, udev, tree)| {
-                let mutex_lock = engine.blocking_lock();
-                for (pool_name, pool_uuid, pool) in mutex_lock.pools() {
-                    udev.register_pool(&pool_name, pool_uuid, pool)
-                }
-                info!("D-Bus API is available");
-                (conn, udev, tree)
-            })
-            .map_err(StratisError::from)
-    })
-    .await
-    .map_err(StratisError::from)
-    .and_then(|res| res)?;
+    let engine_clone = Arc::clone(&engine);
+    let (mut conn, mut udev, mut tree) =
+        spawn_blocking(move || create_dbus_handlers(engine_clone, receiver, trigger)).await??;
+
+    for (pool_name, pool_uuid, pool) in engine.pools().await.iter() {
+        udev.register_pool(pool_name, *pool_uuid, pool)
+    }
+
+    info!("D-Bus API is available");
 
     let mut tree_handle = task::spawn_blocking(move || {
         if let Err(e) = tree.process_dbus_actions() {

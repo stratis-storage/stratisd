@@ -27,7 +27,7 @@ use crate::{
         },
         udev::DbusUdevHandler,
     },
-    engine::{Engine, Lockable, LockableEngine, UdevEngineEvent},
+    engine::{Engine, Lockable, UdevEngineEvent},
     stratis::StratisError,
 };
 
@@ -181,7 +181,7 @@ where
 /// * received by the DbusUdevHandler from the udev thread,
 /// * sent by the DbusContext to the DbusTreeHandler
 pub fn create_dbus_handlers<E>(
-    engine: LockableEngine<E>,
+    engine: Arc<E>,
     udev_receiver: UnboundedReceiver<UdevEngineEvent>,
     trigger: Sender<()>,
 ) -> DbusHandlers<E>

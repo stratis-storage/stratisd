@@ -11,13 +11,11 @@ use std::{
     hash::Hash,
     ops::Deref,
     path::{Path, PathBuf},
-    sync::Arc,
 };
 
 use libudev::EventType;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tokio::sync::Mutex;
 use uuid::Uuid;
 
 pub use crate::engine::{
@@ -76,9 +74,6 @@ macro_rules! uuid {
 
 /// Value representing Clevis config information.
 pub type ClevisInfo = (String, Value);
-
-/// An engine that can be locked for synchronization.
-pub type LockableEngine<E> = Lockable<Arc<Mutex<E>>>;
 
 pub trait AsUuid:
     Copy
@@ -365,4 +360,11 @@ impl Display for ActionAvailability {
 pub enum MaybeInconsistent<T> {
     Yes,
     No(T),
+}
+
+/// Represents either a name or a UUID.
+#[derive(Debug)]
+pub enum LockKey<U> {
+    Name(Name),
+    Uuid(U),
 }

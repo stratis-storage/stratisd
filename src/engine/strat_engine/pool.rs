@@ -285,6 +285,7 @@ impl StratPool {
 
     /// Called when a DM device in this pool has generated an event. This method
     /// handles checking filesystems.
+    #[pool_mutating_action("NoPoolChanges")]
     pub fn fs_event_on(
         &mut self,
         pool_uuid: PoolUuid,

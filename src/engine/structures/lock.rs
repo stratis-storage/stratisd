@@ -5,7 +5,7 @@
 use std::{
     any::type_name,
     collections::{HashMap, HashSet, VecDeque},
-    fmt::{self, Display},
+    fmt::{self, Debug, Display},
     future::Future,
     ops::{Deref, DerefMut},
     pin::Pin,
@@ -137,13 +137,22 @@ where
     }
 }
 
+macro_rules! lock_mutex {
+    ($mutex:expr) => {{
+        trace!("Locking internal mutex...");
+        let guard = $mutex.lock().expect("mutex only locked internally");
+        trace!("Locked internal mutex");
+        guard
+    }};
+}
+
 #[derive(Debug)]
 struct LockRecord<U, T> {
     all_read_locked: u64,
     all_write_locked: bool,
     read_locked: HashMap<U, u64>,
     write_locked: HashSet<U>,
-    waiting: VecDeque<Waker>,
+    waiting: VecDeque<Waiter<U>>,
     inner: Table<U, T>,
 }
 
@@ -157,8 +166,30 @@ where
             .field("all_write_locked", &self.all_write_locked)
             .field("read_locked", &self.read_locked)
             .field("write_locked", &self.write_locked)
-            .field("num_waiting", &self.waiting.len())
+            .field("waiting", &self.waiting)
             .finish()
+    }
+}
+
+#[derive(Debug)]
+pub enum WaitType<U> {
+    SomeRead(U),
+    SomeWrite(U),
+    AllRead,
+    AllWrite,
+}
+
+pub struct Waiter<U> {
+    ty: WaitType<U>,
+    waker: Waker,
+}
+
+impl<U> Debug for Waiter<U>
+where
+    U: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self.ty)
     }
 }
 
@@ -264,11 +295,7 @@ where
 
     fn poll(mut self: Pin<&mut Self>, cxt: &mut Context<'_>) -> Poll<Self::Output> {
         trace!("Polling read lock on pool {:?}", self.1);
-        let mut lock_record = self
-            .0
-            .lock_record
-            .lock()
-            .expect("mutex only locked internally");
+        let mut lock_record = lock_mutex!(self.0.lock_record);
         if let Some((uuid, name)) = match self.1 {
             LockKey::Name(ref n) => lock_record
                 .inner
@@ -282,9 +309,15 @@ where
             {
                 let waker = cxt.waker().clone();
                 if self.2 {
-                    lock_record.waiting.push_front(waker);
+                    lock_record.waiting.push_front(Waiter {
+                        ty: WaitType::SomeRead(uuid),
+                        waker,
+                    });
                 } else {
-                    lock_record.waiting.push_back(waker);
+                    lock_record.waiting.push_back(Waiter {
+                        ty: WaitType::SomeRead(uuid),
+                        waker,
+                    });
                     self.2 = true;
                 }
                 Poll::Pending
@@ -353,11 +386,7 @@ where
 {
     fn drop(&mut self) {
         trace!("Dropping read lock on pool with UUID {}", self.1);
-        let mut lock_record = self
-            .0
-            .lock_record
-            .lock()
-            .expect("mutex only locked internally");
+        let mut lock_record = lock_mutex!(self.0.lock_record);
         trace!("Lock record before drop: {}", lock_record);
         match lock_record.read_locked.remove(&self.1) {
             Some(counter) => {
@@ -368,7 +397,7 @@ where
             None => panic!("Must have acquired lock and incremented lock count"),
         }
         if let Some(w) = lock_record.waiting.pop_front() {
-            w.wake();
+            w.waker.wake();
         }
         trace!("Read lock on pool with UUID {} dropped", self.1);
         trace!("Lock record after drop: {}", lock_record);
@@ -394,11 +423,7 @@ where
 
     fn poll(mut self: Pin<&mut Self>, cxt: &mut Context<'_>) -> Poll<Self::Output> {
         trace!("Polling write lock on pool {:?}", self.1);
-        let mut lock_record = self
-            .0
-            .lock_record
-            .lock()
-            .expect("mutex only locked internally");
+        let mut lock_record = lock_mutex!(self.0.lock_record);
         if let Some((uuid, name)) = match self.1 {
             LockKey::Name(ref n) => lock_record
                 .inner
@@ -413,9 +438,15 @@ where
             {
                 let waker = cxt.waker().clone();
                 if self.2 {
-                    lock_record.waiting.push_front(waker);
+                    lock_record.waiting.push_front(Waiter {
+                        ty: WaitType::SomeWrite(uuid),
+                        waker,
+                    });
                 } else {
-                    lock_record.waiting.push_back(waker);
+                    lock_record.waiting.push_back(Waiter {
+                        ty: WaitType::SomeWrite(uuid),
+                        waker,
+                    });
                     self.2 = true;
                 }
                 Poll::Pending
@@ -491,15 +522,11 @@ where
 {
     fn drop(&mut self) {
         trace!("Dropping write lock on pool with UUID {}", self.1);
-        let mut lock_record = self
-            .0
-            .lock_record
-            .lock()
-            .expect("mutex only locked internally");
+        let mut lock_record = lock_mutex!(self.0.lock_record);
         trace!("Lock record before drop: {}", lock_record);
         assert!(lock_record.write_locked.remove(&self.1));
         if let Some(w) = lock_record.waiting.pop_front() {
-            w.wake();
+            w.waker.wake();
         }
         trace!("Write lock on pool with UUID {} dropped", self.1);
         trace!("Lock record after drop: {}", lock_record);
@@ -517,20 +544,22 @@ where
 
     fn poll(mut self: Pin<&mut Self>, cxt: &mut Context<'_>) -> Poll<Self::Output> {
         trace!("Polling all read lock");
-        let mut lock_record = self
-            .0
-            .lock_record
-            .lock()
-            .expect("mutex only locked internally");
+        let mut lock_record = lock_mutex!(self.0.lock_record);
         if (lock_record.all_write_locked || !lock_record.write_locked.is_empty())
             || ((lock_record.all_read_locked > 0 || !lock_record.read_locked.is_empty())
                 && !lock_record.waiting.is_empty())
         {
             let waker = cxt.waker().clone();
             if self.1 {
-                lock_record.waiting.push_front(waker);
+                lock_record.waiting.push_front(Waiter {
+                    ty: WaitType::AllRead,
+                    waker,
+                });
             } else {
-                lock_record.waiting.push_back(waker);
+                lock_record.waiting.push_back(Waiter {
+                    ty: WaitType::AllRead,
+                    waker,
+                });
                 self.1 = true;
             }
             Poll::Pending
@@ -575,18 +604,14 @@ where
 {
     fn drop(&mut self) {
         trace!("Dropping all read lock");
-        let mut lock_record = self
-            .0
-            .lock_record
-            .lock()
-            .expect("mutex only locked internally");
+        let mut lock_record = lock_mutex!(self.0.lock_record);
         trace!("Lock record before drop: {}", lock_record);
         lock_record.all_read_locked = lock_record
             .all_read_locked
             .checked_sub(1)
             .expect("Cannot drop below 0");
         if let Some(w) = lock_record.waiting.pop_front() {
-            w.wake();
+            w.waker.wake();
         }
         trace!("All read lock dropped");
         trace!("Lock record after drop: {}", lock_record);
@@ -604,11 +629,7 @@ where
 
     fn poll(mut self: Pin<&mut Self>, cxt: &mut Context<'_>) -> Poll<Self::Output> {
         trace!("Polling all write lock");
-        let mut lock_record = self
-            .0
-            .lock_record
-            .lock()
-            .expect("mutex only locked internally");
+        let mut lock_record = lock_mutex!(self.0.lock_record);
         if lock_record.all_write_locked
             || !lock_record.write_locked.is_empty()
             || lock_record.all_read_locked > 0
@@ -616,9 +637,15 @@ where
         {
             let waker = cxt.waker().clone();
             if self.1 {
-                lock_record.waiting.push_front(waker);
+                lock_record.waiting.push_front(Waiter {
+                    ty: WaitType::AllWrite,
+                    waker,
+                });
             } else {
-                lock_record.waiting.push_back(waker);
+                lock_record.waiting.push_back(Waiter {
+                    ty: WaitType::AllWrite,
+                    waker,
+                });
                 self.1 = true;
             }
             Poll::Pending
@@ -675,16 +702,12 @@ where
 {
     fn drop(&mut self) {
         trace!("Dropping all write lock");
-        let mut lock_record = self
-            .0
-            .lock_record
-            .lock()
-            .expect("mutex only locked internally");
+        let mut lock_record = lock_mutex!(self.0.lock_record);
         trace!("Lock record before drop: {}", lock_record);
         assert!(lock_record.all_write_locked);
         lock_record.all_write_locked = false;
         if let Some(w) = lock_record.waiting.pop_front() {
-            w.wake();
+            w.waker.wake();
         }
         trace!("All write lock dropped");
         trace!("Lock record after drop: {}", lock_record);

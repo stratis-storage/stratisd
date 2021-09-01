@@ -22,7 +22,7 @@ fn get_filesystem_property<F, R, E>(
     getter: F,
 ) -> Result<(), MethodErr>
 where
-    F: Fn((Name, Name, &<<E as Engine>::Pool as Pool>::Filesystem)) -> Result<R, String>,
+    F: Fn((Name, Name, &<E::Pool as Pool>::Filesystem)) -> Result<R, String>,
     R: dbus::arg::Append,
     E: Engine,
 {

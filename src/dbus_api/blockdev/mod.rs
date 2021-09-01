@@ -23,7 +23,7 @@ pub fn create_dbus_blockdev<'a, E>(
     parent: dbus::Path<'static>,
     uuid: DevUuid,
     tier: BlockDevTier,
-    blockdev: &<<E as Engine>::Pool as Pool>::BlockDev,
+    blockdev: &<E::Pool as Pool>::BlockDev,
 ) -> dbus::Path<'a>
 where
     E: 'static + Engine,
@@ -67,7 +67,7 @@ pub fn get_blockdev_properties<E>(
     parent: dbus::Path<'static>,
     dev_uuid: DevUuid,
     tier: BlockDevTier,
-    dev: &<<E as Engine>::Pool as Pool>::BlockDev,
+    dev: &<E::Pool as Pool>::BlockDev,
 ) -> InterfacesAddedThreadSafe
 where
     E: 'static + Engine,

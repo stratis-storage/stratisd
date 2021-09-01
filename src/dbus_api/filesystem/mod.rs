@@ -24,7 +24,7 @@ pub fn create_dbus_filesystem<'a, E>(
     pool_name: &Name,
     name: &Name,
     uuid: FilesystemUuid,
-    filesystem: &<<E as Engine>::Pool as Pool>::Filesystem,
+    filesystem: &<E::Pool as Pool>::Filesystem,
 ) -> dbus::Path<'a>
 where
     E: 'static + Engine,
@@ -66,7 +66,7 @@ pub fn get_fs_properties<E>(
     pool_name: &Name,
     fs_name: &Name,
     fs_uuid: FilesystemUuid,
-    fs: &<<E as Engine>::Pool as Pool>::Filesystem,
+    fs: &<E::Pool as Pool>::Filesystem,
 ) -> InterfacesAddedThreadSafe
 where
     E: 'static + Engine,

@@ -18,7 +18,7 @@ pub fn blockdev_operation<F, R, E>(
     closure: F,
 ) -> Result<R, String>
 where
-    F: Fn(BlockDevTier, &<<E as Engine>::Pool as Pool>::BlockDev) -> Result<R, String>,
+    F: Fn(BlockDevTier, &<E::Pool as Pool>::BlockDev) -> Result<R, String>,
     R: dbus::arg::Append,
     E: Engine,
 {
@@ -66,7 +66,7 @@ pub fn get_blockdev_property<F, R, E>(
     getter: F,
 ) -> Result<(), MethodErr>
 where
-    F: Fn(BlockDevTier, &<<E as Engine>::Pool as Pool>::BlockDev) -> Result<R, String>,
+    F: Fn(BlockDevTier, &<E::Pool as Pool>::BlockDev) -> Result<R, String>,
     R: dbus::arg::Append,
     E: Engine,
 {
@@ -79,7 +79,7 @@ where
 
 /// Generate D-Bus representation of devnode property.
 #[inline]
-pub fn blockdev_devnode_prop<E>(dev: &<<E as Engine>::Pool as Pool>::BlockDev) -> String
+pub fn blockdev_devnode_prop<E>(dev: &<E::Pool as Pool>::BlockDev) -> String
 where
     E: Engine,
 {
@@ -88,9 +88,7 @@ where
 
 /// Generate D-Bus representation of hardware info property.
 #[inline]
-pub fn blockdev_hardware_info_prop<E>(
-    dev: &<<E as Engine>::Pool as Pool>::BlockDev,
-) -> (bool, String)
+pub fn blockdev_hardware_info_prop<E>(dev: &<E::Pool as Pool>::BlockDev) -> (bool, String)
 where
     E: Engine,
 {
@@ -100,7 +98,7 @@ where
 
 /// Generate D-Bus representation of user info property.
 #[inline]
-pub fn blockdev_user_info_prop<E>(dev: &<<E as Engine>::Pool as Pool>::BlockDev) -> (bool, String)
+pub fn blockdev_user_info_prop<E>(dev: &<E::Pool as Pool>::BlockDev) -> (bool, String)
 where
     E: Engine,
 {
@@ -110,7 +108,7 @@ where
 
 /// Generate D-Bus representation of initialization time property.
 #[inline]
-pub fn blockdev_init_time_prop<E>(dev: &<<E as Engine>::Pool as Pool>::BlockDev) -> u64
+pub fn blockdev_init_time_prop<E>(dev: &<E::Pool as Pool>::BlockDev) -> u64
 where
     E: Engine,
 {
@@ -125,7 +123,7 @@ pub fn blockdev_tier_prop(tier: BlockDevTier) -> u16 {
 
 // Generate a D-Bus representation of the physical path
 #[inline]
-pub fn blockdev_physical_path_prop<E>(dev: &<<E as Engine>::Pool as Pool>::BlockDev) -> String
+pub fn blockdev_physical_path_prop<E>(dev: &<E::Pool as Pool>::BlockDev) -> String
 where
     E: Engine,
 {

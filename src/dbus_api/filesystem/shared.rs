@@ -19,7 +19,7 @@ pub fn filesystem_operation<F, R, E>(
     closure: F,
 ) -> Result<R, String>
 where
-    F: Fn((Name, Name, &<<E as Engine>::Pool as Pool>::Filesystem)) -> Result<R, String>,
+    F: Fn((Name, Name, &<E::Pool as Pool>::Filesystem)) -> Result<R, String>,
     R: dbus::arg::Append,
     E: Engine,
 {
@@ -67,7 +67,7 @@ pub fn fs_name_prop(name: &Name) -> String {
 /// Generate D-Bus representation of devnode property.
 #[inline]
 pub fn fs_devnode_prop<E>(
-    fs: &<<E as Engine>::Pool as Pool>::Filesystem,
+    fs: &<E::Pool as Pool>::Filesystem,
     pool_name: &Name,
     fs_name: &Name,
 ) -> String
@@ -81,7 +81,7 @@ where
 
 /// Generate D-Bus representation of created property.
 #[inline]
-pub fn fs_created_prop<E>(fs: &<<E as Engine>::Pool as Pool>::Filesystem) -> String
+pub fn fs_created_prop<E>(fs: &<E::Pool as Pool>::Filesystem) -> String
 where
     E: Engine,
 {

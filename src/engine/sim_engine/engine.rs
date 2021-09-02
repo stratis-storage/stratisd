@@ -12,7 +12,7 @@ use serde_json::{json, Value};
 
 use crate::{
     engine::{
-        engine::{Engine, KeyActions, Pool, Report},
+        engine::{Engine, Report},
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         sim_engine::{keys::SimKeyActions, pool::SimPool},
         structures::Table,
@@ -73,6 +73,9 @@ impl Report for SimEngine {
 }
 
 impl Engine for SimEngine {
+    type Pool = SimPool;
+    type KeyActions = SimKeyActions;
+
     fn create_pool(
         &mut self,
         name: &str,
@@ -117,7 +120,7 @@ impl Engine for SimEngine {
         }
     }
 
-    fn handle_event(&mut self, _event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &dyn Pool)> {
+    fn handle_event(&mut self, _event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &Self::Pool)> {
         None
     }
 
@@ -162,11 +165,11 @@ impl Engine for SimEngine {
         Ok(SetUnlockAction::empty())
     }
 
-    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)> {
+    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &Self::Pool)> {
         get_pool!(self; uuid)
     }
 
-    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut dyn Pool)> {
+    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut Self::Pool)> {
         get_mut_pool!(self; uuid)
     }
 
@@ -174,17 +177,17 @@ impl Engine for SimEngine {
         HashMap::new()
     }
 
-    fn pools(&self) -> Vec<(Name, PoolUuid, &dyn Pool)> {
+    fn pools(&self) -> Vec<(Name, PoolUuid, &Self::Pool)> {
         self.pools
             .iter()
-            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &dyn Pool))
+            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool))
             .collect()
     }
 
-    fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut dyn Pool)> {
+    fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut Self::Pool)> {
         self.pools
             .iter_mut()
-            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &mut dyn Pool))
+            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool))
             .collect()
     }
 
@@ -192,12 +195,12 @@ impl Engine for SimEngine {
         Ok(())
     }
 
-    fn get_key_handler(&self) -> &dyn KeyActions {
-        &self.key_handler as &dyn KeyActions
+    fn get_key_handler(&self) -> &Self::KeyActions {
+        &self.key_handler
     }
 
-    fn get_key_handler_mut(&mut self) -> &mut dyn KeyActions {
-        &mut self.key_handler as &mut dyn KeyActions
+    fn get_key_handler_mut(&mut self) -> &mut Self::KeyActions {
+        &mut self.key_handler
     }
 
     fn is_sim(&self) -> bool {
@@ -211,8 +214,8 @@ mod tests {
     use std::{self, path::Path};
 
     use crate::engine::{
+        engine::{Engine, Pool},
         types::{EngineAction, RenameAction},
-        Engine,
     };
 
     use super::*;

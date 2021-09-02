@@ -10,7 +10,6 @@ use devicemapper::DmNameBuf;
 
 use crate::{
     engine::{
-        engine::KeyActions,
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         strat_engine::{
             cmd::verify_binaries,
@@ -24,7 +23,7 @@ use crate::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, LockedPoolInfo, RenameAction,
             ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
         },
-        Engine, Name, Pool, PoolUuid, Report,
+        Engine, Name, PoolUuid, Report,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -153,7 +152,10 @@ impl Report for StratEngine {
 }
 
 impl Engine for StratEngine {
-    fn handle_event(&mut self, event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &dyn Pool)> {
+    type Pool = StratPool;
+    type KeyActions = StratKeyActions;
+
+    fn handle_event(&mut self, event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &Self::Pool)> {
         if let Some((pool_uuid, pool_name, pool)) =
             self.liminal_devices.block_evaluate(&self.pools, event)
         {
@@ -161,7 +163,7 @@ impl Engine for StratEngine {
             Some((
                 pool_name,
                 pool_uuid,
-                self.pools.get_by_uuid(pool_uuid).expect("just_inserted").1 as &dyn Pool,
+                self.pools.get_by_uuid(pool_uuid).expect("just_inserted").1,
             ))
         } else {
             None
@@ -258,11 +260,11 @@ impl Engine for StratEngine {
         Ok(SetUnlockAction::new(unlocked))
     }
 
-    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)> {
+    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &Self::Pool)> {
         get_pool!(self; uuid)
     }
 
-    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut dyn Pool)> {
+    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut Self::Pool)> {
         get_mut_pool!(self; uuid)
     }
 
@@ -270,17 +272,17 @@ impl Engine for StratEngine {
         self.liminal_devices.locked_pools()
     }
 
-    fn pools(&self) -> Vec<(Name, PoolUuid, &dyn Pool)> {
+    fn pools(&self) -> Vec<(Name, PoolUuid, &Self::Pool)> {
         self.pools
             .iter()
-            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &dyn Pool))
+            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool))
             .collect()
     }
 
-    fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut dyn Pool)> {
+    fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut Self::Pool)> {
         self.pools
             .iter_mut()
-            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool as &mut dyn Pool))
+            .map(|(name, uuid, pool)| (name.clone(), *uuid, pool))
             .collect()
     }
 
@@ -323,12 +325,12 @@ impl Engine for StratEngine {
         Ok(())
     }
 
-    fn get_key_handler(&self) -> &dyn KeyActions {
-        &self.key_handler as &dyn KeyActions
+    fn get_key_handler(&self) -> &Self::KeyActions {
+        &self.key_handler
     }
 
-    fn get_key_handler_mut(&mut self) -> &mut dyn KeyActions {
-        &mut self.key_handler as &mut dyn KeyActions
+    fn get_key_handler_mut(&mut self) -> &mut Self::KeyActions {
+        &mut self.key_handler
     }
 
     fn is_sim(&self) -> bool {
@@ -343,6 +345,7 @@ mod test {
     use devicemapper::{Bytes, Sectors};
 
     use crate::engine::{
+        engine::Pool,
         strat_engine::{
             backstore::crypt_metadata_size,
             cmd,
@@ -506,7 +509,7 @@ mod test {
         unlock_method: UnlockMethod,
     ) -> Result<(), Box<dyn Error>>
     where
-        F: Fn(&mut dyn Pool) -> Result<(), Box<dyn Error>>,
+        F: Fn(&mut StratPool) -> Result<(), Box<dyn Error>>,
     {
         let mut engine = StratEngine::initialize()?;
 

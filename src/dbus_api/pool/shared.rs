@@ -16,7 +16,7 @@ use crate::{
         types::{DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg, option_to_tuple},
     },
-    engine::{BlockDevTier, EngineAction, Name, Pool, PoolUuid},
+    engine::{BlockDevTier, Engine, EngineAction, Name, Pool, PoolUuid},
 };
 
 pub enum BlockDevOp {
@@ -25,14 +25,15 @@ pub enum BlockDevOp {
     AddData,
 }
 
-pub fn pool_operation<F, R>(
-    tree: &Tree<MTSync<TData>, TData>,
+pub fn pool_operation<F, R, E>(
+    tree: &Tree<MTSync<TData<E>>, TData<E>>,
     object_path: &dbus::Path<'static>,
     closure: F,
 ) -> Result<R, String>
 where
-    F: Fn((Name, PoolUuid, &dyn Pool)) -> Result<R, String>,
+    F: Fn((Name, PoolUuid, &E::Pool)) -> Result<R, String>,
     R: dbus::arg::Append,
+    E: 'static + Engine,
 {
     let dbus_context = tree.get_data();
 
@@ -57,9 +58,12 @@ where
     closure((pool_name, pool_uuid, pool))
 }
 
-pub fn get_pool_encryption_key_desc(
-    m: &MethodInfo<MTSync<TData>, TData>,
-) -> Result<(bool, String), String> {
+pub fn get_pool_encryption_key_desc<E>(
+    m: &MethodInfo<MTSync<TData<E>>, TData<E>>,
+) -> Result<(bool, String), String>
+where
+    E: 'static + Engine,
+{
     pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
         Ok(option_to_tuple(
             match pool.encryption_info() {
@@ -74,19 +78,28 @@ pub fn get_pool_encryption_key_desc(
     })
 }
 
-pub fn get_pool_has_cache(m: &MethodInfo<MTSync<TData>, TData>) -> Result<bool, String> {
+pub fn get_pool_has_cache<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> Result<bool, String>
+where
+    E: 'static + Engine,
+{
     pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
         Ok(pool.has_cache())
     })
 }
 
-pub fn get_pool_total_size(m: &MethodInfo<MTSync<TData>, TData>) -> Result<String, String> {
+pub fn get_pool_total_size<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> Result<String, String>
+where
+    E: 'static + Engine,
+{
     pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
         Ok((*pool.total_physical_size().bytes()).to_string())
     })
 }
 
-pub fn get_pool_total_used(m: &MethodInfo<MTSync<TData>, TData>) -> Result<String, String> {
+pub fn get_pool_total_used<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> Result<String, String>
+where
+    E: 'static + Engine,
+{
     pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
         pool.total_physical_used()
             .map_err(|e| e.to_string())
@@ -94,9 +107,12 @@ pub fn get_pool_total_used(m: &MethodInfo<MTSync<TData>, TData>) -> Result<Strin
     })
 }
 
-pub fn get_pool_clevis_info(
-    m: &MethodInfo<MTSync<TData>, TData>,
-) -> Result<(bool, (String, String)), String> {
+pub fn get_pool_clevis_info<E>(
+    m: &MethodInfo<MTSync<TData<E>>, TData<E>>,
+) -> Result<(bool, (String, String)), String>
+where
+    E: 'static + Engine,
+{
     pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
         Ok(option_to_tuple(
             match pool.encryption_info() {
@@ -117,7 +133,10 @@ pub fn get_pool_clevis_info(
 /// data tier must already contain some block devices. The op parameter
 /// determines which method belonging to the engine's Pool interface must
 /// be invoked.
-pub fn add_blockdevs(m: &MethodInfo<MTSync<TData>, TData>, op: BlockDevOp) -> MethodResult {
+pub fn add_blockdevs<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>, op: BlockDevOp) -> MethodResult
+where
+    E: 'static + Engine,
+{
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -207,14 +226,15 @@ pub fn add_blockdevs(m: &MethodInfo<MTSync<TData>, TData>, op: BlockDevOp) -> Me
 /// Get a pool property and place it on the D-Bus. The property is
 /// found by means of the getter method which takes a reference to a
 /// Pool and obtains the property from the pool.
-pub fn get_pool_property<F, R>(
+pub fn get_pool_property<F, R, E>(
     i: &mut IterAppend,
-    p: &PropInfo<MTSync<TData>, TData>,
+    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
     getter: F,
 ) -> Result<(), MethodErr>
 where
-    F: Fn((Name, PoolUuid, &dyn Pool)) -> Result<R, String>,
+    F: Fn((Name, PoolUuid, &E::Pool)) -> Result<R, String>,
     R: dbus::arg::Append,
+    E: 'static + Engine,
 {
     i.append(
         pool_operation(p.tree, p.path.get_name(), getter).map_err(|ref e| MethodErr::failed(e))?,
@@ -230,12 +250,18 @@ pub fn pool_name_prop(name: &Name) -> String {
 
 /// Generate D-Bus representation of encrypted property.
 #[inline]
-pub fn pool_enc_prop(pool: &dyn Pool) -> bool {
+pub fn pool_enc_prop<E>(pool: &E::Pool) -> bool
+where
+    E: 'static + Engine,
+{
     pool.is_encrypted()
 }
 
 /// Generate D-Bus representation of pool state property.
 #[inline]
-pub fn pool_avail_actions_prop(pool: &dyn Pool) -> String {
+pub fn pool_avail_actions_prop<E>(pool: &E::Pool) -> String
+where
+    E: 'static + Engine,
+{
     pool.avail_actions().to_string()
 }

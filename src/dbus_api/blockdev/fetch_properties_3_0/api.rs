@@ -4,14 +4,20 @@
 
 use dbus_tree::{Factory, MTSync, Method};
 
-use crate::dbus_api::{
-    blockdev::fetch_properties_3_0::methods::{get_all_properties, get_properties},
-    types::TData,
+use crate::{
+    dbus_api::{
+        blockdev::fetch_properties_3_0::methods::{get_all_properties, get_properties},
+        types::TData,
+    },
+    engine::Engine,
 };
 
-pub fn get_all_properties_method(
-    f: &Factory<MTSync<TData>, TData>,
-) -> Method<MTSync<TData>, TData> {
+pub fn get_all_properties_method<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Method<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.method("GetAllProperties", (), get_all_properties)
         // a{s(bv)}: Dictionary of property names to tuples
         // In the tuple:
@@ -21,7 +27,12 @@ pub fn get_all_properties_method(
         .out_arg(("results", "a{s(bv)}"))
 }
 
-pub fn get_properties_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
+pub fn get_properties_method<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Method<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
     f.method("GetProperties", (), get_properties)
         .in_arg(("properties", "as"))
         // a{s(bv)}: Dictionary of property names to tuples

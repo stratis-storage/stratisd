@@ -106,6 +106,11 @@ pub trait BlockDev: Debug {
 }
 
 pub trait Pool: Debug {
+    /// Filesystem type associated with this engine type.
+    type Filesystem: Filesystem;
+    /// Block device type associated with this engine type.
+    type BlockDev: BlockDev;
+
     /// Initialize the cache with the provided cache block devices.
     /// Returns a list of the the block devices that were actually added as cache
     /// devices. In practice, this will have three types of return values:
@@ -208,7 +213,7 @@ pub trait Pool: Debug {
         pool_uuid: PoolUuid,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<CreateAction<(FilesystemUuid, &mut dyn Filesystem)>>;
+    ) -> StratisResult<CreateAction<(FilesystemUuid, &mut Self::Filesystem)>>;
 
     /// The total number of Sectors belonging to this pool.
     /// There are no exclusions, so this number includes overhead sectors
@@ -225,20 +230,20 @@ pub trait Pool: Debug {
     fn total_physical_used(&self) -> StratisResult<Sectors>;
 
     /// Get all the filesystems belonging to this pool.
-    fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)>;
+    fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Self::Filesystem)>;
 
     /// Get the filesystem in this pool with this UUID.
-    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &dyn Filesystem)>;
+    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &Self::Filesystem)>;
 
     /// Get the filesystem in this pool with this name.
-    fn get_filesystem_by_name(&self, name: &Name) -> Option<(FilesystemUuid, &dyn Filesystem)>;
+    fn get_filesystem_by_name(&self, name: &Name) -> Option<(FilesystemUuid, &Self::Filesystem)>;
 
     /// Get _all_ the blockdevs that belong to this pool.
     /// All really means all. For example, it does not exclude cache blockdevs.
-    fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &dyn BlockDev)>;
+    fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &Self::BlockDev)>;
 
     /// Get the blockdev in this pool with this UUID.
-    fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &dyn BlockDev)>;
+    fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &Self::BlockDev)>;
 
     /// Set the user-settable string associated with the blockdev specified
     /// by the uuid.
@@ -265,6 +270,11 @@ pub trait Pool: Debug {
 }
 
 pub trait Engine: Debug + Report + Send {
+    /// Pool type associated with this engine type.
+    type Pool: Pool;
+    /// Key handling type associated with this engine type.
+    type KeyActions: KeyActions;
+
     /// Create a Stratis pool.
     /// Returns the UUID of the newly created pool.
     /// Returns an error if the redundancy code does not correspond to a
@@ -282,7 +292,7 @@ pub trait Engine: Debug + Report + Send {
     /// and its UUID.
     ///
     /// Precondition: the subsystem of the device evented on is "block".
-    fn handle_event(&mut self, event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &dyn Pool)>;
+    fn handle_event(&mut self, event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &Self::Pool)>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.
@@ -312,29 +322,29 @@ pub trait Engine: Debug + Report + Send {
     ) -> StratisResult<SetUnlockAction<DevUuid>>;
 
     /// Find the pool designated by uuid.
-    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)>;
+    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &Self::Pool)>;
 
     /// Get a mutable referent to the pool designated by uuid.
-    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut dyn Pool)>;
+    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut Self::Pool)>;
 
     /// Get a mapping of encrypted pool UUIDs for pools that have not yet
     /// been set up and need to be unlocked to their encryption infos.
     fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo>;
 
     /// Get all pools belonging to this engine.
-    fn pools(&self) -> Vec<(Name, PoolUuid, &dyn Pool)>;
+    fn pools(&self) -> Vec<(Name, PoolUuid, &Self::Pool)>;
 
     /// Get mutable references to all pools belonging to this engine.
-    fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut dyn Pool)>;
+    fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut Self::Pool)>;
 
     /// Notify the engine that an event has occurred on the DM file descriptor.
     fn evented(&mut self) -> StratisResult<()>;
 
     /// Get the handler for kernel keyring operations.
-    fn get_key_handler(&self) -> &dyn KeyActions;
+    fn get_key_handler(&self) -> &Self::KeyActions;
 
     /// Get the handler for kernel keyring operations mutably.
-    fn get_key_handler_mut(&mut self) -> &mut dyn KeyActions;
+    fn get_key_handler_mut(&mut self) -> &mut Self::KeyActions;
 
     /// Return true if this engine is the simulator engine, otherwise false.
     fn is_sim(&self) -> bool;

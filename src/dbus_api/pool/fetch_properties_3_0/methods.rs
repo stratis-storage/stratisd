@@ -11,14 +11,17 @@ use dbus::{
 use dbus_tree::{MTSync, MethodInfo, MethodResult};
 use itertools::Itertools;
 
-use crate::dbus_api::{
-    consts,
-    pool::shared::{
-        get_pool_clevis_info, get_pool_encryption_key_desc, get_pool_has_cache,
-        get_pool_total_size, get_pool_total_used,
+use crate::{
+    dbus_api::{
+        consts,
+        pool::shared::{
+            get_pool_clevis_info, get_pool_encryption_key_desc, get_pool_has_cache,
+            get_pool_total_size, get_pool_total_used,
+        },
+        types::TData,
+        util::result_to_tuple,
     },
-    types::TData,
-    util::result_to_tuple,
+    engine::Engine,
 };
 
 const ALL_PROPERTIES: [&str; 5] = [
@@ -29,10 +32,13 @@ const ALL_PROPERTIES: [&str; 5] = [
     consts::POOL_CLEVIS_INFO,
 ];
 
-fn get_properties_shared(
-    m: &MethodInfo<MTSync<TData>, TData>,
+fn get_properties_shared<E>(
+    m: &MethodInfo<MTSync<TData<E>>, TData<E>>,
     properties: &mut dyn Iterator<Item = String>,
-) -> MethodResult {
+) -> MethodResult
+where
+    E: 'static + Engine,
+{
     let message: &Message = m.msg;
 
     let return_message = message.method_return();

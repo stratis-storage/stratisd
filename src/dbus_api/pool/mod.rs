@@ -11,20 +11,23 @@ use crate::{
         types::{DbusContext, InterfacesAddedThreadSafe, OPContext},
         util::make_object_path,
     },
-    engine::{Name, Pool, PoolUuid, StratisUuid},
+    engine::{Engine, Name, PoolUuid, StratisUuid},
 };
 
 mod fetch_properties_3_0;
 mod pool_3_0;
 mod shared;
 
-pub fn create_dbus_pool<'a>(
-    dbus_context: &DbusContext,
+pub fn create_dbus_pool<'a, E>(
+    dbus_context: &DbusContext<E>,
     parent: dbus::Path<'static>,
     name: &Name,
     uuid: PoolUuid,
-    pool: &dyn Pool,
-) -> dbus::Path<'a> {
+    pool: &E::Pool,
+) -> dbus::Path<'a>
+where
+    E: 'static + Engine,
+{
     let f = Factory::new_sync();
 
     let object_name = make_object_path(dbus_context);
@@ -62,23 +65,26 @@ pub fn create_dbus_pool<'a>(
         );
 
     let path = object_path.get_name().to_owned();
-    let interfaces = get_pool_properties(name, uuid, pool);
+    let interfaces = get_pool_properties::<E>(name, uuid, pool);
     dbus_context.push_add(object_path, interfaces);
     path
 }
 
 /// Get the initial state of all properties associated with a pool object.
-pub fn get_pool_properties(
+pub fn get_pool_properties<E>(
     pool_name: &Name,
     pool_uuid: PoolUuid,
-    pool: &dyn Pool,
-) -> InterfacesAddedThreadSafe {
+    pool: &E::Pool,
+) -> InterfacesAddedThreadSafe
+where
+    E: 'static + Engine,
+{
     initial_properties! {
         consts::POOL_INTERFACE_NAME_3_0 => {
             consts::POOL_NAME_PROP => shared::pool_name_prop(pool_name),
             consts::POOL_UUID_PROP => uuid_to_string!(pool_uuid),
-            consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop(pool),
-            consts::POOL_AVAIL_ACTIONS_PROP => shared::pool_avail_actions_prop(pool)
+            consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop::<E>(pool),
+            consts::POOL_AVAIL_ACTIONS_PROP => shared::pool_avail_actions_prop::<E>(pool)
         }
     }
 }

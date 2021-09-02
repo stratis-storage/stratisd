@@ -19,13 +19,16 @@ use crate::{
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
     engine::{
-        CreateAction, DeleteAction, EngineAction, FilesystemUuid, KeyDescription, Name, PoolUuid,
-        RenameAction,
+        CreateAction, DeleteAction, Engine, EngineAction, FilesystemUuid, KeyDescription, Name,
+        Pool, PoolUuid, RenameAction,
     },
     stratis::StratisError,
 };
 
-pub fn create_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+pub fn create_filesystems<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+where
+    E: 'static + Engine,
+{
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -130,7 +133,10 @@ pub fn create_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult 
     )])
 }
 
-pub fn destroy_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+pub fn destroy_filesystems<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+where
+    E: 'static + Engine,
+{
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -207,7 +213,10 @@ pub fn destroy_filesystems(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
     Ok(vec![msg])
 }
 
-pub fn snapshot_filesystem(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+pub fn snapshot_filesystem<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+where
+    E: 'static + Engine,
+{
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -281,11 +290,17 @@ pub fn snapshot_filesystem(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult
     Ok(vec![msg])
 }
 
-pub fn add_datadevs(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+pub fn add_datadevs<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+where
+    E: 'static + Engine,
+{
     add_blockdevs(m, BlockDevOp::AddData)
 }
 
-pub fn rename_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+pub fn rename_pool<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+where
+    E: 'static + Engine,
+{
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -341,15 +356,24 @@ pub fn rename_pool(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-pub fn init_cache(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+pub fn init_cache<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+where
+    E: 'static + Engine,
+{
     add_blockdevs(m, BlockDevOp::InitCache)
 }
 
-pub fn add_cachedevs(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+pub fn add_cachedevs<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+where
+    E: 'static + Engine,
+{
     add_blockdevs(m, BlockDevOp::AddCache)
 }
 
-pub fn bind_clevis(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+pub fn bind_clevis<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+where
+    E: 'static + Engine,
+{
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
     let pin: String = get_next_arg(&mut iter, 0)?;
@@ -400,7 +424,10 @@ pub fn bind_clevis(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-pub fn unbind_clevis(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+pub fn unbind_clevis<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+where
+    E: 'static + Engine,
+{
     let message: &Message = m.msg;
 
     let dbus_context = m.tree.get_data();
@@ -437,7 +464,10 @@ pub fn unbind_clevis(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-pub fn bind_keyring(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+pub fn bind_keyring<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+where
+    E: 'static + Engine,
+{
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
     let key_desc_str: String = get_next_arg(&mut iter, 0)?;
@@ -488,7 +518,10 @@ pub fn bind_keyring(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-pub fn unbind_keyring(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+pub fn unbind_keyring<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+where
+    E: 'static + Engine,
+{
     let message: &Message = m.msg;
 
     let dbus_context = m.tree.get_data();
@@ -525,7 +558,10 @@ pub fn unbind_keyring(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-pub fn rebind_keyring(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+pub fn rebind_keyring<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+where
+    E: 'static + Engine,
+{
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
     let key_desc_str: String = get_next_arg(&mut iter, 0)?;
@@ -584,7 +620,10 @@ pub fn rebind_keyring(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
     Ok(vec![msg])
 }
 
-pub fn rebind_clevis(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+pub fn rebind_clevis<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+where
+    E: 'static + Engine,
+{
     let message: &Message = m.msg;
 
     let dbus_context = m.tree.get_data();

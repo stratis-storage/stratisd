@@ -10,10 +10,13 @@ use crate::{
         types::{DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg},
     },
-    engine::{FilesystemUuid, RenameAction},
+    engine::{Engine, FilesystemUuid, Pool, RenameAction},
 };
 
-pub fn rename_filesystem(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
+pub fn rename_filesystem<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+where
+    E: Engine,
+{
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 

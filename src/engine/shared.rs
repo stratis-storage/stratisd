@@ -18,7 +18,7 @@ use libcryptsetup_rs::SafeMemHandle;
 
 use crate::{
     engine::{
-        engine::{Pool, MAX_STRATIS_PASS_SIZE},
+        engine::{BlockDev, Pool, MAX_STRATIS_PASS_SIZE},
         types::{
             BlockDevTier, CreateAction, DevUuid, EncryptionInfo, PoolEncryptionInfo, PoolUuid,
             SetCreateAction, SizedKeyMemory,
@@ -40,11 +40,14 @@ const MIN_THIN_DEV_SIZE: Sectors = Sectors(64 * IEC::Ki); // 32 MiB
 /// existing pool. Returns an error if the specifications of the requested
 /// pool differ from the specifications of the existing pool, otherwise
 /// returns Ok(CreateAction::Identity).
-pub fn create_pool_idempotent_or_err(
-    pool: &dyn Pool,
+pub fn create_pool_idempotent_or_err<P>(
+    pool: &P,
     pool_name: &str,
     blockdev_paths: &[&Path],
-) -> StratisResult<CreateAction<PoolUuid>> {
+) -> StratisResult<CreateAction<PoolUuid>>
+where
+    P: Pool,
+{
     let input_devices: HashSet<PathBuf, RandomState> =
         blockdev_paths.iter().map(|p| p.to_path_buf()).collect();
 

@@ -6,6 +6,7 @@ use std::{
     any::type_name,
     collections::HashMap,
     fmt::{self, Debug},
+    marker::PhantomData,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
@@ -18,16 +19,36 @@ use dbus::{
     Path,
 };
 use dbus_tree::{DataType, MTSync, ObjectPath, Tree};
-use tokio::sync::{mpsc::UnboundedSender as TokioSender, RwLock};
+use tokio::sync::{mpsc::UnboundedSender as TokioSender, RwLock, RwLockWriteGuard};
 
-use crate::engine::{ActionAvailability, Lockable, LockableEngine, StratisUuid};
+use crate::{
+    dbus_api::{
+        connection::{DbusConnectionHandler, DbusTreeHandler},
+        udev::DbusUdevHandler,
+    },
+    engine::{ActionAvailability, Engine, ExclusiveGuard, Lockable, LockableEngine, StratisUuid},
+};
 
 /// Type for lockable D-Bus tree object.
-pub type LockableTree = Lockable<Arc<RwLock<Tree<MTSync<TData>, TData>>>>;
+pub type LockableTree<E> = Lockable<Arc<RwLock<Tree<MTSync<TData<E>>, TData<E>>>>>;
 
 /// Type for return value of `GetManagedObjects`.
 pub type GetManagedObjects =
     HashMap<dbus::Path<'static>, HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>>;
+
+/// Type representing an acquired write lock for the D-Bus tree.
+pub type TreeWriteLock<'a, E> =
+    ExclusiveGuard<RwLockWriteGuard<'a, Tree<MTSync<TData<E>>, TData<E>>>>;
+
+/// Type representing all of the handlers for driving the multithreaded D-Bus layer.
+pub type DbusHandlers<E> = Result<
+    (
+        DbusConnectionHandler<E>,
+        DbusUdevHandler<E>,
+        DbusTreeHandler<E>,
+    ),
+    dbus::Error,
+>;
 
 /// Type for interfaces parameter for `ObjectManagerInterfacesAdded`. This type cannot be sent
 /// over the D-Bus but it is safe to send across threads.
@@ -49,8 +70,11 @@ pub enum DbusErrorEnum {
 pub const OK_STRING: &str = "Ok";
 
 #[derive(Debug)]
-pub enum DbusAction {
-    Add(ObjectPath<MTSync<TData>, TData>, InterfacesAddedThreadSafe),
+pub enum DbusAction<E> {
+    Add(
+        ObjectPath<MTSync<TData<E>>, TData<E>>,
+        InterfacesAddedThreadSafe,
+    ),
     Remove(Path<'static>, InterfacesRemoved),
     FsNameChange(Path<'static>, String),
     PoolNameChange(Path<'static>, String),
@@ -72,30 +96,43 @@ impl OPContext {
     }
 }
 
-#[derive(Clone)]
-pub struct DbusContext {
+pub struct DbusContext<E> {
     next_index: Arc<AtomicU64>,
-    pub(super) engine: LockableEngine,
-    pub(super) sender: TokioSender<DbusAction>,
+    pub(super) engine: LockableEngine<E>,
+    pub(super) sender: TokioSender<DbusAction<E>>,
     connection: Arc<SyncConnection>,
 }
 
-impl Debug for DbusContext {
+impl<E> Clone for DbusContext<E> {
+    fn clone(&self) -> Self {
+        DbusContext {
+            next_index: Arc::clone(&self.next_index),
+            engine: self.engine.clone(),
+            sender: self.sender.clone(),
+            connection: Arc::clone(&self.connection),
+        }
+    }
+}
+
+impl<E> Debug for DbusContext<E> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("DbusContext")
             .field("next_index", &self.next_index)
-            .field("engine", &type_name::<LockableEngine>())
+            .field("engine", &type_name::<LockableEngine<E>>())
             .field("sender", &self.sender)
             .finish()
     }
 }
 
-impl DbusContext {
+impl<E> DbusContext<E>
+where
+    E: Engine,
+{
     pub fn new(
-        engine: LockableEngine,
-        sender: TokioSender<DbusAction>,
+        engine: LockableEngine<E>,
+        sender: TokioSender<DbusAction<E>>,
         connection: Arc<SyncConnection>,
-    ) -> DbusContext {
+    ) -> DbusContext<E> {
         DbusContext {
             engine,
             next_index: Arc::new(AtomicU64::new(0)),
@@ -114,7 +151,7 @@ impl DbusContext {
 
     pub fn push_add(
         &self,
-        object_path: ObjectPath<MTSync<TData>, TData>,
+        object_path: ObjectPath<MTSync<TData<E>>, TData<E>>,
         interfaces: InterfacesAddedThreadSafe,
     ) {
         let object_path_name = object_path.get_name().clone();
@@ -185,10 +222,17 @@ impl DbusContext {
     }
 }
 
-#[derive(Default, Debug)]
-pub struct TData;
-impl DataType for TData {
-    type Tree = DbusContext;
+#[derive(Debug)]
+pub struct TData<E>(PhantomData<E>);
+
+impl<E> Default for TData<E> {
+    fn default() -> Self {
+        TData(PhantomData)
+    }
+}
+
+impl<E> DataType for TData<E> {
+    type Tree = DbusContext<E>;
     type ObjectPath = Option<OPContext>;
     type Property = ();
     type Interface = ();

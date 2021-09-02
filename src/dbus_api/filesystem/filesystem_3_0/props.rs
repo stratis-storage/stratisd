@@ -10,20 +10,21 @@ use crate::{
         filesystem::shared::{self, filesystem_operation},
         types::TData,
     },
-    engine::{Filesystem, Name},
+    engine::{Engine, Name, Pool},
 };
 
 /// Get a filesystem property and place it on the D-Bus. The property is
 /// found by means of the getter method which takes a reference to a
 /// Filesystem and obtains the property from the filesystem.
-fn get_filesystem_property<F, R>(
+fn get_filesystem_property<F, R, E>(
     i: &mut IterAppend,
-    p: &PropInfo<MTSync<TData>, TData>,
+    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
     getter: F,
 ) -> Result<(), MethodErr>
 where
-    F: Fn((Name, Name, &dyn Filesystem)) -> Result<R, String>,
+    F: Fn((Name, Name, &<E::Pool as Pool>::Filesystem)) -> Result<R, String>,
     R: dbus::arg::Append,
+    E: Engine,
 {
     i.append(
         filesystem_operation(p.tree, p.path.get_name(), getter)
@@ -33,26 +34,35 @@ where
 }
 
 /// Get the devnode for an object path.
-pub fn get_filesystem_devnode(
+pub fn get_filesystem_devnode<E>(
     i: &mut IterAppend,
-    p: &PropInfo<MTSync<TData>, TData>,
-) -> Result<(), MethodErr> {
+    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+) -> Result<(), MethodErr>
+where
+    E: Engine,
+{
     get_filesystem_property(i, p, |(pool_name, fs_name, fs)| {
-        Ok(shared::fs_devnode_prop(fs, &pool_name, &fs_name))
+        Ok(shared::fs_devnode_prop::<E>(fs, &pool_name, &fs_name))
     })
 }
 
-pub fn get_filesystem_name(
+pub fn get_filesystem_name<E>(
     i: &mut IterAppend,
-    p: &PropInfo<MTSync<TData>, TData>,
-) -> Result<(), MethodErr> {
+    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+) -> Result<(), MethodErr>
+where
+    E: Engine,
+{
     get_filesystem_property(i, p, |(_, fs_name, _)| Ok(shared::fs_name_prop(&fs_name)))
 }
 
 /// Get the creation date and time in rfc3339 format.
-pub fn get_filesystem_created(
+pub fn get_filesystem_created<E>(
     i: &mut IterAppend,
-    p: &PropInfo<MTSync<TData>, TData>,
-) -> Result<(), MethodErr> {
-    get_filesystem_property(i, p, |(_, _, fs)| Ok(shared::fs_created_prop(fs)))
+    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+) -> Result<(), MethodErr>
+where
+    E: Engine,
+{
+    get_filesystem_property(i, p, |(_, _, fs)| Ok(shared::fs_created_prop::<E>(fs)))
 }

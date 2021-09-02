@@ -14,7 +14,7 @@ use tokio::{
 };
 
 use crate::{
-    engine::{Lockable, LockableEngine, SimEngine, StratEngine, UdevEngineEvent},
+    engine::{Engine, Lockable, LockableEngine, SimEngine, StratEngine, UdevEngineEvent},
     stratis::{
         dm::dm_event_thread, errors::StratisResult, ipc_support::setup, stratis::VERSION,
         udev_monitor::udev_thread,
@@ -59,64 +59,68 @@ pub fn run(sim: bool) -> StratisResult<()> {
         })
         .build()?;
     runtime.block_on(async move {
-        let engine: LockableEngine = {
-            info!("stratis daemon version {} started", VERSION);
-            if sim {
-                info!("Using SimEngine");
-                Lockable::new_exclusive(SimEngine::default())
+        async fn start_threads<E>(engine: LockableEngine<E>, sim: bool) -> StratisResult<()> where E: 'static + Engine {
+            let (trigger, should_exit) = channel(1);
+            let (sender, receiver) = unbounded_channel::<UdevEngineEvent>();
+
+            let join_udev = udev_thread(sender, should_exit);
+            let join_ipc = setup(engine.clone(), receiver, trigger.clone());
+            let join_signal = signal_thread();
+            let join_dm = dm_event_thread(if sim {
+                None
             } else {
-                info!("Using StratEngine");
+                Some(engine.clone())
+            });
+
+            select! {
+                res = join_udev => {
+                    if let Err(e) = res {
+                        error!("The udev thread exited with an error: {}; shutting down stratisd...", e);
+                        return Err(e);
+                    } else {
+                        info!("The udev thread exited; shutting down stratisd...");
+                    }
+                }
+                res = join_ipc => {
+                    if let Err(e) = res {
+                        error!("The IPC thread exited with an error: {}; shutting down stratisd...", e);
+                    } else {
+                        info!("The IPC thread exited; shutting down stratisd...");
+                    }
+                },
+                Err(e) = join_dm => {
+                    error!("The devicemapper thread exited with an error: {}; shutting down stratisd...", e);
+                    return Err(e);
+                },
+                _ = join_signal => {
+                    info!("Caught SIGINT; exiting...");
+                },
+            }
+
+            if let Err(e) = trigger.send(()) {
+                warn!("Failed to notify blocking stratisd threads to shut down: {}", e);
+            }
+
+            Ok(())
+        }
+
+        info!("stratis daemon version {} started", VERSION);
+        if sim {
+            info!("Using SimEngine");
+            start_threads(Lockable::new_exclusive(SimEngine::default()), sim).await
+        } else {
+            info!("Using StratEngine");
+            start_threads(
                 Lockable::new_exclusive(match StratEngine::initialize() {
                     Ok(engine) => engine,
                     Err(e) => {
                         error!("Failed to start up stratisd engine: {}; exiting", e);
                         return Err(e);
                     }
-                })
-            }
-        };
-
-        let (trigger, should_exit) = channel(1);
-        let (sender, receiver) = unbounded_channel::<UdevEngineEvent>();
-
-        let join_udev = udev_thread(sender, should_exit);
-        let join_ipc = setup(engine.clone(), receiver, trigger.clone());
-        let join_signal = signal_thread();
-        let join_dm = dm_event_thread(if sim {
-            None
-        } else {
-            Some(engine.clone())
-        });
-
-        select! {
-            res = join_udev => {
-                if let Err(e) = res {
-                    error!("The udev thread exited with an error: {}; shutting down stratisd...", e);
-                    return Err(e);
-                } else {
-                    info!("The udev thread exited; shutting down stratisd...");
-                }
-            }
-            res = join_ipc => {
-                if let Err(e) = res {
-                    error!("The IPC thread exited with an error: {}; shutting down stratisd...", e);
-                    return Err(e);
-                } else {
-                    info!("The IPC thread exited; shutting down stratisd...");
-                }
-            }
-            Err(e) = join_dm => {
-                error!("The devicemapper thread exited with an error: {}; shutting down stratisd...", e);
-                return Err(e);
-            }
-            _ = join_signal => {
-                info!("Caught SIGINT; exiting...");
-            }
+                }),
+                sim
+            ).await
         }
-        if let Err(e) = trigger.send(()) {
-            warn!("Failed to notify blocking stratisd threads to shut down: {}", e);
-        }
-        Ok(())
     })?;
     Ok(())
 }

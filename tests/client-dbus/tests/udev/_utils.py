@@ -240,6 +240,7 @@ class _Service:
     Start and stop stratisd.
     """
 
+    # pylint: disable=consider-using-with
     def start_service(self):
         """
         Starts the stratisd service if it is not already started. Verifies

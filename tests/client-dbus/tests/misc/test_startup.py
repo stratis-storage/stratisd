@@ -33,6 +33,7 @@ class TestUniqueInstance(unittest.TestCase):
     Test that only one instance of stratisd can be running at any given time.
     """
 
+    # pylint: disable=consider-using-with
     def setUp(self):
         """
         Start the original stratisd instance. Register a cleanup function to

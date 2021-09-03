@@ -12,7 +12,7 @@ use std::{
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde_json::Value;
-use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
+use tokio::sync::{OwnedRwLockReadGuard, OwnedRwLockWriteGuard};
 
 use devicemapper::{Bytes, Sectors};
 
@@ -303,7 +303,7 @@ pub trait Engine: Debug + Report + Send + Sync {
     /// precondition: the subsystem of the device evented on is "block".
     async fn handle_event(
         &self,
-        event: &UdevEngineEvent,
+        event: UdevEngineEvent,
     ) -> Option<SomeLockReadGuard<PoolUuid, Self::Pool>>;
 
     /// Destroy a pool.
@@ -359,10 +359,10 @@ pub trait Engine: Debug + Report + Send + Sync {
     async fn evented(&self) -> StratisResult<()>;
 
     /// Get the handler for kernel keyring operations.
-    async fn get_key_handler(&self) -> SharedGuard<RwLockReadGuard<Self::KeyActions>>;
+    async fn get_key_handler(&self) -> SharedGuard<OwnedRwLockReadGuard<Self::KeyActions>>;
 
     /// Get the handler for kernel keyring operations mutably.
-    async fn get_key_handler_mut(&self) -> ExclusiveGuard<RwLockWriteGuard<Self::KeyActions>>;
+    async fn get_key_handler_mut(&self) -> ExclusiveGuard<OwnedRwLockWriteGuard<Self::KeyActions>>;
 
     /// Return true if this engine is the simulator engine, otherwise false.
     fn is_sim(&self) -> bool;

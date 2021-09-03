@@ -19,7 +19,7 @@ use dbus::{
     Path,
 };
 use dbus_tree::{DataType, MTSync, ObjectPath, Tree};
-use tokio::sync::{mpsc::UnboundedSender as TokioSender, RwLock, RwLockWriteGuard};
+use tokio::sync::{mpsc::UnboundedSender as TokioSender, OwnedRwLockWriteGuard, RwLock};
 
 use crate::{
     dbus_api::{
@@ -37,8 +37,7 @@ pub type GetManagedObjects =
     HashMap<dbus::Path<'static>, HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>>;
 
 /// Type representing an acquired write lock for the D-Bus tree.
-pub type TreeWriteLock<'a, E> =
-    ExclusiveGuard<RwLockWriteGuard<'a, Tree<MTSync<TData<E>>, TData<E>>>>;
+pub type TreeWriteLock<E> = ExclusiveGuard<OwnedRwLockWriteGuard<Tree<MTSync<TData<E>>, TData<E>>>>;
 
 /// Type representing all of the handlers for driving the multithreaded D-Bus layer.
 pub type DbusHandlers<E> = Result<

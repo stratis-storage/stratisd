@@ -9,7 +9,7 @@ use futures::executor::block_on;
 use serde_json::Value;
 
 use devicemapper::DmNameBuf;
-use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use tokio::sync::{OwnedRwLockReadGuard, OwnedRwLockWriteGuard, RwLock};
 
 use crate::{
     engine::{
@@ -91,7 +91,7 @@ impl StratEngine {
     #[cfg(test)]
     pub fn teardown(self) -> StratisResult<()> {
         let mut untorndown_pools = Vec::new();
-        let mut write_all = block_on(self.pools.write_all());
+        let mut write_all = block_on(self.pools.write_all(lock_debug_info!()));
         for (_, uuid, pool) in write_all.iter_mut() {
             pool.teardown()
                 .unwrap_or_else(|_| untorndown_pools.push(uuid));
@@ -114,7 +114,7 @@ impl<'a> Into<Value> for &'a StratEngine {
     fn into(self) -> Value {
         let json = json!({
             "pools": Value::Array(
-                block_on(self.pools.read_all()).iter()
+                block_on(self.pools.read_all(lock_debug_info!())).iter()
                     .map(|(name, uuid, pool)| {
                         let mut json = json!({
                             "uuid": Value::from(uuid.to_string()),
@@ -167,21 +167,28 @@ impl Engine for StratEngine {
 
     async fn handle_event(
         &self,
-        event: &UdevEngineEvent,
+        event: UdevEngineEvent,
     ) -> Option<SomeLockReadGuard<PoolUuid, Self::Pool>> {
-        if let Some((pool_uuid, pool_name, pool)) = self
-            .liminal_devices
-            .write()
-            .await
-            .block_evaluate(&*self.pools.read_all().await, event)
-        {
-            self.pools
-                .write_all()
-                .await
-                .insert(pool_name.clone(), pool_uuid, pool);
+        let evaluated = {
+            let mut ld_guard = self.liminal_devices.write().await;
+            let pools_read_all = self.pools.read_all(lock_debug_info!()).await;
+            match spawn_blocking!(ld_guard.block_evaluate(&*pools_read_all, &event)) {
+                Ok(opt) => opt,
+                Err(e) => {
+                    warn!("Failed to handle provided udev event: {}", e);
+                    return None;
+                }
+            }
+        };
+        if let Some((pool_uuid, pool_name, pool)) = evaluated {
+            self.pools.write_all(lock_debug_info!()).await.insert(
+                pool_name.clone(),
+                pool_uuid,
+                pool,
+            );
             Some(
                 self.pools
-                    .read(LockKey::Uuid(pool_uuid))
+                    .read(LockKey::Uuid(pool_uuid), lock_debug_info!())
                     .await
                     .expect("just_inserted"),
             )
@@ -204,7 +211,11 @@ impl Engine for StratEngine {
 
         validate_paths(blockdev_paths)?;
 
-        if let Some(guard) = self.pools.read(LockKey::Name(name.clone())).await {
+        let maybe_guard = self
+            .pools
+            .read(LockKey::Name(name.clone()), lock_debug_info!())
+            .await;
+        if let Some(guard) = maybe_guard {
             let (name, _, pool) = guard.as_tuple();
             create_pool_idempotent_or_err(pool, &name, blockdev_paths)
         } else if blockdev_paths.is_empty() {
@@ -212,16 +223,38 @@ impl Engine for StratEngine {
                 "At least one blockdev is required to create a pool.".to_string(),
             ))
         } else {
-            let (uuid, pool) =
-                StratPool::initialize(&*name, blockdev_paths, redundancy, encryption_info)?;
+            let cloned_name = name.to_string();
+            let cloned_paths = blockdev_paths
+                .iter()
+                .map(|p| p.to_path_buf())
+                .collect::<Vec<_>>();
+            let cloned_enc_info = encryption_info.cloned();
 
-            self.pools.write_all().await.insert(name, uuid, pool);
+            let (uuid, pool) = spawn_blocking!({
+                let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
+                let pool = StratPool::initialize(
+                    &*cloned_name,
+                    &borrowed_paths,
+                    redundancy,
+                    cloned_enc_info.as_ref(),
+                );
+                pool
+            })??;
+
+            self.pools
+                .write_all(lock_debug_info!())
+                .await
+                .insert(name, uuid, pool);
             Ok(CreateAction::Created(uuid))
         }
     }
 
     async fn destroy_pool(&self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {
-        if let Some(pool) = self.pools.read(LockKey::Uuid(uuid)).await {
+        if let Some(pool) = self
+            .pools
+            .read(LockKey::Uuid(uuid), lock_debug_info!())
+            .await
+        {
             if pool.has_filesystems() {
                 return Err(StratisError::Msg("filesystems remaining on pool".into()));
             };
@@ -229,15 +262,13 @@ impl Engine for StratEngine {
             return Ok(DeleteAction::Identity);
         }
 
-        println!("HERE");
-
-        let mut guard = self.pools.write_all().await;
-        println!("THERE");
+        let mut guard = self.pools.write_all(lock_debug_info!()).await;
         let (pool_name, mut pool) = guard
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
 
-        if let Err(err) = pool.destroy() {
+        let (res, pool) = spawn_blocking!((pool.destroy(), pool))?;
+        if let Err(err) = res {
             guard.insert(pool_name, uuid, pool);
             Err(err)
         } else {
@@ -254,13 +285,15 @@ impl Engine for StratEngine {
         let new_name = Name::new(new_name.to_owned());
         let old_name = rename_pool_pre_idem!(self; uuid; new_name.clone());
 
-        let mut guard = self.pools.write_all().await;
+        let mut guard = self.pools.write_all(lock_debug_info!()).await;
 
         let (_, mut pool) = guard
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
 
-        if let Err(err) = pool.write_metadata(&new_name) {
+        let cloned_new_name = new_name.clone();
+        let (res, pool) = spawn_blocking!((pool.write_metadata(&cloned_new_name), pool))?;
+        if let Err(err) = res {
             guard.insert(old_name, uuid, pool);
             Err(err)
         } else {
@@ -276,11 +309,10 @@ impl Engine for StratEngine {
         pool_uuid: PoolUuid,
         unlock_method: UnlockMethod,
     ) -> StratisResult<SetUnlockAction<DevUuid>> {
-        let unlocked = self.liminal_devices.write().await.unlock_pool(
-            &*self.pools.read_all().await,
-            pool_uuid,
-            unlock_method,
-        )?;
+        let mut ld_guard = self.liminal_devices.write().await;
+        let pools_read_all = self.pools.read_all(lock_debug_info!()).await;
+        let unlocked =
+            spawn_blocking!(ld_guard.unlock_pool(&*pools_read_all, pool_uuid, unlock_method,))??;
         Ok(SetUnlockAction::new(unlocked))
     }
 
@@ -303,11 +335,11 @@ impl Engine for StratEngine {
     }
 
     async fn pools(&self) -> AllLockReadGuard<PoolUuid, Self::Pool> {
-        self.pools.read_all().await
+        self.pools.read_all(lock_debug_info!()).await
     }
 
     async fn pools_mut(&self) -> AllLockWriteGuard<PoolUuid, Self::Pool> {
-        self.pools.write_all().await
+        self.pools.write_all(lock_debug_info!()).await
     }
 
     async fn evented(&self) -> StratisResult<()> {
@@ -322,40 +354,55 @@ impl Engine for StratEngine {
             })
             .collect();
 
-        for (pool_name, pool_uuid, pool) in self.pools.write_all().await.iter_mut() {
-            let dev_names = pool.get_eventing_dev_names(*pool_uuid);
-            let event_nrs = device_list
-                .iter()
-                .filter_map(|(dm_name, event_nr)| {
-                    if dev_names.contains(dm_name) {
-                        Some((dm_name.clone(), *event_nr))
-                    } else {
-                        None
-                    }
-                })
-                .collect::<HashMap<_, _>>();
+        let mut all_event_nrs = HashMap::new();
+        {
+            let read_pools = self.pools.read_all(lock_debug_info!()).await;
+            for (_, pool_uuid, pool) in read_pools.iter() {
+                let dev_names = pool.get_eventing_dev_names(*pool_uuid);
+                let event_nrs = device_list
+                    .iter()
+                    .filter_map(|(dm_name, event_nr)| {
+                        if dev_names.contains(dm_name) {
+                            Some((dm_name.clone(), *event_nr))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<HashMap<_, _>>();
+                all_event_nrs.insert(*pool_uuid, event_nrs);
+            }
+        }
 
-            if self.watched_dev_last_event_nrs.read().await.get(pool_uuid) != Some(&event_nrs) {
+        let mut last_event_nrs = self.watched_dev_last_event_nrs.write().await;
+        for (pool_uuid, event_nrs) in all_event_nrs {
+            if last_event_nrs.get(&pool_uuid) != Some(&event_nrs) {
                 // Return error early before updating the watched event numbers
                 // so that if another event comes in on any pool, this method
                 // will retry eventing as the event number will be higher than
                 // what was previously recorded.
-                pool.event_on(*pool_uuid, pool_name)?;
+                if let Some(mut pool) = self
+                    .pools
+                    .write(LockKey::Uuid(pool_uuid), lock_debug_info!())
+                    .await
+                {
+                    let (pool_name, _, _) = pool.as_tuple();
+                    last_event_nrs.insert(pool_uuid, event_nrs);
+                    spawn_blocking!(pool.event_on(pool_uuid, &pool_name))??;
+                } else {
+                    last_event_nrs.remove(&pool_uuid);
+                    warn!("Pool with UUID {} appears to have been removed in the middle of handling devicemapper events", pool_uuid);
+                }
             }
-            self.watched_dev_last_event_nrs
-                .write()
-                .await
-                .insert(*pool_uuid, event_nrs);
         }
 
         Ok(())
     }
 
-    async fn get_key_handler(&self) -> SharedGuard<RwLockReadGuard<Self::KeyActions>> {
+    async fn get_key_handler(&self) -> SharedGuard<OwnedRwLockReadGuard<Self::KeyActions>> {
         self.key_handler.read().await
     }
 
-    async fn get_key_handler_mut(&self) -> ExclusiveGuard<RwLockWriteGuard<Self::KeyActions>> {
+    async fn get_key_handler_mut(&self) -> ExclusiveGuard<OwnedRwLockWriteGuard<Self::KeyActions>> {
         self.key_handler.write().await
     }
 
@@ -366,7 +413,7 @@ impl Engine for StratEngine {
 
 #[cfg(test)]
 mod test {
-    use std::{env, error::Error};
+    use std::{env, error::Error, path::Path};
 
     use devicemapper::{Bytes, Sectors};
 

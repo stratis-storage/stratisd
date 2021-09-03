@@ -40,7 +40,7 @@ where
         let udev_event = self.receiver.recv().await.ok_or_else(|| {
             StratisError::Msg("Channel from udev handler to D-Bus handler was shut".to_string())
         })?;
-        let optional_pool_info = self.dbus_context.engine.handle_event(&udev_event).await;
+        let optional_pool_info = self.dbus_context.engine.handle_event(udev_event).await;
 
         if let Some((pool_name, pool_uuid, pool)) =
             optional_pool_info.as_ref().map(|g| g.as_tuple())

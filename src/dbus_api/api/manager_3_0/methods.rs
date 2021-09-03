@@ -294,7 +294,7 @@ where
     let dbus_context = m.tree.get_data();
     let result = handle_action!(block_on(dbus_context.engine.create_pool(
         name,
-        &devs.map(|x| Path::new(x)).collect::<Vec<&Path>>(),
+        &devs.map(|x| Path::new(x)).collect::<Vec<_>>(),
         tuple_to_option(redundancy_tuple),
         EncryptionInfo::from_options((key_desc, clevis_info)).as_ref(),
     )));
@@ -308,7 +308,7 @@ where
                     let pool_object_path: dbus::Path = create_dbus_pool(
                         dbus_context,
                         object_path.clone(),
-                        &Name::new(name.to_string()),
+                        &Name::new(name.to_owned()),
                         uuid,
                         &*pool,
                     );

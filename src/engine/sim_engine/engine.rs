@@ -12,7 +12,7 @@ use std::{
 use async_trait::async_trait;
 use futures::executor::block_on;
 use serde_json::{json, Value};
-use tokio::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use tokio::sync::{OwnedRwLockReadGuard, OwnedRwLockWriteGuard, RwLock};
 
 use crate::{
     engine::{
@@ -52,7 +52,7 @@ impl<'a> Into<Value> for &'a SimEngine {
     fn into(self) -> Value {
         json!({
             "pools": Value::Array(
-                block_on(self.pools.read_all()).iter().map(|(name, uuid, pool)| {
+                block_on(self.pools.read_all(lock_debug_info!())).iter().map(|(name, uuid, pool)| {
                     let json = json!({
                         "pool_uuid": uuid.to_string(),
                         "name": name.to_string(),
@@ -116,7 +116,10 @@ impl Engine for SimEngine {
             }
         }
 
-        let guard = self.pools.read(LockKey::Name(name.clone())).await;
+        let guard = self
+            .pools
+            .read(LockKey::Name(name.clone()), lock_debug_info!())
+            .await;
         match guard.as_ref().map(|g| g.as_tuple()) {
             Some((_, _, pool)) => create_pool_idempotent_or_err(pool, &name, blockdev_paths),
             None => {
@@ -126,11 +129,11 @@ impl Engine for SimEngine {
                     ))
                 } else {
                     let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
-                    let devices = device_set.into_iter().cloned().collect::<Vec<&Path>>();
+                    let devices = device_set.into_iter().cloned().collect::<Vec<_>>();
 
                     let (pool_uuid, pool) = SimPool::new(&devices, redundancy, encryption_info);
 
-                    self.pools.write_all().await.insert(
+                    self.pools.write_all(lock_debug_info!()).await.insert(
                         Name::new(name.to_owned()),
                         pool_uuid,
                         pool,
@@ -144,19 +147,23 @@ impl Engine for SimEngine {
 
     async fn handle_event(
         &self,
-        _event: &UdevEngineEvent,
+        _event: UdevEngineEvent,
     ) -> Option<SomeLockReadGuard<PoolUuid, Self::Pool>> {
         None
     }
 
     async fn destroy_pool(&self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {
-        if let Some(pool) = self.pools.read(LockKey::Uuid(uuid)).await {
+        if let Some(pool) = self
+            .pools
+            .read(LockKey::Uuid(uuid), lock_debug_info!())
+            .await
+        {
             if pool.has_filesystems() {
                 return Err(StratisError::Msg("filesystems remaining on pool".into()));
             }
             drop(pool);
             self.pools
-                .write_all()
+                .write_all(lock_debug_info!())
                 .await
                 .remove_by_uuid(uuid)
                 .expect("Must succeed since self.pool.get_by_uuid() returned a value")
@@ -176,7 +183,7 @@ impl Engine for SimEngine {
         let new_name = Name::new(new_name.to_owned());
         rename_pool_pre_idem!(self; uuid; new_name.clone());
 
-        let mut guard = self.pools.write_all().await;
+        let mut guard = self.pools.write_all(lock_debug_info!()).await;
 
         let (_, pool) = guard
             .remove_by_uuid(uuid)
@@ -213,22 +220,22 @@ impl Engine for SimEngine {
     }
 
     async fn pools(&self) -> AllLockReadGuard<PoolUuid, Self::Pool> {
-        self.pools.read_all().await
+        self.pools.read_all(lock_debug_info!()).await
     }
 
     async fn pools_mut(&self) -> AllLockWriteGuard<PoolUuid, Self::Pool> {
-        self.pools.write_all().await
+        self.pools.write_all(lock_debug_info!()).await
     }
 
     async fn evented(&self) -> StratisResult<()> {
         Ok(())
     }
 
-    async fn get_key_handler(&self) -> SharedGuard<RwLockReadGuard<Self::KeyActions>> {
+    async fn get_key_handler(&self) -> SharedGuard<OwnedRwLockReadGuard<Self::KeyActions>> {
         self.key_handler.read().await
     }
 
-    async fn get_key_handler_mut(&self) -> ExclusiveGuard<RwLockWriteGuard<Self::KeyActions>> {
+    async fn get_key_handler_mut(&self) -> ExclusiveGuard<OwnedRwLockWriteGuard<Self::KeyActions>> {
         self.key_handler.write().await
     }
 
@@ -239,9 +246,6 @@ impl Engine for SimEngine {
 
 #[cfg(test)]
 mod tests {
-
-    use std::{self, path::Path};
-
     use crate::engine::{
         engine::{Engine, Pool},
         types::{EngineAction, RenameAction},

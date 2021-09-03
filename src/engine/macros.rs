@@ -16,13 +16,13 @@ macro_rules! calculate_redundancy {
 
 macro_rules! get_pool {
     ($s:ident; $key:expr) => {
-        $s.pools.read($key).await
+        $s.pools.read($key, lock_debug_info!()).await
     };
 }
 
 macro_rules! get_mut_pool {
     ($s:ident; $key:expr) => {
-        $s.pools.write($key).await
+        $s.pools.write($key, lock_debug_info!()).await
     };
 }
 
@@ -50,7 +50,12 @@ macro_rules! rename_pre_sync {
 macro_rules! rename_pre_async {
     ($s:expr; $uuid:expr; $new_name:expr; $not_found:expr; $same:expr) => {{
         let old_name = {
-            let guard = $s.read($crate::engine::types::LockKey::Uuid($uuid)).await;
+            let guard = $s
+                .read(
+                    $crate::engine::types::LockKey::Uuid($uuid),
+                    lock_debug_info!(),
+                )
+                .await;
             match guard.as_ref().map(|g| g.as_tuple()) {
                 Some((name, _, _)) => name,
                 None => return $not_found,
@@ -62,7 +67,10 @@ macro_rules! rename_pre_async {
         }
 
         if $s
-            .read($crate::engine::types::LockKey::Name($new_name))
+            .read(
+                $crate::engine::types::LockKey::Name($new_name),
+                lock_debug_info!(),
+            )
             .await
             .is_some()
         {
@@ -187,7 +195,7 @@ macro_rules! create_pool_generate_error_string {
 #[cfg(test)]
 macro_rules! strs_to_paths {
     ($slice:expr) => {
-        &$slice.iter().map(Path::new).collect::<Vec<_>>()
+        &$slice.iter().map(std::path::Path::new).collect::<Vec<_>>()
     };
 }
 

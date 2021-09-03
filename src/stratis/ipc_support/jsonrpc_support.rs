@@ -31,7 +31,7 @@ where
             };
             // Return value should be ignored as JSON RPC does not keep a record
             // of data structure information in the IPC layer.
-            let _ = engine.handle_event(&udev_event);
+            let _ = engine.handle_event(udev_event);
         }
     })
 }

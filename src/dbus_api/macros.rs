@@ -147,7 +147,7 @@ macro_rules! initial_properties {
             $(
                 ($iface, vec![
                     $(
-                        ($prop, Variant(
+                        ($prop, dbus::arg::Variant(
                             Box::new($val) as Box<dyn dbus::arg::RefArg + std::marker::Send + std::marker::Sync>
                         )),
                     )*

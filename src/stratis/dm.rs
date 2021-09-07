@@ -43,9 +43,11 @@ where
             Some(engine) => {
                 let fd = setup_dm()?;
                 loop {
+                    debug!("Starting handling of devicemapper event");
                     if let Err(e) = process_dm_event(&engine, &fd).await {
                         warn!("Failed to process devicemapper event: {}", e);
                     }
+                    debug!("Finished handling of devicemapper event");
                 }
             }
             None => {

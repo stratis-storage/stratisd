@@ -55,6 +55,7 @@ where
     let mut conn_handle = task::spawn_blocking(move || conn.process_dbus_requests());
     let mut udev_handle = task::spawn(async move {
         loop {
+            debug!("Starting D-Bus udev event handling");
             if let Err(e) = udev.handle_udev_event().await {
                 error!(
                     "Failed to process udev event in the D-Bus layer: {}; exiting D-Bus thread",
@@ -62,6 +63,7 @@ where
                 );
                 return;
             }
+            debug!("Finished D-Bus udev event handling");
         }
     });
 

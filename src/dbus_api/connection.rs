@@ -72,6 +72,7 @@ where
     /// Process a D-Bus action (add/remove) request.
     pub fn process_dbus_actions(&mut self) -> StratisResult<()> {
         loop {
+            debug!("Starting D-Bus tree event handling");
             let (action, write_lock) = {
                 let recv_fut = self.receiver.recv();
                 let should_exit_fut = self.should_exit.recv();
@@ -122,6 +123,7 @@ where
             };
 
             self.handle_dbus_action(action, write_lock);
+            debug!("Finished D-Bus tree event handling");
         }
         Ok(())
     }
@@ -354,6 +356,7 @@ where
                 let cloned_tree = tree.clone();
                 let cloned_connection = Arc::clone(&connection);
                 spawn_blocking(move || {
+                    debug!("Starting D-Bus request handling");
                     let lock = cloned_tree.blocking_read();
                     if let Some(msgs) = lock.handle(&msg) {
                         for msg in msgs {
@@ -369,6 +372,7 @@ where
                             }
                         }
                     }
+                    debug!("Finished D-Bus request handling");
                 });
                 true
             }),

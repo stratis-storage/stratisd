@@ -259,45 +259,6 @@ jobs:
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
-  python-checks:
-    strategy:
-      matrix:
-        include:
-          # PYTHON CHECKS ON CURRENT FEDORA AND PYTHON TOOLS VERSION
-          - dependencies: >
-              pylint
-              python3-dbus-client-gen
-              python3-dbus-python-client-gen
-              python3-psutil
-              python3-pyudev
-              python3-semantic_version
-            image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
-            task: PYTHONPATH=./src make -f Makefile lint
-            working-directory: ./tests/client-dbus
-          - dependencies: black python3-isort
-            image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
-            task: make -f Makefile fmt-travis
-            working-directory: ./tests/client-dbus
-          - dependencies: yamllint
-            image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
-            task: make -f Makefile yamllint
-            working-directory: .
-    runs-on: ubuntu-18.04
-    container: ${{ matrix.image }}
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install dependencies
-        run: >
-          dnf install -y
-          make
-          python-unversioned-command
-          ${{ matrix.dependencies }}
-      - name: Display Python version
-        run: python --version
-      - name: Run test
-        run: ${{ matrix.task }}
-        working-directory: ${{ matrix.working-directory }}
-
   stratis-cli-checks:
     runs-on: ubuntu-18.04
     container: fedora:30  # LOWEST SUPPORTED ENVIRONMENT PROXY

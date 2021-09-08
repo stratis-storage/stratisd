@@ -22,9 +22,9 @@ the Rust integration test framework.
 To run the real device backed tests:
 
 First, set up the configuration file to specify your set of scratch devices.
-Copy `tests/test_config.json.example` to `tests/test_config.json` and modify
-ok_to_destroy_dev_array_key to have a list of paths to scratch block
-devices. For example:
+
+The contents of the `tests/test_config.json` file should be a JSON array of
+paths to the scratch devices.  For example:
 
 ```
 {

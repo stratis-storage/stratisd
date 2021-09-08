@@ -55,7 +55,7 @@ pub fn uuid_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData
 }
 
 pub fn created_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
-    f.property::<&str, _>("Created", ())
+    f.property::<&str, _>(consts::FILESYSTEM_CREATED_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_filesystem_created)

@@ -88,7 +88,7 @@ pub fn created_property<E>(
 where
     E: 'static + Engine,
 {
-    f.property::<&str, _>("Created", ())
+    f.property::<&str, _>(consts::FILESYSTEM_CREATED_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_filesystem_created)

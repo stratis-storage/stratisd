@@ -31,7 +31,8 @@ paths to the scratch devices.  For example:
     "ok_to_destroy_dev_array_key": [
     				   "/dev/vdb",
     				   "/dev/vdc",
-    				   "/dev/vdd"
+				   "/dev/vdd",
+				   "/dev/vde"
     ]
 }
 ```

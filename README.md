@@ -122,7 +122,7 @@ $ make test
 ```
 
 For a description of the unsafe unit tests, necessary setup steps, and how to
-run them, see [`tests/README.md`](tests/README.md).
+run them, see [`README_tests.md`](README_tests.md).
 
 ##### Test that interact with stratisd via the D-Bus
 For a description of the D-Bus-based tests see

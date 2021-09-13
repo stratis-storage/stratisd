@@ -170,7 +170,7 @@ impl CryptHandle {
                 yes,
             )
         })?;
-        self.encryption_info.clevis_info = Some((pin.to_string(), json_owned));
+        self.encryption_info.clevis_info = self.clevis_info()?;
         Ok(())
     }
 

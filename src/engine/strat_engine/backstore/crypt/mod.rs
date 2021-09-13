@@ -16,7 +16,9 @@ pub use self::{
     consts::CLEVIS_TANG_TRUST_URL,
     handle::CryptHandle,
     initialize::CryptInitializer,
-    shared::{crypt_metadata_size, interpret_clevis_config},
+    shared::{
+        back_up_luks_header, crypt_metadata_size, interpret_clevis_config, restore_luks_header,
+    },
 };
 
 #[cfg(test)]

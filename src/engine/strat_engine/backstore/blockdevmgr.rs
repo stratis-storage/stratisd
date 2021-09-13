@@ -8,7 +8,7 @@ use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
     fs,
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use chrono::{DateTime, Duration, Utc};
@@ -470,7 +470,6 @@ impl BlockDevMgr {
             operation_loop(
                 self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
                 |blockdev| blockdev.bind_clevis(pin, clevis_info),
-                |_, blockdev| blockdev.unbind_clevis(),
             )?;
             Ok(true)
         }
@@ -493,15 +492,13 @@ impl BlockDevMgr {
             }
         };
 
-        if let Some((pin, clevis_info)) = encryption_info.clevis_info() {
+        if encryption_info.clevis_info().is_some() {
             operation_loop(
                 self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
                 |blockdev| blockdev.unbind_clevis(),
-                |_, blockdev| blockdev.bind_clevis(pin, clevis_info),
             )?;
             Ok(true)
         } else {
-            // is encrypted and Clevis info is None
             Ok(false)
         }
     }
@@ -548,7 +545,6 @@ impl BlockDevMgr {
             operation_loop(
                 self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
                 |blockdev| blockdev.bind_keyring(key_desc),
-                |_, blockdev| blockdev.unbind_keyring(),
             )?;
             Ok(true)
         }
@@ -572,11 +568,10 @@ impl BlockDevMgr {
             }
         };
 
-        if let Some(key_desc) = encryption_info.key_description() {
+        if encryption_info.key_description().is_some() {
             operation_loop(
                 self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
                 |blockdev| blockdev.unbind_keyring(),
-                |_, blockdev| blockdev.bind_keyring(key_desc),
             )?;
             Ok(true)
         } else {
@@ -605,18 +600,15 @@ impl BlockDevMgr {
 
         if encryption_info.key_description() == Some(key_desc) {
             Ok(Some(false))
+        } else if encryption_info.key_description().is_some() {
+            // Keys are not the same but key description is present
+            operation_loop(
+                self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
+                |blockdev| blockdev.rebind_keyring(key_desc),
+            )?;
+            Ok(Some(true))
         } else {
-            match encryption_info.key_description() {
-                Some(kd) => {
-                    operation_loop(
-                        self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
-                        |blockdev| blockdev.rebind_keyring(key_desc),
-                        |_, blockdev| blockdev.rebind_keyring(kd),
-                    )?;
-                    Ok(Some(true))
-                }
-                None => Ok(None),
-            }
+            Ok(None)
         }
     }
 
@@ -631,27 +623,6 @@ impl BlockDevMgr {
     /// so this method will either fail to regenerate the bindings or it will
     /// result in a metadata change.
     pub fn rebind_clevis(&mut self) -> StratisResult<()> {
-        fn rebind_clevis_with_tmp_files(
-            bd: &mut BlockDevMgr,
-            tmp_dir: &TempDir,
-        ) -> StratisResult<()> {
-            let mut original_headers = Vec::new();
-            let blockdevs = bd.blockdevs_mut();
-            for (_, blockdev) in blockdevs.iter() {
-                original_headers.push(back_up_luks_header(blockdev.physical_path(), tmp_dir)?);
-            }
-
-            operation_loop(
-                blockdevs.into_iter().map(|(_, bd)| bd),
-                |blockdev| blockdev.rebind_clevis(),
-                |index, blockdev| {
-                    restore_luks_header(blockdev.physical_path(), &original_headers[index])
-                },
-            )?;
-
-            Ok(())
-        }
-
         let encryption_info = match pool_enc_to_enc!(self.encryption_info()) {
             Some(ei) => ei,
             None => {
@@ -666,37 +637,32 @@ impl BlockDevMgr {
                 "Requested pool is not already bound to Clevis".to_string(),
             ))
         } else {
-            let tmp_dir = TempDir::new()?;
-            let res = rebind_clevis_with_tmp_files(self, &tmp_dir);
-            if let Err(e) = fs::remove_dir_all(tmp_dir.path()) {
-                warn!(
-                    "Leaked temporary files at path {}: {}",
-                    tmp_dir.path().display(),
-                    e
-                );
-            }
+            operation_loop(
+                self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
+                |blockdev| blockdev.rebind_clevis(),
+            )?;
 
-            res
+            Ok(())
         }
     }
 }
 
-fn operation_loop<'a, I, A, R>(blockdevs: I, action: A, rollback: R) -> StratisResult<()>
+fn operation_loop<'a, I, A>(blockdevs: I, action: A) -> StratisResult<()>
 where
     I: IntoIterator<Item = &'a mut StratBlockDev>,
     A: Fn(&mut StratBlockDev) -> StratisResult<()>,
-    R: Fn(usize, &mut StratBlockDev) -> StratisResult<()>,
 {
-    fn rollback_loop<R>(
+    fn rollback_loop(
         rollback_record: Vec<&mut StratBlockDev>,
-        rollback: R,
+        headers: Vec<PathBuf>,
         causal_error: StratisError,
-    ) -> StratisError
-    where
-        R: Fn(usize, &mut StratBlockDev) -> StratisResult<()>,
-    {
-        for (index, blockdev) in rollback_record.into_iter().enumerate() {
-            if let Err(e) = rollback(index, blockdev) {
+    ) -> StratisError {
+        // NOTE: Zip can be used here because the header will always be backed up before
+        // the operation is performed. As a result, the header iterator will always be
+        // equal to or longer than the blockdev record iterator which means all blockdevs
+        // that have had operations performed on them will always be restored.
+        for (blockdev, header) in rollback_record.into_iter().zip(headers) {
+            if let Err(e) = restore_luks_header(blockdev.devnode(), header.as_path()) {
                 warn!(
                     "Failed to roll back device operation for device {}: {}",
                     blockdev.physical_path().display(),
@@ -712,15 +678,38 @@ where
         causal_error
     }
 
-    let mut rollback_record = Vec::new();
-    for blockdev_ref in blockdevs {
-        if let Err(error) = action(blockdev_ref) {
-            return Err(rollback_loop(rollback_record, rollback, error));
-        } else {
-            rollback_record.push(blockdev_ref);
+    fn perform_operation<'a, I, A>(tmp_dir: &TempDir, blockdevs: I, action: A) -> StratisResult<()>
+    where
+        I: IntoIterator<Item = &'a mut StratBlockDev>,
+        A: Fn(&mut StratBlockDev) -> StratisResult<()>,
+    {
+        let mut original_headers = Vec::new();
+        let mut rollback_record = Vec::new();
+        for blockdev in blockdevs {
+            match back_up_luks_header(blockdev.physical_path(), tmp_dir) {
+                Ok(h) => original_headers.push(h),
+                Err(e) => return Err(rollback_loop(rollback_record, original_headers, e)),
+            };
+            let res = action(blockdev);
+            rollback_record.push(blockdev);
+            if let Err(error) = res {
+                return Err(rollback_loop(rollback_record, original_headers, error));
+            }
         }
+
+        Ok(())
     }
-    Ok(())
+
+    let tmp_dir = TempDir::new()?;
+    let res = perform_operation(&tmp_dir, blockdevs, action);
+    if let Err(e) = fs::remove_dir_all(tmp_dir.path()) {
+        warn!(
+            "Leaked temporary files at path {}: {}",
+            tmp_dir.path().display(),
+            e
+        );
+    }
+    res
 }
 
 impl Recordable<Vec<BaseBlockDevSave>> for BlockDevMgr {

@@ -171,7 +171,12 @@ impl CryptHandle {
             .metadata_handle
             .encryption_info
             .clone()
-            .set_clevis_info((pin.to_string(), json_owned));
+            .set_clevis_info(self.clevis_info()?.ok_or_else(|| {
+                StratisError::Msg(
+                    "Clevis reported successfully binding to device but no metadata was found"
+                        .to_string(),
+                )
+            })?);
         Ok(())
     }
 

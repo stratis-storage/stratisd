@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{clone::Clone, collections::HashMap, path::Path, sync::Arc};
+use std::{collections::HashMap, path::Path, sync::Arc};
 
 use async_trait::async_trait;
 use futures::executor::block_on;
@@ -15,11 +15,15 @@ use crate::{
     engine::{
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         strat_engine::{
+            backstore::Backstore,
             cmd::verify_binaries,
             dm::get_dm,
             keys::{MemoryFilesystem, StratKeyActions},
             liminal::{find_all, LiminalDevices},
+            metadata::MDADataSize,
             pool::StratPool,
+            serde_structs::{PoolSave, Recordable},
+            thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
         structures::{
             AllLockReadGuard, AllLockWriteGuard, AllOrSomeLock, ExclusiveGuard, Lockable,
@@ -165,36 +169,46 @@ impl Engine for StratEngine {
     type Pool = StratPool;
     type KeyActions = StratKeyActions;
 
-    async fn handle_event(
+    async fn handle_events(
         &self,
-        event: UdevEngineEvent,
-    ) -> Option<SomeLockReadGuard<PoolUuid, Self::Pool>> {
-        let evaluated = {
+        events: Vec<UdevEngineEvent>,
+    ) -> Vec<SomeLockReadGuard<PoolUuid, Self::Pool>> {
+        let mut ret_guards = Vec::new();
+        let uuids = {
             let mut ld_guard = self.liminal_devices.write().await;
-            let pools_read_all = self.pools.read_all(lock_debug_info!()).await;
-            match spawn_blocking!(ld_guard.block_evaluate(&*pools_read_all, &event)) {
-                Ok(opt) => opt,
+            let mut pools_write_all = self.pools.write_all(lock_debug_info!()).await;
+            match spawn_blocking!({
+                events
+                    .into_iter()
+                    .filter_map(|event| {
+                        if let Some((uuid, name, pool)) =
+                            ld_guard.block_evaluate(&*pools_write_all, &event)
+                        {
+                            pools_write_all.insert(name, uuid, pool);
+                            Some(uuid)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            }) {
+                Ok(u) => u,
                 Err(e) => {
-                    warn!("Failed to handle provided udev event: {}", e);
-                    return None;
+                    warn!("Failed to handle udev events: {}", e);
+                    return ret_guards;
                 }
             }
         };
-        if let Some((pool_uuid, pool_name, pool)) = evaluated {
-            self.pools.write_all(lock_debug_info!()).await.insert(
-                pool_name.clone(),
-                pool_uuid,
-                pool,
-            );
-            Some(
-                self.pools
-                    .read(LockKey::Uuid(pool_uuid), lock_debug_info!())
-                    .await
-                    .expect("just_inserted"),
-            )
-        } else {
-            None
+        for uuid in uuids {
+            if let Some(guard) = self
+                .pools
+                .read(LockKey::Uuid(uuid), lock_debug_info!())
+                .await
+            {
+                ret_guards.push(guard);
+            }
         }
+        ret_guards
     }
 
     async fn create_pool(
@@ -204,7 +218,7 @@ impl Engine for StratEngine {
         redundancy: Option<u16>,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
-        let redundancy = calculate_redundancy!(redundancy);
+        let _redundancy = calculate_redundancy!(redundancy);
 
         validate_name(name)?;
         let name = Name::new(name.to_owned());
@@ -223,29 +237,40 @@ impl Engine for StratEngine {
                 "At least one blockdev is required to create a pool.".to_string(),
             ))
         } else {
-            let cloned_name = name.to_string();
+            let pool_uuid = PoolUuid::new_v4();
+
+            let cloned_name = name.clone();
             let cloned_paths = blockdev_paths
                 .iter()
                 .map(|p| p.to_path_buf())
                 .collect::<Vec<_>>();
             let cloned_enc_info = encryption_info.cloned();
 
-            let (uuid, pool) = spawn_blocking!({
+            spawn_blocking!({
                 let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
-                let pool = StratPool::initialize(
-                    &*cloned_name,
+                let mut backstore = Backstore::initialize(
+                    pool_uuid,
                     &borrowed_paths,
-                    redundancy,
+                    MDADataSize::default(),
                     cloned_enc_info.as_ref(),
-                );
-                pool
+                )?;
+                let thin_pool = ThinPool::new(
+                    pool_uuid,
+                    &ThinPoolSizeParams::default(),
+                    DATA_BLOCK_SIZE,
+                    &mut backstore,
+                )?;
+                let data = serde_json::to_string(&PoolSave {
+                    name: cloned_name.to_string(),
+                    backstore: backstore.record(),
+                    flex_devs: thin_pool.record(),
+                    thinpool_dev: thin_pool.record(),
+                })?;
+                backstore.save_state(data.as_bytes())?;
+                StratisResult::Ok(())
             })??;
 
-            self.pools
-                .write_all(lock_debug_info!())
-                .await
-                .insert(name, uuid, pool);
-            Ok(CreateAction::Created(uuid))
+            Ok(CreateAction::Created(pool_uuid))
         }
     }
 

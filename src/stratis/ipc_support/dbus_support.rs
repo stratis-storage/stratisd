@@ -37,7 +37,7 @@ where
         spawn_blocking(move || create_dbus_handlers(engine_clone, receiver, trigger)).await??;
 
     for (pool_name, pool_uuid, pool) in engine.pools().await.iter() {
-        udev.register_pool(pool_name, *pool_uuid, pool)
+        udev.register_pool(pool_name, *pool_uuid, pool);
     }
 
     info!("D-Bus API is available");

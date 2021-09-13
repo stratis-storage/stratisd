@@ -301,10 +301,10 @@ pub trait Engine: Debug + Report + Send + Sync {
     /// and its uuid.
     ///
     /// precondition: the subsystem of the device evented on is "block".
-    async fn handle_event(
+    async fn handle_events(
         &self,
-        event: UdevEngineEvent,
-    ) -> Option<SomeLockReadGuard<PoolUuid, Self::Pool>>;
+        event: Vec<UdevEngineEvent>,
+    ) -> Vec<SomeLockReadGuard<PoolUuid, Self::Pool>>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.

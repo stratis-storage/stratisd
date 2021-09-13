@@ -145,11 +145,11 @@ impl Engine for SimEngine {
         }
     }
 
-    async fn handle_event(
+    async fn handle_events(
         &self,
-        _event: UdevEngineEvent,
-    ) -> Option<SomeLockReadGuard<PoolUuid, Self::Pool>> {
-        None
+        _: Vec<UdevEngineEvent>,
+    ) -> Vec<SomeLockReadGuard<PoolUuid, Self::Pool>> {
+        Vec::new()
     }
 
     async fn destroy_pool(&self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {

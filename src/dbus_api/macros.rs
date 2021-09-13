@@ -70,24 +70,6 @@ macro_rules! typed_uuid {
     };
 }
 
-/// Macro for early return with Ok dbus message on failure to get immutable pool.
-macro_rules! get_pool {
-    ($engine:expr; $uuid:ident; $default:expr; $message:expr) => {
-        if let Some(pool) =
-            futures::executor::block_on($engine.get_pool($crate::engine::LockKey::Uuid($uuid)))
-        {
-            pool
-        } else {
-            let message = format!("engine does not know about pool with uuid {}", $uuid);
-            let (rc, rs) = (
-                $crate::dbus_api::types::DbusErrorEnum::ERROR as u16,
-                message,
-            );
-            return Ok(vec![$message.append3($default, rc, rs)]);
-        }
-    };
-}
-
 /// Macro for early return with Ok dbus message on failure to get mutable pool.
 macro_rules! get_mut_pool {
     ($engine:expr; $uuid:ident; $default:expr; $message:expr) => {
@@ -194,4 +176,21 @@ macro_rules! handle_action {
         }
         action
     }};
+}
+
+macro_rules! pool_notify_lock {
+    ($expr:expr, $return_message:expr, $default_return:expr) => {{
+        match $expr {
+            Ok(g) => g,
+            Err(e) => {
+                let (rc, rs) = $crate::dbus_api::util::engine_to_dbus_err_tuple(
+                    &$crate::stratis::StratisError::Msg(format!(
+                        "stratisd has ended up in a bad state and is no longer able to report pool creation completion: {}",
+                        e,
+                    ))
+                );
+                return Ok(vec![$return_message.append3($default_return, rc, rs)]);
+            },
+        }
+    }}
 }

@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{convert::TryFrom, os::unix::io::AsRawFd, path::Path};
+use std::{convert::TryFrom, os::unix::io::AsRawFd, path::Path, time::Duration};
 
 use dbus::{
     arg::{Array, OwnedFd},
@@ -13,16 +13,14 @@ use futures::executor::block_on;
 
 use crate::{
     dbus_api::{
-        blockdev::create_dbus_blockdev,
         consts,
-        pool::create_dbus_pool,
         types::{DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
+        POOL_CONDVAR, POOL_SETUP_STATE,
     },
     engine::{
         CreateAction, DeleteAction, EncryptionInfo, Engine, EngineAction, KeyActions,
-        KeyDescription, MappingCreateAction, MappingDeleteAction, Name, Pool, PoolUuid,
-        UnlockMethod,
+        KeyDescription, MappingCreateAction, MappingDeleteAction, PoolUuid, UnlockMethod,
     },
     stratis::StratisError,
 };
@@ -290,7 +288,6 @@ where
         None => None,
     };
 
-    let object_path = m.path.get_name();
     let dbus_context = m.tree.get_data();
     let result = handle_action!(block_on(dbus_context.engine.create_pool(
         name,
@@ -303,30 +300,45 @@ where
         Ok(pool_uuid_action) => {
             let results = match pool_uuid_action {
                 CreateAction::Created(uuid) => {
-                    let pool = get_pool!(dbus_context.engine; uuid; default_return; return_message);
-
-                    let pool_object_path: dbus::Path = create_dbus_pool(
-                        dbus_context,
-                        object_path.clone(),
-                        &Name::new(name.to_owned()),
-                        uuid,
-                        &*pool,
+                    let mut guard = pool_notify_lock!(
+                        (*POOL_SETUP_STATE).lock(),
+                        return_message,
+                        default_return
                     );
-
-                    let bd_paths = pool
-                        .blockdevs()
-                        .into_iter()
-                        .map(|(uuid, tier, bd)| {
-                            create_dbus_blockdev(
-                                dbus_context,
-                                pool_object_path.clone(),
-                                uuid,
-                                tier,
-                                bd,
-                            )
-                        })
-                        .collect::<Vec<_>>();
-                    (true, (pool_object_path, bd_paths))
+                    guard.insert(uuid, None);
+                    // NOTE: Condvar keeps guard acquired if condition is false so we do not
+                    // need to check again as nothing can change the state between these two
+                    // statements.
+                    let (mut guard, timeout) = pool_notify_lock!(
+                        (*POOL_CONDVAR).wait_timeout_while(
+                            guard,
+                            Duration::from_secs(120),
+                            |state| {
+                                if let Some(paths) = state.get(&uuid) {
+                                    paths.is_none()
+                                } else {
+                                    // End wait if pool is not in state so that we can return an
+                                    // error.
+                                    false
+                                }
+                            }
+                        ),
+                        return_message,
+                        default_return
+                    );
+                    if timeout.timed_out() {
+                        warn!("Create pool request timed out waiting for pool to be created");
+                    }
+                    if let Some(Some((pool_path, bd_paths))) = guard.remove(&uuid) {
+                        (true, (pool_path, bd_paths))
+                    } else {
+                        let err = StratisError::Msg(format!(
+                            "Pool with UUID {} was not found after creation was requested",
+                            uuid
+                        ));
+                        let (rc, rs) = engine_to_dbus_err_tuple(&err);
+                        return Ok(vec![return_message.append3(default_return, rc, rs)]);
+                    }
                 }
                 CreateAction::Identity => default_return,
             };

@@ -100,7 +100,6 @@ pub fn run(sim: bool) -> StratisResult<()> {
                     } else {
                         info!("The udev thread exited; shutting down stratisd...");
                     }
-
                 }
                 res = join_ipc => {
                     if let Err(e) = res {

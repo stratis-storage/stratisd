@@ -229,7 +229,7 @@ jobs:
       options: --privileged -v /dev:/dev
     services:
       tang:
-        image: docker.pkg.github.com/stratis-storage/stratisd/tang:33
+        image: docker.pkg.github.com/stratis-storage/stratisd/tang:34
         credentials:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
@@ -384,6 +384,7 @@ jobs:
           PYTHONPATH=./src
           make udev-tests
         working-directory: ./tests/client-dbus
+
 
   shell-checks:
     runs-on: ubuntu-18.04

@@ -229,7 +229,7 @@ jobs:
       options: --privileged -v /dev:/dev
     services:
       tang:
-        image: docker.pkg.github.com/stratis-storage/stratisd/tang:33
+        image: docker.pkg.github.com/stratis-storage/stratisd/tang:34
         credentials:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
@@ -390,7 +390,7 @@ jobs:
       options: --privileged -v /dev:/dev
     services:
       tang:
-        image: docker.pkg.github.com/stratis-storage/stratisd/tang:33
+        image: docker.pkg.github.com/stratis-storage/stratisd/tang:34
         credentials:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}

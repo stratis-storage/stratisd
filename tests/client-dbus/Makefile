@@ -19,6 +19,10 @@ fmt-travis:
 	isort --diff --check-only src tests
 	black . --check
 
+.PHONY: tang-tests
+tang-tests:
+	python3 -m unittest ${UNITTEST_OPTS} tests.udev.test_bind
+
 .PHONY: udev-tests
 udev-tests:
 	python3 -m unittest ${UNITTEST_OPTS} tests.udev.test_udev

@@ -63,13 +63,15 @@ def random_string(length):
     )
 
 
-def create_pool(name, devices, *, key_description=None):
+def create_pool(name, devices, *, key_description=None, clevis_info=None):
     """
     Creates a stratis pool.
     :param name:    Name of pool
     :param devices:  Devices to use for pool
     :param key_description: optional key description
     :type key_description: str or NoneType
+    :param clevis_info: clevis information, pin and config
+    :type clevis_info: pair of str * str
     :return: result of the CreatePool D-Bus method call if it succeeds
     :rtype: bool * str * list of str
     :raises RuntimeError: if pool is not created
@@ -83,7 +85,9 @@ def create_pool(name, devices, *, key_description=None):
             "key_desc": (False, "")
             if key_description is None
             else (True, key_description),
-            "clevis_info": (False, ("", "")),
+            "clevis_info": (False, ("", ""))
+            if clevis_info is None
+            else (True, clevis_info),
         },
     )
 

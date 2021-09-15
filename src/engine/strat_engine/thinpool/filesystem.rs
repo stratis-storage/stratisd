@@ -35,7 +35,8 @@ use crate::{
             thinpool::{thinpool::DATA_LOWATER, DATA_BLOCK_SIZE},
         },
         types::{
-            FilesystemUuid, Name, PoolUuid, StratFilesystemDiff, StratFilesystemState, StratisUuid,
+            ActionAvailability, FilesystemUuid, Name, PoolUuid, StratFilesystemDiff,
+            StratFilesystemState, StratisUuid,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -215,12 +216,13 @@ impl StratFilesystem {
         }
     }
 
-    /// check if filesystem is getting full and needs to be extended
+    /// Check if filesystem is getting full and needs to be extended.
+    ///
+    /// Returns:
+    /// * Some(_) if metadata should be saved.
+    /// * None if metadata should not be saved.
     /// TODO: deal with the thindev in a Fail state.
-    /// TODO: Add rollback handling if the thin device is extended but the
-    /// filesystem cannot be.
-    /// TODO: Fix error handling to not swallow errors.
-    pub fn check(&mut self) -> StratisResult<StratFilesystemDiff> {
+    pub fn check(&mut self) -> StratisResult<Option<StratFilesystemDiff>> {
         match self.thin_dev.status(get_dm())? {
             ThinStatus::Working(_) => {
                 if let Some(mount_point) = self.mount_points()?.first() {
@@ -228,22 +230,30 @@ impl StratFilesystem {
                     let (fs_total_bytes, fs_total_used_bytes) = fs_usage(mount_point)?;
                     let free_bytes = fs_total_bytes - fs_total_used_bytes;
                     if free_bytes.sectors() < FILESYSTEM_LOWATER {
-                        let mut table = self.thin_dev.table().table.clone();
-                        table.length =
+                        let old_table = self.thin_dev.table().table.clone();
+                        let mut new_table = old_table.clone();
+                        new_table.length =
                             self.thin_dev.size() + Self::extend_size(self.thin_dev.size());
-                        if self.thin_dev.set_table(get_dm(), table).is_err() {
-                            return Ok(StratFilesystemDiff::default());
-                        }
-                        if xfs_growfs(mount_point).is_err() {
-                            Ok(StratFilesystemDiff::default())
+                        self.thin_dev.set_table(get_dm(), new_table)?;
+                        if let Err(causal) = xfs_growfs(mount_point) {
+                            if let Err(rollback) = self.thin_dev.set_table(get_dm(), old_table) {
+                                Err(StratisError::RollbackError {
+                                    causal_error: Box::new(causal),
+                                    rollback_error: Box::new(StratisError::from(rollback)),
+                                    // NOTE: Read-only may be too aggressive.
+                                    level: ActionAvailability::NoPoolChanges,
+                                })
+                            } else {
+                                Err(causal)
+                            }
                         } else {
-                            Ok(original_state.diff(&self.dump()))
+                            Ok(Some(original_state.diff(&self.dump())))
                         }
                     } else {
-                        Ok(StratFilesystemDiff::default())
+                        Ok(None)
                     }
                 } else {
-                    Ok(StratFilesystemDiff::default())
+                    Ok(None)
                 }
             }
             ThinStatus::Error => {
@@ -253,7 +263,7 @@ impl StratFilesystem {
                 );
                 Err(StratisError::Msg(error_msg))
             }
-            ThinStatus::Fail => Ok(StratFilesystemDiff::default()),
+            ThinStatus::Fail => Ok(None),
         }
     }
 

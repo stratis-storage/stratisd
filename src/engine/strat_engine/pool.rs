@@ -342,6 +342,7 @@ impl StratPool {
         Err(StratisError::RollbackError {
             causal_error: Box::new(StratisError::Msg("Causal error".to_string())),
             rollback_error: Box::new(StratisError::Msg("Rollback error".to_string())),
+            level: ActionAvailability::NoRequests,
         })
     }
 
@@ -354,6 +355,7 @@ impl StratPool {
             Box::new(StratisError::RollbackError {
                 causal_error: Box::new(StratisError::Msg("Causal error".to_string())),
                 rollback_error: Box::new(StratisError::Msg("Rollback error".to_string())),
+                level: ActionAvailability::NoRequests,
             }),
         ))
     }

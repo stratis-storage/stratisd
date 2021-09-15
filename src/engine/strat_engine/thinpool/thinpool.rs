@@ -573,11 +573,13 @@ impl ThinPool {
     pub fn check_fs(&mut self, pool_uuid: PoolUuid) -> StratisResult<ChangedProperties> {
         let mut updated = ChangedProperties::default();
         for (name, uuid, fs) in self.filesystems.iter_mut() {
-            let prop_diff = fs.check()?;
-            updated.add_fs_prop(*uuid, prop_diff);
-            if let Err(e) = self.mdv.save_fs(name, *uuid, fs) {
-                error!("Could not save MDV for fs with UUID {} and name {} belonging to pool with UUID {}, reason: {:?}",
-                            uuid, name, pool_uuid, e);
+            let check_ret = fs.check()?;
+            if let Some(prop_diff) = check_ret {
+                updated.add_fs_prop(*uuid, prop_diff);
+                if let Err(e) = self.mdv.save_fs(name, *uuid, fs) {
+                    error!("Could not save MDV for fs with UUID {} and name {} belonging to pool with UUID {}, reason: {:?}",
+                                uuid, name, pool_uuid, e);
+                }
             }
         }
         Ok(updated)

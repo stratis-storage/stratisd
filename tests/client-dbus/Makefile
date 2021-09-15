@@ -3,7 +3,7 @@ UNITTEST_OPTS = --verbose
 .PHONY: lint
 lint:
 	pylint src/stratisd_client_dbus --ignore=_introspect.py
-	pylint tests
+	pylint tests --disable=R0801
 
 .PHONY: misc-tests
 misc-tests:

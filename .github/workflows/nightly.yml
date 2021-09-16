@@ -15,9 +15,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - task: cargo update --locked
-            toolchain: 1.55.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
           - task: make -f Makefile audit
             toolchain: 1.55.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo

@@ -6,12 +6,14 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    fs::OpenOptions,
+    fs::{File, OpenOptions},
+    os::unix::io::AsRawFd,
     path::{Path, PathBuf},
 };
 
 use chrono::Utc;
 use itertools::Itertools;
+use nix::fcntl::{flock, FlockArg};
 
 use devicemapper::{Bytes, Device, Sectors, IEC};
 
@@ -604,6 +606,12 @@ pub fn initialize_devices(
         }
     }
 
+    let _flock = devices.iter().try_fold(Vec::new(), |mut locks, info| {
+        let file = File::open(info.devnode.as_path())?;
+        flock(file.as_raw_fd(), FlockArg::LockExclusiveNonblock)?;
+        locks.push(file);
+        StratisResult::Ok(locks)
+    })?;
     let mut initialized_blockdevs: Vec<StratBlockDev> = Vec::new();
     for dev_info in devices {
         match initialize_one(&dev_info, pool_uuid, mda_data_size, encryption_info) {

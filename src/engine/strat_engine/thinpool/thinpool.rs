@@ -34,7 +34,7 @@ use crate::{
             writing::wipe_sectors,
         },
         structures::Table,
-        types::{FilesystemUuid, Name, PoolUuid},
+        types::{ChangedProperties, FilesystemUuid, Name, PoolUuid},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -500,18 +500,6 @@ impl ThinPool {
     /// Returns a bool communicating if a configuration change requiring a
     /// metadata save has been made.
     pub fn check(&mut self, pool_uuid: PoolUuid, backstore: &mut Backstore) -> StratisResult<bool> {
-        let mut should_save = false;
-
-        // Re-run to ensure pool status is updated if we made any changes
-        while self.do_check(pool_uuid, backstore)? {
-            should_save = true;
-        }
-
-        Ok(should_save)
-    }
-
-    /// Do the real work of check().
-    fn do_check(&mut self, pool_uuid: PoolUuid, backstore: &mut Backstore) -> StratisResult<bool> {
         assert_eq!(
             backstore.device().expect(
                 "thinpool exists and has been allocated to, so backstore must have a cap device"
@@ -572,18 +560,29 @@ impl ThinPool {
             self.resume()?;
         }
 
-        self.set_state(thin_pool_status);
+        self.set_state(self.thin_pool.status(get_dm())?);
 
+        Ok(should_save)
+    }
+
+    /// Check all filesystems on this thin pool and return which had their sizes
+    /// extended, if any. This method should not need to handle thin pool status
+    /// because it never alters the thin pool itself.
+    /// TODO: Put filesystem in read only if the MDV can't be saved after a pool
+    /// is extended.
+    pub fn check_fs(&mut self, pool_uuid: PoolUuid) -> StratisResult<ChangedProperties> {
+        let mut updated = ChangedProperties::default();
         for (name, uuid, fs) in self.filesystems.iter_mut() {
-            let save_mdv = fs.check()?;
-            if save_mdv {
+            let check_ret = fs.check()?;
+            if let Some(prop_diff) = check_ret {
+                updated.add_fs_prop(*uuid, prop_diff);
                 if let Err(e) = self.mdv.save_fs(name, *uuid, fs) {
                     error!("Could not save MDV for fs with UUID {} and name {} belonging to pool with UUID {}, reason: {:?}",
                                 uuid, name, pool_uuid, e);
                 }
             }
         }
-        Ok(should_save)
+        Ok(updated)
     }
 
     /// Set the current status of the thin_pool device to thin_pool_status.
@@ -1791,6 +1790,7 @@ mod tests {
         let (orig_fs_total_bytes, _) = fs_usage(tmp_dir.path()).unwrap();
         // Simulate handling a DM event by running a pool check.
         pool.check(pool_uuid, &mut backstore).unwrap();
+        pool.check_fs(pool_uuid).unwrap();
         let (fs_total_bytes, _) = fs_usage(tmp_dir.path()).unwrap();
         assert!(fs_total_bytes > orig_fs_total_bytes);
         umount(tmp_dir.path()).unwrap();

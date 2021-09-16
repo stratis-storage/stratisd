@@ -66,3 +66,14 @@ where
 {
     get_filesystem_property(i, p, |(_, _, fs)| Ok(shared::fs_created_prop::<E>(fs)))
 }
+
+/// Get the size of the filesystem in bytes.
+pub fn get_filesystem_size<E>(
+    i: &mut IterAppend,
+    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+) -> Result<(), MethodErr>
+where
+    E: Engine,
+{
+    get_filesystem_property(i, p, |(_, _, fs)| Ok(shared::fs_size_prop(fs)))
+}

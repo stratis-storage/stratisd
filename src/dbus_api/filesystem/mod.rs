@@ -45,7 +45,8 @@ where
                 .add_p(filesystem_3_0::name_property(&f))
                 .add_p(filesystem_3_0::pool_property(&f))
                 .add_p(filesystem_3_0::uuid_property(&f))
-                .add_p(filesystem_3_0::created_property(&f)),
+                .add_p(filesystem_3_0::created_property(&f))
+                .add_p(filesystem_3_0::size_property(&f)),
         )
         .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_3_0, ())
@@ -76,7 +77,8 @@ where
             consts::FILESYSTEM_UUID_PROP => uuid_to_string!(fs_uuid),
             consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop::<E>(fs, pool_name, fs_name),
             consts::FILESYSTEM_POOL_PROP => parent,
-            consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop::<E>(fs)
+            consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop::<E>(fs),
+            consts::FILESYSTEM_SIZE_PROP => shared::fs_size_prop(fs)
         }
     }
 }

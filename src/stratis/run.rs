@@ -13,11 +13,13 @@ use tokio::{
     task,
 };
 
+#[cfg(feature = "dbus_enabled")]
+use crate::dbus_api::DbusAction;
 use crate::{
     engine::{Engine, Lockable, LockableEngine, SimEngine, StratEngine, UdevEngineEvent},
     stratis::{
         dm::dm_event_thread, errors::StratisResult, ipc_support::setup, stratis::VERSION,
-        udev_monitor::udev_thread,
+        timer::run_timers, udev_monitor::udev_thread,
     },
 };
 
@@ -61,16 +63,34 @@ pub fn run(sim: bool) -> StratisResult<()> {
     runtime.block_on(async move {
         async fn start_threads<E>(engine: LockableEngine<E>, sim: bool) -> StratisResult<()> where E: 'static + Engine {
             let (trigger, should_exit) = channel(1);
-            let (sender, receiver) = unbounded_channel::<UdevEngineEvent>();
+            let (udev_sender, udev_receiver) = unbounded_channel::<UdevEngineEvent>();
+            #[cfg(feature = "dbus_enabled")]
+            let (dbus_sender, dbus_receiver) = unbounded_channel::<DbusAction<E>>();
 
-            let join_udev = udev_thread(sender, should_exit);
-            let join_ipc = setup(engine.clone(), receiver, trigger.clone());
+            let join_udev = udev_thread(udev_sender, should_exit);
+            let join_ipc = setup(
+                engine.clone(),
+                udev_receiver,
+                #[cfg(feature = "dbus_enabled")]
+                trigger.clone(),
+                #[cfg(feature = "dbus_enabled")]
+                (dbus_sender.clone(), dbus_receiver),
+            );
             let join_signal = signal_thread();
-            let join_dm = dm_event_thread(if sim {
-                None
-            } else {
-                Some(engine.clone())
-            });
+            let join_dm = dm_event_thread(
+                if sim {
+                    None
+                } else {
+                    Some(engine.clone())
+                },
+                #[cfg(feature = "dbus_enabled")]
+                dbus_sender.clone(),
+            );
+            let join_timer = run_timers(
+                engine,
+                #[cfg(feature = "dbus_enabled")]
+                dbus_sender,
+            );
 
             select! {
                 res = join_udev => {
@@ -91,6 +111,14 @@ pub fn run(sim: bool) -> StratisResult<()> {
                 Err(e) = join_dm => {
                     error!("The devicemapper thread exited with an error: {}; shutting down stratisd...", e);
                     return Err(e);
+                },
+                res = join_timer => {
+                    if let Err(e) = res {
+                        error!("The timer thread exited with an error: {}; shutting down stratisd...", e);
+                        return Err(e);
+                    } else {
+                        info!("The timer thread exited; shutting down stratisd...");
+                    }
                 },
                 _ = join_signal => {
                     info!("Caught SIGINT; exiting...");

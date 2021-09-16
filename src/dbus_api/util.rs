@@ -2,16 +2,21 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, fmt::Display, sync::Arc};
+use std::{collections::HashMap, fmt::Display, future::Future, sync::Arc};
 
 use dbus::{
     arg::{ArgType, Iter, IterAppend, RefArg, Variant},
     blocking::SyncConnection,
 };
 use dbus_tree::{MTSync, MethodErr, PropInfo};
+use futures::{
+    executor::block_on,
+    future::{select, Either},
+    pin_mut,
+};
 use tokio::sync::{
-    broadcast::Sender,
-    mpsc::{unbounded_channel, UnboundedReceiver},
+    broadcast::{error::RecvError, Sender},
+    mpsc::{UnboundedReceiver, UnboundedSender},
 };
 
 use devicemapper::DmError;
@@ -19,16 +24,17 @@ use devicemapper::DmError;
 use crate::{
     dbus_api::{
         api::get_base_tree,
-        connection::{DbusConnectionHandler, DbusTreeHandler},
+        connection::DbusConnectionHandler,
         consts,
+        tree::DbusTreeHandler,
         types::{
-            DbusContext, DbusErrorEnum, DbusHandlers, InterfacesAdded, InterfacesAddedThreadSafe,
-            TData,
+            DbusAction, DbusContext, DbusErrorEnum, DbusHandlers, InterfacesAdded,
+            InterfacesAddedThreadSafe, TData,
         },
         udev::DbusUdevHandler,
     },
     engine::{Engine, Lockable, LockableEngine, UdevEngineEvent},
-    stratis::StratisError,
+    stratis::{StratisError, StratisResult},
 };
 
 /// Convert a tuple as option to an Option type
@@ -184,13 +190,17 @@ pub fn create_dbus_handlers<E>(
     engine: LockableEngine<E>,
     udev_receiver: UnboundedReceiver<UdevEngineEvent>,
     trigger: Sender<()>,
+    (tree_sender, tree_receiver): (
+        UnboundedSender<DbusAction<E>>,
+        UnboundedReceiver<DbusAction<E>>,
+    ),
 ) -> DbusHandlers<E>
 where
     E: 'static + Engine,
 {
     let conn = Arc::new(SyncConnection::new_system()?);
-    let (sender, receiver) = unbounded_channel();
-    let (tree, object_path) = get_base_tree(DbusContext::new(engine, sender, Arc::clone(&conn)));
+    let (tree, object_path) =
+        get_base_tree(DbusContext::new(engine, tree_sender, Arc::clone(&conn)));
     let dbus_context = tree.get_data().clone();
     conn.request_name(consts::STRATIS_BASE_SERVICE, false, true, true)?;
 
@@ -198,7 +208,7 @@ where
     let connection =
         DbusConnectionHandler::new(Arc::clone(&conn), tree.clone(), trigger.subscribe());
     let udev = DbusUdevHandler::new(udev_receiver, object_path, dbus_context);
-    let tree = DbusTreeHandler::new(tree, receiver, conn, trigger.subscribe());
+    let tree = DbusTreeHandler::new(tree, tree_receiver, conn, trigger.subscribe());
     Ok((connection, udev, tree))
 }
 
@@ -214,4 +224,24 @@ pub fn thread_safe_to_dbus_sendable(ia: InterfacesAddedThreadSafe) -> Interfaces
             (k, new_map)
         })
         .collect()
+}
+
+pub fn poll_exit_and_future<E, F, R>(exit: E, future: F) -> StratisResult<Option<R>>
+where
+    E: Future<Output = Result<(), RecvError>>,
+    F: Future<Output = R>,
+{
+    pin_mut!(exit);
+    pin_mut!(future);
+
+    match block_on(select(exit, future)) {
+        Either::Left((Ok(()), _)) => {
+            info!("D-Bus tree handler was notified to exit");
+            Ok(None)
+        }
+        Either::Left((Err(_), _)) => Err(StratisError::Msg(
+            "Checking the shutdown signal failed so stratisd can no longer be notified to shut down; exiting now...".to_string(),
+        )),
+        Either::Right((a, _)) => Ok(Some(a)),
+    }
 }

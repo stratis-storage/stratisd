@@ -11,12 +11,15 @@
 
 use tokio::{
     select,
-    sync::{broadcast::Sender, mpsc::UnboundedReceiver},
+    sync::{
+        broadcast::Sender,
+        mpsc::{UnboundedReceiver, UnboundedSender},
+    },
     task::{self, spawn_blocking},
 };
 
 use crate::{
-    dbus_api::create_dbus_handlers,
+    dbus_api::{create_dbus_handlers, DbusAction},
     engine::{Engine, LockableEngine, UdevEngineEvent},
     stratis::{StratisError, StratisResult},
 };
@@ -26,12 +29,16 @@ pub async fn setup<E>(
     engine: LockableEngine<E>,
     receiver: UnboundedReceiver<UdevEngineEvent>,
     trigger: Sender<()>,
+    tree_channel: (
+        UnboundedSender<DbusAction<E>>,
+        UnboundedReceiver<DbusAction<E>>,
+    ),
 ) -> StratisResult<()>
 where
     E: 'static + Engine,
 {
     let (mut conn, mut udev, mut tree) = spawn_blocking(move || {
-        create_dbus_handlers(engine.clone(), receiver, trigger)
+        create_dbus_handlers(engine.clone(), receiver, trigger, tree_channel)
             .map(|(conn, udev, tree)| {
                 let mutex_lock = engine.blocking_lock();
                 for (pool_name, pool_uuid, pool) in mutex_lock.pools() {

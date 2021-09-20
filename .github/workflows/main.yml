@@ -229,7 +229,8 @@ jobs:
       options: --privileged -v /dev:/dev
     services:
       tang:
-        image: docker.pkg.github.com/stratis-storage/stratisd/tang:34
+        # yamllint disable rule:line-length
+        image: docker.pkg.github.com/stratis-storage/stratisd/tang:34  # CURRENT DEVELOPMENT ENVIRONMENT
         credentials:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}

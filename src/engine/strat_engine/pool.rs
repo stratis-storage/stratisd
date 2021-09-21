@@ -413,10 +413,18 @@ impl Pool for StratPool {
                 ));
             }
 
-            // If adding cache devices, must suspend the pool, since the cache
-            // must be augmented with the new devices.
             self.thin_pool.suspend()?;
-            let devices_result = self.backstore.init_cache(pool_uuid, blockdevs);
+            let devices_result = self
+                .backstore
+                .init_cache(pool_uuid, blockdevs)
+                .and_then(|bdi| {
+                    self.thin_pool
+                        .set_device(self.backstore.device().expect(
+                            "Since thin pool exists, space must have been allocated \
+                             from the backstore, so backstore must have a cap device",
+                        ))
+                        .and(Ok(bdi))
+                });
             self.thin_pool.resume()?;
             let devices = devices_result?;
             self.write_metadata(pool_name)?;
@@ -570,17 +578,7 @@ impl Pool for StratPool {
             // If adding cache devices, must suspend the pool; the cache
             // must be augmented with the new devices.
             self.thin_pool.suspend()?;
-            let bdev_info_res = self
-                .backstore
-                .add_cachedevs(pool_uuid, paths)
-                .and_then(|bdi| {
-                    self.thin_pool
-                        .set_device(self.backstore.device().expect(
-                            "Since thin pool exists, space must have been allocated \
-                             from the backstore, so backstore must have a cap device",
-                        ))
-                        .and(Ok(bdi))
-                });
+            let bdev_info_res = self.backstore.add_cachedevs(pool_uuid, paths);
             self.thin_pool.resume()?;
             let bdev_info = bdev_info_res?;
             Ok(SetCreateAction::new(bdev_info))
@@ -892,6 +890,43 @@ mod tests {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(2, None, None),
             test_add_cachedevs,
+        );
+    }
+
+    // Verify that it is possible to add datadevs after a cache is initialized.
+    fn test_add_cachedevs_and_datadevs(paths: &[&Path]) {
+        assert!(paths.len() > 2);
+
+        let (cache_path, data_paths) = paths.split_at(1);
+        let (data_path, data_paths) = data_paths.split_at(1);
+
+        let name = "stratis-test-pool";
+        let (uuid, mut pool) =
+            StratPool::initialize(name, data_path, Redundancy::NONE, None).unwrap();
+        invariant(&pool, name);
+
+        pool.init_cache(uuid, name, cache_path).unwrap();
+        invariant(&pool, name);
+
+        pool.add_blockdevs(uuid, name, data_paths, BlockDevTier::Data)
+            .unwrap();
+
+        pool.teardown().unwrap();
+    }
+
+    #[test]
+    fn loop_test_add_cachedevs_and_datadevs() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(3, 4, None),
+            test_add_cachedevs_and_datadevs,
+        );
+    }
+
+    #[test]
+    fn real_test_add_cachedevs_and_datadevs() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(3, None, None),
+            test_add_cachedevs_and_datadevs,
         );
     }
 

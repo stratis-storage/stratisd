@@ -11,6 +11,7 @@ on:
       - 'CHANGES.txt'
       - '**/README.md'
       - 'README_tests.md'
+      - 'tests/**'
   pull_request:
     branches:
       - master
@@ -19,6 +20,7 @@ on:
       - 'CHANGES.txt'
       - '**/README.md'
       - 'README_tests.md'
+      - 'tests/**'
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:

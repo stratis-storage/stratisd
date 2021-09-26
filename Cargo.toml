@@ -1,7 +1,7 @@
 [package]
 name = "stratisd"
 version = "2.4.3"
-authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.com>"]
+authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.org>"]
 edition = "2018"
 build = "build.rs"
 description = "Stratis daemon"

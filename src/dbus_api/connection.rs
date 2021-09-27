@@ -85,7 +85,7 @@ where
                     info!("D-Bus connection handler thread notified to exit");
                     break;
                 }
-                Err(TryRecvError::Lagged(_)) | Err(TryRecvError::Closed) => {
+                Err(TryRecvError::Lagged(_) | TryRecvError::Closed) => {
                     return Err(StratisError::Msg(
                         "D-Bus connection handler can't be notified to exit; shutting down..."
                             .to_string(),

@@ -185,7 +185,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             };
             let pin = args.value_of("clevis");
             let clevis_info = match pin {
-                Some("nbde") | Some("tang") => {
+                Some("nbde" | "tang") => {
                     let mut json = Map::new();
                     json.insert(
                         "url".to_string(),

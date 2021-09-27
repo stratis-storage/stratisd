@@ -290,7 +290,7 @@ pub fn setup_crypt_handle(
         }
         Some(UnlockMethod::Clevis) => activate(Either::Right(physical_path), &name)?,
         None => {
-            if let Ok(CryptStatusInfo::Active) | Ok(CryptStatusInfo::Busy) = libcryptsetup_rs::status(Some(device), &name) {
+            if let Ok(CryptStatusInfo::Active | CryptStatusInfo::Busy) = libcryptsetup_rs::status(Some(device), &name) {
                 [DEVICEMAPPER_PATH, &name].iter().collect()
             } else {
                 return Err(StratisError::Msg(

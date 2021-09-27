@@ -1,7 +1,7 @@
 [package]
 name = "stratisd_proc_macros"
 version = "0.1.0"
-authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.com>"]
+authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.org>"]
 edition = "2018"
 description = "Stratis daemon procedural macros"
 license-file = "LICENSE"

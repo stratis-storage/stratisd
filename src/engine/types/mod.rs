@@ -342,8 +342,6 @@ pub enum ActionAvailability {
     /// No changes may be made to the pool including background changes
     /// like reacting to devicemapper events
     NoPoolChanges = 2,
-    /// The pool should not accept
-    ReadOnly = 3,
 }
 
 impl Display for ActionAvailability {
@@ -355,7 +353,6 @@ impl Display for ActionAvailability {
                 ActionAvailability::Full => "fully_operational",
                 ActionAvailability::NoRequests => "no_ipc_requests",
                 ActionAvailability::NoPoolChanges => "no_pool_changes",
-                ActionAvailability::ReadOnly => "no_write_io",
             }
         )
     }

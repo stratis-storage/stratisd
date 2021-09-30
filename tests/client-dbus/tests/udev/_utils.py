@@ -337,7 +337,6 @@ class KernelKey:
                         {
                             "key_desc": key_desc,
                             "key_fd": fd_for_dbus.fileno(),
-                            "interactive": False,
                         },
                     )
 

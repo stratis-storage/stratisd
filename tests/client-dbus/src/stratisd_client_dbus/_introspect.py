@@ -145,7 +145,7 @@ SPECS = {
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
-    <method name="Bind">
+    <method name="BindClevis">
       <arg name="pin" type="s" direction="in" />
       <arg name="json" type="s" direction="in" />
       <arg name="results" type="b" direction="out" />
@@ -200,7 +200,7 @@ SPECS = {
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
-    <method name="Unbind">
+    <method name="UnbindClevis">
       <arg name="results" type="b" direction="out" />
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />

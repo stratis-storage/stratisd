@@ -112,7 +112,8 @@ macro_rules! uuid_to_string {
 macro_rules! properties_footer {
     () => {
         pub fn get_all_properties<E>(
-            m: &dbus_tree::MethodInfo<'_,
+            m: &dbus_tree::MethodInfo<
+                '_,
                 dbus_tree::MTSync<$crate::dbus_api::types::TData<E>>,
                 $crate::dbus_api::types::TData<E>,
             >,
@@ -124,7 +125,8 @@ macro_rules! properties_footer {
         }
 
         pub fn get_properties<E>(
-            m: &dbus_tree::MethodInfo<'_,
+            m: &dbus_tree::MethodInfo<
+                '_,
                 dbus_tree::MTSync<$crate::dbus_api::types::TData<E>>,
                 $crate::dbus_api::types::TData<E>,
             >,

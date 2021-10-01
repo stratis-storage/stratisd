@@ -87,7 +87,9 @@ where
     })
 }
 
-pub fn get_pool_total_size<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> Result<String, String>
+pub fn get_pool_total_size<E>(
+    m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
+) -> Result<String, String>
 where
     E: 'static + Engine,
 {
@@ -96,7 +98,9 @@ where
     })
 }
 
-pub fn get_pool_total_used<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> Result<String, String>
+pub fn get_pool_total_used<E>(
+    m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
+) -> Result<String, String>
 where
     E: 'static + Engine,
 {
@@ -133,7 +137,10 @@ where
 /// data tier must already contain some block devices. The op parameter
 /// determines which method belonging to the engine's Pool interface must
 /// be invoked.
-pub fn add_blockdevs<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>, op: BlockDevOp) -> MethodResult
+pub fn add_blockdevs<E>(
+    m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
+    op: BlockDevOp,
+) -> MethodResult
 where
     E: 'static + Engine,
 {

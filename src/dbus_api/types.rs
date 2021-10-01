@@ -137,7 +137,7 @@ impl<E> Clone for DbusContext<E> {
 }
 
 impl<E> Debug for DbusContext<E> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("DbusContext")
             .field("next_index", &self.next_index)
             .field("engine", &type_name::<LockableEngine<E>>())

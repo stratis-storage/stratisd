@@ -38,7 +38,7 @@ enum Destination {
 }
 
 impl fmt::Display for Destination {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Destination::Hopeless(val) => write!(f, "{}", val),
             Destination::Errored(val) => write!(f, "{}", val),

@@ -21,7 +21,7 @@ use crate::{
 const ALL_PROPERTIES: [&str; 1] = [consts::FILESYSTEM_USED_PROP];
 
 fn get_properties_shared<E>(
-    m: &MethodInfo<MTSync<TData<E>>, TData<E>>,
+    m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
     properties: &mut dyn Iterator<Item = String>,
 ) -> MethodResult
 where

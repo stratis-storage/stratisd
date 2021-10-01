@@ -58,7 +58,7 @@ impl PerDevSegments {
         self.limit
     }
 
-    pub fn iter(&self) -> Iter {
+    pub fn iter(&self) -> Iter<'_> {
         Iter {
             items: self.used.iter(),
         }

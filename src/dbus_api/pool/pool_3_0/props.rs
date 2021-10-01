@@ -14,8 +14,8 @@ use crate::{
 };
 
 pub fn get_pool_name<E>(
-    i: &mut IterAppend,
-    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
 ) -> Result<(), MethodErr>
 where
     E: 'static + Engine,
@@ -24,8 +24,8 @@ where
 }
 
 pub fn get_pool_encrypted<E>(
-    i: &mut IterAppend,
-    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
 ) -> Result<(), MethodErr>
 where
     E: 'static + Engine,
@@ -34,8 +34,8 @@ where
 }
 
 pub fn get_pool_avail_actions<E>(
-    i: &mut IterAppend,
-    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
 ) -> Result<(), MethodErr>
 where
     E: 'static + Engine,

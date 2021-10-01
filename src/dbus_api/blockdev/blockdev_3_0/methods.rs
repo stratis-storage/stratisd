@@ -13,7 +13,7 @@ use crate::{
     engine::{DevUuid, Engine, Pool, RenameAction},
 };
 
-pub fn set_user_info<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+pub fn set_user_info<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
 where
     E: Engine,
 {

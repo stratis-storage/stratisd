@@ -77,7 +77,7 @@ impl StratisIdentifiers {
 }
 
 impl fmt::Display for StratisIdentifiers {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "Stratis pool UUID: \"{}\", Stratis device UUID: \"{}\"",

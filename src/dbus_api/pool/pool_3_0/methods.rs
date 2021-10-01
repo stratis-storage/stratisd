@@ -25,19 +25,19 @@ use crate::{
     stratis::StratisError,
 };
 
-pub fn create_filesystems<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+pub fn create_filesystems<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
 where
     E: 'static + Engine,
 {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let filesystems: Array<(&str, (bool, &str)), _> = get_next_arg(&mut iter, 0)?;
+    let filesystems: Array<'_, (&str, (bool, &str)), _> = get_next_arg(&mut iter, 0)?;
     let dbus_context = m.tree.get_data();
 
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let default_return: (bool, Vec<(dbus::Path, &str)>) = (false, Vec::new());
+    let default_return: (bool, Vec<(dbus::Path<'_>, &str)>) = (false, Vec::new());
 
     if filesystems.count() > 1 {
         let error_message = "only 1 filesystem per request allowed";
@@ -133,14 +133,14 @@ where
     )])
 }
 
-pub fn destroy_filesystems<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+pub fn destroy_filesystems<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
 where
     E: 'static + Engine,
 {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let filesystems: Array<dbus::Path<'static>, _> = get_next_arg(&mut iter, 0)?;
+    let filesystems: Array<'_, dbus::Path<'static>, _> = get_next_arg(&mut iter, 0)?;
 
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
@@ -213,7 +213,7 @@ where
     Ok(vec![msg])
 }
 
-pub fn snapshot_filesystem<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+pub fn snapshot_filesystem<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
 where
     E: 'static + Engine,
 {
@@ -262,7 +262,7 @@ where
         pool_path.get_name()
     ) {
         Ok(CreateAction::Created((uuid, fs))) => {
-            let fs_object_path: dbus::Path = create_dbus_filesystem(
+            let fs_object_path: dbus::Path<'_> = create_dbus_filesystem(
                 dbus_context,
                 object_path.clone(),
                 &pool_name,
@@ -290,14 +290,14 @@ where
     Ok(vec![msg])
 }
 
-pub fn add_datadevs<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+pub fn add_datadevs<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
 where
     E: 'static + Engine,
 {
     add_blockdevs(m, BlockDevOp::AddData)
 }
 
-pub fn rename_pool<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+pub fn rename_pool<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
 where
     E: 'static + Engine,
 {
@@ -356,21 +356,21 @@ where
     Ok(vec![msg])
 }
 
-pub fn init_cache<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+pub fn init_cache<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
 where
     E: 'static + Engine,
 {
     add_blockdevs(m, BlockDevOp::InitCache)
 }
 
-pub fn add_cachedevs<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+pub fn add_cachedevs<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
 where
     E: 'static + Engine,
 {
     add_blockdevs(m, BlockDevOp::AddCache)
 }
 
-pub fn bind_clevis<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+pub fn bind_clevis<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
 where
     E: 'static + Engine,
 {
@@ -424,7 +424,7 @@ where
     Ok(vec![msg])
 }
 
-pub fn unbind_clevis<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+pub fn unbind_clevis<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
 where
     E: 'static + Engine,
 {
@@ -464,7 +464,7 @@ where
     Ok(vec![msg])
 }
 
-pub fn bind_keyring<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+pub fn bind_keyring<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
 where
     E: 'static + Engine,
 {
@@ -518,7 +518,7 @@ where
     Ok(vec![msg])
 }
 
-pub fn unbind_keyring<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+pub fn unbind_keyring<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
 where
     E: 'static + Engine,
 {
@@ -558,7 +558,7 @@ where
     Ok(vec![msg])
 }
 
-pub fn rebind_keyring<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+pub fn rebind_keyring<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
 where
     E: 'static + Engine,
 {
@@ -620,7 +620,7 @@ where
     Ok(vec![msg])
 }
 
-pub fn rebind_clevis<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+pub fn rebind_clevis<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
 where
     E: 'static + Engine,
 {

@@ -133,8 +133,8 @@ pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
 
 /// Get the UUID for an object path.
 pub fn get_uuid<E>(
-    i: &mut IterAppend,
-    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
 ) -> Result<(), MethodErr>
 where
     E: Engine,
@@ -156,8 +156,8 @@ where
 
 /// Get the parent object path for an object path.
 pub fn get_parent<E>(
-    i: &mut IterAppend,
-    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
 ) -> Result<(), MethodErr>
 where
     E: Engine,

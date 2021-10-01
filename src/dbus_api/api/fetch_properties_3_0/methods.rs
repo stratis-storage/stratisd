@@ -26,7 +26,7 @@ const ALL_PROPERTIES: [&str; 2] = [consts::KEY_LIST_PROP, consts::LOCKED_POOL_DE
 type LockedPoolsWithDevs = HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>;
 
 pub fn locked_pools_with_devs<E>(
-    info: &MethodInfo<MTSync<TData<E>>, TData<E>>,
+    info: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
 ) -> Result<LockedPoolsWithDevs, String>
 where
     E: 'static + Engine,
@@ -88,7 +88,7 @@ where
 }
 
 fn get_properties_shared<E>(
-    m: &MethodInfo<MTSync<TData<E>>, TData<E>>,
+    m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
     properties: &mut dyn Iterator<Item = String>,
 ) -> MethodResult
 where

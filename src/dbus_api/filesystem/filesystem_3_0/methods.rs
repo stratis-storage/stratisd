@@ -13,7 +13,7 @@ use crate::{
     engine::{Engine, FilesystemUuid, Pool, RenameAction},
 };
 
-pub fn rename_filesystem<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+pub fn rename_filesystem<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
 where
     E: Engine,
 {

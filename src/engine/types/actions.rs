@@ -60,7 +60,7 @@ impl<T> EngineAction for CreateAction<T> {
 }
 
 impl Display for CreateAction<PoolUuid> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CreateAction::Created(uuid) => {
                 write!(f, "Pool with UUID {} was created successfully", uuid)
@@ -76,7 +76,7 @@ impl Display for CreateAction<PoolUuid> {
 }
 
 impl Display for CreateAction<Clevis> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CreateAction::Created(Clevis) => {
                 write!(
@@ -95,7 +95,7 @@ impl Display for CreateAction<Clevis> {
 }
 
 impl Display for CreateAction<Key> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CreateAction::Created(Key) => {
                 write!(
@@ -117,7 +117,7 @@ impl<F> Display for CreateAction<(FilesystemUuid, &mut F)>
 where
     F: Filesystem,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CreateAction::Created((uuid, fs)) => {
                 write!(
@@ -149,7 +149,7 @@ pub enum MappingCreateAction<T> {
 }
 
 impl Display for MappingCreateAction<Key> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             MappingCreateAction::Created(Key) => write!(f, "Set a new key successfully"),
             MappingCreateAction::Identity => {
@@ -206,7 +206,7 @@ impl<T> EngineAction for MappingDeleteAction<T> {
 }
 
 impl Display for MappingDeleteAction<Key> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             MappingDeleteAction::Deleted(_) => {
                 write!(f, "A key was deleted successfully")
@@ -258,7 +258,7 @@ impl<T> EngineAction for SetUnlockAction<T> {
 }
 
 impl Display for SetUnlockAction<DevUuid> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.unlocked.is_empty() {
             write!(
                 f,
@@ -311,7 +311,7 @@ impl<T> EngineAction for SetCreateAction<T> {
 }
 
 impl Display for SetCreateAction<(&str, FilesystemUuid, Sectors)> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.changed.is_empty() {
             write!(
                 f,
@@ -332,7 +332,7 @@ impl Display for SetCreateAction<(&str, FilesystemUuid, Sectors)> {
 }
 
 impl Display for SetCreateAction<DevUuid> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.changed.is_empty() {
             write!(
                 f,
@@ -379,7 +379,7 @@ impl<T> EngineAction for RenameAction<T> {
 }
 
 impl Display for RenameAction<DevUuid> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             RenameAction::Identity => {
                 write!(
@@ -398,7 +398,7 @@ impl Display for RenameAction<DevUuid> {
 }
 
 impl Display for RenameAction<FilesystemUuid> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             RenameAction::Identity => {
                 write!(
@@ -417,7 +417,7 @@ impl Display for RenameAction<FilesystemUuid> {
 }
 
 impl Display for RenameAction<PoolUuid> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             RenameAction::Identity => {
                 write!(f, "Pool is already named the target name; no action taken")
@@ -433,7 +433,7 @@ impl Display for RenameAction<PoolUuid> {
 }
 
 impl Display for RenameAction<Key> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             RenameAction::Identity => {
                 write!(
@@ -455,7 +455,7 @@ impl Display for RenameAction<Key> {
 }
 
 impl Display for RenameAction<Clevis> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             RenameAction::Identity => {
                 write!(
@@ -501,7 +501,7 @@ impl<T> EngineAction for DeleteAction<T> {
 }
 
 impl Display for DeleteAction<PoolUuid> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DeleteAction::Deleted(uuid) => {
                 write!(f, "Pool with UUID {} was deleted successfully", uuid)
@@ -517,7 +517,7 @@ impl Display for DeleteAction<PoolUuid> {
 }
 
 impl Display for DeleteAction<Clevis> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DeleteAction::Deleted(_) => {
                 write!(f, "A clevis binding was successfully removed from a pool")
@@ -533,7 +533,7 @@ impl Display for DeleteAction<Clevis> {
 }
 
 impl Display for DeleteAction<Key> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DeleteAction::Deleted(_) => {
                 write!(
@@ -584,7 +584,7 @@ impl<T> EngineAction for SetDeleteAction<T> {
 }
 
 impl Display for SetDeleteAction<FilesystemUuid> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.changed.is_empty() {
             write!(
                 f,
@@ -608,7 +608,7 @@ impl Display for SetDeleteAction<FilesystemUuid> {
 pub struct RegenAction;
 
 impl Display for RegenAction {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "The Clevis bindings were successfully regenerated using the same configuration that was originally supplied"

@@ -67,7 +67,7 @@ macro_rules! uuid {
         }
 
         impl std::fmt::Display for $ident {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 std::fmt::Display::fmt(&self.0, f)
             }
         }
@@ -122,7 +122,7 @@ impl Deref for StratisUuid {
 }
 
 impl Display for StratisUuid {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             StratisUuid::Dev(d) => Display::fmt(d, f),
             StratisUuid::Fs(fs) => Display::fmt(fs, f),
@@ -203,7 +203,7 @@ impl Borrow<str> for Name {
 }
 
 impl fmt::Display for Name {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
@@ -345,7 +345,7 @@ pub enum ActionAvailability {
 }
 
 impl Display for ActionAvailability {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{}",

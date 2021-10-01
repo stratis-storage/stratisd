@@ -15,8 +15,8 @@ use crate::{
 
 /// Get the devnode for an object path.
 pub fn get_blockdev_devnode<E>(
-    i: &mut IterAppend,
-    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
 ) -> Result<(), MethodErr>
 where
     E: Engine,
@@ -25,8 +25,8 @@ where
 }
 
 pub fn get_blockdev_hardware_info<E>(
-    i: &mut IterAppend,
-    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
 ) -> Result<(), MethodErr>
 where
     E: Engine,
@@ -35,8 +35,8 @@ where
 }
 
 pub fn get_blockdev_user_info<E>(
-    i: &mut IterAppend,
-    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
 ) -> Result<(), MethodErr>
 where
     E: Engine,
@@ -45,8 +45,8 @@ where
 }
 
 pub fn get_blockdev_initialization_time<E>(
-    i: &mut IterAppend,
-    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
 ) -> Result<(), MethodErr>
 where
     E: Engine,
@@ -55,8 +55,8 @@ where
 }
 
 pub fn get_blockdev_tier<E>(
-    i: &mut IterAppend,
-    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
 ) -> Result<(), MethodErr>
 where
     E: Engine,
@@ -66,8 +66,8 @@ where
 
 /// Get the devnode for an object path.
 pub fn get_blockdev_physical_path<E>(
-    i: &mut IterAppend,
-    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
 ) -> Result<(), MethodErr>
 where
     E: Engine,

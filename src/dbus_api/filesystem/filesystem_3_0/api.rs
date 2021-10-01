@@ -67,7 +67,7 @@ pub fn pool_property<E>(
 where
     E: 'static + Engine,
 {
-    f.property::<&dbus::Path, _>(consts::FILESYSTEM_POOL_PROP, ())
+    f.property::<&dbus::Path<'_>, _>(consts::FILESYSTEM_POOL_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_parent)

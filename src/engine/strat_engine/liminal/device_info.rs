@@ -32,7 +32,7 @@ pub struct LLuksInfo {
 }
 
 impl fmt::Display for LLuksInfo {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}, {}", self.ids, self.encryption_info)
     }
 }
@@ -79,7 +79,7 @@ pub struct LStratisInfo {
 }
 
 impl fmt::Display for LStratisInfo {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(info) = &self.luks {
             write!(
                 f,
@@ -149,7 +149,7 @@ pub enum LInfo {
 }
 
 impl fmt::Display for LInfo {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             LInfo::Stratis(info) => write!(f, "Stratis device with {}", info),
             LInfo::Luks(info) => write!(f, "LUKS device belonging to Stratis with {}", info),
@@ -351,7 +351,7 @@ impl DeviceSet {
     }
 
     /// An iterator over the elements in the set
-    pub fn iter(&self) -> Iter {
+    pub fn iter(&self) -> Iter<'_> {
         Iter {
             items: self.internal.iter(),
         }

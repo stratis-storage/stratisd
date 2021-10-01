@@ -59,7 +59,7 @@ where
 }
 
 pub fn get_pool_encryption_key_desc<E>(
-    m: &MethodInfo<MTSync<TData<E>>, TData<E>>,
+    m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
 ) -> Result<(bool, String), String>
 where
     E: 'static + Engine,
@@ -78,7 +78,7 @@ where
     })
 }
 
-pub fn get_pool_has_cache<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> Result<bool, String>
+pub fn get_pool_has_cache<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> Result<bool, String>
 where
     E: 'static + Engine,
 {
@@ -87,7 +87,7 @@ where
     })
 }
 
-pub fn get_pool_total_size<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> Result<String, String>
+pub fn get_pool_total_size<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> Result<String, String>
 where
     E: 'static + Engine,
 {
@@ -96,7 +96,7 @@ where
     })
 }
 
-pub fn get_pool_total_used<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> Result<String, String>
+pub fn get_pool_total_used<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> Result<String, String>
 where
     E: 'static + Engine,
 {
@@ -108,7 +108,7 @@ where
 }
 
 pub fn get_pool_clevis_info<E>(
-    m: &MethodInfo<MTSync<TData<E>>, TData<E>>,
+    m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
 ) -> Result<(bool, (String, String)), String>
 where
     E: 'static + Engine,
@@ -133,19 +133,19 @@ where
 /// data tier must already contain some block devices. The op parameter
 /// determines which method belonging to the engine's Pool interface must
 /// be invoked.
-pub fn add_blockdevs<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>, op: BlockDevOp) -> MethodResult
+pub fn add_blockdevs<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>, op: BlockDevOp) -> MethodResult
 where
     E: 'static + Engine,
 {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
-    let devs: Array<&str, _> = get_next_arg(&mut iter, 0)?;
+    let devs: Array<'_, &str, _> = get_next_arg(&mut iter, 0)?;
 
     let dbus_context = m.tree.get_data();
     let object_path = m.path.get_name();
     let return_message = message.method_return();
-    let default_return: (bool, Vec<dbus::Path>) = (false, Vec::new());
+    let default_return: (bool, Vec<dbus::Path<'_>>) = (false, Vec::new());
 
     let pool_path = m
         .tree
@@ -227,8 +227,8 @@ where
 /// found by means of the getter method which takes a reference to a
 /// Pool and obtains the property from the pool.
 pub fn get_pool_property<F, R, E>(
-    i: &mut IterAppend,
-    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
     getter: F,
 ) -> Result<(), MethodErr>
 where

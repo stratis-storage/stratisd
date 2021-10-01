@@ -17,8 +17,8 @@ use crate::{
 /// found by means of the getter method which takes a reference to a
 /// Filesystem and obtains the property from the filesystem.
 fn get_filesystem_property<F, R, E>(
-    i: &mut IterAppend,
-    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
     getter: F,
 ) -> Result<(), MethodErr>
 where
@@ -35,8 +35,8 @@ where
 
 /// Get the devnode for an object path.
 pub fn get_filesystem_devnode<E>(
-    i: &mut IterAppend,
-    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
 ) -> Result<(), MethodErr>
 where
     E: Engine,
@@ -47,8 +47,8 @@ where
 }
 
 pub fn get_filesystem_name<E>(
-    i: &mut IterAppend,
-    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
 ) -> Result<(), MethodErr>
 where
     E: Engine,
@@ -58,8 +58,8 @@ where
 
 /// Get the creation date and time in rfc3339 format.
 pub fn get_filesystem_created<E>(
-    i: &mut IterAppend,
-    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
 ) -> Result<(), MethodErr>
 where
     E: Engine,
@@ -69,8 +69,8 @@ where
 
 /// Get the size of the filesystem in bytes.
 pub fn get_filesystem_size<E>(
-    i: &mut IterAppend,
-    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
 ) -> Result<(), MethodErr>
 where
     E: Engine,

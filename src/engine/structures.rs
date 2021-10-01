@@ -27,7 +27,7 @@ where
     U: AsUuid,
     T: fmt::Debug,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_map()
             .entries(
                 self.iter()
@@ -169,13 +169,13 @@ where
         self.items.len()
     }
 
-    pub fn iter(&self) -> Iter<U, T> {
+    pub fn iter(&self) -> Iter<'_, U, T> {
         Iter {
             items: self.items.iter(),
         }
     }
 
-    pub fn iter_mut(&mut self) -> IterMut<U, T> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, U, T> {
         IterMut {
             items: self.items.iter_mut(),
         }

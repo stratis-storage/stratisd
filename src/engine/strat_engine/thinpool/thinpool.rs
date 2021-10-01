@@ -216,7 +216,7 @@ impl From<&ThinPoolStatus> for ThinPoolStatusDigest {
 /// match those strings that the kernel uses to identify the different states
 /// in the ioctl result.
 impl fmt::Display for ThinPoolStatusDigest {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ThinPoolStatusDigest::Good => write!(f, "rw"),
             ThinPoolStatusDigest::ReadOnly => write!(f, "ro"),

@@ -17,7 +17,7 @@ use crate::{
     engine::{DevUuid, Engine, FilesystemUuid, KeyActions, Pool, PoolUuid, StratisUuid},
 };
 
-pub fn list_keys<E>(info: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> Result<Vec<String>, String>
+pub fn list_keys<E>(info: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> Result<Vec<String>, String>
 where
     E: 'static + Engine,
 {
@@ -118,7 +118,7 @@ where
         })
     }
 
-    fn get_managed_objects<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+    fn get_managed_objects<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
     where
         E: 'static + Engine,
     {

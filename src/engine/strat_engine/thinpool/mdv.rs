@@ -47,7 +47,7 @@ struct MountedMDV<'a> {
 
 impl<'a> MountedMDV<'a> {
     /// Borrow the MDV and ensure it's mounted.
-    fn mount(mdv: &MetadataVol) -> StratisResult<MountedMDV> {
+    fn mount(mdv: &MetadataVol) -> StratisResult<MountedMDV<'_>> {
         if let Err(err) = create_dir_all(&mdv.mount_pt) {
             if err.kind() != ErrorKind::AlreadyExists {
                 return Err(From::from(err));

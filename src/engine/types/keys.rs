@@ -36,7 +36,7 @@ impl SizedKeyMemory {
 unsafe impl Send for SizedKeyMemory {}
 
 impl Debug for SizedKeyMemory {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.as_ref())
     }
 }
@@ -125,7 +125,7 @@ impl EncryptionInfo {
 }
 
 impl fmt::Display for EncryptionInfo {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let key_desc_str = if let Some(kd) = self.key_description() {
             format!("key description: \"{}\"", kd.as_application_str())
         } else {

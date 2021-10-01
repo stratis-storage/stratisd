@@ -33,7 +33,7 @@ const ALL_PROPERTIES: [&str; 5] = [
 ];
 
 fn get_properties_shared<E>(
-    m: &MethodInfo<MTSync<TData<E>>, TData<E>>,
+    m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
     properties: &mut dyn Iterator<Item = String>,
 ) -> MethodResult
 where

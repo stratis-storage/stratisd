@@ -22,7 +22,7 @@ pub const SUBSYSTEM_BLOCK: &str = "block";
 
 /// Make an enumerator for enumerating block devices. Return an error if there
 /// was any udev-related error.
-pub fn block_enumerator(context: &libudev::Context) -> libudev::Result<libudev::Enumerator> {
+pub fn block_enumerator(context: &libudev::Context) -> libudev::Result<libudev::Enumerator<'_>> {
     let mut enumerator = libudev::Enumerator::new(context)?;
     enumerator.match_subsystem(SUBSYSTEM_BLOCK)?;
     Ok(enumerator)
@@ -105,7 +105,7 @@ pub enum UdevOwnership {
 }
 
 impl fmt::Display for UdevOwnership {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             UdevOwnership::Luks => write!(f, "LUKS encrypted block device"),
             UdevOwnership::MultipathMember => write!(f, "member of a multipath block device"),

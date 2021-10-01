@@ -44,10 +44,7 @@ MIN_FEATURES = --no-default-features --features min
 SYSTEMD_FEATURES = --no-default-features --features min,systemd_compat
 EXTRAS_FEATURES =  --features extras
 
-RUST_2018_IDIOMS = -D bare-trait-objects \
-                   -D ellipsis-inclusive-range-patterns
-
-DENY = -D warnings -D future-incompatible -D unused ${RUST_2018_IDIOMS}
+DENY = -D warnings -D future-incompatible -D unused -D rust_2018_idioms -D rust_2018_compatibility -D nonstandard_style
 
 # Clippy-related lints
 CLIPPY_CARGO = -D clippy::cargo_common_metadata \

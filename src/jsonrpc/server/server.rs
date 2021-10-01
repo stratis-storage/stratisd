@@ -369,7 +369,7 @@ pub struct StratisUnixRequest {
 impl Future for StratisUnixRequest {
     type Output = StratisResult<StratisParams>;
 
-    fn poll(self: Pin<&mut Self>, ctxt: &mut Context) -> Poll<StratisResult<StratisParams>> {
+    fn poll(self: Pin<&mut Self>, ctxt: &mut Context<'_>) -> Poll<StratisResult<StratisParams>> {
         let poll_res = ready!(self.fd.poll_read_ready(ctxt));
         let mut poll_guard = match poll_res {
             Ok(poll) => poll,
@@ -395,7 +395,7 @@ impl StratisUnixResponse {
 impl Future for StratisUnixResponse {
     type Output = StratisResult<()>;
 
-    fn poll(self: Pin<&mut Self>, ctxt: &mut Context) -> Poll<StratisResult<()>> {
+    fn poll(self: Pin<&mut Self>, ctxt: &mut Context<'_>) -> Poll<StratisResult<()>> {
         let poll_res = ready!(self.fd.poll_write_ready(ctxt));
         let mut poll_guard = match poll_res {
             Ok(poll) => poll,
@@ -456,7 +456,7 @@ impl Stream for StratisUnixListener {
 
     fn poll_next(
         self: Pin<&mut Self>,
-        ctxt: &mut Context,
+        ctxt: &mut Context<'_>,
     ) -> Poll<Option<StratisResult<StratisUnixRequest>>> {
         let poll_res = ready!(self.fd.poll_read_ready(ctxt));
         let mut poll_guard = match poll_res {

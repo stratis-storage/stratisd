@@ -49,7 +49,7 @@ where
     }
 }
 
-pub struct Iter<'a, U: 'a, T: 'a> {
+pub struct Iter<'a, U, T> {
     items: hash_map::Iter<'a, U, (Name, T)>,
 }
 
@@ -72,7 +72,7 @@ where
     }
 }
 
-pub struct IterMut<'a, U: 'a, T: 'a> {
+pub struct IterMut<'a, U, T> {
     items: hash_map::IterMut<'a, U, (Name, T)>,
 }
 

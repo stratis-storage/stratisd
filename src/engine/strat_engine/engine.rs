@@ -621,8 +621,40 @@ mod test {
     where
         F: Fn(&mut StratPool) -> Result<(), Box<dyn Error>>,
     {
-        let mut engine = StratEngine::initialize()?;
+        fn needs_clean_up<F>(
+            mut engine: StratEngine,
+            uuid: PoolUuid,
+            fail_device: &FailDevice,
+            operation: F,
+        ) -> Result<(), Box<dyn Error>>
+        where
+            F: Fn(&mut StratPool) -> Result<(), Box<dyn Error>>,
+        {
+            let (_, pool) = engine
+                .get_mut_pool(uuid)
+                .ok_or_else(|| Box::new(StratisError::Msg("Pool must be present".to_string())))?;
 
+            fail_device.start_failing(*Bytes(u128::from(crypt_metadata_size())).sectors())?;
+            if operation(pool).is_ok() {
+                return Err(Box::new(StratisError::Msg(
+                    "Clevis initialization should have failed".to_string(),
+                )));
+            }
+
+            if pool.avail_actions() != ActionAvailability::Full {
+                return Err(Box::new(StratisError::Msg(
+                    "Pool should have rolled back the change entirely".to_string(),
+                )));
+            }
+
+            fail_device.stop_failing()?;
+
+            engine.teardown()?;
+
+            Ok(())
+        }
+
+        let mut engine = StratEngine::initialize()?;
         let uuid = engine
             .create_pool(name, paths_with_fail_device, None, Some(encryption_info))?
             .changed()
@@ -631,31 +663,13 @@ mod test {
                     "Pool should be newly created".to_string(),
                 ))
             })?;
-        let (_, pool) = engine
-            .get_mut_pool(uuid)
-            .ok_or_else(|| Box::new(StratisError::Msg("Pool must be present".to_string())))?;
 
-        fail_device.start_failing(*Bytes(u128::from(crypt_metadata_size())).sectors())?;
-        if operation(pool).is_ok() {
-            return Err(Box::new(StratisError::Msg(
-                "Clevis initialization should have failed".to_string(),
-            )));
-        }
-
-        if pool.avail_actions() != ActionAvailability::Full {
-            return Err(Box::new(StratisError::Msg(
-                "Pool should have rolled back the change entirely".to_string(),
-            )));
-        }
-
-        fail_device.stop_failing()?;
-
-        engine.teardown()?;
+        let res = needs_clean_up(engine, uuid, fail_device, operation);
         dm_stratis_devices_remove()?;
+        res?;
 
         let mut engine = StratEngine::initialize()?;
         engine.unlock_pool(uuid, unlock_method)?;
-
         engine.destroy_pool(uuid)?;
         engine.teardown()?;
 

@@ -195,7 +195,7 @@ pub fn bind_clevis_method<E>(
 where
     E: 'static + Engine,
 {
-    f.method("Bind", (), bind_clevis)
+    f.method("BindClevis", (), bind_clevis)
         .in_arg(("pin", "s"))
         .in_arg(("json", "s"))
         // b: Indicates if new clevis bindings were added
@@ -212,7 +212,7 @@ pub fn unbind_clevis_method<E>(
 where
     E: 'static + Engine,
 {
-    f.method("Unbind", (), unbind_clevis)
+    f.method("UnbindClevis", (), unbind_clevis)
         // b: Indicates if clevis bindings were removed
         //
         // Rust representation: bool

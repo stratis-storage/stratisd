@@ -60,7 +60,7 @@ class TestBindingAndAddingTrustedUrl(UdevTest):
             )
             self.wait_for_pools(1)
 
-            (_, exit_code, message) = Pool.Methods.Bind(
+            (_, exit_code, message) = Pool.Methods.BindClevis(
                 get_object(pool_object_path),
                 {"pin": "tang", "json": self._CLEVIS_CONFIG_STR},
             )
@@ -91,14 +91,14 @@ class TestBindingAndAddingTrustedUrl(UdevTest):
             )
             self.wait_for_pools(1)
 
-            (_, exit_code, message) = Pool.Methods.Bind(
+            (_, exit_code, message) = Pool.Methods.BindClevis(
                 get_object(pool_object_path),
                 {"pin": "tang", "json": self._CLEVIS_CONFIG_STR},
             )
 
             self.assertEqual(exit_code, StratisdErrors.OK, message)
 
-            (_, exit_code, message) = Pool.Methods.Unbind(
+            (_, exit_code, message) = Pool.Methods.UnbindClevis(
                 get_object(pool_object_path), {}
             )
 
@@ -129,7 +129,7 @@ class TestBindingAndAddingTrustedUrl(UdevTest):
             )
             self.wait_for_pools(1)
 
-            (_, exit_code, message) = Pool.Methods.Bind(
+            (_, exit_code, message) = Pool.Methods.BindClevis(
                 get_object(pool_object_path),
                 {"pin": "tang", "json": self._CLEVIS_CONFIG_STR},
             )
@@ -175,7 +175,7 @@ class TestBindingAndAddingTrustedUrl(UdevTest):
 
             self.assertEqual(exit_code, StratisdErrors.OK, message)
 
-            (_, exit_code, message) = Pool.Methods.Unbind(
+            (_, exit_code, message) = Pool.Methods.UnbindClevis(
                 get_object(pool_object_path), {}
             )
 

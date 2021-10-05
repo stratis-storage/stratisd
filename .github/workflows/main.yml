@@ -289,7 +289,6 @@ jobs:
           python3-packaging
           python3-psutil
           systemd-devel
-          systemd-udev
       - uses: actions-rs/toolchain@v1
         with:
           components: cargo
@@ -299,8 +298,6 @@ jobs:
         run: PROFILEDIR=debug make -f Makefile install
       - name: Check out stratis-cli
         run: git clone https://github.com/stratis-storage/stratis-cli.git
-      - name: Start udev
-        run: /usr/lib/systemd/systemd-udevd &
       - name: Set up for D-Bus
         run: |
           mkdir -p /var/lib/dbus

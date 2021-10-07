@@ -8,8 +8,8 @@ use dbus_tree::{MTSync, MethodErr, PropInfo};
 use crate::{dbus_api::types::TData, engine::Engine, stratis::VERSION};
 
 pub fn get_version<E>(
-    i: &mut IterAppend,
-    _p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+    i: &mut IterAppend<'_>,
+    _p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
 ) -> Result<(), MethodErr>
 where
     E: Engine,

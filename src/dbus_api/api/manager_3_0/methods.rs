@@ -28,7 +28,7 @@ use crate::{
 
 type EncryptionParams = (Option<(bool, String)>, Option<(bool, (String, String))>);
 
-pub fn destroy_pool<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+pub fn destroy_pool<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
 where
     E: 'static + Engine,
 {
@@ -80,7 +80,7 @@ where
     Ok(vec![msg])
 }
 
-pub fn unset_key<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+pub fn unset_key<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
 where
     E: 'static + Engine,
 {
@@ -120,7 +120,7 @@ where
     Ok(vec![msg])
 }
 
-pub fn set_key<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+pub fn set_key<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
 where
     E: 'static + Engine,
 {
@@ -168,7 +168,7 @@ where
     Ok(vec![msg])
 }
 
-pub fn unlock_pool<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+pub fn unlock_pool<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
 where
     E: 'static + Engine,
 {
@@ -231,7 +231,7 @@ where
     Ok(vec![msg])
 }
 
-pub fn engine_state_report<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+pub fn engine_state_report<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
 where
     E: 'static + Engine,
 {
@@ -256,7 +256,7 @@ where
     Ok(vec![msg])
 }
 
-pub fn create_pool<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+pub fn create_pool<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
 where
     E: 'static + Engine,
 {
@@ -265,7 +265,7 @@ where
 
     let name: &str = get_next_arg(&mut iter, 0)?;
     let redundancy_tuple: (bool, u16) = get_next_arg(&mut iter, 1)?;
-    let devs: Array<&str, _> = get_next_arg(&mut iter, 2)?;
+    let devs: Array<'_, &str, _> = get_next_arg(&mut iter, 2)?;
     let (key_desc_tuple, clevis_tuple): EncryptionParams = (
         Some(get_next_arg(&mut iter, 3)?),
         Some(get_next_arg(&mut iter, 4)?),
@@ -314,7 +314,7 @@ where
                 CreateAction::Created(uuid) => {
                     let (_, pool) = get_pool!(mutex_lock; uuid; default_return; return_message);
 
-                    let pool_object_path: dbus::Path = create_dbus_pool(
+                    let pool_object_path: dbus::Path<'_> = create_dbus_pool(
                         dbus_context,
                         object_path.clone(),
                         &Name::new(name.to_string()),

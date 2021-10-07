@@ -42,7 +42,7 @@ fn parse_args() -> App<'static, 'static> {
         )
 }
 
-fn get_long_help(app: &mut App) -> Result<String, Box<dyn Error>> {
+fn get_long_help(app: &mut App<'_, '_>) -> Result<String, Box<dyn Error>> {
     let mut help = Vec::new();
     app.write_long_help(&mut help)?;
     Ok(String::from_utf8(help)?)

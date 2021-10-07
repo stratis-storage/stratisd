@@ -134,7 +134,7 @@ fn get_paths_from_args<'a>(args: &'a ArgMatches<'a>) -> Vec<PathBuf> {
         .collect::<Vec<_>>()
 }
 
-fn get_long_help(app: &mut App) -> Result<String, Box<dyn Error>> {
+fn get_long_help(app: &mut App<'_, '_>) -> Result<String, Box<dyn Error>> {
     let mut help = Vec::new();
     app.write_long_help(&mut help)?;
     Ok(String::from_utf8(help)?)

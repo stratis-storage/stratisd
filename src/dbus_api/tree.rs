@@ -83,7 +83,7 @@ where
     /// Handle an object path being added to the tree of D-Bus objects.
     fn handle_add_action(
         &self,
-        mut write_lock: TreeWriteLock<E>,
+        mut write_lock: TreeWriteLock<'_, E>,
         path: ObjectPath<MTSync<TData<E>>, TData<E>>,
         interfaces: InterfacesAddedThreadSafe,
     ) {
@@ -97,7 +97,7 @@ where
     /// Handle an object path being removed from the tree of D-Bus objects.
     fn handle_remove_action(
         &self,
-        mut write_lock: TreeWriteLock<E>,
+        mut write_lock: TreeWriteLock<'_, E>,
         path: Path<'static>,
         interfaces: InterfacesRemoved,
     ) {
@@ -158,7 +158,7 @@ where
     /// Handle a pool name change in the engine.
     fn handle_pool_name_change(
         &self,
-        read_lock: TreeReadLock<E>,
+        read_lock: TreeReadLock<'_, E>,
         item: Path<'static>,
         new_name: String,
     ) {
@@ -233,7 +233,7 @@ where
     /// the UUID, then send a signal indicating that the size has changed.
     fn handle_fs_size_change(
         &self,
-        read_lock: TreeReadLock<E>,
+        read_lock: TreeReadLock<'_, E>,
         uuid: FilesystemUuid,
         new_size: Bytes,
     ) {
@@ -368,7 +368,7 @@ where
 
     fn property_changed_invalidated_signal(
         &self,
-        object: &Path,
+        object: &Path<'_>,
         changed_properties: HashMap<String, Variant<Box<dyn RefArg>>>,
         invalidated_properties: Vec<String>,
         interfaces: &[String],

@@ -72,7 +72,7 @@ pub struct LuksInfo {
 }
 
 impl fmt::Display for LuksInfo {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}, {}", self.info, self.encryption_info,)
     }
 }
@@ -87,7 +87,7 @@ pub struct StratisInfo {
 }
 
 impl fmt::Display for StratisInfo {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{}, device number: \"{}\", devnode: \"{}\"",
@@ -149,7 +149,7 @@ impl DeviceInfo {
 }
 
 impl fmt::Display for DeviceInfo {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DeviceInfo::Luks(info) => write!(f, "LUKS device description: {}", info),
             DeviceInfo::Stratis(info) => write!(f, "Stratis device description: {}", info),

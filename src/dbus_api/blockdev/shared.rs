@@ -61,8 +61,8 @@ where
 /// found by means of the getter method which takes a reference to a
 /// blockdev and obtains the property from the blockdev.
 pub fn get_blockdev_property<F, R, E>(
-    i: &mut IterAppend,
-    p: &PropInfo<MTSync<TData<E>>, TData<E>>,
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
     getter: F,
 ) -> Result<(), MethodErr>
 where

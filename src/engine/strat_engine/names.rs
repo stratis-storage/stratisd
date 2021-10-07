@@ -81,7 +81,7 @@ pub enum FlexRole {
 }
 
 impl Display for FlexRole {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             FlexRole::MetadataVolume => write!(f, "mdv"),
             FlexRole::ThinData => write!(f, "thindata"),
@@ -97,7 +97,7 @@ pub enum ThinRole {
 }
 
 impl Display for ThinRole {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             ThinRole::Filesystem(uuid) => write!(f, "fs-{}", uuid_to_string!(uuid)),
         }
@@ -110,7 +110,7 @@ pub enum ThinPoolRole {
 }
 
 impl Display for ThinPoolRole {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             ThinPoolRole::Pool => write!(f, "pool"),
         }
@@ -131,7 +131,7 @@ pub enum CacheRole {
 }
 
 impl Display for CacheRole {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             CacheRole::Cache => write!(f, "cache"),
             CacheRole::CacheSub => write!(f, "cachesub"),

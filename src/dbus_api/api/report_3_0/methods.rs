@@ -15,7 +15,7 @@ use crate::{
     engine::{Engine, ReportType},
 };
 
-pub fn get_report<E>(m: &MethodInfo<MTSync<TData<E>>, TData<E>>) -> MethodResult
+pub fn get_report<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
 where
     E: Engine,
 {

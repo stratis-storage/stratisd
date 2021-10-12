@@ -39,3 +39,6 @@ proptest-regression*
 # cargo-vendor
 vendor
 *vendor.tar.gz
+
+# stratisd_proc_macros
+stratisd_proc_macros/Cargo.lock

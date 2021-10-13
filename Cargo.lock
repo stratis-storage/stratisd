@@ -523,6 +523,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
+name = "libblkid-rs"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac1e8cad6450395a4549b5c31486d4bb3eb9f31c74c8ea9c0e53862bd92baf5a"
+dependencies = [
+ "either",
+ "libblkid-rs-sys",
+ "libc",
+ "uuid",
+]
+
+[[package]]
+name = "libblkid-rs-sys"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57ad6d85062c64c2f79162bf17efaaf886709d76962118fe4095516c298ee087"
+dependencies = [
+ "bindgen 0.57.0",
+ "cc",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.98"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1122,6 +1144,7 @@ dependencies = [
  "futures",
  "itertools",
  "lazy_static",
+ "libblkid-rs",
  "libc",
  "libcryptsetup-rs",
  "libmount",

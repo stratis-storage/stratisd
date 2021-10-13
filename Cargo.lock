@@ -1124,7 +1124,6 @@ dependencies = [
  "lazy_static",
  "libc",
  "libcryptsetup-rs",
- "libdbus-sys",
  "libmount",
  "libudev",
  "log",

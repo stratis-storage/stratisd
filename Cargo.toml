@@ -50,6 +50,7 @@ env_logger="0.8.0"
 futures = "0.3.11"
 itertools = "0.10.0"
 lazy_static = "1.2.0"
+libblkid-rs = { version = "0.1.0", git = "https://github.com/stratis-storage/libblkid-rs" }
 libc = "0.2.98"
 libmount = "0.1.9"
 libudev = "0.2.0"

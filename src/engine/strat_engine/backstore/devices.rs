@@ -94,7 +94,7 @@ fn udev_info(
 ///
 /// Returns true if the device has no partitions and no recognized superblock.
 /// Otherwise false
-fn verify_unowned_with_blkid(path: &DevicePath) -> StratisResult<bool> {
+fn verify_unowned_with_blkid(path: &DevicePath) -> StratisResult<(Option<i32>, Option<String>)> {
     let mut probe = BlkidProbe::new_from_filename(path)?;
     probe.enable_superblocks(true)?;
     probe.enable_partitions(true)?;
@@ -105,7 +105,9 @@ fn verify_unowned_with_blkid(path: &DevicePath) -> StratisResult<bool> {
         .and_then(|mut parts| parts.number_of_partitions());
     let superblock_type = probe.lookup_value("TYPE");
 
-    Ok(num_parts.map(|num| num == 0).unwrap_or(true) || superblock_type.is_err())
+    debug!("Verifying device that device is unowned: superblock probe: {:?}, number of partitions: {:?}", superblock_type, num_parts);
+
+    Ok((num_parts.ok(), superblock_type.ok()))
 }
 
 // Find information from the devnode that is useful to identify a device or
@@ -125,10 +127,14 @@ fn dev_info(
     let (ownership, devnum, hw_id) = udev_info(devnode)?;
 
     if let UdevOwnership::Unowned = ownership {
-        if !verify_unowned_with_blkid(devnode)? {
-            return Err(StratisError::Msg(
-                "Device reported to be unowned by udev actually contains existing partitions or superblock".to_string()
-            ));
+        let (num_parts, sublk_type) = verify_unowned_with_blkid(devnode)?;
+        if num_parts.as_ref().map(|num| *num > 0).unwrap_or(false) || sublk_type.is_some() {
+            return Err(StratisError::Msg(format!(
+                "Device {} was reported to be unowned by udev but actually contains existing partitions or superblock; partitions: {:?}, superblock: {:?}",
+                devnode.display(),
+                num_parts,
+                sublk_type,
+            )));
         }
     }
 

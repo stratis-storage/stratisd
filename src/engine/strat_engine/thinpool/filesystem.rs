@@ -15,7 +15,7 @@ use data_encoding::BASE32_NOPAD;
 use serde_json::{Map, Value};
 
 use devicemapper::{
-    Bytes, DmDevice, DmName, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev, ThinStatus,
+    Bytes, DmDevice, DmName, DmResult, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev, ThinStatus,
 };
 
 use nix::{
@@ -52,7 +52,7 @@ pub const FILESYSTEM_LOWATER: Sectors = Sectors(4 * (DATA_LOWATER.0 * DATA_BLOCK
 pub struct StratFilesystem {
     thin_dev: ThinDev,
     created: DateTime<Utc>,
-    thin_dev_status: Option<ThinStatus>,
+    thin_dev_status: DmResult<ThinStatus>,
 }
 
 impl StratFilesystem {
@@ -86,17 +86,7 @@ impl StratFilesystem {
             return Err(err);
         }
 
-        let thin_dev_status = match thin_dev.status(get_dm()) {
-            Ok(status) => Some(status),
-            Err(err) => {
-                warn!(
-                    "Status could not be obtained for just initialized device {}: {}",
-                    thin_dev.device(),
-                    err
-                );
-                None
-            }
-        };
+        let thin_dev_status = thin_dev.status(get_dm());
 
         Ok((
             fs_uuid,
@@ -124,17 +114,7 @@ impl StratFilesystem {
             fssave.thin_id,
         )?;
 
-        let thin_dev_status = match thin_dev.status(get_dm()) {
-            Ok(status) => Some(status),
-            Err(err) => {
-                warn!(
-                    "Status could not be obtained for just set up device {}: {}",
-                    thin_dev.device(),
-                    err
-                );
-                None
-            }
-        };
+        let thin_dev_status = thin_dev.status(get_dm());
 
         Ok(StratFilesystem {
             thin_dev,
@@ -233,17 +213,7 @@ impl StratFilesystem {
 
                 set_uuid(&thin_dev.devnode(), snapshot_fs_uuid)?;
 
-                let thin_dev_status = match thin_dev.status(get_dm()) {
-                    Ok(status) => Some(status),
-                    Err(err) => {
-                        warn!(
-                            "Status could not be obtained for newly created snapshot device {}: {}",
-                            thin_dev.device(),
-                            err
-                        );
-                        None
-                    }
-                };
+                let thin_dev_status = thin_dev.status(get_dm());
 
                 Ok(StratFilesystem {
                     thin_dev,
@@ -308,17 +278,7 @@ impl StratFilesystem {
             ThinStatus::Fail => Ok(None),
         };
 
-        match self.thin_dev.status(get_dm()) {
-            Ok(status) => self.thin_dev_status = Some(status),
-            Err(err) => {
-                warn!(
-                    "Unable to obtain and set status information for thin device {} while performing check: {}",
-                    self.thin_dev.device(),
-                    err
-                );
-                self.thin_dev_status = None;
-            }
-        }
+        self.thin_dev_status = self.thin_dev.status(get_dm());
 
         diff
     }
@@ -410,25 +370,19 @@ impl Filesystem for StratFilesystem {
 
     fn used(&self) -> StratisResult<Bytes> {
         match &self.thin_dev_status {
-            Some(ThinStatus::Working(wk_status)) => Ok(wk_status.nr_mapped_sectors.bytes()),
-            Some(ThinStatus::Error) => {
+            Ok(ThinStatus::Working(wk_status)) => Ok(wk_status.nr_mapped_sectors.bytes()),
+            Ok(ThinStatus::Error) => {
                 let error_msg = format!(
                     "Unable to get status for filesystem thin device {}",
                     self.thin_dev.device()
                 );
                 Err(StratisError::Msg(error_msg))
             }
-            Some(ThinStatus::Fail) => {
+            Ok(ThinStatus::Fail) => {
                 let error_msg = format!("ThinDev {} is in a failed state", self.thin_dev.device());
                 Err(StratisError::Msg(error_msg))
             }
-            None => {
-                let error_msg = format!(
-                    "status of thin device {} is unknown",
-                    self.thin_dev.device()
-                );
-                Err(StratisError::Msg(error_msg))
-            }
+            Err(err) => Err(err.clone().into()),
         }
     }
 

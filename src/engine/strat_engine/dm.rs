@@ -20,8 +20,7 @@ pub fn get_dm_init() -> StratisResult<&'static DM> {
             Some(Ok(ref context)) => Ok(context),
             Some(Err(e)) => Err(StratisError::Chained(
                 "Failed to initialize DM context".to_string(),
-                // FIXME: Cannot clone DMError
-                Box::new(StratisError::Msg(e.to_string())),
+                Box::new(e.clone().into()),
             )),
             _ => panic!("DM_CONTEXT.is_some()"),
         }

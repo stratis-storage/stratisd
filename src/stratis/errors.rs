@@ -39,6 +39,7 @@ pub enum StratisError {
     Recv(sync::mpsc::RecvError),
     Null(std::ffi::NulError),
     Join(tokio::task::JoinError),
+    Blkid(libblkid_rs::BlkidErr),
 
     #[cfg(feature = "dbus_enabled")]
     Dbus(dbus::Error),
@@ -126,6 +127,9 @@ impl fmt::Display for StratisError {
             StratisError::Recv(ref err) => write!(f, "Synchronization channel error: {}", err),
             StratisError::Null(ref err) => write!(f, "C string conversion error: {}", err),
             StratisError::Join(ref err) => write!(f, "Failed to join thread: {}", err),
+            StratisError::Blkid(ref err) => {
+                write!(f, "Failed to probe device using blkid: {}", err)
+            }
 
             #[cfg(feature = "dbus_enabled")]
             StratisError::Dbus(ref err) => {
@@ -137,6 +141,12 @@ impl fmt::Display for StratisError {
 }
 
 impl Error for StratisError {}
+
+impl From<libblkid_rs::BlkidErr> for StratisError {
+    fn from(err: libblkid_rs::BlkidErr) -> StratisError {
+        StratisError::Blkid(err)
+    }
+}
 
 impl From<tokio::task::JoinError> for StratisError {
     fn from(err: tokio::task::JoinError) -> StratisError {

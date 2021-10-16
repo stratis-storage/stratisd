@@ -14,6 +14,7 @@ use chrono::Utc;
 use itertools::Itertools;
 
 use devicemapper::{Bytes, Device, Sectors, IEC};
+use libblkid_rs::BlkidProbe;
 
 use crate::{
     engine::{
@@ -89,6 +90,28 @@ fn udev_info(
     })
 }
 
+/// Verify that udev information is correct about the device being unowned.
+///
+/// Returns optional number of partitions and superblock type or error.
+fn verify_unowned_with_blkid(path: &DevicePath) -> StratisResult<(Option<i32>, Option<String>)> {
+    let mut probe = BlkidProbe::new_from_filename(path)?;
+    probe.enable_superblocks(true)?;
+    probe.enable_partitions(true)?;
+    probe.do_safeprobe()?;
+
+    let num_parts = probe
+        .get_partitions()
+        .and_then(|mut parts| parts.number_of_partitions());
+    let superblock_type = probe.lookup_value("TYPE");
+
+    debug!(
+        "Verifying that device is unowned: superblock probe: {:?}, number of partitions: {:?}",
+        superblock_type, num_parts
+    );
+
+    Ok((num_parts.ok(), superblock_type.ok()))
+}
+
 // Find information from the devnode that is useful to identify a device or
 // to construct a StratBlockDev object. Returns a tuple of the ID_WWN,
 // the size of the device, and Stratis identifiers for the device, if any
@@ -104,6 +127,19 @@ fn dev_info(
     Device,
 )> {
     let (ownership, devnum, hw_id) = udev_info(devnode)?;
+
+    if let UdevOwnership::Unowned = ownership {
+        let (num_parts, sublk_type) = verify_unowned_with_blkid(devnode)?;
+        if num_parts.as_ref().map(|num| *num > 0).unwrap_or(false) || sublk_type.is_some() {
+            return Err(StratisError::Msg(format!(
+                "Device {} was reported to be unowned by udev but actually contains existing partitions or superblock; partitions: {:?}, superblock: {:?}",
+                devnode.display(),
+                num_parts,
+                sublk_type,
+            )));
+        }
+    }
+
     match ownership {
         UdevOwnership::Luks | UdevOwnership::MultipathMember | UdevOwnership::Theirs => {
             let err_str = format!(
@@ -117,14 +153,6 @@ fn dev_info(
             let mut f = OpenOptions::new().read(true).write(true).open(&**devnode)?;
             let dev_size = blkdev_size(&f)?;
 
-            // FIXME: Read device identifiers from either an Unowned or a
-            // Stratis device. For a Stratis device, this is the correct thing
-            // to do. For an unowned device, this is the best available check
-            // that we currently have to prevent overwriting a device which
-            // is owned, but which udev has not identified as such. In future,
-            // we hope to use libblkid in order to double check that the
-            // device is truly unowned, not just for Stratis but also for
-            // other potential owners.
             let stratis_identifiers = device_identifiers(&mut f).map_err(|err| {
                 let error_message = format!(
                     "There was an error reading Stratis metadata from device {}; the device is unsuitable for initialization: {}",

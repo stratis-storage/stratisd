@@ -716,7 +716,7 @@ impl Recordable<BackstoreSave> for Backstore {
 mod tests {
     use std::fs::OpenOptions;
 
-    use devicemapper::{CacheDevStatus, DataBlocks, IEC};
+    use devicemapper::{CacheDevStatus, DataBlocks, DmOptions, IEC};
 
     use crate::engine::strat_engine::{
         cmd,
@@ -788,7 +788,7 @@ mod tests {
         let cache_status = backstore
             .cache
             .as_ref()
-            .map(|c| c.status(get_dm()).unwrap())
+            .map(|c| c.status(get_dm(), DmOptions::default()).unwrap())
             .unwrap();
 
         match cache_status {
@@ -813,7 +813,7 @@ mod tests {
         let cache_status = backstore
             .cache
             .as_ref()
-            .map(|c| c.status(get_dm()).unwrap())
+            .map(|c| c.status(get_dm(), DmOptions::default()).unwrap())
             .unwrap();
 
         match cache_status {

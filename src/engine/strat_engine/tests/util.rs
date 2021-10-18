@@ -230,6 +230,7 @@ impl FailDevice {
                 "linear".to_string(),
                 format!("{} 0", backing_device.display()),
             )],
+            &DmOptions::default(),
         )?;
         dm.device_suspend(&dev_id, &DmOptions::new())?;
 
@@ -269,6 +270,7 @@ impl FailDevice {
                     format!("{} 0", self.backing_device.display()),
                 ),
             ],
+            &DmOptions::default(),
         )?;
         self.dm_context.device_suspend(&dev_id, &DmOptions::new())?;
 
@@ -289,6 +291,7 @@ impl FailDevice {
                 "linear".to_string(),
                 format!("{} 0", self.backing_device.display()),
             )],
+            &DmOptions::default(),
         )?;
         self.dm_context.device_suspend(&dev_id, &DmOptions::new())?;
 

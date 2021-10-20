@@ -414,6 +414,7 @@ where
             return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Ok(CreateAction::Created(_)) => {
+            dbus_context.push_pool_clevis_info_change(pool_path.get_name(), pool.encryption_info());
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(e) => {
@@ -454,6 +455,7 @@ where
             return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Ok(DeleteAction::Deleted(_)) => {
+            dbus_context.push_pool_clevis_info_change(pool_path.get_name(), pool.encryption_info());
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(e) => {
@@ -508,6 +510,7 @@ where
             return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Ok(CreateAction::Created(_)) => {
+            dbus_context.push_pool_key_desc_change(pool_path.get_name(), pool.encryption_info());
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(e) => {
@@ -548,6 +551,7 @@ where
             return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Ok(DeleteAction::Deleted(_)) => {
+            dbus_context.push_pool_key_desc_change(pool_path.get_name(), pool.encryption_info());
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(e) => {
@@ -602,6 +606,7 @@ where
             return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Ok(RenameAction::Renamed(_)) => {
+            dbus_context.push_pool_key_desc_change(pool_path.get_name(), pool.encryption_info());
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Ok(RenameAction::NoSource) => {
@@ -646,7 +651,10 @@ where
     let (_, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
     let msg = match handle_action!(pool.rebind_clevis(), dbus_context, pool_path.get_name()) {
-        Ok(_) => return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string()),
+        Ok(_) => {
+            dbus_context.push_pool_clevis_info_change(pool_path.get_name(), pool.encryption_info());
+            return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
         Err(e) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e);
             return_message.append3(default_return, rc, rs)

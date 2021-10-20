@@ -109,43 +109,9 @@ macro_rules! uuid_to_string {
     };
 }
 
-macro_rules! properties_footer {
-    () => {
-        pub fn get_all_properties<E>(
-            m: &dbus_tree::MethodInfo<
-                '_,
-                dbus_tree::MTSync<$crate::dbus_api::types::TData<E>>,
-                $crate::dbus_api::types::TData<E>,
-            >,
-        ) -> dbus_tree::MethodResult
-        where
-            E: 'static + $crate::engine::Engine,
-        {
-            get_properties_shared(m, &mut ALL_PROPERTIES.iter().map(|&s| s.to_string()))
-        }
-
-        pub fn get_properties<E>(
-            m: &dbus_tree::MethodInfo<
-                '_,
-                dbus_tree::MTSync<$crate::dbus_api::types::TData<E>>,
-                $crate::dbus_api::types::TData<E>,
-            >,
-        ) -> dbus_tree::MethodResult
-        where
-            E: 'static + $crate::engine::Engine,
-        {
-            let message: &dbus::Message = m.msg;
-            let mut iter = message.iter_init();
-            let mut properties: dbus::arg::Array<'_, String, _> =
-                $crate::dbus_api::util::get_next_arg(&mut iter, 0)?;
-            get_properties_shared(m, &mut properties)
-        }
-    };
-}
-
 macro_rules! initial_properties {
     ($($iface:expr => { $($prop:expr => $val:expr),* }),*) => {{
-        let mut interfaces = vec![
+        vec![
             $(
                 ($iface, vec![
                     $(
@@ -163,13 +129,7 @@ macro_rules! initial_properties {
         ]
         .into_iter()
         .map(|(s, v)| (s.to_string(), v))
-        .collect::<$crate::dbus_api::types::InterfacesAddedThreadSafe>();
-        interfaces.extend(
-            $crate::dbus_api::consts::fetch_properties_interfaces()
-                .into_iter()
-                .map(|s| (s, std::collections::HashMap::new()))
-        );
-        interfaces
+        .collect::<$crate::dbus_api::types::InterfacesAddedThreadSafe>()
     }};
 }
 
@@ -192,4 +152,10 @@ macro_rules! handle_action {
         }
         action
     }};
+}
+
+macro_rules! box_variant {
+    ($val:expr) => {
+        dbus::arg::Variant(Box::new($val) as Box<dyn dbus::arg::RefArg>)
+    };
 }

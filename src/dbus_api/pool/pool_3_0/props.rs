@@ -44,3 +44,71 @@ where
         Ok(shared::pool_avail_actions_prop::<E>(pool))
     })
 }
+
+pub fn get_pool_key_desc<E>(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+) -> Result<(), MethodErr>
+where
+    E: 'static + Engine,
+{
+    get_pool_property(i, p, |(_, _, pool)| {
+        Ok(shared::pool_key_desc_prop::<E>(pool))
+    })
+}
+
+pub fn get_pool_clevis_info<E>(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+) -> Result<(), MethodErr>
+where
+    E: 'static + Engine,
+{
+    get_pool_property(i, p, |(_, _, pool)| {
+        Ok(shared::pool_clevis_info_prop::<E>(pool))
+    })
+}
+
+pub fn get_pool_has_cache<E>(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+) -> Result<(), MethodErr>
+where
+    E: 'static + Engine,
+{
+    get_pool_property(i, p, |(_, _, pool)| {
+        Ok(shared::pool_has_cache_prop::<E>(pool))
+    })
+}
+
+pub fn get_pool_used_size<E>(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+) -> Result<(), MethodErr>
+where
+    E: 'static + Engine,
+{
+    get_pool_property(i, p, |(_, _, pool)| Ok(shared::pool_used_size::<E>(pool)))
+}
+
+pub fn get_pool_allocated_size<E>(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+) -> Result<(), MethodErr>
+where
+    E: 'static + Engine,
+{
+    get_pool_property(i, p, |(_, _, pool)| {
+        Ok(shared::pool_allocated_size::<E>(pool))
+    })
+}
+
+pub fn get_pool_total_size<E>(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+) -> Result<(), MethodErr>
+where
+    E: 'static + Engine,
+{
+    get_pool_property(i, p, |(_, _, pool)| Ok(shared::pool_total_size::<E>(pool)))
+}

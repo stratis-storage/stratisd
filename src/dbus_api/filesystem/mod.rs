@@ -13,8 +13,8 @@ use crate::{
     engine::{Engine, FilesystemUuid, Name, Pool, StratisUuid},
 };
 
-mod fetch_properties_3_0;
 mod filesystem_3_0;
+pub mod prop_conv;
 mod shared;
 
 pub fn create_dbus_filesystem<'a, E>(
@@ -46,12 +46,8 @@ where
                 .add_p(filesystem_3_0::pool_property(&f))
                 .add_p(filesystem_3_0::uuid_property(&f))
                 .add_p(filesystem_3_0::created_property(&f))
-                .add_p(filesystem_3_0::size_property(&f)),
-        )
-        .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_3_0, ())
-                .add_m(fetch_properties_3_0::get_all_properties_method(&f))
-                .add_m(fetch_properties_3_0::get_properties_method(&f)),
+                .add_p(filesystem_3_0::size_property(&f))
+                .add_p(filesystem_3_0::used_property(&f)),
         );
 
     let path = object_path.get_name().to_owned();
@@ -78,7 +74,8 @@ where
             consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop::<E>(fs, pool_name, fs_name),
             consts::FILESYSTEM_POOL_PROP => parent,
             consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop::<E>(fs),
-            consts::FILESYSTEM_SIZE_PROP => shared::fs_size_prop(fs)
+            consts::FILESYSTEM_SIZE_PROP => shared::fs_size_prop(fs),
+            consts::FILESYSTEM_USED_PROP => shared::fs_used_prop::<E>(fs)
         }
     }
 }

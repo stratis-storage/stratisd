@@ -233,11 +233,13 @@ impl<'a> TryFrom<&'a str> for ReportType {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct LockedPoolDevice {
     pub devnode: PathBuf,
     pub uuid: DevUuid,
 }
 
+#[derive(Debug, PartialEq)]
 pub struct LockedPoolInfo {
     pub info: PoolEncryptionInfo,
     pub devices: Vec<LockedPoolDevice>,
@@ -366,57 +368,33 @@ pub enum MaybeInconsistent<T> {
     No(T),
 }
 
-/// A set of properties that can change independently of IPC calls.
-#[derive(Default)]
-pub struct ChangedProperties {
-    // NOTE: Bytes will eventually become a more general structure if more information
-    // needs to be sent to the D-Bus layer.
-    pub filesystem_props: HashMap<FilesystemUuid, Bytes>,
-    // NOTE: Any additional properties should be specified similarly (HashMap between
-    // UUIDs and a set of properties that have changed.
+/// Change in attributes of the thin pool that may need to be reported to the
+/// IPC layer.
+#[derive(Default, Debug)]
+pub struct ThinPoolDiff {
+    #[allow(clippy::option_option)]
+    pub usage: Option<Option<Bytes>>,
+    pub allocated_size: Option<Bytes>,
 }
 
-impl ChangedProperties {
-    /// Returns a boolean indicating whether any properties were changed.
+impl ThinPoolDiff {
+    /// Returns true if the thin pool information has changed.
     pub fn is_changed(&self) -> bool {
-        !self.filesystem_props.is_empty()
-    }
-
-    /// Add a new record for filesystem properties that have changed.
-    pub fn add_fs_prop(&mut self, uuid: FilesystemUuid, diff: StratFilesystemDiff) {
-        if let Some(bytes) = diff.0 {
-            self.filesystem_props.insert(uuid, bytes);
-        }
-    }
-
-    /// Merge two ChangedProperties structs.
-    pub fn merge(&mut self, other: Self) -> &mut Self {
-        self.filesystem_props.extend(other.filesystem_props);
-        self
+        self.usage.is_some() || self.allocated_size.is_some()
     }
 }
 
 /// Represents the difference between two dumped states for a filesystem.
-#[derive(Default)]
-pub struct StratFilesystemDiff(Option<Bytes>);
-
-/// Represents the state of the Stratis filesystem at a given moment in time.
-pub struct StratFilesystemState(Bytes);
-
-impl StratFilesystemState {
-    pub fn new(size: Bytes) -> Self {
-        StratFilesystemState(size)
-    }
+#[derive(Default, Debug)]
+pub struct StratFilesystemDiff {
+    pub size: Option<Bytes>,
+    #[allow(clippy::option_option)]
+    pub used: Option<Option<Bytes>>,
 }
 
-impl StateDiff for StratFilesystemState {
-    type Diff = StratFilesystemDiff;
-
-    fn diff(&self, new_state: &Self) -> Self::Diff {
-        StratFilesystemDiff(if self.0 != new_state.0 {
-            Some(new_state.0)
-        } else {
-            None
-        })
+impl StratFilesystemDiff {
+    /// Returns true if the filesystem information has changed.
+    pub fn is_changed(&self) -> bool {
+        self.size.is_some() || self.used.is_some()
     }
 }

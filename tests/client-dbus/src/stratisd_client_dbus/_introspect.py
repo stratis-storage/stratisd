@@ -4,17 +4,6 @@ SPECS = {
     <method name="GetManagedObjects" />
   </interface>
 """,
-    "org.storage.stratis3.FetchProperties.r0": """
-<interface name="org.storage.stratis3.FetchProperties.r0">
-    <method name="GetAllProperties">
-      <arg name="results" type="a{s(bv)}" direction="out" />
-    </method>
-    <method name="GetProperties">
-      <arg name="properties" type="as" direction="in" />
-      <arg name="results" type="a{s(bv)}" direction="out" />
-    </method>
-  </interface>
-""",
     "org.storage.stratis3.Manager.r0": """
 <interface name="org.storage.stratis3.Manager.r0">
     <method name="CreatePool">
@@ -38,6 +27,11 @@ SPECS = {
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
+    <method name="ListKeys">
+      <arg name="result" type="as" direction="out" />
+      <arg name="return_code" type="q" direction="out" />
+      <arg name="return_string" type="s" direction="out" />
+    </method>
     <method name="SetKey">
       <arg name="key_desc" type="s" direction="in" />
       <arg name="key_fd" type="h" direction="in" />
@@ -58,6 +52,7 @@ SPECS = {
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
+    <property name="LockedPools" type="a{sa{sv}}" access="read" />
     <property name="Version" type="s" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>
@@ -99,6 +94,7 @@ SPECS = {
     <property name="Tier" type="q" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false" />
     </property>
+    <property name="TotalPhysicalSize" type="s" access="read" />
     <property name="UserInfo" type="(bs)" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false" />
     </property>
@@ -126,6 +122,7 @@ SPECS = {
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>
     <property name="Size" type="s" access="read" />
+    <property name="Used" type="(bs)" access="read" />
     <property name="Uuid" type="s" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>
@@ -210,11 +207,17 @@ SPECS = {
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
+    <property name="AllocatedSize" type="s" access="read" />
     <property name="AvailableActions" type="s" access="read" />
+    <property name="ClevisInfo" type="(b(b(ss)))" access="read" />
     <property name="Encrypted" type="b" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>
+    <property name="HasCache" type="b" access="read" />
+    <property name="KeyDescription" type="(b(bs))" access="read" />
     <property name="Name" type="s" access="read" />
+    <property name="TotalPhysicalSize" type="s" access="read" />
+    <property name="TotalPhysicalUsed" type="(bs)" access="read" />
     <property name="Uuid" type="s" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>

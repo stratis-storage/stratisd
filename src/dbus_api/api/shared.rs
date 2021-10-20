@@ -2,40 +2,24 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, vec::Vec};
+use std::collections::HashMap;
 
-use dbus_tree::{Factory, MTSync, Method, MethodInfo, MethodResult, ObjectPath};
+use dbus::arg::IterAppend;
+use dbus_tree::{
+    Factory, MTSync, Method, MethodErr, MethodInfo, MethodResult, ObjectPath, PropInfo, Tree,
+};
 
 use crate::{
     dbus_api::{
+        api::prop_conv::{self, LockedPools},
         blockdev::get_blockdev_properties,
         filesystem::get_fs_properties,
         pool::get_pool_properties,
         types::{GetManagedObjects, InterfacesAddedThreadSafe, TData},
         util::thread_safe_to_dbus_sendable,
     },
-    engine::{DevUuid, Engine, FilesystemUuid, KeyActions, Pool, PoolUuid, StratisUuid},
+    engine::{DevUuid, Engine, FilesystemUuid, Pool, PoolUuid, StratisUuid},
 };
-
-pub fn list_keys<E>(
-    info: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<Vec<String>, String>
-where
-    E: 'static + Engine,
-{
-    let dbus_context = info.tree.get_data();
-
-    let mutex_lock = dbus_context.engine.blocking_lock();
-    mutex_lock
-        .get_key_handler()
-        .list()
-        .map(|v| {
-            v.into_iter()
-                .map(|kd| kd.as_application_str().to_string())
-                .collect()
-        })
-        .map_err(|e| e.to_string())
-}
 
 pub fn get_managed_objects_method<E>(
     f: &Factory<MTSync<TData<E>>, TData<E>>,
@@ -160,4 +144,46 @@ where
     }
 
     f.method("GetManagedObjects", (), get_managed_objects)
+}
+
+/// Get a Manager property and place it on the D-Bus. The property is
+/// found by means of the getter method which takes a reference to an
+/// engine and obtains the property from the engine.
+pub fn get_manager_property<F, R, E>(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+    getter: F,
+) -> Result<(), MethodErr>
+where
+    F: Fn(&E) -> Result<R, String>,
+    R: dbus::arg::Append,
+    E: Engine,
+{
+    i.append(manager_operation(p.tree, getter).map_err(|ref e| MethodErr::failed(e))?);
+    Ok(())
+}
+
+/// Perform an operation on an Engine object for a given D-Bus implicit argument
+/// that is a Manager
+pub fn manager_operation<F, R, E>(
+    tree: &Tree<MTSync<TData<E>>, TData<E>>,
+    closure: F,
+) -> Result<R, String>
+where
+    F: Fn(&E) -> Result<R, String>,
+    R: dbus::arg::Append,
+    E: Engine,
+{
+    let dbus_context = tree.get_data();
+    let mutex_lock = dbus_context.engine.blocking_lock();
+    closure(&mutex_lock)
+}
+
+/// Generate D-Bus representation of locked pools
+#[inline]
+pub fn locked_pools_prop<E>(e: &E) -> LockedPools
+where
+    E: Engine,
+{
+    prop_conv::locked_pools_to_prop(e.locked_pools())
 }

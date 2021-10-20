@@ -36,8 +36,7 @@ use crate::{
             thinpool::{thinpool::DATA_LOWATER, DATA_BLOCK_SIZE},
         },
         types::{
-            ActionAvailability, FilesystemUuid, Name, PoolUuid, StratFilesystemDiff,
-            StratFilesystemState, StratisUuid,
+            ActionAvailability, FilesystemUuid, Name, PoolUuid, StratFilesystemDiff, StratisUuid,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -53,6 +52,20 @@ pub const FILESYSTEM_LOWATER: Sectors = Sectors(4 * (DATA_LOWATER.0 * DATA_BLOCK
 pub struct StratFilesystem {
     thin_dev: ThinDev,
     created: DateTime<Utc>,
+    used: Option<Bytes>,
+}
+
+fn init_used(thin_dev: &ThinDev) -> Option<Bytes> {
+    thin_dev
+        .status(get_dm(), DmOptions::default())
+        .ok()
+        .and_then(|status| {
+            if let ThinStatus::Working(s) = status {
+                Some(s.nr_mapped_sectors.bytes())
+            } else {
+                None
+            }
+        })
 }
 
 impl StratFilesystem {
@@ -89,6 +102,7 @@ impl StratFilesystem {
         Ok((
             fs_uuid,
             StratFilesystem {
+                used: init_used(&thin_dev),
                 thin_dev,
                 created: Utc::now(),
             },
@@ -111,6 +125,7 @@ impl StratFilesystem {
             fssave.thin_id,
         )?;
         Ok(StratFilesystem {
+            used: init_used(&thin_dev),
             thin_dev,
             created: Utc.timestamp(fssave.created as i64, 0),
         })
@@ -206,6 +221,7 @@ impl StratFilesystem {
 
                 set_uuid(&thin_dev.devnode(), snapshot_fs_uuid)?;
                 Ok(StratFilesystem {
+                    used: init_used(&thin_dev),
                     thin_dev,
                     created: Utc::now(),
                 })
@@ -223,38 +239,36 @@ impl StratFilesystem {
     /// * Some(_) if metadata should be saved.
     /// * None if metadata should not be saved.
     /// TODO: deal with the thindev in a Fail state.
-    pub fn check(&mut self) -> StratisResult<Option<StratFilesystemDiff>> {
+    pub fn check(&mut self) -> StratisResult<(bool, StratFilesystemDiff)> {
+        let mut needs_save = false;
+        let original_state = self.cached(|fs| StratFilesystemState {
+            size: fs.size(),
+            used: fs.used().ok(),
+        });
         match self.thin_dev.status(get_dm(), DmOptions::default())? {
             ThinStatus::Working(_) => {
                 if let Some(mount_point) = self.mount_points()?.first() {
-                    let original_state = self.dump();
                     let (fs_total_bytes, fs_total_used_bytes) = fs_usage(mount_point)?;
                     let free_bytes = fs_total_bytes - fs_total_used_bytes;
                     if free_bytes.sectors() < FILESYSTEM_LOWATER {
                         let old_table = self.thin_dev.table().table.clone();
                         let mut new_table = old_table.clone();
                         new_table.length =
-                            self.thin_dev.size() + Self::extend_size(self.thin_dev.size());
+                            original_state.size.sectors() + Self::extend_size(self.thin_dev.size());
                         self.thin_dev.set_table(get_dm(), new_table)?;
                         if let Err(causal) = xfs_growfs(mount_point) {
                             if let Err(rollback) = self.thin_dev.set_table(get_dm(), old_table) {
-                                Err(StratisError::RollbackError {
+                                return Err(StratisError::RollbackError {
                                     causal_error: Box::new(causal),
                                     rollback_error: Box::new(StratisError::from(rollback)),
-                                    // NOTE: Read-only may be too aggressive.
                                     level: ActionAvailability::NoPoolChanges,
-                                })
+                                });
                             } else {
-                                Err(causal)
+                                return Err(causal);
                             }
-                        } else {
-                            Ok(Some(original_state.diff(&self.dump())))
                         }
-                    } else {
-                        Ok(None)
+                        needs_save = true;
                     }
-                } else {
-                    Ok(None)
                 }
             }
             ThinStatus::Error => {
@@ -262,10 +276,17 @@ impl StratFilesystem {
                     "Unable to get status for filesystem thin device {}",
                     self.thin_dev.device()
                 );
-                Err(StratisError::Msg(error_msg))
+                return Err(StratisError::Msg(error_msg));
             }
-            ThinStatus::Fail => Ok(None),
-        }
+            _ => (),
+        };
+        Ok((
+            needs_save,
+            original_state.diff(&self.dump(|fs| StratFilesystemState {
+                used: fs.used().ok(),
+                size: fs.size(),
+            })),
+        ))
     }
 
     /// Return an extend size for the thindev under the filesystem
@@ -365,12 +386,32 @@ impl Filesystem for StratFilesystem {
     }
 }
 
+/// Represents the state of the Stratis filesystem at a given moment in time.
+pub struct StratFilesystemState {
+    size: Bytes,
+    used: Option<Bytes>,
+}
+
+impl StateDiff for StratFilesystemState {
+    type Diff = StratFilesystemDiff;
+
+    fn diff(&self, new_state: &Self) -> Self::Diff {
+        StratFilesystemDiff {
+            size: if self.size != new_state.size {
+                Some(new_state.size)
+            } else {
+                None
+            },
+            used: if self.used != new_state.used {
+                Some(new_state.used)
+            } else {
+                None
+            },
+        }
+    }
+}
 impl DumpState for StratFilesystem {
     type State = StratFilesystemState;
-
-    fn dump(&self) -> Self::State {
-        StratFilesystemState::new(self.thin_dev.size().bytes())
-    }
 }
 
 /// Return total bytes allocated to the filesystem, total bytes used by data/metadata

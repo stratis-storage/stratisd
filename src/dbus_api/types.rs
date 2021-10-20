@@ -28,8 +28,9 @@ use devicemapper::Bytes;
 use crate::{
     dbus_api::{connection::DbusConnectionHandler, tree::DbusTreeHandler, udev::DbusUdevHandler},
     engine::{
-        ActionAvailability, ChangedProperties, Engine, ExclusiveGuard, FilesystemUuid, Lockable,
-        LockableEngine, SharedGuard, StratisUuid,
+        ActionAvailability, Engine, ExclusiveGuard, FilesystemUuid, Lockable, LockableEngine,
+        LockedPoolInfo, PoolEncryptionInfo, PoolUuid, SharedGuard, StratFilesystemDiff,
+        StratisUuid, ThinPoolDiff,
     },
 };
 
@@ -85,21 +86,50 @@ pub enum DbusAction<E> {
     FsNameChange(Path<'static>, String),
     PoolNameChange(Path<'static>, String),
     PoolAvailActions(Path<'static>, ActionAvailability),
-    FsSizeChange(FilesystemUuid, Bytes),
+    PoolKeyDescChange(Path<'static>, Option<PoolEncryptionInfo>),
+    PoolClevisInfoChange(Path<'static>, Option<PoolEncryptionInfo>),
+    #[allow(clippy::option_option)]
+    FsBackgroundChange(FilesystemUuid, Option<Bytes>, Option<Option<Bytes>>),
+    #[allow(clippy::option_option)]
+    PoolBackgroundChange(PoolUuid, Option<Option<Bytes>>, Option<Bytes>),
+    PoolCacheChange(Path<'static>, bool),
+    PoolSizeChange(Path<'static>, Bytes),
+    LockedPoolsChange(HashMap<PoolUuid, LockedPoolInfo>),
 }
 
 impl<E> DbusAction<E>
 where
     E: Engine,
 {
-    /// Convert changed properties to a series of D-Bus actions.
-    pub fn from_changed_properties(cp: ChangedProperties) -> Vec<Self> {
-        let mut actions = Vec::new();
-        let ChangedProperties { filesystem_props } = cp;
-        for (uuid, size) in filesystem_props {
-            actions.push(DbusAction::FsSizeChange(uuid, size));
-        }
-        actions
+    /// Convert changed properties from a pool to a series of D-Bus actions.
+    ///
+    /// Precondition: Filtering of diffs that show no change has already been
+    /// done in the engine.
+    pub fn from_pool_diffs(diffs: HashMap<PoolUuid, ThinPoolDiff>) -> Vec<Self> {
+        diffs
+            .into_iter()
+            .map(|(uuid, diff)| {
+                let ThinPoolDiff {
+                    allocated_size,
+                    usage,
+                } = diff;
+                DbusAction::PoolBackgroundChange(uuid, usage, allocated_size)
+            })
+            .collect()
+    }
+
+    /// Convert changed properties from filesystems to a series of D-Bus actions.
+    ///
+    /// Precondition: Filtering of diffs that show no change has already been
+    /// done in the engine.
+    pub fn from_fs_diffs(diffs: HashMap<FilesystemUuid, StratFilesystemDiff>) -> Vec<Self> {
+        diffs
+            .into_iter()
+            .map(|(uuid, diff)| {
+                let StratFilesystemDiff { size, used } = diff;
+                DbusAction::FsBackgroundChange(uuid, size, used)
+            })
+            .collect()
     }
 }
 
@@ -214,6 +244,50 @@ where
         }
     }
 
+    /// Send changed signal for KeyDesc property.
+    pub fn push_pool_key_desc_change(&self, item: &Path<'static>, ei: Option<PoolEncryptionInfo>) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::PoolKeyDescChange(item.clone(), ei))
+        {
+            warn!(
+                "D-Bus pool key description change event could not be sent to the processing thread; no signal will be sent out for pool with path {}: {}",
+                item, e,
+            )
+        }
+    }
+
+    /// Send changed signal for ClevisInfo property.
+    #[allow(clippy::option_option)]
+    pub fn push_pool_clevis_info_change(
+        &self,
+        item: &Path<'static>,
+        ei: Option<PoolEncryptionInfo>,
+    ) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::PoolClevisInfoChange(item.clone(), ei))
+        {
+            warn!(
+                "D-Bus pool Clevis info change event could not be sent to the processing thread; no signal will be sent out for pool with path {}: {}",
+                item, e,
+            )
+        }
+    }
+
+    /// Send changed signal for HasCache property.
+    pub fn push_pool_cache_change(&self, item: &Path<'static>, has_cache: bool) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::PoolCacheChange(item.clone(), has_cache))
+        {
+            warn!(
+                "D-Bus pool cache status change event could not be sent to the processing thread; no signal will be sent out for pool with path {}: {}",
+                item, e,
+            )
+        }
+    }
+
     /// Send changed signal for pool Name property and invalidated signal for
     /// all Devnode properties of child filesystems.
     pub fn push_pool_name_change(&self, item: &Path<'static>, new_name: &str) {
@@ -230,6 +304,20 @@ where
         }
     }
 
+    /// Send changed signal for pool TotalPhysicalSize property.
+    pub fn push_pool_size_change(&self, item: &Path<'static>, new_size: Bytes) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::PoolSizeChange(item.clone(), new_size))
+        {
+            warn!(
+                "D-Bus pool size change event could not be sent to the processing thread; \
+                no signal will be sent out for the size change of pool with path {}: {}",
+                item, e,
+            )
+        }
+    }
+
     /// Send changed signal for pool available actions state.
     pub fn push_pool_avail_actions(&self, item: &Path<'static>, avail_actions: ActionAvailability) {
         if let Err(e) = self
@@ -239,6 +327,19 @@ where
             warn!(
                 "D-Bus pool available actions status change event could not be sent to the processing thread; no signal will be sent out for the pool available actions status change of pool with path {}: {}",
                 item, e,
+            )
+        }
+    }
+
+    /// Send changed signal for changed locked pool state.
+    pub fn push_locked_pools(&self, locked_pools: HashMap<PoolUuid, LockedPoolInfo>) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::LockedPoolsChange(locked_pools))
+        {
+            warn!(
+                "Locked pool change event could not be sent to the processing thread; no signal will be sent out for the locked pool state change: {}",
+                e,
             )
         }
     }

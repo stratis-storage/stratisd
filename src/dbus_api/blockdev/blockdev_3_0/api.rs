@@ -10,7 +10,8 @@ use crate::{
             methods::set_user_info,
             props::{
                 get_blockdev_devnode, get_blockdev_hardware_info, get_blockdev_initialization_time,
-                get_blockdev_physical_path, get_blockdev_tier, get_blockdev_user_info,
+                get_blockdev_physical_path, get_blockdev_size, get_blockdev_tier,
+                get_blockdev_user_info,
             },
         },
         consts,
@@ -131,4 +132,17 @@ where
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_blockdev_physical_path)
+}
+
+pub fn size_property<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Property<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
+    f.property::<&str, _>(consts::BLOCKDEV_TOTAL_SIZE_PROP, ())
+        .access(Access::Read)
+        // Set to true in preparation for growing block devices
+        .emits_changed(EmitsChangedSignal::True)
+        .on_get(get_blockdev_size)
 }

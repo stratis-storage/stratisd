@@ -381,8 +381,20 @@ impl BlockDevMgr {
             .sum()
     }
 
+    /// The current size of allocated regions of the blockdevs.
+    /// self.allocated_size() > self.avail_space() because some sectors are
+    /// allocated for Stratis metadata. Even if the entire block device is not
+    /// allocated, the amount of space available for storage will be less than
+    /// that of the total amount allocated.
+    pub fn allocated_size(&self) -> Sectors {
+        self.block_devs
+            .iter()
+            .map(|b| b.total_allocated_size().sectors())
+            .sum()
+    }
+
     /// The number of sectors given over to Stratis metadata
-    /// self.size() - self.metadata_size() >= self.avail_space()
+    /// self.allocated_size() - self.metadata_size() >= self.avail_space()
     pub fn metadata_size(&self) -> Sectors {
         self.block_devs
             .iter()

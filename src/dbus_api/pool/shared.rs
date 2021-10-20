@@ -13,8 +13,9 @@ use dbus_tree::{MTSync, MethodErr, MethodInfo, MethodResult, PropInfo, Tree};
 use crate::{
     dbus_api::{
         blockdev::create_dbus_blockdev,
+        pool::prop_conv,
         types::{DbusErrorEnum, TData, OK_STRING},
-        util::{engine_to_dbus_err_tuple, get_next_arg, option_to_tuple},
+        util::{engine_to_dbus_err_tuple, get_next_arg},
     },
     engine::{BlockDevTier, Engine, EngineAction, Name, Pool, PoolUuid},
 };
@@ -58,79 +59,6 @@ where
     closure((pool_name, pool_uuid, pool))
 }
 
-pub fn get_pool_encryption_key_desc<E>(
-    m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<(bool, String), String>
-where
-    E: 'static + Engine,
-{
-    pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
-        Ok(option_to_tuple(
-            match pool.encryption_info() {
-                Some(ei) => ei
-                    .key_description()
-                    .map_err(|e| e.to_string())?
-                    .map(|kd| kd.as_application_str().to_string()),
-                None => None,
-            },
-            String::new(),
-        ))
-    })
-}
-
-pub fn get_pool_has_cache<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> Result<bool, String>
-where
-    E: 'static + Engine,
-{
-    pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
-        Ok(pool.has_cache())
-    })
-}
-
-pub fn get_pool_total_size<E>(
-    m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<String, String>
-where
-    E: 'static + Engine,
-{
-    pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
-        Ok((*pool.total_physical_size().bytes()).to_string())
-    })
-}
-
-pub fn get_pool_total_used<E>(
-    m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<String, String>
-where
-    E: 'static + Engine,
-{
-    pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
-        pool.total_physical_used()
-            .map_err(|e| e.to_string())
-            .map(|size| (*size.bytes()).to_string())
-    })
-}
-
-pub fn get_pool_clevis_info<E>(
-    m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<(bool, (String, String)), String>
-where
-    E: 'static + Engine,
-{
-    pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
-        Ok(option_to_tuple(
-            match pool.encryption_info() {
-                Some(ei) => ei
-                    .clevis_info()
-                    .map_err(|e| e.to_string())?
-                    .map(|(pin, config)| (pin.to_owned(), config.to_string())),
-                None => None,
-            },
-            (String::new(), String::new()),
-        ))
-    })
-}
-
 /// A method shared by all pool interfaces and by all blockdev-adding
 /// operations, including cache initialization, which is considered a
 /// blockdev-adding operation because when a cache is initialized, the
@@ -171,21 +99,30 @@ where
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
     let result = match op {
-        BlockDevOp::InitCache => handle_action!(
-            pool.init_cache(pool_uuid, &*pool_name, &blockdevs),
-            dbus_context,
-            pool_path.get_name()
-        ),
+        BlockDevOp::InitCache => {
+            let res = handle_action!(
+                pool.init_cache(pool_uuid, &*pool_name, &blockdevs),
+                dbus_context,
+                pool_path.get_name()
+            );
+            dbus_context.push_pool_cache_change(pool_path.get_name(), true);
+            res
+        }
         BlockDevOp::AddCache => handle_action!(
             pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Cache),
             dbus_context,
             pool_path.get_name()
         ),
-        BlockDevOp::AddData => handle_action!(
-            pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Data),
-            dbus_context,
-            pool_path.get_name()
-        ),
+        BlockDevOp::AddData => {
+            let res = handle_action!(
+                pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Data),
+                dbus_context,
+                pool_path.get_name()
+            );
+            dbus_context
+                .push_pool_size_change(pool_path.get_name(), pool.total_physical_size().bytes());
+            res
+        }
     };
     let msg = match result.map(|bds| bds.changed()) {
         Ok(Some(uuids)) => {
@@ -265,10 +202,61 @@ where
 }
 
 /// Generate D-Bus representation of pool state property.
-#[inline]
 pub fn pool_avail_actions_prop<E>(pool: &E::Pool) -> String
 where
     E: 'static + Engine,
 {
-    pool.avail_actions().to_string()
+    prop_conv::avail_actions_to_prop(pool.avail_actions())
+}
+
+/// Generate D-Bus representation of a pool key description property.
+pub fn pool_key_desc_prop<E>(pool: &E::Pool) -> (bool, (bool, String))
+where
+    E: 'static + Engine,
+{
+    prop_conv::key_desc_to_prop(pool.encryption_info())
+}
+
+/// Generate D-Bus representation of a pool Clevis info property.
+pub fn pool_clevis_info_prop<E>(pool: &E::Pool) -> (bool, (bool, (String, String)))
+where
+    E: 'static + Engine,
+{
+    prop_conv::clevis_info_to_prop(pool.encryption_info())
+}
+
+/// Generate D-Bus representation of a boolean indicating whether the pool
+/// has a cache.
+#[inline]
+pub fn pool_has_cache_prop<E>(pool: &E::Pool) -> bool
+where
+    E: 'static + Engine,
+{
+    pool.has_cache()
+}
+
+/// Generate D-Bus representation of the number of bytes of physical space
+/// already allocated to this pool.
+pub fn pool_allocated_size<E>(pool: &E::Pool) -> String
+where
+    E: 'static + Engine,
+{
+    prop_conv::pool_alloc_to_prop(pool.total_allocated_size().bytes())
+}
+
+/// Generate D-Bus representation of the number of bytes used by this pool.
+pub fn pool_used_size<E>(pool: &E::Pool) -> (bool, String)
+where
+    E: 'static + Engine,
+{
+    prop_conv::pool_used_to_prop(pool.total_physical_used().map(|u| u.bytes()).ok())
+}
+
+/// Generate a D-Bus representation of the total size of the pool in bytes.
+#[inline]
+pub fn pool_total_size<E>(pool: &E::Pool) -> String
+where
+    E: 'static + Engine,
+{
+    prop_conv::pool_size_to_prop(pool.total_physical_size().bytes())
 }

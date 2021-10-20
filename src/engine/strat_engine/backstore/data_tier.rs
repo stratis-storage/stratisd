@@ -105,6 +105,12 @@ impl DataTier {
         self.block_mgr.size()
     }
 
+    /// The total size of all the blockdevs combined that has been allocated.
+    /// self.allocated_size() <= self.size()
+    pub fn allocated_size(&self) -> Sectors {
+        self.block_mgr.allocated_size()
+    }
+
     /// The number of sectors used for metadata by all the blockdevs
     pub fn metadata_size(&self) -> Sectors {
         self.block_mgr.metadata_size()

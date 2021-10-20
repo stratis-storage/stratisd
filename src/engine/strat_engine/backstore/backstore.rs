@@ -493,6 +493,11 @@ impl Backstore {
         self.data_tier.size()
     }
 
+    /// The current size of allocated space on the blockdevs in the data tier.
+    pub fn datatier_allocated_size(&self) -> Sectors {
+        self.data_tier.allocated_size()
+    }
+
     /// The current usable size of all the blockdevs in the data tier.
     pub fn datatier_usable_size(&self) -> Sectors {
         self.data_tier.usable_size()

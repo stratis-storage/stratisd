@@ -2,10 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{
-    collections::{HashMap, HashSet},
-    path::Path,
-};
+use std::{collections::HashMap, path::Path};
 
 use serde_json::Value;
 
@@ -23,8 +20,9 @@ use crate::{
         },
         structures::Table,
         types::{
-            ChangedProperties, CreateAction, DeleteAction, DevUuid, EncryptionInfo, LockedPoolInfo,
-            RenameAction, ReportType, SetUnlockAction, UdevEngineEvent, UnlockMethod,
+            CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockedPoolInfo,
+            RenameAction, ReportType, SetUnlockAction, StratFilesystemDiff, ThinPoolDiff,
+            UdevEngineEvent, UnlockMethod,
         },
         Engine, Name, PoolUuid, Report,
     },
@@ -326,22 +324,30 @@ impl Engine for StratEngine {
         Ok(changed)
     }
 
-    fn pool_evented(&mut self, pools: Option<&Vec<PoolUuid>>) -> StratisResult<HashSet<PoolUuid>> {
+    fn pool_evented(
+        &mut self,
+        pools: Option<&Vec<PoolUuid>>,
+    ) -> StratisResult<HashMap<PoolUuid, ThinPoolDiff>> {
         fn handle_eventing(
             name: &Name,
             uuid: PoolUuid,
             pool: &mut StratPool,
-            changed: &mut HashSet<PoolUuid>,
+            changed: &mut HashMap<PoolUuid, ThinPoolDiff>,
             errors: &mut Vec<StratisError>,
         ) {
-            if let Err(e) = pool.event_on(uuid, name) {
-                errors.push(e);
-            } else {
-                changed.insert(uuid);
+            match pool.event_on(uuid, name) {
+                Ok(diff) => {
+                    if diff.is_changed() {
+                        changed.insert(uuid, diff);
+                    }
+                }
+                Err(e) => {
+                    errors.push(e);
+                }
             }
         }
 
-        let mut changed = HashSet::new();
+        let mut changed = HashMap::default();
         let mut errors = Vec::new();
 
         match pools {
@@ -377,22 +383,23 @@ impl Engine for StratEngine {
         }
     }
 
-    fn fs_evented(&mut self, pools: Option<&Vec<PoolUuid>>) -> StratisResult<ChangedProperties> {
-        let mut changed = ChangedProperties {
-            filesystem_props: HashMap::new(),
-        };
+    fn fs_evented(
+        &mut self,
+        pools: Option<&Vec<PoolUuid>>,
+    ) -> StratisResult<HashMap<FilesystemUuid, StratFilesystemDiff>> {
+        let mut changed = HashMap::default();
         let mut errors = Vec::new();
 
         fn handle_eventing(
             name: &Name,
             uuid: PoolUuid,
             pool: &mut StratPool,
-            changed: &mut ChangedProperties,
+            changed: &mut HashMap<FilesystemUuid, StratFilesystemDiff>,
             errors: &mut Vec<StratisError>,
         ) {
             match pool.fs_event_on(uuid, name) {
                 Ok(newly_changed) => {
-                    changed.merge(newly_changed);
+                    changed.extend(newly_changed);
                 }
                 Err(e) => {
                     errors.push(e);
@@ -423,10 +430,10 @@ impl Engine for StratEngine {
         if errors.is_empty() {
             Ok(changed)
         } else {
-            let msg = if changed.is_changed() {
+            let msg = if !changed.is_empty() {
                 format!(
                     "Operations on filesystems with UUIDs {:?} succeeded but the following errors were also reported while handling devicemapper eventing for filesystems",
-                    changed.filesystem_props.keys().collect::<Vec<_>>(),
+                    changed.keys().collect::<Vec<_>>(),
                 )
             } else {
                 "The following errors were reported while handling devicemapper eventing for filesystems".to_string()

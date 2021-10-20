@@ -100,7 +100,7 @@ jobs:
           - task: |
               COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../stratisd_proc_macros/Cargo.toml FEDORA_RELEASE=f34 make -f ../../Makefile check-fedora-versions
               COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../stratisd_proc_macros/Cargo.toml FEDORA_RELEASE=rawhide make -f ../../Makefile check-fedora-versions
-              COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../Cargo.toml FEDORA_RELEASE=rawhide IGNORE_ARGS="--ignore-missing stratisd_proc_macros --ignore-missing libblkid-rs" make -f ../../Makefile check-fedora-versions
+              COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../Cargo.toml FEDORA_RELEASE=rawhide IGNORE_ARGS="--ignore-missing stratisd_proc_macros --ignore-missing libblkid-rs --ignore-low clap" make -f ../../Makefile check-fedora-versions
               COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../Cargo.toml FEDORA_RELEASE=f34 IGNORE_ARGS="--ignore-missing stratisd_proc_macros --ignore-missing libblkid-rs --ignore-low clap" make -f ../../Makefile check-fedora-versions
     runs-on: ubuntu-18.04
     container:

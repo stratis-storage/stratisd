@@ -292,6 +292,6 @@ where
 {
     f.property::<(bool, Box<Variant<Box<dyn RefArg>>>), _>(consts::POOL_ENCRYPTION_KEY_DESC, ())
         .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::True)
+        .emits_changed(EmitsChangedSignal::False)
         .on_get(get_pool_key_desc)
 }

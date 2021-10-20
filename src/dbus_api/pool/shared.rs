@@ -5,7 +5,7 @@
 use std::path::Path;
 
 use dbus::{
-    arg::{Array, IterAppend},
+    arg::{Array, IterAppend, RefArg, Variant},
     Message,
 };
 use dbus_tree::{MTSync, MethodErr, MethodInfo, MethodResult, PropInfo, Tree};
@@ -14,7 +14,7 @@ use crate::{
     dbus_api::{
         blockdev::create_dbus_blockdev,
         types::{DbusErrorEnum, TData, OK_STRING},
-        util::{engine_to_dbus_err_tuple, get_next_arg, option_to_tuple},
+        util::{engine_to_dbus_err_tuple, get_next_arg, option_to_tuple, result_to_variant_tuple},
     },
     engine::{BlockDevTier, Engine, EngineAction, Name, Pool, PoolUuid},
 };
@@ -56,26 +56,6 @@ where
         .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
 
     closure((pool_name, pool_uuid, pool))
-}
-
-pub fn get_pool_encryption_key_desc<E>(
-    m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<(bool, String), String>
-where
-    E: 'static + Engine,
-{
-    pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
-        Ok(option_to_tuple(
-            match pool.encryption_info() {
-                Some(ei) => ei
-                    .key_description()
-                    .map_err(|e| e.to_string())?
-                    .map(|kd| kd.as_application_str().to_string()),
-                None => None,
-            },
-            String::new(),
-        ))
-    })
 }
 
 pub fn get_pool_has_cache<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> Result<bool, String>
@@ -271,4 +251,21 @@ where
     E: 'static + Engine,
 {
     pool.avail_actions().to_string()
+}
+
+/// Generate D-Bus representation of a pool key description property.
+#[inline]
+pub fn pool_key_desc_prop<E>(pool: &E::Pool) -> (bool, Variant<Box<dyn RefArg>>)
+where
+    E: 'static + Engine,
+{
+    result_to_variant_tuple(
+        pool.encryption_info()
+            .map(|ei| {
+                ei.key_description()
+                    .map(|kd_opt| kd_opt.map(|kd| kd.as_application_str().to_string()))
+            })
+            .transpose()
+            .map(|opt| option_to_tuple(opt.and_then(|subopt| subopt), String::new())),
+    )
 }

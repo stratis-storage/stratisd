@@ -37,6 +37,17 @@ use crate::{
     stratis::{StratisError, StratisResult},
 };
 
+pub fn result_to_variant_tuple<O, E>(res: Result<O, E>) -> (bool, Variant<Box<dyn RefArg>>)
+where
+    O: 'static + RefArg,
+    E: Display,
+{
+    match res {
+        Ok(o) => (true, Variant(Box::new(o) as Box<dyn RefArg>)),
+        Err(e) => (false, Variant(Box::new(e.to_string()) as Box<dyn RefArg>)),
+    }
+}
+
 /// Convert a tuple as option to an Option type
 pub fn tuple_to_option<T>(value: (bool, T)) -> Option<T> {
     if value.0 {

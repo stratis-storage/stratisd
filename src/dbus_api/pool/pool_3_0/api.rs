@@ -2,6 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use dbus::arg::{RefArg, Variant};
 use dbus_tree::{Access, EmitsChangedSignal, Factory, MTSync, Method, Property};
 
 use crate::{
@@ -13,7 +14,7 @@ use crate::{
                 destroy_filesystems, init_cache, rebind_clevis, rebind_keyring, rename_pool,
                 snapshot_filesystem, unbind_clevis, unbind_keyring,
             },
-            props::{get_pool_avail_actions, get_pool_encrypted, get_pool_name},
+            props::{get_pool_avail_actions, get_pool_encrypted, get_pool_key_desc, get_pool_name},
         },
         types::TData,
         util::get_uuid,
@@ -281,4 +282,16 @@ where
         .out_arg(("results", "b"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"))
+}
+
+pub fn key_desc_property<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Property<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
+    f.property::<(bool, Box<Variant<Box<dyn RefArg>>>), _>(consts::POOL_ENCRYPTION_KEY_DESC, ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::True)
+        .on_get(get_pool_key_desc)
 }

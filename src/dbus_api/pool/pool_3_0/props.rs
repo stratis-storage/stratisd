@@ -44,3 +44,15 @@ where
         Ok(shared::pool_avail_actions_prop::<E>(pool))
     })
 }
+
+pub fn get_pool_key_desc<E>(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+) -> Result<(), MethodErr>
+where
+    E: 'static + Engine,
+{
+    get_pool_property(i, p, |(_, _, pool)| {
+        Ok(shared::pool_key_desc_prop::<E>(pool))
+    })
+}

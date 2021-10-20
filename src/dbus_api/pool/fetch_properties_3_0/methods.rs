@@ -15,8 +15,7 @@ use crate::{
     dbus_api::{
         consts,
         pool::shared::{
-            get_pool_clevis_info, get_pool_encryption_key_desc, get_pool_has_cache,
-            get_pool_total_size, get_pool_total_used,
+            get_pool_clevis_info, get_pool_has_cache, get_pool_total_size, get_pool_total_used,
         },
         types::TData,
         util::result_to_tuple,
@@ -24,8 +23,7 @@ use crate::{
     engine::Engine,
 };
 
-const ALL_PROPERTIES: [&str; 5] = [
-    consts::POOL_ENCRYPTION_KEY_DESC,
+const ALL_PROPERTIES: [&str; 4] = [
     consts::POOL_HAS_CACHE_PROP,
     consts::POOL_TOTAL_SIZE_PROP,
     consts::POOL_TOTAL_USED_PROP,
@@ -46,9 +44,6 @@ where
     let return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = properties
         .unique()
         .filter_map(|prop| match prop.as_str() {
-            consts::POOL_ENCRYPTION_KEY_DESC => {
-                Some((prop, result_to_tuple(get_pool_encryption_key_desc(m))))
-            }
             consts::POOL_HAS_CACHE_PROP => Some((prop, result_to_tuple(get_pool_has_cache(m)))),
             consts::POOL_TOTAL_SIZE_PROP => Some((prop, result_to_tuple(get_pool_total_size(m)))),
             consts::POOL_TOTAL_USED_PROP => Some((prop, result_to_tuple(get_pool_total_used(m)))),

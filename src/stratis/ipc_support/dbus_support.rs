@@ -60,7 +60,6 @@ where
                 exiting D-Bus thread",
                 e,
             );
-            return;
         }
     });
     let mut conn_handle = task::spawn_blocking(move || conn.process_dbus_requests());

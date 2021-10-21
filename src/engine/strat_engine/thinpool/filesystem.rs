@@ -15,7 +15,7 @@ use data_encoding::BASE32_NOPAD;
 use serde_json::{Map, Value};
 
 use devicemapper::{
-    Bytes, DmDevice, DmFlags, DmName, DmOptions, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev,
+    Bytes, DmDevice, DmName, DmOptions, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev,
     ThinStatus,
 };
 
@@ -295,23 +295,6 @@ impl StratFilesystem {
             size: self.thin_dev.size(),
             created: self.created.timestamp() as u64,
         }
-    }
-
-    pub fn suspend(&mut self, flush: bool) -> StratisResult<()> {
-        self.thin_dev.suspend(
-            get_dm(),
-            if flush {
-                DmOptions::default()
-            } else {
-                DmOptions::default().set_flags(DmFlags::DM_NOFLUSH)
-            },
-        )?;
-        Ok(())
-    }
-
-    pub fn resume(&mut self) -> StratisResult<()> {
-        self.thin_dev.resume(get_dm())?;
-        Ok(())
     }
 
     /// Find places where this filesystem is mounted.

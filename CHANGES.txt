@@ -1,12 +1,13 @@
-stratisd 3.0.0 (UNRELEASED)
-===========================
-Recommended Rust toolchain version: 1.55.0
+stratisd 3.0.0
+==============
+Recommended Rust toolchain version: 1.56.1
 Lowest supported Rust toolchain version: 1.54.0
 
 Recommended development platform for Python development: Fedora 34
 Lowest supported Python interpreter: 3.6.8
 
 - Bump major version to 3.0; remove version 2 D-Bus interfaces:
+  https://github.com/stratis-storage/stratisd/pull/2837
   https://github.com/stratis-storage/stratisd/pull/2799
   https://github.com/stratis-storage/stratisd/pull/2798
   https://github.com/stratis-storage/stratisd/pull/2710
@@ -14,10 +15,23 @@ Lowest supported Python interpreter: 3.6.8
   https://github.com/stratis-storage/stratisd/pull/2706
   https://github.com/stratis-storage/stratisd/pull/2703
 
+- Remove FetchProperties interfaces; use standard D-Bus properties and
+  methods instead:
+  https://github.com/stratis-storage/stratisd/issues/2816
+  https://github.com/stratis-storage/stratisd/pull/2817
+
+- Verify udev information with libblkid before taking overwriting action:
+  https://github.com/stratis-storage/stratisd/issues/1506
+  https://github.com/stratis-storage/stratisd/pull/2826
+  https://github.com/stratis-storage/stratisd/pull/2808
+
 - Refactor for devicemapper event handling:
   https://github.com/stratis-storage/stratisd/issues/2712
   https://github.com/stratis-storage/stratisd/pull/2787
   https://github.com/stratis-storage/stratisd/pull/2786
+
+- Extend metadata spare segments when extending metadata device:
+  https://github.com/stratis-storage/stratisd/pull/2834
 
 - Fix a bug where Clevis info was incorrectly updated on a bind command;
   refactor encryption related rollback code for greater generality:
@@ -60,6 +74,9 @@ Lowest supported Python interpreter: 3.6.8
   https://github.com/stratis-storage/stratisd/issues/2749
   https://github.com/stratis-storage/stratisd/pull/2754
 
+- Remove config file requiring Stratis dracut module:
+  https://github.com/stratis-storage/stratisd/pull/2828
+
 - Pass --prompt flag to stratisd-min when unlocking via a key:
   https://github.com/stratis-storage/stratisd/pull/2742
 
@@ -93,6 +110,9 @@ Lowest supported Python interpreter: 3.6.8
   https://github.com/stratis-storage/stratisd/issues/2670
   https://github.com/stratis-storage/stratisd/pull/2672
 
+- Require dbus-tree 0.9.2:
+  https://github.com/stratis-storage/stratisd/pull/2820
+
 - Refactor to unify rollback code:
   https://github.com/stratis-storage/stratisd/issues/2610
   https://github.com/stratis-storage/stratisd/pull/2637
@@ -104,7 +124,26 @@ Lowest supported Python interpreter: 3.6.8
 - Conform entirely to Rust 2018 syntax recommendations:
   https://github.com/stratis-storage/stratisd/pull/2802
 
+- Require devicemapper-rs 0.30.0:
+  https://github.com/stratis-storage/stratisd/pull/2822
+
+- Drop transitive dependency on time crate:
+  https://github.com/stratis-storage/stratisd/pull/2832
+
 - Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/2844
+  https://github.com/stratis-storage/stratisd/pull/2842
+  https://github.com/stratis-storage/stratisd/pull/2841
+  https://github.com/stratis-storage/stratisd/pull/2840
+  https://github.com/stratis-storage/stratisd/pull/2839
+  https://github.com/stratis-storage/stratisd/pull/2836
+  https://github.com/stratis-storage/stratisd/pull/2829
+  https://github.com/stratis-storage/stratisd/pull/2823
+  https://github.com/stratis-storage/stratisd/pull/2819
+  https://github.com/stratis-storage/stratisd/pull/2818
+  https://github.com/stratis-storage/stratisd/pull/2812
+  https://github.com/stratis-storage/stratisd/pull/2807
+  https://github.com/stratis-storage/stratisd/pull/2805
   https://github.com/stratis-storage/stratisd/pull/2804
   https://github.com/stratis-storage/stratisd/pull/2803
   https://github.com/stratis-storage/stratisd/pull/2796
@@ -113,6 +152,7 @@ Lowest supported Python interpreter: 3.6.8
   https://github.com/stratis-storage/stratisd/pull/2792
   https://github.com/stratis-storage/stratisd/pull/2791
   https://github.com/stratis-storage/stratisd/pull/2785
+  https://github.com/stratis-storage/stratisd/pull/2784
   https://github.com/stratis-storage/stratisd/pull/2783
   https://github.com/stratis-storage/stratisd/pull/2780
   https://github.com/stratis-storage/stratisd/pull/2779
@@ -164,6 +204,7 @@ Lowest supported Python interpreter: 3.6.8
   https://github.com/stratis-storage/stratisd/pull/2671
   https://github.com/stratis-storage/stratisd/pull/2669
   https://github.com/stratis-storage/stratisd/pull/2668
+  https://github.com/stratis-storage/stratisd/pull/2666
   https://github.com/stratis-storage/stratisd/pull/2665
   https://github.com/stratis-storage/stratisd/pull/2663
   https://github.com/stratis-storage/stratisd/pull/2660

@@ -56,7 +56,8 @@ where
                 .add_p(pool_3_0::uuid_property(&f))
                 .add_p(pool_3_0::encrypted_property(&f))
                 .add_p(pool_3_0::avail_actions_property(&f))
-                .add_p(pool_3_0::key_desc_property(&f)),
+                .add_p(pool_3_0::key_desc_property(&f))
+                .add_p(pool_3_0::has_cache_property(&f)),
         )
         .add(
             f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_3_0, ())
@@ -85,7 +86,8 @@ where
             consts::POOL_UUID_PROP => uuid_to_string!(pool_uuid),
             consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop::<E>(pool),
             consts::POOL_AVAIL_ACTIONS_PROP => shared::pool_avail_actions_prop::<E>(pool),
-            consts::POOL_ENCRYPTION_KEY_DESC => shared::pool_key_desc_prop::<E>(pool)
+            consts::POOL_KEY_DESC_PROP => shared::pool_key_desc_prop::<E>(pool),
+            consts::POOL_HAS_CACHE_PROP => shared::pool_has_cache_prop::<E>(pool)
         }
     }
 }

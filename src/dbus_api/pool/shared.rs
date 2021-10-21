@@ -58,15 +58,6 @@ where
     closure((pool_name, pool_uuid, pool))
 }
 
-pub fn get_pool_has_cache<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> Result<bool, String>
-where
-    E: 'static + Engine,
-{
-    pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
-        Ok(pool.has_cache())
-    })
-}
-
 pub fn get_pool_total_size<E>(
     m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
 ) -> Result<String, String>
@@ -268,4 +259,14 @@ where
             .transpose()
             .map(|opt| option_to_tuple(opt.and_then(|subopt| subopt), String::new())),
     )
+}
+
+/// Generate D-Bus representation of a boolean indicating whether the pool
+/// has a cache.
+#[inline]
+pub fn pool_has_cache_prop<E>(pool: &E::Pool) -> bool
+where
+    E: 'static + Engine,
+{
+    pool.has_cache()
 }

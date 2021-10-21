@@ -14,7 +14,10 @@ use crate::{
                 destroy_filesystems, init_cache, rebind_clevis, rebind_keyring, rename_pool,
                 snapshot_filesystem, unbind_clevis, unbind_keyring,
             },
-            props::{get_pool_avail_actions, get_pool_encrypted, get_pool_key_desc, get_pool_name},
+            props::{
+                get_pool_avail_actions, get_pool_encrypted, get_pool_has_cache, get_pool_key_desc,
+                get_pool_name,
+            },
         },
         types::TData,
         util::get_uuid,
@@ -290,8 +293,20 @@ pub fn key_desc_property<E>(
 where
     E: 'static + Engine,
 {
-    f.property::<(bool, Box<Variant<Box<dyn RefArg>>>), _>(consts::POOL_ENCRYPTION_KEY_DESC, ())
+    f.property::<(bool, Box<Variant<Box<dyn RefArg>>>), _>(consts::POOL_KEY_DESC_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::False)
         .on_get(get_pool_key_desc)
+}
+
+pub fn has_cache_property<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Property<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
+    f.property::<bool, _>(consts::POOL_HAS_CACHE_PROP, ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::True)
+        .on_get(get_pool_has_cache)
 }

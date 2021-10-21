@@ -86,6 +86,7 @@ pub enum DbusAction<E> {
     PoolNameChange(Path<'static>, String),
     PoolAvailActions(Path<'static>, ActionAvailability),
     FsSizeChange(FilesystemUuid, Bytes),
+    PoolCacheChange(Path<'static>, bool),
 }
 
 impl<E> DbusAction<E>
@@ -209,6 +210,19 @@ where
             warn!(
                 "D-Bus filesystem name change event could not be sent to the processing thread; \
                 no signal will be sent out for pool with path {}: {}",
+                item, e,
+            )
+        }
+    }
+
+    /// Send changed signal for HasCache property.
+    pub fn push_pool_cache_change(&self, item: &Path<'static>, has_cache: bool) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::PoolCacheChange(item.clone(), has_cache))
+        {
+            warn!(
+                "D-Bus pool cache status change event could not be sent to the processing thread; no signal will be sent out for pool with path {}: {}",
                 item, e,
             )
         }

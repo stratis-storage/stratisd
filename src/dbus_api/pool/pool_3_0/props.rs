@@ -56,3 +56,15 @@ where
         Ok(shared::pool_key_desc_prop::<E>(pool))
     })
 }
+
+pub fn get_pool_has_cache<E>(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+) -> Result<(), MethodErr>
+where
+    E: 'static + Engine,
+{
+    get_pool_property(i, p, |(_, _, pool)| {
+        Ok(shared::pool_has_cache_prop::<E>(pool))
+    })
+}

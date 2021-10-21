@@ -14,9 +14,9 @@ use std::{
 use serde_json::{Map, Value};
 
 use devicemapper::{
-    device_exists, DataBlocks, Device, DmDevice, DmName, DmNameBuf, FlakeyTargetParams, LinearDev,
-    LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine, ThinDevId,
-    ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, IEC,
+    device_exists, DataBlocks, Device, DmDevice, DmName, DmNameBuf, DmOptions, FlakeyTargetParams,
+    LinearDev, LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine,
+    ThinDevId, ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, IEC,
 };
 
 use crate::{
@@ -508,7 +508,7 @@ impl ThinPool {
         );
 
         let mut should_save: bool = false;
-        let thin_pool_status = self.thin_pool.status(get_dm())?;
+        let thin_pool_status = self.thin_pool.status(get_dm(), DmOptions::default())?;
 
         if let ThinPoolStatus::Working(status) = &thin_pool_status {
             let usage = &status.usage;
@@ -560,7 +560,7 @@ impl ThinPool {
             self.resume()?;
         }
 
-        self.set_state(self.thin_pool.status(get_dm())?);
+        self.set_state(self.thin_pool.status(get_dm(), DmOptions::default())?);
 
         Ok(should_save)
     }
@@ -995,7 +995,7 @@ impl ThinPool {
     /// Suspend the thinpool
     pub fn suspend(&mut self) -> StratisResult<()> {
         // thindevs automatically suspended when thinpool is suspended
-        self.thin_pool.suspend(get_dm(), true)?;
+        self.thin_pool.suspend(get_dm(), DmOptions::default())?;
         // If MDV suspend fails, resume the thin pool and return the error
         if let Err(err) = self.mdv.suspend() {
             if let Err(e) = self.thin_pool.resume(get_dm()) {
@@ -1236,7 +1236,7 @@ mod tests {
     // notify blivet.
     macro_rules! check_expected_filesystem_size {
         ($p:ident) => {
-            match $p.thin_pool.status(get_dm()).unwrap() {
+            match $p.thin_pool.status(get_dm(), DmOptions::default()).unwrap() {
                 ThinPoolStatus::Working(status) => {
                     assert_eq!(status.usage.used_data, DataBlocks(546));
                 }
@@ -1345,7 +1345,11 @@ mod tests {
             );
             // Write the write_buf until the pool is full
             loop {
-                match pool.thin_pool.status(get_dm()).unwrap() {
+                match pool
+                    .thin_pool
+                    .status(get_dm(), DmOptions::default())
+                    .unwrap()
+                {
                     ThinPoolStatus::Working(_) => {
                         f.write_all(write_buf).unwrap();
                         if f.sync_all().is_err() {
@@ -1357,7 +1361,11 @@ mod tests {
                 }
             }
         }
-        match pool.thin_pool.status(get_dm()).unwrap() {
+        match pool
+            .thin_pool
+            .status(get_dm(), DmOptions::default())
+            .unwrap()
+        {
             ThinPoolStatus::Working(ref status) => {
                 assert_eq!(
                     status.summary,
@@ -1373,7 +1381,11 @@ mod tests {
         backstore.add_datadevs(pool_uuid, remaining_paths).unwrap();
         pool.check(pool_uuid, &mut backstore).unwrap();
         // Verify the pool is back in a Good state
-        match pool.thin_pool.status(get_dm()).unwrap() {
+        match pool
+            .thin_pool
+            .status(get_dm(), DmOptions::default())
+            .unwrap()
+        {
             ThinPoolStatus::Working(ref status) => {
                 assert_eq!(
                     status.summary,

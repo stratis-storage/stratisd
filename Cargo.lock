@@ -240,7 +240,7 @@ dependencies = [
 [[package]]
 name = "devicemapper"
 version = "0.30.0"
-source = "git+https://github.com/mulkieran/devicemapper-rs?branch=devicemapper-issue-663#0b8fc23135fa7c54255169716c27eab785e9ab72"
+source = "git+https://github.com/mulkieran/devicemapper-rs?branch=test-post-release-adjustment#1744298cb11f43ece2a5ace41bf0455ddf7fa80c"
 dependencies = [
  "bitflags",
  "devicemapper-sys",
@@ -252,7 +252,7 @@ dependencies = [
 [[package]]
 name = "devicemapper-sys"
 version = "0.1.1"
-source = "git+https://github.com/mulkieran/devicemapper-rs?branch=devicemapper-issue-663#0b8fc23135fa7c54255169716c27eab785e9ab72"
+source = "git+https://github.com/mulkieran/devicemapper-rs?branch=test-post-release-adjustment#1744298cb11f43ece2a5ace41bf0455ddf7fa80c"
 dependencies = [
  "bindgen 0.57.0",
  "nix 0.22.0",

@@ -29,7 +29,10 @@ use crate::{
             DbusAction, InterfacesAddedThreadSafe, InterfacesRemoved, LockableTree, TData,
             TreeReadLock, TreeWriteLock,
         },
-        util::{poll_exit_and_future, thread_safe_to_dbus_sendable},
+        util::{
+            option_to_tuple, poll_exit_and_future, result_to_variant_tuple,
+            thread_safe_to_dbus_sendable,
+        },
     },
     engine::{ActionAvailability, Engine, FilesystemUuid, StratisUuid},
     stratis::{StratisError, StratisResult},
@@ -229,6 +232,56 @@ where
         }
     }
 
+    /// Handle a change of the key description for a pool in the engine.
+    fn handle_pool_key_desc_change(&self, item: Path<'static>, kd: Result<Option<String>, String>) {
+        let mut changed = HashMap::new();
+        changed.insert(
+            consts::POOL_KEY_DESC_PROP.into(),
+            Variant(Box::new(result_to_variant_tuple(
+                kd.map(|opt| option_to_tuple(opt, String::new())),
+            )) as Box<dyn RefArg>),
+        );
+
+        if self
+            .property_changed_invalidated_signal(
+                &item,
+                changed,
+                vec![],
+                &consts::standard_pool_interfaces(),
+            )
+            .is_err()
+        {
+            warn!("Signal on pool key description change was not sent to the D-Bus client");
+        }
+    }
+
+    /// Handle a change of the key description for a pool in the engine.
+    fn handle_pool_clevis_info_change(
+        &self,
+        item: Path<'static>,
+        ci: Result<Option<(String, String)>, String>,
+    ) {
+        let mut changed = HashMap::new();
+        changed.insert(
+            consts::POOL_KEY_DESC_PROP.into(),
+            Variant(Box::new(result_to_variant_tuple(
+                ci.map(|opt| option_to_tuple(opt, (String::new(), String::new()))),
+            )) as Box<dyn RefArg>),
+        );
+
+        if self
+            .property_changed_invalidated_signal(
+                &item,
+                changed,
+                vec![],
+                &consts::standard_pool_interfaces(),
+            )
+            .is_err()
+        {
+            warn!("Signal on pool key description change was not sent to the D-Bus client");
+        }
+    }
+
     /// Handle a change of available actions for a pool in the engine.
     fn handle_pool_cache_change(&self, item: Path<'static>, b: bool) {
         let mut changed = HashMap::new();
@@ -335,6 +388,14 @@ where
             }
             DbusAction::PoolAvailActions(item, new_avail_actions) => {
                 self.handle_pool_avail_actions_change(item, new_avail_actions);
+                Ok(true)
+            }
+            DbusAction::PoolKeyDescChange(item, kd) => {
+                self.handle_pool_key_desc_change(item, kd);
+                Ok(true)
+            }
+            DbusAction::PoolClevisInfoChange(item, ci) => {
+                self.handle_pool_clevis_info_change(item, ci);
                 Ok(true)
             }
             DbusAction::FsSizeChange(uuid, new_size) => {

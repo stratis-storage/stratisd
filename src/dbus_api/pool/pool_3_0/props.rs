@@ -57,6 +57,18 @@ where
     })
 }
 
+pub fn get_pool_clevis_info<E>(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+) -> Result<(), MethodErr>
+where
+    E: 'static + Engine,
+{
+    get_pool_property(i, p, |(_, _, pool)| {
+        Ok(shared::pool_clevis_info_prop::<E>(pool))
+    })
+}
+
 pub fn get_pool_has_cache<E>(
     i: &mut IterAppend<'_>,
     p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,

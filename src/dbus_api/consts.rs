@@ -25,7 +25,7 @@ pub const POOL_AVAIL_ACTIONS_PROP: &str = "AvailableActions";
 pub const POOL_KEY_DESC_PROP: &str = "KeyDescription";
 pub const POOL_TOTAL_SIZE_PROP: &str = "TotalPhysicalSize";
 pub const POOL_TOTAL_USED_PROP: &str = "TotalPhysicalUsed";
-pub const POOL_CLEVIS_INFO: &str = "ClevisInfo";
+pub const POOL_CLEVIS_INFO_PROP: &str = "ClevisInfo";
 
 pub const FILESYSTEM_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.filesystem.r0";
 pub const FILESYSTEM_NAME_PROP: &str = "Name";

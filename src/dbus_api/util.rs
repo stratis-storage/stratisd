@@ -33,7 +33,7 @@ use crate::{
         },
         udev::DbusUdevHandler,
     },
-    engine::{Engine, Lockable, LockableEngine, UdevEngineEvent},
+    engine::{Engine, Lockable, LockableEngine, Pool, PoolEncryptionInfo, UdevEngineEvent},
     stratis::{StratisError, StratisResult},
 };
 
@@ -255,4 +255,54 @@ where
         )),
         Either::Right((a, _)) => Ok(Some(a)),
     }
+}
+
+/// Convert a Result type of fetching encryption information to its appropriate
+/// D-Bus property representation.
+pub fn enc_res_to_prop<T>(
+    res: Result<Option<T>, String>,
+    default: T,
+) -> (bool, Variant<Box<dyn RefArg>>)
+where
+    T: 'static + RefArg,
+{
+    result_to_variant_tuple(res.map(|opt| option_to_tuple(opt, default)))
+}
+
+/// Convert an encryption information data structure to a
+/// Result<Option<_>, String> type.
+pub fn enc_to_res<E, F, T>(pool: &E::Pool, f: F) -> Result<Option<T>, String>
+where
+    E: Engine,
+    F: Fn(PoolEncryptionInfo) -> StratisResult<Option<T>>,
+{
+    pool.encryption_info()
+        .map(f)
+        .transpose()
+        .map(|opt| opt.and_then(|subopt| subopt))
+        .map_err(|e| e.to_string())
+}
+
+/// Fetch the key description and handle converting it into a
+/// Result<Option<_>, String> type.
+pub fn key_desc_res<E>(pool: &E::Pool) -> Result<Option<String>, String>
+where
+    E: Engine,
+{
+    enc_to_res::<E, _, _>(pool, |ei| {
+        ei.key_description()
+            .map(|kd_opt| kd_opt.map(|kd| kd.as_application_str().to_string()))
+    })
+}
+
+/// Fetch the Clevis information and handle converting it into a
+/// StratisResult<Option<_>> type.
+pub fn clevis_info_res<E>(pool: &E::Pool) -> Result<Option<(String, String)>, String>
+where
+    E: Engine,
+{
+    enc_to_res::<E, _, _>(pool, |ei| {
+        ei.clevis_info()
+            .map(|ci_opt| ci_opt.map(|(pin, cfg)| (pin.to_owned(), cfg.to_string())))
+    })
 }

@@ -11,10 +11,11 @@ pub use self::{
     },
     structures::{ExclusiveGuard, SharedGuard},
     types::{
-        ActionAvailability, BlockDevTier, ChangedProperties, CreateAction, DeleteAction, DevUuid,
-        EncryptionInfo, EngineAction, FilesystemUuid, KeyDescription, Lockable, LockableEngine,
-        MappingCreateAction, MappingDeleteAction, Name, PoolUuid, Redundancy, RenameAction,
-        ReportType, SetCreateAction, SetDeleteAction, StratisUuid, UdevEngineEvent, UnlockMethod,
+        ActionAvailability, BlockDevTier, ChangedProperties, ClevisInfo, CreateAction,
+        DeleteAction, DevUuid, EncryptionInfo, EngineAction, FilesystemUuid, KeyDescription,
+        Lockable, LockableEngine, MappingCreateAction, MappingDeleteAction, Name,
+        PoolEncryptionInfo, PoolUuid, Redundancy, RenameAction, ReportType, SetCreateAction,
+        SetDeleteAction, StratisUuid, UdevEngineEvent, UnlockMethod,
     },
 };
 

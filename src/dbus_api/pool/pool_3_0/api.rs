@@ -15,8 +15,8 @@ use crate::{
                 snapshot_filesystem, unbind_clevis, unbind_keyring,
             },
             props::{
-                get_pool_avail_actions, get_pool_encrypted, get_pool_has_cache, get_pool_key_desc,
-                get_pool_name,
+                get_pool_avail_actions, get_pool_clevis_info, get_pool_encrypted,
+                get_pool_has_cache, get_pool_key_desc, get_pool_name,
             },
         },
         types::TData,
@@ -295,8 +295,20 @@ where
 {
     f.property::<(bool, Box<Variant<Box<dyn RefArg>>>), _>(consts::POOL_KEY_DESC_PROP, ())
         .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::False)
+        .emits_changed(EmitsChangedSignal::True)
         .on_get(get_pool_key_desc)
+}
+
+pub fn clevis_info_property<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Property<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
+    f.property::<(bool, Box<Variant<Box<dyn RefArg>>>), _>(consts::POOL_CLEVIS_INFO_PROP, ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::True)
+        .on_get(get_pool_clevis_info)
 }
 
 pub fn has_cache_property<E>(

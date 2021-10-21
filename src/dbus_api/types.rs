@@ -85,6 +85,8 @@ pub enum DbusAction<E> {
     FsNameChange(Path<'static>, String),
     PoolNameChange(Path<'static>, String),
     PoolAvailActions(Path<'static>, ActionAvailability),
+    PoolKeyDescChange(Path<'static>, Result<Option<String>, String>),
+    PoolClevisInfoChange(Path<'static>, Result<Option<(String, String)>, String>),
     FsSizeChange(FilesystemUuid, Bytes),
     PoolCacheChange(Path<'static>, bool),
 }
@@ -210,6 +212,40 @@ where
             warn!(
                 "D-Bus filesystem name change event could not be sent to the processing thread; \
                 no signal will be sent out for pool with path {}: {}",
+                item, e,
+            )
+        }
+    }
+
+    /// Send changed signal for KeyDesc property.
+    pub fn push_pool_key_desc_change(
+        &self,
+        item: &Path<'static>,
+        kd: Result<Option<String>, String>,
+    ) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::PoolKeyDescChange(item.clone(), kd))
+        {
+            warn!(
+                "D-Bus pool key description change event could not be sent to the processing thread; no signal will be sent out for pool with path {}: {}",
+                item, e,
+            )
+        }
+    }
+
+    /// Send changed signal for ClevisInfo property.
+    pub fn push_pool_clevis_info_change(
+        &self,
+        item: &Path<'static>,
+        ci: Result<Option<(String, String)>, String>,
+    ) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::PoolClevisInfoChange(item.clone(), ci))
+        {
+            warn!(
+                "D-Bus pool Clevis info change event could not be sent to the processing thread; no signal will be sent out for pool with path {}: {}",
                 item, e,
             )
         }

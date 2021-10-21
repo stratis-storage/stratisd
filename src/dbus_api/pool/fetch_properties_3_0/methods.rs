@@ -14,18 +14,14 @@ use itertools::Itertools;
 use crate::{
     dbus_api::{
         consts,
-        pool::shared::{get_pool_clevis_info, get_pool_total_size, get_pool_total_used},
+        pool::shared::{get_pool_total_size, get_pool_total_used},
         types::TData,
         util::result_to_tuple,
     },
     engine::Engine,
 };
 
-const ALL_PROPERTIES: [&str; 3] = [
-    consts::POOL_TOTAL_SIZE_PROP,
-    consts::POOL_TOTAL_USED_PROP,
-    consts::POOL_CLEVIS_INFO,
-];
+const ALL_PROPERTIES: [&str; 2] = [consts::POOL_TOTAL_SIZE_PROP, consts::POOL_TOTAL_USED_PROP];
 
 fn get_properties_shared<E>(
     m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
@@ -43,7 +39,6 @@ where
         .filter_map(|prop| match prop.as_str() {
             consts::POOL_TOTAL_SIZE_PROP => Some((prop, result_to_tuple(get_pool_total_size(m)))),
             consts::POOL_TOTAL_USED_PROP => Some((prop, result_to_tuple(get_pool_total_used(m)))),
-            consts::POOL_CLEVIS_INFO => Some((prop, result_to_tuple(get_pool_clevis_info(m)))),
             _ => None,
         })
         .collect();

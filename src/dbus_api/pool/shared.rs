@@ -14,7 +14,9 @@ use crate::{
     dbus_api::{
         blockdev::create_dbus_blockdev,
         types::{DbusErrorEnum, TData, OK_STRING},
-        util::{engine_to_dbus_err_tuple, get_next_arg, option_to_tuple, result_to_variant_tuple},
+        util::{
+            clevis_info_res, enc_res_to_prop, engine_to_dbus_err_tuple, get_next_arg, key_desc_res,
+        },
     },
     engine::{BlockDevTier, Engine, EngineAction, Name, Pool, PoolUuid},
 };
@@ -79,26 +81,6 @@ where
         pool.total_physical_used()
             .map_err(|e| e.to_string())
             .map(|size| (*size.bytes()).to_string())
-    })
-}
-
-pub fn get_pool_clevis_info<E>(
-    m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<(bool, (String, String)), String>
-where
-    E: 'static + Engine,
-{
-    pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
-        Ok(option_to_tuple(
-            match pool.encryption_info() {
-                Some(ei) => ei
-                    .clevis_info()
-                    .map_err(|e| e.to_string())?
-                    .map(|(pin, config)| (pin.to_owned(), config.to_string())),
-                None => None,
-            },
-            (String::new(), String::new()),
-        ))
     })
 }
 
@@ -250,15 +232,16 @@ pub fn pool_key_desc_prop<E>(pool: &E::Pool) -> (bool, Variant<Box<dyn RefArg>>)
 where
     E: 'static + Engine,
 {
-    result_to_variant_tuple(
-        pool.encryption_info()
-            .map(|ei| {
-                ei.key_description()
-                    .map(|kd_opt| kd_opt.map(|kd| kd.as_application_str().to_string()))
-            })
-            .transpose()
-            .map(|opt| option_to_tuple(opt.and_then(|subopt| subopt), String::new())),
-    )
+    enc_res_to_prop(key_desc_res::<E>(pool), String::new())
+}
+
+/// Generate D-Bus representation of a pool Clevis info property.
+#[inline]
+pub fn pool_clevis_info_prop<E>(pool: &E::Pool) -> (bool, Variant<Box<dyn RefArg>>)
+where
+    E: 'static + Engine,
+{
+    enc_res_to_prop(clevis_info_res::<E>(pool), (String::new(), String::new()))
 }
 
 /// Generate D-Bus representation of a boolean indicating whether the pool

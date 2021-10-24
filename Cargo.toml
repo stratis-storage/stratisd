@@ -115,3 +115,7 @@ dbus_enabled = ["dbus", "dbus-tree"]
 extras = ["pretty-hex"]
 min = ["rpassword"]
 systemd_compat = ["bindgen"]
+
+[patch.crates-io.devicemapper]
+git = "https://github.com/stratis-storage/devicemapper-rs"
+branch = "crates-io-patch-0.30.0"

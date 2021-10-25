@@ -13,7 +13,7 @@ use std::{
 
 use nix::mount::{mount, umount, MsFlags};
 
-use devicemapper::{DmDevice, LinearDev, LinearDevTargetParams, TargetLine};
+use devicemapper::{DmDevice, DmOptions, LinearDev, LinearDevTargetParams, TargetLine};
 
 use crate::{
     engine::{
@@ -207,7 +207,7 @@ impl MetadataVol {
 
     /// Suspend the metadata volume DM devices
     pub fn suspend(&mut self) -> StratisResult<()> {
-        self.dev.suspend(get_dm(), true)?;
+        self.dev.suspend(get_dm(), DmOptions::default())?;
         Ok(())
     }
 

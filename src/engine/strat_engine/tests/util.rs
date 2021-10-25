@@ -100,7 +100,7 @@ pub fn dm_stratis_devices_remove() -> Result<()> {
                 if !n.to_string().starts_with("stratis-1") {
                     None
                 } else {
-                    match get_dm().device_remove(&DevId::Name(n), &DmOptions::new()) {
+                    match get_dm().device_remove(&DevId::Name(n), DmOptions::default()) {
                         Ok(_) => {
                             progress_made = true;
                             None
@@ -117,7 +117,7 @@ pub fn dm_stratis_devices_remove() -> Result<()> {
                 .into_iter()
                 .filter(|name| {
                     for _ in 0..3 {
-                        match get_dm().device_remove(&DevId::Name(name), &DmOptions::new()) {
+                        match get_dm().device_remove(&DevId::Name(name), DmOptions::default()) {
                             Ok(_) => {
                                 progress_made = true;
                                 return false;
@@ -221,7 +221,7 @@ impl FailDevice {
             blkdev_size(&file)?
         };
 
-        dm.device_create(dm_name, None, &DmOptions::new())?;
+        dm.device_create(dm_name, None, DmOptions::default())?;
         dm.table_load(
             &dev_id,
             &[(
@@ -230,8 +230,9 @@ impl FailDevice {
                 "linear".to_string(),
                 format!("{} 0", backing_device.display()),
             )],
+            DmOptions::default(),
         )?;
-        dm.device_suspend(&dev_id, &DmOptions::new())?;
+        dm.device_suspend(&dev_id, DmOptions::default())?;
 
         Ok(FailDevice {
             backing_device: backing_device.to_owned(),
@@ -252,7 +253,7 @@ impl FailDevice {
         let dev_id = DevId::Name(dm_name);
 
         self.dm_context
-            .device_suspend(&dev_id, DmOptions::new().set_flags(DmFlags::DM_SUSPEND))?;
+            .device_suspend(&dev_id, DmOptions::default().set_flags(DmFlags::DM_SUSPEND))?;
         self.dm_context.table_load(
             &dev_id,
             &[
@@ -269,8 +270,10 @@ impl FailDevice {
                     format!("{} 0", self.backing_device.display()),
                 ),
             ],
+            DmOptions::default(),
         )?;
-        self.dm_context.device_suspend(&dev_id, &DmOptions::new())?;
+        self.dm_context
+            .device_suspend(&dev_id, DmOptions::default())?;
 
         Ok(())
     }
@@ -280,7 +283,7 @@ impl FailDevice {
         let dev_id = DevId::Name(dm_name);
 
         self.dm_context
-            .device_suspend(&dev_id, DmOptions::new().set_flags(DmFlags::DM_SUSPEND))?;
+            .device_suspend(&dev_id, DmOptions::default().set_flags(DmFlags::DM_SUSPEND))?;
         self.dm_context.table_load(
             &dev_id,
             &[(
@@ -289,8 +292,10 @@ impl FailDevice {
                 "linear".to_string(),
                 format!("{} 0", self.backing_device.display()),
             )],
+            DmOptions::default(),
         )?;
-        self.dm_context.device_suspend(&dev_id, &DmOptions::new())?;
+        self.dm_context
+            .device_suspend(&dev_id, DmOptions::default())?;
 
         Ok(())
     }
@@ -301,11 +306,13 @@ impl Drop for FailDevice {
         fn drop_fail(dev: &mut FailDevice) -> StratisResult<()> {
             let dev_id = DevId::Name(DmName::new(dev.test_device_name.as_str())?);
 
-            let (dev_info, _) = dev.dm_context.table_status(&dev_id, &DmOptions::new())?;
+            let (dev_info, _) = dev.dm_context.table_status(&dev_id, DmOptions::default())?;
             if dev_info.flags() & DmFlags::DM_SUSPEND == DmFlags::DM_SUSPEND {
-                dev.dm_context.device_suspend(&dev_id, &DmOptions::new())?;
+                dev.dm_context
+                    .device_suspend(&dev_id, DmOptions::default())?;
             }
-            dev.dm_context.device_remove(&dev_id, &DmOptions::new())?;
+            dev.dm_context
+                .device_remove(&dev_id, DmOptions::default())?;
 
             Ok(())
         }

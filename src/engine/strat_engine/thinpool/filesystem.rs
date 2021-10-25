@@ -15,7 +15,8 @@ use data_encoding::BASE32_NOPAD;
 use serde_json::{Map, Value};
 
 use devicemapper::{
-    Bytes, DmDevice, DmName, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev, ThinStatus,
+    Bytes, DmDevice, DmName, DmOptions, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev,
+    ThinStatus,
 };
 
 use nix::{
@@ -223,7 +224,7 @@ impl StratFilesystem {
     /// * None if metadata should not be saved.
     /// TODO: deal with the thindev in a Fail state.
     pub fn check(&mut self) -> StratisResult<Option<StratFilesystemDiff>> {
-        match self.thin_dev.status(get_dm())? {
+        match self.thin_dev.status(get_dm(), DmOptions::default())? {
             ThinStatus::Working(_) => {
                 if let Some(mount_point) = self.mount_points()?.first() {
                     let original_state = self.dump();
@@ -296,16 +297,6 @@ impl StratFilesystem {
         }
     }
 
-    pub fn suspend(&mut self, flush: bool) -> StratisResult<()> {
-        self.thin_dev.suspend(get_dm(), flush)?;
-        Ok(())
-    }
-
-    pub fn resume(&mut self) -> StratisResult<()> {
-        self.thin_dev.resume(get_dm())?;
-        Ok(())
-    }
-
     /// Find places where this filesystem is mounted.
     fn mount_points(&self) -> StratisResult<Vec<PathBuf>> {
         // Use major:minor values to find mounts for this filesystem
@@ -353,7 +344,7 @@ impl Filesystem for StratFilesystem {
     }
 
     fn used(&self) -> StratisResult<Bytes> {
-        match self.thin_dev.status(get_dm())? {
+        match self.thin_dev.status(get_dm(), DmOptions::default())? {
             ThinStatus::Working(wk_status) => Ok(wk_status.nr_mapped_sectors.bytes()),
             ThinStatus::Error => {
                 let error_msg = format!(

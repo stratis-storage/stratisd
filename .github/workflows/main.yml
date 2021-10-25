@@ -32,75 +32,75 @@ jobs:
         include:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
           - task: make -f Makefile fmt-travis
-            toolchain: 1.55.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: rustfmt
             image: ubuntu:groovy
           - task: make -f Makefile clippy
-            toolchain: 1.55.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: clippy
             image: ubuntu:groovy
           - task: make -f Makefile fmt-travis
-            toolchain: 1.55.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: rustfmt
             image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
           - task: make -f Makefile clippy
-            toolchain: 1.55.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: clippy
             image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
           - task: make -f Makefile build
-            toolchain: 1.55.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
             image: ubuntu:groovy
           - task: make -f Makefile build-min
-            toolchain: 1.55.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
             image: ubuntu:groovy
           - task: make -f Makefile build-extras
-            toolchain: 1.55.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
             image: ubuntu:groovy
           - task: make -f Makefile docs-travis
-            toolchain: 1.55.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
             image: ubuntu:groovy
           - task: make -f Makefile test
-            toolchain: 1.55.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
             image: ubuntu:groovy
           - task: make -f Makefile release
-            toolchain: 1.55.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
             image: ubuntu:groovy
           - task: make -f Makefile release-min
-            toolchain: 1.55.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
             image: ubuntu:groovy
           - task: make -f Makefile build
-            toolchain: 1.55.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
             image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
           - task: make -f Makefile build-min
-            toolchain: 1.55.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
             image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
           - task: make -f Makefile build-extras
-            toolchain: 1.55.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
             image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
           - task: make -f Makefile docs-travis
-            toolchain: 1.55.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
             image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
           - task: make -f Makefile test
-            toolchain: 1.55.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
             image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
           - task: make -f Makefile release
-            toolchain: 1.55.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
             image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
           - task: make -f Makefile release-min
-            toolchain: 1.55.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
             image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
     runs-on: ubuntu-18.04
@@ -151,11 +151,11 @@ jobs:
         include:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
           - task: RUST_LOG=stratisd=debug make -f Makefile test-loop
-            toolchain: 1.55.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
             image: ubuntu:groovy
           - task: RUST_LOG=stratisd=debug make -f Makefile test-loop
-            toolchain: 1.55.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
             image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
     runs-on: ubuntu-18.04
@@ -222,7 +222,7 @@ jobs:
               TANG_URL=tang
               RUST_LOG=stratisd=debug
               make -f Makefile test-clevis-loop
-            toolchain: 1.55.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
             image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
     runs-on: ubuntu-18.04
@@ -363,7 +363,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           components: cargo
-          toolchain: 1.55.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           override: true
       - name: Check out ci repo
         run: git clone https://github.com/stratis-storage/ci.git

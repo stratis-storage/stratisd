@@ -37,17 +37,6 @@ use crate::{
     stratis::{StratisError, StratisResult},
 };
 
-pub fn result_to_variant_tuple<O, E>(res: Result<O, E>) -> (bool, Variant<Box<dyn RefArg>>)
-where
-    O: 'static + RefArg,
-    E: Display,
-{
-    match res {
-        Ok(o) => (true, Variant(Box::new(o) as Box<dyn RefArg>)),
-        Err(e) => (false, Variant(Box::new(e.to_string()) as Box<dyn RefArg>)),
-    }
-}
-
 /// Convert a tuple as option to an Option type
 pub fn tuple_to_option<T>(value: (bool, T)) -> Option<T> {
     if value.0 {
@@ -257,21 +246,10 @@ where
     }
 }
 
-/// Convert a Result type of fetching encryption information to its appropriate
-/// D-Bus property representation.
-pub fn enc_res_to_prop<T>(
-    res: Result<Option<T>, String>,
-    default: T,
-) -> (bool, Variant<Box<dyn RefArg>>)
-where
-    T: 'static + RefArg,
-{
-    result_to_variant_tuple(res.map(|opt| option_to_tuple(opt, default)))
-}
-
 /// Convert an encryption information data structure to a
-/// Result<Option<_>, String> type.
-pub fn enc_to_res<E, F, T>(pool: &E::Pool, f: F) -> Result<Option<T>, String>
+/// Option<Option<_>> type.
+#[allow(clippy::option_option)]
+pub fn enc_to_opt<E, F, T>(pool: &E::Pool, f: F) -> Option<Option<T>>
 where
     E: Engine,
     F: Fn(PoolEncryptionInfo) -> StratisResult<Option<T>>,
@@ -280,28 +258,30 @@ where
         .map(f)
         .transpose()
         .map(|opt| opt.and_then(|subopt| subopt))
-        .map_err(|e| e.to_string())
+        .ok()
 }
 
 /// Fetch the key description and handle converting it into a
-/// Result<Option<_>, String> type.
-pub fn key_desc_res<E>(pool: &E::Pool) -> Result<Option<String>, String>
+/// Option<<Option<_>> type.
+#[allow(clippy::option_option)]
+pub fn key_desc_opt<E>(pool: &E::Pool) -> Option<Option<String>>
 where
     E: Engine,
 {
-    enc_to_res::<E, _, _>(pool, |ei| {
+    enc_to_opt::<E, _, _>(pool, |ei| {
         ei.key_description()
             .map(|kd_opt| kd_opt.map(|kd| kd.as_application_str().to_string()))
     })
 }
 
 /// Fetch the Clevis information and handle converting it into a
-/// StratisResult<Option<_>> type.
-pub fn clevis_info_res<E>(pool: &E::Pool) -> Result<Option<(String, String)>, String>
+/// Option<Option<_>> type.
+#[allow(clippy::option_option)]
+pub fn clevis_info_opt<E>(pool: &E::Pool) -> Option<Option<(String, String)>>
 where
     E: Engine,
 {
-    enc_to_res::<E, _, _>(pool, |ei| {
+    enc_to_opt::<E, _, _>(pool, |ei| {
         ei.clevis_info()
             .map(|ci_opt| ci_opt.map(|(pin, cfg)| (pin.to_owned(), cfg.to_string())))
     })

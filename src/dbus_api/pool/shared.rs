@@ -5,7 +5,7 @@
 use std::path::Path;
 
 use dbus::{
-    arg::{Array, IterAppend, RefArg, Variant},
+    arg::{Array, IterAppend},
     Message,
 };
 use dbus_tree::{MTSync, MethodErr, MethodInfo, MethodResult, PropInfo, Tree};
@@ -15,7 +15,7 @@ use crate::{
         blockdev::create_dbus_blockdev,
         types::{DbusErrorEnum, TData, OK_STRING},
         util::{
-            clevis_info_res, enc_res_to_prop, engine_to_dbus_err_tuple, get_next_arg, key_desc_res,
+            clevis_info_opt, engine_to_dbus_err_tuple, get_next_arg, key_desc_opt, option_to_tuple,
         },
     },
     engine::{BlockDevTier, Engine, EngineAction, Name, Pool, PoolUuid},
@@ -68,19 +68,6 @@ where
 {
     pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
         Ok((*pool.total_physical_size().bytes()).to_string())
-    })
-}
-
-pub fn get_pool_total_used<E>(
-    m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<String, String>
-where
-    E: 'static + Engine,
-{
-    pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
-        pool.total_physical_used()
-            .map_err(|e| e.to_string())
-            .map(|size| (*size.bytes()).to_string())
     })
 }
 
@@ -228,20 +215,26 @@ where
 
 /// Generate D-Bus representation of a pool key description property.
 #[inline]
-pub fn pool_key_desc_prop<E>(pool: &E::Pool) -> (bool, Variant<Box<dyn RefArg>>)
+pub fn pool_key_desc_prop<E>(pool: &E::Pool) -> (bool, (bool, String))
 where
     E: 'static + Engine,
 {
-    enc_res_to_prop(key_desc_res::<E>(pool), String::new())
+    option_to_tuple(
+        key_desc_opt::<E>(pool).map(|opt| option_to_tuple(opt, String::new())),
+        (false, String::new()),
+    )
 }
 
 /// Generate D-Bus representation of a pool Clevis info property.
 #[inline]
-pub fn pool_clevis_info_prop<E>(pool: &E::Pool) -> (bool, Variant<Box<dyn RefArg>>)
+pub fn pool_clevis_info_prop<E>(pool: &E::Pool) -> (bool, (bool, (String, String)))
 where
     E: 'static + Engine,
 {
-    enc_res_to_prop(clevis_info_res::<E>(pool), (String::new(), String::new()))
+    option_to_tuple(
+        clevis_info_opt::<E>(pool).map(|opt| option_to_tuple(opt, (String::new(), String::new()))),
+        (false, (String::new(), String::new())),
+    )
 }
 
 /// Generate D-Bus representation of a boolean indicating whether the pool
@@ -252,4 +245,28 @@ where
     E: 'static + Engine,
 {
     pool.has_cache()
+}
+
+/// Generate D-Bus representation of the number of bytes of physical space
+/// already allocated to this pool.
+#[inline]
+pub fn pool_allocated_size<E>(pool: &E::Pool) -> String
+where
+    E: 'static + Engine,
+{
+    (*pool.total_allocated_size().bytes()).to_string()
+}
+
+/// Generate D-Bus representation of the number of bytes used by this pool.
+#[inline]
+pub fn pool_used_size<E>(pool: &E::Pool) -> (bool, String)
+where
+    E: 'static + Engine,
+{
+    option_to_tuple(
+        pool.total_physical_used()
+            .ok()
+            .map(|u| (*u.bytes()).to_string()),
+        String::new(),
+    )
 }

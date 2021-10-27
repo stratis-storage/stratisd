@@ -12,16 +12,11 @@ use dbus_tree::{MTSync, MethodInfo, MethodResult};
 use itertools::Itertools;
 
 use crate::{
-    dbus_api::{
-        consts,
-        pool::shared::{get_pool_total_size, get_pool_total_used},
-        types::TData,
-        util::result_to_tuple,
-    },
+    dbus_api::{consts, pool::shared::get_pool_total_size, types::TData, util::result_to_tuple},
     engine::Engine,
 };
 
-const ALL_PROPERTIES: [&str; 2] = [consts::POOL_TOTAL_SIZE_PROP, consts::POOL_TOTAL_USED_PROP];
+const ALL_PROPERTIES: [&str; 1] = [consts::POOL_TOTAL_SIZE_PROP];
 
 fn get_properties_shared<E>(
     m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
@@ -38,7 +33,6 @@ where
         .unique()
         .filter_map(|prop| match prop.as_str() {
             consts::POOL_TOTAL_SIZE_PROP => Some((prop, result_to_tuple(get_pool_total_size(m)))),
-            consts::POOL_TOTAL_USED_PROP => Some((prop, result_to_tuple(get_pool_total_used(m)))),
             _ => None,
         })
         .collect();

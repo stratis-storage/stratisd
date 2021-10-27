@@ -46,15 +46,25 @@ where
         get_dm().arm_poll()?;
         let mut lock = engine.lock().await;
         let evented = lock.get_events()?;
-        // Return result currently not needed.
+
         // NOTE: May need to change order of pool_evented() and fs_evented()
+
         let _ = lock.pool_evented(Some(&evented))?;
         #[cfg(feature = "min")]
         let _ = lock.fs_evented(Some(&evented))?;
         #[cfg(feature = "dbus_enabled")]
         {
-            let props_changed = lock.fs_evented(Some(&evented))?;
-            for action in DbusAction::from_changed_properties(props_changed) {
+            let pool_diffs = lock.pool_evented(Some(&evented))?;
+            for action in DbusAction::from_pool_diffs(pool_diffs) {
+                if let Err(e) = sender.send(action) {
+                    warn!(
+                        "Failed to update D-Bus layer with changed engine properties: {}",
+                        e
+                    );
+                }
+            }
+            let fs_diffs = lock.fs_evented(Some(&evented))?;
+            for action in DbusAction::from_fs_diffs(fs_diffs) {
                 if let Err(e) = sender.send(action) {
                     warn!(
                         "Failed to update D-Bus layer with changed engine properties: {}",

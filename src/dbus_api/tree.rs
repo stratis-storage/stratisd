@@ -29,12 +29,9 @@ use crate::{
             DbusAction, InterfacesAddedThreadSafe, InterfacesRemoved, LockableTree, TData,
             TreeReadLock, TreeWriteLock,
         },
-        util::{
-            option_to_tuple, poll_exit_and_future, result_to_variant_tuple,
-            thread_safe_to_dbus_sendable,
-        },
+        util::{option_to_tuple, poll_exit_and_future, thread_safe_to_dbus_sendable},
     },
-    engine::{ActionAvailability, Engine, FilesystemUuid, StratisUuid},
+    engine::{ActionAvailability, Engine, FilesystemUuid, PoolUuid, StratisUuid},
     stratis::{StratisError, StratisResult},
 };
 
@@ -233,12 +230,14 @@ where
     }
 
     /// Handle a change of the key description for a pool in the engine.
-    fn handle_pool_key_desc_change(&self, item: Path<'static>, kd: Result<Option<String>, String>) {
+    #[allow(clippy::option_option)]
+    fn handle_pool_key_desc_change(&self, item: Path<'static>, kd: Option<Option<String>>) {
         let mut changed = HashMap::new();
         changed.insert(
             consts::POOL_KEY_DESC_PROP.into(),
-            Variant(Box::new(result_to_variant_tuple(
+            Variant(Box::new(option_to_tuple(
                 kd.map(|opt| option_to_tuple(opt, String::new())),
+                (false, String::new()),
             )) as Box<dyn RefArg>),
         );
 
@@ -256,16 +255,18 @@ where
     }
 
     /// Handle a change of the key description for a pool in the engine.
+    #[allow(clippy::option_option)]
     fn handle_pool_clevis_info_change(
         &self,
         item: Path<'static>,
-        ci: Result<Option<(String, String)>, String>,
+        ci: Option<Option<(String, String)>>,
     ) {
         let mut changed = HashMap::new();
         changed.insert(
-            consts::POOL_KEY_DESC_PROP.into(),
-            Variant(Box::new(result_to_variant_tuple(
+            consts::POOL_CLEVIS_INFO_PROP.into(),
+            Variant(Box::new(option_to_tuple(
                 ci.map(|opt| option_to_tuple(opt, (String::new(), String::new()))),
+                (false, (String::new(), String::new())),
             )) as Box<dyn RefArg>),
         );
 
@@ -348,6 +349,99 @@ where
         }
     }
 
+    /// Look up the pool path of the pool whose usage just changed using
+    /// the UUID, then send a signal indicating that the size has changed.
+    fn handle_pool_usage_change(
+        &self,
+        read_lock: TreeReadLock<'_, E>,
+        uuid: PoolUuid,
+        new_used: Option<Bytes>,
+    ) {
+        if let Some(path) = read_lock
+            .iter()
+            .filter_map(|opath| {
+                opath.get_data().as_ref().and_then(|data| {
+                    if let StratisUuid::Pool(u) = data.uuid {
+                        if u == uuid {
+                            Some(opath.get_name())
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+            })
+            .next()
+        {
+            if let Err(e) = self.property_changed_invalidated_signal(
+                path,
+                once((
+                    consts::POOL_TOTAL_USED_PROP.to_string(),
+                    Variant(Box::new(option_to_tuple(
+                        new_used.map(|s| (*s).to_string()),
+                        String::new(),
+                    )) as Box<dyn RefArg>),
+                ))
+                .collect::<HashMap<_, _>>(),
+                vec![],
+                &consts::standard_pool_interfaces(),
+            ) {
+                warn!(
+                    "Failed to send a signal over D-Bus indicating pool usage change: {}",
+                    e
+                );
+            }
+        } else {
+            warn!("A pool usage was changed in the engine but no pool with the corresponding UUID could be found in the D-Bus layer");
+        }
+    }
+
+    /// Look up the pool path of the pool whose allocated size just changed using
+    /// the UUID, then send a signal indicating that the size has changed.
+    fn handle_pool_alloc_change(
+        &self,
+        read_lock: TreeReadLock<'_, E>,
+        uuid: PoolUuid,
+        new_alloc: Bytes,
+    ) {
+        if let Some(path) = read_lock
+            .iter()
+            .filter_map(|opath| {
+                opath.get_data().as_ref().and_then(|data| {
+                    if let StratisUuid::Pool(u) = data.uuid {
+                        if u == uuid {
+                            Some(opath.get_name())
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+            })
+            .next()
+        {
+            if let Err(e) = self.property_changed_invalidated_signal(
+                path,
+                once((
+                    consts::POOL_ALLOC_SIZE_PROP.to_string(),
+                    Variant(Box::new((*new_alloc).to_string()) as Box<dyn RefArg>),
+                ))
+                .collect::<HashMap<_, _>>(),
+                vec![],
+                &consts::standard_pool_interfaces(),
+            ) {
+                warn!(
+                    "Failed to send a signal over D-Bus indicating allocated pool size change: {}",
+                    e
+                );
+            }
+        } else {
+            warn!("A pool allocated size was changed in the engine but no pool with the corresponding UUID could be found in the D-Bus layer");
+        }
+    }
+
     /// Handle a D-Bus action that has been generated by the connection processing
     /// handle.
     fn handle_dbus_action(&mut self, action: DbusAction<E>) -> StratisResult<bool> {
@@ -411,6 +505,26 @@ where
             DbusAction::PoolCacheChange(item, has_cache) => {
                 self.handle_pool_cache_change(item, has_cache);
                 Ok(true)
+            }
+            DbusAction::PoolUsageChange(uuid, new_usage) => {
+                if let Some(read_lock) =
+                    poll_exit_and_future(self.should_exit.recv(), self.tree.read())?
+                {
+                    self.handle_pool_usage_change(read_lock, uuid, new_usage);
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
+            }
+            DbusAction::PoolAllocSizeChange(uuid, new_alloc) => {
+                if let Some(read_lock) =
+                    poll_exit_and_future(self.should_exit.recv(), self.tree.read())?
+                {
+                    self.handle_pool_alloc_change(read_lock, uuid, new_alloc);
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
             }
         }
     }

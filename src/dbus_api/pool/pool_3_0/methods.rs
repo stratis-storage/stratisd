@@ -17,7 +17,7 @@ use crate::{
         pool::shared::{add_blockdevs, BlockDevOp},
         types::{DbusErrorEnum, TData, OK_STRING},
         util::{
-            clevis_info_res, engine_to_dbus_err_tuple, get_next_arg, key_desc_res, tuple_to_option,
+            clevis_info_opt, engine_to_dbus_err_tuple, get_next_arg, key_desc_opt, tuple_to_option,
         },
     },
     engine::{
@@ -423,7 +423,7 @@ where
         }
         Ok(CreateAction::Created(_)) => {
             dbus_context
-                .push_pool_clevis_info_change(pool_path.get_name(), clevis_info_res::<E>(pool));
+                .push_pool_clevis_info_change(pool_path.get_name(), clevis_info_opt::<E>(pool));
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(e) => {
@@ -465,7 +465,7 @@ where
         }
         Ok(DeleteAction::Deleted(_)) => {
             dbus_context
-                .push_pool_clevis_info_change(pool_path.get_name(), clevis_info_res::<E>(pool));
+                .push_pool_clevis_info_change(pool_path.get_name(), clevis_info_opt::<E>(pool));
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(e) => {
@@ -520,7 +520,7 @@ where
             return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Ok(CreateAction::Created(_)) => {
-            dbus_context.push_pool_key_desc_change(pool_path.get_name(), key_desc_res::<E>(pool));
+            dbus_context.push_pool_key_desc_change(pool_path.get_name(), key_desc_opt::<E>(pool));
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(e) => {
@@ -561,7 +561,7 @@ where
             return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Ok(DeleteAction::Deleted(_)) => {
-            dbus_context.push_pool_key_desc_change(pool_path.get_name(), key_desc_res::<E>(pool));
+            dbus_context.push_pool_key_desc_change(pool_path.get_name(), key_desc_opt::<E>(pool));
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(e) => {
@@ -616,7 +616,7 @@ where
             return_message.append3(false, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Ok(RenameAction::Renamed(_)) => {
-            dbus_context.push_pool_key_desc_change(pool_path.get_name(), key_desc_res::<E>(pool));
+            dbus_context.push_pool_key_desc_change(pool_path.get_name(), key_desc_opt::<E>(pool));
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Ok(RenameAction::NoSource) => {
@@ -663,7 +663,7 @@ where
     let msg = match handle_action!(pool.rebind_clevis(), dbus_context, pool_path.get_name()) {
         Ok(_) => {
             dbus_context
-                .push_pool_clevis_info_change(pool_path.get_name(), clevis_info_res::<E>(pool));
+                .push_pool_clevis_info_change(pool_path.get_name(), clevis_info_opt::<E>(pool));
             return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string())
         }
         Err(e) => {

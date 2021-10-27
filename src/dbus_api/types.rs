@@ -28,8 +28,8 @@ use devicemapper::Bytes;
 use crate::{
     dbus_api::{connection::DbusConnectionHandler, tree::DbusTreeHandler, udev::DbusUdevHandler},
     engine::{
-        ActionAvailability, ChangedProperties, Engine, ExclusiveGuard, FilesystemUuid, Lockable,
-        LockableEngine, SharedGuard, StratisUuid,
+        ActionAvailability, Engine, ExclusiveGuard, FilesystemUuid, Lockable, LockableEngine,
+        PoolUuid, SharedGuard, StratFilesystemDiff, StratisUuid, ThinPoolDiff,
     },
 };
 
@@ -85,22 +85,52 @@ pub enum DbusAction<E> {
     FsNameChange(Path<'static>, String),
     PoolNameChange(Path<'static>, String),
     PoolAvailActions(Path<'static>, ActionAvailability),
-    PoolKeyDescChange(Path<'static>, Result<Option<String>, String>),
-    PoolClevisInfoChange(Path<'static>, Result<Option<(String, String)>, String>),
+    #[allow(clippy::option_option)]
+    PoolKeyDescChange(Path<'static>, Option<Option<String>>),
+    #[allow(clippy::option_option)]
+    PoolClevisInfoChange(Path<'static>, Option<Option<(String, String)>>),
     FsSizeChange(FilesystemUuid, Bytes),
     PoolCacheChange(Path<'static>, bool),
+    PoolAllocSizeChange(PoolUuid, Bytes),
+    PoolUsageChange(PoolUuid, Option<Bytes>),
 }
 
 impl<E> DbusAction<E>
 where
     E: Engine,
 {
-    /// Convert changed properties to a series of D-Bus actions.
-    pub fn from_changed_properties(cp: ChangedProperties) -> Vec<Self> {
+    /// Convert changed properties from a pool to a series of D-Bus actions.
+    ///
+    /// Precondition: Filtering of diffs that show no change has already been
+    /// done in the engine.
+    pub fn from_pool_diffs(diffs: HashMap<PoolUuid, ThinPoolDiff>) -> Vec<Self> {
         let mut actions = Vec::new();
-        let ChangedProperties { filesystem_props } = cp;
-        for (uuid, size) in filesystem_props {
-            actions.push(DbusAction::FsSizeChange(uuid, size));
+        for (uuid, diff) in diffs {
+            let ThinPoolDiff {
+                allocated_size,
+                usage,
+            } = diff;
+            if let Some(a) = allocated_size {
+                actions.push(DbusAction::PoolAllocSizeChange(uuid, a));
+            }
+            if let Some(u) = usage {
+                actions.push(DbusAction::PoolUsageChange(uuid, u));
+            }
+        }
+        actions
+    }
+
+    /// Convert changed properties from filesystems to a series of D-Bus actions.
+    ///
+    /// Precondition: Filtering of diffs that show no change has already been
+    /// done in the engine.
+    pub fn from_fs_diffs(diffs: HashMap<FilesystemUuid, StratFilesystemDiff>) -> Vec<Self> {
+        let mut actions = Vec::new();
+        for (uuid, diff) in diffs {
+            let StratFilesystemDiff { size } = diff;
+            if let Some(s) = size {
+                actions.push(DbusAction::FsSizeChange(uuid, s));
+            }
         }
         actions
     }
@@ -218,11 +248,8 @@ where
     }
 
     /// Send changed signal for KeyDesc property.
-    pub fn push_pool_key_desc_change(
-        &self,
-        item: &Path<'static>,
-        kd: Result<Option<String>, String>,
-    ) {
+    #[allow(clippy::option_option)]
+    pub fn push_pool_key_desc_change(&self, item: &Path<'static>, kd: Option<Option<String>>) {
         if let Err(e) = self
             .sender
             .send(DbusAction::PoolKeyDescChange(item.clone(), kd))
@@ -235,10 +262,11 @@ where
     }
 
     /// Send changed signal for ClevisInfo property.
+    #[allow(clippy::option_option)]
     pub fn push_pool_clevis_info_change(
         &self,
         item: &Path<'static>,
-        ci: Result<Option<(String, String)>, String>,
+        ci: Option<Option<(String, String)>>,
     ) {
         if let Err(e) = self
             .sender

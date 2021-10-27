@@ -28,13 +28,24 @@ where
         sleep(Duration::from_secs(10)).await;
         let mut lock = engine.lock().await;
         // Return value currently not needed
-        let _ = lock.pool_evented(None)?;
         #[cfg(not(feature = "dbus_enabled"))]
-        let _ = lock.fs_evented(None)?;
+        {
+            let _ = lock.pool_evented(None)?;
+            let _ = lock.fs_evented(None)?;
+        }
         #[cfg(feature = "dbus_enabled")]
         {
-            let changed_properties = lock.fs_evented(None)?;
-            for action in DbusAction::from_changed_properties(changed_properties) {
+            let pool_diffs = lock.pool_evented(None)?;
+            for action in DbusAction::from_pool_diffs(pool_diffs) {
+                if let Err(e) = sender.send(action) {
+                    warn!(
+                        "Failed to update D-Bus API with information on changed properties: {}",
+                        e
+                    );
+                }
+            }
+            let fs_diffs = lock.fs_evented(None)?;
+            for action in DbusAction::from_fs_diffs(fs_diffs) {
                 if let Err(e) = sender.send(action) {
                     warn!(
                         "Failed to update D-Bus API with information on changed properties: {}",

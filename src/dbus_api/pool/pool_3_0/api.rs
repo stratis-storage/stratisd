@@ -2,7 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus::arg::{RefArg, Variant};
 use dbus_tree::{Access, EmitsChangedSignal, Factory, MTSync, Method, Property};
 
 use crate::{
@@ -15,8 +14,9 @@ use crate::{
                 snapshot_filesystem, unbind_clevis, unbind_keyring,
             },
             props::{
-                get_pool_avail_actions, get_pool_clevis_info, get_pool_encrypted,
-                get_pool_has_cache, get_pool_key_desc, get_pool_name,
+                get_pool_allocated_size, get_pool_avail_actions, get_pool_clevis_info,
+                get_pool_encrypted, get_pool_has_cache, get_pool_key_desc, get_pool_name,
+                get_pool_used_size,
             },
         },
         types::TData,
@@ -293,7 +293,7 @@ pub fn key_desc_property<E>(
 where
     E: 'static + Engine,
 {
-    f.property::<(bool, Box<Variant<Box<dyn RefArg>>>), _>(consts::POOL_KEY_DESC_PROP, ())
+    f.property::<(bool, (bool, String)), _>(consts::POOL_KEY_DESC_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_pool_key_desc)
@@ -305,7 +305,7 @@ pub fn clevis_info_property<E>(
 where
     E: 'static + Engine,
 {
-    f.property::<(bool, Box<Variant<Box<dyn RefArg>>>), _>(consts::POOL_CLEVIS_INFO_PROP, ())
+    f.property::<(bool, (bool, (String, String))), _>(consts::POOL_CLEVIS_INFO_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_pool_clevis_info)
@@ -321,4 +321,28 @@ where
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_pool_has_cache)
+}
+
+pub fn alloc_size_property<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Property<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
+    f.property::<&str, _>(consts::POOL_ALLOC_SIZE_PROP, ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::True)
+        .on_get(get_pool_allocated_size)
+}
+
+pub fn used_size_property<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Property<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
+    f.property::<(bool, &str), _>(consts::POOL_TOTAL_USED_PROP, ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::True)
+        .on_get(get_pool_used_size)
 }

@@ -194,16 +194,18 @@ impl StratBlockDev {
     }
 
     /// The number of Sectors on this device not allocated for any purpose.
-    /// self.size() - self.metadata_size() >= self.available()
+    /// self.total_allocated_size() - self.metadata_size() >= self.available()
     pub fn available(&self) -> Sectors {
         self.used.available()
     }
 
     /// The total size of the Stratis block device.
     pub fn total_size(&self) -> BlockdevSize {
-        let size = self.used.size();
-        assert_eq!(self.bda.dev_size(), size);
-        size
+        self.bda.dev_size()
+    }
+    /// The total size of the allocated portions of the Stratis block device.
+    pub fn total_allocated_size(&self) -> BlockdevSize {
+        self.used.size()
     }
 
     /// The maximum size of variable length metadata that can be accommodated.

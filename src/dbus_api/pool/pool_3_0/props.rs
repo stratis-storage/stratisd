@@ -80,3 +80,25 @@ where
         Ok(shared::pool_has_cache_prop::<E>(pool))
     })
 }
+
+pub fn get_pool_used_size<E>(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+) -> Result<(), MethodErr>
+where
+    E: 'static + Engine,
+{
+    get_pool_property(i, p, |(_, _, pool)| Ok(shared::pool_used_size::<E>(pool)))
+}
+
+pub fn get_pool_allocated_size<E>(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+) -> Result<(), MethodErr>
+where
+    E: 'static + Engine,
+{
+    get_pool_property(i, p, |(_, _, pool)| {
+        Ok(shared::pool_allocated_size::<E>(pool))
+    })
+}

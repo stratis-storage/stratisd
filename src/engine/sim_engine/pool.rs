@@ -555,6 +555,12 @@ impl Pool for SimPool {
         Sectors(IEC::Ei)
     }
 
+    fn total_allocated_size(&self) -> Sectors {
+        // We choose to make our pools very big, and we can change that
+        // if it is inconvenient.
+        Sectors(0)
+    }
+
     fn total_physical_used(&self) -> StratisResult<Sectors> {
         Ok(Sectors(0))
     }

@@ -369,6 +369,7 @@ impl ThinPool {
             ),
         )?;
 
+        let thin_pool_status = thinpool_dev.status(get_dm(), DmOptions::default()).ok();
         Ok(ThinPool {
             thin_pool: thinpool_dev,
             segments: Segments {
@@ -381,7 +382,7 @@ impl ThinPool {
             filesystems: Table::default(),
             mdv,
             backstore_device,
-            thin_pool_status: None,
+            thin_pool_status,
         })
     }
 
@@ -482,6 +483,7 @@ impl ThinPool {
         }
 
         let thin_ids: Vec<ThinDevId> = filesystem_metadatas.iter().map(|x| x.thin_id).collect();
+        let thin_pool_status = thinpool_dev.status(get_dm(), DmOptions::default()).ok();
         Ok(ThinPool {
             thin_pool: thinpool_dev,
             segments: Segments {
@@ -494,7 +496,7 @@ impl ThinPool {
             filesystems: fs_table,
             mdv,
             backstore_device,
-            thin_pool_status: None,
+            thin_pool_status,
         })
     }
 

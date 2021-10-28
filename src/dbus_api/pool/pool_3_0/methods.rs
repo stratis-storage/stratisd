@@ -362,13 +362,7 @@ pub fn init_cache<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodRe
 where
     E: 'static + Engine,
 {
-    let res = add_blockdevs(m, BlockDevOp::InitCache);
-    if res.is_ok() {
-        let dbus_context = m.tree.get_data();
-        let object_path = m.path.get_name();
-        dbus_context.push_pool_cache_change(object_path, true);
-    }
-    res
+    add_blockdevs(m, BlockDevOp::InitCache)
 }
 
 pub fn add_cachedevs<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult

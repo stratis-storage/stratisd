@@ -93,6 +93,7 @@ pub enum DbusAction<E> {
     PoolCacheChange(Path<'static>, bool),
     PoolAllocSizeChange(PoolUuid, Bytes),
     PoolUsageChange(PoolUuid, Option<Bytes>),
+    PoolSizeChange(Path<'static>, Bytes),
 }
 
 impl<E> DbusAction<E>
@@ -303,6 +304,20 @@ where
                 "D-Bus pool name change event could not be sent to the processing thread; \
                 no signal will be sent out for the name change of pool with path {} or any \
                 of its child filesystems: {}",
+                item, e,
+            )
+        }
+    }
+
+    /// Send changed signal for pool TotalPhysicalSize property.
+    pub fn push_pool_size_change(&self, item: &Path<'static>, new_size: Bytes) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::PoolSizeChange(item.clone(), new_size))
+        {
+            warn!(
+                "D-Bus pool size change event could not be sent to the processing thread; \
+                no signal will be sent out for the size change of pool with path {}: {}",
                 item, e,
             )
         }

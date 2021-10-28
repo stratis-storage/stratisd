@@ -60,17 +60,6 @@ where
     closure((pool_name, pool_uuid, pool))
 }
 
-pub fn get_pool_total_size<E>(
-    m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<String, String>
-where
-    E: 'static + Engine,
-{
-    pool_operation(m.tree, m.path.get_name(), |(_, _, pool)| {
-        Ok((*pool.total_physical_size().bytes()).to_string())
-    })
-}
-
 /// A method shared by all pool interfaces and by all blockdev-adding
 /// operations, including cache initialization, which is considered a
 /// blockdev-adding operation because when a cache is initialized, the
@@ -111,21 +100,30 @@ where
     let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
 
     let result = match op {
-        BlockDevOp::InitCache => handle_action!(
-            pool.init_cache(pool_uuid, &*pool_name, &blockdevs),
-            dbus_context,
-            pool_path.get_name()
-        ),
+        BlockDevOp::InitCache => {
+            let res = handle_action!(
+                pool.init_cache(pool_uuid, &*pool_name, &blockdevs),
+                dbus_context,
+                pool_path.get_name()
+            );
+            dbus_context.push_pool_cache_change(pool_path.get_name(), true);
+            res
+        }
         BlockDevOp::AddCache => handle_action!(
             pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Cache),
             dbus_context,
             pool_path.get_name()
         ),
-        BlockDevOp::AddData => handle_action!(
-            pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Data),
-            dbus_context,
-            pool_path.get_name()
-        ),
+        BlockDevOp::AddData => {
+            let res = handle_action!(
+                pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Data),
+                dbus_context,
+                pool_path.get_name()
+            );
+            dbus_context
+                .push_pool_size_change(pool_path.get_name(), pool.total_physical_size().bytes());
+            res
+        }
     };
     let msg = match result.map(|bds| bds.changed()) {
         Ok(Some(uuids)) => {
@@ -269,4 +267,13 @@ where
             .map(|u| (*u.bytes()).to_string()),
         String::new(),
     )
+}
+
+/// Generate a D-Bus representation of the total size of the pool in bytes.
+#[inline]
+pub fn pool_total_size<E>(pool: &E::Pool) -> String
+where
+    E: 'static + Engine,
+{
+    (*pool.total_physical_size().bytes()).to_string()
 }

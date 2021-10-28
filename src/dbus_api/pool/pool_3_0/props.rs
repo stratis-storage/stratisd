@@ -102,3 +102,13 @@ where
         Ok(shared::pool_allocated_size::<E>(pool))
     })
 }
+
+pub fn get_pool_total_size<E>(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+) -> Result<(), MethodErr>
+where
+    E: 'static + Engine,
+{
+    get_pool_property(i, p, |(_, _, pool)| Ok(shared::pool_total_size::<E>(pool)))
+}

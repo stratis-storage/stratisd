@@ -13,7 +13,6 @@ use crate::{
     engine::{Engine, Name, PoolUuid, StratisUuid},
 };
 
-mod fetch_properties_3_0;
 mod pool_3_0;
 mod shared;
 
@@ -60,12 +59,8 @@ where
                 .add_p(pool_3_0::clevis_info_property(&f))
                 .add_p(pool_3_0::has_cache_property(&f))
                 .add_p(pool_3_0::alloc_size_property(&f))
-                .add_p(pool_3_0::used_size_property(&f)),
-        )
-        .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_3_0, ())
-                .add_m(fetch_properties_3_0::get_all_properties_method(&f))
-                .add_m(fetch_properties_3_0::get_properties_method(&f)),
+                .add_p(pool_3_0::used_size_property(&f))
+                .add_p(pool_3_0::total_size_property(&f)),
         );
 
     let path = object_path.get_name().to_owned();
@@ -93,7 +88,8 @@ where
             consts::POOL_CLEVIS_INFO_PROP => shared::pool_clevis_info_prop::<E>(pool),
             consts::POOL_HAS_CACHE_PROP => shared::pool_has_cache_prop::<E>(pool),
             consts::POOL_ALLOC_SIZE_PROP => shared::pool_allocated_size::<E>(pool),
-            consts::POOL_TOTAL_USED_PROP => shared::pool_used_size::<E>(pool)
+            consts::POOL_TOTAL_USED_PROP => shared::pool_used_size::<E>(pool),
+            consts::POOL_TOTAL_SIZE_PROP => shared::pool_total_size::<E>(pool)
         }
     }
 }

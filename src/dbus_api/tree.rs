@@ -397,6 +397,25 @@ where
         }
     }
 
+    /// Send a signal indicating that the pool total size has changed.
+    fn handle_pool_size_change(&self, path: Path<'static>, new_size: Bytes) {
+        if let Err(e) = self.property_changed_invalidated_signal(
+            &path,
+            once((
+                consts::POOL_TOTAL_SIZE_PROP.to_string(),
+                Variant(Box::new((*new_size).to_string()) as Box<dyn RefArg>),
+            ))
+            .collect::<HashMap<_, _>>(),
+            vec![],
+            &consts::standard_pool_interfaces(),
+        ) {
+            warn!(
+                "Failed to send a signal over D-Bus indicating pool size change: {}",
+                e
+            );
+        }
+    }
+
     /// Look up the pool path of the pool whose allocated size just changed using
     /// the UUID, then send a signal indicating that the size has changed.
     fn handle_pool_alloc_change(
@@ -525,6 +544,10 @@ where
                 } else {
                     Ok(false)
                 }
+            }
+            DbusAction::PoolSizeChange(path, new_size) => {
+                self.handle_pool_size_change(path, new_size);
+                Ok(true)
             }
         }
     }

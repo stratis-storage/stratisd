@@ -16,7 +16,7 @@ use crate::{
             props::{
                 get_pool_allocated_size, get_pool_avail_actions, get_pool_clevis_info,
                 get_pool_encrypted, get_pool_has_cache, get_pool_key_desc, get_pool_name,
-                get_pool_used_size,
+                get_pool_total_size, get_pool_used_size,
             },
         },
         types::TData,
@@ -345,4 +345,16 @@ where
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_pool_used_size)
+}
+
+pub fn total_size_property<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Property<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
+    f.property::<&str, _>(consts::POOL_TOTAL_SIZE_PROP, ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::True)
+        .on_get(get_pool_total_size)
 }

@@ -121,11 +121,20 @@ pub fn blockdev_tier_prop(tier: BlockDevTier) -> u16 {
     tier as u16
 }
 
-// Generate a D-Bus representation of the physical path
+/// Generate a D-Bus representation of the physical path
 #[inline]
 pub fn blockdev_physical_path_prop<E>(dev: &<E::Pool as Pool>::BlockDev) -> String
 where
     E: Engine,
 {
     dev.devnode().display().to_string()
+}
+
+/// Generate D-Bus representation of devnode size.
+#[inline]
+pub fn blockdev_size_prop<E>(dev: &<E::Pool as Pool>::BlockDev) -> String
+where
+    E: Engine,
+{
+    (*dev.size().bytes()).to_string()
 }

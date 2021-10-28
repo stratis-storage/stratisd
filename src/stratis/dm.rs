@@ -49,9 +49,11 @@ where
 
         // NOTE: May need to change order of pool_evented() and fs_evented()
 
-        let _ = lock.pool_evented(Some(&evented))?;
         #[cfg(feature = "min")]
-        let _ = lock.fs_evented(Some(&evented))?;
+        {
+            let _ = lock.pool_evented(Some(&evented))?;
+            let _ = lock.fs_evented(Some(&evented))?;
+        }
         #[cfg(feature = "dbus_enabled")]
         {
             let pool_diffs = lock.pool_evented(Some(&evented))?;

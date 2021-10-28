@@ -27,8 +27,7 @@ where
     loop {
         sleep(Duration::from_secs(10)).await;
         let mut lock = engine.lock().await;
-        // Return value currently not needed
-        #[cfg(not(feature = "dbus_enabled"))]
+        #[cfg(feature = "min")]
         {
             let _ = lock.pool_evented(None)?;
             let _ = lock.fs_evented(None)?;

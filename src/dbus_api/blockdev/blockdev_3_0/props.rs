@@ -74,3 +74,14 @@ where
 {
     get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_physical_path_prop::<E>(p)))
 }
+
+/// Get the devnode size
+pub fn get_blockdev_size<E>(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+) -> Result<(), MethodErr>
+where
+    E: Engine,
+{
+    get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_size_prop::<E>(p)))
+}

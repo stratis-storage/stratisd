@@ -24,17 +24,23 @@ use devicemapper::Bytes;
 
 use crate::{
     dbus_api::{
+        api::prop_conv::locked_pools_to_prop,
         consts,
+        filesystem::prop_conv::{fs_size_to_prop, fs_used_to_prop},
+        pool::prop_conv::{
+            avail_actions_to_prop, clevis_info_to_prop, key_desc_to_prop, pool_alloc_to_prop,
+            pool_size_to_prop, pool_used_to_prop,
+        },
         types::{
             DbusAction, InterfacesAddedThreadSafe, InterfacesRemoved, LockableTree, TData,
             TreeReadLock, TreeWriteLock,
         },
-        util::{
-            locked_pools_to_prop, option_to_tuple, poll_exit_and_future,
-            thread_safe_to_dbus_sendable,
-        },
+        util::{poll_exit_and_future, thread_safe_to_dbus_sendable},
     },
-    engine::{ActionAvailability, Engine, FilesystemUuid, LockedPoolInfo, PoolUuid, StratisUuid},
+    engine::{
+        ActionAvailability, Engine, FilesystemUuid, LockedPoolInfo, PoolEncryptionInfo, PoolUuid,
+        StratisUuid,
+    },
     stratis::{StratisError, StratisResult},
 };
 
@@ -216,7 +222,7 @@ where
         let mut changed = HashMap::new();
         changed.insert(
             consts::POOL_AVAIL_ACTIONS_PROP.into(),
-            Variant(Box::new(new_avail_actions.to_string()) as Box<(dyn RefArg + 'static)>),
+            box_variant!(avail_actions_to_prop(new_avail_actions)),
         );
 
         if self
@@ -233,15 +239,11 @@ where
     }
 
     /// Handle a change of the key description for a pool in the engine.
-    #[allow(clippy::option_option)]
-    fn handle_pool_key_desc_change(&self, item: Path<'static>, kd: Option<Option<String>>) {
+    fn handle_pool_key_desc_change(&self, item: Path<'static>, ei: Option<PoolEncryptionInfo>) {
         let mut changed = HashMap::new();
         changed.insert(
             consts::POOL_KEY_DESC_PROP.into(),
-            Variant(Box::new(option_to_tuple(
-                kd.map(|opt| option_to_tuple(opt, String::new())),
-                (false, String::new()),
-            )) as Box<dyn RefArg>),
+            box_variant!(key_desc_to_prop(ei)),
         );
 
         if self
@@ -258,19 +260,11 @@ where
     }
 
     /// Handle a change of the key description for a pool in the engine.
-    #[allow(clippy::option_option)]
-    fn handle_pool_clevis_info_change(
-        &self,
-        item: Path<'static>,
-        ci: Option<Option<(String, String)>>,
-    ) {
+    fn handle_pool_clevis_info_change(&self, item: Path<'static>, ei: Option<PoolEncryptionInfo>) {
         let mut changed = HashMap::new();
         changed.insert(
             consts::POOL_CLEVIS_INFO_PROP.into(),
-            Variant(Box::new(option_to_tuple(
-                ci.map(|opt| option_to_tuple(opt, (String::new(), String::new()))),
-                (false, (String::new(), String::new())),
-            )) as Box<dyn RefArg>),
+            box_variant!(clevis_info_to_prop(ei)),
         );
 
         if self
@@ -282,17 +276,14 @@ where
             )
             .is_err()
         {
-            warn!("Signal on pool key description change was not sent to the D-Bus client");
+            warn!("Signal on pool Clevis information change was not sent to the D-Bus client");
         }
     }
 
     /// Handle a change of available actions for a pool in the engine.
     fn handle_pool_cache_change(&self, item: Path<'static>, b: bool) {
         let mut changed = HashMap::new();
-        changed.insert(
-            consts::POOL_HAS_CACHE_PROP.into(),
-            Variant(Box::new(b) as Box<(dyn RefArg + 'static)>),
-        );
+        changed.insert(consts::POOL_HAS_CACHE_PROP.into(), box_variant!(b));
 
         if self
             .property_changed_invalidated_signal(
@@ -312,7 +303,7 @@ where
         let mut changed = HashMap::new();
         changed.insert(
             consts::LOCKED_POOLS_PROP.into(),
-            Variant(Box::new(locked_pools_to_prop(locked_pools)) as Box<dyn RefArg>),
+            box_variant!(locked_pools_to_prop(locked_pools)),
         );
 
         if self
@@ -360,16 +351,11 @@ where
                 vec![
                     (
                         consts::FILESYSTEM_SIZE_PROP.to_string(),
-                        new_size.map(|s| Variant(Box::new((*s).to_string()) as Box<dyn RefArg>)),
+                        new_size.map(|s| box_variant!(fs_size_to_prop(s))),
                     ),
                     (
                         consts::FILESYSTEM_USED_PROP.to_string(),
-                        new_used.map(|u| {
-                            Variant(Box::new(option_to_tuple(
-                                u.map(|b| (*b).to_string()),
-                                String::new(),
-                            )) as Box<dyn RefArg>)
-                        }),
+                        new_used.map(|u| box_variant!(fs_used_to_prop(u))),
                     ),
                 ]
                 .into_iter()
@@ -420,16 +406,11 @@ where
                 vec![
                     (
                         consts::POOL_TOTAL_USED_PROP.to_string(),
-                        new_used.map(|u| {
-                            Variant(Box::new(option_to_tuple(
-                                u.map(|b| (*b).to_string()),
-                                String::new(),
-                            )) as Box<dyn RefArg>)
-                        }),
+                        new_used.map(|u| box_variant!(pool_used_to_prop(u))),
                     ),
                     (
                         consts::POOL_ALLOC_SIZE_PROP.to_string(),
-                        new_alloc.map(|a| Variant(Box::new((*a).to_string()) as Box<dyn RefArg>)),
+                        new_alloc.map(|a| box_variant!(pool_alloc_to_prop(a))),
                     ),
                 ]
                 .into_iter()
@@ -454,7 +435,7 @@ where
             &path,
             once((
                 consts::POOL_TOTAL_SIZE_PROP.to_string(),
-                Variant(Box::new((*new_size).to_string()) as Box<dyn RefArg>),
+                box_variant!(pool_size_to_prop(new_size)),
             ))
             .collect::<HashMap<_, _>>(),
             vec![],
@@ -509,12 +490,12 @@ where
                 self.handle_pool_avail_actions_change(item, new_avail_actions);
                 Ok(true)
             }
-            DbusAction::PoolKeyDescChange(item, kd) => {
-                self.handle_pool_key_desc_change(item, kd);
+            DbusAction::PoolKeyDescChange(item, ei) => {
+                self.handle_pool_key_desc_change(item, ei);
                 Ok(true)
             }
-            DbusAction::PoolClevisInfoChange(item, ci) => {
-                self.handle_pool_clevis_info_change(item, ci);
+            DbusAction::PoolClevisInfoChange(item, ei) => {
+                self.handle_pool_clevis_info_change(item, ei);
                 Ok(true)
             }
             DbusAction::FsBackgroundChange(uuid, new_size, new_used) => {

@@ -2,9 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::collections::HashMap;
-
-use dbus::arg::{RefArg, Variant};
 use dbus_tree::{Factory, MTSync, Tree};
 
 use crate::{
@@ -16,10 +13,9 @@ use crate::{
 };
 
 mod manager_3_0;
+pub mod prop_conv;
 mod report_3_0;
 mod shared;
-
-type LockedPools = HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>;
 
 pub fn get_base_tree<'a, E>(
     dbus_context: DbusContext<E>,

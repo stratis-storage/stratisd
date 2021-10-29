@@ -7,7 +7,7 @@ use dbus::Path;
 use dbus_tree::{MTSync, Tree};
 
 use crate::{
-    dbus_api::{types::TData, util::option_to_tuple},
+    dbus_api::{filesystem::prop_conv, types::TData},
     engine::{Engine, Filesystem, Name, Pool},
 };
 
@@ -89,16 +89,14 @@ where
 }
 
 /// Generate D-Bus representation of filesystem size property.
-#[inline]
 pub fn fs_size_prop(fs: &dyn Filesystem) -> String {
-    (*fs.size()).to_string()
+    prop_conv::fs_size_to_prop(fs.size())
 }
 
 /// Generate D-Bus representation of used property.
-#[inline]
 pub fn fs_used_prop<E>(fs: &<E::Pool as Pool>::Filesystem) -> (bool, String)
 where
     E: Engine,
 {
-    option_to_tuple(fs.used().map(|u| (*u).to_string()).ok(), String::new())
+    prop_conv::fs_used_to_prop(fs.used().ok())
 }

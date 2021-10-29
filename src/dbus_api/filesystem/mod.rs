@@ -14,6 +14,7 @@ use crate::{
 };
 
 mod filesystem_3_0;
+pub mod prop_conv;
 mod shared;
 
 pub fn create_dbus_filesystem<'a, E>(

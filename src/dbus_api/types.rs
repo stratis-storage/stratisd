@@ -29,7 +29,8 @@ use crate::{
     dbus_api::{connection::DbusConnectionHandler, tree::DbusTreeHandler, udev::DbusUdevHandler},
     engine::{
         ActionAvailability, Engine, ExclusiveGuard, FilesystemUuid, Lockable, LockableEngine,
-        LockedPoolInfo, PoolUuid, SharedGuard, StratFilesystemDiff, StratisUuid, ThinPoolDiff,
+        LockedPoolInfo, PoolEncryptionInfo, PoolUuid, SharedGuard, StratFilesystemDiff,
+        StratisUuid, ThinPoolDiff,
     },
 };
 
@@ -85,10 +86,8 @@ pub enum DbusAction<E> {
     FsNameChange(Path<'static>, String),
     PoolNameChange(Path<'static>, String),
     PoolAvailActions(Path<'static>, ActionAvailability),
-    #[allow(clippy::option_option)]
-    PoolKeyDescChange(Path<'static>, Option<Option<String>>),
-    #[allow(clippy::option_option)]
-    PoolClevisInfoChange(Path<'static>, Option<Option<(String, String)>>),
+    PoolKeyDescChange(Path<'static>, Option<PoolEncryptionInfo>),
+    PoolClevisInfoChange(Path<'static>, Option<PoolEncryptionInfo>),
     #[allow(clippy::option_option)]
     FsBackgroundChange(FilesystemUuid, Option<Bytes>, Option<Option<Bytes>>),
     #[allow(clippy::option_option)]
@@ -246,11 +245,10 @@ where
     }
 
     /// Send changed signal for KeyDesc property.
-    #[allow(clippy::option_option)]
-    pub fn push_pool_key_desc_change(&self, item: &Path<'static>, kd: Option<Option<String>>) {
+    pub fn push_pool_key_desc_change(&self, item: &Path<'static>, ei: Option<PoolEncryptionInfo>) {
         if let Err(e) = self
             .sender
-            .send(DbusAction::PoolKeyDescChange(item.clone(), kd))
+            .send(DbusAction::PoolKeyDescChange(item.clone(), ei))
         {
             warn!(
                 "D-Bus pool key description change event could not be sent to the processing thread; no signal will be sent out for pool with path {}: {}",
@@ -264,11 +262,11 @@ where
     pub fn push_pool_clevis_info_change(
         &self,
         item: &Path<'static>,
-        ci: Option<Option<(String, String)>>,
+        ei: Option<PoolEncryptionInfo>,
     ) {
         if let Err(e) = self
             .sender
-            .send(DbusAction::PoolClevisInfoChange(item.clone(), ci))
+            .send(DbusAction::PoolClevisInfoChange(item.clone(), ei))
         {
             warn!(
                 "D-Bus pool Clevis info change event could not be sent to the processing thread; no signal will be sent out for pool with path {}: {}",

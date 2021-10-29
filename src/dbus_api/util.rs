@@ -33,10 +33,7 @@ use crate::{
         },
         udev::DbusUdevHandler,
     },
-    engine::{
-        Engine, Lockable, LockableEngine, LockedPoolInfo, Pool, PoolEncryptionInfo, PoolUuid,
-        UdevEngineEvent,
-    },
+    engine::{Engine, Lockable, LockableEngine, UdevEngineEvent},
     stratis::{StratisError, StratisResult},
 };
 
@@ -231,101 +228,4 @@ where
         )),
         Either::Right((a, _)) => Ok(Some(a)),
     }
-}
-
-/// Convert an encryption information data structure to a
-/// Option<Option<_>> type.
-#[allow(clippy::option_option)]
-pub fn enc_to_opt<E, F, T>(pool: &E::Pool, f: F) -> Option<Option<T>>
-where
-    E: Engine,
-    F: Fn(PoolEncryptionInfo) -> StratisResult<Option<T>>,
-{
-    pool.encryption_info()
-        .map(f)
-        .transpose()
-        .map(|opt| opt.and_then(|subopt| subopt))
-        .ok()
-}
-
-/// Fetch the key description and handle converting it into a
-/// Option<<Option<_>> type.
-#[allow(clippy::option_option)]
-pub fn key_desc_opt<E>(pool: &E::Pool) -> Option<Option<String>>
-where
-    E: Engine,
-{
-    enc_to_opt::<E, _, _>(pool, |ei| {
-        ei.key_description()
-            .map(|kd_opt| kd_opt.map(|kd| kd.as_application_str().to_string()))
-    })
-}
-
-/// Fetch the Clevis information and handle converting it into a
-/// Option<Option<_>> type.
-#[allow(clippy::option_option)]
-pub fn clevis_info_opt<E>(pool: &E::Pool) -> Option<Option<(String, String)>>
-where
-    E: Engine,
-{
-    enc_to_opt::<E, _, _>(pool, |ei| {
-        ei.clevis_info()
-            .map(|ci_opt| ci_opt.map(|(pin, cfg)| (pin.to_owned(), cfg.to_string())))
-    })
-}
-
-/// Convert a locked pool data structure to a property format.
-pub fn locked_pools_to_prop(
-    pools: HashMap<PoolUuid, LockedPoolInfo>,
-) -> HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>> {
-    pools
-        .into_iter()
-        .map(|(u, locked)| {
-            (
-                uuid_to_string!(u),
-                vec![
-                    (
-                        "key_description".to_string(),
-                        Variant(Box::new(result_option_to_tuple(
-                            locked
-                                .info
-                                .key_description()
-                                .map(|opt| opt.map(|kd| kd.as_application_str().to_string())),
-                            String::new(),
-                        )) as Box<dyn RefArg>),
-                    ),
-                    (
-                        "clevis_info".to_string(),
-                        Variant(Box::new(result_option_to_tuple(
-                            locked
-                                .info
-                                .clevis_info()
-                                .map(|opt| opt.map(|(pin, cfg)| (pin.to_owned(), cfg.to_string()))),
-                            (String::new(), String::new()),
-                        )) as Box<dyn RefArg>),
-                    ),
-                    (
-                        "devs".to_string(),
-                        Variant(Box::new(
-                            locked
-                                .devices
-                                .into_iter()
-                                .map(|d| {
-                                    let mut map = HashMap::new();
-                                    map.insert(
-                                        "devnode".to_string(),
-                                        d.devnode.display().to_string(),
-                                    );
-                                    map.insert("uuid".to_string(), uuid_to_string!(d.uuid));
-                                    map
-                                })
-                                .collect::<Vec<_>>(),
-                        )),
-                    ),
-                ]
-                .into_iter()
-                .collect::<HashMap<_, _>>(),
-            )
-        })
-        .collect()
 }

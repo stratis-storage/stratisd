@@ -153,3 +153,9 @@ macro_rules! handle_action {
         action
     }};
 }
+
+macro_rules! box_variant {
+    ($val:expr) => {
+        dbus::arg::Variant(Box::new($val) as Box<dyn dbus::arg::RefArg>)
+    };
+}

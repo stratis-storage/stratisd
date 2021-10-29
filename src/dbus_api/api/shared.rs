@@ -11,12 +11,12 @@ use dbus_tree::{
 
 use crate::{
     dbus_api::{
-        api::LockedPools,
+        api::prop_conv::{self, LockedPools},
         blockdev::get_blockdev_properties,
         filesystem::get_fs_properties,
         pool::get_pool_properties,
         types::{GetManagedObjects, InterfacesAddedThreadSafe, TData},
-        util::{locked_pools_to_prop, thread_safe_to_dbus_sendable},
+        util::thread_safe_to_dbus_sendable,
     },
     engine::{DevUuid, Engine, FilesystemUuid, Pool, PoolUuid, StratisUuid},
 };
@@ -185,5 +185,5 @@ pub fn locked_pools_prop<E>(e: &E) -> LockedPools
 where
     E: Engine,
 {
-    locked_pools_to_prop(e.locked_pools())
+    prop_conv::locked_pools_to_prop(e.locked_pools())
 }

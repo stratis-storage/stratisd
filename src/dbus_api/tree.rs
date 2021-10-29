@@ -29,9 +29,12 @@ use crate::{
             DbusAction, InterfacesAddedThreadSafe, InterfacesRemoved, LockableTree, TData,
             TreeReadLock, TreeWriteLock,
         },
-        util::{option_to_tuple, poll_exit_and_future, thread_safe_to_dbus_sendable},
+        util::{
+            locked_pools_to_prop, option_to_tuple, poll_exit_and_future,
+            thread_safe_to_dbus_sendable,
+        },
     },
-    engine::{ActionAvailability, Engine, FilesystemUuid, PoolUuid, StratisUuid},
+    engine::{ActionAvailability, Engine, FilesystemUuid, LockedPoolInfo, PoolUuid, StratisUuid},
     stratis::{StratisError, StratisResult},
 };
 
@@ -304,6 +307,27 @@ where
         }
     }
 
+    /// Handle a change of locked pools registered in the engine.
+    fn handle_locked_pools_change(&self, locked_pools: HashMap<PoolUuid, LockedPoolInfo>) {
+        let mut changed = HashMap::new();
+        changed.insert(
+            consts::LOCKED_POOLS_PROP.into(),
+            Variant(Box::new(locked_pools_to_prop(locked_pools)) as Box<dyn RefArg>),
+        );
+
+        if self
+            .property_changed_invalidated_signal(
+                &Path::new(consts::STRATIS_BASE_PATH).expect("Valid path"),
+                changed,
+                vec![],
+                &consts::standard_pool_interfaces(),
+            )
+            .is_err()
+        {
+            warn!("Signal on pool available actions mode change was not sent to the D-Bus client");
+        }
+    }
+
     /// Look up the filesystem path of the filesystem and notify clients of any
     /// changes to properties that change in the background.
     #[allow(clippy::option_option)]
@@ -519,6 +543,10 @@ where
             }
             DbusAction::PoolSizeChange(path, new_size) => {
                 self.handle_pool_size_change(path, new_size);
+                Ok(true)
+            }
+            DbusAction::LockedPoolsChange(pools) => {
+                self.handle_locked_pools_change(pools);
                 Ok(true)
             }
         }

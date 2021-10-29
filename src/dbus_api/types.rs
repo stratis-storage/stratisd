@@ -29,7 +29,7 @@ use crate::{
     dbus_api::{connection::DbusConnectionHandler, tree::DbusTreeHandler, udev::DbusUdevHandler},
     engine::{
         ActionAvailability, Engine, ExclusiveGuard, FilesystemUuid, Lockable, LockableEngine,
-        PoolUuid, SharedGuard, StratFilesystemDiff, StratisUuid, ThinPoolDiff,
+        LockedPoolInfo, PoolUuid, SharedGuard, StratFilesystemDiff, StratisUuid, ThinPoolDiff,
     },
 };
 
@@ -95,6 +95,7 @@ pub enum DbusAction<E> {
     PoolBackgroundChange(PoolUuid, Option<Option<Bytes>>, Option<Bytes>),
     PoolCacheChange(Path<'static>, bool),
     PoolSizeChange(Path<'static>, Bytes),
+    LockedPoolsChange(HashMap<PoolUuid, LockedPoolInfo>),
 }
 
 impl<E> DbusAction<E>
@@ -106,19 +107,16 @@ where
     /// Precondition: Filtering of diffs that show no change has already been
     /// done in the engine.
     pub fn from_pool_diffs(diffs: HashMap<PoolUuid, ThinPoolDiff>) -> Vec<Self> {
-        let mut actions = Vec::new();
-        for (uuid, diff) in diffs {
-            let ThinPoolDiff {
-                allocated_size,
-                usage,
-            } = diff;
-            actions.push(DbusAction::PoolBackgroundChange(
-                uuid,
-                usage,
-                allocated_size,
-            ));
-        }
-        actions
+        diffs
+            .into_iter()
+            .map(|(uuid, diff)| {
+                let ThinPoolDiff {
+                    allocated_size,
+                    usage,
+                } = diff;
+                DbusAction::PoolBackgroundChange(uuid, usage, allocated_size)
+            })
+            .collect()
     }
 
     /// Convert changed properties from filesystems to a series of D-Bus actions.
@@ -126,12 +124,13 @@ where
     /// Precondition: Filtering of diffs that show no change has already been
     /// done in the engine.
     pub fn from_fs_diffs(diffs: HashMap<FilesystemUuid, StratFilesystemDiff>) -> Vec<Self> {
-        let mut actions = Vec::new();
-        for (uuid, diff) in diffs {
-            let StratFilesystemDiff { size, used } = diff;
-            actions.push(DbusAction::FsBackgroundChange(uuid, size, used));
-        }
-        actions
+        diffs
+            .into_iter()
+            .map(|(uuid, diff)| {
+                let StratFilesystemDiff { size, used } = diff;
+                DbusAction::FsBackgroundChange(uuid, size, used)
+            })
+            .collect()
     }
 }
 
@@ -330,6 +329,19 @@ where
             warn!(
                 "D-Bus pool available actions status change event could not be sent to the processing thread; no signal will be sent out for the pool available actions status change of pool with path {}: {}",
                 item, e,
+            )
+        }
+    }
+
+    /// Send changed signal for changed locked pool state.
+    pub fn push_locked_pools(&self, locked_pools: HashMap<PoolUuid, LockedPoolInfo>) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::LockedPoolsChange(locked_pools))
+        {
+            warn!(
+                "Locked pool change event could not be sent to the processing thread; no signal will be sent out for the locked pool state change: {}",
+                e,
             )
         }
     }

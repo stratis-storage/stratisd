@@ -11,8 +11,9 @@ use crate::{
                 create_pool, destroy_pool, engine_state_report, list_keys, set_key, unlock_pool,
                 unset_key,
             },
-            props::get_version,
+            props::{get_locked_pools, get_version},
         },
+        consts,
         types::TData,
     },
     engine::Engine,
@@ -61,8 +62,9 @@ where
     f.property::<&str, _>("Version", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
-        .on_get(get_version)
+        .on_get(get_version::<E>)
 }
+
 pub fn unset_key_method<E>(
     f: &Factory<MTSync<TData<E>>, TData<E>>,
 ) -> Method<MTSync<TData<E>>, TData<E>>
@@ -167,4 +169,16 @@ where
         .out_arg(("result", "(b(oao))"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"))
+}
+
+pub fn locked_pools_property<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Property<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
+    f.property::<&str, _>(consts::LOCKED_POOLS_PROP, ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::True)
+        .on_get(get_locked_pools::<E>)
 }

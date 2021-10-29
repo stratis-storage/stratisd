@@ -10,9 +10,7 @@ pub const STRATIS_BASE_SERVICE: &str = "org.storage.stratis3";
 pub const MANAGER_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.Manager.r0";
 pub const REPORT_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.Report.r0";
 
-pub const PROPERTY_FETCH_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.FetchProperties.r0";
-
-pub const LOCKED_POOL_DEVS: &str = "LockedPoolsWithDevs";
+pub const LOCKED_POOLS_PROP: &str = "LockedPoolsProp";
 
 pub const POOL_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.pool.r0";
 pub const POOL_NAME_PROP: &str = "Name";
@@ -47,14 +45,6 @@ pub const BLOCKDEV_PHYSICAL_PATH_PROP: &str = "PhysicalPath";
 
 pub const BLOCKDEV_TOTAL_SIZE_PROP: &str = "TotalPhysicalSize";
 
-/// Get a list of all the FetchProperties interfaces
-pub fn fetch_properties_interfaces() -> Vec<String> {
-    [PROPERTY_FETCH_INTERFACE_NAME_3_0]
-        .iter()
-        .map(|s| (*s).to_string())
-        .collect()
-}
-
 /// Get a list of all the standard pool interfaces; i.e., all the revisions of
 /// org.storage.stratis2.pool.
 pub fn standard_pool_interfaces() -> Vec<String> {
@@ -84,21 +74,15 @@ pub fn standard_blockdev_interfaces() -> Vec<String> {
 
 /// Get a list of all interfaces supported by a pool object.
 pub fn pool_interface_list() -> InterfacesRemoved {
-    let mut interfaces = standard_pool_interfaces();
-    interfaces.extend(fetch_properties_interfaces());
-    interfaces
+    standard_pool_interfaces()
 }
 
 /// Get a list of all interfaces supported by a filesystem object.
 pub fn filesystem_interface_list() -> InterfacesRemoved {
-    let mut interfaces = standard_filesystem_interfaces();
-    interfaces.extend(fetch_properties_interfaces());
-    interfaces
+    standard_filesystem_interfaces()
 }
 
 /// Get a list of all interfaces supported by a blockdev object.
 pub fn blockdev_interface_list() -> InterfacesRemoved {
-    let mut interfaces = standard_blockdev_interfaces();
-    interfaces.extend(fetch_properties_interfaces());
-    interfaces
+    standard_blockdev_interfaces()
 }

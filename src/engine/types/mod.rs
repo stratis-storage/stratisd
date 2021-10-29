@@ -233,11 +233,13 @@ impl<'a> TryFrom<&'a str> for ReportType {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct LockedPoolDevice {
     pub devnode: PathBuf,
     pub uuid: DevUuid,
 }
 
+#[derive(Debug, PartialEq)]
 pub struct LockedPoolInfo {
     pub info: PoolEncryptionInfo,
     pub devices: Vec<LockedPoolDevice>,

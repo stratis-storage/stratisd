@@ -13,9 +13,9 @@ pub use self::{
     types::{
         ActionAvailability, BlockDevTier, ClevisInfo, CreateAction, DeleteAction, DevUuid,
         EncryptionInfo, EngineAction, FilesystemUuid, KeyDescription, Lockable, LockableEngine,
-        MappingCreateAction, MappingDeleteAction, Name, PoolEncryptionInfo, PoolUuid, Redundancy,
-        RenameAction, ReportType, SetCreateAction, SetDeleteAction, StratFilesystemDiff,
-        StratisUuid, ThinPoolDiff, UdevEngineEvent, UnlockMethod,
+        LockedPoolInfo, MappingCreateAction, MappingDeleteAction, Name, PoolEncryptionInfo,
+        PoolUuid, Redundancy, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
+        StratFilesystemDiff, StratisUuid, ThinPoolDiff, UdevEngineEvent, UnlockMethod,
     },
 };
 

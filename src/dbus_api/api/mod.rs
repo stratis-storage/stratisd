@@ -2,6 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+use std::collections::HashMap;
+
+use dbus::arg::{RefArg, Variant};
 use dbus_tree::{Factory, MTSync, Tree};
 
 use crate::{
@@ -12,10 +15,11 @@ use crate::{
     engine::Engine,
 };
 
-mod fetch_properties_3_0;
 mod manager_3_0;
 mod report_3_0;
 mod shared;
+
+type LockedPools = HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>;
 
 pub fn get_base_tree<'a, E>(
     dbus_context: DbusContext<E>,
@@ -52,12 +56,8 @@ where
                 .add_m(manager_3_0::unlock_pool_method(&f))
                 .add_m(manager_3_0::destroy_pool_method(&f))
                 .add_m(manager_3_0::engine_state_report_method(&f))
-                .add_p(manager_3_0::version_property(&f)),
-        )
-        .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_3_0, ())
-                .add_m(fetch_properties_3_0::get_all_properties_method(&f))
-                .add_m(fetch_properties_3_0::get_properties_method(&f)),
+                .add_p(manager_3_0::version_property(&f))
+                .add_p(manager_3_0::locked_pools_property(&f)),
         )
         .add(
             f.interface(consts::REPORT_INTERFACE_NAME_3_0, ())

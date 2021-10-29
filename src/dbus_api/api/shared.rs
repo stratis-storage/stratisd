@@ -4,15 +4,19 @@
 
 use std::collections::HashMap;
 
-use dbus_tree::{Factory, MTSync, Method, MethodInfo, MethodResult, ObjectPath};
+use dbus::arg::IterAppend;
+use dbus_tree::{
+    Factory, MTSync, Method, MethodErr, MethodInfo, MethodResult, ObjectPath, PropInfo, Tree,
+};
 
 use crate::{
     dbus_api::{
+        api::LockedPools,
         blockdev::get_blockdev_properties,
         filesystem::get_fs_properties,
         pool::get_pool_properties,
         types::{GetManagedObjects, InterfacesAddedThreadSafe, TData},
-        util::thread_safe_to_dbus_sendable,
+        util::{locked_pools_to_prop, thread_safe_to_dbus_sendable},
     },
     engine::{DevUuid, Engine, FilesystemUuid, Pool, PoolUuid, StratisUuid},
 };
@@ -140,4 +144,46 @@ where
     }
 
     f.method("GetManagedObjects", (), get_managed_objects)
+}
+
+/// Get a Manager property and place it on the D-Bus. The property is
+/// found by means of the getter method which takes a reference to a
+/// blockdev and obtains the property from the blockdev.
+pub fn get_manager_property<F, R, E>(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+    getter: F,
+) -> Result<(), MethodErr>
+where
+    F: Fn(&E) -> Result<R, String>,
+    R: dbus::arg::Append,
+    E: Engine,
+{
+    i.append(manager_operation(p.tree, getter).map_err(|ref e| MethodErr::failed(e))?);
+    Ok(())
+}
+
+/// Perform an operation on an Engine object for a given D-Bus implicit argument
+/// that is a Manager
+pub fn manager_operation<F, R, E>(
+    tree: &Tree<MTSync<TData<E>>, TData<E>>,
+    closure: F,
+) -> Result<R, String>
+where
+    F: Fn(&E) -> Result<R, String>,
+    R: dbus::arg::Append,
+    E: Engine,
+{
+    let dbus_context = tree.get_data();
+    let mutex_lock = dbus_context.engine.blocking_lock();
+    closure(&mutex_lock)
+}
+
+/// Generate D-Bus representation of locked pools
+#[inline]
+pub fn locked_pools_prop<E>(e: &E) -> LockedPools
+where
+    E: Engine,
+{
+    locked_pools_to_prop(e.locked_pools())
 }

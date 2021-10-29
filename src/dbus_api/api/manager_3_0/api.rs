@@ -8,7 +8,8 @@ use crate::{
     dbus_api::{
         api::manager_3_0::{
             methods::{
-                create_pool, destroy_pool, engine_state_report, set_key, unlock_pool, unset_key,
+                create_pool, destroy_pool, engine_state_report, list_keys, set_key, unlock_pool,
+                unset_key,
             },
             props::get_version,
         },
@@ -31,6 +32,22 @@ where
         //
         // Rust representation: (bool, String)
         .out_arg(("result", "(bs)"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"))
+}
+
+pub fn list_keys_method<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Method<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
+    f.method("ListKeys", (), list_keys)
+        // In order from left to right:
+        // as: Array of key descriptions as strings.
+        //
+        // Rust representation: Vec<String>
+        .out_arg(("result", "as"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"))
 }

@@ -13,7 +13,6 @@ use itertools::Itertools;
 
 use crate::{
     dbus_api::{
-        api::shared::list_keys,
         consts,
         types::TData,
         util::{result_option_to_tuple, result_to_tuple},
@@ -21,7 +20,7 @@ use crate::{
     engine::Engine,
 };
 
-const ALL_PROPERTIES: [&str; 2] = [consts::KEY_LIST_PROP, consts::LOCKED_POOL_DEVS];
+const ALL_PROPERTIES: [&str; 1] = [consts::LOCKED_POOL_DEVS];
 
 type LockedPoolsWithDevs = HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>;
 
@@ -101,7 +100,6 @@ where
     let return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = properties
         .unique()
         .filter_map(|prop| match prop.as_str() {
-            consts::KEY_LIST_PROP => Some((prop, result_to_tuple(list_keys(m)))),
             consts::LOCKED_POOL_DEVS => Some((prop, result_to_tuple(locked_pools_with_devs(m)))),
             _ => None,
         })

@@ -12,8 +12,6 @@ pub const REPORT_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.Report.r0";
 
 pub const PROPERTY_FETCH_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.FetchProperties.r0";
 
-pub const KEY_LIST_PROP: &str = "KeyList";
-
 pub const LOCKED_POOL_DEVS: &str = "LockedPoolsWithDevs";
 
 pub const POOL_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.pool.r0";

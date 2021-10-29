@@ -48,6 +48,7 @@ where
                 .add_m(manager_3_0::create_pool_method(&f))
                 .add_m(manager_3_0::set_key_method(&f))
                 .add_m(manager_3_0::unset_key_method(&f))
+                .add_m(manager_3_0::list_keys_method(&f))
                 .add_m(manager_3_0::unlock_pool_method(&f))
                 .add_m(manager_3_0::destroy_pool_method(&f))
                 .add_m(manager_3_0::engine_state_report_method(&f))

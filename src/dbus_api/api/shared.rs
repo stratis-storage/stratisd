@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, vec::Vec};
+use std::collections::HashMap;
 
 use dbus_tree::{Factory, MTSync, Method, MethodInfo, MethodResult, ObjectPath};
 
@@ -14,28 +14,8 @@ use crate::{
         types::{GetManagedObjects, InterfacesAddedThreadSafe, TData},
         util::thread_safe_to_dbus_sendable,
     },
-    engine::{DevUuid, Engine, FilesystemUuid, KeyActions, Pool, PoolUuid, StratisUuid},
+    engine::{DevUuid, Engine, FilesystemUuid, Pool, PoolUuid, StratisUuid},
 };
-
-pub fn list_keys<E>(
-    info: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<Vec<String>, String>
-where
-    E: 'static + Engine,
-{
-    let dbus_context = info.tree.get_data();
-
-    let mutex_lock = dbus_context.engine.blocking_lock();
-    mutex_lock
-        .get_key_handler()
-        .list()
-        .map(|v| {
-            v.into_iter()
-                .map(|kd| kd.as_application_str().to_string())
-                .collect()
-        })
-        .map_err(|e| e.to_string())
-}
 
 pub fn get_managed_objects_method<E>(
     f: &Factory<MTSync<TData<E>>, TData<E>>,

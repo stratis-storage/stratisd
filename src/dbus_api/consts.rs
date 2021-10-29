@@ -10,7 +10,7 @@ pub const STRATIS_BASE_SERVICE: &str = "org.storage.stratis3";
 pub const MANAGER_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.Manager.r0";
 pub const REPORT_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.Report.r0";
 
-pub const LOCKED_POOLS_PROP: &str = "LockedPoolsProp";
+pub const LOCKED_POOLS_PROP: &str = "LockedPools";
 
 pub const POOL_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.pool.r0";
 pub const POOL_NAME_PROP: &str = "Name";

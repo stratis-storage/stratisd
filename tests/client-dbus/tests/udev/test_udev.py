@@ -21,13 +21,7 @@ from os import environ
 from unittest import skipIf
 
 # isort: LOCAL
-from stratisd_client_dbus import (
-    FetchProperties,
-    Manager,
-    Pool,
-    StratisdErrors,
-    get_object,
-)
+from stratisd_client_dbus import Manager, Pool, StratisdErrors, get_object
 from stratisd_client_dbus._constants import TOP_OBJECT
 from stratisd_client_dbus._stratisd_constants import EncryptionMethod
 
@@ -46,8 +40,6 @@ from ._utils import (
     wait_for_udev,
     wait_for_udev_count,
 )
-
-LOCKED_POOL_UUIDS_PROP_NAME = "LockedPoolsWithDevs"
 
 
 class UdevTest1(UdevTest):
@@ -519,11 +511,7 @@ class UdevTest5(UdevTest):
             wait_for_udev(CRYPTO_LUKS_FS_TYPE, self._lb_mgr.device_files(luks_tokens))
             wait_for_udev(STRATIS_FS_TYPE, self._lb_mgr.device_files(non_luks_tokens))
 
-            (valid, variant_pool_uuids) = FetchProperties.Methods.GetProperties(
-                get_object(TOP_OBJECT), {"properties": [LOCKED_POOL_UUIDS_PROP_NAME]}
-            )[LOCKED_POOL_UUIDS_PROP_NAME]
-
-            self.assertTrue(valid)
+            variant_pool_uuids = Manager.Properties.LockedPools.Get(get_object(TOP_OBJECT))
 
             for pool_uuid in variant_pool_uuids:
                 ((option, _), exit_code, _) = Manager.Methods.UnlockPool(

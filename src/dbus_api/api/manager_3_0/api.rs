@@ -6,12 +6,15 @@ use dbus_tree::{Access, EmitsChangedSignal, Factory, MTSync, Method, Property};
 
 use crate::{
     dbus_api::{
-        api::manager_3_0::{
-            methods::{
-                create_pool, destroy_pool, engine_state_report, list_keys, set_key, unlock_pool,
-                unset_key,
+        api::{
+            manager_3_0::{
+                methods::{
+                    create_pool, destroy_pool, engine_state_report, list_keys, set_key,
+                    unlock_pool, unset_key,
+                },
+                props::{get_locked_pools, get_version},
             },
-            props::{get_locked_pools, get_version},
+            prop_conv::LockedPools,
         },
         consts,
         types::TData,
@@ -177,7 +180,7 @@ pub fn locked_pools_property<E>(
 where
     E: 'static + Engine,
 {
-    f.property::<&str, _>(consts::LOCKED_POOLS_PROP, ())
+    f.property::<LockedPools, _>(consts::LOCKED_POOLS_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_locked_pools::<E>)

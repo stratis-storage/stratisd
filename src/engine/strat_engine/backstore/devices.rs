@@ -102,15 +102,16 @@ fn verify_device_with_blkid(path: &DevicePath) -> StratisResult<(Option<i32>, Op
 
     let num_parts = probe
         .get_partitions()
-        .and_then(|mut parts| parts.number_of_partitions());
-    let superblock_type = probe.lookup_value("TYPE");
+        .and_then(|mut parts| parts.number_of_partitions())
+        .ok();
+    let superblock_type = probe.lookup_value("TYPE").ok();
 
     debug!(
         "Verifying device using blkid probe: superblock probe: {:?}, number of partitions: {:?}",
         superblock_type, num_parts
     );
 
-    Ok((num_parts.ok(), superblock_type.ok()))
+    Ok((num_parts, superblock_type))
 }
 
 // Find information from the devnode that is useful to identify a device or

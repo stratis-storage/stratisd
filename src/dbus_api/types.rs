@@ -89,10 +89,11 @@ pub enum DbusAction<E> {
     PoolKeyDescChange(Path<'static>, Option<Option<String>>),
     #[allow(clippy::option_option)]
     PoolClevisInfoChange(Path<'static>, Option<Option<(String, String)>>),
-    FsSizeChange(FilesystemUuid, Bytes),
+    #[allow(clippy::option_option)]
+    FsBackgroundChange(FilesystemUuid, Option<Bytes>, Option<Option<Bytes>>),
+    #[allow(clippy::option_option)]
+    PoolBackgroundChange(PoolUuid, Option<Option<Bytes>>, Option<Bytes>),
     PoolCacheChange(Path<'static>, bool),
-    PoolAllocSizeChange(PoolUuid, Bytes),
-    PoolUsageChange(PoolUuid, Option<Bytes>),
     PoolSizeChange(Path<'static>, Bytes),
 }
 
@@ -111,12 +112,11 @@ where
                 allocated_size,
                 usage,
             } = diff;
-            if let Some(a) = allocated_size {
-                actions.push(DbusAction::PoolAllocSizeChange(uuid, a));
-            }
-            if let Some(u) = usage {
-                actions.push(DbusAction::PoolUsageChange(uuid, u));
-            }
+            actions.push(DbusAction::PoolBackgroundChange(
+                uuid,
+                usage,
+                allocated_size,
+            ));
         }
         actions
     }
@@ -128,10 +128,8 @@ where
     pub fn from_fs_diffs(diffs: HashMap<FilesystemUuid, StratFilesystemDiff>) -> Vec<Self> {
         let mut actions = Vec::new();
         for (uuid, diff) in diffs {
-            let StratFilesystemDiff { size } = diff;
-            if let Some(s) = size {
-                actions.push(DbusAction::FsSizeChange(uuid, s));
-            }
+            let StratFilesystemDiff { size, used } = diff;
+            actions.push(DbusAction::FsBackgroundChange(uuid, size, used));
         }
         actions
     }

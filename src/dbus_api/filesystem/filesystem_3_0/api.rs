@@ -11,7 +11,7 @@ use crate::{
             methods::rename_filesystem,
             props::{
                 get_filesystem_created, get_filesystem_devnode, get_filesystem_name,
-                get_filesystem_size,
+                get_filesystem_size, get_filesystem_used,
             },
         },
         types::TData,
@@ -107,4 +107,16 @@ where
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_filesystem_size)
+}
+
+pub fn used_property<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Property<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
+    f.property::<(bool, &str), _>(consts::FILESYSTEM_USED_PROP, ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::True)
+        .on_get(get_filesystem_used)
 }

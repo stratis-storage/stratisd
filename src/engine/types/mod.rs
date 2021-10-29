@@ -386,11 +386,13 @@ impl ThinPoolDiff {
 #[derive(Default, Debug)]
 pub struct StratFilesystemDiff {
     pub size: Option<Bytes>,
+    #[allow(clippy::option_option)]
+    pub used: Option<Option<Bytes>>,
 }
 
 impl StratFilesystemDiff {
     /// Returns true if the filesystem information has changed.
     pub fn is_changed(&self) -> bool {
-        self.size.is_some()
+        self.size.is_some() || self.used.is_some()
     }
 }

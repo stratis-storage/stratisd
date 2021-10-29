@@ -304,13 +304,15 @@ where
         }
     }
 
-    /// Look up the filesystem path of the filesystem whose size just changed using
-    /// the UUID, then send a signal indicating that the size has changed.
-    fn handle_fs_size_change(
+    /// Look up the filesystem path of the filesystem and notify clients of any
+    /// changes to properties that change in the background.
+    #[allow(clippy::option_option)]
+    fn handle_fs_background_change(
         &self,
         read_lock: TreeReadLock<'_, E>,
         uuid: FilesystemUuid,
-        new_size: Bytes,
+        new_size: Option<Bytes>,
+        new_used: Option<Option<Bytes>>,
     ) {
         if let Some(path) = read_lock
             .iter()
@@ -331,10 +333,23 @@ where
         {
             if let Err(e) = self.property_changed_invalidated_signal(
                 path,
-                once((
-                    consts::FILESYSTEM_SIZE_PROP.to_string(),
-                    Variant(Box::new(new_size.to_string()) as Box<dyn RefArg>),
-                ))
+                vec![
+                    (
+                        consts::FILESYSTEM_SIZE_PROP.to_string(),
+                        new_size.map(|s| Variant(Box::new((*s).to_string()) as Box<dyn RefArg>)),
+                    ),
+                    (
+                        consts::FILESYSTEM_USED_PROP.to_string(),
+                        new_used.map(|u| {
+                            Variant(Box::new(option_to_tuple(
+                                u.map(|b| (*b).to_string()),
+                                String::new(),
+                            )) as Box<dyn RefArg>)
+                        }),
+                    ),
+                ]
+                .into_iter()
+                .filter_map(|(prop, opt)| opt.map(|val| (prop, val)))
                 .collect::<HashMap<_, _>>(),
                 vec![],
                 &consts::standard_filesystem_interfaces(),
@@ -349,13 +364,15 @@ where
         }
     }
 
-    /// Look up the pool path of the pool whose usage just changed using
-    /// the UUID, then send a signal indicating that the size has changed.
-    fn handle_pool_usage_change(
+    /// Look up the pool path of the pool and send out a signal indicating which
+    /// properties, have changed in the background.
+    #[allow(clippy::option_option)]
+    fn handle_pool_background_change(
         &self,
         read_lock: TreeReadLock<'_, E>,
         uuid: PoolUuid,
-        new_used: Option<Bytes>,
+        new_used: Option<Option<Bytes>>,
+        new_alloc: Option<Bytes>,
     ) {
         if let Some(path) = read_lock
             .iter()
@@ -376,13 +393,23 @@ where
         {
             if let Err(e) = self.property_changed_invalidated_signal(
                 path,
-                once((
-                    consts::POOL_TOTAL_USED_PROP.to_string(),
-                    Variant(Box::new(option_to_tuple(
-                        new_used.map(|s| (*s).to_string()),
-                        String::new(),
-                    )) as Box<dyn RefArg>),
-                ))
+                vec![
+                    (
+                        consts::POOL_TOTAL_USED_PROP.to_string(),
+                        new_used.map(|u| {
+                            Variant(Box::new(option_to_tuple(
+                                u.map(|b| (*b).to_string()),
+                                String::new(),
+                            )) as Box<dyn RefArg>)
+                        }),
+                    ),
+                    (
+                        consts::POOL_ALLOC_SIZE_PROP.to_string(),
+                        new_alloc.map(|a| Variant(Box::new((*a).to_string()) as Box<dyn RefArg>)),
+                    ),
+                ]
+                .into_iter()
+                .filter_map(|(prop, opt)| opt.map(|val| (prop, val)))
                 .collect::<HashMap<_, _>>(),
                 vec![],
                 &consts::standard_pool_interfaces(),
@@ -413,51 +440,6 @@ where
                 "Failed to send a signal over D-Bus indicating pool size change: {}",
                 e
             );
-        }
-    }
-
-    /// Look up the pool path of the pool whose allocated size just changed using
-    /// the UUID, then send a signal indicating that the size has changed.
-    fn handle_pool_alloc_change(
-        &self,
-        read_lock: TreeReadLock<'_, E>,
-        uuid: PoolUuid,
-        new_alloc: Bytes,
-    ) {
-        if let Some(path) = read_lock
-            .iter()
-            .filter_map(|opath| {
-                opath.get_data().as_ref().and_then(|data| {
-                    if let StratisUuid::Pool(u) = data.uuid {
-                        if u == uuid {
-                            Some(opath.get_name())
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                })
-            })
-            .next()
-        {
-            if let Err(e) = self.property_changed_invalidated_signal(
-                path,
-                once((
-                    consts::POOL_ALLOC_SIZE_PROP.to_string(),
-                    Variant(Box::new((*new_alloc).to_string()) as Box<dyn RefArg>),
-                ))
-                .collect::<HashMap<_, _>>(),
-                vec![],
-                &consts::standard_pool_interfaces(),
-            ) {
-                warn!(
-                    "Failed to send a signal over D-Bus indicating allocated pool size change: {}",
-                    e
-                );
-            }
-        } else {
-            warn!("A pool allocated size was changed in the engine but no pool with the corresponding UUID could be found in the D-Bus layer");
         }
     }
 
@@ -511,11 +493,21 @@ where
                 self.handle_pool_clevis_info_change(item, ci);
                 Ok(true)
             }
-            DbusAction::FsSizeChange(uuid, new_size) => {
+            DbusAction::FsBackgroundChange(uuid, new_size, new_used) => {
                 if let Some(read_lock) =
                     poll_exit_and_future(self.should_exit.recv(), self.tree.read())?
                 {
-                    self.handle_fs_size_change(read_lock, uuid, new_size);
+                    self.handle_fs_background_change(read_lock, uuid, new_size, new_used);
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
+            }
+            DbusAction::PoolBackgroundChange(uuid, new_usage, new_alloc) => {
+                if let Some(read_lock) =
+                    poll_exit_and_future(self.should_exit.recv(), self.tree.read())?
+                {
+                    self.handle_pool_background_change(read_lock, uuid, new_usage, new_alloc);
                     Ok(true)
                 } else {
                     Ok(false)
@@ -524,26 +516,6 @@ where
             DbusAction::PoolCacheChange(item, has_cache) => {
                 self.handle_pool_cache_change(item, has_cache);
                 Ok(true)
-            }
-            DbusAction::PoolUsageChange(uuid, new_usage) => {
-                if let Some(read_lock) =
-                    poll_exit_and_future(self.should_exit.recv(), self.tree.read())?
-                {
-                    self.handle_pool_usage_change(read_lock, uuid, new_usage);
-                    Ok(true)
-                } else {
-                    Ok(false)
-                }
-            }
-            DbusAction::PoolAllocSizeChange(uuid, new_alloc) => {
-                if let Some(read_lock) =
-                    poll_exit_and_future(self.should_exit.recv(), self.tree.read())?
-                {
-                    self.handle_pool_alloc_change(read_lock, uuid, new_alloc);
-                    Ok(true)
-                } else {
-                    Ok(false)
-                }
             }
             DbusAction::PoolSizeChange(path, new_size) => {
                 self.handle_pool_size_change(path, new_size);

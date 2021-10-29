@@ -52,6 +52,20 @@ pub const FILESYSTEM_LOWATER: Sectors = Sectors(4 * (DATA_LOWATER.0 * DATA_BLOCK
 pub struct StratFilesystem {
     thin_dev: ThinDev,
     created: DateTime<Utc>,
+    used: Option<Bytes>,
+}
+
+fn init_used(thin_dev: &ThinDev) -> Option<Bytes> {
+    thin_dev
+        .status(get_dm(), DmOptions::default())
+        .ok()
+        .and_then(|status| {
+            if let ThinStatus::Working(s) = status {
+                Some(s.nr_mapped_sectors.bytes())
+            } else {
+                None
+            }
+        })
 }
 
 impl StratFilesystem {
@@ -88,6 +102,7 @@ impl StratFilesystem {
         Ok((
             fs_uuid,
             StratFilesystem {
+                used: init_used(&thin_dev),
                 thin_dev,
                 created: Utc::now(),
             },
@@ -110,6 +125,7 @@ impl StratFilesystem {
             fssave.thin_id,
         )?;
         Ok(StratFilesystem {
+            used: init_used(&thin_dev),
             thin_dev,
             created: Utc.timestamp(fssave.created as i64, 0),
         })
@@ -205,6 +221,7 @@ impl StratFilesystem {
 
                 set_uuid(&thin_dev.devnode(), snapshot_fs_uuid)?;
                 Ok(StratFilesystem {
+                    used: init_used(&thin_dev),
                     thin_dev,
                     created: Utc::now(),
                 })
@@ -224,7 +241,10 @@ impl StratFilesystem {
     /// TODO: deal with the thindev in a Fail state.
     pub fn check(&mut self) -> StratisResult<(bool, StratFilesystemDiff)> {
         let mut needs_save = false;
-        let original_state = self.cached(|fs| StratFilesystemState { size: fs.size() });
+        let original_state = self.cached(|fs| StratFilesystemState {
+            size: fs.size(),
+            used: fs.used().ok(),
+        });
         match self.thin_dev.status(get_dm(), DmOptions::default())? {
             ThinStatus::Working(_) => {
                 if let Some(mount_point) = self.mount_points()?.first() {
@@ -262,7 +282,10 @@ impl StratFilesystem {
         };
         Ok((
             needs_save,
-            original_state.diff(&self.dump(|fs| StratFilesystemState { size: fs.size() })),
+            original_state.diff(&self.dump(|fs| StratFilesystemState {
+                used: fs.used().ok(),
+                size: fs.size(),
+            })),
         ))
     }
 
@@ -366,6 +389,7 @@ impl Filesystem for StratFilesystem {
 /// Represents the state of the Stratis filesystem at a given moment in time.
 pub struct StratFilesystemState {
     size: Bytes,
+    used: Option<Bytes>,
 }
 
 impl StateDiff for StratFilesystemState {
@@ -375,6 +399,11 @@ impl StateDiff for StratFilesystemState {
         StratFilesystemDiff {
             size: if self.size != new_state.size {
                 Some(new_state.size)
+            } else {
+                None
+            },
+            used: if self.used != new_state.used {
+                Some(new_state.used)
             } else {
                 None
             },

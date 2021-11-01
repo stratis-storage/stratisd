@@ -511,7 +511,9 @@ class UdevTest5(UdevTest):
             wait_for_udev(CRYPTO_LUKS_FS_TYPE, self._lb_mgr.device_files(luks_tokens))
             wait_for_udev(STRATIS_FS_TYPE, self._lb_mgr.device_files(non_luks_tokens))
 
-            variant_pool_uuids = Manager.Properties.LockedPools.Get(get_object(TOP_OBJECT))
+            variant_pool_uuids = Manager.Properties.LockedPools.Get(
+                get_object(TOP_OBJECT)
+            )
 
             for pool_uuid in variant_pool_uuids:
                 ((option, _), exit_code, _) = Manager.Methods.UnlockPool(

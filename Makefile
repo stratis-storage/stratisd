@@ -239,7 +239,6 @@ install-cfg: docs/stratisd.8
 	install -Dpm0644 -t $(DESTDIR)$(MANDIR)/man8 docs/stratisd.8
 	install -Dpm0644 -t $(DESTDIR)$(UDEVDIR)/rules.d udev/61-stratisd.rules
 	install -Dpm0644 -t $(DESTDIR)$(UNITDIR) systemd/stratisd.service
-	install -Dpm0644 -t $(DESTDIR)$(DRACUTDIR)/dracut.conf.d dracut/90-stratis.conf
 	install -Dpm0755 -d $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis
 	install -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/module-setup.sh
 	install -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/stratis-rootfs-setup
@@ -269,7 +268,6 @@ clean-cfg:
 	rm -fv $(DESTDIR)$(MANDIR)/man8/stratisd.8
 	rm -fv $(DESTDIR)$(UDEVDIR)/rules.d/*-stratisd.rules
 	rm -fv $(DESTDIR)$(UNITDIR)/stratisd.service
-	rm -fv $(DESTDIR)$(DRACUTDIR)/dracut.conf.d/90-stratis.conf
 	rm -rfv $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis
 	rm -rfv $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis-clevis
 	rm -fv $(DESTDIR)$(UNITDIR)/stratisd-min-postinitrd.service

@@ -162,7 +162,13 @@ impl StratPool {
 
         let thinpool = ThinPool::new(
             pool_uuid,
-            &ThinPoolSizeParams::default(),
+            match ThinPoolSizeParams::new(backstore.available_in_backstore()) {
+                Ok(ref params) => params,
+                Err(e) => {
+                    let _ = backstore.destroy();
+                    return Err(e);
+                }
+            },
             DATA_BLOCK_SIZE,
             &mut backstore,
         );
@@ -221,7 +227,11 @@ impl StratPool {
             &backstore,
         )?;
 
-        let (needs_save, _) = thinpool.check(uuid, &mut backstore)?;
+        // TODO: Remove in stratisd 4.0
+        let mut needs_save = metadata.thinpool_dev.fs_limit.is_none()
+            || metadata.thinpool_dev.feature_args.is_none();
+
+        needs_save |= thinpool.check(uuid, &mut backstore)?.0;
 
         let metadata_size = backstore.datatier_metadata_size();
         let mut pool = StratPool {
@@ -335,6 +345,16 @@ impl StratPool {
         Ok(())
     }
 
+    /// Check the limit of filesystems on a pool and return an error if it has been passed.
+    fn check_fs_limit(&self, new_fs: usize) -> StratisResult<()> {
+        let fs_limit = self.fs_limit();
+        if convert_int!(fs_limit, u64, usize)? < self.filesystems().len() + new_fs {
+            Err(StratisError::Msg(format!("The pool limit of {} filesystems has already been reached; increase the filesystem limit on the pool to continue", fs_limit)))
+        } else {
+            Ok(())
+        }
+    }
+
     #[cfg(test)]
     #[pool_mutating_action("NoRequests")]
     #[pool_rollback]
@@ -383,6 +403,7 @@ impl<'a> Into<Value> for &'a StratPool {
             "available_actions".to_string(),
             Value::from(self.action_avail.to_string()),
         );
+        map.insert("fs_limit".to_string(), Value::from(self.fs_limit()));
         Value::from(map)
     }
 }
@@ -517,6 +538,8 @@ impl Pool for StratPool {
         pool_uuid: PoolUuid,
         specs: &[(&'a str, Option<Bytes>)],
     ) -> StratisResult<SetCreateAction<(&'a str, FilesystemUuid, Sectors)>> {
+        self.check_fs_limit(specs.len())?;
+
         let spec_map = validate_filesystem_size_specs(specs)?;
 
         spec_map.iter().fold(Ok(()), |res, (name, size)| {
@@ -586,6 +609,7 @@ impl Pool for StratPool {
             // If just adding data devices, no need to suspend the pool.
             // No action will be taken on the DM devices.
             let bdev_info = self.backstore.add_datadevs(pool_uuid, paths)?;
+            self.thin_pool.set_queue_mode();
 
             // Adding data devices does not change the state of the thin
             // pool at all. However, if the thin pool is in a state
@@ -652,6 +676,8 @@ impl Pool for StratPool {
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
     ) -> StratisResult<CreateAction<(FilesystemUuid, &'a mut Self::Filesystem)>> {
+        self.check_fs_limit(1)?;
+
         validate_name(snapshot_name)?;
 
         if self
@@ -754,6 +780,26 @@ impl Pool for StratPool {
 
     fn avail_actions(&self) -> ActionAvailability {
         self.action_avail.clone()
+    }
+
+    fn fs_limit(&self) -> u64 {
+        self.thin_pool.fs_limit()
+    }
+
+    #[pool_mutating_action("NoPoolChanges")]
+    fn set_fs_limit(
+        &mut self,
+        pool_name: &Name,
+        pool_uuid: PoolUuid,
+        new_limit: u64,
+    ) -> StratisResult<()> {
+        let (should_save, res) =
+            self.thin_pool
+                .set_fs_limit(pool_uuid, &mut self.backstore, new_limit);
+        if should_save {
+            self.write_metadata(pool_name)?;
+        }
+        res
     }
 }
 

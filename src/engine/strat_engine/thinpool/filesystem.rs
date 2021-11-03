@@ -33,7 +33,6 @@ use crate::{
             dm::get_dm,
             names::{format_thin_ids, ThinRole},
             serde_structs::FilesystemSave,
-            thinpool::{thinpool::DATA_LOWATER, DATA_BLOCK_SIZE},
         },
         types::{
             ActionAvailability, Compare, FilesystemUuid, Name, PoolUuid, StratFilesystemDiff,
@@ -44,10 +43,6 @@ use crate::{
 };
 
 const TEMP_MNT_POINT_PREFIX: &str = "stratis_mp_";
-
-/// Set the low water mark on the filesystem at 4 times the data low water.  The filesystem
-/// expansion check is triggered by crossing the data low water mark for the thin pool.
-pub const FILESYSTEM_LOWATER: Sectors = Sectors(4 * (DATA_LOWATER.0 * DATA_BLOCK_SIZE.0));
 
 #[derive(Debug)]
 pub struct StratFilesystem {
@@ -247,8 +242,7 @@ impl StratFilesystem {
             ThinStatus::Working(_) => {
                 if let Some(mount_point) = self.mount_points()?.first() {
                     let (fs_total_bytes, fs_total_used_bytes) = fs_usage(mount_point)?;
-                    let free_bytes = fs_total_bytes - fs_total_used_bytes;
-                    if free_bytes.sectors() < FILESYSTEM_LOWATER {
+                    if 2u64 * fs_total_used_bytes > fs_total_bytes {
                         let old_table = self.thin_dev.table().table.clone();
                         let mut new_table = old_table.clone();
                         new_table.length =

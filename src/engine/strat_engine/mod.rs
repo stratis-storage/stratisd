@@ -19,8 +19,7 @@ mod udev;
 mod writing;
 
 pub use self::{
-    backstore::{crypt_metadata_size, CryptMetadataHandle, CLEVIS_TANG_TRUST_URL},
-    device::blkdev_size,
+    backstore::{CryptMetadataHandle, CLEVIS_TANG_TRUST_URL},
     dm::{get_dm, get_dm_init},
     engine::StratEngine,
     keys::StratKeyActions,

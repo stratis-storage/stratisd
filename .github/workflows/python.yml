@@ -84,7 +84,6 @@ jobs:
         run: >
           RUST_LOG=stratisd=debug
           STRATISD=/usr/libexec/stratisd
-          STRATIS_PREDICT_USAGE=/usr/bin/stratis-predict-usage
           SKIP_DUPLICATE_NAMES_TEST=${{ matrix.skip_value }}
           PYTHONPATH=./src
           make udev-tests

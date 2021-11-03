@@ -447,6 +447,25 @@ where
         }
     }
 
+    /// Send a signal indicating that the pool filesystem limit has changed.
+    fn handle_pool_fs_limit_change(&self, path: Path<'static>, new_fs_limit: u64) {
+        if let Err(e) = self.property_changed_invalidated_signal(
+            &path,
+            prop_hashmap!(
+                consts::POOL_INTERFACE_NAME_3_1 => {
+                    Vec::new(),
+                    consts::POOL_FS_LIMIT_PROP.to_string() =>
+                    box_variant!(new_fs_limit)
+                }
+            ),
+        ) {
+            warn!(
+                "Failed to send a signal over D-Bus indicating pool size change: {}",
+                e
+            );
+        }
+    }
+
     /// Send a signal indicating that the pool total allocated size has changed.
     fn handle_pool_foreground_change(
         &self,
@@ -540,6 +559,10 @@ where
             }
             DbusAction::PoolSizeChange(path, new_size) => {
                 self.handle_pool_size_change(path, new_size);
+                Ok(true)
+            }
+            DbusAction::PoolFsLimitChange(path, new_limit) => {
+                self.handle_pool_fs_limit_change(path, new_limit);
                 Ok(true)
             }
             DbusAction::LockedPoolsChange(pools) => {

@@ -25,6 +25,8 @@ use libc::c_uint;
 use libcryptsetup_rs::SafeMemHandle;
 use serde_json::Value;
 
+use devicemapper::{Bytes, Sectors};
+
 use crate::{
     engine::{
         engine::MAX_STRATIS_PASS_SIZE,
@@ -54,6 +56,7 @@ const MKFS_XFS: &str = "mkfs.xfs";
 const THIN_CHECK: &str = "thin_check";
 const THIN_REPAIR: &str = "thin_repair";
 const UDEVADM: &str = "udevadm";
+const THIN_METADATA_SIZE: &str = "thin_metadata_size";
 const XFS_DB: &str = "xfs_db";
 const XFS_GROWFS: &str = "xfs_growfs";
 const CLEVIS: &str = "clevis";
@@ -111,6 +114,10 @@ lazy_static! {
         (UDEVADM.to_string(), find_binary(UDEVADM)),
         (XFS_DB.to_string(), find_binary(XFS_DB)),
         (XFS_GROWFS.to_string(), find_binary(XFS_GROWFS)),
+        (
+            THIN_METADATA_SIZE.to_string(),
+            find_binary(THIN_METADATA_SIZE)
+        ),
     ]
     .iter()
     .cloned()
@@ -415,4 +422,44 @@ pub fn clevis_luks_regen(dev_path: &Path, keyslot: c_uint) -> StratisResult<()> 
             .arg(keyslot.to_string())
             .arg("-q"),
     )
+}
+
+/// Determine the number of sectors required to house the specified parameters for
+/// the thin pool that determine metadata size.
+#[allow(dead_code)]
+pub fn thin_metadata_size(
+    block_size: Bytes,
+    pool_size: Bytes,
+    max_thins: u64,
+) -> StratisResult<Sectors> {
+    let mut thin_meta_child = Command::new(get_executable(THIN_METADATA_SIZE))
+        .arg("-b")
+        .arg(format!("{}b", *block_size))
+        .arg("-s")
+        .arg(format!("{}b", *pool_size))
+        .arg("-m")
+        .arg(max_thins.to_string())
+        .arg("-n")
+        .stdout(Stdio::piped())
+        .spawn()?;
+    thin_meta_child.wait()?;
+    let mut output = String::new();
+    let is_ok = thin_meta_child.id() == 0;
+    thin_meta_child
+        .stdout
+        .ok_or_else(|| {
+            StratisError::Msg(
+                "Spawned thin_metadata_size process had no stdout; cannot continue with metadata size requirement simulation"
+                    .to_string(),
+            )
+        })?
+        .read_to_string(&mut output)?;
+    if is_ok {
+        Ok(Sectors(output.parse::<u64>()?))
+    } else {
+        Err(StratisError::Msg(format!(
+            "thin_metadata_size failed: {}",
+            output
+        )))
+    }
 }

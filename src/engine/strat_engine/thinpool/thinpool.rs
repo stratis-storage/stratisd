@@ -6,6 +6,7 @@
 
 use std::{
     cmp::{max, min},
+    collections::HashMap,
     fmt,
     thread::sleep,
     time::Duration,
@@ -14,13 +15,14 @@ use std::{
 use serde_json::{Map, Value};
 
 use devicemapper::{
-    device_exists, DataBlocks, Device, DmDevice, DmName, DmNameBuf, DmOptions, FlakeyTargetParams,
-    LinearDev, LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors, TargetLine,
-    ThinDevId, ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, IEC,
+    device_exists, Bytes, DataBlocks, Device, DmDevice, DmName, DmNameBuf, DmOptions,
+    FlakeyTargetParams, LinearDev, LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors,
+    TargetLine, ThinDevId, ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, IEC,
 };
 
 use crate::{
     engine::{
+        engine::{DumpState, StateDiff},
         strat_engine::{
             backstore::Backstore,
             cmd::{thin_check, thin_repair, udev_settle},
@@ -34,7 +36,7 @@ use crate::{
             writing::wipe_sectors,
         },
         structures::Table,
-        types::{ChangedProperties, FilesystemUuid, Name, PoolUuid},
+        types::{FilesystemUuid, Name, PoolUuid, StratFilesystemDiff, ThinPoolDiff},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -367,6 +369,7 @@ impl ThinPool {
             ),
         )?;
 
+        let thin_pool_status = thinpool_dev.status(get_dm(), DmOptions::default()).ok();
         Ok(ThinPool {
             thin_pool: thinpool_dev,
             segments: Segments {
@@ -379,7 +382,7 @@ impl ThinPool {
             filesystems: Table::default(),
             mdv,
             backstore_device,
-            thin_pool_status: None,
+            thin_pool_status,
         })
     }
 
@@ -480,6 +483,7 @@ impl ThinPool {
         }
 
         let thin_ids: Vec<ThinDevId> = filesystem_metadatas.iter().map(|x| x.thin_id).collect();
+        let thin_pool_status = thinpool_dev.status(get_dm(), DmOptions::default()).ok();
         Ok(ThinPool {
             thin_pool: thinpool_dev,
             segments: Segments {
@@ -492,14 +496,18 @@ impl ThinPool {
             filesystems: fs_table,
             mdv,
             backstore_device,
-            thin_pool_status: None,
+            thin_pool_status,
         })
     }
 
     /// Run status checks and take actions on the thinpool and its components.
     /// Returns a bool communicating if a configuration change requiring a
     /// metadata save has been made.
-    pub fn check(&mut self, pool_uuid: PoolUuid, backstore: &mut Backstore) -> StratisResult<bool> {
+    pub fn check(
+        &mut self,
+        pool_uuid: PoolUuid,
+        backstore: &mut Backstore,
+    ) -> StratisResult<(bool, ThinPoolDiff)> {
         assert_eq!(
             backstore.device().expect(
                 "thinpool exists and has been allocated to, so backstore must have a cap device"
@@ -507,10 +515,14 @@ impl ThinPool {
             self.backstore_device
         );
 
-        let mut should_save: bool = false;
-        let thin_pool_status = self.thin_pool.status(get_dm(), DmOptions::default())?;
+        let original_state = self.cached(|pool| ThinPoolState {
+            usage: pool.total_physical_used().map(|s| s.bytes()).ok(),
+            allocated_size: backstore.datatier_allocated_size().bytes(),
+        });
 
-        if let ThinPoolStatus::Working(status) = &thin_pool_status {
+        let mut should_save: bool = false;
+
+        if let Some(ThinPoolStatus::Working(status)) = self.thin_pool_status.as_ref().cloned() {
             let usage = &status.usage;
 
             // Ensure meta subdevice is approx. 1/1000th of total usable
@@ -560,25 +572,35 @@ impl ThinPool {
             self.resume()?;
         }
 
-        self.set_state(self.thin_pool.status(get_dm(), DmOptions::default())?);
-
-        Ok(should_save)
+        Ok((
+            should_save,
+            original_state.diff(&self.dump(|pool| {
+                pool.set_state(pool.thin_pool.status(get_dm(), DmOptions::default()).ok());
+                ThinPoolState {
+                    usage: pool.total_physical_used().map(|s| s.bytes()).ok(),
+                    allocated_size: backstore.datatier_allocated_size().bytes(),
+                }
+            })),
+        ))
     }
 
     /// Check all filesystems on this thin pool and return which had their sizes
     /// extended, if any. This method should not need to handle thin pool status
     /// because it never alters the thin pool itself.
-    /// TODO: Put filesystem in read only if the MDV can't be saved after a pool
-    /// is extended.
-    pub fn check_fs(&mut self, pool_uuid: PoolUuid) -> StratisResult<ChangedProperties> {
-        let mut updated = ChangedProperties::default();
+    pub fn check_fs(
+        &mut self,
+        pool_uuid: PoolUuid,
+    ) -> StratisResult<HashMap<FilesystemUuid, StratFilesystemDiff>> {
+        let mut updated = HashMap::default();
         for (name, uuid, fs) in self.filesystems.iter_mut() {
-            let check_ret = fs.check()?;
-            if let Some(prop_diff) = check_ret {
-                updated.add_fs_prop(*uuid, prop_diff);
-                if let Err(e) = self.mdv.save_fs(name, *uuid, fs) {
-                    error!("Could not save MDV for fs with UUID {} and name {} belonging to pool with UUID {}, reason: {:?}",
-                                uuid, name, pool_uuid, e);
+            let (needs_save, prop_diff) = fs.check()?;
+            if prop_diff.is_changed() {
+                updated.insert(*uuid, prop_diff);
+                if needs_save {
+                    if let Err(e) = self.mdv.save_fs(name, *uuid, fs) {
+                        error!("Could not save MDV for fs with UUID {} and name {} belonging to pool with UUID {}, reason: {:?}",
+                                    uuid, name, pool_uuid, e);
+                    }
                 }
             }
         }
@@ -588,34 +610,38 @@ impl ThinPool {
     /// Set the current status of the thin_pool device to thin_pool_status.
     /// If there has been a change, log that change at the info or warn level
     /// as appropriate.
-    fn set_state(&mut self, thin_pool_status: ThinPoolStatus) {
+    fn set_state(&mut self, thin_pool_status: Option<ThinPoolStatus>) {
         let current_status: Option<ThinPoolStatusDigest> =
             self.thin_pool_status.as_ref().map(|x| x.into());
-        let new_status: ThinPoolStatusDigest = (&thin_pool_status).into();
+        let new_status: Option<ThinPoolStatusDigest> = thin_pool_status.as_ref().map(|s| s.into());
 
-        if current_status != Some(new_status) {
+        if current_status != new_status {
             let current_status_str = current_status
                 .map(|x| x.to_string())
                 .unwrap_or_else(|| "none".to_string());
 
-            if new_status != ThinPoolStatusDigest::Good {
+            if new_status != Some(ThinPoolStatusDigest::Good) {
                 warn!(
                     "Status of thinpool device with \"{}\" changed from \"{}\" to \"{}\"",
                     thin_pool_identifiers(&self.thin_pool),
                     current_status_str,
-                    new_status,
+                    new_status
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| "none".to_string()),
                 );
             } else {
                 info!(
                     "Status of thinpool device with \"{}\" changed from \"{}\" to \"{}\"",
                     thin_pool_identifiers(&self.thin_pool),
                     current_status_str,
-                    new_status,
+                    new_status
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| "none".to_string()),
                 );
             }
         }
 
-        self.thin_pool_status = Some(thin_pool_status);
+        self.thin_pool_status = thin_pool_status;
     }
 
     /// Tear down the components managed here: filesystems, the MDV,
@@ -1111,6 +1137,35 @@ impl<'a> Into<Value> for &'a ThinPool {
             )
         })
     }
+}
+
+/// Represents the attributes of the thin pool that are being watched for changes.
+pub struct ThinPoolState {
+    usage: Option<Bytes>,
+    allocated_size: Bytes,
+}
+
+impl StateDiff for ThinPoolState {
+    type Diff = ThinPoolDiff;
+
+    fn diff(&self, new_state: &Self) -> Self::Diff {
+        ThinPoolDiff {
+            usage: if self.usage != new_state.usage {
+                Some(new_state.usage.as_ref().cloned())
+            } else {
+                None
+            },
+            allocated_size: if self.allocated_size != new_state.allocated_size {
+                Some(new_state.allocated_size)
+            } else {
+                None
+            },
+        }
+    }
+}
+
+impl DumpState for ThinPool {
+    type State = ThinPoolState;
 }
 
 impl Recordable<FlexDevsSave> for Segments {

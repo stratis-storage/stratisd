@@ -348,3 +348,31 @@ where
     };
     Ok(vec![msg])
 }
+
+pub fn list_keys<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
+where
+    E: 'static + Engine,
+{
+    let message: &Message = m.msg;
+
+    let return_message = message.method_return();
+
+    let default_return: Vec<String> = Vec::new();
+    let dbus_context = m.tree.get_data();
+
+    let mutex_lock = dbus_context.engine.blocking_lock();
+
+    Ok(vec![match mutex_lock.get_key_handler().list() {
+        Ok(keys) => {
+            let key_strings = keys
+                .into_iter()
+                .map(|k| k.as_application_str().to_string())
+                .collect::<Vec<_>>();
+            return_message.append3(key_strings, DbusErrorEnum::OK as u16, OK_STRING.to_string())
+        }
+        Err(x) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&x);
+            return_message.append3(default_return, rc, rs)
+        }
+    }])
+}

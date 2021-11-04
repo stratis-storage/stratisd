@@ -12,8 +12,8 @@ use crate::{
     engine::Engine,
 };
 
-mod fetch_properties_3_0;
 mod manager_3_0;
+pub mod prop_conv;
 mod report_3_0;
 mod shared;
 
@@ -48,15 +48,12 @@ where
                 .add_m(manager_3_0::create_pool_method(&f))
                 .add_m(manager_3_0::set_key_method(&f))
                 .add_m(manager_3_0::unset_key_method(&f))
+                .add_m(manager_3_0::list_keys_method(&f))
                 .add_m(manager_3_0::unlock_pool_method(&f))
                 .add_m(manager_3_0::destroy_pool_method(&f))
                 .add_m(manager_3_0::engine_state_report_method(&f))
-                .add_p(manager_3_0::version_property(&f)),
-        )
-        .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_3_0, ())
-                .add_m(fetch_properties_3_0::get_all_properties_method(&f))
-                .add_m(fetch_properties_3_0::get_properties_method(&f)),
+                .add_p(manager_3_0::version_property(&f))
+                .add_p(manager_3_0::locked_pools_property(&f)),
         )
         .add(
             f.interface(consts::REPORT_INTERFACE_NAME_3_0, ())

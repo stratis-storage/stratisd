@@ -54,22 +54,6 @@ pub fn option_to_tuple<T>(value: Option<T>, default: T) -> (bool, T) {
     }
 }
 
-/// Map a result obtained for the FetchProperties interface to a value used
-/// to represent an option.  An error in the result
-/// argument yields a false in the return value, indicating that the value
-/// returned is a string representation of the error encountered in
-/// obtaining the value, and not the value requested.
-pub fn result_to_tuple<T>(result: Result<T, String>) -> (bool, Variant<Box<dyn RefArg>>)
-where
-    T: RefArg + 'static,
-{
-    let (success, value) = match result {
-        Ok(value) => (true, Variant(Box::new(value) as Box<dyn RefArg>)),
-        Err(e) => (false, Variant(Box::new(e) as Box<dyn RefArg>)),
-    };
-    (success, value)
-}
-
 /// Map a result containing an option obtained for the FetchProperties interface to
 /// a value used to represent both the result and option.  An error in the result
 /// argument yields a false in the return value, indicating that the value

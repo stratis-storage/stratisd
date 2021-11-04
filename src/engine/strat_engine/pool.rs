@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{path::Path, vec::Vec};
+use std::{collections::HashMap, path::Path, vec::Vec};
 
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
@@ -24,10 +24,10 @@ use crate::{
             thinpool::{StratFilesystem, ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
         types::{
-            ActionAvailability, BlockDevTier, ChangedProperties, Clevis, CreateAction,
-            DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, Key, KeyDescription, Name,
-            PoolEncryptionInfo, PoolUuid, Redundancy, RegenAction, RenameAction, SetCreateAction,
-            SetDeleteAction,
+            ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
+            EncryptionInfo, FilesystemUuid, Key, KeyDescription, Name, PoolEncryptionInfo,
+            PoolUuid, Redundancy, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
+            StratFilesystemDiff, ThinPoolDiff,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -223,7 +223,7 @@ impl StratPool {
             &backstore,
         )?;
 
-        let changed = thinpool.check(uuid, &mut backstore)?;
+        let (needs_save, _) = thinpool.check(uuid, &mut backstore)?;
 
         let mut pool = StratPool {
             backstore,
@@ -232,7 +232,7 @@ impl StratPool {
             action_avail,
         };
 
-        if changed {
+        if needs_save {
             pool.write_metadata(pool_name)?;
         }
 
@@ -274,13 +274,16 @@ impl StratPool {
     // TODO: Just check the device that evented. Currently checks
     // everything.
     #[pool_mutating_action("NoPoolChanges")]
-    pub fn event_on(&mut self, pool_uuid: PoolUuid, pool_name: &Name) -> StratisResult<bool> {
-        if self.thin_pool.check(pool_uuid, &mut self.backstore)? {
+    pub fn event_on(
+        &mut self,
+        pool_uuid: PoolUuid,
+        pool_name: &Name,
+    ) -> StratisResult<ThinPoolDiff> {
+        let (changed, diff) = self.thin_pool.check(pool_uuid, &mut self.backstore)?;
+        if changed {
             self.write_metadata(pool_name)?;
-            Ok(true)
-        } else {
-            Ok(false)
         }
+        Ok(diff)
     }
 
     /// Called when a DM device in this pool has generated an event. This method
@@ -290,9 +293,11 @@ impl StratPool {
         &mut self,
         pool_uuid: PoolUuid,
         pool_name: &Name,
-    ) -> StratisResult<ChangedProperties> {
+    ) -> StratisResult<HashMap<FilesystemUuid, StratFilesystemDiff>> {
         let changed = self.thin_pool.check_fs(pool_uuid)?;
-        if changed.is_changed() {
+        if !changed.is_empty() {
+            // Do we really need this if we call event_on after doing the
+            // filesystem checks?
             self.write_metadata(pool_name)?;
         }
         Ok(changed)
@@ -659,6 +664,10 @@ impl Pool for StratPool {
 
     fn total_physical_size(&self) -> Sectors {
         self.backstore.datatier_size()
+    }
+
+    fn total_allocated_size(&self) -> Sectors {
+        self.backstore.datatier_allocated_size()
     }
 
     fn total_physical_used(&self) -> StratisResult<Sectors> {

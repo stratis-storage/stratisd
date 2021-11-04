@@ -14,7 +14,6 @@ use crate::{
 };
 
 mod blockdev_3_0;
-mod fetch_properties_3_0;
 mod shared;
 
 pub fn create_dbus_blockdev<'a, E>(
@@ -47,12 +46,8 @@ where
                 .add_p(blockdev_3_0::tier_property(&f))
                 .add_p(blockdev_3_0::user_info_property(&f))
                 .add_p(blockdev_3_0::uuid_property(&f))
-                .add_p(blockdev_3_0::physical_path_property(&f)),
-        )
-        .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_3_0, ())
-                .add_m(fetch_properties_3_0::get_all_properties_method(&f))
-                .add_m(fetch_properties_3_0::get_properties_method(&f)),
+                .add_p(blockdev_3_0::physical_path_property(&f))
+                .add_p(blockdev_3_0::size_property(&f)),
         );
 
     let path = object_path.get_name().to_owned();
@@ -80,7 +75,8 @@ where
             consts::BLOCKDEV_POOL_PROP => parent,
             consts::BLOCKDEV_UUID_PROP => uuid_to_string!(dev_uuid),
             consts::BLOCKDEV_TIER_PROP => shared::blockdev_tier_prop(tier),
-            consts::BLOCKDEV_PHYSICAL_PATH_PROP => shared::blockdev_physical_path_prop::<E>(dev)
+            consts::BLOCKDEV_PHYSICAL_PATH_PROP => shared::blockdev_physical_path_prop::<E>(dev),
+            consts::BLOCKDEV_TOTAL_SIZE_PROP => shared::blockdev_size_prop::<E>(dev)
         }
     }
 }

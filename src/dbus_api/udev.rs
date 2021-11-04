@@ -41,10 +41,21 @@ where
             StratisError::Msg("Channel from udev handler to D-Bus handler was shut".to_string())
         })?;
         let mut mutex_lock = self.dbus_context.engine.lock().await;
+
+        // Avoiding implementing DumpState here because all of the information
+        // is cached, the entire property will be considered changed if any
+        // part changes, and it generally makes more sense to treat the
+        // HashMap comparison as a diff in itself.
+        let original_state = mutex_lock.locked_pools();
         let optional_pool_info = mutex_lock.handle_event(&udev_event);
 
         if let Some((pool_name, pool_uuid, pool)) = optional_pool_info {
             self.register_pool(&pool_name, pool_uuid, pool)
+        }
+
+        let new_state = mutex_lock.locked_pools();
+        if original_state != new_state {
+            self.dbus_context.push_locked_pools(new_state);
         }
 
         Ok(())

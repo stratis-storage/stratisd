@@ -4,38 +4,21 @@
 
 use std::collections::HashMap;
 
-use dbus::{
-    arg::{RefArg, Variant},
-    Message,
-};
-use dbus_tree::{MTSync, MethodInfo, MethodResult};
-use itertools::Itertools;
+use dbus::arg::{RefArg, Variant};
 
 use crate::{
-    dbus_api::{
-        api::shared::list_keys,
-        consts,
-        types::TData,
-        util::{result_option_to_tuple, result_to_tuple},
-    },
-    engine::Engine,
+    dbus_api::util::result_option_to_tuple,
+    engine::{LockedPoolInfo, PoolUuid},
 };
 
-const ALL_PROPERTIES: [&str; 2] = [consts::KEY_LIST_PROP, consts::LOCKED_POOL_DEVS];
+/// D-Bus representation of locked pools.
+pub type LockedPools = HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>;
 
-type LockedPoolsWithDevs = HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>;
-
-pub fn locked_pools_with_devs<E>(
-    info: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<LockedPoolsWithDevs, String>
-where
-    E: 'static + Engine,
-{
-    let dbus_context = info.tree.get_data();
-
-    let engine = dbus_context.engine.blocking_lock();
-    Ok(engine
-        .locked_pools()
+/// Convert a locked pool data structure to a property format.
+pub fn locked_pools_to_prop(
+    pools: HashMap<PoolUuid, LockedPoolInfo>,
+) -> HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>> {
+    pools
         .into_iter()
         .map(|(u, locked)| {
             (
@@ -84,30 +67,5 @@ where
                 .collect::<HashMap<_, _>>(),
             )
         })
-        .collect())
+        .collect()
 }
-
-fn get_properties_shared<E>(
-    m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
-    properties: &mut dyn Iterator<Item = String>,
-) -> MethodResult
-where
-    E: 'static + Engine,
-{
-    let message: &Message = m.msg;
-
-    let return_message = message.method_return();
-
-    let return_value: HashMap<String, (bool, Variant<Box<dyn RefArg>>)> = properties
-        .unique()
-        .filter_map(|prop| match prop.as_str() {
-            consts::KEY_LIST_PROP => Some((prop, result_to_tuple(list_keys(m)))),
-            consts::LOCKED_POOL_DEVS => Some((prop, result_to_tuple(locked_pools_with_devs(m)))),
-            _ => None,
-        })
-        .collect();
-
-    Ok(vec![return_message.append1(return_value)])
-}
-
-properties_footer!();

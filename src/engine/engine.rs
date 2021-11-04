@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fmt::Debug,
     os::unix::io::RawFd,
     path::{Path, PathBuf},
@@ -16,11 +16,11 @@ use devicemapper::{Bytes, Sectors};
 
 use crate::{
     engine::types::{
-        ActionAvailability, BlockDevTier, ChangedProperties, Clevis, CreateAction, DeleteAction,
-        DevUuid, EncryptionInfo, FilesystemUuid, Key, KeyDescription, LockedPoolInfo,
-        MappingCreateAction, MappingDeleteAction, Name, PoolEncryptionInfo, PoolUuid, RegenAction,
-        RenameAction, ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction,
-        UdevEngineEvent, UnlockMethod,
+        ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
+        EncryptionInfo, FilesystemUuid, Key, KeyDescription, LockedPoolInfo, MappingCreateAction,
+        MappingDeleteAction, Name, PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction,
+        ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, StratFilesystemDiff,
+        ThinPoolDiff, UdevEngineEvent, UnlockMethod,
     },
     stratis::StratisResult,
 };
@@ -226,6 +226,18 @@ pub trait Pool: Debug {
     /// associated with a pool.
     fn total_physical_size(&self) -> Sectors;
 
+    /// The total number of Sectors of physical storage that have been allocated
+    /// in this pool.
+    /// There are no exclusions, so this number includes overhead sectors
+    /// of all sorts, sectors allocated for every sort of metadata by
+    /// Stratis or devicemapper and therefore not available to the user for
+    /// storing their data.
+    ///
+    /// self.total_allocated_size() <= self.total_physical_size() as no more
+    /// physical space can be allocated for the pool than is available on
+    /// the block devices.
+    fn total_allocated_size(&self) -> Sectors;
+
     /// The number of Sectors in this pool that are currently in use by the
     /// pool for some purpose, and therefore not available for future use,
     /// by any subcomponent of Stratis, either for internal managment or to
@@ -345,11 +357,17 @@ pub trait Engine: Debug + Report + Send {
 
     /// Notify the engine that an event has occurred on the DM file descriptor
     /// and check pools for needed changes.
-    fn pool_evented(&mut self, pools: Option<&Vec<PoolUuid>>) -> StratisResult<HashSet<PoolUuid>>;
+    fn pool_evented(
+        &mut self,
+        pools: Option<&Vec<PoolUuid>>,
+    ) -> StratisResult<HashMap<PoolUuid, ThinPoolDiff>>;
 
     /// Notify the engine that an event has occurred on the DM file descriptor
     /// and check filesystems for needed changes.
-    fn fs_evented(&mut self, pools: Option<&Vec<PoolUuid>>) -> StratisResult<ChangedProperties>;
+    fn fs_evented(
+        &mut self,
+        pools: Option<&Vec<PoolUuid>>,
+    ) -> StratisResult<HashMap<FilesystemUuid, StratFilesystemDiff>>;
 
     /// Get the handler for kernel keyring operations.
     fn get_key_handler(&self) -> &Self::KeyActions;
@@ -376,6 +394,24 @@ pub trait DumpState {
     type State: StateDiff;
 
     /// Return a structure that can be diffed and contains all of the values that
-    /// need to be checked in a diff and can change.
-    fn dump(&self) -> Self::State;
+    /// need to be checked in a diff and can change. This method should use
+    /// existing cached stratisd data structures to determine the state.
+    fn cached<F>(&self, f: F) -> Self::State
+    where
+        F: Fn(&Self) -> Self::State,
+    {
+        f(self)
+    }
+
+    /// Return a structure that can be diffed and contains all of the values that
+    /// need to be checked in a diff and can change. This method should call
+    /// out to fetch the current values of the state. A mutable reference is
+    /// taken because this method should also update the cached values of the
+    /// current state.
+    fn dump<F>(&mut self, mut f: F) -> Self::State
+    where
+        F: FnMut(&mut Self) -> Self::State,
+    {
+        f(self)
+    }
 }

@@ -18,7 +18,6 @@ Top-level classes and methods.
 from ._connection import get_object
 from ._implementation import (
     Blockdev,
-    FetchProperties,
     Filesystem,
     Manager,
     MOBlockDev,

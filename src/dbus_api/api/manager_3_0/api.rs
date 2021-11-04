@@ -6,12 +6,17 @@ use dbus_tree::{Access, EmitsChangedSignal, Factory, MTSync, Method, Property};
 
 use crate::{
     dbus_api::{
-        api::manager_3_0::{
-            methods::{
-                create_pool, destroy_pool, engine_state_report, set_key, unlock_pool, unset_key,
+        api::{
+            manager_3_0::{
+                methods::{
+                    create_pool, destroy_pool, engine_state_report, list_keys, set_key,
+                    unlock_pool, unset_key,
+                },
+                props::{get_locked_pools, get_version},
             },
-            props::get_version,
+            prop_conv::LockedPools,
         },
+        consts,
         types::TData,
     },
     engine::Engine,
@@ -35,6 +40,22 @@ where
         .out_arg(("return_string", "s"))
 }
 
+pub fn list_keys_method<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Method<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
+    f.method("ListKeys", (), list_keys)
+        // In order from left to right:
+        // as: Array of key descriptions as strings.
+        //
+        // Rust representation: Vec<String>
+        .out_arg(("result", "as"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"))
+}
+
 pub fn version_property<E>(
     f: &Factory<MTSync<TData<E>>, TData<E>>,
 ) -> Property<MTSync<TData<E>>, TData<E>>
@@ -46,6 +67,7 @@ where
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_version)
 }
+
 pub fn unset_key_method<E>(
     f: &Factory<MTSync<TData<E>>, TData<E>>,
 ) -> Method<MTSync<TData<E>>, TData<E>>
@@ -150,4 +172,16 @@ where
         .out_arg(("result", "(b(oao))"))
         .out_arg(("return_code", "q"))
         .out_arg(("return_string", "s"))
+}
+
+pub fn locked_pools_property<E>(
+    f: &Factory<MTSync<TData<E>>, TData<E>>,
+) -> Property<MTSync<TData<E>>, TData<E>>
+where
+    E: 'static + Engine,
+{
+    f.property::<LockedPools, _>(consts::LOCKED_POOLS_PROP, ())
+        .access(Access::Read)
+        .emits_changed(EmitsChangedSignal::True)
+        .on_get(get_locked_pools)
 }

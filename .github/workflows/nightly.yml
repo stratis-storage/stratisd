@@ -16,7 +16,7 @@ jobs:
       matrix:
         include:
           - task: make -f Makefile audit
-            toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.56.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           # Allowed because a failure may occur after a new Rust stable
           # version is released.
@@ -59,7 +59,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           components: cargo
-          toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.56.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - name: Install dependencies
         run: dnf install -y findutils git make tar util-linux
       - uses: actions/checkout@v2
@@ -124,7 +124,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           components: cargo
-          toolchain: 1.56.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.56.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           override: true
       - name: Check out ci repo
         run: git clone https://github.com/stratis-storage/ci.git

@@ -64,6 +64,8 @@ sha2 = "0.9.3"
 tempfile = "3.0.2"
 
 [dependencies.chrono]
+git = "https://github.com/mulkieran/chrono"
+branch = "v0.4.19-remove"
 version = "0.4.16"
 default-features = false
 features = ["clock", "std"]

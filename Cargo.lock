@@ -155,8 +155,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "chrono"
 version = "0.4.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "670ad68c9088c2a963aaa298cb369688cf3f9465ce5e2d4ca10e6e0098a1ce73"
+source = "git+https://github.com/mulkieran/chrono?branch=v0.4.19-remove#3867e717d817a989a6cea81463241517cb9dfd14"
 dependencies = [
  "libc",
  "num-integer",

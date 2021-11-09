@@ -45,8 +45,7 @@ pub const BLOCKDEV_PHYSICAL_PATH_PROP: &str = "PhysicalPath";
 
 pub const BLOCKDEV_TOTAL_SIZE_PROP: &str = "TotalPhysicalSize";
 
-/// Get a list of all the standard pool interfaces; i.e., all the revisions of
-/// org.storage.stratis2.pool.
+/// Get a list of all the standard pool interfaces
 pub fn standard_pool_interfaces() -> Vec<String> {
     [POOL_INTERFACE_NAME_3_0]
         .iter()
@@ -54,8 +53,7 @@ pub fn standard_pool_interfaces() -> Vec<String> {
         .collect()
 }
 
-/// Get a list of all the standard filesystem interfaces; i.e., all the
-/// revisions of org.storage.stratis2.filesystem.
+/// Get a list of all the standard filesystem interfaces
 pub fn standard_filesystem_interfaces() -> Vec<String> {
     [FILESYSTEM_INTERFACE_NAME_3_0]
         .iter()
@@ -63,8 +61,7 @@ pub fn standard_filesystem_interfaces() -> Vec<String> {
         .collect()
 }
 
-/// Get a list of all the standard blockdev interfaces; i.e., all the
-/// revisions of org.storage.stratis2.blockdev.
+/// Get a list of all the standard blockdev interfaces
 pub fn standard_blockdev_interfaces() -> Vec<String> {
     [BLOCKDEV_INTERFACE_NAME_3_0]
         .iter()

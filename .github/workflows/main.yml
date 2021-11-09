@@ -335,6 +335,9 @@ jobs:
         run: PROFILEDIR=debug make -f Makefile install
       - name: Check out stratis-cli
         run: git clone https://github.com/stratis-storage/stratis-cli.git
+      - name: Check out highest compatible 2.4.0 branch
+        run: git checkout -b test-branch v2.4.4
+        working-directory: ./stratis-cli
       - name: Set up for D-Bus
         run: |
           mkdir -p /var/lib/dbus

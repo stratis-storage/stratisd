@@ -100,7 +100,7 @@ impl StratBlockDev {
 
     /// Returns the physical path of the block device structure.
     pub fn physical_path(&self) -> &Path {
-        &self.devnode.path()
+        self.devnode.path()
     }
 
     /// Returns the path to the unencrypted metadata stored on the block device structure.

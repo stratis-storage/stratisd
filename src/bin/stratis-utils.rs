@@ -131,8 +131,8 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
             );
         let matches = parser.get_matches_from(&args);
         string_compare(
-            &matches.value_of("left").expect("required argument"),
-            &matches.value_of("right").expect("required argument"),
+            matches.value_of("left").expect("required argument"),
+            matches.value_of("right").expect("required argument"),
         );
     } else if argv1.ends_with("stratis-base32-decode") {
         let parser = App::new("stratis-base32-decode")
@@ -148,8 +148,8 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
             );
         let matches = parser.get_matches_from(&args);
         base32_decode(
-            &matches.value_of("key").expect("required argument"),
-            &matches.value_of("value").expect("required argument"),
+            matches.value_of("key").expect("required argument"),
+            matches.value_of("value").expect("required argument"),
         )?;
     } else if argv1.ends_with("stratis-predict-usage") {
         let parser = App::new("stratis-predict-usage")

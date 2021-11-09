@@ -855,7 +855,7 @@ impl ThinPool {
             .filesystems
             .get_by_uuid(fs_uuid)
             .expect("Inserted above");
-        fs.udev_fs_change(&pool_name, fs_uuid, &name);
+        fs.udev_fs_change(pool_name, fs_uuid, &name);
 
         Ok(fs_uuid)
     }
@@ -899,7 +899,7 @@ impl ThinPool {
             .filesystems
             .get_by_uuid(snapshot_fs_uuid)
             .expect("Inserted above");
-        fs.udev_fs_change(&pool_name, snapshot_fs_uuid, &new_fs_name);
+        fs.udev_fs_change(pool_name, snapshot_fs_uuid, &new_fs_name);
         Ok((
             snapshot_fs_uuid,
             self.filesystems

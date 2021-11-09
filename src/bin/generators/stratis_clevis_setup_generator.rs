@@ -50,7 +50,7 @@ fn generator_with_err(early_dir: String) -> Result<(), Box<dyn Error>> {
         }
     };
 
-    let parsed_pool_uuid = Uuid::parse_str(&pool_uuid)?;
+    let parsed_pool_uuid = Uuid::parse_str(pool_uuid)?;
     let file_contents = unit_template(parsed_pool_uuid);
     let mut path = PathBuf::from(early_dir);
     path.push("stratis-clevis-setup.service");

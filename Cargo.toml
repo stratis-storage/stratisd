@@ -10,14 +10,15 @@ repository = "https://github.com/stratis-storage/stratisd/"
 keywords = ["Linux", "filesystem", "storage"]
 categories = ["filesystem"]
 exclude = [
-	"container_files",
-	"docs",
-	"dracut",
-	"systemd",
-	"tests",
-	"udev",
-	"Makefile",
-	"stratisd.conf"
+    "container_files",
+    "docs",
+    "dracut",
+    "systemd",
+    "tests",
+    "udev",
+    "Makefile",
+    "README_tests.md",
+    "stratisd.conf"
 ]
 
 [[bin]]

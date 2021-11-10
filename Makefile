@@ -38,8 +38,6 @@ else
   PROFILEMINTARGET = release-min
 endif
 
-RELEASE_VERSION ?= 9.9.9
-
 MIN_FEATURES = --no-default-features --features min
 SYSTEMD_FEATURES = --no-default-features --features min,systemd_compat
 EXTRAS_FEATURES =  --features extras
@@ -172,14 +170,6 @@ audit: ${HOME}/.cargo/bin/cargo-audit
 
 expand: ${HOME}/.cargo/bin/cargo-expand
 	PATH=${HOME}/.cargo/bin:${PATH} cargo expand --lib=libstratisd engine::strat_engine::pool
-
-vendored-tar-file:
-	cargo vendor
-	tar -czvf stratisd-${RELEASE_VERSION}-vendor.tar.gz vendor
-
-${PWD}/stratisd-vendor.tar.gz:
-	cargo vendor
-	tar -czvf stratisd-vendor.tar.gz vendor
 
 fmt: fmt-macros
 	cargo fmt
@@ -395,6 +385,5 @@ check-fedora-versions: test-compare-fedora-versions
 	test-clevis-real
 	test-compare-fedora-versions
 	test-set-lower-bounds
-	vendored-tar-file
 	verify-dependency-bounds
 	yamllint

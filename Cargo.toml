@@ -17,6 +17,7 @@ exclude = [
     "tests",
     "udev",
     "Makefile",
+    "README_tests.md",
     "stratisd.conf"
 ]
 

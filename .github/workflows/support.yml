@@ -1,0 +1,57 @@
+---
+# linting and formatting for support code that is not part of the project
+name: stratisd support CI
+
+# yamllint disable-line rule:truthy
+on:
+  push:
+    branches:
+      - master
+      - develop-2.4.2
+    paths:
+      - "**/*.yml"
+      - "tests/**"
+      - "!tests/**/README.*"
+  pull_request:
+    branches:
+      - master
+      - develop-2.4.2
+    paths:
+      - "**/*.yml"
+      - "tests/**"
+      - "!tests/**/README.*"
+
+  workflow_dispatch:
+
+jobs:
+  support-checks:
+    strategy:
+      matrix:
+        include:
+          - dependencies: >
+              pylint
+              python3-dbus-client-gen
+              python3-dbus-python-client-gen
+              python3-psutil
+              python3-pyudev
+              python3-semantic_version
+            task: PYTHONPATH=./src make -f Makefile lint
+            working-directory: ./tests/client-dbus
+          - dependencies: black python3-isort
+            task: make -f Makefile fmt-travis
+            working-directory: ./tests/client-dbus
+          - dependencies: yamllint
+            task: make -f Makefile yamllint
+            working-directory: .
+    runs-on: ubuntu-18.04
+    container: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies
+        run: >
+          dnf install -y
+          make
+          ${{ matrix.dependencies }}
+      - name: Run test
+        run: ${{ matrix.task }}
+        working-directory: ${{ matrix.working-directory }}

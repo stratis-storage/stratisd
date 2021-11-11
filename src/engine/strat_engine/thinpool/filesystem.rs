@@ -2,9 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use chrono::{DateTime, TimeZone, Utc};
-use data_encoding::BASE32_NOPAD;
-
 use std::{
     fs::{File, OpenOptions},
     io::{Read, Write},
@@ -12,6 +9,9 @@ use std::{
     thread::sleep,
     time::Duration,
 };
+
+use chrono::{DateTime, TimeZone, Utc};
+use data_encoding::BASE32_NOPAD;
 
 use devicemapper::{
     Bytes, DmDevice, DmName, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev, ThinStatus, IEC,

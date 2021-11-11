@@ -19,8 +19,7 @@ if $(stratis-min pool is-locked "$STRATIS_ROOTFS_UUID"); then
 	if ! plymouth ask-for-password \
 		--command="stratis-min pool unlock --prompt keyring $STRATIS_ROOTFS_UUID" \
 		--prompt="Enter password for Stratis pool with UUID $STRATIS_ROOTFS_UUID containing root filesystem" \
-		--number-of-tries=3
-	then
+		--number-of-tries=3; then
 		echo Failed to unlock pool with UUID $STRATIS_ROOTFS_UUID using a passphrase >&2
 		exit 1
 	fi

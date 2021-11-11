@@ -347,10 +347,18 @@ impl Pool for StratPool {
                 ));
             }
 
-            // If adding cache devices, must suspend the pool, since the cache
-            // must be augmented with the new devices.
             self.thin_pool.suspend()?;
-            let devices_result = self.backstore.init_cache(pool_uuid, blockdevs);
+            let devices_result = self
+                .backstore
+                .init_cache(pool_uuid, blockdevs)
+                .and_then(|bdi| {
+                    self.thin_pool
+                        .set_device(self.backstore.device().expect(
+                            "Since thin pool exists, space must have been allocated \
+                             from the backstore, so backstore must have a cap device",
+                        ))
+                        .and(Ok(bdi))
+                });
             self.thin_pool.resume()?;
             let devices = devices_result?;
             self.write_metadata(pool_name)?;
@@ -457,17 +465,7 @@ impl Pool for StratPool {
             // If adding cache devices, must suspend the pool; the cache
             // must be augmented with the new devices.
             self.thin_pool.suspend()?;
-            let bdev_info_res = self
-                .backstore
-                .add_cachedevs(pool_uuid, paths)
-                .and_then(|bdi| {
-                    self.thin_pool
-                        .set_device(self.backstore.device().expect(
-                            "Since thin pool exists, space must have been allocated \
-                             from the backstore, so backstore must have a cap device",
-                        ))
-                        .and(Ok(bdi))
-                });
+            let bdev_info_res = self.backstore.add_cachedevs(pool_uuid, paths);
             self.thin_pool.resume()?;
             let bdev_info = bdev_info_res?;
             Ok(SetCreateAction::new(bdev_info))
@@ -570,39 +568,16 @@ impl Pool for StratPool {
             .collect()
     }
 
-    fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut dyn Filesystem)> {
-        self.thin_pool
-            .filesystems_mut()
-            .into_iter()
-            .map(|(n, u, f)| (n, u, f as &mut dyn Filesystem))
-            .collect()
-    }
-
     fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &dyn Filesystem)> {
         self.thin_pool
             .get_filesystem_by_uuid(uuid)
             .map(|(name, fs)| (name, fs as &dyn Filesystem))
     }
 
-    fn get_mut_filesystem(&mut self, uuid: FilesystemUuid) -> Option<(Name, &mut dyn Filesystem)> {
-        self.thin_pool
-            .get_mut_filesystem_by_uuid(uuid)
-            .map(|(name, fs)| (name, fs as &mut dyn Filesystem))
-    }
-
     fn get_filesystem_by_name(&self, fs_name: &Name) -> Option<(FilesystemUuid, &dyn Filesystem)> {
         self.thin_pool
             .get_filesystem_by_name(fs_name)
             .map(|(uuid, fs)| (uuid, fs as &dyn Filesystem))
-    }
-
-    fn get_mut_filesystem_by_name(
-        &mut self,
-        fs_name: &Name,
-    ) -> Option<(FilesystemUuid, &mut dyn Filesystem)> {
-        self.thin_pool
-            .get_mut_filesystem_by_name(fs_name)
-            .map(|(uuid, fs)| (uuid, fs as &mut dyn Filesystem))
     }
 
     fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &dyn BlockDev)> {
@@ -613,22 +588,9 @@ impl Pool for StratPool {
             .collect()
     }
 
-    fn blockdevs_mut(&mut self) -> Vec<(DevUuid, BlockDevTier, &mut dyn BlockDev)> {
-        self.backstore
-            .blockdevs_mut()
-            .into_iter()
-            .map(|(u, t, b)| (u, t, b as &mut dyn BlockDev))
-            .collect()
-    }
-
     fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &dyn BlockDev)> {
         self.get_strat_blockdev(uuid)
             .map(|(t, b)| (t, b as &dyn BlockDev))
-    }
-
-    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut dyn BlockDev)> {
-        self.get_mut_strat_blockdev(uuid)
-            .map(|(t, b)| (t, b as &mut dyn BlockDev))
     }
 
     fn set_blockdev_user_info(
@@ -797,6 +759,48 @@ mod tests {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(2, None, None),
             test_add_cachedevs,
+        );
+    }
+
+    // Verify that it is possible to add datadevs after a cache is initialized.
+    fn test_add_cachedevs_and_datadevs(paths: &[&Path]) {
+        assert!(paths.len() > 2);
+
+        let (cache_path, data_paths) = paths.split_at(1);
+        let (data_path, data_paths) = data_paths.split_at(1);
+
+        let name = "stratis-test-pool";
+        let (uuid, mut pool) = StratPool::initialize(
+            name,
+            data_path,
+            Redundancy::NONE,
+            &EncryptionInfo::default(),
+        )
+        .unwrap();
+        invariant(&pool, name);
+
+        pool.init_cache(uuid, name, cache_path).unwrap();
+        invariant(&pool, name);
+
+        pool.add_blockdevs(uuid, name, data_paths, BlockDevTier::Data)
+            .unwrap();
+
+        pool.teardown().unwrap();
+    }
+
+    #[test]
+    fn loop_test_add_cachedevs_and_datadevs() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(3, 4, None),
+            test_add_cachedevs_and_datadevs,
+        );
+    }
+
+    #[test]
+    fn real_test_add_cachedevs_and_datadevs() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(3, None, None),
+            test_add_cachedevs_and_datadevs,
         );
     }
 

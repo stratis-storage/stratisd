@@ -21,7 +21,6 @@ import random
 import signal
 import string
 import subprocess
-import sys
 import time
 import unittest
 from tempfile import NamedTemporaryFile
@@ -47,7 +46,6 @@ from ._dm import _get_stratis_devices, remove_stratis_setup
 from ._loopback import LoopBackDevices
 
 _STRATISD = os.environ["STRATISD"]
-_STRATIS_PREDICT_USAGE = os.environ["STRATIS_PREDICT_USAGE"]
 
 CRYPTO_LUKS_FS_TYPE = "crypto_LUKS"
 STRATIS_FS_TYPE = "stratis"
@@ -241,6 +239,7 @@ class _Service:
     Start and stop stratisd.
     """
 
+    # pylint: disable=consider-using-with
     def start_service(self):
         """
         Starts the stratisd service if it is not already started. Verifies
@@ -255,8 +254,6 @@ class _Service:
 
         service = subprocess.Popen(
             [_STRATISD],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
             universal_newlines=True,
         )
 
@@ -293,14 +290,12 @@ class _Service:
     def stop_service(self):
         """
         Stops the stratisd daemon previously spawned.
-        :return: a tuple of stdout and stderr
+        :return: None
         """
         self._service.send_signal(signal.SIGINT)
-        output = self._service.communicate()
+        self._service.wait()
         if list(processes("stratisd")) != []:
             raise RuntimeError("Failed to stop stratisd service")
-
-        return output
 
 
 class KernelKey:
@@ -381,13 +376,7 @@ class ServiceContextManager:
         self._service.start_service()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        (_, stderrdata) = self._service.stop_service()
-
-        print("", file=sys.stdout, flush=True)
-        print(
-            "Log output from this invocation of stratisd:", file=sys.stdout, flush=True
-        )
-        print(stderrdata, file=sys.stdout, flush=True)
+        self._service.stop_service()
 
         return False
 

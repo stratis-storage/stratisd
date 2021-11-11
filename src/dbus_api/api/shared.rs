@@ -343,7 +343,6 @@ pub fn get_managed_objects_method(
         })
     }
 
-    #[allow(clippy::unnecessary_wraps)]
     fn get_managed_objects(m: &MethodInfo<MTSync<TData>, TData>) -> MethodResult {
         let dbus_context = m.tree.get_data();
         let engine = dbus_context.engine.blocking_lock();

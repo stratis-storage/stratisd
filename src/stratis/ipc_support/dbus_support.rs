@@ -50,7 +50,6 @@ pub async fn setup(
                 exiting D-Bus thread",
                 e,
             );
-            return;
         }
     });
     let mut conn_handle = task::spawn_blocking(move || conn.process_dbus_requests());
@@ -69,15 +68,15 @@ pub async fn setup(
     select! {
         res = &mut tree_handle => {
             error!("The tree handling thread exited...");
-            res.map_err(|e| StratisError::Error(e.to_string()))
+            res.map_err(StratisError::from)
         }
         res = &mut conn_handle => {
             error!("The D-Bus request thread exited...");
-            res.map_err(|e| StratisError::Error(e.to_string())).and_then(|res| res)
+            res.map_err(StratisError::from).and_then(|res| res)
         }
         res = &mut udev_handle => {
             error!("The udev processing thread exited...");
-            res.map_err(|e| StratisError::Error(e.to_string()))
+            res.map_err(StratisError::from)
         }
     }
 }

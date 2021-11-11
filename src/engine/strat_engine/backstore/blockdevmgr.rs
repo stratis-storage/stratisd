@@ -7,12 +7,14 @@
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
-    path::Path,
+    fs,
+    path::{Path, PathBuf},
 };
 
 use chrono::{DateTime, Duration, Utc};
 use rand::{seq::IteratorRandom, thread_rng};
 use serde_json::Value;
+use tempfile::TempDir;
 
 use devicemapper::{Bytes, Device, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine};
 
@@ -21,7 +23,10 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
-                crypt::{interpret_clevis_config, CryptActivationHandle},
+                crypt::{
+                    back_up_luks_header, interpret_clevis_config, restore_luks_header,
+                    CryptActivationHandle,
+                },
                 devices::{initialize_devices, process_and_verify_devices, wipe_blockdevs},
             },
             metadata::MDADataSize,
@@ -456,23 +461,21 @@ impl BlockDevMgr {
             if (existing_pin.as_str(), &config_to_check) == (pin, &parsed_config)
                 && self.can_unlock(false, true)
             {
-                return Ok(false);
+                Ok(false)
             } else {
-                return Err(StratisError::Error(format!(
+                Err(StratisError::Error(format!(
                     "Block devices have already been bound with pin {} and config {}; \
                     requested pin {} and config {} can't be applied",
                     existing_pin, existing_info, pin, parsed_config,
-                )));
+                )))
             }
+        } else {
+            operation_loop(
+                self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
+                |blockdev| blockdev.bind_clevis(pin, clevis_info),
+            )?;
+            Ok(true)
         }
-
-        bind_loop(
-            self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
-            |blockdev| blockdev.bind_clevis(pin, clevis_info),
-            |blockdev| blockdev.unbind_clevis(),
-        )?;
-
-        Ok(true)
     }
 
     /// Unbind all devices in the given blockdev manager from clevis.
@@ -488,22 +491,17 @@ impl BlockDevMgr {
             return Err(StratisError::Error(
                 "Requested pool does not appear to be encrypted".to_string(),
             ));
-        } else if encryption_info.clevis_info.is_none() {
-            return Ok(false);
         }
 
-        for blockdev in self.blockdevs_mut().into_iter().map(|(_, bd)| bd) {
-            let res = blockdev.unbind_clevis();
-            if let Err(ref e) = res {
-                warn!(
-                    "Failed to unbind from the tang server using clevis: {}. \
-                    This operation cannot be rolled back automatically.",
-                    e,
-                );
-            }
-            res?
+        if encryption_info.clevis_info.is_some() {
+            operation_loop(
+                self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
+                |blockdev| blockdev.unbind_clevis(),
+            )?;
+            Ok(true)
+        } else {
+            Ok(false)
         }
-        Ok(true)
     }
 
     /// Bind all devices in the given blockdev manager to a passphrase using the
@@ -525,32 +523,30 @@ impl BlockDevMgr {
         if let Some(ref kd) = encryption_info.key_description {
             if kd == key_desc {
                 if self.can_unlock(true, false) {
-                    return Ok(false);
+                    Ok(false)
                 } else {
-                    return Err(StratisError::Error(format!(
+                    Err(StratisError::Error(format!(
                         "Key description {} is registered in the metadata but the \
                         associated passphrase can't unlock the device; the \
                         associated passphrase may have changed since binding",
                         key_desc.as_application_str(),
-                    )));
+                    )))
                 }
             } else {
-                return Err(StratisError::Error(format!(
+                Err(StratisError::Error(format!(
                     "Block devices have already been bound with key description {}; \
                     requested key description {} can't be applied",
                     key_desc.as_application_str(),
                     kd.as_application_str(),
-                )));
+                )))
             }
+        } else {
+            operation_loop(
+                self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
+                |blockdev| blockdev.bind_keyring(key_desc),
+            )?;
+            Ok(true)
         }
-
-        bind_loop(
-            self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
-            |blockdev| blockdev.bind_keyring(key_desc),
-            |blockdev| blockdev.unbind_keyring(),
-        )?;
-
-        Ok(true)
     }
 
     /// Unbind all devices in the given blockdev manager from the passphrase
@@ -567,56 +563,85 @@ impl BlockDevMgr {
             return Err(StratisError::Error(
                 "Requested pool does not appear to be encrypted".to_string(),
             ));
-        } else if encryption_info.key_description.is_none() {
-            return Ok(false);
         }
 
-        for blockdev in self.blockdevs_mut().into_iter().map(|(_, bd)| bd) {
-            let res = blockdev.unbind_keyring();
-            if let Err(ref e) = res {
-                warn!(
-                    "Failed to unbind from the passphrase in the kernel keyring: {}. \
-                    This operation cannot be rolled back automatically.",
-                    e,
-                );
-            }
-            res?
+        if encryption_info.key_description.is_some() {
+            operation_loop(
+                self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
+                |blockdev| blockdev.unbind_keyring(),
+            )?;
+            Ok(true)
+        } else {
+            // is encrypted and key description is None
+            Ok(false)
         }
-        Ok(true)
     }
 }
 
-fn bind_loop<'a, I, B, U>(blockdevs: I, bind: B, unbind: U) -> StratisResult<()>
+fn operation_loop<'a, I, A>(blockdevs: I, action: A) -> StratisResult<()>
 where
     I: IntoIterator<Item = &'a mut StratBlockDev>,
-    B: Fn(&mut StratBlockDev) -> StratisResult<()>,
-    U: Fn(&mut StratBlockDev) -> StratisResult<()>,
+    A: Fn(&mut StratBlockDev) -> StratisResult<()>,
 {
-    fn rollback_loop<U>(rollback_record: Vec<&mut StratBlockDev>, unbind: U)
-    where
-        U: Fn(&mut StratBlockDev) -> StratisResult<()>,
-    {
-        rollback_record.into_iter().for_each(|blockdev| {
-            if let Err(e) = unbind(blockdev) {
+    fn rollback_loop(
+        rollback_record: Vec<&mut StratBlockDev>,
+        headers: Vec<PathBuf>,
+        causal_error: StratisError,
+    ) -> StratisError {
+        // NOTE: Zip can be used here because the header will always be backed up before
+        // the operation is performed. As a result, the header iterator will always be
+        // equal to or longer than the blockdev record iterator which means all blockdevs
+        // that have had operations performed on them will always be restored.
+        for (blockdev, header) in rollback_record.into_iter().zip(headers) {
+            if let Err(e) = restore_luks_header(blockdev.physical_path(), header.as_path()) {
                 warn!(
-                    "Failed to unbind device {} during rollback: {}",
+                    "Failed to roll back device operation for device {}: {}",
                     blockdev.physical_path().display(),
                     e,
                 );
+                return StratisError::Error(format!(
+					"An error condition was not able to be rolled back; causal error: {}, rollback error: {}",
+                    causal_error,
+                    e,
+                ));
             }
-        });
+        }
+
+        causal_error
     }
 
-    let mut rollback_record = Vec::new();
-    for blockdev_ref in blockdevs {
-        if let Err(e) = bind(blockdev_ref) {
-            rollback_loop(rollback_record, unbind);
-            return Err(e);
-        } else {
-            rollback_record.push(blockdev_ref);
+    fn perform_operation<'a, I, A>(tmp_dir: &TempDir, blockdevs: I, action: A) -> StratisResult<()>
+    where
+        I: IntoIterator<Item = &'a mut StratBlockDev>,
+        A: Fn(&mut StratBlockDev) -> StratisResult<()>,
+    {
+        let mut original_headers = Vec::new();
+        let mut rollback_record = Vec::new();
+        for blockdev in blockdevs {
+            match back_up_luks_header(blockdev.physical_path(), tmp_dir) {
+                Ok(h) => original_headers.push(h),
+                Err(e) => return Err(rollback_loop(rollback_record, original_headers, e)),
+            };
+            let res = action(blockdev);
+            rollback_record.push(blockdev);
+            if let Err(error) = res {
+                return Err(rollback_loop(rollback_record, original_headers, error));
+            }
         }
+
+        Ok(())
     }
-    Ok(())
+
+    let tmp_dir = TempDir::new()?;
+    let res = perform_operation(&tmp_dir, blockdevs, action);
+    if let Err(e) = fs::remove_dir_all(tmp_dir.path()) {
+        warn!(
+            "Leaked temporary files at path {}: {}",
+            tmp_dir.path().display(),
+            e
+        );
+    }
+    res
 }
 
 impl Recordable<Vec<BaseBlockDevSave>> for BlockDevMgr {

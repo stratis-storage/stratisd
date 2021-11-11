@@ -259,7 +259,6 @@ impl LInfo {
         // Returns true if the information found via udev for two devices is
         // compatible, otherwise false.
         // Precondition: Stratis identifiers of devices are the same
-        #[allow(unknown_lints)]
         #[allow(clippy::suspicious_operation_groupings)]
         fn luks_luks_compatible(info_1: &LLuksInfo, info_2: &LuksInfo) -> bool {
             assert_eq!(info_1.ids.identifiers, info_2.info.identifiers);
@@ -283,7 +282,7 @@ impl LInfo {
             }
             (LInfo::Stratis(strat_info), DeviceInfo::Luks(luks_info)) => {
                 if let Some(luks) = strat_info.luks.as_ref() {
-                    if !luks_luks_compatible(luks, &luks_info) {
+                    if !luks_luks_compatible(luks, luks_info) {
                         return Err(());
                     }
                 }
@@ -293,14 +292,14 @@ impl LInfo {
                 }))
             }
             (LInfo::Luks(luks_info_1), DeviceInfo::Luks(luks_info_2)) => {
-                if !luks_luks_compatible(&luks_info_1, &luks_info_2) {
+                if !luks_luks_compatible(luks_info_1, luks_info_2) {
                     Err(())
                 } else {
                     Ok(LInfo::Luks(LLuksInfo::from(luks_info_2.clone())))
                 }
             }
             (LInfo::Stratis(strat_info_1), DeviceInfo::Stratis(strat_info_2)) => {
-                if !stratis_stratis_compatible(&strat_info_1, &strat_info_2) {
+                if !stratis_stratis_compatible(strat_info_1, strat_info_2) {
                     Err(())
                 } else {
                     Ok(LInfo::Stratis(LStratisInfo {

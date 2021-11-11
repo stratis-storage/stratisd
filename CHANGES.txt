@@ -1,3 +1,17 @@
+stratisd 2.4.3
+==============
+Recommended Rust toolchain version: 1.56.1
+Lowest supported Rust toolchain version: 1.54.0
+
+Recommended development platform for Python development: Fedora 34
+Lowest supported Python interpreter: 3.6.8
+
+- Commits cherry-picked or manually picked from develop-2.4.2 branch,
+  miscellaneous release prep:
+  https://github.com/stratis-storage/stratisd/issues/2838
+  https://github.com/stratis-storage/stratisd/pull/2635
+
+
 stratisd 2.4.2
 ==============
 Recommended Rust toolchain version: 1.52.1
@@ -17,6 +31,8 @@ Lowest supported Python interpreter: 3.6.8
   https://github.com/stratis-storage/stratisd/pull/2612
 
 - Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/2630
+  https://github.com/stratis-storage/stratisd/pull/2628
   https://github.com/stratis-storage/stratisd/pull/2624
   https://github.com/stratis-storage/stratisd/pull/2621
   https://github.com/stratis-storage/stratisd/pull/2620

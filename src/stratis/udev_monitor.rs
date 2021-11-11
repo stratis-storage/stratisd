@@ -36,7 +36,7 @@ pub fn udev_thread(
                         info!("udev thread was notified to exit");
                         return Ok(());
                     }
-                    Err(TryRecvError::Closed) | Err(TryRecvError::Lagged(_)) => {
+                    Err(TryRecvError::Closed | TryRecvError::Lagged(_)) => {
                         return Err(StratisError::Error(
                             "udev processing thread can no longer be notified to exit; shutting down...".to_string()
                         ));
@@ -67,7 +67,7 @@ struct UdevMonitor<'a> {
 
 impl<'a> UdevMonitor<'a> {
     fn create(context: &'a libudev::Context) -> StratisResult<UdevMonitor<'a>> {
-        let mut monitor = libudev::Monitor::new(&context)?;
+        let mut monitor = libudev::Monitor::new(context)?;
         monitor.match_subsystem("block")?;
 
         let socket = monitor.listen()?;

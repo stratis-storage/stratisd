@@ -11,7 +11,8 @@ use std::{
 use data_encoding::BASE64URL_NOPAD;
 use either::Either;
 use serde_json::{Map, Value};
-use sha1::{Digest, Sha1};
+use sha2::{Digest, Sha256};
+use tempfile::TempDir;
 
 use libcryptsetup_rs::{
     c_uint, CryptActivateFlags, CryptDeactivateFlags, CryptDevice, CryptInit, CryptStatusInfo,
@@ -357,7 +358,7 @@ fn tang_dispatch(json: &Value) -> StratisResult<Value> {
     map.remove("alg");
 
     let thp = key.to_string();
-    let mut hasher = Sha1::new();
+    let mut hasher = Sha256::new();
     hasher.update(thp.as_bytes());
     let array = hasher.finalize();
     let thp = BASE64URL_NOPAD.encode(array.as_slice());
@@ -867,4 +868,24 @@ fn identifiers_from_metadata(device: &mut CryptDevice) -> StratisResult<StratisI
 // Bytes occupied by crypt metadata
 pub fn crypt_metadata_size() -> u64 {
     2 * DEFAULT_CRYPT_METADATA_SIZE + DEFAULT_CRYPT_KEYSLOTS_SIZE
+}
+
+/// Back up the LUKS2 header to a temporary file.
+pub fn back_up_luks_header(dev_path: &Path, tmp_dir: &TempDir) -> StratisResult<PathBuf> {
+    let file_name = dev_path.display().to_string().replace("/", "_");
+    let pathbuf = vec![tmp_dir.path(), Path::new(&file_name)]
+        .into_iter()
+        .collect::<PathBuf>();
+    acquire_crypt_device(dev_path)?
+        .backup_handle()
+        .header_backup(EncryptionFormat::Luks2, &pathbuf)?;
+    Ok(pathbuf)
+}
+
+/// Restore the LUKS2 header from a temporary file.
+pub fn restore_luks_header(dev_path: &Path, backup_path: &Path) -> StratisResult<()> {
+    acquire_crypt_device(dev_path)?
+        .backup_handle()
+        .header_restore(EncryptionFormat::Luks2, backup_path)?;
+    Ok(())
 }

@@ -7,7 +7,7 @@ use std::{convert::TryFrom, error::Error, path::PathBuf};
 use clap::{App, Arg, ArgGroup, ArgMatches, SubCommand};
 use serde_json::{json, Map, Value};
 
-use libstratis::{
+use stratisd::{
     engine::{EncryptionInfo, KeyDescription, PoolUuid, UnlockMethod, CLEVIS_TANG_TRUST_URL},
     jsonrpc::client::{filesystem, key, pool, report},
     stratis::{StratisError, VERSION},
@@ -185,7 +185,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             };
             let pin = args.value_of("clevis");
             let clevis_info = match pin {
-                Some("nbde") | Some("tang") => {
+                Some("nbde" | "tang") => {
                     let mut json = Map::new();
                     json.insert(
                         "url".to_string(),

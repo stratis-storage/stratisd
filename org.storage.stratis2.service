@@ -1,4 +1,0 @@
-[D-BUS Service]
-Name=org.storage.stratis2
-Exec=/usr/libexec/stratisd
-User=root

@@ -246,7 +246,7 @@ fn process_stratis_device(dev: &UdevEngineDevice) -> Option<StratisInfo> {
                 device_to_devno_wrapper(dev),
                 device_identifiers_wrapper(devnode),
             ) {
-                (Err(err), _) | (_, Err(err)) | (_, Ok(Err(err))) => {
+                (Err(err), _) | (_, Err(err) | Ok(Err(err))) => {
                     warn!("udev identified device {} as a Stratis device but {}, disregarding the device",
                           devnode.display(),
                           err);

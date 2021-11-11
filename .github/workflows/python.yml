@@ -1,0 +1,160 @@
+---
+name: stratisd python-based tests
+
+# yamllint disable-line rule:truthy
+on:
+  push:
+    branches:
+      - master
+      - develop-2.4.2
+    paths-ignore:
+      - 'CHANGES.txt'
+      - '**/README.md'
+      - 'README_tests.md'
+  pull_request:
+    branches:
+      - master
+      - develop-2.4.2
+    paths-ignore:
+      - 'CHANGES.txt'
+      - '**/README.md'
+      - 'README_tests.md'
+
+  workflow_dispatch:
+
+jobs:
+
+  python-based-tests:
+    strategy:
+      matrix:
+        include:
+          # MANDATORY CHECKS USING CURRENT DEVELOPMENT ENVIRONMENT
+          - image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
+            toolchain: 1.56.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            skip_value: 0
+          # MANDATORY CHECKS USING LOWEST SUPPORTED ENVIRONMENT PROXY
+          - image: fedora:30  # LOWEST DEVELOPMENT ENVIRONMENT
+            toolchain: 1.54.0  # LOWEST SUPPORTED RUST TOOLCHAIN
+            skip_value: 1
+    runs-on: ubuntu-18.04
+    container:
+      image: ${{ matrix.image }}
+      options: --privileged -v /dev:/dev
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies for Fedora
+        run: >
+          dnf install -y
+          asciidoc
+          clang
+          cryptsetup-devel
+          curl
+          dbus-daemon
+          dbus-devel
+          dbus-tools
+          device-mapper-persistent-data
+          libblkid-devel
+          make
+          python3-dbus
+          python3-dbus-client-gen
+          python3-dbus-python-client-gen
+          python3-psutil
+          python3-pyudev
+          systemd-devel
+          systemd-udev
+          xfsprogs
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: cargo
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+      - name: Install all necessary Stratis files
+        run: PROFILEDIR=debug make -f Makefile install
+      - name: Start udev
+        run: /usr/lib/systemd/systemd-udevd &
+      - name: Set up for D-Bus
+        run: |
+          mkdir -p /var/lib/dbus
+          dbus-uuidgen > /var/lib/dbus/machine-id
+          mkdir -p /var/run/dbus
+      - name: Start D-Bus
+        run: >
+          dbus-daemon
+          --config-file=/usr/share/dbus-1/system.conf
+          --print-address
+      - name: Tests on ${{ matrix.image }} using Rust ${{ matrix.toolchain }}
+        run: >
+          RUST_LOG=stratisd=debug
+          STRATISD=/usr/libexec/stratisd
+          STRATIS_PREDICT_USAGE=/usr/bin/stratis-predict-usage
+          SKIP_DUPLICATE_NAMES_TEST=${{ matrix.skip_value }}
+          PYTHONPATH=./src
+          make udev-tests
+        working-directory: ./tests/client-dbus
+
+  # PYTHON-BASED TESTS WITH TANG
+  python-based-checks_with_tang:
+    runs-on: ubuntu-18.04
+    container:
+      image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
+      options: --privileged -v /dev:/dev
+    services:
+      tang:
+        # yamllint disable rule:line-length
+        image: docker.pkg.github.com/stratis-storage/stratisd/tang:34  # CURRENT DEVELOPMENT ENVIRONMENT
+        credentials:
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+        options: --privileged -p 80:80
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies for Fedora
+        run: >
+          dnf install -y
+          asciidoc
+          clang
+          clevis
+          clevis-luks
+          cryptsetup-devel
+          curl
+          dbus-daemon
+          dbus-devel
+          dbus-tools
+          device-mapper-persistent-data
+          libblkid-devel
+          make
+          python3-dbus
+          python3-dbus-client-gen
+          python3-dbus-python-client-gen
+          python3-psutil
+          python3-pyudev
+          systemd-devel
+          systemd-udev
+          xfsprogs
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: cargo
+          toolchain: 1.56.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          override: true
+      - name: Install all necessary Stratis files
+        run: PROFILEDIR=debug make -f Makefile install
+      - name: Start udev
+        run: /usr/lib/systemd/systemd-udevd &
+      - name: Set up for D-Bus
+        run: |
+          mkdir -p /var/lib/dbus
+          dbus-uuidgen > /var/lib/dbus/machine-id
+          mkdir -p /var/run/dbus
+      - name: Start D-Bus
+        run: >
+          dbus-daemon
+          --config-file=/usr/share/dbus-1/system.conf
+          --print-address
+      - name: Run D-Bus based bind tests
+        run: >
+          TANG_URL=tang
+          RUST_LOG=stratisd=debug
+          STRATISD=/usr/libexec/stratisd
+          PYTHONPATH=./src
+          make -f Makefile tang-tests
+        working-directory: ./tests/client-dbus

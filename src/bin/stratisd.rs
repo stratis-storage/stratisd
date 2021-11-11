@@ -19,7 +19,7 @@ use nix::{
     unistd::getpid,
 };
 
-use libstratis::stratis::{run, StratisError, StratisResult, VERSION};
+use stratisd::stratis::{run, StratisError, StratisResult, VERSION};
 
 const STRATISD_PID_PATH: &str = "/run/stratisd.pid";
 const STRATISD_MIN_PID_PATH: &str = "/run/stratisd-min.pid";
@@ -36,11 +36,6 @@ fn initialize_log(log_level: Option<&str>) {
     if let Some(log_level) = log_level {
         builder.filter(
             Some("stratisd"),
-            LevelFilter::from_str(log_level)
-                .expect("argument parser only accepts valid log levels"),
-        );
-        builder.filter(
-            Some("libstratis"),
             LevelFilter::from_str(log_level)
                 .expect("argument parser only accepts valid log levels"),
         );

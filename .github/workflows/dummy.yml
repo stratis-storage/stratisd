@@ -1,0 +1,20 @@
+---
+name: stratisd dummy CI
+
+# yamllint disable-line rule:truthy
+on:
+  push:
+    branches:
+      - patch-2.4.2
+  pull_request:
+    branches:
+      - patch-2.4.2
+
+  workflow_dispatch:
+
+jobs:
+  dummy:
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Run dummy test
+        run: echo "I exist to be Required in Github branch protection rules"

@@ -447,7 +447,7 @@ pub fn thin_metadata_size(
         .spawn()?;
     thin_meta_child.wait()?;
     let mut output = String::new();
-    let is_ok = thin_meta_child.id() == 0;
+    let is_ok = thin_meta_child.wait()?.code() == Some(0);
     thin_meta_child
         .stdout
         .ok_or_else(|| {

@@ -163,7 +163,13 @@ impl StratPool {
 
         let thinpool = ThinPool::new(
             pool_uuid,
-            &ThinPoolSizeParams::default(),
+            match ThinPoolSizeParams::new(backstore.available_in_backstore()) {
+                Ok(ref params) => params,
+                Err(e) => {
+                    let _ = backstore.destroy();
+                    return Err(e);
+                }
+            },
             DATA_BLOCK_SIZE,
             &mut backstore,
         );

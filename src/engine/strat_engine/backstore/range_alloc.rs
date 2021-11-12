@@ -14,7 +14,6 @@ use crate::{
     stratis::{StratisError, StratisResult},
 };
 
-#[derive(Debug)]
 /// A structure that keeps a bunch of segments organized by their initial
 /// index. This is principally useful for the range allocator.
 /// It enforces some invariants:
@@ -23,6 +22,7 @@ use crate::{
 /// coalesced into a single segment.
 /// * No overlapping segments
 /// * No segments that extend beyond limit
+#[derive(Debug, Clone)]
 pub struct PerDevSegments {
     // the end, no sectors can be allocated beyond this point
     limit: Sectors,
@@ -350,22 +350,9 @@ impl RangeAllocator {
         self.segments.sum()
     }
 
-    #[allow(dead_code)]
-    /// Just allocate all the sectors that are available.
-    pub fn request_all(&mut self) -> PerDevSegments {
-        let segs = self.segments.complement();
-
-        let mut temp = PerDevSegments::new(self.segments.limit);
-        temp.insert(&(Sectors(0), self.segments.limit))
-            .expect("exactly one segment to fill whole range");
-        self.segments = temp;
-
-        segs
-    }
-
     /// Attempt to allocate.
     /// Returns a PerDevSegments object containing the allocated ranges.
-    pub fn request(&mut self, amount: Sectors) -> PerDevSegments {
+    pub fn request(&self, amount: Sectors) -> PerDevSegments {
         let mut segs = PerDevSegments::new(self.segments.limit());
         let mut needed = amount;
 
@@ -379,37 +366,18 @@ impl RangeAllocator {
                 .expect("wholly disjoint from other elements in segs");
             needed -= to_use;
         }
+        segs
+    }
 
+    /// Commit an allocation determined to be valid.
+    ///
+    /// This method does not actually modify metadata but is required for bookkeeping
+    /// for the internal block device allocation data structure.
+    pub fn commit(&mut self, segs: PerDevSegments) {
         self.segments = self
             .segments
             .union(&segs)
             .expect("all segments verified to be in available ranges");
-        segs
-    }
-
-    #[cfg(test)]
-    fn invariant(&self) {
-        // Verify that calling request_all() has the identical effect to
-        // calling request() and requesting all available.
-        let mut dup1 = RangeAllocator {
-            segments: PerDevSegments {
-                limit: self.segments.limit,
-                used: self.segments.used.clone(),
-            },
-        };
-        let mut dup2 = RangeAllocator {
-            segments: PerDevSegments {
-                limit: self.segments.limit,
-                used: self.segments.used.clone(),
-            },
-        };
-        let result1 = dup1.request_all();
-        let result2 = dup2.request(dup2.available());
-        assert_eq!(result1.limit, result2.limit);
-        assert_eq!(result1.used, result2.used);
-
-        assert_eq!(dup1.available(), Sectors(0));
-        assert_eq!(dup2.available(), Sectors(0));
     }
 }
 
@@ -442,17 +410,17 @@ mod tests {
         assert_eq!(allocator.used(), Sectors(100));
         assert_eq!(allocator.available(), Sectors(28));
 
-        let request = allocator.request(Sectors(50));
-        assert_eq!(request.len(), 2);
-        assert_eq!(request.sum(), Sectors(28));
+        let seg = allocator.request(Sectors(50));
+        allocator.commit(seg.clone());
+        assert_eq!(seg.len(), 2);
+        assert_eq!(seg.sum(), Sectors(28));
         assert_eq!(allocator.used(), Sectors(128));
         assert_eq!(allocator.available(), Sectors(0));
 
         let available = allocator.available();
-        allocator.request(available);
+        let seg = allocator.request(available);
+        allocator.commit(seg);
         assert_eq!(allocator.available(), Sectors(0));
-
-        allocator.invariant();
     }
 
     #[test]
@@ -472,7 +440,6 @@ mod tests {
             allocator.used.iter().next().unwrap(),
             (&Sectors(10), &Sectors(30))
         );
-        allocator.invariant();
     }
 
     #[test]
@@ -525,10 +492,11 @@ mod tests {
     fn test_allocator_failures_range_overwrite() {
         let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
 
-        let request = allocator.request(Sectors(128));
+        let seg = allocator.request(Sectors(128));
+        allocator.commit(seg.clone());
         assert_eq!(allocator.used(), Sectors(128));
         assert_eq!(
-            request.iter().collect::<Vec<_>>(),
+            seg.iter().collect::<Vec<_>>(),
             vec![(&Sectors(0), &Sectors(128))]
         );
 
@@ -538,8 +506,6 @@ mod tests {
             allocator.segments.insert_all(&[(Sectors(1), Sectors(1))]),
             Err(_)
         );
-
-        allocator.invariant();
     }
 
     #[test]

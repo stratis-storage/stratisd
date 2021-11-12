@@ -15,6 +15,7 @@
 // an explicit error is returned if the executable can not be found.
 
 use std::{
+    cmp::min,
     collections::HashMap,
     io::{Read, Write},
     path::{Path, PathBuf},
@@ -25,7 +26,7 @@ use libc::c_uint;
 use libcryptsetup_rs::SafeMemHandle;
 use serde_json::Value;
 
-use devicemapper::{Bytes, Sectors};
+use devicemapper::{MetaBlocks, Sectors};
 
 use crate::{
     engine::{
@@ -34,6 +35,9 @@ use crate::{
     },
     stratis::{StratisError, StratisResult},
 };
+
+// The maximum allowable size of the thinpool metadata device
+const MAX_META_SIZE: MetaBlocks = MetaBlocks(255 * ((1 << 14) - 64));
 
 const BINARIES_PATHS: [&str; 4] = ["/usr/sbin", "/sbin", "/usr/bin", "/bin"];
 
@@ -426,17 +430,16 @@ pub fn clevis_luks_regen(dev_path: &Path, keyslot: c_uint) -> StratisResult<()> 
 
 /// Determine the number of sectors required to house the specified parameters for
 /// the thin pool that determine metadata size.
-#[allow(dead_code)]
 pub fn thin_metadata_size(
-    block_size: Bytes,
-    pool_size: Bytes,
+    block_size: Sectors,
+    pool_size: Sectors,
     max_thins: u64,
 ) -> StratisResult<Sectors> {
     let mut thin_meta_child = Command::new(get_executable(THIN_METADATA_SIZE))
         .arg("-b")
-        .arg(format!("{}b", *block_size))
+        .arg(format!("{}b", *block_size.bytes()))
         .arg("-s")
-        .arg(format!("{}b", *pool_size))
+        .arg(format!("{}b", *pool_size.bytes()))
         .arg("-m")
         .arg(max_thins.to_string())
         .arg("-n")
@@ -455,7 +458,10 @@ pub fn thin_metadata_size(
         })?
         .read_to_string(&mut output)?;
     if is_ok {
-        Ok(Sectors(output.parse::<u64>()?))
+        Ok(min(
+            Sectors(output.parse::<u64>()?),
+            MAX_META_SIZE.sectors(),
+        ))
     } else {
         Err(StratisError::Msg(format!(
             "thin_metadata_size failed: {}",

@@ -12,6 +12,7 @@ mod data_tier;
 mod devices;
 mod range_alloc;
 mod shared;
+mod transaction;
 
 pub use self::{
     backstore::Backstore,

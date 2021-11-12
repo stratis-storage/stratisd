@@ -15,6 +15,7 @@ use crate::{
                 blockdev::StratBlockDev,
                 blockdevmgr::{BlkDevSegment, BlockDevMgr},
                 shared::{coalesce_blkdevsegs, metadata_to_segment},
+                transaction::RequestTransaction,
             },
             serde_structs::{BaseDevSave, BlockDevSave, DataTierSave, Recordable},
         },
@@ -70,24 +71,21 @@ impl DataTier {
         self.block_mgr.add(pool_uuid, paths)
     }
 
-    /// Allocate at least request sectors from unallocated segments in
-    /// block devices belonging to the data tier. Return true if requested
-    /// amount or more was allocated, otherwise, false.
-    pub fn alloc(&mut self, request: Sectors) -> bool {
-        match self.block_mgr.alloc_space(&[request]) {
-            Some(segments) => {
-                self.segments = coalesce_blkdevsegs(
-                    &self.segments,
-                    &segments
-                        .iter()
-                        .flat_map(|s| s.iter())
-                        .cloned()
-                        .collect::<Vec<_>>(),
-                );
-                true
-            }
-            None => false,
-        }
+    /// Allocate a region for all sector size requests from unallocated segments in
+    /// block devices belonging to the data tier. Return Some(_) if requested
+    /// amount or more was allocated, otherwise, None.
+    pub fn alloc_request(&self, requests: &[Sectors]) -> Option<RequestTransaction> {
+        self.block_mgr.request_space(requests)
+    }
+
+    /// Commit an allocation that was determined to be valid by alloc_request()
+    /// to metadata.
+    pub fn alloc_commit(&mut self, transaction: RequestTransaction) -> StratisResult<()> {
+        let segments = transaction.get_blockdevmgr();
+        self.block_mgr.commit_space(transaction)?;
+        self.segments = coalesce_blkdevsegs(&self.segments, &segments);
+
+        Ok(())
     }
 
     /// The sum of the lengths of all the sectors that have been mapped to an
@@ -205,7 +203,8 @@ mod tests {
         let request_amount = data_tier.block_mgr.avail_space() / 2usize;
         assert!(request_amount != Sectors(0));
 
-        assert!(data_tier.alloc(request_amount));
+        let transaction = data_tier.alloc_request(&[request_amount]).unwrap();
+        data_tier.alloc_commit(transaction).unwrap();
 
         // A data tier w/ some amount allocated
         assert!(data_tier.allocated() >= request_amount);
@@ -221,7 +220,8 @@ mod tests {
         size = data_tier.size();
 
         // Allocate enough to get into the newly added block devices
-        assert!(data_tier.alloc(last_request_amount));
+        let transaction = data_tier.alloc_request(&[last_request_amount]).unwrap();
+        data_tier.alloc_commit(transaction).unwrap();
 
         assert!(data_tier.allocated() >= request_amount + last_request_amount);
         assert_eq!(data_tier.size(), size);

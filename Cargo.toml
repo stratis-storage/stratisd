@@ -121,5 +121,5 @@ min = ["rpassword"]
 systemd_compat = ["bindgen"]
 
 [patch.crates-io.devicemapper]
-git = "https://github.com/stratis-storage/devicemapper-rs"
-branch = "crates-io-patch-0.30.0"
+git = "https://github.com/jbaublitz/devicemapper-rs"
+branch = "issue-stratisd-2814"

@@ -183,8 +183,15 @@ impl StratBlockDev {
     /// If all available sectors are desired, don't use this function.
     /// Define a request_all() function here and have it invoke the
     /// RangeAllocator::request_all() function.
-    pub fn request_space(&mut self, size: Sectors) -> PerDevSegments {
+    pub fn request_space(&self, size: Sectors) -> PerDevSegments {
         self.used.request(size)
+    }
+
+    /// Commit allocation requested by request_space().
+    ///
+    /// This method will record the requested allocations in the metadata.
+    pub fn commit_space(&mut self, segs: PerDevSegments) {
+        self.used.commit(segs);
     }
 
     // ALL SIZE METHODS (except size(), which is in BlockDev impl.)

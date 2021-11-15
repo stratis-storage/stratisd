@@ -459,7 +459,7 @@ pub fn thin_metadata_size(
         .read_to_string(&mut output)?;
     if is_ok {
         Ok(min(
-            Sectors(output.parse::<u64>()?),
+            Sectors(output.trim().parse::<u64>()?),
             MAX_META_SIZE.sectors(),
         ))
     } else {

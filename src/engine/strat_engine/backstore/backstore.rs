@@ -355,32 +355,29 @@ impl Backstore {
         &mut self,
         sizes: &[Sectors],
     ) -> StratisResult<Option<RequestTransaction>> {
-        let total_required = sizes.iter().cloned().sum();
-        let available = self.available_in_cap();
-        if available >= total_required {
-            let transaction = self.data_tier.alloc_request(sizes);
+        let mut transaction = match self.data_tier.alloc_request(sizes)? {
+            Some(t) => t,
+            None => return Ok(None),
+        };
 
-            let mut chunks = Vec::new();
-            let mut next = self.next;
-            for size in sizes {
-                chunks.push((next, *size));
-                next += *size
-            }
-
-            // Assert that the postcondition holds.
-            assert_eq!(
-                sizes,
-                chunks
-                    .iter()
-                    .map(|x| x.1)
-                    .collect::<Vec<Sectors>>()
-                    .as_slice()
-            );
-
-            Ok(transaction)
-        } else {
-            Ok(None)
+        let mut next = self.next;
+        for size in sizes {
+            transaction.add_seg_req((next, *size));
+            next += *size
         }
+
+        // Assert that the postcondition holds.
+        assert_eq!(
+            sizes,
+            transaction
+                .get_backstore()
+                .iter()
+                .map(|x| x.1)
+                .collect::<Vec<Sectors>>()
+                .as_slice()
+        );
+
+        Ok(Some(transaction))
     }
 
     /// Commit space requested by request_alloc() to metadata.
@@ -396,6 +393,8 @@ impl Backstore {
         self.data_tier.alloc_commit(transaction)?;
         // This must occur after the segments have been updated in the data tier
         self.extend_cap_device(pool_uuid)?;
+
+        assert!(self.next <= self.size());
 
         self.next += segs
             .into_iter()
@@ -491,21 +490,6 @@ impl Backstore {
     /// added to cap.
     pub fn available_in_backstore(&self) -> Sectors {
         self.data_tier.usable_size() - self.next
-    }
-
-    /// The available number of Sectors.
-    fn available_in_cap(&self) -> Sectors {
-        let size = self.size();
-        // It is absolutely essential for correct operation that the assertion
-        // be true. If it is false, the result will be incorrect, and space
-        // will be allocated incorrectly from the cap device.
-        assert!(
-            self.next <= size,
-            "next index, {}, is greater than the total size available {}",
-            self.next,
-            size
-        );
-        size - self.next
     }
 
     /// Destroy the entire store.

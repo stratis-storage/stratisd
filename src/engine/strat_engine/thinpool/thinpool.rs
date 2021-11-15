@@ -214,26 +214,29 @@ fn search(
     upper_limit: Sectors,
     lower_limit: Sectors,
 ) -> StratisResult<(Sectors, Sectors)> {
+    let upper_aligned = upper_limit / DATA_BLOCK_SIZE * DATA_BLOCK_SIZE;
+    let lower_aligned = lower_limit / DATA_BLOCK_SIZE * DATA_BLOCK_SIZE;
+
     let (upper_meta_size, lower_meta_size) = (
-        thin_metadata_size(DATA_BLOCK_SIZE, upper_limit, MAX_THINS)?,
-        thin_metadata_size(DATA_BLOCK_SIZE, lower_limit, MAX_THINS)?,
+        thin_metadata_size(DATA_BLOCK_SIZE, upper_aligned, MAX_THINS)?,
+        thin_metadata_size(DATA_BLOCK_SIZE, lower_aligned, MAX_THINS)?,
     );
 
     if upper_meta_size == lower_meta_size
-        && total_space - (lower_limit + lower_meta_size * 2u64) < DATA_BLOCK_SIZE
+        && total_space - (lower_aligned + lower_meta_size * 2u64) < DATA_BLOCK_SIZE
     {
-        Ok((lower_limit, lower_meta_size))
+        Ok((lower_aligned, lower_meta_size))
     } else {
-        let diff = (upper_limit - lower_limit) / DATA_BLOCK_SIZE * DATA_BLOCK_SIZE;
+        let diff = upper_limit - lower_limit;
         let half_diff = diff / (DATA_BLOCK_SIZE * 2u64) * DATA_BLOCK_SIZE;
         let half_limit = lower_limit + half_diff;
 
         let half_meta_size = thin_metadata_size(DATA_BLOCK_SIZE, half_limit, MAX_THINS)?;
 
-        if total_space <= half_limit + 2u64 * half_meta_size {
-            search(total_space, half_limit, lower_limit)
+        if total_space < half_limit + 2u64 * half_meta_size {
+            search(total_space, half_limit, lower_aligned)
         } else {
-            search(total_space, upper_limit, half_limit)
+            search(total_space, upper_aligned, half_limit)
         }
     }
 }
@@ -252,14 +255,15 @@ fn divide_space(
     let (data_size, meta_size) = search(
         total_space,
         total_space,
-        total_space - upper_limit_meta_size,
+        total_space - 2u64 * upper_limit_meta_size,
     )?;
 
     let data_extended = data_size - current_data_size;
     let meta_extended = meta_size - current_meta_size;
 
-    assert!(available_space >= data_extended + meta_extended);
-    assert!((available_space - data_extended + meta_extended) < DATA_BLOCK_SIZE);
+    assert!(available_space >= data_extended + 2u64 * meta_extended);
+    assert!((available_space - (data_extended + 2u64 * meta_extended)) < DATA_BLOCK_SIZE);
+    assert_eq!(data_extended % DATA_BLOCK_SIZE, Sectors(0));
     Ok((data_extended, meta_extended))
 }
 
@@ -279,25 +283,13 @@ fn calculate_subdevice_extension(
     requested_space: Sectors,
 ) -> StratisResult<(Sectors, Sectors)> {
     let requested_min = min(available_space, requested_space);
-    let requested_aligned = (requested_min / DATA_BLOCK_SIZE) * DATA_BLOCK_SIZE;
 
-    let extended_meta_size = thin_metadata_size(
-        DATA_BLOCK_SIZE,
-        current_data_size + requested_aligned,
-        MAX_THINS,
-    )?;
-    let meta_extension = extended_meta_size - current_meta_size;
-
-    if available_space >= requested_aligned + meta_extension {
-        Ok((requested_aligned, meta_extension))
-    } else {
-        divide_space(
-            total_space,
-            available_space,
-            current_data_size,
-            current_meta_size,
-        )
-    }
+    divide_space(
+        total_space,
+        requested_min,
+        current_data_size,
+        current_meta_size,
+    )
 }
 
 pub struct ThinPoolSizeParams {
@@ -309,12 +301,27 @@ pub struct ThinPoolSizeParams {
 impl ThinPoolSizeParams {
     /// Create a new set of initial sizes for all flex devices.
     pub fn new(available_space: Sectors) -> StratisResult<Self> {
+        debug!(
+            "Determining thin pool parameters for {} of available space",
+            available_space
+        );
+
         let initial_space = min(
             available_space - INITIAL_MDV_SIZE,
             datablocks_to_sectors(DATA_ALLOC_SIZE),
         );
+
+        let initial_aligned = (initial_space / DATA_BLOCK_SIZE) * DATA_BLOCK_SIZE;
+
+        debug!("Using {} for initial space", initial_space);
+
         let (data_size, meta_size) =
-            divide_space(initial_space, initial_space, Sectors(0), Sectors(0))?;
+            divide_space(initial_aligned, initial_aligned, Sectors(0), Sectors(0))?;
+
+        debug!(
+            "Determined sizes {} for data device and {} for meta device",
+            data_size, meta_size
+        );
 
         Ok(ThinPoolSizeParams {
             data_size: sectors_to_datablocks(data_size),
@@ -607,8 +614,8 @@ impl ThinPool {
 
         let mut should_save: bool = false;
 
-        if let Some(ThinPoolStatus::Working(status)) = self.thin_pool_status.as_ref().cloned() {
-            if backstore.available_in_backstore() - datablocks_to_sectors(status.usage.used_data)
+        if let Some(ThinPoolStatus::Working(_)) = self.thin_pool_status.as_ref().cloned() {
+            if self.thin_pool.data_dev().size() - self.total_physical_used()?
                 < datablocks_to_sectors(DATA_LOWATER)
             {
                 let amount_allocated = match self.extend_thin_data_device(pool_uuid, backstore) {

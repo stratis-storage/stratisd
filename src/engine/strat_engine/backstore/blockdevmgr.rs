@@ -268,12 +268,12 @@ impl BlockDevMgr {
     /// not possible to satisfy the request.
     /// This method is atomic, it either allocates all requested or allocates
     /// nothing.
-    pub fn request_space(&self, sizes: &[Sectors]) -> Option<RequestTransaction> {
+    pub fn request_space(&self, sizes: &[Sectors]) -> StratisResult<Option<RequestTransaction>> {
         let mut transaction = RequestTransaction::default();
 
         let total_needed: Sectors = sizes.iter().cloned().sum();
         if self.avail_space() < total_needed {
-            return None;
+            return Ok(None);
         }
 
         for (idx, &needed) in sizes.iter().enumerate() {
@@ -290,7 +290,7 @@ impl BlockDevMgr {
                     break;
                 }
 
-                let r_segs = bd.request_space(needed - alloc);
+                let r_segs = bd.request_space(needed - alloc, &transaction)?;
                 for (&start, &length) in r_segs.iter() {
                     transaction.add_bd_seg_req(
                         idx,
@@ -302,7 +302,7 @@ impl BlockDevMgr {
             assert_eq!(alloc, needed);
         }
 
-        Some(transaction)
+        Ok(Some(transaction))
     }
 
     /// Commit the allocations calculated by the request_space() method.
@@ -800,7 +800,7 @@ mod tests {
         assert_eq!(mgr.avail_space() + mgr.metadata_size(), mgr.size());
 
         let allocated = Sectors(2);
-        let transaction = mgr.request_space(&[allocated]).unwrap();
+        let transaction = mgr.request_space(&[allocated]).unwrap().unwrap();
         mgr.commit_space(transaction).unwrap();
         assert_eq!(
             mgr.avail_space() + allocated + mgr.metadata_size(),

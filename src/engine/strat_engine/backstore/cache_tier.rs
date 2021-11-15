@@ -123,7 +123,7 @@ impl CacheTier {
 
         let trans = self
             .block_mgr
-            .request_space(&[avail_space])
+            .request_space(&[avail_space])?
             .expect("asked for exactly the space available, must get");
         let segments = trans.get_blockdevmgr();
         if let Err(e) = self.block_mgr.commit_space(trans) {
@@ -166,7 +166,7 @@ impl CacheTier {
         }
 
         let trans = block_mgr
-            .request_space(&[meta_space, avail_space - meta_space])
+            .request_space(&[meta_space, avail_space - meta_space])?
             .expect("asked for exactly the space available, must get");
         let meta_segments = trans.get_segs_for_req(0).expect("segments.len() == 2");
         let cache_segments = trans.get_segs_for_req(1).expect("segments.len() == 2");

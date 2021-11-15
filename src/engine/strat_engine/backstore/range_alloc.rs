@@ -10,7 +10,10 @@ use std::{
 use devicemapper::Sectors;
 
 use crate::{
-    engine::strat_engine::metadata::BlockdevSize,
+    engine::{
+        strat_engine::{backstore::transaction::RequestTransaction, metadata::BlockdevSize},
+        types::DevUuid,
+    },
     stratis::{StratisError, StratisResult},
 };
 
@@ -352,11 +355,36 @@ impl RangeAllocator {
 
     /// Attempt to allocate.
     /// Returns a PerDevSegments object containing the allocated ranges.
-    pub fn request(&self, amount: Sectors) -> PerDevSegments {
+    pub fn request(
+        &self,
+        uuid: DevUuid,
+        amount: Sectors,
+        transaction: &RequestTransaction,
+    ) -> StratisResult<PerDevSegments> {
+        let trans_used = transaction
+            .get_blockdevmgr()
+            .into_iter()
+            .filter_map(|seg| {
+                if seg.uuid == uuid {
+                    Some((seg.segment.start, seg.segment.length))
+                } else {
+                    None
+                }
+            })
+            .try_fold(
+                PerDevSegments::new(self.segments.limit()),
+                |mut segs, seg| {
+                    segs.insert(&seg)?;
+                    StratisResult::Ok(segs)
+                },
+            )?;
+
+        let total_segments = self.segments.union(&trans_used)?;
+
         let mut segs = PerDevSegments::new(self.segments.limit());
         let mut needed = amount;
 
-        for (&start, &len) in self.segments.complement().iter() {
+        for (&start, &len) in total_segments.complement().iter() {
             if needed == Sectors(0) {
                 break;
             }
@@ -366,7 +394,7 @@ impl RangeAllocator {
                 .expect("wholly disjoint from other elements in segs");
             needed -= to_use;
         }
-        segs
+        Ok(segs)
     }
 
     /// Commit an allocation determined to be valid.
@@ -410,7 +438,13 @@ mod tests {
         assert_eq!(allocator.used(), Sectors(100));
         assert_eq!(allocator.available(), Sectors(28));
 
-        let seg = allocator.request(Sectors(50));
+        let seg = allocator
+            .request(
+                DevUuid::new_v4(),
+                Sectors(50),
+                &RequestTransaction::default(),
+            )
+            .unwrap();
         allocator.commit(seg.clone());
         assert_eq!(seg.len(), 2);
         assert_eq!(seg.sum(), Sectors(28));
@@ -418,7 +452,9 @@ mod tests {
         assert_eq!(allocator.available(), Sectors(0));
 
         let available = allocator.available();
-        let seg = allocator.request(available);
+        let seg = allocator
+            .request(DevUuid::new_v4(), available, &RequestTransaction::default())
+            .unwrap();
         allocator.commit(seg);
         assert_eq!(allocator.available(), Sectors(0));
     }
@@ -492,7 +528,13 @@ mod tests {
     fn test_allocator_failures_range_overwrite() {
         let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
 
-        let seg = allocator.request(Sectors(128));
+        let seg = allocator
+            .request(
+                DevUuid::new_v4(),
+                Sectors(128),
+                &RequestTransaction::default(),
+            )
+            .unwrap();
         allocator.commit(seg.clone());
         assert_eq!(allocator.used(), Sectors(128));
         assert_eq!(

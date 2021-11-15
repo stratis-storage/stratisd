@@ -18,6 +18,7 @@ use crate::{
             backstore::{
                 crypt::CryptHandle,
                 range_alloc::{PerDevSegments, RangeAllocator},
+                transaction::RequestTransaction,
             },
             metadata::{disown_device, BDAExtendedSize, BlockdevSize, MDADataSize, BDA},
             serde_structs::{BaseBlockDevSave, Recordable},
@@ -183,8 +184,12 @@ impl StratBlockDev {
     /// If all available sectors are desired, don't use this function.
     /// Define a request_all() function here and have it invoke the
     /// RangeAllocator::request_all() function.
-    pub fn request_space(&self, size: Sectors) -> PerDevSegments {
-        self.used.request(size)
+    pub fn request_space(
+        &self,
+        size: Sectors,
+        transaction: &RequestTransaction,
+    ) -> StratisResult<PerDevSegments> {
+        self.used.request(self.uuid(), size, transaction)
     }
 
     /// Commit allocation requested by request_space().

@@ -74,7 +74,7 @@ impl DataTier {
     /// Allocate a region for all sector size requests from unallocated segments in
     /// block devices belonging to the data tier. Return Some(_) if requested
     /// amount or more was allocated, otherwise, None.
-    pub fn alloc_request(&self, requests: &[Sectors]) -> Option<RequestTransaction> {
+    pub fn alloc_request(&self, requests: &[Sectors]) -> StratisResult<Option<RequestTransaction>> {
         self.block_mgr.request_space(requests)
     }
 
@@ -203,7 +203,7 @@ mod tests {
         let request_amount = data_tier.block_mgr.avail_space() / 2usize;
         assert!(request_amount != Sectors(0));
 
-        let transaction = data_tier.alloc_request(&[request_amount]).unwrap();
+        let transaction = data_tier.alloc_request(&[request_amount]).unwrap().unwrap();
         data_tier.alloc_commit(transaction).unwrap();
 
         // A data tier w/ some amount allocated
@@ -220,7 +220,10 @@ mod tests {
         size = data_tier.size();
 
         // Allocate enough to get into the newly added block devices
-        let transaction = data_tier.alloc_request(&[last_request_amount]).unwrap();
+        let transaction = data_tier
+            .alloc_request(&[last_request_amount])
+            .unwrap()
+            .unwrap();
         data_tier.alloc_commit(transaction).unwrap();
 
         assert!(data_tier.allocated() >= request_amount + last_request_amount);

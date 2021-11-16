@@ -19,7 +19,7 @@ use nix::{
     unistd::getpid,
 };
 
-use libstratis::stratis::{run, StratisError, StratisResult, VERSION};
+use stratisd::stratis::{run, StratisError, StratisResult, VERSION};
 
 const STRATISD_PID_PATH: &str = "/run/stratisd.pid";
 const STRATISD_MIN_PID_PATH: &str = "/run/stratisd-min.pid";
@@ -39,11 +39,6 @@ fn initialize_log(log_level: Option<&str>) {
             LevelFilter::from_str(log_level)
                 .expect("argument parser only accepts valid log levels"),
         );
-        builder.filter(
-            Some("libstratis"),
-            LevelFilter::from_str(log_level)
-                .expect("argument parser only accepts valid log levels"),
-        );
     } else if let Ok(s) = env::var("RUST_LOG") {
         builder.parse_filters(&s);
     }
@@ -60,10 +55,13 @@ fn trylock_pid_file() -> StratisResult<File> {
         .create(true)
         .open(STRATISD_PID_PATH)
         .map_err(|err| {
-            StratisError::Error(format!(
-                "Failed to create or open the stratisd PID file at {}: {}",
-                STRATISD_PID_PATH, err
-            ))
+            StratisError::Chained(
+                format!(
+                    "Failed to create or open the stratisd PID file at {}",
+                    STRATISD_PID_PATH
+                ),
+                Box::new(StratisError::from(err)),
+            )
         })?;
     let stratisd_file = match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
         Ok(_) => {
@@ -77,7 +75,7 @@ fn trylock_pid_file() -> StratisResult<File> {
                 buf = "<unreadable>".to_string();
             }
 
-            Err(StratisError::Error(format!(
+            Err(StratisError::Msg(format!(
                 "Daemon already running with supposed pid: {}",
                 buf
             )))
@@ -90,18 +88,21 @@ fn trylock_pid_file() -> StratisResult<File> {
         .create(true)
         .open(STRATISD_MIN_PID_PATH)
         .map_err(|err| {
-            StratisError::Error(format!(
-                "Failed to create or open the stratisd-min PID file at {}: {}",
-                STRATISD_MIN_PID_PATH, err
-            ))
+            StratisError::Chained(
+                format!(
+                    "Failed to create or open the stratisd-min PID file at {}",
+                    STRATISD_MIN_PID_PATH
+                ),
+                Box::new(StratisError::from(err)),
+            )
         })?;
     match flock(f.as_raw_fd(), FlockArg::LockExclusive) {
         Ok(_) => drop(f),
         Err(e) => {
-            return Err(StratisError::Error(format!(
-                "Failed to wait on stratisd-min to exit: {}",
-                e
-            )))
+            return Err(StratisError::Chained(
+                "Failed to wait on stratisd-min to exit".to_string(),
+                Box::new(StratisError::from(e)),
+            ))
         }
     };
 

@@ -2,8 +2,8 @@ UNITTEST_OPTS = --verbose
 
 .PHONY: lint
 lint:
-	./check.py src/stratisd_client_dbus
-	./check.py tests
+	pylint src/stratisd_client_dbus --ignore=_introspect.py
+	pylint tests --disable=R0801
 
 .PHONY: misc-tests
 misc-tests:
@@ -11,13 +11,17 @@ misc-tests:
 
 .PHONY: fmt
 fmt:
-	isort --recursive check.py src tests
+	isort src tests
 	black .
 
 .PHONY: fmt-travis
 fmt-travis:
-	isort --recursive --diff --check-only check.py src tests
+	isort --diff --check-only src tests
 	black . --check
+
+.PHONY: tang-tests
+tang-tests:
+	python3 -m unittest ${UNITTEST_OPTS} tests.udev.test_bind
 
 .PHONY: udev-tests
 udev-tests:

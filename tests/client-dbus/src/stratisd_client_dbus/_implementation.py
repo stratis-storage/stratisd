@@ -24,7 +24,6 @@ from dbus_python_client_gen import make_class
 
 from ._constants import (
     BLOCKDEV_INTERFACE,
-    FETCH_PROPERTIES_INTERFACE,
     FILESYSTEM_INTERFACE,
     MANAGER_INTERFACE,
     POOL_INTERFACE,
@@ -52,11 +51,6 @@ ObjectManager = make_class(
 )
 Report = make_class("Report", ET.fromstring(SPECS[REPORT_INTERFACE]), TIME_OUT)
 Manager = make_class("Manager", ET.fromstring(SPECS[MANAGER_INTERFACE]), TIME_OUT)
-FetchProperties = make_class(
-    "FetchProperties",
-    ET.fromstring(SPECS[FETCH_PROPERTIES_INTERFACE]),
-    TIME_OUT,
-)
 Filesystem = make_class("Filesystem", _FILESYSTEM_SPEC, TIME_OUT)
 Pool = make_class("Pool", _POOL_SPEC, TIME_OUT)
 Blockdev = make_class("Blockdev", _BLOCKDEV_SPEC, TIME_OUT)

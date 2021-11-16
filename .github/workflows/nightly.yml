@@ -15,14 +15,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - task: cargo update --locked
-            toolchain: 1.52.1  # CURRENT DEVELOPMENT TOOLCHAIN
-            components: cargo
-          - task: make -f Makefile verify-dependency-bounds
-            toolchain: 1.52.1  # CURRENT DEVELOPMENT TOOLCHAIN
-            components: cargo
           - task: make -f Makefile audit
-            toolchain: 1.52.1  # CURRENT DEVELOPMENT TOOLCHAIN
+            toolchain: 1.56.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           # Allowed because a failure may occur after a new Rust stable
           # version is released.
@@ -31,7 +25,7 @@ jobs:
             components: clippy
     runs-on: ubuntu-18.04
     container:
-      image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
@@ -56,130 +50,19 @@ jobs:
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
-  # Nightly to show us in advance what will change in Python utilities in
-  # the next version of Fedora
-  next-fedora-python-checks:
-    continue-on-error: true
-    strategy:
-      matrix:
-        include:
-          # PYTHON CHECKS ON NEXT FEDORA PYTHON AND PYTHON TOOLS VERSION
-          - dependencies: >
-              pylint
-              python3-dbus-client-gen
-              python3-dbus-python-client-gen
-              python3-psutil
-              python3-pyudev
-              python3-requests
-              python3-semantic_version
-              python3-pygithub
-            image: fedora:34
-            task: >
-              (cd code_maintenance; make -f Makefile lint) &&
-              (cd developer_tools; make -f Makefile lint) &&
-              (cd tests/client-dbus; PYTHONPATH=./src make -f Makefile lint)
-          - dependencies: black python3-isort
-            image: fedora:34
-            task: >
-              (cd code_maintenance; make -f Makefile fmt-travis) &&
-              (cd developer_tools; make -f Makefile fmt-travis) &&
-              (cd tests/client-dbus; make -f Makefile fmt-travis)
-          - dependencies: yamllint
-            image: fedora:34
-            task: make -f Makefile yamllint
-    runs-on: ubuntu-18.04
-    container: ${{ matrix.image }}
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install dependencies
-        run: >
-          dnf install -y
-          make
-          python-unversioned-command
-          ${{ matrix.dependencies }}
-      - name: Display Python version
-        run: python --version
-      - name: Run test
-        run: ${{ matrix.task }}
-
-  # Uses most recent fedora version that supports the given stratis-cli
-  # version.
-  legacy-cli-checks:
-    strategy:
-      matrix:
-        include:
-          - image: fedora:32
-            tag: v2.0.0
-          - image: fedora:32
-            tag: v2.0.1
-          - image: fedora:33
-            tag: v2.1.0
-          - image: fedora:33
-            tag: v2.1.1
-          - image: fedora:34
-            tag: v2.2.1
-          - image: fedora:34
-            tag: v2.3.0
-    runs-on: ubuntu-18.04
-    container: ${{ matrix.image }}
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install dependencies for Fedora
-        run: >
-          dnf install -y
-          asciidoc
-          clang
-          cryptsetup-devel
-          dbus-daemon
-          dbus-tools
-          dbus-devel
-          libblkid-devel
-          git
-          make
-          pytest
-          python3-dbus-client-gen
-          python3-dbus-python-client-gen
-          python3-justbytes
-          python3-dateutil
-          python3-psutil
-          python3-semantic_version
-          systemd-devel
-      - uses: actions-rs/toolchain@v1
-        with:
-          components: cargo
-          toolchain: 1.52.1  # CURRENT DEVELOPMENT
-          override: true
-      - name: Install all necessary Stratis files
-        run: PROFILEDIR=debug make -f Makefile install
-      - name: Set up for D-Bus
-        run: |
-          mkdir -p /var/lib/dbus
-          dbus-uuidgen > /var/lib/dbus/machine-id
-          mkdir -p /var/run/dbus
-      - name: Start D-Bus
-        run: >
-          dbus-daemon
-          --config-file=/usr/share/dbus-1/system.conf
-          --print-address
-      - name: Clone stratis-cli
-        run: git clone https://github.com/stratis-storage/stratis-cli.git
-      - name: Checkout tag
-        run: git checkout tags/${{ matrix.tag }} -b ${{ matrix.tag }}
-        working-directory: ./stratis-cli
-      - name: Test stratisd using stratis-cli version ${{ matrix.tag }}
-        run: >
-          RUST_LOG=libstratis=debug,stratisd=debug
-          STRATISD=/usr/libexec/stratisd
-          PYTHONPATH=./src
-          make dbus-tests
-        working-directory: ./stratis-cli
-
   checks-with-ci-repo:
-    continue-on-error: true
+    strategy:
+      matrix:
+        include:
+          # yamllint disable rule:line-length
+          - task: |
+              COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../stratisd_proc_macros/Cargo.toml FEDORA_RELEASE=f34 make -f ../../Makefile check-fedora-versions
+              COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../stratisd_proc_macros/Cargo.toml FEDORA_RELEASE=rawhide make -f ../../Makefile check-fedora-versions
+              COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../Cargo.toml FEDORA_RELEASE=rawhide IGNORE_ARGS="--ignore-low clap --ignore-low env_logger" make -f ../../Makefile check-fedora-versions
+              COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../Cargo.toml FEDORA_RELEASE=f34 IGNORE_ARGS="--ignore-missing stratisd_proc_macros --ignore-missing libblkid-rs --ignore-low clap --ignore-low env_logger --ignore-high=devicemapper" make -f ../../Makefile check-fedora-versions
     runs-on: ubuntu-18.04
     container:
-      image: fedora:33  # CURRENT DEVELOPMENT ENVIRONMENT
-      options: --privileged -v /dev:/dev
+      image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies for Fedora
@@ -199,9 +82,10 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           components: cargo
-          toolchain: 1.52.1  # CURRENT DEVELOPMENT TOOLCHAIN
+          toolchain: 1.56.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           override: true
       - name: Check out ci repo
         run: git clone https://github.com/stratis-storage/ci.git
-      - name: Compare Fedora versions
-        run: ./ci/dependency_management/compare_fedora_versions
+      - name: Run ${{ matrix.task }}
+        run: ${{ matrix.task }}
+        working-directory: ./ci/dependency_management

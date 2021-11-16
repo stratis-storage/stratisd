@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 pub use self::{
-    errors::{ErrorEnum, StratisError, StratisResult},
+    errors::{StratisError, StratisResult},
     run::run,
     stratis::VERSION,
 };
@@ -14,4 +14,5 @@ mod ipc_support;
 mod run;
 #[allow(clippy::module_inception)]
 mod stratis;
+mod timer;
 mod udev_monitor;

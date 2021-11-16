@@ -2,24 +2,32 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{error::Error, fmt, io, str, sync};
+use std::{collections::HashSet, error::Error, fmt, io, iter::once, str, sync};
+
+use crate::engine::ActionAvailability;
 
 pub type StratisResult<T> = Result<T, StratisError>;
 
-#[derive(Debug, Clone)]
-pub enum ErrorEnum {
-    Error,
-
-    AlreadyExists,
-    Busy,
-    Invalid,
-    NotFound,
-}
-
 #[derive(Debug)]
 pub enum StratisError {
-    Error(String),
-    Engine(ErrorEnum, String),
+    Msg(String),
+    Chained(String, Box<StratisError>),
+    /// This variant is for rollback operations like wiping block devices
+    /// where the operation may continue even if there are failures
+    /// as there is no action to be taken in the event of failures. We
+    /// just need to report all of the failures to the users.
+    BestEffortError(String, Vec<StratisError>),
+    RollbackError {
+        causal_error: Box<StratisError>,
+        rollback_error: Box<StratisError>,
+        level: ActionAvailability,
+    },
+    /// This variant should be used for failed roll back that does not
+    /// prompt any action in stratisd but needs to be reported to the user.
+    NoActionRollbackError {
+        causal_error: Box<StratisError>,
+        rollback_error: Box<StratisError>,
+    },
     Io(io::Error),
     Nix(nix::Error),
     Uuid(uuid::Error),
@@ -31,17 +39,83 @@ pub enum StratisError {
     Recv(sync::mpsc::RecvError),
     Null(std::ffi::NulError),
     Join(tokio::task::JoinError),
+    Blkid(libblkid_rs::BlkidErr),
 
     #[cfg(feature = "dbus_enabled")]
     Dbus(dbus::Error),
     Udev(libudev::Error),
 }
 
+impl StratisError {
+    /// Determine all possible pool action availability states that result from this
+    /// error chain.
+    fn error_to_all_available_actions(&self) -> HashSet<ActionAvailability> {
+        match self {
+            StratisError::Chained(_, c) => c.error_to_all_available_actions(),
+            StratisError::BestEffortError(_, errs) => errs
+                .iter()
+                .flat_map(|e| e.error_to_all_available_actions())
+                .collect::<HashSet<_>>(),
+            StratisError::RollbackError { level, .. } => {
+                once(level).cloned().collect::<HashSet<_>>()
+            }
+            StratisError::NoActionRollbackError {
+                causal_error,
+                rollback_error,
+            } => {
+                let mut states = causal_error.error_to_all_available_actions();
+                states.extend(rollback_error.error_to_all_available_actions());
+                states
+            }
+            _ => HashSet::new(),
+        }
+    }
+
+    /// Determine the most restrictive pool action availability state required from
+    /// the set of all available action states.
+    pub fn error_to_available_actions(&self) -> Option<ActionAvailability> {
+        self.error_to_all_available_actions().into_iter().max()
+    }
+}
+
 impl fmt::Display for StratisError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            StratisError::Error(ref s) => write!(f, "Error: {}", s),
-            StratisError::Engine(_, ref msg) => write!(f, "Engine error: {}", msg),
+            StratisError::Msg(ref s) => write!(f, "{}", s),
+            StratisError::Chained(ref s, ref chained) => write!(f, "{}; {}", s, chained),
+            StratisError::BestEffortError(ref s, ref errs) => {
+                if errs.is_empty() {
+                    write!(f, "{}", s)
+                } else {
+                    let errs_string = errs
+                        .iter()
+                        .map(|err| err.to_string())
+                        .collect::<Vec<_>>()
+                        .join("; ");
+                    write!(f, "{}; {}", s, errs_string)
+                }
+            }
+            StratisError::RollbackError {
+                ref causal_error,
+                ref rollback_error,
+                ref level,
+            } => {
+                write!(
+                    f,
+                    "Rollback failed; causal_error: {}, rollback error: {}; putting pool in action availability state {}",
+                    causal_error, rollback_error, level,
+                )
+            }
+            StratisError::NoActionRollbackError {
+                ref causal_error,
+                ref rollback_error,
+            } => {
+                write!(
+                    f,
+                    "Rollback failed; causal_error: {}, rollback error: {}",
+                    causal_error, rollback_error
+                )
+            }
             StratisError::Io(ref err) => write!(f, "IO error: {}", err),
             StratisError::Nix(ref err) => write!(f, "Nix error: {}", err),
             StratisError::Uuid(ref err) => write!(f, "Uuid error: {}", err),
@@ -53,6 +127,9 @@ impl fmt::Display for StratisError {
             StratisError::Recv(ref err) => write!(f, "Synchronization channel error: {}", err),
             StratisError::Null(ref err) => write!(f, "C string conversion error: {}", err),
             StratisError::Join(ref err) => write!(f, "Failed to join thread: {}", err),
+            StratisError::Blkid(ref err) => {
+                write!(f, "Failed to probe device using blkid: {}", err)
+            }
 
             #[cfg(feature = "dbus_enabled")]
             StratisError::Dbus(ref err) => {
@@ -63,26 +140,11 @@ impl fmt::Display for StratisError {
     }
 }
 
-impl Error for StratisError {
-    fn cause(&self) -> Option<&dyn Error> {
-        match *self {
-            StratisError::Error(_) | StratisError::Engine(_, _) => None,
-            StratisError::Io(ref err) => Some(err),
-            StratisError::Nix(ref err) => Some(err),
-            StratisError::Uuid(ref err) => Some(err),
-            StratisError::Utf8(ref err) => Some(err),
-            StratisError::Serde(ref err) => Some(err),
-            StratisError::Decode(ref err) => Some(err),
-            StratisError::DM(ref err) => Some(err),
-            StratisError::Crypt(ref err) => Some(err),
-            StratisError::Recv(ref err) => Some(err),
-            StratisError::Null(ref err) => Some(err),
-            StratisError::Join(ref err) => Some(err),
+impl Error for StratisError {}
 
-            #[cfg(feature = "dbus_enabled")]
-            StratisError::Dbus(ref err) => Some(err),
-            StratisError::Udev(ref err) => Some(err),
-        }
+impl From<libblkid_rs::BlkidErr> for StratisError {
+    fn from(err: libblkid_rs::BlkidErr) -> StratisError {
+        StratisError::Blkid(err)
     }
 }
 
@@ -159,14 +221,33 @@ impl From<libudev::Error> for StratisError {
     }
 }
 
-impl<T> From<sync::PoisonError<T>> for StratisError {
-    fn from(err: sync::PoisonError<T>) -> StratisError {
-        StratisError::Error(err.to_string())
-    }
-}
-
 impl From<sync::mpsc::RecvError> for StratisError {
     fn from(err: sync::mpsc::RecvError) -> StratisError {
         StratisError::Recv(err)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_error_to_available_actions() {
+        assert_eq!(
+            StratisError::Msg("Message".to_string()).error_to_available_actions(),
+            None
+        );
+        assert_eq!(
+            StratisError::Chained(
+                "Message".to_string(),
+                Box::new(StratisError::RollbackError {
+                    causal_error: Box::new(StratisError::Msg("Cause".to_string())),
+                    rollback_error: Box::new(StratisError::Msg("Rollback".to_string())),
+                    level: ActionAvailability::NoRequests,
+                }),
+            )
+            .error_to_available_actions(),
+            Some(ActionAvailability::NoRequests)
+        );
     }
 }

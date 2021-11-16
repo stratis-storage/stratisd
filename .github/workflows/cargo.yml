@@ -1,0 +1,63 @@
+---
+name: stratisd cargo CI
+
+# yamllint disable-line rule:truthy
+on:
+  push:
+    branches:
+      - master
+      - develop-2.4.2
+    paths:
+      - '**/Cargo.toml'
+      - '.github/workflows/cargo.yml'
+  pull_request:
+    branches:
+      - master
+      - develop-2.4.2
+    paths:
+      - '**/Cargo.toml'
+      - '.github/workflows/cargo.yml'
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  checks-with-ci-repo:
+    strategy:
+      matrix:
+        include:
+          # yamllint disable rule:line-length
+          - task: |
+              COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../stratisd_proc_macros/Cargo.toml FEDORA_RELEASE=rawhide IGNORE_ARGS="--ignore-category low" make -f ../../Makefile check-fedora-versions
+              COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../stratisd_proc_macros/Cargo.toml FEDORA_RELEASE=f34 IGNORE_ARGS="--ignore-category low" make -f ../../Makefile check-fedora-versions
+              COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../Cargo.toml FEDORA_RELEASE=rawhide IGNORE_ARGS="--ignore-category low" make -f ../../Makefile check-fedora-versions
+              COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../Cargo.toml FEDORA_RELEASE=f34 IGNORE_ARGS="--ignore-category low --ignore-missing=stratisd_proc_macros --ignore-missing libblkid-rs --ignore-high devicemapper" make -f ../../Makefile check-fedora-versions
+    runs-on: ubuntu-18.04
+    container:
+      image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies for Fedora
+        run: >
+          dnf install -y
+          clang
+          curl
+          cryptsetup-devel
+          dbus-devel
+          git
+          libblkid-devel
+          make
+          openssl-devel
+          python-requests
+          python-semantic_version
+          systemd-devel
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: cargo
+          toolchain: 1.56.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          override: true
+      - name: Check out ci repo
+        run: git clone https://github.com/stratis-storage/ci.git
+      - name: Run ${{ matrix.task }}
+        run: ${{ matrix.task }}
+        working-directory: ./ci/dependency_management

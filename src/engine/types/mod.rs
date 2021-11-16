@@ -16,21 +16,25 @@ use std::{
 
 use libudev::EventType;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
+use devicemapper::Bytes;
+
 pub use crate::engine::{
-    engine::Engine,
+    engine::{Engine, StateDiff},
     structures::Lockable,
     types::{
         actions::{
             Clevis, CreateAction, DeleteAction, EngineAction, Key, MappingCreateAction,
-            MappingDeleteAction, RenameAction, SetCreateAction, SetDeleteAction, SetUnlockAction,
+            MappingDeleteAction, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
+            SetUnlockAction,
         },
-        keys::{EncryptionInfo, KeyDescription, SizedKeyMemory},
+        keys::{EncryptionInfo, KeyDescription, PoolEncryptionInfo, SizedKeyMemory},
     },
 };
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
+use crate::stratis::{StratisError, StratisResult};
 
 mod actions;
 mod keys;
@@ -63,7 +67,7 @@ macro_rules! uuid {
         }
 
         impl std::fmt::Display for $ident {
-            fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 std::fmt::Display::fmt(&self.0, f)
             }
         }
@@ -72,8 +76,11 @@ macro_rules! uuid {
     }
 }
 
+/// Value representing Clevis config information.
+pub type ClevisInfo = (String, Value);
+
 /// An engine that can be locked for synchronization.
-pub type LockableEngine = Lockable<Arc<Mutex<dyn Engine>>>;
+pub type LockableEngine<E> = Lockable<Arc<Mutex<E>>>;
 
 pub trait AsUuid:
     Copy
@@ -115,7 +122,7 @@ impl Deref for StratisUuid {
 }
 
 impl Display for StratisUuid {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             StratisUuid::Dev(d) => Display::fmt(d, f),
             StratisUuid::Fs(fs) => Display::fmt(fs, f),
@@ -138,7 +145,7 @@ impl<'a> TryFrom<&'a str> for UnlockMethod {
         match s {
             "keyring" => Ok(UnlockMethod::Keyring),
             "clevis" => Ok(UnlockMethod::Clevis),
-            _ => Err(StratisError::Error(format!(
+            _ => Err(StratisError::Msg(format!(
                 "{} is an invalid unlock method",
                 s
             ))),
@@ -196,7 +203,7 @@ impl Borrow<str> for Name {
 }
 
 impl fmt::Display for Name {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
@@ -218,65 +225,23 @@ impl<'a> TryFrom<&'a str> for ReportType {
     fn try_from(name: &str) -> StratisResult<ReportType> {
         match name {
             "errored_pool_report" => Ok(ReportType::ErroredPoolDevices),
-            _ => Err(StratisError::Engine(
-                ErrorEnum::NotFound,
-                format!("Report name {} not understood", name),
-            )),
+            _ => Err(StratisError::Msg(format!(
+                "Report name {} not understood",
+                name
+            ))),
         }
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct BlockDevPath {
-    /// Path to the device represented by this data structure.
-    path: PathBuf,
-    /// Reference to the path of the child device of this device.
-    child_paths: Vec<Arc<BlockDevPath>>,
-}
-
-impl BlockDevPath {
-    /// Create a new node in the graph representing a device with no children.
-    pub fn leaf(path: PathBuf) -> Arc<Self> {
-        Arc::new(BlockDevPath {
-            path,
-            child_paths: vec![],
-        })
-    }
-
-    /// Create a new node in the graph representing the devices and their children.
-    pub fn node_with_children<I>(path: PathBuf, child_paths: I) -> Arc<Self>
-    where
-        I: IntoIterator<Item = Arc<Self>>,
-    {
-        Arc::new(BlockDevPath {
-            path,
-            child_paths: child_paths.into_iter().collect(),
-        })
-    }
-
-    /// Get the path of the device associated with the current structure.
-    pub fn path(&self) -> &Path {
-        self.path.as_path()
-    }
-
-    /// Get the child nodes of this node in the tree.
-    pub fn children(&self) -> impl Iterator<Item = Arc<Self>> + '_ {
-        self.child_paths.iter().cloned()
-    }
-
-    /// Paths of the child devices of this node in the graph.
-    pub fn child_paths(&self) -> impl Iterator<Item = &Path> + '_ {
-        self.child_paths.iter().map(|child| child.path())
-    }
-}
-
+#[derive(Debug, PartialEq)]
 pub struct LockedPoolDevice {
     pub devnode: PathBuf,
     pub uuid: DevUuid,
 }
 
+#[derive(Debug, PartialEq)]
 pub struct LockedPoolInfo {
-    pub info: EncryptionInfo,
+    pub info: PoolEncryptionInfo,
     pub devices: Vec<LockedPoolDevice>,
 }
 
@@ -349,5 +314,87 @@ impl<'a> From<&'a libudev::Device<'a>> for UdevEngineDevice {
                 .map(|prop| (Box::from(prop.name()), Box::from(prop.value())))
                 .collect(),
         }
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub struct DevicePath(PathBuf);
+
+impl DevicePath {
+    pub fn new(path: &Path) -> StratisResult<Self> {
+        Ok(DevicePath(path.canonicalize()?))
+    }
+}
+
+impl Deref for DevicePath {
+    type Target = Path;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.as_path()
+    }
+}
+
+/// Represents what actions this pool can accept.
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Clone)]
+pub enum ActionAvailability {
+    /// Full set of actions may be taken
+    Full = 0,
+    /// No requests via an IPC mechanism may be taken
+    NoRequests = 1,
+    /// No changes may be made to the pool including background changes
+    /// like reacting to devicemapper events
+    NoPoolChanges = 2,
+}
+
+impl Display for ActionAvailability {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                ActionAvailability::Full => "fully_operational",
+                ActionAvailability::NoRequests => "no_ipc_requests",
+                ActionAvailability::NoPoolChanges => "no_pool_changes",
+            }
+        )
+    }
+}
+
+/// Indicates that a property that should be consistent across block devices
+/// in a pool may be inconsistent.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum MaybeInconsistent<T> {
+    Yes,
+    No(T),
+}
+
+/// Change in attributes of the thin pool that may need to be reported to the
+/// IPC layer.
+#[derive(Default, Debug)]
+pub struct ThinPoolDiff {
+    #[allow(clippy::option_option)]
+    pub usage: Option<Option<Bytes>>,
+    pub allocated_size: Option<Bytes>,
+}
+
+impl ThinPoolDiff {
+    /// Returns true if the thin pool information has changed.
+    pub fn is_changed(&self) -> bool {
+        self.usage.is_some() || self.allocated_size.is_some()
+    }
+}
+
+/// Represents the difference between two dumped states for a filesystem.
+#[derive(Default, Debug)]
+pub struct StratFilesystemDiff {
+    pub size: Option<Bytes>,
+    #[allow(clippy::option_option)]
+    pub used: Option<Option<Bytes>>,
+}
+
+impl StratFilesystemDiff {
+    /// Returns true if the filesystem information has changed.
+    pub fn is_changed(&self) -> bool {
+        self.size.is_some() || self.used.is_some()
     }
 }

@@ -33,6 +33,7 @@ class TestUniqueInstance(unittest.TestCase):
     Test that only one instance of stratisd can be running at any given time.
     """
 
+    # pylint: disable=consider-using-with
     def setUp(self):
         """
         Start the original stratisd instance. Register a cleanup function to
@@ -61,12 +62,12 @@ class TestUniqueInstance(unittest.TestCase):
         """
         env = dict(os.environ)
         env["RUST_LOG"] = env.get("RUST_LOG", "") + ",nix::fcntl=debug"
-        process = subprocess.Popen(
+        with subprocess.Popen(
             [_STRATISD, "--sim"],
             stderr=subprocess.STDOUT,
             universal_newlines=True,
             close_fds=True,
             env=env,
-        )
-        (_, _) = process.communicate()
-        self.assertEqual(process.returncode, 1)
+        ) as process:
+            (_, _) = process.communicate()
+            self.assertEqual(process.returncode, 1)

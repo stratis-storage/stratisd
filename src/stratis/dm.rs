@@ -5,11 +5,15 @@
 use std::os::unix::io::{AsRawFd, RawFd};
 
 use nix::fcntl::{fcntl, FcntlArg, OFlag};
-use tokio::io::unix::AsyncFd;
+#[cfg(feature = "dbus_enabled")]
+use tokio::sync::mpsc::UnboundedSender;
+use tokio::{io::unix::AsyncFd, task::spawn};
 
+#[cfg(feature = "dbus_enabled")]
+use crate::dbus_api::DbusAction;
 use crate::{
-    engine::{get_dm, get_dm_init, LockableEngine},
-    stratis::errors::{ErrorEnum, StratisError, StratisResult},
+    engine::{get_dm, get_dm_init, Engine, LockableEngine},
+    stratis::errors::{StratisError, StratisResult},
 };
 
 const REQUIRED_DM_MINOR_VERSION: u32 = 37;
@@ -18,25 +22,89 @@ const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 // to engine to handle event and waits until control is returned from engine.
 // Accepts None as an argument; this indicates that devicemapper events are
 // to be ignored.
-pub async fn dm_event_thread(engine: Option<LockableEngine>) -> StratisResult<()> {
-    match engine {
-        Some(engine) => {
-            let fd = setup_dm()?;
-            loop {
-                {
-                    let mut guard = fd.readable().await?;
-                    guard.clear_ready();
+pub async fn dm_event_thread<E>(
+    engine: Option<LockableEngine<E>>,
+    #[cfg(feature = "dbus_enabled")] sender: UnboundedSender<DbusAction<E>>,
+) -> StratisResult<()>
+where
+    E: 'static + Engine,
+{
+    async fn process_dm_event<E>(
+        engine: &LockableEngine<E>,
+        #[cfg(feature = "dbus_enabled")] sender: &UnboundedSender<DbusAction<E>>,
+        fd: &AsyncFd<RawFd>,
+    ) -> StratisResult<()>
+    where
+        E: Engine,
+    {
+        {
+            let mut guard = fd.readable().await?;
+            // Must clear readiness given that we never actually read any data
+            // from the devicemapper file descriptor.
+            guard.clear_ready();
+        }
+        get_dm().arm_poll()?;
+        let mut lock = engine.lock().await;
+        let evented = lock.get_events()?;
+
+        // NOTE: May need to change order of pool_evented() and fs_evented()
+
+        #[cfg(feature = "min")]
+        {
+            let _ = lock.pool_evented(Some(&evented))?;
+            let _ = lock.fs_evented(Some(&evented))?;
+        }
+        #[cfg(feature = "dbus_enabled")]
+        {
+            let pool_diffs = lock.pool_evented(Some(&evented))?;
+            for action in DbusAction::from_pool_diffs(pool_diffs) {
+                if let Err(e) = sender.send(action) {
+                    warn!(
+                        "Failed to update D-Bus layer with changed engine properties: {}",
+                        e
+                    );
                 }
-                get_dm().arm_poll()?;
-                let mut lock = engine.lock().await;
-                lock.evented()?;
+            }
+            let fs_diffs = lock.fs_evented(Some(&evented))?;
+            for action in DbusAction::from_fs_diffs(fs_diffs) {
+                if let Err(e) = sender.send(action) {
+                    warn!(
+                        "Failed to update D-Bus layer with changed engine properties: {}",
+                        e
+                    );
+                }
             }
         }
-        None => {
-            info!("devicemapper event monitoring disabled in sim engine");
-            Ok(())
-        }
+
+        Ok(())
     }
+
+    spawn(async move {
+        match engine {
+            Some(engine) => {
+                let fd = setup_dm()?;
+                loop {
+                    if let Err(e) = process_dm_event(
+                        &engine,
+                        #[cfg(feature = "dbus_enabled")]
+                        &sender,
+                        &fd,
+                    )
+                    .await
+                    {
+                        warn!("Failed to process devicemapper event: {}", e);
+                    }
+                }
+            }
+            None => {
+                info!("devicemapper event monitoring disabled in sim engine");
+                Result::<_, StratisError>::Ok(())
+            }
+        }
+    })
+    .await??;
+
+    Ok(())
 }
 
 /// Set the devicemapper file descriptor to nonblocking and create an asynchronous
@@ -49,7 +117,7 @@ fn setup_dm() -> StratisResult<AsyncFd<RawFd>> {
             "Requires DM minor version {} but kernel only supports {}",
             REQUIRED_DM_MINOR_VERSION, minor_dm_version
         );
-        Err(StratisError::Engine(ErrorEnum::Error, err_msg))
+        Err(StratisError::Msg(err_msg))
     } else {
         let fd = get_dm().as_raw_fd();
         fcntl(

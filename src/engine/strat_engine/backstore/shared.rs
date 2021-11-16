@@ -16,7 +16,7 @@ use crate::{
         },
         types::DevUuid,
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::{StratisError, StratisResult},
 };
 
 /// Given a function that translates a Stratis UUID to a device
@@ -35,13 +35,10 @@ pub fn metadata_to_segment(
     uuid_to_devno
         .get(&parent)
         .ok_or_else(|| {
-            StratisError::Engine(
-                ErrorEnum::NotFound,
-                format!(
-                    "No block device corresponding to stratisd UUID {:?} found",
-                    &parent
-                ),
-            )
+            StratisError::Msg(format!(
+                "No block device corresponding to stratisd UUID {:?} found",
+                &parent
+            ))
         })
         .map(|device| {
             BlkDevSegment::new(

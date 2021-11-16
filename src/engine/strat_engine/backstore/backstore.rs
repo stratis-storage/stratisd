@@ -4,7 +4,7 @@
 
 // Code to handle the backing store of a pool.
 
-use std::{borrow::Cow, cmp, path::Path};
+use std::{cmp, path::Path};
 
 use chrono::{DateTime, Utc};
 use serde_json::Value;
@@ -26,9 +26,11 @@ use crate::{
             serde_structs::{BackstoreSave, CapSave, Recordable},
             writing::wipe_sectors,
         },
-        types::{BlockDevTier, DevUuid, EncryptionInfo, KeyDescription, PoolUuid},
+        types::{
+            BlockDevTier, DevUuid, EncryptionInfo, KeyDescription, PoolEncryptionInfo, PoolUuid,
+        },
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::{StratisError, StratisResult},
 };
 
 /// Use a cache block size that the kernel docs indicate is the largest
@@ -149,7 +151,7 @@ impl Backstore {
                 }
                 None => {
                     let err_msg = "Cachedevs exist, but cache metdata does not exist";
-                    return Err(StratisError::Engine(ErrorEnum::Error, err_msg.into()));
+                    return Err(StratisError::Msg(err_msg.into()));
                 }
             }
         } else {
@@ -178,7 +180,7 @@ impl Backstore {
         pool_uuid: PoolUuid,
         paths: &[&Path],
         mda_data_size: MDADataSize,
-        encryption_info: &EncryptionInfo,
+        encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<Backstore> {
         let data_tier = DataTier::new(BlockDevMgr::initialize(
             pool_uuid,
@@ -213,8 +215,7 @@ impl Backstore {
             Some(_) => unreachable!("self.cache.is_none()"),
             None => {
                 if paths.is_empty() {
-                    return Err(StratisError::Engine(
-                        ErrorEnum::Invalid,
+                    return Err(StratisError::Msg(
                         "Must initialize cache with at least one blockdev.".to_string(),
                     ));
                 }
@@ -224,12 +225,7 @@ impl Backstore {
                 // If it is desired to change a cache dev to a data dev, it
                 // should be removed and then re-added in order to ensure
                 // that the MDA region is set to the correct size.
-                let bdm = BlockDevMgr::initialize(
-                    pool_uuid,
-                    paths,
-                    MDADataSize::default(),
-                    &EncryptionInfo::default(),
-                )?;
+                let bdm = BlockDevMgr::initialize(pool_uuid, paths, MDADataSize::default(), None)?;
 
                 let cache_tier = CacheTier::new(bdm)?;
 
@@ -497,6 +493,11 @@ impl Backstore {
         self.data_tier.size()
     }
 
+    /// The current size of allocated space on the blockdevs in the data tier.
+    pub fn datatier_allocated_size(&self) -> Sectors {
+        self.data_tier.allocated_size()
+    }
+
     /// The current usable size of all the blockdevs in the data tier.
     pub fn datatier_usable_size(&self) -> Sectors {
         self.data_tier.usable_size()
@@ -624,7 +625,7 @@ impl Backstore {
     ///
     /// * Ok(Some(uuid)) provides the uuid of the changed blockdev
     /// * Ok(None) is returned if the blockdev was unchanged
-    /// * Err(StratisError::Engine(ErrorEnum::NotFound, _)) is returned if the UUID
+    /// * Err(StratisError::Engine(_)) is returned if the UUID
     /// does not correspond to a blockdev
     pub fn set_blockdev_user_info(
         &mut self,
@@ -633,10 +634,10 @@ impl Backstore {
     ) -> StratisResult<Option<DevUuid>> {
         self.get_mut_blockdev_by_uuid(uuid).map_or_else(
             || {
-                Err(StratisError::Engine(
-                    ErrorEnum::NotFound,
-                    format!("Blockdev with a UUID of {} was not found", uuid),
-                ))
+                Err(StratisError::Msg(format!(
+                    "Blockdev with a UUID of {} was not found",
+                    uuid
+                )))
             },
             |(_, b)| {
                 if b.set_user_info(user_info) {
@@ -652,7 +653,7 @@ impl Backstore {
         self.data_tier.block_mgr.is_encrypted()
     }
 
-    pub fn data_tier_encryption_info(&self) -> Cow<EncryptionInfo> {
+    pub fn data_tier_encryption_info(&self) -> Option<PoolEncryptionInfo> {
         self.data_tier.block_mgr.encryption_info()
     }
 
@@ -674,6 +675,14 @@ impl Backstore {
 
     pub fn unbind_keyring(&mut self) -> StratisResult<bool> {
         self.data_tier.block_mgr.unbind_keyring()
+    }
+
+    pub fn rebind_keyring(&mut self, new_key_desc: &KeyDescription) -> StratisResult<Option<bool>> {
+        self.data_tier.block_mgr.rebind_keyring(new_key_desc)
+    }
+
+    pub fn rebind_clevis(&mut self) -> StratisResult<()> {
+        self.data_tier.block_mgr.rebind_clevis()
     }
 }
 
@@ -712,7 +721,7 @@ impl Recordable<BackstoreSave> for Backstore {
 mod tests {
     use std::fs::OpenOptions;
 
-    use devicemapper::{CacheDevStatus, DataBlocks, IEC};
+    use devicemapper::{CacheDevStatus, DataBlocks, DmOptions, IEC};
 
     use crate::engine::strat_engine::{
         cmd,
@@ -764,13 +773,8 @@ mod tests {
         let (datadevpaths, initdatapaths) = paths.split_at(1);
 
         let pool_uuid = PoolUuid::new_v4();
-        let mut backstore = Backstore::initialize(
-            pool_uuid,
-            initdatapaths,
-            MDADataSize::default(),
-            &EncryptionInfo::default(),
-        )
-        .unwrap();
+        let mut backstore =
+            Backstore::initialize(pool_uuid, initdatapaths, MDADataSize::default(), None).unwrap();
 
         invariant(&backstore);
 
@@ -789,7 +793,7 @@ mod tests {
         let cache_status = backstore
             .cache
             .as_ref()
-            .map(|c| c.status(get_dm()).unwrap())
+            .map(|c| c.status(get_dm(), DmOptions::default()).unwrap())
             .unwrap();
 
         match cache_status {
@@ -814,7 +818,7 @@ mod tests {
         let cache_status = backstore
             .cache
             .as_ref()
-            .map(|c| c.status(get_dm()).unwrap())
+            .map(|c| c.status(get_dm(), DmOptions::default()).unwrap())
             .unwrap();
 
         match cache_status {
@@ -856,13 +860,8 @@ mod tests {
         assert!(!paths.is_empty());
 
         let pool_uuid = PoolUuid::new_v4();
-        let mut backstore = Backstore::initialize(
-            pool_uuid,
-            paths,
-            MDADataSize::default(),
-            &EncryptionInfo::default(),
-        )
-        .unwrap();
+        let mut backstore =
+            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
 
         assert_matches!(
             backstore
@@ -917,13 +916,8 @@ mod tests {
 
         let pool_uuid = PoolUuid::new_v4();
 
-        let mut backstore = Backstore::initialize(
-            pool_uuid,
-            paths1,
-            MDADataSize::default(),
-            &EncryptionInfo::default(),
-        )
-        .unwrap();
+        let mut backstore =
+            Backstore::initialize(pool_uuid, paths1, MDADataSize::default(), None).unwrap();
 
         for path in paths1 {
             assert_eq!(

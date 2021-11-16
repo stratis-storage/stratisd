@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use crate::{
-    engine::{Engine, Pool, PoolUuid},
+    engine::{Engine, PoolUuid},
     jsonrpc::consts::{OP_ERR, OP_OK, OP_OK_STR},
     stratis::StratisResult,
 };
@@ -13,7 +13,7 @@ macro_rules! expects_fd {
         match $fd_opt {
             Some(fd) => fd,
             None => {
-                let res = Err($crate::stratis::StratisError::Error(
+                let res = Err($crate::stratis::StratisError::Msg(
                     "Method expected a file descriptor and did not receive one".to_string(),
                 ));
                 return $crate::jsonrpc::interface::StratisRet::$ret(
@@ -32,7 +32,7 @@ macro_rules! expects_fd {
                         fd, e,
                     );
                 }
-                let res = Err($crate::stratis::StratisError::Error(
+                let res = Err($crate::stratis::StratisError::Msg(
                     "Method did not expect a file descriptor and received one \
                     anyway; file descriptor has been closed"
                         .to_string(),
@@ -55,10 +55,13 @@ pub fn stratis_result_to_return<T>(result: StratisResult<T>, default_value: T) -
 
 /// Convert a string representing the name of a pool to the UUID and stratisd
 /// data structure representing the pool state.
-pub fn name_to_uuid_and_pool<'a>(
-    engine: &'a mut dyn Engine,
+pub fn name_to_uuid_and_pool<'a, E>(
+    engine: &'a mut E,
     name: &str,
-) -> Option<(PoolUuid, &'a mut dyn Pool)> {
+) -> Option<(PoolUuid, &'a mut E::Pool)>
+where
+    E: Engine,
+{
     let mut uuids_pools_for_name = engine
         .pools_mut()
         .into_iter()

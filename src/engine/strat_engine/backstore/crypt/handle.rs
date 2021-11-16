@@ -2,32 +2,31 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{
-    fmt::Debug,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{fmt::Debug, path::Path};
 
+use either::Either;
 use serde_json::Value;
 
 use devicemapper::Sectors;
-use libcryptsetup_rs::{c_uint, CryptDevice, TokenInput};
+use libcryptsetup_rs::{c_uint, CryptDevice, EncryptionFormat, TokenInput};
 
 use crate::{
     engine::{
         strat_engine::{
             backstore::crypt::{
                 consts::{CLEVIS_LUKS_TOKEN_ID, LUKS2_TOKEN_ID},
+                metadata_handle::CryptMetadataHandle,
                 shared::{
                     acquire_crypt_device, add_keyring_keyslot, clevis_info_from_metadata,
-                    ensure_wiped, get_keyslot_number, interpret_clevis_config, setup_crypt_handle,
+                    ensure_wiped, get_keyslot_number, interpret_clevis_config, setup_crypt_device,
+                    setup_crypt_handle,
                 },
             },
-            cmd::{clevis_decrypt, clevis_luks_bind, clevis_luks_unbind},
+            cmd::{clevis_decrypt, clevis_luks_bind, clevis_luks_regen, clevis_luks_unbind},
             keys::MemoryPrivateFilesystem,
             metadata::StratisIdentifiers,
         },
-        types::{BlockDevPath, EncryptionInfo, KeyDescription, SizedKeyMemory},
+        types::{DevicePath, EncryptionInfo, KeyDescription, SizedKeyMemory},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -39,31 +38,40 @@ use crate::{
 /// * CryptInitializer will ensure that the newly formatted device is activated.
 /// * CryptActivationHandle requires the user to activate a device to yield a CryptHandle.
 /// * CryptHandle::setup() fails if the device is not active.
-#[derive(Debug)]
+///
+/// `Clone` is derived for this data structure because `CryptHandle` acquires
+/// a next crypt device context for each operation.
+#[derive(Debug, Clone)]
 pub struct CryptHandle {
-    path: Arc<BlockDevPath>,
-    identifiers: StratisIdentifiers,
-    encryption_info: EncryptionInfo,
+    activated_path: DevicePath,
     name: String,
+    metadata_handle: CryptMetadataHandle,
 }
 
 impl CryptHandle {
     pub(super) fn new(
-        physical_path: PathBuf,
-        activated_path: PathBuf,
+        physical_path: DevicePath,
+        activated_path: DevicePath,
         identifiers: StratisIdentifiers,
         encryption_info: EncryptionInfo,
         name: String,
     ) -> CryptHandle {
-        let path = BlockDevPath::node_with_children(
+        CryptHandle::new_with_metadata_handle(
             activated_path,
-            vec![BlockDevPath::leaf(physical_path)],
-        );
-        CryptHandle {
-            path,
-            identifiers,
-            encryption_info,
             name,
+            CryptMetadataHandle::new(physical_path, identifiers, encryption_info),
+        )
+    }
+
+    pub(super) fn new_with_metadata_handle(
+        activated_path: DevicePath,
+        name: String,
+        metadata_handle: CryptMetadataHandle,
+    ) -> CryptHandle {
+        CryptHandle {
+            activated_path,
+            name,
+            metadata_handle,
         }
     }
 
@@ -93,53 +101,42 @@ impl CryptHandle {
     /// * has a valid Stratis LUKS2 token
     /// * has a token of the proper type for LUKS2 keyring unlocking
     pub fn setup(physical_path: &Path) -> StratisResult<Option<CryptHandle>> {
-        setup_crypt_handle(physical_path, None)
+        match setup_crypt_device(physical_path)? {
+            Some(ref mut device) => setup_crypt_handle(device, physical_path, None),
+            None => Ok(None),
+        }
     }
 
     /// Get the encryption info for this encrypted device.
     pub fn encryption_info(&self) -> &EncryptionInfo {
-        &self.encryption_info
-    }
-
-    /// Get a reference to the `BlockDevPath` node representing the physical device.
-    pub fn get_physical_path_ref(&self) -> Arc<BlockDevPath> {
-        self.path
-            .children()
-            .next()
-            .expect("crypt devices have exactly one child")
+        self.metadata_handle.encryption_info()
     }
 
     /// Return the path to the device node of the underlying storage device
-    /// for the encrypted device. If storage layers are added between
-    /// the crypt device and the physical device, this method will still work
-    /// properly as it will provide the path to the device that exposes the LUKS2
-    /// metadata.
+    /// for the encrypted device.
     pub fn luks2_device_path(&self) -> &Path {
-        self.path
-            .child_paths()
-            .next()
-            .expect("crypt devices have exactly one child")
+        self.metadata_handle.luks2_device_path()
     }
 
     /// Return the path to the device node of the decrypted contents of the encrypted
     /// storage device. In an encrypted pool, this is the path that can be used to read
     /// the Stratis blockdev metatdata.
     pub fn activated_device_path(&self) -> &Path {
-        self.path.path()
+        &*self.activated_path
     }
 
     /// Get the Stratis device identifiers for a given encrypted device.
     pub fn device_identifiers(&self) -> &StratisIdentifiers {
-        &self.identifiers
+        self.metadata_handle.device_identifiers()
     }
 
     /// Get the keyslot associated with the given token ID.
-    pub fn keyslots(&mut self, token_id: c_uint) -> StratisResult<Option<Vec<c_uint>>> {
+    pub fn keyslots(&self, token_id: c_uint) -> StratisResult<Option<Vec<c_uint>>> {
         get_keyslot_number(&mut self.acquire_crypt_device()?, token_id)
     }
 
     /// Get info for the clevis binding.
-    pub fn clevis_info(&mut self) -> StratisResult<Option<(String, Value)>> {
+    pub fn clevis_info(&self) -> StratisResult<Option<(String, Value)>> {
         clevis_info_from_metadata(&mut self.acquire_crypt_device()?)
     }
 
@@ -149,11 +146,11 @@ impl CryptHandle {
         let yes = interpret_clevis_config(pin, &mut json_owned)?;
 
         let key_desc = self
+            .metadata_handle
             .encryption_info
-            .key_description
-            .as_ref()
+            .key_description()
             .ok_or_else(|| {
-                StratisError::Error(
+                StratisError::Msg(
                     "Clevis binding requires a registered key description for the device \
                     but none was found"
                         .to_string(),
@@ -170,14 +167,28 @@ impl CryptHandle {
                 yes,
             )
         })?;
-        self.encryption_info.clevis_info = Some((pin.to_string(), json_owned));
+        self.metadata_handle.encryption_info = self
+            .metadata_handle
+            .encryption_info
+            .clone()
+            .set_clevis_info(self.clevis_info()?.ok_or_else(|| {
+                StratisError::Msg(
+                    "Clevis reported successfully binding to device but no metadata was found"
+                        .to_string(),
+                )
+            })?);
         Ok(())
     }
 
     /// Unbind the given device using clevis.
     pub fn clevis_unbind(&mut self) -> StratisResult<()> {
-        if self.encryption_info.key_description.is_none() {
-            return Err(StratisError::Error(
+        if self
+            .metadata_handle
+            .encryption_info
+            .key_description()
+            .is_none()
+        {
+            return Err(StratisError::Msg(
                 "No kernel keyring binding found; removing the Clevis binding \
                 would remove the ability to open this device; aborting"
                     .to_string(),
@@ -185,7 +196,7 @@ impl CryptHandle {
         }
 
         let keyslots = self.keyslots(CLEVIS_LUKS_TOKEN_ID)?.ok_or_else(|| {
-            StratisError::Error(format!(
+            StratisError::Msg(format!(
                 "Token slot {} appears to be empty; could not determine keyslots",
                 CLEVIS_LUKS_TOKEN_ID,
             ))
@@ -197,7 +208,56 @@ impl CryptHandle {
                 self.luks2_device_path().display()
             );
         }
-        self.encryption_info.clevis_info = None;
+        self.metadata_handle.encryption_info = self
+            .metadata_handle
+            .encryption_info
+            .clone()
+            .unset_clevis_info();
+        Ok(())
+    }
+
+    /// Change the key description and passphrase that a device is bound to
+    ///
+    /// This method needs to re-read the cached Clevis information because
+    /// the config may change specifically in the case where a new thumbprint
+    /// is provided if Tang keys are rotated.
+    pub fn rebind_clevis(&mut self) -> StratisResult<()> {
+        if self.metadata_handle.encryption_info.clevis_info().is_none() {
+            return Err(StratisError::Msg(
+                "No Clevis binding found; cannot regenerate the Clevis binding if the device does not already have a Clevis binding".to_string(),
+            ));
+        }
+
+        let mut device = self.acquire_crypt_device()?;
+        let keyslot = get_keyslot_number(&mut device, CLEVIS_LUKS_TOKEN_ID)?
+            .and_then(|vec| vec.into_iter().next())
+            .ok_or_else(|| {
+                StratisError::Msg("Clevis binding found but no keyslot was associated".to_string())
+            })?;
+
+        clevis_luks_regen(self.luks2_device_path(), keyslot)?;
+        // Need to reload LUKS2 metadata after Clevis metadata modification.
+        if let Err(e) = device
+            .context_handle()
+            .load::<()>(Some(EncryptionFormat::Luks2), None)
+        {
+            return Err(StratisError::Chained(
+                "Failed to reload crypt device state after modification to Clevis data".to_string(),
+                Box::new(StratisError::from(e)),
+            ));
+        }
+
+        let (pin, config) = clevis_info_from_metadata(&mut device)?.ok_or_else(|| {
+            StratisError::Msg(format!(
+                "Did not find Clevis metadata on device {}",
+                self.luks2_device_path().display()
+            ))
+        })?;
+        self.metadata_handle.encryption_info = self
+            .metadata_handle
+            .encryption_info
+            .clone()
+            .set_clevis_info((pin, config));
         Ok(())
     }
 
@@ -205,7 +265,7 @@ impl CryptHandle {
     pub fn bind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<()> {
         let mut device = self.acquire_crypt_device()?;
         let key = Self::clevis_decrypt(&mut device)?.ok_or_else(|| {
-            StratisError::Error(
+            StratisError::Msg(
                 "The Clevis token appears to have been wiped outside of \
                     Stratis; cannot add a keyring key binding without an existing \
                     passphrase to unlock the device"
@@ -213,16 +273,20 @@ impl CryptHandle {
             )
         })?;
 
-        add_keyring_keyslot(&mut device, key_desc, Some(key))?;
+        add_keyring_keyslot(&mut device, key_desc, Some(Either::Left(key)))?;
 
-        self.encryption_info.key_description = Some(key_desc.clone());
+        self.metadata_handle.encryption_info = self
+            .metadata_handle
+            .encryption_info
+            .clone()
+            .set_key_desc(key_desc.clone());
         Ok(())
     }
 
     /// Add a keyring binding to the underlying LUKS2 volume.
     pub fn unbind_keyring(&mut self) -> StratisResult<()> {
-        if self.encryption_info.clevis_info.is_none() {
-            return Err(StratisError::Error(
+        if self.metadata_handle.encryption_info.clevis_info().is_none() {
+            return Err(StratisError::Msg(
                 "No Clevis binding was found; removing the keyring binding would \
                 remove the ability to open this device; aborting"
                     .to_string(),
@@ -231,7 +295,7 @@ impl CryptHandle {
 
         let mut device = self.acquire_crypt_device()?;
         let keyslots = get_keyslot_number(&mut device, LUKS2_TOKEN_ID)?
-            .ok_or_else(|| StratisError::Error("No LUKS2 keyring token was found".to_string()))?;
+            .ok_or_else(|| StratisError::Msg("No LUKS2 keyring token was found".to_string()))?;
         for keyslot in keyslots {
             log_on_failure!(
                 device.keyslot_handle().destroy(keyslot),
@@ -243,8 +307,34 @@ impl CryptHandle {
             .token_handle()
             .json_set(TokenInput::RemoveToken(LUKS2_TOKEN_ID))?;
 
-        self.encryption_info.key_description = None;
+        self.metadata_handle.encryption_info = self
+            .metadata_handle
+            .encryption_info
+            .clone()
+            .unset_key_desc();
 
+        Ok(())
+    }
+
+    /// Change the key description and passphrase that a device is bound to
+    pub fn rebind_keyring(&mut self, new_key_desc: &KeyDescription) -> StratisResult<()> {
+        let mut device = self.acquire_crypt_device()?;
+
+        let old_key_description = self.metadata_handle.encryption_info
+            .key_description()
+            .ok_or_else(|| {
+                StratisError::Msg("Cannot change passphrase because this device is not bound to a passphrase in the kernel keyring".to_string())
+            })?;
+        add_keyring_keyslot(
+            &mut device,
+            new_key_desc,
+            Some(Either::Right(old_key_description)),
+        )?;
+        self.metadata_handle.encryption_info = self
+            .metadata_handle
+            .encryption_info
+            .clone()
+            .set_key_desc(new_key_desc.clone());
         Ok(())
     }
 
@@ -258,9 +348,9 @@ impl CryptHandle {
             .as_object_mut()
             .and_then(|map| map.remove("jwe"))
             .ok_or_else(|| {
-                StratisError::Error(format!(
+                StratisError::Msg(format!(
                     "Token slot {} is occupied but does not appear to be a Clevis \
-                    token; aborting",
+                        token; aborting",
                     CLEVIS_LUKS_TOKEN_ID,
                 ))
             })?;
@@ -269,21 +359,22 @@ impl CryptHandle {
 
     /// Deactivate the device referenced by the current device handle.
     #[cfg(test)]
-    pub fn deactivate(&mut self) -> StratisResult<()> {
-        let name = self.name.to_owned();
-        super::shared::ensure_inactive(&mut self.acquire_crypt_device()?, &name)
+    pub fn deactivate(&self) -> StratisResult<()> {
+        super::shared::ensure_inactive(&mut self.acquire_crypt_device()?, &self.name)
     }
 
     /// Wipe all LUKS2 metadata on the device safely using libcryptsetup.
-    pub fn wipe(&mut self) -> StratisResult<()> {
-        let path = self.luks2_device_path().to_owned();
-        let name = self.name.to_owned();
-        ensure_wiped(&mut self.acquire_crypt_device()?, &path, &name)
+    pub fn wipe(&self) -> StratisResult<()> {
+        ensure_wiped(
+            &mut self.acquire_crypt_device()?,
+            self.luks2_device_path(),
+            &self.name,
+        )
     }
 
     /// Get the size of the logical device built on the underlying encrypted physical
     /// device. `devicemapper` will return the size in terms of number of sectors.
-    pub fn logical_device_size(&mut self) -> StratisResult<Sectors> {
+    pub fn logical_device_size(&self) -> StratisResult<Sectors> {
         let name = self.name.clone();
         let active_device = log_on_failure!(
             self.acquire_crypt_device()?

@@ -34,7 +34,7 @@ use tokio::{io::unix::AsyncFd, task::JoinHandle};
 #[cfg(feature = "systemd_compat")]
 use crate::systemd;
 use crate::{
-    engine::LockableEngine,
+    engine::{Engine, LockableEngine},
     jsonrpc::{
         consts::RPC_SOCKADDR,
         interface::{StratisParamType, StratisParams, StratisRet},
@@ -44,7 +44,10 @@ use crate::{
 };
 
 impl StratisParams {
-    async fn process(self, engine: LockableEngine) -> StratisRet {
+    async fn process<E>(self, engine: LockableEngine<E>) -> StratisRet
+    where
+        E: Engine,
+    {
         match self.type_ {
             StratisParamType::KeySet(key_desc) => {
                 let fd = expects_fd!(self.fd_opt, KeySet, None, true);
@@ -71,8 +74,13 @@ impl StratisParams {
                 expects_fd!(self.fd_opt, PoolCreate, false, false);
                 let path_ref: Vec<_> = paths.iter().map(|p| p.as_path()).collect();
                 StratisRet::PoolCreate(stratis_result_to_return(
-                    pool::pool_create(engine, name.as_str(), path_ref.as_slice(), encryption_info)
-                        .await,
+                    pool::pool_create(
+                        engine,
+                        name.as_str(),
+                        path_ref.as_slice(),
+                        encryption_info.as_ref(),
+                    )
+                    .await,
                     false,
                 ))
             }
@@ -216,13 +224,16 @@ impl StratisParams {
     }
 }
 
-pub struct StratisServer {
-    engine: LockableEngine,
+pub struct StratisServer<E> {
+    engine: LockableEngine<E>,
     listener: StratisUnixListener,
 }
 
-impl StratisServer {
-    pub fn new<P>(engine: LockableEngine, path: P) -> StratisResult<StratisServer>
+impl<E> StratisServer<E>
+where
+    E: 'static + Engine,
+{
+    pub fn new<P>(engine: LockableEngine<E>, path: P) -> StratisResult<StratisServer<E>>
     where
         P: AsRef<Path>,
     {
@@ -298,7 +309,7 @@ fn handle_cmsgs(mut cmsgs: Vec<ControlMessageOwned>) -> StratisResult<Option<Raw
                     }
                 }
             });
-        return Err(StratisError::Error(
+        return Err(StratisError::Msg(
             "Unix packet contained more than one ancillary data message".to_string(),
         ));
     }
@@ -311,7 +322,7 @@ fn handle_cmsgs(mut cmsgs: Vec<ControlMessageOwned>) -> StratisResult<Option<Raw
                         warn!("Failed to close file descriptor {}: {}", fd, e);
                     }
                 }
-                return Err(StratisError::Error(
+                return Err(StratisError::Msg(
                     "Received more than one file descriptor".to_string(),
                 ));
             } else {
@@ -358,7 +369,7 @@ pub struct StratisUnixRequest {
 impl Future for StratisUnixRequest {
     type Output = StratisResult<StratisParams>;
 
-    fn poll(self: Pin<&mut Self>, ctxt: &mut Context) -> Poll<StratisResult<StratisParams>> {
+    fn poll(self: Pin<&mut Self>, ctxt: &mut Context<'_>) -> Poll<StratisResult<StratisParams>> {
         let poll_res = ready!(self.fd.poll_read_ready(ctxt));
         let mut poll_guard = match poll_res {
             Ok(poll) => poll,
@@ -384,7 +395,7 @@ impl StratisUnixResponse {
 impl Future for StratisUnixResponse {
     type Output = StratisResult<()>;
 
-    fn poll(self: Pin<&mut Self>, ctxt: &mut Context) -> Poll<StratisResult<()>> {
+    fn poll(self: Pin<&mut Self>, ctxt: &mut Context<'_>) -> Poll<StratisResult<()>> {
         let poll_res = ready!(self.fd.poll_write_ready(ctxt));
         let mut poll_guard = match poll_res {
             Ok(poll) => poll,
@@ -418,7 +429,7 @@ impl StratisUnixListener {
             None,
         )?;
         let flags = OFlag::from_bits(fcntl(fd, FcntlArg::F_GETFL)?).ok_or_else(|| {
-            StratisError::Error("Unrecognized flag types returned from fcntl".to_string())
+            StratisError::Msg("Unrecognized flag types returned from fcntl".to_string())
         })?;
         fcntl(fd, FcntlArg::F_SETFL(flags | OFlag::O_NONBLOCK))?;
         bind(fd, &SockAddr::new_unix(path.as_ref())?)?;
@@ -432,7 +443,7 @@ impl StratisUnixListener {
 fn try_accept(fd: RawFd) -> StratisResult<StratisUnixRequest> {
     let fd = accept(fd)?;
     let flags = OFlag::from_bits(fcntl(fd, FcntlArg::F_GETFL)?).ok_or_else(|| {
-        StratisError::Error("Unrecognized flag types returned from fcntl".to_string())
+        StratisError::Msg("Unrecognized flag types returned from fcntl".to_string())
     })?;
     fcntl(fd, FcntlArg::F_SETFL(flags | OFlag::O_NONBLOCK))?;
     Ok(StratisUnixRequest {
@@ -445,7 +456,7 @@ impl Stream for StratisUnixListener {
 
     fn poll_next(
         self: Pin<&mut Self>,
-        ctxt: &mut Context,
+        ctxt: &mut Context<'_>,
     ) -> Poll<Option<StratisResult<StratisUnixRequest>>> {
         let poll_res = ready!(self.fd.poll_read_ready(ctxt));
         let mut poll_guard = match poll_res {
@@ -459,7 +470,10 @@ impl Stream for StratisUnixListener {
     }
 }
 
-pub fn run_server(engine: LockableEngine) -> JoinHandle<()> {
+pub fn run_server<E>(engine: LockableEngine<E>) -> JoinHandle<()>
+where
+    E: 'static + Engine,
+{
     tokio::spawn(async move {
         match StratisServer::new(engine, RPC_SOCKADDR) {
             Ok(server) => server.run().await,

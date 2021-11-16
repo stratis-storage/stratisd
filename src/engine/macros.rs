@@ -8,10 +8,7 @@ macro_rules! calculate_redundancy {
             None | Some(0) => $crate::engine::Redundancy::NONE,
             Some(n) => {
                 let message = format!("code {} does not correspond to any redundancy", n);
-                return Err($crate::stratis::StratisError::Engine(
-                    $crate::stratis::ErrorEnum::Error,
-                    message,
-                ));
+                return Err($crate::stratis::StratisError::Msg(message));
             }
         }
     };
@@ -21,7 +18,7 @@ macro_rules! get_pool {
     ($s:ident; $uuid:ident) => {
         $s.pools
             .get_by_uuid($uuid)
-            .map(|(name, p)| (name.clone(), p as &dyn $crate::engine::Pool))
+            .map(|(name, p)| (name.clone(), p))
     };
 }
 
@@ -29,7 +26,7 @@ macro_rules! get_mut_pool {
     ($s:ident; $uuid:ident) => {
         $s.pools
             .get_mut_by_uuid($uuid)
-            .map(|(name, p)| (name.clone(), p as &mut dyn $crate::engine::Pool))
+            .map(|(name, p)| (name.clone(), p))
     };
 }
 
@@ -45,10 +42,7 @@ macro_rules! rename_pre {
         }
 
         if $s.contains_name($new_name) {
-            return Err($crate::stratis::StratisError::Engine(
-                $crate::stratis::ErrorEnum::AlreadyExists,
-                $new_name.into(),
-            ));
+            return Err($crate::stratis::StratisError::Msg($new_name.into()));
         }
         old_name
     }};
@@ -60,11 +54,8 @@ macro_rules! rename_filesystem_pre {
             $s.filesystems;
             $uuid;
             $new_name;
-            Err($crate::stratis::StratisError::Engine(
-                $crate::stratis::ErrorEnum::NotFound,
-                format!("Filesystem not found with UUID of {}", $uuid),
-            ));
-            Ok(None)
+            Ok(None);
+            Ok(Some(false))
         )
     }}
 }
@@ -194,7 +185,7 @@ macro_rules! convert_int {
     ($expr:expr, $from_type:ty, $to_type:ty) => {{
         let expr = $expr;
         <$to_type as std::convert::TryFrom<$from_type>>::try_from(expr).map_err(|_| {
-            $crate::stratis::StratisError::Error(format!(
+            $crate::stratis::StratisError::Msg(format!(
                 "Failed to convert integer {} from {} to {}",
                 expr,
                 stringify!($from_type),
@@ -239,6 +230,17 @@ macro_rules! retry_operation {
                 }
             }
             std::thread::sleep(std::time::Duration::from_secs(1));
+        }
+    };
+}
+
+macro_rules! pool_enc_to_enc {
+    ($ei_option:expr) => {
+        match $ei_option {
+            Some(pei) => Some($crate::engine::types::EncryptionInfo::try_from(
+                pei.clone(),
+            )?),
+            None => None,
         }
     };
 }

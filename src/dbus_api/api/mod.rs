@@ -4,25 +4,25 @@
 
 use dbus_tree::{Factory, MTSync, Tree};
 
-use crate::dbus_api::{
-    consts,
-    types::{DbusContext, TData},
+use crate::{
+    dbus_api::{
+        consts,
+        types::{DbusContext, TData},
+    },
+    engine::Engine,
 };
 
-mod fetch_properties_2_1;
-mod fetch_properties_2_2;
-mod fetch_properties_2_4;
-mod manager_2_0;
-mod manager_2_1;
-mod manager_2_2;
-mod manager_2_3;
-mod manager_2_4;
-mod report_2_1;
+mod manager_3_0;
+pub mod prop_conv;
+mod report_3_0;
 mod shared;
 
-pub fn get_base_tree<'a>(
-    dbus_context: DbusContext,
-) -> (Tree<MTSync<TData>, TData>, dbus::Path<'a>) {
+pub fn get_base_tree<'a, E>(
+    dbus_context: DbusContext<E>,
+) -> (Tree<MTSync<TData<E>>, TData<E>>, dbus::Path<'a>)
+where
+    E: 'static + Engine,
+{
     let f = Factory::new_sync();
 
     let base_tree = f.tree(dbus_context);
@@ -44,80 +44,20 @@ pub fn get_base_tree<'a>(
                 .add_m(shared::get_managed_objects_method(&f)),
         )
         .add(
-            f.interface(consts::MANAGER_INTERFACE_NAME, ())
-                .add_m(manager_2_0::create_pool_method(&f))
-                .add_m(manager_2_0::destroy_pool_method(&f))
-                .add_m(manager_2_0::configure_simulator_method(&f))
-                .add_p(manager_2_0::version_property(&f)),
+            f.interface(consts::MANAGER_INTERFACE_NAME_3_0, ())
+                .add_m(manager_3_0::create_pool_method(&f))
+                .add_m(manager_3_0::set_key_method(&f))
+                .add_m(manager_3_0::unset_key_method(&f))
+                .add_m(manager_3_0::list_keys_method(&f))
+                .add_m(manager_3_0::unlock_pool_method(&f))
+                .add_m(manager_3_0::destroy_pool_method(&f))
+                .add_m(manager_3_0::engine_state_report_method(&f))
+                .add_p(manager_3_0::version_property(&f))
+                .add_p(manager_3_0::locked_pools_property(&f)),
         )
         .add(
-            f.interface(consts::MANAGER_INTERFACE_NAME_2_1, ())
-                .add_m(manager_2_1::create_pool_method(&f))
-                .add_m(manager_2_1::set_key_method(&f))
-                .add_m(manager_2_1::unset_key_method(&f))
-                .add_m(manager_2_1::unlock_pool_method(&f))
-                .add_m(manager_2_0::destroy_pool_method(&f))
-                .add_m(manager_2_0::configure_simulator_method(&f))
-                .add_p(manager_2_0::version_property(&f)),
-        )
-        .add(
-            f.interface(consts::MANAGER_INTERFACE_NAME_2_2, ())
-                .add_m(manager_2_1::create_pool_method(&f))
-                .add_m(manager_2_2::set_key_method(&f))
-                .add_m(manager_2_1::unset_key_method(&f))
-                .add_m(manager_2_1::unlock_pool_method(&f))
-                .add_m(manager_2_0::destroy_pool_method(&f))
-                .add_m(manager_2_0::configure_simulator_method(&f))
-                .add_p(manager_2_0::version_property(&f)),
-        )
-        .add(
-            f.interface(consts::MANAGER_INTERFACE_NAME_2_3, ())
-                .add_m(manager_2_1::create_pool_method(&f))
-                .add_m(manager_2_2::set_key_method(&f))
-                .add_m(manager_2_1::unset_key_method(&f))
-                .add_m(manager_2_3::unlock_pool_method(&f))
-                .add_m(manager_2_0::destroy_pool_method(&f))
-                .add_m(manager_2_0::configure_simulator_method(&f))
-                .add_p(manager_2_0::version_property(&f)),
-        )
-        .add(
-            f.interface(consts::MANAGER_INTERFACE_NAME_2_4, ())
-                .add_m(manager_2_4::create_pool_method(&f))
-                .add_m(manager_2_2::set_key_method(&f))
-                .add_m(manager_2_1::unset_key_method(&f))
-                .add_m(manager_2_3::unlock_pool_method(&f))
-                .add_m(manager_2_0::destroy_pool_method(&f))
-                .add_m(manager_2_0::configure_simulator_method(&f))
-                .add_m(manager_2_4::engine_state_report_method(&f))
-                .add_p(manager_2_0::version_property(&f)),
-        )
-        .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_1, ())
-                .add_m(fetch_properties_2_1::get_all_properties_method(&f))
-                .add_m(fetch_properties_2_1::get_properties_method(&f)),
-        )
-        .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_2, ())
-                .add_m(fetch_properties_2_2::get_all_properties_method(&f))
-                .add_m(fetch_properties_2_2::get_properties_method(&f)),
-        )
-        .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_3, ())
-                .add_m(fetch_properties_2_2::get_all_properties_method(&f))
-                .add_m(fetch_properties_2_2::get_properties_method(&f)),
-        )
-        .add(
-            f.interface(consts::PROPERTY_FETCH_INTERFACE_NAME_2_4, ())
-                .add_m(fetch_properties_2_4::get_all_properties_method(&f))
-                .add_m(fetch_properties_2_4::get_properties_method(&f)),
-        )
-        .add(
-            f.interface(consts::REPORT_INTERFACE_NAME_2_1, ())
-                .add_m(report_2_1::get_report_method(&f)),
-        )
-        .add(
-            f.interface(consts::REPORT_INTERFACE_NAME_2_4, ())
-                .add_m(report_2_1::get_report_method(&f)),
+            f.interface(consts::REPORT_INTERFACE_NAME_3_0, ())
+                .add_m(report_3_0::get_report_method(&f)),
         );
 
     let path = obj_path.get_name().to_owned();

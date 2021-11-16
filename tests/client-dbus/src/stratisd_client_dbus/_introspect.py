@@ -1,29 +1,11 @@
 SPECS = {
     "org.freedesktop.DBus.ObjectManager": """
 <interface name="org.freedesktop.DBus.ObjectManager">
-    <method name="GetManagedObjects">
-      <arg name="objpath_interfaces_and_properties" type="a{oa{sa{sv}}}" direction="out" />
-    </method>
+    <method name="GetManagedObjects" />
   </interface>
 """,
-    "org.storage.stratis2.FetchProperties.r4": """
-<interface name="org.storage.stratis2.FetchProperties.r4">
-    <method name="GetAllProperties">
-      <arg name="results" type="a{s(bv)}" direction="out" />
-    </method>
-    <method name="GetProperties">
-      <arg name="properties" type="as" direction="in" />
-      <arg name="results" type="a{s(bv)}" direction="out" />
-    </method>
-  </interface>
-""",
-    "org.storage.stratis2.Manager.r4": """
-<interface name="org.storage.stratis2.Manager.r4">
-    <method name="ConfigureSimulator">
-      <arg name="denominator" type="u" direction="in" />
-      <arg name="return_code" type="q" direction="out" />
-      <arg name="return_string" type="s" direction="out" />
-    </method>
+    "org.storage.stratis3.Manager.r0": """
+<interface name="org.storage.stratis3.Manager.r0">
     <method name="CreatePool">
       <arg name="name" type="s" direction="in" />
       <arg name="redundancy" type="(bq)" direction="in" />
@@ -45,10 +27,14 @@ SPECS = {
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
+    <method name="ListKeys">
+      <arg name="result" type="as" direction="out" />
+      <arg name="return_code" type="q" direction="out" />
+      <arg name="return_string" type="s" direction="out" />
+    </method>
     <method name="SetKey">
       <arg name="key_desc" type="s" direction="in" />
       <arg name="key_fd" type="h" direction="in" />
-      <arg name="interactive" type="b" direction="in" />
       <arg name="result" type="(bb)" direction="out" />
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
@@ -66,13 +52,14 @@ SPECS = {
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
+    <property name="LockedPools" type="a{sa{sv}}" access="read" />
     <property name="Version" type="s" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>
   </interface>
 """,
-    "org.storage.stratis2.Report.r4": """
-<interface name="org.storage.stratis2.Report.r4">
+    "org.storage.stratis3.Report.r0": """
+<interface name="org.storage.stratis3.Report.r0">
     <method name="GetReport">
       <arg name="name" type="s" direction="in" />
       <arg name="result" type="s" direction="out" />
@@ -81,8 +68,8 @@ SPECS = {
     </method>
   </interface>
 """,
-    "org.storage.stratis2.blockdev.r4": """
-<interface name="org.storage.stratis2.blockdev.r4">
+    "org.storage.stratis3.blockdev.r0": """
+<interface name="org.storage.stratis3.blockdev.r0">
     <method name="SetUserInfo">
       <arg name="id" type="(bs)" direction="in" />
       <arg name="changed" type="(bs)" direction="out" />
@@ -107,6 +94,7 @@ SPECS = {
     <property name="Tier" type="q" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false" />
     </property>
+    <property name="TotalPhysicalSize" type="s" access="read" />
     <property name="UserInfo" type="(bs)" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="false" />
     </property>
@@ -115,8 +103,8 @@ SPECS = {
     </property>
   </interface>
 """,
-    "org.storage.stratis2.filesystem.r4": """
-<interface name="org.storage.stratis2.filesystem.r4">
+    "org.storage.stratis3.filesystem.r0": """
+<interface name="org.storage.stratis3.filesystem.r0">
     <method name="SetName">
       <arg name="name" type="s" direction="in" />
       <arg name="result" type="(bs)" direction="out" />
@@ -133,13 +121,15 @@ SPECS = {
     <property name="Pool" type="o" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>
+    <property name="Size" type="s" access="read" />
+    <property name="Used" type="(bs)" access="read" />
     <property name="Uuid" type="s" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>
   </interface>
 """,
-    "org.storage.stratis2.pool.r4": """
-<interface name="org.storage.stratis2.pool.r4">
+    "org.storage.stratis3.pool.r0": """
+<interface name="org.storage.stratis3.pool.r0">
     <method name="AddCacheDevs">
       <arg name="devices" type="as" direction="in" />
       <arg name="results" type="(bao)" direction="out" />
@@ -152,7 +142,7 @@ SPECS = {
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
-    <method name="Bind">
+    <method name="BindClevis">
       <arg name="pin" type="s" direction="in" />
       <arg name="json" type="s" direction="in" />
       <arg name="results" type="b" direction="out" />
@@ -166,7 +156,7 @@ SPECS = {
       <arg name="return_string" type="s" direction="out" />
     </method>
     <method name="CreateFilesystems">
-      <arg name="specs" type="as" direction="in" />
+      <arg name="specs" type="a(s(bs))" direction="in" />
       <arg name="results" type="(ba(os))" direction="out" />
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
@@ -183,6 +173,17 @@ SPECS = {
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
+    <method name="RebindClevis">
+      <arg name="results" type="b" direction="out" />
+      <arg name="return_code" type="q" direction="out" />
+      <arg name="return_string" type="s" direction="out" />
+    </method>
+    <method name="RebindKeyring">
+      <arg name="key_desc" type="s" direction="in" />
+      <arg name="results" type="b" direction="out" />
+      <arg name="return_code" type="q" direction="out" />
+      <arg name="return_string" type="s" direction="out" />
+    </method>
     <method name="SetName">
       <arg name="name" type="s" direction="in" />
       <arg name="result" type="(bs)" direction="out" />
@@ -196,7 +197,7 @@ SPECS = {
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
-    <method name="Unbind">
+    <method name="UnbindClevis">
       <arg name="results" type="b" direction="out" />
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
@@ -206,10 +207,17 @@ SPECS = {
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
+    <property name="AllocatedSize" type="s" access="read" />
+    <property name="AvailableActions" type="s" access="read" />
+    <property name="ClevisInfo" type="(b(b(ss)))" access="read" />
     <property name="Encrypted" type="b" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>
+    <property name="HasCache" type="b" access="read" />
+    <property name="KeyDescription" type="(b(bs))" access="read" />
     <property name="Name" type="s" access="read" />
+    <property name="TotalPhysicalSize" type="s" access="read" />
+    <property name="TotalPhysicalUsed" type="(bs)" access="read" />
     <property name="Uuid" type="s" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>

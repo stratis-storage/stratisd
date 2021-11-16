@@ -3,7 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    borrow::Cow,
     collections::HashMap,
     fmt::Debug,
     os::unix::io::RawFd,
@@ -17,10 +16,11 @@ use devicemapper::{Bytes, Sectors};
 
 use crate::{
     engine::types::{
-        BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid,
-        Key, KeyDescription, LockedPoolInfo, MappingCreateAction, MappingDeleteAction, Name,
-        PoolUuid, RenameAction, ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction,
-        UdevEngineEvent, UnlockMethod,
+        ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
+        EncryptionInfo, FilesystemUuid, Key, KeyDescription, LockedPoolInfo, MappingCreateAction,
+        MappingDeleteAction, Name, PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction,
+        ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, StratFilesystemDiff,
+        ThinPoolDiff, UdevEngineEvent, UnlockMethod,
     },
     stratis::StratisResult,
 };
@@ -79,14 +79,14 @@ pub trait Filesystem: Debug {
 
     /// The amount of data stored on the filesystem, including overhead.
     fn used(&self) -> StratisResult<Bytes>;
+
+    /// Get the size of the filesystem in bytes.
+    fn size(&self) -> Bytes;
 }
 
 pub trait BlockDev: Debug {
     /// Get the device path for the block device.
     fn devnode(&self) -> &Path;
-
-    /// Get the canonicalized path to display to the user representing this block device.
-    fn user_path(&self) -> StratisResult<PathBuf>;
 
     /// Get the path to the device on which the Stratis metadata is stored.
     fn metadata_path(&self) -> &Path;
@@ -109,6 +109,11 @@ pub trait BlockDev: Debug {
 }
 
 pub trait Pool: Debug {
+    /// Filesystem type associated with this engine type.
+    type Filesystem: Filesystem;
+    /// Block device type associated with this engine type.
+    type BlockDev: BlockDev;
+
     /// Initialize the cache with the provided cache block devices.
     /// Returns a list of the the block devices that were actually added as cache
     /// devices. In practice, this will have three types of return values:
@@ -139,8 +144,8 @@ pub trait Pool: Debug {
         &'a mut self,
         pool_name: &str,
         pool_uuid: PoolUuid,
-        specs: &[(&'b str, Option<Sectors>)],
-    ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid)>>;
+        specs: &[(&'b str, Option<Bytes>)],
+    ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid, Sectors)>>;
 
     /// Adds blockdevs specified by paths to pool.
     /// Returns a list of uuids corresponding to devices actually added.
@@ -174,6 +179,13 @@ pub trait Pool: Debug {
     /// Unbind all devices in the given pool from the registered keyring passphrase.
     fn unbind_keyring(&mut self) -> StratisResult<DeleteAction<Key>>;
 
+    /// Change the key description and passphrase associated with a pool.
+    fn rebind_keyring(&mut self, new_key_desc: &KeyDescription)
+        -> StratisResult<RenameAction<Key>>;
+
+    /// Regenerate the Clevis bindings associated with a pool.
+    fn rebind_clevis(&mut self) -> StratisResult<RegenAction>;
+
     /// Ensures that all designated filesystems are gone from pool.
     /// Returns a list of the filesystems found, and actually destroyed.
     /// This list will be a subset of the uuids passed in fs_uuids.
@@ -204,7 +216,7 @@ pub trait Pool: Debug {
         pool_uuid: PoolUuid,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<CreateAction<(FilesystemUuid, &mut dyn Filesystem)>>;
+    ) -> StratisResult<CreateAction<(FilesystemUuid, &mut Self::Filesystem)>>;
 
     /// The total number of Sectors belonging to this pool.
     /// There are no exclusions, so this number includes overhead sectors
@@ -214,6 +226,18 @@ pub trait Pool: Debug {
     /// associated with a pool.
     fn total_physical_size(&self) -> Sectors;
 
+    /// The total number of Sectors of physical storage that have been allocated
+    /// in this pool.
+    /// There are no exclusions, so this number includes overhead sectors
+    /// of all sorts, sectors allocated for every sort of metadata by
+    /// Stratis or devicemapper and therefore not available to the user for
+    /// storing their data.
+    ///
+    /// self.total_allocated_size() <= self.total_physical_size() as no more
+    /// physical space can be allocated for the pool than is available on
+    /// the block devices.
+    fn total_allocated_size(&self) -> Sectors;
+
     /// The number of Sectors in this pool that are currently in use by the
     /// pool for some purpose, and therefore not available for future use,
     /// by any subcomponent of Stratis, either for internal managment or to
@@ -221,38 +245,20 @@ pub trait Pool: Debug {
     fn total_physical_used(&self) -> StratisResult<Sectors>;
 
     /// Get all the filesystems belonging to this pool.
-    fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)>;
-
-    /// Get all the filesystems belonging to this pool as mutable references.
-    fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut dyn Filesystem)>;
+    fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Self::Filesystem)>;
 
     /// Get the filesystem in this pool with this UUID.
-    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &dyn Filesystem)>;
-
-    /// Get the mutable filesystem in this pool with this UUID.
-    fn get_mut_filesystem(&mut self, uuid: FilesystemUuid) -> Option<(Name, &mut dyn Filesystem)>;
+    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &Self::Filesystem)>;
 
     /// Get the filesystem in this pool with this name.
-    fn get_filesystem_by_name(&self, name: &Name) -> Option<(FilesystemUuid, &dyn Filesystem)>;
-
-    /// Get the mutable filesystem in this pool with this name.
-    fn get_mut_filesystem_by_name(
-        &mut self,
-        name: &Name,
-    ) -> Option<(FilesystemUuid, &mut dyn Filesystem)>;
+    fn get_filesystem_by_name(&self, name: &Name) -> Option<(FilesystemUuid, &Self::Filesystem)>;
 
     /// Get _all_ the blockdevs that belong to this pool.
     /// All really means all. For example, it does not exclude cache blockdevs.
-    fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &dyn BlockDev)>;
-
-    /// Get all the blockdevs belonging to this pool as mutable references.
-    fn blockdevs_mut(&mut self) -> Vec<(DevUuid, BlockDevTier, &mut dyn BlockDev)>;
+    fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &Self::BlockDev)>;
 
     /// Get the blockdev in this pool with this UUID.
-    fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &dyn BlockDev)>;
-
-    /// Get a mutable reference to the blockdev in this pool with this UUID.
-    fn get_mut_blockdev(&mut self, uuid: DevUuid) -> Option<(BlockDevTier, &mut dyn BlockDev)>;
+    fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &Self::BlockDev)>;
 
     /// Set the user-settable string associated with the blockdev specified
     /// by the uuid.
@@ -270,10 +276,20 @@ pub trait Pool: Debug {
     fn is_encrypted(&self) -> bool;
 
     /// Get all encryption information for this pool.
-    fn encryption_info(&self) -> Cow<EncryptionInfo>;
+    fn encryption_info(&self) -> Option<PoolEncryptionInfo>;
+
+    /// Get the pool state for the given pool. The state indicates which actions
+    /// will be disabled or enabled. Disabled actions are triggered by failures
+    /// caught by stratisd.
+    fn avail_actions(&self) -> ActionAvailability;
 }
 
 pub trait Engine: Debug + Report + Send {
+    /// Pool type associated with this engine type.
+    type Pool: Pool;
+    /// Key handling type associated with this engine type.
+    type KeyActions: KeyActions;
+
     /// Create a Stratis pool.
     /// Returns the UUID of the newly created pool.
     /// Returns an error if the redundancy code does not correspond to a
@@ -283,7 +299,7 @@ pub trait Engine: Debug + Report + Send {
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
-        encryption_info: &EncryptionInfo,
+        encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<CreateAction<PoolUuid>>;
 
     /// Handle a libudev event.
@@ -291,7 +307,7 @@ pub trait Engine: Debug + Report + Send {
     /// and its UUID.
     ///
     /// Precondition: the subsystem of the device evented on is "block".
-    fn handle_event(&mut self, event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &dyn Pool)>;
+    fn handle_event(&mut self, event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &Self::Pool)>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.
@@ -321,35 +337,81 @@ pub trait Engine: Debug + Report + Send {
     ) -> StratisResult<SetUnlockAction<DevUuid>>;
 
     /// Find the pool designated by uuid.
-    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &dyn Pool)>;
+    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &Self::Pool)>;
 
     /// Get a mutable referent to the pool designated by uuid.
-    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut dyn Pool)>;
+    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut Self::Pool)>;
 
     /// Get a mapping of encrypted pool UUIDs for pools that have not yet
     /// been set up and need to be unlocked to their encryption infos.
     fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo>;
 
-    /// Configure the simulator. Obsolete.
-    fn configure_simulator(&mut self, _: u32) -> StratisResult<()> {
-        Ok(())
-    }
-
     /// Get all pools belonging to this engine.
-    fn pools(&self) -> Vec<(Name, PoolUuid, &dyn Pool)>;
+    fn pools(&self) -> Vec<(Name, PoolUuid, &Self::Pool)>;
 
     /// Get mutable references to all pools belonging to this engine.
-    fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut dyn Pool)>;
+    fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut Self::Pool)>;
 
-    /// Notify the engine that an event has occurred on the DM file descriptor.
-    fn evented(&mut self) -> StratisResult<()>;
+    /// Get the UUIDs of all pools that experienced an event.
+    fn get_events(&mut self) -> StratisResult<Vec<PoolUuid>>;
+
+    /// Notify the engine that an event has occurred on the DM file descriptor
+    /// and check pools for needed changes.
+    fn pool_evented(
+        &mut self,
+        pools: Option<&Vec<PoolUuid>>,
+    ) -> StratisResult<HashMap<PoolUuid, ThinPoolDiff>>;
+
+    /// Notify the engine that an event has occurred on the DM file descriptor
+    /// and check filesystems for needed changes.
+    fn fs_evented(
+        &mut self,
+        pools: Option<&Vec<PoolUuid>>,
+    ) -> StratisResult<HashMap<FilesystemUuid, StratFilesystemDiff>>;
 
     /// Get the handler for kernel keyring operations.
-    fn get_key_handler(&self) -> &dyn KeyActions;
+    fn get_key_handler(&self) -> &Self::KeyActions;
 
     /// Get the handler for kernel keyring operations mutably.
-    fn get_key_handler_mut(&mut self) -> &mut dyn KeyActions;
+    fn get_key_handler_mut(&mut self) -> &mut Self::KeyActions;
 
     /// Return true if this engine is the simulator engine, otherwise false.
     fn is_sim(&self) -> bool;
+}
+
+/// Implements an interface for diffing two state structs.
+pub trait StateDiff {
+    type Diff;
+
+    /// Run the diff and return what has changed. The newer state should always be
+    /// the new_state argument as this method should always return the new values
+    /// for any properties that are inconsistent.
+    fn diff(&self, new_state: &Self) -> Self::Diff;
+}
+
+/// Dump all of the necessary state for the given data structure that may change.
+pub trait DumpState {
+    type State: StateDiff;
+
+    /// Return a structure that can be diffed and contains all of the values that
+    /// need to be checked in a diff and can change. This method should use
+    /// existing cached stratisd data structures to determine the state.
+    fn cached<F>(&self, f: F) -> Self::State
+    where
+        F: Fn(&Self) -> Self::State,
+    {
+        f(self)
+    }
+
+    /// Return a structure that can be diffed and contains all of the values that
+    /// need to be checked in a diff and can change. This method should call
+    /// out to fetch the current values of the state. A mutable reference is
+    /// taken because this method should also update the cached values of the
+    /// current state.
+    fn dump<F>(&mut self, mut f: F) -> Self::State
+    where
+        F: FnMut(&mut Self) -> Self::State,
+    {
+        f(self)
+    }
 }

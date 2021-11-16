@@ -2,16 +2,21 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, fmt::Display, future::Future, sync::Arc};
 
 use dbus::{
     arg::{ArgType, Iter, IterAppend, RefArg, Variant},
     blocking::SyncConnection,
 };
 use dbus_tree::{MTSync, MethodErr, PropInfo};
+use futures::{
+    executor::block_on,
+    future::{select, Either},
+    pin_mut,
+};
 use tokio::sync::{
-    broadcast::Sender,
-    mpsc::{unbounded_channel, UnboundedReceiver},
+    broadcast::{error::RecvError, Sender},
+    mpsc::{UnboundedReceiver, UnboundedSender},
 };
 
 use devicemapper::DmError;
@@ -19,13 +24,17 @@ use devicemapper::DmError;
 use crate::{
     dbus_api::{
         api::get_base_tree,
-        connection::{DbusConnectionHandler, DbusTreeHandler},
+        connection::DbusConnectionHandler,
         consts,
-        types::{DbusContext, DbusErrorEnum, InterfacesAdded, InterfacesAddedThreadSafe, TData},
+        tree::DbusTreeHandler,
+        types::{
+            DbusAction, DbusContext, DbusErrorEnum, DbusHandlers, InterfacesAdded,
+            InterfacesAddedThreadSafe, TData,
+        },
         udev::DbusUdevHandler,
     },
-    engine::{Lockable, LockableEngine, UdevEngineEvent},
-    stratis::{ErrorEnum, StratisError},
+    engine::{Engine, Lockable, LockableEngine, UdevEngineEvent},
+    stratis::{StratisError, StratisResult},
 };
 
 /// Convert a tuple as option to an Option type
@@ -45,18 +54,27 @@ pub fn option_to_tuple<T>(value: Option<T>, default: T) -> (bool, T) {
     }
 }
 
-/// Map a result obtained for the FetchProperties interface to a value used
-/// to represent an option.  An error in the result
+/// Map a result containing an option obtained for the FetchProperties interface to
+/// a value used to represent both the result and option.  An error in the result
 /// argument yields a false in the return value, indicating that the value
 /// returned is a string representation of the error encountered in
-/// obtaining the value, and not the value requested.
-pub fn result_to_tuple<T>(result: Result<T, String>) -> (bool, Variant<Box<dyn RefArg>>)
+/// obtaining the value, and not the value requested. If the first boolean is true,
+/// the variant will be a tuple of type (bool, T). If the second boolean if false,
+/// this indicates None. If it is true, the value for T is the Some(_) value.
+pub fn result_option_to_tuple<T, E>(
+    result: Result<Option<T>, E>,
+    default: T,
+) -> (bool, Variant<Box<dyn RefArg>>)
 where
     T: RefArg + 'static,
+    E: Display,
 {
     let (success, value) = match result {
-        Ok(value) => (true, Variant(Box::new(value) as Box<dyn RefArg>)),
-        Err(e) => (false, Variant(Box::new(e) as Box<dyn RefArg>)),
+        Ok(value) => (
+            true,
+            Variant(Box::new(option_to_tuple(value, default)) as Box<dyn RefArg>),
+        ),
+        Err(e) => (false, Variant(Box::new(e.to_string()) as Box<dyn RefArg>)),
     };
     (success, value)
 }
@@ -76,7 +94,10 @@ where
 
 /// Generate a new object path which is guaranteed unique wrt. all previously
 /// generated object paths.
-pub fn make_object_path(context: &DbusContext) -> String {
+pub fn make_object_path<E>(context: &DbusContext<E>) -> String
+where
+    E: Engine,
+{
     format!(
         "{}/{}",
         consts::STRATIS_BASE_PATH,
@@ -87,48 +108,21 @@ pub fn make_object_path(context: &DbusContext) -> String {
 /// Translates an engine error to the (errorcode, string) tuple that Stratis
 /// D-Bus methods return.
 pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
-    let error = match *err {
-        StratisError::Error(_) => DbusErrorEnum::ERROR,
-        StratisError::Engine(ref e, _) => match *e {
-            ErrorEnum::Error => DbusErrorEnum::ERROR,
-            ErrorEnum::AlreadyExists => DbusErrorEnum::ALREADY_EXISTS,
-            ErrorEnum::Busy => DbusErrorEnum::BUSY,
-            ErrorEnum::Invalid => DbusErrorEnum::ERROR,
-            ErrorEnum::NotFound => DbusErrorEnum::NOTFOUND,
-        },
-        StratisError::Io(_) => DbusErrorEnum::ERROR,
-        StratisError::Nix(_) => DbusErrorEnum::ERROR,
-        StratisError::Uuid(_)
-        | StratisError::Utf8(_)
-        | StratisError::Serde(_)
-        | StratisError::Decode(_)
-        | StratisError::DM(_)
-        | StratisError::Dbus(_)
-        | StratisError::Udev(_)
-        | StratisError::Crypt(_)
-        | StratisError::Null(_)
-        | StratisError::Join(_)
-        | StratisError::Recv(_) => DbusErrorEnum::ERROR,
-    };
     let description = match *err {
         StratisError::DM(DmError::Core(ref err)) => err.to_string(),
         ref err => err.to_string(),
     };
-    (error as u16, description)
-}
-
-/// Convenience function to get the error value for "OK"
-pub fn msg_code_ok() -> u16 {
-    DbusErrorEnum::OK as u16
-}
-
-/// Convenience function to get the error string for "OK"
-pub fn msg_string_ok() -> String {
-    DbusErrorEnum::OK.get_error_string().to_owned()
+    (DbusErrorEnum::ERROR as u16, description)
 }
 
 /// Get the UUID for an object path.
-pub fn get_uuid(i: &mut IterAppend, p: &PropInfo<MTSync<TData>, TData>) -> Result<(), MethodErr> {
+pub fn get_uuid<E>(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+) -> Result<(), MethodErr>
+where
+    E: Engine,
+{
     let object_path = p.path.get_name();
     let path = p
         .tree
@@ -145,7 +139,13 @@ pub fn get_uuid(i: &mut IterAppend, p: &PropInfo<MTSync<TData>, TData>) -> Resul
 }
 
 /// Get the parent object path for an object path.
-pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTSync<TData>, TData>) -> Result<(), MethodErr> {
+pub fn get_parent<E>(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+) -> Result<(), MethodErr>
+where
+    E: Engine,
+{
     let object_path = p.path.get_name();
     let path = p
         .tree
@@ -170,14 +170,21 @@ pub fn get_parent(i: &mut IterAppend, p: &PropInfo<MTSync<TData>, TData>) -> Res
 /// Messages may be:
 /// * received by the DbusUdevHandler from the udev thread,
 /// * sent by the DbusContext to the DbusTreeHandler
-pub fn create_dbus_handlers(
-    engine: LockableEngine,
+pub fn create_dbus_handlers<E>(
+    engine: LockableEngine<E>,
     udev_receiver: UnboundedReceiver<UdevEngineEvent>,
     trigger: Sender<()>,
-) -> Result<(DbusConnectionHandler, DbusUdevHandler, DbusTreeHandler), dbus::Error> {
+    (tree_sender, tree_receiver): (
+        UnboundedSender<DbusAction<E>>,
+        UnboundedReceiver<DbusAction<E>>,
+    ),
+) -> DbusHandlers<E>
+where
+    E: 'static + Engine,
+{
     let conn = Arc::new(SyncConnection::new_system()?);
-    let (sender, receiver) = unbounded_channel();
-    let (tree, object_path) = get_base_tree(DbusContext::new(engine, sender, Arc::clone(&conn)));
+    let (tree, object_path) =
+        get_base_tree(DbusContext::new(engine, tree_sender, Arc::clone(&conn)));
     let dbus_context = tree.get_data().clone();
     conn.request_name(consts::STRATIS_BASE_SERVICE, false, true, true)?;
 
@@ -185,7 +192,7 @@ pub fn create_dbus_handlers(
     let connection =
         DbusConnectionHandler::new(Arc::clone(&conn), tree.clone(), trigger.subscribe());
     let udev = DbusUdevHandler::new(udev_receiver, object_path, dbus_context);
-    let tree = DbusTreeHandler::new(tree, receiver, conn, trigger.subscribe());
+    let tree = DbusTreeHandler::new(tree, tree_receiver, conn, trigger.subscribe());
     Ok((connection, udev, tree))
 }
 
@@ -201,4 +208,24 @@ pub fn thread_safe_to_dbus_sendable(ia: InterfacesAddedThreadSafe) -> Interfaces
             (k, new_map)
         })
         .collect()
+}
+
+pub fn poll_exit_and_future<E, F, R>(exit: E, future: F) -> StratisResult<Option<R>>
+where
+    E: Future<Output = Result<(), RecvError>>,
+    F: Future<Output = R>,
+{
+    pin_mut!(exit);
+    pin_mut!(future);
+
+    match block_on(select(exit, future)) {
+        Either::Left((Ok(()), _)) => {
+            info!("D-Bus tree handler was notified to exit");
+            Ok(None)
+        }
+        Either::Left((Err(_), _)) => Err(StratisError::Msg(
+            "Checking the shutdown signal failed so stratisd can no longer be notified to shut down; exiting now...".to_string(),
+        )),
+        Either::Right((a, _)) => Ok(Some(a)),
+    }
 }

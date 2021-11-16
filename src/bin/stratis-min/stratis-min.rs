@@ -7,7 +7,7 @@ use std::{convert::TryFrom, error::Error, path::PathBuf};
 use clap::{App, Arg, ArgGroup, ArgMatches, SubCommand};
 use serde_json::{json, Map, Value};
 
-use libstratis::{
+use stratisd::{
     engine::{EncryptionInfo, KeyDescription, PoolUuid, UnlockMethod, CLEVIS_TANG_TRUST_URL},
     jsonrpc::client::{filesystem, key, pool, report},
     stratis::{StratisError, VERSION},
@@ -134,7 +134,7 @@ fn get_paths_from_args<'a>(args: &'a ArgMatches<'a>) -> Vec<PathBuf> {
         .collect::<Vec<_>>()
 }
 
-fn get_long_help(app: &mut App) -> Result<String, Box<dyn Error>> {
+fn get_long_help(app: &mut App<'_, '_>) -> Result<String, Box<dyn Error>> {
     let mut help = Vec::new();
     app.write_long_help(&mut help)?;
     Ok(String::from_utf8(help)?)
@@ -171,7 +171,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             };
             let prompt = args.is_present("prompt");
             if prompt && unlock_method == UnlockMethod::Clevis {
-                return Err(Box::new(StratisError::Error(
+                return Err(Box::new(StratisError::Msg(
                     "--prompt and an unlock_method of clevis are mutally exclusive".to_string(),
                 )));
             }
@@ -185,7 +185,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             };
             let pin = args.value_of("clevis");
             let clevis_info = match pin {
-                Some("nbde") | Some("tang") => {
+                Some("nbde" | "tang") => {
                     let mut json = Map::new();
                     json.insert(
                         "url".to_string(),
@@ -205,10 +205,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             pool::pool_create(
                 args.value_of("name").expect("required").to_string(),
                 paths,
-                EncryptionInfo {
-                    key_description,
-                    clevis_info,
-                },
+                EncryptionInfo::from_options((key_description, clevis_info)),
             )?;
             Ok(())
         } else if let Some(args) = subcommand.subcommand_matches("destroy") {

@@ -7,19 +7,20 @@ use dbus_tree::{MTSync, MethodErr, PropInfo, Tree};
 
 use crate::{
     dbus_api::types::TData,
-    engine::{BlockDev, BlockDevTier},
+    engine::{BlockDev, BlockDevTier, Engine, Pool},
 };
 
 /// Perform an operation on a `BlockDev` object for a given
 /// DBus implicit argument that is a block device
-pub fn blockdev_operation<F, R>(
-    tree: &Tree<MTSync<TData>, TData>,
+pub fn blockdev_operation<F, R, E>(
+    tree: &Tree<MTSync<TData<E>>, TData<E>>,
     object_path: &Path<'static>,
     closure: F,
 ) -> Result<R, String>
 where
-    F: Fn(BlockDevTier, &dyn BlockDev) -> Result<R, String>,
+    F: Fn(BlockDevTier, &<E::Pool as Pool>::BlockDev) -> Result<R, String>,
     R: dbus::arg::Append,
+    E: Engine,
 {
     let dbus_context = tree.get_data();
 
@@ -59,14 +60,15 @@ where
 /// Get a blockdev property and place it on the D-Bus. The property is
 /// found by means of the getter method which takes a reference to a
 /// blockdev and obtains the property from the blockdev.
-pub fn get_blockdev_property<F, R>(
-    i: &mut IterAppend,
-    p: &PropInfo<MTSync<TData>, TData>,
+pub fn get_blockdev_property<F, R, E>(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
     getter: F,
 ) -> Result<(), MethodErr>
 where
-    F: Fn(BlockDevTier, &dyn BlockDev) -> Result<R, String>,
+    F: Fn(BlockDevTier, &<E::Pool as Pool>::BlockDev) -> Result<R, String>,
     R: dbus::arg::Append,
+    E: Engine,
 {
     i.append(
         blockdev_operation(p.tree, p.path.get_name(), getter)
@@ -77,38 +79,39 @@ where
 
 /// Generate D-Bus representation of devnode property.
 #[inline]
-pub fn blockdev_devnode_prop(dev: &dyn BlockDev) -> String {
-    let pathbuf = match dev.user_path() {
-        Ok(path) => path,
-        Err(e) => {
-            warn!(
-                "Failed to canonicalize metadata path for block device: {}; \
-                falling back on non-canonicalized path",
-                e
-            );
-            dev.metadata_path().to_owned()
-        }
-    };
-    pathbuf.display().to_string()
+pub fn blockdev_devnode_prop<E>(dev: &<E::Pool as Pool>::BlockDev) -> String
+where
+    E: Engine,
+{
+    dev.metadata_path().display().to_string()
 }
 
 /// Generate D-Bus representation of hardware info property.
 #[inline]
-pub fn blockdev_hardware_info_prop(dev: &dyn BlockDev) -> (bool, String) {
+pub fn blockdev_hardware_info_prop<E>(dev: &<E::Pool as Pool>::BlockDev) -> (bool, String)
+where
+    E: Engine,
+{
     dev.hardware_info()
         .map_or_else(|| (false, "".to_owned()), |val| (true, val.to_owned()))
 }
 
 /// Generate D-Bus representation of user info property.
 #[inline]
-pub fn blockdev_user_info_prop(dev: &dyn BlockDev) -> (bool, String) {
+pub fn blockdev_user_info_prop<E>(dev: &<E::Pool as Pool>::BlockDev) -> (bool, String)
+where
+    E: Engine,
+{
     dev.user_info()
         .map_or_else(|| (false, "".to_owned()), |val| (true, val.to_owned()))
 }
 
 /// Generate D-Bus representation of initialization time property.
 #[inline]
-pub fn blockdev_init_time_prop(dev: &dyn BlockDev) -> u64 {
+pub fn blockdev_init_time_prop<E>(dev: &<E::Pool as Pool>::BlockDev) -> u64
+where
+    E: Engine,
+{
     dev.initialization_time().timestamp() as u64
 }
 
@@ -118,8 +121,20 @@ pub fn blockdev_tier_prop(tier: BlockDevTier) -> u16 {
     tier as u16
 }
 
-// Generate a D-Bus representation of the physical path
+/// Generate a D-Bus representation of the physical path
 #[inline]
-pub fn blockdev_physical_path_prop(dev: &dyn BlockDev) -> String {
+pub fn blockdev_physical_path_prop<E>(dev: &<E::Pool as Pool>::BlockDev) -> String
+where
+    E: Engine,
+{
     dev.devnode().display().to_string()
+}
+
+/// Generate D-Bus representation of devnode size.
+#[inline]
+pub fn blockdev_size_prop<E>(dev: &<E::Pool as Pool>::BlockDev) -> String
+where
+    E: Engine,
+{
+    (*dev.size().bytes()).to_string()
 }

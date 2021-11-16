@@ -9,6 +9,7 @@ mod activate;
 mod consts;
 mod handle;
 mod initialize;
+mod metadata_handle;
 mod shared;
 
 pub use self::{
@@ -16,7 +17,10 @@ pub use self::{
     consts::CLEVIS_TANG_TRUST_URL,
     handle::CryptHandle,
     initialize::CryptInitializer,
-    shared::{crypt_metadata_size, interpret_clevis_config},
+    metadata_handle::CryptMetadataHandle,
+    shared::{
+        back_up_luks_header, crypt_metadata_size, interpret_clevis_config, restore_luks_header,
+    },
 };
 
 #[cfg(test)]
@@ -49,7 +53,7 @@ mod tests {
                 keys::MemoryFilesystem,
                 tests::{crypt, loopbacked, real},
             },
-            types::{DevUuid, KeyDescription, PoolUuid, UnlockMethod},
+            types::{DevUuid, DevicePath, KeyDescription, PoolUuid, UnlockMethod},
         },
         stratis::StratisError,
     };
@@ -69,7 +73,7 @@ mod tests {
         let pool_uuid = PoolUuid::new_v4();
         let dev_uuid = DevUuid::new_v4();
 
-        let result = CryptInitializer::new((*path).to_owned(), pool_uuid, dev_uuid)
+        let result = CryptInitializer::new(DevicePath::new(path).unwrap(), pool_uuid, dev_uuid)
             .initialize(Some(&key_description), None);
 
         // Initialization cannot occur with a non-existent key
@@ -102,7 +106,6 @@ mod tests {
         fn crypt_test(
             paths: &[&Path],
             key_desc: &KeyDescription,
-            _: (),
         ) -> std::result::Result<(), Box<dyn Error>> {
             let mut handles = vec![];
 
@@ -110,14 +113,14 @@ mod tests {
             for path in paths {
                 let dev_uuid = DevUuid::new_v4();
 
-                let handle = CryptInitializer::new((*path).to_owned(), pool_uuid, dev_uuid)
+                let handle = CryptInitializer::new(DevicePath::new(path)?, pool_uuid, dev_uuid)
                     .initialize(Some(key_desc), None)?;
                 handles.push(handle);
             }
 
             for path in paths {
                 if !CryptActivationHandle::can_unlock(path, true, false) {
-                    return Err(Box::new(StratisError::Error(
+                    return Err(Box::new(StratisError::Msg(
                         "All devices should be able to be unlocked".to_string(),
                     )));
                 }
@@ -129,7 +132,7 @@ mod tests {
 
             for path in paths {
                 if !CryptActivationHandle::can_unlock(path, true, false) {
-                    return Err(Box::new(StratisError::Error(
+                    return Err(Box::new(StratisError::Msg(
                         "All devices should be able to be unlocked".to_string(),
                     )));
                 }
@@ -141,7 +144,7 @@ mod tests {
 
             for path in paths {
                 if CryptActivationHandle::can_unlock(path, true, false) {
-                    return Err(Box::new(StratisError::Error(
+                    return Err(Box::new(StratisError::Msg(
                         "All devices should no longer be able to be unlocked".to_string(),
                     )));
                 }
@@ -186,10 +189,9 @@ mod tests {
         fn crypt_test(
             paths: &[&Path],
             key_desc: &KeyDescription,
-            _: (),
         ) -> std::result::Result<(), Box<dyn Error>> {
             let path = paths.get(0).ok_or_else(|| {
-                Box::new(StratisError::Error(
+                Box::new(StratisError::Msg(
                     "This test only accepts a single device".to_string(),
                 ))
             })?;
@@ -197,7 +199,7 @@ mod tests {
             let pool_uuid = PoolUuid::new_v4();
             let dev_uuid = DevUuid::new_v4();
 
-            let mut handle = CryptInitializer::new((*path).to_owned(), pool_uuid, dev_uuid)
+            let handle = CryptInitializer::new(DevicePath::new(path)?, pool_uuid, dev_uuid)
                 .initialize(Some(key_desc), None)?;
             let logical_path = handle.activated_device_path();
 
@@ -291,8 +293,8 @@ mod tests {
 
             handle.deactivate()?;
 
-            let mut handle = CryptActivationHandle::setup(path, UnlockMethod::Keyring)?
-                .ok_or_else(|| {
+            let handle =
+                CryptActivationHandle::setup(path, UnlockMethod::Keyring)?.ok_or_else(|| {
                     Box::new(io::Error::new(
                         io::ErrorKind::Other,
                         format!(
@@ -345,22 +347,24 @@ mod tests {
         fn both_initialize(
             paths: &[&Path],
             key_desc: &KeyDescription,
-            _: (),
         ) -> Result<(), Box<dyn Error>> {
             let _memfs = MemoryFilesystem::new()?;
             let path = paths
                 .get(0)
                 .copied()
-                .ok_or_else(|| StratisError::Error("Expected exactly one path".to_string()))?;
-            let handle =
-                CryptInitializer::new(path.to_owned(), PoolUuid::new_v4(), DevUuid::new_v4())
-                    .initialize(
-                        Some(key_desc),
-                        Some((
-                            "tang",
-                            &json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true}),
-                        )),
-                    )?;
+                .ok_or_else(|| StratisError::Msg("Expected exactly one path".to_string()))?;
+            let handle = CryptInitializer::new(
+                DevicePath::new(path)?,
+                PoolUuid::new_v4(),
+                DevUuid::new_v4(),
+            )
+            .initialize(
+                Some(key_desc),
+                Some(&(
+                    "tang".to_string(),
+                    json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true}),
+                )),
+            )?;
 
             let mut device = acquire_crypt_device(handle.luks2_device_path())?;
             device.token_handle().json_get(LUKS2_TOKEN_ID)?;
@@ -390,15 +394,19 @@ mod tests {
     fn test_clevis_initialize(paths: &[&Path]) {
         let _memfs = MemoryFilesystem::new().unwrap();
         let path = paths[0];
-        let handle = CryptInitializer::new(path.to_owned(), PoolUuid::new_v4(), DevUuid::new_v4())
-            .initialize(
-                None,
-                Some((
-                    "tang",
-                    &json!({"url": env::var("TANG_URL").unwrap(), "stratis:tang:trust_url": true}),
-                )),
-            )
-            .unwrap();
+        let handle = CryptInitializer::new(
+            DevicePath::new(path).unwrap(),
+            PoolUuid::new_v4(),
+            DevUuid::new_v4(),
+        )
+        .initialize(
+            None,
+            Some(&(
+                "tang".to_string(),
+                json!({"url": env::var("TANG_URL").unwrap(), "stratis:tang:trust_url": true}),
+            )),
+        )
+        .unwrap();
 
         let mut device = acquire_crypt_device(handle.luks2_device_path()).unwrap();
         assert!(device.token_handle().json_get(CLEVIS_LUKS_TOKEN_ID).is_ok());

@@ -10,6 +10,8 @@
 
 use std::fmt::{self, Display};
 
+use devicemapper::Sectors;
+
 use crate::engine::{
     engine::Filesystem,
     types::{DevUuid, FilesystemUuid, PoolUuid},
@@ -58,7 +60,7 @@ impl<T> EngineAction for CreateAction<T> {
 }
 
 impl Display for CreateAction<PoolUuid> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CreateAction::Created(uuid) => {
                 write!(f, "Pool with UUID {} was created successfully", uuid)
@@ -74,7 +76,7 @@ impl Display for CreateAction<PoolUuid> {
 }
 
 impl Display for CreateAction<Clevis> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CreateAction::Created(Clevis) => {
                 write!(
@@ -93,7 +95,7 @@ impl Display for CreateAction<Clevis> {
 }
 
 impl Display for CreateAction<Key> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CreateAction::Created(Key) => {
                 write!(
@@ -111,8 +113,11 @@ impl Display for CreateAction<Key> {
     }
 }
 
-impl Display for CreateAction<(FilesystemUuid, &mut dyn Filesystem)> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl<F> Display for CreateAction<(FilesystemUuid, &mut F)>
+where
+    F: Filesystem,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CreateAction::Created((uuid, fs)) => {
                 write!(
@@ -144,7 +149,7 @@ pub enum MappingCreateAction<T> {
 }
 
 impl Display for MappingCreateAction<Key> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             MappingCreateAction::Created(Key) => write!(f, "Set a new key successfully"),
             MappingCreateAction::Identity => {
@@ -201,7 +206,7 @@ impl<T> EngineAction for MappingDeleteAction<T> {
 }
 
 impl Display for MappingDeleteAction<Key> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             MappingDeleteAction::Deleted(_) => {
                 write!(f, "A key was deleted successfully")
@@ -253,7 +258,7 @@ impl<T> EngineAction for SetUnlockAction<T> {
 }
 
 impl Display for SetUnlockAction<DevUuid> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.unlocked.is_empty() {
             write!(
                 f,
@@ -305,8 +310,8 @@ impl<T> EngineAction for SetCreateAction<T> {
     }
 }
 
-impl Display for SetCreateAction<(&str, FilesystemUuid)> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl Display for SetCreateAction<(&str, FilesystemUuid, Sectors)> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.changed.is_empty() {
             write!(
                 f,
@@ -318,7 +323,7 @@ impl Display for SetCreateAction<(&str, FilesystemUuid)> {
                 "The following filesystems {} were successfully created",
                 self.changed
                     .iter()
-                    .map(|(n, u)| format!("name: {}, UUID: {}", n, u))
+                    .map(|(n, u, s)| format!("name: {}, UUID: {}, size: {}", n, u, s))
                     .collect::<Vec<_>>()
                     .join("; ")
             )
@@ -327,7 +332,7 @@ impl Display for SetCreateAction<(&str, FilesystemUuid)> {
 }
 
 impl Display for SetCreateAction<DevUuid> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.changed.is_empty() {
             write!(
                 f,
@@ -374,7 +379,7 @@ impl<T> EngineAction for RenameAction<T> {
 }
 
 impl Display for RenameAction<DevUuid> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             RenameAction::Identity => {
                 write!(
@@ -393,7 +398,7 @@ impl Display for RenameAction<DevUuid> {
 }
 
 impl Display for RenameAction<FilesystemUuid> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             RenameAction::Identity => {
                 write!(
@@ -412,7 +417,7 @@ impl Display for RenameAction<FilesystemUuid> {
 }
 
 impl Display for RenameAction<PoolUuid> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             RenameAction::Identity => {
                 write!(f, "Pool is already named the target name; no action taken")
@@ -422,6 +427,50 @@ impl Display for RenameAction<PoolUuid> {
             }
             RenameAction::NoSource => {
                 write!(f, "The pool requested to be renamed does not exist")
+            }
+        }
+    }
+}
+
+impl Display for RenameAction<Key> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RenameAction::Identity => {
+                write!(
+                    f,
+                    "Requested passphrase in change passphrase operation was the same as the original"
+                )
+            }
+            RenameAction::Renamed(_) => {
+                write!(f, "Passphrase was successfully changed")
+            }
+            RenameAction::NoSource => {
+                write!(
+                    f,
+                    "Could not change the passphrase as no passphrase is currently set"
+                )
+            }
+        }
+    }
+}
+
+impl Display for RenameAction<Clevis> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RenameAction::Identity => {
+                write!(
+                    f,
+                    "Clevis bindings regeneration resulted in no changes to the metadata",
+                )
+            }
+            RenameAction::Renamed(_) => {
+                write!(f, "Clevis bindings were successfully regenerated")
+            }
+            RenameAction::NoSource => {
+                write!(
+                    f,
+                    "Could not change the Clevis bindings as this pool is not bound to Clevis"
+                )
             }
         }
     }
@@ -452,7 +501,7 @@ impl<T> EngineAction for DeleteAction<T> {
 }
 
 impl Display for DeleteAction<PoolUuid> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DeleteAction::Deleted(uuid) => {
                 write!(f, "Pool with UUID {} was deleted successfully", uuid)
@@ -468,7 +517,7 @@ impl Display for DeleteAction<PoolUuid> {
 }
 
 impl Display for DeleteAction<Clevis> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DeleteAction::Deleted(_) => {
                 write!(f, "A clevis binding was successfully removed from a pool")
@@ -484,7 +533,7 @@ impl Display for DeleteAction<Clevis> {
 }
 
 impl Display for DeleteAction<Key> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DeleteAction::Deleted(_) => {
                 write!(
@@ -535,7 +584,7 @@ impl<T> EngineAction for SetDeleteAction<T> {
 }
 
 impl Display for SetDeleteAction<FilesystemUuid> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.changed.is_empty() {
             write!(
                 f,
@@ -552,5 +601,17 @@ impl Display for SetDeleteAction<FilesystemUuid> {
                     .join(", ")
             )
         }
+    }
+}
+
+/// Action indicating a Clevis binding regeneration
+pub struct RegenAction;
+
+impl Display for RegenAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "The Clevis bindings were successfully regenerated using the same configuration that was originally supplied"
+        )
     }
 }

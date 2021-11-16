@@ -13,7 +13,7 @@ use std::{
 
 use nix::mount::{mount, umount, MsFlags};
 
-use devicemapper::{DmDevice, LinearDev, LinearDevTargetParams, TargetLine};
+use devicemapper::{DmDevice, DmOptions, LinearDev, LinearDevTargetParams, TargetLine};
 
 use crate::{
     engine::{
@@ -47,7 +47,7 @@ struct MountedMDV<'a> {
 
 impl<'a> MountedMDV<'a> {
     /// Borrow the MDV and ensure it's mounted.
-    fn mount(mdv: &MetadataVol) -> StratisResult<MountedMDV> {
+    fn mount(mdv: &MetadataVol) -> StratisResult<MountedMDV<'_>> {
         if let Err(err) = create_dir_all(&mdv.mount_pt) {
             if err.kind() != ErrorKind::AlreadyExists {
                 return Err(From::from(err));
@@ -61,7 +61,7 @@ impl<'a> MountedMDV<'a> {
             MsFlags::empty(),
             None as Option<&str>,
         ) {
-            Err(nix::Error::Sys(nix::errno::Errno::EBUSY)) => {
+            Err(nix::Error::EBUSY) => {
                 // The device is already mounted at the specified mount point
                 Ok(())
             }
@@ -207,7 +207,7 @@ impl MetadataVol {
 
     /// Suspend the metadata volume DM devices
     pub fn suspend(&mut self) -> StratisResult<()> {
-        self.dev.suspend(get_dm(), true)?;
+        self.dev.suspend(get_dm(), DmOptions::default())?;
         Ok(())
     }
 

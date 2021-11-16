@@ -8,10 +8,6 @@ extern crate log;
 
 #[cfg(test)]
 #[macro_use]
-extern crate error_chain;
-
-#[cfg(test)]
-#[macro_use]
 extern crate proptest;
 
 #[cfg(test)]

@@ -17,15 +17,11 @@ Used to test behavior of the udev device discovery mechanism.
 
 # isort: STDLIB
 import random
+from os import environ
+from unittest import skipIf
 
 # isort: LOCAL
-from stratisd_client_dbus import (
-    FetchProperties,
-    Manager,
-    Pool,
-    StratisdErrors,
-    get_object,
-)
+from stratisd_client_dbus import Manager, Pool, StratisdErrors, get_object
 from stratisd_client_dbus._constants import TOP_OBJECT
 from stratisd_client_dbus._stratisd_constants import EncryptionMethod
 
@@ -44,8 +40,6 @@ from ._utils import (
     wait_for_udev,
     wait_for_udev_count,
 )
-
-LOCKED_POOL_UUIDS_PROP_NAME = "LockedPoolUuids"
 
 
 class UdevTest1(UdevTest):
@@ -432,6 +426,10 @@ class UdevTest4(UdevTest):
         self._simple_event_test(key_spec=("test_key_desc", "test_key"))
 
 
+@skipIf(
+    int(environ.get("SKIP_DUPLICATE_NAMES_TEST", "0")) == 1,
+    "See: https://github.com/stratis-storage/stratisd/issues/2719",
+)
 class UdevTest5(UdevTest):
     """
     Test correct handling of pools with duplicate pool names.
@@ -513,11 +511,9 @@ class UdevTest5(UdevTest):
             wait_for_udev(CRYPTO_LUKS_FS_TYPE, self._lb_mgr.device_files(luks_tokens))
             wait_for_udev(STRATIS_FS_TYPE, self._lb_mgr.device_files(non_luks_tokens))
 
-            (valid, variant_pool_uuids) = FetchProperties.Methods.GetProperties(
-                get_object(TOP_OBJECT), {"properties": [LOCKED_POOL_UUIDS_PROP_NAME]}
-            )[LOCKED_POOL_UUIDS_PROP_NAME]
-
-            self.assertTrue(valid)
+            variant_pool_uuids = Manager.Properties.LockedPools.Get(
+                get_object(TOP_OBJECT)
+            )
 
             for pool_uuid in variant_pool_uuids:
                 ((option, _), exit_code, _) = Manager.Methods.UnlockPool(
@@ -539,8 +535,8 @@ class UdevTest5(UdevTest):
             # Dynamically rename all active pools to a randomly chosen name,
             # then generate synthetic add events for every loopbacked device.
             # After num_pools - 1 iterations, all pools should have been set up.
-            for pool_count in range(num_pools - 1):
-                current_pools = self.wait_for_pools(pool_count + 1)
+            for pool_count in range(1, num_pools):
+                current_pools = self.wait_for_pools(pool_count)
 
                 # Rename all active pools to a randomly selected new name
                 for object_path, _ in current_pools:
@@ -552,7 +548,7 @@ class UdevTest5(UdevTest):
 
                 settle()
 
-                self.wait_for_pools(len(current_pools) + 1)
+                self.wait_for_pools(pool_count + 1)
 
             self.wait_for_pools(num_pools)
 

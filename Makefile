@@ -3,6 +3,18 @@ else
   TARGET_ARGS = --target=${TARGET}
 endif
 
+ifeq ($(origin MANIFEST_PATH), undefined)
+else
+  MANIFEST_PATH_ARGS = --manifest-path=${MANIFEST_PATH}
+endif
+
+ifeq ($(origin FEDORA_RELEASE), undefined)
+else
+  FEDORA_RELEASE_ARGS = --release=${FEDORA_RELEASE}
+endif
+
+IGNORE_ARGS ?=
+
 DESTDIR ?=
 PREFIX ?= /usr
 LIBEXECDIR ?= $(PREFIX)/libexec
@@ -26,30 +38,25 @@ else
   PROFILEMINTARGET = release-min
 endif
 
-RELEASE_VERSION ?= 9.9.9
-
 MIN_FEATURES = --no-default-features --features min
 SYSTEMD_FEATURES = --no-default-features --features min,systemd_compat
 EXTRAS_FEATURES =  --features extras
 
-RUST_2018_IDIOMS = -D bare-trait-objects \
-                   -D ellipsis-inclusive-range-patterns
+DENY = -D warnings -D future-incompatible -D unused -D rust_2018_idioms -D rust_2018_compatibility -D nonstandard_style
 
-DENY = -D warnings -D future-incompatible -D unused ${RUST_2018_IDIOMS}
-
-# Clippy-related lints
-CLIPPY_CARGO = -D clippy::cargo_common_metadata \
-               -D clippy::wildcard_dependencies
+CLIPPY_DENY = -D clippy::all -D clippy::cargo
 
 # Explicitly allow these lints because they don't seem helpful
 # doc_markdown: we would rather have useful than well-formatted docs
 # from_over_into: preferring from over into is very awkward with JSON report
+# manual_filter_map: sometimes map() after filter_map() is clearer
 # map_err_ignore: we generally drop the errors for a reason
 # option_if_let_else: causing problems with if-else chains
 # similar_names: judges "yes" and "res" to be too similar
 # upper_case_acronyms: We use upper case for initialisms, e.g., BDA
 CLIPPY_PEDANTIC_USELESS = -A clippy::doc_markdown \
                           -A clippy::from_over_into \
+                          -A clippy::manual_filter_map \
                           -A clippy::map_err_ignore \
                           -A clippy::option_if_let_else \
                           -A clippy::similar_names \
@@ -76,7 +83,6 @@ CLIPPY_PEDANTIC = -D clippy::await_holding_lock \
                   -D clippy::explicit_deref_methods \
                   -D clippy::explicit_into_iter_loop \
                   -A clippy::explicit_iter_loop \
-                  -A clippy::filter_map \
                   -A clippy::filter_map_next \
                   -D clippy::fn_params_excessive_bools \
                   -A clippy::if_not_else \
@@ -110,7 +116,6 @@ CLIPPY_PEDANTIC = -D clippy::await_holding_lock \
                   -A clippy::non_ascii_literal \
                   -A clippy::option_if_let_else \
                   -D clippy::option_option \
-                  -D clippy::pub_enum_variant_names \
                   -D clippy::range_minus_one \
                   -D clippy::range_plus_one \
                   -A clippy::redundant_closure_for_method_calls \
@@ -147,6 +152,9 @@ ${HOME}/.cargo/bin/cargo-bloat:
 ${HOME}/.cargo/bin/cargo-audit:
 	cargo install cargo-audit
 
+${HOME}/.cargo/bin/cargo-expand:
+	cargo install cargo-expand
+
 outdated: ${HOME}/.cargo/bin/cargo-outdated
 	PATH=${HOME}/.cargo/bin:${PATH} cargo outdated
 
@@ -160,21 +168,26 @@ bloat: ${HOME}/.cargo/bin/cargo-bloat
 audit: ${HOME}/.cargo/bin/cargo-audit
 	PATH=${HOME}/.cargo/bin:${PATH} cargo audit -D warnings
 
-${PWD}/stratisd-vendor.tar.gz:
-	cargo vendor
-	tar -czvf stratisd-vendor.tar.gz vendor
+expand: ${HOME}/.cargo/bin/cargo-expand
+	PATH=${HOME}/.cargo/bin:${PATH} cargo expand --lib=libstratisd engine::strat_engine::pool
 
-create-release: ${PWD}/stratisd-vendor.tar.gz
-	mv ${PWD}/stratisd-vendor.tar.gz ${PWD}/stratisd-${RELEASE_VERSION}-vendor.tar.gz
-	${PWD}/code_maintenance/create_release.py ${RELEASE_VERSION}
-	rm -rf vendor
-	rm stratisd-${RELEASE_VERSION}-vendor.tar.gz
-
-fmt:
+fmt: fmt-macros
 	cargo fmt
 
-fmt-travis:
+fmt-macros:
+	cd stratisd_proc_macros && cargo fmt
+
+fmt-travis: fmt-macros-travis
 	cargo fmt -- --check
+
+fmt-macros-travis:
+	cd stratisd_proc_macros && cargo fmt -- --check
+
+fmt-shell:
+	shfmt -l -w .
+
+fmt-shell-ci:
+	shfmt -d .
 
 build:
 	PKG_CONFIG_ALLOW_CROSS=1 \
@@ -223,7 +236,6 @@ install-cfg: docs/stratisd.8
 	install -Dpm0644 -t $(DESTDIR)$(MANDIR)/man8 docs/stratisd.8
 	install -Dpm0644 -t $(DESTDIR)$(UDEVDIR)/rules.d udev/61-stratisd.rules
 	install -Dpm0644 -t $(DESTDIR)$(UNITDIR) systemd/stratisd.service
-	install -Dpm0644 -t $(DESTDIR)$(DRACUTDIR)/dracut.conf.d dracut/90-stratis.conf
 	install -Dpm0755 -d $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis
 	install -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/module-setup.sh
 	install -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/stratis-rootfs-setup
@@ -253,7 +265,6 @@ clean-cfg:
 	rm -fv $(DESTDIR)$(MANDIR)/man8/stratisd.8
 	rm -fv $(DESTDIR)$(UDEVDIR)/rules.d/*-stratisd.rules
 	rm -fv $(DESTDIR)$(UNITDIR)/stratisd.service
-	rm -fv $(DESTDIR)$(DRACUTDIR)/dracut.conf.d/90-stratis.conf
 	rm -rfv $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis
 	rm -rfv $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis-clevis
 	rm -fv $(DESTDIR)$(UNITDIR)/stratisd-min-postinitrd.service
@@ -306,58 +317,73 @@ docs-rust:
 docs/stratisd.8: docs/stratisd.txt
 	a2x -f manpage docs/stratisd.txt
 
-clippy:
-	RUSTFLAGS="${DENY}" cargo clippy --all-targets -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
-	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${MIN_FEATURES} -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
-	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${SYSTEMD_FEATURES} -- ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS} ${CLIPPY_CARGO}
+clippy-macros:
+	cd stratisd_proc_macros && RUSTFLAGS="${DENY}" cargo clippy --all-targets --all-features -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 
-set-lower-bounds:
-	${PWD}/code_maintenance/set_lower_bounds
+# stratisd requires the most recent version of libmount, which is over 2 years
+# old and requires some older versions of nix and cfg-if which are not
+# semantic version compatible with the new ones that stratisd requires
+STRATISD_CLIPPY_DENY = ${CLIPPY_DENY} -A clippy::multiple-crate-versions
+clippy: clippy-macros
+	RUSTFLAGS="${DENY}" cargo clippy --all-targets -- ${STRATISD_CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${MIN_FEATURES} -- ${STRATISD_CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${SYSTEMD_FEATURES} -- ${STRATISD_CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 
-# Note that this target is really just a helper target for the
-# verify-dependency-bounds target.
-build-all:
+SET_LOWER_BOUNDS ?=
+test-set-lower-bounds:
+	echo "Testing that SET_LOWER_BOUNDS environment variable is set to a valid path"
+	test -e "${SET_LOWER_BOUNDS}"
+
+verify-dependency-bounds: test-set-lower-bounds
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build --all-targets --all-features
+	cargo build ${MANIFEST_PATH_ARGS} --all-targets --all-features
+	${SET_LOWER_BOUNDS} ${MANIFEST_PATH_ARGS}
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY}" \
+	cargo build ${MANIFEST_PATH_ARGS} --all-targets --all-features
 
-# Verify that the dependency bounds set in Cargo.toml are not lower
-# than is actually reqired. Use build-all target to set up for cargo-tree
-# and also to test that everything still compiles when the versions are set
-# to their precise values.
-verify-dependency-bounds:
-	$(MAKE) build-all
-	$(MAKE) set-lower-bounds
-	$(MAKE) build-all
+COMPARE_FEDORA_VERSIONS ?=
+test-compare-fedora-versions:
+	echo "Testing that COMPARE_FEDORA_VERSIONS environment variable is set to a valid path"
+	test -e "${COMPARE_FEDORA_VERSIONS}"
 
+check-fedora-versions: test-compare-fedora-versions
+	${COMPARE_FEDORA_VERSIONS} ${MANIFEST_PATH_ARGS} ${FEDORA_RELEASE_ARGS} ${IGNORE_ARGS}
 
 .PHONY:
 	audit
 	bloat
 	build
-	build-all
 	build-min
+	check-fedora-versions
 	clean
 	clean-ancillary
 	clean-cfg
 	clean-primary
 	clippy
-	create-release
+	clippy-macros
 	docs-rust
 	docs-travis
+	expand
 	fmt
+	fmt-shell
+	fmt-shell-ci
 	fmt-travis
+	fmt-macros
+	fmt-macros-travis
 	install
 	install-cfg
 	license
 	outdated
 	release
 	release-min
-	set-lower-bounds
 	test
 	test-loop
 	test-real
 	test-clevis-loop
 	test-clevis-real
+	test-compare-fedora-versions
+	test-set-lower-bounds
 	verify-dependency-bounds
 	yamllint

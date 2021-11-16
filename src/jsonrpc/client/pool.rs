@@ -17,7 +17,7 @@ use crate::{
 pub fn pool_create(
     name: String,
     blockdevs: Vec<PathBuf>,
-    enc_info: EncryptionInfo,
+    enc_info: Option<EncryptionInfo>,
 ) -> StratisResult<()> {
     do_request_standard!(PoolCreate, name, blockdevs, enc_info)
 }
@@ -119,7 +119,7 @@ pub fn pool_list() -> StratisResult<()> {
 pub fn pool_is_encrypted(uuid: PoolUuid) -> StratisResult<bool> {
     let (is_encrypted, rc, rs) = do_request!(PoolIsEncrypted, uuid);
     if rc != 0 {
-        Err(StratisError::Error(rs))
+        Err(StratisError::Msg(rs))
     } else {
         Ok(is_encrypted)
     }
@@ -129,7 +129,7 @@ pub fn pool_is_encrypted(uuid: PoolUuid) -> StratisResult<bool> {
 pub fn pool_is_locked(uuid: PoolUuid) -> StratisResult<bool> {
     let (is_locked, rc, rs) = do_request!(PoolIsLocked, uuid);
     if rc != 0 {
-        Err(StratisError::Error(rs))
+        Err(StratisError::Msg(rs))
     } else {
         Ok(is_locked)
     }
@@ -139,7 +139,7 @@ pub fn pool_is_locked(uuid: PoolUuid) -> StratisResult<bool> {
 pub fn pool_is_bound(uuid: PoolUuid) -> StratisResult<bool> {
     let (is_bound, rc, rs) = do_request!(PoolIsBound, uuid);
     if rc != 0 {
-        Err(StratisError::Error(rs))
+        Err(StratisError::Msg(rs))
     } else {
         Ok(is_bound)
     }
@@ -149,7 +149,7 @@ pub fn pool_is_bound(uuid: PoolUuid) -> StratisResult<bool> {
 pub fn pool_has_passphrase(uuid: PoolUuid) -> StratisResult<bool> {
     let (has_passphrase, rc, rs) = do_request!(PoolHasPassphrase, uuid);
     if rc != 0 {
-        Err(StratisError::Error(rs))
+        Err(StratisError::Msg(rs))
     } else {
         Ok(has_passphrase)
     }
@@ -159,7 +159,7 @@ pub fn pool_has_passphrase(uuid: PoolUuid) -> StratisResult<bool> {
 pub fn pool_clevis_pin(uuid: PoolUuid) -> StratisResult<String> {
     let (clevis_pin, rc, rs) = do_request!(PoolClevisPin, uuid);
     if rc != 0 {
-        Err(StratisError::Error(rs))
+        Err(StratisError::Msg(rs))
     } else {
         Ok(clevis_pin.unwrap_or_else(|| "None".to_string()))
     }

@@ -5,16 +5,22 @@
 use std::os::unix::io::RawFd;
 
 use crate::{
-    engine::{KeyDescription, LockableEngine, MappingCreateAction, MappingDeleteAction, PoolUuid},
+    engine::{
+        Engine, KeyActions, KeyDescription, LockableEngine, MappingCreateAction,
+        MappingDeleteAction, PoolUuid,
+    },
     stratis::StratisResult,
 };
 
 // stratis-min key set
-pub async fn key_set(
-    engine: LockableEngine,
+pub async fn key_set<E>(
+    engine: LockableEngine<E>,
     key_desc: &KeyDescription,
     key_fd: RawFd,
-) -> StratisResult<Option<bool>> {
+) -> StratisResult<Option<bool>>
+where
+    E: Engine,
+{
     Ok(
         match engine
             .lock()
@@ -30,7 +36,13 @@ pub async fn key_set(
 }
 
 // stratis-min key unset
-pub async fn key_unset(engine: LockableEngine, key_desc: &KeyDescription) -> StratisResult<bool> {
+pub async fn key_unset<E>(
+    engine: LockableEngine<E>,
+    key_desc: &KeyDescription,
+) -> StratisResult<bool>
+where
+    E: Engine,
+{
     Ok(
         match engine.lock().await.get_key_handler_mut().unset(key_desc)? {
             MappingDeleteAction::Deleted(_) => true,
@@ -40,7 +52,10 @@ pub async fn key_unset(engine: LockableEngine, key_desc: &KeyDescription) -> Str
 }
 
 // stratis-min key [list]
-pub async fn key_list(engine: LockableEngine) -> StratisResult<Vec<KeyDescription>> {
+pub async fn key_list<E>(engine: LockableEngine<E>) -> StratisResult<Vec<KeyDescription>>
+where
+    E: Engine,
+{
     Ok(engine
         .lock()
         .await
@@ -50,9 +65,16 @@ pub async fn key_list(engine: LockableEngine) -> StratisResult<Vec<KeyDescriptio
         .collect())
 }
 
-pub async fn key_get_desc(engine: LockableEngine, pool_uuid: PoolUuid) -> Option<KeyDescription> {
+pub async fn key_get_desc<E>(
+    engine: LockableEngine<E>,
+    pool_uuid: PoolUuid,
+) -> StratisResult<Option<KeyDescription>>
+where
+    E: Engine,
+{
     let locked_pools = engine.lock().await.locked_pools();
-    locked_pools
-        .get(&pool_uuid)
-        .and_then(|info| info.info.key_description.to_owned())
+    match locked_pools.get(&pool_uuid) {
+        Some(info) => Ok(info.info.key_description()?.cloned()),
+        None => Ok(None),
+    }
 }

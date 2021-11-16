@@ -21,7 +21,7 @@ use devicemapper::{Bytes, Sectors};
 
 #[cfg(feature = "systemd_compat")]
 use crate::generators::{stratis_clevis_setup_generator, stratis_setup_generator};
-use libstratis::{
+use stratisd::{
     engine::{blkdev_size, crypt_metadata_size, BDA},
     stratis::StratisResult,
 };
@@ -30,7 +30,7 @@ use libstratis::{
 struct ExecutableError(String);
 
 impl Display for ExecutableError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
 }
@@ -131,8 +131,8 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
             );
         let matches = parser.get_matches_from(&args);
         string_compare(
-            &matches.value_of("left").expect("required argument"),
-            &matches.value_of("right").expect("required argument"),
+            matches.value_of("left").expect("required argument"),
+            matches.value_of("right").expect("required argument"),
         );
     } else if argv1.ends_with("stratis-base32-decode") {
         let parser = App::new("stratis-base32-decode")
@@ -148,8 +148,8 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
             );
         let matches = parser.get_matches_from(&args);
         base32_decode(
-            &matches.value_of("key").expect("required argument"),
-            &matches.value_of("value").expect("required argument"),
+            matches.value_of("key").expect("required argument"),
+            matches.value_of("value").expect("required argument"),
         )?;
     } else if argv1.ends_with("stratis-predict-usage") {
         let parser = App::new("stratis-predict-usage")

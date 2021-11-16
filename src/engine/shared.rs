@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    collections::{hash_map::RandomState, HashSet},
+    collections::{hash_map::RandomState, HashMap, HashSet},
     fs::File,
     io::Read,
     os::unix::io::{AsRawFd, FromRawFd, RawFd},
@@ -13,26 +13,41 @@ use std::{
 use nix::poll::{poll, PollFd, PollFlags};
 use regex::Regex;
 
-use devicemapper::Bytes;
+use devicemapper::{Bytes, Sectors, IEC, SECTOR_SIZE};
 use libcryptsetup_rs::SafeMemHandle;
 
 use crate::{
     engine::{
-        engine::{Pool, MAX_STRATIS_PASS_SIZE},
-        types::{BlockDevTier, CreateAction, DevUuid, PoolUuid, SetCreateAction, SizedKeyMemory},
+        engine::{BlockDev, Pool, MAX_STRATIS_PASS_SIZE},
+        types::{
+            BlockDevTier, CreateAction, DevUuid, EncryptionInfo, PoolEncryptionInfo, PoolUuid,
+            SetCreateAction, SizedKeyMemory,
+        },
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::{StratisError, StratisResult},
 };
+
+#[cfg(not(test))]
+const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
+#[cfg(test)]
+pub const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
+
+// Maximum taken from "XFS Algorithms and Data Structured: 3rd edition"
+const MAX_THIN_DEV_SIZE: Sectors = Sectors(16 * IEC::Pi); // 8 EiB
+const MIN_THIN_DEV_SIZE: Sectors = Sectors(64 * IEC::Ki); // 32 MiB
 
 /// Called when the name of a requested pool coincides with the name of an
 /// existing pool. Returns an error if the specifications of the requested
 /// pool differ from the specifications of the existing pool, otherwise
 /// returns Ok(CreateAction::Identity).
-pub fn create_pool_idempotent_or_err(
-    pool: &dyn Pool,
+pub fn create_pool_idempotent_or_err<P>(
+    pool: &P,
     pool_name: &str,
     blockdev_paths: &[&Path],
-) -> StratisResult<CreateAction<PoolUuid>> {
+) -> StratisResult<CreateAction<PoolUuid>>
+where
+    P: Pool,
+{
     let input_devices: HashSet<PathBuf, RandomState> =
         blockdev_paths.iter().map(|p| p.to_path_buf()).collect();
 
@@ -59,10 +74,9 @@ pub fn create_pool_idempotent_or_err(
             .difference(&input_devices)
             .map(|path| path.display().to_string())
             .collect::<Vec<_>>();
-        Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            create_pool_generate_error_string!(pool_name, in_input, in_pool),
-        ))
+        Err(StratisError::Msg(create_pool_generate_error_string!(
+            pool_name, in_input, in_pool
+        )))
     }
 }
 
@@ -90,10 +104,9 @@ where
             .difference(&input_devices)
             .map(|path| path.display().to_string())
             .collect::<Vec<_>>();
-        Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            init_cache_generate_error_string!(in_input, in_pool),
-        ))
+        Err(StratisError::Msg(init_cache_generate_error_string!(
+            in_input, in_pool
+        )))
     }
 }
 
@@ -109,13 +122,10 @@ pub fn set_key_shared(key_fd: RawFd) -> StratisResult<SizedKeyMemory> {
         let mut pollers = [PollFd::new(key_file.as_raw_fd(), PollFlags::POLLIN)];
         let num_events = poll(&mut pollers, 0)?;
         if num_events > 0 {
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
-                format!(
-                    "Provided key exceeded maximum allow length of {}",
-                    Bytes::from(MAX_STRATIS_PASS_SIZE)
-                ),
-            ));
+            return Err(StratisError::Msg(format!(
+                "Provided key exceeded maximum allow length of {}",
+                Bytes::from(MAX_STRATIS_PASS_SIZE)
+            )));
         }
     }
 
@@ -127,62 +137,56 @@ pub fn set_key_shared(key_fd: RawFd) -> StratisResult<SizedKeyMemory> {
 /// Validate a str for use as a Pool or Filesystem name.
 pub fn validate_name(name: &str) -> StratisResult<()> {
     if name.contains('\u{0}') {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name contains NULL characters : {}", name),
-        ));
+        return Err(StratisError::Msg(format!(
+            "Name contains NULL characters: {}",
+            name
+        )));
     }
     if name == "." || name == ".." {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name is . or .. : {}", name),
-        ));
+        return Err(StratisError::Msg(format!("Name is . or .. : {}", name)));
     }
     // Linux has a maximum filename length of 255 bytes
     if name.len() > 255 {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name has more than 255 bytes : {}", name),
-        ));
+        return Err(StratisError::Msg(format!(
+            "Name has more than 255 bytes: {}",
+            name
+        )));
     }
     if name.len() != name.trim().len() {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name contains leading or trailing space : {}", name),
-        ));
+        return Err(StratisError::Msg(format!(
+            "Name contains leading or trailing space: {}",
+            name
+        )));
     }
     if name.chars().any(|c| c.is_control()) {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name contains control characters : {}", name),
-        ));
+        return Err(StratisError::Msg(format!(
+            "Name contains control characters: {}",
+            name
+        )));
     }
     lazy_static! {
         static ref NAME_UDEVREGEX: Regex =
             Regex::new(r"[[:ascii:]&&[^0-9A-Za-z#+-.:=@_/]]+").expect("regex is valid");
     }
     if NAME_UDEVREGEX.is_match(name) {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!(
-                "Name contains characters not allowed in udev symlinks : {}",
-                name
-            ),
-        ));
+        return Err(StratisError::Msg(format!(
+            "Name contains characters not allowed in udev symlinks: {}",
+            name
+        )));
     }
 
     let name_path = Path::new(name);
     if name_path.components().count() != 1 {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name is a path with 0 or more than 1 components : {}", name),
-        ));
+        return Err(StratisError::Msg(format!(
+            "Name is a path with 0 or more than 1 components: {}",
+            name
+        )));
     }
     if name_path.is_absolute() {
-        return Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!("Name is an absolute path : {}", name),
-        ));
+        return Err(StratisError::Msg(format!(
+            "Name is an absolute path: {}",
+            name
+        )));
     }
     Ok(())
 }
@@ -197,16 +201,70 @@ pub fn validate_paths(paths: &[&Path]) -> StratisResult<()> {
     if non_absolute_paths.is_empty() {
         Ok(())
     } else {
-        Err(StratisError::Engine(
-            ErrorEnum::Invalid,
-            format!(
-                "Paths{{{}}} are not absolute",
-                non_absolute_paths
-                    .iter()
-                    .map(|p| p.display().to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            ),
+        Err(StratisError::Msg(format!(
+            "Paths{{{}}} are not absolute",
+            non_absolute_paths
+                .iter()
+                .map(|p| p.display().to_string())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )))
+    }
+}
+
+pub fn validate_filesystem_size_specs<'a>(
+    specs: &[(&'a str, Option<Bytes>)],
+) -> StratisResult<HashMap<&'a str, Sectors>> {
+    specs
+        .iter()
+        .map(|&(name, size_opt)| {
+            size_opt
+                .map(|size| {
+                    let size_sectors = size.sectors();
+                    if size_sectors.bytes() != size {
+                        Err(StratisError::Msg(format!(
+                            "Requested size of filesystem {} must be divisble by {}",
+                            name, SECTOR_SIZE
+                        )))
+                    } else if size_sectors < MIN_THIN_DEV_SIZE {
+                        Err(StratisError::Msg(format!(
+                            "Requested size of filesystem {} is {} which is less than minimum required: {}",
+                            name, size_sectors, MIN_THIN_DEV_SIZE
+                        )))
+                    } else if size_sectors > MAX_THIN_DEV_SIZE {
+                        Err(StratisError::Msg(format!(
+                            "Requested size of filesystem {} is {} which is greater than maximum allowed: {}",
+                            name, size_sectors, MAX_THIN_DEV_SIZE
+                        )))
+                    } else {
+                        Ok(size_sectors)
+                    }
+                })
+                .transpose()
+                .map(|size_opt| size_opt.unwrap_or(DEFAULT_THIN_DEV_SIZE))
+                .map(|size| (name, size))
+        })
+        .collect::<StratisResult<HashMap<_, Sectors>>>()
+}
+
+/// Gather the encryption information from across multiple block devices.
+pub fn gather_encryption_info<'a, I>(
+    len: usize,
+    iterator: I,
+) -> StratisResult<Option<PoolEncryptionInfo>>
+where
+    I: Iterator<Item = Option<&'a EncryptionInfo>>,
+{
+    let encryption_infos = iterator.flatten().collect::<Vec<_>>();
+
+    // Return error if not all devices are either encrypted or unencrypted.
+    if encryption_infos.is_empty() {
+        Ok(None)
+    } else if encryption_infos.len() == len {
+        Ok(Some(PoolEncryptionInfo::from(encryption_infos)))
+    } else {
+        Err(StratisError::Msg(
+            "All devices in a pool must be either encrypted or unencrypted; found a mixture of both".to_string()
         ))
     }
 }
@@ -216,7 +274,6 @@ mod tests {
     use super::*;
 
     #[test]
-    #[allow(clippy::cognitive_complexity)]
     fn test_validate_name() {
         assert_matches!(validate_name(&'\u{0}'.to_string()), Err(_));
         assert_matches!(validate_name("./some"), Err(_));

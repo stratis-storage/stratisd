@@ -8,7 +8,7 @@ use std::sync::Once;
 
 use devicemapper::{DmResult, DM};
 
-use crate::stratis::{ErrorEnum, StratisError, StratisResult};
+use crate::stratis::{StratisError, StratisResult};
 
 static INIT: Once = Once::new();
 static mut DM_CONTEXT: Option<DmResult<DM>> = None;
@@ -16,11 +16,11 @@ static mut DM_CONTEXT: Option<DmResult<DM>> = None;
 pub fn get_dm_init() -> StratisResult<&'static DM> {
     unsafe {
         INIT.call_once(|| DM_CONTEXT = Some(DM::new()));
-        match DM_CONTEXT {
+        match &DM_CONTEXT {
             Some(Ok(ref context)) => Ok(context),
-            Some(Err(ref e)) => Err(StratisError::Engine(
-                ErrorEnum::Error,
-                format!("Failed to initialize DM context: {}", e),
+            Some(Err(e)) => Err(StratisError::Chained(
+                "Failed to initialize DM context".to_string(),
+                Box::new(e.clone().into()),
             )),
             _ => panic!("DM_CONTEXT.is_some()"),
         }

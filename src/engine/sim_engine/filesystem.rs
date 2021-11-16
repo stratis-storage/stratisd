@@ -2,11 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use chrono::{DateTime, Utc};
-
 use std::path::PathBuf;
 
-use devicemapper::Bytes;
+use chrono::{DateTime, Utc};
+use serde_json::{Map, Value};
+
+use devicemapper::{Bytes, Sectors};
 
 use crate::{engine::Filesystem, stratis::StratisResult};
 
@@ -14,14 +15,20 @@ use crate::{engine::Filesystem, stratis::StratisResult};
 pub struct SimFilesystem {
     rand: u32,
     created: DateTime<Utc>,
+    size: Sectors,
 }
 
 impl SimFilesystem {
-    pub fn new() -> SimFilesystem {
+    pub fn new(size: Sectors) -> SimFilesystem {
         SimFilesystem {
             rand: rand::random::<u32>(),
             created: Utc::now(),
+            size,
         }
+    }
+
+    pub fn size(&self) -> Sectors {
+        self.size
     }
 }
 
@@ -41,6 +48,26 @@ impl Filesystem for SimFilesystem {
     }
 
     fn used(&self) -> StratisResult<Bytes> {
-        Ok(Bytes(12_345_678))
+        Ok((self.size / 2u64).bytes())
+    }
+
+    fn size(&self) -> Bytes {
+        self.size.bytes()
+    }
+}
+
+impl<'a> Into<Value> for &'a SimFilesystem {
+    fn into(self) -> Value {
+        let mut json = Map::new();
+        json.insert("size".to_string(), Value::from(self.size().to_string()));
+        json.insert(
+            "used".to_string(),
+            Value::from(
+                self.used()
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|_| "Unavailable".to_string()),
+            ),
+        );
+        Value::from(json)
     }
 }

@@ -2,9 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use chrono::{DateTime, TimeZone, Utc};
-use data_encoding::BASE32_NOPAD;
-
 use std::{
     fs::{File, OpenOptions},
     io::{Read, Write},
@@ -13,8 +10,13 @@ use std::{
     time::Duration,
 };
 
+use chrono::{DateTime, TimeZone, Utc};
+use data_encoding::BASE32_NOPAD;
+use serde_json::{Map, Value};
+
 use devicemapper::{
-    Bytes, DmDevice, DmName, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev, ThinStatus, IEC,
+    Bytes, DmDevice, DmName, DmOptions, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev,
+    ThinStatus,
 };
 
 use nix::{
@@ -24,7 +26,7 @@ use nix::{
 
 use crate::{
     engine::{
-        engine::Filesystem,
+        engine::{DumpState, Filesystem, StateDiff},
         strat_engine::{
             cmd::{create_fs, set_uuid, udev_settle, xfs_growfs},
             devlinks,
@@ -33,12 +35,12 @@ use crate::{
             serde_structs::FilesystemSave,
             thinpool::{thinpool::DATA_LOWATER, DATA_BLOCK_SIZE},
         },
-        types::{FilesystemUuid, Name, PoolUuid, StratisUuid},
+        types::{
+            ActionAvailability, FilesystemUuid, Name, PoolUuid, StratFilesystemDiff, StratisUuid,
+        },
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::{StratisError, StratisResult},
 };
-
-const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
 const TEMP_MNT_POINT_PREFIX: &str = "stratis_mp_";
 
@@ -50,6 +52,20 @@ pub const FILESYSTEM_LOWATER: Sectors = Sectors(4 * (DATA_LOWATER.0 * DATA_BLOCK
 pub struct StratFilesystem {
     thin_dev: ThinDev,
     created: DateTime<Utc>,
+    used: Option<Bytes>,
+}
+
+fn init_used(thin_dev: &ThinDev) -> Option<Bytes> {
+    thin_dev
+        .status(get_dm(), DmOptions::default())
+        .ok()
+        .and_then(|status| {
+            if let ThinStatus::Working(s) = status {
+                Some(s.nr_mapped_sectors.bytes())
+            } else {
+                None
+            }
+        })
 }
 
 impl StratFilesystem {
@@ -57,19 +73,13 @@ impl StratFilesystem {
     pub fn initialize(
         pool_uuid: PoolUuid,
         thinpool_dev: &ThinPoolDev,
-        size: Option<Sectors>,
+        size: Sectors,
         id: ThinDevId,
     ) -> StratisResult<(FilesystemUuid, StratFilesystem)> {
         let fs_uuid = FilesystemUuid::new_v4();
         let (dm_name, dm_uuid) = format_thin_ids(pool_uuid, ThinRole::Filesystem(fs_uuid));
-        let mut thin_dev = ThinDev::new(
-            get_dm(),
-            &dm_name,
-            Some(&dm_uuid),
-            size.unwrap_or(DEFAULT_THIN_DEV_SIZE),
-            thinpool_dev,
-            id,
-        )?;
+        let mut thin_dev =
+            ThinDev::new(get_dm(), &dm_name, Some(&dm_uuid), size, thinpool_dev, id)?;
 
         if let Err(err) = create_fs(&thin_dev.devnode(), Some(StratisUuid::Fs(fs_uuid)), false) {
             udev_settle().unwrap_or_else(|err| {
@@ -92,6 +102,7 @@ impl StratFilesystem {
         Ok((
             fs_uuid,
             StratFilesystem {
+                used: init_used(&thin_dev),
                 thin_dev,
                 created: Utc::now(),
             },
@@ -114,6 +125,7 @@ impl StratFilesystem {
             fssave.thin_id,
         )?;
         Ok(StratFilesystem {
+            used: init_used(&thin_dev),
             thin_dev,
             created: Utc.timestamp(fssave.created as i64, 0),
         })
@@ -209,52 +221,72 @@ impl StratFilesystem {
 
                 set_uuid(&thin_dev.devnode(), snapshot_fs_uuid)?;
                 Ok(StratFilesystem {
+                    used: init_used(&thin_dev),
                     thin_dev,
                     created: Utc::now(),
                 })
             }
-            Err(e) => Err(StratisError::Engine(
-                ErrorEnum::Error,
-                format!(
-                    "failed to create {} snapshot for {} - {}",
-                    snapshot_name, snapshot_fs_name, e
-                ),
-            )),
+            Err(e) => Err(StratisError::Msg(format!(
+                "failed to create {} snapshot for {} - {}",
+                snapshot_name, snapshot_fs_name, e
+            ))),
         }
     }
 
-    /// check if filesystem is getting full and needs to be extended
+    /// Check if filesystem is getting full and needs to be extended.
+    ///
+    /// Returns:
+    /// * Some(_) if metadata should be saved.
+    /// * None if metadata should not be saved.
     /// TODO: deal with the thindev in a Fail state.
-    pub fn check(&mut self) -> StratisResult<bool> {
-        match self.thin_dev.status(get_dm())? {
+    pub fn check(&mut self) -> StratisResult<(bool, StratFilesystemDiff)> {
+        let mut needs_save = false;
+        let original_state = self.cached(|fs| StratFilesystemState {
+            size: fs.size(),
+            used: fs.used().ok(),
+        });
+        match self.thin_dev.status(get_dm(), DmOptions::default())? {
             ThinStatus::Working(_) => {
                 if let Some(mount_point) = self.mount_points()?.first() {
                     let (fs_total_bytes, fs_total_used_bytes) = fs_usage(mount_point)?;
                     let free_bytes = fs_total_bytes - fs_total_used_bytes;
                     if free_bytes.sectors() < FILESYSTEM_LOWATER {
-                        let mut table = self.thin_dev.table().table.clone();
-                        table.length =
-                            self.thin_dev.size() + Self::extend_size(self.thin_dev.size());
-                        if self.thin_dev.set_table(get_dm(), table).is_err() {
-                            return Ok(false);
+                        let old_table = self.thin_dev.table().table.clone();
+                        let mut new_table = old_table.clone();
+                        new_table.length =
+                            original_state.size.sectors() + Self::extend_size(self.thin_dev.size());
+                        self.thin_dev.set_table(get_dm(), new_table)?;
+                        if let Err(causal) = xfs_growfs(mount_point) {
+                            if let Err(rollback) = self.thin_dev.set_table(get_dm(), old_table) {
+                                return Err(StratisError::RollbackError {
+                                    causal_error: Box::new(causal),
+                                    rollback_error: Box::new(StratisError::from(rollback)),
+                                    level: ActionAvailability::NoPoolChanges,
+                                });
+                            } else {
+                                return Err(causal);
+                            }
                         }
-                        if xfs_growfs(mount_point).is_err() {
-                            return Ok(true);
-                        }
-                        return Ok(true);
+                        needs_save = true;
                     }
                 }
-                Ok(false)
             }
             ThinStatus::Error => {
                 let error_msg = format!(
                     "Unable to get status for filesystem thin device {}",
                     self.thin_dev.device()
                 );
-                Err(StratisError::Engine(ErrorEnum::Error, error_msg))
+                return Err(StratisError::Msg(error_msg));
             }
-            ThinStatus::Fail => Ok(false),
-        }
+            _ => (),
+        };
+        Ok((
+            needs_save,
+            original_state.diff(&self.dump(|fs| StratFilesystemState {
+                used: fs.used().ok(),
+                size: fs.size(),
+            })),
+        ))
     }
 
     /// Return an extend size for the thindev under the filesystem
@@ -286,16 +318,6 @@ impl StratFilesystem {
         }
     }
 
-    pub fn suspend(&mut self, flush: bool) -> StratisResult<()> {
-        self.thin_dev.suspend(get_dm(), flush)?;
-        Ok(())
-    }
-
-    pub fn resume(&mut self) -> StratisResult<()> {
-        self.thin_dev.resume(get_dm())?;
-        Ok(())
-    }
-
     /// Find places where this filesystem is mounted.
     fn mount_points(&self) -> StratisResult<Vec<PathBuf>> {
         // Use major:minor values to find mounts for this filesystem
@@ -316,14 +338,14 @@ impl StratFilesystem {
                 }
                 Err(e) => {
                     let error_msg = format!("Error during parsing {:?}: {:?}", *self, e);
-                    return Err(StratisError::Engine(ErrorEnum::Error, error_msg));
+                    return Err(StratisError::Msg(error_msg));
                 }
             }
         }
 
         Ok(ret_vec)
     }
-    #[cfg(test)]
+
     pub fn thindev_size(&self) -> Sectors {
         self.thin_dev.size()
     }
@@ -343,21 +365,53 @@ impl Filesystem for StratFilesystem {
     }
 
     fn used(&self) -> StratisResult<Bytes> {
-        match self.thin_dev.status(get_dm())? {
+        match self.thin_dev.status(get_dm(), DmOptions::default())? {
             ThinStatus::Working(wk_status) => Ok(wk_status.nr_mapped_sectors.bytes()),
             ThinStatus::Error => {
                 let error_msg = format!(
                     "Unable to get status for filesystem thin device {}",
                     self.thin_dev.device()
                 );
-                Err(StratisError::Engine(ErrorEnum::Error, error_msg))
+                Err(StratisError::Msg(error_msg))
             }
             ThinStatus::Fail => {
                 let error_msg = format!("ThinDev {} is in a failed state", self.thin_dev.device());
-                Err(StratisError::Engine(ErrorEnum::Error, error_msg))
+                Err(StratisError::Msg(error_msg))
             }
         }
     }
+
+    fn size(&self) -> Bytes {
+        self.thin_dev.size().bytes()
+    }
+}
+
+/// Represents the state of the Stratis filesystem at a given moment in time.
+pub struct StratFilesystemState {
+    size: Bytes,
+    used: Option<Bytes>,
+}
+
+impl StateDiff for StratFilesystemState {
+    type Diff = StratFilesystemDiff;
+
+    fn diff(&self, new_state: &Self) -> Self::Diff {
+        StratFilesystemDiff {
+            size: if self.size != new_state.size {
+                Some(new_state.size)
+            } else {
+                None
+            },
+            used: if self.used != new_state.used {
+                Some(new_state.used)
+            } else {
+                None
+            },
+        }
+    }
+}
+impl DumpState for StratFilesystem {
+    type State = StratFilesystemState;
 }
 
 /// Return total bytes allocated to the filesystem, total bytes used by data/metadata
@@ -374,4 +428,23 @@ pub fn fs_usage(mount_point: &Path) -> StratisResult<(Bytes, Bytes)> {
         Bytes::from(block_size * blocks),
         Bytes::from(block_size * (blocks - blocks_free)),
     ))
+}
+
+impl<'a> Into<Value> for &'a StratFilesystem {
+    fn into(self) -> Value {
+        let mut json = Map::new();
+        json.insert(
+            "size".to_string(),
+            Value::from(self.thindev_size().to_string()),
+        );
+        json.insert(
+            "used".to_string(),
+            Value::from(
+                self.used()
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|_| "Unavailable".to_string()),
+            ),
+        );
+        Value::from(json)
+    }
 }

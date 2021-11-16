@@ -11,7 +11,7 @@ macro_rules! get_data {
         } else {
             let message = format!("no data for object path {}", $path.get_name());
             let (rc, rs) = (
-                $crate::dbus_api::types::DbusErrorEnum::INTERNAL_ERROR as u16,
+                $crate::dbus_api::types::DbusErrorEnum::ERROR as u16,
                 message,
             );
             return Ok(vec![$message.append3($default, rc, rs)]);
@@ -28,7 +28,7 @@ macro_rules! get_parent {
         } else {
             let message = format!("no path for object path {}", $data.parent);
             let (rc, rs) = (
-                $crate::dbus_api::types::DbusErrorEnum::INTERNAL_ERROR as u16,
+                $crate::dbus_api::types::DbusErrorEnum::ERROR as u16,
                 message,
             );
             return Ok(vec![$message.append3($default, rc, rs)]);
@@ -62,7 +62,7 @@ macro_rules! typed_uuid {
                 $uuid,
             );
             let (rc, rs) = (
-                $crate::dbus_api::types::DbusErrorEnum::INTERNAL_ERROR as u16,
+                $crate::dbus_api::types::DbusErrorEnum::ERROR as u16,
                 message,
             );
             return Ok(vec![$message.append3($default, rc, rs)]);
@@ -78,7 +78,7 @@ macro_rules! get_pool {
         } else {
             let message = format!("engine does not know about pool with uuid {}", $uuid);
             let (rc, rs) = (
-                $crate::dbus_api::types::DbusErrorEnum::INTERNAL_ERROR as u16,
+                $crate::dbus_api::types::DbusErrorEnum::ERROR as u16,
                 message,
             );
             return Ok(vec![$message.append3($default, rc, rs)]);
@@ -94,7 +94,7 @@ macro_rules! get_mut_pool {
         } else {
             let message = format!("engine does not know about pool with uuid {}", $uuid);
             let (rc, rs) = (
-                $crate::dbus_api::types::DbusErrorEnum::INTERNAL_ERROR as u16,
+                $crate::dbus_api::types::DbusErrorEnum::ERROR as u16,
                 message,
             );
             return Ok(vec![$message.append3($default, rc, rs)]);
@@ -109,39 +109,13 @@ macro_rules! uuid_to_string {
     };
 }
 
-macro_rules! properties_footer {
-    () => {
-        pub fn get_all_properties(
-            m: &dbus_tree::MethodInfo<
-                dbus_tree::MTSync<$crate::dbus_api::types::TData>,
-                $crate::dbus_api::types::TData,
-            >,
-        ) -> dbus_tree::MethodResult {
-            get_properties_shared(m, &mut ALL_PROPERTIES.iter().map(|&s| s.to_string()))
-        }
-
-        pub fn get_properties(
-            m: &dbus_tree::MethodInfo<
-                dbus_tree::MTSync<$crate::dbus_api::types::TData>,
-                $crate::dbus_api::types::TData,
-            >,
-        ) -> dbus_tree::MethodResult {
-            let message: &dbus::Message = m.msg;
-            let mut iter = message.iter_init();
-            let mut properties: dbus::arg::Array<String, _> =
-                $crate::dbus_api::util::get_next_arg(&mut iter, 0)?;
-            get_properties_shared(m, &mut properties)
-        }
-    };
-}
-
 macro_rules! initial_properties {
     ($($iface:expr => { $($prop:expr => $val:expr),* }),*) => {{
-        let mut interfaces = vec![
+        vec![
             $(
                 ($iface, vec![
                     $(
-                        ($prop, Variant(
+                        ($prop, dbus::arg::Variant(
                             Box::new($val) as Box<dyn dbus::arg::RefArg + std::marker::Send + std::marker::Sync>
                         )),
                     )*
@@ -155,17 +129,11 @@ macro_rules! initial_properties {
         ]
         .into_iter()
         .map(|(s, v)| (s.to_string(), v))
-        .collect::<$crate::dbus_api::types::InterfacesAddedThreadSafe>();
-        interfaces.extend(
-            $crate::dbus_api::consts::fetch_properties_interfaces()
-                .into_iter()
-                .map(|s| (s, std::collections::HashMap::new()))
-        );
-        interfaces
+        .collect::<$crate::dbus_api::types::InterfacesAddedThreadSafe>()
     }};
 }
 
-macro_rules! log_action {
+macro_rules! handle_action {
     ($action:expr) => {{
         let action = $action;
         if let Ok(ref a) = action {
@@ -173,4 +141,21 @@ macro_rules! log_action {
         }
         action
     }};
+    ($action:expr, $dbus_cxt:expr, $path:expr) => {{
+        let action = $action;
+        if let Ok(ref a) = action {
+            log::info!("{}", a);
+        } else if let Err(ref e) = action {
+            if let Some(state) = e.error_to_available_actions() {
+                $dbus_cxt.push_pool_avail_actions($path, state)
+            }
+        }
+        action
+    }};
+}
+
+macro_rules! box_variant {
+    ($val:expr) => {
+        dbus::arg::Variant(Box::new($val) as Box<dyn dbus::arg::RefArg>)
+    };
 }

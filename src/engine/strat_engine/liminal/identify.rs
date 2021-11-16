@@ -51,7 +51,7 @@ use devicemapper::Device;
 
 use crate::engine::{
     strat_engine::{
-        backstore::CryptHandle,
+        backstore::CryptMetadataHandle,
         metadata::{device_identifiers, StratisIdentifiers},
         udev::{
             block_enumerator, decide_ownership, UdevOwnership, CRYPTO_FS_TYPE, FS_TYPE_KEY,
@@ -72,7 +72,7 @@ pub struct LuksInfo {
 }
 
 impl fmt::Display for LuksInfo {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}, {}", self.info, self.encryption_info,)
     }
 }
@@ -87,7 +87,7 @@ pub struct StratisInfo {
 }
 
 impl fmt::Display for StratisInfo {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "{}, device number: \"{}\", devnode: \"{}\"",
@@ -149,7 +149,7 @@ impl DeviceInfo {
 }
 
 impl fmt::Display for DeviceInfo {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DeviceInfo::Luks(info) => write!(f, "LUKS device description: {}", info),
             DeviceInfo::Stratis(info) => write!(f, "Stratis device description: {}", info),
@@ -211,7 +211,7 @@ fn process_luks_device(dev: &UdevEngineDevice) -> Option<LuksInfo> {
                 );
                 None
             }
-            Ok(device_number) => match CryptHandle::setup(devnode) {
+            Ok(device_number) => match CryptMetadataHandle::setup(devnode) {
                 Ok(None) => None,
                 Err(err) => {
                     warn!(
@@ -246,7 +246,7 @@ fn process_stratis_device(dev: &UdevEngineDevice) -> Option<StratisInfo> {
                 device_to_devno_wrapper(dev),
                 device_identifiers_wrapper(devnode),
             ) {
-                (Err(err), _) | (_, Err(err)) | (_, Ok(Err(err))) => {
+                (Err(err), _) | (_, Err(err) | Ok(Err(err))) => {
                     warn!("udev identified device {} as a Stratis device but {}, disregarding the device",
                           devnode.display(),
                           err);
@@ -446,8 +446,7 @@ mod tests {
                 tests::{crypt, loopbacked, real},
                 udev::block_device_apply,
             },
-            types::{EncryptionInfo, KeyDescription},
-            BlockDev,
+            types::{DevicePath, EncryptionInfo, KeyDescription},
         },
         stratis::StratisError,
     };
@@ -467,7 +466,6 @@ mod tests {
         fn luks_device_test(
             paths: &[&Path],
             key_description: &KeyDescription,
-            _: (),
         ) -> Result<(), Box<dyn Error>> {
             let pool_uuid = PoolUuid::new_v4();
 
@@ -475,82 +473,84 @@ mod tests {
                 process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?,
                 pool_uuid,
                 MDADataSize::default(),
-                &EncryptionInfo {
-                    key_description: Some(key_description.clone()),
-                    clevis_info: None,
-                },
+                Some(&EncryptionInfo::KeyDesc(key_description.clone())),
             )?;
 
             for dev in devices {
-                let info = block_device_apply(dev.physical_path(), |dev| process_luks_device(dev))?
+                let info =
+                    block_device_apply(&DevicePath::new(dev.physical_path()).unwrap(), |dev| {
+                        process_luks_device(dev)
+                    })?
                     .ok_or_else(|| {
-                        StratisError::Error(
+                        StratisError::Msg(
                             "No device with specified devnode found in udev database".into(),
                         )
                     })?
                     .ok_or_else(|| {
-                        StratisError::Error(
+                        StratisError::Msg(
                             "No LUKS information for Stratis found on specified device".into(),
                         )
                     })?;
 
                 if info.info.identifiers.pool_uuid != pool_uuid {
-                    return Err(Box::new(StratisError::Error(format!(
+                    return Err(Box::new(StratisError::Msg(format!(
                         "Discovered pool UUID {} != expected pool UUID {}",
                         info.info.identifiers.pool_uuid, pool_uuid
                     ))));
                 }
 
                 if info.info.devnode != dev.physical_path() {
-                    return Err(Box::new(StratisError::Error(format!(
+                    return Err(Box::new(StratisError::Msg(format!(
                         "Discovered device node {} != expected device node {}",
                         info.info.devnode.display(),
                         dev.physical_path().display()
                     ))));
                 }
 
-                if info.encryption_info.key_description.as_ref() != Some(key_description) {
-                    return Err(Box::new(StratisError::Error(format!(
+                if info.encryption_info.key_description() != Some(key_description) {
+                    return Err(Box::new(StratisError::Msg(format!(
                         "Discovered key description {:?} != expected key description {:?}",
-                        info.encryption_info.key_description,
+                        info.encryption_info.key_description(),
                         Some(key_description.as_application_str())
                     ))));
                 }
 
                 let info =
-                    block_device_apply(dev.physical_path(), |dev| process_stratis_device(dev))?
-                        .ok_or_else(|| {
-                            StratisError::Error(
-                                "No device with specified devnode found in udev database".into(),
-                            )
-                        })?;
+                    block_device_apply(&DevicePath::new(dev.physical_path()).unwrap(), |dev| {
+                        process_stratis_device(dev)
+                    })?
+                    .ok_or_else(|| {
+                        StratisError::Msg(
+                            "No device with specified devnode found in udev database".into(),
+                        )
+                    })?;
                 if info.is_some() {
-                    return Err(Box::new(StratisError::Error(
+                    return Err(Box::new(StratisError::Msg(
                         "Encrypted block device was incorrectly identified as a Stratis device"
                             .to_string(),
                     )));
                 }
 
                 let info =
-                    block_device_apply(&dev.user_path()?, |dev| process_stratis_device(dev))?
-                        .ok_or_else(|| {
-                            StratisError::Error(
-                                "No device with specified devnode found in udev database".into(),
-                            )
-                        })?
-                        .ok_or_else(|| {
-                            StratisError::Error(
-                                "No Stratis metadata found on specified device".into(),
-                            )
-                        })?;
+                    block_device_apply(&DevicePath::new(dev.metadata_path()).unwrap(), |dev| {
+                        process_stratis_device(dev)
+                    })?
+                    .ok_or_else(|| {
+                        StratisError::Msg(
+                            "No device with specified devnode found in udev database".into(),
+                        )
+                    })?
+                    .ok_or_else(|| {
+                        StratisError::Msg("No Stratis metadata found on specified device".into())
+                    })?;
 
-                if info.identifiers.pool_uuid != pool_uuid || info.devnode != dev.user_path()? {
-                    return Err(Box::new(StratisError::Error(format!(
+                if info.identifiers.pool_uuid != pool_uuid || info.devnode != dev.metadata_path() {
+                    return Err(Box::new(StratisError::Msg(format!(
                         "Wrong identifiers and devnode found on Stratis block device: found: pool UUID: {}, device node; {} != expected: pool UUID: {}, device node: {}",
                         info.identifiers.pool_uuid,
                         info.devnode.display(),
                         pool_uuid,
-                        dev.user_path()?.display()),
+                        dev.metadata_path().display()),
                     )));
                 }
             }
@@ -587,12 +587,13 @@ mod tests {
             process_and_verify_devices(pool_uuid, &HashSet::new(), paths).unwrap(),
             pool_uuid,
             MDADataSize::default(),
-            &EncryptionInfo::default(),
+            None,
         )
         .unwrap();
 
         for path in paths {
-            let info = block_device_apply(path, |dev| process_stratis_device(dev))
+            let device_path = DevicePath::new(path).expect("our test path");
+            let info = block_device_apply(&device_path, |dev| process_stratis_device(dev))
                 .unwrap()
                 .unwrap()
                 .unwrap();
@@ -600,7 +601,7 @@ mod tests {
             assert_eq!(&&info.devnode, path);
 
             assert_eq!(
-                block_device_apply(path, |dev| process_luks_device(dev))
+                block_device_apply(&device_path, |dev| process_luks_device(dev))
                     .unwrap()
                     .unwrap(),
                 None
@@ -636,14 +637,15 @@ mod tests {
         assert!(!paths.is_empty());
 
         for path in paths {
+            let device_path = DevicePath::new(path).expect("our test path");
             assert_eq!(
-                block_device_apply(path, |dev| process_stratis_device(dev))
+                block_device_apply(&device_path, |dev| process_stratis_device(dev))
                     .unwrap()
                     .unwrap(),
                 None
             );
             assert_eq!(
-                block_device_apply(path, |dev| process_luks_device(dev))
+                block_device_apply(&device_path, |dev| process_luks_device(dev))
                     .unwrap()
                     .unwrap(),
                 None
@@ -652,14 +654,15 @@ mod tests {
 
         for path in paths {
             create_fs(path, None, false).unwrap();
+            let device_path = DevicePath::new(path).expect("our test path");
             assert_eq!(
-                block_device_apply(path, |dev| process_stratis_device(dev))
+                block_device_apply(&device_path, |dev| process_stratis_device(dev))
                     .unwrap()
                     .unwrap(),
                 None
             );
             assert_eq!(
-                block_device_apply(path, |dev| process_luks_device(dev))
+                block_device_apply(&device_path, |dev| process_luks_device(dev))
                     .unwrap()
                     .unwrap(),
                 None

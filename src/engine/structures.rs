@@ -14,10 +14,7 @@ use std::{
 use futures::executor::block_on;
 use tokio::sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-use crate::engine::{
-    engine::Engine,
-    types::{AsUuid, Name},
-};
+use crate::engine::types::{AsUuid, Name};
 
 /// Map UUID and name to T items.
 pub struct Table<U, T> {
@@ -30,7 +27,7 @@ where
     U: AsUuid,
     T: fmt::Debug,
 {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_map()
             .entries(
                 self.iter()
@@ -52,7 +49,7 @@ where
     }
 }
 
-pub struct Iter<'a, U: 'a, T: 'a> {
+pub struct Iter<'a, U, T> {
     items: hash_map::Iter<'a, U, (Name, T)>,
 }
 
@@ -75,7 +72,7 @@ where
     }
 }
 
-pub struct IterMut<'a, U: 'a, T: 'a> {
+pub struct IterMut<'a, U, T> {
     items: hash_map::IterMut<'a, U, (Name, T)>,
 }
 
@@ -172,13 +169,13 @@ where
         self.items.len()
     }
 
-    pub fn iter(&self) -> Iter<U, T> {
+    pub fn iter(&self) -> Iter<'_, U, T> {
         Iter {
             items: self.items.iter(),
         }
     }
 
-    pub fn iter_mut(&mut self) -> IterMut<U, T> {
+    pub fn iter_mut(&mut self) -> IterMut<'_, U, T> {
         IterMut {
             items: self.items.iter_mut(),
         }
@@ -350,12 +347,9 @@ impl<G> Drop for ExclusiveGuard<G> {
 
 pub struct Lockable<T>(T);
 
-impl<T> Lockable<Arc<Mutex<T>>>
-where
-    T: 'static + Engine,
-{
-    pub fn new_exclusive(t: T) -> Lockable<Arc<Mutex<dyn Engine>>> {
-        Lockable(Arc::new(Mutex::new(t)) as Arc<Mutex<dyn Engine>>)
+impl<T> Lockable<Arc<Mutex<T>>> {
+    pub fn new_exclusive(t: T) -> Lockable<Arc<Mutex<T>>> {
+        Lockable(Arc::new(Mutex::new(t)))
     }
 }
 

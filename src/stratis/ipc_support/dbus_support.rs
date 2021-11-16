@@ -11,24 +11,34 @@
 
 use tokio::{
     select,
-    sync::{broadcast::Sender, mpsc::UnboundedReceiver},
+    sync::{
+        broadcast::Sender,
+        mpsc::{UnboundedReceiver, UnboundedSender},
+    },
     task::{self, spawn_blocking},
 };
 
 use crate::{
-    dbus_api::create_dbus_handlers,
-    engine::{LockableEngine, UdevEngineEvent},
+    dbus_api::{create_dbus_handlers, DbusAction},
+    engine::{Engine, LockableEngine, UdevEngineEvent},
     stratis::{StratisError, StratisResult},
 };
 
 /// Set up the cooperating D-Bus threads.
-pub async fn setup(
-    engine: LockableEngine,
+pub async fn setup<E>(
+    engine: LockableEngine<E>,
     receiver: UnboundedReceiver<UdevEngineEvent>,
     trigger: Sender<()>,
-) -> StratisResult<()> {
+    tree_channel: (
+        UnboundedSender<DbusAction<E>>,
+        UnboundedReceiver<DbusAction<E>>,
+    ),
+) -> StratisResult<()>
+where
+    E: 'static + Engine,
+{
     let (mut conn, mut udev, mut tree) = spawn_blocking(move || {
-        create_dbus_handlers(engine.clone(), receiver, trigger)
+        create_dbus_handlers(engine.clone(), receiver, trigger, tree_channel)
             .map(|(conn, udev, tree)| {
                 let mutex_lock = engine.blocking_lock();
                 for (pool_name, pool_uuid, pool) in mutex_lock.pools() {
@@ -50,7 +60,6 @@ pub async fn setup(
                 exiting D-Bus thread",
                 e,
             );
-            return;
         }
     });
     let mut conn_handle = task::spawn_blocking(move || conn.process_dbus_requests());
@@ -69,15 +78,15 @@ pub async fn setup(
     select! {
         res = &mut tree_handle => {
             error!("The tree handling thread exited...");
-            res.map_err(|e| StratisError::Error(e.to_string()))
+            res.map_err(StratisError::from)
         }
         res = &mut conn_handle => {
             error!("The D-Bus request thread exited...");
-            res.map_err(|e| StratisError::Error(e.to_string())).and_then(|res| res)
+            res.map_err(StratisError::from).and_then(|res| res)
         }
         res = &mut udev_handle => {
             error!("The udev processing thread exited...");
-            res.map_err(|e| StratisError::Error(e.to_string()))
+            res.map_err(StratisError::from)
         }
     }
 }

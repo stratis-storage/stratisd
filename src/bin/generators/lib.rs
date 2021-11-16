@@ -12,7 +12,7 @@ use std::{
 
 use log::{set_logger, set_max_level, LevelFilter, Log, Metadata, Record};
 
-use libstratis::systemd;
+use stratisd::systemd;
 
 static LOGGER: SystemdLogger = SystemdLogger;
 

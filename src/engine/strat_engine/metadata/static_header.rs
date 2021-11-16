@@ -25,7 +25,7 @@ use crate::{
         },
         types::{DevUuid, PoolUuid},
     },
-    stratis::{ErrorEnum, StratisError, StratisResult},
+    stratis::{StratisError, StratisResult},
 };
 
 const RESERVED_SECTORS: Sectors = Sectors(3 * IEC::Mi / (SECTOR_SIZE as u64)); // = 3 MiB
@@ -77,7 +77,7 @@ impl StratisIdentifiers {
 }
 
 impl fmt::Display for StratisIdentifiers {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
             "Stratis pool UUID: \"{}\", Stratis device UUID: \"{}\"",
@@ -358,7 +358,7 @@ impl StaticHeader {
                 Ok(Some(sh_1))
             } else if sh_1.initialization_time == sh_2.initialization_time {
                 let err_str = "Appeared to be a Stratis device, but signature blocks disagree.";
-                Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
+                Err(StratisError::Msg(err_str.into()))
             } else if sh_1.initialization_time > sh_2.initialization_time {
                 closure(f, sh_1, MetadataLocation::Second)
             } else {
@@ -432,7 +432,7 @@ impl StaticHeader {
                 }
                 (Err(_), Err(_)) => {
                     let err_str = "Appeared to be a Stratis device, but no valid sigblock found";
-                    Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
+                    Err(StratisError::Msg(err_str.into()))
                 }
             },
             (
@@ -466,7 +466,7 @@ impl StaticHeader {
                 },
             ) => {
                 let err_str = "Unable to read data at sigblock locations.";
-                Err(StratisError::Engine(ErrorEnum::Invalid, err_str.into()))
+                Err(StratisError::Msg(err_str.into()))
             }
             (_, _) => unreachable!("header == None <-> bytes is Err(_)"),
         }
@@ -504,20 +504,17 @@ impl StaticHeader {
 
         let crc = crc32::checksum_castagnoli(&buf[4..bytes!(static_header_size::SIGBLOCK_SECTORS)]);
         if crc != LittleEndian::read_u32(&buf[..4]) {
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
-                "header CRC invalid".into(),
-            ));
+            return Err(StratisError::Msg("header CRC invalid".into()));
         }
 
         let blkdev_size = BlockdevSize::new(Sectors(LittleEndian::read_u64(&buf[20..28])));
 
         let version = buf[28];
         if version != STRAT_SIGBLOCK_VERSION {
-            return Err(StratisError::Engine(
-                ErrorEnum::Invalid,
-                format!("Unknown sigblock version: {}", version),
-            ));
+            return Err(StratisError::Msg(format!(
+                "Unknown sigblock version: {}",
+                version
+            )));
         }
 
         let pool_uuid = PoolUuid::parse_str(from_utf8(&buf[32..64])?)?;

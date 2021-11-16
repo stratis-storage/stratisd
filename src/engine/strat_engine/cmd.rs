@@ -66,6 +66,7 @@ const CLEVIS_DECRYPT_TANG: &str = "clevis-decrypt-tang";
 const CLEVIS_DECRYPT_TPM2: &str = "clevis-decrypt-tpm2";
 const CLEVIS_ENCRYPT_TANG: &str = "clevis-encrypt-tang";
 const CLEVIS_ENCRYPT_TPM2: &str = "clevis-encrypt-tpm2";
+const CLEVIS_REGEN: &str = "clevis-luks-regen";
 const JOSE: &str = "jose";
 const JQ: &str = "jq";
 const CRYPTSETUP: &str = "cryptsetup";
@@ -91,6 +92,7 @@ const CLEVIS_EXEC_NAMES: &[&str] = &[
     CLEVIS_DECRYPT_TPM2,
     CLEVIS_ENCRYPT_TANG,
     CLEVIS_ENCRYPT_TPM2,
+    CLEVIS_REGEN,
     JOSE,
     JQ,
     CRYPTSETUP,
@@ -142,7 +144,7 @@ lazy_static! {
 pub fn verify_binaries() -> StratisResult<()> {
     match BINARIES.iter().find(|&(_, path)| path.is_none()) {
         None => Ok(()),
-        Some((name, _)) => Err(StratisError::Error(format!(
+        Some((name, _)) => Err(StratisError::Msg(format!(
             "Unable to find executable \"{}\" in any of {}",
             name,
             BINARIES_PATHS
@@ -158,7 +160,7 @@ pub fn verify_binaries() -> StratisResult<()> {
 /// fails or if the command itself fails.
 fn execute_cmd(cmd: &mut Command) -> StratisResult<()> {
     match cmd.output() {
-        Err(err) => Err(StratisError::Error(format!(
+        Err(err) => Err(StratisError::Msg(format!(
             "Failed to execute command {:?}, err: {:?}",
             cmd, err
         ))),
@@ -178,7 +180,7 @@ fn execute_cmd(cmd: &mut Command) -> StratisResult<()> {
                     "Command failed: cmd: {:?}, exit reason: {} stdout: {} stderr: {}",
                     cmd, exit_reason, std_out_txt, std_err_txt
                 );
-                Err(StratisError::Error(err_msg))
+                Err(StratisError::Msg(err_msg))
             }
         }
     }
@@ -198,9 +200,9 @@ fn get_executable(name: &str) -> &Path {
 /// support is disabled.
 fn get_clevis_executable() -> StratisResult<&'static Path> {
     Ok(CLEVIS_BINARIES.as_ref().map(|(c, _)| c).ok_or_else(|| {
-        StratisError::Error(format!(
+        StratisError::Msg(format!(
             "Clevis has been disabled due to some of the required executables not \
-            being found on this system. Required executables are: {:?}",
+                being found on this system. Required executables are: {:?}",
             CLEVIS_EXEC_NAMES,
         ))
     })?)
@@ -210,9 +212,9 @@ fn get_clevis_executable() -> StratisResult<&'static Path> {
 /// support is disabled.
 fn get_jose_executable() -> StratisResult<&'static Path> {
     Ok(CLEVIS_BINARIES.as_ref().map(|(_, j)| j).ok_or_else(|| {
-        StratisError::Error(format!(
+        StratisError::Msg(format!(
             "Clevis has been disabled due to some of the required executables not \
-            being found on this system. Required executables are: {:?}",
+                being found on this system. Required executables are: {:?}",
             CLEVIS_EXEC_NAMES,
         ))
     })?)
@@ -350,7 +352,7 @@ pub fn clevis_decrypt(jwe: &Value) -> StratisResult<SizedKeyMemory> {
         .stdout(Stdio::piped())
         .spawn()?;
     let mut jose_stdin = jose_child.stdin.take().ok_or_else(|| {
-        StratisError::Error(
+        StratisError::Msg(
             "Could not communicate with executable {} through stdin; Stratis will \
             not be able to decrypt the Clevis passphrase"
                 .to_string(),
@@ -364,9 +366,8 @@ pub fn clevis_decrypt(jwe: &Value) -> StratisResult<SizedKeyMemory> {
     jose_child
         .stdout
         .ok_or_else(|| {
-            StratisError::Error(
-                "Spawned jose process had no stdout; cannot continue with password \
-            decryption"
+            StratisError::Msg(
+                "Spawned jose process had no stdout; cannot continue with password decryption"
                     .to_string(),
             )
         })?
@@ -378,7 +379,7 @@ pub fn clevis_decrypt(jwe: &Value) -> StratisResult<SizedKeyMemory> {
         .stdout(Stdio::piped())
         .spawn()?;
     let mut clevis_stdin = clevis_child.stdin.take().ok_or_else(|| {
-        StratisError::Error(
+        StratisError::Msg(
             "Could not communicate with executable clevis through stdin; Stratis will \
             not be able to decrypt the Clevis passphrase"
                 .to_string(),
@@ -393,12 +394,25 @@ pub fn clevis_decrypt(jwe: &Value) -> StratisResult<SizedKeyMemory> {
     let bytes_read = clevis_child
         .stdout
         .ok_or_else(|| {
-            StratisError::Error(
-                "Spawned clevis process had no stdout; cannot continue with password \
-            decryption"
+            StratisError::Msg(
+                "Spawned clevis process had no stdout; cannot continue with password decryption"
                     .to_string(),
             )
         })?
         .read(mem.as_mut())?;
     Ok(SizedKeyMemory::new(mem, bytes_read))
+}
+
+/// Regenerate the bindings for a device using the clevis CLI.
+pub fn clevis_luks_regen(dev_path: &Path, keyslot: c_uint) -> StratisResult<()> {
+    execute_cmd(
+        Command::new(get_clevis_executable()?)
+            .arg("luks")
+            .arg("regen")
+            .arg("-d")
+            .arg(dev_path.display().to_string())
+            .arg("-s")
+            .arg(keyslot.to_string())
+            .arg("-q"),
+    )
 }

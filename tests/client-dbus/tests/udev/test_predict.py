@@ -18,6 +18,7 @@ Test that predictions of space usage match the actual.
 
 # isort: STDLIB
 import json
+import os
 import subprocess
 
 # isort: LOCAL
@@ -25,7 +26,6 @@ from stratisd_client_dbus import MOPool, ObjectManager, get_object, pools
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from ._utils import (
-    _STRATIS_PREDICT_USAGE,
     OptionalKeyServiceContextManager,
     ServiceContextManager,
     UdevTest,
@@ -40,6 +40,7 @@ class TestSpaceUsagePrediction(UdevTest):
     """
 
     _CAP_DEVICE_STR = "stratis-1-private-%s-physical-originsub"
+    _STRATIS_PREDICT_USAGE = os.environ["STRATIS_PREDICT_USAGE"]
 
     def _test_cap_size(self, pool_name, prediction):
         """
@@ -61,13 +62,13 @@ class TestSpaceUsagePrediction(UdevTest):
 
         cap_name = self._CAP_DEVICE_STR % pool_uuid
 
-        command = subprocess.Popen(
+        with subprocess.Popen(
             ["blockdev", "--getsize64", "/dev/mapper/%s" % cap_name],
             stdout=subprocess.PIPE,
             universal_newlines=True,
-        )
-        cap_device_size, _ = command.communicate()
-        self.assertEqual(cap_device_size.rstrip("\n"), prediction["free"])
+        ) as command:
+            cap_device_size, _ = command.communicate()
+            self.assertEqual(cap_device_size.rstrip("\n"), prediction["free"])
 
     def test_prediction(self):
         """
@@ -75,11 +76,11 @@ class TestSpaceUsagePrediction(UdevTest):
         """
         device_tokens = self._lb_mgr.create_devices(4)
         devnodes = self._lb_mgr.device_files(device_tokens)
-        command = subprocess.Popen(
-            [_STRATIS_PREDICT_USAGE] + devnodes, stdout=subprocess.PIPE
-        )
-        outs, _ = command.communicate()
-        prediction = json.loads(outs)
+        with subprocess.Popen(
+            [self._STRATIS_PREDICT_USAGE] + devnodes, stdout=subprocess.PIPE
+        ) as command:
+            outs, _ = command.communicate()
+            prediction = json.loads(outs)
 
         with ServiceContextManager():
             pool_name = random_string(5)
@@ -94,11 +95,12 @@ class TestSpaceUsagePrediction(UdevTest):
         """
         device_tokens = self._lb_mgr.create_devices(4)
         devnodes = self._lb_mgr.device_files(device_tokens)
-        command = subprocess.Popen(
-            [_STRATIS_PREDICT_USAGE, "--encrypted"] + devnodes, stdout=subprocess.PIPE
-        )
-        outs, _ = command.communicate()
-        prediction = json.loads(outs)
+        with subprocess.Popen(
+            [self._STRATIS_PREDICT_USAGE, "--encrypted"] + devnodes,
+            stdout=subprocess.PIPE,
+        ) as command:
+            outs, _ = command.communicate()
+            prediction = json.loads(outs)
 
         (key_description, key) = ("key_spec", "data")
         with OptionalKeyServiceContextManager(key_spec=[(key_description, key)]):

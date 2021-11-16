@@ -5,10 +5,10 @@ name: stratisd dummy CI
 on:
   push:
     branches:
-      - develop-2.4.2
+      - master
   pull_request:
     branches:
-      - develop-2.4.2
+      - master
 
   workflow_dispatch:
 

@@ -7,7 +7,6 @@ on:
   push:
     branches:
       - master
-      - develop-2.4.2
     paths:
       - "**/*.yml"
       - "tests/**"
@@ -15,7 +14,6 @@ on:
   pull_request:
     branches:
       - master
-      - develop-2.4.2
     paths:
       - "**/*.yml"
       - "tests/**"

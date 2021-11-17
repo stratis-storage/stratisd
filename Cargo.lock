@@ -239,7 +239,7 @@ dependencies = [
 [[package]]
 name = "devicemapper"
 version = "0.30.0"
-source = "git+https://github.com/jbaublitz/devicemapper-rs?branch=issue-stratisd-2814#0317652ab426f1035bbb719cdfa4a449f73a0452"
+source = "git+https://github.com/stratis-storage/devicemapper-rs?branch=crates-io-patch-0.30.0#5e510632a9750959d31209fe46dca8d230618266"
 dependencies = [
  "bitflags",
  "devicemapper-sys",
@@ -251,7 +251,8 @@ dependencies = [
 [[package]]
 name = "devicemapper-sys"
 version = "0.1.1"
-source = "git+https://github.com/jbaublitz/devicemapper-rs?branch=issue-stratisd-2814#0317652ab426f1035bbb719cdfa4a449f73a0452"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d54a87e9fbf1ef8ccad900812830bb042eaaed63bd2a8f77f668fd1f40d2250e"
 dependencies = [
  "bindgen 0.57.0",
  "nix 0.22.2",

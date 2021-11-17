@@ -90,7 +90,6 @@ impl DataTier {
 
     /// The sum of the lengths of all the sectors that have been mapped to an
     /// upper device.
-    #[cfg(test)]
     pub fn allocated(&self) -> Sectors {
         self.segments
             .iter()
@@ -101,12 +100,6 @@ impl DataTier {
     /// The total size of all the blockdevs combined
     pub fn size(&self) -> Sectors {
         self.block_mgr.size()
-    }
-
-    /// The total size of all the blockdevs combined that has been allocated.
-    /// self.allocated_size() <= self.size()
-    pub fn allocated_size(&self) -> Sectors {
-        self.block_mgr.allocated_size()
     }
 
     /// The number of sectors used for metadata by all the blockdevs

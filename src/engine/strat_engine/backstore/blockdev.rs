@@ -215,6 +215,7 @@ impl StratBlockDev {
     pub fn total_size(&self) -> BlockdevSize {
         self.bda.dev_size()
     }
+
     /// The total size of the allocated portions of the Stratis block device.
     pub fn total_allocated_size(&self) -> BlockdevSize {
         self.used.size()

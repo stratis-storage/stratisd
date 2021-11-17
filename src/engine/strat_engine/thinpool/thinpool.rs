@@ -218,10 +218,6 @@ fn search(
     let lower_aligned = lower_limit / DATA_BLOCK_SIZE * DATA_BLOCK_SIZE;
     let total_aligned = total_space / DATA_BLOCK_SIZE * DATA_BLOCK_SIZE;
 
-    debug!("{}", upper_aligned);
-    debug!("{}", lower_aligned);
-    debug!("{}", total_aligned);
-
     let (upper_meta_size, lower_meta_size) = (
         thin_metadata_size(DATA_BLOCK_SIZE, upper_aligned, MAX_THINS)?,
         thin_metadata_size(DATA_BLOCK_SIZE, lower_aligned, MAX_THINS)?,
@@ -250,21 +246,12 @@ fn search(
 /// extensions. It converts the return values from search() into the amount by
 /// which these devices should be extended.
 fn divide_space(
-    total_space: Sectors,
     available_space: Sectors,
     current_data_size: Sectors,
     current_meta_size: Sectors,
 ) -> StratisResult<(Sectors, Sectors)> {
-    let total_aligned = total_space / DATA_BLOCK_SIZE * DATA_BLOCK_SIZE;
+    let total_aligned = (current_data_size + available_space) / DATA_BLOCK_SIZE * DATA_BLOCK_SIZE;
     let available_aligned = available_space / DATA_BLOCK_SIZE * DATA_BLOCK_SIZE;
-    debug!("Used: {}", total_aligned - available_aligned);
-
-    debug!(
-        "Dividing {} into data and metadata segments",
-        available_aligned
-    );
-    debug!("Using {} as the total size", total_aligned);
-    debug!("Current data size is {}", current_data_size);
 
     let upper_limit_meta_size = thin_metadata_size(DATA_BLOCK_SIZE, total_aligned, MAX_THINS)?;
 
@@ -276,8 +263,8 @@ fn divide_space(
     let meta_extended = meta_size - current_meta_size;
     debug!("Meta extension: {}", meta_extended);
 
-    assert!(available_space >= data_extended + 2u64 * meta_extended);
-    assert!((available_space - (data_extended + 2u64 * meta_extended)) < DATA_BLOCK_SIZE);
+    assert!(available_aligned >= data_extended + 2u64 * meta_extended);
+    assert!(available_aligned - (data_extended + 2u64 * meta_extended) < DATA_BLOCK_SIZE);
     assert_eq!(data_extended % DATA_BLOCK_SIZE, Sectors(0));
     Ok((data_extended, meta_extended))
 }
@@ -291,7 +278,6 @@ fn divide_space(
 ///
 /// This method returns the extension size, not the total size.
 fn calculate_subdevice_extension(
-    allocated_size: Sectors,
     available_space: Sectors,
     current_data_size: Sectors,
     current_meta_size: Sectors,
@@ -308,12 +294,7 @@ fn calculate_subdevice_extension(
 
     let requested_min = min(available_space, requested_space);
 
-    divide_space(
-        allocated_size + requested_min,
-        requested_min,
-        current_data_size,
-        current_meta_size,
-    )
+    divide_space(requested_min, current_data_size, current_meta_size)
 }
 
 pub struct ThinPoolSizeParams {
@@ -331,8 +312,7 @@ impl ThinPoolSizeParams {
         );
         let initial_aligned = (initial_space / DATA_BLOCK_SIZE) * DATA_BLOCK_SIZE;
 
-        let (data_size, meta_size) =
-            divide_space(initial_aligned, initial_aligned, Sectors(0), Sectors(0))?;
+        let (data_size, meta_size) = divide_space(initial_aligned, Sectors(0), Sectors(0))?;
 
         Ok(ThinPoolSizeParams {
             data_size: sectors_to_datablocks(data_size),
@@ -740,11 +720,8 @@ impl ThinPool {
         pool_uuid: PoolUuid,
         backstore: &mut Backstore,
     ) -> StratisResult<(Sectors, Sectors)> {
-        let mdv_size = self.mdv.device().size();
-        let allocated_size = backstore.datatier_allocated_size() - mdv_size;
         let available_size = backstore.available_in_backstore();
         let (requested_data, requested_meta) = calculate_subdevice_extension(
-            allocated_size,
             available_size,
             self.thin_pool.data_dev().size(),
             self.thin_pool.meta_dev().size(),

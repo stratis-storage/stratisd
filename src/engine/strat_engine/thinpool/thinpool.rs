@@ -229,15 +229,16 @@ fn search(
         Ok((lower_aligned, lower_meta_size))
     } else {
         let diff = upper_limit - lower_limit;
-        let half_diff = diff / (DATA_BLOCK_SIZE * 2u64) * DATA_BLOCK_SIZE;
-        let half_limit = lower_limit + half_diff;
+        let half_diff = diff / 2u64;
+        let half_limit = lower_aligned + half_diff;
+        let half_aligned = half_limit / DATA_BLOCK_SIZE * DATA_BLOCK_SIZE;
 
-        let half_meta_size = thin_metadata_size(DATA_BLOCK_SIZE, half_limit, MAX_THINS)?;
+        let half_meta_size = thin_metadata_size(DATA_BLOCK_SIZE, half_aligned, MAX_THINS)?;
 
-        if total_aligned < half_limit + 2u64 * half_meta_size {
-            search(total_aligned, half_limit, lower_aligned)
+        if total_aligned < half_aligned + 2u64 * half_meta_size {
+            search(total_aligned, half_aligned, lower_aligned)
         } else {
-            search(total_aligned, upper_aligned, half_limit)
+            search(total_aligned, upper_aligned, half_aligned)
         }
     }
 }
@@ -250,13 +251,23 @@ fn divide_space(
     current_data_size: Sectors,
     current_meta_size: Sectors,
 ) -> StratisResult<(Sectors, Sectors)> {
-    let total_aligned = (current_data_size + available_space) / DATA_BLOCK_SIZE * DATA_BLOCK_SIZE;
+    let upper_data_aligned =
+        (current_data_size + available_space) / DATA_BLOCK_SIZE * DATA_BLOCK_SIZE;
+    let total_aligned = (current_data_size + current_meta_size + available_space) / DATA_BLOCK_SIZE
+        * DATA_BLOCK_SIZE;
     let available_aligned = available_space / DATA_BLOCK_SIZE * DATA_BLOCK_SIZE;
 
-    let upper_limit_meta_size = thin_metadata_size(DATA_BLOCK_SIZE, total_aligned, MAX_THINS)?;
+    debug!("Space for extension: {}", available_aligned);
+    debug!("Current data device size: {}", current_data_size);
+    debug!("Current meta device size: {}", current_meta_size);
 
-    let max = current_data_size + available_aligned;
-    let (data_size, meta_size) = search(total_aligned, max, max - 2u64 * upper_limit_meta_size)?;
+    let upper_limit_meta_size = thin_metadata_size(DATA_BLOCK_SIZE, upper_data_aligned, MAX_THINS)?;
+
+    let (data_size, meta_size) = search(
+        total_aligned,
+        upper_data_aligned,
+        Sectors(upper_data_aligned.saturating_sub(2u64 * *upper_limit_meta_size)),
+    )?;
 
     let data_extended = data_size - current_data_size;
     debug!("Data extension: {}", data_extended);
@@ -307,7 +318,7 @@ impl ThinPoolSizeParams {
     /// Create a new set of initial sizes for all flex devices.
     pub fn new(available_space: Sectors) -> StratisResult<Self> {
         let initial_space = min(
-            available_space - INITIAL_MDV_SIZE,
+            Sectors(available_space.saturating_sub(*INITIAL_MDV_SIZE)),
             datablocks_to_sectors(DATA_ALLOC_SIZE),
         );
         let initial_aligned = (initial_space / DATA_BLOCK_SIZE) * DATA_BLOCK_SIZE;
@@ -1484,11 +1495,15 @@ mod tests {
 
         let meta_size = pool.thin_pool.meta_dev().size();
         let data_size = pool.thin_pool.data_dev().size();
+        let mdv_size = INITIAL_MDV_SIZE;
         assert_eq!(
             meta_size,
             thin_metadata_size(DATA_BLOCK_SIZE, data_size, MAX_THINS).unwrap()
         );
-        assert_eq!(data_size + meta_size, backstore.datatier_allocated_size());
+        assert_eq!(
+            mdv_size + data_size + 2u64 * meta_size,
+            backstore.datatier_allocated_size()
+        );
     }
 
     #[test]
@@ -1641,7 +1656,7 @@ mod tests {
             Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
-            &ThinPoolSizeParams::new(backstore.available_in_backstore()).unwrap(),
+            &ThinPoolSizeParams::new(datablocks_to_sectors(DataBlocks(768))).unwrap(),
             DATA_BLOCK_SIZE,
             &mut backstore,
         )

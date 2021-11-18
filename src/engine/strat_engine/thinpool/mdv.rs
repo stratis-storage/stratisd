@@ -9,6 +9,8 @@ use std::{
     fs::{create_dir, create_dir_all, read_dir, remove_dir, remove_file, rename, OpenOptions},
     io::{prelude::*, ErrorKind},
     path::{Path, PathBuf},
+    thread::sleep,
+    time::Duration,
 };
 
 use nix::mount::{mount, umount, MsFlags};
@@ -79,9 +81,15 @@ impl<'a> MountedMDV<'a> {
 
 impl<'a> Drop for MountedMDV<'a> {
     fn drop(&mut self) {
-        if let Err(err) = umount(&self.mdv.mount_pt) {
-            warn!("Could not unmount MDV: {}", err);
-        } else if let Err(err) = remove_dir(&self.mdv.mount_pt) {
+        for _ in 0..3 {
+            if let Err(err) = umount(&self.mdv.mount_pt) {
+                warn!("Could not unmount MDV: {}", err);
+            } else {
+                break;
+            }
+            sleep(Duration::from_millis(100));
+        }
+        if let Err(err) = remove_dir(&self.mdv.mount_pt) {
             warn!("Could not remove MDV mount point: {}", err);
         }
     }

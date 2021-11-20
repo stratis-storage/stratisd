@@ -1,3 +1,36 @@
+stratisd 3.0.1
+==============
+Recommended Rust toolchain version: 1.56.1
+Lowest supported Rust toolchain version: 1.54.0
+
+Recommended development platform for Python development: Fedora 34
+Lowest supported Python interpreter: 3.6.8
+
+- Report pool property TotalPhysicalUsed correctly in PropertyChanged signal:
+  https://github.com/stratis-storage/stratisd/issues/2860
+  https://github.com/stratis-storage/stratisd/pull/2862
+
+- Use cached value at start of check method:
+  https://github.com/stratis-storage/stratisd/pull/2868
+
+- Avoid termination on error returned in timer task:
+  https://github.com/stratis-storage/stratisd/pull/2866
+
+- Allow non-privileged users to list Stratis encryption keys:
+  https://github.com/stratis-storage/stratisd/pull/2861
+
+- New release: 3.0.1
+  https://github.com/stratis-storage/stratisd/pull/2848
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/2859
+  https://github.com/stratis-storage/stratisd/pull/2856
+  https://github.com/stratis-storage/stratisd/pull/2855
+  https://github.com/stratis-storage/stratisd/pull/2850
+  https://github.com/stratis-storage/stratisd/pull/2849
+  https://github.com/stratis-storage/stratisd/pull/2846
+
+
 stratisd 3.0.0
 ==============
 Recommended Rust toolchain version: 1.56.1

@@ -15,7 +15,7 @@ use crate::{
     engine::{
         shared::gather_encryption_info,
         strat_engine::{
-            liminal::identify::{DeviceInfo, LuksInfo, StratisInfo},
+            liminal::identify::{DeviceInfo, EventDeviceInfo, LuksInfo, StratisInfo},
             metadata::StratisIdentifiers,
         },
         types::{DevUuid, EncryptionInfo, LockedPoolDevice, LockedPoolInfo, PoolEncryptionInfo},
@@ -140,7 +140,7 @@ impl LStratisInfo {
 
 /// A unifying Info struct for Stratis or Luks devices. This struct is used
 /// for storing known information in DeviceSet and DeviceBag.
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Debug, Eq, Hash, PartialEq, Clone)]
 pub enum LInfo {
     /// A Stratis device, which may be an encrypted device
     Stratis(LStratisInfo),
@@ -212,47 +212,38 @@ impl LInfo {
     /// information about the removed device, where "removed" means there
     /// was a udev "remove" event and this info has been found out about the
     /// device attached to the event.
-    fn update_on_remove(info_1: &LInfo, info_2: &DeviceInfo) -> Option<LInfo> {
-        match (info_1, info_2) {
-            (LInfo::Luks(luks_info), DeviceInfo::Stratis(_)) => {
-                Some(LInfo::Luks(luks_info.clone()))
-            }
-            (LInfo::Stratis(strat_info), DeviceInfo::Luks(luks_info)) => {
-                if let Some(luks) = &strat_info.luks {
-                    if luks.ids.device_number != luks_info.info.device_number {
-                        warn!("Received udev remove event on a device with {} that stratisd does not know about; retaining logical device with {} among the set of devices known to belong to pool with UUID {}",
-                                luks_info,
-                                strat_info,
-                                strat_info.ids.identifiers.pool_uuid);
+    fn update_on_remove(record_type: &LInfo, info: &EventDeviceInfo) -> Option<LInfo> {
+        match (record_type, info) {
+            (LInfo::Stratis(info_1), EventDeviceInfo::Luks(info_2)) => {
+                if let Some(luks) = info_1.luks.as_ref() {
+                    if luks.ids.device_number != info_2.device_number {
+                        warn!("Received udev remove event on a LUKS device with {} that stratisd does not know about; leaving original device information {} unchanged", info_2, info_1);
+                        Some(LInfo::Stratis(info_1.clone()))
                     } else {
-                        warn!("Received udev remove event on a device with {} that appeared to belong to Stratis, but the logical device information is still present; retaining the logical device with the original encryption information",
-                                  luks_info);
+                        warn!("Received udev remove event on a device with {} that appeared to belong to Stratis, but the logical device appears to still be present; removing logical device to avoid errors", info_2);
+                        None
                     }
+                } else {
+                    Some(LInfo::Stratis(info_1.clone()))
                 }
-                Some(LInfo::Stratis(strat_info.clone()))
             }
-            (LInfo::Stratis(info_1), DeviceInfo::Stratis(info_2)) => {
+            (LInfo::Stratis(info_1), EventDeviceInfo::Stratis(info_2)) => {
                 if info_1.ids.device_number != info_2.device_number {
-                    warn!("Received udev remove event on a device with {} that stratisd does not know about; retaining duplicate device {} among the set of devices known to belong to pool with UUID {}",
-                              info_2,
-                              info_1,
-                              info_1.ids.identifiers.pool_uuid);
+                    warn!("Received udev remove event on a device with {} that stratisd does not know about; retaining original device with {}", info_2, info_1);
                     Some(LInfo::Stratis(info_1.clone()))
                 } else {
                     info_1.luks.as_ref().map(|i| LInfo::Luks(i.clone()))
                 }
             }
-            (LInfo::Luks(info_1), DeviceInfo::Luks(info_2)) => {
-                if info_1.ids.device_number != info_2.info.device_number {
-                    warn!("Received udev remove event on a device with {} that stratisd does not know about; retaining duplicate device {} among the set of devices known to belong to pool with UUID {}",
-                              info_2,
-                              info_1,
-                              info_1.ids.identifiers.pool_uuid);
+            (LInfo::Luks(info_1), EventDeviceInfo::Luks(info_2)) => {
+                if info_1.ids.device_number != info_2.device_number {
+                    warn!("Received udev remove event on a device with {} that stratisd does not know about; retaining original device {}", info_2, info_1);
                     Some(LInfo::Luks(info_1.clone()))
                 } else {
                     None
                 }
             }
+            (LInfo::Luks(info), _) => Some(LInfo::Luks(info.clone())),
         }
     }
 
@@ -448,16 +439,20 @@ impl DeviceSet {
     /// Process the data from a remove udev event. Since remove events are
     /// always subtractive, this method can never introduce a key_description
     /// which is incompatible with the existing key description.
-    pub fn process_info_remove(&mut self, info: DeviceInfo) {
-        let stratis_identifiers = info.stratis_identifiers();
-        let device_uuid = stratis_identifiers.device_uuid;
+    pub fn process_info_remove(&mut self, info: &EventDeviceInfo) {
+        let dev_uuid = info.dev_uuid();
+        let record_type = match self.internal.get_mut(&dev_uuid) {
+            Some(info) => info,
+            None => {
+                warn!("Received udev remove event on a device with {} that stratisd does not know about; ignoring event", info);
+                return;
+            }
+        };
 
-        if let Some(new_info) = self
-            .internal
-            .remove(&device_uuid)
-            .and_then(|removed| LInfo::update_on_remove(&removed, &info))
-        {
-            self.internal.insert(device_uuid, new_info);
+        if let Some(info) = LInfo::update_on_remove(record_type, info) {
+            *record_type = info;
+        } else {
+            self.internal.remove(&dev_uuid);
         }
     }
 
@@ -495,6 +490,12 @@ impl DeviceSet {
             },
         }
     }
+
+    /// Returns a boolean indicating whether the data structure has any devices
+    /// registered.
+    pub fn is_empty(&self) -> bool {
+        self.internal.is_empty()
+    }
 }
 
 impl<'a> Into<Value> for &'a DeviceSet {
@@ -511,8 +512,12 @@ pub struct DeviceBag {
 }
 
 impl DeviceBag {
-    pub fn remove(&mut self, info: &LInfo) -> bool {
-        self.internal.remove(info)
+    pub fn remove(&mut self, info: &EventDeviceInfo) {
+        self.internal = self
+            .internal
+            .drain()
+            .filter_map(|i| LInfo::update_on_remove(&i, info))
+            .collect::<HashSet<_>>();
     }
 
     pub fn insert(&mut self, info: LInfo) -> bool {

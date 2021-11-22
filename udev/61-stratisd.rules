@@ -1,3 +1,9 @@
+ACTION=="add|change", ENV{ID_FS_TYPE}=="stratis", IMPORT{program}="identify-stratis-dev"
+ACTION=="remove", ENV{ID_FS_TYPE}=="stratis", IMPORT{db}="ID_FS_STRATIS_POOL_UUID", IMPORT{db}="ID_FS_STRATIS_DEV_UUID"
+
+ACTION=="add|change", ENV{ID_FS_TYPE}=="crypto_LUKS", IMPORT{program}="identify-stratis-luks-dev $env{DEVNAME}"
+ACTION=="remove", ENV{ID_FS_TYPE}=="stratis", IMPORT{db}="ID_FS_STRATIS_POOL_UUID", IMPORT{db}="ID_FS_STRATIS_DEV_UUID"
+
 ACTION=="change", ENV{DM_NAME}=="stratis-1-[0-9a-f]*-thin-fs-[0-9a-f]*", IMPORT{program}="stratis-base32-decode STRATIS_POOL_NAME $env{SYNTH_ARG_STRATISPOOLNAME}", ENV{SYNTH_ARG_STRATISPOOLNAME}!=""
 ACTION=="change", ENV{DM_NAME}=="stratis-1-[0-9a-f]*-thin-fs-[0-9a-f]*", IMPORT{program}="stratis-base32-decode STRATIS_FS_NAME $env{SYNTH_ARG_STRATISFSNAME}", ENV{SYNTH_ARG_STRATISFSNAME}!=""
 ACTION=="change", ENV{DM_NAME}=="stratis-1-[0-9a-f]*-thin-fs-[0-9a-f]*", PROGRAM+="stratis-str-cmp $env{SYNTH_UUID} $env{ID_FS_UUID}", RESULT=="0", ENV{SYNTH_UUID}!="", ENV{STRATIS_POOL_NAME}!="", ENV{STRATIS_FS_NAME}!="", SYMLINK+="stratis/$env{STRATIS_POOL_NAME}/$env{STRATIS_FS_NAME}", GOTO="stratis_end"

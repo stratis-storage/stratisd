@@ -18,7 +18,9 @@ use crate::{
             backstore::CryptActivationHandle,
             liminal::{
                 device_info::{DeviceBag, DeviceSet, LInfo, LLuksInfo},
-                identify::{identify_block_device, DeviceInfo, LuksInfo, StratisInfo},
+                identify::{
+                    identify_block_device, DeviceInfo, EventDeviceInfo, LuksInfo, StratisInfo,
+                },
                 setup::{get_bdas, get_blockdevs, get_metadata, get_pool_state},
             },
             metadata::StratisIdentifiers,
@@ -368,7 +370,9 @@ impl LiminalDevices {
             }
             Err(Destination::Errored(err)) => {
                 info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {}", err);
-                self.errored_pool_devices.insert(pool_uuid, infos);
+                if !infos.is_empty() {
+                    self.errored_pool_devices.insert(pool_uuid, infos);
+                }
                 None
             }
         }
@@ -429,33 +433,38 @@ impl LiminalDevices {
                 }
             })
         } else if event_type == libudev::EventType::Remove {
-            identify_block_device(event).and_then(move |info| {
-                let stratis_identifiers = info.stratis_identifiers();
-                let pool_uuid = stratis_identifiers.pool_uuid;
-                let device_uuid = stratis_identifiers.device_uuid;
-                if let Some((_, pool)) = pools.get_by_uuid(pool_uuid) {
-                    if pool.get_strat_blockdev(device_uuid).is_some() {
-                        warn!("udev reports that a device with {} that appears to belong to a pool with UUID {} has just been removed; this is likely to result in data loss",
-                              info,
-                              pool_uuid);
-                    }
-                    None
-                } else if let Some(mut set) = self.hopeless_device_sets.remove(&pool_uuid) {
-                    set.remove(&info.into());
-                    self.hopeless_device_sets.insert(pool_uuid, set);
-                    None
-                } else {
-                    let mut devices = self
-                        .errored_pool_devices
-                        .remove(&pool_uuid)
-                        .unwrap_or_else(DeviceSet::new);
+            let event_info = match EventDeviceInfo::from_event(event) {
+                Some(e) => e,
+                None => return None,
+            };
+            let pool_uuid = event_info.pool_uuid();
+            let dev_uuid = event_info.dev_uuid();
 
-                    devices.process_info_remove(info);
+            if pools
+                .get_by_uuid(pool_uuid)
+                .and_then(|(_, p)| p.get_strat_blockdev(dev_uuid))
+                .is_some()
+            {
+                warn!("udev reports that a device with UUID {} that appears to belong to a pool with UUID {} has just been removed; this is likely to result in data loss",
+                      dev_uuid,
+                      pool_uuid);
+                None
+            } else if let Some(bag) = self.hopeless_device_sets.get_mut(&pool_uuid) {
+                bag.remove(&event_info);
+                None
+            } else if self.errored_pool_devices.get(&pool_uuid).is_some() {
+                let mut devices = self
+                    .errored_pool_devices
+                    .remove(&pool_uuid)
+                    .unwrap_or_else(DeviceSet::new);
 
-                    self.try_setup_pool(pools, pool_uuid, devices)
-                        .map(|(name, pool)| (pool_uuid, name, pool))
-                }
-            })
+                devices.process_info_remove(&event_info);
+
+                self.try_setup_pool(pools, pool_uuid, devices)
+                    .map(|(name, pool)| (pool_uuid, name, pool))
+            } else {
+                None
+            }
         } else {
             None
         }

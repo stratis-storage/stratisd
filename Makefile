@@ -252,6 +252,8 @@ install: $(PROFILETARGET) $(PROFILEMINTARGET) install-cfg
 	install -Dpm0755 -t $(DESTDIR)$(UDEVDIR) target/$(PROFILEDIR)/stratis-utils
 	mv -fv $(DESTDIR)$(UDEVDIR)/stratis-utils $(DESTDIR)$(UDEVDIR)/stratis-str-cmp
 	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(UDEVDIR)/stratis-base32-decode
+	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(UDEVDIR)/identify-stratis-dev
+	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(UDEVDIR)/identify-stratis-luks-dev
 	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(BINDIR)/stratis-predict-usage
 	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(UNITGENDIR)/stratis-clevis-setup-generator
 	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(UNITGENDIR)/stratis-setup-generator

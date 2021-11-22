@@ -58,8 +58,13 @@ use crate::engine::{
             STRATIS_FS_TYPE,
         },
     },
-    types::{EncryptionInfo, PoolUuid, UdevEngineDevice, UdevEngineEvent},
+    types::{DevUuid, EncryptionInfo, PoolUuid, UdevEngineDevice, UdevEngineEvent},
 };
+
+/// udev property key for Stratis device UUID
+const DEV_UUID: &str = "ID_FS_STRATIS_DEV_UUID";
+/// udev property key for Stratis pool UUID
+const POOL_UUID: &str = "ID_FS_STRATIS_POOL_UUID";
 
 /// A miscellaneous group of identifiers found when identifying a LUKS
 /// device which belongs to Stratis.
@@ -153,6 +158,67 @@ impl fmt::Display for DeviceInfo {
         match self {
             DeviceInfo::Luks(info) => write!(f, "LUKS device description: {}", info),
             DeviceInfo::Stratis(info) => write!(f, "Stratis device description: {}", info),
+        }
+    }
+}
+
+pub enum EventDeviceInfo {
+    Luks(StratisInfo),
+    Stratis(StratisInfo),
+}
+
+impl EventDeviceInfo {
+    pub fn from_event(event: &UdevEngineEvent) -> Option<Self> {
+        let device_number = event
+            .device()
+            .devnum()
+            .and_then(|dn| Some(Device::from_kdev_t(convert_int!(dn, u64, u32).ok()?)))?;
+        let devnode = event.device().devnode().map(|p| p.to_owned())?;
+        let device_uuid = event
+            .device()
+            .property_value(DEV_UUID)
+            .and_then(|prop| DevUuid::parse_str(prop.to_str()?).ok())?;
+        let pool_uuid = event
+            .device()
+            .property_value(POOL_UUID)
+            .and_then(|prop| PoolUuid::parse_str(prop.to_str()?).ok())?;
+
+        let info = StratisInfo {
+            device_number,
+            devnode,
+            identifiers: StratisIdentifiers {
+                device_uuid,
+                pool_uuid,
+            },
+        };
+        let ownership = decide_ownership(event.device()).ok()?;
+        match ownership {
+            UdevOwnership::Luks => Some(EventDeviceInfo::Luks(info)),
+            UdevOwnership::Stratis => Some(EventDeviceInfo::Stratis(info)),
+            _ => None,
+        }
+    }
+
+    pub fn pool_uuid(&self) -> PoolUuid {
+        match self {
+            EventDeviceInfo::Luks(info) => info.identifiers.pool_uuid,
+            EventDeviceInfo::Stratis(info) => info.identifiers.pool_uuid,
+        }
+    }
+
+    pub fn dev_uuid(&self) -> DevUuid {
+        match self {
+            EventDeviceInfo::Luks(info) => info.identifiers.device_uuid,
+            EventDeviceInfo::Stratis(info) => info.identifiers.device_uuid,
+        }
+    }
+}
+
+impl fmt::Display for EventDeviceInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            EventDeviceInfo::Luks(info) => write!(f, "LUKS device description: {}", info),
+            EventDeviceInfo::Stratis(info) => write!(f, "Stratis device description: {}", info),
         }
     }
 }

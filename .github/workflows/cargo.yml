@@ -5,14 +5,12 @@ name: stratisd cargo CI
 on:
   push:
     branches:
-      - master
-      - develop-2.4.2
+      - patch-2.4.2
     paths:
       - '**/Cargo.toml'
   pull_request:
     branches:
-      - master
-      - develop-2.4.2
+      - patch-2.4.2
     paths:
       - '**/Cargo.toml'
 
@@ -27,7 +25,7 @@ jobs:
           # yamllint disable rule:line-length
           - task: |
               COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../Cargo.toml FEDORA_RELEASE=rawhide IGNORE_ARGS="--ignore-category low" make -f ../../Makefile check-fedora-versions
-              COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../Cargo.toml FEDORA_RELEASE=f34 IGNORE_ARGS="--ignore-category low" make -f ../../Makefile check-fedora-versions
+              COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../Cargo.toml FEDORA_RELEASE=f34 IGNORE_ARGS="--ignore-category low --ignore-high bindgen" make -f ../../Makefile check-fedora-versions
     runs-on: ubuntu-18.04
     container:
       image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT

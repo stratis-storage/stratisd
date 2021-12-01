@@ -392,6 +392,13 @@ impl<'a> Into<Value> for &'a StratPool {
     }
 }
 
+pub fn total_physical_used(
+    backstore: &Backstore,
+    size: StratisResult<Sectors>,
+) -> StratisResult<Sectors> {
+    size.map(|v| v + backstore.datatier_metadata_size())
+}
+
 #[strat_pool_impl_gen]
 impl Pool for StratPool {
     type Filesystem = StratFilesystem;
@@ -677,9 +684,7 @@ impl Pool for StratPool {
         // by the pool abstraction will be invalid. In the event of, e.g.,
         // software RAID, the amount will be far too low to be useful, in the
         // event of, e.g, VDO, the amount will be far too large to be useful.
-        self.thin_pool
-            .total_physical_used()
-            .map(|v| v + self.backstore.datatier_metadata_size())
+        total_physical_used(&self.backstore, self.thin_pool.total_physical_used())
     }
 
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Self::Filesystem)> {

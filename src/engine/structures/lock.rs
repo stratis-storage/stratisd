@@ -40,7 +40,7 @@ where
 
 impl<G> Drop for SharedGuard<G> {
     fn drop(&mut self) {
-        trace!("Dropping shared lock {}", type_name::<G>());
+        trace!("Dropping shared lock on {}", type_name::<G>());
     }
 }
 
@@ -69,7 +69,7 @@ where
 
 impl<G> Drop for ExclusiveGuard<G> {
     fn drop(&mut self) {
-        trace!("Dropping exclusive lock {}", type_name::<G>());
+        trace!("Dropping exclusive lock on {}", type_name::<G>());
     }
 }
 

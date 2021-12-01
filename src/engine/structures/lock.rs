@@ -404,7 +404,7 @@ where
 
 /// A record of the type of a waiting request.
 #[derive(Debug, PartialEq)]
-pub enum WaitType<U> {
+enum WaitType<U> {
     SomeRead(U),
     SomeWrite(U),
     AllRead,
@@ -412,7 +412,7 @@ pub enum WaitType<U> {
 }
 
 /// A record of a waiting request.
-pub struct Waiter<U> {
+struct Waiter<U> {
     ty: WaitType<U>,
     waker: Waker,
     idx: u64,

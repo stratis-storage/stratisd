@@ -31,6 +31,7 @@ use crate::{
                 format_flex_ids, format_thin_ids, format_thinpool_ids, FlexRole, ThinPoolRole,
                 ThinRole,
             },
+            pool::total_physical_used,
             serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave},
             thinpool::{filesystem::StratFilesystem, mdv::MetadataVol, thinids::ThinDevIdPool},
             writing::wipe_sectors,
@@ -533,7 +534,9 @@ impl ThinPool {
         );
 
         let original_state = self.cached(|pool| ThinPoolState {
-            usage: pool.total_physical_used().map(|s| s.bytes()).ok(),
+            usage: total_physical_used(backstore, pool.total_physical_used())
+                .map(|s| s.bytes())
+                .ok(),
             allocated_size: backstore.datatier_allocated_size().bytes(),
         });
 
@@ -603,7 +606,9 @@ impl ThinPool {
             original_state.diff(&self.dump(|pool| {
                 pool.set_state(pool.thin_pool.status(get_dm(), DmOptions::default()).ok());
                 ThinPoolState {
-                    usage: pool.total_physical_used().map(|s| s.bytes()).ok(),
+                    usage: total_physical_used(backstore, pool.total_physical_used())
+                        .map(|s| s.bytes())
+                        .ok(),
                     allocated_size: backstore.datatier_allocated_size().bytes(),
                 }
             })),

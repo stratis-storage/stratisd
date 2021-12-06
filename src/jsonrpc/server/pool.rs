@@ -159,6 +159,7 @@ where
     block_in_place(|| {
         Ok(pool
             .add_blockdevs(uuid, name, blockdevs, tier)?
+            .0
             .is_changed())
     })
 }
@@ -176,7 +177,7 @@ where
                 n.to_string(),
                 (
                     *p.total_physical_size().bytes(),
-                    p.total_physical_used().ok().map(|u| *u.bytes()),
+                    p.total_physical_used().map(|u| *u.bytes()),
                 ),
                 (p.has_cache(), p.is_encrypted()),
                 u,

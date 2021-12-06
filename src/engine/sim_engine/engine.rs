@@ -26,7 +26,7 @@ use crate::{
         types::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockKey,
             LockedPoolInfo, Name, PoolUuid, RenameAction, ReportType, SetUnlockAction,
-            StratFilesystemDiff, ThinPoolDiff, UdevEngineEvent, UnlockMethod,
+            StratFilesystemDiff, StratPoolDiff, UdevEngineEvent, UnlockMethod,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -222,7 +222,10 @@ impl Engine for SimEngine {
         Ok(HashSet::new())
     }
 
-    async fn pool_evented(&self, _: Option<&HashSet<PoolUuid>>) -> HashMap<PoolUuid, ThinPoolDiff> {
+    async fn pool_evented(
+        &self,
+        _: Option<&HashSet<PoolUuid>>,
+    ) -> HashMap<PoolUuid, StratPoolDiff> {
         HashMap::default()
     }
 

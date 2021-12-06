@@ -26,7 +26,7 @@ use crate::{
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
             EncryptionInfo, FilesystemUuid, Key, KeyDescription, Name, PoolEncryptionInfo,
-            PoolUuid, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
+            PoolUuid, RegenAction, RenameAction, SetCreateAction, SetDeleteAction, StratPoolDiff,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -251,7 +251,7 @@ impl Pool for SimPool {
         _pool_name: &str,
         paths: &[&Path],
         tier: BlockDevTier,
-    ) -> StratisResult<SetCreateAction<DevUuid>> {
+    ) -> StratisResult<(SetCreateAction<DevUuid>, Option<StratPoolDiff>)> {
         validate_paths(paths)?;
 
         if tier == BlockDevTier::Cache && !self.has_cache() {
@@ -262,7 +262,7 @@ impl Pool for SimPool {
 
         if paths.is_empty() {
             // Treat adding no new blockdev as the empty set.
-            return Ok(SetCreateAction::new(vec![]));
+            return Ok((SetCreateAction::new(vec![]), None));
         }
 
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
@@ -300,7 +300,7 @@ impl Pool for SimPool {
         };
 
         the_vec.extend(filtered_device_pairs);
-        Ok(SetCreateAction::new(ret_uuids))
+        Ok((SetCreateAction::new(ret_uuids), None))
     }
 
     fn bind_clevis(
@@ -553,8 +553,8 @@ impl Pool for SimPool {
         Sectors(5 * IEC::Mi)
     }
 
-    fn total_physical_used(&self) -> StratisResult<Sectors> {
-        Ok(Sectors(0))
+    fn total_physical_used(&self) -> Option<Sectors> {
+        Some(Sectors(0))
     }
 
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Self::Filesystem)> {
@@ -917,7 +917,7 @@ mod tests {
         assert!(match pool
             .add_blockdevs(uuid, &*pool_name, &devices, BlockDevTier::Data)
             .ok()
-            .and_then(|c| c.changed())
+            .and_then(|c| c.0.changed())
         {
             Some(devs) => devs.len() == devices.len(),
             _ => false,

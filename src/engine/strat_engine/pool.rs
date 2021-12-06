@@ -12,7 +12,7 @@ use stratisd_proc_macros::strat_pool_impl_gen;
 
 use crate::{
     engine::{
-        engine::Pool,
+        engine::{DumpState, Pool, StateDiff},
         shared::{
             init_cache_idempotent_or_err, validate_filesystem_size_specs, validate_name,
             validate_paths,
@@ -21,13 +21,15 @@ use crate::{
             backstore::{Backstore, StratBlockDev},
             metadata::MDADataSize,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
-            thinpool::{StratFilesystem, ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
+            thinpool::{
+                StratFilesystem, ThinPool, ThinPoolSizeParams, ThinPoolState, DATA_BLOCK_SIZE,
+            },
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
             EncryptionInfo, FilesystemUuid, Key, KeyDescription, Name, PoolEncryptionInfo,
             PoolUuid, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
-            StratFilesystemDiff, ThinPoolDiff,
+            StratFilesystemDiff, StratPoolDiff,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -138,6 +140,7 @@ pub struct StratPool {
     backstore: Backstore,
     thin_pool: ThinPool,
     action_avail: ActionAvailability,
+    usage: Option<Sectors>,
 }
 
 #[strat_pool_impl_gen]
@@ -174,10 +177,14 @@ impl StratPool {
             }
         };
 
+        let used = thinpool
+            .used()
+            .map(|u| u + backstore.datatier_metadata_size());
         let mut pool = StratPool {
             backstore,
             thin_pool: thinpool,
             action_avail: ActionAvailability::Full,
+            usage: used,
         };
 
         pool.write_metadata(&Name::new(name.to_owned()))?;
@@ -218,12 +225,16 @@ impl StratPool {
             &backstore,
         )?;
 
-        let (needs_save, _) = thinpool.check(uuid, &mut backstore)?;
+        let needs_save = thinpool.check(uuid, &mut backstore)?;
 
+        let used = thinpool
+            .used()
+            .map(|u| u + backstore.datatier_metadata_size());
         let mut pool = StratPool {
             backstore,
             thin_pool: thinpool,
             action_avail,
+            usage: used,
         };
 
         if needs_save {
@@ -272,8 +283,10 @@ impl StratPool {
         &mut self,
         pool_uuid: PoolUuid,
         pool_name: &Name,
-    ) -> StratisResult<ThinPoolDiff> {
-        let (changed, diff) = self.thin_pool.check(pool_uuid, &mut self.backstore)?;
+    ) -> StratisResult<StratPoolDiff> {
+        let cached = self.cached();
+        let changed = self.thin_pool.check(pool_uuid, &mut self.backstore)?;
+        let diff = cached.diff(&self.dump(()));
         if changed {
             self.write_metadata(pool_name)?;
         }
@@ -382,13 +395,6 @@ impl<'a> Into<Value> for &'a StratPool {
         );
         Value::from(map)
     }
-}
-
-pub fn total_physical_used(
-    backstore: &Backstore,
-    size: StratisResult<Sectors>,
-) -> StratisResult<Sectors> {
-    size.map(|v| v + backstore.datatier_metadata_size())
 }
 
 #[strat_pool_impl_gen]
@@ -564,7 +570,7 @@ impl Pool for StratPool {
         pool_name: &str,
         paths: &[&Path],
         tier: BlockDevTier,
-    ) -> StratisResult<SetCreateAction<DevUuid>> {
+    ) -> StratisResult<(SetCreateAction<DevUuid>, Option<StratPoolDiff>)> {
         validate_paths(paths)?;
 
         let bdev_info = if tier == BlockDevTier::Cache && !self.has_cache() {
@@ -577,7 +583,7 @@ impl Pool for StratPool {
             ));
         } else if paths.is_empty() {
             //TODO: Substitute is_empty check with process_and_verify_devices
-            return Ok(SetCreateAction::new(vec![]));
+            return Ok((SetCreateAction::new(vec![]), None));
         } else if tier == BlockDevTier::Cache {
             // If adding cache devices, must suspend the pool; the cache
             // must be augmented with the new devices.
@@ -585,7 +591,7 @@ impl Pool for StratPool {
             let bdev_info_res = self.backstore.add_cachedevs(pool_uuid, paths);
             self.thin_pool.resume()?;
             let bdev_info = bdev_info_res?;
-            Ok(SetCreateAction::new(bdev_info))
+            Ok((SetCreateAction::new(bdev_info), None))
         } else {
             // If just adding data devices, no need to suspend the pool.
             // No action will be taken on the DM devices.
@@ -597,8 +603,18 @@ impl Pool for StratPool {
             // addition of the new data devs may have changed its context
             // so that it can satisfy the allocation request where
             // previously it could not. Run check() in case that is true.
-            self.thin_pool.check(pool_uuid, &mut self.backstore)?;
-            Ok(SetCreateAction::new(bdev_info))
+            let cached = self.cached();
+            let check = match self.thin_pool.check(pool_uuid, &mut self.backstore) {
+                Ok(_) => {
+                    let diff = cached.diff(&self.dump(()));
+                    Some(diff)
+                }
+                Err(e) => {
+                    warn!("Failed to check the thin pool for status changes; some information may not be able to reported to the IPC layer: {}", e);
+                    None
+                }
+            };
+            Ok((SetCreateAction::new(bdev_info), check))
         };
         self.write_metadata(pool_name)?;
         bdev_info
@@ -669,14 +685,14 @@ impl Pool for StratPool {
         self.backstore.datatier_allocated_size()
     }
 
-    fn total_physical_used(&self) -> StratisResult<Sectors> {
+    fn total_physical_used(&self) -> Option<Sectors> {
         // TODO: note that with the addition of another layer, the
         // calculation of the amount of physical spaced used by means
         // of adding the amount used by Stratis metadata to the amount used
         // by the pool abstraction will be invalid. In the event of, e.g.,
         // software RAID, the amount will be far too low to be useful, in the
         // event of, e.g, VDO, the amount will be far too large to be useful.
-        total_physical_used(&self.backstore, self.thin_pool.total_physical_used())
+        self.usage
     }
 
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Self::Filesystem)> {
@@ -749,6 +765,51 @@ impl Pool for StratPool {
     }
 }
 
+pub struct StratPoolState {
+    usage: Option<Bytes>,
+    thin_pool: ThinPoolState,
+}
+
+impl StateDiff for StratPoolState {
+    type Diff = StratPoolDiff;
+
+    fn diff(&self, other: &Self) -> Self::Diff {
+        StratPoolDiff {
+            usage: if self.usage != other.usage {
+                Some(other.usage)
+            } else {
+                None
+            },
+            thin_pool: self.thin_pool.diff(&other.thin_pool),
+        }
+    }
+}
+
+impl<'a> DumpState<'a> for StratPool {
+    type State = StratPoolState;
+    type DumpInput = ();
+
+    fn cached(&self) -> Self::State {
+        StratPoolState {
+            thin_pool: self.thin_pool.cached(),
+            usage: self.usage.map(|u| u.bytes()),
+        }
+    }
+
+    fn dump(&mut self, _: ()) -> Self::State {
+        let thin_pool = self.thin_pool.dump(&self.backstore);
+        let usage = self
+            .thin_pool
+            .used()
+            .map(|u| u + self.backstore.datatier_metadata_size());
+        self.usage = usage;
+        StratPoolState {
+            usage: usage.map(|u| u.bytes()),
+            thin_pool,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
@@ -758,13 +819,14 @@ mod tests {
 
     use nix::mount::{mount, umount, MsFlags};
 
-    use devicemapper::{Bytes, ThinPoolStatus, ThinPoolStatusSummary, IEC, SECTOR_SIZE};
+    use devicemapper::{Bytes, IEC, SECTOR_SIZE};
 
     use crate::engine::{
         engine::Filesystem,
         strat_engine::{
             cmd::udev_settle,
             tests::{loopbacked, real},
+            thinpool::ThinPoolStatusDigest,
         },
         types::EngineAction,
     };
@@ -967,20 +1029,14 @@ mod tests {
 
             let mut amount_written = Sectors(0);
             let buffer_length = Bytes::from(buffer_length).sectors();
-            while match pool.thin_pool.state() {
-                Some(ThinPoolStatus::Working(working)) => {
-                    working.summary == ThinPoolStatusSummary::Good
-                }
-                _ => false,
-            } {
+            while matches!(pool.thin_pool.state(), Some(ThinPoolStatusDigest::Good)) {
                 f.write_all(buf).unwrap();
                 amount_written += Sectors(1);
                 // Run check roughly every time the buffer is cleared.
                 // Running it more often is pointless as the pool is guaranteed
                 // not to see any effects unless the buffer is cleared.
                 if amount_written % buffer_length == Sectors(1) {
-                    pool.thin_pool
-                        .check(pool_uuid, &mut pool.backstore)
+                    pool.event_on(pool_uuid, &Name::new(name.to_string()))
                         .unwrap();
                 }
             }
@@ -989,9 +1045,7 @@ mod tests {
                 .unwrap();
 
             match pool.thin_pool.state() {
-                Some(ThinPoolStatus::Working(working)) => {
-                    assert_eq!(working.summary, ThinPoolStatusSummary::Good)
-                }
+                Some(ThinPoolStatusDigest::Good) => (),
                 _ => panic!("thin pool status should be back to working"),
             }
         }

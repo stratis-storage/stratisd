@@ -241,10 +241,7 @@ impl StratFilesystem {
     /// TODO: deal with the thindev in a Fail state.
     pub fn check(&mut self) -> StratisResult<(bool, StratFilesystemDiff)> {
         let mut needs_save = false;
-        let original_state = self.cached(|fs| StratFilesystemState {
-            size: fs.size(),
-            used: fs.used,
-        });
+        let original_state = self.cached();
         match self.thin_dev.status(get_dm(), DmOptions::default())? {
             ThinStatus::Working(_) => {
                 if let Some(mount_point) = self.mount_points()?.first() {
@@ -280,13 +277,7 @@ impl StratFilesystem {
             }
             _ => (),
         };
-        Ok((
-            needs_save,
-            original_state.diff(&self.dump(|fs| StratFilesystemState {
-                used: fs.used().ok(),
-                size: fs.size(),
-            })),
-        ))
+        Ok((needs_save, original_state.diff(&self.dump(()))))
     }
 
     /// Return an extend size for the thindev under the filesystem
@@ -410,8 +401,24 @@ impl StateDiff for StratFilesystemState {
         }
     }
 }
-impl DumpState for StratFilesystem {
+impl<'a> DumpState<'a> for StratFilesystem {
     type State = StratFilesystemState;
+    type DumpInput = ();
+
+    fn cached(&self) -> Self::State {
+        StratFilesystemState {
+            size: self.size(),
+            used: self.used,
+        }
+    }
+
+    fn dump(&mut self, _: Self::DumpInput) -> Self::State {
+        self.used = self.used().ok();
+        StratFilesystemState {
+            used: self.used,
+            size: self.size(),
+        }
+    }
 }
 
 /// Return total bytes allocated to the filesystem, total bytes used by data/metadata

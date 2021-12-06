@@ -27,7 +27,7 @@ use crate::{
             EncryptionInfo, FilesystemUuid, Key, KeyDescription, LockKey, LockedPoolInfo,
             MappingCreateAction, MappingDeleteAction, Name, PoolEncryptionInfo, PoolUuid,
             RegenAction, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
-            SetUnlockAction, StratFilesystemDiff, ThinPoolDiff, UdevEngineEvent, UnlockMethod,
+            SetUnlockAction, StratFilesystemDiff, StratPoolDiff, UdevEngineEvent, UnlockMethod,
         },
     },
     stratis::StratisResult,
@@ -167,7 +167,7 @@ pub trait Pool: Debug + Send + Sync {
         pool_name: &str,
         paths: &[&Path],
         tier: BlockDevTier,
-    ) -> StratisResult<SetCreateAction<DevUuid>>;
+    ) -> StratisResult<(SetCreateAction<DevUuid>, Option<StratPoolDiff>)>;
 
     /// Bind all devices in the given pool for automated unlocking
     /// using clevis.
@@ -250,7 +250,7 @@ pub trait Pool: Debug + Send + Sync {
     /// pool for some purpose, and therefore not available for future use,
     /// by any subcomponent of Stratis, either for internal managment or to
     /// store user data.
-    fn total_physical_used(&self) -> StratisResult<Sectors>;
+    fn total_physical_used(&self) -> Option<Sectors>;
 
     /// Get all the filesystems belonging to this pool.
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Self::Filesystem)>;
@@ -375,7 +375,7 @@ pub trait Engine: Debug + Report + Send + Sync {
     async fn pool_evented(
         &self,
         pools: Option<&HashSet<PoolUuid>>,
-    ) -> HashMap<PoolUuid, ThinPoolDiff>;
+    ) -> HashMap<PoolUuid, StratPoolDiff>;
 
     /// Notify the engine that an event has occurred on the DM file descriptor
     /// and check filesystems for needed changes.
@@ -405,28 +405,19 @@ pub trait StateDiff {
 }
 
 /// Dump all of the necessary state for the given data structure that may change.
-pub trait DumpState {
+pub trait DumpState<'a> {
     type State: StateDiff;
+    type DumpInput;
 
     /// Return a structure that can be diffed and contains all of the values that
     /// need to be checked in a diff and can change. This method should use
     /// existing cached stratisd data structures to determine the state.
-    fn cached<F>(&self, f: F) -> Self::State
-    where
-        F: Fn(&Self) -> Self::State,
-    {
-        f(self)
-    }
+    fn cached(&self) -> Self::State;
 
     /// Return a structure that can be diffed and contains all of the values that
     /// need to be checked in a diff and can change. This method should call
     /// out to fetch the current values of the state. A mutable reference is
     /// taken because this method should also update the cached values of the
     /// current state.
-    fn dump<F>(&mut self, mut f: F) -> Self::State
-    where
-        F: FnMut(&mut Self) -> Self::State,
-    {
-        f(self)
-    }
+    fn dump(&mut self, input: Self::DumpInput) -> Self::State;
 }

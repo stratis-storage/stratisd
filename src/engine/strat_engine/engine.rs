@@ -48,6 +48,7 @@ pub struct StratEngine {
     // kernel keyring.
     // In memory filesystem for passing keys to Clevis.
     // See GitHub issue: https://github.com/stratis-storage/project/issues/212.
+    #[allow(dead_code)]
     key_fs: MemoryFilesystem,
 }
 

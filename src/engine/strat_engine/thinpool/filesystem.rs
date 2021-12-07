@@ -243,7 +243,7 @@ impl StratFilesystem {
         let mut needs_save = false;
         let original_state = self.cached(|fs| StratFilesystemState {
             size: fs.size(),
-            used: fs.used().ok(),
+            used: fs.used.clone(),
         });
         match self.thin_dev.status(get_dm(), DmOptions::default())? {
             ThinStatus::Working(_) => {

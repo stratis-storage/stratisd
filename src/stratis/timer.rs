@@ -20,12 +20,16 @@ use crate::{
 async fn check_pool_and_fs<E>(
     engine: LockableEngine<E>,
     #[cfg(feature = "dbus_enabled")] sender: UnboundedSender<DbusAction<E>>,
-) -> StratisResult<()>
-where
+) where
     E: Engine,
 {
-    loop {
-        sleep(Duration::from_secs(10)).await;
+    async fn process_checks<E>(
+        engine: &LockableEngine<E>,
+        #[cfg(feature = "dbus_enabled")] sender: &UnboundedSender<DbusAction<E>>,
+    ) -> StratisResult<()>
+    where
+        E: Engine,
+    {
         let mut lock = engine.lock().await;
         #[cfg(feature = "min")]
         {
@@ -53,6 +57,20 @@ where
                 }
             }
         }
+        Ok(())
+    }
+
+    loop {
+        if let Err(e) = process_checks(
+            &engine,
+            #[cfg(feature = "dbus_enabled")]
+            &sender,
+        )
+        .await
+        {
+            warn!("Failed to handle timed pool and filesystem checks: {}", e);
+        }
+        sleep(Duration::from_secs(10)).await;
     }
 }
 
@@ -71,6 +89,6 @@ where
         #[cfg(feature = "dbus_enabled")]
         sender,
     ))
-    .await??;
+    .await?;
     Ok(())
 }

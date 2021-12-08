@@ -458,7 +458,7 @@ fn sss_dispatch(json: &Value) -> StratisResult<Value> {
             // NOTE: Workaround for the on-disk format for Shamir secret sharing
             // as written by clevis. The base64 encoded string delimits the end
             // of the JSON blob with a period.
-            let json_s = s.splitn(2, '.').next().ok_or_else(|| {
+            let json_s = Some(s.split_once('.').map_or(&**s, |x| x.0)).ok_or_else(|| {
                 StratisError::Msg(format!(
                     "Splitting string {} on character '.' did not result in \
                         at least one string segment.",

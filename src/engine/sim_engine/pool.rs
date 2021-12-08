@@ -37,6 +37,7 @@ pub struct SimPool {
     block_devs: HashMap<DevUuid, SimDev>,
     cache_devs: HashMap<DevUuid, SimDev>,
     filesystems: Table<FilesystemUuid, SimFilesystem>,
+    #[allow(dead_code)]
     redundancy: Redundancy,
 }
 

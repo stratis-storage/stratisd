@@ -136,6 +136,7 @@ fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
 #[derive(Debug)]
 pub struct StratPool {
     backstore: Backstore,
+    #[allow(dead_code)]
     redundancy: Redundancy,
     thin_pool: ThinPool,
     action_avail: ActionAvailability,

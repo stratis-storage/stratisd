@@ -96,7 +96,7 @@ where
     let mut mutex_lock = dbus_context.engine.blocking_lock();
     let (pool_name, pool) = get_mut_pool!(mutex_lock; pool_uuid; default_return; return_message);
 
-    let blockdevs = devs.map(|x| Path::new(x)).collect::<Vec<&Path>>();
+    let blockdevs = devs.map(Path::new).collect::<Vec<&Path>>();
 
     let result = match op {
         BlockDevOp::InitCache => {
@@ -180,6 +180,7 @@ where
     R: dbus::arg::Append,
     E: 'static + Engine,
 {
+    #[allow(clippy::redundant_closure)]
     i.append(
         pool_operation(p.tree, p.path.get_name(), getter).map_err(|ref e| MethodErr::failed(e))?,
     );

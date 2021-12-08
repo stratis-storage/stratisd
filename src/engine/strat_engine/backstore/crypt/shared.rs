@@ -953,7 +953,7 @@ fn identifiers_from_metadata(device: &mut CryptDevice) -> StratisResult<StratisI
                     ))
                 })
             })
-            .and_then(|type_str| PoolUuid::parse_str(type_str)),
+            .and_then(PoolUuid::parse_str),
         "Could not get value for key {} from Stratis JSON token",
         STRATIS_TOKEN_POOL_UUID_KEY
     );

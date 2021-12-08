@@ -303,7 +303,7 @@ where
     let mut mutex_lock = dbus_context.engine.blocking_lock();
     let result = handle_action!(mutex_lock.create_pool(
         name,
-        &devs.map(|x| Path::new(x)).collect::<Vec<&Path>>(),
+        &devs.map(Path::new).collect::<Vec<&Path>>(),
         tuple_to_option(redundancy_tuple),
         EncryptionInfo::from_options((key_desc, clevis_info)).as_ref(),
     ));

@@ -594,7 +594,7 @@ mod tests {
         #[allow(clippy::redundant_closure)]
         for path in paths {
             let device_path = DevicePath::new(path).expect("our test path");
-            let info = block_device_apply(&device_path, |dev| process_stratis_device(dev))
+            let info = block_device_apply(&device_path, process_stratis_device)
                 .unwrap()
                 .unwrap()
                 .unwrap();
@@ -602,7 +602,7 @@ mod tests {
             assert_eq!(&&info.devnode, path);
 
             assert_eq!(
-                block_device_apply(&device_path, |dev| process_luks_device(dev))
+                block_device_apply(&device_path, process_luks_device)
                     .unwrap()
                     .unwrap(),
                 None
@@ -641,13 +641,13 @@ mod tests {
         for path in paths {
             let device_path = DevicePath::new(path).expect("our test path");
             assert_eq!(
-                block_device_apply(&device_path, |dev| process_stratis_device(dev))
+                block_device_apply(&device_path, process_stratis_device)
                     .unwrap()
                     .unwrap(),
                 None
             );
             assert_eq!(
-                block_device_apply(&device_path, |dev| process_luks_device(dev))
+                block_device_apply(&device_path, process_luks_device)
                     .unwrap()
                     .unwrap(),
                 None
@@ -659,13 +659,13 @@ mod tests {
             create_fs(path, None, false).unwrap();
             let device_path = DevicePath::new(path).expect("our test path");
             assert_eq!(
-                block_device_apply(&device_path, |dev| process_stratis_device(dev))
+                block_device_apply(&device_path, process_stratis_device)
                     .unwrap()
                     .unwrap(),
                 None
             );
             assert_eq!(
-                block_device_apply(&device_path, |dev| process_luks_device(dev))
+                block_device_apply(&device_path, process_luks_device)
                     .unwrap()
                     .unwrap(),
                 None

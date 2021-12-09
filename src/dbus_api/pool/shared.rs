@@ -180,6 +180,7 @@ where
     R: dbus::arg::Append,
     E: 'static + Engine,
 {
+    #[allow(clippy::redundant_closure)]
     i.append(
         pool_operation(p.tree, p.path.get_name(), getter).map_err(|ref e| MethodErr::failed(e))?,
     );

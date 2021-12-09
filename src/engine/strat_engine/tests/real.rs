@@ -112,11 +112,10 @@ fn get_device_runs<'a>(
 
     // Retain only devices that are less than max_size
     let (mut matches, mut too_large): (Vec<(&Path, Sectors)>, Vec<(&Path, Sectors)>) =
-        if max_size.is_none() {
-            (matches, vec![])
-        } else {
-            let max_size = max_size.expect("!max_size.is_none()");
+        if let Some(max_size) = max_size {
             matches.iter().partition(|&&(_, s)| s <= max_size)
+        } else {
+            (matches, vec![])
         };
 
     let avail = matches.len();

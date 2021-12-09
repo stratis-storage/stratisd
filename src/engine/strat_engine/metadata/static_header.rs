@@ -164,12 +164,12 @@ impl StaticHeader {
         let mut buf_loc_1 = [0u8; bytes!(static_header_size::SIGBLOCK_SECTORS)];
         let mut buf_loc_2 = [0u8; bytes!(static_header_size::SIGBLOCK_SECTORS)];
 
-        fn read_sector_at_offset<F>(f: &mut F, offset: usize, mut buf: &mut [u8]) -> io::Result<()>
+        fn read_sector_at_offset<F>(f: &mut F, offset: usize, buf: &mut [u8]) -> io::Result<()>
         where
             F: Read + Seek,
         {
             f.seek(SeekFrom::Start(offset as u64))
-                .and_then(|_| f.read_exact(&mut buf))
+                .and_then(|_| f.read_exact(buf))
         }
 
         (

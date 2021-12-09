@@ -70,6 +70,7 @@ where
     R: dbus::arg::Append,
     E: Engine,
 {
+    #[allow(clippy::redundant_closure)]
     i.append(
         blockdev_operation(p.tree, p.path.get_name(), getter)
             .map_err(|ref e| MethodErr::failed(e))?,

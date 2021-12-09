@@ -591,7 +591,6 @@ mod tests {
         )
         .unwrap();
 
-        #[allow(clippy::redundant_closure)]
         for path in paths {
             let device_path = DevicePath::new(path).expect("our test path");
             let info = block_device_apply(&device_path, process_stratis_device)
@@ -637,7 +636,6 @@ mod tests {
     fn test_process_device_uninitialized(paths: &[&Path]) {
         assert!(!paths.is_empty());
 
-        #[allow(clippy::redundant_closure)]
         for path in paths {
             let device_path = DevicePath::new(path).expect("our test path");
             assert_eq!(
@@ -654,7 +652,6 @@ mod tests {
             );
         }
 
-        #[allow(clippy::redundant_closure)]
         for path in paths {
             create_fs(path, None, false).unwrap();
             let device_path = DevicePath::new(path).expect("our test path");

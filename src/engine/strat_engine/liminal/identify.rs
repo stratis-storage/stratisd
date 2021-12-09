@@ -591,9 +591,10 @@ mod tests {
         )
         .unwrap();
 
+        #[allow(clippy::redundant_closure)]
         for path in paths {
             let device_path = DevicePath::new(path).expect("our test path");
-            let info = block_device_apply(&device_path, process_stratis_device)
+            let info = block_device_apply(&device_path, |dev| process_stratis_device(dev))
                 .unwrap()
                 .unwrap()
                 .unwrap();
@@ -601,7 +602,7 @@ mod tests {
             assert_eq!(&&info.devnode, path);
 
             assert_eq!(
-                block_device_apply(&device_path, process_luks_device)
+                block_device_apply(&device_path, |dev| process_luks_device(dev))
                     .unwrap()
                     .unwrap(),
                 None
@@ -636,33 +637,35 @@ mod tests {
     fn test_process_device_uninitialized(paths: &[&Path]) {
         assert!(!paths.is_empty());
 
+        #[allow(clippy::redundant_closure)]
         for path in paths {
             let device_path = DevicePath::new(path).expect("our test path");
             assert_eq!(
-                block_device_apply(&device_path, process_stratis_device)
+                block_device_apply(&device_path, |dev| process_stratis_device(dev))
                     .unwrap()
                     .unwrap(),
                 None
             );
             assert_eq!(
-                block_device_apply(&device_path, process_luks_device)
+                block_device_apply(&device_path, |dev| process_luks_device(dev))
                     .unwrap()
                     .unwrap(),
                 None
             );
         }
 
+        #[allow(clippy::redundant_closure)]
         for path in paths {
             create_fs(path, None, false).unwrap();
             let device_path = DevicePath::new(path).expect("our test path");
             assert_eq!(
-                block_device_apply(&device_path, process_stratis_device)
+                block_device_apply(&device_path, |dev| process_stratis_device(dev))
                     .unwrap()
                     .unwrap(),
                 None
             );
             assert_eq!(
-                block_device_apply(&device_path, process_luks_device)
+                block_device_apply(&device_path, |dev| process_luks_device(dev))
                     .unwrap()
                     .unwrap(),
                 None

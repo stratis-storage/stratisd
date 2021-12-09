@@ -81,11 +81,9 @@ impl Engine for SimEngine {
         &mut self,
         name: &str,
         blockdev_paths: &[&Path],
-        redundancy: Option<u16>,
+        _redundancy: Option<u16>,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
-        let redundancy = calculate_redundancy!(redundancy);
-
         validate_name(name)?;
 
         validate_paths(blockdev_paths)?;
@@ -110,7 +108,7 @@ impl Engine for SimEngine {
                     let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
                     let devices = device_set.into_iter().cloned().collect::<Vec<&Path>>();
 
-                    let (pool_uuid, pool) = SimPool::new(&devices, redundancy, encryption_info);
+                    let (pool_uuid, pool) = SimPool::new(&devices, encryption_info);
 
                     self.pools
                         .insert(Name::new(name.to_owned()), pool_uuid, pool);

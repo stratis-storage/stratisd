@@ -264,7 +264,7 @@ where
     let mut iter = message.iter_init();
 
     let name: &str = get_next_arg(&mut iter, 0)?;
-    let redundancy_tuple: (bool, u16) = get_next_arg(&mut iter, 1)?;
+    let _redundancy_tuple: (bool, u16) = get_next_arg(&mut iter, 1)?;
     let devs: Array<'_, &str, _> = get_next_arg(&mut iter, 2)?;
     let (key_desc_tuple, clevis_tuple): EncryptionParams = (
         Some(get_next_arg(&mut iter, 3)?),
@@ -304,7 +304,6 @@ where
     let result = handle_action!(mutex_lock.create_pool(
         name,
         &devs.map(Path::new).collect::<Vec<&Path>>(),
-        tuple_to_option(redundancy_tuple),
         EncryptionInfo::from_options((key_desc, clevis_info)).as_ref(),
     ));
 

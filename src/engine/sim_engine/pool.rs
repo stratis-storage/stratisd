@@ -658,7 +658,6 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
             )
             .unwrap()
             .changed()
@@ -679,7 +678,6 @@ mod tests {
             .create_pool(
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
                 None,
             )
             .unwrap()
@@ -710,7 +708,6 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
             )
             .unwrap()
             .changed()
@@ -739,7 +736,6 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
             )
             .unwrap()
             .changed()
@@ -760,7 +756,6 @@ mod tests {
             .create_pool(
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
                 None,
             )
             .unwrap()
@@ -783,7 +778,6 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
             )
             .unwrap()
             .changed()
@@ -804,7 +798,6 @@ mod tests {
             .create_pool(
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
                 None,
             )
             .unwrap()
@@ -833,7 +826,6 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
             )
             .unwrap()
             .changed()
@@ -852,7 +844,6 @@ mod tests {
             .create_pool(
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
                 None,
             )
             .unwrap()
@@ -880,7 +871,6 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
             )
             .unwrap()
             .changed()
@@ -905,7 +895,6 @@ mod tests {
                 pool_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
             )
             .unwrap()
             .changed()
@@ -929,7 +918,6 @@ mod tests {
             .create_pool(
                 "pool_name",
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
                 None,
             )
             .unwrap()

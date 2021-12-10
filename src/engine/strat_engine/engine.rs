@@ -176,7 +176,6 @@ impl Engine for StratEngine {
         &mut self,
         name: &str,
         blockdev_paths: &[&Path],
-        _redundancy: Option<u16>,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
         validate_name(name)?;
@@ -478,7 +477,7 @@ mod test {
 
         let name1 = "name1";
         let uuid1 = engine
-            .create_pool(name1, paths, None, None)
+            .create_pool(name1, paths, None)
             .unwrap()
             .changed()
             .unwrap();
@@ -574,14 +573,14 @@ mod test {
 
         let name1 = "name1";
         let uuid1 = engine
-            .create_pool(name1, paths1, None, None)
+            .create_pool(name1, paths1, None)
             .unwrap()
             .changed()
             .unwrap();
 
         let name2 = "name2";
         let uuid2 = engine
-            .create_pool(name2, paths2, None, None)
+            .create_pool(name2, paths2, None)
             .unwrap()
             .changed()
             .unwrap();
@@ -662,7 +661,7 @@ mod test {
 
         let mut engine = StratEngine::initialize()?;
         let uuid = engine
-            .create_pool(name, paths_with_fail_device, None, Some(encryption_info))?
+            .create_pool(name, paths_with_fail_device, Some(encryption_info))?
             .changed()
             .ok_or_else(|| {
                 Box::new(StratisError::Msg(

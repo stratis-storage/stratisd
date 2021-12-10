@@ -69,7 +69,7 @@ where
 {
     let mut lock = engine.lock().await;
     Ok(
-        match block_in_place(|| lock.create_pool(name, blockdev_paths, None, enc_info))? {
+        match block_in_place(|| lock.create_pool(name, blockdev_paths, enc_info))? {
             CreateAction::Created(_) => true,
             CreateAction::Identity => false,
         },

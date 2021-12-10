@@ -81,7 +81,6 @@ impl Engine for SimEngine {
         &mut self,
         name: &str,
         blockdev_paths: &[&Path],
-        _redundancy: Option<u16>,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
         validate_name(name)?;
@@ -254,7 +253,6 @@ mod tests {
                 "name",
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
             )
             .unwrap()
             .changed()
@@ -267,7 +265,7 @@ mod tests {
     fn destroy_pool_w_devices() {
         let mut engine = SimEngine::default();
         let uuid = engine
-            .create_pool("name", strs_to_paths!(["/s/d"]), None, None)
+            .create_pool("name", strs_to_paths!(["/s/d"]), None)
             .unwrap()
             .changed()
             .unwrap();
@@ -280,7 +278,7 @@ mod tests {
         let mut engine = SimEngine::default();
         let pool_name = "pool_name";
         let uuid = engine
-            .create_pool(pool_name, strs_to_paths!(["/s/d"]), None, None)
+            .create_pool(pool_name, strs_to_paths!(["/s/d"]), None)
             .unwrap()
             .changed()
             .unwrap();
@@ -299,9 +297,9 @@ mod tests {
         let name = "name";
         let mut engine = SimEngine::default();
         let devices = strs_to_paths!(["/s/d"]);
-        engine.create_pool(name, devices, None, None).unwrap();
+        engine.create_pool(name, devices, None).unwrap();
         assert_matches!(
-            engine.create_pool(name, devices, None, None),
+            engine.create_pool(name, devices, None),
             Ok(CreateAction::Identity)
         );
     }
@@ -312,13 +310,12 @@ mod tests {
         let name = "name";
         let mut engine = SimEngine::default();
         engine
-            .create_pool(name, strs_to_paths!(["/s/d"]), None, None)
+            .create_pool(name, strs_to_paths!(["/s/d"]), None)
             .unwrap();
         assert_matches!(
             engine.create_pool(
                 name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
                 None,
             ),
             Err(_)
@@ -332,26 +329,11 @@ mod tests {
         let mut engine = SimEngine::default();
         assert_matches!(
             engine
-                .create_pool("name", strs_to_paths!([path, path]), None, None)
+                .create_pool("name", strs_to_paths!([path, path]), None)
                 .unwrap()
                 .changed()
                 .map(|uuid| engine.get_pool(uuid).unwrap().1.blockdevs().len()),
             Some(1)
-        );
-    }
-
-    #[test]
-    /// Creating a pool with an impossible raid level should fail
-    fn create_pool_max_u16_raid() {
-        let mut engine = SimEngine::default();
-        assert_matches!(
-            engine.create_pool(
-                "name",
-                strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                Some(std::u16::MAX),
-                None,
-            ),
-            Err(_)
         );
     }
 
@@ -375,7 +357,6 @@ mod tests {
                 name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
             )
             .unwrap()
             .changed()
@@ -394,7 +375,6 @@ mod tests {
             .create_pool(
                 "old_name",
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
                 None,
             )
             .unwrap()
@@ -416,7 +396,6 @@ mod tests {
                 "old_name",
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
                 None,
-                None,
             )
             .unwrap()
             .changed()
@@ -425,7 +404,6 @@ mod tests {
             .create_pool(
                 new_name,
                 strs_to_paths!(["/dev/four", "/dev/five", "/dev/six"]),
-                None,
                 None,
             )
             .unwrap();
@@ -441,7 +419,6 @@ mod tests {
             .create_pool(
                 new_name,
                 strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-                None,
                 None,
             )
             .unwrap();

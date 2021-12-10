@@ -292,13 +292,10 @@ pub trait Engine: Debug + Report + Send {
 
     /// Create a Stratis pool.
     /// Returns the UUID of the newly created pool.
-    /// Returns an error if the redundancy code does not correspond to a
-    /// supported redundancy.
     fn create_pool(
         &mut self,
         name: &str,
         blockdev_paths: &[&Path],
-        redundancy: Option<u16>,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<CreateAction<PoolUuid>>;
 

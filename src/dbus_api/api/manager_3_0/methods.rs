@@ -264,7 +264,7 @@ where
     let mut iter = message.iter_init();
 
     let name: &str = get_next_arg(&mut iter, 0)?;
-    let _redundancy_tuple: (bool, u16) = get_next_arg(&mut iter, 1)?;
+    let redundancy_tuple: (bool, u16) = get_next_arg(&mut iter, 1)?;
     let devs: Array<'_, &str, _> = get_next_arg(&mut iter, 2)?;
     let (key_desc_tuple, clevis_tuple): EncryptionParams = (
         Some(get_next_arg(&mut iter, 3)?),
@@ -275,6 +275,17 @@ where
 
     let default_return: (bool, (dbus::Path<'static>, Vec<dbus::Path<'static>>)) =
         (false, (dbus::Path::default(), Vec::new()));
+
+    match tuple_to_option(redundancy_tuple) {
+        None | Some(0) => {}
+        Some(n) => {
+            return Ok(vec![return_message.append3(
+                default_return,
+                1,
+                format!("code {} does not correspond to any redundancy", n),
+            )]);
+        }
+    }
 
     let key_desc = match key_desc_tuple.and_then(tuple_to_option) {
         Some(kds) => match KeyDescription::try_from(kds) {

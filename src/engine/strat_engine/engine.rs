@@ -176,11 +176,9 @@ impl Engine for StratEngine {
         &mut self,
         name: &str,
         blockdev_paths: &[&Path],
-        redundancy: Option<u16>,
+        _redundancy: Option<u16>,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
-        let redundancy = calculate_redundancy!(redundancy);
-
         validate_name(name)?;
 
         validate_paths(blockdev_paths)?;
@@ -194,7 +192,7 @@ impl Engine for StratEngine {
                     ))
                 } else {
                     let (uuid, pool) =
-                        StratPool::initialize(name, blockdev_paths, redundancy, encryption_info)?;
+                        StratPool::initialize(name, blockdev_paths, encryption_info)?;
 
                     let name = Name::new(name.to_owned());
                     self.pools.insert(name, uuid, pool);

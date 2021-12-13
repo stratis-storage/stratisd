@@ -23,6 +23,9 @@ jobs:
           - task: make -f Makefile clippy
             toolchain: stable
             components: clippy
+          - task: cargo package
+            toolchain: 1.57.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            components: cargo
     runs-on: ubuntu-18.04
     container:
       image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT

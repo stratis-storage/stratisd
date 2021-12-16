@@ -1084,7 +1084,7 @@ checksum = "9def91fd1e018fe007022791f865d0ccc9b3a0d5001e01aabb8b40e46000afb5"
 
 [[package]]
 name = "stratisd"
-version = "3.0.1"
+version = "3.0.2"
 dependencies = [
  "bindgen 0.59.2",
  "byteorder",

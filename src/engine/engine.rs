@@ -3,24 +3,32 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fmt::Debug,
     os::unix::io::RawFd,
     path::{Path, PathBuf},
 };
 
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde_json::Value;
+use tokio::sync::{OwnedRwLockReadGuard, OwnedRwLockWriteGuard};
 
 use devicemapper::{Bytes, Sectors};
 
 use crate::{
-    engine::types::{
-        ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-        EncryptionInfo, FilesystemUuid, Key, KeyDescription, LockedPoolInfo, MappingCreateAction,
-        MappingDeleteAction, Name, PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction,
-        ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, StratFilesystemDiff,
-        ThinPoolDiff, UdevEngineEvent, UnlockMethod,
+    engine::{
+        structures::{
+            AllLockReadGuard, AllLockWriteGuard, ExclusiveGuard, SharedGuard, SomeLockReadGuard,
+            SomeLockWriteGuard,
+        },
+        types::{
+            ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
+            EncryptionInfo, FilesystemUuid, Key, KeyDescription, LockKey, LockedPoolInfo,
+            MappingCreateAction, MappingDeleteAction, Name, PoolEncryptionInfo, PoolUuid,
+            RegenAction, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
+            SetUnlockAction, StratFilesystemDiff, ThinPoolDiff, UdevEngineEvent, UnlockMethod,
+        },
     },
     stratis::StratisResult,
 };
@@ -108,7 +116,7 @@ pub trait BlockDev: Debug {
     fn is_encrypted(&self) -> bool;
 }
 
-pub trait Pool: Debug {
+pub trait Pool: Debug + Send + Sync {
     /// Filesystem type associated with this engine type.
     type Filesystem: Filesystem;
     /// Block device type associated with this engine type.
@@ -284,7 +292,8 @@ pub trait Pool: Debug {
     fn avail_actions(&self) -> ActionAvailability;
 }
 
-pub trait Engine: Debug + Report + Send {
+#[async_trait]
+pub trait Engine: Debug + Report + Send + Sync {
     /// Pool type associated with this engine type.
     type Pool: Pool;
     /// Key handling type associated with this engine type.
@@ -294,8 +303,8 @@ pub trait Engine: Debug + Report + Send {
     /// Returns the UUID of the newly created pool.
     /// Returns an error if the redundancy code does not correspond to a
     /// supported redundancy.
-    fn create_pool(
-        &mut self,
+    async fn create_pool(
+        &self,
         name: &str,
         blockdev_paths: &[&Path],
         redundancy: Option<u16>,
@@ -307,19 +316,22 @@ pub trait Engine: Debug + Report + Send {
     /// and its UUID.
     ///
     /// Precondition: the subsystem of the device evented on is "block".
-    fn handle_event(&mut self, event: &UdevEngineEvent) -> Option<(Name, PoolUuid, &Self::Pool)>;
+    async fn handle_events(
+        &self,
+        event: Vec<UdevEngineEvent>,
+    ) -> Vec<SomeLockReadGuard<PoolUuid, Self::Pool>>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.
     /// Returns true if some action was necessary, otherwise false.
-    fn destroy_pool(&mut self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>>;
+    async fn destroy_pool(&self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>>;
 
     /// Rename pool with uuid to new_name.
     /// Raises an error if the mapping can't be applied because
     /// new_name is already in use.
     /// Returns true if it was necessary to perform an action, false if not.
-    fn rename_pool(
-        &mut self,
+    async fn rename_pool(
+        &self,
         uuid: PoolUuid,
         new_name: &str,
     ) -> StratisResult<RenameAction<PoolUuid>>;
@@ -330,50 +342,56 @@ pub trait Engine: Debug + Report + Send {
     /// in the unlocked state. If some devices are able to be unlocked
     /// and some fail, an error is returned as all devices should be able to
     /// be unlocked if the necessary key is in the keyring.
-    fn unlock_pool(
-        &mut self,
+    async fn unlock_pool(
+        &self,
         uuid: PoolUuid,
         unlock_method: UnlockMethod,
     ) -> StratisResult<SetUnlockAction<DevUuid>>;
 
-    /// Find the pool designated by uuid.
-    fn get_pool(&self, uuid: PoolUuid) -> Option<(Name, &Self::Pool)>;
+    /// Find the pool designated by name or UUID.
+    async fn get_pool(
+        &self,
+        key: LockKey<PoolUuid>,
+    ) -> Option<SomeLockReadGuard<PoolUuid, Self::Pool>>;
 
-    /// Get a mutable referent to the pool designated by uuid.
-    fn get_mut_pool(&mut self, uuid: PoolUuid) -> Option<(Name, &mut Self::Pool)>;
+    /// Get a mutable reference to the pool designated by name or UUID.
+    async fn get_mut_pool(
+        &self,
+        key: LockKey<PoolUuid>,
+    ) -> Option<SomeLockWriteGuard<PoolUuid, Self::Pool>>;
 
     /// Get a mapping of encrypted pool UUIDs for pools that have not yet
     /// been set up and need to be unlocked to their encryption infos.
-    fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo>;
+    async fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo>;
 
     /// Get all pools belonging to this engine.
-    fn pools(&self) -> Vec<(Name, PoolUuid, &Self::Pool)>;
+    async fn pools(&self) -> AllLockReadGuard<PoolUuid, Self::Pool>;
 
     /// Get mutable references to all pools belonging to this engine.
-    fn pools_mut(&mut self) -> Vec<(Name, PoolUuid, &mut Self::Pool)>;
+    async fn pools_mut(&self) -> AllLockWriteGuard<PoolUuid, Self::Pool>;
 
     /// Get the UUIDs of all pools that experienced an event.
-    fn get_events(&mut self) -> StratisResult<Vec<PoolUuid>>;
+    async fn get_events(&self) -> StratisResult<HashSet<PoolUuid>>;
 
     /// Notify the engine that an event has occurred on the DM file descriptor
     /// and check pools for needed changes.
-    fn pool_evented(
-        &mut self,
-        pools: Option<&Vec<PoolUuid>>,
-    ) -> StratisResult<HashMap<PoolUuid, ThinPoolDiff>>;
+    async fn pool_evented(
+        &self,
+        pools: Option<&HashSet<PoolUuid>>,
+    ) -> HashMap<PoolUuid, ThinPoolDiff>;
 
     /// Notify the engine that an event has occurred on the DM file descriptor
     /// and check filesystems for needed changes.
-    fn fs_evented(
-        &mut self,
-        pools: Option<&Vec<PoolUuid>>,
-    ) -> StratisResult<HashMap<FilesystemUuid, StratFilesystemDiff>>;
+    async fn fs_evented(
+        &self,
+        pools: Option<&HashSet<PoolUuid>>,
+    ) -> HashMap<FilesystemUuid, StratFilesystemDiff>;
 
     /// Get the handler for kernel keyring operations.
-    fn get_key_handler(&self) -> &Self::KeyActions;
+    async fn get_key_handler(&self) -> SharedGuard<OwnedRwLockReadGuard<Self::KeyActions>>;
 
     /// Get the handler for kernel keyring operations mutably.
-    fn get_key_handler_mut(&mut self) -> &mut Self::KeyActions;
+    async fn get_key_handler_mut(&self) -> ExclusiveGuard<OwnedRwLockWriteGuard<Self::KeyActions>>;
 
     /// Return true if this engine is the simulator engine, otherwise false.
     fn is_sim(&self) -> bool;

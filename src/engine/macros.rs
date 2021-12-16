@@ -15,23 +15,19 @@ macro_rules! calculate_redundancy {
 }
 
 macro_rules! get_pool {
-    ($s:ident; $uuid:ident) => {
-        $s.pools
-            .get_by_uuid($uuid)
-            .map(|(name, p)| (name.clone(), p))
+    ($s:ident; $key:expr) => {
+        $s.pools.read($key).await
     };
 }
 
 macro_rules! get_mut_pool {
-    ($s:ident; $uuid:ident) => {
-        $s.pools
-            .get_mut_by_uuid($uuid)
-            .map(|(name, p)| (name.clone(), p))
+    ($s:ident; $key:expr) => {
+        $s.pools.write($key).await
     };
 }
 
-macro_rules! rename_pre {
-    ($s:expr; $uuid:ident; $new_name:ident; $not_found:expr; $same:expr) => {{
+macro_rules! rename_pre_sync {
+    ($s:expr; $uuid:expr; $new_name:expr; $not_found:expr; $same:expr) => {{
         let old_name = match $s.get_by_uuid($uuid) {
             Some((name, _)) => name,
             None => return $not_found,
@@ -42,15 +38,46 @@ macro_rules! rename_pre {
         }
 
         if $s.contains_name($new_name) {
-            return Err($crate::stratis::StratisError::Msg($new_name.into()));
+            return Err($crate::stratis::StratisError::Msg(format!(
+                "Entry with name {} already exists",
+                $new_name,
+            )));
+        }
+        old_name
+    }};
+}
+
+macro_rules! rename_pre_async {
+    ($s:expr; $uuid:expr; $new_name:expr; $not_found:expr; $same:expr) => {{
+        let old_name = {
+            let guard = $s.read($crate::engine::types::LockKey::Uuid($uuid)).await;
+            match guard.as_ref().map(|g| g.as_tuple()) {
+                Some((name, _, _)) => name,
+                None => return $not_found,
+            }
+        };
+
+        if old_name == $new_name {
+            return $same;
+        }
+
+        if $s
+            .read($crate::engine::types::LockKey::Name($new_name))
+            .await
+            .is_some()
+        {
+            return Err($crate::stratis::StratisError::Msg(format!(
+                "Entry with name {} already exists",
+                $new_name,
+            )));
         }
         old_name
     }};
 }
 
 macro_rules! rename_filesystem_pre {
-    ($s:ident; $uuid:ident; $new_name:ident) => {{
-        rename_pre!(
+    ($s:expr; $uuid:expr; $new_name:expr) => {{
+        rename_pre_sync!(
             $s.filesystems;
             $uuid;
             $new_name;
@@ -60,9 +87,21 @@ macro_rules! rename_filesystem_pre {
     }}
 }
 
-macro_rules! rename_pre_idem {
-    ($s:expr; $uuid:ident; $new_name:ident) => {{
-        rename_pre!(
+macro_rules! rename_pre_idem_sync {
+    ($s:expr; $uuid:expr; $new_name:expr) => {{
+        rename_pre_sync!(
+            $s;
+            $uuid;
+            $new_name;
+            Ok($crate::engine::RenameAction::NoSource);
+            Ok($crate::engine::RenameAction::Identity)
+        )
+    }}
+}
+
+macro_rules! rename_pre_idem_async {
+    ($s:expr; $uuid:expr; $new_name:expr) => {{
+        rename_pre_async!(
             $s;
             $uuid;
             $new_name;
@@ -73,8 +112,8 @@ macro_rules! rename_pre_idem {
 }
 
 macro_rules! rename_filesystem_pre_idem {
-    ($s:ident; $uuid:ident; $new_name:ident) => {{
-        rename_pre_idem!(
+    ($s:expr; $uuid:expr; $new_name:expr) => {{
+        rename_pre_idem_sync!(
             $s.filesystems;
             $uuid;
             $new_name
@@ -83,8 +122,8 @@ macro_rules! rename_filesystem_pre_idem {
 }
 
 macro_rules! rename_pool_pre_idem {
-    ($s:ident; $uuid:ident; $new_name:ident) => {{
-        rename_pre_idem!(
+    ($s:expr; $uuid:expr; $new_name:expr) => {{
+        rename_pre_idem_async!(
             $s.pools;
             $uuid;
             $new_name
@@ -148,7 +187,7 @@ macro_rules! create_pool_generate_error_string {
 #[cfg(test)]
 macro_rules! strs_to_paths {
     ($slice:expr) => {
-        &$slice.iter().map(Path::new).collect::<Vec<_>>()
+        &$slice.iter().map(std::path::Path::new).collect::<Vec<_>>()
     };
 }
 
@@ -243,4 +282,40 @@ macro_rules! pool_enc_to_enc {
             None => None,
         }
     };
+}
+
+#[cfg(test)]
+macro_rules! generate_events {
+    () => {{
+        let cxt = libudev::Context::new().expect("Creating udev context should succeed");
+        let mut enumerator =
+            libudev::Enumerator::new(&cxt).expect("Creating enumerator should succeed");
+        enumerator.match_is_initialized().unwrap();
+        let devices = enumerator
+            .scan_devices()
+            .expect("Scanning udev devices should succeed");
+
+        devices
+            .into_iter()
+            .filter_map(|dev| {
+                let val = dev.property_value($crate::engine::strat_engine::udev::FS_TYPE_KEY);
+                if val
+                    == Some(std::ffi::OsStr::new(
+                        $crate::engine::strat_engine::udev::STRATIS_FS_TYPE,
+                    ))
+                    || val
+                        == Some(std::ffi::OsStr::new(
+                            $crate::engine::strat_engine::udev::CRYPTO_FS_TYPE,
+                        ))
+                {
+                    Some($crate::engine::types::UdevEngineEvent::new(
+                        libudev::EventType::Add,
+                        $crate::engine::types::UdevEngineDevice::from(&dev),
+                    ))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+    }};
 }

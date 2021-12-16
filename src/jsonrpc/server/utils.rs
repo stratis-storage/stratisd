@@ -3,7 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use crate::{
-    engine::{Engine, PoolUuid},
     jsonrpc::consts::{OP_ERR, OP_OK, OP_OK_STR},
     stratis::StratisResult,
 };
@@ -51,22 +50,4 @@ pub fn stratis_result_to_return<T>(result: StratisResult<T>, default_value: T) -
         Ok(r) => (r, OP_OK, OP_OK_STR.to_string()),
         Err(e) => (default_value, OP_ERR, e.to_string()),
     }
-}
-
-/// Convert a string representing the name of a pool to the UUID and stratisd
-/// data structure representing the pool state.
-pub fn name_to_uuid_and_pool<'a, E>(
-    engine: &'a mut E,
-    name: &str,
-) -> Option<(PoolUuid, &'a mut E::Pool)>
-where
-    E: Engine,
-{
-    let mut uuids_pools_for_name = engine
-        .pools_mut()
-        .into_iter()
-        .filter_map(|(n, u, p)| if &*n == name { Some((u, p)) } else { None })
-        .collect::<Vec<_>>();
-    assert!(uuids_pools_for_name.len() <= 1);
-    uuids_pools_for_name.pop()
 }

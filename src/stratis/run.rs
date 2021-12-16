@@ -4,7 +4,10 @@
 
 //! Main loop
 
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 
 use tokio::{
     runtime::Builder,
@@ -16,7 +19,7 @@ use tokio::{
 #[cfg(feature = "dbus_enabled")]
 use crate::dbus_api::DbusAction;
 use crate::{
-    engine::{Engine, Lockable, LockableEngine, SimEngine, StratEngine, UdevEngineEvent},
+    engine::{Engine, SimEngine, StratEngine, UdevEngineEvent},
     stratis::{
         dm::dm_event_thread, errors::StratisResult, ipc_support::setup, stratis::VERSION,
         timer::run_timers, udev_monitor::udev_thread,
@@ -61,7 +64,7 @@ pub fn run(sim: bool) -> StratisResult<()> {
         })
         .build()?;
     runtime.block_on(async move {
-        async fn start_threads<E>(engine: LockableEngine<E>, sim: bool) -> StratisResult<()> where E: 'static + Engine {
+        async fn start_threads<E>(engine: Arc<E>, sim: bool) -> StratisResult<()> where E: 'static + Engine {
             let (trigger, should_exit) = channel(1);
             let (udev_sender, udev_receiver) = unbounded_channel::<UdevEngineEvent>();
             #[cfg(feature = "dbus_enabled")]
@@ -81,7 +84,7 @@ pub fn run(sim: bool) -> StratisResult<()> {
                 if sim {
                     None
                 } else {
-                    Some(engine.clone())
+                    Some(Arc::clone(&engine))
                 },
                 #[cfg(feature = "dbus_enabled")]
                 dbus_sender.clone(),
@@ -135,11 +138,11 @@ pub fn run(sim: bool) -> StratisResult<()> {
         info!("stratis daemon version {} started", VERSION);
         if sim {
             info!("Using SimEngine");
-            start_threads(Lockable::new_exclusive(SimEngine::default()), sim).await
+            start_threads(Arc::new(SimEngine::default()), sim).await
         } else {
             info!("Using StratEngine");
             start_threads(
-                Lockable::new_exclusive(match StratEngine::initialize() {
+                Arc::new(match StratEngine::initialize() {
                     Ok(engine) => engine,
                     Err(e) => {
                         error!("Failed to start up stratisd engine: {}; exiting", e);

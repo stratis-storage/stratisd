@@ -4,10 +4,11 @@
 
 use dbus::{arg::IterAppend, Path};
 use dbus_tree::{MTSync, MethodErr, PropInfo, Tree};
+use futures::executor::block_on;
 
 use crate::{
     dbus_api::types::TData,
-    engine::{BlockDev, BlockDevTier, Engine, Pool},
+    engine::{BlockDev, BlockDevTier, Engine, LockKey, Pool},
 };
 
 /// Perform an operation on a `BlockDev` object for a given
@@ -47,9 +48,7 @@ where
         Pool
     );
 
-    let mutex_lock = dbus_context.engine.blocking_lock();
-    let (_, pool) = mutex_lock
-        .get_pool(pool_uuid)
+    let pool = block_on(dbus_context.engine.get_pool(LockKey::Uuid(pool_uuid)))
         .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
     let (tier, blockdev) = pool
         .get_blockdev(blockdev_uuid)

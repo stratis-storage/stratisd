@@ -3,16 +3,10 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    any::type_name,
     collections::{hash_map, HashMap},
     fmt,
     iter::IntoIterator,
-    ops::{Deref, DerefMut},
-    sync::Arc,
 };
-
-use futures::executor::block_on;
-use tokio::sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use crate::engine::types::{AsUuid, Name};
 
@@ -24,14 +18,15 @@ pub struct Table<U, T> {
 
 impl<U, T> fmt::Debug for Table<U, T>
 where
-    U: AsUuid,
+    U: fmt::Debug,
     T: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_map()
             .entries(
-                self.iter()
-                    .map(|(name, uuid, item)| ((name.to_string(), uuid), item)),
+                self.items
+                    .iter()
+                    .map(|(uuid, (name, item))| ((name.to_string(), uuid), item)),
             )
             .finish()
     }
@@ -126,7 +121,9 @@ where
     type IntoIter = IntoIter<U, T>;
 
     fn into_iter(self) -> IntoIter<U, T> {
-        self.into_iter()
+        IntoIter {
+            items: self.items.into_iter(),
+        }
     }
 }
 
@@ -178,12 +175,6 @@ where
     pub fn iter_mut(&mut self) -> IterMut<'_, U, T> {
         IterMut {
             items: self.items.iter_mut(),
-        }
-    }
-
-    pub fn into_iter(self) -> IntoIter<U, T> {
-        IntoIter {
-            items: self.items.into_iter(),
         }
     }
 
@@ -293,121 +284,6 @@ where
             // nothing ejected
             (None, None) => None,
         }
-    }
-}
-
-pub struct SharedGuard<G>(G);
-
-impl<T, G> Deref for SharedGuard<G>
-where
-    G: Deref<Target = T>,
-    T: ?Sized,
-{
-    type Target = T;
-
-    fn deref(&self) -> &T {
-        &*self.0
-    }
-}
-
-impl<G> Drop for SharedGuard<G> {
-    fn drop(&mut self) {
-        trace!("Dropping shared lock {}", type_name::<G>());
-    }
-}
-
-pub struct ExclusiveGuard<G>(G);
-
-impl<T, G> Deref for ExclusiveGuard<G>
-where
-    G: Deref<Target = T>,
-    T: ?Sized,
-{
-    type Target = T;
-
-    fn deref(&self) -> &T {
-        &*self.0
-    }
-}
-
-impl<G> DerefMut for ExclusiveGuard<G>
-where
-    G: DerefMut,
-{
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut *self.0
-    }
-}
-
-impl<G> Drop for ExclusiveGuard<G> {
-    fn drop(&mut self) {
-        trace!("Dropping exclusive lock {}", type_name::<G>());
-    }
-}
-
-pub struct Lockable<T>(T);
-
-impl<T> Lockable<Arc<Mutex<T>>> {
-    pub fn new_exclusive(t: T) -> Lockable<Arc<Mutex<T>>> {
-        Lockable(Arc::new(Mutex::new(t)))
-    }
-}
-
-impl<T> Lockable<Arc<RwLock<T>>> {
-    pub fn new_shared(t: T) -> Self {
-        Lockable(Arc::new(RwLock::new(t)))
-    }
-}
-
-impl<T> Lockable<Arc<Mutex<T>>>
-where
-    T: ?Sized,
-{
-    pub async fn lock(&self) -> ExclusiveGuard<MutexGuard<'_, T>> {
-        trace!("Acquiring exclusive lock on {}", type_name::<Self>());
-        let lock = ExclusiveGuard(self.0.lock().await);
-        trace!("Acquired exclusive lock on {}", type_name::<Self>());
-        lock
-    }
-
-    pub fn blocking_lock(&self) -> ExclusiveGuard<MutexGuard<'_, T>> {
-        block_on(self.lock())
-    }
-}
-
-impl<T> Lockable<Arc<RwLock<T>>>
-where
-    T: ?Sized,
-{
-    pub async fn read(&self) -> SharedGuard<RwLockReadGuard<'_, T>> {
-        trace!("Acquiring shared lock on {}", type_name::<Self>());
-        let lock = SharedGuard(self.0.read().await);
-        trace!("Acquired shared lock on {}", type_name::<Self>());
-        lock
-    }
-
-    pub fn blocking_read(&self) -> SharedGuard<RwLockReadGuard<'_, T>> {
-        block_on(self.read())
-    }
-
-    pub async fn write(&self) -> ExclusiveGuard<RwLockWriteGuard<'_, T>> {
-        trace!("Acquiring exclusive lock on {}", type_name::<Self>());
-        let lock = ExclusiveGuard(self.0.write().await);
-        trace!("Acquired exclusive lock on {}", type_name::<Self>());
-        lock
-    }
-
-    pub fn blocking_write(&self) -> ExclusiveGuard<RwLockWriteGuard<'_, T>> {
-        block_on(self.write())
-    }
-}
-
-impl<T> Clone for Lockable<Arc<T>>
-where
-    T: ?Sized,
-{
-    fn clone(&self) -> Self {
-        Lockable(Arc::clone(&self.0))
     }
 }
 

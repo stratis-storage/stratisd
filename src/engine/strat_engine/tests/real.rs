@@ -74,7 +74,6 @@ pub enum DeviceLimits {
     /// of devices available in the second argument.
     /// The third argument is the minimum size for all devices.
     /// The fourth argument is the maximum size for all devices.
-    #[allow(dead_code)]
     Range(usize, usize, Option<Sectors>, Option<Sectors>),
 }
 

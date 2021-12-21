@@ -2,18 +2,6 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-macro_rules! calculate_redundancy {
-    ($redundancy:ident) => {
-        match $redundancy {
-            None | Some(0) => $crate::engine::Redundancy::NONE,
-            Some(n) => {
-                let message = format!("code {} does not correspond to any redundancy", n);
-                return Err($crate::stratis::StratisError::Msg(message));
-            }
-        }
-    };
-}
-
 macro_rules! get_pool {
     ($s:ident; $key:expr) => {
         $s.pools.read($key).await

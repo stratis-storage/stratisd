@@ -26,7 +26,7 @@ use crate::{
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
             EncryptionInfo, FilesystemUuid, Key, KeyDescription, Name, PoolEncryptionInfo,
-            PoolUuid, Redundancy, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
+            PoolUuid, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -37,16 +37,10 @@ pub struct SimPool {
     block_devs: HashMap<DevUuid, SimDev>,
     cache_devs: HashMap<DevUuid, SimDev>,
     filesystems: Table<FilesystemUuid, SimFilesystem>,
-    #[allow(dead_code)]
-    redundancy: Redundancy,
 }
 
 impl SimPool {
-    pub fn new(
-        paths: &[&Path],
-        redundancy: Redundancy,
-        enc_info: Option<&EncryptionInfo>,
-    ) -> (PoolUuid, SimPool) {
+    pub fn new(paths: &[&Path], enc_info: Option<&EncryptionInfo>) -> (PoolUuid, SimPool) {
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
         let device_pairs = devices.iter().map(|p| SimDev::new(p, enc_info));
         (
@@ -55,7 +49,6 @@ impl SimPool {
                 block_devs: device_pairs.collect(),
                 cache_devs: HashMap::new(),
                 filesystems: Table::default(),
-                redundancy,
             },
         )
     }
@@ -664,7 +657,6 @@ mod tests {
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
         ))
         .unwrap()
         .changed()
@@ -684,7 +676,6 @@ mod tests {
         let uuid = test_async!(engine.create_pool(
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-            None,
             None,
         ))
         .unwrap()
@@ -714,7 +705,6 @@ mod tests {
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
         ))
         .unwrap()
         .changed()
@@ -742,7 +732,6 @@ mod tests {
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
         ))
         .unwrap()
         .changed()
@@ -762,7 +751,6 @@ mod tests {
         let uuid = test_async!(engine.create_pool(
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-            None,
             None,
         ))
         .unwrap()
@@ -784,7 +772,6 @@ mod tests {
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
         ))
         .unwrap()
         .changed()
@@ -804,7 +791,6 @@ mod tests {
         let uuid = test_async!(engine.create_pool(
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-            None,
             None,
         ))
         .unwrap()
@@ -832,7 +818,6 @@ mod tests {
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
         ))
         .unwrap()
         .changed()
@@ -850,7 +835,6 @@ mod tests {
         let uuid = test_async!(engine.create_pool(
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-            None,
             None,
         ))
         .unwrap()
@@ -877,7 +861,6 @@ mod tests {
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
         ))
         .unwrap()
         .changed()
@@ -901,7 +884,6 @@ mod tests {
             pool_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
         ))
         .unwrap()
         .changed()
@@ -924,7 +906,6 @@ mod tests {
         let uuid = test_async!(engine.create_pool(
             "pool_name",
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-            None,
             None,
         ))
         .unwrap()

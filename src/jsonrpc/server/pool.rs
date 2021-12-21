@@ -64,10 +64,7 @@ where
     E: Engine,
 {
     Ok(
-        match engine
-            .create_pool(name, blockdev_paths, None, enc_info)
-            .await?
-        {
+        match engine.create_pool(name, blockdev_paths, enc_info).await? {
             CreateAction::Created(_) => true,
             CreateAction::Identity => false,
         },

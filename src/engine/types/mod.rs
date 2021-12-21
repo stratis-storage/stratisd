@@ -156,14 +156,6 @@ pub enum BlockDevTier {
     Cache = 1,
 }
 
-/// Redundancy classifications which the engine allows for pools.
-#[derive(Debug, Eq, PartialEq)]
-#[allow(non_camel_case_types)]
-/// Redundancy specification for a pool.
-pub enum Redundancy {
-    NONE = 0,
-}
-
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Name(String);
 

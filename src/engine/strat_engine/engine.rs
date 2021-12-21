@@ -34,8 +34,8 @@ use crate::{
         },
         types::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockKey,
-            LockedPoolInfo, Redundancy, RenameAction, ReportType, SetUnlockAction,
-            StratFilesystemDiff, ThinPoolDiff, UdevEngineEvent, UnlockMethod,
+            LockedPoolInfo, RenameAction, ReportType, SetUnlockAction, StratFilesystemDiff,
+            ThinPoolDiff, UdevEngineEvent, UnlockMethod,
         },
         Engine, Name, PoolUuid, Report,
     },
@@ -350,11 +350,8 @@ impl Engine for StratEngine {
         &self,
         name: &str,
         blockdev_paths: &[&Path],
-        redundancy: Option<u16>,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
-        let _redundancy = calculate_redundancy!(redundancy);
-
         validate_name(name)?;
         let name = Name::new(name.to_owned());
 
@@ -378,12 +375,7 @@ impl Engine for StratEngine {
 
             let (pool_uuid, _) = spawn_blocking!({
                 let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
-                StratPool::initialize(
-                    &cloned_name,
-                    &borrowed_paths,
-                    Redundancy::NONE,
-                    cloned_enc_info.as_ref(),
-                )
+                StratPool::initialize(&cloned_name, &borrowed_paths, cloned_enc_info.as_ref())
             })??;
 
             Ok(CreateAction::Created(pool_uuid))
@@ -576,7 +568,7 @@ mod test {
         let engine = StratEngine::initialize().unwrap();
 
         let name1 = "name1";
-        let uuid1 = test_async!(engine.create_pool(name1, paths, None, None))
+        let uuid1 = test_async!(engine.create_pool(name1, paths, None))
             .unwrap()
             .changed()
             .unwrap();
@@ -683,13 +675,13 @@ mod test {
         let engine = StratEngine::initialize().unwrap();
 
         let name1 = "name1";
-        let uuid1 = test_async!(engine.create_pool(name1, paths1, None, None))
+        let uuid1 = test_async!(engine.create_pool(name1, paths1, None))
             .unwrap()
             .changed()
             .unwrap();
 
         let name2 = "name2";
-        let uuid2 = test_async!(engine.create_pool(name2, paths2, None, None))
+        let uuid2 = test_async!(engine.create_pool(name2, paths2, None))
             .unwrap()
             .changed()
             .unwrap();
@@ -775,18 +767,14 @@ mod test {
         }
 
         let engine = StratEngine::initialize()?;
-        let uuid = test_async!(engine.create_pool(
-            name,
-            paths_with_fail_device,
-            None,
-            Some(encryption_info)
-        ))?
-        .changed()
-        .ok_or_else(|| {
-            Box::new(StratisError::Msg(
-                "Pool should be newly created".to_string(),
-            ))
-        })?;
+        let uuid =
+            test_async!(engine.create_pool(name, paths_with_fail_device, Some(encryption_info)))?
+                .changed()
+                .ok_or_else(|| {
+                    Box::new(StratisError::Msg(
+                        "Pool should be newly created".to_string(),
+                    ))
+                })?;
 
         let mut events = generate_events!();
 

@@ -301,13 +301,10 @@ pub trait Engine: Debug + Report + Send + Sync {
 
     /// Create a Stratis pool.
     /// Returns the UUID of the newly created pool.
-    /// Returns an error if the redundancy code does not correspond to a
-    /// supported redundancy.
     async fn create_pool(
         &self,
         name: &str,
         blockdev_paths: &[&Path],
-        redundancy: Option<u16>,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<CreateAction<PoolUuid>>;
 

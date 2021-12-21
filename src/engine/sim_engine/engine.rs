@@ -98,11 +98,8 @@ impl Engine for SimEngine {
         &self,
         name: &str,
         blockdev_paths: &[&Path],
-        redundancy: Option<u16>,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
-        let redundancy = calculate_redundancy!(redundancy);
-
         validate_name(name)?;
         let name = Name::new(name.to_owned());
 
@@ -129,7 +126,7 @@ impl Engine for SimEngine {
                     let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
                     let devices = device_set.into_iter().cloned().collect::<Vec<_>>();
 
-                    let (pool_uuid, pool) = SimPool::new(&devices, redundancy, encryption_info);
+                    let (pool_uuid, pool) = SimPool::new(&devices, encryption_info);
 
                     self.pools.write_all().await.insert(
                         Name::new(name.to_owned()),
@@ -280,7 +277,6 @@ mod tests {
             "name",
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
         ))
         .unwrap()
         .changed()
@@ -292,7 +288,7 @@ mod tests {
     /// Destroying a pool with devices should succeed
     fn destroy_pool_w_devices() {
         let engine = SimEngine::default();
-        let uuid = test_async!(engine.create_pool("name", strs_to_paths!(["/s/d"]), None, None))
+        let uuid = test_async!(engine.create_pool("name", strs_to_paths!(["/s/d"]), None))
             .unwrap()
             .changed()
             .unwrap();
@@ -304,7 +300,7 @@ mod tests {
     fn destroy_pool_w_filesystem() {
         let engine = SimEngine::default();
         let pool_name = "pool_name";
-        let uuid = test_async!(engine.create_pool(pool_name, strs_to_paths!(["/s/d"]), None, None))
+        let uuid = test_async!(engine.create_pool(pool_name, strs_to_paths!(["/s/d"]), None))
             .unwrap()
             .changed()
             .unwrap();
@@ -323,9 +319,9 @@ mod tests {
         let name = "name";
         let engine = SimEngine::default();
         let devices = strs_to_paths!(["/s/d"]);
-        test_async!(engine.create_pool(name, devices, None, None)).unwrap();
+        test_async!(engine.create_pool(name, devices, None)).unwrap();
         assert_matches!(
-            test_async!(engine.create_pool(name, devices, None, None)),
+            test_async!(engine.create_pool(name, devices, None)),
             Ok(CreateAction::Identity)
         );
     }
@@ -335,11 +331,10 @@ mod tests {
     fn create_pool_name_collision_different_args() {
         let name = "name";
         let engine = SimEngine::default();
-        test_async!(engine.create_pool(name, strs_to_paths!(["/s/d"]), None, None)).unwrap();
+        test_async!(engine.create_pool(name, strs_to_paths!(["/s/d"]), None)).unwrap();
         assert!(test_async!(engine.create_pool(
             name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-            None,
             None,
         ))
         .is_err());
@@ -351,7 +346,7 @@ mod tests {
         let path = "/s/d";
         let engine = SimEngine::default();
         assert_matches!(
-            test_async!(engine.create_pool("name", strs_to_paths!([path, path]), None, None))
+            test_async!(engine.create_pool("name", strs_to_paths!([path, path]), None))
                 .unwrap()
                 .changed()
                 .map(|uuid| test_async!(engine.get_pool(LockKey::Uuid(uuid)))
@@ -360,19 +355,6 @@ mod tests {
                     .len()),
             Some(1)
         );
-    }
-
-    #[test]
-    /// Creating a pool with an impossible raid level should fail
-    fn create_pool_max_u16_raid() {
-        let engine = SimEngine::default();
-        assert!(test_async!(engine.create_pool(
-            "name",
-            strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-            Some(std::u16::MAX),
-            None,
-        ))
-        .is_err());
     }
 
     #[test]
@@ -394,7 +376,6 @@ mod tests {
             name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
         ))
         .unwrap()
         .changed()
@@ -412,7 +393,6 @@ mod tests {
         let uuid = test_async!(engine.create_pool(
             "old_name",
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-            None,
             None,
         ))
         .unwrap()
@@ -433,7 +413,6 @@ mod tests {
             "old_name",
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
             None,
-            None,
         ))
         .unwrap()
         .changed()
@@ -441,7 +420,6 @@ mod tests {
         test_async!(engine.create_pool(
             new_name,
             strs_to_paths!(["/dev/four", "/dev/five", "/dev/six"]),
-            None,
             None,
         ))
         .unwrap();
@@ -456,7 +434,6 @@ mod tests {
         test_async!(engine.create_pool(
             new_name,
             strs_to_paths!(["/dev/one", "/dev/two", "/dev/three"]),
-            None,
             None,
         ))
         .unwrap();

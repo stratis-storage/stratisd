@@ -360,6 +360,17 @@ where
     let default_return: (bool, (dbus::Path<'static>, Vec<dbus::Path<'static>>)) =
         (false, (dbus::Path::default(), Vec::new()));
 
+    match tuple_to_option(redundancy_tuple) {
+        None | Some(0) => {}
+        Some(n) => {
+            return Ok(vec![return_message.append3(
+                default_return,
+                1,
+                format!("code {} does not correspond to any redundancy", n),
+            )]);
+        }
+    }
+
     let key_desc = match key_desc_tuple.and_then(tuple_to_option) {
         Some(kds) => match KeyDescription::try_from(kds) {
             Ok(kd) => Some(kd),
@@ -386,7 +397,6 @@ where
     let result = handle_action!(block_on(dbus_context.engine.create_pool(
         name,
         &devs.map(Path::new).collect::<Vec<&Path>>(),
-        tuple_to_option(redundancy_tuple),
         EncryptionInfo::from_options((key_desc, clevis_info)).as_ref(),
     )));
 

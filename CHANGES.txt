@@ -1,3 +1,62 @@
+stratisd 3.0.3
+==============
+Recommended Rust toolchain version: 1.58.1
+Lowest supported Rust toolchain version: 1.54.0
+
+Recommended development platform for Python development: Fedora 35
+Lowest supported Python interpreter: 3.6.8
+
+- New version 3.0.3:
+  https://github.com/stratis-storage/stratisd/pull/2886
+
+- Per-pool locking:
+  https://github.com/stratis-storage/stratisd/issues/2724
+  https://github.com/stratis-storage/stratisd/pull/2853
+
+- Include stratis dracut module by default if it is installed:
+  https://github.com/stratis-storage/stratisd/issues/2893
+  https://github.com/stratis-storage/stratisd/pull/2896
+
+- Fix missing signal for pool allocated size changes:
+  https://github.com/stratis-storage/stratisd/issues/2863
+  https://github.com/stratis-storage/stratisd/pull/2865
+
+- Require devicemapper 0.32.0:
+  https://github.com/stratis-storage/stratisd/issues/2922
+  https://github.com/stratis-storage/stratisd/issues/2920
+
+- Update liminal data structures correctly on udev remove events:
+  https://github.com/stratis-storage/stratisd/issues/2456
+  https://github.com/stratis-storage/stratisd/pull/2881
+
+- Demote some multi-threading related log messages to trace from debug:
+  https://github.com/stratis-storage/stratisd/pull/2910
+
+- Remove dead redundancy field from engines:
+  https://github.com/stratis-storage/stratisd/pull/2895
+  https://github.com/stratis-storage/stratisd/pull/2883
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/2918
+  https://github.com/stratis-storage/stratisd/pull/2917
+  https://github.com/stratis-storage/stratisd/pull/2915
+  https://github.com/stratis-storage/stratisd/pull/2914
+  https://github.com/stratis-storage/stratisd/pull/2909
+  https://github.com/stratis-storage/stratisd/pull/2906
+  https://github.com/stratis-storage/stratisd/pull/2905
+  https://github.com/stratis-storage/stratisd/pull/2903
+  https://github.com/stratis-storage/stratisd/pull/2902
+  https://github.com/stratis-storage/stratisd/pull/2900
+  https://github.com/stratis-storage/stratisd/pull/2899
+  https://github.com/stratis-storage/stratisd/pull/2898
+  https://github.com/stratis-storage/stratisd/pull/2892
+  https://github.com/stratis-storage/stratisd/pull/2891
+  https://github.com/stratis-storage/stratisd/pull/2890
+  https://github.com/stratis-storage/stratisd/pull/2887
+  https://github.com/stratis-storage/stratisd/pull/2885
+  https://github.com/stratis-storage/stratisd/pull/2882
+
+
 stratisd 3.0.2
 ==============
 Recommended Rust toolchain version: 1.57.0

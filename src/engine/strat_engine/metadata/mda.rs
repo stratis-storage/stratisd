@@ -9,7 +9,7 @@ use std::{
 
 use byteorder::{ByteOrder, LittleEndian};
 use chrono::{DateTime, TimeZone, Utc};
-use crc::crc32;
+use crc::{Crc, CRC_32_ISCSI};
 
 use devicemapper::Bytes;
 
@@ -23,6 +23,7 @@ use crate::{
 
 const STRAT_REGION_HDR_VERSION: u8 = 1;
 const STRAT_METADATA_VERSION: u8 = 1;
+const CASTAGNOLI: Crc<u32> = Crc::<u32>::new(&CRC_32_ISCSI);
 
 /// Manages the MDA regions which hold the variable length metadata.
 #[derive(Debug)]
@@ -170,7 +171,7 @@ impl MDARegions {
         let header = MDAHeader {
             last_updated: *time,
             used: MetaDataSize::new(used),
-            data_crc: crc32::checksum_castagnoli(data),
+            data_crc: CASTAGNOLI.checksum(data),
         };
         let hdr_buf = header.to_buf();
 
@@ -344,7 +345,7 @@ impl MDAHeader {
     /// Return None if there is no MDAHeader to be read. This is detected if the
     /// timestamp region in the buffer is 0.
     fn from_buf(buf: &[u8; mda_size::_MDA_REGION_HDR_SIZE]) -> StratisResult<Option<MDAHeader>> {
-        if LittleEndian::read_u32(&buf[..4]) != crc32::checksum_castagnoli(&buf[4..]) {
+        if LittleEndian::read_u32(&buf[..4]) != CASTAGNOLI.checksum(&buf[4..]) {
             return Err(StratisError::Msg("MDA region header CRC".into()));
         }
 
@@ -385,7 +386,7 @@ impl MDAHeader {
         buf[28] = STRAT_REGION_HDR_VERSION;
         buf[29] = STRAT_METADATA_VERSION;
 
-        let buf_crc = crc32::checksum_castagnoli(&buf[4..mda_size::_MDA_REGION_HDR_SIZE]);
+        let buf_crc = CASTAGNOLI.checksum(&buf[4..mda_size::_MDA_REGION_HDR_SIZE]);
         LittleEndian::write_u32(&mut buf[..4], buf_crc);
 
         buf
@@ -403,7 +404,7 @@ impl MDAHeader {
 
         f.read_exact(&mut data_buf)?;
 
-        if self.data_crc != crc32::checksum_castagnoli(&data_buf) {
+        if self.data_crc != CASTAGNOLI.checksum(&data_buf) {
             return Err(StratisError::Msg("MDA region data CRC".into()));
         }
 
@@ -475,7 +476,7 @@ mod tests {
             let header = MDAHeader {
                 last_updated: Utc.timestamp(sec, nsec),
                 used: MetaDataSize::new(Bytes::from(data.len())),
-                data_crc: crc32::checksum_castagnoli(data),
+                data_crc: CASTAGNOLI.checksum(data),
             };
             let buf = header.to_buf();
             let mda1 = MDAHeader::from_buf(&buf).unwrap().unwrap();
@@ -497,7 +498,7 @@ mod tests {
         let header = MDAHeader {
             last_updated: Utc::now(),
             used: MetaDataSize::new(Bytes::from(data.len())),
-            data_crc: crc32::checksum_castagnoli(&data),
+            data_crc: CASTAGNOLI.checksum(&data),
         };
         let mut buf = header.to_buf();
         LittleEndian::write_u32(&mut buf[..4], 0u32);

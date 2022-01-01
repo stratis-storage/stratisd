@@ -20,7 +20,6 @@ on:
       - 'README_tests.md'
       - 'tests/**'
 
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 jobs:
@@ -28,101 +27,39 @@ jobs:
     strategy:
       matrix:
         include:
-          # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
           - task: make -f Makefile fmt-travis
             toolchain: 1.57.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: rustfmt
-            image: ubuntu:groovy
           - task: make -f Makefile clippy
             toolchain: 1.57.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: clippy
-            image: ubuntu:groovy
-          - task: make -f Makefile fmt-travis
-            toolchain: 1.57.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: rustfmt
-            image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
-          - task: make -f Makefile clippy
-            toolchain: 1.57.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: clippy
-            image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
           - task: make -f Makefile build
             toolchain: 1.57.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-            image: ubuntu:groovy
           - task: make -f Makefile build-min
             toolchain: 1.57.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-            image: ubuntu:groovy
           - task: make -f Makefile build-extras
             toolchain: 1.57.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-            image: ubuntu:groovy
           - task: make -f Makefile docs-travis
             toolchain: 1.57.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-            image: ubuntu:groovy
           - task: make -f Makefile test
             toolchain: 1.57.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-            image: ubuntu:groovy
           - task: make -f Makefile release
             toolchain: 1.57.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-            image: ubuntu:groovy
           - task: make -f Makefile release-min
             toolchain: 1.57.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-            image: ubuntu:groovy
-          - task: make -f Makefile build
-            toolchain: 1.57.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
-            image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
-          - task: make -f Makefile build-min
-            toolchain: 1.57.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
-            image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
-          - task: make -f Makefile build-extras
-            toolchain: 1.57.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
-            image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
-          - task: make -f Makefile docs-travis
-            toolchain: 1.57.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
-            image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
-          - task: make -f Makefile test
-            toolchain: 1.57.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
-            image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
-          - task: make -f Makefile release
-            toolchain: 1.57.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
-            image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
-          - task: make -f Makefile release-min
-            toolchain: 1.57.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
-            image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
     runs-on: ubuntu-18.04
     container:
-      image: ${{ matrix.image }}
+      image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
-      - name: Install dependencies for Ubuntu
-        run: apt-get -q update
-        if: matrix.image == 'ubuntu:groovy'
-      - name: Install dependencies for Ubuntu
-        run: >
-          DEBIAN_FRONTEND=noninteractive
-          apt-get install -y
-          clang
-          curl
-          libblkid-dev
-          libcryptsetup-dev
-          libdbus-1-dev
-          libsystemd-dev
-          libudev-dev
-          make
-        if: matrix.image == 'ubuntu:groovy'
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -133,7 +70,6 @@ jobs:
           libblkid-devel
           make
           systemd-devel
-        if: matrix.image == 'fedora:34'
       - uses: actions-rs/toolchain@v1
         with:
           components: ${{ matrix.components }}
@@ -147,42 +83,15 @@ jobs:
     strategy:
       matrix:
         include:
-          # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
           - task: RUST_LOG=stratisd=debug make -f Makefile test-loop
             toolchain: 1.57.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-            image: ubuntu:groovy
-          - task: RUST_LOG=stratisd=debug make -f Makefile test-loop
-            toolchain: 1.57.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
-            image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
     runs-on: ubuntu-18.04
     container:
-      image: ${{ matrix.image }}
+      image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
-      - name: Install dependencies for Ubuntu
-        run: apt-get -q update
-        if: matrix.image == 'ubuntu:groovy'
-      - name: Install dependencies for Ubuntu
-        run: >
-          DEBIAN_FRONTEND=noninteractive
-          apt-get install -y
-          asciidoc
-          clang
-          curl
-          libblkid-dev
-          libcryptsetup-dev
-          libdbus-1-dev
-          libsystemd-dev
-          libudev-dev
-          make
-          systemd
-          thin-provisioning-tools
-          udev
-          xfsprogs
-        if: matrix.image == 'ubuntu:groovy'
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -197,7 +106,6 @@ jobs:
           systemd-devel
           systemd-udev
           xfsprogs
-        if: matrix.image == 'fedora:34'
       - uses: actions-rs/toolchain@v1
         with:
           components: ${{ matrix.components }}

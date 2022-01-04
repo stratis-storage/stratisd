@@ -169,7 +169,7 @@ audit: ${HOME}/.cargo/bin/cargo-audit
 	PATH=${HOME}/.cargo/bin:${PATH} cargo audit -D warnings
 
 expand: ${HOME}/.cargo/bin/cargo-expand
-	PATH=${HOME}/.cargo/bin:${PATH} cargo expand --lib=libstratisd engine::strat_engine::pool
+	PATH=${HOME}/.cargo/bin:${PATH} cargo expand --lib engine::strat_engine::pool
 
 fmt: fmt-macros
 	cargo fmt

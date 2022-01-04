@@ -53,7 +53,7 @@ jobs:
             components: cargo
     runs-on: ubuntu-18.04
     container:
-      image: ubuntu:groovy
+      image: ubuntu:hirsute
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
@@ -89,7 +89,7 @@ jobs:
             components: cargo
     runs-on: ubuntu-18.04
     container:
-      image: ubuntu:groovy
+      image: ubuntu:hirsute
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2

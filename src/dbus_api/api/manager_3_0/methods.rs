@@ -365,7 +365,7 @@ where
         Some(n) => {
             return Ok(vec![return_message.append3(
                 default_return,
-                1,
+                1u16,
                 format!("code {} does not correspond to any redundancy", n),
             )]);
         }

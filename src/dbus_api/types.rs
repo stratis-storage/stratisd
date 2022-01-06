@@ -29,7 +29,8 @@ use crate::{
     dbus_api::{connection::DbusConnectionHandler, tree::DbusTreeHandler, udev::DbusUdevHandler},
     engine::{
         ActionAvailability, Engine, ExclusiveGuard, FilesystemUuid, Lockable, LockedPoolInfo,
-        PoolEncryptionInfo, PoolUuid, SharedGuard, StratFilesystemDiff, StratisUuid, ThinPoolDiff,
+        PoolEncryptionInfo, PoolUuid, SharedGuard, StratFilesystemDiff, StratPoolDiff, StratisUuid,
+        ThinPoolDiff,
     },
 };
 
@@ -93,6 +94,8 @@ pub enum DbusAction<E> {
     PoolCacheChange(Path<'static>, bool),
     PoolSizeChange(Path<'static>, Bytes),
     LockedPoolsChange(HashMap<PoolUuid, LockedPoolInfo>),
+    PoolAllocSizeChange(Path<'static>, Bytes),
+    PoolUsedChange(Path<'static>, Option<Bytes>),
 }
 
 impl<E> DbusAction<E>
@@ -103,13 +106,13 @@ where
     ///
     /// Precondition: Filtering of diffs that show no change has already been
     /// done in the engine.
-    pub fn from_pool_diffs(diffs: HashMap<PoolUuid, ThinPoolDiff>) -> Vec<Self> {
+    pub fn from_pool_diffs(diffs: HashMap<PoolUuid, StratPoolDiff>) -> Vec<Self> {
         diffs
             .into_iter()
             .map(|(uuid, diff)| {
-                let ThinPoolDiff {
-                    allocated_size,
+                let StratPoolDiff {
                     usage,
+                    thin_pool: ThinPoolDiff { allocated_size },
                 } = diff;
                 DbusAction::PoolBackgroundChange(uuid, usage, allocated_size)
             })
@@ -337,6 +340,32 @@ where
         {
             warn!(
                 "Locked pool change event could not be sent to the processing thread; no signal will be sent out for the locked pool state change: {}",
+                e,
+            )
+        }
+    }
+
+    /// Send changed signal for changed allocated size .
+    pub fn push_pool_allocated_size_change(&self, path: &Path<'static>, new_allocated_size: Bytes) {
+        if let Err(e) = self.sender.send(DbusAction::PoolAllocSizeChange(
+            path.clone(),
+            new_allocated_size,
+        )) {
+            warn!(
+                "Pool allocated size change event could not be sent to the processing thread; no signal will be sent out for the pool allocated size state change: {}",
+                e,
+            )
+        }
+    }
+
+    /// Send changed signal for used pool size.
+    pub fn push_pool_used_change(&self, path: &Path<'static>, new_used: Option<Bytes>) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::PoolUsedChange(path.clone(), new_used))
+        {
+            warn!(
+                "Used pool size change event could not be sent to the processing thread; no signal will be sent out for the used pool size state change: {}",
                 e,
             )
         }

@@ -108,20 +108,34 @@ where
             dbus_context.push_pool_cache_change(pool_path.get_name(), true);
             res
         }
-        BlockDevOp::AddCache => handle_action!(
-            pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Cache),
-            dbus_context,
-            pool_path.get_name()
-        ),
-        BlockDevOp::AddData => {
-            let res = handle_action!(
-                pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Data),
+        BlockDevOp::AddCache => {
+            handle_action!(
+                pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Cache,)
+                    .map(|(act, _)| { act }),
                 dbus_context,
                 pool_path.get_name()
-            );
-            dbus_context
-                .push_pool_size_change(pool_path.get_name(), pool.total_physical_size().bytes());
-            res
+            )
+        }
+        BlockDevOp::AddData => {
+            handle_action!(
+                pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Data,)
+                    .map(|(act, diff)| {
+                        dbus_context.push_pool_size_change(
+                            pool_path.get_name(),
+                            pool.total_physical_size().bytes(),
+                        );
+                        if let Some(used) = diff.as_ref().and_then(|d| d.usage) {
+                            dbus_context.push_pool_used_change(pool_path.get_name(), used);
+                        }
+                        if let Some(alloc) = diff.and_then(|d| d.thin_pool.allocated_size) {
+                            dbus_context
+                                .push_pool_allocated_size_change(pool_path.get_name(), alloc);
+                        }
+                        act
+                    }),
+                dbus_context,
+                pool_path.get_name()
+            )
         }
     };
     let msg = match result.map(|bds| bds.changed()) {
@@ -250,7 +264,7 @@ pub fn pool_used_size<E>(pool: &E::Pool) -> (bool, String)
 where
     E: 'static + Engine,
 {
-    prop_conv::pool_used_to_prop(pool.total_physical_used().map(|u| u.bytes()).ok())
+    prop_conv::pool_used_to_prop(pool.total_physical_used().map(|u| u.bytes()))
 }
 
 /// Generate a D-Bus representation of the total size of the pool in bytes.

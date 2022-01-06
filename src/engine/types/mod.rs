@@ -379,15 +379,29 @@ pub enum MaybeInconsistent<T> {
 /// IPC layer.
 #[derive(Default, Debug)]
 pub struct ThinPoolDiff {
-    #[allow(clippy::option_option)]
-    pub usage: Option<Option<Bytes>>,
     pub allocated_size: Option<Bytes>,
 }
 
 impl ThinPoolDiff {
     /// Returns true if the thin pool information has changed.
     pub fn is_changed(&self) -> bool {
-        self.usage.is_some() || self.allocated_size.is_some()
+        self.allocated_size.is_some()
+    }
+}
+
+/// Change in attributes of a Stratis pool that may need to be reported to the
+/// IPC layer.
+#[derive(Default, Debug)]
+pub struct StratPoolDiff {
+    #[allow(clippy::option_option)]
+    pub usage: Option<Option<Bytes>>,
+    pub thin_pool: ThinPoolDiff,
+}
+
+impl StratPoolDiff {
+    /// Returns true if the thin pool information has changed.
+    pub fn is_changed(&self) -> bool {
+        self.usage.is_some() || self.thin_pool.is_changed()
     }
 }
 

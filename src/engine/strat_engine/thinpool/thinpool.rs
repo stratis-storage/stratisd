@@ -17,7 +17,7 @@ use serde_json::{Map, Value};
 use devicemapper::{
     device_exists, Bytes, DataBlocks, Device, DmDevice, DmName, DmNameBuf, DmOptions,
     FlakeyTargetParams, LinearDev, LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors,
-    TargetLine, ThinDevId, ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, IEC,
+    TargetLine, ThinDevId, ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, ThinPoolUsage, IEC,
 };
 
 use crate::{
@@ -31,7 +31,6 @@ use crate::{
                 format_flex_ids, format_thin_ids, format_thinpool_ids, FlexRole, ThinPoolRole,
                 ThinRole,
             },
-            pool::total_physical_used,
             serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave},
             thinpool::{filesystem::StratFilesystem, mdv::MetadataVol, thinids::ThinDevIdPool},
             writing::wipe_sectors,
@@ -210,7 +209,7 @@ struct Segments {
 /// collected at different times can be checked to determine whether their
 /// gross, as opposed to fine, differences are significant.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum ThinPoolStatusDigest {
+pub enum ThinPoolStatusDigest {
     Fail,
     Error,
     Good,
@@ -278,6 +277,32 @@ impl Default for ThinPoolSizeParams {
     }
 }
 
+/// Convert the thin pool status to usage information.
+fn status_to_usage(status: Option<ThinPoolStatus>) -> Option<ThinPoolUsage> {
+    status.and_then(|s| {
+        if let ThinPoolStatus::Working(w) = s {
+            Some(w.usage)
+        } else {
+            None
+        }
+    })
+}
+
+/// The number of physical sectors in use by this thinpool abstraction.
+/// All sectors allocated to the mdv, all sectors allocated to the
+/// metadata spare, and all sectors actually in use by the thinpool DM
+/// device, either for the metadata device or for the data device.
+fn calc_total_physical_used(usage: Option<&ThinPoolUsage>, segments: &Segments) -> Option<Sectors> {
+    let (data_dev_used, meta_dev_used) =
+        usage.map(|u| (datablocks_to_sectors(u.used_data), u.used_meta.sectors()))?;
+
+    let spare_total = segments.meta_spare_segments.iter().map(|s| s.1).sum();
+
+    let mdv_total = segments.mdv_segments.iter().map(|s| s.1).sum();
+
+    Some(data_dev_used + spare_total + meta_dev_used + mdv_total)
+}
+
 /// A ThinPool struct contains the thinpool itself, the spare
 /// segments for its metadata device, and the filesystems and filesystem
 /// metadata associated with it.
@@ -292,7 +317,9 @@ pub struct ThinPool {
     /// layer. All DM components obtain their storage from this layer.
     /// The device will change if the backstore adds or removes a cache.
     backstore_device: Device,
-    thin_pool_status: Option<ThinPoolStatus>,
+    thin_pool_status: Option<ThinPoolStatusDigest>,
+    allocated_size: Sectors,
+    used: Option<ThinPoolUsage>,
 }
 
 impl ThinPool {
@@ -388,19 +415,23 @@ impl ThinPool {
         )?;
 
         let thin_pool_status = thinpool_dev.status(get_dm(), DmOptions::default()).ok();
+        let digest = thin_pool_status.as_ref().map(|s| s.into());
+        let segments = Segments {
+            meta_segments: vec![meta_segments],
+            meta_spare_segments: vec![spare_segments],
+            data_segments: vec![data_segments],
+            mdv_segments: vec![mdv_segments],
+        };
         Ok(ThinPool {
             thin_pool: thinpool_dev,
-            segments: Segments {
-                meta_segments: vec![meta_segments],
-                meta_spare_segments: vec![spare_segments],
-                data_segments: vec![data_segments],
-                mdv_segments: vec![mdv_segments],
-            },
+            segments,
             id_gen: ThinDevIdPool::new_from_ids(&[]),
             filesystems: Table::default(),
             mdv,
             backstore_device,
-            thin_pool_status,
+            thin_pool_status: digest,
+            allocated_size: backstore.datatier_allocated_size(),
+            used: status_to_usage(thin_pool_status),
         })
     }
 
@@ -502,30 +533,35 @@ impl ThinPool {
 
         let thin_ids: Vec<ThinDevId> = filesystem_metadatas.iter().map(|x| x.thin_id).collect();
         let thin_pool_status = thinpool_dev.status(get_dm(), DmOptions::default()).ok();
+        let digest = thin_pool_status.as_ref().map(|s| s.into());
+        let segments = Segments {
+            meta_segments,
+            meta_spare_segments: spare_segments,
+            data_segments,
+            mdv_segments,
+        };
         Ok(ThinPool {
             thin_pool: thinpool_dev,
-            segments: Segments {
-                meta_segments,
-                meta_spare_segments: spare_segments,
-                data_segments,
-                mdv_segments,
-            },
+            segments,
             id_gen: ThinDevIdPool::new_from_ids(&thin_ids),
             filesystems: fs_table,
             mdv,
             backstore_device,
-            thin_pool_status,
+            thin_pool_status: digest,
+            allocated_size: backstore.datatier_allocated_size(),
+            used: status_to_usage(thin_pool_status),
         })
+    }
+
+    /// Get the last cached value for the amount of data used.
+    pub fn used(&self) -> Option<Sectors> {
+        calc_total_physical_used(self.used.as_ref(), &self.segments)
     }
 
     /// Run status checks and take actions on the thinpool and its components.
     /// Returns a bool communicating if a configuration change requiring a
     /// metadata save has been made.
-    pub fn check(
-        &mut self,
-        pool_uuid: PoolUuid,
-        backstore: &mut Backstore,
-    ) -> StratisResult<(bool, ThinPoolDiff)> {
+    pub fn check(&mut self, pool_uuid: PoolUuid, backstore: &mut Backstore) -> StratisResult<bool> {
         assert_eq!(
             backstore.device().expect(
                 "thinpool exists and has been allocated to, so backstore must have a cap device"
@@ -533,18 +569,9 @@ impl ThinPool {
             self.backstore_device
         );
 
-        let original_state = self.cached(|pool| ThinPoolState {
-            usage: total_physical_used(backstore, pool.total_physical_used())
-                .map(|s| s.bytes())
-                .ok(),
-            allocated_size: backstore.datatier_allocated_size().bytes(),
-        });
-
         let mut should_save: bool = false;
 
-        if let Some(ThinPoolStatus::Working(status)) = self.thin_pool_status.as_ref().cloned() {
-            let usage = &status.usage;
-
+        if let Some(usage) = self.used.as_ref().cloned() {
             // Ensure meta subdevice is approx. 1/1000th of total usable
             // size, but no larger than the maximum allowed by devicemapper.
             let target_meta_size = min(
@@ -601,18 +628,7 @@ impl ThinPool {
             self.resume()?;
         }
 
-        Ok((
-            should_save,
-            original_state.diff(&self.dump(|pool| {
-                pool.set_state(pool.thin_pool.status(get_dm(), DmOptions::default()).ok());
-                ThinPoolState {
-                    usage: total_physical_used(backstore, pool.total_physical_used())
-                        .map(|s| s.bytes())
-                        .ok(),
-                    allocated_size: backstore.datatier_allocated_size().bytes(),
-                }
-            })),
-        ))
+        Ok(should_save)
     }
 
     /// Check all filesystems on this thin pool and return which had their sizes
@@ -642,8 +658,7 @@ impl ThinPool {
     /// If there has been a change, log that change at the info or warn level
     /// as appropriate.
     fn set_state(&mut self, thin_pool_status: Option<ThinPoolStatus>) {
-        let current_status: Option<ThinPoolStatusDigest> =
-            self.thin_pool_status.as_ref().map(|x| x.into());
+        let current_status = self.thin_pool_status;
         let new_status: Option<ThinPoolStatusDigest> = thin_pool_status.as_ref().map(|s| s.into());
 
         if current_status != new_status {
@@ -672,7 +687,8 @@ impl ThinPool {
             }
         }
 
-        self.thin_pool_status = thin_pool_status;
+        self.thin_pool_status = new_status;
+        self.used = status_to_usage(thin_pool_status);
     }
 
     /// Tear down the components managed here: filesystems, the MDV,
@@ -814,48 +830,6 @@ impl ThinPool {
             }
         }
         result
-    }
-
-    /// The number of physical sectors in use by this thinpool abstraction.
-    /// All sectors allocated to the mdv, all sectors allocated to the
-    /// metadata spare, and all sectors actually in use by the thinpool DM
-    /// device, either for the metadata device or for the data device.
-    pub fn total_physical_used(&self) -> StratisResult<Sectors> {
-        let (data_dev_used, meta_dev_used) = match &self.thin_pool_status {
-            None => {
-                let err_msg = format!(
-                    "Unknown status for thin pool device with \"{}\"",
-                    thin_pool_identifiers(&self.thin_pool)
-                );
-                return Err(StratisError::Msg(err_msg));
-            }
-            Some(status) => match status {
-                ThinPoolStatus::Working(status) => (
-                    datablocks_to_sectors(status.usage.used_data),
-                    status.usage.used_meta.sectors(),
-                ),
-                ThinPoolStatus::Error => {
-                    let err_msg = format!(
-                        "Devicemapper could not obtain status for devicemapper thin pool device with \"{}\"",
-                        thin_pool_identifiers(&self.thin_pool)
-                    );
-                    return Err(StratisError::Msg(err_msg));
-                }
-                ThinPoolStatus::Fail => {
-                    let err_msg = format!(
-                        "The thinpool device with \"{}\" has failed",
-                        thin_pool_identifiers(&self.thin_pool)
-                    );
-                    return Err(StratisError::Msg(err_msg));
-                }
-            },
-        };
-
-        let spare_total = self.segments.meta_spare_segments.iter().map(|s| s.1).sum();
-
-        let mdv_total = self.segments.mdv_segments.iter().map(|s| s.1).sum();
-
-        Ok(data_dev_used + spare_total + meta_dev_used + mdv_total)
     }
 
     pub fn get_filesystem_by_uuid(&self, uuid: FilesystemUuid) -> Option<(Name, &StratFilesystem)> {
@@ -1015,7 +989,7 @@ impl ThinPool {
     }
 
     #[cfg(test)]
-    pub fn state(&self) -> Option<&ThinPoolStatus> {
+    pub fn state(&self) -> Option<&ThinPoolStatusDigest> {
         self.thin_pool_status.as_ref()
     }
 
@@ -1190,7 +1164,6 @@ impl<'a> Into<Value> for &'a ThinPool {
 
 /// Represents the attributes of the thin pool that are being watched for changes.
 pub struct ThinPoolState {
-    usage: Option<Bytes>,
     allocated_size: Bytes,
 }
 
@@ -1199,11 +1172,6 @@ impl StateDiff for ThinPoolState {
 
     fn diff(&self, new_state: &Self) -> Self::Diff {
         ThinPoolDiff {
-            usage: if self.usage != new_state.usage {
-                Some(new_state.usage.as_ref().cloned())
-            } else {
-                None
-            },
             allocated_size: if self.allocated_size != new_state.allocated_size {
                 Some(new_state.allocated_size)
             } else {
@@ -1213,8 +1181,24 @@ impl StateDiff for ThinPoolState {
     }
 }
 
-impl DumpState for ThinPool {
+impl<'a> DumpState<'a> for ThinPool {
     type State = ThinPoolState;
+    type DumpInput = &'a Backstore;
+
+    fn cached(&self) -> Self::State {
+        ThinPoolState {
+            allocated_size: self.allocated_size.bytes(),
+        }
+    }
+
+    fn dump(&mut self, input: Self::DumpInput) -> Self::State {
+        let state = self.thin_pool.status(get_dm(), DmOptions::default()).ok();
+        self.set_state(state);
+        self.allocated_size = input.datatier_allocated_size();
+        ThinPoolState {
+            allocated_size: self.allocated_size.bytes(),
+        }
+    }
 }
 
 impl Recordable<FlexDevsSave> for Segments {

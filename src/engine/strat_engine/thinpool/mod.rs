@@ -8,7 +8,9 @@ mod thinids;
 #[allow(clippy::module_inception)]
 mod thinpool;
 
+#[cfg(test)]
+pub use self::thinpool::ThinPoolStatusDigest;
 pub use self::{
     filesystem::StratFilesystem,
-    thinpool::{ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
+    thinpool::{ThinPool, ThinPoolSizeParams, ThinPoolState, DATA_BLOCK_SIZE},
 };

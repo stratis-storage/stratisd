@@ -35,7 +35,7 @@ use crate::{
         types::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockKey,
             LockedPoolInfo, RenameAction, ReportType, SetUnlockAction, StratFilesystemDiff,
-            ThinPoolDiff, UdevEngineEvent, UnlockMethod,
+            StratPoolDiff, UdevEngineEvent, UnlockMethod,
         },
         Engine, Name, PoolUuid, Report,
     },
@@ -67,7 +67,7 @@ pub struct StratEngine {
     key_fs: MemoryFilesystem,
 }
 
-type PoolJoinHandles = Vec<JoinHandle<StratisResult<Option<(PoolUuid, ThinPoolDiff)>>>>;
+type PoolJoinHandles = Vec<JoinHandle<StratisResult<Option<(PoolUuid, StratPoolDiff)>>>>;
 
 impl StratEngine {
     /// Setup a StratEngine.
@@ -122,7 +122,7 @@ impl StratEngine {
         }));
     }
 
-    async fn join_all_pool_checks(handles: PoolJoinHandles) -> HashMap<PoolUuid, ThinPoolDiff> {
+    async fn join_all_pool_checks(handles: PoolJoinHandles) -> HashMap<PoolUuid, StratPoolDiff> {
         join_all(handles)
             .await
             .into_iter()
@@ -169,7 +169,7 @@ impl StratEngine {
     }
 
     /// The implementation for pool_evented when caused by a devicemapper event.
-    async fn pool_evented_dm(&self, pools: &HashSet<PoolUuid>) -> HashMap<PoolUuid, ThinPoolDiff> {
+    async fn pool_evented_dm(&self, pools: &HashSet<PoolUuid>) -> HashMap<PoolUuid, StratPoolDiff> {
         let mut joins = Vec::new();
         for uuid in pools {
             if let Some(guard) = self.pools.write(LockKey::Uuid(*uuid)).await {
@@ -186,7 +186,7 @@ impl StratEngine {
     }
 
     /// The implementation for pool_evented when called by the timer thread.
-    async fn pool_evented_timer(&self) -> HashMap<PoolUuid, ThinPoolDiff> {
+    async fn pool_evented_timer(&self) -> HashMap<PoolUuid, StratPoolDiff> {
         let mut joins = Vec::new();
         let guards: Vec<SomeLockWriteGuard<PoolUuid, StratPool>> =
             self.pools.write_all().await.into();
@@ -512,7 +512,7 @@ impl Engine for StratEngine {
     async fn pool_evented(
         &self,
         pools: Option<&HashSet<PoolUuid>>,
-    ) -> HashMap<PoolUuid, ThinPoolDiff> {
+    ) -> HashMap<PoolUuid, StratPoolDiff> {
         match pools {
             Some(ps) => self.pool_evented_dm(ps).await,
             None => self.pool_evented_timer().await,

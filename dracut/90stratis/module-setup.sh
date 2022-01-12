@@ -17,7 +17,7 @@ check() {
 		/usr/lib/udev/stratis-str-cmp \
 		/usr/lib/udev/stratis-base32-decode ||
 		return 1
-	return 255
+	return 0
 }
 
 # called by dracut

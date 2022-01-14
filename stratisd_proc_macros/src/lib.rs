@@ -35,7 +35,7 @@ fn add_method_guards(method: &mut ImplItemMethod, level: Ident) {
                         }
                     })).expect("This block should be a valid statement")
                 } else {
-                    panic!("The only return type currently supported for mutable actions is StratisResult<_>; found return type {} for method {}", ident.to_string(), method.sig.ident);
+                    panic!("The only return type currently supported for mutable actions is StratisResult<_>; found return type {} for method {}", ident, method.sig.ident);
                 }
             } else {
                 unreachable!();

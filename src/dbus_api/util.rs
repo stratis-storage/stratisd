@@ -98,11 +98,7 @@ pub fn make_object_path<E>(context: &DbusContext<E>) -> String
 where
     E: Engine,
 {
-    format!(
-        "{}/{}",
-        consts::STRATIS_BASE_PATH,
-        context.get_next_id().to_string()
-    )
+    format!("{}/{}", consts::STRATIS_BASE_PATH, context.get_next_id())
 }
 
 /// Translates an engine error to the (errorcode, string) tuple that Stratis

@@ -374,7 +374,7 @@ fn check_device_ids(
                     .map(|(dev_uuid, info)| {
                         format!(
                             "(device node: {}, device UUID: {})",
-                            info.devnode.display().to_string(),
+                            info.devnode.display(),
                             dev_uuid
                         )
                     })

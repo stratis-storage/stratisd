@@ -28,7 +28,7 @@ jobs:
           - task: |
               COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../stratisd_proc_macros/Cargo.toml FEDORA_RELEASE=rawhide IGNORE_ARGS="--ignore-category low" make -f ../../Makefile check-fedora-versions
               COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../stratisd_proc_macros/Cargo.toml FEDORA_RELEASE=f34 IGNORE_ARGS="--ignore-category low" make -f ../../Makefile check-fedora-versions
-              COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../Cargo.toml FEDORA_RELEASE=rawhide IGNORE_ARGS="--ignore-category low --ignore-high devicemapper" make -f ../../Makefile check-fedora-versions
+              COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../Cargo.toml FEDORA_RELEASE=rawhide IGNORE_ARGS="--ignore-category low" make -f ../../Makefile check-fedora-versions
               COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../Cargo.toml FEDORA_RELEASE=f34 IGNORE_ARGS="--ignore-category low --ignore-missing=stratisd_proc_macros --ignore-missing libblkid-rs --ignore-high devicemapper" make -f ../../Makefile check-fedora-versions
     runs-on: ubuntu-18.04
     container:

@@ -9,7 +9,7 @@ use std::{cmp, path::Path};
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 
-use devicemapper::{CacheDev, Device, DmDevice, LinearDev, Sectors};
+use devicemapper::{CacheDev, Device, DmCookie, DmDevice, DmOptions, LinearDev, Sectors};
 
 use crate::{
     engine::{
@@ -37,6 +37,13 @@ use crate::{
 /// typical size.
 const CACHE_BLOCK_SIZE: Sectors = Sectors(2048); // 1024 KiB
 
+lazy_static! {
+    // devicemapper flags to disable some udev rules
+    static ref DM_UDEV_COOKIE: DmCookie = DmCookie::DM_UDEV_DISABLE_DISK_RULES_FLAG
+        | DmCookie::DM_UDEV_DISABLE_SUBSYSTEM_RULES_FLAG
+        | DmCookie::DM_UDEV_DISABLE_OTHER_RULES_FLAG;
+}
+
 /// Make a DM cache device. If the cache device is being made new,
 /// take extra steps to make it clean.
 fn make_cache(
@@ -51,6 +58,7 @@ fn make_cache(
         &dm_name,
         Some(&dm_uuid),
         map_to_dm(&cache_tier.meta_segments),
+        DmOptions::default().set_cookie(*DM_UDEV_COOKIE),
     )?;
 
     if new {
@@ -68,6 +76,7 @@ fn make_cache(
         &dm_name,
         Some(&dm_uuid),
         map_to_dm(&cache_tier.cache_segments),
+        DmOptions::default().set_cookie(*DM_UDEV_COOKIE),
     )?;
 
     let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::Cache);
@@ -79,6 +88,7 @@ fn make_cache(
         cache,
         origin,
         CACHE_BLOCK_SIZE,
+        DmOptions::default().set_cookie(*DM_UDEV_COOKIE),
     )?)
 }
 
@@ -138,6 +148,7 @@ impl Backstore {
             &dm_name,
             Some(&dm_uuid),
             map_to_dm(&data_tier.segments),
+            DmOptions::default().set_cookie(*DM_UDEV_COOKIE),
         )?;
 
         let (cache_tier, cache, origin) = if !cachedevs.is_empty() {
@@ -331,7 +342,13 @@ impl Backstore {
         if create {
             let table = map_to_dm(&self.data_tier.segments);
             let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
-            let origin = LinearDev::setup(get_dm(), &dm_name, Some(&dm_uuid), table)?;
+            let origin = LinearDev::setup(
+                get_dm(),
+                &dm_name,
+                Some(&dm_uuid),
+                table,
+                DmOptions::default().set_cookie(*DM_UDEV_COOKIE),
+            )?;
             self.linear = Some(origin);
         }
 

@@ -15,7 +15,7 @@ use std::{
 use serde_json::{Map, Value};
 
 use devicemapper::{
-    device_exists, Bytes, DataBlocks, Device, DmDevice, DmName, DmNameBuf, DmOptions,
+    device_exists, Bytes, DataBlocks, Device, DmCookie, DmDevice, DmName, DmNameBuf, DmOptions,
     FlakeyTargetParams, LinearDev, LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors,
     TargetLine, ThinDevId, ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, ThinPoolUsage, IEC,
 };
@@ -54,6 +54,13 @@ const INITIAL_MDV_SIZE: Sectors = Sectors(32 * IEC::Ki); // 16 MiB
 const MAX_META_SIZE: MetaBlocks = MetaBlocks(255 * ((1 << 14) - 64));
 
 const SPACE_CRIT_PCT: u8 = 95;
+
+lazy_static! {
+    // devicemapper flags to disable some udev rules
+    static ref DM_UDEV_COOKIE: DmCookie = DmCookie::DM_UDEV_DISABLE_DISK_RULES_FLAG
+        | DmCookie::DM_UDEV_DISABLE_SUBSYSTEM_RULES_FLAG
+        | DmCookie::DM_UDEV_DISABLE_OTHER_RULES_FLAG;
+}
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum ExtendDevice {
@@ -369,6 +376,7 @@ impl ThinPool {
             &dm_name,
             Some(&dm_uuid),
             segs_to_table(backstore_device, &[meta_segments]),
+            DmOptions::default().set_cookie(*DM_UDEV_COOKIE),
         )?;
 
         // Wipe the first 4 KiB, i.e. 8 sectors as recommended in kernel DM
@@ -386,6 +394,7 @@ impl ThinPool {
             &dm_name,
             Some(&dm_uuid),
             segs_to_table(backstore_device, &[data_segments]),
+            DmOptions::default().set_cookie(*DM_UDEV_COOKIE),
         )?;
 
         let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::MetadataVolume);
@@ -394,6 +403,7 @@ impl ThinPool {
             &dm_name,
             Some(&dm_uuid),
             segs_to_table(backstore_device, &[mdv_segments]),
+            DmOptions::default().set_cookie(*DM_UDEV_COOKIE),
         )?;
         let mdv = MetadataVol::initialize(pool_uuid, mdv_dev)?;
 
@@ -412,6 +422,7 @@ impl ThinPool {
                 sectors_to_datablocks(data_dev_size),
                 sectors_to_datablocks(backstore.available_in_backstore()),
             ),
+            DmOptions::default().set_cookie(*DM_UDEV_COOKIE),
         )?;
 
         let thin_pool_status = thinpool_dev.status(get_dm(), DmOptions::default()).ok();
@@ -471,6 +482,7 @@ impl ThinPool {
             &dm_name,
             Some(&dm_uuid),
             segs_to_table(backstore_device, &data_segments),
+            DmOptions::default().set_cookie(*DM_UDEV_COOKIE),
         )?;
 
         let data_dev_size = data_dev.size();
@@ -488,6 +500,7 @@ impl ThinPool {
                 sectors_to_datablocks(data_dev_size),
                 sectors_to_datablocks(backstore.available_in_backstore()),
             ),
+            DmOptions::default().set_cookie(*DM_UDEV_COOKIE),
         )?;
 
         let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::MetadataVolume);
@@ -496,6 +509,7 @@ impl ThinPool {
             &dm_name,
             Some(&dm_uuid),
             segs_to_table(backstore_device, &mdv_segments),
+            DmOptions::default().set_cookie(*DM_UDEV_COOKIE),
         )?;
         let mdv = MetadataVol::setup(pool_uuid, mdv_dev)?;
         let filesystem_metadatas = mdv.filesystems()?;
@@ -1246,6 +1260,7 @@ fn setup_metadev(
         &dm_name,
         Some(&dm_uuid),
         segs_to_table(device, &meta_segments),
+        DmOptions::default().set_cookie(*DM_UDEV_COOKIE),
     )?;
 
     if !device_exists(get_dm(), thinpool_name)? {
@@ -1277,6 +1292,7 @@ fn attempt_thin_repair(
         &dm_name,
         Some(&dm_uuid),
         segs_to_table(device, spare_segments),
+        DmOptions::default().set_cookie(*DM_UDEV_COOKIE),
     )?;
 
     thin_repair(&meta_dev.devnode(), &new_meta_dev.devnode())?;

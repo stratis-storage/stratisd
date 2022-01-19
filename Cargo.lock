@@ -269,7 +269,7 @@ dependencies = [
 [[package]]
 name = "devicemapper"
 version = "0.32.0"
-source = "git+https://github.com/stratis-storage/devicemapper-rs?branch=crates-io-patch-0.32.0#ce34272563acd52bb2c04a91e87c450ab5f91ece"
+source = "git+https://github.com/mulkieran/devicemapper-rs?branch=devicemapper-rs_issue_740#d9b1a9533ca819f578fc153f1e3f00b233ed32fd"
 dependencies = [
  "bitflags",
  "devicemapper-sys",
@@ -281,11 +281,10 @@ dependencies = [
 [[package]]
 name = "devicemapper-sys"
 version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2bcbd37e4723b2221792aa84fc1a9f833657b132ae2fcfff1693a8bd3c68c1dd"
+source = "git+https://github.com/mulkieran/devicemapper-rs?branch=devicemapper-rs_issue_740#d9b1a9533ca819f578fc153f1e3f00b233ed32fd"
 dependencies = [
  "bindgen 0.59.2",
- "nix 0.22.3",
+ "nix 0.23.1",
 ]
 
 [[package]]
@@ -709,19 +708,6 @@ dependencies = [
  "cfg-if 0.1.10",
  "libc",
  "void",
-]
-
-[[package]]
-name = "nix"
-version = "0.22.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e4916f159ed8e5de0082076562152a76b7a1f64a01fd9d1e0fea002c37624faf"
-dependencies = [
- "bitflags",
- "cc",
- "cfg-if 1.0.0",
- "libc",
- "memoffset",
 ]
 
 [[package]]

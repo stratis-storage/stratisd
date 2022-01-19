@@ -259,7 +259,7 @@ dependencies = [
 [[package]]
 name = "devicemapper"
 version = "0.30.1"
-source = "git+https://github.com/jbaublitz/devicemapper-rs?branch=issue-stratisd-2814#e56d11529c904085d47c258c968b9724c0721fd3"
+source = "git+https://github.com/mulkieran/devicemapper-rs?branch=devicemapper-rs_issue_740#42914413d8ade3c1ea9c297ec723e79416e91ca5"
 dependencies = [
  "bitflags",
  "devicemapper-sys",
@@ -271,7 +271,7 @@ dependencies = [
 [[package]]
 name = "devicemapper-sys"
 version = "0.1.2"
-source = "git+https://github.com/jbaublitz/devicemapper-rs?branch=issue-stratisd-2814#e56d11529c904085d47c258c968b9724c0721fd3"
+source = "git+https://github.com/mulkieran/devicemapper-rs?branch=devicemapper-rs_issue_740#42914413d8ade3c1ea9c297ec723e79416e91ca5"
 dependencies = [
  "bindgen 0.59.2",
  "nix 0.22.2",

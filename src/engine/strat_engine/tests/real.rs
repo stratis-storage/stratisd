@@ -14,7 +14,7 @@ use serde_json::{from_reader, Value};
 use uuid::Uuid;
 
 use devicemapper::{
-    devnode_to_devno, Bytes, Device, DmDevice, DmName, LinearDev, LinearDevTargetParams,
+    devnode_to_devno, Bytes, Device, DmDevice, DmName, DmOptions, LinearDev, LinearDevTargetParams,
     LinearTargetParams, Sectors, TargetLine, IEC,
 };
 
@@ -184,6 +184,7 @@ fn make_linear_test_dev(devnode: &Path, start: Sectors, length: Sectors) -> Line
         DmName::new(&format!("stratis_test_{}", Uuid::new_v4())).expect("valid format"),
         None,
         table,
+        DmOptions::default(),
     )
     .unwrap()
 }

@@ -120,19 +120,11 @@ fn verify_device_with_blkid(path: &DevicePath) -> StratisResult<(Option<i32>, Op
 }
 
 // Find information from the devnode that is useful to identify a device or
-// to construct a StratBlockDev object. Returns a tuple of the ID_WWN,
-// the size of the device, and Stratis identifiers for the device, if any
-// are found. If the value for the Stratis identifiers is None, then this
-// device has been determined to be unowned.
-#[allow(clippy::type_complexity)]
-fn dev_info(
-    devnode: &DevicePath,
-) -> StratisResult<(
-    Option<StratisResult<String>>,
-    Bytes,
-    Option<StratisIdentifiers>,
-    Device,
-)> {
+// to construct a StratBlockDev object. Returns a tuple of a DeviceInfo struct
+// and Stratis identifiers for the device, if any are found. If the value for
+// the Stratis identifiers is None, then this device has been determined to be
+// unowned.
+fn dev_info(devnode: &DevicePath) -> StratisResult<(DeviceInfo, Option<StratisIdentifiers>)> {
     let (ownership, devnum, hw_id) = udev_info(devnode)?;
 
     match ownership {
@@ -179,7 +171,15 @@ fn dev_info(
                 return Err(StratisError::Msg(error_message));
             }
 
-            Ok((hw_id, dev_size, stratis_identifiers, devnum))
+            Ok((
+                DeviceInfo {
+                    devno: devnum,
+                    devnode: devnode.to_path_buf(),
+                    id_wwn: hw_id,
+                    size: dev_size,
+                },
+                stratis_identifiers,
+            ))
         }
     }
 }
@@ -222,19 +222,7 @@ fn process_devices(
     let infos = canonical_paths
         .iter()
         .unique()
-        .map(|devnode| {
-            dev_info(devnode).map(|(id_wwn, size, stratis_identifiers, devno)| {
-                (
-                    DeviceInfo {
-                        devno,
-                        devnode: devnode.to_path_buf(),
-                        id_wwn,
-                        size,
-                    },
-                    stratis_identifiers,
-                )
-            })
-        })
+        .map(dev_info)
         .collect::<StratisResult<Vec<(DeviceInfo, Option<StratisIdentifiers>)>>>()
         .map_err(|err| {
             let error_message = format!(

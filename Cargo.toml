@@ -74,7 +74,7 @@ features = ["clock", "std"]
 [dependencies.devicemapper]
 version = "0.30.0"
 git = "https://github.com/mulkieran/devicemapper-rs"
-branch = "devicemapper-rs_issue_740"
+branch = "devicemapper-rs_issue_740_hack"
 
 [dependencies.stratisd_proc_macros]
 version = "0.1.0"

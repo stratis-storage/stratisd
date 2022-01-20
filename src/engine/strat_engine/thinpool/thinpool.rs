@@ -488,6 +488,11 @@ impl ThinPool {
                 sectors_to_datablocks(data_dev_size),
                 sectors_to_datablocks(backstore.available_in_backstore()),
             ),
+            vec![
+                "error_if_no_space".to_string(),
+                "no_discard_passdown".to_string(),
+                "skip_block_zeroing".to_string(),
+            ],
         )?;
 
         let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::MetadataVolume);

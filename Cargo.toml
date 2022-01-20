@@ -72,9 +72,9 @@ default-features = false
 features = ["clock", "std"]
 
 [dependencies.devicemapper]
-version = "0.30.0"
+version = "0.31.0"
 git = "https://github.com/stratis-storage/devicemapper-rs"
-branch = "crates-io-patch-0.30.1"
+branch = "crates-io-patch-0.31.0"
 
 [dependencies.stratisd_proc_macros]
 version = "0.1.0"

@@ -57,6 +57,7 @@ async fn check_pool_and_fs<E>(
     }
 
     loop {
+        trace!("Starting timed pool and filesystem checks");
         if let Err(e) = process_checks(
             &engine,
             #[cfg(feature = "dbus_enabled")]
@@ -66,6 +67,7 @@ async fn check_pool_and_fs<E>(
         {
             warn!("Failed to handle timed pool and filesystem checks: {}", e);
         }
+        trace!("Timed pool and filesystem checks finished");
         sleep(Duration::from_secs(10)).await;
     }
 }

@@ -86,7 +86,7 @@ where
             Some(engine) => {
                 let fd = setup_dm()?;
                 loop {
-                    debug!("Starting handling of devicemapper event");
+                    trace!("Starting handling of devicemapper event");
                     if let Err(e) = process_dm_event(
                         &engine,
                         #[cfg(feature = "dbus_enabled")]
@@ -97,7 +97,7 @@ where
                     {
                         warn!("Failed to process devicemapper event: {}", e);
                     }
-                    debug!("Finished handling of devicemapper event");
+                    trace!("Finished handling of devicemapper event");
                 }
             }
             None => {

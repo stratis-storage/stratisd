@@ -55,12 +55,12 @@ pub fn run(sim: bool) -> StratisResult<()> {
         .on_thread_start(|| {
             static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
             let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-            debug!("{}: thread started", id)
+            trace!("{}: thread started", id)
         })
         .on_thread_stop(|| {
             static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
             let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-            debug!("{}: thread finished", id)
+            trace!("{}: thread finished", id)
         })
         .build()?;
     runtime.block_on(async move {

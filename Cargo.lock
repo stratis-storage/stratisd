@@ -259,7 +259,7 @@ dependencies = [
 [[package]]
 name = "devicemapper"
 version = "0.30.1"
-source = "git+https://github.com/mulkieran/devicemapper-rs?branch=devicemapper-rs_issue_740#71849d9630d6e09fc7f5182d7ef9f4ebff839c6e"
+source = "git+https://github.com/mulkieran/devicemapper-rs?branch=devicemapper-rs_issue_740_hack#7228f863583054bb073b44e5e5a77425f6705c23"
 dependencies = [
  "bitflags",
  "devicemapper-sys",
@@ -271,7 +271,8 @@ dependencies = [
 [[package]]
 name = "devicemapper-sys"
 version = "0.1.2"
-source = "git+https://github.com/mulkieran/devicemapper-rs?branch=devicemapper-rs_issue_740#71849d9630d6e09fc7f5182d7ef9f4ebff839c6e"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2bcbd37e4723b2221792aa84fc1a9f833657b132ae2fcfff1693a8bd3c68c1dd"
 dependencies = [
  "bindgen 0.59.2",
  "nix 0.22.2",

@@ -28,9 +28,9 @@ use devicemapper::Bytes;
 use crate::{
     dbus_api::{connection::DbusConnectionHandler, tree::DbusTreeHandler, udev::DbusUdevHandler},
     engine::{
-        ActionAvailability, Engine, ExclusiveGuard, FilesystemUuid, Lockable, LockedPoolInfo,
-        PoolEncryptionInfo, PoolUuid, SharedGuard, StratFilesystemDiff, StratPoolDiff, StratisUuid,
-        ThinPoolDiff,
+        total_used, ActionAvailability, Diff, Engine, ExclusiveGuard, FilesystemUuid, Lockable,
+        LockedPoolInfo, PoolDiff, PoolEncryptionInfo, PoolUuid, SharedGuard, StratFilesystemDiff,
+        StratPoolDiff, StratisUuid, ThinPoolDiff,
     },
 };
 
@@ -76,6 +76,27 @@ pub enum DbusErrorEnum {
 pub const OK_STRING: &str = "Ok";
 
 #[derive(Debug)]
+pub enum SignalChange<T> {
+    Changed(T),
+    Unchanged,
+}
+
+impl<T> SignalChange<T> {
+    pub fn is_changed(&self) -> bool {
+        matches!(self, SignalChange::Changed(_))
+    }
+}
+
+impl<T> From<Diff<T>> for SignalChange<T> {
+    fn from(diff: Diff<T>) -> Self {
+        match diff {
+            Diff::Changed(t) => SignalChange::Changed(t),
+            Diff::Unchanged(_) => SignalChange::Unchanged,
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum DbusAction<E> {
     Add(
         ObjectPath<MTSync<TData<E>>, TData<E>>,
@@ -87,15 +108,22 @@ pub enum DbusAction<E> {
     PoolAvailActions(Path<'static>, ActionAvailability),
     PoolKeyDescChange(Path<'static>, Option<PoolEncryptionInfo>),
     PoolClevisInfoChange(Path<'static>, Option<PoolEncryptionInfo>),
-    #[allow(clippy::option_option)]
-    FsBackgroundChange(FilesystemUuid, Option<Bytes>, Option<Option<Bytes>>),
-    #[allow(clippy::option_option)]
-    PoolBackgroundChange(PoolUuid, Option<Option<Bytes>>, Option<Bytes>),
     PoolCacheChange(Path<'static>, bool),
     PoolSizeChange(Path<'static>, Bytes),
     LockedPoolsChange(HashMap<PoolUuid, LockedPoolInfo>),
-    PoolAllocSizeChange(Path<'static>, Bytes),
-    PoolUsedChange(Path<'static>, Option<Bytes>),
+
+    FsBackgroundChange(
+        FilesystemUuid,
+        SignalChange<Option<Bytes>>,
+        SignalChange<Bytes>,
+    ),
+    PoolBackgroundChange(PoolUuid, SignalChange<Option<Bytes>>, SignalChange<Bytes>),
+    PoolForegroundChange(
+        Path<'static>,
+        SignalChange<Option<Bytes>>,
+        SignalChange<Bytes>,
+        SignalChange<Bytes>,
+    ),
 }
 
 impl<E> DbusAction<E>
@@ -106,15 +134,24 @@ where
     ///
     /// Precondition: Filtering of diffs that show no change has already been
     /// done in the engine.
-    pub fn from_pool_diffs(diffs: HashMap<PoolUuid, StratPoolDiff>) -> Vec<Self> {
+    pub fn from_pool_diffs(diffs: HashMap<PoolUuid, PoolDiff>) -> Vec<Self> {
         diffs
             .into_iter()
             .map(|(uuid, diff)| {
-                let StratPoolDiff {
-                    usage,
-                    thin_pool: ThinPoolDiff { allocated_size },
+                let PoolDiff {
+                    pool: StratPoolDiff { metadata_size },
+                    thin_pool:
+                        ThinPoolDiff {
+                            used,
+                            allocated_size,
+                        },
                 } = diff;
-                DbusAction::PoolBackgroundChange(uuid, usage, allocated_size)
+
+                DbusAction::PoolBackgroundChange(
+                    uuid,
+                    SignalChange::from(total_used(used, metadata_size)),
+                    SignalChange::from(allocated_size),
+                )
             })
             .collect()
     }
@@ -128,7 +165,12 @@ where
             .into_iter()
             .map(|(uuid, diff)| {
                 let StratFilesystemDiff { size, used } = diff;
-                DbusAction::FsBackgroundChange(uuid, size, used)
+
+                DbusAction::FsBackgroundChange(
+                    uuid,
+                    SignalChange::from(used),
+                    SignalChange::from(size),
+                )
             })
             .collect()
     }
@@ -259,7 +301,6 @@ where
     }
 
     /// Send changed signal for ClevisInfo property.
-    #[allow(clippy::option_option)]
     pub fn push_pool_clevis_info_change(
         &self,
         item: &Path<'static>,
@@ -345,27 +386,22 @@ where
         }
     }
 
-    /// Send changed signal for changed allocated size .
-    pub fn push_pool_allocated_size_change(&self, path: &Path<'static>, new_allocated_size: Bytes) {
-        if let Err(e) = self.sender.send(DbusAction::PoolAllocSizeChange(
+    /// Send changed signal for changed pool properties.
+    pub fn push_pool_foreground_change(
+        &self,
+        path: &Path<'static>,
+        new_used: Diff<Option<Bytes>>,
+        new_alloc: Diff<Bytes>,
+        new_size: Diff<Bytes>,
+    ) {
+        if let Err(e) = self.sender.send(DbusAction::PoolForegroundChange(
             path.clone(),
-            new_allocated_size,
+            SignalChange::from(new_used),
+            SignalChange::from(new_alloc),
+            SignalChange::from(new_size),
         )) {
             warn!(
                 "Pool allocated size change event could not be sent to the processing thread; no signal will be sent out for the pool allocated size state change: {}",
-                e,
-            )
-        }
-    }
-
-    /// Send changed signal for used pool size.
-    pub fn push_pool_used_change(&self, path: &Path<'static>, new_used: Option<Bytes>) {
-        if let Err(e) = self
-            .sender
-            .send(DbusAction::PoolUsedChange(path.clone(), new_used))
-        {
-            warn!(
-                "Used pool size change event could not be sent to the processing thread; no signal will be sent out for the used pool size state change: {}",
                 e,
             )
         }

@@ -36,7 +36,8 @@ use crate::{
             thinpool::{thinpool::DATA_LOWATER, DATA_BLOCK_SIZE},
         },
         types::{
-            ActionAvailability, FilesystemUuid, Name, PoolUuid, StratFilesystemDiff, StratisUuid,
+            ActionAvailability, Compare, FilesystemUuid, Name, PoolUuid, StratFilesystemDiff,
+            StratisUuid,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -236,8 +237,8 @@ impl StratFilesystem {
     /// Check if filesystem is getting full and needs to be extended.
     ///
     /// Returns:
-    /// * Some(_) if metadata should be saved.
-    /// * None if metadata should not be saved.
+    /// * (true, _) if metadata should be saved.
+    /// * (false, _) if metadata should not be saved.
     /// TODO: deal with the thindev in a Fail state.
     pub fn check(&mut self) -> StratisResult<(bool, StratFilesystemDiff)> {
         let mut needs_save = false;
@@ -388,16 +389,8 @@ impl StateDiff for StratFilesystemState {
 
     fn diff(&self, new_state: &Self) -> Self::Diff {
         StratFilesystemDiff {
-            size: if self.size != new_state.size {
-                Some(new_state.size)
-            } else {
-                None
-            },
-            used: if self.used != new_state.used {
-                Some(new_state.used)
-            } else {
-                None
-            },
+            size: self.size.compare(&new_state.size),
+            used: self.used.compare(&new_state.used),
         }
     }
 }

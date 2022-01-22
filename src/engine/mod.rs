@@ -4,6 +4,7 @@
 
 pub use self::{
     engine::{BlockDev, Engine, Filesystem, KeyActions, Pool, Report},
+    shared::total_used,
     sim_engine::SimEngine,
     strat_engine::{
         blkdev_size, crypt_metadata_size, device_identifiers, get_dm, get_dm_init,
@@ -12,12 +13,12 @@ pub use self::{
     },
     structures::{ExclusiveGuard, SharedGuard, Table},
     types::{
-        ActionAvailability, BlockDevTier, ClevisInfo, CreateAction, DeleteAction, DevUuid,
+        ActionAvailability, BlockDevTier, ClevisInfo, CreateAction, DeleteAction, DevUuid, Diff,
         EncryptionInfo, EngineAction, FilesystemUuid, KeyDescription, LockKey, Lockable,
         LockedPoolInfo, MappingCreateAction, MappingDeleteAction, MaybeInconsistent, Name,
-        PoolEncryptionInfo, PoolUuid, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
-        StratFilesystemDiff, StratPoolDiff, StratisUuid, ThinPoolDiff, UdevEngineEvent,
-        UnlockMethod,
+        PoolDiff, PoolEncryptionInfo, PoolUuid, RenameAction, ReportType, SetCreateAction,
+        SetDeleteAction, StratFilesystemDiff, StratPoolDiff, StratisUuid, ThinPoolDiff,
+        UdevEngineEvent, UnlockMethod,
     },
 };
 

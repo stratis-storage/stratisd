@@ -18,7 +18,7 @@ use crate::{
         types::{DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg},
     },
-    engine::{BlockDevTier, Engine, EngineAction, LockKey, Name, Pool, PoolUuid},
+    engine::{total_used, BlockDevTier, Diff, Engine, EngineAction, LockKey, Name, Pool, PoolUuid},
 };
 
 pub enum BlockDevOp {
@@ -120,16 +120,16 @@ where
             handle_action!(
                 pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Data,)
                     .map(|(act, diff)| {
-                        dbus_context.push_pool_size_change(
-                            pool_path.get_name(),
-                            pool.total_physical_size().bytes(),
-                        );
-                        if let Some(used) = diff.as_ref().and_then(|d| d.usage) {
-                            dbus_context.push_pool_used_change(pool_path.get_name(), used);
-                        }
-                        if let Some(alloc) = diff.and_then(|d| d.thin_pool.allocated_size) {
-                            dbus_context
-                                .push_pool_allocated_size_change(pool_path.get_name(), alloc);
+                        if act.is_changed() {
+                            if let Some(d) = diff {
+                                assert!(d.pool.metadata_size.is_changed());
+                                dbus_context.push_pool_foreground_change(
+                                    pool_path.get_name(),
+                                    total_used(d.thin_pool.used, d.pool.metadata_size),
+                                    d.thin_pool.allocated_size,
+                                    Diff::Changed(pool.total_physical_size().bytes()),
+                                )
+                            }
                         }
                         act
                     }),

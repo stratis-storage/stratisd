@@ -18,8 +18,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
 
-use devicemapper::Bytes;
-
 pub use crate::engine::{
     engine::{Engine, StateDiff},
     structures::Lockable,
@@ -29,12 +27,14 @@ pub use crate::engine::{
             MappingDeleteAction, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
             SetUnlockAction,
         },
+        diff::{Compare, Diff, PoolDiff, StratFilesystemDiff, StratPoolDiff, ThinPoolDiff},
         keys::{EncryptionInfo, KeyDescription, PoolEncryptionInfo, SizedKeyMemory},
     },
 };
 use crate::stratis::{StratisError, StratisResult};
 
 mod actions;
+mod diff;
 mod keys;
 
 macro_rules! uuid {
@@ -373,51 +373,6 @@ impl Display for ActionAvailability {
 pub enum MaybeInconsistent<T> {
     Yes,
     No(T),
-}
-
-/// Change in attributes of the thin pool that may need to be reported to the
-/// IPC layer.
-#[derive(Default, Debug)]
-pub struct ThinPoolDiff {
-    pub allocated_size: Option<Bytes>,
-}
-
-impl ThinPoolDiff {
-    /// Returns true if the thin pool information has changed.
-    pub fn is_changed(&self) -> bool {
-        self.allocated_size.is_some()
-    }
-}
-
-/// Change in attributes of a Stratis pool that may need to be reported to the
-/// IPC layer.
-#[derive(Default, Debug)]
-pub struct StratPoolDiff {
-    #[allow(clippy::option_option)]
-    pub usage: Option<Option<Bytes>>,
-    pub thin_pool: ThinPoolDiff,
-}
-
-impl StratPoolDiff {
-    /// Returns true if the thin pool information has changed.
-    pub fn is_changed(&self) -> bool {
-        self.usage.is_some() || self.thin_pool.is_changed()
-    }
-}
-
-/// Represents the difference between two dumped states for a filesystem.
-#[derive(Default, Debug)]
-pub struct StratFilesystemDiff {
-    pub size: Option<Bytes>,
-    #[allow(clippy::option_option)]
-    pub used: Option<Option<Bytes>>,
-}
-
-impl StratFilesystemDiff {
-    /// Returns true if the filesystem information has changed.
-    pub fn is_changed(&self) -> bool {
-        self.size.is_some() || self.used.is_some()
-    }
 }
 
 /// Represents either a name or a UUID.

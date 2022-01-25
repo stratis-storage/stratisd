@@ -400,19 +400,23 @@ impl ThinPool {
         let (dm_name, dm_uuid) = format_thinpool_ids(pool_uuid, ThinPoolRole::Pool);
 
         let data_dev_size = data_dev.size();
-        let thinpool_dev = ThinPoolDev::new(
-            get_dm(),
-            &dm_name,
-            Some(&dm_uuid),
-            meta_dev,
-            data_dev,
-            data_block_size,
-            calc_lowater(
-                DataBlocks(0),
-                sectors_to_datablocks(data_dev_size),
-                sectors_to_datablocks(backstore.available_in_backstore()),
-            ),
-        )?;
+        let thinpool_dev = {
+            let mut thinpool_dev = ThinPoolDev::new(
+                get_dm(),
+                &dm_name,
+                Some(&dm_uuid),
+                meta_dev,
+                data_dev,
+                data_block_size,
+                calc_lowater(
+                    DataBlocks(0),
+                    sectors_to_datablocks(data_dev_size),
+                    sectors_to_datablocks(backstore.available_in_backstore()),
+                ),
+            )?;
+            thinpool_dev.error_if_no_space(get_dm())?;
+            thinpool_dev
+        };
 
         let thin_pool_status = thinpool_dev.status(get_dm(), DmOptions::default()).ok();
         let digest = thin_pool_status.as_ref().map(|s| s.into());
@@ -488,6 +492,11 @@ impl ThinPool {
                 sectors_to_datablocks(data_dev_size),
                 sectors_to_datablocks(backstore.available_in_backstore()),
             ),
+            vec![
+                "error_if_no_space".to_string(),
+                "no_discard_passdown".to_string(),
+                "skip_block_zeroing".to_string(),
+            ],
         )?;
 
         let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::MetadataVolume);

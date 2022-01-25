@@ -19,7 +19,6 @@ use crate::{
 
 /// A handle for memory designed to safely handle Stratis passphrases. It can
 /// be coerced to a slice reference for use in read-only operations.
-#[allow(clippy::non_send_fields_in_send_ty)]
 pub struct SizedKeyMemory {
     mem: SafeMemHandle,
     size: usize,

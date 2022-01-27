@@ -261,29 +261,34 @@ fn process_devices(
     Ok(infos)
 }
 
-/// Create, and then filter some paths.
-pub fn process_and_verify_devices(
-    pool_uuid: PoolUuid,
-    current_uuids: &HashSet<DevUuid>,
-    paths: &[&Path],
-) -> StratisResult<Vec<DeviceInfo>> {
-    ProcessedPaths::try_from(paths)
-        .and_then(|processed| processed.into_filtered(pool_uuid, current_uuids))
-        .map(|filtered| filtered.internal)
-}
-
 /// Gathered information about devices that have been specified for
 /// initialization. These devices are guaranteed to be unowned by Stratis
 /// or another, and thus good candidates for initialization.
-struct FilteredDeviceInfos {
+pub struct FilteredDeviceInfos {
     internal: Vec<DeviceInfo>,
+}
+
+impl FilteredDeviceInfos {
+    fn iter(&self) -> std::slice::Iter<'_, DeviceInfo> {
+        self.internal.iter()
+    }
+
+    #[cfg(test)]
+    fn is_empty(&self) -> bool {
+        self.internal.is_empty()
+    }
+
+    #[cfg(test)]
+    fn len(&self) -> usize {
+        self.internal.len()
+    }
 }
 
 /// Gathered information about devices that have been specified
 /// for initialization. The devices are not necessarily all valid for
 /// initialization by Stratis, as some may have been identified as Stratis
 /// devices.
-struct ProcessedPaths {
+pub struct ProcessedPaths {
     stratis_devices: HashMap<PoolUuid, Vec<(DevUuid, DeviceInfo)>>,
     free_devices: Vec<DeviceInfo>,
 }
@@ -441,7 +446,7 @@ impl TryFrom<&[&Path]> for ProcessedPaths {
 /// Precondition: Each device's DeviceInfo struct contains all necessary
 /// information about the device.
 pub fn initialize_devices(
-    devices: Vec<DeviceInfo>,
+    devices: FilteredDeviceInfos,
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
     encryption_info: Option<&EncryptionInfo>,
@@ -659,14 +664,14 @@ pub fn initialize_devices(
 
     /// Initialize all provided devices with Stratis metadata.
     fn initialize_all(
-        devices: Vec<DeviceInfo>,
+        devices: FilteredDeviceInfos,
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<Vec<StratBlockDev>> {
         let mut initialized_blockdevs: Vec<StratBlockDev> = Vec::new();
-        for dev_info in devices {
-            match initialize_one(&dev_info, pool_uuid, mda_data_size, encryption_info) {
+        for dev_info in devices.iter() {
+            match initialize_one(dev_info, pool_uuid, mda_data_size, encryption_info) {
                 Ok(blockdev) => initialized_blockdevs.push(blockdev),
                 Err(err) => {
                     if let Err(err) = wipe_blockdevs(&mut initialized_blockdevs) {
@@ -746,6 +751,15 @@ mod tests {
 
     use super::*;
 
+    fn process_and_verify_devices(
+        pool_uuid: PoolUuid,
+        current_uuids: &HashSet<DevUuid>,
+        paths: &[&Path],
+    ) -> StratisResult<FilteredDeviceInfos> {
+        ProcessedPaths::try_from(paths)
+            .and_then(|processed| processed.into_filtered(pool_uuid, current_uuids))
+    }
+
     /// Test that initializing devices claims all and that destroying
     /// them releases all. Verify that already initialized devices are
     /// rejected or filtered as appropriate.
@@ -764,14 +778,14 @@ mod tests {
 
         let dev_infos = infos.into_filtered(pool_uuid, &HashSet::new())?;
 
-        if dev_infos.internal.len() != paths.len() {
+        if dev_infos.len() != paths.len() {
             return Err(Box::new(StratisError::Msg(
                 "Some devices were filtered from the specified set".to_string(),
             )));
         }
 
         let mut blockdevs = initialize_devices(
-            dev_infos.internal,
+            dev_infos,
             pool_uuid,
             MDADataSize::default(),
             key_description
@@ -1002,7 +1016,7 @@ mod tests {
 
         let mut dev_infos = infos.into_filtered(pool_uuid, &HashSet::new())?;
 
-        if dev_infos.internal.len() != paths.len() {
+        if dev_infos.len() != paths.len() {
             return Err(Box::new(StratisError::Msg(
                 "Some devices were filtered from the specified set".to_string(),
             )));
@@ -1026,7 +1040,7 @@ mod tests {
         }
 
         if initialize_devices(
-            dev_infos.internal,
+            dev_infos,
             pool_uuid,
             MDADataSize::default(),
             key_desc

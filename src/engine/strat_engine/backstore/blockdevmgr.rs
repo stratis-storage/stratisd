@@ -28,7 +28,7 @@ use crate::{
                     back_up_luks_header, interpret_clevis_config, restore_luks_header,
                     CryptActivationHandle,
                 },
-                devices::{initialize_devices, process_and_verify_devices, wipe_blockdevs},
+                devices::{initialize_devices, wipe_blockdevs, ProcessedPaths},
             },
             metadata::MDADataSize,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
@@ -146,7 +146,8 @@ impl BlockDevMgr {
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<BlockDevMgr> {
-        let devices = process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?;
+        let devices = ProcessedPaths::try_from(paths)
+            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))?;
 
         Ok(BlockDevMgr::new(
             initialize_devices(devices, pool_uuid, mda_data_size, encryption_info)?,
@@ -194,7 +195,8 @@ impl BlockDevMgr {
             .iter()
             .map(|bd| bd.uuid())
             .collect::<HashSet<_>>();
-        let devices = process_and_verify_devices(pool_uuid, &current_uuids, paths)?;
+        let devices = ProcessedPaths::try_from(paths)
+            .and_then(|processed| processed.into_filtered(pool_uuid, &current_uuids))?;
 
         let encryption_info = pool_enc_to_enc!(self.encryption_info());
         if let Some(ref ei) = encryption_info {

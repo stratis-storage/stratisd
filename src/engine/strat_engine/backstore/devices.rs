@@ -344,33 +344,33 @@ impl ProcessedPaths {
 
             if !not_included.is_empty() {
                 let error_message = format!(
-                "Devices ({}) appear to be already in use by this pool which has UUID {}; they may be in use by the other tier",
-                not_included
-                    .iter()
-                    .map(|(_, info)| info.devnode.display().to_string())
-                    .collect::<Vec<_>>()
-                    .join(", "),
-                pool_uuid
-            );
+                    "Devices ({}) appear to be already in use by this pool which has UUID {}; they may be in use by the other tier",
+                    not_included
+                        .iter()
+                        .map(|(_, info)| info.devnode.display().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    pool_uuid
+                );
                 return Err(StratisError::Msg(error_message));
             }
 
             if !included.is_empty() {
                 info!(
-                "Devices [{}] appear to be already in use by this pool which has UUID {}; omitting from the set of devices to initialize",
-                included
-                    .iter()
-                    .map(|(dev_uuid, info)| {
-                        format!(
-                            "(device node: {}, device UUID: {})",
-                            info.devnode.display(),
-                            dev_uuid
-                        )
-                    })
-                    .collect::<Vec<_>>()
-                    .join(", "),
-                pool_uuid
-            );
+                    "Devices [{}] appear to be already in use by this pool which has UUID {}; omitting from the set of devices to initialize",
+                    included
+                        .iter()
+                        .map(|(dev_uuid, info)| {
+                            format!(
+                                "(device node: {}, device UUID: {})",
+                                info.devnode.display(),
+                                dev_uuid
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    pool_uuid
+                );
             }
         }
 

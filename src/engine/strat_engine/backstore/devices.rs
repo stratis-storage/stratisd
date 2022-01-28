@@ -752,15 +752,6 @@ mod tests {
 
     use super::*;
 
-    fn process_and_verify_devices(
-        pool_uuid: PoolUuid,
-        current_uuids: &HashSet<DevUuid>,
-        paths: &[&Path],
-    ) -> StratisResult<FilteredDeviceInfos> {
-        ProcessedPaths::try_from(paths)
-            .and_then(|processed| processed.into_filtered(pool_uuid, current_uuids))
-    }
-
     /// Test that initializing devices claims all and that destroying
     /// them releases all. Verify that already initialized devices are
     /// rejected or filtered as appropriate.
@@ -839,7 +830,8 @@ mod tests {
             })
             .collect();
 
-        let result = process_and_verify_devices(pool_uuid, &initialized_uuids, paths);
+        let result = ProcessedPaths::try_from(paths)
+            .and_then(|processed| processed.into_filtered(pool_uuid, &initialized_uuids));
         if key_description.is_some() && result.is_ok() {
             return Err(Box::new(StratisError::Msg(
                 "Failed to return an error when encountering devices that are LUKS2".to_string(),

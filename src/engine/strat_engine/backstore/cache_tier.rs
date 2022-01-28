@@ -4,7 +4,7 @@
 
 // Code to handle the backing store of a pool.
 
-use std::path::Path;
+use std::{collections::HashSet, convert::TryFrom, path::Path};
 
 use devicemapper::{Sectors, IEC, SECTOR_SIZE};
 
@@ -14,6 +14,7 @@ use crate::{
             backstore::{
                 blockdev::StratBlockDev,
                 blockdevmgr::{BlkDevSegment, BlockDevMgr},
+                devices::ProcessedPaths,
                 shared::{coalesce_blkdevsegs, metadata_to_segment},
             },
             serde_structs::{BaseDevSave, BlockDevSave, CacheTierSave, Recordable},
@@ -100,7 +101,17 @@ impl CacheTier {
         pool_uuid: PoolUuid,
         paths: &[&Path],
     ) -> StratisResult<(Vec<DevUuid>, (bool, bool))> {
-        let uuids = self.block_mgr.add(pool_uuid, paths)?;
+        let current_uuids = self
+            .block_mgr
+            .blockdevs()
+            .iter()
+            .map(|(uuid, _)| *uuid)
+            .collect::<HashSet<_>>();
+
+        let devices = ProcessedPaths::try_from(paths)
+            .and_then(|processed| processed.into_filtered(pool_uuid, &current_uuids))?;
+
+        let uuids = self.block_mgr.add(pool_uuid, devices)?;
 
         let avail_space = self.block_mgr.avail_space();
 
@@ -237,8 +248,11 @@ mod tests {
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let pool_uuid = PoolUuid::new_v4();
-
-        let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MDADataSize::default(), None).unwrap();
+        let devices1 = ProcessedPaths::try_from(paths1)
+            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .unwrap();
+        let mgr =
+            BlockDevMgr::initialize(pool_uuid, devices1, MDADataSize::default(), None).unwrap();
 
         let mut cache_tier = CacheTier::new(mgr).unwrap();
 

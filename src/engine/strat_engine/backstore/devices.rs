@@ -264,6 +264,7 @@ fn process_devices(
 /// Gathered information about devices that have been specified for
 /// initialization. These devices are guaranteed to be unowned by Stratis
 /// or another, and thus good candidates for initialization.
+#[derive(Debug)]
 pub struct FilteredDeviceInfos {
     internal: Vec<DeviceInfo>,
 }

@@ -4,7 +4,7 @@
 
 // Code to handle the backing store of a pool.
 
-use std::path::Path;
+use std::{collections::HashSet, convert::TryFrom, path::Path};
 
 use devicemapper::Sectors;
 
@@ -14,6 +14,7 @@ use crate::{
             backstore::{
                 blockdev::StratBlockDev,
                 blockdevmgr::{BlkDevSegment, BlockDevMgr},
+                devices::ProcessedPaths,
                 shared::{coalesce_blkdevsegs, metadata_to_segment},
             },
             serde_structs::{BaseDevSave, BlockDevSave, DataTierSave, Recordable},
@@ -67,7 +68,17 @@ impl DataTier {
     /// corresponding to the specified paths.
     /// WARNING: metadata changing event
     pub fn add(&mut self, pool_uuid: PoolUuid, paths: &[&Path]) -> StratisResult<Vec<DevUuid>> {
-        self.block_mgr.add(pool_uuid, paths)
+        let current_uuids = self
+            .block_mgr
+            .blockdevs()
+            .iter()
+            .map(|(uuid, _)| *uuid)
+            .collect::<HashSet<_>>();
+
+        let devices = ProcessedPaths::try_from(paths)
+            .and_then(|processed| processed.into_filtered(pool_uuid, &current_uuids))?;
+
+        self.block_mgr.add(pool_uuid, devices)
     }
 
     /// Allocate at least request sectors from unallocated segments in
@@ -189,7 +200,12 @@ mod tests {
 
         let pool_uuid = PoolUuid::new_v4();
 
-        let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MDADataSize::default(), None).unwrap();
+        let devices1 = ProcessedPaths::try_from(paths1)
+            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .unwrap();
+
+        let mgr =
+            BlockDevMgr::initialize(pool_uuid, devices1, MDADataSize::default(), None).unwrap();
 
         let mut data_tier = DataTier::new(mgr);
 

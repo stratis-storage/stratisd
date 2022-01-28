@@ -4,12 +4,7 @@
 
 // Code to handle a collection of block devices.
 
-use std::{
-    collections::{HashMap, HashSet},
-    convert::TryFrom,
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashMap, convert::TryFrom, fs, path::PathBuf};
 
 use chrono::{DateTime, Duration, Utc};
 use rand::{seq::IteratorRandom, thread_rng};
@@ -28,7 +23,7 @@ use crate::{
                     back_up_luks_header, interpret_clevis_config, restore_luks_header,
                     CryptActivationHandle,
                 },
-                devices::{initialize_devices, wipe_blockdevs, ProcessedPaths},
+                devices::{initialize_devices, wipe_blockdevs, FilteredDeviceInfos},
             },
             metadata::MDADataSize,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
@@ -142,13 +137,10 @@ impl BlockDevMgr {
     /// Initialize a new StratBlockDevMgr with specified pool and devices.
     pub fn initialize(
         pool_uuid: PoolUuid,
-        paths: &[&Path],
+        devices: FilteredDeviceInfos,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<BlockDevMgr> {
-        let devices = ProcessedPaths::try_from(paths)
-            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))?;
-
         Ok(BlockDevMgr::new(
             initialize_devices(devices, pool_uuid, mda_data_size, encryption_info)?,
             None,
@@ -180,7 +172,11 @@ impl BlockDevMgr {
     /// Add paths to self.
     /// Return the uuids of all blockdevs corresponding to paths that were
     /// added.
-    pub fn add(&mut self, pool_uuid: PoolUuid, paths: &[&Path]) -> StratisResult<Vec<DevUuid>> {
+    pub fn add(
+        &mut self,
+        pool_uuid: PoolUuid,
+        devices: FilteredDeviceInfos,
+    ) -> StratisResult<Vec<DevUuid>> {
         let this_pool_uuid = self.block_devs.get(0).map(|bd| bd.pool_uuid());
         if this_pool_uuid.is_some() && this_pool_uuid != Some(pool_uuid) {
             return Err(StratisError::Msg(
@@ -189,14 +185,6 @@ impl BlockDevMgr {
                         pool_uuid)
             ));
         }
-
-        let current_uuids = self
-            .block_devs
-            .iter()
-            .map(|bd| bd.uuid())
-            .collect::<HashSet<_>>();
-        let devices = ProcessedPaths::try_from(paths)
-            .and_then(|processed| processed.into_filtered(pool_uuid, &current_uuids))?;
 
         let encryption_info = pool_enc_to_enc!(self.encryption_info());
         if let Some(ref ei) = encryption_info {
@@ -415,30 +403,6 @@ impl BlockDevMgr {
 
     pub fn is_encrypted(&self) -> bool {
         self.encryption_info().is_some()
-    }
-
-    #[cfg(test)]
-    fn invariant(&self) {
-        let pool_uuids = self
-            .block_devs
-            .iter()
-            .map(|bd| bd.pool_uuid())
-            .collect::<HashSet<_>>();
-        assert!(pool_uuids.len() == 1);
-
-        let encryption_infos = self
-            .block_devs
-            .iter()
-            .filter_map(|bd| bd.encryption_info())
-            .collect::<Vec<_>>();
-        if encryption_infos.is_empty() {
-            assert_eq!(self.encryption_info(), None);
-        } else {
-            assert_eq!(encryption_infos.len(), self.block_devs.len());
-
-            let info_set = encryption_infos.iter().collect::<HashSet<_>>();
-            assert!(info_set.len() == 1);
-        }
     }
 
     /// Bind all devices in the given blockdev manager using the given clevis
@@ -738,9 +702,10 @@ impl Recordable<Vec<BaseBlockDevSave>> for BlockDevMgr {
 
 #[cfg(test)]
 mod tests {
-    use std::{env, error::Error, path::PathBuf};
+    use std::{collections::HashSet, env, error::Error, path::Path, path::PathBuf};
 
     use crate::engine::strat_engine::{
+        backstore::devices::ProcessedPaths,
         cmd,
         keys::MemoryFilesystem,
         names::KeyDescription,
@@ -749,14 +714,39 @@ mod tests {
 
     use super::*;
 
+    fn invariant(bdm: &BlockDevMgr) {
+        let pool_uuids = bdm
+            .block_devs
+            .iter()
+            .map(|bd| bd.pool_uuid())
+            .collect::<HashSet<_>>();
+        assert!(pool_uuids.len() == 1);
+
+        let encryption_infos = bdm
+            .block_devs
+            .iter()
+            .filter_map(|bd| bd.encryption_info())
+            .collect::<Vec<_>>();
+        if encryption_infos.is_empty() {
+            assert_eq!(bdm.encryption_info(), None);
+        } else {
+            assert_eq!(encryption_infos.len(), bdm.block_devs.len());
+
+            let info_set = encryption_infos.iter().collect::<HashSet<_>>();
+            assert!(info_set.len() == 1);
+        }
+    }
     /// Verify that initially,
     /// size() - metadata_size() = avail_space().
     /// After 2 Sectors have been allocated, that amount must also be included
     /// in balance.
     fn test_blockdevmgr_used(paths: &[&Path]) {
+        let pool_uuid = PoolUuid::new_v4();
+        let devices = ProcessedPaths::try_from(paths)
+            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .unwrap();
         let mut mgr =
-            BlockDevMgr::initialize(PoolUuid::new_v4(), paths, MDADataSize::default(), None)
-                .unwrap();
+            BlockDevMgr::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
         assert_eq!(mgr.avail_space() + mgr.metadata_size(), mgr.size());
 
         let allocated = Sectors(2);
@@ -790,12 +780,22 @@ mod tests {
             let pool_uuid = PoolUuid::new_v4();
             let mut bdm = BlockDevMgr::initialize(
                 pool_uuid,
-                &paths[..2],
+                ProcessedPaths::try_from(&paths[..2])
+                    .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+                    .unwrap(),
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
             )?;
 
-            if bdm.add(pool_uuid, &paths[2..3]).is_err() {
+            if bdm
+                .add(
+                    pool_uuid,
+                    ProcessedPaths::try_from(&paths[2..3])
+                        .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+                        .unwrap(),
+                )
+                .is_err()
+            {
                 Err(Box::new(StratisError::Msg(
                     "Adding a blockdev with the same key to an encrypted pool should succeed"
                         .to_string(),
@@ -832,14 +832,24 @@ mod tests {
             let pool_uuid = PoolUuid::new_v4();
             let mut bdm = BlockDevMgr::initialize(
                 pool_uuid,
-                &paths[..2],
+                ProcessedPaths::try_from(&paths[..2])
+                    .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+                    .unwrap(),
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
             )?;
 
             crypt::change_key(key_desc)?;
 
-            if bdm.add(pool_uuid, &paths[2..3]).is_ok() {
+            if bdm
+                .add(
+                    pool_uuid,
+                    ProcessedPaths::try_from(&paths[2..3])
+                        .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+                        .unwrap(),
+                )
+                .is_ok()
+            {
                 Err(Box::new(StratisError::Msg(
                     "Adding a blockdev with a new key to an encrypted pool should fail".to_string(),
                 )))
@@ -879,26 +889,44 @@ mod tests {
         let uuid = PoolUuid::new_v4();
         let uuid2 = PoolUuid::new_v4();
 
-        let mut bd_mgr =
-            BlockDevMgr::initialize(uuid, paths1, MDADataSize::default(), None).unwrap();
+        let devices1 = ProcessedPaths::try_from(paths1)
+            .and_then(|processed| processed.into_filtered(uuid, &HashSet::new()))
+            .unwrap();
+        let bd_mgr = BlockDevMgr::initialize(uuid, devices1, MDADataSize::default(), None).unwrap();
         cmd::udev_settle().unwrap();
 
+        let current_uuids = bd_mgr
+            .blockdevs()
+            .iter()
+            .map(|(uuid, _)| *uuid)
+            .collect::<HashSet<_>>();
         assert_matches!(
-            BlockDevMgr::initialize(uuid2, paths1, MDADataSize::default(), None),
+            ProcessedPaths::try_from(paths1)
+                .and_then(|processed| processed.into_filtered(uuid2, &current_uuids)),
             Err(_)
         );
 
         let original_length = bd_mgr.block_devs.len();
-        assert_matches!(bd_mgr.add(uuid2, paths1), Err(_));
-        assert_matches!(bd_mgr.add(uuid, paths1), Ok(_));
         assert_eq!(bd_mgr.block_devs.len(), original_length);
 
-        BlockDevMgr::initialize(uuid, paths2, MDADataSize::default(), None).unwrap();
+        let devices2 = ProcessedPaths::try_from(paths2)
+            .and_then(|processed| processed.into_filtered(uuid, &HashSet::new()))
+            .unwrap();
+        BlockDevMgr::initialize(uuid, devices2, MDADataSize::default(), None).unwrap();
         cmd::udev_settle().unwrap();
 
-        assert_matches!(bd_mgr.add(uuid, paths2), Err(_));
+        let current_uuids = bd_mgr
+            .blockdevs()
+            .iter()
+            .map(|(uuid, _)| *uuid)
+            .collect::<HashSet<_>>();
+        assert_matches!(
+            ProcessedPaths::try_from(paths2)
+                .and_then(|processed| processed.into_filtered(uuid, &current_uuids)),
+            Err(_)
+        );
 
-        bd_mgr.invariant()
+        invariant(&bd_mgr)
     }
 
     #[test]
@@ -919,9 +947,13 @@ mod tests {
 
     fn test_clevis_initialize(paths: &[&Path]) {
         let _memfs = MemoryFilesystem::new().unwrap();
+        let uuid = PoolUuid::new_v4();
+        let devices = ProcessedPaths::try_from(paths)
+            .and_then(|processed| processed.into_filtered(uuid, &HashSet::new()))
+            .unwrap();
         let mut mgr = BlockDevMgr::initialize(
-            PoolUuid::new_v4(),
-            paths,
+            uuid,
+            devices,
             MDADataSize::default(),
             Some(&EncryptionInfo::ClevisInfo((
                 "tang".to_string(),
@@ -959,9 +991,13 @@ mod tests {
     fn test_clevis_both_initialize(paths: &[&Path]) {
         fn test_both(paths: &[&Path], key_desc: &KeyDescription) -> Result<(), Box<dyn Error>> {
             let _memfs = MemoryFilesystem::new().unwrap();
+            let uuid = PoolUuid::new_v4();
+            let devices = ProcessedPaths::try_from(paths)
+                .and_then(|processed| processed.into_filtered(uuid, &HashSet::new()))
+                .unwrap();
             let mut mgr = BlockDevMgr::initialize(
-                PoolUuid::new_v4(),
-                paths,
+                uuid,
+                devices,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::Both(
                     key_desc.clone(),
@@ -1061,9 +1097,13 @@ mod tests {
             let invalid_path = PathBuf::from("/i/am/not/a/path");
             paths_vec.push(invalid_path.as_path());
             let _memfs = MemoryFilesystem::new().unwrap();
+            let uuid = PoolUuid::new_v4();
+            let devices = ProcessedPaths::try_from(paths_vec.as_slice())
+                .and_then(|processed| processed.into_filtered(uuid, &HashSet::new()))
+                .unwrap();
             let res = BlockDevMgr::initialize(
-                PoolUuid::new_v4(),
-                paths_vec.as_slice(),
+                uuid,
+                devices,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::Both(
                     key_desc.clone(),
@@ -1080,11 +1120,16 @@ mod tests {
                 )));
             }
 
+            let uuid = PoolUuid::new_v4();
+            let devices = ProcessedPaths::try_from(paths)
+                .and_then(|processed| processed.into_filtered(uuid, &HashSet::new()))
+                .unwrap();
+
             // Ensure that rollback completed successfully by trying a call that
             // should succeed.
             BlockDevMgr::initialize(
-                PoolUuid::new_v4(),
-                paths,
+                uuid,
+                devices,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::Both(
                     key_desc.clone(),

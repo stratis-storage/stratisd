@@ -4,7 +4,7 @@
 
 // Code to handle the backing store of a pool.
 
-use std::{cmp, path::Path};
+use std::{cmp, collections::HashSet, convert::TryFrom, path::Path};
 
 use chrono::{DateTime, Utc};
 use serde_json::Value;
@@ -19,6 +19,7 @@ use crate::{
                 blockdevmgr::{map_to_dm, BlockDevMgr},
                 cache_tier::CacheTier,
                 data_tier::DataTier,
+                devices::ProcessedPaths,
             },
             dm::get_dm,
             metadata::MDADataSize,
@@ -182,9 +183,11 @@ impl Backstore {
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<Backstore> {
+        let devices = ProcessedPaths::try_from(paths)
+            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))?;
         let data_tier = DataTier::new(BlockDevMgr::initialize(
             pool_uuid,
-            paths,
+            devices,
             mda_data_size,
             encryption_info,
         )?);
@@ -220,12 +223,16 @@ impl Backstore {
                     ));
                 }
 
+                let devices = ProcessedPaths::try_from(paths)
+                    .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))?;
+
                 // Note that variable length metadata is not stored on the
                 // cachedevs, so the mda_size can always be the minimum.
                 // If it is desired to change a cache dev to a data dev, it
                 // should be removed and then re-added in order to ensure
                 // that the MDA region is set to the correct size.
-                let bdm = BlockDevMgr::initialize(pool_uuid, paths, MDADataSize::default(), None)?;
+                let bdm =
+                    BlockDevMgr::initialize(pool_uuid, devices, MDADataSize::default(), None)?;
 
                 let cache_tier = CacheTier::new(bdm)?;
 

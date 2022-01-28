@@ -839,54 +839,6 @@ mod tests {
             })
             .collect();
 
-        if !process_and_verify_devices(
-            pool_uuid,
-            &initialized_uuids,
-            stratis_devnodes
-                .iter()
-                .map(|p| p.as_path())
-                .collect::<Vec<_>>()
-                .as_slice(),
-        )?
-        .is_empty()
-        {
-            return Err(Box::new(StratisError::Msg(
-                "Failed to eliminate devices already initialized for this pool from list of devices to initialize".to_string()
-            )));
-        }
-
-        if process_and_verify_devices(
-            pool_uuid,
-            &HashSet::new(),
-            stratis_devnodes
-                .iter()
-                .map(|p| p.as_path())
-                .collect::<Vec<_>>()
-                .as_slice(),
-        )
-        .is_ok()
-        {
-            return Err(Box::new(StratisError::Msg(
-                "Failed to return an error when some device processed was not in the set of already initialized devices".to_string()
-            )));
-        }
-
-        if process_and_verify_devices(
-            PoolUuid::new_v4(),
-            &initialized_uuids,
-            stratis_devnodes
-                .iter()
-                .map(|p| p.as_path())
-                .collect::<Vec<_>>()
-                .as_slice(),
-        )
-        .is_ok()
-        {
-            return Err(Box::new(StratisError::Msg(
-                "Failed to return an error when processing devices for a pool UUID which is not the same as that for which the devices were initialized".to_string()
-            )));
-        }
-
         let result = process_and_verify_devices(pool_uuid, &initialized_uuids, paths);
         if key_description.is_some() && result.is_ok() {
             return Err(Box::new(StratisError::Msg(

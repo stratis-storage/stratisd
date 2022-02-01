@@ -56,7 +56,7 @@ jobs:
             components: cargo
     runs-on: ubuntu-18.04
     container:
-      image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
@@ -88,7 +88,7 @@ jobs:
             components: cargo
     runs-on: ubuntu-18.04
     container:
-      image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
@@ -130,7 +130,7 @@ jobs:
               make -f Makefile test-clevis-loop
             toolchain: 1.58.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-            image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
+            image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
     runs-on: ubuntu-18.04
     container:
       image: ${{ matrix.image }}
@@ -138,7 +138,7 @@ jobs:
     services:
       tang:
         # yamllint disable rule:line-length
-        image: ghcr.io/stratis-storage/stratisd/tang:34  # CURRENT DEVELOPMENT ENVIRONMENT
+        image: ghcr.io/stratis-storage/stratisd/tang:35  # CURRENT DEVELOPMENT ENVIRONMENT
         credentials:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
@@ -225,7 +225,7 @@ jobs:
   shell-checks:
     runs-on: ubuntu-18.04
     container:
-      image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies
@@ -250,7 +250,7 @@ jobs:
               make -f ../../Makefile verify-dependency-bounds
     runs-on: ubuntu-18.04
     container:
-      image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies for Fedora
@@ -282,7 +282,7 @@ jobs:
     continue-on-error: true
     runs-on: ubuntu-18.04
     container:
-      image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1

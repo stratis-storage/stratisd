@@ -42,7 +42,7 @@ jobs:
             task: make -f Makefile yamllint
             working-directory: .
     runs-on: ubuntu-18.04
-    container: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
+    container: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies

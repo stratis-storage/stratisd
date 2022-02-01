@@ -28,7 +28,7 @@ jobs:
             components: cargo
     runs-on: ubuntu-18.04
     container:
-      image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
@@ -65,7 +65,7 @@ jobs:
               COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../Cargo.toml FEDORA_RELEASE=f34 IGNORE_ARGS="--ignore-missing stratisd_proc_macros --ignore-missing libblkid-rs --ignore-low clap --ignore-high=devicemapper" make -f ../../Makefile check-fedora-versions
     runs-on: ubuntu-18.04
     container:
-      image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies for Fedora

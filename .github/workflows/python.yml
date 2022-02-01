@@ -27,7 +27,7 @@ jobs:
       matrix:
         include:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT ENVIRONMENT
-          - image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
+          - image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
             toolchain: 1.58.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             skip_value: 0
           # MANDATORY CHECKS USING LOWEST SUPPORTED ENVIRONMENT PROXY
@@ -94,12 +94,12 @@ jobs:
   python-based-checks_with_tang:
     runs-on: ubuntu-18.04
     container:
-      image: fedora:34  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     services:
       tang:
         # yamllint disable rule:line-length
-        image: ghcr.io/stratis-storage/stratisd/tang:34  # CURRENT DEVELOPMENT ENVIRONMENT
+        image: ghcr.io/stratis-storage/stratisd/tang:35  # CURRENT DEVELOPMENT ENVIRONMENT
         credentials:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}

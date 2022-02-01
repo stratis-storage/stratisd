@@ -1,4 +1,4 @@
-FROM fedora:34
+FROM fedora:35
 
 RUN dnf install -y systemd tang
 RUN systemctl enable tangd.socket

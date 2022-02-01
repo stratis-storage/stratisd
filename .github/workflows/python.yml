@@ -99,7 +99,7 @@ jobs:
     services:
       tang:
         # yamllint disable rule:line-length
-        image: docker.pkg.github.com/stratis-storage/stratisd/tang:34  # CURRENT DEVELOPMENT ENVIRONMENT
+        image: ghcr.io/stratis-storage/stratisd/tang:34  # CURRENT DEVELOPMENT ENVIRONMENT
         credentials:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}

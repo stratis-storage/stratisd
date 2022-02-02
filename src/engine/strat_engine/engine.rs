@@ -155,12 +155,12 @@ impl StratEngine {
                     acc
                 }
                 Ok(Err(e)) => {
-                    warn!("Pool checks failed with error: {}", e);
+                    warn!("Filesystem checks failed with error: {}", e);
                     acc
                 }
                 Err(e) => {
                     warn!(
-                        "Failed to get status for thread handling pool checks: {}",
+                        "Failed to get status for thread handling filesystem checks: {}",
                         e
                     );
                     acc

@@ -89,7 +89,9 @@ where
                 .add_p(pool_3_0::alloc_size_property(&f))
                 .add_p(pool_3_0::used_size_property(&f))
                 .add_p(pool_3_0::total_size_property(&f))
-                .add_p(pool_3_1::fs_limit_property(&f)),
+                .add_p(pool_3_1::fs_limit_property(&f))
+                .add_p(pool_3_1::enable_overprov_property(&f))
+                .add_p(pool_3_1::no_alloc_space_property(&f)),
         );
 
     let path = object_path.get_name().to_owned();
@@ -131,7 +133,9 @@ where
             consts::POOL_ALLOC_SIZE_PROP => shared::pool_allocated_size::<E>(pool),
             consts::POOL_TOTAL_USED_PROP => shared::pool_used_size::<E>(pool),
             consts::POOL_TOTAL_SIZE_PROP => shared::pool_total_size::<E>(pool),
-            consts::POOL_FS_LIMIT_PROP => shared::pool_fs_limit::<E>(pool)
+            consts::POOL_FS_LIMIT_PROP => shared::pool_fs_limit::<E>(pool),
+            consts::POOL_OVERPROV_PROP => shared::pool_overprov_enabled::<E>(pool),
+            consts::POOL_NO_ALLOCABLE_SPACE_PROP => shared::pool_no_alloc_space::<E>(pool)
         }
     }
 }

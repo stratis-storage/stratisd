@@ -159,6 +159,7 @@ where
                                     total_used(d.thin_pool.used, d.pool.metadata_size),
                                     d.thin_pool.allocated_size,
                                     Diff::Changed(pool.total_physical_size().bytes()),
+                                    d.pool.out_of_alloc_space,
                                 )
                             }
                         }
@@ -345,4 +346,38 @@ where
 {
     pool.set_fs_limit(name, pool_uuid, new_limit)
         .map_err(|e| e.to_string())
+}
+
+/// Generate a D-Bus representation of whether the pool has disabled overprovisioning
+/// or not.
+#[inline]
+pub fn pool_overprov_enabled<E>(pool: &E::Pool) -> bool
+where
+    E: 'static + Engine,
+{
+    pool.overprov_enabled()
+}
+
+/// Set the overprovisioning mode on a pool.
+#[inline]
+pub fn pool_set_overprov_mode<E>(
+    pool: &mut E::Pool,
+    name: &Name,
+    enabled: bool,
+) -> Result<(), String>
+where
+    E: 'static + Engine,
+{
+    pool.set_overprov_mode(name, enabled)
+        .map_err(|e| e.to_string())
+}
+
+/// Generate a D-Bus representation of whether the pool has remaining space to
+/// allocate or not.
+#[inline]
+pub fn pool_no_alloc_space<E>(pool: &E::Pool) -> bool
+where
+    E: 'static + Engine,
+{
+    pool.out_of_alloc_space()
 }

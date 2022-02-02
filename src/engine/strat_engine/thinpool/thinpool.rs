@@ -253,8 +253,8 @@ fn search(
 }
 
 /// This method divides the total space into optimized data and metadata size
-/// extensions. It converts the return values from search() into the amount by
-/// which these devices should be extended.
+/// extensions. It returns values from search() respresenting the new total size
+/// of these devices.
 fn divide_space(
     available_space: Sectors,
     current_data_size: Sectors,
@@ -265,27 +265,14 @@ fn divide_space(
         (current_data_size + available_space) / DATA_BLOCK_SIZE * DATA_BLOCK_SIZE;
     let total_space = current_data_size + 2u64 * current_meta_size + available_space;
 
-    debug!("Space for extension: {}", available_space);
-    debug!("Current data device size: {}", current_data_size);
-    debug!("Current meta device size: {}", current_meta_size);
-
     let upper_limit_meta_size = thin_metadata_size(DATA_BLOCK_SIZE, upper_data_aligned, fs_limit)?;
 
-    let (data_size, meta_size) = search(
+    search(
         total_space,
         upper_data_aligned,
         upper_data_aligned - 2u64 * upper_limit_meta_size,
         fs_limit,
-    )?;
-
-    let data_extended = Sectors(data_size.saturating_sub(*current_data_size));
-    debug!("Data extension: {}", data_extended);
-    let meta_extended = Sectors(meta_size.saturating_sub(*current_meta_size));
-    debug!("Meta extension: {}", meta_extended);
-
-    assert!(available_space >= data_extended + 2u64 * meta_extended);
-    assert_eq!(data_extended % DATA_BLOCK_SIZE, Sectors(0));
-    Ok((data_extended, meta_extended))
+    )
 }
 
 /// Finds the optimized size for the data and metadata extension.
@@ -305,6 +292,10 @@ fn calculate_subdevice_extension(
 ) -> StratisResult<(Sectors, Sectors)> {
     let requested_min = min(available_space, requested_space);
 
+    debug!("Space for extension: {}", available_space);
+    debug!("Current data device size: {}", current_data_size);
+    debug!("Current meta device size: {}", current_meta_size);
+
     let (data, meta) = divide_space(
         requested_min,
         current_data_size,
@@ -312,13 +303,21 @@ fn calculate_subdevice_extension(
         fs_limit,
     )?;
 
-    if data == Sectors(0) && meta == Sectors(0) {
+    let data_extended = Sectors(data.saturating_sub(*current_data_size));
+    debug!("Data extension: {}", data_extended);
+    let meta_extended = Sectors(meta.saturating_sub(*current_meta_size));
+    debug!("Meta extension: {}", meta_extended);
+
+    assert!(available_space >= data_extended + 2u64 * meta_extended);
+    assert_eq!(data_extended % DATA_BLOCK_SIZE, Sectors(0));
+
+    if data_extended == Sectors(0) && meta_extended == Sectors(0) {
         Err(StratisError::OutOfSpaceError(format!(
             "{} requested but no space is available",
             requested_min
         )))
     } else {
-        Ok((data, meta))
+        Ok((data_extended, meta_extended))
     }
 }
 
@@ -411,6 +410,7 @@ pub struct ThinPool {
     allocated_size: Sectors,
     used: Option<ThinPoolUsage>,
     fs_limit: u64,
+    enable_overprov: bool,
 }
 
 impl ThinPool {
@@ -531,6 +531,7 @@ impl ThinPool {
             allocated_size: backstore.datatier_allocated_size(),
             used: status_to_usage(thin_pool_status),
             fs_limit: DEFAULT_FS_LIMIT,
+            enable_overprov: true,
         })
     }
 
@@ -667,6 +668,7 @@ impl ThinPool {
             allocated_size: backstore.datatier_allocated_size(),
             used: status_to_usage(thin_pool_status),
             fs_limit: thin_pool_save.fs_limit.unwrap_or(DEFAULT_FS_LIMIT),
+            enable_overprov: thin_pool_save.enable_overprov.unwrap_or(true),
         })
     }
 
@@ -730,23 +732,55 @@ impl ThinPool {
         Ok((should_save, old_state.diff(&new_state)))
     }
 
+    /// Sum the logical size of all filesystems on the pool.
+    fn filesystem_logical_size_sum(&self) -> Sectors {
+        self.filesystems
+            .iter()
+            .map(|(_, _, fs)| fs.thindev_size())
+            .sum()
+    }
+
     /// Check all filesystems on this thin pool and return which had their sizes
     /// extended, if any. This method should not need to handle thin pool status
     /// because it never alters the thin pool itself.
     pub fn check_fs(
         &mut self,
         pool_uuid: PoolUuid,
+        backstore: &Backstore,
     ) -> StratisResult<HashMap<FilesystemUuid, StratFilesystemDiff>> {
         let mut updated = HashMap::default();
+        let data_size = self.thin_pool.data_dev().size();
+        let min_data_size = self.min_datadev_size(backstore)?;
+        let mut remaining_space = if !self.enable_overprov {
+            let data_space = if self.out_of_alloc_space() || data_size > min_data_size {
+                data_size
+            } else {
+                min_data_size
+            };
+            Some(Sectors(
+                data_space.saturating_sub(*self.filesystem_logical_size_sum()),
+            ))
+        } else {
+            None
+        };
+
         for (name, uuid, fs) in self.filesystems.iter_mut() {
-            let (needs_save, prop_diff) = fs.check()?;
-            if prop_diff.is_changed() {
-                updated.insert(*uuid, prop_diff);
-                if needs_save {
-                    if let Err(e) = self.mdv.save_fs(name, *uuid, fs) {
-                        error!("Could not save MDV for fs with UUID {} and name {} belonging to pool with UUID {}, reason: {:?}",
-                                    uuid, name, pool_uuid, e);
-                    }
+            let should_warn_on_zero = remaining_space
+                .as_ref()
+                .map(|s| *s > Sectors(0))
+                .unwrap_or(false);
+            let (needs_save, prop_diff) = fs.check(remaining_space.as_mut())?;
+            if should_warn_on_zero && remaining_space == Some(Sectors(0)) {
+                warn!(
+                    "Overprovisioning protection must be disabled to extend the filesystem further"
+                );
+            }
+
+            updated.insert(*uuid, prop_diff);
+            if needs_save {
+                if let Err(e) = self.mdv.save_fs(name, *uuid, fs) {
+                    error!("Could not save MDV for fs with UUID {} and name {} belonging to pool with UUID {}, reason: {:?}",
+                                uuid, name, pool_uuid, e);
                 }
             }
         }
@@ -848,7 +882,7 @@ impl ThinPool {
     }
 
     /// Returns true if the pool has run out of available space to allocate.
-    fn out_of_alloc_space(&self) -> bool {
+    pub fn out_of_alloc_space(&self) -> bool {
         self.thin_pool
             .table()
             .table
@@ -1401,11 +1435,24 @@ impl ThinPool {
         new_limit: u64,
     ) -> (bool, StratisResult<()>) {
         if self.fs_limit >= new_limit {
-            (
+            return (
                 false,
                 Err(StratisError::Msg(
                     "New filesystem limit must be greater than the current limit".to_string(),
                 )),
+            );
+        }
+        let max_fs_limit = match self.mdv.max_fs_limit() {
+            Ok(m) => m,
+            Err(e) => return (false, Err(e)),
+        };
+        if new_limit > max_fs_limit {
+            (
+                false,
+                Err(StratisError::Msg(format!(
+                    "Currently Stratis can only handle a filesystem limit of up to {}",
+                    max_fs_limit
+                ))),
             )
         } else {
             let (should_save, res) = self.extend_thin_meta_device(pool_uuid, backstore, new_limit);
@@ -1414,6 +1461,61 @@ impl ThinPool {
             }
             (should_save, res.map(|_| ()))
         }
+    }
+
+    /// Returns a boolean indicating whether overprovisioning is disabled or not.
+    pub fn overprov_enabled(&self) -> bool {
+        self.enable_overprov
+    }
+
+    /// Set the overprovisioning mode to either enabled or disabled based on the boolean
+    /// provided as an input and return an error if changing this property fails.
+    pub fn set_overprov_mode(
+        &mut self,
+        backstore: &Backstore,
+        enabled: bool,
+    ) -> (bool, StratisResult<()>) {
+        if self.enable_overprov && !enabled {
+            let data_size = self.thin_pool.data_dev().size();
+            let min_data_size = match self.min_datadev_size(backstore) {
+                Ok(min) => min,
+                Err(e) => return (false, Err(e)),
+            };
+            let data_limit = if self.out_of_alloc_space() || data_size > min_data_size {
+                data_size
+            } else {
+                min_data_size
+            };
+
+            if self.filesystem_logical_size_sum() > data_limit {
+                (false, Err(StratisError::Msg(format!(
+                    "Cannot disable overprovisioning on a pool that is already overprovisioned; the sum of the logical sizes of all filesystems and snapshots must be less than the data space available to the thin pool ({}) to disable overprovisioning",
+                    data_limit
+                ))))
+            } else {
+                self.enable_overprov = false;
+                (true, Ok(()))
+            }
+        } else if !self.enable_overprov && enabled {
+            self.enable_overprov = true;
+            (true, Ok(()))
+        } else {
+            (false, Ok(()))
+        }
+    }
+
+    /// Determine the minimum data size possible to ensure that a filesystem can be
+    /// safely extended when overprovisioning is disabled regardless of future
+    /// requirements.
+    pub fn min_datadev_size(&self, backstore: &Backstore) -> StratisResult<Sectors> {
+        let (data, _) = divide_space(
+            backstore.available_in_backstore(),
+            self.thin_pool.data_dev().size(),
+            self.thin_pool.meta_dev().size(),
+            self.mdv.max_fs_limit()?,
+        )?;
+
+        Ok(data)
     }
 }
 
@@ -1501,6 +1603,7 @@ impl Recordable<ThinPoolDevSave> for ThinPool {
             data_block_size: self.thin_pool.data_block_size(),
             feature_args: Some(self.thin_pool.table().table.params.feature_args.clone()),
             fs_limit: Some(self.fs_limit),
+            enable_overprov: Some(self.enable_overprov),
         }
     }
 }

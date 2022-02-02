@@ -101,6 +101,9 @@ pub struct ThinPoolDevSave {
     // TODO: This data type should no longer be optional in Stratis 4.0
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fs_limit: Option<u64>,
+    // TODO: This data type should no longer be optional in Stratis 4.0
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enable_overprov: Option<bool>,
 }
 
 // Struct representing filesystem metadata. This metadata is not held in the

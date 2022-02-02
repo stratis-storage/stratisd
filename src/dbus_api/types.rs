@@ -111,6 +111,7 @@ pub enum DbusAction<E> {
     PoolCacheChange(Path<'static>, bool),
     PoolSizeChange(Path<'static>, Bytes),
     PoolFsLimitChange(Path<'static>, u64),
+    PoolOverprovModeChange(Path<'static>, bool),
     LockedPoolsChange(HashMap<PoolUuid, LockedPoolInfo>),
 
     FsBackgroundChange(
@@ -118,12 +119,18 @@ pub enum DbusAction<E> {
         SignalChange<Option<Bytes>>,
         SignalChange<Bytes>,
     ),
-    PoolBackgroundChange(PoolUuid, SignalChange<Option<Bytes>>, SignalChange<Bytes>),
+    PoolBackgroundChange(
+        PoolUuid,
+        SignalChange<Option<Bytes>>,
+        SignalChange<Bytes>,
+        SignalChange<bool>,
+    ),
     PoolForegroundChange(
         Path<'static>,
         SignalChange<Option<Bytes>>,
         SignalChange<Bytes>,
         SignalChange<Bytes>,
+        SignalChange<bool>,
     ),
 }
 
@@ -140,7 +147,11 @@ where
             .into_iter()
             .map(|(uuid, diff)| {
                 let PoolDiff {
-                    pool: StratPoolDiff { metadata_size },
+                    pool:
+                        StratPoolDiff {
+                            metadata_size,
+                            out_of_alloc_space,
+                        },
                     thin_pool:
                         ThinPoolDiff {
                             used,
@@ -152,6 +163,7 @@ where
                     uuid,
                     SignalChange::from(total_used(used, metadata_size)),
                     SignalChange::from(allocated_size),
+                    SignalChange::from(out_of_alloc_space),
                 )
             })
             .collect()
@@ -374,6 +386,19 @@ where
         }
     }
 
+    /// Send changed signal for pool overprovisioning mode property.
+    pub fn push_pool_overprov_mode_change(&self, item: &Path<'static>, new_mode: bool) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::PoolOverprovModeChange(item.clone(), new_mode))
+        {
+            warn!(
+                "D-Bus pool overprovisioning mode change event could not be sent to the processing thread; no signal will be sent out for the filesystem overprovisioning mode of pool with path {}: {}",
+                item, e,
+            )
+        }
+    }
+
     /// Send changed signal for pool available actions state.
     pub fn push_pool_avail_actions(&self, item: &Path<'static>, avail_actions: ActionAvailability) {
         if let Err(e) = self
@@ -407,12 +432,14 @@ where
         new_used: Diff<Option<Bytes>>,
         new_alloc: Diff<Bytes>,
         new_size: Diff<Bytes>,
+        out_of_alloc_space: Diff<bool>,
     ) {
         if let Err(e) = self.sender.send(DbusAction::PoolForegroundChange(
             path.clone(),
             SignalChange::from(new_used),
             SignalChange::from(new_alloc),
             SignalChange::from(new_size),
+            SignalChange::from(out_of_alloc_space),
         )) {
             warn!(
                 "Pool allocated size change event could not be sent to the processing thread; no signal will be sent out for the pool allocated size state change: {}",

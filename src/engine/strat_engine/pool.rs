@@ -300,7 +300,7 @@ impl StratPool {
         &mut self,
         pool_uuid: PoolUuid,
     ) -> StratisResult<HashMap<FilesystemUuid, StratFilesystemDiff>> {
-        self.thin_pool.check_fs(pool_uuid)
+        self.thin_pool.check_fs(pool_uuid, &self.backstore)
     }
 
     pub fn record(&self, name: &str) -> PoolSave {
@@ -373,6 +373,28 @@ impl StratPool {
                 level: ActionAvailability::NoRequests,
             }),
         ))
+    }
+
+    /// Verifies that the filesystem operation to be performed is allowed to perform
+    /// overprovisioning if it is determined to be the end result.
+    fn check_overprov(&self, increase: Sectors) -> StratisResult<()> {
+        if !self.thin_pool.overprov_enabled()
+            && self
+                .thin_pool
+                .filesystems()
+                .iter()
+                .map(|(_, _, fs)| fs.thindev_size())
+                .sum::<Sectors>()
+                + increase
+                > self.thin_pool.min_datadev_size(&self.backstore)?
+        {
+            Err(StratisError::Msg(format!(
+                "Overprovisioning is disabled on this pool and increasing total filesystems size by {} would result in overprovisioning",
+                increase
+            )))
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -537,6 +559,9 @@ impl Pool for StratPool {
 
         let spec_map = validate_filesystem_size_specs(specs)?;
 
+        let increase = spec_map.iter().map(|(_, size)| *size).sum::<Sectors>();
+        self.check_overprov(increase)?;
+
         spec_map.iter().fold(Ok(()), |res, (name, size)| {
             res.and_then(|()| validate_name(name))
                 .and_then(|()| {
@@ -601,6 +626,8 @@ impl Pool for StratPool {
             let bdev_info = bdev_info_res?;
             Ok((SetCreateAction::new(bdev_info), None))
         } else {
+            let cached = self.cached();
+
             // If just adding data devices, no need to suspend the pool.
             // No action will be taken on the DM devices.
             let bdev_info = self.backstore.add_datadevs(pool_uuid, paths)?;
@@ -612,7 +639,6 @@ impl Pool for StratPool {
             // addition of the new data devs may have changed its context
             // so that it can satisfy the allocation request where
             // previously it could not. Run check() in case that is true.
-            let cached = self.cached();
             let check = match self.thin_pool.check(pool_uuid, &mut self.backstore) {
                 Ok((_, thin_pool)) => {
                     let pool = cached.diff(&self.dump(()));
@@ -674,6 +700,18 @@ impl Pool for StratPool {
         self.check_fs_limit(1)?;
 
         validate_name(snapshot_name)?;
+        self.check_overprov(
+            self.thin_pool
+                .get_filesystem_by_uuid(origin_uuid)
+                .ok_or_else(|| {
+                    StratisError::Msg(format!(
+                        "Filesystem with UUID {} could not be found",
+                        origin_uuid
+                    ))
+                })?
+                .1
+                .thindev_size(),
+        )?;
 
         if self
             .thin_pool
@@ -796,10 +834,28 @@ impl Pool for StratPool {
         }
         res
     }
+
+    fn overprov_enabled(&self) -> bool {
+        self.thin_pool.overprov_enabled()
+    }
+
+    #[pool_mutating_action("NoPoolChanges")]
+    fn set_overprov_mode(&mut self, pool_name: &Name, enabled: bool) -> StratisResult<()> {
+        let (should_save, res) = self.thin_pool.set_overprov_mode(&self.backstore, enabled);
+        if should_save {
+            self.write_metadata(pool_name)?;
+        }
+        res
+    }
+
+    fn out_of_alloc_space(&self) -> bool {
+        self.thin_pool.out_of_alloc_space()
+    }
 }
 
 pub struct StratPoolState {
     metadata_size: Bytes,
+    out_of_alloc_space: bool,
 }
 
 impl StateDiff for StratPoolState {
@@ -808,6 +864,7 @@ impl StateDiff for StratPoolState {
     fn diff(&self, other: &Self) -> Self::Diff {
         StratPoolDiff {
             metadata_size: self.metadata_size.compare(&other.metadata_size),
+            out_of_alloc_space: self.out_of_alloc_space.compare(&other.out_of_alloc_space),
         }
     }
 }
@@ -819,6 +876,7 @@ impl<'a> DumpState<'a> for StratPool {
     fn cached(&self) -> Self::State {
         StratPoolState {
             metadata_size: self.metadata_size.bytes(),
+            out_of_alloc_space: self.thin_pool.out_of_alloc_space(),
         }
     }
 
@@ -826,6 +884,7 @@ impl<'a> DumpState<'a> for StratPool {
         self.metadata_size = self.backstore.datatier_metadata_size();
         StratPoolState {
             metadata_size: self.metadata_size.bytes(),
+            out_of_alloc_space: self.thin_pool.out_of_alloc_space(),
         }
     }
 }
@@ -1133,6 +1192,113 @@ mod tests {
                 Some(Bytes::from(IEC::Gi * 4).sectors()),
             ),
             test_maintenance_mode,
+        );
+    }
+
+    /// Test overprovisioning mode disabled and enabled assuring that the appropriate
+    /// checks and behavior are in place.
+    fn test_overprov(paths: &[&Path]) {
+        assert!(paths.len() == 1);
+
+        let pool_name = "pool";
+        let (pool_uuid, mut pool) = StratPool::initialize(pool_name, paths, None).unwrap();
+
+        let (_, fs_uuid, _) = pool
+            .create_filesystems(
+                pool_name,
+                pool_uuid,
+                &[(
+                    "stratis_test_filesystem",
+                    Some(pool.backstore.datatier_usable_size().bytes() * 2u64),
+                )],
+            )
+            .unwrap()
+            .changed()
+            .unwrap()
+            .pop()
+            .unwrap();
+        assert!(pool
+            .set_overprov_mode(&Name::new(pool_name.to_string()), false)
+            .is_err());
+        pool.destroy_filesystems(pool_name, &[fs_uuid]).unwrap();
+
+        pool.set_overprov_mode(&Name::new(pool_name.to_string()), false)
+            .unwrap();
+        assert!(pool
+            .create_filesystems(
+                &*pool_name,
+                pool_uuid,
+                &[(
+                    "stratis_test_filesystem",
+                    Some(pool.backstore.datatier_usable_size().bytes() * 2u64)
+                )],
+            )
+            .is_err());
+
+        let mut initial_fs_size = pool.backstore.datatier_usable_size().bytes() * 2u64 / 3u64;
+        initial_fs_size = initial_fs_size.sectors().bytes();
+        let half_init_size = initial_fs_size / 2u64 + Bytes(1);
+        let (_, fs_uuid, _) = pool
+            .create_filesystems(
+                pool_name,
+                pool_uuid,
+                &[("stratis_test_filesystem", Some(initial_fs_size))],
+            )
+            .unwrap()
+            .changed()
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let tmp_dir = tempfile::Builder::new()
+            .prefix("stratis_testing")
+            .tempdir()
+            .unwrap();
+        let new_file = tmp_dir.path().join("stratis_test.txt");
+        let sector = &[0; 512];
+
+        {
+            let (_, fs) = pool.get_filesystem(fs_uuid).unwrap();
+            mount(
+                Some(&fs.devnode()),
+                tmp_dir.path(),
+                Some("xfs"),
+                MsFlags::empty(),
+                None as Option<&str>,
+            )
+            .unwrap();
+        }
+
+        let mut f = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(&new_file)
+            .unwrap();
+        let mut written = Sectors(0);
+        while written.bytes() < half_init_size {
+            f.write_all(sector).unwrap();
+            written += Sectors(1);
+        }
+        let diffs = pool.fs_event_on(pool_uuid).unwrap();
+        assert!(diffs.get(&fs_uuid).unwrap().size.is_changed());
+
+        let (_, fs) = pool.get_filesystem(fs_uuid).unwrap();
+        assert!(fs.thindev_size() < initial_fs_size.sectors() * 2u64);
+    }
+
+    #[test]
+    fn loop_test_overprov() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(1, Some(Sectors(10 * IEC::Mi))),
+            test_overprov,
+        );
+    }
+
+    #[test]
+    fn real_test_overprov() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(1, Some(Sectors(10 * IEC::Mi)), None),
+            test_overprov,
         );
     }
 }

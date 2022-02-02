@@ -78,6 +78,7 @@ pub struct ThinPoolDiff {
 #[derive(Debug)]
 pub struct StratPoolDiff {
     pub metadata_size: Diff<Bytes>,
+    pub out_of_alloc_space: Diff<bool>,
 }
 
 /// Represents the difference between two dumped states for a filesystem.
@@ -85,13 +86,6 @@ pub struct StratPoolDiff {
 pub struct StratFilesystemDiff {
     pub size: Diff<Bytes>,
     pub used: Diff<Option<Bytes>>,
-}
-
-impl StratFilesystemDiff {
-    /// Returns true if the filesystem information has changed.
-    pub fn is_changed(&self) -> bool {
-        self.size.is_changed() || self.used.is_changed()
-    }
 }
 
 /// Represents the difference between two dumped states for a pool.

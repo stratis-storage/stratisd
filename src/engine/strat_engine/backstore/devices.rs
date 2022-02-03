@@ -311,6 +311,7 @@ impl ProcessedPaths {
         mut self,
         pool_uuid: PoolUuid,
         in_use_pool_uuids: &HashSet<DevUuid>,
+        other_in_use_pool_uuids: &HashSet<DevUuid>,
     ) -> StratisResult<FilteredDeviceInfos> {
         let this_pool: Option<Vec<(DevUuid, DeviceInfo)>> = self.stratis_devices.remove(&pool_uuid);
 
@@ -338,10 +339,12 @@ impl ProcessedPaths {
         }
 
         if let Some(mut this_pool) = this_pool {
-            let (mut included, mut not_included) = (vec![], vec![]);
+            let (mut included, mut another_tier, mut not_included) = (vec![], vec![], vec![]);
             for (dev_uuid, info) in this_pool.drain(..) {
                 if in_use_pool_uuids.contains(&dev_uuid) {
                     included.push((dev_uuid, info))
+                } else if other_in_use_pool_uuids.contains(&dev_uuid) {
+                    another_tier.push((dev_uuid, info))
                 } else {
                     not_included.push((dev_uuid, info))
                 }
@@ -349,8 +352,21 @@ impl ProcessedPaths {
 
             if !not_included.is_empty() {
                 let error_message = format!(
-                    "Devices ({}) appear to be already in use by this pool which has UUID {}; they may be in use by the other tier",
+                    "Devices ({}) appear to be already in use by this pool which has UUID {} but they are unaccounted for",
                     not_included
+                        .iter()
+                        .map(|(_, info)| info.devnode.display().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    pool_uuid
+                );
+                return Err(StratisError::Msg(error_message));
+            }
+
+            if !another_tier.is_empty() {
+                let error_message = format!(
+                    "Devices ({}) appear to be already in use by this pool which has UUID {}; they belong to another tier",
+                    another_tier
                         .iter()
                         .map(|(_, info)| info.devnode.display().to_string())
                         .collect::<Vec<_>>()
@@ -767,7 +783,7 @@ mod tests {
             )));
         }
 
-        let dev_infos = infos.into_filtered(pool_uuid, &HashSet::new())?;
+        let dev_infos = infos.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())?;
 
         if dev_infos.len() != paths.len() {
             return Err(Box::new(StratisError::Msg(
@@ -829,8 +845,9 @@ mod tests {
             })
             .collect();
 
-        let result = ProcessedPaths::try_from(paths)
-            .and_then(|processed| processed.into_filtered(pool_uuid, &initialized_uuids));
+        let result = ProcessedPaths::try_from(paths).and_then(|processed| {
+            processed.into_filtered(pool_uuid, &initialized_uuids, &HashSet::new())
+        });
         if key_description.is_some() && result.is_ok() {
             return Err(Box::new(StratisError::Msg(
                 "Failed to return an error when encountering devices that are LUKS2".to_string(),
@@ -958,7 +975,7 @@ mod tests {
             )));
         }
 
-        let mut dev_infos = infos.into_filtered(pool_uuid, &HashSet::new())?;
+        let mut dev_infos = infos.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())?;
 
         if dev_infos.len() != paths.len() {
             return Err(Box::new(StratisError::Msg(

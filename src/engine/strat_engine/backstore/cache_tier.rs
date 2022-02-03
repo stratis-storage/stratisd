@@ -108,8 +108,9 @@ impl CacheTier {
             .map(|(uuid, _)| *uuid)
             .collect::<HashSet<_>>();
 
-        let devices = ProcessedPaths::try_from(paths)
-            .and_then(|processed| processed.into_filtered(pool_uuid, &current_uuids))?;
+        let devices = ProcessedPaths::try_from(paths).and_then(|processed| {
+            processed.into_filtered(pool_uuid, &current_uuids, &HashSet::new())
+        })?;
 
         let uuids = self.block_mgr.add(pool_uuid, devices)?;
 
@@ -249,7 +250,9 @@ mod tests {
 
         let pool_uuid = PoolUuid::new_v4();
         let devices1 = ProcessedPaths::try_from(paths1)
-            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .and_then(|processed| {
+                processed.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())
+            })
             .unwrap();
         let mgr =
             BlockDevMgr::initialize(pool_uuid, devices1, MDADataSize::default(), None).unwrap();

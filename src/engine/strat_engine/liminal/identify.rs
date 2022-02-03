@@ -536,8 +536,9 @@ mod tests {
             let pool_uuid = PoolUuid::new_v4();
 
             let devices = initialize_devices(
-                ProcessedPaths::try_from(paths)
-                    .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))?,
+                ProcessedPaths::try_from(paths).and_then(|processed| {
+                    processed.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())
+                })?,
                 pool_uuid,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_description.clone())),
@@ -652,7 +653,9 @@ mod tests {
 
         initialize_devices(
             ProcessedPaths::try_from(paths)
-                .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+                .and_then(|processed| {
+                    processed.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())
+                })
                 .unwrap(),
             pool_uuid,
             MDADataSize::default(),

@@ -743,7 +743,9 @@ mod tests {
     fn test_blockdevmgr_used(paths: &[&Path]) {
         let pool_uuid = PoolUuid::new_v4();
         let devices = ProcessedPaths::try_from(paths)
-            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .and_then(|processed| {
+                processed.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())
+            })
             .unwrap();
         let mut mgr =
             BlockDevMgr::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
@@ -781,21 +783,28 @@ mod tests {
             let mut bdm = BlockDevMgr::initialize(
                 pool_uuid,
                 ProcessedPaths::try_from(&paths[..2])
-                    .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+                    .and_then(|processed| {
+                        processed.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())
+                    })
                     .unwrap(),
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
             )?;
 
-            if bdm
-                .add(
-                    pool_uuid,
-                    ProcessedPaths::try_from(&paths[2..3])
-                        .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
-                        .unwrap(),
-                )
-                .is_err()
-            {
+            let current_uuids = bdm
+                .blockdevs()
+                .iter()
+                .map(|(uuid, _)| *uuid)
+                .collect::<HashSet<_>>();
+            let add_result = bdm.add(
+                pool_uuid,
+                ProcessedPaths::try_from(&paths[2..3])
+                    .and_then(|processed| {
+                        processed.into_filtered(pool_uuid, &current_uuids, &HashSet::new())
+                    })
+                    .unwrap(),
+            );
+            if add_result.is_err() {
                 Err(Box::new(StratisError::Msg(
                     "Adding a blockdev with the same key to an encrypted pool should succeed"
                         .to_string(),
@@ -833,7 +842,9 @@ mod tests {
             let mut bdm = BlockDevMgr::initialize(
                 pool_uuid,
                 ProcessedPaths::try_from(&paths[..2])
-                    .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+                    .and_then(|processed| {
+                        processed.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())
+                    })
                     .unwrap(),
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
@@ -841,15 +852,20 @@ mod tests {
 
             crypt::change_key(key_desc)?;
 
-            if bdm
-                .add(
-                    pool_uuid,
-                    ProcessedPaths::try_from(&paths[2..3])
-                        .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
-                        .unwrap(),
-                )
-                .is_ok()
-            {
+            let current_uuids = bdm
+                .blockdevs()
+                .iter()
+                .map(|(uuid, _)| *uuid)
+                .collect::<HashSet<_>>();
+            let add_result = bdm.add(
+                pool_uuid,
+                ProcessedPaths::try_from(&paths[2..3])
+                    .and_then(|processed| {
+                        processed.into_filtered(pool_uuid, &current_uuids, &HashSet::new())
+                    })
+                    .unwrap(),
+            );
+            if add_result.is_ok() {
                 Err(Box::new(StratisError::Msg(
                     "Adding a blockdev with a new key to an encrypted pool should fail".to_string(),
                 )))
@@ -890,7 +906,7 @@ mod tests {
         let uuid2 = PoolUuid::new_v4();
 
         let devices1 = ProcessedPaths::try_from(paths1)
-            .and_then(|processed| processed.into_filtered(uuid, &HashSet::new()))
+            .and_then(|processed| processed.into_filtered(uuid, &HashSet::new(), &HashSet::new()))
             .unwrap();
         let bd_mgr = BlockDevMgr::initialize(uuid, devices1, MDADataSize::default(), None).unwrap();
         cmd::udev_settle().unwrap();
@@ -901,8 +917,11 @@ mod tests {
             .map(|(uuid, _)| *uuid)
             .collect::<HashSet<_>>();
         assert_matches!(
-            ProcessedPaths::try_from(paths1)
-                .and_then(|processed| processed.into_filtered(uuid2, &current_uuids)),
+            ProcessedPaths::try_from(paths1).and_then(|processed| processed.into_filtered(
+                uuid2,
+                &current_uuids,
+                &HashSet::new()
+            )),
             Err(_)
         );
 
@@ -910,7 +929,7 @@ mod tests {
         assert_eq!(bd_mgr.block_devs.len(), original_length);
 
         let devices2 = ProcessedPaths::try_from(paths2)
-            .and_then(|processed| processed.into_filtered(uuid, &HashSet::new()))
+            .and_then(|processed| processed.into_filtered(uuid, &HashSet::new(), &HashSet::new()))
             .unwrap();
         BlockDevMgr::initialize(uuid, devices2, MDADataSize::default(), None).unwrap();
         cmd::udev_settle().unwrap();
@@ -921,8 +940,11 @@ mod tests {
             .map(|(uuid, _)| *uuid)
             .collect::<HashSet<_>>();
         assert_matches!(
-            ProcessedPaths::try_from(paths2)
-                .and_then(|processed| processed.into_filtered(uuid, &current_uuids)),
+            ProcessedPaths::try_from(paths2).and_then(|processed| processed.into_filtered(
+                uuid,
+                &current_uuids,
+                &HashSet::new()
+            )),
             Err(_)
         );
 
@@ -949,7 +971,7 @@ mod tests {
         let _memfs = MemoryFilesystem::new().unwrap();
         let uuid = PoolUuid::new_v4();
         let devices = ProcessedPaths::try_from(paths)
-            .and_then(|processed| processed.into_filtered(uuid, &HashSet::new()))
+            .and_then(|processed| processed.into_filtered(uuid, &HashSet::new(), &HashSet::new()))
             .unwrap();
         let mut mgr = BlockDevMgr::initialize(
             uuid,
@@ -993,7 +1015,9 @@ mod tests {
             let _memfs = MemoryFilesystem::new().unwrap();
             let uuid = PoolUuid::new_v4();
             let devices = ProcessedPaths::try_from(paths)
-                .and_then(|processed| processed.into_filtered(uuid, &HashSet::new()))
+                .and_then(|processed| {
+                    processed.into_filtered(uuid, &HashSet::new(), &HashSet::new())
+                })
                 .unwrap();
             let mut mgr = BlockDevMgr::initialize(
                 uuid,
@@ -1099,7 +1123,9 @@ mod tests {
             let _memfs = MemoryFilesystem::new().unwrap();
             let uuid = PoolUuid::new_v4();
             let devices = ProcessedPaths::try_from(paths_vec.as_slice())
-                .and_then(|processed| processed.into_filtered(uuid, &HashSet::new()))
+                .and_then(|processed| {
+                    processed.into_filtered(uuid, &HashSet::new(), &HashSet::new())
+                })
                 .unwrap();
             let res = BlockDevMgr::initialize(
                 uuid,
@@ -1122,7 +1148,9 @@ mod tests {
 
             let uuid = PoolUuid::new_v4();
             let devices = ProcessedPaths::try_from(paths)
-                .and_then(|processed| processed.into_filtered(uuid, &HashSet::new()))
+                .and_then(|processed| {
+                    processed.into_filtered(uuid, &HashSet::new(), &HashSet::new())
+                })
                 .unwrap();
 
             // Ensure that rollback completed successfully by trying a call that

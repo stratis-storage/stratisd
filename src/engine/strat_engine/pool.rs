@@ -159,8 +159,9 @@ impl StratPool {
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = PoolUuid::new_v4();
 
-        let devices = ProcessedPaths::try_from(paths)
-            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))?;
+        let devices = ProcessedPaths::try_from(paths).and_then(|processed| {
+            processed.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())
+        })?;
 
         if devices.is_empty() {
             return Err(StratisError::Msg(
@@ -421,8 +422,10 @@ impl Pool for StratPool {
             ));
         }
         if !self.has_cache() {
-            let devices = ProcessedPaths::try_from(blockdevs)
-                .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))?;
+            // FIXME
+            let devices = ProcessedPaths::try_from(blockdevs).and_then(|processed| {
+                processed.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())
+            })?;
 
             if devices.is_empty() {
                 return Err(StratisError::Msg(

@@ -777,7 +777,9 @@ mod tests {
 
         let pool_uuid = PoolUuid::new_v4();
         let devices = ProcessedPaths::try_from(initdatapaths)
-            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .and_then(|processed| {
+                processed.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())
+            })
             .unwrap();
         let mut backstore =
             Backstore::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
@@ -789,8 +791,15 @@ mod tests {
             .alloc(pool_uuid, &[INITIAL_BACKSTORE_ALLOCATION])
             .unwrap();
 
+        let datadev_uuids = backstore
+            .datadevs()
+            .iter()
+            .map(|(uuid, _)| *uuid)
+            .collect::<HashSet<DevUuid>>();
         let devices = ProcessedPaths::try_from(initcachepaths)
-            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .and_then(|processed| {
+                processed.into_filtered(pool_uuid, &HashSet::new(), &datadev_uuids)
+            })
             .unwrap();
         let cache_uuids = backstore.init_cache(pool_uuid, devices).unwrap();
 
@@ -870,7 +879,9 @@ mod tests {
 
         let pool_uuid = PoolUuid::new_v4();
         let devices = ProcessedPaths::try_from(paths)
-            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .and_then(|processed| {
+                processed.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())
+            })
             .unwrap();
         let mut backstore =
             Backstore::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
@@ -929,7 +940,9 @@ mod tests {
         let pool_uuid = PoolUuid::new_v4();
 
         let devices = ProcessedPaths::try_from(paths1)
-            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .and_then(|processed| {
+                processed.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())
+            })
             .unwrap();
         let mut backstore =
             Backstore::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
@@ -953,8 +966,15 @@ mod tests {
 
         let old_device = backstore.device();
 
+        let datadev_uuids = backstore
+            .datadevs()
+            .iter()
+            .map(|(uuid, _)| *uuid)
+            .collect::<HashSet<DevUuid>>();
         let devices = ProcessedPaths::try_from(paths2)
-            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .and_then(|processed| {
+                processed.into_filtered(pool_uuid, &HashSet::new(), &datadev_uuids)
+            })
             .unwrap();
         backstore.init_cache(pool_uuid, devices).unwrap();
 

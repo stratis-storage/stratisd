@@ -1339,6 +1339,7 @@ mod tests {
             tests::{loopbacked, real},
             writing::SyncAll,
         },
+        types::DevUuid,
     };
 
     use crate::engine::strat_engine::thinpool::filesystem::{fs_usage, FILESYSTEM_LOWATER};
@@ -1374,7 +1375,9 @@ mod tests {
         let pool_uuid = PoolUuid::new_v4();
 
         let devices = ProcessedPaths::try_from(paths)
-            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .and_then(|processed| {
+                processed.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())
+            })
             .unwrap();
         let mut backstore =
             Backstore::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
@@ -1419,7 +1422,9 @@ mod tests {
         let pool_uuid = PoolUuid::new_v4();
         let (first_path, remaining_paths) = paths.split_at(1);
         let devices = ProcessedPaths::try_from(first_path)
-            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .and_then(|processed| {
+                processed.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())
+            })
             .unwrap();
         let mut backstore =
             Backstore::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
@@ -1547,7 +1552,9 @@ mod tests {
         let pool_name = "pool";
         let pool_uuid = PoolUuid::new_v4();
         let devices = ProcessedPaths::try_from(paths)
-            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .and_then(|processed| {
+                processed.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())
+            })
             .unwrap();
         let mut backstore =
             Backstore::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
@@ -1675,7 +1682,9 @@ mod tests {
 
         let pool_uuid = PoolUuid::new_v4();
         let devices = ProcessedPaths::try_from(paths)
-            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .and_then(|processed| {
+                processed.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())
+            })
             .unwrap();
         let mut backstore =
             Backstore::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
@@ -1741,7 +1750,9 @@ mod tests {
         let pool_name = "pool";
         let pool_uuid = PoolUuid::new_v4();
         let devices = ProcessedPaths::try_from(paths)
-            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .and_then(|processed| {
+                processed.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())
+            })
             .unwrap();
         let mut backstore =
             Backstore::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
@@ -1816,7 +1827,9 @@ mod tests {
     fn test_thindev_destroy(paths: &[&Path]) {
         let pool_uuid = PoolUuid::new_v4();
         let devices = ProcessedPaths::try_from(paths)
-            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .and_then(|processed| {
+                processed.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())
+            })
             .unwrap();
         let mut backstore =
             Backstore::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
@@ -1883,7 +1896,9 @@ mod tests {
         let pool_name = "pool";
         let pool_uuid = PoolUuid::new_v4();
         let devices = ProcessedPaths::try_from(paths)
-            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .and_then(|processed| {
+                processed.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())
+            })
             .unwrap();
         let mut backstore =
             Backstore::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
@@ -1980,7 +1995,9 @@ mod tests {
         let pool_name = "pool";
         let pool_uuid = PoolUuid::new_v4();
         let devices = ProcessedPaths::try_from(paths)
-            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .and_then(|processed| {
+                processed.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())
+            })
             .unwrap();
         let mut backstore =
             Backstore::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
@@ -2034,7 +2051,9 @@ mod tests {
         let pool_name = "pool";
         let pool_uuid = PoolUuid::new_v4();
         let devices = ProcessedPaths::try_from(paths2)
-            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .and_then(|processed| {
+                processed.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())
+            })
             .unwrap();
         let mut backstore =
             Backstore::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
@@ -2096,8 +2115,15 @@ mod tests {
             .device()
             .expect("Space already allocated from backstore, backstore must have device");
 
+        let datadev_uuids = backstore
+            .datadevs()
+            .iter()
+            .map(|(uuid, _)| *uuid)
+            .collect::<HashSet<DevUuid>>();
         let devices = ProcessedPaths::try_from(paths1)
-            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .and_then(|processed| {
+                processed.into_filtered(pool_uuid, &HashSet::new(), &datadev_uuids)
+            })
             .unwrap();
         backstore.init_cache(pool_uuid, devices).unwrap();
         let new_device = backstore

@@ -4,7 +4,7 @@
 
 // Code to handle the backing store of a pool.
 
-use std::{cmp, collections::HashSet, convert::TryFrom, path::Path};
+use std::{cmp, path::Path};
 
 use chrono::{DateTime, Utc};
 use serde_json::Value;
@@ -19,7 +19,7 @@ use crate::{
                 blockdevmgr::{map_to_dm, BlockDevMgr},
                 cache_tier::CacheTier,
                 data_tier::DataTier,
-                devices::ProcessedPaths,
+                devices::FilteredDeviceInfos,
             },
             dm::get_dm,
             metadata::MDADataSize,
@@ -179,12 +179,10 @@ impl Backstore {
     /// WARNING: metadata changing event
     pub fn initialize(
         pool_uuid: PoolUuid,
-        paths: &[&Path],
+        devices: FilteredDeviceInfos,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<Backstore> {
-        let devices = ProcessedPaths::try_from(paths)
-            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))?;
         let data_tier = DataTier::new(BlockDevMgr::initialize(
             pool_uuid,
             devices,
@@ -212,19 +210,16 @@ impl Backstore {
     pub fn init_cache(
         &mut self,
         pool_uuid: PoolUuid,
-        paths: &[&Path],
+        devices: FilteredDeviceInfos,
     ) -> StratisResult<Vec<DevUuid>> {
         match self.cache_tier {
             Some(_) => unreachable!("self.cache.is_none()"),
             None => {
-                if paths.is_empty() {
+                if devices.is_empty() {
                     return Err(StratisError::Msg(
                         "Must initialize cache with at least one blockdev.".to_string(),
                     ));
                 }
-
-                let devices = ProcessedPaths::try_from(paths)
-                    .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))?;
 
                 // Note that variable length metadata is not stored on the
                 // cachedevs, so the mda_size can always be the minimum.
@@ -726,11 +721,12 @@ impl Recordable<BackstoreSave> for Backstore {
 
 #[cfg(test)]
 mod tests {
-    use std::fs::OpenOptions;
+    use std::{collections::HashSet, convert::TryFrom, fs::OpenOptions};
 
     use devicemapper::{CacheDevStatus, DataBlocks, DmOptions, IEC};
 
     use crate::engine::strat_engine::{
+        backstore::devices::ProcessedPaths,
         cmd,
         metadata::device_identifiers,
         tests::{loopbacked, real},
@@ -780,8 +776,11 @@ mod tests {
         let (datadevpaths, initdatapaths) = paths.split_at(1);
 
         let pool_uuid = PoolUuid::new_v4();
+        let devices = ProcessedPaths::try_from(initdatapaths)
+            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .unwrap();
         let mut backstore =
-            Backstore::initialize(pool_uuid, initdatapaths, MDADataSize::default(), None).unwrap();
+            Backstore::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
 
         invariant(&backstore);
 
@@ -790,7 +789,10 @@ mod tests {
             .alloc(pool_uuid, &[INITIAL_BACKSTORE_ALLOCATION])
             .unwrap();
 
-        let cache_uuids = backstore.init_cache(pool_uuid, initcachepaths).unwrap();
+        let devices = ProcessedPaths::try_from(initcachepaths)
+            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .unwrap();
+        let cache_uuids = backstore.init_cache(pool_uuid, devices).unwrap();
 
         invariant(&backstore);
 
@@ -867,8 +869,11 @@ mod tests {
         assert!(!paths.is_empty());
 
         let pool_uuid = PoolUuid::new_v4();
+        let devices = ProcessedPaths::try_from(paths)
+            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .unwrap();
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
+            Backstore::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
 
         assert_matches!(
             backstore
@@ -923,8 +928,11 @@ mod tests {
 
         let pool_uuid = PoolUuid::new_v4();
 
+        let devices = ProcessedPaths::try_from(paths1)
+            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .unwrap();
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths1, MDADataSize::default(), None).unwrap();
+            Backstore::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
 
         for path in paths1 {
             assert_eq!(
@@ -945,7 +953,10 @@ mod tests {
 
         let old_device = backstore.device();
 
-        backstore.init_cache(pool_uuid, paths2).unwrap();
+        let devices = ProcessedPaths::try_from(paths2)
+            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))
+            .unwrap();
+        backstore.init_cache(pool_uuid, devices).unwrap();
 
         for path in paths2 {
             assert_eq!(

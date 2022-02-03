@@ -274,8 +274,7 @@ impl FilteredDeviceInfos {
         self.internal.iter()
     }
 
-    #[cfg(test)]
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.internal.is_empty()
     }
 

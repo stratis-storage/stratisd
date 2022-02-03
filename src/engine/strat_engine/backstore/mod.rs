@@ -20,8 +20,5 @@ pub use self::{
         crypt_metadata_size, CryptActivationHandle, CryptHandle, CryptMetadataHandle,
         CLEVIS_TANG_TRUST_URL,
     },
-    devices::initialize_devices,
+    devices::{initialize_devices, ProcessedPaths},
 };
-
-#[cfg(test)]
-pub use self::devices::ProcessedPaths;

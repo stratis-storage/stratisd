@@ -2,7 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, path::Path, vec::Vec};
+use std::{
+    collections::{HashMap, HashSet},
+    convert::TryFrom,
+    path::Path,
+    vec::Vec,
+};
 
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
@@ -18,7 +23,7 @@ use crate::{
             validate_paths,
         },
         strat_engine::{
-            backstore::{Backstore, StratBlockDev},
+            backstore::{Backstore, ProcessedPaths, StratBlockDev},
             metadata::MDADataSize,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             thinpool::{StratFilesystem, ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
@@ -154,11 +159,20 @@ impl StratPool {
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = PoolUuid::new_v4();
 
+        let devices = ProcessedPaths::try_from(paths)
+            .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))?;
+
+        if devices.is_empty() {
+            return Err(StratisError::Msg(
+                "At least one blockdev path is required to initialize a pool.".to_string(),
+            ));
+        }
+
         // FIXME: Initializing with the minimum MDA size is not necessarily
         // enough. If there are enough devices specified, more space will be
         // required.
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), encryption_info)?;
+            Backstore::initialize(pool_uuid, devices, MDADataSize::default(), encryption_info)?;
 
         let thinpool = ThinPool::new(
             pool_uuid,
@@ -407,7 +421,10 @@ impl Pool for StratPool {
             ));
         }
         if !self.has_cache() {
-            if blockdevs.is_empty() {
+            let devices = ProcessedPaths::try_from(blockdevs)
+                .and_then(|processed| processed.into_filtered(pool_uuid, &HashSet::new()))?;
+
+            if devices.is_empty() {
                 return Err(StratisError::Msg(
                     "At least one blockdev path is required to initialize a cache.".to_string(),
                 ));
@@ -416,7 +433,7 @@ impl Pool for StratPool {
             self.thin_pool.suspend()?;
             let devices_result = self
                 .backstore
-                .init_cache(pool_uuid, blockdevs)
+                .init_cache(pool_uuid, devices)
                 .and_then(|bdi| {
                     self.thin_pool
                         .set_device(self.backstore.device().expect(

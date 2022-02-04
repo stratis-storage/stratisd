@@ -422,9 +422,15 @@ impl Pool for StratPool {
             ));
         }
         if !self.has_cache() {
-            // FIXME
+            let datadev_uuids = self
+                .backstore
+                .datadevs()
+                .iter()
+                .map(|(uuid, _)| *uuid)
+                .collect::<HashSet<DevUuid>>();
+
             let devices = ProcessedPaths::try_from(blockdevs).and_then(|processed| {
-                processed.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())
+                processed.into_filtered(pool_uuid, &HashSet::new(), &datadev_uuids)
             })?;
 
             if devices.is_empty() {

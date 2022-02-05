@@ -258,8 +258,8 @@ dependencies = [
 
 [[package]]
 name = "devicemapper"
-version = "0.31.0"
-source = "git+https://github.com/stratis-storage/devicemapper-rs?branch=crates-io-patch-0.31.0#8502f7b74a1a5c3b1d920b6c83bbe7d7c368dfd5"
+version = "0.32.0"
+source = "git+https://github.com/stratis-storage/devicemapper-rs?branch=crates-io-patch-0.32.0#126e2a7f8deb7f0bf7205466cce2b54271c3ea70"
 dependencies = [
  "bitflags",
  "devicemapper-sys",

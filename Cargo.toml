@@ -10,7 +10,6 @@ repository = "https://github.com/stratis-storage/stratisd/"
 keywords = ["Linux", "filesystem", "storage"]
 categories = ["filesystem"]
 exclude = [
-    "container_files",
     "docs",
     "dracut",
     ".gitignore",

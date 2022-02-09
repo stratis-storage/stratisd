@@ -320,6 +320,10 @@ impl ProcessedPaths {
                 .sum::<usize>()
     }
 
+    pub fn stratis_devices(&self) -> &HashMap<PoolUuid, HashMap<DevUuid, DeviceInfo>> {
+        &self.stratis_devices
+    }
+
     pub fn has_free_devices(&self) -> bool {
         !self.free_devices.is_empty()
     }

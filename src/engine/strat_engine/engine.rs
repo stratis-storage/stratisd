@@ -373,7 +373,29 @@ impl Engine for StratEngine {
             })??;
 
             if device_infos.has_stratis_devices() {
-                unimplemented!()
+                let mut error_message_entries = vec![];
+                let pools_read_all = self.pools.read_all().await;
+                for (pool_uuid, device_map) in device_infos.stratis_devices() {
+                    if let Some(entry) = pools_read_all.get_by_uuid(*pool_uuid) {
+                        for (_, dev_info) in device_map.iter() {
+                            error_message_entries.push((pool_uuid, entry.0.to_owned(), dev_info.devnode.to_owned()));
+                        }
+                    }
+                }
+                let error_message = format!(
+                    "The specified devices appear to already belong to some Stratis pool: {}",
+                    error_message_entries
+                        .iter()
+                        .map(|(pool_name, pool_uuid, path)| format!(
+                            "Path {} belongs to pool {} with UUID {}",
+                            path.display(),
+                            pool_name,
+                            pool_uuid
+                        ))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+                return Err(StratisError::Msg(error_message));
             }
 
             let cloned_name = name.clone();

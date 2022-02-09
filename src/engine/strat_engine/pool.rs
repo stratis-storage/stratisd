@@ -153,21 +153,18 @@ impl StratPool {
     /// 2. Set up thinpool device to back filesystems.
     /// Precondition: p.is_absolute() is true for all p in paths
     pub fn initialize(
+        pool_uuid: PoolUuid,
         name: &str,
-        paths: &[&Path],
+        device_infos: ProcessedPaths,
         encryption_info: Option<&EncryptionInfo>,
-    ) -> StratisResult<(PoolUuid, StratPool)> {
-        let pool_uuid = PoolUuid::new_v4();
-
-        let devices = ProcessedPaths::try_from(paths).and_then(|processed| {
-            processed.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())
-        })?;
-
-        if devices.is_empty() {
+    ) -> StratisResult<StratPool> {
+        if !device_infos.has_free_devices() {
             return Err(StratisError::Msg(
                 "At least one blockdev path is required to initialize a pool.".to_string(),
             ));
         }
+
+        let devices = device_infos.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())?;
 
         // FIXME: Initializing with the minimum MDA size is not necessarily
         // enough. If there are enough devices specified, more space will be
@@ -200,7 +197,7 @@ impl StratPool {
 
         pool.write_metadata(&Name::new(name.to_owned()))?;
 
-        Ok((pool_uuid, pool))
+        Ok(pool)
     }
 
     /// Setup a StratPool using its UUID and the list of devnodes it has.
@@ -866,8 +863,9 @@ mod tests {
     /// space required.
     fn test_empty_pool(paths: &[&Path]) {
         assert_eq!(paths.len(), 0);
+        let device_infos = ProcessedPaths::try_from(blockdev_paths).unwrap();
         assert_matches!(
-            StratPool::initialize("stratis_test_pool", paths, None),
+            StratPool::initialize(PoolUuid::new_v4(), "stratis_test_pool", device_infos, None),
             Err(_)
         );
     }

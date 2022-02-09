@@ -289,8 +289,8 @@ impl FilteredDeviceInfos {
 /// initialization by Stratis, as some may have been identified as Stratis
 /// devices.
 pub struct ProcessedPaths {
-    stratis_devices: HashMap<PoolUuid, Vec<(DevUuid, DeviceInfo)>>,
-    free_devices: Vec<DeviceInfo>,
+    pub stratis_devices: HashMap<PoolUuid, Vec<(DevUuid, DeviceInfo)>>,
+    pub free_devices: Vec<DeviceInfo>,
 }
 
 impl ProcessedPaths {
@@ -302,6 +302,10 @@ impl ProcessedPaths {
                 .values()
                 .map(|devices| devices.len())
                 .sum::<usize>()
+    }
+
+    pub fn has_free_devices(&self) -> bool {
+        !self.free_devices.is_empty()
     }
 
     /// Filter the devices for a particular pool. Remove all devices that

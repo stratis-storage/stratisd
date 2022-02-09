@@ -4,6 +4,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
+    convert::TryFrom,
     path::Path,
     sync::Arc,
 };
@@ -22,6 +23,7 @@ use crate::{
     engine::{
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         strat_engine::{
+            backstore::ProcessedPaths,
             cmd::verify_binaries,
             dm::get_dm,
             keys::{MemoryFilesystem, StratKeyActions},
@@ -360,16 +362,31 @@ impl Engine for StratEngine {
                 "At least one blockdev is required to create a pool.".to_string(),
             ))
         } else {
-            let cloned_name = name.clone();
             let cloned_paths = blockdev_paths
                 .iter()
                 .map(|p| p.to_path_buf())
                 .collect::<Vec<_>>();
+
+            let device_infos = spawn_blocking!({
+                let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
+                ProcessedPaths::try_from(borrowed_paths.as_slice())
+            })??;
+
+            if !device_infos.stratis_devices.is_empty() {
+                unimplemented!()
+            }
+
+            let cloned_name = name.clone();
             let cloned_enc_info = encryption_info.cloned();
 
-            let (pool_uuid, _) = spawn_blocking!({
-                let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
-                StratPool::initialize(&cloned_name, &borrowed_paths, cloned_enc_info.as_ref())
+            let pool_uuid = PoolUuid::new_v4();
+            let _ = spawn_blocking!({
+                StratPool::initialize(
+                    pool_uuid,
+                    &cloned_name,
+                    device_infos,
+                    cloned_enc_info.as_ref(),
+                )
             })??;
 
             Ok(CreateAction::Created(pool_uuid))

@@ -412,7 +412,7 @@ impl Engine for StratEngine {
                     &cloned_name,
                     device_infos
                         .into_unowned()
-                        .expect("returned an error if any stratis owned devices"),
+                        .expect("returned an error if any Stratis owned devices"),
                     cloned_enc_info.as_ref(),
                 )
             })??;

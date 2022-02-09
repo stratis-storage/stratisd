@@ -374,7 +374,6 @@ impl Engine for StratEngine {
 
             if device_infos.has_stratis_devices() {
                 unimplemented!()
-
             }
 
             let cloned_name = name.clone();

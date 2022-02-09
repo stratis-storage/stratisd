@@ -305,7 +305,7 @@ impl FilteredDeviceInfos {
 /// initialization by Stratis, as some may have been identified as Stratis
 /// devices.
 pub struct ProcessedPaths {
-    stratis_devices: HashMap<PoolUuid, Vec<(DevUuid, DeviceInfo)>>,
+    stratis_devices: HashMap<PoolUuid, HashMap<DevUuid, DeviceInfo>>,
     free_devices: Vec<DeviceInfo>,
 }
 
@@ -337,7 +337,8 @@ impl ProcessedPaths {
         in_use_pool_uuids: &HashSet<DevUuid>,
         other_in_use_pool_uuids: &HashSet<DevUuid>,
     ) -> StratisResult<FilteredDeviceInfos> {
-        let this_pool: Option<Vec<(DevUuid, DeviceInfo)>> = self.stratis_devices.remove(&pool_uuid);
+        let this_pool: Option<HashMap<DevUuid, DeviceInfo>> =
+            self.stratis_devices.remove(&pool_uuid);
 
         if !self.stratis_devices.is_empty() {
             let error_string = self
@@ -364,7 +365,7 @@ impl ProcessedPaths {
 
         if let Some(mut this_pool) = this_pool {
             let (mut included, mut another_tier, mut not_included) = (vec![], vec![], vec![]);
-            for (dev_uuid, info) in this_pool.drain(..) {
+            for (dev_uuid, info) in this_pool.drain() {
                 if in_use_pool_uuids.contains(&dev_uuid) {
                     included.push((dev_uuid, info))
                 } else if other_in_use_pool_uuids.contains(&dev_uuid) {
@@ -450,25 +451,32 @@ impl TryFrom<&[&Path]> for ProcessedPaths {
                 .collect()
         })?;
 
-        let (mut stratis_assigned_devices, mut free_devices) = (vec![], vec![]);
+        let (mut stratis_devices, mut free_devices) = (HashMap::new(), vec![]);
 
         for (info, ids) in devices.drain(..) {
             match ids {
-                Some(ids) => stratis_assigned_devices.push((info, ids)),
+                Some(ids) => {
+                    let entry = stratis_devices
+                        .entry(ids.pool_uuid)
+                        .or_insert_with(HashMap::new);
+                    let get_result = entry.get(&ids.device_uuid);
+                    if let Some(prior_info) = get_result {
+                        if prior_info != &info {
+                            let error_message = format!(
+                                "Inconsistent information about existing Stratis devices: device with pool UUID {} and device UUID {} is both {:?} and {:?}",
+                                ids.pool_uuid,
+                                ids.device_uuid,
+                                prior_info,
+                                info);
+                            return Err(StratisError::Msg(error_message));
+                        }
+                    } else {
+                        entry.insert(ids.device_uuid, info);
+                    }
+                }
                 None => free_devices.push(info),
             }
         }
-
-        let stratis_devices: HashMap<PoolUuid, Vec<(DevUuid, DeviceInfo)>> =
-            stratis_assigned_devices.drain(..).fold(
-                HashMap::new(),
-                |mut acc, (info, identifiers)| {
-                    acc.entry(identifiers.pool_uuid)
-                        .or_insert_with(Vec::new)
-                        .push((identifiers.device_uuid, info));
-                    acc
-                },
-            );
 
         Ok(ProcessedPaths {
             stratis_devices,

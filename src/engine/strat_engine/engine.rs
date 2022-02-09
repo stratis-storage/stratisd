@@ -372,9 +372,9 @@ impl Engine for StratEngine {
                 ProcessedPaths::try_from(borrowed_paths.as_slice())
             })??;
 
-            if !device_infos.stratis_devices.is_empty() {
-                // FIXME: return error about Stratis pools, with names
+            if device_infos.has_stratis_devices() {
                 unimplemented!()
+
             }
 
             let cloned_name = name.clone();

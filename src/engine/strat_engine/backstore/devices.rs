@@ -450,23 +450,25 @@ impl TryFrom<&[&Path]> for ProcessedPaths {
                 .collect()
         })?;
 
-        let (mut stratis_devices, mut free_devices) = (vec![], vec![]);
+        let (mut stratis_assigned_devices, mut free_devices) = (vec![], vec![]);
 
         for (info, ids) in devices.drain(..) {
             match ids {
-                Some(ids) => stratis_devices.push((info, ids)),
+                Some(ids) => stratis_assigned_devices.push((info, ids)),
                 None => free_devices.push(info),
             }
         }
 
-        let stratis_devices: HashMap<PoolUuid, Vec<(DevUuid, DeviceInfo)>> = stratis_devices
-            .drain(..)
-            .fold(HashMap::new(), |mut acc, (info, identifiers)| {
-                acc.entry(identifiers.pool_uuid)
-                    .or_insert_with(Vec::new)
-                    .push((identifiers.device_uuid, info));
-                acc
-            });
+        let stratis_devices: HashMap<PoolUuid, Vec<(DevUuid, DeviceInfo)>> =
+            stratis_assigned_devices.drain(..).fold(
+                HashMap::new(),
+                |mut acc, (info, identifiers)| {
+                    acc.entry(identifiers.pool_uuid)
+                        .or_insert_with(Vec::new)
+                        .push((identifiers.device_uuid, info));
+                    acc
+                },
+            );
 
         Ok(ProcessedPaths {
             stratis_devices,

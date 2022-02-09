@@ -373,6 +373,7 @@ impl Engine for StratEngine {
             })??;
 
             if !device_infos.stratis_devices.is_empty() {
+                // FIXME: return error about Stratis pools, with names
                 unimplemented!()
             }
 

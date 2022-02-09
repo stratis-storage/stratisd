@@ -2,12 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{
-    collections::{HashMap, HashSet},
-    convert::TryFrom,
-    path::Path,
-    vec::Vec,
-};
+use std::{collections::HashMap, convert::TryFrom, path::Path, vec::Vec};
 
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
@@ -23,7 +18,7 @@ use crate::{
             validate_paths,
         },
         strat_engine::{
-            backstore::{Backstore, ProcessedPaths, StratBlockDev},
+            backstore::{Backstore, ProcessedPaths, StratBlockDev, UnownedPaths},
             metadata::MDADataSize,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             thinpool::{StratFilesystem, ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
@@ -155,22 +150,24 @@ impl StratPool {
     pub fn initialize(
         pool_uuid: PoolUuid,
         name: &str,
-        device_infos: ProcessedPaths,
+        device_infos: UnownedPaths,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<StratPool> {
-        if !device_infos.has_free_devices() {
+        if device_infos.is_empty() {
             return Err(StratisError::Msg(
                 "At least one blockdev path is required to initialize a pool.".to_string(),
             ));
         }
 
-        let devices = device_infos.into_filtered(pool_uuid, &HashSet::new(), &HashSet::new())?;
-
         // FIXME: Initializing with the minimum MDA size is not necessarily
         // enough. If there are enough devices specified, more space will be
         // required.
-        let mut backstore =
-            Backstore::initialize(pool_uuid, devices, MDADataSize::default(), encryption_info)?;
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            device_infos,
+            MDADataSize::default(),
+            encryption_info,
+        )?;
 
         let thinpool = ThinPool::new(
             pool_uuid,
@@ -419,16 +416,8 @@ impl Pool for StratPool {
             ));
         }
         if !self.has_cache() {
-            let datadev_uuids = self
-                .backstore
-                .datadevs()
-                .iter()
-                .map(|(uuid, _)| *uuid)
-                .collect::<HashSet<DevUuid>>();
-
-            let devices = ProcessedPaths::try_from(blockdevs).and_then(|processed| {
-                processed.into_filtered(pool_uuid, &HashSet::new(), &datadev_uuids)
-            })?;
+            let devices = ProcessedPaths::try_from(blockdevs)
+                .and_then(|processed| processed.into_unowned())?;
 
             if devices.is_empty() {
                 return Err(StratisError::Msg(

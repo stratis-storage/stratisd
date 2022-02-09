@@ -378,7 +378,11 @@ impl Engine for StratEngine {
                 for (pool_uuid, device_map) in device_infos.stratis_devices() {
                     if let Some(entry) = pools_read_all.get_by_uuid(*pool_uuid) {
                         for (_, dev_info) in device_map.iter() {
-                            error_message_entries.push((pool_uuid, entry.0.to_owned(), dev_info.devnode.to_owned()));
+                            error_message_entries.push((
+                                pool_uuid,
+                                entry.0.to_owned(),
+                                dev_info.devnode.to_owned(),
+                            ));
                         }
                     }
                 }
@@ -406,7 +410,9 @@ impl Engine for StratEngine {
                 StratPool::initialize(
                     pool_uuid,
                     &cloned_name,
-                    device_infos,
+                    device_infos
+                        .into_unowned()
+                        .expect("returned an error if any stratis owned devices"),
                     cloned_enc_info.as_ref(),
                 )
             })??;

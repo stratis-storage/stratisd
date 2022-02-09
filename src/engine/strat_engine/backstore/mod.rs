@@ -20,5 +20,5 @@ pub use self::{
         crypt_metadata_size, CryptActivationHandle, CryptHandle, CryptMetadataHandle,
         CLEVIS_TANG_TRUST_URL,
     },
-    devices::{initialize_devices, ProcessedPaths},
+    devices::{initialize_devices, ProcessedPaths, UnownedPaths},
 };

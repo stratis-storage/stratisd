@@ -23,7 +23,7 @@ use crate::{
                     back_up_luks_header, interpret_clevis_config, restore_luks_header,
                     CryptActivationHandle,
                 },
-                devices::{initialize_devices, wipe_blockdevs, FilteredDeviceInfos},
+                devices::{initialize_devices, wipe_blockdevs, UnownedPaths},
             },
             metadata::MDADataSize,
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
@@ -137,7 +137,7 @@ impl BlockDevMgr {
     /// Initialize a new StratBlockDevMgr with specified pool and devices.
     pub fn initialize(
         pool_uuid: PoolUuid,
-        devices: FilteredDeviceInfos,
+        devices: UnownedPaths,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<BlockDevMgr> {
@@ -175,7 +175,7 @@ impl BlockDevMgr {
     pub fn add(
         &mut self,
         pool_uuid: PoolUuid,
-        devices: FilteredDeviceInfos,
+        devices: UnownedPaths,
     ) -> StratisResult<Vec<DevUuid>> {
         let this_pool_uuid = self.block_devs.get(0).map(|bd| bd.pool_uuid());
         if this_pool_uuid.is_some() && this_pool_uuid != Some(pool_uuid) {

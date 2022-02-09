@@ -277,29 +277,6 @@ fn process_devices(
     Ok(infos)
 }
 
-/// Gathered information about devices that have been specified for
-/// initialization. These devices are guaranteed to be unowned by Stratis
-/// or another, and thus good candidates for initialization.
-#[derive(Debug)]
-pub struct FilteredDeviceInfos {
-    internal: Vec<DeviceInfo>,
-}
-
-impl FilteredDeviceInfos {
-    fn iter(&self) -> std::slice::Iter<'_, DeviceInfo> {
-        self.internal.iter()
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.internal.is_empty()
-    }
-
-    #[cfg(test)]
-    fn len(&self) -> usize {
-        self.internal.len()
-    }
-}
-
 /// Gathered information about devices that have been specified
 /// for initialization. The devices are not necessarily all valid for
 /// initialization by Stratis, as some may have been identified as Stratis
@@ -307,6 +284,21 @@ impl FilteredDeviceInfos {
 pub struct ProcessedPaths {
     stratis_devices: HashMap<PoolUuid, HashMap<DevUuid, DeviceInfo>>,
     free_devices: Vec<DeviceInfo>,
+}
+
+/// Paths that can be claimed by Stratis, because the are unowned
+pub struct UnownedPaths {
+    internal: Vec<DeviceInfo>,
+}
+
+impl UnownedPaths {
+    pub fn is_empty(&self) -> bool {
+        self.internal.is_empty()
+    }
+
+    fn iter(&self) -> std::slice::Iter<'_, DeviceInfo> {
+        self.internal.iter()
+    }
 }
 
 impl ProcessedPaths {
@@ -324,109 +316,18 @@ impl ProcessedPaths {
         &self.stratis_devices
     }
 
-    pub fn has_free_devices(&self) -> bool {
-        !self.free_devices.is_empty()
-    }
-
     pub fn has_stratis_devices(&self) -> bool {
         !self.stratis_devices.is_empty()
     }
 
-    /// Filter the devices for a particular pool. Remove all devices that
-    /// match the pool and device UUIDs. Return an error if any belong to a
-    /// different pool.
-    pub fn into_filtered(
-        mut self,
-        pool_uuid: PoolUuid,
-        in_use_pool_uuids: &HashSet<DevUuid>,
-        other_in_use_pool_uuids: &HashSet<DevUuid>,
-    ) -> StratisResult<FilteredDeviceInfos> {
-        let this_pool: Option<HashMap<DevUuid, DeviceInfo>> =
-            self.stratis_devices.remove(&pool_uuid);
-
-        if !self.stratis_devices.is_empty() {
-            let error_string = self
-                .stratis_devices
-                .iter()
-                .map(|(pool_uuid, devs)| {
-                    format!(
-                        "devices ({}) appear to belong to Stratis pool with UUID {}",
-                        devs.iter()
-                            .map(|(_, info)| info.devnode.display().to_string())
-                            .collect::<Vec<_>>()
-                            .join(", "),
-                        pool_uuid
-                    )
-                })
-                .collect::<Vec<_>>()
-                .join("; ");
-            let error_message = format!(
-                "Some devices specified appear to be already in use by other Stratis pools: {}",
-                error_string
-            );
-            return Err(StratisError::Msg(error_message));
+    pub fn into_unowned(self) -> StratisResult<UnownedPaths> {
+        if self.stratis_devices.is_empty() {
+            Ok(UnownedPaths {
+                internal: self.free_devices,
+            })
+        } else {
+            Err(StratisError::Msg("stratis_devices is not empty".into()))
         }
-
-        if let Some(mut this_pool) = this_pool {
-            let (mut included, mut another_tier, mut not_included) = (vec![], vec![], vec![]);
-            for (dev_uuid, info) in this_pool.drain() {
-                if in_use_pool_uuids.contains(&dev_uuid) {
-                    included.push((dev_uuid, info))
-                } else if other_in_use_pool_uuids.contains(&dev_uuid) {
-                    another_tier.push((dev_uuid, info))
-                } else {
-                    not_included.push((dev_uuid, info))
-                }
-            }
-
-            if !not_included.is_empty() {
-                let error_message = format!(
-                    "Devices ({}) appear to be already in use by this pool which has UUID {} but they are unaccounted for",
-                    not_included
-                        .iter()
-                        .map(|(_, info)| info.devnode.display().to_string())
-                        .collect::<Vec<_>>()
-                        .join(", "),
-                    pool_uuid
-                );
-                return Err(StratisError::Msg(error_message));
-            }
-
-            if !another_tier.is_empty() {
-                let error_message = format!(
-                    "Devices ({}) appear to be already in use by this pool which has UUID {}; they belong to another tier",
-                    another_tier
-                        .iter()
-                        .map(|(_, info)| info.devnode.display().to_string())
-                        .collect::<Vec<_>>()
-                        .join(", "),
-                    pool_uuid
-                );
-                return Err(StratisError::Msg(error_message));
-            }
-
-            if !included.is_empty() {
-                info!(
-                    "Devices [{}] appear to be already in use by this pool which has UUID {}; omitting from the set of devices to initialize",
-                    included
-                        .iter()
-                        .map(|(dev_uuid, info)| {
-                            format!(
-                                "(device node: {}, device UUID: {})",
-                                info.devnode.display(),
-                                dev_uuid
-                            )
-                        })
-                        .collect::<Vec<_>>()
-                        .join(", "),
-                    pool_uuid
-                );
-            }
-        }
-
-        Ok(FilteredDeviceInfos {
-            internal: self.free_devices,
-        })
     }
 }
 
@@ -500,7 +401,7 @@ impl TryFrom<&[&Path]> for ProcessedPaths {
 /// Precondition: Each device's DeviceInfo struct contains all necessary
 /// information about the device.
 pub fn initialize_devices(
-    devices: FilteredDeviceInfos,
+    devices: UnownedPaths,
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
     encryption_info: Option<&EncryptionInfo>,
@@ -718,7 +619,7 @@ pub fn initialize_devices(
 
     /// Initialize all provided devices with Stratis metadata.
     fn initialize_all(
-        devices: FilteredDeviceInfos,
+        devices: UnownedPaths,
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,

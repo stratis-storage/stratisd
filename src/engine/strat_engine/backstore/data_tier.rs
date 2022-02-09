@@ -4,7 +4,7 @@
 
 // Code to handle the backing store of a pool.
 
-use std::{collections::HashSet, convert::TryFrom, path::Path};
+use std::{convert::TryFrom, path::Path};
 
 use devicemapper::Sectors;
 
@@ -68,16 +68,8 @@ impl DataTier {
     /// corresponding to the specified paths.
     /// WARNING: metadata changing event
     pub fn add(&mut self, pool_uuid: PoolUuid, paths: &[&Path]) -> StratisResult<Vec<DevUuid>> {
-        let current_uuids = self
-            .block_mgr
-            .blockdevs()
-            .iter()
-            .map(|(uuid, _)| *uuid)
-            .collect::<HashSet<_>>();
-
-        let devices = ProcessedPaths::try_from(paths).and_then(|processed| {
-            processed.into_filtered(pool_uuid, &current_uuids, &HashSet::new())
-        })?;
+        let devices =
+            ProcessedPaths::try_from(paths).and_then(|processed| processed.into_unowned())?;
 
         self.block_mgr.add(pool_uuid, devices)
     }

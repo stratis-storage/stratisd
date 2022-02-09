@@ -19,7 +19,7 @@ use crate::{
                 blockdevmgr::{map_to_dm, BlockDevMgr},
                 cache_tier::CacheTier,
                 data_tier::DataTier,
-                devices::FilteredDeviceInfos,
+                devices::UnownedPaths,
             },
             dm::get_dm,
             metadata::MDADataSize,
@@ -179,7 +179,7 @@ impl Backstore {
     /// WARNING: metadata changing event
     pub fn initialize(
         pool_uuid: PoolUuid,
-        devices: FilteredDeviceInfos,
+        devices: UnownedPaths,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<Backstore> {
@@ -210,7 +210,7 @@ impl Backstore {
     pub fn init_cache(
         &mut self,
         pool_uuid: PoolUuid,
-        devices: FilteredDeviceInfos,
+        devices: UnownedPaths,
     ) -> StratisResult<Vec<DevUuid>> {
         match self.cache_tier {
             Some(_) => unreachable!("self.cache.is_none()"),

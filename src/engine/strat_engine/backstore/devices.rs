@@ -60,6 +60,22 @@ pub struct DeviceInfo {
     pub size: Bytes,
 }
 
+impl PartialEq for DeviceInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.devno == other.devno
+            && self.devnode == other.devnode
+            && match (self.id_wwn.as_ref(), other.id_wwn.as_ref()) {
+                (Some(Err(_)), Some(Err(_))) => true,
+                (Some(Ok(v_self)), Some(Ok(v_other))) => v_self == v_other,
+                (None, None) => true,
+                (_, _) => false,
+            }
+            && self.size == other.size
+    }
+}
+
+impl Eq for DeviceInfo {}
+
 // Get information that can be obtained from udev for the block device
 // identified by devnode. Return an error if there was an error finding the
 // information or no udev entry corresponding to the devnode could be found.

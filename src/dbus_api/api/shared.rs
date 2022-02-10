@@ -146,6 +146,7 @@ where
     }
 
     f.method("GetManagedObjects", (), get_managed_objects)
+        .out_arg(("objpath_interfaces_and_properties", "a{oa{sa{sv}}}"))
 }
 
 /// Get a Manager property and place it on the D-Bus. The property is

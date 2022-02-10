@@ -45,6 +45,14 @@ pub const BLOCKDEV_PHYSICAL_PATH_PROP: &str = "PhysicalPath";
 
 pub const BLOCKDEV_TOTAL_SIZE_PROP: &str = "TotalPhysicalSize";
 
+/// Get a list of all the standard manager interfaces
+pub fn standard_manager_interfaces() -> Vec<String> {
+    [MANAGER_INTERFACE_NAME_3_0]
+        .iter()
+        .map(|s| (*s).to_string())
+        .collect()
+}
+
 /// Get a list of all the standard pool interfaces
 pub fn standard_pool_interfaces() -> Vec<String> {
     [POOL_INTERFACE_NAME_3_0]

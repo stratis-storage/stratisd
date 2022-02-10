@@ -30,11 +30,6 @@ impl SizedKeyMemory {
     }
 }
 
-// This is safe to send across threads because the *mut c_void pointer is always
-// allocated in the heap by libcryptsetup which is accessible globally to all threads
-// in the process.
-unsafe impl Send for SizedKeyMemory {}
-
 impl Debug for SizedKeyMemory {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.as_ref())

@@ -311,7 +311,7 @@ where
                 &Path::new(consts::STRATIS_BASE_PATH).expect("Valid path"),
                 changed,
                 vec![],
-                &consts::standard_pool_interfaces(),
+                &consts::standard_manager_interfaces(),
             )
             .is_err()
         {

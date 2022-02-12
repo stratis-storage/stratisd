@@ -1,3 +1,29 @@
+stratisd 3.0.4
+==============
+Recommended Rust toolchain version: 1.58.1
+Lowest supported Rust toolchain version: 1.54.0
+
+Recommended development platform for Python development: Fedora 35
+Lowest supported Python interpreter: 3.6.8
+
+- New version 3.0.4:
+  https://github.com/stratis-storage/stratisd/pull/2929
+
+- Send correct interface name for LockedPools property changed signal:
+  https://github.com/stratis-storage/stratisd/issues/2923
+  https://github.com/stratis-storage/stratisd/pull/2924
+
+- Fix introspection data for GetManagedObjects method:
+  https://github.com/stratis-storage/stratisd/pull/2926
+
+- Require libcryptsetup-rs 0.5.0:
+  https://github.com/stratis-storage/stratisd/pull/2925
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/2928
+  https://github.com/stratis-storage/stratisd/pull/2921
+
+
 stratisd 3.0.3
 ==============
 Recommended Rust toolchain version: 1.58.1

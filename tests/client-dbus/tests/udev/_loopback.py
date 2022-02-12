@@ -30,7 +30,7 @@ UDEV_REMOVE_EVENT = "remove"
 
 _LOSETUP_BIN = os.getenv("STRATIS_LOSETUP_BIN", "/usr/sbin/losetup")
 
-_SIZE_OF_DEVICE = 1024 ** 4  # 1 TiB
+_SIZE_OF_DEVICE = 1024**4  # 1 TiB
 
 
 def _generate_synthetic_udev_events(devnodes, event):

@@ -993,7 +993,7 @@ pub fn back_up_luks_header(dev_path: &Path, tmp_dir: &TempDir) -> StratisResult<
         .collect::<PathBuf>();
     acquire_crypt_device(dev_path)?
         .backup_handle()
-        .header_backup(EncryptionFormat::Luks2, &pathbuf)?;
+        .header_backup(Some(EncryptionFormat::Luks2), &pathbuf)?;
     Ok(pathbuf)
 }
 
@@ -1001,6 +1001,6 @@ pub fn back_up_luks_header(dev_path: &Path, tmp_dir: &TempDir) -> StratisResult<
 pub fn restore_luks_header(dev_path: &Path, backup_path: &Path) -> StratisResult<()> {
     acquire_crypt_device(dev_path)?
         .backup_handle()
-        .header_restore(EncryptionFormat::Luks2, backup_path)?;
+        .header_restore(Some(EncryptionFormat::Luks2), backup_path)?;
     Ok(())
 }

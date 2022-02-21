@@ -56,7 +56,23 @@ where
                 .add_p(manager_3_0::locked_pools_property(&f)),
         )
         .add(
+            f.interface(consts::MANAGER_INTERFACE_NAME_3_1, ())
+                .add_m(manager_3_0::create_pool_method(&f))
+                .add_m(manager_3_0::set_key_method(&f))
+                .add_m(manager_3_0::unset_key_method(&f))
+                .add_m(manager_3_0::list_keys_method(&f))
+                .add_m(manager_3_0::unlock_pool_method(&f))
+                .add_m(manager_3_0::destroy_pool_method(&f))
+                .add_m(manager_3_0::engine_state_report_method(&f))
+                .add_p(manager_3_0::version_property(&f))
+                .add_p(manager_3_0::locked_pools_property(&f)),
+        )
+        .add(
             f.interface(consts::REPORT_INTERFACE_NAME_3_0, ())
+                .add_m(report_3_0::get_report_method(&f)),
+        )
+        .add(
+            f.interface(consts::REPORT_INTERFACE_NAME_3_1, ())
                 .add_m(report_3_0::get_report_method(&f)),
         );
 

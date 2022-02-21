@@ -48,6 +48,17 @@ where
                 .add_p(filesystem_3_0::created_property(&f))
                 .add_p(filesystem_3_0::size_property(&f))
                 .add_p(filesystem_3_0::used_property(&f)),
+        )
+        .add(
+            f.interface(consts::FILESYSTEM_INTERFACE_NAME_3_1, ())
+                .add_m(filesystem_3_0::rename_method(&f))
+                .add_p(filesystem_3_0::devnode_property(&f))
+                .add_p(filesystem_3_0::name_property(&f))
+                .add_p(filesystem_3_0::pool_property(&f))
+                .add_p(filesystem_3_0::uuid_property(&f))
+                .add_p(filesystem_3_0::created_property(&f))
+                .add_p(filesystem_3_0::size_property(&f))
+                .add_p(filesystem_3_0::used_property(&f)),
         );
 
     let path = object_path.get_name().to_owned();
@@ -72,7 +83,16 @@ where
             consts::FILESYSTEM_NAME_PROP => shared::fs_name_prop(fs_name),
             consts::FILESYSTEM_UUID_PROP => uuid_to_string!(fs_uuid),
             consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop::<E>(fs, pool_name, fs_name),
-            consts::FILESYSTEM_POOL_PROP => parent,
+            consts::FILESYSTEM_POOL_PROP => parent.clone(),
+            consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop::<E>(fs),
+            consts::FILESYSTEM_SIZE_PROP => shared::fs_size_prop(fs),
+            consts::FILESYSTEM_USED_PROP => shared::fs_used_prop::<E>(fs)
+        },
+        consts::FILESYSTEM_INTERFACE_NAME_3_1 => {
+            consts::FILESYSTEM_NAME_PROP => shared::fs_name_prop(fs_name),
+            consts::FILESYSTEM_UUID_PROP => uuid_to_string!(fs_uuid),
+            consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop::<E>(fs, pool_name, fs_name),
+            consts::FILESYSTEM_POOL_PROP => parent.clone(),
             consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop::<E>(fs),
             consts::FILESYSTEM_SIZE_PROP => shared::fs_size_prop(fs),
             consts::FILESYSTEM_USED_PROP => shared::fs_used_prop::<E>(fs)

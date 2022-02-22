@@ -36,7 +36,7 @@ use crate::{
             writing::wipe_sectors,
         },
         structures::Table,
-        types::{FilesystemUuid, Name, PoolUuid, StratFilesystemDiff, ThinPoolDiff},
+        types::{Compare, FilesystemUuid, Name, PoolUuid, StratFilesystemDiff, ThinPoolDiff},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -292,15 +292,15 @@ fn status_to_usage(status: Option<ThinPoolStatus>) -> Option<ThinPoolUsage> {
 /// All sectors allocated to the mdv, all sectors allocated to the
 /// metadata spare, and all sectors actually in use by the thinpool DM
 /// device, either for the metadata device or for the data device.
-fn calc_total_physical_used(usage: Option<&ThinPoolUsage>, segments: &Segments) -> Option<Sectors> {
-    let (data_dev_used, meta_dev_used) =
-        usage.map(|u| (datablocks_to_sectors(u.used_data), u.used_meta.sectors()))?;
+fn calc_total_physical_used(data_used: Option<Sectors>, segments: &Segments) -> Option<Sectors> {
+    let data_dev_used = data_used?;
 
+    let meta_total = segments.meta_segments.iter().map(|s| s.1).sum();
     let spare_total = segments.meta_spare_segments.iter().map(|s| s.1).sum();
 
     let mdv_total = segments.mdv_segments.iter().map(|s| s.1).sum();
 
-    Some(data_dev_used + spare_total + meta_dev_used + mdv_total)
+    Some(data_dev_used + spare_total + meta_total + mdv_total)
 }
 
 /// A ThinPool struct contains the thinpool itself, the spare
@@ -563,15 +563,28 @@ impl ThinPool {
         })
     }
 
-    /// Get the last cached value for the amount of data used.
-    pub fn used(&self) -> Option<Sectors> {
-        calc_total_physical_used(self.used.as_ref(), &self.segments)
+    /// Get the last cached value for the total amount of space used on the pool.
+    /// Stratis metadata size will be added a layer about my StratPool.
+    pub fn total_physical_used(&self) -> Option<Sectors> {
+        calc_total_physical_used(self.data_used(), &self.segments)
+    }
+
+    /// Get the last cached value for the total amount of data space used on the
+    /// thin pool.
+    fn data_used(&self) -> Option<Sectors> {
+        self.used
+            .as_ref()
+            .map(|u| datablocks_to_sectors(u.used_data))
     }
 
     /// Run status checks and take actions on the thinpool and its components.
-    /// Returns a bool communicating if a configuration change requiring a
+    /// The boolean in the return value indicates if a configuration change requiring a
     /// metadata save has been made.
-    pub fn check(&mut self, pool_uuid: PoolUuid, backstore: &mut Backstore) -> StratisResult<bool> {
+    pub fn check(
+        &mut self,
+        pool_uuid: PoolUuid,
+        backstore: &mut Backstore,
+    ) -> StratisResult<(bool, ThinPoolDiff)> {
         assert_eq!(
             backstore.device().expect(
                 "thinpool exists and has been allocated to, so backstore must have a cap device"
@@ -580,6 +593,8 @@ impl ThinPool {
         );
 
         let mut should_save: bool = false;
+
+        let old_state = self.cached();
 
         if let Some(usage) = self.used.as_ref().cloned() {
             // Ensure meta subdevice is approx. 1/1000th of total usable
@@ -638,7 +653,9 @@ impl ThinPool {
             self.resume()?;
         }
 
-        Ok(should_save)
+        let new_state = self.dump(backstore);
+
+        Ok((should_save, old_state.diff(&new_state)))
     }
 
     /// Check all filesystems on this thin pool and return which had their sizes
@@ -1175,6 +1192,7 @@ impl<'a> Into<Value> for &'a ThinPool {
 /// Represents the attributes of the thin pool that are being watched for changes.
 pub struct ThinPoolState {
     allocated_size: Bytes,
+    used: Option<Bytes>,
 }
 
 impl StateDiff for ThinPoolState {
@@ -1182,11 +1200,8 @@ impl StateDiff for ThinPoolState {
 
     fn diff(&self, new_state: &Self) -> Self::Diff {
         ThinPoolDiff {
-            allocated_size: if self.allocated_size != new_state.allocated_size {
-                Some(new_state.allocated_size)
-            } else {
-                None
-            },
+            allocated_size: self.allocated_size.compare(&new_state.allocated_size),
+            used: self.used.compare(&new_state.used),
         }
     }
 }
@@ -1198,6 +1213,7 @@ impl<'a> DumpState<'a> for ThinPool {
     fn cached(&self) -> Self::State {
         ThinPoolState {
             allocated_size: self.allocated_size.bytes(),
+            used: self.total_physical_used().map(|u| u.bytes()),
         }
     }
 
@@ -1207,6 +1223,7 @@ impl<'a> DumpState<'a> for ThinPool {
         self.allocated_size = input.datatier_allocated_size();
         ThinPoolState {
             allocated_size: self.allocated_size.bytes(),
+            used: self.total_physical_used().map(|u| u.bytes()),
         }
     }
 }

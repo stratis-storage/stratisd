@@ -32,8 +32,8 @@ use crate::{
             pool_size_to_prop, pool_used_to_prop,
         },
         types::{
-            DbusAction, InterfacesAddedThreadSafe, InterfacesRemoved, LockableTree, TData,
-            TreeReadLock, TreeWriteLock,
+            DbusAction, InterfacesAddedThreadSafe, InterfacesRemoved, LockableTree, SignalChange,
+            TData, TreeReadLock, TreeWriteLock,
         },
         util::{poll_exit_and_future, thread_safe_to_dbus_sendable},
     },
@@ -43,6 +43,88 @@ use crate::{
     },
     stratis::{StratisError, StratisResult},
 };
+
+macro_rules! uuid_to_path {
+    ($read_lock:expr, $uuid:expr, $utype:ident) => {
+        $read_lock
+            .iter()
+            .filter_map(|opath| {
+                opath.get_data().as_ref().and_then(|data| {
+                    if let StratisUuid::$utype(u) = data.uuid {
+                        if u == $uuid {
+                            Some(opath.get_name())
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+            })
+            .next()
+    };
+}
+
+macro_rules! handle_signal_change {
+    (
+        $self:expr,
+        $path:expr,
+        $interfaces:expr,
+        $type:tt,
+        $( $prop:expr, $data_to_prop:ident, $prop_val:expr),+
+    ) => {{
+        let mut pairs = HashMap::new();
+        $(
+            if let $crate::dbus_api::types::SignalChange::Changed(t) = $prop_val {
+                pairs.insert($prop, box_variant!($data_to_prop(t)));
+            }
+        )*
+
+        if !pairs.is_empty() {
+            if let Err(e) = $self.property_changed_invalidated_signal(
+                $path,
+                pairs,
+                vec![],
+                &$interfaces,
+            ) {
+                warn!(
+                    "Failed to send a signal over D-Bus indicating {} property change: {}",
+                    $type, e
+                );
+            }
+        }
+    }}
+}
+
+macro_rules! handle_background_change {
+    (
+        $self:expr,
+        $read_lock:expr,
+        $uuid:expr,
+        $pat:ident,
+        $interfaces:expr,
+        $type:tt,
+        $( $prop:expr, $data_to_prop:ident, $prop_val:expr),+
+    ) => {
+        if let Some(path) = uuid_to_path!($read_lock, $uuid, $pat) {
+            handle_signal_change!($self, path, $interfaces, $type, $( $prop, $data_to_prop, $prop_val),*)
+        } else {
+            warn!("A {} property was changed in the engine but no {} with the corresponding UUID could be found in the D-Bus layer", $type, $type);
+        }
+    }
+}
+
+macro_rules! background_arm {
+    ($self:expr, $uuid:expr, $handle:ident, $( $new:expr ),+) => {{
+        if let Some(read_lock) = poll_exit_and_future($self.should_exit.recv(), $self.tree.read())?
+        {
+            $self.$handle(read_lock, $uuid, $( $new ),+);
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }};
+}
 
 /// Handler for a D-Bus tree.
 /// Processes messages specifying tree mutations or traversals.
@@ -321,112 +403,52 @@ where
 
     /// Look up the filesystem path of the filesystem and notify clients of any
     /// changes to properties that change in the background.
-    #[allow(clippy::option_option)]
     fn handle_fs_background_change(
         &self,
         read_lock: TreeReadLock<E>,
         uuid: FilesystemUuid,
-        new_size: Option<Bytes>,
-        new_used: Option<Option<Bytes>>,
+        new_used: SignalChange<Option<Bytes>>,
+        new_size: SignalChange<Bytes>,
     ) {
-        if let Some(path) = read_lock
-            .iter()
-            .filter_map(|opath| {
-                opath.get_data().as_ref().and_then(|data| {
-                    if let StratisUuid::Fs(u) = data.uuid {
-                        if u == uuid {
-                            Some(opath.get_name())
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                })
-            })
-            .next()
-        {
-            if let Err(e) = self.property_changed_invalidated_signal(
-                path,
-                vec![
-                    (
-                        consts::FILESYSTEM_SIZE_PROP.to_string(),
-                        new_size.map(|s| box_variant!(fs_size_to_prop(s))),
-                    ),
-                    (
-                        consts::FILESYSTEM_USED_PROP.to_string(),
-                        new_used.map(|u| box_variant!(fs_used_to_prop(u))),
-                    ),
-                ]
-                .into_iter()
-                .filter_map(|(prop, opt)| opt.map(|val| (prop, val)))
-                .collect::<HashMap<_, _>>(),
-                vec![],
-                &consts::standard_filesystem_interfaces(),
-            ) {
-                warn!(
-                    "Failed to send a signal over D-Bus indicating filesystem size change: {}",
-                    e
-                );
-            }
-        } else {
-            warn!("A filesystem size was changed in the engine but no filesystem with the corresponding UUID could be found in the D-Bus layer");
-        }
+        handle_background_change!(
+            self,
+            read_lock,
+            uuid,
+            Fs,
+            consts::standard_filesystem_interfaces(),
+            "filesystem",
+            consts::FILESYSTEM_USED_PROP.to_string(),
+            fs_used_to_prop,
+            new_used,
+            consts::FILESYSTEM_SIZE_PROP.to_string(),
+            fs_size_to_prop,
+            new_size
+        );
     }
 
-    /// Look up the pool path of the pool and send out a signal indicating which
-    /// properties, have changed in the background.
-    #[allow(clippy::option_option)]
+    /// Look up the pool path of the pool and notify clients of any changes to
+    /// properties that change in the background.
     fn handle_pool_background_change(
         &self,
         read_lock: TreeReadLock<E>,
         uuid: PoolUuid,
-        new_used: Option<Option<Bytes>>,
-        new_alloc: Option<Bytes>,
+        new_used: SignalChange<Option<Bytes>>,
+        new_alloc: SignalChange<Bytes>,
     ) {
-        if let Some(path) = read_lock
-            .iter()
-            .filter_map(|opath| {
-                opath.get_data().as_ref().and_then(|data| {
-                    if let StratisUuid::Pool(u) = data.uuid {
-                        if u == uuid {
-                            Some(opath.get_name())
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                })
-            })
-            .next()
-        {
-            if let Err(e) = self.property_changed_invalidated_signal(
-                path,
-                vec![
-                    (
-                        consts::POOL_TOTAL_USED_PROP.to_string(),
-                        new_used.map(|u| box_variant!(pool_used_to_prop(u))),
-                    ),
-                    (
-                        consts::POOL_ALLOC_SIZE_PROP.to_string(),
-                        new_alloc.map(|a| box_variant!(pool_alloc_to_prop(a))),
-                    ),
-                ]
-                .into_iter()
-                .filter_map(|(prop, opt)| opt.map(|val| (prop, val)))
-                .collect::<HashMap<_, _>>(),
-                vec![],
-                &consts::standard_pool_interfaces(),
-            ) {
-                warn!(
-                    "Failed to send a signal over D-Bus indicating pool usage change: {}",
-                    e
-                );
-            }
-        } else {
-            warn!("A pool usage was changed in the engine but no pool with the corresponding UUID could be found in the D-Bus layer");
-        }
+        handle_background_change!(
+            self,
+            read_lock,
+            uuid,
+            Pool,
+            consts::standard_pool_interfaces(),
+            "pool",
+            consts::POOL_TOTAL_USED_PROP.to_string(),
+            pool_used_to_prop,
+            new_used,
+            consts::POOL_ALLOC_SIZE_PROP.to_string(),
+            pool_alloc_to_prop,
+            new_alloc
+        );
     }
 
     /// Send a signal indicating that the pool total size has changed.
@@ -449,41 +471,28 @@ where
     }
 
     /// Send a signal indicating that the pool total allocated size has changed.
-    fn handle_pool_alloc_size_change(&self, path: Path<'static>, new_alloc_size: Bytes) {
-        if let Err(e) = self.property_changed_invalidated_signal(
+    fn handle_pool_foreground_change(
+        &self,
+        path: Path<'static>,
+        new_used: SignalChange<Option<Bytes>>,
+        new_alloc: SignalChange<Bytes>,
+        new_size: SignalChange<Bytes>,
+    ) {
+        handle_signal_change!(
+            self,
             &path,
-            once((
-                consts::POOL_ALLOC_SIZE_PROP.to_string(),
-                box_variant!(pool_alloc_to_prop(new_alloc_size)),
-            ))
-            .collect::<HashMap<_, _>>(),
-            vec![],
-            &consts::standard_pool_interfaces(),
-        ) {
-            warn!(
-                "Failed to send a signal over D-Bus indicating pool allocated size change: {}",
-                e
-            );
-        }
-    }
-
-    /// Send a signal indicating that the pool usage has changed.
-    fn handle_pool_usage_change(&self, path: Path<'static>, new_usage: Option<Bytes>) {
-        if let Err(e) = self.property_changed_invalidated_signal(
-            &path,
-            once((
-                consts::POOL_TOTAL_USED_PROP.to_string(),
-                box_variant!(pool_used_to_prop(new_usage)),
-            ))
-            .collect::<HashMap<_, _>>(),
-            vec![],
-            &consts::standard_pool_interfaces(),
-        ) {
-            warn!(
-                "Failed to send a signal over D-Bus indicating pool allocated size change: {}",
-                e
-            );
-        }
+            consts::standard_pool_interfaces(),
+            "pool",
+            consts::POOL_TOTAL_USED_PROP.to_string(),
+            pool_used_to_prop,
+            new_used,
+            consts::POOL_ALLOC_SIZE_PROP.to_string(),
+            pool_alloc_to_prop,
+            new_alloc,
+            consts::POOL_TOTAL_SIZE_PROP.to_string(),
+            pool_size_to_prop,
+            new_size
+        );
     }
 
     /// Handle a D-Bus action that has been generated by the connection processing
@@ -536,26 +545,6 @@ where
                 self.handle_pool_clevis_info_change(item, ei);
                 Ok(true)
             }
-            DbusAction::FsBackgroundChange(uuid, new_size, new_used) => {
-                if let Some(read_lock) =
-                    poll_exit_and_future(self.should_exit.recv(), self.tree.read())?
-                {
-                    self.handle_fs_background_change(read_lock, uuid, new_size, new_used);
-                    Ok(true)
-                } else {
-                    Ok(false)
-                }
-            }
-            DbusAction::PoolBackgroundChange(uuid, new_usage, new_alloc) => {
-                if let Some(read_lock) =
-                    poll_exit_and_future(self.should_exit.recv(), self.tree.read())?
-                {
-                    self.handle_pool_background_change(read_lock, uuid, new_usage, new_alloc);
-                    Ok(true)
-                } else {
-                    Ok(false)
-                }
-            }
             DbusAction::PoolCacheChange(item, has_cache) => {
                 self.handle_pool_cache_change(item, has_cache);
                 Ok(true)
@@ -568,13 +557,27 @@ where
                 self.handle_locked_pools_change(pools);
                 Ok(true)
             }
-            DbusAction::PoolAllocSizeChange(item, new_alloc) => {
-                self.handle_pool_alloc_size_change(item, new_alloc);
+            DbusAction::PoolForegroundChange(item, new_used, new_alloc, new_size) => {
+                self.handle_pool_foreground_change(item, new_used, new_alloc, new_size);
                 Ok(true)
             }
-            DbusAction::PoolUsedChange(item, new_usage) => {
-                self.handle_pool_usage_change(item, new_usage);
-                Ok(true)
+            DbusAction::FsBackgroundChange(uuid, new_used, new_size) => {
+                background_arm! {
+                    self,
+                    uuid,
+                    handle_fs_background_change,
+                    new_used,
+                    new_size
+                }
+            }
+            DbusAction::PoolBackgroundChange(uuid, new_used, new_alloc) => {
+                background_arm! {
+                    self,
+                    uuid,
+                    handle_pool_background_change,
+                    new_used,
+                    new_alloc
+                }
             }
         }
     }

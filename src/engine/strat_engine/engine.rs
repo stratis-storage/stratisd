@@ -34,8 +34,8 @@ use crate::{
         },
         types::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockKey,
-            LockedPoolInfo, RenameAction, ReportType, SetUnlockAction, StratFilesystemDiff,
-            StratPoolDiff, UdevEngineEvent, UnlockMethod,
+            LockedPoolInfo, PoolDiff, RenameAction, ReportType, SetUnlockAction,
+            StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
         },
         Engine, Name, PoolUuid, Report,
     },
@@ -43,6 +43,7 @@ use crate::{
 };
 
 type EventNumbers = HashMap<PoolUuid, HashMap<DmNameBuf, u32>>;
+type PoolJoinHandles = Vec<JoinHandle<StratisResult<(PoolUuid, PoolDiff)>>>;
 
 #[derive(Debug)]
 pub struct StratEngine {
@@ -66,8 +67,6 @@ pub struct StratEngine {
     #[allow(dead_code)]
     key_fs: MemoryFilesystem,
 }
-
-type PoolJoinHandles = Vec<JoinHandle<StratisResult<Option<(PoolUuid, StratPoolDiff)>>>>;
 
 impl StratEngine {
     /// Setup a StratEngine.
@@ -103,12 +102,7 @@ impl StratEngine {
     ) {
         joins.push(spawn_blocking(move || {
             let (name, uuid, pool) = guard.as_tuple();
-            let diff = pool.event_on(uuid, &name)?;
-            Ok(if diff.is_changed() {
-                Some((uuid, diff))
-            } else {
-                None
-            })
+            Ok((uuid, pool.event_on(uuid, &name)?))
         }));
     }
 
@@ -122,12 +116,12 @@ impl StratEngine {
         }));
     }
 
-    async fn join_all_pool_checks(handles: PoolJoinHandles) -> HashMap<PoolUuid, StratPoolDiff> {
+    async fn join_all_pool_checks(handles: PoolJoinHandles) -> HashMap<PoolUuid, PoolDiff> {
         join_all(handles)
             .await
             .into_iter()
             .filter_map(|res| match res {
-                Ok(Ok(opt)) => opt,
+                Ok(Ok(tup)) => Some(tup),
                 Ok(Err(e)) => {
                     warn!("Pool checks failed with error: {}", e);
                     None
@@ -169,7 +163,7 @@ impl StratEngine {
     }
 
     /// The implementation for pool_evented when caused by a devicemapper event.
-    async fn pool_evented_dm(&self, pools: &HashSet<PoolUuid>) -> HashMap<PoolUuid, StratPoolDiff> {
+    async fn pool_evented_dm(&self, pools: &HashSet<PoolUuid>) -> HashMap<PoolUuid, PoolDiff> {
         let mut joins = Vec::new();
         for uuid in pools {
             if let Some(guard) = self.pools.write(LockKey::Uuid(*uuid)).await {
@@ -186,7 +180,7 @@ impl StratEngine {
     }
 
     /// The implementation for pool_evented when called by the timer thread.
-    async fn pool_evented_timer(&self) -> HashMap<PoolUuid, StratPoolDiff> {
+    async fn pool_evented_timer(&self) -> HashMap<PoolUuid, PoolDiff> {
         let mut joins = Vec::new();
         let guards: Vec<SomeLockWriteGuard<PoolUuid, StratPool>> =
             self.pools.write_all().await.into();
@@ -509,10 +503,7 @@ impl Engine for StratEngine {
         Ok(changed)
     }
 
-    async fn pool_evented(
-        &self,
-        pools: Option<&HashSet<PoolUuid>>,
-    ) -> HashMap<PoolUuid, StratPoolDiff> {
+    async fn pool_evented(&self, pools: Option<&HashSet<PoolUuid>>) -> HashMap<PoolUuid, PoolDiff> {
         match pools {
             Some(ps) => self.pool_evented_dm(ps).await,
             None => self.pool_evented_timer().await,

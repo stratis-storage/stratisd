@@ -19,7 +19,7 @@ use crate::{
     engine::{
         engine::{BlockDev, Pool, MAX_STRATIS_PASS_SIZE},
         types::{
-            BlockDevTier, CreateAction, DevUuid, EncryptionInfo, Name, PoolEncryptionInfo,
+            BlockDevTier, CreateAction, DevUuid, Diff, EncryptionInfo, Name, PoolEncryptionInfo,
             PoolUuid, SetCreateAction,
         },
     },
@@ -262,6 +262,20 @@ where
         Err(StratisError::Msg(
             "All devices in a pool must be either encrypted or unencrypted; found a mixture of both".to_string()
         ))
+    }
+}
+
+/// Calculate the total used diff from a diff of the thin pool usage and metadata size.
+pub fn total_used(used: Diff<Option<Bytes>>, metadata_size: Diff<Bytes>) -> Diff<Option<Bytes>> {
+    let changed = matches!(
+        (&used, &metadata_size),
+        (Diff::Changed(_), _) | (Diff::Unchanged(Some(_)), Diff::Changed(_))
+    );
+    let total_used = used.map(|u| u + *metadata_size);
+    if changed {
+        Diff::Changed(total_used)
+    } else {
+        Diff::Unchanged(total_used)
     }
 }
 

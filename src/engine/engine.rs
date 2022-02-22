@@ -25,9 +25,9 @@ use crate::{
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
             EncryptionInfo, FilesystemUuid, Key, KeyDescription, LockKey, LockedPoolInfo,
-            MappingCreateAction, MappingDeleteAction, Name, PoolEncryptionInfo, PoolUuid,
+            MappingCreateAction, MappingDeleteAction, Name, PoolDiff, PoolEncryptionInfo, PoolUuid,
             RegenAction, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
-            SetUnlockAction, StratFilesystemDiff, StratPoolDiff, UdevEngineEvent, UnlockMethod,
+            SetUnlockAction, StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
         },
     },
     stratis::StratisResult,
@@ -167,7 +167,7 @@ pub trait Pool: Debug + Send + Sync {
         pool_name: &str,
         paths: &[&Path],
         tier: BlockDevTier,
-    ) -> StratisResult<(SetCreateAction<DevUuid>, Option<StratPoolDiff>)>;
+    ) -> StratisResult<(SetCreateAction<DevUuid>, Option<PoolDiff>)>;
 
     /// Bind all devices in the given pool for automated unlocking
     /// using clevis.
@@ -372,10 +372,7 @@ pub trait Engine: Debug + Report + Send + Sync {
 
     /// Notify the engine that an event has occurred on the DM file descriptor
     /// and check pools for needed changes.
-    async fn pool_evented(
-        &self,
-        pools: Option<&HashSet<PoolUuid>>,
-    ) -> HashMap<PoolUuid, StratPoolDiff>;
+    async fn pool_evented(&self, pools: Option<&HashSet<PoolUuid>>) -> HashMap<PoolUuid, PoolDiff>;
 
     /// Notify the engine that an event has occurred on the DM file descriptor
     /// and check filesystems for needed changes.

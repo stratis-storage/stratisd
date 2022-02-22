@@ -21,15 +21,13 @@ use crate::{
             backstore::{Backstore, StratBlockDev},
             metadata::MDADataSize,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
-            thinpool::{
-                StratFilesystem, ThinPool, ThinPoolSizeParams, ThinPoolState, DATA_BLOCK_SIZE,
-            },
+            thinpool::{StratFilesystem, ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
         },
         types::{
-            ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, Key, KeyDescription, Name, PoolEncryptionInfo,
-            PoolUuid, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
-            StratFilesystemDiff, StratPoolDiff,
+            ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
+            EncryptionInfo, FilesystemUuid, Key, KeyDescription, Name, PoolDiff,
+            PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
+            SetDeleteAction, StratFilesystemDiff, StratPoolDiff,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -140,7 +138,7 @@ pub struct StratPool {
     backstore: Backstore,
     thin_pool: ThinPool,
     action_avail: ActionAvailability,
-    usage: Option<Sectors>,
+    metadata_size: Sectors,
 }
 
 #[strat_pool_impl_gen]
@@ -177,14 +175,12 @@ impl StratPool {
             }
         };
 
-        let used = thinpool
-            .used()
-            .map(|u| u + backstore.datatier_metadata_size());
+        let metadata_size = backstore.datatier_metadata_size();
         let mut pool = StratPool {
             backstore,
             thin_pool: thinpool,
             action_avail: ActionAvailability::Full,
-            usage: used,
+            metadata_size,
         };
 
         pool.write_metadata(&Name::new(name.to_owned()))?;
@@ -225,16 +221,14 @@ impl StratPool {
             &backstore,
         )?;
 
-        let needs_save = thinpool.check(uuid, &mut backstore)?;
+        let (needs_save, _) = thinpool.check(uuid, &mut backstore)?;
 
-        let used = thinpool
-            .used()
-            .map(|u| u + backstore.datatier_metadata_size());
+        let metadata_size = backstore.datatier_metadata_size();
         let mut pool = StratPool {
             backstore,
             thin_pool: thinpool,
             action_avail,
-            usage: used,
+            metadata_size,
         };
 
         if needs_save {
@@ -279,18 +273,14 @@ impl StratPool {
     // TODO: Just check the device that evented. Currently checks
     // everything.
     #[pool_mutating_action("NoPoolChanges")]
-    pub fn event_on(
-        &mut self,
-        pool_uuid: PoolUuid,
-        pool_name: &Name,
-    ) -> StratisResult<StratPoolDiff> {
+    pub fn event_on(&mut self, pool_uuid: PoolUuid, pool_name: &Name) -> StratisResult<PoolDiff> {
         let cached = self.cached();
-        let changed = self.thin_pool.check(pool_uuid, &mut self.backstore)?;
-        let diff = cached.diff(&self.dump(()));
+        let (changed, thin_pool) = self.thin_pool.check(pool_uuid, &mut self.backstore)?;
+        let pool = cached.diff(&self.dump(()));
         if changed {
             self.write_metadata(pool_name)?;
         }
-        Ok(diff)
+        Ok(PoolDiff { thin_pool, pool })
     }
 
     /// Called when a DM device in this pool has generated an event. This method
@@ -570,7 +560,7 @@ impl Pool for StratPool {
         pool_name: &str,
         paths: &[&Path],
         tier: BlockDevTier,
-    ) -> StratisResult<(SetCreateAction<DevUuid>, Option<StratPoolDiff>)> {
+    ) -> StratisResult<(SetCreateAction<DevUuid>, Option<PoolDiff>)> {
         validate_paths(paths)?;
 
         let bdev_info = if tier == BlockDevTier::Cache && !self.has_cache() {
@@ -605,9 +595,9 @@ impl Pool for StratPool {
             // previously it could not. Run check() in case that is true.
             let cached = self.cached();
             let check = match self.thin_pool.check(pool_uuid, &mut self.backstore) {
-                Ok(_) => {
-                    let diff = cached.diff(&self.dump(()));
-                    Some(diff)
+                Ok((_, thin_pool)) => {
+                    let pool = cached.diff(&self.dump(()));
+                    Some(PoolDiff { thin_pool, pool })
                 }
                 Err(e) => {
                     warn!("Failed to check the thin pool for status changes; some information may not be able to reported to the IPC layer: {}", e);
@@ -692,7 +682,9 @@ impl Pool for StratPool {
         // by the pool abstraction will be invalid. In the event of, e.g.,
         // software RAID, the amount will be far too low to be useful, in the
         // event of, e.g, VDO, the amount will be far too large to be useful.
-        self.usage
+        self.thin_pool
+            .total_physical_used()
+            .map(|u| u + self.metadata_size)
     }
 
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Self::Filesystem)> {
@@ -766,8 +758,7 @@ impl Pool for StratPool {
 }
 
 pub struct StratPoolState {
-    usage: Option<Bytes>,
-    thin_pool: ThinPoolState,
+    metadata_size: Bytes,
 }
 
 impl StateDiff for StratPoolState {
@@ -775,12 +766,7 @@ impl StateDiff for StratPoolState {
 
     fn diff(&self, other: &Self) -> Self::Diff {
         StratPoolDiff {
-            usage: if self.usage != other.usage {
-                Some(other.usage)
-            } else {
-                None
-            },
-            thin_pool: self.thin_pool.diff(&other.thin_pool),
+            metadata_size: self.metadata_size.compare(&other.metadata_size),
         }
     }
 }
@@ -791,21 +777,14 @@ impl<'a> DumpState<'a> for StratPool {
 
     fn cached(&self) -> Self::State {
         StratPoolState {
-            thin_pool: self.thin_pool.cached(),
-            usage: self.usage.map(|u| u.bytes()),
+            metadata_size: self.metadata_size.bytes(),
         }
     }
 
     fn dump(&mut self, _: ()) -> Self::State {
-        let thin_pool = self.thin_pool.dump(&self.backstore);
-        let usage = self
-            .thin_pool
-            .used()
-            .map(|u| u + self.backstore.datatier_metadata_size());
-        self.usage = usage;
+        self.metadata_size = self.backstore.datatier_metadata_size();
         StratPoolState {
-            usage: usage.map(|u| u.bytes()),
-            thin_pool,
+            metadata_size: self.metadata_size.bytes(),
         }
     }
 }

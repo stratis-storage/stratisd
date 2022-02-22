@@ -25,8 +25,9 @@ use crate::{
         structures::Table,
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, Key, KeyDescription, Name, PoolEncryptionInfo,
-            PoolUuid, RegenAction, RenameAction, SetCreateAction, SetDeleteAction, StratPoolDiff,
+            EncryptionInfo, FilesystemUuid, Key, KeyDescription, Name, PoolDiff,
+            PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
+            SetDeleteAction,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -251,7 +252,7 @@ impl Pool for SimPool {
         _pool_name: &str,
         paths: &[&Path],
         tier: BlockDevTier,
-    ) -> StratisResult<(SetCreateAction<DevUuid>, Option<StratPoolDiff>)> {
+    ) -> StratisResult<(SetCreateAction<DevUuid>, Option<PoolDiff>)> {
         validate_paths(paths)?;
 
         if tier == BlockDevTier::Cache && !self.has_cache() {

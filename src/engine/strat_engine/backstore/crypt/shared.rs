@@ -987,7 +987,7 @@ pub fn crypt_metadata_size() -> u64 {
 
 /// Back up the LUKS2 header to a temporary file.
 pub fn back_up_luks_header(dev_path: &Path, tmp_dir: &TempDir) -> StratisResult<PathBuf> {
-    let file_name = dev_path.display().to_string().replace("/", "_");
+    let file_name = dev_path.display().to_string().replace('/', "_");
     let pathbuf = vec![tmp_dir.path(), Path::new(&file_name)]
         .into_iter()
         .collect::<PathBuf>();

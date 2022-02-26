@@ -192,12 +192,12 @@ impl LiminalDevices {
                 let luks_infos = luks_devices.remove(pool_uuid);
                 let stratis_infos = stratis_devices.remove(pool_uuid);
                 let mut infos: Vec<DeviceInfo> = stratis_infos
-                    .unwrap_or_else(Vec::new)
+                    .unwrap_or_default()
                     .drain(..)
                     .map(DeviceInfo::Stratis)
                     .chain(
                         luks_infos
-                            .unwrap_or_else(Vec::new)
+                            .unwrap_or_default()
                             .drain(..)
                             .map(DeviceInfo::Luks),
                     )

@@ -28,7 +28,7 @@ jobs:
         include:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT ENVIRONMENT
           - image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
-            toolchain: 1.58.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.59.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             skip_value: 0
           # MANDATORY CHECKS USING LOWEST SUPPORTED ENVIRONMENT PROXY
           - image: fedora:30  # LOWEST DEVELOPMENT ENVIRONMENT
@@ -132,7 +132,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           components: cargo
-          toolchain: 1.58.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.59.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           override: true
       - name: Install all necessary Stratis files
         run: PROFILEDIR=debug make -f Makefile install

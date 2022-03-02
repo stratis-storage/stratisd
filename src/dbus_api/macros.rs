@@ -188,23 +188,31 @@ macro_rules! handle_signal_change {
     (
         $self:expr,
         $path:expr,
-        $interfaces:expr,
         $type:tt,
-        $( $prop:expr, $data_to_prop:ident, $prop_val:expr),+
-    ) => {{
-        let mut pairs = std::collections::HashMap::new();
         $(
-            if let $crate::dbus_api::types::SignalChange::Changed(t) = $prop_val {
-                pairs.insert($prop, box_variant!($data_to_prop(t)));
+            $interface:expr => {
+                $( $prop:expr, $data_to_prop:ident, $prop_val:expr),+
+            }
+        ),*
+    ) => {{
+        let mut props = std::collections::HashMap::new();
+        $(
+            let mut pairs = std::collections::HashMap::new();
+            $(
+                if let $crate::dbus_api::types::SignalChange::Changed(t) = $prop_val {
+                    pairs.insert($prop, box_variant!($data_to_prop(t)));
+                }
+            )+
+
+            if !pairs.is_empty() {
+                props.insert($interface.to_string(), (pairs, Vec::new()));
             }
         )*
 
-        if !pairs.is_empty() {
+        if !props.is_empty() {
             if let Err(e) = $self.property_changed_invalidated_signal(
                 $path,
-                pairs,
-                vec![],
-                &$interfaces,
+                props,
             ) {
                 warn!(
                     "Failed to send a signal over D-Bus indicating {} property change: {}",
@@ -221,12 +229,15 @@ macro_rules! handle_background_change {
         $read_lock:expr,
         $uuid:expr,
         $pat:ident,
-        $interfaces:expr,
         $type:tt,
-        $( $prop:expr, $data_to_prop:ident, $prop_val:expr),+
+        $(
+            $interface:expr => {
+                $( $prop:expr, $data_to_prop:ident, $prop_val:expr),+
+            }
+        ),*
     ) => {
         if let Some(path) = uuid_to_path!($read_lock, $uuid, $pat) {
-            handle_signal_change!($self, path, $interfaces, $type, $( $prop, $data_to_prop, $prop_val),*)
+            handle_signal_change!($self, path, $type, $( $interface => { $($prop, $data_to_prop, $prop_val),+ }),*)
         } else {
             warn!("A {} property was changed in the engine but no {} with the corresponding UUID could be found in the D-Bus layer", $type, $type);
         }
@@ -243,4 +254,22 @@ macro_rules! background_arm {
             Ok(false)
         }
     }};
+}
+
+macro_rules! prop_hashmap {
+    ($($iface:expr => { $props_inval:expr $(, $prop_name:expr => $prop_value:expr)* }),*) => {{
+        let mut all_props = std::collections::HashMap::new();
+        $(
+            #[allow(unused_mut)]
+            let mut props = HashMap::new();
+            $(
+                props.insert(
+                    $prop_name.to_string(),
+                    $prop_value,
+                );
+            )*
+            all_props.insert($iface.to_string(), (props, $props_inval));
+        )*
+        all_props
+    }}
 }

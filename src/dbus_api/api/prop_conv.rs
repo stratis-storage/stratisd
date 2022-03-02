@@ -16,10 +16,10 @@ pub type LockedPools = HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>
 
 /// Convert a locked pool data structure to a property format.
 pub fn locked_pools_to_prop(
-    pools: HashMap<PoolUuid, LockedPoolInfo>,
+    pools: &HashMap<PoolUuid, LockedPoolInfo>,
 ) -> HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>> {
     pools
-        .into_iter()
+        .iter()
         .map(|(u, locked)| {
             (
                 uuid_to_string!(u),
@@ -49,7 +49,7 @@ pub fn locked_pools_to_prop(
                         Variant(Box::new(
                             locked
                                 .devices
-                                .into_iter()
+                                .iter()
                                 .map(|d| {
                                     let mut map = HashMap::new();
                                     map.insert(

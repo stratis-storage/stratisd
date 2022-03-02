@@ -162,3 +162,85 @@ macro_rules! pool_notify_lock {
         }
     }}
 }
+
+macro_rules! uuid_to_path {
+    ($read_lock:expr, $uuid:expr, $utype:ident) => {
+        $read_lock
+            .iter()
+            .filter_map(|opath| {
+                opath.get_data().as_ref().and_then(|data| {
+                    if let $crate::engine::StratisUuid::$utype(u) = data.uuid {
+                        if u == $uuid {
+                            Some(opath.get_name())
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+            })
+            .next()
+    };
+}
+
+macro_rules! handle_signal_change {
+    (
+        $self:expr,
+        $path:expr,
+        $interfaces:expr,
+        $type:tt,
+        $( $prop:expr, $data_to_prop:ident, $prop_val:expr),+
+    ) => {{
+        let mut pairs = std::collections::HashMap::new();
+        $(
+            if let $crate::dbus_api::types::SignalChange::Changed(t) = $prop_val {
+                pairs.insert($prop, box_variant!($data_to_prop(t)));
+            }
+        )*
+
+        if !pairs.is_empty() {
+            if let Err(e) = $self.property_changed_invalidated_signal(
+                $path,
+                pairs,
+                vec![],
+                &$interfaces,
+            ) {
+                warn!(
+                    "Failed to send a signal over D-Bus indicating {} property change: {}",
+                    $type, e
+                );
+            }
+        }
+    }}
+}
+
+macro_rules! handle_background_change {
+    (
+        $self:expr,
+        $read_lock:expr,
+        $uuid:expr,
+        $pat:ident,
+        $interfaces:expr,
+        $type:tt,
+        $( $prop:expr, $data_to_prop:ident, $prop_val:expr),+
+    ) => {
+        if let Some(path) = uuid_to_path!($read_lock, $uuid, $pat) {
+            handle_signal_change!($self, path, $interfaces, $type, $( $prop, $data_to_prop, $prop_val),*)
+        } else {
+            warn!("A {} property was changed in the engine but no {} with the corresponding UUID could be found in the D-Bus layer", $type, $type);
+        }
+    }
+}
+
+macro_rules! background_arm {
+    ($self:expr, $uuid:expr, $handle:ident, $( $new:expr ),+) => {{
+        if let Some(read_lock) = $crate::dbus_api::util::poll_exit_and_future($self.should_exit.recv(), $self.tree.read())?
+        {
+            $self.$handle(read_lock, $uuid, $( $new ),+);
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }};
+}

@@ -12,6 +12,7 @@ use std::{
 };
 
 use nix::mount::{mount, umount, MsFlags};
+use retry::{delay::Fixed, retry_with_index};
 
 use devicemapper::{DmDevice, DmOptions, LinearDev, LinearDevTargetParams, TargetLine};
 
@@ -79,9 +80,14 @@ impl<'a> MountedMDV<'a> {
 
 impl<'a> Drop for MountedMDV<'a> {
     fn drop(&mut self) {
-        if let Err(err) = umount(&self.mdv.mount_pt) {
-            warn!("Could not unmount MDV: {}", err);
-        } else if let Err(err) = remove_dir(&self.mdv.mount_pt) {
+        if let Err(e) = retry_with_index(Fixed::from_millis(100).take(2), |i| {
+            debug!("MDV unmount attempt {}", i);
+            umount(&self.mdv.mount_pt)
+        }) {
+            warn!("Unmounting MDV failed: {}", e);
+            return;
+        }
+        if let Err(err) = remove_dir(&self.mdv.mount_pt) {
             warn!("Could not remove MDV mount point: {}", err);
         }
     }

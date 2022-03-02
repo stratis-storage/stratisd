@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, iter::once, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use dbus::{
     arg::{RefArg, Variant},
@@ -43,6 +43,8 @@ use crate::{
     },
     stratis::{StratisError, StratisResult},
 };
+
+type PropertySignal = HashMap<String, (HashMap<String, Variant<Box<dyn RefArg>>>, Vec<String>)>;
 
 /// Handler for a D-Bus tree.
 /// Processes messages specifying tree mutations or traversals.
@@ -146,17 +148,21 @@ where
 
     /// Handle a filesystem name change in the engine.
     fn handle_fs_name_change(&self, item: Path<'static>, new_name: String) {
-        let mut changed = HashMap::new();
-        changed.insert(
-            consts::FILESYSTEM_NAME_PROP.into(),
-            Variant(new_name.box_clone()),
-        );
         if self
             .property_changed_invalidated_signal(
                 &item,
-                changed,
-                vec![consts::FILESYSTEM_DEVNODE_PROP.into()],
-                &consts::standard_filesystem_interfaces(),
+                prop_hashmap! {
+                    consts::FILESYSTEM_INTERFACE_NAME_3_0 => {
+                        vec![consts::FILESYSTEM_DEVNODE_PROP.into()],
+                        consts::FILESYSTEM_NAME_PROP.to_string() =>
+                        Variant(new_name.box_clone())
+                    },
+                    consts::FILESYSTEM_INTERFACE_NAME_3_1 => {
+                        vec![consts::FILESYSTEM_DEVNODE_PROP.into()],
+                        consts::FILESYSTEM_NAME_PROP.to_string() =>
+                        Variant(new_name.box_clone())
+                    }
+                },
             )
             .is_err()
         {
@@ -171,15 +177,21 @@ where
         item: Path<'static>,
         new_name: String,
     ) {
-        let mut changed = HashMap::new();
-        changed.insert(consts::POOL_NAME_PROP.into(), Variant(new_name.box_clone()));
-
         if self
             .property_changed_invalidated_signal(
                 &item,
-                changed,
-                vec![],
-                &consts::standard_pool_interfaces(),
+                prop_hashmap! {
+                    consts::POOL_INTERFACE_NAME_3_0 => {
+                        Vec::new(),
+                        consts::POOL_NAME_PROP.to_string() =>
+                        Variant(new_name.box_clone())
+                    },
+                    consts::POOL_INTERFACE_NAME_3_1 => {
+                        Vec::new(),
+                        consts::POOL_NAME_PROP.to_string() =>
+                        Variant(new_name.box_clone())
+                    }
+                },
             )
             .is_err()
         {
@@ -201,9 +213,14 @@ where
                 if self
                     .property_changed_invalidated_signal(
                         &opath.get_name().clone(),
-                        HashMap::new(),
-                        vec![consts::FILESYSTEM_DEVNODE_PROP.into()],
-                        &consts::standard_filesystem_interfaces(),
+                        prop_hashmap! {
+                            consts::FILESYSTEM_INTERFACE_NAME_3_0 => {
+                                vec![consts::FILESYSTEM_DEVNODE_PROP.into()]
+                            },
+                            consts::FILESYSTEM_INTERFACE_NAME_3_1 => {
+                                vec![consts::FILESYSTEM_DEVNODE_PROP.into()]
+                            }
+                        },
                     )
                     .is_err()
                 {
@@ -219,18 +236,22 @@ where
         item: Path<'static>,
         new_avail_actions: ActionAvailability,
     ) {
-        let mut changed = HashMap::new();
-        changed.insert(
-            consts::POOL_AVAIL_ACTIONS_PROP.into(),
-            box_variant!(avail_actions_to_prop(new_avail_actions)),
-        );
-
+        let avail_prop = avail_actions_to_prop(new_avail_actions);
         if self
             .property_changed_invalidated_signal(
                 &item,
-                changed,
-                vec![],
-                &consts::standard_pool_interfaces(),
+                prop_hashmap! {
+                    consts::POOL_INTERFACE_NAME_3_0 => {
+                        Vec::new(),
+                        consts::POOL_AVAIL_ACTIONS_PROP.to_string() =>
+                        box_variant!(avail_prop.clone())
+                    },
+                    consts::POOL_INTERFACE_NAME_3_1 => {
+                        Vec::new(),
+                        consts::POOL_AVAIL_ACTIONS_PROP.to_string() =>
+                        box_variant!(avail_prop)
+                    }
+                },
             )
             .is_err()
         {
@@ -240,18 +261,22 @@ where
 
     /// Handle a change of the key description for a pool in the engine.
     fn handle_pool_key_desc_change(&self, item: Path<'static>, ei: Option<PoolEncryptionInfo>) {
-        let mut changed = HashMap::new();
-        changed.insert(
-            consts::POOL_KEY_DESC_PROP.into(),
-            box_variant!(key_desc_to_prop(ei)),
-        );
-
+        let kd_prop = key_desc_to_prop(ei);
         if self
             .property_changed_invalidated_signal(
                 &item,
-                changed,
-                vec![],
-                &consts::standard_pool_interfaces(),
+                prop_hashmap! {
+                    consts::POOL_INTERFACE_NAME_3_0 => {
+                        Vec::new(),
+                        consts::POOL_KEY_DESC_PROP.to_string() =>
+                        box_variant!(kd_prop.clone())
+                    },
+                    consts::POOL_INTERFACE_NAME_3_1 => {
+                        Vec::new(),
+                        consts::POOL_KEY_DESC_PROP.to_string() =>
+                        box_variant!(kd_prop)
+                    }
+                },
             )
             .is_err()
         {
@@ -261,18 +286,22 @@ where
 
     /// Handle a change of the key description for a pool in the engine.
     fn handle_pool_clevis_info_change(&self, item: Path<'static>, ei: Option<PoolEncryptionInfo>) {
-        let mut changed = HashMap::new();
-        changed.insert(
-            consts::POOL_CLEVIS_INFO_PROP.into(),
-            box_variant!(clevis_info_to_prop(ei)),
-        );
-
+        let ci_prop = clevis_info_to_prop(ei);
         if self
             .property_changed_invalidated_signal(
                 &item,
-                changed,
-                vec![],
-                &consts::standard_pool_interfaces(),
+                prop_hashmap! {
+                    consts::POOL_INTERFACE_NAME_3_0 => {
+                        Vec::new(),
+                        consts::POOL_CLEVIS_INFO_PROP.to_string() =>
+                        box_variant!(ci_prop.clone())
+                    },
+                    consts::POOL_INTERFACE_NAME_3_1 => {
+                        Vec::new(),
+                        consts::POOL_CLEVIS_INFO_PROP.to_string() =>
+                        box_variant!(ci_prop)
+                    }
+                },
             )
             .is_err()
         {
@@ -282,15 +311,19 @@ where
 
     /// Handle a change of available actions for a pool in the engine.
     fn handle_pool_cache_change(&self, item: Path<'static>, b: bool) {
-        let mut changed = HashMap::new();
-        changed.insert(consts::POOL_HAS_CACHE_PROP.into(), box_variant!(b));
-
         if self
             .property_changed_invalidated_signal(
                 &item,
-                changed,
-                vec![],
-                &consts::standard_pool_interfaces(),
+                prop_hashmap! {
+                    consts::POOL_INTERFACE_NAME_3_0 => {
+                        Vec::new(),
+                        consts::POOL_HAS_CACHE_PROP.to_string() => box_variant!(b)
+                    },
+                    consts::POOL_INTERFACE_NAME_3_1 => {
+                        Vec::new(),
+                        consts::POOL_HAS_CACHE_PROP.to_string() => box_variant!(b)
+                    }
+                },
             )
             .is_err()
         {
@@ -300,18 +333,21 @@ where
 
     /// Handle a change of locked pools registered in the engine.
     fn handle_locked_pools_change(&self, locked_pools: HashMap<PoolUuid, LockedPoolInfo>) {
-        let mut changed = HashMap::new();
-        changed.insert(
-            consts::LOCKED_POOLS_PROP.into(),
-            box_variant!(locked_pools_to_prop(locked_pools)),
-        );
-
         if self
             .property_changed_invalidated_signal(
                 &Path::new(consts::STRATIS_BASE_PATH).expect("Valid path"),
-                changed,
-                vec![],
-                &consts::standard_manager_interfaces(),
+                prop_hashmap! {
+                    consts::MANAGER_INTERFACE_NAME_3_0 => {
+                        Vec::new(),
+                        consts::LOCKED_POOLS_PROP.to_string() =>
+                        box_variant!(locked_pools_to_prop(&locked_pools))
+                    },
+                    consts::MANAGER_INTERFACE_NAME_3_1 => {
+                        Vec::new(),
+                        consts::LOCKED_POOLS_PROP.to_string() =>
+                        box_variant!(locked_pools_to_prop(&locked_pools))
+                    }
+                },
             )
             .is_err()
         {
@@ -333,14 +369,23 @@ where
             read_lock,
             uuid,
             Fs,
-            consts::standard_filesystem_interfaces(),
             "filesystem",
-            consts::FILESYSTEM_USED_PROP.to_string(),
-            fs_used_to_prop,
-            new_used,
-            consts::FILESYSTEM_SIZE_PROP.to_string(),
-            fs_size_to_prop,
-            new_size
+            consts::FILESYSTEM_INTERFACE_NAME_3_0 => {
+                consts::FILESYSTEM_USED_PROP.to_string(),
+                fs_used_to_prop,
+                new_used,
+                consts::FILESYSTEM_SIZE_PROP.to_string(),
+                fs_size_to_prop,
+                new_size
+            },
+            consts::FILESYSTEM_INTERFACE_NAME_3_1 => {
+                consts::FILESYSTEM_USED_PROP.to_string(),
+                fs_used_to_prop,
+                new_used,
+                consts::FILESYSTEM_SIZE_PROP.to_string(),
+                fs_size_to_prop,
+                new_size
+            }
         );
     }
 
@@ -358,14 +403,23 @@ where
             read_lock,
             uuid,
             Pool,
-            consts::standard_pool_interfaces(),
             "pool",
-            consts::POOL_TOTAL_USED_PROP.to_string(),
-            pool_used_to_prop,
-            new_used,
-            consts::POOL_ALLOC_SIZE_PROP.to_string(),
-            pool_alloc_to_prop,
-            new_alloc
+            consts::POOL_INTERFACE_NAME_3_0 => {
+                consts::POOL_TOTAL_USED_PROP.to_string(),
+                pool_used_to_prop,
+                new_used,
+                consts::POOL_ALLOC_SIZE_PROP.to_string(),
+                pool_alloc_to_prop,
+                new_alloc
+            },
+            consts::POOL_INTERFACE_NAME_3_1 => {
+                consts::POOL_TOTAL_USED_PROP.to_string(),
+                pool_used_to_prop,
+                new_used,
+                consts::POOL_ALLOC_SIZE_PROP.to_string(),
+                pool_alloc_to_prop,
+                new_alloc
+            }
         );
     }
 
@@ -373,13 +427,18 @@ where
     fn handle_pool_size_change(&self, path: Path<'static>, new_size: Bytes) {
         if let Err(e) = self.property_changed_invalidated_signal(
             &path,
-            once((
-                consts::POOL_TOTAL_SIZE_PROP.to_string(),
-                box_variant!(pool_size_to_prop(new_size)),
-            ))
-            .collect::<HashMap<_, _>>(),
-            vec![],
-            &consts::standard_pool_interfaces(),
+            prop_hashmap! {
+                consts::POOL_INTERFACE_NAME_3_0 => {
+                    Vec::new(),
+                    consts::POOL_TOTAL_SIZE_PROP.to_string() =>
+                    box_variant!(pool_size_to_prop(new_size))
+                },
+                consts::POOL_INTERFACE_NAME_3_1 => {
+                    Vec::new(),
+                    consts::POOL_TOTAL_SIZE_PROP.to_string() =>
+                    box_variant!(pool_size_to_prop(new_size))
+                }
+            },
         ) {
             warn!(
                 "Failed to send a signal over D-Bus indicating pool size change: {}",
@@ -399,17 +458,29 @@ where
         handle_signal_change!(
             self,
             &path,
-            consts::standard_pool_interfaces(),
             "pool",
-            consts::POOL_TOTAL_USED_PROP.to_string(),
-            pool_used_to_prop,
-            new_used,
-            consts::POOL_ALLOC_SIZE_PROP.to_string(),
-            pool_alloc_to_prop,
-            new_alloc,
-            consts::POOL_TOTAL_SIZE_PROP.to_string(),
-            pool_size_to_prop,
-            new_size
+            consts::POOL_INTERFACE_NAME_3_0 => {
+                consts::POOL_TOTAL_USED_PROP.to_string(),
+                pool_used_to_prop,
+                new_used,
+                consts::POOL_ALLOC_SIZE_PROP.to_string(),
+                pool_alloc_to_prop,
+                new_alloc,
+                consts::POOL_TOTAL_SIZE_PROP.to_string(),
+                pool_size_to_prop,
+                new_size
+            },
+            consts::POOL_INTERFACE_NAME_3_1 => {
+                consts::POOL_TOTAL_USED_PROP.to_string(),
+                pool_used_to_prop,
+                new_used,
+                consts::POOL_ALLOC_SIZE_PROP.to_string(),
+                pool_alloc_to_prop,
+                new_alloc,
+                consts::POOL_TOTAL_SIZE_PROP.to_string(),
+                pool_size_to_prop,
+                new_size
+            }
         );
     }
 
@@ -540,24 +611,22 @@ where
     fn property_changed_invalidated_signal(
         &self,
         object: &Path<'_>,
-        changed_properties: HashMap<String, Variant<Box<dyn RefArg>>>,
-        invalidated_properties: Vec<String>,
-        interfaces: &[String],
+        props: PropertySignal,
     ) -> Result<(), dbus::Error> {
-        let mut prop_changed = PropertiesPropertiesChanged {
-            changed_properties,
-            invalidated_properties,
-            interface_name: "temp_value".into(),
-        };
-
-        interfaces.iter().try_for_each(|interface| {
-            prop_changed.interface_name = interface.to_owned();
-            self.connection
-                .send(prop_changed.to_emit_message(object))
-                .map(|_| ())
-                .map_err(|_| {
-                    dbus::Error::new_failed("Failed to send the requested signal on the D-Bus.")
-                })
-        })
+        props.into_iter().try_for_each(
+            |(interface_name, (changed_properties, invalidated_properties))| {
+                let prop_changed = PropertiesPropertiesChanged {
+                    changed_properties,
+                    invalidated_properties,
+                    interface_name,
+                };
+                self.connection
+                    .send(prop_changed.to_emit_message(object))
+                    .map(|_| ())
+                    .map_err(|_| {
+                        dbus::Error::new_failed("Failed to send the requested signal on the D-Bus.")
+                    })
+            },
+        )
     }
 }

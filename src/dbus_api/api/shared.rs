@@ -188,5 +188,5 @@ pub fn locked_pools_prop<E>(e: &E) -> LockedPools
 where
     E: Engine,
 {
-    prop_conv::locked_pools_to_prop(block_on(e.locked_pools()))
+    prop_conv::locked_pools_to_prop(&block_on(e.locked_pools()))
 }

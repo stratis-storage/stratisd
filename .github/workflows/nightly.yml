@@ -124,6 +124,7 @@ jobs:
           python3-dateutil
           python3-packaging
           python3-psutil
+          python3-wcwidth
           systemd-devel
       - uses: actions-rs/toolchain@v1
         with:

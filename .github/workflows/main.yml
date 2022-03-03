@@ -172,7 +172,7 @@ jobs:
 
   stratis-cli-checks:
     runs-on: ubuntu-18.04
-    container: fedora:30  # LOWEST SUPPORTED ENVIRONMENT PROXY
+    container: fedora:34  # LOWEST SUPPORTED ENVIRONMENT PROXY
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies

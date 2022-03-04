@@ -65,7 +65,7 @@ class TestUniqueInstance(unittest.TestCase):
         with subprocess.Popen(
             [_STRATISD, "--sim"],
             stderr=subprocess.STDOUT,
-            universal_newlines=True,
+            text=True,
             close_fds=True,
             env=env,
         ) as process:

@@ -65,7 +65,7 @@ class TestSpaceUsagePrediction(UdevTest):
         with subprocess.Popen(
             ["blockdev", "--getsize64", "/dev/mapper/%s" % cap_name],
             stdout=subprocess.PIPE,
-            universal_newlines=True,
+            text=True,
         ) as command:
             cap_device_size, _ = command.communicate()
             self.assertEqual(cap_device_size.rstrip("\n"), prediction["free"])

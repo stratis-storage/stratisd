@@ -1324,6 +1324,7 @@ mod tests {
     };
 
     use nix::mount::{mount, umount, MsFlags};
+    use retry::{delay::Fixed, retry};
 
     use devicemapper::{Bytes, SECTOR_SIZE};
 
@@ -1695,7 +1696,7 @@ mod tests {
         let flexdevs: FlexDevsSave = pool.record();
         let thinpoolsave: ThinPoolDevSave = pool.record();
 
-        retry_operation!(pool.teardown());
+        retry(Fixed::from_millis(100), || pool.teardown()).unwrap();
 
         let pool =
             ThinPool::setup(pool_name, pool_uuid, &thinpoolsave, &flexdevs, &backstore).unwrap();
@@ -1814,7 +1815,10 @@ mod tests {
 
         check_expected_filesystem_size!(pool);
 
-        retry_operation!(pool.destroy_filesystem(pool_name, fs_uuid));
+        retry(Fixed::from_millis(100), || {
+            pool.destroy_filesystem(pool_name, fs_uuid)
+        })
+        .unwrap();
         let flexdevs: FlexDevsSave = pool.record();
         let thinpooldevsave: ThinPoolDevSave = pool.record();
         pool.teardown().unwrap();

@@ -244,23 +244,6 @@ macro_rules! uuid_to_string {
     };
 }
 
-#[cfg(test)]
-// Macro for allowing a delay for certain operations in tests
-macro_rules! retry_operation {
-    ($expr:expr) => {
-        for i in 0.. {
-            match ($expr, i) {
-                (Ok(_), _) => break,
-                (Err(e), i) if i == 3 => Err(e).unwrap(),
-                (Err(e), _) => {
-                    debug!("Waiting on {} that returned error {}", stringify!($expr), e);
-                }
-            }
-            std::thread::sleep(std::time::Duration::from_secs(1));
-        }
-    };
-}
-
 macro_rules! pool_enc_to_enc {
     ($ei_option:expr) => {
         match $ei_option {

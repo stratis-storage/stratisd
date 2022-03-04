@@ -248,16 +248,11 @@ macro_rules! uuid_to_string {
 // Macro for allowing a delay for certain operations in tests
 macro_rules! retry_operation {
     ($expr:expr) => {
-        for i in 0.. {
-            match ($expr, i) {
-                (Ok(_), _) => break,
-                (Err(e), i) if i == 3 => Err(e).unwrap(),
-                (Err(e), _) => {
-                    debug!("Waiting on {} that returned error {}", stringify!($expr), e);
-                }
-            }
-            std::thread::sleep(std::time::Duration::from_secs(1));
-        }
+        retry::retry_with_index(retry::delay::Fixed::from_millis(1000).take(2), |i| {
+            debug!("Attempt number {} of expression {}", i, stringify!($expr));
+            $expr
+        })
+        .unwrap()
     };
 }
 

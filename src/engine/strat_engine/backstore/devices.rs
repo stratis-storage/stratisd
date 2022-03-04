@@ -6,6 +6,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
+    convert::TryFrom,
     fs::OpenOptions,
     path::{Path, PathBuf},
     sync::Mutex,
@@ -184,6 +185,22 @@ fn dev_info(devnode: &DevicePath) -> StratisResult<(DeviceInfo, Option<StratisId
     }
 }
 
+/// Check a device to determine whether it satisfies Stratis's device
+/// requirements, return an error if not.
+fn check_dev(device_info: &DeviceInfo) -> StratisResult<()> {
+    if device_info.size < MIN_DEV_SIZE {
+        let error_message = format!(
+            "Device {} is {} which is smaller than the minimum required size for a Stratis blockdev, {}",
+            device_info.devnode.display(),
+            device_info.size,
+            MIN_DEV_SIZE
+        );
+        Err(StratisError::Msg(error_message))
+    } else {
+        Ok(())
+    }
+}
+
 /// A miscellaneous grab bag of useful information required to decide whether
 /// a device should be allowed to be initialized by Stratis or to be used
 /// when initializing a device.
@@ -200,64 +217,131 @@ pub struct DeviceInfo {
     pub size: Bytes,
 }
 
-// Process a list of devices specified as device nodes.
-//
-// * Reduce the list of devices to a set.
-// * Return a vector of accumulated information about the device nodes.
-//
-// If the StratisIdentifiers value is not None, then the device has been
-// identified as a Stratis device.
-//
-// Return an error if there was an error collecting the information or
-// if it turns out that at least two of the specified devices have the same
-// device number.
-fn process_devices(
-    paths: &[&Path],
-) -> StratisResult<Vec<(DeviceInfo, Option<StratisIdentifiers>)>> {
-    let canonical_paths = paths
-        .iter()
-        .map(|p| DevicePath::new(p))
-        .collect::<StratisResult<Vec<DevicePath>>>()?;
+/// A list of device paths is converted into this structure.
+/// Invariants:
+/// * DeviceInfo devnode values are unique.
+/// * DeviceInfo id_wwn values are unique, if present.
+/// * DeviceInfo devno values are unique.
+/// * DeviceInfo.size value meets the required Stratis minimum.
+#[derive(Debug)]
+pub struct ProcessedPathInfos {
+    pub stratis_devices: HashMap<PoolUuid, HashMap<DevUuid, DeviceInfo>>,
+    pub unclaimed_devices: Vec<DeviceInfo>,
+}
 
-    let infos = canonical_paths
-        .iter()
-        .unique()
-        .map(dev_info)
-        .collect::<StratisResult<Vec<(DeviceInfo, Option<StratisIdentifiers>)>>>()
-        .map_err(|err| {
-            let error_message = format!(
-                "At least one of the devices specified was unsuitable for initialization: {}",
-                err
-            );
-            StratisError::Msg(error_message)
-        })?;
+impl TryFrom<&[&Path]> for ProcessedPathInfos {
+    type Error = StratisError;
 
-    let duplicate_device_number_messages: Vec<String> = infos
-        .iter()
-        .map(|(info, _)| (info.devno, info.devnode.to_path_buf()))
-        .fold(HashMap::new(), |mut acc, (devno, devnode)| {
-            acc.entry(devno).or_insert_with(Vec::new).push(devnode);
-            acc
+    fn try_from(paths: &[&Path]) -> StratisResult<Self> {
+        let canonical_paths = paths
+            .iter()
+            .map(|p| DevicePath::new(p))
+            .collect::<StratisResult<Vec<DevicePath>>>()?;
+
+        let mut infos = canonical_paths
+            .iter()
+            .unique()
+            .map(|path| {
+                dev_info(path).and_then(|(info, ids)| check_dev(&info).map(|_| (info, ids)))
+            })
+            .collect::<StratisResult<Vec<(DeviceInfo, Option<StratisIdentifiers>)>>>()
+            .map_err(|err| {
+                let error_message = format!(
+                    "At least one of the devices specified was unsuitable for initialization: {}",
+                    err
+                );
+                StratisError::Msg(error_message)
+            })?;
+
+        let duplicate_device_numbers = infos
+            .iter()
+            .duplicates_by(|(info, _)| info.devno)
+            .collect::<Vec<_>>();
+
+        let duplicate_device_number_messages = duplicate_device_numbers
+            .iter()
+            .map(|(info, _)| {
+                let dups = infos
+                    .iter()
+                    .filter(|(i, _)| i.devno == info.devno)
+                    .collect::<Vec<_>>();
+                format!(
+                    "device nodes {} correspond to device number {}",
+                    dups.iter().map(|(i, _)| i.devnode.display()).join(", "),
+                    info.devno
+                )
+            })
+            .collect::<Vec<_>>();
+
+        if !duplicate_device_number_messages.is_empty() {
+            return Err(StratisError::Msg(
+                duplicate_device_number_messages.join("; "),
+            ));
+        }
+
+        // If two DeviceInfos are missing an id_wwn they are not duplicates.
+        // If both encountered a udev error when reading the id_wwn, then
+        // consider them duplicates.
+        let duplicate_id_wwns = infos
+            .iter()
+            .filter(|(info, _)| info.id_wwn.is_some())
+            .duplicates_by(|(info, _)| {
+                info.id_wwn
+                    .as_ref()
+                    .map(|x| x.as_ref().ok())
+                    .expect("filtered")
+            })
+            .collect::<Vec<_>>();
+
+        let duplicate_id_wwn_messages = duplicate_id_wwns
+            .iter()
+            .map(|(info, _)| {
+                let dups = infos
+                    .iter()
+                    .filter(|(i, _)| match (info.id_wwn.as_ref(), i.id_wwn.as_ref()) {
+                        (None, _) => unreachable!(),
+                        (Some(Err(_)), Some(Err(_))) => true,
+                        (Some(Ok(v1)), Some(Ok(v2))) => v1 == v2,
+                        (_, _) => false,
+                    })
+                    .collect::<Vec<_>>();
+                format!(
+                    "device nodes {} have the same WWN or have WWNs which could not be read",
+                    dups.iter().map(|(i, _)| i.devnode.display()).join(", "),
+                )
+            })
+            .collect::<Vec<_>>();
+
+        if !duplicate_id_wwn_messages.is_empty() {
+            return Err(StratisError::Msg(duplicate_id_wwn_messages.join("; ")));
+        }
+
+        let (mut stratis_devices, mut unclaimed_devices) = (HashMap::new(), vec![]);
+
+        for (info, ids) in infos.drain(..) {
+            match ids {
+                Some(ids) => {
+                    let entry = stratis_devices
+                        .entry(ids.pool_uuid)
+                        .or_insert_with(HashMap::new);
+                    if let Some(old_info) = entry.insert(ids.device_uuid, info) {
+                        return Err(StratisError::Msg(format!(
+                            "Duplicate Stratis devices found: {} and {} both have the Stratis identifiers {}",
+                            old_info.devnode.display(),
+                            entry.get(&ids.device_uuid).expect("just inserted").devnode.display(),
+                            ids
+                        )));
+                    }
+                }
+                None => unclaimed_devices.push(info),
+            }
+        }
+
+        Ok(ProcessedPathInfos {
+            stratis_devices,
+            unclaimed_devices,
         })
-        .iter()
-        .filter(|(_, devnodes)| devnodes.len() > 1)
-        .map(|(devno, devnodes)| {
-            format!(
-                "device nodes {} correspond to device number {}",
-                devnodes.iter().map(|d| d.display()).join(", "),
-                devno
-            )
-        })
-        .collect();
-
-    if !duplicate_device_number_messages.is_empty() {
-        return Err(StratisError::Msg(format!(
-            "At least two of the devices specified have the same device number: {}",
-            duplicate_device_number_messages.join("; ")
-        )));
     }
-
-    Ok(infos)
 }
 
 // Check coherence of pool and device UUIDs against a set of current UUIDs.
@@ -286,28 +370,10 @@ fn process_devices(
 fn check_device_ids(
     pool_uuid: PoolUuid,
     current_uuids: &HashSet<DevUuid>,
-    mut devices: Vec<(DeviceInfo, Option<StratisIdentifiers>)>,
+    devices: ProcessedPathInfos,
 ) -> StratisResult<Vec<DeviceInfo>> {
-    let (mut stratis_devices, mut non_stratis_devices) = (vec![], vec![]);
-
-    for (info, ids) in devices.drain(..) {
-        match ids {
-            Some(ids) => stratis_devices.push((info, ids)),
-            None => non_stratis_devices.push(info),
-        }
-    }
-
-    let mut pools: HashMap<PoolUuid, Vec<(DevUuid, DeviceInfo)>> =
-        stratis_devices
-            .drain(..)
-            .fold(HashMap::new(), |mut acc, (info, identifiers)| {
-                acc.entry(identifiers.pool_uuid)
-                    .or_insert_with(Vec::new)
-                    .push((identifiers.device_uuid, info));
-                acc
-            });
-
-    let this_pool: Option<Vec<(DevUuid, DeviceInfo)>> = pools.remove(&pool_uuid);
+    let mut pools = devices.stratis_devices;
+    let this_pool: Option<HashMap<DevUuid, DeviceInfo>> = pools.remove(&pool_uuid);
 
     if !pools.is_empty() {
         let error_string = pools
@@ -333,7 +399,7 @@ fn check_device_ids(
 
     if let Some(mut this_pool) = this_pool {
         let (mut included, mut not_included) = (vec![], vec![]);
-        for (dev_uuid, info) in this_pool.drain(..) {
+        for (dev_uuid, info) in this_pool.drain() {
             if current_uuids.contains(&dev_uuid) {
                 included.push((dev_uuid, info))
             } else {
@@ -373,7 +439,7 @@ fn check_device_ids(
         }
     }
 
-    Ok(non_stratis_devices)
+    Ok(devices.unclaimed_devices)
 }
 
 /// Combine the functionality of process_devices and check_device_ids.
@@ -384,22 +450,11 @@ pub fn process_and_verify_devices(
     current_uuids: &HashSet<DevUuid>,
     paths: &[&Path],
 ) -> StratisResult<Vec<DeviceInfo>> {
-    check_device_ids(pool_uuid, current_uuids, process_devices(paths)?)
-        .and_then(|vec| {
-            vec
-                .into_iter()
-                .map(|info| {
-                    if info.size < MIN_DEV_SIZE {
-                        let error_message = format!(
-                            "Device {} is {} which is smaller than the minimum required size for a Stratis blockdev, {}",
-                            info.devnode.display(),
-                            info.size,
-                            MIN_DEV_SIZE);
-                        Err(StratisError::Msg(error_message))
-                    } else { Ok(info) }
-                })
-                .collect()
-        })
+    check_device_ids(
+        pool_uuid,
+        current_uuids,
+        ProcessedPathInfos::try_from(paths)?,
+    )
 }
 
 /// Initialze devices in devices.
@@ -726,19 +781,11 @@ mod tests {
         key_description: Option<&KeyDescription>,
     ) -> Result<(), Box<dyn Error>> {
         let pool_uuid = PoolUuid::new_v4();
-        let infos: Vec<_> = process_devices(paths)?;
-
-        if infos.len() != paths.len() {
-            return Err(Box::new(StratisError::Msg(
-                "Some duplicate devices were found".to_string(),
-            )));
-        }
-
-        let dev_infos = check_device_ids(pool_uuid, &HashSet::new(), infos)?;
+        let dev_infos: Vec<_> = ProcessedPathInfos::try_from(paths)?.unclaimed_devices;
 
         if dev_infos.len() != paths.len() {
             return Err(Box::new(StratisError::Msg(
-                "Some devices were filtered from the specified set".to_string(),
+                "Some duplicate devices were found".to_string(),
             )));
         }
 
@@ -796,36 +843,57 @@ mod tests {
             })
             .collect();
 
-        if !process_and_verify_devices(
-            pool_uuid,
-            &initialized_uuids,
-            stratis_devnodes
-                .iter()
-                .map(|p| p.as_path())
-                .collect::<Vec<_>>()
-                .as_slice(),
-        )?
-        .is_empty()
-        {
-            return Err(Box::new(StratisError::Msg(
-                "Failed to eliminate devices already initialized for this pool from list of devices to initialize".to_string()
-            )));
-        }
+        if key_description.is_none() {
+            if !process_and_verify_devices(
+                pool_uuid,
+                &initialized_uuids,
+                stratis_devnodes
+                    .iter()
+                    .map(|p| p.as_path())
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            )?
+            .is_empty()
+            {
+                return Err(Box::new(StratisError::Msg(
+                    "Failed to eliminate devices already initialized for this pool from list of devices to initialize".to_string()
+                )));
+            }
 
-        if process_and_verify_devices(
-            pool_uuid,
-            &HashSet::new(),
-            stratis_devnodes
-                .iter()
-                .map(|p| p.as_path())
-                .collect::<Vec<_>>()
-                .as_slice(),
-        )
-        .is_ok()
-        {
-            return Err(Box::new(StratisError::Msg(
+            if process_and_verify_devices(
+                pool_uuid,
+                &HashSet::new(),
+                stratis_devnodes
+                    .iter()
+                    .map(|p| p.as_path())
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            )
+            .is_ok()
+            {
+                return Err(Box::new(StratisError::Msg(
                 "Failed to return an error when some device processed was not in the set of already initialized devices".to_string()
-            )));
+                )));
+            }
+        } else {
+            // The devices will be rejected with an errorif they were the
+            // minimum size when initialized.
+
+            if let Ok(infos) = process_and_verify_devices(
+                pool_uuid,
+                &initialized_uuids,
+                stratis_devnodes
+                    .iter()
+                    .map(|p| p.as_path())
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            ) {
+                if !infos.is_empty() {
+                    return Err(Box::new(StratisError::Msg(
+                        "Failed to eliminate devices already initialized for this pool from list of devices to initialize".to_string()
+                    )));
+                }
+            }
         }
 
         if process_and_verify_devices(
@@ -931,7 +999,7 @@ mod tests {
 
         let test_paths = [paths, &[Path::new("/srk/cheese")]].concat();
 
-        assert_matches!(process_devices(&test_paths), Err(_));
+        assert_matches!(ProcessedPathInfos::try_from(test_paths.as_slice()), Err(_));
     }
 
     #[test]
@@ -963,20 +1031,12 @@ mod tests {
             )));
         }
 
-        let infos: Vec<_> = process_devices(paths)?;
+        let mut dev_infos = ProcessedPathInfos::try_from(paths)?.unclaimed_devices;
         let pool_uuid = PoolUuid::new_v4();
-
-        if infos.len() != paths.len() {
-            return Err(Box::new(StratisError::Msg(
-                "Some duplicate devices were found".to_string(),
-            )));
-        }
-
-        let mut dev_infos = check_device_ids(pool_uuid, &HashSet::new(), infos)?;
 
         if dev_infos.len() != paths.len() {
             return Err(Box::new(StratisError::Msg(
-                "Some devices were filtered from the specified set".to_string(),
+                "Some duplicate devices were found".to_string(),
             )));
         }
 
@@ -1097,7 +1157,9 @@ mod tests {
             .copied()
             .collect::<Vec<_>>();
 
-        let result = process_devices(&duplicate_paths).unwrap();
+        let result = ProcessedPathInfos::try_from(duplicate_paths.as_slice())
+            .unwrap()
+            .unclaimed_devices;
 
         assert_eq!(result.len(), paths.len());
     }

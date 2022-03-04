@@ -258,7 +258,7 @@ class _Service:
 
         service = subprocess.Popen(
             [_STRATISD],
-            universal_newlines=True,
+            text=True,
         )
 
         dbus_interface_present = False

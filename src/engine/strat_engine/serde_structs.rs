@@ -37,6 +37,8 @@ pub struct PoolSave {
     pub backstore: BackstoreSave,
     pub flex_devs: FlexDevsSave,
     pub thinpool_dev: ThinPoolDevSave,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub started: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]

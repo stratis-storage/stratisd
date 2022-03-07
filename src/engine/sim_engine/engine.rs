@@ -16,17 +16,18 @@ use tokio::sync::{OwnedRwLockReadGuard, OwnedRwLockWriteGuard, RwLock};
 
 use crate::{
     engine::{
-        engine::{Engine, Report},
+        engine::{Engine, Pool, Report},
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         sim_engine::{keys::SimKeyActions, pool::SimPool},
         structures::{
             AllLockReadGuard, AllLockWriteGuard, AllOrSomeLock, ExclusiveGuard, Lockable,
-            SharedGuard, SomeLockReadGuard, SomeLockWriteGuard,
+            SharedGuard, SomeLockReadGuard, SomeLockWriteGuard, Table,
         },
         types::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockKey,
-            LockedPoolInfo, Name, PoolDiff, PoolUuid, RenameAction, ReportType, SetUnlockAction,
-            StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
+            LockedPoolInfo, Name, PoolDevice, PoolDiff, PoolUuid, RenameAction, ReportType,
+            SetUnlockAction, StartAction, StopAction, StoppedPoolInfo, StratFilesystemDiff,
+            UdevEngineEvent, UnlockMethod,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -36,6 +37,7 @@ use crate::{
 pub struct SimEngine {
     pools: AllOrSomeLock<PoolUuid, SimPool>,
     key_handler: Lockable<Arc<RwLock<SimKeyActions>>>,
+    stopped_pools: Lockable<Arc<RwLock<Table<PoolUuid, SimPool>>>>,
 }
 
 impl Default for SimEngine {
@@ -43,6 +45,7 @@ impl Default for SimEngine {
         SimEngine {
             pools: AllOrSomeLock::default(),
             key_handler: Lockable::new_shared(SimKeyActions::default()),
+            stopped_pools: Lockable::new_shared(Table::default()),
         }
     }
 }
@@ -68,8 +71,22 @@ impl<'a> Into<Value> for &'a SimEngine {
                 })
                 .collect()
             ),
-            "errored_pools": json!([]),
-            "hopeless_devices": json!([]),
+            "stopped_pools": Value::Array(
+                (&*block_on(self.stopped_pools.read())).iter().map(|(name, uuid, pool)| {
+                    let json = json!({
+                        "pool_uuid": uuid.to_string(),
+                        "name": name.to_string(),
+                    });
+                    let pool_json = pool.into();
+                    if let (Value::Object(mut map), Value::Object(submap)) = (json, pool_json) {
+                        map.extend(submap.into_iter());
+                        Value::Object(map)
+                    } else {
+                        unreachable!("json!() output is always JSON object");
+                    }
+                })
+                .collect()
+            ),
         })
     }
 }
@@ -81,10 +98,24 @@ impl Report for SimEngine {
 
     fn get_report(&self, report_type: ReportType) -> Value {
         match report_type {
-            ReportType::ErroredPoolDevices => json!({
-                "errored_pools": json!([]),
-                "hopeless_devices": json!([]),
-            }),
+            ReportType::StoppedPools => {
+                json!({
+                    "stopped_pools": (&*block_on(self.stopped_pools.read())).iter().map(|(name, uuid, pool)| {
+                        let json = json!({
+                            "pool_uuid": uuid.to_string(),
+                            "name": name.to_string(),
+                        });
+                        let pool_json = pool.into();
+                        if let (Value::Object(mut map), Value::Object(submap)) = (json, pool_json) {
+                            map.extend(submap.into_iter());
+                            Value::Object(map)
+                        } else {
+                            unreachable!("json!() output is always JSON object");
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                })
+            }
         }
     }
 }
@@ -210,6 +241,27 @@ impl Engine for SimEngine {
         HashMap::new()
     }
 
+    async fn stopped_pools(&self) -> HashMap<PoolUuid, StoppedPoolInfo> {
+        let mut map = HashMap::new();
+        for (_, uuid, pool) in self.stopped_pools.read().await.iter() {
+            map.insert(
+                *uuid,
+                StoppedPoolInfo {
+                    info: pool.encryption_info(),
+                    devices: pool
+                        .blockdevs()
+                        .into_iter()
+                        .map(|(dev_uuid, _, bd)| PoolDevice {
+                            devnode: bd.devnode().to_path_buf(),
+                            uuid: dev_uuid,
+                        })
+                        .collect::<Vec<_>>(),
+                },
+            );
+        }
+        map
+    }
+
     async fn pools(&self) -> AllLockReadGuard<PoolUuid, Self::Pool> {
         self.pools.read_all().await
     }
@@ -239,6 +291,70 @@ impl Engine for SimEngine {
 
     async fn get_key_handler_mut(&self) -> ExclusiveGuard<OwnedRwLockWriteGuard<Self::KeyActions>> {
         self.key_handler.write().await
+    }
+
+    async fn start_pool(
+        &self,
+        pool_uuid: PoolUuid,
+        unlock_method: Option<UnlockMethod>,
+    ) -> StratisResult<StartAction<PoolUuid>> {
+        if let Some(guard) = self.pools.read(LockKey::Uuid(pool_uuid)).await {
+            let (_, _, pool) = guard.as_tuple();
+            if pool.is_encrypted() && unlock_method.is_none() {
+                return Err(StratisError::Msg(format!(
+                    "Pool with UUID {} is encrypted but no unlock method was provided",
+                    pool_uuid,
+                )));
+            } else if !pool.is_encrypted() && unlock_method.is_some() {
+                return Err(StratisError::Msg(format!(
+                    "Pool with UUID {} is not encrypted but an unlock method was provided",
+                    pool_uuid,
+                )));
+            } else {
+                Ok(StartAction::Identity)
+            }
+        } else {
+            let (name, pool) = self
+                .stopped_pools
+                .write()
+                .await
+                .remove_by_uuid(pool_uuid)
+                .ok_or_else(|| {
+                    StratisError::Msg(format!(
+                        "Pool with UUID {} was not found and cannot be started",
+                        pool_uuid
+                    ))
+                })?;
+            self.pools.write_all().await.insert(name, pool_uuid, pool);
+            Ok(StartAction::Started(pool_uuid))
+        }
+    }
+
+    async fn stop_pool(&self, pool_uuid: PoolUuid) -> StratisResult<StopAction<PoolUuid>> {
+        if self
+            .stopped_pools
+            .read()
+            .await
+            .get_by_uuid(pool_uuid)
+            .is_some()
+        {
+            Ok(StopAction::Identity)
+        } else if let Some((name, pool)) = self.pools.write_all().await.remove_by_uuid(pool_uuid) {
+            self.stopped_pools
+                .write()
+                .await
+                .insert(name, pool_uuid, pool);
+            Ok(StopAction::Stopped(pool_uuid))
+        } else {
+            Err(StratisError::Msg(format!(
+                "Pool with UUID {} was not found and cannot be stopped",
+                pool_uuid
+            )))
+        }
+    }
+
+    async fn refresh_state(&self) -> StratisResult<()> {
+        Ok(())
     }
 
     fn is_sim(&self) -> bool {

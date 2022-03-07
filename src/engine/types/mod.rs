@@ -25,7 +25,7 @@ pub use crate::engine::{
         actions::{
             Clevis, CreateAction, DeleteAction, EngineAction, Key, MappingCreateAction,
             MappingDeleteAction, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
-            SetUnlockAction,
+            SetUnlockAction, StartAction, StopAction,
         },
         diff::{Compare, Diff, PoolDiff, StratFilesystemDiff, StratPoolDiff, ThinPoolDiff},
         keys::{EncryptionInfo, KeyDescription, PoolEncryptionInfo, SizedKeyMemory},
@@ -203,7 +203,7 @@ impl fmt::Display for Name {
 /// * `ErroredPoolDevices` returns the state of devices that caused an error while
 /// attempting to reconstruct a pool.
 pub enum ReportType {
-    ErroredPoolDevices,
+    StoppedPools,
 }
 
 impl<'a> TryFrom<&'a str> for ReportType {
@@ -211,7 +211,7 @@ impl<'a> TryFrom<&'a str> for ReportType {
 
     fn try_from(name: &str) -> StratisResult<ReportType> {
         match name {
-            "errored_pool_report" => Ok(ReportType::ErroredPoolDevices),
+            "stopped_pools" => Ok(ReportType::StoppedPools),
             _ => Err(StratisError::Msg(format!(
                 "Report name {} not understood",
                 name
@@ -221,7 +221,7 @@ impl<'a> TryFrom<&'a str> for ReportType {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct LockedPoolDevice {
+pub struct PoolDevice {
     pub devnode: PathBuf,
     pub uuid: DevUuid,
 }
@@ -229,7 +229,13 @@ pub struct LockedPoolDevice {
 #[derive(Debug, PartialEq)]
 pub struct LockedPoolInfo {
     pub info: PoolEncryptionInfo,
-    pub devices: Vec<LockedPoolDevice>,
+    pub devices: Vec<PoolDevice>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct StoppedPoolInfo {
+    pub info: Option<PoolEncryptionInfo>,
+    pub devices: Vec<PoolDevice>,
 }
 
 /// A sendable event with all of the necessary information for the engine

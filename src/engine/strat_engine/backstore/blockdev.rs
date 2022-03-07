@@ -297,6 +297,20 @@ impl StratBlockDev {
         })?;
         crypt_handle.rebind_clevis()
     }
+
+    /// If a pool is encrypted, tear down the cryptsetup devicemapper devices on the
+    /// physical device.
+    pub fn teardown(&mut self) -> StratisResult<()> {
+        if let Some(ch) = self.underlying_device.crypt_handle() {
+            debug!(
+                "Deactivating unlocked encrypted device with UUID {}",
+                self.bda.dev_uuid()
+            );
+            ch.deactivate()
+        } else {
+            Ok(())
+        }
+    }
 }
 
 impl<'a> Into<Value> for &'a StratBlockDev {

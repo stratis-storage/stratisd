@@ -48,15 +48,20 @@ fn parse_args() -> Command<'static> {
                 Command::new("unset").arg(Arg::new("key_desc").required(true)),
             ]),
             Command::new("pool").subcommands(vec![
-                Command::new("unlock")
-                    .arg(Arg::new("unlock_method").required(true))
-                    .arg(Arg::new("pool_uuid").required(false))
+                Command::new("start")
+                    .arg(Arg::new("pool_uuid").required(true))
+                    .arg(
+                        Arg::new("unlock_method")
+                            .long("--unlock-method")
+                            .takes_value(true),
+                    )
                     .arg(
                         Arg::new("prompt")
                             .long("--prompt")
                             .takes_value(false)
-                            .requires("pool_uuid"),
+                            .requires("unlock_method"),
                     ),
+                Command::new("stop").arg(Arg::new("pool_uuid").required(true)),
                 Command::new("create")
                     .arg(Arg::new("name").required(true))
                     .arg(
@@ -117,7 +122,7 @@ fn parse_args() -> Command<'static> {
                     ),
                 Command::new("destroy").arg(Arg::new("name").required(true)),
                 Command::new("is-encrypted").arg(Arg::new("pool_uuid").required(true)),
-                Command::new("is-locked").arg(Arg::new("pool_uuid").required(true)),
+                Command::new("is-stopped").arg(Arg::new("pool_uuid").required(true)),
                 Command::new("is-bound").arg(Arg::new("pool_uuid").required(true)),
                 Command::new("has-passphrase").arg(Arg::new("pool_uuid").required(true)),
                 Command::new("clevis-pin").arg(Arg::new("pool_uuid").required(true)),
@@ -169,20 +174,23 @@ fn main() -> Result<(), String> {
                 Ok(())
             }
         } else if let Some(subcommand) = args.subcommand_matches("pool") {
-            if let Some(args) = subcommand.subcommand_matches("unlock") {
-                let unlock_method =
-                    UnlockMethod::try_from(args.value_of("unlock_method").expect("required"))?;
-                let uuid = match args.value_of("pool_uuid") {
-                    Some(u) => Some(PoolUuid::parse_str(u)?),
+            if let Some(args) = subcommand.subcommand_matches("start") {
+                let uuid = PoolUuid::parse_str(args.value_of("pool_uuid").expect("required"))?;
+                let unlock_method = match args.value_of("unlock_method") {
+                    Some(um) => Some(UnlockMethod::try_from(um)?),
                     None => None,
                 };
                 let prompt = args.is_present("prompt");
-                if prompt && unlock_method == UnlockMethod::Clevis {
+                if prompt && unlock_method == Some(UnlockMethod::Clevis) {
                     return Err(Box::new(StratisError::Msg(
                         "--prompt and an unlock_method of clevis are mutally exclusive".to_string(),
                     )));
                 }
-                pool::pool_unlock(unlock_method, uuid, prompt)?;
+                pool::pool_start(uuid, unlock_method, prompt)?;
+                Ok(())
+            } else if let Some(args) = subcommand.subcommand_matches("stop") {
+                let uuid = PoolUuid::parse_str(args.value_of("pool_uuid").expect("required"))?;
+                pool::pool_stop(uuid)?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("create") {
                 let paths = get_paths_from_args(args);
@@ -241,10 +249,10 @@ fn main() -> Result<(), String> {
                 let uuid = PoolUuid::parse_str(uuid_str)?;
                 println!("{}", pool::pool_is_encrypted(uuid)?,);
                 Ok(())
-            } else if let Some(args) = subcommand.subcommand_matches("is-locked") {
+            } else if let Some(args) = subcommand.subcommand_matches("is-stopped") {
                 let uuid_str = args.value_of("pool_uuid").expect("required");
                 let uuid = PoolUuid::parse_str(uuid_str)?;
-                println!("{}", pool::pool_is_locked(uuid)?,);
+                println!("{}", pool::pool_is_stopped(uuid)?,);
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("is-bound") {
                 let uuid_str = args.value_of("pool_uuid").expect("required");

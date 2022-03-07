@@ -12,7 +12,7 @@ use futures::executor::block_on;
 
 use crate::{
     dbus_api::{
-        api::prop_conv::{self, LockedPools},
+        api::prop_conv::{self, StoppedOrLockedPools},
         blockdev::get_blockdev_properties,
         filesystem::get_fs_properties,
         pool::get_pool_properties,
@@ -184,9 +184,18 @@ where
 
 /// Generate D-Bus representation of locked pools
 #[inline]
-pub fn locked_pools_prop<E>(e: &E) -> LockedPools
+pub fn locked_pools_prop<E>(e: &E) -> StoppedOrLockedPools
 where
     E: Engine,
 {
     prop_conv::locked_pools_to_prop(&block_on(e.locked_pools()))
+}
+
+/// Generate D-Bus representation of stopped pools
+#[inline]
+pub fn stopped_pools_prop<E>(e: &E) -> StoppedOrLockedPools
+where
+    E: Engine,
+{
+    prop_conv::stopped_pools_to_prop(&block_on(e.stopped_pools()))
 }

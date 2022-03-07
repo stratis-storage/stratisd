@@ -2,10 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{
-    convert::TryFrom,
-    path::{Path, PathBuf},
-};
+use std::{convert::TryFrom, path::Path};
 
 use either::Either;
 use serde_json::Value;
@@ -85,35 +82,31 @@ impl CryptInitializer {
             MetadataSize::try_from(DEFAULT_CRYPT_METADATA_SIZE)?,
             KeyslotsSize::try_from(DEFAULT_CRYPT_KEYSLOTS_SIZE)?,
         )?;
-        let result = self
+        self
             .initialize_with_err(&mut device, key_description, clevis_parsed)
-            .and_then(|path| clevis_info_from_metadata(&mut device).map(|ci| (path, ci)));
-
-        match result {
-            Ok((activated_path, clevis_info)) => {
+            .and_then(|path| clevis_info_from_metadata(&mut device).map(|ci| (path, ci)))
+            .and_then(|(_, clevis_info)| {
                 let encryption_info =
                     EncryptionInfo::from_options((key_description.cloned(), clevis_info))
                         .expect("Encrypted device must be provided encryption parameters");
-                Ok(CryptHandle::new(
-                    self.physical_path,
-                    DevicePath::new(&activated_path)?,
+                CryptHandle::new(
+                    self.physical_path.clone(),
                     self.identifiers,
                     encryption_info,
-                    self.activation_name,
-                ))
-            }
-            Err(e) => {
+                    self.activation_name.clone(),
+                )
+            })
+            .map_err(|e| {
                 if let Err(err) =
-                    Self::rollback(&mut device, &self.physical_path, self.activation_name)
+                    Self::rollback(&mut device, &self.physical_path, &self.activation_name)
                 {
                     warn!(
                         "Failed to roll back crypt device initialization; you may need to manually wipe this device: {}",
                         err
                     );
                 }
-                Err(e)
-            }
-        }
+                e
+            })
     }
 
     /// Initialize with a passphrase in the kernel keyring only.
@@ -213,7 +206,7 @@ impl CryptInitializer {
         device: &mut CryptDevice,
         key_description: Option<&KeyDescription>,
         clevis_info: Option<(&str, &Value, bool)>,
-    ) -> StratisResult<PathBuf> {
+    ) -> StratisResult<()> {
         log_on_failure!(
             device.context_handle().format::<()>(
                 EncryptionFormat::Luks2,
@@ -259,8 +252,8 @@ impl CryptInitializer {
     pub fn rollback(
         device: &mut CryptDevice,
         physical_path: &Path,
-        name: String,
+        name: &str,
     ) -> StratisResult<()> {
-        ensure_wiped(device, physical_path, &name)
+        ensure_wiped(device, physical_path, name)
     }
 }

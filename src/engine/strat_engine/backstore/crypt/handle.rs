@@ -2,7 +2,11 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{fmt::Debug, path::Path};
+use std::{
+    fmt::Debug,
+    iter::once,
+    path::{Path, PathBuf},
+};
 
 use either::Either;
 use serde_json::Value;
@@ -23,6 +27,7 @@ use crate::{
                 },
             },
             cmd::{clevis_decrypt, clevis_luks_bind, clevis_luks_regen, clevis_luks_unbind},
+            dm::DEVICEMAPPER_PATH,
             keys::MemoryPrivateFilesystem,
             metadata::StratisIdentifiers,
         },
@@ -44,45 +49,41 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct CryptHandle {
     activated_path: DevicePath,
-    name: String,
     metadata_handle: CryptMetadataHandle,
 }
 
 impl CryptHandle {
     pub(super) fn new(
         physical_path: DevicePath,
-        activated_path: DevicePath,
         identifiers: StratisIdentifiers,
         encryption_info: EncryptionInfo,
         name: String,
-    ) -> CryptHandle {
-        CryptHandle::new_with_metadata_handle(
-            activated_path,
+    ) -> StratisResult<CryptHandle> {
+        CryptHandle::new_with_metadata_handle(CryptMetadataHandle::new(
+            physical_path,
+            identifiers,
+            encryption_info,
             name,
-            CryptMetadataHandle::new(physical_path, identifiers, encryption_info),
-        )
+        ))
     }
 
     pub(super) fn new_with_metadata_handle(
-        activated_path: DevicePath,
-        name: String,
         metadata_handle: CryptMetadataHandle,
-    ) -> CryptHandle {
-        CryptHandle {
+    ) -> StratisResult<CryptHandle> {
+        let activated_path = DevicePath::new(
+            &once(DEVICEMAPPER_PATH)
+                .chain(once(metadata_handle.name()))
+                .collect::<PathBuf>(),
+        )?;
+        Ok(CryptHandle {
             activated_path,
-            name,
             metadata_handle,
-        }
+        })
     }
 
     /// Acquire the crypt device handle for the physical path in this `CryptHandle`.
     pub(super) fn acquire_crypt_device(&self) -> StratisResult<CryptDevice> {
         acquire_crypt_device(self.luks2_device_path())
-    }
-
-    #[cfg(test)]
-    pub(super) fn name(&self) -> &str {
-        &self.name
     }
 
     /// Query the device metadata to reconstruct a handle for performing operations
@@ -123,6 +124,11 @@ impl CryptHandle {
     /// the Stratis blockdev metatdata.
     pub fn activated_device_path(&self) -> &Path {
         &*self.activated_path
+    }
+
+    /// Return the name of the activated devicemapper device.
+    pub fn name(&self) -> &str {
+        self.metadata_handle.name()
     }
 
     /// Get the Stratis device identifiers for a given encrypted device.
@@ -358,9 +364,8 @@ impl CryptHandle {
     }
 
     /// Deactivate the device referenced by the current device handle.
-    #[cfg(test)]
     pub fn deactivate(&self) -> StratisResult<()> {
-        super::shared::ensure_inactive(&mut self.acquire_crypt_device()?, &self.name)
+        super::shared::ensure_inactive(&mut self.acquire_crypt_device()?, self.name())
     }
 
     /// Wipe all LUKS2 metadata on the device safely using libcryptsetup.
@@ -368,14 +373,14 @@ impl CryptHandle {
         ensure_wiped(
             &mut self.acquire_crypt_device()?,
             self.luks2_device_path(),
-            &self.name,
+            self.name(),
         )
     }
 
     /// Get the size of the logical device built on the underlying encrypted physical
     /// device. `devicemapper` will return the size in terms of number of sectors.
     pub fn logical_device_size(&self) -> StratisResult<Sectors> {
-        let name = self.name.clone();
+        let name = self.name().to_owned();
         let active_device = log_on_failure!(
             self.acquire_crypt_device()?
                 .runtime_handle(&name)

@@ -615,3 +615,73 @@ impl Display for RegenAction {
         )
     }
 }
+
+/// Action indicating an operation for starting a resource
+pub enum StartAction<T> {
+    Identity,
+    Started(T),
+}
+
+impl Display for StartAction<PoolUuid> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StartAction::Identity => write!(
+                f,
+                "The requested pool is already started; no action was taken"
+            ),
+            StartAction::Started(uuid) => {
+                write!(f, "The pool with UUID {} was successfully started", uuid)
+            }
+        }
+    }
+}
+
+impl<T> EngineAction for StartAction<T> {
+    type Return = T;
+
+    fn is_changed(&self) -> bool {
+        matches!(self, StartAction::Started(_))
+    }
+
+    fn changed(self) -> Option<Self::Return> {
+        match self {
+            StartAction::Started(t) => Some(t),
+            _ => None,
+        }
+    }
+}
+
+/// Action indicating an operation for stopped a resource
+pub enum StopAction<T> {
+    Identity,
+    Stopped(T),
+}
+
+impl Display for StopAction<PoolUuid> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StopAction::Identity => write!(
+                f,
+                "The requested pool is already stopped; no action was taken"
+            ),
+            StopAction::Stopped(uuid) => {
+                write!(f, "The pool with UUID {} was successfully stopped", uuid)
+            }
+        }
+    }
+}
+
+impl<T> EngineAction for StopAction<T> {
+    type Return = T;
+
+    fn is_changed(&self) -> bool {
+        matches!(self, StopAction::Stopped(_))
+    }
+
+    fn changed(self) -> Option<Self::Return> {
+        match self {
+            StopAction::Stopped(t) => Some(t),
+            _ => None,
+        }
+    }
+}

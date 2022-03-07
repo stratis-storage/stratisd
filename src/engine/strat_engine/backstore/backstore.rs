@@ -512,19 +512,16 @@ impl Backstore {
     }
 
     /// Teardown the DM devices in the backstore.
-    #[cfg(test)]
     pub fn teardown(&mut self) -> StratisResult<()> {
         match self.cache {
-            Some(ref mut cache) => cache.teardown(get_dm()),
+            Some(ref mut cache) => cache.teardown(get_dm())?,
             None => {
                 if let Some(ref mut linear) = self.linear {
-                    linear.teardown(get_dm())
-                } else {
-                    Ok(())
+                    linear.teardown(get_dm())?;
                 }
             }
-        }
-        .map_err(|e| e.into())
+        };
+        self.data_tier.block_mgr.teardown()
     }
 
     /// Return the device that this tier is currently using.

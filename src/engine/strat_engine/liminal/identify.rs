@@ -51,7 +51,7 @@ use devicemapper::Device;
 
 use crate::engine::{
     strat_engine::{
-        backstore::CryptMetadataHandle,
+        backstore::{CryptMetadataHandle, StratBlockDev},
         metadata::{device_identifiers, StratisIdentifiers},
         udev::{
             block_enumerator, decide_ownership, UdevOwnership, CRYPTO_FS_TYPE, FS_TYPE_KEY,
@@ -144,6 +144,29 @@ impl DeviceInfo {
         match self {
             DeviceInfo::Luks(info) => Some(&info.encryption_info),
             DeviceInfo::Stratis(_) => None,
+        }
+    }
+}
+
+impl From<&StratBlockDev> for DeviceInfo {
+    fn from(bd: &StratBlockDev) -> Self {
+        fn stratis_info_from_bd(bd: &StratBlockDev) -> StratisInfo {
+            StratisInfo {
+                device_number: *bd.device(),
+                devnode: bd.physical_path().to_owned(),
+                identifiers: StratisIdentifiers {
+                    pool_uuid: bd.pool_uuid(),
+                    device_uuid: bd.uuid(),
+                },
+            }
+        }
+
+        match bd.encryption_info() {
+            Some(ei) => DeviceInfo::Luks(LuksInfo {
+                encryption_info: ei.clone(),
+                info: stratis_info_from_bd(bd),
+            }),
+            None => DeviceInfo::Stratis(stratis_info_from_bd(bd)),
         }
     }
 }
@@ -289,6 +312,7 @@ fn find_all_luks_devices() -> libudev::Result<HashMap<PoolUuid, Vec<LuksInfo>>> 
         });
     Ok(pool_map)
 }
+
 // Find all devices identified by udev as Stratis devices.
 fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, Vec<StratisInfo>>> {
     let context = libudev::Context::new()?;

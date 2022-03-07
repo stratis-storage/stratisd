@@ -24,7 +24,7 @@ use devicemapper::Bytes;
 
 use crate::{
     dbus_api::{
-        api::prop_conv::locked_pools_to_prop,
+        api::prop_conv::{locked_pools_to_prop, stopped_pools_to_prop},
         consts,
         filesystem::prop_conv::{fs_size_to_prop, fs_used_to_prop},
         pool::prop_conv::{
@@ -39,7 +39,7 @@ use crate::{
     },
     engine::{
         ActionAvailability, Engine, FilesystemUuid, LockedPoolInfo, PoolEncryptionInfo, PoolUuid,
-        StratisUuid,
+        StoppedPoolInfo, StratisUuid,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -378,17 +378,31 @@ where
                         Vec::new(),
                         consts::LOCKED_POOLS_PROP.to_string() =>
                         box_variant!(locked_pools_to_prop(&locked_pools))
-                    },
-                    consts::MANAGER_INTERFACE_NAME_3_2 => {
-                        Vec::new(),
-                        consts::LOCKED_POOLS_PROP.to_string() =>
-                        box_variant!(locked_pools_to_prop(&locked_pools))
                     }
                 },
             )
             .is_err()
         {
-            warn!("Signal on pool available actions mode change was not sent to the D-Bus client");
+            warn!("Signal on locked pools change was not sent to the D-Bus client");
+        }
+    }
+
+    /// Handle a change of stopped pools registered in the engine.
+    fn handle_stopped_pools_change(&self, stopped_pools: HashMap<PoolUuid, StoppedPoolInfo>) {
+        if self
+            .property_changed_invalidated_signal(
+                &Path::new(consts::STRATIS_BASE_PATH).expect("Valid path"),
+                prop_hashmap! {
+                    consts::MANAGER_INTERFACE_NAME_3_2 => {
+                        Vec::new(),
+                        consts::STOPPED_POOLS_PROP.to_string() =>
+                        box_variant!(stopped_pools_to_prop(&stopped_pools))
+                    }
+                },
+            )
+            .is_err()
+        {
+            warn!("Signal on stopped pools change was not sent to the D-Bus client");
         }
     }
 
@@ -683,6 +697,10 @@ where
             }
             DbusAction::LockedPoolsChange(pools) => {
                 self.handle_locked_pools_change(pools);
+                Ok(true)
+            }
+            DbusAction::StoppedPoolsChange(pools) => {
+                self.handle_stopped_pools_change(pools);
                 Ok(true)
             }
             DbusAction::PoolForegroundChange(item, new_used, new_alloc, new_size, new_no_space) => {

@@ -19,6 +19,7 @@ use crate::{
         },
         strat_engine::{
             backstore::{Backstore, StratBlockDev},
+            liminal::{DeviceInfo, DeviceSet, LInfo},
             metadata::MDADataSize,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             thinpool::{StratFilesystem, ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
@@ -241,6 +242,9 @@ impl StratPool {
             metadata_size,
         };
 
+        // Change the pool to started at this point not that the pool has been set up.
+        needs_save |= !metadata.started.unwrap_or(false);
+
         if needs_save {
             pool.write_metadata(pool_name)?;
         }
@@ -309,6 +313,7 @@ impl StratPool {
             backstore: self.backstore.record(),
             flex_devs: self.thin_pool.record(),
             thinpool_dev: self.thin_pool.record(),
+            started: Some(true),
         }
     }
 
@@ -348,6 +353,23 @@ impl StratPool {
         } else {
             Ok(())
         }
+    }
+
+    /// Stop a pool, consuming it and converting it into a set of devices to be
+    /// set up again later.
+    pub fn stop(&mut self, pool_name: &Name) -> StratisResult<DeviceSet> {
+        self.thin_pool.teardown()?;
+        let mut data = self.record(pool_name);
+        data.started = Some(false);
+        let json = serde_json::to_string(&data)?;
+        self.backstore.save_state(json.as_bytes())?;
+        self.backstore.teardown()?;
+        Ok(self
+            .backstore
+            .blockdevs()
+            .into_iter()
+            .map(|(uuid, _, bd)| (uuid, LInfo::from(DeviceInfo::from(bd))))
+            .collect::<DeviceSet>())
     }
 
     #[cfg(test)]

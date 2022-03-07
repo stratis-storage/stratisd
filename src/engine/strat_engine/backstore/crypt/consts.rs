@@ -25,9 +25,6 @@ pub const STRATIS_MEK_SIZE: usize = 512 / 8;
 /// Sector size as determined in `cryptsetup/lib/internal.h`
 pub const SECTOR_SIZE: u64 = 512;
 
-/// Path to logical devices for encrypted devices
-pub const DEVICEMAPPER_PATH: &str = "/dev/mapper";
-
 /// Key in clevis configuration for tang indicating that the URL of the
 /// tang server does not need to be verified.
 pub const CLEVIS_TANG_TRUST_URL: &str = "stratis:tang:trust_url";

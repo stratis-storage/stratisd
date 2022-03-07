@@ -6,7 +6,7 @@ if [ -z "$STRATIS_ROOTFS_UUID" ]; then
 fi
 
 i=0
-while ! stratis-min pool is-locked "$STRATIS_ROOTFS_UUID" >/dev/null; do
+while ! stratis-min pool is-stopped "$STRATIS_ROOTFS_UUID" >/dev/null; do
 	echo Waiting on pool with UUID $STRATIS_ROOTFS_UUID...
 	sleep 1
 	if [ "$i" = 5 ]; then
@@ -15,12 +15,19 @@ while ! stratis-min pool is-locked "$STRATIS_ROOTFS_UUID" >/dev/null; do
 	i=$(($i + 1))
 done
 
-if $(stratis-min pool is-locked "$STRATIS_ROOTFS_UUID"); then
-	if ! plymouth ask-for-password \
-		--command="stratis-min pool unlock --prompt keyring $STRATIS_ROOTFS_UUID" \
-		--prompt="Enter password for Stratis pool with UUID $STRATIS_ROOTFS_UUID containing root filesystem" \
-		--number-of-tries=3; then
-		echo Failed to unlock pool with UUID $STRATIS_ROOTFS_UUID using a passphrase >&2
-		exit 1
+if $(stratis-min pool is-stopped "$STRATIS_ROOTFS_UUID"); then
+	if $(stratis-min pool is-encrypted "$STRATIS_ROOTFS_UUID"); then
+		if ! plymouth ask-for-password \
+			--command="stratis-min pool start --prompt --unlock-method=keyring $STRATIS_ROOTFS_UUID" \
+			--prompt="Enter password for Stratis pool with UUID $STRATIS_ROOTFS_UUID containing root filesystem" \
+			--number-of-tries=3; then
+			echo Failed to start pool with UUID $STRATIS_ROOTFS_UUID using a passphrase >&2
+			exit 1
+		fi
+	else
+		if ! stratis-min pool start "$STRATIS_ROOTFS_UUID"; then
+			echo Failed to start pool with UUID $STRATIS_ROOTFS_UUID >&2
+			exit 1
+		fi
 	fi
 fi

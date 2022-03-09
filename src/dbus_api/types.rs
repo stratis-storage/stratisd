@@ -110,6 +110,7 @@ pub enum DbusAction<E> {
     PoolClevisInfoChange(Path<'static>, Option<PoolEncryptionInfo>),
     PoolCacheChange(Path<'static>, bool),
     PoolSizeChange(Path<'static>, Bytes),
+    PoolFsLimitChange(Path<'static>, u64),
     LockedPoolsChange(HashMap<PoolUuid, LockedPoolInfo>),
 
     FsBackgroundChange(
@@ -355,6 +356,19 @@ where
             warn!(
                 "D-Bus pool size change event could not be sent to the processing thread; \
                 no signal will be sent out for the size change of pool with path {}: {}",
+                item, e,
+            )
+        }
+    }
+
+    /// Send changed signal for pool FsLimit property.
+    pub fn push_pool_fs_limit_change(&self, item: &Path<'static>, new_fs_limit: u64) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::PoolFsLimitChange(item.clone(), new_fs_limit))
+        {
+            warn!(
+                "D-Bus pool filesystem limit change event could not be sent to the processing thread; no signal will be sent out for the filesystem limit change of pool with path {}: {}",
                 item, e,
             )
         }

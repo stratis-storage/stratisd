@@ -59,6 +59,37 @@ where
     closure((pool_name, pool_uuid, pool))
 }
 
+pub fn pool_set_operation<F, E>(
+    tree: &Tree<MTSync<TData<E>>, TData<E>>,
+    object_path: &dbus::Path<'static>,
+    closure: F,
+) -> Result<(), String>
+where
+    F: Fn((Name, PoolUuid, &mut E::Pool)) -> Result<(), String>,
+    E: 'static + Engine,
+{
+    let dbus_context = tree.get_data();
+
+    let pool_path = tree
+        .get(object_path)
+        .expect("implicit argument must be in tree");
+
+    let pool_uuid = typed_uuid_string_err!(
+        pool_path
+            .get_data()
+            .as_ref()
+            .ok_or_else(|| format!("no data for object path {}", object_path))?
+            .uuid;
+        Pool
+    );
+
+    let guard = block_on(dbus_context.engine.get_mut_pool(LockKey::Uuid(pool_uuid)))
+        .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
+    let (pool_name, _, pool) = guard.as_tuple();
+
+    closure((pool_name, pool_uuid, pool))
+}
+
 /// A method shared by all pool interfaces and by all blockdev-adding
 /// operations, including cache initialization, which is considered a
 /// blockdev-adding operation because when a cache is initialized, the
@@ -201,6 +232,22 @@ where
     Ok(())
 }
 
+/// Set a pool property. The property is found by means of the setter method which
+/// takes a mutable reference to a Pool and sets the property on the pool.
+pub fn set_pool_property<F, E>(
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+    setter: F,
+) -> Result<(), MethodErr>
+where
+    F: Fn((Name, PoolUuid, &mut E::Pool)) -> Result<(), String>,
+    E: 'static + Engine,
+{
+    // Using clippy's suggested code causes a compilation error
+    #[allow(clippy::redundant_closure)]
+    pool_set_operation(p.tree, p.path.get_name(), setter).map_err(|ref e| MethodErr::failed(e))?;
+    Ok(())
+}
+
 /// Generate D-Bus representation of name property.
 #[inline]
 pub fn pool_name_prop(name: &Name) -> String {
@@ -274,4 +321,28 @@ where
     E: 'static + Engine,
 {
     prop_conv::pool_size_to_prop(pool.total_physical_size().bytes())
+}
+
+/// Generate a D-Bus representation of the filesystem limit on the pool.
+#[inline]
+pub fn pool_fs_limit<E>(pool: &E::Pool) -> u64
+where
+    E: 'static + Engine,
+{
+    pool.fs_limit()
+}
+
+/// Set the filesystem limit on a pool.
+#[inline]
+pub fn set_pool_fs_limit<E>(
+    name: &Name,
+    pool_uuid: PoolUuid,
+    pool: &mut E::Pool,
+    new_limit: u64,
+) -> Result<(), String>
+where
+    E: 'static + Engine,
+{
+    pool.set_fs_limit(name, pool_uuid, new_limit)
+        .map_err(|e| e.to_string())
 }

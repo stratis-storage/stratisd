@@ -14,6 +14,7 @@ use crate::{
 };
 
 mod pool_3_0;
+mod pool_3_1;
 pub mod prop_conv;
 mod shared;
 
@@ -87,7 +88,8 @@ where
                 .add_p(pool_3_0::has_cache_property(&f))
                 .add_p(pool_3_0::alloc_size_property(&f))
                 .add_p(pool_3_0::used_size_property(&f))
-                .add_p(pool_3_0::total_size_property(&f)),
+                .add_p(pool_3_0::total_size_property(&f))
+                .add_p(pool_3_1::fs_limit_property(&f)),
         );
 
     let path = object_path.get_name().to_owned();
@@ -128,7 +130,8 @@ where
             consts::POOL_HAS_CACHE_PROP => shared::pool_has_cache_prop::<E>(pool),
             consts::POOL_ALLOC_SIZE_PROP => shared::pool_allocated_size::<E>(pool),
             consts::POOL_TOTAL_USED_PROP => shared::pool_used_size::<E>(pool),
-            consts::POOL_TOTAL_SIZE_PROP => shared::pool_total_size::<E>(pool)
+            consts::POOL_TOTAL_SIZE_PROP => shared::pool_total_size::<E>(pool),
+            consts::POOL_FS_LIMIT_PROP => shared::pool_fs_limit::<E>(pool)
         }
     }
 }

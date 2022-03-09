@@ -191,7 +191,7 @@ macro_rules! handle_signal_change {
         $type:tt,
         $(
             $interface:expr => {
-                $( $prop:expr, $data_to_prop:ident, $prop_val:expr),+
+                $($prop:expr, $data_to_prop:expr, $prop_val:expr),+
             }
         ),*
     ) => {{
@@ -232,7 +232,7 @@ macro_rules! handle_background_change {
         $type:tt,
         $(
             $interface:expr => {
-                $( $prop:expr, $data_to_prop:ident, $prop_val:expr),+
+                $($prop:expr, $data_to_prop:expr, $prop_val:expr),+
             }
         ),*
     ) => {

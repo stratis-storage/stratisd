@@ -19,6 +19,7 @@ use crate::{
                 blockdevmgr::{map_to_dm, BlockDevMgr},
                 cache_tier::CacheTier,
                 data_tier::DataTier,
+                transaction::RequestTransaction,
             },
             dm::get_dm,
             metadata::MDADataSize,
@@ -350,92 +351,59 @@ impl Backstore {
     /// retained as a convenience to the caller.
     /// Postcondition:
     /// forall i, result_i.0 = result_(i - 1).0 + result_(i - 1).1
-    ///
-    /// WARNING: metadata changing event
-    pub fn alloc(
+    pub fn request_alloc(
         &mut self,
-        pool_uuid: PoolUuid,
         sizes: &[Sectors],
-    ) -> StratisResult<Option<Vec<(Sectors, Sectors)>>> {
-        let total_required = sizes.iter().cloned().sum();
-        let available = self.available_in_cap();
-        if available < total_required {
-            if self.data_tier.alloc(total_required - available) {
-                self.extend_cap_device(pool_uuid)?;
-            } else {
-                return Ok(None);
-            }
-        }
+    ) -> StratisResult<Option<RequestTransaction>> {
+        let mut transaction = match self.data_tier.alloc_request(sizes)? {
+            Some(t) => t,
+            None => return Ok(None),
+        };
 
-        let mut chunks = Vec::new();
+        let mut next = self.next;
         for size in sizes {
-            chunks.push((self.next, *size));
-            self.next += *size;
+            transaction.add_seg_req((next, *size));
+            next += *size
         }
 
         // Assert that the postcondition holds.
         assert_eq!(
             sizes,
-            chunks
+            transaction
+                .get_backstore()
                 .iter()
                 .map(|x| x.1)
                 .collect::<Vec<Sectors>>()
                 .as_slice()
         );
 
-        Ok(Some(chunks))
+        Ok(Some(transaction))
     }
 
-    /// Allocate a single segment from the backstore.
-    /// If it is impossible to allocate the requested amount, try
-    /// something smaller. If it is impossible to allocate any amount
-    /// greater than 0, return None. Only allocate amounts that are divisible
-    /// by modulus.
+    /// Commit space requested by request_alloc() to metadata.
     ///
-    /// Precondition: self.next <= self.size()
-    /// Postcondition: self.next <= self.size()
-    ///
-    /// Postcondition: result.1 % modulus == 0
-    /// Postcondition: result.1 <= request
-    /// Postcondition: result.1 != 0
-    ///
-    /// WARNING: metadata changing event
-    pub fn request(
+    /// This method commits the newly allocated data segments and then extends the cap device
+    /// to be the same size as the allocated data size.
+    pub fn commit_alloc(
         &mut self,
         pool_uuid: PoolUuid,
-        request: Sectors,
-        modulus: Sectors,
-    ) -> StratisResult<Option<(Sectors, Sectors)>> {
-        assert!(modulus != Sectors(0));
+        transaction: RequestTransaction,
+    ) -> StratisResult<()> {
+        let segs = transaction.get_backstore();
+        self.data_tier.alloc_commit(transaction)?;
+        // This must occur after the segments have been updated in the data tier
+        self.extend_cap_device(pool_uuid)?;
 
-        let mut internal_request = (request / modulus) * modulus;
+        assert!(self.next <= self.size());
 
-        if internal_request == Sectors(0) {
-            return Ok(None);
-        }
+        self.next += segs
+            .into_iter()
+            .fold(Sectors(0), |mut size, (_, next_size)| {
+                size += next_size;
+                size
+            });
 
-        let available = self.available_in_cap();
-        if available < internal_request {
-            let mut allocated = false;
-            while !allocated && internal_request != Sectors(0) {
-                allocated = self.data_tier.alloc(internal_request - available);
-                let temp = internal_request / 2usize;
-                internal_request = (temp / modulus) * modulus;
-            }
-            if allocated {
-                self.extend_cap_device(pool_uuid)?;
-
-                let return_amt = cmp::min(request, self.available_in_cap());
-                let return_amt = (return_amt / modulus) * modulus;
-                self.next += return_amt;
-                Ok(Some((self.next - return_amt, return_amt)))
-            } else {
-                Ok(None)
-            }
-        } else {
-            self.next += internal_request;
-            Ok(Some((self.next - internal_request, internal_request)))
-        }
+        Ok(())
     }
 
     /// Get only the datadevs in the pool.
@@ -495,7 +463,7 @@ impl Backstore {
 
     /// The current size of allocated space on the blockdevs in the data tier.
     pub fn datatier_allocated_size(&self) -> Sectors {
-        self.data_tier.allocated_size()
+        self.data_tier.allocated()
     }
 
     /// The current usable size of all the blockdevs in the data tier.
@@ -522,21 +490,6 @@ impl Backstore {
     /// added to cap.
     pub fn available_in_backstore(&self) -> Sectors {
         self.data_tier.usable_size() - self.next
-    }
-
-    /// The available number of Sectors.
-    fn available_in_cap(&self) -> Sectors {
-        let size = self.size();
-        // It is absolutely essential for correct operation that the assertion
-        // be true. If it is false, the result will be incorrect, and space
-        // will be allocated incorrectly from the cap device.
-        assert!(
-            self.next <= size,
-            "next index, {}, is greater than the total size available {}",
-            self.next,
-            size
-        );
-        size - self.next
     }
 
     /// Destroy the entire store.
@@ -724,7 +677,6 @@ mod tests {
     use devicemapper::{CacheDevStatus, DataBlocks, DmOptions, IEC};
 
     use crate::engine::strat_engine::{
-        cmd,
         metadata::device_identifiers,
         tests::{loopbacked, real},
     };
@@ -779,9 +731,11 @@ mod tests {
         invariant(&backstore);
 
         // Allocate space from the backstore so that the cap device is made.
-        backstore
-            .alloc(pool_uuid, &[INITIAL_BACKSTORE_ALLOCATION])
+        let transaction = backstore
+            .request_alloc(&[INITIAL_BACKSTORE_ALLOCATION])
+            .unwrap()
             .unwrap();
+        backstore.commit_alloc(pool_uuid, transaction).unwrap();
 
         let cache_uuids = backstore.init_cache(pool_uuid, initcachepaths).unwrap();
 
@@ -852,61 +806,6 @@ mod tests {
     }
 
     /// Create a backstore.
-    /// Request a amount that can not be allocated because the modulus is
-    /// bigger than the reqested amount.
-    /// Request an impossibly large amount.
-    /// Verify that the backstore is now all used up.
-    fn test_request(paths: &[&Path]) {
-        assert!(!paths.is_empty());
-
-        let pool_uuid = PoolUuid::new_v4();
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
-
-        assert_matches!(
-            backstore
-                .request(pool_uuid, Sectors(IEC::Ki), Sectors(IEC::Mi))
-                .unwrap(),
-            None
-        );
-
-        let request = Sectors(IEC::Ei);
-        let modulus = Sectors(IEC::Ki);
-        let old_next = backstore.next;
-        let (start, length) = backstore
-            .request(pool_uuid, request, modulus)
-            .unwrap()
-            .unwrap();
-        assert!(length < request);
-        assert_eq!(length % modulus, Sectors(0));
-        assert_eq!(backstore.next, old_next + length);
-        assert_eq!(start, old_next);
-
-        let new_request = backstore
-            .request(pool_uuid, request, Sectors(IEC::Ki))
-            .unwrap();
-
-        // Either there is nothing left to allocate or there is some, but it
-        // is less than length.  If what is allocated now is more than length
-        // then the amount available to be allocated was greater than
-        // length * 2. In that case, length * 2 would have been allocated.
-        assert!(new_request.is_none() || new_request.expect("!is_none()").1 < length);
-        cmd::udev_settle().unwrap();
-        backstore.destroy().unwrap();
-        cmd::udev_settle().unwrap();
-    }
-
-    #[test]
-    fn loop_test_request() {
-        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Range(1, 3, None), test_request);
-    }
-
-    #[test]
-    fn real_test_request() {
-        real::test_with_spec(&real::DeviceLimits::AtLeast(1, None, None), test_request);
-    }
-
-    /// Create a backstore.
     /// Initialize a cache and verify that there is a new device representing
     /// the cache.
     fn test_setup(paths: &[&Path]) {
@@ -932,9 +831,11 @@ mod tests {
         invariant(&backstore);
 
         // Allocate space from the backstore so that the cap device is made.
-        backstore
-            .alloc(pool_uuid, &[INITIAL_BACKSTORE_ALLOCATION])
+        let transaction = backstore
+            .request_alloc(&[INITIAL_BACKSTORE_ALLOCATION])
+            .unwrap()
             .unwrap();
+        backstore.commit_alloc(pool_uuid, transaction).unwrap();
 
         let old_device = backstore.device();
 

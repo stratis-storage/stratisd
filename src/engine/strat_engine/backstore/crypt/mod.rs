@@ -12,15 +12,15 @@ mod initialize;
 mod metadata_handle;
 mod shared;
 
+#[cfg(test)]
+pub use self::shared::crypt_metadata_size;
 pub use self::{
     activate::CryptActivationHandle,
     consts::CLEVIS_TANG_TRUST_URL,
     handle::CryptHandle,
     initialize::CryptInitializer,
     metadata_handle::CryptMetadataHandle,
-    shared::{
-        back_up_luks_header, crypt_metadata_size, interpret_clevis_config, restore_luks_header,
-    },
+    shared::{back_up_luks_header, interpret_clevis_config, restore_luks_header},
 };
 
 #[cfg(test)]

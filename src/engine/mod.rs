@@ -7,9 +7,8 @@ pub use self::{
     shared::total_used,
     sim_engine::SimEngine,
     strat_engine::{
-        blkdev_size, crypt_metadata_size, device_identifiers, get_dm, get_dm_init,
-        CryptMetadataHandle, StaticHeader, StaticHeaderResult, StratEngine, StratKeyActions, BDA,
-        CLEVIS_TANG_TRUST_URL,
+        device_identifiers, get_dm, get_dm_init, CryptMetadataHandle, StaticHeader,
+        StaticHeaderResult, StratEngine, StratKeyActions, BDA, CLEVIS_TANG_TRUST_URL,
     },
     structures::{ExclusiveGuard, SharedGuard, Table},
     types::{

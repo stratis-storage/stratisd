@@ -105,6 +105,12 @@ impl Engine for SimEngine {
 
         validate_paths(blockdev_paths)?;
 
+        if blockdev_paths.is_empty() {
+            return Err(StratisError::Msg(
+                "At least one blockdev is required to create a pool.".to_string(),
+            ));
+        }
+
         if let Some(key_desc) = encryption_info.and_then(|ei| ei.key_description()) {
             if !self.key_handler.read().await.contains_key(key_desc) {
                 return Err(StratisError::Msg(format!(
@@ -118,24 +124,17 @@ impl Engine for SimEngine {
         match guard.as_ref().map(|g| g.as_tuple()) {
             Some((_, _, pool)) => create_pool_idempotent_or_err(pool, &name, blockdev_paths),
             None => {
-                if blockdev_paths.is_empty() {
-                    Err(StratisError::Msg(
-                        "At least one blockdev is required to create a pool.".to_string(),
-                    ))
-                } else {
-                    let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
-                    let devices = device_set.into_iter().cloned().collect::<Vec<_>>();
+                let device_set: HashSet<_, RandomState> = HashSet::from_iter(blockdev_paths);
+                let devices = device_set.into_iter().cloned().collect::<Vec<_>>();
 
-                    let (pool_uuid, pool) = SimPool::new(&devices, encryption_info);
+                let (pool_uuid, pool) = SimPool::new(&devices, encryption_info);
 
-                    self.pools.write_all().await.insert(
-                        Name::new(name.to_owned()),
-                        pool_uuid,
-                        pool,
-                    );
+                self.pools
+                    .write_all()
+                    .await
+                    .insert(Name::new(name.to_owned()), pool_uuid, pool);
 
-                    Ok(CreateAction::Created(pool_uuid))
-                }
+                Ok(CreateAction::Created(pool_uuid))
             }
         }
     }

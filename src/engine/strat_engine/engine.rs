@@ -351,14 +351,16 @@ impl Engine for StratEngine {
 
         validate_paths(blockdev_paths)?;
 
+        if blockdev_paths.is_empty() {
+            return Err(StratisError::Msg(
+                "At least one blockdev is required to create a pool.".to_string(),
+            ));
+        }
+
         let maybe_guard = self.pools.read(LockKey::Name(name.clone())).await;
         if let Some(guard) = maybe_guard {
             let (name, _, pool) = guard.as_tuple();
             create_pool_idempotent_or_err(pool, &name, blockdev_paths)
-        } else if blockdev_paths.is_empty() {
-            Err(StratisError::Msg(
-                "At least one blockdev is required to create a pool.".to_string(),
-            ))
         } else {
             let cloned_name = name.clone();
             let cloned_paths = blockdev_paths

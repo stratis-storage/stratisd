@@ -191,17 +191,18 @@ impl Pool for SimPool {
     ) -> StratisResult<SetCreateAction<DevUuid>> {
         validate_paths(blockdevs)?;
 
+        if blockdevs.is_empty() {
+            return Err(StratisError::Msg(
+                "At least one blockdev path is required to initialize a cache.".to_string(),
+            ));
+        }
+
         if self.is_encrypted() {
             return Err(StratisError::Msg(
                 "Use of a cache is not supported with an encrypted pool".to_string(),
             ));
         }
         if !self.has_cache() {
-            if blockdevs.is_empty() {
-                return Err(StratisError::Msg(
-                    "At least one blockdev path is required to initialize a cache.".to_string(),
-                ));
-            }
             let blockdev_pairs: Vec<_> = blockdevs.iter().map(|p| SimDev::new(p, None)).collect();
             let blockdev_uuids: Vec<_> = blockdev_pairs.iter().map(|(uuid, _)| *uuid).collect();
             self.cache_devs.extend(blockdev_pairs);

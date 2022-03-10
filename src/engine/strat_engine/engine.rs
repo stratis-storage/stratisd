@@ -4,6 +4,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
+    convert::TryFrom,
     path::Path,
     sync::Arc,
 };
@@ -22,6 +23,7 @@ use crate::{
     engine::{
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         strat_engine::{
+            backstore::ProcessedPathInfos,
             cmd::verify_binaries,
             dm::get_dm,
             keys::{MemoryFilesystem, StratKeyActions},
@@ -357,15 +359,45 @@ impl Engine for StratEngine {
             ));
         }
 
+        let mut device_infos = ProcessedPathInfos::try_from(blockdev_paths)?;
+
         let maybe_guard = self.pools.read(LockKey::Name(name.clone())).await;
         if let Some(guard) = maybe_guard {
-            let (name, _, pool) = guard.as_tuple();
-            create_pool_idempotent_or_err(pool, &name, blockdev_paths)
+            let (name, uuid, pool) = guard.as_tuple();
+            if !device_infos.unclaimed_devices.is_empty() {
+                return Err(StratisError::Msg(format!(
+                    "Pool with name {} and UUID {} already exists; can not add new devices to existing pool with create command.",
+                    name,
+                    uuid
+                )));
+            }
+            let this_pool = device_infos.stratis_devices.remove(&uuid);
+            if !device_infos.stratis_devices.is_empty() {
+                return Err(StratisError::Msg(format!(
+                    "Pool with name {} and UUID {} already exists; some of the devices specified appeared to belong to a different Stratis pool.", 
+                    name,
+                    uuid
+                )));
+            }
+            let cloned_paths = this_pool
+                .unwrap_or_default()
+                .values()
+                .map(|info| info.devnode.clone())
+                .collect::<Vec<_>>();
+            let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
+            create_pool_idempotent_or_err(pool, &name, &borrowed_paths)
         } else {
+            if !device_infos.stratis_devices.is_empty() {
+                return Err(StratisError::Msg(
+                    "Some devices specified already belong to Stratis pools.".into(),
+                ));
+            }
+
             let cloned_name = name.clone();
-            let cloned_paths = blockdev_paths
+            let cloned_paths = device_infos
+                .unclaimed_devices
                 .iter()
-                .map(|p| p.to_path_buf())
+                .map(|info| info.devnode.clone())
                 .collect::<Vec<_>>();
             let cloned_enc_info = encryption_info.cloned();
 

@@ -317,6 +317,18 @@ impl TryFrom<&[&Path]> for ProcessedPathInfos {
     }
 }
 
+/// A list of device paths that have been determined to be unowned, and thus
+/// can be initialized by stratisd.
+/// Invariants:
+/// * DeviceInfo devnode values are unique.
+/// * DeviceInfo id_wwn values are unique, if present.
+/// * DeviceInfo devno values are unique.
+/// * DeviceInfo.size value meets the required Stratis minimum.
+#[derive(Debug)]
+pub struct UnownedDevices {
+    pub devices: Vec<DeviceInfo>,
+}
+
 // Check coherence of pool and device UUIDs against a set of current UUIDs.
 // If the selection of devices is incompatible with the current
 // state of the set, or simply invalid, return an error.

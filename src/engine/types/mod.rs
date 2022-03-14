@@ -300,13 +300,24 @@ impl UdevEngineDevice {
         self.devnum
     }
 
-    pub fn property_value<T>(&self, property_name: T) -> Option<&OsStr>
+    pub fn property_value<T>(&self, property_name: T) -> Option<StratisResult<&str>>
     where
-        T: AsRef<OsStr>,
+        T: AsRef<OsStr> + Display,
     {
         self.properties
             .get(property_name.as_ref())
-            .map(|prop| &**prop)
+            .map(|value| {
+                value.to_str()
+                    .ok_or_else(|| {
+                        StratisError::Msg(
+                            format!(
+                                "Unable to convert udev property value with key {} to a string, lossy value is {}",
+                                property_name,
+                                value.to_string_lossy()
+                            ),
+                        )
+                    })
+            })
     }
 }
 

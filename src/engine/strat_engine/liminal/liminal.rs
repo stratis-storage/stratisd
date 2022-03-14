@@ -7,6 +7,7 @@
 use std::{
     collections::{HashMap, HashSet},
     fmt,
+    path::PathBuf,
 };
 
 use serde_json::Value;
@@ -18,9 +19,7 @@ use crate::{
             backstore::CryptActivationHandle,
             liminal::{
                 device_info::{DeviceBag, DeviceSet, LInfo, LLuksInfo},
-                identify::{
-                    identify_block_device, DeviceInfo, EventDeviceInfo, LuksInfo, StratisInfo,
-                },
+                identify::{identify_block_device, DeviceInfo, LuksInfo, StratisInfo},
                 setup::{get_bdas, get_blockdevs, get_metadata, get_pool_state},
             },
             metadata::StratisIdentifiers,
@@ -58,6 +57,9 @@ pub struct LiminalDevices {
     /// Sets of devices which possess some internal contradiction which makes
     /// it impossible for them to be made into sensible pools ever.
     hopeless_device_sets: HashMap<PoolUuid, DeviceBag>,
+    /// Lookup data structure for pool and device UUIDs corresponding with
+    /// a path where the superblock was either removed or the device was removed.
+    uuid_lookup: HashMap<PathBuf, (PoolUuid, DevUuid)>,
 }
 
 impl LiminalDevices {
@@ -202,6 +204,30 @@ impl LiminalDevices {
                             .map(DeviceInfo::Luks),
                     )
                     .collect();
+
+                for info in infos.iter() {
+                    let linfo = LInfo::from(info.clone());
+                    match linfo {
+                        LInfo::Luks(l) => {
+                            self.uuid_lookup.insert(
+                                l.ids.devnode.clone(),
+                                (l.ids.identifiers.pool_uuid, l.ids.identifiers.device_uuid),
+                            );
+                        }
+                        LInfo::Stratis(s) => {
+                            if let Some(l) = s.luks.as_ref() {
+                                self.uuid_lookup.insert(
+                                    l.ids.devnode.clone(),
+                                    (l.ids.identifiers.pool_uuid, l.ids.identifiers.device_uuid),
+                                );
+                            }
+                            self.uuid_lookup.insert(
+                                s.ids.devnode.clone(),
+                                (s.ids.identifiers.pool_uuid, s.ids.identifiers.device_uuid),
+                            );
+                        }
+                    }
+                }
 
                 let mut info_map = DeviceSet::new();
                 while !infos.is_empty() && !self.hopeless_device_sets.contains_key(pool_uuid) {
@@ -353,6 +379,11 @@ impl LiminalDevices {
 
         match result {
             Ok((pool_name, pool)) => {
+                self.uuid_lookup = self
+                    .uuid_lookup
+                    .drain()
+                    .filter(|(_, (p, _))| *p != pool_uuid)
+                    .collect();
                 info!(
                     "Pool with name \"{}\" and UUID \"{}\" set up",
                     pool_name, pool_uuid
@@ -390,8 +421,16 @@ impl LiminalDevices {
         event: &UdevEngineEvent,
     ) -> Option<(PoolUuid, Name, StratPool)> {
         let event_type = event.event_type();
-        if event_type == libudev::EventType::Add || event_type == libudev::EventType::Change {
-            identify_block_device(event).and_then(move |info| {
+        let device_info = identify_block_device(event);
+        let device_path = match event.device().devnode() {
+            Some(d) => d,
+            None => return None,
+        };
+
+        if event_type == libudev::EventType::Add
+            || (event_type == libudev::EventType::Change && device_info.is_some())
+        {
+            device_info.and_then(move |info| {
                 let stratis_identifiers = info.stratis_identifiers();
                 let pool_uuid = stratis_identifiers.pool_uuid;
                 let device_uuid = stratis_identifiers.device_uuid;
@@ -407,12 +446,15 @@ impl LiminalDevices {
                 } else if let Some(mut set) = self.hopeless_device_sets.remove(&pool_uuid) {
                     set.insert(info.into());
                     self.hopeless_device_sets.insert(pool_uuid, set);
+                    self.uuid_lookup.insert(device_path.to_path_buf(), (pool_uuid, device_uuid));
                     None
                 } else {
                     let mut devices = self
                         .errored_pool_devices
                         .remove(&pool_uuid)
                         .unwrap_or_else(DeviceSet::new);
+
+                    self.uuid_lookup.insert(device_path.to_path_buf(), (pool_uuid, device_uuid));
 
                     if let Err(hopeless) = devices.process_info_add(info) {
                         self.hopeless_device_sets.insert(pool_uuid, hopeless);
@@ -432,14 +474,15 @@ impl LiminalDevices {
                         .map(|(name, pool)| (pool_uuid, name, pool))
                 }
             })
-        } else if event_type == libudev::EventType::Remove {
-            let event_info = match EventDeviceInfo::from_event(event) {
-                Some(e) => e,
-                None => return None,
-            };
-            let pool_uuid = event_info.pool_uuid();
-            let dev_uuid = event_info.dev_uuid();
-
+        } else if (event_type == libudev::EventType::Change && device_info.is_none())
+            || event_type == libudev::EventType::Remove
+        {
+            let (pool_uuid, dev_uuid) =
+                if let Some((pool_uuid, dev_uuid)) = self.uuid_lookup.get(device_path) {
+                    (*pool_uuid, *dev_uuid)
+                } else {
+                    return None;
+                };
             if pools
                 .get_by_uuid(pool_uuid)
                 .and_then(|(_, p)| p.get_strat_blockdev(dev_uuid))
@@ -450,7 +493,8 @@ impl LiminalDevices {
                       pool_uuid);
                 None
             } else if let Some(bag) = self.hopeless_device_sets.get_mut(&pool_uuid) {
-                bag.remove(&event_info);
+                bag.remove(&*device_path, pool_uuid, dev_uuid);
+                self.uuid_lookup.remove(device_path);
                 None
             } else if self.errored_pool_devices.get(&pool_uuid).is_some() {
                 let mut devices = self
@@ -458,7 +502,8 @@ impl LiminalDevices {
                     .remove(&pool_uuid)
                     .unwrap_or_else(DeviceSet::new);
 
-                devices.process_info_remove(&event_info);
+                devices.process_info_remove(device_path, pool_uuid, dev_uuid);
+                self.uuid_lookup.remove(device_path);
 
                 self.try_setup_pool(pools, pool_uuid, devices)
                     .map(|(name, pool)| (pool_uuid, name, pool))

@@ -19,11 +19,11 @@ mod udev;
 mod writing;
 
 pub use self::{
-    backstore::{CryptMetadataHandle, CLEVIS_TANG_TRUST_URL},
+    backstore::CLEVIS_TANG_TRUST_URL,
     dm::{get_dm, get_dm_init},
     engine::StratEngine,
     keys::StratKeyActions,
-    metadata::{device_identifiers, StaticHeader, StaticHeaderResult, BDA},
+    metadata::{StaticHeader, StaticHeaderResult, BDA},
 };
 
 #[cfg(test)]

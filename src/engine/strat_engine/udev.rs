@@ -39,20 +39,9 @@ pub fn get_udev_property<T: AsRef<OsStr>>(
 where
     T: fmt::Display,
 {
-    device.property_value(&property_name).map(|value| {
-        value
-            .to_str()
-            .ok_or_else(|| {
-                StratisError::Msg(
-                    format!(
-                        "Unable to convert udev property value with key {} to a string, lossy value is {}",
-                        property_name,
-                        value.to_string_lossy()
-                    ),
-                )
-            })
-            .map(|value| value.into())
-    })
+    device
+        .property_value(&property_name)
+        .map(|opt| opt.map(|s| s.to_string()))
 }
 
 /// Returns true if udev indicates that the device is a multipath member

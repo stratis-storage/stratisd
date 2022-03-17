@@ -9,8 +9,6 @@ use std::{
     env,
     error::Error,
     fmt::{self, Display},
-    fs::File,
-    path::Path,
 };
 
 use clap::{App, Arg};
@@ -18,7 +16,6 @@ use data_encoding::BASE32_NOPAD;
 
 #[cfg(feature = "systemd_compat")]
 use crate::generators::{stratis_clevis_setup_generator, stratis_setup_generator};
-use stratisd::engine::{device_identifiers, CryptMetadataHandle};
 
 #[derive(Debug)]
 struct ExecutableError(String);
@@ -43,23 +40,6 @@ fn string_compare(arg1: &str, arg2: &str) {
 fn base32_decode(var_name: &str, base32_str: &str) -> Result<(), Box<dyn Error>> {
     let base32_decoded = String::from_utf8(BASE32_NOPAD.decode(base32_str.as_bytes())?)?;
     println!("{}={}", var_name, base32_decoded);
-    Ok(())
-}
-
-fn identify_stratis_device(dev: &Path) -> Result<(), Box<dyn Error>> {
-    if let Some(idents) = device_identifiers(&mut File::open(dev)?)? {
-        println!("ID_FS_STRATIS_DEV_UUID={}", idents.device_uuid);
-        println!("ID_FS_STRATIS_POOL_UUID={}", idents.pool_uuid);
-    }
-    Ok(())
-}
-
-fn identify_luks_device(dev: &Path) -> Result<(), Box<dyn Error>> {
-    if let Some(h) = CryptMetadataHandle::setup(dev)? {
-        let idents = h.device_identifiers();
-        println!("ID_FS_STRATIS_DEV_UUID={}", idents.device_uuid);
-        println!("ID_FS_STRATIS_POOL_UUID={}", idents.pool_uuid);
-    }
     Ok(())
 }
 
@@ -160,26 +140,6 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
         return Err(Box::new(ExecutableError(
             "systemd compatibility disabled for this build".into(),
         )));
-    } else if argv1.ends_with("identify-stratis-luks-dev") {
-        let parser = App::new("identify-stratis-luks-dev").arg(
-            Arg::with_name("dev")
-                .help("Device to verify as a Stratis LUKS2 device")
-                .required(true),
-        );
-        let matches = parser.get_matches_from(&args);
-        identify_luks_device(Path::new(
-            matches.value_of("dev").expect("required argument"),
-        ))?;
-    } else if argv1.ends_with("identify-stratis-dev") {
-        let parser = App::new("identify-stratis-dev").arg(
-            Arg::with_name("dev")
-                .help("Device to verify as a Stratis device")
-                .required(true),
-        );
-        let matches = parser.get_matches_from(&args);
-        identify_stratis_device(Path::new(
-            matches.value_of("dev").expect("required argument"),
-        ))?;
     } else {
         return Err(Box::new(ExecutableError(format!(
             "{} is not a recognized executable name",

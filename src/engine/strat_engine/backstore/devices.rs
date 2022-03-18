@@ -235,7 +235,17 @@ impl TryFrom<&[&Path]> for ProcessedPathInfos {
     fn try_from(paths: &[&Path]) -> StratisResult<Self> {
         let canonical_paths = paths
             .iter()
-            .map(|p| DevicePath::new(p))
+            .map(|p| {
+                DevicePath::new(p).map_err(|err| {
+                    StratisError::Chained(
+                        format!(
+                            "Unable to process specified device path \"{}\"",
+                            p.display()
+                        ),
+                        Box::new(err),
+                    )
+                })
+            })
             .collect::<StratisResult<Vec<DevicePath>>>()?;
 
         let mut infos = canonical_paths

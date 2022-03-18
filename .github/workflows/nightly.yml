@@ -93,6 +93,43 @@ jobs:
         run: ${{ matrix.task }}
         working-directory: ./ci/dependency_management
 
+  legacy-audit-checks:
+    continue-on-error: true
+    strategy:
+      matrix:
+        include:
+          - tag: v3.0.0
+          - tag: v3.0.1
+          - tag: v3.0.2
+          - tag: v3.0.3
+          - tag: v3.0.4
+    runs-on: ubuntu-18.04
+    container:
+      image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
+      options: --privileged -v /dev:/dev
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies for Fedora
+        run: >
+          dnf install -y
+          clang
+          curl
+          cryptsetup-devel
+          dbus-devel
+          libblkid-devel
+          make
+          openssl-devel
+          systemd-devel
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: cargo
+          toolchain: 1.59.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          override: true
+      - name: Checkout tag
+        run: git checkout tags/${{ matrix.tag }} -b ${{ matrix.tag }}
+      - name: Run audit task on ${{ matrix.tag }}
+        run: make -f Makefile audit
+
   legacy-cli-checks:
     strategy:
       matrix:

@@ -117,6 +117,7 @@ jobs:
           cryptsetup-devel
           dbus-devel
           libblkid-devel
+          git
           make
           openssl-devel
           systemd-devel

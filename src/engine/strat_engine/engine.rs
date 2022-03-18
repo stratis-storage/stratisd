@@ -359,7 +359,15 @@ impl Engine for StratEngine {
 
         validate_paths(blockdev_paths)?;
 
-        let mut device_infos = ProcessedPathInfos::try_from(blockdev_paths)?;
+        let cloned_paths = blockdev_paths
+            .iter()
+            .map(|p| p.to_path_buf())
+            .collect::<Vec<_>>();
+
+        let mut device_infos = spawn_blocking!({
+            let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
+            ProcessedPathInfos::try_from(borrowed_paths.as_slice())
+        })??;
 
         let maybe_guard = self.pools.read(LockKey::Name(name.clone())).await;
         if let Some(guard) = maybe_guard {

@@ -103,13 +103,13 @@ impl Engine for SimEngine {
         validate_name(name)?;
         let name = Name::new(name.to_owned());
 
-        validate_paths(blockdev_paths)?;
-
         if blockdev_paths.is_empty() {
             return Err(StratisError::Msg(
                 "At least one blockdev is required to create a pool.".to_string(),
             ));
         }
+
+        validate_paths(blockdev_paths)?;
 
         if let Some(key_desc) = encryption_info.and_then(|ei| ei.key_description()) {
             if !self.key_handler.read().await.contains_key(key_desc) {

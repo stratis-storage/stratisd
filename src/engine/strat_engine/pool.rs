@@ -437,13 +437,13 @@ impl Pool for StratPool {
         pool_name: &str,
         blockdevs: &[&Path],
     ) -> StratisResult<SetCreateAction<DevUuid>> {
-        validate_paths(blockdevs)?;
-
         if blockdevs.is_empty() {
             return Err(StratisError::Msg(
                 "At least one blockdev path is required to initialize a cache.".to_string(),
             ));
         }
+
+        validate_paths(blockdevs)?;
 
         if self.is_encrypted() {
             return Err(StratisError::Msg(
@@ -655,11 +655,11 @@ impl Pool for StratPool {
             ));
         }
 
-        validate_paths(paths)?;
-
         if paths.is_empty() {
             return Ok((SetCreateAction::new(vec![]), None));
         }
+
+        validate_paths(paths)?;
 
         let mut device_infos = ProcessedPathInfos::try_from(paths)?;
         let this_pool = device_infos.stratis_devices.remove(&pool_uuid);

@@ -189,13 +189,13 @@ impl Pool for SimPool {
         _pool_name: &str,
         blockdevs: &[&Path],
     ) -> StratisResult<SetCreateAction<DevUuid>> {
-        validate_paths(blockdevs)?;
-
         if blockdevs.is_empty() {
             return Err(StratisError::Msg(
                 "At least one blockdev path is required to initialize a cache.".to_string(),
             ));
         }
+
+        validate_paths(blockdevs)?;
 
         if self.is_encrypted() {
             return Err(StratisError::Msg(
@@ -268,8 +268,6 @@ impl Pool for SimPool {
         paths: &[&Path],
         tier: BlockDevTier,
     ) -> StratisResult<(SetCreateAction<DevUuid>, Option<PoolDiff>)> {
-        validate_paths(paths)?;
-
         if tier == BlockDevTier::Cache && !self.has_cache() {
             return Err(StratisError::Msg(
                     "The cache has not been initialized; you must use init_cache first to initialize the cache.".to_string(),
@@ -280,6 +278,8 @@ impl Pool for SimPool {
             // Treat adding no new blockdev as the empty set.
             return Ok((SetCreateAction::new(vec![]), None));
         }
+
+        validate_paths(paths)?;
 
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
         let encryption_info = pool_enc_to_enc!(self.encryption_info());

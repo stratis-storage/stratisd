@@ -351,13 +351,13 @@ impl Engine for StratEngine {
         validate_name(name)?;
         let name = Name::new(name.to_owned());
 
-        validate_paths(blockdev_paths)?;
-
         if blockdev_paths.is_empty() {
             return Err(StratisError::Msg(
                 "At least one blockdev is required to create a pool.".to_string(),
             ));
         }
+
+        validate_paths(blockdev_paths)?;
 
         let mut device_infos = ProcessedPathInfos::try_from(blockdev_paths)?;
 

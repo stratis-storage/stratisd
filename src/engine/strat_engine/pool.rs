@@ -451,30 +451,10 @@ impl Pool for StratPool {
             ));
         }
 
-        let mut device_infos = ProcessedPathInfos::try_from(blockdevs)?;
-        let this_pool = device_infos.stratis_devices.remove(&pool_uuid);
-        if !device_infos.stratis_devices.is_empty() {
-            return Err(StratisError::Msg(format!(
-                "Pool with name {} and UUID {} already exists; some of the devices specified appeared to belong to a different Stratis pool.", 
-                pool_name,
-                pool_uuid
-            )));
-        }
+        let device_infos = ProcessedPathInfos::try_from(blockdevs)?;
 
         if !self.has_cache() {
-            if this_pool.is_some() {
-                return Err(StratisError::Msg(format!(
-                    "Pool with name {} and UUID {} has no cache; some of the devices specified appeared to belong to this pool's data tier.",
-                    pool_name,
-                    pool_uuid
-                )));
-            }
-
-            let cloned_paths = device_infos
-                .unclaimed_devices
-                .iter()
-                .map(|info| info.devnode.clone())
-                .collect::<Vec<_>>();
+            let cloned_paths = device_infos.get_infos_for_create()?;
             let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
 
             self.thin_pool.suspend()?;
@@ -494,19 +474,7 @@ impl Pool for StratPool {
             self.write_metadata(pool_name)?;
             Ok(SetCreateAction::new(devices))
         } else {
-            if !device_infos.unclaimed_devices.is_empty() {
-                return Err(StratisError::Msg(format!(
-                    "Cache for pool with name {} and UUID {} already exists; can not add new devices to existing pool cache with init-cache command.",
-                    pool_name,
-                    pool_uuid
-                )));
-            }
-
-            let cloned_paths = this_pool
-                .unwrap_or_default()
-                .values()
-                .map(|info| info.devnode.clone())
-                .collect::<Vec<_>>();
+            let cloned_paths = device_infos.get_paths_for_idempotent_create(pool_uuid)?;
             let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
 
             init_cache_idempotent_or_err(
@@ -661,40 +629,18 @@ impl Pool for StratPool {
 
         validate_paths(paths)?;
 
-        let mut device_infos = ProcessedPathInfos::try_from(paths)?;
-        let this_pool = device_infos.stratis_devices.remove(&pool_uuid);
-        if !device_infos.stratis_devices.is_empty() {
-            return Err(StratisError::Msg(
-                "Some of the devices specified belong to other Stratis pools.".into(),
-            ));
-        }
-
+        let device_infos = ProcessedPathInfos::try_from(paths)?;
         let bdev_info = if tier == BlockDevTier::Cache {
-            if let Some(pool_devices) = this_pool {
-                let argument_uuids = pool_devices.keys().cloned().collect::<HashSet<_>>();
-                let cache_uuids = self
+            let cloned_paths = device_infos.get_infos_for_add(
+                pool_uuid,
+                &self
                     .backstore
                     .cachedevs()
                     .iter()
                     .map(|(u, _)| u)
                     .cloned()
-                    .collect::<HashSet<_>>();
-
-                return if argument_uuids.is_subset(&cache_uuids) {
-                    Ok((SetCreateAction::new(vec![]), None))
-                } else {
-                    Err(StratisError::Msg(
-                        "Some of the devices specified appear to belong to this pool but are not cache devices.".into() 
-                    ))
-                };
-            }
-
-            let cloned_paths = device_infos
-                .unclaimed_devices
-                .iter()
-                .map(|info| info.devnode.clone())
-                .collect::<Vec<_>>();
-
+                    .collect::<HashSet<_>>(),
+            )?;
             let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
 
             // If adding cache devices, must suspend the pool; the cache
@@ -707,30 +653,16 @@ impl Pool for StratPool {
         } else {
             let cached = self.cached();
 
-            if let Some(pool_devices) = this_pool {
-                let argument_uuids = pool_devices.keys().cloned().collect::<HashSet<_>>();
-                let data_uuids = self
+            let cloned_paths = device_infos.get_infos_for_add(
+                pool_uuid,
+                &self
                     .backstore
                     .datadevs()
                     .iter()
                     .map(|(u, _)| u)
                     .cloned()
-                    .collect::<HashSet<_>>();
-
-                return if argument_uuids.is_subset(&data_uuids) {
-                    Ok((SetCreateAction::new(vec![]), None))
-                } else {
-                    Err(StratisError::Msg(
-                        "Some of the devices specified appear to belong to this pool but are not data devices.".into() 
-                    ))
-                };
-            }
-
-            let cloned_paths = device_infos
-                .unclaimed_devices
-                .iter()
-                .map(|info| info.devnode.clone())
-                .collect::<Vec<_>>();
+                    .collect::<HashSet<_>>(),
+            )?;
 
             let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
 

@@ -225,8 +225,99 @@ pub struct DeviceInfo {
 /// * DeviceInfo.size value meets the required Stratis minimum.
 #[derive(Debug)]
 pub struct ProcessedPathInfos {
-    pub stratis_devices: HashMap<PoolUuid, HashMap<DevUuid, DeviceInfo>>,
-    pub unclaimed_devices: Vec<DeviceInfo>,
+    stratis_devices: HashMap<PoolUuid, HashMap<DevUuid, DeviceInfo>>,
+    unclaimed_devices: Vec<DeviceInfo>,
+}
+
+impl ProcessedPathInfos {
+    /// If adding devices to an existing tier, ignore those that
+    /// already belong to the tier, return an error if there are any
+    /// devices belonging to Stratis that do not belong to the pool,
+    /// and return only unclaimed devices for initialization.
+    pub fn get_infos_for_add(
+        mut self,
+        pool_uuid: PoolUuid,
+        dev_uuids: &HashSet<DevUuid>,
+    ) -> StratisResult<Vec<PathBuf>> {
+        let this_pool = self.stratis_devices.remove(&pool_uuid);
+        if !self.stratis_devices.is_empty() {
+            return Err(StratisError::Msg(format!(
+                "Pool with UUID {} already exists; some of the devices specified appear to belong to a different Stratis pool.", 
+                pool_uuid
+            )));
+        }
+
+        let to_be_added_uuids = this_pool
+            .unwrap_or_default()
+            .keys()
+            .cloned()
+            .collect::<HashSet<_>>();
+
+        let remaining_added = to_be_added_uuids
+            .difference(dev_uuids)
+            .cloned()
+            .collect::<HashSet<DevUuid>>();
+        if !remaining_added.is_empty() {
+            return Err(StratisError::Msg(format!(
+                "Pool with UUID {} already exists; some of the devices specified appear to belong to this pool but not to this tier.",
+                pool_uuid
+
+            )));
+        }
+
+        Ok(self
+            .unclaimed_devices
+            .iter()
+            .map(|i| i.devnode.clone())
+            .collect::<Vec<PathBuf>>())
+    }
+
+    /// If creating a new pool or cache, all devices must be unowned.
+    /// Return an error if any appear to belong to Stratis.
+    pub fn get_infos_for_create(self) -> StratisResult<Vec<PathBuf>> {
+        if self.stratis_devices.is_empty() {
+            Ok(self
+                .unclaimed_devices
+                .iter()
+                .map(|i| i.devnode.clone())
+                .collect::<Vec<PathBuf>>())
+        } else {
+            Err(StratisError::Msg(
+                "Several devices appear to belong to a Stratis pool; can not initialize.".into(),
+            ))
+        }
+    }
+
+    /// If doing an idempotent create of a pool or a cache, it is not permitted
+    /// to have any unclaimed devices or devices belonging to other Stratis
+    /// pools. Return an error if any such found. If none found, return a list
+    /// of devnodes, which appear to belong to this pool to pass to
+    /// the idempotent create method.
+    pub fn get_paths_for_idempotent_create(
+        mut self,
+        pool_uuid: PoolUuid,
+    ) -> StratisResult<Vec<PathBuf>> {
+        if !self.unclaimed_devices.is_empty() {
+            return Err(StratisError::Msg(format!(
+                "Pool with UUID {} already exists; can not add unclaimed devices to existing pool or cache with init or create command.",
+                pool_uuid
+            )));
+        }
+
+        let this_pool = self.stratis_devices.remove(&pool_uuid);
+        if !self.stratis_devices.is_empty() {
+            return Err(StratisError::Msg(format!(
+                "Pool with UUID {} already exists; some of the devices specified appear to belong to a different Stratis pool.", 
+                pool_uuid
+            )));
+        }
+
+        Ok(this_pool
+            .unwrap_or_default()
+            .values()
+            .map(|i| i.devnode.clone())
+            .collect::<Vec<PathBuf>>())
+    }
 }
 
 impl TryFrom<&[&Path]> for ProcessedPathInfos {

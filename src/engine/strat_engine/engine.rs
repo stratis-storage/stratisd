@@ -364,7 +364,7 @@ impl Engine for StratEngine {
             .map(|p| p.to_path_buf())
             .collect::<Vec<_>>();
 
-        let mut device_infos = spawn_blocking!({
+        let device_infos = spawn_blocking!({
             let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
             ProcessedPathInfos::try_from(borrowed_paths.as_slice())
         })??;
@@ -372,41 +372,12 @@ impl Engine for StratEngine {
         let maybe_guard = self.pools.read(LockKey::Name(name.clone())).await;
         if let Some(guard) = maybe_guard {
             let (name, uuid, pool) = guard.as_tuple();
-            if !device_infos.unclaimed_devices.is_empty() {
-                return Err(StratisError::Msg(format!(
-                    "Pool with name {} and UUID {} already exists; can not add new devices to existing pool with create command.",
-                    name,
-                    uuid
-                )));
-            }
-            let this_pool = device_infos.stratis_devices.remove(&uuid);
-            if !device_infos.stratis_devices.is_empty() {
-                return Err(StratisError::Msg(format!(
-                    "Pool with name {} and UUID {} already exists; some of the devices specified appeared to belong to a different Stratis pool.", 
-                    name,
-                    uuid
-                )));
-            }
-            let cloned_paths = this_pool
-                .unwrap_or_default()
-                .values()
-                .map(|info| info.devnode.clone())
-                .collect::<Vec<_>>();
+            let cloned_paths = device_infos.get_paths_for_idempotent_create(uuid)?;
             let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
             create_pool_idempotent_or_err(pool, &name, &borrowed_paths)
         } else {
-            if !device_infos.stratis_devices.is_empty() {
-                return Err(StratisError::Msg(
-                    "Some devices specified already belong to Stratis pools.".into(),
-                ));
-            }
-
             let cloned_name = name.clone();
-            let cloned_paths = device_infos
-                .unclaimed_devices
-                .iter()
-                .map(|info| info.devnode.clone())
-                .collect::<Vec<_>>();
+            let cloned_paths = device_infos.get_infos_for_create()?;
             let cloned_enc_info = encryption_info.cloned();
 
             let (pool_uuid, _) = spawn_blocking!({

@@ -299,7 +299,7 @@ impl ProcessedPathInfos {
     ) -> StratisResult<Vec<PathBuf>> {
         if !self.unclaimed_devices.is_empty() {
             return Err(StratisError::Msg(format!(
-                "Pool with UUID {} already exists; can not add unclaimed devices to existing pool or cache with init or create command.",
+                "Pool with UUID {} already exists; can not add uninitialized devices to existing pool or cache with init or create command.",
                 pool_uuid
             )));
         }

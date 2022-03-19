@@ -312,6 +312,8 @@ impl ProcessedPathInfos {
             )));
         }
 
+        // TODO: Might want to check UUIDs instead of using the *idempotent*
+        // methods.
         Ok(this_pool
             .unwrap_or_default()
             .values()

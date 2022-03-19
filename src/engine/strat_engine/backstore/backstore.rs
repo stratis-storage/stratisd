@@ -19,6 +19,7 @@ use crate::{
                 blockdevmgr::{map_to_dm, BlockDevMgr},
                 cache_tier::CacheTier,
                 data_tier::DataTier,
+                devices::UnownedDevices,
                 transaction::RequestTransaction,
             },
             dm::get_dm,
@@ -267,7 +268,7 @@ impl Backstore {
     pub fn add_cachedevs(
         &mut self,
         pool_uuid: PoolUuid,
-        paths: &[&Path],
+        infos: UnownedDevices,
     ) -> StratisResult<Vec<DevUuid>> {
         match self.cache_tier {
             Some(ref mut cache_tier) => {
@@ -275,7 +276,7 @@ impl Backstore {
                     .cache
                     .as_mut()
                     .expect("cache_tier.is_some() <=> self.cache.is_some()");
-                let (uuids, (cache_change, meta_change)) = cache_tier.add(pool_uuid, paths)?;
+                let (uuids, (cache_change, meta_change)) = cache_tier.add(pool_uuid, infos)?;
 
                 if cache_change {
                     let table = map_to_dm(&cache_tier.cache_segments);
@@ -303,9 +304,9 @@ impl Backstore {
     pub fn add_datadevs(
         &mut self,
         pool_uuid: PoolUuid,
-        paths: &[&Path],
+        infos: UnownedDevices,
     ) -> StratisResult<Vec<DevUuid>> {
-        self.data_tier.add(pool_uuid, paths)
+        self.data_tier.add(pool_uuid, infos)
     }
 
     /// Extend the cap device whether it is a cache or not. Create the DM

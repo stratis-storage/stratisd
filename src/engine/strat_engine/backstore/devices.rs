@@ -238,7 +238,7 @@ impl ProcessedPathInfos {
         mut self,
         pool_uuid: PoolUuid,
         dev_uuids: &HashSet<DevUuid>,
-    ) -> StratisResult<Vec<PathBuf>> {
+    ) -> StratisResult<UnownedDevices> {
         let this_pool = self.stratis_devices.remove(&pool_uuid);
         if !self.stratis_devices.is_empty() {
             return Err(StratisError::Msg(format!(
@@ -265,11 +265,9 @@ impl ProcessedPathInfos {
             )));
         }
 
-        Ok(self
-            .unclaimed_devices
-            .iter()
-            .map(|i| i.devnode.clone())
-            .collect::<Vec<PathBuf>>())
+        Ok(UnownedDevices {
+            devices: self.unclaimed_devices,
+        })
     }
 
     /// If creating a new pool or cache, all devices must be unowned.

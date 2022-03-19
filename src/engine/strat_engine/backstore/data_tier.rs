@@ -4,8 +4,6 @@
 
 // Code to handle the backing store of a pool.
 
-use std::path::Path;
-
 use devicemapper::Sectors;
 
 use crate::{
@@ -14,6 +12,7 @@ use crate::{
             backstore::{
                 blockdev::StratBlockDev,
                 blockdevmgr::{BlkDevSegment, BlockDevMgr},
+                devices::UnownedDevices,
                 shared::{coalesce_blkdevsegs, metadata_to_segment},
                 transaction::RequestTransaction,
             },
@@ -67,8 +66,12 @@ impl DataTier {
     /// Add the given paths to self. Return UUIDs of the new blockdevs
     /// corresponding to the specified paths.
     /// WARNING: metadata changing event
-    pub fn add(&mut self, pool_uuid: PoolUuid, paths: &[&Path]) -> StratisResult<Vec<DevUuid>> {
-        self.block_mgr.add(pool_uuid, paths)
+    pub fn add(
+        &mut self,
+        pool_uuid: PoolUuid,
+        infos: UnownedDevices,
+    ) -> StratisResult<Vec<DevUuid>> {
+        self.block_mgr.add(pool_uuid, infos)
     }
 
     /// Allocate a region for all sector size requests from unallocated segments in
@@ -163,6 +166,8 @@ impl Recordable<DataTierSave> for DataTier {
 
 #[cfg(test)]
 mod tests {
+
+    use std::path::Path;
 
     use crate::engine::strat_engine::{
         metadata::MDADataSize,

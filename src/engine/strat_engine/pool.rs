@@ -631,7 +631,7 @@ impl Pool for StratPool {
 
         let device_infos = ProcessedPathInfos::try_from(paths)?;
         let bdev_info = if tier == BlockDevTier::Cache {
-            let cloned_paths = device_infos.get_infos_for_add(
+            let unclaimed = device_infos.get_infos_for_add(
                 pool_uuid,
                 &self
                     .backstore
@@ -641,19 +641,18 @@ impl Pool for StratPool {
                     .cloned()
                     .collect::<HashSet<_>>(),
             )?;
-            let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
 
             // If adding cache devices, must suspend the pool; the cache
             // must be augmented with the new devices.
             self.thin_pool.suspend()?;
-            let bdev_info_res = self.backstore.add_cachedevs(pool_uuid, &borrowed_paths);
+            let bdev_info_res = self.backstore.add_cachedevs(pool_uuid, unclaimed);
             self.thin_pool.resume()?;
             let bdev_info = bdev_info_res?;
             Ok((SetCreateAction::new(bdev_info), None))
         } else {
             let cached = self.cached();
 
-            let cloned_paths = device_infos.get_infos_for_add(
+            let unclaimed = device_infos.get_infos_for_add(
                 pool_uuid,
                 &self
                     .backstore
@@ -664,11 +663,9 @@ impl Pool for StratPool {
                     .collect::<HashSet<_>>(),
             )?;
 
-            let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
-
             // If just adding data devices, no need to suspend the pool.
             // No action will be taken on the DM devices.
-            let bdev_info = self.backstore.add_datadevs(pool_uuid, &borrowed_paths)?;
+            let bdev_info = self.backstore.add_datadevs(pool_uuid, unclaimed)?;
             self.thin_pool.set_queue_mode();
 
             // Adding data devices does not change the state of the thin

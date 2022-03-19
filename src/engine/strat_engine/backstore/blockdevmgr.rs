@@ -28,7 +28,9 @@ use crate::{
                     back_up_luks_header, interpret_clevis_config, restore_luks_header,
                     CryptActivationHandle,
                 },
-                devices::{initialize_devices, process_and_verify_devices, wipe_blockdevs},
+                devices::{
+                    initialize_devices, process_and_verify_devices, wipe_blockdevs, UnownedDevices,
+                },
                 range_alloc::PerDevSegments,
                 transaction::RequestTransaction,
             },
@@ -181,7 +183,11 @@ impl BlockDevMgr {
     /// Add paths to self.
     /// Return the uuids of all blockdevs corresponding to paths that were
     /// added.
-    pub fn add(&mut self, pool_uuid: PoolUuid, paths: &[&Path]) -> StratisResult<Vec<DevUuid>> {
+    pub fn add(
+        &mut self,
+        pool_uuid: PoolUuid,
+        infos: UnownedDevices,
+    ) -> StratisResult<Vec<DevUuid>> {
         let this_pool_uuid = self.block_devs.get(0).map(|bd| bd.pool_uuid());
         if this_pool_uuid.is_some() && this_pool_uuid != Some(pool_uuid) {
             return Err(StratisError::Msg(
@@ -190,13 +196,6 @@ impl BlockDevMgr {
                         pool_uuid)
             ));
         }
-
-        let current_uuids = self
-            .block_devs
-            .iter()
-            .map(|bd| bd.uuid())
-            .collect::<HashSet<_>>();
-        let devices = process_and_verify_devices(pool_uuid, &current_uuids, paths)?;
 
         let encryption_info = pool_enc_to_enc!(self.encryption_info());
         if let Some(ref ei) = encryption_info {
@@ -212,7 +211,7 @@ impl BlockDevMgr {
         // then the necessary amount must be provided or the data can not be
         // saved.
         let bds = initialize_devices(
-            devices,
+            infos.devices,
             pool_uuid,
             MDADataSize::default(),
             encryption_info.as_ref(),

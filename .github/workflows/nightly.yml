@@ -109,6 +109,9 @@ jobs:
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          ref: tags/${{ matrix.tag }}
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -117,7 +120,6 @@ jobs:
           cryptsetup-devel
           dbus-devel
           libblkid-devel
-          git
           make
           openssl-devel
           systemd-devel
@@ -126,8 +128,6 @@ jobs:
           components: cargo
           toolchain: 1.59.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           override: true
-      - name: Checkout tag
-        run: git checkout tags/${{ matrix.tag }} -b ${{ matrix.tag }}
       - name: Run audit task on ${{ matrix.tag }}
         run: make -f Makefile audit
 

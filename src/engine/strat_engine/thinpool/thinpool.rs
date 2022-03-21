@@ -895,7 +895,10 @@ impl ThinPool {
                 &mut self.segments.meta_spare_segments,
             ),
         );
-        (should_save | res.is_ok(), res)
+        match res {
+            Ok((Sectors(0), Sectors(0))) | Err(_) => (should_save, res),
+            Ok(_) => (should_save | res.is_ok(), res),
+        }
     }
 
     /// Extend thinpool's meta dev. See extend_thin_sub_device for more info.

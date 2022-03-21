@@ -81,7 +81,7 @@ impl<'a> MountedMDV<'a> {
 impl<'a> Drop for MountedMDV<'a> {
     fn drop(&mut self) {
         if let Err(e) = retry_with_index(Fixed::from_millis(100).take(2), |i| {
-            debug!("MDV unmount attempt {}", i);
+            trace!("MDV unmount attempt {}", i);
             umount(&self.mdv.mount_pt)
         }) {
             warn!("Unmounting MDV failed: {}", e);

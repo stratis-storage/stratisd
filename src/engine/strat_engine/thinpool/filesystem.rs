@@ -12,6 +12,7 @@ use std::{
 
 use chrono::{DateTime, TimeZone, Utc};
 use data_encoding::BASE32_NOPAD;
+use retry::{delay::Fixed, retry_with_index};
 use serde_json::{Map, Value};
 
 use devicemapper::{
@@ -212,7 +213,12 @@ impl StratFilesystem {
                         MsFlags::empty(),
                         Some("nouuid"),
                     )?;
-                    umount(tmp_dir.path())?;
+                    if let Err(e) = retry_with_index(Fixed::from_millis(100).take(2), |i| {
+                        trace!("Unmount temporary snapshot mount attempt {}", i);
+                        umount(tmp_dir.path())
+                    }) {
+                        warn!("Unmounting temporary snapshot mount failed: {}", e);
+                    }
                 }
 
                 set_uuid(&thin_dev.devnode(), snapshot_fs_uuid)?;

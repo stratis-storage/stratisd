@@ -299,13 +299,8 @@ impl StratPool {
     pub fn fs_event_on(
         &mut self,
         pool_uuid: PoolUuid,
-        pool_name: &Name,
     ) -> StratisResult<HashMap<FilesystemUuid, StratFilesystemDiff>> {
-        let changed = self.thin_pool.check_fs(pool_uuid)?;
-        if !changed.is_empty() {
-            self.write_metadata(pool_name)?;
-        }
-        Ok(changed)
+        self.thin_pool.check_fs(pool_uuid)
     }
 
     pub fn record(&self, name: &str) -> PoolSave {

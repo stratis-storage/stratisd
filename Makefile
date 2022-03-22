@@ -252,7 +252,6 @@ install: $(PROFILETARGET) $(PROFILEMINTARGET) install-cfg
 	install -Dpm0755 -t $(DESTDIR)$(UDEVDIR) target/$(PROFILEDIR)/stratis-utils
 	mv -fv $(DESTDIR)$(UDEVDIR)/stratis-utils $(DESTDIR)$(UDEVDIR)/stratis-str-cmp
 	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(UDEVDIR)/stratis-base32-decode
-	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(BINDIR)/stratis-predict-usage
 	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(UNITGENDIR)/stratis-clevis-setup-generator
 	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(UNITGENDIR)/stratis-setup-generator
 	install -Dpm0755 -t $(DESTDIR)$(PREFIX)/bin target/$(PROFILEDIR)/stratis-min
@@ -274,7 +273,6 @@ clean-cfg:
 clean-ancillary:
 	rm -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp
 	rm -fv $(DESTDIR)$(UDEVDIR)/stratis-base32-decode
-	rm -fv $(DESTDIR)$(BINDIR)/stratis-predict-usage
 	rm -fv $(DESTDIR)$(UNITGENDIR)/stratis-setup-generator
 	rm -fv $(DESTDIR)$(UNITGENDIR)/stratis-clevis-setup-generator
 	rm -fv $(DESTDIR)$(UNITEXECDIR)/stratis-fstab-setup

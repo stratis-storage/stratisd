@@ -111,8 +111,8 @@ impl StratEngine {
         guard: SomeLockWriteGuard<PoolUuid, StratPool>,
     ) {
         joins.push(spawn_blocking(move || {
-            let (name, uuid, pool) = guard.as_tuple();
-            pool.fs_event_on(uuid, &name)
+            let (_, uuid, pool) = guard.as_tuple();
+            pool.fs_event_on(uuid)
         }));
     }
 

@@ -170,7 +170,7 @@ jobs:
           toolchain: 1.59.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           override: true
       - name: Build stratisd
-        run: PROFILEDIR=debug make -f Makefile install
+        run: make -f Makefile install-debug
       - name: Check out stratis-cli
         run: git clone https://github.com/stratis-storage/stratis-cli.git
       - name: Checkout tag

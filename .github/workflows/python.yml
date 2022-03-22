@@ -67,7 +67,7 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
           override: true
       - name: Install all necessary Stratis files
-        run: PROFILEDIR=debug make -f Makefile install
+        run: make -f Makefile install-debug
       - name: Start udev
         run: /usr/lib/systemd/systemd-udevd &
       - name: Set up for D-Bus
@@ -134,7 +134,7 @@ jobs:
           toolchain: 1.59.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           override: true
       - name: Install all necessary Stratis files
-        run: PROFILEDIR=debug make -f Makefile install
+        run: make -f Makefile install-debug
       - name: Start udev
         run: /usr/lib/systemd/systemd-udevd &
       - name: Set up for D-Bus

@@ -57,7 +57,7 @@ where
                 let cloned_tree = tree.clone();
                 let cloned_connection = Arc::clone(&connection);
                 spawn_blocking(move || {
-                    debug!("Starting D-Bus request handling");
+                    trace!("Starting D-Bus request handling");
                     let lock = cloned_tree.blocking_read();
                     if let Some(msgs) = lock.handle(&msg) {
                         for msg in msgs {
@@ -73,7 +73,7 @@ where
                             }
                         }
                     }
-                    debug!("Finished D-Bus request handling");
+                    trace!("Finished D-Bus request handling");
                 });
                 true
             }),

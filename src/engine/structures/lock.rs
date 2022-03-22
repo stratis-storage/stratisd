@@ -137,7 +137,7 @@ where
 {
     /// * Asserts that tasks performing an actions either are performing an action immediately
     /// after being spawned or are in the list of woken tasks.
-    fn is_woken_or_new(&mut self, wait_type: &WaitType<U>, idx: u64) {
+    fn woken_or_new(&mut self, wait_type: &WaitType<U>, idx: u64) {
         if self.woken.contains_key(&idx) {
             assert_eq!(self.woken.remove(&idx).as_ref(), Some(wait_type));
         }
@@ -148,7 +148,7 @@ where
     /// * Asserts that the current task never conflicts with tasks that have been woken but
     /// not processed yet.
     fn assert(&mut self, wait_type: &WaitType<U>, idx: u64) {
-        self.is_woken_or_new(wait_type, idx);
+        self.woken_or_new(wait_type, idx);
         assert!(!self.conflicts_with_woken(wait_type));
     }
 
@@ -260,7 +260,7 @@ where
             return;
         }
 
-        self.is_woken_or_new(&wait_type, idx);
+        self.woken_or_new(&wait_type, idx);
 
         if has_waited.load(Ordering::SeqCst) {
             self.waiting.push_front(Waiter {

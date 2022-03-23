@@ -118,7 +118,7 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
           override: true
       - name: Install all necessary Stratis files
-        run: make install
+        run: make -f Makefile install-release
       - name: Start udev
         run: /usr/lib/systemd/systemd-udevd &
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain

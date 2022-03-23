@@ -112,7 +112,7 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
           override: true
       - name: Install all necessary Stratis files
-        run: make install
+        run: make -f Makefile install-release
       - name: Start udev
         run: /usr/lib/systemd/systemd-udevd &
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
@@ -202,7 +202,7 @@ jobs:
           toolchain: 1.54.0  # LOWEST SUPPORTED RUST TOOLCHAIN
           override: true
       - name: Build stratisd
-        run: PROFILEDIR=debug make -f Makefile install
+        run: make -f Makefile install-debug
       - name: Check out stratis-cli
         run: git clone https://github.com/stratis-storage/stratis-cli.git
       - name: Set up for D-Bus

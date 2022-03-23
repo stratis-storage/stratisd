@@ -30,14 +30,6 @@ BINDIR ?= $(PREFIX)/bin
 # alternative is "debug"
 PROFILEDIR ?= release
 
-ifeq ($(PROFILEDIR), debug)
-  PROFILETARGET = build
-  PROFILEMINTARGET = build-min
-else
-  PROFILETARGET = release
-  PROFILEMINTARGET = release-min
-endif
-
 MIN_FEATURES = --no-default-features --features min
 SYSTEMD_FEATURES = --no-default-features --features min,systemd_compat
 EXTRAS_FEATURES =  --features extras
@@ -231,7 +223,7 @@ stratisd-min:
 	RUSTFLAGS="${DENY}" \
 	cargo build --bin=stratisd-min ${SYSTEMD_FEATURES} ${TARGET_ARGS}
 
-install-cfg: docs/stratisd.8
+install-cfg:
 	install -Dpm0644 -t $(DESTDIR)$(DATADIR)/dbus-1/system.d stratisd.conf
 	install -Dpm0644 -t $(DESTDIR)$(MANDIR)/man8 docs/stratisd.8
 	install -Dpm0644 -t $(DESTDIR)$(UDEVDIR)/rules.d udev/61-stratisd.rules
@@ -247,7 +239,8 @@ install-cfg: docs/stratisd.8
 	install -Dpm0644 -t $(DESTDIR)$(UNITDIR) systemd/stratisd-min-postinitrd.service
 	install -Dpm0644 -t $(DESTDIR)$(UNITDIR) systemd/stratis-fstab-setup@.service
 
-install: $(PROFILETARGET) $(PROFILEMINTARGET) install-cfg
+install: install-cfg
+	mkdir -p $(DESTDIR)$(UNITGENDIR)
 	install -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd
 	install -Dpm0755 -t $(DESTDIR)$(UDEVDIR) target/$(PROFILEDIR)/stratis-utils
 	mv -fv $(DESTDIR)$(UDEVDIR)/stratis-utils $(DESTDIR)$(UDEVDIR)/stratis-str-cmp
@@ -257,6 +250,12 @@ install: $(PROFILETARGET) $(PROFILEMINTARGET) install-cfg
 	install -Dpm0755 -t $(DESTDIR)$(BINDIR) target/$(PROFILEDIR)/stratis-min
 	install -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd-min
 	install -Dpm0755 -t $(DESTDIR)$(UNITEXECDIR) systemd/stratis-fstab-setup
+
+install-release: release release-min docs/stratisd.8
+	${MAKE} install
+
+install-debug: build build-min docs/stratisd.8
+	${MAKE} install PROFILEDIR=debug
 
 # remove installed configuration files
 clean-cfg:

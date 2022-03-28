@@ -573,6 +573,7 @@ where
         let (uuid, name) = if let Some((uuid, name)) = lock_record.get_by_lock_key(&self.1) {
             (uuid, name)
         } else {
+            lock_record.wake();
             return Poll::Ready(None);
         };
 
@@ -672,6 +673,7 @@ where
         let (uuid, name) = if let Some((uuid, name)) = lock_record.get_by_lock_key(&self.1) {
             (uuid, name)
         } else {
+            lock_record.wake();
             return Poll::Ready(None);
         };
 

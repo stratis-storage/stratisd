@@ -289,43 +289,6 @@ impl TryFrom<&[&Path]> for ProcessedPathInfos {
             ));
         }
 
-        // If two DeviceInfos are missing an id_wwn they are not duplicates.
-        // If both encountered a udev error when reading the id_wwn, then
-        // consider them duplicates.
-        let duplicate_id_wwns = infos
-            .iter()
-            .filter(|(info, _)| info.id_wwn.is_some())
-            .duplicates_by(|(info, _)| {
-                info.id_wwn
-                    .as_ref()
-                    .map(|x| x.as_ref().ok())
-                    .expect("filtered")
-            })
-            .collect::<Vec<_>>();
-
-        let duplicate_id_wwn_messages = duplicate_id_wwns
-            .iter()
-            .map(|(info, _)| {
-                let dups = infos
-                    .iter()
-                    .filter(|(i, _)| match (info.id_wwn.as_ref(), i.id_wwn.as_ref()) {
-                        (None, _) => unreachable!(),
-                        (Some(Err(_)), Some(Err(_))) => true,
-                        (Some(Ok(v1)), Some(Ok(v2))) => v1 == v2,
-                        (_, _) => false,
-                    })
-                    .collect::<Vec<_>>();
-                format!(
-                    "device nodes {} have the same WWN or have WWNs which could not be read",
-                    dups.iter().map(|(i, _)| i.devnode.display()).join(", "),
-                )
-            })
-            .collect::<Vec<_>>();
-
-        if !duplicate_id_wwn_messages.is_empty() {
-            return Err(StratisError::Msg(duplicate_id_wwn_messages.join("; ")));
-        }
-
         let (mut stratis_devices, mut unclaimed_devices) = (HashMap::new(), vec![]);
 
         for (info, ids) in infos.drain(..) {

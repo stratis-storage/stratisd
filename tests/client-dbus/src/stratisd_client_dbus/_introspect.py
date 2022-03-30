@@ -215,6 +215,7 @@ SPECS = {
     <property name="Encrypted" type="b" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>
+    <property name="FsLimit" type="t" access="readwrite" />
     <property name="HasCache" type="b" access="read" />
     <property name="KeyDescription" type="(b(bs))" access="read" />
     <property name="Name" type="s" access="read" />

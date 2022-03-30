@@ -33,7 +33,10 @@ pub const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
 // Maximum taken from "XFS Algorithms and Data Structured: 3rd edition"
 const MAX_THIN_DEV_SIZE: Sectors = Sectors(16 * IEC::Pi); // 8 EiB
-const MIN_THIN_DEV_SIZE: Sectors = Sectors(64 * IEC::Ki); // 32 MiB
+
+// xfs is planning to reject making "small" filesystems:
+// https://www.spinics.net/lists/linux-xfs/msg59453.html
+const MIN_THIN_DEV_SIZE: Sectors = Sectors(IEC::Mi); // 512 MiB
 
 /// Called when the name of a requested pool coincides with the name of an
 /// existing pool. Returns an error if the specifications of the requested

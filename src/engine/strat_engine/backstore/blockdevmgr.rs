@@ -768,6 +768,7 @@ mod tests {
     use std::{env, error::Error};
 
     use crate::engine::strat_engine::{
+        backstore::ProcessedPathInfos,
         cmd,
         keys::MemoryFilesystem,
         names::KeyDescription,
@@ -793,6 +794,7 @@ mod tests {
             mgr.avail_space() + allocated + mgr.metadata_size(),
             mgr.size()
         );
+        mgr.invariant();
     }
 
     #[test]
@@ -823,7 +825,16 @@ mod tests {
                 Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
             )?;
 
-            if bdm.add(pool_uuid, &paths[2..3]).is_err() {
+            let dev_uuids = bdm
+                .blockdevs()
+                .iter()
+                .map(|(u, _)| u)
+                .cloned()
+                .collect::<HashSet<_>>();
+            let devices = ProcessedPathInfos::try_from(&paths[2..3])
+                .and_then(|pp| pp.get_infos_for_add(pool_uuid, &dev_uuids))
+                .unwrap();
+            if bdm.add(pool_uuid, devices).is_err() {
                 Err(Box::new(StratisError::Msg(
                     "Adding a blockdev with the same key to an encrypted pool should succeed"
                         .to_string(),
@@ -867,7 +878,16 @@ mod tests {
 
             crypt::change_key(key_desc)?;
 
-            if bdm.add(pool_uuid, &paths[2..3]).is_ok() {
+            let dev_uuids = bdm
+                .blockdevs()
+                .iter()
+                .map(|(u, _)| u)
+                .cloned()
+                .collect::<HashSet<_>>();
+            let devices = ProcessedPathInfos::try_from(&paths[2..3])
+                .and_then(|pp| pp.get_infos_for_add(pool_uuid, &dev_uuids))
+                .unwrap();
+            if bdm.add(pool_uuid, devices).is_ok() {
                 Err(Box::new(StratisError::Msg(
                     "Adding a blockdev with a new key to an encrypted pool should fail".to_string(),
                 )))
@@ -892,56 +912,6 @@ mod tests {
         real::test_with_spec(
             &real::DeviceLimits::Exactly(3, None, None),
             test_blockdevmgr_changed_key,
-        );
-    }
-
-    /// Verify that it is impossible to steal blockdevs from another Stratis
-    /// pool.
-    /// 1. Initialize devices with pool uuid.
-    /// 2. Initializing again with different uuid must fail.
-    /// 3. Adding the devices must succeed, because they already belong.
-    fn test_initialization_add_stratis(paths: &[&Path]) {
-        assert!(paths.len() > 1);
-        let (paths1, paths2) = paths.split_at(paths.len() / 2);
-
-        let uuid = PoolUuid::new_v4();
-        let uuid2 = PoolUuid::new_v4();
-
-        let mut bd_mgr =
-            BlockDevMgr::initialize(uuid, paths1, MDADataSize::default(), None).unwrap();
-        cmd::udev_settle().unwrap();
-
-        assert_matches!(
-            BlockDevMgr::initialize(uuid2, paths1, MDADataSize::default(), None),
-            Err(_)
-        );
-
-        let original_length = bd_mgr.block_devs.len();
-        assert_matches!(bd_mgr.add(uuid2, paths1), Err(_));
-        assert_matches!(bd_mgr.add(uuid, paths1), Ok(_));
-        assert_eq!(bd_mgr.block_devs.len(), original_length);
-
-        BlockDevMgr::initialize(uuid, paths2, MDADataSize::default(), None).unwrap();
-        cmd::udev_settle().unwrap();
-
-        assert_matches!(bd_mgr.add(uuid, paths2), Err(_));
-
-        bd_mgr.invariant()
-    }
-
-    #[test]
-    fn loop_test_initialization_stratis() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, None),
-            test_initialization_add_stratis,
-        );
-    }
-
-    #[test]
-    fn real_test_initialization_stratis() {
-        real::test_with_spec(
-            &real::DeviceLimits::AtLeast(2, None, None),
-            test_initialization_add_stratis,
         );
     }
 

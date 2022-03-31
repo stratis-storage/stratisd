@@ -230,9 +230,10 @@ impl Recordable<CacheTierSave> for CacheTier {
 #[cfg(test)]
 mod tests {
 
-    use std::path::Path;
+    use std::{collections::HashSet, convert::TryFrom, path::Path};
 
     use crate::engine::strat_engine::{
+        backstore::ProcessedPathInfos,
         metadata::MDADataSize,
         tests::{loopbacked, real},
     };
@@ -272,7 +273,18 @@ mod tests {
         assert_eq!(cache_tier.block_mgr.avail_space(), Sectors(0));
         assert_eq!(size - metadata_size, allocated + cache_metadata_size);
 
-        let (_, (cache, meta)) = cache_tier.add(pool_uuid, paths2).unwrap();
+        let dev_uuids = cache_tier
+            .block_mgr
+            .blockdevs()
+            .iter()
+            .map(|(u, _)| u)
+            .cloned()
+            .collect::<HashSet<_>>();
+        let devices2 = ProcessedPathInfos::try_from(paths2)
+            .and_then(|pp| pp.get_infos_for_add(pool_uuid, &dev_uuids))
+            .unwrap();
+
+        let (_, (cache, meta)) = cache_tier.add(pool_uuid, devices2).unwrap();
         // TODO: Ultimately, it should be the case that meta can be true.
         assert!(cache);
         assert!(!meta);

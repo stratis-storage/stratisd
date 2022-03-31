@@ -673,11 +673,12 @@ impl Recordable<BackstoreSave> for Backstore {
 
 #[cfg(test)]
 mod tests {
-    use std::fs::OpenOptions;
+    use std::{collections::HashSet, convert::TryFrom, fs::OpenOptions};
 
     use devicemapper::{CacheDevStatus, DataBlocks, DmOptions, IEC};
 
     use crate::engine::strat_engine::{
+        backstore::ProcessedPathInfos,
         metadata::device_identifiers,
         tests::{loopbacked, real},
     };
@@ -762,11 +763,30 @@ mod tests {
             CacheDevStatus::Fail => panic!("cache is in a failed state"),
         }
 
-        let data_uuids = backstore.add_datadevs(pool_uuid, datadevpaths).unwrap();
+        let data_uuids = backstore
+            .datadevs()
+            .iter()
+            .map(|(u, _)| u)
+            .cloned()
+            .collect::<HashSet<_>>();
+        let unowned_devices = ProcessedPathInfos::try_from(datadevpaths)
+            .and_then(|pp| pp.get_infos_for_add(pool_uuid, &data_uuids))
+            .unwrap();
+
+        let data_uuids = backstore.add_datadevs(pool_uuid, unowned_devices).unwrap();
         invariant(&backstore);
         assert_eq!(data_uuids.len(), datadevpaths.len());
 
-        let cache_uuids = backstore.add_cachedevs(pool_uuid, cachedevpaths).unwrap();
+        let cache_uuids = backstore
+            .cachedevs()
+            .iter()
+            .map(|(u, _)| u)
+            .cloned()
+            .collect::<HashSet<_>>();
+        let unowned_devices = ProcessedPathInfos::try_from(cachedevpaths)
+            .and_then(|pp| pp.get_infos_for_add(pool_uuid, &cache_uuids))
+            .unwrap();
+        let cache_uuids = backstore.add_cachedevs(pool_uuid, unowned_devices).unwrap();
         invariant(&backstore);
         assert_eq!(cache_uuids.len(), cachedevpaths.len());
 

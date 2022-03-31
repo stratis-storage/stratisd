@@ -167,9 +167,10 @@ impl Recordable<DataTierSave> for DataTier {
 #[cfg(test)]
 mod tests {
 
-    use std::path::Path;
+    use std::{collections::HashSet, convert::TryFrom, path::Path};
 
     use crate::engine::strat_engine::{
+        backstore::ProcessedPathInfos,
         metadata::MDADataSize,
         tests::{loopbacked, real},
     };
@@ -209,7 +210,17 @@ mod tests {
         assert_eq!(data_tier.size(), size);
         allocated = data_tier.allocated();
 
-        data_tier.add(pool_uuid, paths2).unwrap();
+        let dev_uuids = data_tier
+            .block_mgr
+            .blockdevs()
+            .iter()
+            .map(|(u, _)| u)
+            .cloned()
+            .collect::<HashSet<_>>();
+        let devices2 = ProcessedPathInfos::try_from(paths2)
+            .and_then(|pp| pp.get_infos_for_add(pool_uuid, &dev_uuids))
+            .unwrap();
+        data_tier.add(pool_uuid, devices2).unwrap();
 
         // A data tier w/ additional blockdevs added
         assert!(data_tier.size() > size);

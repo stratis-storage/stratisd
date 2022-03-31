@@ -348,14 +348,14 @@ impl Engine for StratEngine {
         blockdev_paths: &[&Path],
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<CreateAction<PoolUuid>> {
-        validate_name(name)?;
-        let name = Name::new(name.to_owned());
-
         if blockdev_paths.is_empty() {
             return Err(StratisError::Msg(
                 "At least one blockdev is required to create a pool.".to_string(),
             ));
         }
+
+        validate_name(name)?;
+        let name = Name::new(name.to_owned());
 
         validate_paths(blockdev_paths)?;
 

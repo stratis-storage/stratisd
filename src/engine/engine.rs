@@ -301,6 +301,15 @@ pub trait Pool: Debug + Send + Sync {
         pool_uuid: PoolUuid,
         new_limit: u64,
     ) -> StratisResult<()>;
+
+    /// Check whether overprovisioning is disabled for the pool.
+    fn overprov_enabled(&self) -> bool;
+
+    /// Either enable or disable overprovisioning for the pool.
+    fn set_overprov_mode(&mut self, pool_name: &Name, enabled: bool) -> StratisResult<()>;
+
+    /// Returns a boolean indicating whether the pool is out of allocation space.
+    fn out_of_alloc_space(&self) -> bool;
 }
 
 #[async_trait]

@@ -14,13 +14,15 @@ use std::{
 use nix::mount::{mount, umount, MsFlags};
 use retry::{delay::Fixed, retry_with_index};
 
-use devicemapper::{DmDevice, DmOptions, LinearDev, LinearDevTargetParams, TargetLine};
+use devicemapper::{DmDevice, DmOptions, LinearDev, LinearDevTargetParams, Sectors, TargetLine};
 
 use crate::{
     engine::{
         strat_engine::{
-            cmd::create_fs, dm::get_dm, serde_structs::FilesystemSave,
-            thinpool::filesystem::StratFilesystem,
+            cmd::create_fs,
+            dm::get_dm,
+            serde_structs::FilesystemSave,
+            thinpool::filesystem::{fs_usage, StratFilesystem},
         },
         types::{FilesystemUuid, Name, PoolUuid, StratisUuid},
     },
@@ -94,6 +96,10 @@ impl<'a> Drop for MountedMDV<'a> {
 }
 
 impl MetadataVol {
+    /// Minimum allocation size for a file is a block which will be 4k in this
+    /// set up.
+    const XFS_MIN_FILE_ALLOC_SIZE: Sectors = Sectors(8);
+
     /// Initialize a new Metadata Volume.
     pub fn initialize(pool_uuid: PoolUuid, dev: LinearDev) -> StratisResult<MetadataVol> {
         create_fs(&dev.devnode(), Some(StratisUuid::Pool(pool_uuid)), true)?;
@@ -235,6 +241,13 @@ impl MetadataVol {
     ) -> StratisResult<()> {
         self.dev.set_table(get_dm(), table)?;
         Ok(())
+    }
+
+    /// The maximum number of filesystems that can be recorded in the MDV.
+    pub fn max_fs_limit(&self) -> StratisResult<u64> {
+        let mounted = MountedMDV::mount(self)?;
+        let (total_size, _) = fs_usage(mounted.mount_pt())?;
+        Ok(total_size.sectors() / Self::XFS_MIN_FILE_ALLOC_SIZE)
     }
 }
 

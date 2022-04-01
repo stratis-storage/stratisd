@@ -665,6 +665,18 @@ impl Pool for SimPool {
             Ok(())
         }
     }
+
+    fn overprov_enabled(&self) -> bool {
+        true
+    }
+
+    fn set_overprov_mode(&mut self, _: &Name, _: bool) -> StratisResult<()> {
+        Ok(())
+    }
+
+    fn out_of_alloc_space(&self) -> bool {
+        false
+    }
 }
 
 #[cfg(test)]

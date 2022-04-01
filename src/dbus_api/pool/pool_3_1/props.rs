@@ -43,3 +43,48 @@ where
     }
     res
 }
+
+pub fn get_overprov_mode<E>(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+) -> Result<(), MethodErr>
+where
+    E: 'static + Engine,
+{
+    get_pool_property(i, p, |(_, _, pool)| {
+        Ok(shared::pool_overprov_enabled::<E>(pool))
+    })
+}
+
+pub fn set_overprov_mode<E>(
+    i: &mut Iter<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+) -> Result<(), MethodErr>
+where
+    E: 'static + Engine,
+{
+    let disabled = i.get().ok_or_else(|| {
+        MethodErr::failed("Overprovisioning mode changes require a boolean as an argument")
+    })?;
+    let res = set_pool_property(p, |(name, _, pool)| {
+        shared::pool_set_overprov_mode::<E>(pool, &name, disabled)
+    });
+    if res.is_ok() {
+        p.tree
+            .get_data()
+            .push_pool_overprov_mode_change(p.path.get_name(), disabled);
+    }
+    res
+}
+
+pub fn get_no_alloc_space<E>(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+) -> Result<(), MethodErr>
+where
+    E: 'static + Engine,
+{
+    get_pool_property(i, p, |(_, _, pool)| {
+        Ok(shared::pool_no_alloc_space::<E>(pool))
+    })
+}

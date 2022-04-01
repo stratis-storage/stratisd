@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
+    cmp::min,
     fs::{File, OpenOptions},
     io::{Read, Write},
     path::{Path, PathBuf},
@@ -241,7 +242,10 @@ impl StratFilesystem {
     /// * (true, _) if metadata should be saved.
     /// * (false, _) if metadata should not be saved.
     /// TODO: deal with the thindev in a Fail state.
-    pub fn check(&mut self) -> StratisResult<(bool, StratFilesystemDiff)> {
+    pub fn check(
+        &mut self,
+        remaining_size: Option<&mut Sectors>,
+    ) -> StratisResult<(bool, StratFilesystemDiff)> {
         let mut needs_save = false;
         let original_state = self.cached();
         match self.thin_dev.status(get_dm(), DmOptions::default())? {
@@ -249,10 +253,14 @@ impl StratFilesystem {
                 if let Some(mount_point) = self.mount_points()?.first() {
                     let (fs_total_bytes, fs_total_used_bytes) = fs_usage(mount_point)?;
                     if 2u64 * fs_total_used_bytes > fs_total_bytes {
+                        let extend_size = Self::extend_size(
+                            self.thin_dev.size(),
+                            remaining_size.as_ref().map(|rem| **rem),
+                        );
+
                         let old_table = self.thin_dev.table().table.clone();
                         let mut new_table = old_table.clone();
-                        new_table.length =
-                            original_state.size.sectors() + Self::extend_size(self.thin_dev.size());
+                        new_table.length = original_state.size.sectors() + extend_size;
                         self.thin_dev.set_table(get_dm(), new_table)?;
                         if let Err(causal) = xfs_growfs(mount_point) {
                             if let Err(rollback) = self.thin_dev.set_table(get_dm(), old_table) {
@@ -264,6 +272,9 @@ impl StratFilesystem {
                             } else {
                                 return Err(causal);
                             }
+                        }
+                        if let Some(rem_size) = remaining_size {
+                            *rem_size = Sectors(rem_size.saturating_sub(*extend_size))
                         }
                         needs_save = true;
                     }
@@ -284,8 +295,15 @@ impl StratFilesystem {
     /// Return an extend size for the thindev under the filesystem
     /// TODO: returning the current size will double the space provisioned to
     /// the thin device.  We should determine if this is a reasonable value.
-    fn extend_size(current_size: Sectors) -> Sectors {
-        current_size
+    fn extend_size(current_size: Sectors, remaining_size: Option<Sectors>) -> Sectors {
+        if let Some(rem_size) = remaining_size {
+            // Extend either by the remaining amount left before the data device
+            // overprovisioning limit is reached if it is less than the size of the
+            // filesystem or double the filesystem size.
+            min(rem_size, current_size)
+        } else {
+            current_size
+        }
     }
 
     /// Tear down the filesystem.

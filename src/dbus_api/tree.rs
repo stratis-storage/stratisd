@@ -397,6 +397,7 @@ where
         uuid: PoolUuid,
         new_used: SignalChange<Option<Bytes>>,
         new_alloc: SignalChange<Bytes>,
+        new_no_space: SignalChange<bool>,
     ) {
         handle_background_change!(
             self,
@@ -418,7 +419,10 @@ where
                 new_used,
                 consts::POOL_ALLOC_SIZE_PROP.to_string(),
                 pool_alloc_to_prop,
-                new_alloc
+                new_alloc,
+                consts::POOL_NO_ALLOCABLE_SPACE_PROP.to_string(),
+                |x| x,
+                new_no_space
             }
         );
     }
@@ -466,6 +470,25 @@ where
         }
     }
 
+    /// Send a signal indicating that the pool overprovisioning mode has changed.
+    fn handle_pool_overprov_mode_change(&self, path: Path<'static>, new_mode: bool) {
+        if let Err(e) = self.property_changed_invalidated_signal(
+            &path,
+            prop_hashmap!(
+                consts::POOL_INTERFACE_NAME_3_1 => {
+                    Vec::new(),
+                    consts::POOL_OVERPROV_PROP.to_string() =>
+                    box_variant!(new_mode)
+                }
+            ),
+        ) {
+            warn!(
+                "Failed to send a signal over D-Bus indicating pool overprovisioning mode change: {}",
+                e
+            );
+        }
+    }
+
     /// Send a signal indicating that the pool total allocated size has changed.
     fn handle_pool_foreground_change(
         &self,
@@ -473,6 +496,7 @@ where
         new_used: SignalChange<Option<Bytes>>,
         new_alloc: SignalChange<Bytes>,
         new_size: SignalChange<Bytes>,
+        new_no_space: SignalChange<bool>,
     ) {
         handle_signal_change!(
             self,
@@ -498,7 +522,10 @@ where
                 new_alloc,
                 consts::POOL_TOTAL_SIZE_PROP.to_string(),
                 pool_size_to_prop,
-                new_size
+                new_size,
+                consts::POOL_NO_ALLOCABLE_SPACE_PROP.to_string(),
+                |x| x,
+                new_no_space
             }
         );
     }
@@ -565,12 +592,22 @@ where
                 self.handle_pool_fs_limit_change(path, new_limit);
                 Ok(true)
             }
+            DbusAction::PoolOverprovModeChange(path, new_mode) => {
+                self.handle_pool_overprov_mode_change(path, new_mode);
+                Ok(true)
+            }
             DbusAction::LockedPoolsChange(pools) => {
                 self.handle_locked_pools_change(pools);
                 Ok(true)
             }
-            DbusAction::PoolForegroundChange(item, new_used, new_alloc, new_size) => {
-                self.handle_pool_foreground_change(item, new_used, new_alloc, new_size);
+            DbusAction::PoolForegroundChange(item, new_used, new_alloc, new_size, new_no_space) => {
+                self.handle_pool_foreground_change(
+                    item,
+                    new_used,
+                    new_alloc,
+                    new_size,
+                    new_no_space,
+                );
                 Ok(true)
             }
             DbusAction::FsBackgroundChange(uuid, new_used, new_size) => {
@@ -582,13 +619,14 @@ where
                     new_size
                 }
             }
-            DbusAction::PoolBackgroundChange(uuid, new_used, new_alloc) => {
+            DbusAction::PoolBackgroundChange(uuid, new_used, new_alloc, new_no_space) => {
                 background_arm! {
                     self,
                     uuid,
                     handle_pool_background_change,
                     new_used,
-                    new_alloc
+                    new_alloc,
+                    new_no_space
                 }
             }
         }

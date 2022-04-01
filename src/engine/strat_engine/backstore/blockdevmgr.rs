@@ -4,12 +4,7 @@
 
 // Code to handle a collection of block devices.
 
-use std::{
-    collections::{HashMap, HashSet},
-    convert::TryFrom,
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{collections::HashMap, convert::TryFrom, fs, path::PathBuf};
 
 use chrono::{DateTime, Duration, Utc};
 use rand::{seq::IteratorRandom, thread_rng};
@@ -28,9 +23,7 @@ use crate::{
                     back_up_luks_header, interpret_clevis_config, restore_luks_header,
                     CryptActivationHandle,
                 },
-                devices::{
-                    initialize_devices, process_and_verify_devices, wipe_blockdevs, UnownedDevices,
-                },
+                devices::{initialize_devices, wipe_blockdevs, UnownedDevices},
                 range_alloc::PerDevSegments,
                 transaction::RequestTransaction,
             },
@@ -146,12 +139,10 @@ impl BlockDevMgr {
     /// Initialize a new StratBlockDevMgr with specified pool and devices.
     pub fn initialize(
         pool_uuid: PoolUuid,
-        paths: &[&Path],
+        devices: UnownedDevices,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<BlockDevMgr> {
-        let devices = process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?;
-
         Ok(BlockDevMgr::new(
             initialize_devices(devices, pool_uuid, mda_data_size, encryption_info)?,
             None,
@@ -211,7 +202,7 @@ impl BlockDevMgr {
         // then the necessary amount must be provided or the data can not be
         // saved.
         let bds = initialize_devices(
-            infos.devices,
+            infos,
             pool_uuid,
             MDADataSize::default(),
             encryption_info.as_ref(),

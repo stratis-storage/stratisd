@@ -272,13 +272,11 @@ impl ProcessedPathInfos {
 
     /// If creating a new pool or cache, all devices must be unowned.
     /// Return an error if any appear to belong to Stratis.
-    pub fn get_infos_for_create(self) -> StratisResult<Vec<PathBuf>> {
+    pub fn get_infos_for_create(self) -> StratisResult<UnownedDevices> {
         if self.stratis_devices.is_empty() {
-            Ok(self
-                .unclaimed_devices
-                .iter()
-                .map(|i| i.devnode.clone())
-                .collect::<Vec<PathBuf>>())
+            Ok(UnownedDevices {
+                devices: self.unclaimed_devices,
+            })
         } else {
             Err(StratisError::Msg(
                 "Several devices appear to belong to a Stratis pool; can not initialize.".into(),
@@ -420,119 +418,6 @@ pub struct UnownedDevices {
     pub devices: Vec<DeviceInfo>,
 }
 
-// Check coherence of pool and device UUIDs against a set of current UUIDs.
-// If the selection of devices is incompatible with the current
-// state of the set, or simply invalid, return an error.
-//
-// Postcondition: There are no infos returned from this method that
-// represent information about Stratis devices. If any device with
-// Stratis identifiers was in the list of devices passed to the function
-// either:
-// * It was filtered out of the list, because its device UUID was
-// found in current_uuids
-// * An error was returned because it was unsuitable, for example,
-// its pool UUID did not match the pool_uuid argument
-//
-// Precondition: This method is called only with the result of
-// process_devices. Currently, this guarantees that all LUKS devices,
-// for example, have been eliminated from the devices that are being
-// checked. Thus, the absence of stratisd identifiers for a particular
-// device should ensure that the device does not belong to Stratis.
-//
-// FIXME:
-// Note that this method _should_ be somewhat temporary. We hope that in
-// another step the functionality contained will be hoisted up closer to
-// the D-Bus/engine interface, as it computes some idempotency information.
-fn check_device_ids(
-    pool_uuid: PoolUuid,
-    current_uuids: &HashSet<DevUuid>,
-    devices: ProcessedPathInfos,
-) -> StratisResult<Vec<DeviceInfo>> {
-    let mut pools = devices.stratis_devices;
-    let this_pool: Option<HashMap<DevUuid, DeviceInfo>> = pools.remove(&pool_uuid);
-
-    if !pools.is_empty() {
-        let error_string = pools
-            .iter()
-            .map(|(pool_uuid, devs)| {
-                format!(
-                    "devices ({}) appear to belong to Stratis pool with UUID {}",
-                    devs.iter()
-                        .map(|(_, info)| info.devnode.display().to_string())
-                        .collect::<Vec<_>>()
-                        .join(", "),
-                    pool_uuid
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("; ");
-        let error_message = format!(
-            "Some devices specified appear to be already in use by other Stratis pools: {}",
-            error_string
-        );
-        return Err(StratisError::Msg(error_message));
-    }
-
-    if let Some(mut this_pool) = this_pool {
-        let (mut included, mut not_included) = (vec![], vec![]);
-        for (dev_uuid, info) in this_pool.drain() {
-            if current_uuids.contains(&dev_uuid) {
-                included.push((dev_uuid, info))
-            } else {
-                not_included.push((dev_uuid, info))
-            }
-        }
-
-        if !not_included.is_empty() {
-            let error_message = format!(
-                "Devices ({}) appear to be already in use by this pool which has UUID {}; they may be in use by the other tier",
-                not_included
-                    .iter()
-                    .map(|(_, info)| info.devnode.display().to_string())
-                    .collect::<Vec<_>>()
-                    .join(", "),
-                pool_uuid
-            );
-            return Err(StratisError::Msg(error_message));
-        }
-
-        if !included.is_empty() {
-            info!(
-                "Devices [{}] appear to be already in use by this pool which has UUID {}; omitting from the set of devices to initialize",
-                included
-                    .iter()
-                    .map(|(dev_uuid, info)| {
-                        format!(
-                            "(device node: {}, device UUID: {})",
-                            info.devnode.display(),
-                            dev_uuid
-                        )
-                    })
-                    .collect::<Vec<_>>()
-                    .join(", "),
-                pool_uuid
-            );
-        }
-    }
-
-    Ok(devices.unclaimed_devices)
-}
-
-/// Combine the functionality of process_devices and check_device_ids.
-/// It is useful to guarantee that check_device_ids is called only with
-/// the result of invoking process_devices.
-pub fn process_and_verify_devices(
-    pool_uuid: PoolUuid,
-    current_uuids: &HashSet<DevUuid>,
-    paths: &[&Path],
-) -> StratisResult<Vec<DeviceInfo>> {
-    check_device_ids(
-        pool_uuid,
-        current_uuids,
-        ProcessedPathInfos::try_from(paths)?,
-    )
-}
-
 /// Initialze devices in devices.
 /// Clean up previously initialized devices if initialization of any single
 /// device fails during initialization. Log at the warning level if cleanup
@@ -544,7 +429,7 @@ pub fn process_and_verify_devices(
 /// Precondition: Each device's DeviceInfo struct contains all necessary
 /// information about the device.
 pub fn initialize_devices(
-    devices: Vec<DeviceInfo>,
+    devices: UnownedDevices,
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
     encryption_info: Option<&EncryptionInfo>,
@@ -786,6 +671,7 @@ pub fn initialize_devices(
     }
 
     let device_paths = devices
+        .devices
         .iter()
         .map(|d| d.devnode.clone())
         .collect::<Vec<_>>();
@@ -797,7 +683,7 @@ pub fn initialize_devices(
         guard.extend(device_paths.iter().cloned());
     }
 
-    let res = initialize_all(devices, pool_uuid, mda_data_size, encryption_info);
+    let res = initialize_all(devices.devices, pool_uuid, mda_data_size, encryption_info);
 
     {
         let mut guard = (*BLOCKDEVS_IN_PROGRESS).lock().expect("Should not panic");

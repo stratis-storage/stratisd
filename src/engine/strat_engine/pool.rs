@@ -18,7 +18,7 @@ use crate::{
             validate_paths,
         },
         strat_engine::{
-            backstore::{Backstore, ProcessedPathInfos, StratBlockDev},
+            backstore::{Backstore, ProcessedPathInfos, StratBlockDev, UnownedDevices},
             metadata::MDADataSize,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             thinpool::{StratFilesystem, ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
@@ -149,7 +149,7 @@ impl StratPool {
     /// Precondition: p.is_absolute() is true for all p in paths
     pub fn initialize(
         name: &str,
-        paths: &[&Path],
+        paths: UnownedDevices,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = PoolUuid::new_v4();
@@ -451,32 +451,29 @@ impl Pool for StratPool {
             ));
         }
 
-        let device_infos = ProcessedPathInfos::try_from(blockdevs)?;
+        let devices = ProcessedPathInfos::try_from(blockdevs)?;
 
         if !self.has_cache() {
-            let cloned_paths = device_infos.get_infos_for_create()?;
-            let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
-
+            let device_infos = devices.get_infos_for_create()?;
             self.thin_pool.suspend()?;
-            let devices_result = self
-                .backstore
-                .init_cache(pool_uuid, &borrowed_paths)
-                .and_then(|bdi| {
-                    self.thin_pool
-                        .set_device(self.backstore.device().expect(
-                            "Since thin pool exists, space must have been allocated \
+            let devices_result =
+                self.backstore
+                    .init_cache(pool_uuid, device_infos)
+                    .and_then(|bdi| {
+                        self.thin_pool
+                            .set_device(self.backstore.device().expect(
+                                "Since thin pool exists, space must have been allocated \
                              from the backstore, so backstore must have a cap device",
-                        ))
-                        .and(Ok(bdi))
-                });
+                            ))
+                            .and(Ok(bdi))
+                    });
             self.thin_pool.resume()?;
             let devices = devices_result?;
             self.write_metadata(pool_name)?;
             Ok(SetCreateAction::new(devices))
         } else {
-            let cloned_paths = device_infos.get_paths_for_idempotent_create(pool_uuid)?;
+            let cloned_paths = devices.get_paths_for_idempotent_create(pool_uuid)?;
             let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
-
             init_cache_idempotent_or_err(
                 &borrowed_paths,
                 self.backstore

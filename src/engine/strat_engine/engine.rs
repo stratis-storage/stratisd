@@ -377,12 +377,11 @@ impl Engine for StratEngine {
             create_pool_idempotent_or_err(pool, &name, &borrowed_paths)
         } else {
             let cloned_name = name.clone();
-            let cloned_paths = device_infos.get_infos_for_create()?;
+            let device_infos = device_infos.get_infos_for_create()?;
             let cloned_enc_info = encryption_info.cloned();
 
             let (pool_uuid, _) = spawn_blocking!({
-                let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
-                StratPool::initialize(&cloned_name, &borrowed_paths, cloned_enc_info.as_ref())
+                StratPool::initialize(&cloned_name, device_infos, cloned_enc_info.as_ref())
             })??;
 
             Ok(CreateAction::Created(pool_uuid))

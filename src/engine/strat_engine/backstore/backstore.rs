@@ -4,7 +4,7 @@
 
 // Code to handle the backing store of a pool.
 
-use std::{cmp, path::Path};
+use std::cmp;
 
 use chrono::{DateTime, Utc};
 use serde_json::Value;
@@ -180,7 +180,7 @@ impl Backstore {
     /// WARNING: metadata changing event
     pub fn initialize(
         pool_uuid: PoolUuid,
-        paths: &[&Path],
+        paths: UnownedDevices,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<Backstore> {
@@ -211,12 +211,12 @@ impl Backstore {
     pub fn init_cache(
         &mut self,
         pool_uuid: PoolUuid,
-        paths: &[&Path],
+        devices: UnownedDevices,
     ) -> StratisResult<Vec<DevUuid>> {
         match self.cache_tier {
             Some(_) => unreachable!("self.cache.is_none()"),
             None => {
-                if paths.is_empty() {
+                if devices.devices.is_empty() {
                     return Err(StratisError::Msg(
                         "Must initialize cache with at least one blockdev.".to_string(),
                     ));
@@ -227,7 +227,8 @@ impl Backstore {
                 // If it is desired to change a cache dev to a data dev, it
                 // should be removed and then re-added in order to ensure
                 // that the MDA region is set to the correct size.
-                let bdm = BlockDevMgr::initialize(pool_uuid, paths, MDADataSize::default(), None)?;
+                let bdm =
+                    BlockDevMgr::initialize(pool_uuid, devices, MDADataSize::default(), None)?;
 
                 let cache_tier = CacheTier::new(bdm)?;
 

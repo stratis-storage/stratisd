@@ -435,12 +435,12 @@ pub fn find_all() -> libudev::Result<(
 #[cfg(test)]
 mod tests {
 
-    use std::{collections::HashSet, error::Error};
+    use std::{convert::TryFrom, error::Error};
 
     use crate::{
         engine::{
             strat_engine::{
-                backstore::{initialize_devices, process_and_verify_devices},
+                backstore::{initialize_devices, ProcessedPathInfos},
                 cmd::create_fs,
                 metadata::MDADataSize,
                 tests::{crypt, loopbacked, real},
@@ -470,7 +470,7 @@ mod tests {
             let pool_uuid = PoolUuid::new_v4();
 
             let devices = initialize_devices(
-                process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?,
+                ProcessedPathInfos::try_from(paths).and_then(|pp| pp.get_infos_for_create())?,
                 pool_uuid,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_description.clone())),
@@ -584,7 +584,9 @@ mod tests {
         let pool_uuid = PoolUuid::new_v4();
 
         initialize_devices(
-            process_and_verify_devices(pool_uuid, &HashSet::new(), paths).unwrap(),
+            ProcessedPathInfos::try_from(paths)
+                .and_then(|pp| pp.get_infos_for_create())
+                .unwrap(),
             pool_uuid,
             MDADataSize::default(),
             None,

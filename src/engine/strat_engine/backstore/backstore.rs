@@ -674,7 +674,7 @@ impl Recordable<BackstoreSave> for Backstore {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, convert::TryFrom, fs::OpenOptions};
+    use std::{collections::HashSet, convert::TryFrom, fs::OpenOptions, path::Path};
 
     use devicemapper::{CacheDevStatus, DataBlocks, DmOptions, IEC};
 
@@ -728,8 +728,15 @@ mod tests {
         let (datadevpaths, initdatapaths) = paths.split_at(1);
 
         let pool_uuid = PoolUuid::new_v4();
-        let mut backstore =
-            Backstore::initialize(pool_uuid, initdatapaths, MDADataSize::default(), None).unwrap();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            ProcessedPathInfos::try_from(initdatapaths)
+                .and_then(|pp| pp.get_infos_for_create())
+                .unwrap(),
+            MDADataSize::default(),
+            None,
+        )
+        .unwrap();
 
         invariant(&backstore);
 
@@ -740,7 +747,14 @@ mod tests {
             .unwrap();
         backstore.commit_alloc(pool_uuid, transaction).unwrap();
 
-        let cache_uuids = backstore.init_cache(pool_uuid, initcachepaths).unwrap();
+        let cache_uuids = backstore
+            .init_cache(
+                pool_uuid,
+                ProcessedPathInfos::try_from(initcachepaths)
+                    .and_then(|pp| pp.get_infos_for_create())
+                    .unwrap(),
+            )
+            .unwrap();
 
         invariant(&backstore);
 
@@ -837,8 +851,15 @@ mod tests {
 
         let pool_uuid = PoolUuid::new_v4();
 
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths1, MDADataSize::default(), None).unwrap();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            ProcessedPathInfos::try_from(paths1)
+                .and_then(|pp| pp.get_infos_for_create())
+                .unwrap(),
+            MDADataSize::default(),
+            None,
+        )
+        .unwrap();
 
         for path in paths1 {
             assert_eq!(
@@ -861,7 +882,14 @@ mod tests {
 
         let old_device = backstore.device();
 
-        backstore.init_cache(pool_uuid, paths2).unwrap();
+        backstore
+            .init_cache(
+                pool_uuid,
+                ProcessedPathInfos::try_from(paths2)
+                    .and_then(|pp| pp.get_infos_for_create())
+                    .unwrap(),
+            )
+            .unwrap();
 
         for path in paths2 {
             assert_eq!(

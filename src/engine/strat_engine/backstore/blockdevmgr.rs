@@ -435,30 +435,6 @@ impl BlockDevMgr {
         self.encryption_info().is_some()
     }
 
-    #[cfg(test)]
-    fn invariant(&self) {
-        let pool_uuids = self
-            .block_devs
-            .iter()
-            .map(|bd| bd.pool_uuid())
-            .collect::<HashSet<_>>();
-        assert!(pool_uuids.len() == 1);
-
-        let encryption_infos = self
-            .block_devs
-            .iter()
-            .filter_map(|bd| bd.encryption_info())
-            .collect::<Vec<_>>();
-        if encryption_infos.is_empty() {
-            assert_eq!(self.encryption_info(), None);
-        } else {
-            assert_eq!(encryption_infos.len(), self.block_devs.len());
-
-            let info_set = encryption_infos.iter().collect::<HashSet<_>>();
-            assert!(info_set.len() == 1);
-        }
-    }
-
     /// Bind all devices in the given blockdev manager using the given clevis
     /// configuration.
     ///
@@ -756,7 +732,7 @@ impl Recordable<Vec<BaseBlockDevSave>> for BlockDevMgr {
 
 #[cfg(test)]
 mod tests {
-    use std::{env, error::Error};
+    use std::{collections::HashSet, env, error::Error, path::Path};
 
     use crate::engine::strat_engine::{
         backstore::ProcessedPathInfos,
@@ -768,13 +744,41 @@ mod tests {
 
     use super::*;
 
+    impl BlockDevMgr {
+        fn invariant(&self) {
+            let pool_uuids = self
+                .block_devs
+                .iter()
+                .map(|bd| bd.pool_uuid())
+                .collect::<HashSet<_>>();
+            assert!(pool_uuids.len() == 1);
+
+            let encryption_infos = self
+                .block_devs
+                .iter()
+                .filter_map(|bd| bd.encryption_info())
+                .collect::<Vec<_>>();
+            if encryption_infos.is_empty() {
+                assert_eq!(self.encryption_info(), None);
+            } else {
+                assert_eq!(encryption_infos.len(), self.block_devs.len());
+
+                let info_set = encryption_infos.iter().collect::<HashSet<_>>();
+                assert!(info_set.len() == 1);
+            }
+        }
+    }
+
     /// Verify that initially,
     /// size() - metadata_size() = avail_space().
     /// After 2 Sectors have been allocated, that amount must also be included
     /// in balance.
     fn test_blockdevmgr_used(paths: &[&Path]) {
+        let infos = ProcessedPathInfos::try_from(paths)
+            .and_then(|pp| pp.get_infos_for_create())
+            .unwrap();
         let mut mgr =
-            BlockDevMgr::initialize(PoolUuid::new_v4(), paths, MDADataSize::default(), None)
+            BlockDevMgr::initialize(PoolUuid::new_v4(), infos, MDADataSize::default(), None)
                 .unwrap();
         assert_eq!(mgr.avail_space() + mgr.metadata_size(), mgr.size());
 
@@ -811,7 +815,8 @@ mod tests {
             let pool_uuid = PoolUuid::new_v4();
             let mut bdm = BlockDevMgr::initialize(
                 pool_uuid,
-                &paths[..2],
+                ProcessedPathInfos::try_from(&paths[..2])
+                    .and_then(|pp| pp.get_infos_for_create())?,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
             )?;
@@ -862,7 +867,8 @@ mod tests {
             let pool_uuid = PoolUuid::new_v4();
             let mut bdm = BlockDevMgr::initialize(
                 pool_uuid,
-                &paths[..2],
+                ProcessedPathInfos::try_from(&paths[..2])
+                    .and_then(|pp| pp.get_infos_for_create())?,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
             )?;
@@ -908,9 +914,12 @@ mod tests {
 
     fn test_clevis_initialize(paths: &[&Path]) {
         let _memfs = MemoryFilesystem::new().unwrap();
+        let devices = ProcessedPathInfos::try_from(paths)
+            .and_then(|pp| pp.get_infos_for_create())
+            .unwrap();
         let mut mgr = BlockDevMgr::initialize(
             PoolUuid::new_v4(),
-            paths,
+            devices,
             MDADataSize::default(),
             Some(&EncryptionInfo::ClevisInfo((
                 "tang".to_string(),
@@ -948,9 +957,12 @@ mod tests {
     fn test_clevis_both_initialize(paths: &[&Path]) {
         fn test_both(paths: &[&Path], key_desc: &KeyDescription) -> Result<(), Box<dyn Error>> {
             let _memfs = MemoryFilesystem::new().unwrap();
+            let devices =
+                ProcessedPathInfos::try_from(paths).and_then(|pp| pp.get_infos_for_create())?;
+
             let mut mgr = BlockDevMgr::initialize(
                 PoolUuid::new_v4(),
-                paths,
+                devices,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::Both(
                     key_desc.clone(),

@@ -973,7 +973,13 @@ mod tests {
     fn test_empty_pool(paths: &[&Path]) {
         assert_eq!(paths.len(), 0);
         assert_matches!(
-            StratPool::initialize("stratis_test_pool", paths, None),
+            StratPool::initialize(
+                "stratis_test_pool",
+                ProcessedPathInfos::try_from(paths)
+                    .and_then(|pp| pp.get_infos_for_create())
+                    .unwrap(),
+                None
+            ),
             Err(_)
         );
     }
@@ -997,7 +1003,14 @@ mod tests {
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let name = "stratis-test-pool";
-        let (uuid, mut pool) = StratPool::initialize(name, paths2, None).unwrap();
+        let (uuid, mut pool) = StratPool::initialize(
+            name,
+            ProcessedPathInfos::try_from(paths2)
+                .and_then(|pp| pp.get_infos_for_create())
+                .unwrap(),
+            None,
+        )
+        .unwrap();
         invariant(&pool, name);
 
         let metadata1 = pool.record(name);
@@ -1080,7 +1093,14 @@ mod tests {
         let (data_path, data_paths) = data_paths.split_at(1);
 
         let name = "stratis-test-pool";
-        let (uuid, mut pool) = StratPool::initialize(name, data_path, None).unwrap();
+        let (uuid, mut pool) = StratPool::initialize(
+            name,
+            ProcessedPathInfos::try_from(data_path)
+                .and_then(|pp| pp.get_infos_for_create())
+                .unwrap(),
+            None,
+        )
+        .unwrap();
         invariant(&pool, name);
 
         pool.init_cache(uuid, name, cache_path).unwrap();
@@ -1116,7 +1136,14 @@ mod tests {
         let (paths1, paths2) = paths.split_at(1);
 
         let name = "stratis-test-pool";
-        let (pool_uuid, mut pool) = StratPool::initialize(name, paths1, None).unwrap();
+        let (pool_uuid, mut pool) = StratPool::initialize(
+            name,
+            ProcessedPathInfos::try_from(paths1)
+                .and_then(|pp| pp.get_infos_for_create())
+                .unwrap(),
+            None,
+        )
+        .unwrap();
         invariant(&pool, name);
 
         let fs_name = "stratis_test_filesystem";
@@ -1188,7 +1215,14 @@ mod tests {
         assert!(paths.len() > 1);
 
         let name = "stratis-test-pool";
-        let (_, mut pool) = StratPool::initialize(name, paths, None).unwrap();
+        let (_, mut pool) = StratPool::initialize(
+            name,
+            ProcessedPathInfos::try_from(paths)
+                .and_then(|pp| pp.get_infos_for_create())
+                .unwrap(),
+            None,
+        )
+        .unwrap();
         invariant(&pool, name);
 
         assert_eq!(pool.action_avail, ActionAvailability::Full);
@@ -1199,7 +1233,14 @@ mod tests {
         udev_settle().unwrap();
 
         let name = "stratis-test-pool";
-        let (_, mut pool) = StratPool::initialize(name, paths, None).unwrap();
+        let (_, mut pool) = StratPool::initialize(
+            name,
+            ProcessedPathInfos::try_from(paths)
+                .and_then(|pp| pp.get_infos_for_create())
+                .unwrap(),
+            None,
+        )
+        .unwrap();
         invariant(&pool, name);
 
         assert_eq!(pool.action_avail, ActionAvailability::Full);
@@ -1233,7 +1274,14 @@ mod tests {
         assert!(paths.len() == 1);
 
         let pool_name = "pool";
-        let (pool_uuid, mut pool) = StratPool::initialize(pool_name, paths, None).unwrap();
+        let (pool_uuid, mut pool) = StratPool::initialize(
+            pool_name,
+            ProcessedPathInfos::try_from(paths)
+                .and_then(|pp| pp.get_infos_for_create())
+                .unwrap(),
+            None,
+        )
+        .unwrap();
 
         let (_, fs_uuid, _) = pool
             .create_filesystems(

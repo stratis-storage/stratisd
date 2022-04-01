@@ -1731,8 +1731,15 @@ mod tests {
     fn test_lazy_allocation(paths: &[&Path]) {
         let pool_uuid = PoolUuid::new_v4();
 
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            ProcessedPathInfos::try_from(paths)
+                .and_then(|pp| pp.get_infos_for_create())
+                .unwrap(),
+            MDADataSize::default(),
+            None,
+        )
+        .unwrap();
 
         let size = ThinPoolSizeParams::new(backstore.available_in_backstore()).unwrap();
         let mut pool = ThinPool::new(pool_uuid, &size, DATA_BLOCK_SIZE, &mut backstore).unwrap();
@@ -1820,8 +1827,15 @@ mod tests {
         let pool_name = "pool";
         let pool_uuid = PoolUuid::new_v4();
         let (first_path, remaining_paths) = paths.split_at(1);
-        let mut backstore =
-            Backstore::initialize(pool_uuid, first_path, MDADataSize::default(), None).unwrap();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            ProcessedPathInfos::try_from(first_path)
+                .and_then(|pp| pp.get_infos_for_create())
+                .unwrap(),
+            MDADataSize::default(),
+            None,
+        )
+        .unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::new(backstore.available_in_backstore()).unwrap(),
@@ -1955,8 +1969,15 @@ mod tests {
     fn test_filesystem_snapshot(paths: &[&Path]) {
         let pool_name = "pool";
         let pool_uuid = PoolUuid::new_v4();
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            ProcessedPathInfos::try_from(paths)
+                .and_then(|pp| pp.get_infos_for_create())
+                .unwrap(),
+            MDADataSize::default(),
+            None,
+        )
+        .unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::new(datablocks_to_sectors(DataBlocks(768))).unwrap(),
@@ -2076,8 +2097,15 @@ mod tests {
         let name2 = "name2";
 
         let pool_uuid = PoolUuid::new_v4();
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            ProcessedPathInfos::try_from(paths)
+                .and_then(|pp| pp.get_infos_for_create())
+                .unwrap(),
+            MDADataSize::default(),
+            None,
+        )
+        .unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::new(backstore.available_in_backstore()).unwrap(),
@@ -2139,8 +2167,15 @@ mod tests {
     fn test_pool_setup(paths: &[&Path]) {
         let pool_name = "pool";
         let pool_uuid = PoolUuid::new_v4();
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            ProcessedPathInfos::try_from(paths)
+                .and_then(|pp| pp.get_infos_for_create())
+                .unwrap(),
+            MDADataSize::default(),
+            None,
+        )
+        .unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::new(backstore.available_in_backstore()).unwrap(),
@@ -2211,8 +2246,15 @@ mod tests {
     /// same thin id and verifying that it fails.
     fn test_thindev_destroy(paths: &[&Path]) {
         let pool_uuid = PoolUuid::new_v4();
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            ProcessedPathInfos::try_from(paths)
+                .and_then(|pp| pp.get_infos_for_create())
+                .unwrap(),
+            MDADataSize::default(),
+            None,
+        )
+        .unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::new(backstore.available_in_backstore()).unwrap(),
@@ -2271,8 +2313,15 @@ mod tests {
     fn test_suspend_resume(paths: &[&Path]) {
         let pool_name = "pool";
         let pool_uuid = PoolUuid::new_v4();
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            ProcessedPathInfos::try_from(paths)
+                .and_then(|pp| pp.get_infos_for_create())
+                .unwrap(),
+            MDADataSize::default(),
+            None,
+        )
+        .unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::new(backstore.available_in_backstore()).unwrap(),
@@ -2322,8 +2371,15 @@ mod tests {
 
         let pool_name = "pool";
         let pool_uuid = PoolUuid::new_v4();
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths2, MDADataSize::default(), None).unwrap();
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            ProcessedPathInfos::try_from(paths2)
+                .and_then(|pp| pp.get_infos_for_create())
+                .unwrap(),
+            MDADataSize::default(),
+            None,
+        )
+        .unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
             &ThinPoolSizeParams::new(backstore.available_in_backstore()).unwrap(),
@@ -2381,7 +2437,14 @@ mod tests {
         let old_device = backstore
             .device()
             .expect("Space already allocated from backstore, backstore must have device");
-        backstore.init_cache(pool_uuid, paths1).unwrap();
+        backstore
+            .init_cache(
+                pool_uuid,
+                ProcessedPathInfos::try_from(paths1)
+                    .and_then(|pp| pp.get_infos_for_create())
+                    .unwrap(),
+            )
+            .unwrap();
         let new_device = backstore
             .device()
             .expect("Space already allocated from backstore, backstore must have device");

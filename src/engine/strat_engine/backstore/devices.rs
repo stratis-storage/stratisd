@@ -743,9 +743,10 @@ mod tests {
         key_description: Option<&KeyDescription>,
     ) -> Result<(), Box<dyn Error>> {
         let pool_uuid = PoolUuid::new_v4();
-        let dev_infos: Vec<_> = ProcessedPathInfos::try_from(paths)?.unclaimed_devices;
+        let dev_infos =
+            ProcessedPathInfos::try_from(paths).and_then(|pp| pp.get_infos_for_create())?;
 
-        if dev_infos.len() != paths.len() {
+        if dev_infos.devices.len() != paths.len() {
             return Err(Box::new(StratisError::Msg(
                 "Some duplicate devices were found".to_string(),
             )));
@@ -806,31 +807,29 @@ mod tests {
             .collect();
 
         if key_description.is_none() {
-            if !process_and_verify_devices(
-                pool_uuid,
-                &initialized_uuids,
-                stratis_devnodes
-                    .iter()
-                    .map(|p| p.as_path())
-                    .collect::<Vec<_>>()
-                    .as_slice(),
-            )?
-            .is_empty()
-            {
-                return Err(Box::new(StratisError::Msg(
-                    "Failed to eliminate devices already initialized for this pool from list of devices to initialize".to_string()
-                )));
-            }
-
-            if process_and_verify_devices(
-                pool_uuid,
-                &HashSet::new(),
+            if ProcessedPathInfos::try_from(
                 stratis_devnodes
                     .iter()
                     .map(|p| p.as_path())
                     .collect::<Vec<_>>()
                     .as_slice(),
             )
+            .and_then(|pp| pp.get_infos_for_add(pool_uuid, &initialized_uuids))
+            .map(|un| un.devices.is_empty())?
+            {
+                return Err(Box::new(StratisError::Msg(
+                    "Failed to eliminate devices already initialized for this pool from list of devices to initialize".to_string()
+                )));
+            }
+
+            if ProcessedPathInfos::try_from(
+                stratis_devnodes
+                    .iter()
+                    .map(|p| p.as_path())
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            )
+            .and_then(|pp| pp.get_infos_for_add(pool_uuid, &HashSet::new()))
             .is_ok()
             {
                 return Err(Box::new(StratisError::Msg(
@@ -841,16 +840,16 @@ mod tests {
             // The devices will be rejected with an errorif they were the
             // minimum size when initialized.
 
-            if let Ok(infos) = process_and_verify_devices(
-                pool_uuid,
-                &initialized_uuids,
+            if let Ok(infos) = ProcessedPathInfos::try_from(
                 stratis_devnodes
                     .iter()
                     .map(|p| p.as_path())
                     .collect::<Vec<_>>()
                     .as_slice(),
-            ) {
-                if !infos.is_empty() {
+            )
+            .and_then(|pp| pp.get_infos_for_add(pool_uuid, &initialized_uuids))
+            {
+                if !infos.devices.is_empty() {
                     return Err(Box::new(StratisError::Msg(
                         "Failed to eliminate devices already initialized for this pool from list of devices to initialize".to_string()
                     )));
@@ -858,15 +857,14 @@ mod tests {
             }
         }
 
-        if process_and_verify_devices(
-            PoolUuid::new_v4(),
-            &initialized_uuids,
+        if ProcessedPathInfos::try_from(
             stratis_devnodes
                 .iter()
                 .map(|p| p.as_path())
                 .collect::<Vec<_>>()
                 .as_slice(),
         )
+        .and_then(|pp| pp.get_infos_for_add(PoolUuid::new_v4(), &initialized_uuids))
         .is_ok()
         {
             return Err(Box::new(StratisError::Msg(
@@ -874,17 +872,11 @@ mod tests {
             )));
         }
 
-        let result = process_and_verify_devices(pool_uuid, &initialized_uuids, paths);
+        let result = ProcessedPathInfos::try_from(paths);
         if key_description.is_some() && result.is_ok() {
             return Err(Box::new(StratisError::Msg(
                 "Failed to return an error when encountering devices that are LUKS2".to_string(),
             )));
-        }
-
-        if key_description.is_none() && !result?.is_empty() {
-            return Err(Box::new(StratisError::Msg(
-                        "Failed to filter all previously initialized devices which should have all been eliminated on the basis of already belonging to pool with the given pool UUID".to_string()
-                )));
         }
 
         wipe_blockdevs(&mut blockdevs)?;
@@ -993,10 +985,10 @@ mod tests {
             )));
         }
 
-        let mut dev_infos = ProcessedPathInfos::try_from(paths)?.unclaimed_devices;
+        let mut dev_infos = ProcessedPathInfos::try_from(paths)?.get_infos_for_create()?;
         let pool_uuid = PoolUuid::new_v4();
 
-        if dev_infos.len() != paths.len() {
+        if dev_infos.devices.len() != paths.len() {
             return Err(Box::new(StratisError::Msg(
                 "Some duplicate devices were found".to_string(),
             )));
@@ -1004,7 +996,10 @@ mod tests {
 
         // Synthesize a DeviceInfo that will cause initialization to fail.
         {
-            let old_info = dev_infos.pop().expect("Must contain at least two devices");
+            let old_info = dev_infos
+                .devices
+                .pop()
+                .expect("Must contain at least two devices");
 
             let new_info = DeviceInfo {
                 devnode: PathBuf::from("/srk/cheese"),
@@ -1013,7 +1008,7 @@ mod tests {
                 size: old_info.size,
             };
 
-            dev_infos.push(new_info);
+            dev_infos.devices.push(new_info);
         }
 
         if initialize_devices(

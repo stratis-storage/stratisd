@@ -811,7 +811,7 @@ mod tests {
                     .as_slice(),
             )
             .and_then(|pp| pp.for_add(pool_uuid, &initialized_uuids))
-            .map(|un| un.devices.is_empty())?
+            .map(|un| !un.devices.is_empty())?
             {
                 return Err(Box::new(StratisError::Msg(
                     "Failed to eliminate devices already initialized for this pool from list of devices to initialize".to_string()

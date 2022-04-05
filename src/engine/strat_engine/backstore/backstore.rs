@@ -785,7 +785,7 @@ mod tests {
             .cloned()
             .collect::<HashSet<_>>();
         let unowned_devices = ProcessedPathInfos::try_from(datadevpaths)
-            .and_then(|pp| pp.get_infos_for_add(pool_uuid, &data_uuids))
+            .and_then(|pp| pp.for_add(pool_uuid, &data_uuids))
             .unwrap();
 
         let data_uuids = backstore.add_datadevs(pool_uuid, unowned_devices).unwrap();
@@ -799,7 +799,7 @@ mod tests {
             .cloned()
             .collect::<HashSet<_>>();
         let unowned_devices = ProcessedPathInfos::try_from(cachedevpaths)
-            .and_then(|pp| pp.get_infos_for_add(pool_uuid, &cache_uuids))
+            .and_then(|pp| pp.for_add(pool_uuid, &cache_uuids))
             .unwrap();
         let cache_uuids = backstore.add_cachedevs(pool_uuid, unowned_devices).unwrap();
         invariant(&backstore);

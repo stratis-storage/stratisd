@@ -827,7 +827,7 @@ mod tests {
                 .cloned()
                 .collect::<HashSet<_>>();
             let devices = ProcessedPathInfos::try_from(&paths[2..3])
-                .and_then(|pp| pp.get_infos_for_add(pool_uuid, &dev_uuids))
+                .and_then(|pp| pp.for_add(pool_uuid, &dev_uuids))
                 .unwrap();
             if bdm.add(pool_uuid, devices).is_err() {
                 Err(Box::new(StratisError::Msg(
@@ -880,7 +880,7 @@ mod tests {
                 .cloned()
                 .collect::<HashSet<_>>();
             let devices = ProcessedPathInfos::try_from(&paths[2..3])
-                .and_then(|pp| pp.get_infos_for_add(pool_uuid, &dev_uuids))
+                .and_then(|pp| pp.for_add(pool_uuid, &dev_uuids))
                 .unwrap();
             if bdm.add(pool_uuid, devices).is_ok() {
                 Err(Box::new(StratisError::Msg(

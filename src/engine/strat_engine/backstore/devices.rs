@@ -234,7 +234,7 @@ impl ProcessedPathInfos {
     /// already belong to the tier, return an error if there are any
     /// devices belonging to Stratis that do not belong to the pool,
     /// and return only unclaimed devices for initialization.
-    pub fn get_infos_for_add(
+    pub fn for_add(
         mut self,
         pool_uuid: PoolUuid,
         dev_uuids: &HashSet<DevUuid>,
@@ -289,10 +289,7 @@ impl ProcessedPathInfos {
     /// pools. Return an error if any such found. If none found, return a list
     /// of devnodes, which appear to belong to this pool to pass to
     /// the idempotent create method.
-    pub fn get_paths_for_idempotent_create(
-        mut self,
-        pool_uuid: PoolUuid,
-    ) -> StratisResult<Vec<PathBuf>> {
+    pub fn for_idempotent_create(mut self, pool_uuid: PoolUuid) -> StratisResult<Vec<PathBuf>> {
         if !self.unclaimed_devices.is_empty() {
             return Err(StratisError::Msg(format!(
                 "Pool with UUID {} already exists; can not add uninitialized devices to existing pool or cache with init or create command.",
@@ -813,7 +810,7 @@ mod tests {
                     .collect::<Vec<_>>()
                     .as_slice(),
             )
-            .and_then(|pp| pp.get_infos_for_add(pool_uuid, &initialized_uuids))
+            .and_then(|pp| pp.for_add(pool_uuid, &initialized_uuids))
             .map(|un| un.devices.is_empty())?
             {
                 return Err(Box::new(StratisError::Msg(
@@ -828,7 +825,7 @@ mod tests {
                     .collect::<Vec<_>>()
                     .as_slice(),
             )
-            .and_then(|pp| pp.get_infos_for_add(pool_uuid, &HashSet::new()))
+            .and_then(|pp| pp.for_add(pool_uuid, &HashSet::new()))
             .is_ok()
             {
                 return Err(Box::new(StratisError::Msg(
@@ -846,7 +843,7 @@ mod tests {
                     .collect::<Vec<_>>()
                     .as_slice(),
             )
-            .and_then(|pp| pp.get_infos_for_add(pool_uuid, &initialized_uuids))
+            .and_then(|pp| pp.for_add(pool_uuid, &initialized_uuids))
             {
                 if !infos.devices.is_empty() {
                     return Err(Box::new(StratisError::Msg(
@@ -863,7 +860,7 @@ mod tests {
                 .collect::<Vec<_>>()
                 .as_slice(),
         )
-        .and_then(|pp| pp.get_infos_for_add(PoolUuid::new_v4(), &initialized_uuids))
+        .and_then(|pp| pp.for_add(PoolUuid::new_v4(), &initialized_uuids))
         .is_ok()
         {
             return Err(Box::new(StratisError::Msg(

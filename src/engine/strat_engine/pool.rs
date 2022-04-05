@@ -472,7 +472,7 @@ impl Pool for StratPool {
             self.write_metadata(pool_name)?;
             Ok(SetCreateAction::new(devices))
         } else {
-            let cloned_paths = devices.get_paths_for_idempotent_create(pool_uuid)?;
+            let cloned_paths = devices.for_idempotent_create(pool_uuid)?;
             let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
             init_cache_idempotent_or_err(
                 &borrowed_paths,
@@ -628,7 +628,7 @@ impl Pool for StratPool {
 
         let device_infos = ProcessedPathInfos::try_from(paths)?;
         let bdev_info = if tier == BlockDevTier::Cache {
-            let unclaimed = device_infos.get_infos_for_add(
+            let unclaimed = device_infos.for_add(
                 pool_uuid,
                 &self
                     .backstore
@@ -649,7 +649,7 @@ impl Pool for StratPool {
         } else {
             let cached = self.cached();
 
-            let unclaimed = device_infos.get_infos_for_add(
+            let unclaimed = device_infos.for_add(
                 pool_uuid,
                 &self
                     .backstore

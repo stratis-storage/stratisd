@@ -289,7 +289,7 @@ mod tests {
             .cloned()
             .collect::<HashSet<_>>();
         let devices2 = ProcessedPathInfos::try_from(paths2)
-            .and_then(|pp| pp.get_infos_for_add(pool_uuid, &dev_uuids))
+            .and_then(|pp| pp.for_add(pool_uuid, &dev_uuids))
             .unwrap();
 
         let (_, (cache, meta)) = cache_tier.add(pool_uuid, devices2).unwrap();

@@ -372,7 +372,7 @@ impl Engine for StratEngine {
         let maybe_guard = self.pools.read(LockKey::Name(name.clone())).await;
         if let Some(guard) = maybe_guard {
             let (name, uuid, pool) = guard.as_tuple();
-            let cloned_paths = device_infos.get_paths_for_idempotent_create(uuid)?;
+            let cloned_paths = device_infos.for_idempotent_create(uuid)?;
             let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
             create_pool_idempotent_or_err(pool, &name, &borrowed_paths)
         } else {

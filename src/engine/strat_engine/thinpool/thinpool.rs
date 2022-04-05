@@ -1921,7 +1921,7 @@ mod tests {
             .collect::<HashSet<_>>();
         let devices = ProcessedPathInfos::try_from(remaining_paths)
             .unwrap()
-            .get_infos_for_add(pool_uuid, &data_uuids)
+            .for_add(pool_uuid, &data_uuids)
             .unwrap();
 
         // Add block devices to the pool and run check() to extend

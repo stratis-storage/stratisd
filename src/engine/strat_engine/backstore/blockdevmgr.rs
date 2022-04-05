@@ -775,7 +775,7 @@ mod tests {
     /// in balance.
     fn test_blockdevmgr_used(paths: &[&Path]) {
         let infos = ProcessedPathInfos::try_from(paths)
-            .and_then(|pp| pp.get_infos_for_create())
+            .and_then(|pp| pp.for_create())
             .unwrap();
         let mut mgr =
             BlockDevMgr::initialize(PoolUuid::new_v4(), infos, MDADataSize::default(), None)
@@ -815,8 +815,7 @@ mod tests {
             let pool_uuid = PoolUuid::new_v4();
             let mut bdm = BlockDevMgr::initialize(
                 pool_uuid,
-                ProcessedPathInfos::try_from(&paths[..2])
-                    .and_then(|pp| pp.get_infos_for_create())?,
+                ProcessedPathInfos::try_from(&paths[..2]).and_then(|pp| pp.for_create())?,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
             )?;
@@ -867,8 +866,7 @@ mod tests {
             let pool_uuid = PoolUuid::new_v4();
             let mut bdm = BlockDevMgr::initialize(
                 pool_uuid,
-                ProcessedPathInfos::try_from(&paths[..2])
-                    .and_then(|pp| pp.get_infos_for_create())?,
+                ProcessedPathInfos::try_from(&paths[..2]).and_then(|pp| pp.for_create())?,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
             )?;
@@ -915,7 +913,7 @@ mod tests {
     fn test_clevis_initialize(paths: &[&Path]) {
         let _memfs = MemoryFilesystem::new().unwrap();
         let devices = ProcessedPathInfos::try_from(paths)
-            .and_then(|pp| pp.get_infos_for_create())
+            .and_then(|pp| pp.for_create())
             .unwrap();
         let mut mgr = BlockDevMgr::initialize(
             PoolUuid::new_v4(),
@@ -957,8 +955,7 @@ mod tests {
     fn test_clevis_both_initialize(paths: &[&Path]) {
         fn test_both(paths: &[&Path], key_desc: &KeyDescription) -> Result<(), Box<dyn Error>> {
             let _memfs = MemoryFilesystem::new().unwrap();
-            let devices =
-                ProcessedPathInfos::try_from(paths).and_then(|pp| pp.get_infos_for_create())?;
+            let devices = ProcessedPathInfos::try_from(paths).and_then(|pp| pp.for_create())?;
 
             let mut mgr = BlockDevMgr::initialize(
                 PoolUuid::new_v4(),

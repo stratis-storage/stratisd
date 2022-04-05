@@ -470,7 +470,7 @@ mod tests {
             let pool_uuid = PoolUuid::new_v4();
 
             let devices = initialize_devices(
-                ProcessedPathInfos::try_from(paths).and_then(|pp| pp.get_infos_for_create())?,
+                ProcessedPathInfos::try_from(paths).and_then(|pp| pp.for_create())?,
                 pool_uuid,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_description.clone())),
@@ -585,7 +585,7 @@ mod tests {
 
         initialize_devices(
             ProcessedPathInfos::try_from(paths)
-                .and_then(|pp| pp.get_infos_for_create())
+                .and_then(|pp| pp.for_create())
                 .unwrap(),
             pool_uuid,
             MDADataSize::default(),

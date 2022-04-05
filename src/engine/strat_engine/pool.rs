@@ -454,7 +454,7 @@ impl Pool for StratPool {
         let devices = ProcessedPathInfos::try_from(blockdevs)?;
 
         if !self.has_cache() {
-            let device_infos = devices.get_infos_for_create()?;
+            let device_infos = devices.for_create()?;
             self.thin_pool.suspend()?;
             let devices_result =
                 self.backstore
@@ -976,7 +976,7 @@ mod tests {
             StratPool::initialize(
                 "stratis_test_pool",
                 ProcessedPathInfos::try_from(paths)
-                    .and_then(|pp| pp.get_infos_for_create())
+                    .and_then(|pp| pp.for_create())
                     .unwrap(),
                 None
             ),
@@ -1006,7 +1006,7 @@ mod tests {
         let (uuid, mut pool) = StratPool::initialize(
             name,
             ProcessedPathInfos::try_from(paths2)
-                .and_then(|pp| pp.get_infos_for_create())
+                .and_then(|pp| pp.for_create())
                 .unwrap(),
             None,
         )
@@ -1096,7 +1096,7 @@ mod tests {
         let (uuid, mut pool) = StratPool::initialize(
             name,
             ProcessedPathInfos::try_from(data_path)
-                .and_then(|pp| pp.get_infos_for_create())
+                .and_then(|pp| pp.for_create())
                 .unwrap(),
             None,
         )
@@ -1139,7 +1139,7 @@ mod tests {
         let (pool_uuid, mut pool) = StratPool::initialize(
             name,
             ProcessedPathInfos::try_from(paths1)
-                .and_then(|pp| pp.get_infos_for_create())
+                .and_then(|pp| pp.for_create())
                 .unwrap(),
             None,
         )
@@ -1218,7 +1218,7 @@ mod tests {
         let (_, mut pool) = StratPool::initialize(
             name,
             ProcessedPathInfos::try_from(paths)
-                .and_then(|pp| pp.get_infos_for_create())
+                .and_then(|pp| pp.for_create())
                 .unwrap(),
             None,
         )
@@ -1236,7 +1236,7 @@ mod tests {
         let (_, mut pool) = StratPool::initialize(
             name,
             ProcessedPathInfos::try_from(paths)
-                .and_then(|pp| pp.get_infos_for_create())
+                .and_then(|pp| pp.for_create())
                 .unwrap(),
             None,
         )
@@ -1277,7 +1277,7 @@ mod tests {
         let (pool_uuid, mut pool) = StratPool::initialize(
             pool_name,
             ProcessedPathInfos::try_from(paths)
-                .and_then(|pp| pp.get_infos_for_create())
+                .and_then(|pp| pp.for_create())
                 .unwrap(),
             None,
         )

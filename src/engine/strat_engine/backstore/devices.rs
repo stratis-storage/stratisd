@@ -272,7 +272,7 @@ impl ProcessedPathInfos {
 
     /// If creating a new pool or cache, all devices must be unowned.
     /// Return an error if any appear to belong to Stratis.
-    pub fn get_infos_for_create(self) -> StratisResult<UnownedDevices> {
+    pub fn for_create(self) -> StratisResult<UnownedDevices> {
         if self.stratis_devices.is_empty() {
             Ok(UnownedDevices {
                 devices: self.unclaimed_devices,
@@ -743,8 +743,7 @@ mod tests {
         key_description: Option<&KeyDescription>,
     ) -> Result<(), Box<dyn Error>> {
         let pool_uuid = PoolUuid::new_v4();
-        let dev_infos =
-            ProcessedPathInfos::try_from(paths).and_then(|pp| pp.get_infos_for_create())?;
+        let dev_infos = ProcessedPathInfos::try_from(paths).and_then(|pp| pp.for_create())?;
 
         if dev_infos.devices.len() != paths.len() {
             return Err(Box::new(StratisError::Msg(
@@ -985,7 +984,7 @@ mod tests {
             )));
         }
 
-        let mut dev_infos = ProcessedPathInfos::try_from(paths)?.get_infos_for_create()?;
+        let mut dev_infos = ProcessedPathInfos::try_from(paths)?.for_create()?;
         let pool_uuid = PoolUuid::new_v4();
 
         if dev_infos.devices.len() != paths.len() {

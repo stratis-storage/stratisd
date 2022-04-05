@@ -377,7 +377,7 @@ impl Engine for StratEngine {
             create_pool_idempotent_or_err(pool, &name, &borrowed_paths)
         } else {
             let cloned_name = name.clone();
-            let device_infos = device_infos.get_infos_for_create()?;
+            let device_infos = device_infos.for_create()?;
             let cloned_enc_info = encryption_info.cloned();
 
             let (pool_uuid, _) = spawn_blocking!({

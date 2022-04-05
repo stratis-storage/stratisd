@@ -253,7 +253,7 @@ mod tests {
         let mgr = BlockDevMgr::initialize(
             pool_uuid,
             ProcessedPathInfos::try_from(paths1)
-                .and_then(|pp| pp.get_infos_for_create())
+                .and_then(|pp| pp.for_create())
                 .unwrap(),
             MDADataSize::default(),
             None,

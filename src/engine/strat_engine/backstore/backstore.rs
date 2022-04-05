@@ -731,7 +731,7 @@ mod tests {
         let mut backstore = Backstore::initialize(
             pool_uuid,
             ProcessedPathInfos::try_from(initdatapaths)
-                .and_then(|pp| pp.get_infos_for_create())
+                .and_then(|pp| pp.for_create())
                 .unwrap(),
             MDADataSize::default(),
             None,
@@ -751,7 +751,7 @@ mod tests {
             .init_cache(
                 pool_uuid,
                 ProcessedPathInfos::try_from(initcachepaths)
-                    .and_then(|pp| pp.get_infos_for_create())
+                    .and_then(|pp| pp.for_create())
                     .unwrap(),
             )
             .unwrap();
@@ -854,7 +854,7 @@ mod tests {
         let mut backstore = Backstore::initialize(
             pool_uuid,
             ProcessedPathInfos::try_from(paths1)
-                .and_then(|pp| pp.get_infos_for_create())
+                .and_then(|pp| pp.for_create())
                 .unwrap(),
             MDADataSize::default(),
             None,
@@ -886,7 +886,7 @@ mod tests {
             .init_cache(
                 pool_uuid,
                 ProcessedPathInfos::try_from(paths2)
-                    .and_then(|pp| pp.get_infos_for_create())
+                    .and_then(|pp| pp.for_create())
                     .unwrap(),
             )
             .unwrap();

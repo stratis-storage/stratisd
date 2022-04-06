@@ -820,14 +820,8 @@ mod tests {
                 Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
             )?;
 
-            let dev_uuids = bdm
-                .blockdevs()
-                .iter()
-                .map(|(u, _)| u)
-                .cloned()
-                .collect::<HashSet<_>>();
             let devices = ProcessedPathInfos::try_from(&paths[2..3])
-                .and_then(|pp| pp.for_add(pool_uuid, &dev_uuids))
+                .map(|pp| pp.unpack().1)
                 .unwrap();
             if bdm.add(pool_uuid, devices).is_err() {
                 Err(Box::new(StratisError::Msg(
@@ -873,14 +867,8 @@ mod tests {
 
             crypt::change_key(key_desc)?;
 
-            let dev_uuids = bdm
-                .blockdevs()
-                .iter()
-                .map(|(u, _)| u)
-                .cloned()
-                .collect::<HashSet<_>>();
             let devices = ProcessedPathInfos::try_from(&paths[2..3])
-                .and_then(|pp| pp.for_add(pool_uuid, &dev_uuids))
+                .map(|pp| pp.unpack().1)
                 .unwrap();
             if bdm.add(pool_uuid, devices).is_ok() {
                 Err(Box::new(StratisError::Msg(

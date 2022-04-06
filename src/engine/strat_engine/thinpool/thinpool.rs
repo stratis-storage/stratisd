@@ -1673,7 +1673,6 @@ fn attempt_thin_repair(
 #[cfg(test)]
 mod tests {
     use std::{
-        collections::HashSet,
         convert::TryFrom,
         fs::OpenOptions,
         io::{BufWriter, Read, Write},
@@ -1914,14 +1913,8 @@ mod tests {
             ThinPoolStatus::Fail => panic!("ThinPoolStatus::Fail  Expected working/full."),
         };
 
-        let data_uuids = backstore
-            .datadevs()
-            .iter()
-            .map(|(u, _)| *u)
-            .collect::<HashSet<_>>();
         let devices = ProcessedPathInfos::try_from(remaining_paths)
-            .unwrap()
-            .for_add(pool_uuid, &data_uuids)
+            .map(|pp| pp.unpack().1)
             .unwrap();
 
         // Add block devices to the pool and run check() to extend

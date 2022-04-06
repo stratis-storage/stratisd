@@ -229,45 +229,40 @@ pub struct ProcessedPathInfos {
     unclaimed_devices: Vec<DeviceInfo>,
 }
 
-impl ProcessedPathInfos {
-    /// If adding devices to an existing tier, ignore those that
-    /// already belong to the tier, return an error if there are any
-    /// devices belonging to Stratis that do not belong to the pool,
-    /// and return only unclaimed devices for initialization.
-    pub fn for_add(
+#[derive(Debug)]
+pub struct StratisDevices {
+    devices: HashMap<PoolUuid, HashMap<DevUuid, DeviceInfo>>,
+}
+
+impl StratisDevices {
+    pub fn partition(
         mut self,
-        pool_uuid: PoolUuid,
-        dev_uuids: &HashSet<DevUuid>,
-    ) -> StratisResult<UnownedDevices> {
-        let this_pool = self.stratis_devices.remove(&pool_uuid);
-        if !self.stratis_devices.is_empty() {
-            return Err(StratisError::Msg(format!(
-                "Pool with UUID {} already exists; some of the devices specified appear to belong to a different Stratis pool.", 
-                pool_uuid
-            )));
-        }
+        uuid: PoolUuid,
+    ) -> (Option<HashMap<DevUuid, DeviceInfo>>, StratisDevices) {
+        let this_pool = self.devices.remove(&uuid);
+        (
+            this_pool,
+            StratisDevices {
+                devices: self.devices,
+            },
+        )
+    }
 
-        let to_be_added_uuids = this_pool
-            .unwrap_or_default()
-            .keys()
-            .cloned()
-            .collect::<HashSet<_>>();
+    pub fn is_empty(&self) -> bool {
+        self.devices.is_empty()
+    }
+}
 
-        let remaining_added = to_be_added_uuids
-            .difference(dev_uuids)
-            .cloned()
-            .collect::<HashSet<DevUuid>>();
-        if !remaining_added.is_empty() {
-            return Err(StratisError::Msg(format!(
-                "Pool with UUID {} already exists; some of the devices specified appear to belong to this pool but not to this tier.",
-                pool_uuid
-
-            )));
-        }
-
-        Ok(UnownedDevices {
-            devices: self.unclaimed_devices,
-        })
+impl ProcessedPathInfos {
+    pub fn unpack(self) -> (StratisDevices, UnownedDevices) {
+        (
+            StratisDevices {
+                devices: self.stratis_devices,
+            },
+            UnownedDevices {
+                devices: self.unclaimed_devices,
+            },
+        )
     }
 
     /// If creating a new pool or cache, all devices must be unowned.
@@ -810,26 +805,10 @@ mod tests {
                     .collect::<Vec<_>>()
                     .as_slice(),
             )
-            .and_then(|pp| pp.for_add(pool_uuid, &initialized_uuids))
-            .map(|un| !un.devices.is_empty())?
+            .map(|pp| !pp.unpack().1.devices.is_empty())?
             {
                 return Err(Box::new(StratisError::Msg(
                     "Failed to eliminate devices already initialized for this pool from list of devices to initialize".to_string()
-                )));
-            }
-
-            if ProcessedPathInfos::try_from(
-                stratis_devnodes
-                    .iter()
-                    .map(|p| p.as_path())
-                    .collect::<Vec<_>>()
-                    .as_slice(),
-            )
-            .and_then(|pp| pp.for_add(pool_uuid, &HashSet::new()))
-            .is_ok()
-            {
-                return Err(Box::new(StratisError::Msg(
-                "Failed to return an error when some device processed was not in the set of already initialized devices".to_string()
                 )));
             }
         } else {
@@ -843,29 +822,20 @@ mod tests {
                     .collect::<Vec<_>>()
                     .as_slice(),
             )
-            .and_then(|pp| pp.for_add(pool_uuid, &initialized_uuids))
-            {
-                if !infos.devices.is_empty() {
+            .map(|pp| pp.unpack().0.partition(pool_uuid).0)
+            .map(|this| {
+                let mut infos = this.unwrap_or_default();
+                for uuid in initialized_uuids {
+                    infos.remove(&uuid);
+                }
+                infos
+            }) {
+                if !infos.is_empty() {
                     return Err(Box::new(StratisError::Msg(
                         "Failed to eliminate devices already initialized for this pool from list of devices to initialize".to_string()
                     )));
                 }
             }
-        }
-
-        if ProcessedPathInfos::try_from(
-            stratis_devnodes
-                .iter()
-                .map(|p| p.as_path())
-                .collect::<Vec<_>>()
-                .as_slice(),
-        )
-        .and_then(|pp| pp.for_add(PoolUuid::new_v4(), &initialized_uuids))
-        .is_ok()
-        {
-            return Err(Box::new(StratisError::Msg(
-                "Failed to return an error when processing devices for a pool UUID which is not the same as that for which the devices were initialized".to_string()
-            )));
         }
 
         let result = ProcessedPathInfos::try_from(paths);

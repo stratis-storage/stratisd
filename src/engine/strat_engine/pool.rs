@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, collections::HashSet, convert::TryFrom, path::Path, vec::Vec};
+use std::{collections::HashMap, convert::TryFrom, path::Path, vec::Vec};
 
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
@@ -628,16 +628,24 @@ impl Pool for StratPool {
 
         let device_infos = ProcessedPathInfos::try_from(paths)?;
         let bdev_info = if tier == BlockDevTier::Cache {
-            let unclaimed = device_infos.for_add(
-                pool_uuid,
-                &self
-                    .backstore
-                    .cachedevs()
-                    .iter()
-                    .map(|(u, _)| u)
-                    .cloned()
-                    .collect::<HashSet<_>>(),
-            )?;
+            let (stratis_devices, unclaimed) = device_infos.unpack();
+            let (this_pool, other_pools) = stratis_devices.partition(pool_uuid);
+            if !other_pools.is_empty() {
+                return Err(StratisError::Msg(
+                    "Some of the devices specified have been identified as belonging to already existing Stratis pools but not to this pool.".into()
+                ));
+            }
+
+            let mut this_pool = this_pool.unwrap_or_default();
+            for (uuid, _) in self.backstore.cachedevs().iter() {
+                this_pool.remove(uuid);
+            }
+
+            if !this_pool.is_empty() {
+                return Err(StratisError::Msg(
+                    "Some of the devices specified belong to this pool but do not belong to the cache; likely they already belong to the data tier instead.".into()
+                ));
+            }
 
             // If adding cache devices, must suspend the pool; the cache
             // must be augmented with the new devices.
@@ -649,16 +657,24 @@ impl Pool for StratPool {
         } else {
             let cached = self.cached();
 
-            let unclaimed = device_infos.for_add(
-                pool_uuid,
-                &self
-                    .backstore
-                    .datadevs()
-                    .iter()
-                    .map(|(u, _)| u)
-                    .cloned()
-                    .collect::<HashSet<_>>(),
-            )?;
+            let (stratis_devices, unclaimed) = device_infos.unpack();
+            let (this_pool, other_pools) = stratis_devices.partition(pool_uuid);
+            if !other_pools.is_empty() {
+                return Err(StratisError::Msg(
+                    "Some of the devices specified have been identified as belonging to already existing Stratis pools but not to this pool.".into()
+                ));
+            }
+
+            let mut this_pool = this_pool.unwrap_or_default();
+            for (uuid, _) in self.backstore.datadevs().iter() {
+                this_pool.remove(uuid);
+            }
+
+            if !this_pool.is_empty() {
+                return Err(StratisError::Msg(
+                    "Some of the devices specified belong to this pool but do not belong to the cache; likely they already belong to the cache tier instead.".into()
+                ));
+            }
 
             // If just adding data devices, no need to suspend the pool.
             // No action will be taken on the DM devices.

@@ -674,7 +674,7 @@ impl Recordable<BackstoreSave> for Backstore {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, convert::TryFrom, fs::OpenOptions, path::Path};
+    use std::{convert::TryFrom, fs::OpenOptions, path::Path};
 
     use devicemapper::{CacheDevStatus, DataBlocks, DmOptions, IEC};
 
@@ -778,28 +778,16 @@ mod tests {
             CacheDevStatus::Fail => panic!("cache is in a failed state"),
         }
 
-        let data_uuids = backstore
-            .datadevs()
-            .iter()
-            .map(|(u, _)| u)
-            .cloned()
-            .collect::<HashSet<_>>();
         let unowned_devices = ProcessedPathInfos::try_from(datadevpaths)
-            .and_then(|pp| pp.for_add(pool_uuid, &data_uuids))
+            .map(|pp| pp.unpack().1)
             .unwrap();
 
         let data_uuids = backstore.add_datadevs(pool_uuid, unowned_devices).unwrap();
         invariant(&backstore);
         assert_eq!(data_uuids.len(), datadevpaths.len());
 
-        let cache_uuids = backstore
-            .cachedevs()
-            .iter()
-            .map(|(u, _)| u)
-            .cloned()
-            .collect::<HashSet<_>>();
         let unowned_devices = ProcessedPathInfos::try_from(cachedevpaths)
-            .and_then(|pp| pp.for_add(pool_uuid, &cache_uuids))
+            .map(|pp| pp.unpack().1)
             .unwrap();
         let cache_uuids = backstore.add_cachedevs(pool_uuid, unowned_devices).unwrap();
         invariant(&backstore);

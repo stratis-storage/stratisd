@@ -836,7 +836,7 @@ mod tests {
                     .collect::<Vec<_>>()
                     .as_slice(),
             )
-            .map(|pp| !pp.unpack().1.devices.is_empty())?
+            .map(|pp| !pp.unpack().0.partition(pool_uuid).1.is_empty())?
             {
                 return Err(Box::new(StratisError::Msg(
                     "Failed to eliminate devices already initialized for this pool from list of devices to initialize".to_string()

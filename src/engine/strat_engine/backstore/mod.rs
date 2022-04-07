@@ -16,9 +16,12 @@ mod transaction;
 
 #[cfg(test)]
 pub use self::crypt::crypt_metadata_size;
+#[cfg(test)]
+pub use self::devices::initialize_devices;
+
 pub use self::{
     backstore::Backstore,
     blockdev::{StratBlockDev, UnderlyingDevice},
     crypt::{CryptActivationHandle, CryptHandle, CryptMetadataHandle, CLEVIS_TANG_TRUST_URL},
-    devices::{initialize_devices, NonEmptyUnownedDevices, ProcessedPathInfos, UnownedDevices},
+    devices::{NonEmptyUnownedDevices, ProcessedPathInfos, UnownedDevices},
 };

@@ -1673,7 +1673,7 @@ fn attempt_thin_repair(
 #[cfg(test)]
 mod tests {
     use std::{
-        convert::TryFrom,
+        convert::{TryFrom, TryInto},
         fs::OpenOptions,
         io::{BufWriter, Read, Write},
         path::Path,
@@ -1734,6 +1734,7 @@ mod tests {
             pool_uuid,
             ProcessedPathInfos::try_from(paths)
                 .and_then(|pp| pp.for_create())
+                .and_then(|un| un.try_into())
                 .unwrap(),
             MDADataSize::default(),
             None,
@@ -1830,6 +1831,7 @@ mod tests {
             pool_uuid,
             ProcessedPathInfos::try_from(first_path)
                 .and_then(|pp| pp.for_create())
+                .and_then(|un| un.try_into())
                 .unwrap(),
             MDADataSize::default(),
             None,
@@ -1915,6 +1917,7 @@ mod tests {
 
         let devices = ProcessedPathInfos::try_from(remaining_paths)
             .map(|pp| pp.unpack().1)
+            .and_then(|un| un.try_into())
             .unwrap();
 
         // Add block devices to the pool and run check() to extend
@@ -1966,6 +1969,7 @@ mod tests {
             pool_uuid,
             ProcessedPathInfos::try_from(paths)
                 .and_then(|pp| pp.for_create())
+                .and_then(|un| un.try_into())
                 .unwrap(),
             MDADataSize::default(),
             None,
@@ -2094,6 +2098,7 @@ mod tests {
             pool_uuid,
             ProcessedPathInfos::try_from(paths)
                 .and_then(|pp| pp.for_create())
+                .and_then(|un| un.try_into())
                 .unwrap(),
             MDADataSize::default(),
             None,
@@ -2164,6 +2169,7 @@ mod tests {
             pool_uuid,
             ProcessedPathInfos::try_from(paths)
                 .and_then(|pp| pp.for_create())
+                .and_then(|un| un.try_into())
                 .unwrap(),
             MDADataSize::default(),
             None,
@@ -2243,6 +2249,7 @@ mod tests {
             pool_uuid,
             ProcessedPathInfos::try_from(paths)
                 .and_then(|pp| pp.for_create())
+                .and_then(|un| un.try_into())
                 .unwrap(),
             MDADataSize::default(),
             None,
@@ -2310,6 +2317,7 @@ mod tests {
             pool_uuid,
             ProcessedPathInfos::try_from(paths)
                 .and_then(|pp| pp.for_create())
+                .and_then(|un| un.try_into())
                 .unwrap(),
             MDADataSize::default(),
             None,
@@ -2368,6 +2376,7 @@ mod tests {
             pool_uuid,
             ProcessedPathInfos::try_from(paths2)
                 .and_then(|pp| pp.for_create())
+                .and_then(|un| un.try_into())
                 .unwrap(),
             MDADataSize::default(),
             None,
@@ -2435,6 +2444,7 @@ mod tests {
                 pool_uuid,
                 ProcessedPathInfos::try_from(paths1)
                     .and_then(|pp| pp.for_create())
+                    .and_then(|un| un.try_into())
                     .unwrap(),
             )
             .unwrap();

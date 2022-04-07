@@ -20,5 +20,5 @@ pub use self::{
     backstore::Backstore,
     blockdev::{StratBlockDev, UnderlyingDevice},
     crypt::{CryptActivationHandle, CryptHandle, CryptMetadataHandle, CLEVIS_TANG_TRUST_URL},
-    devices::{initialize_devices, ProcessedPathInfos, UnownedDevices},
+    devices::{initialize_devices, NonEmptyUnownedDevices, ProcessedPathInfos, UnownedDevices},
 };

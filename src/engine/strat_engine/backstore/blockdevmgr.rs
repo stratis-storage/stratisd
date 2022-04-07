@@ -23,7 +23,7 @@ use crate::{
                     back_up_luks_header, interpret_clevis_config, restore_luks_header,
                     CryptActivationHandle,
                 },
-                devices::{initialize_devices, wipe_blockdevs, UnownedDevices},
+                devices::{initialize_devices, wipe_blockdevs, NonEmptyUnownedDevices},
                 range_alloc::PerDevSegments,
                 transaction::RequestTransaction,
             },
@@ -139,7 +139,7 @@ impl BlockDevMgr {
     /// Initialize a new StratBlockDevMgr with specified pool and devices.
     pub fn initialize(
         pool_uuid: PoolUuid,
-        devices: UnownedDevices,
+        devices: NonEmptyUnownedDevices,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<BlockDevMgr> {
@@ -177,7 +177,7 @@ impl BlockDevMgr {
     pub fn add(
         &mut self,
         pool_uuid: PoolUuid,
-        infos: UnownedDevices,
+        infos: NonEmptyUnownedDevices,
     ) -> StratisResult<Vec<DevUuid>> {
         let this_pool_uuid = self.block_devs.get(0).map(|bd| bd.pool_uuid());
         if this_pool_uuid.is_some() && this_pool_uuid != Some(pool_uuid) {
@@ -732,7 +732,7 @@ impl Recordable<Vec<BaseBlockDevSave>> for BlockDevMgr {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, env, error::Error, path::Path};
+    use std::{collections::HashSet, convert::TryInto, env, error::Error, path::Path};
 
     use crate::engine::strat_engine::{
         backstore::ProcessedPathInfos,
@@ -776,6 +776,7 @@ mod tests {
     fn test_blockdevmgr_used(paths: &[&Path]) {
         let infos = ProcessedPathInfos::try_from(paths)
             .and_then(|pp| pp.for_create())
+            .and_then(|un| un.try_into())
             .unwrap();
         let mut mgr =
             BlockDevMgr::initialize(PoolUuid::new_v4(), infos, MDADataSize::default(), None)
@@ -815,13 +816,16 @@ mod tests {
             let pool_uuid = PoolUuid::new_v4();
             let mut bdm = BlockDevMgr::initialize(
                 pool_uuid,
-                ProcessedPathInfos::try_from(&paths[..2]).and_then(|pp| pp.for_create())?,
+                ProcessedPathInfos::try_from(&paths[..2])
+                    .and_then(|pp| pp.for_create())
+                    .and_then(|un| un.try_into())?,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
             )?;
 
             let devices = ProcessedPathInfos::try_from(&paths[2..3])
                 .map(|pp| pp.unpack().1)
+                .and_then(|un| un.try_into())
                 .unwrap();
             if bdm.add(pool_uuid, devices).is_err() {
                 Err(Box::new(StratisError::Msg(
@@ -860,7 +864,9 @@ mod tests {
             let pool_uuid = PoolUuid::new_v4();
             let mut bdm = BlockDevMgr::initialize(
                 pool_uuid,
-                ProcessedPathInfos::try_from(&paths[..2]).and_then(|pp| pp.for_create())?,
+                ProcessedPathInfos::try_from(&paths[..2])
+                    .and_then(|pp| pp.for_create())
+                    .and_then(|un| un.try_into())?,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
             )?;
@@ -869,6 +875,7 @@ mod tests {
 
             let devices = ProcessedPathInfos::try_from(&paths[2..3])
                 .map(|pp| pp.unpack().1)
+                .and_then(|un| un.try_into())
                 .unwrap();
             if bdm.add(pool_uuid, devices).is_ok() {
                 Err(Box::new(StratisError::Msg(
@@ -902,6 +909,7 @@ mod tests {
         let _memfs = MemoryFilesystem::new().unwrap();
         let devices = ProcessedPathInfos::try_from(paths)
             .and_then(|pp| pp.for_create())
+            .and_then(|un| un.try_into())
             .unwrap();
         let mut mgr = BlockDevMgr::initialize(
             PoolUuid::new_v4(),
@@ -943,7 +951,9 @@ mod tests {
     fn test_clevis_both_initialize(paths: &[&Path]) {
         fn test_both(paths: &[&Path], key_desc: &KeyDescription) -> Result<(), Box<dyn Error>> {
             let _memfs = MemoryFilesystem::new().unwrap();
-            let devices = ProcessedPathInfos::try_from(paths).and_then(|pp| pp.for_create())?;
+            let devices = ProcessedPathInfos::try_from(paths)
+                .and_then(|pp| pp.for_create())
+                .and_then(|un| un.try_into())?;
 
             let mut mgr = BlockDevMgr::initialize(
                 PoolUuid::new_v4(),

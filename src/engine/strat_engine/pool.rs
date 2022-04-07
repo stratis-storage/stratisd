@@ -2,7 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, convert::TryFrom, path::Path, vec::Vec};
+use std::{
+    collections::HashMap,
+    convert::{TryFrom, TryInto},
+    path::Path,
+    vec::Vec,
+};
 
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
@@ -18,7 +23,7 @@ use crate::{
             validate_paths,
         },
         strat_engine::{
-            backstore::{Backstore, ProcessedPathInfos, StratBlockDev, UnownedDevices},
+            backstore::{Backstore, NonEmptyUnownedDevices, ProcessedPathInfos, StratBlockDev},
             metadata::MDADataSize,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             thinpool::{StratFilesystem, ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
@@ -149,7 +154,7 @@ impl StratPool {
     /// Precondition: p.is_absolute() is true for all p in paths
     pub fn initialize(
         name: &str,
-        paths: UnownedDevices,
+        paths: NonEmptyUnownedDevices,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = PoolUuid::new_v4();
@@ -454,7 +459,10 @@ impl Pool for StratPool {
         let devices = ProcessedPathInfos::try_from(blockdevs)?;
 
         if !self.has_cache() {
-            let device_infos = devices.for_create()?;
+            let device_infos = devices
+                .for_create()?
+                .try_into()
+                .expect("paths not empty; processed devices contained no Stratis devices.");
             self.thin_pool.suspend()?;
             let devices_result =
                 self.backstore
@@ -647,6 +655,11 @@ impl Pool for StratPool {
                 ));
             }
 
+            let unclaimed = match unclaimed.try_into() {
+                Ok(unclamed) => unclamed,
+                Err(_) => return Ok((SetCreateAction::new(vec![]), None)),
+            };
+
             // If adding cache devices, must suspend the pool; the cache
             // must be augmented with the new devices.
             self.thin_pool.suspend()?;
@@ -675,6 +688,11 @@ impl Pool for StratPool {
                     "Some of the devices specified belong to this pool but do not belong to the cache; likely they already belong to the cache tier instead.".into()
                 ));
             }
+
+            let unclaimed = match unclaimed.try_into() {
+                Ok(unclamed) => unclamed,
+                Err(_) => return Ok((SetCreateAction::new(vec![]), None)),
+            };
 
             // If just adding data devices, no need to suspend the pool.
             // No action will be taken on the DM devices.
@@ -984,32 +1002,6 @@ mod tests {
             .all(|(_, _, bd)| bd.metadata_path().is_absolute()))
     }
 
-    /// Verify that a pool with no devices does not have the minimum amount of
-    /// space required.
-    fn test_empty_pool(paths: &[&Path]) {
-        assert_eq!(paths.len(), 0);
-        assert_matches!(
-            StratPool::initialize(
-                "stratis_test_pool",
-                ProcessedPathInfos::try_from(paths)
-                    .and_then(|pp| pp.for_create())
-                    .unwrap(),
-                None
-            ),
-            Err(_)
-        );
-    }
-
-    #[test]
-    fn loop_test_empty_pool() {
-        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Exactly(0, None), test_empty_pool);
-    }
-
-    #[test]
-    fn real_test_empty_pool() {
-        real::test_with_spec(&real::DeviceLimits::Exactly(0, None, None), test_empty_pool);
-    }
-
     /// Test that initializing a cache causes metadata to be updated. Verify
     /// that data written before the cache was initialized can be read
     /// afterwards.
@@ -1023,6 +1015,7 @@ mod tests {
             name,
             ProcessedPathInfos::try_from(paths2)
                 .and_then(|pp| pp.for_create())
+                .and_then(|un| un.try_into())
                 .unwrap(),
             None,
         )
@@ -1113,6 +1106,7 @@ mod tests {
             name,
             ProcessedPathInfos::try_from(data_path)
                 .and_then(|pp| pp.for_create())
+                .and_then(|un| un.try_into())
                 .unwrap(),
             None,
         )
@@ -1156,6 +1150,7 @@ mod tests {
             name,
             ProcessedPathInfos::try_from(paths1)
                 .and_then(|pp| pp.for_create())
+                .and_then(|un| un.try_into())
                 .unwrap(),
             None,
         )
@@ -1235,6 +1230,7 @@ mod tests {
             name,
             ProcessedPathInfos::try_from(paths)
                 .and_then(|pp| pp.for_create())
+                .and_then(|un| un.try_into())
                 .unwrap(),
             None,
         )
@@ -1253,6 +1249,7 @@ mod tests {
             name,
             ProcessedPathInfos::try_from(paths)
                 .and_then(|pp| pp.for_create())
+                .and_then(|un| un.try_into())
                 .unwrap(),
             None,
         )
@@ -1294,6 +1291,7 @@ mod tests {
             pool_name,
             ProcessedPathInfos::try_from(paths)
                 .and_then(|pp| pp.for_create())
+                .and_then(|un| un.try_into())
                 .unwrap(),
             None,
         )

@@ -435,7 +435,10 @@ pub fn find_all() -> libudev::Result<(
 #[cfg(test)]
 mod tests {
 
-    use std::{convert::TryFrom, error::Error};
+    use std::{
+        convert::{TryFrom, TryInto},
+        error::Error,
+    };
 
     use crate::{
         engine::{
@@ -470,7 +473,9 @@ mod tests {
             let pool_uuid = PoolUuid::new_v4();
 
             let devices = initialize_devices(
-                ProcessedPathInfos::try_from(paths).and_then(|pp| pp.for_create())?,
+                ProcessedPathInfos::try_from(paths)
+                    .and_then(|pp| pp.for_create())
+                    .and_then(|un| un.try_into())?,
                 pool_uuid,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_description.clone())),
@@ -586,6 +591,7 @@ mod tests {
         initialize_devices(
             ProcessedPathInfos::try_from(paths)
                 .and_then(|pp| pp.for_create())
+                .and_then(|un| un.try_into())
                 .unwrap(),
             pool_uuid,
             MDADataSize::default(),

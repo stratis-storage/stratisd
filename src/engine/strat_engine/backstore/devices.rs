@@ -229,12 +229,15 @@ pub struct ProcessedPathInfos {
     unclaimed_devices: Vec<DeviceInfo>,
 }
 
+/// Devices that have all been identified as Stratis devices.
 #[derive(Debug)]
 pub struct StratisDevices {
     devices: HashMap<PoolUuid, HashMap<DevUuid, DeviceInfo>>,
 }
 
 impl StratisDevices {
+    /// Given a pool UUID partition the devices into two divisions;
+    /// those that belong to the pool and those that do not.
     pub fn partition(
         mut self,
         uuid: PoolUuid,
@@ -248,12 +251,15 @@ impl StratisDevices {
         )
     }
 
+    /// True if the structures contains no devices; otherwise false.
     pub fn is_empty(&self) -> bool {
         self.devices.is_empty()
     }
 }
 
 impl ProcessedPathInfos {
+    /// Unpack ProcessedPathInfos into devices owned by Stratis and also
+    /// into unowned devices.
     pub fn unpack(self) -> (StratisDevices, UnownedDevices) {
         (
             StratisDevices {
@@ -407,7 +413,30 @@ impl TryFrom<&[&Path]> for ProcessedPathInfos {
 /// * DeviceInfo.size value meets the required Stratis minimum.
 #[derive(Debug)]
 pub struct UnownedDevices {
-    pub devices: Vec<DeviceInfo>,
+    devices: Vec<DeviceInfo>,
+}
+
+/// The same as UnownedDevices; except that the internal implementation is
+/// non empty.
+#[derive(Debug)]
+pub struct NonEmptyUnownedDevices {
+    devices: Vec<DeviceInfo>,
+}
+
+impl TryFrom<UnownedDevices> for NonEmptyUnownedDevices {
+    type Error = StratisError;
+
+    /// Return an error if UnownedDevices is empty, otherwise returns the
+    /// expected result.
+    fn try_from(devs: UnownedDevices) -> StratisResult<Self> {
+        if devs.devices.is_empty() {
+            Err(StratisError::Msg("UnownedDevice object contains an empty list of devices; can not convert into NonEmptyUnownedDevices.".into()))
+        } else {
+            Ok(NonEmptyUnownedDevices {
+                devices: devs.devices,
+            })
+        }
+    }
 }
 
 /// Initialze devices in devices.
@@ -421,7 +450,7 @@ pub struct UnownedDevices {
 /// Precondition: Each device's DeviceInfo struct contains all necessary
 /// information about the device.
 pub fn initialize_devices(
-    devices: UnownedDevices,
+    devices: NonEmptyUnownedDevices,
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
     encryption_info: Option<&EncryptionInfo>,
@@ -717,7 +746,7 @@ pub fn wipe_blockdevs(blockdevs: &mut [StratBlockDev]) -> StratisResult<()> {
 
 #[cfg(test)]
 mod tests {
-    use std::{error::Error, fs::OpenOptions};
+    use std::{convert::TryInto, error::Error, fs::OpenOptions};
 
     use crate::engine::strat_engine::{
         backstore::crypt::CryptHandle,
@@ -735,7 +764,9 @@ mod tests {
         key_description: Option<&KeyDescription>,
     ) -> Result<(), Box<dyn Error>> {
         let pool_uuid = PoolUuid::new_v4();
-        let dev_infos = ProcessedPathInfos::try_from(paths).and_then(|pp| pp.for_create())?;
+        let dev_infos: NonEmptyUnownedDevices = ProcessedPathInfos::try_from(paths)
+            .and_then(|pp| pp.for_create())
+            .and_then(|un| un.try_into())?;
 
         if dev_infos.devices.len() != paths.len() {
             return Err(Box::new(StratisError::Msg(
@@ -951,7 +982,9 @@ mod tests {
             )));
         }
 
-        let mut dev_infos = ProcessedPathInfos::try_from(paths)?.for_create()?;
+        let mut dev_infos: NonEmptyUnownedDevices = ProcessedPathInfos::try_from(paths)
+            .and_then(|pp| pp.for_create())
+            .and_then(|un| un.try_into())?;
         let pool_uuid = PoolUuid::new_v4();
 
         if dev_infos.devices.len() != paths.len() {

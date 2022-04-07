@@ -12,7 +12,7 @@ use crate::{
             backstore::{
                 blockdev::StratBlockDev,
                 blockdevmgr::{BlkDevSegment, BlockDevMgr},
-                devices::UnownedDevices,
+                devices::NonEmptyUnownedDevices,
                 shared::{coalesce_blkdevsegs, metadata_to_segment},
             },
             serde_structs::{BaseDevSave, BlockDevSave, CacheTierSave, Recordable},
@@ -97,7 +97,7 @@ impl CacheTier {
     pub fn add(
         &mut self,
         pool_uuid: PoolUuid,
-        infos: UnownedDevices,
+        infos: NonEmptyUnownedDevices,
     ) -> StratisResult<(Vec<DevUuid>, (bool, bool))> {
         let uuids = self.block_mgr.add(pool_uuid, infos)?;
 
@@ -230,7 +230,10 @@ impl Recordable<CacheTierSave> for CacheTier {
 #[cfg(test)]
 mod tests {
 
-    use std::{convert::TryFrom, path::Path};
+    use std::{
+        convert::{TryFrom, TryInto},
+        path::Path,
+    };
 
     use crate::engine::strat_engine::{
         backstore::ProcessedPathInfos,
@@ -254,6 +257,7 @@ mod tests {
             pool_uuid,
             ProcessedPathInfos::try_from(paths1)
                 .and_then(|pp| pp.for_create())
+                .and_then(|un| un.try_into())
                 .unwrap(),
             MDADataSize::default(),
             None,
@@ -283,6 +287,7 @@ mod tests {
 
         let devices2 = ProcessedPathInfos::try_from(paths2)
             .map(|pp| pp.unpack().1)
+            .and_then(|un| un.try_into())
             .unwrap();
 
         let (_, (cache, meta)) = cache_tier.add(pool_uuid, devices2).unwrap();

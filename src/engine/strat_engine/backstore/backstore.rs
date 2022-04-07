@@ -19,7 +19,7 @@ use crate::{
                 blockdevmgr::{map_to_dm, BlockDevMgr},
                 cache_tier::CacheTier,
                 data_tier::DataTier,
-                devices::UnownedDevices,
+                devices::NonEmptyUnownedDevices,
                 transaction::RequestTransaction,
             },
             dm::get_dm,
@@ -180,7 +180,7 @@ impl Backstore {
     /// WARNING: metadata changing event
     pub fn initialize(
         pool_uuid: PoolUuid,
-        paths: UnownedDevices,
+        paths: NonEmptyUnownedDevices,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<Backstore> {
@@ -211,17 +211,11 @@ impl Backstore {
     pub fn init_cache(
         &mut self,
         pool_uuid: PoolUuid,
-        devices: UnownedDevices,
+        devices: NonEmptyUnownedDevices,
     ) -> StratisResult<Vec<DevUuid>> {
         match self.cache_tier {
             Some(_) => unreachable!("self.cache.is_none()"),
             None => {
-                if devices.devices.is_empty() {
-                    return Err(StratisError::Msg(
-                        "Must initialize cache with at least one blockdev.".to_string(),
-                    ));
-                }
-
                 // Note that variable length metadata is not stored on the
                 // cachedevs, so the mda_size can always be the minimum.
                 // If it is desired to change a cache dev to a data dev, it
@@ -269,7 +263,7 @@ impl Backstore {
     pub fn add_cachedevs(
         &mut self,
         pool_uuid: PoolUuid,
-        infos: UnownedDevices,
+        infos: NonEmptyUnownedDevices,
     ) -> StratisResult<Vec<DevUuid>> {
         match self.cache_tier {
             Some(ref mut cache_tier) => {
@@ -305,7 +299,7 @@ impl Backstore {
     pub fn add_datadevs(
         &mut self,
         pool_uuid: PoolUuid,
-        infos: UnownedDevices,
+        infos: NonEmptyUnownedDevices,
     ) -> StratisResult<Vec<DevUuid>> {
         self.data_tier.add(pool_uuid, infos)
     }
@@ -674,7 +668,11 @@ impl Recordable<BackstoreSave> for Backstore {
 
 #[cfg(test)]
 mod tests {
-    use std::{convert::TryFrom, fs::OpenOptions, path::Path};
+    use std::{
+        convert::{TryFrom, TryInto},
+        fs::OpenOptions,
+        path::Path,
+    };
 
     use devicemapper::{CacheDevStatus, DataBlocks, DmOptions, IEC};
 
@@ -732,6 +730,7 @@ mod tests {
             pool_uuid,
             ProcessedPathInfos::try_from(initdatapaths)
                 .and_then(|pp| pp.for_create())
+                .and_then(|un| un.try_into())
                 .unwrap(),
             MDADataSize::default(),
             None,
@@ -752,6 +751,7 @@ mod tests {
                 pool_uuid,
                 ProcessedPathInfos::try_from(initcachepaths)
                     .and_then(|pp| pp.for_create())
+                    .and_then(|un| un.try_into())
                     .unwrap(),
             )
             .unwrap();
@@ -780,6 +780,7 @@ mod tests {
 
         let unowned_devices = ProcessedPathInfos::try_from(datadevpaths)
             .map(|pp| pp.unpack().1)
+            .and_then(|un| un.try_into())
             .unwrap();
 
         let data_uuids = backstore.add_datadevs(pool_uuid, unowned_devices).unwrap();
@@ -788,6 +789,7 @@ mod tests {
 
         let unowned_devices = ProcessedPathInfos::try_from(cachedevpaths)
             .map(|pp| pp.unpack().1)
+            .and_then(|un| un.try_into())
             .unwrap();
         let cache_uuids = backstore.add_cachedevs(pool_uuid, unowned_devices).unwrap();
         invariant(&backstore);
@@ -843,6 +845,7 @@ mod tests {
             pool_uuid,
             ProcessedPathInfos::try_from(paths1)
                 .and_then(|pp| pp.for_create())
+                .and_then(|un| un.try_into())
                 .unwrap(),
             MDADataSize::default(),
             None,
@@ -875,6 +878,7 @@ mod tests {
                 pool_uuid,
                 ProcessedPathInfos::try_from(paths2)
                     .and_then(|pp| pp.for_create())
+                    .and_then(|un| un.try_into())
                     .unwrap(),
             )
             .unwrap();

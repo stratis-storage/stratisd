@@ -63,7 +63,7 @@ impl DataTier {
         }
     }
 
-    /// Add the given paths to self. Return UUIDs of the new blockdevs
+    /// Add the given devices to self. Return UUIDs of the new blockdevs
     /// corresponding to the specified paths.
     /// WARNING: metadata changing event
     pub fn add(

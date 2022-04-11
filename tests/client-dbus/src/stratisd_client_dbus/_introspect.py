@@ -219,6 +219,8 @@ SPECS = {
     <property name="HasCache" type="b" access="read" />
     <property name="KeyDescription" type="(b(bs))" access="read" />
     <property name="Name" type="s" access="read" />
+    <property name="NoAllocSpace" type="b" access="read" />
+    <property name="Overprovisioning" type="b" access="readwrite" />
     <property name="TotalPhysicalSize" type="s" access="read" />
     <property name="TotalPhysicalUsed" type="(bs)" access="read" />
     <property name="Uuid" type="s" access="read">

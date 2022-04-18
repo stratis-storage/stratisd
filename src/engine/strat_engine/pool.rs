@@ -256,7 +256,7 @@ impl StratPool {
     }
 
     /// Write current metadata to pool members.
-    #[pool_mutating_action("NoRequests")]
+    #[pool_mutating_action("NoPoolChanges")]
     pub fn write_metadata(&mut self, name: &str) -> StratisResult<()> {
         let data = serde_json::to_string(&self.record(name))?;
         self.backstore.save_state(data.as_bytes())

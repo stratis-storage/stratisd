@@ -29,9 +29,6 @@ use crate::{
     stratis::StratisResult,
 };
 
-// TODO: Monitor fs size and extend linear and fs if needed
-// TODO: Document format of stuff on MDV in SWDD (currently ad-hoc)
-
 const RUN_DIR: &str = "/run/stratisd";
 const FILESYSTEM_DIR: &str = "filesystems";
 

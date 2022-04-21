@@ -99,7 +99,7 @@ impl MetadataVol {
 
     /// Initialize a new Metadata Volume.
     pub fn initialize(pool_uuid: PoolUuid, dev: LinearDev) -> StratisResult<MetadataVol> {
-        create_fs(&dev.devnode(), Some(StratisUuid::Pool(pool_uuid)), true)?;
+        create_fs(&dev.devnode(), Some(StratisUuid::Pool(pool_uuid)), false)?;
         MetadataVol::setup(pool_uuid, dev)
     }
 

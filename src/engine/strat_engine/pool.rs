@@ -1027,7 +1027,7 @@ mod tests {
     #[test]
     fn loop_test_add_cachedevs() {
         loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, None),
+            &loopbacked::DeviceLimits::Range(3, 4, None),
             test_add_cachedevs,
         );
     }

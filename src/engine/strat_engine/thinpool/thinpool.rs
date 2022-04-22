@@ -42,8 +42,8 @@ const DEFAULT_FS_LIMIT: u64 = 100;
 // 1 MiB
 pub const DATA_BLOCK_SIZE: Sectors = Sectors(2 * IEC::Ki);
 
-// 16 MiB
-const INITIAL_MDV_SIZE: Sectors = Sectors(32 * IEC::Ki);
+// 512 MiB
+const INITIAL_MDV_SIZE: Sectors = Sectors(IEC::Mi);
 
 // Use different constants for testing and application builds.
 use self::consts::{DATA_ALLOC_SIZE, DATA_LOWATER};
@@ -1903,7 +1903,7 @@ mod tests {
     #[test]
     fn loop_test_full_pool() {
         loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Exactly(2, Some(Bytes::from(IEC::Gi).sectors())),
+            &loopbacked::DeviceLimits::Exactly(2, Some(Bytes::from(IEC::Gi * 2).sectors())),
             test_full_pool,
         );
     }
@@ -1913,7 +1913,7 @@ mod tests {
         real::test_with_spec(
             &real::DeviceLimits::Exactly(
                 2,
-                Some(Bytes::from(IEC::Gi).sectors()),
+                Some(Bytes::from(IEC::Gi * 2).sectors()),
                 Some(Bytes::from(IEC::Gi * 4).sectors()),
             ),
             test_full_pool,
@@ -1928,7 +1928,7 @@ mod tests {
             Backstore::initialize(pool_uuid, paths, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
             pool_uuid,
-            &ThinPoolSizeParams::new(datablocks_to_sectors(DataBlocks(768))).unwrap(),
+            &ThinPoolSizeParams::new(backstore.available_in_backstore()).unwrap(),
             DATA_BLOCK_SIZE,
             &mut backstore,
         )
@@ -1975,14 +1975,6 @@ mod tests {
                 f.sync_all().unwrap();
             }
         }
-
-        // Double the size of the data device. The space initially allocated
-        // to a pool is close to consumed by the filesystem and few files
-        // written above. If we attempt to update the UUID on the snapshot
-        // without expanding the pool, the pool will go into out-of-data-space
-        // (queue IO) mode, causing the test to fail.
-        let (_, res) = pool.extend_thin_data_device(pool_uuid, &mut backstore);
-        res.unwrap();
 
         let snapshot_name = "test_snapshot";
         let (_, snapshot_filesystem) = pool
@@ -2085,7 +2077,7 @@ mod tests {
     #[test]
     fn loop_test_filesystem_rename() {
         loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(1, 3, None),
+            &loopbacked::DeviceLimits::Range(2, 4, None),
             test_filesystem_rename,
         );
     }
@@ -2160,7 +2152,7 @@ mod tests {
     #[test]
     fn loop_test_pool_setup() {
         loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(1, 3, None),
+            &loopbacked::DeviceLimits::Range(2, 4, None),
             test_pool_setup,
         );
     }
@@ -2259,7 +2251,7 @@ mod tests {
     #[test]
     fn loop_test_suspend_resume() {
         loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(1, 3, None),
+            &loopbacked::DeviceLimits::Range(2, 4, None),
             test_suspend_resume,
         );
     }
@@ -2373,7 +2365,7 @@ mod tests {
     #[test]
     fn loop_test_set_device() {
         loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, None),
+            &loopbacked::DeviceLimits::Range(3, 4, None),
             test_set_device,
         );
     }

@@ -237,16 +237,34 @@ fn get_jose_executable() -> StratisResult<&'static Path> {
 /// MDV, because it was very small; since then the size of the MDV has been
 /// increased, and it is no longer necessary to pass the noalign option when
 /// creating the MDV.
-pub fn create_fs(devnode: &Path, uuid: Option<StratisUuid>, noalign: bool) -> StratisResult<()> {
+pub fn create_fs(
+    devnode: &Path,
+    uuid: Option<StratisUuid>,
+    noalign: bool,
+    bigtime: bool,
+) -> StratisResult<()> {
     let mut command = Command::new(get_executable(MKFS_XFS).as_os_str());
     command.arg("-f");
     command.arg("-q");
     command.arg(devnode);
 
-    if let Some(uuid) = uuid {
+    let m_args = [
+        uuid.map(|uuid| format!("uuid={}", uuid)),
+        if bigtime {
+            Some("bigtime=1".to_string())
+        } else {
+            None
+        },
+    ]
+    .iter()
+    .filter_map(|x| x.as_ref().map(|x| x.to_string()))
+    .collect::<Vec<_>>();
+
+    if !m_args.is_empty() {
         command.arg("-m");
-        command.arg(format!("uuid={}", uuid));
+        command.arg(m_args.join(","));
     }
+
     if noalign {
         command.arg("-d");
         command.arg("noalign");

@@ -249,12 +249,12 @@ pub fn create_fs(
     command.arg(devnode);
 
     let m_args = [
-        uuid.map(|uuid| format!("uuid={}", uuid)),
         if bigtime {
             Some("bigtime=1".to_string())
         } else {
             None
         },
+        uuid.map(|uuid| format!("uuid={}", uuid)),
     ]
     .iter()
     .filter_map(|x| x.as_ref().map(|x| x.to_string()))

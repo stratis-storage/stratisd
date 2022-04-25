@@ -13,6 +13,11 @@ use std::{
 
 use clap::{App, Arg};
 use data_encoding::BASE32_NOPAD;
+use serde_json::{json, Value};
+
+use devicemapper::Bytes;
+
+use stratisd::engine::{crypt_metadata_size, BDA};
 
 #[cfg(feature = "systemd_compat")]
 use crate::generators::{stratis_clevis_setup_generator, stratis_setup_generator};
@@ -40,6 +45,42 @@ fn string_compare(arg1: &str, arg2: &str) {
 fn base32_decode(var_name: &str, base32_str: &str) -> Result<(), Box<dyn Error>> {
     let base32_decoded = String::from_utf8(BASE32_NOPAD.decode(base32_str.as_bytes())?)?;
     println!("{}={}", var_name, base32_decoded);
+    Ok(())
+}
+
+fn predict_usage(encrypted: bool, device_sizes: Vec<Bytes>) -> Result<(), Box<dyn Error>> {
+    let crypt_metadata_size = if encrypted {
+        Bytes(u128::from(crypt_metadata_size()))
+    } else {
+        Bytes(0)
+    };
+
+    let crypt_metadata_size_sectors = crypt_metadata_size.sectors();
+
+    // verify that crypt metadata size is divisible by sector size
+    assert_eq!(crypt_metadata_size_sectors.bytes(), crypt_metadata_size);
+
+    let stratis_device_sizes = device_sizes.iter().map(|&s| s - crypt_metadata_size);
+
+    let stratis_metadata_size = BDA::default().extended_size().sectors().bytes();
+    let stratis_avail_sizes = stratis_device_sizes
+        .map(|s| s - stratis_metadata_size)
+        .collect::<Vec<_>>();
+
+    let total_size: Bytes = device_sizes.iter().cloned().sum();
+    let avail_size = stratis_avail_sizes.iter().cloned().sum();
+    let used_size = total_size - avail_size;
+
+    let total_size_str = Value::String((*(total_size)).to_string());
+    let used_size_str = Value::String((*(used_size)).to_string());
+    let avail_size_str = Value::String((*(avail_size)).to_string());
+
+    let json = json! {
+        {"total": total_size_str, "used": used_size_str, "free": avail_size_str}
+    };
+
+    println!("{}", json);
+
     Ok(())
 }
 
@@ -81,6 +122,29 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
         base32_decode(
             matches.value_of("key").expect("required argument"),
             matches.value_of("value").expect("required argument"),
+        )?;
+    } else if argv1.ends_with("stratis-predict-usage") {
+        let parser = App::new("stratis-predict-usage")
+            .arg(
+                Arg::with_name("encrypted")
+                    .long("encrypted")
+                    .help("Whether the pool will be encrypted."),
+            )
+            .arg(
+                Arg::with_name("sizes")
+                    .multiple(true)
+                    .help("Sizes of devices to be included in the pool."),
+            );
+        let matches = parser.get_matches_from(&args);
+        predict_usage(
+            matches.is_present("encrypted"),
+            matches
+                .values_of("sizes")
+                .map(|szs| {
+                    szs.map(|sz| sz.parse::<u128>().map(Bytes))
+                        .collect::<Result<Vec<_>, _>>()
+                })
+                .expect("may be empty but must exist")?,
         )?;
     } else if argv1.ends_with("stratis-clevis-setup-generator")
         || argv1.ends_with("stratis-setup-generator")

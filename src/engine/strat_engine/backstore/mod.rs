@@ -14,11 +14,12 @@ mod range_alloc;
 mod shared;
 mod transaction;
 
-#[cfg(test)]
-pub use self::crypt::crypt_metadata_size;
 pub use self::{
     backstore::Backstore,
     blockdev::{StratBlockDev, UnderlyingDevice},
-    crypt::{CryptActivationHandle, CryptHandle, CryptMetadataHandle, CLEVIS_TANG_TRUST_URL},
+    crypt::{
+        crypt_metadata_size, CryptActivationHandle, CryptHandle, CryptMetadataHandle,
+        CLEVIS_TANG_TRUST_URL,
+    },
     devices::{initialize_devices, process_and_verify_devices},
 };

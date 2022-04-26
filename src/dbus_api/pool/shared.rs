@@ -18,7 +18,10 @@ use crate::{
         types::{DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg},
     },
-    engine::{total_used, BlockDevTier, Diff, Engine, EngineAction, LockKey, Name, Pool, PoolUuid},
+    engine::{
+        total_allocated, total_used, BlockDevTier, Diff, Engine, EngineAction, LockKey, Name, Pool,
+        PoolUuid,
+    },
 };
 
 pub enum BlockDevOp {
@@ -156,8 +159,11 @@ where
                                 assert!(d.pool.metadata_size.is_changed());
                                 dbus_context.push_pool_foreground_change(
                                     pool_path.get_name(),
-                                    total_used(d.thin_pool.used, d.pool.metadata_size),
-                                    d.thin_pool.allocated_size,
+                                    total_used(&d.thin_pool.used, &d.pool.metadata_size),
+                                    total_allocated(
+                                        &d.thin_pool.allocated_size,
+                                        &d.pool.metadata_size,
+                                    ),
                                     Diff::Changed(pool.total_physical_size().bytes()),
                                     d.pool.out_of_alloc_space,
                                 )

@@ -269,16 +269,26 @@ where
 }
 
 /// Calculate the total used diff from a diff of the thin pool usage and metadata size.
-pub fn total_used(used: Diff<Option<Bytes>>, metadata_size: Diff<Bytes>) -> Diff<Option<Bytes>> {
+pub fn total_used(used: &Diff<Option<Bytes>>, metadata_size: &Diff<Bytes>) -> Diff<Option<Bytes>> {
     let changed = matches!(
-        (&used, &metadata_size),
+        (used, metadata_size),
         (Diff::Changed(_), _) | (Diff::Unchanged(Some(_)), Diff::Changed(_))
     );
-    let total_used = used.map(|u| u + *metadata_size);
+    let total_used = used.map(|u| u + **metadata_size);
     if changed {
         Diff::Changed(total_used)
     } else {
         Diff::Unchanged(total_used)
+    }
+}
+
+/// Calculate the allocated diff from a diff of the allocated size and metadata size.
+pub fn total_allocated(allocated: &Diff<Bytes>, metadata_size: &Diff<Bytes>) -> Diff<Bytes> {
+    match (allocated, metadata_size) {
+        (Diff::Unchanged(a), Diff::Unchanged(m)) => Diff::Unchanged(*a + *m),
+        (Diff::Changed(a), Diff::Unchanged(m)) => Diff::Changed(*a + *m),
+        (Diff::Unchanged(a), Diff::Changed(m)) => Diff::Changed(*a + *m),
+        (Diff::Changed(a), Diff::Changed(m)) => Diff::Changed(*a + *m),
     }
 }
 

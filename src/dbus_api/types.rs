@@ -28,9 +28,9 @@ use devicemapper::Bytes;
 use crate::{
     dbus_api::{connection::DbusConnectionHandler, tree::DbusTreeHandler, udev::DbusUdevHandler},
     engine::{
-        total_used, ActionAvailability, Diff, Engine, ExclusiveGuard, FilesystemUuid, Lockable,
-        LockedPoolInfo, PoolDiff, PoolEncryptionInfo, PoolUuid, SharedGuard, StratFilesystemDiff,
-        StratPoolDiff, StratisUuid, ThinPoolDiff,
+        total_allocated, total_used, ActionAvailability, Diff, Engine, ExclusiveGuard,
+        FilesystemUuid, Lockable, LockedPoolInfo, PoolDiff, PoolEncryptionInfo, PoolUuid,
+        SharedGuard, StratFilesystemDiff, StratPoolDiff, StratisUuid, ThinPoolDiff,
     },
 };
 
@@ -161,8 +161,8 @@ where
 
                 DbusAction::PoolBackgroundChange(
                     uuid,
-                    SignalChange::from(total_used(used, metadata_size)),
-                    SignalChange::from(allocated_size),
+                    SignalChange::from(total_used(&used, &metadata_size)),
+                    SignalChange::from(total_allocated(&allocated_size, &metadata_size)),
                     SignalChange::from(out_of_alloc_space),
                 )
             })

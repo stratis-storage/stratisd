@@ -4,7 +4,7 @@
 
 pub use self::{
     engine::{BlockDev, Engine, Filesystem, KeyActions, Pool, Report},
-    shared::total_used,
+    shared::{total_allocated, total_used},
     sim_engine::SimEngine,
     strat_engine::{
         get_dm, get_dm_init, StaticHeader, StaticHeaderResult, StratEngine, StratKeyActions, BDA,

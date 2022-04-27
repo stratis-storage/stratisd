@@ -60,12 +60,32 @@ fn predict_usage(encrypted: bool, device_sizes: Vec<Bytes>) -> Result<(), Box<dy
     // verify that crypt metadata size is divisible by sector size
     assert_eq!(crypt_metadata_size_sectors.bytes(), crypt_metadata_size);
 
-    let stratis_device_sizes = device_sizes.iter().map(|&s| s - crypt_metadata_size);
+    let stratis_device_sizes = device_sizes
+        .iter()
+        .map(|&s| {
+            (*s).checked_sub(*crypt_metadata_size)
+                .map(Bytes)
+                .ok_or_else(|| {
+                    Box::new(ExecutableError(
+                        "Some device sizes too small for encryption metadata.".into(),
+                    ))
+                })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
     let stratis_metadata_size = BDA::default().extended_size().sectors().bytes();
     let stratis_avail_sizes = stratis_device_sizes
-        .map(|s| s - stratis_metadata_size)
-        .collect::<Vec<_>>();
+        .iter()
+        .map(|&s| {
+            (*s).checked_sub(*stratis_metadata_size)
+                .map(Bytes)
+                .ok_or_else(|| {
+                    Box::new(ExecutableError(
+                        "Some device sizes too small for Stratis metadata.".into(),
+                    ))
+                })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
 
     let total_size: Bytes = device_sizes.iter().cloned().sum();
     let avail_size = stratis_avail_sizes.iter().cloned().sum();
@@ -131,20 +151,24 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
                     .help("Whether the pool will be encrypted."),
             )
             .arg(
-                Arg::with_name("sizes")
+                Arg::with_name("device-size")
+                    .long("device-size")
+                    .number_of_values(1)
                     .multiple(true)
-                    .help("Sizes of devices to be included in the pool."),
+                    .required(true)
+                    .help("Size of device to be included in the pool. May be specified multiple times. Units are bytes.")
+                    .next_line_help(true)
             );
         let matches = parser.get_matches_from(&args);
         predict_usage(
             matches.is_present("encrypted"),
             matches
-                .values_of("sizes")
+                .values_of("device-size")
                 .map(|szs| {
                     szs.map(|sz| sz.parse::<u128>().map(Bytes))
                         .collect::<Result<Vec<_>, _>>()
                 })
-                .expect("may be empty but must exist")?,
+                .expect("required argument")?,
         )?;
     } else if argv1.ends_with("stratis-clevis-setup-generator")
         || argv1.ends_with("stratis-setup-generator")

@@ -90,11 +90,19 @@ fn predict_usage(encrypted: bool, device_sizes: Vec<Bytes>) -> Result<(), Box<dy
         .collect::<Result<Vec<_>, _>>()?;
 
     let total_size: Sectors = device_sizes.iter().cloned().sum();
-    let avail_size: Sectors = stratis_avail_sizes.iter().cloned().sum();
+    let non_metadata_size: Sectors = stratis_avail_sizes.iter().cloned().sum();
 
-    let size_params = ThinPoolSizeParams::new(avail_size)?;
+    let size_params = ThinPoolSizeParams::new(non_metadata_size)?;
+    let total_non_data = 2usize * size_params.meta_size() + size_params.mdv_size();
 
-    let avail_size = avail_size - (2usize * size_params.meta_size() + size_params.mdv_size());
+    let avail_size = (non_metadata_size)
+        .checked_sub(*total_non_data)
+        .map(Sectors)
+        .ok_or_else(|| {
+            Box::new(ExecutableError(
+                "Sum of all device sizes too small for a Stratis pool.".into(),
+            ))
+        })?;
 
     let used_size = total_size - avail_size;
 

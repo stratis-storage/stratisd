@@ -22,7 +22,14 @@ import os
 import subprocess
 
 # isort: LOCAL
-from stratisd_client_dbus import MOPool, ObjectManager, get_object, pools
+from stratisd_client_dbus import (
+    MOBlockDev,
+    MOPool,
+    ObjectManager,
+    blockdevs,
+    get_object,
+    pools,
+)
 from stratisd_client_dbus._constants import TOP_OBJECT
 
 from ._utils import (
@@ -39,36 +46,48 @@ class TestSpaceUsagePrediction(UdevTest):
     Test relations of prediction to reality.
     """
 
-    _CAP_DEVICE_STR = "stratis-1-private-%s-physical-originsub"
     _STRATIS_PREDICT_USAGE = os.environ["STRATIS_PREDICT_USAGE"]
 
-    def _test_cap_size(self, pool_name, prediction):
+    def _test_prediction(self, pool_name):
         """
-        Helper function to verify that the cap device is the correct size.
+        Helper function to verify that the prediction matches the reality to
+        an acceptable degree.
 
         :param str pool_name: the name of the pool to test
-        :param prediction: JSON output from script
         """
         proxy = get_object(TOP_OBJECT)
         managed_objects = ObjectManager.Methods.GetManagedObjects(proxy, {})
 
-        _pool_object_path, pool = next(
+        pool_object_path, pool = next(
             pools(props={"Name": pool_name})
             .require_unique_match(True)
             .search(managed_objects)
         )
 
-        pool_uuid = MOPool(pool).Uuid()
+        modevs = [
+            MOBlockDev(info)
+            for objpath, info in blockdevs(props={"Pool": pool_object_path}).search(
+                managed_objects
+            )
+        ]
 
-        cap_name = self._CAP_DEVICE_STR % pool_uuid
+        mopool = MOPool(pool)
+
+        encrypted = mopool.Encrypted()
+
+        sizes = [modev.TotalPhysicalSize() for modev in modevs]
 
         with subprocess.Popen(
-            ["blockdev", "--getsize64", "/dev/mapper/%s" % cap_name],
+            [self._STRATIS_PREDICT_USAGE]
+            + ["--device-size %s" % size for size in sizes]
+            + (["--encrypted"] if encrypted else []),
             stdout=subprocess.PIPE,
-            text=True,
         ) as command:
-            cap_device_size, _ = command.communicate()
-            self.assertEqual(cap_device_size.rstrip("\n"), prediction["free"])
+            outs, _ = command.communicate()
+            prediction = json.loads(outs)
+
+        self.assertEqual(mopool.TotalPhysicalSize(), prediction["total"])
+        self.assertEqual(mopool.TotalPhysicalUsed(), prediction["used"])
 
     def test_prediction(self):
         """
@@ -76,17 +95,12 @@ class TestSpaceUsagePrediction(UdevTest):
         """
         device_tokens = self._lb_mgr.create_devices(4)
         devnodes = self._lb_mgr.device_files(device_tokens)
-        with subprocess.Popen(
-            [self._STRATIS_PREDICT_USAGE] + devnodes, stdout=subprocess.PIPE
-        ) as command:
-            outs, _ = command.communicate()
-            prediction = json.loads(outs)
 
         with ServiceContextManager():
             pool_name = random_string(5)
             create_pool(pool_name, devnodes)
             self.wait_for_pools(1)
-            self._test_cap_size(pool_name, prediction)
+            self._test_prediction(pool_name)
 
     def test_prediction_encrypted(self):
         """
@@ -95,16 +109,10 @@ class TestSpaceUsagePrediction(UdevTest):
         """
         device_tokens = self._lb_mgr.create_devices(4)
         devnodes = self._lb_mgr.device_files(device_tokens)
-        with subprocess.Popen(
-            [self._STRATIS_PREDICT_USAGE, "--encrypted"] + devnodes,
-            stdout=subprocess.PIPE,
-        ) as command:
-            outs, _ = command.communicate()
-            prediction = json.loads(outs)
 
         (key_description, key) = ("key_spec", "data")
         with OptionalKeyServiceContextManager(key_spec=[(key_description, key)]):
             pool_name = random_string(5)
             create_pool(pool_name, devnodes, key_description=key_description)
             self.wait_for_pools(1)
-            self._test_cap_size(pool_name, prediction)
+            self._test_prediction(pool_name)

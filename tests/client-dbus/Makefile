@@ -26,6 +26,7 @@ tang-tests:
 .PHONY: udev-tests
 udev-tests:
 	python3 -m unittest ${UNITTEST_OPTS} tests.udev.test_udev
+	python3 -m unittest ${UNITTEST_OPTS} tests.udev.test_predict
 
 .PHONY: tests
 tests: udev-tests misc-tests

@@ -50,7 +50,11 @@ fn base32_decode(var_name: &str, base32_str: &str) -> Result<(), Box<dyn Error>>
 
 // Predict usage for a newly created pool given information about whether
 // or not the pool is encrypted and a list of device sizes.
-fn predict_usage(encrypted: bool, device_sizes: Vec<Bytes>) -> Result<(), Box<dyn Error>> {
+fn predict_usage(
+    encrypted: bool,
+    device_sizes: Vec<Bytes>,
+    _filesystem_sizes: Option<Vec<Bytes>>,
+) -> Result<(), Box<dyn Error>> {
     let crypt_metadata_size = if encrypted {
         Bytes(u128::from(crypt_metadata_size()))
     } else {
@@ -176,6 +180,13 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
                     .required(true)
                     .help("Size of device to be included in the pool. May be specified multiple times. Units are bytes.")
                     .next_line_help(true)
+            )
+            .arg(
+                Arg::with_name("filesystem-size")
+                .long("filesystem-size")
+                .multiple(true)
+                .help("Size of filesystem to be made for this pool. May be specified multiple times, one for each filesystem. Units are bytes.")
+                .next_line_help(true)
             );
         let matches = parser.get_matches_from(&args);
         predict_usage(
@@ -187,6 +198,13 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
                         .collect::<Result<Vec<_>, _>>()
                 })
                 .expect("required argument")?,
+            matches
+                .values_of("filesystem-size")
+                .map(|szs| {
+                    szs.map(|sz| sz.parse::<u128>().map(Bytes))
+                        .collect::<Result<Vec<_>, _>>()
+                })
+                .transpose()?,
         )?;
     } else if argv1.ends_with("stratis-clevis-setup-generator")
         || argv1.ends_with("stratis-setup-generator")

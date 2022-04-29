@@ -40,13 +40,32 @@ from ._utils import (
     random_string,
 )
 
+_STRATIS_PREDICT_USAGE = os.environ["STRATIS_PREDICT_USAGE"]
+
+
+def _call_predict_usage(encrypted, sizes):
+    """
+    Call stratis-predict-usage and return JSON resut.
+
+    :param bool encrypted: true if pool is to be encrypted
+    :param sizes: list of sizes of devices for pool
+    """
+    with subprocess.Popen(
+        [_STRATIS_PREDICT_USAGE]
+        + ["--device-size=%s" % size for size in sizes]
+        + (["--encrypted"] if encrypted else []),
+        stdout=subprocess.PIPE,
+    ) as command:
+        outs, _ = command.communicate()
+        prediction = json.loads(outs)
+
+    return prediction
+
 
 class TestSpaceUsagePrediction(UdevTest):
     """
     Test relations of prediction to reality.
     """
-
-    _STRATIS_PREDICT_USAGE = os.environ["STRATIS_PREDICT_USAGE"]
 
     def _test_prediction(self, pool_name):
         """
@@ -77,17 +96,15 @@ class TestSpaceUsagePrediction(UdevTest):
 
         sizes = [modev.TotalPhysicalSize() for modev in modevs]
 
-        with subprocess.Popen(
-            [self._STRATIS_PREDICT_USAGE]
-            + ["--device-size=%s" % size for size in sizes]
-            + (["--encrypted"] if encrypted else []),
-            stdout=subprocess.PIPE,
-        ) as command:
-            outs, _ = command.communicate()
-            prediction = json.loads(outs)
+        prediction = _call_predict_usage(encrypted, sizes)
 
         self.assertEqual(mopool.TotalPhysicalSize(), prediction["total"])
-        self.assertEqual(mopool.TotalPhysicalUsed(), prediction["used"])
+
+        (success, total_physical_used) = mopool.TotalPhysicalUsed()
+        if not success:
+            raise RuntimeError("Pool's TotalPhysicalUsed property was invalid.")
+
+        self.assertEqual(total_physical_used, prediction["used"])
 
     def test_prediction(self):
         """

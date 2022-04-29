@@ -49,7 +49,8 @@ fn base32_decode(var_name: &str, base32_str: &str) -> Result<(), Box<dyn Error>>
 }
 
 // Predict usage for a newly created pool given information about whether
-// or not the pool is encrypted and a list of device sizes.
+// or not the pool is encrypted, a list of device sizes, and an optional list
+// of filesystem sizes.
 fn predict_usage(
     encrypted: bool,
     device_sizes: Vec<Bytes>,

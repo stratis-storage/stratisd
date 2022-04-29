@@ -24,6 +24,7 @@ pub use self::{
     engine::StratEngine,
     keys::StratKeyActions,
     metadata::{StaticHeader, StaticHeaderResult, BDA},
+    thinpool::ThinPoolSizeParams,
 };
 
 #[cfg(test)]

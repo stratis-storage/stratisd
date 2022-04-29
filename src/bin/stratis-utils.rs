@@ -15,9 +15,9 @@ use clap::{App, Arg};
 use data_encoding::BASE32_NOPAD;
 use serde_json::{json, Value};
 
-use devicemapper::Bytes;
+use devicemapper::{Bytes, Sectors};
 
-use stratisd::engine::{crypt_metadata_size, BDA};
+use stratisd::engine::{crypt_metadata_size, ThinPoolSizeParams, BDA};
 
 #[cfg(feature = "systemd_compat")]
 use crate::generators::{stratis_clevis_setup_generator, stratis_setup_generator};
@@ -60,11 +60,13 @@ fn predict_usage(encrypted: bool, device_sizes: Vec<Bytes>) -> Result<(), Box<dy
     // verify that crypt metadata size is divisible by sector size
     assert_eq!(crypt_metadata_size_sectors.bytes(), crypt_metadata_size);
 
+    let device_sizes = device_sizes.iter().map(|s| s.sectors()).collect::<Vec<_>>();
+
     let stratis_device_sizes = device_sizes
         .iter()
         .map(|&s| {
-            (*s).checked_sub(*crypt_metadata_size)
-                .map(Bytes)
+            (*s).checked_sub(*crypt_metadata_size_sectors)
+                .map(Sectors)
                 .ok_or_else(|| {
                     Box::new(ExecutableError(
                         "Some device sizes too small for encryption metadata.".into(),
@@ -73,12 +75,12 @@ fn predict_usage(encrypted: bool, device_sizes: Vec<Bytes>) -> Result<(), Box<dy
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    let stratis_metadata_size = BDA::default().extended_size().sectors().bytes();
+    let stratis_metadata_size = BDA::default().extended_size().sectors();
     let stratis_avail_sizes = stratis_device_sizes
         .iter()
         .map(|&s| {
             (*s).checked_sub(*stratis_metadata_size)
-                .map(Bytes)
+                .map(Sectors)
                 .ok_or_else(|| {
                     Box::new(ExecutableError(
                         "Some device sizes too small for Stratis metadata.".into(),
@@ -87,8 +89,13 @@ fn predict_usage(encrypted: bool, device_sizes: Vec<Bytes>) -> Result<(), Box<dy
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    let total_size: Bytes = device_sizes.iter().cloned().sum();
-    let avail_size = stratis_avail_sizes.iter().cloned().sum();
+    let total_size: Sectors = device_sizes.iter().cloned().sum();
+    let avail_size: Sectors = stratis_avail_sizes.iter().cloned().sum();
+
+    let size_params = ThinPoolSizeParams::new(avail_size)?;
+
+    let avail_size = avail_size - (2usize * size_params.meta_size() + size_params.mdv_size());
+
     let used_size = total_size - avail_size;
 
     let total_size_str = Value::String((*(total_size)).to_string());

@@ -112,9 +112,9 @@ fn predict_usage(
 
     let used_size = total_size - avail_size;
 
-    let total_size_str = Value::String((*(total_size)).to_string());
-    let used_size_str = Value::String((*(used_size)).to_string());
-    let avail_size_str = Value::String((*(avail_size)).to_string());
+    let total_size_str = Value::String((*(total_size.bytes())).to_string());
+    let used_size_str = Value::String((*(used_size.bytes())).to_string());
+    let avail_size_str = Value::String((*(avail_size.bytes())).to_string());
 
     let json = json! {
         {"total": total_size_str, "used": used_size_str, "free": avail_size_str}

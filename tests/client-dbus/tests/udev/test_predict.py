@@ -79,7 +79,7 @@ class TestSpaceUsagePrediction(UdevTest):
 
         with subprocess.Popen(
             [self._STRATIS_PREDICT_USAGE]
-            + ["--device-size %s" % size for size in sizes]
+            + ["--device-size=%s" % size for size in sizes]
             + (["--encrypted"] if encrypted else []),
             stdout=subprocess.PIPE,
         ) as command:

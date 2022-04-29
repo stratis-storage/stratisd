@@ -162,6 +162,7 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
         )?;
     } else if argv1.ends_with("stratis-predict-usage") {
         let parser = App::new("stratis-predict-usage")
+            .about("Predicts the space usage when creating a Stratis pool.")
             .arg(
                 Arg::with_name("encrypted")
                     .long("encrypted")

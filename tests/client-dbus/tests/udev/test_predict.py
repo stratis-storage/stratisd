@@ -49,6 +49,7 @@ def _call_predict_usage(encrypted, sizes):
 
     :param bool encrypted: true if pool is to be encrypted
     :param sizes: list of sizes of devices for pool
+    :type sizes: list of str
     """
     with subprocess.Popen(
         [_STRATIS_PREDICT_USAGE]
@@ -60,6 +61,21 @@ def _call_predict_usage(encrypted, sizes):
         prediction = json.loads(outs)
 
     return prediction
+
+
+def _call_blockdev_size(dev):
+    """
+    Get the blockdev size for a device in bytes.
+    :param str dev: device path
+    :rtype: str
+    """
+    with subprocess.Popen(
+        ["blockdev", "--getsize64", dev],
+        stdout=subprocess.PIPE,
+    ) as command:
+        outs, _ = command.communicate()
+
+    return outs.rstrip("\n")
 
 
 class TestSpaceUsagePrediction(UdevTest):
@@ -94,7 +110,9 @@ class TestSpaceUsagePrediction(UdevTest):
 
         encrypted = mopool.Encrypted()
 
-        sizes = [modev.TotalPhysicalSize() for modev in modevs]
+        block_devices = [modev.PhysicalPath() for modev in modevs]
+
+        sizes = [_call_blockdev_size(dev) for dev in block_devices]
 
         prediction = _call_predict_usage(encrypted, sizes)
 

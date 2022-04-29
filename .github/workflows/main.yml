@@ -30,30 +30,6 @@ jobs:
           - task: make -f Makefile fmt-travis
             toolchain: 1.60.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: rustfmt
-          - task: make -f Makefile clippy
-            toolchain: 1.60.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: clippy
-          - task: make -f Makefile build
-            toolchain: 1.60.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
-          - task: make -f Makefile build-min
-            toolchain: 1.60.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
-          - task: make -f Makefile build-extras
-            toolchain: 1.60.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
-          - task: make -f Makefile docs-travis
-            toolchain: 1.60.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
-          - task: make -f Makefile test
-            toolchain: 1.60.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
-          - task: make -f Makefile release
-            toolchain: 1.60.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
-          - task: make -f Makefile release-min
-            toolchain: 1.60.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
     runs-on: ubuntu-18.04
     container:
       image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
@@ -75,46 +51,6 @@ jobs:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
           override: true
-      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
-        run: ${{ matrix.task }}
-
-  # TESTS WITH UDEV
-  checks_with_udev:
-    strategy:
-      matrix:
-        include:
-          - task: RUST_LOG=stratisd=debug make -f Makefile test-loop
-            toolchain: 1.60.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
-    runs-on: ubuntu-18.04
-    container:
-      image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
-      options: --privileged -v /dev:/dev
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install dependencies for Fedora
-        run: >
-          dnf install -y
-          asciidoc
-          clang
-          cryptsetup-devel
-          curl
-          device-mapper-persistent-data
-          dbus-devel
-          libblkid-devel
-          make
-          systemd-devel
-          systemd-udev
-          xfsprogs
-      - uses: actions-rs/toolchain@v1
-        with:
-          components: ${{ matrix.components }}
-          toolchain: ${{ matrix.toolchain }}
-          override: true
-      - name: Install all necessary Stratis files
-        run: make -f Makefile install-release
-      - name: Start udev
-        run: /usr/lib/systemd/systemd-udevd &
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 

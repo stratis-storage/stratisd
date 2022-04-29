@@ -48,6 +48,8 @@ fn base32_decode(var_name: &str, base32_str: &str) -> Result<(), Box<dyn Error>>
     Ok(())
 }
 
+// Predict usage for a newly created pool given information about whether
+// or not the pool is encrypted and a list of device sizes.
 fn predict_usage(encrypted: bool, device_sizes: Vec<Bytes>) -> Result<(), Box<dyn Error>> {
     let crypt_metadata_size = if encrypted {
         Bytes(u128::from(crypt_metadata_size()))

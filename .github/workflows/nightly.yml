@@ -193,3 +193,68 @@ jobs:
           PYTHONPATH=./src
           make dbus-tests
         working-directory: ./stratis-cli
+
+  python-based-tests:
+    strategy:
+      matrix:
+        include:
+          - image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
+            toolchain: 1.60.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            skip_value: 0
+          - image: fedora:34  # LOWEST DEVELOPMENT ENVIRONMENT
+            toolchain: 1.54.0  # LOWEST SUPPORTED RUST TOOLCHAIN
+            skip_value: 1
+    runs-on: ubuntu-18.04
+    container:
+      image: ${{ matrix.image }}
+      options: --privileged -v /dev:/dev
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies for Fedora
+        run: >
+          dnf install -y
+          asciidoc
+          clang
+          cryptsetup-devel
+          curl
+          dbus-daemon
+          dbus-devel
+          dbus-tools
+          device-mapper-persistent-data
+          libblkid-devel
+          make
+          python3-dbus
+          python3-dbus-client-gen
+          python3-dbus-python-client-gen
+          python3-psutil
+          python3-pyudev
+          systemd-devel
+          systemd-udev
+          xfsprogs
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: cargo
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+      - name: Install all necessary Stratis files
+        run: make -f Makefile install-debug
+      - name: Start udev
+        run: /usr/lib/systemd/systemd-udevd &
+      - name: Set up for D-Bus
+        run: |
+          mkdir -p /var/lib/dbus
+          dbus-uuidgen > /var/lib/dbus/machine-id
+          mkdir -p /var/run/dbus
+      - name: Start D-Bus
+        run: >
+          dbus-daemon
+          --config-file=/usr/share/dbus-1/system.conf
+          --print-address
+      - name: Tests on ${{ matrix.image }} using Rust ${{ matrix.toolchain }}
+        run: >
+          RUST_LOG=stratisd=debug
+          STRATISD=/usr/libexec/stratisd
+          STRATIS_PREDICT_USAGE=/usr/bin/stratis-predict-usage
+          PYTHONPATH=./src
+          make predict-tests
+        working-directory: ./tests/client-dbus

@@ -35,7 +35,7 @@ jobs:
             task: make -f Makefile fmt-shell-ci
             working-directory: .
     runs-on: ubuntu-18.04
-    container: fedora:35  # NEXT DEVELOPMENT ENVIRONMENT
+    container: fedora:36  # NEXT DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies

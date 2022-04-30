@@ -75,7 +75,7 @@ def _call_blockdev_size(dev):
     ) as command:
         outs, _ = command.communicate()
 
-    return outs.rstrip("\n")
+    return outs.decode().rstrip("\n")
 
 
 class TestSpaceUsagePrediction(UdevTest):

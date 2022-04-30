@@ -112,11 +112,14 @@ class TestSpaceUsagePrediction(UdevTest):
 
         block_devices = [modev.PhysicalPath() for modev in modevs]
 
-        sizes = [_call_blockdev_size(dev) for dev in block_devices]
+        physical_sizes = [_call_blockdev_size(dev) for dev in block_devices]
 
-        prediction = _call_predict_usage(encrypted, sizes)
+        prediction = _call_predict_usage(encrypted, physical_sizes)
 
-        self.assertEqual(mopool.TotalPhysicalSize(), prediction["total"])
+        if encrypted:
+            self.assertLess(mopool.TotalPhysicalSize(), prediction["total"])
+        else:
+            self.assertEqual(mopool.TotalPhysicalSize(), prediction["total"])
 
         (success, total_physical_used) = mopool.TotalPhysicalUsed()
         if not success:

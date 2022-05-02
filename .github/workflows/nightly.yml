@@ -242,6 +242,7 @@ jobs:
           python3-dbus
           python3-dbus-client-gen
           python3-dbus-python-client-gen
+          python3-justbytes
           python3-psutil
           python3-pyudev
           systemd-devel

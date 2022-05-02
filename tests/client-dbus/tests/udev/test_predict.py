@@ -21,6 +21,9 @@ import json
 import os
 import subprocess
 
+# isort: THIRDPARTY
+from justbytes import Range
+
 # isort: LOCAL
 from stratisd_client_dbus import (
     MOBlockDev,
@@ -83,7 +86,7 @@ class TestSpaceUsagePrediction(UdevTest):
     Test relations of prediction to reality.
     """
 
-    def _test_prediction(self, pool_name):
+    def _test_prediction(self, pool_name):  # pylint: disable=too-many-locals
         """
         Helper function to verify that the prediction matches the reality to
         an acceptable degree.
@@ -116,16 +119,26 @@ class TestSpaceUsagePrediction(UdevTest):
 
         prediction = _call_predict_usage(encrypted, physical_sizes)
 
-        if encrypted:
-            self.assertLess(mopool.TotalPhysicalSize(), prediction["total"])
-        else:
-            self.assertEqual(mopool.TotalPhysicalSize(), prediction["total"])
-
         (success, total_physical_used) = mopool.TotalPhysicalUsed()
         if not success:
             raise RuntimeError("Pool's TotalPhysicalUsed property was invalid.")
 
-        self.assertEqual(total_physical_used, prediction["used"])
+        (used_prediction, total_prediction) = (
+            prediction["used"],
+            prediction["total"],
+        )
+
+        if encrypted:
+            self.assertLess(mopool.TotalPhysicalSize(), total_prediction)
+            self.assertLess(total_physical_used, used_prediction)
+
+            diff1 = Range(total_prediction) - Range(mopool.TotalPhysicalSize())
+            diff2 = Range(used_prediction) - Range(total_physical_used)
+
+            self.assertEqual(diff1, diff2)
+        else:
+            self.assertEqual(mopool.TotalPhysicalSize(), total_prediction)
+            self.assertEqual(total_physical_used, used_prediction)
 
     def test_prediction(self):
         """

@@ -24,8 +24,9 @@ use crate::{
         strat_engine::{
             cmd::verify_binaries,
             dm::get_dm,
-            keys::{MemoryFilesystem, StratKeyActions},
+            keys::StratKeyActions,
             liminal::{find_all, LiminalDevices},
+            ns::MemoryFilesystem,
             pool::StratPool,
         },
         structures::{
@@ -60,12 +61,9 @@ pub struct StratEngine {
     // Handler for key operations
     key_handler: Lockable<Arc<RwLock<StratKeyActions>>>,
 
-    // TODO: Remove this code when Clevis supports reading keys from the
-    // kernel keyring.
-    // In memory filesystem for passing keys to Clevis.
-    // See GitHub issue: https://github.com/stratis-storage/project/issues/212.
+    // In memory filesystem for private namespace mounts.
     #[allow(dead_code)]
-    key_fs: MemoryFilesystem,
+    fs: MemoryFilesystem,
 }
 
 impl StratEngine {
@@ -79,6 +77,7 @@ impl StratEngine {
     /// Returns an error if there was an error reading device nodes.
     /// Returns an error if the binaries on which it depends can not be found.
     pub fn initialize() -> StratisResult<StratEngine> {
+        let fs = MemoryFilesystem::new()?;
         verify_binaries()?;
 
         let mut liminal_devices = LiminalDevices::default();
@@ -92,7 +91,7 @@ impl StratEngine {
             liminal_devices: Lockable::new_shared(liminal_devices),
             watched_dev_last_event_nrs: Lockable::new_shared(HashMap::new()),
             key_handler: Lockable::new_shared(StratKeyActions),
-            key_fs: MemoryFilesystem::new()?,
+            fs,
         })
     }
 
@@ -550,6 +549,7 @@ mod test {
         strat_engine::{
             backstore::crypt_metadata_size,
             cmd,
+            ns::unshare_namespace,
             tests::{crypt, dm_stratis_devices_remove, loopbacked, real, FailDevice},
             udev::{CRYPTO_FS_TYPE, FS_TYPE_KEY},
         },
@@ -562,6 +562,7 @@ mod test {
 
     /// Verify that a pool rename causes the pool metadata to get the new name.
     fn test_pool_rename(paths: &[&Path]) {
+        unshare_namespace().unwrap();
         let engine = StratEngine::initialize().unwrap();
 
         let name1 = "name1";
@@ -763,6 +764,7 @@ mod test {
             Ok(())
         }
 
+        unshare_namespace()?;
         let engine = StratEngine::initialize()?;
         let uuid =
             test_async!(engine.create_pool(name, paths_with_fail_device, Some(encryption_info)))?

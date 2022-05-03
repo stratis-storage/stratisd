@@ -19,7 +19,7 @@ use tokio::{
 #[cfg(feature = "dbus_enabled")]
 use crate::dbus_api::DbusAction;
 use crate::{
-    engine::{Engine, SimEngine, StratEngine, UdevEngineEvent},
+    engine::{unshare_namespace, Engine, SimEngine, StratEngine, UdevEngineEvent},
     stratis::{
         dm::dm_event_thread, errors::StratisResult, ipc_support::setup, stratis::VERSION,
         timer::run_timers, udev_monitor::udev_thread,
@@ -45,6 +45,10 @@ async fn signal_thread() -> StratisResult<()> {
 /// If sim is true, start the sim engine rather than the real engine.
 /// Always check for devicemapper context.
 pub fn run(sim: bool) -> StratisResult<()> {
+    if !sim {
+        unshare_namespace()?;
+    }
+
     let runtime = Builder::new_multi_thread()
         .enable_all()
         .thread_name_fn(|| {

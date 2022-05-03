@@ -122,8 +122,7 @@ fn predict_usage(
     // For our data, this computation always overestimates the amount of the
     // data required by the a filesystem, but always by less than 100%.
     // The function is piecewise, because our data had a pronounced kink at
-    // 4 TiB. While this may be due to effects of the particular device on
-    // which our tests were run, it is intuitively likely that, for larger
+    // 4 TiB. It is intuitively likely that, for larger
     // filesystems, the proportion of space used by the metadata should be
     // smaller, which justifies the piecewise nature somewhat.
     // This function is ad-hoc and can be re-evaluated if a better model
@@ -141,7 +140,8 @@ fn predict_usage(
         //
         // It is possible to lose precision when casting the logical size to
         // f64 when the logical size exceeds 4 PiB; this should not lead
-        // to any computational misbehavior.
+        // to any computational misbehavior, as the log of the value should
+        // change smoothly.
         #[allow(clippy::cast_possible_truncation)]
         #[allow(clippy::cast_precision_loss)]
         Bytes(10f64.powf(m * f64::log10(*logical_size as f64) + b) as u128)

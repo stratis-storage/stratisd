@@ -54,7 +54,7 @@ fn base32_decode(var_name: &str, base32_str: &str) -> Result<(), Box<dyn Error>>
 fn predict_usage(
     encrypted: bool,
     device_sizes: Vec<Bytes>,
-    _filesystem_sizes: Option<Vec<Bytes>>,
+    filesystem_sizes: Option<Vec<Bytes>>,
 ) -> Result<(), Box<dyn Error>> {
     let crypt_metadata_size = if encrypted {
         Bytes(u128::from(crypt_metadata_size()))
@@ -108,6 +108,54 @@ fn predict_usage(
         .ok_or_else(|| {
             Box::new(ExecutableError(
                 "Sum of all device sizes too small for a Stratis pool.".into(),
+            ))
+        })?;
+
+    // Guess at size required by specified filesystems. Due to layout effects
+    // we can not predict precisely how much space will be required by xfs
+    // metadata, etc. We use the following formulas which are based on some
+    // observations of filesystem sizes on Stratis pools.
+    // If logical size (ls) requested is:
+    // <= 4 TiB, expected size use is 10 ^ (0.51 * log_10(ls) + 3)
+    // otherwise, expected size is 10 ^ (0.36 * log_10(ls) + 5)
+    // Sizes less than 512 MiB are rejected.
+    // For our data, this computation always overestimates the amount of the
+    // data required by the a filesystem, but always by less than 100%.
+    // The function is piecewise, because our data had a pronounced kink at
+    // 4 TiB. While this may be due to effects of the particular device on
+    // which our tests were run, it is intuitively likely that, for larger
+    // filesystems, the proportion of space used by the metadata should be
+    // smaller, which justifies the piecewise nature somewhat.
+    // This function is ad-hoc and can be re-evaluated if a better model
+    // becomes available.
+
+    fn space_for_filesystem(logical_size: Bytes) -> Bytes {
+        let (m, b) = if logical_size < Bytes(4_398_046_511_104) {
+            (0.51f64, 3.0f64)
+        } else {
+            (0.36f64, 5.0f64)
+        };
+        // Truncation is of no concern. All truncated values are expected to
+        // have at least 10 digits to the left of the binary floating point
+        // radix, the truncated fractional values will be relatively trivial.
+        //
+        // It is possible to lose precision when casting the logical size to
+        // f64 when the logical size exceeds 4 PiB; this should not lead
+        // to any computational misbehavior.
+        #[allow(clippy::cast_possible_truncation)]
+        #[allow(clippy::cast_precision_loss)]
+        Bytes(10f64.powf(m * f64::log10(*logical_size as f64) + b) as u128)
+    }
+
+    let fs_used: Option<Bytes> =
+        filesystem_sizes.map(|sizes| sizes.iter().map(|&sz| space_for_filesystem(sz)).sum());
+
+    let avail_size = (*avail_size)
+        .checked_sub(*fs_used.map(|v| v.sectors()).unwrap_or_else(|| Sectors(0)))
+        .map(Sectors)
+        .ok_or_else(|| {
+            Box::new(ExecutableError(
+                "Filesystems will take up too much space on specified pool.".into(),
             ))
         })?;
 

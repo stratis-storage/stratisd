@@ -20,6 +20,7 @@ Test that predictions of space usage match the actual.
 import json
 import os
 import subprocess
+from time import sleep
 
 # isort: THIRDPARTY
 from justbytes import Range, TiB
@@ -119,6 +120,8 @@ class TestSpaceUsagePrediction(UdevTest):
                 raise RuntimeError(
                     "Failed to create a requested filesystem: %s" % message
                 )
+
+            sleep(5)  # Give the daemon a chance to update Pool size values.
 
         modevs = [
             MOBlockDev(info)

@@ -48,17 +48,23 @@ from ._utils import (
 _STRATIS_PREDICT_USAGE = os.environ["STRATIS_PREDICT_USAGE"]
 
 
-def _call_predict_usage(encrypted, sizes):
+def _call_predict_usage(encrypted, device_sizes, *, fs_specs=None):
     """
     Call stratis-predict-usage and return JSON resut.
 
     :param bool encrypted: true if pool is to be encrypted
-    :param sizes: list of sizes of devices for pool
-    :type sizes: list of str
+    :param device_sizes: list of sizes of devices for pool
+    :type device_sizes: list of str
+    :param filesystem_size: list of sizes of filesystems
     """
     with subprocess.Popen(
         [_STRATIS_PREDICT_USAGE]
-        + ["--device-size=%s" % size for size in sizes]
+        + ["--device-size=%s" % size for size in device_sizes]
+        + (
+            []
+            if fs_specs is None
+            else ["--filesystem-size=%s" for size in (size for _, size in fs_specs)]
+        )
         + (["--encrypted"] if encrypted else []),
         stdout=subprocess.PIPE,
     ) as command:
@@ -183,7 +189,9 @@ class TestSpaceUsagePrediction(UdevTest):
         physical_sizes = _get_block_device_sizes(pool_object_path, managed_objects)
         mopool = MOPool(pool)
 
-        prediction = _call_predict_usage(mopool.Encrypted(), physical_sizes)
+        prediction = _call_predict_usage(
+            mopool.Encrypted(), physical_sizes, fs_specs=fs_specs
+        )
 
         self._check_prediction(prediction, mopool)
 

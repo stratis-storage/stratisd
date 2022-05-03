@@ -22,13 +22,14 @@ import os
 import subprocess
 
 # isort: THIRDPARTY
-from justbytes import Range
+from justbytes import Range, TiB
 
 # isort: LOCAL
 from stratisd_client_dbus import (
     MOBlockDev,
     MOPool,
     ObjectManager,
+    Pool,
     blockdevs,
     get_object,
     pools,
@@ -86,12 +87,16 @@ class TestSpaceUsagePrediction(UdevTest):
     Test relations of prediction to reality.
     """
 
-    def _test_prediction(self, pool_name):  # pylint: disable=too-many-locals
+    def _test_prediction(
+        self, pool_name, *, fs_specs=None
+    ):  # pylint: disable=too-many-locals
         """
         Helper function to verify that the prediction matches the reality to
         an acceptable degree.
 
         :param str pool_name: the name of the pool to test
+        :param fs_specs: filesystems to create and test
+        :type fs_specs: list of of str * Range or NoneType
         """
         proxy = get_object(TOP_OBJECT)
         managed_objects = ObjectManager.Methods.GetManagedObjects(proxy, {})
@@ -101,6 +106,19 @@ class TestSpaceUsagePrediction(UdevTest):
             .require_unique_match(True)
             .search(managed_objects)
         )
+
+        if fs_specs is not None:
+            pool_proxy = get_object(pool_object_path)
+
+            (_, return_code, message,) = Pool.Methods.CreateFilesystems(
+                pool_proxy,
+                {"specs": map(lambda x: (x[0], (True, str(x[1].magnitude))), fs_specs)},
+            )
+
+            if return_code != 0:
+                raise RuntimeError(
+                    "Failed to create a requested filesystem: %s" % message
+                )
 
         modevs = [
             MOBlockDev(info)
@@ -167,3 +185,17 @@ class TestSpaceUsagePrediction(UdevTest):
             create_pool(pool_name, devnodes, key_description=key_description)
             self.wait_for_pools(1)
             self._test_prediction(pool_name)
+
+    def test_prediction_filesystems(self):
+        """
+        Verify that the prediction of space used is within acceptable limits
+        when creating filesystems.
+        """
+        device_tokens = self._lb_mgr.create_devices(4)
+        devnodes = self._lb_mgr.device_files(device_tokens)
+
+        with ServiceContextManager():
+            pool_name = random_string(5)
+            create_pool(pool_name, devnodes)
+            self.wait_for_pools(1)
+            self._test_prediction(pool_name, fs_specs=[("fs1", Range(1, TiB))])

@@ -14,6 +14,7 @@ check() {
 		udevadm \
 		plymouth \
 		/usr/sbin/plymouthd \
+		/usr/sbin/thin_metadata_size \
 		/usr/lib/udev/stratis-str-cmp \
 		/usr/lib/udev/stratis-base32-decode ||
 		return 1
@@ -45,6 +46,7 @@ install() {
 		udevadm \
 		plymouth \
 		/usr/sbin/plymouthd \
+		/usr/sbin/thin_metadata_size \
 		/usr/lib/udev/stratis-str-cmp
 	ln ${initdir}/usr/lib/udev/stratis-str-cmp ${initdir}/usr/lib/udev/stratis-base32-decode
 

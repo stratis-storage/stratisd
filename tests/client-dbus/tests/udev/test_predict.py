@@ -83,62 +83,61 @@ def _call_blockdev_size(dev):
     return outs.decode().rstrip("\n")
 
 
+def _possibly_add_filesystems(pool_object_path, *, fs_specs=None):
+    """
+    Add filesystems to the already created pool to set up testing, if
+    filesystms have been specified.
+
+    :param str pool_object_path: the D-Bus object path
+    :param fs_specs: the filesystem specs
+    :type fs_specs: list of str * Range or NoneType
+    """
+    if fs_specs is not None:
+        pool_proxy = get_object(pool_object_path)
+
+        (_, return_code, message,) = Pool.Methods.CreateFilesystems(
+            pool_proxy,
+            {"specs": map(lambda x: (x[0], (True, str(x[1].magnitude))), fs_specs)},
+        )
+
+        if return_code != 0:
+            raise RuntimeError("Failed to create a requested filesystem: %s" % message)
+
+        sleep(5)  # Give the daemon a chance to update Pool size values.
+
+
+def _get_block_device_sizes(pool_object_path, managed_objects):
+    """
+    Get sizes of block devices.
+
+    :param pool_object_path: The object path of the designated pool.
+    :param managed_objects: managed objects dict
+    """
+    modevs = [
+        MOBlockDev(info)
+        for objpath, info in blockdevs(props={"Pool": pool_object_path}).search(
+            managed_objects
+        )
+    ]
+
+    block_devices = [modev.PhysicalPath() for modev in modevs]
+
+    return [_call_blockdev_size(dev) for dev in block_devices]
+
+
 class TestSpaceUsagePrediction(UdevTest):
     """
     Test relations of prediction to reality.
     """
 
-    def _test_prediction(
-        self, pool_name, *, fs_specs=None
-    ):  # pylint: disable=too-many-locals
+    def _check_prediction(self, prediction, mopool):
         """
-        Helper function to verify that the prediction matches the reality to
-        an acceptable degree.
+        Check the prediction against the values obtained from the D-Bus.
 
-        :param str pool_name: the name of the pool to test
-        :param fs_specs: filesystems to create and test
-        :type fs_specs: list of of str * Range or NoneType
+        :param str prediction: result of calling script, JSON format
+        :param MOPool mopool: object with pool properties
         """
-        proxy = get_object(TOP_OBJECT)
-        managed_objects = ObjectManager.Methods.GetManagedObjects(proxy, {})
-
-        pool_object_path, pool = next(
-            pools(props={"Name": pool_name})
-            .require_unique_match(True)
-            .search(managed_objects)
-        )
-
-        if fs_specs is not None:
-            pool_proxy = get_object(pool_object_path)
-
-            (_, return_code, message,) = Pool.Methods.CreateFilesystems(
-                pool_proxy,
-                {"specs": map(lambda x: (x[0], (True, str(x[1].magnitude))), fs_specs)},
-            )
-
-            if return_code != 0:
-                raise RuntimeError(
-                    "Failed to create a requested filesystem: %s" % message
-                )
-
-            sleep(5)  # Give the daemon a chance to update Pool size values.
-
-        modevs = [
-            MOBlockDev(info)
-            for objpath, info in blockdevs(props={"Pool": pool_object_path}).search(
-                managed_objects
-            )
-        ]
-
-        mopool = MOPool(pool)
-
         encrypted = mopool.Encrypted()
-
-        block_devices = [modev.PhysicalPath() for modev in modevs]
-
-        physical_sizes = [_call_blockdev_size(dev) for dev in block_devices]
-
-        prediction = _call_predict_usage(encrypted, physical_sizes)
 
         (success, total_physical_used) = mopool.TotalPhysicalUsed()
         if not success:
@@ -160,6 +159,33 @@ class TestSpaceUsagePrediction(UdevTest):
         else:
             self.assertEqual(mopool.TotalPhysicalSize(), total_prediction)
             self.assertEqual(total_physical_used, used_prediction)
+
+    def _test_prediction(self, pool_name, *, fs_specs=None):
+        """
+        Helper function to verify that the prediction matches the reality to
+        an acceptable degree.
+
+        :param str pool_name: the name of the pool to test
+        :param fs_specs: filesystems to create and test
+        :type fs_specs: list of of str * Range or NoneType
+        """
+        proxy = get_object(TOP_OBJECT)
+        managed_objects = ObjectManager.Methods.GetManagedObjects(proxy, {})
+
+        pool_object_path, pool = next(
+            pools(props={"Name": pool_name})
+            .require_unique_match(True)
+            .search(managed_objects)
+        )
+
+        _possibly_add_filesystems(pool_object_path, fs_specs=fs_specs)
+
+        physical_sizes = _get_block_device_sizes(pool_object_path, managed_objects)
+        mopool = MOPool(pool)
+
+        prediction = _call_predict_usage(mopool.Encrypted(), physical_sizes)
+
+        self._check_prediction(prediction, mopool)
 
     def test_prediction(self):
         """

@@ -54,7 +54,8 @@ def _call_predict_usage(encrypted, device_sizes, *, fs_specs=None):
     :param bool encrypted: true if pool is to be encrypted
     :param device_sizes: list of sizes of devices for pool
     :type device_sizes: list of str
-    :param filesystem_size: list of sizes of filesystems
+    :param fs_specs: list of filesystem specs
+    :type fs_specs: list of str * Range
     """
     with subprocess.Popen(
         [_STRATIS_PREDICT_USAGE]
@@ -62,7 +63,7 @@ def _call_predict_usage(encrypted, device_sizes, *, fs_specs=None):
         + (
             []
             if fs_specs is None
-            else ["--filesystem-size=%s" for size in (size for _, size in fs_specs)]
+            else [("--filesystem-size=%s" % size.magnitude) for _, size in fs_specs]
         )
         + (["--encrypted"] if encrypted else []),
         stdout=subprocess.PIPE,

@@ -128,7 +128,7 @@ fn predict_usage(
     // This function is ad-hoc and can be re-evaluated if a better model
     // becomes available.
 
-    fn space_for_filesystem(logical_size: Bytes) -> Bytes {
+    fn space_for_filesystem(logical_size: Bytes) -> Sectors {
         let (m, b) = if logical_size < Bytes(4_398_046_511_104) {
             (0.51f64, 3.0f64)
         } else {
@@ -144,14 +144,23 @@ fn predict_usage(
         // change smoothly.
         #[allow(clippy::cast_possible_truncation)]
         #[allow(clippy::cast_precision_loss)]
-        Bytes(10f64.powf(m * f64::log10(*logical_size as f64) + b) as u128)
+        let result = Bytes(10f64.powf(m * f64::log10(*logical_size as f64) + b) as u128);
+
+        let result_sectors = result.sectors();
+
+        // Round up to the nearest sector
+        if result_sectors.bytes() == result {
+            result_sectors
+        } else {
+            result_sectors + Sectors(1)
+        }
     }
 
-    let fs_used: Option<Bytes> =
+    let fs_used: Option<Sectors> =
         filesystem_sizes.map(|sizes| sizes.iter().map(|&sz| space_for_filesystem(sz)).sum());
 
     let avail_size = (*avail_size)
-        .checked_sub(*fs_used.map(|v| v.sectors()).unwrap_or_else(|| Sectors(0)))
+        .checked_sub(*fs_used.unwrap_or(Sectors(0)))
         .map(Sectors)
         .ok_or_else(|| {
             Box::new(ExecutableError(

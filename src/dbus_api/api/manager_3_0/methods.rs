@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{convert::TryFrom, os::unix::io::AsRawFd, path::Path, time::Duration};
+use std::{convert::TryFrom, os::unix::io::AsRawFd, path::Path};
 
 use dbus::{
     arg::{Array, OwnedFd},
@@ -16,9 +16,8 @@ use crate::{
         blockdev::create_dbus_blockdev,
         consts,
         pool::create_dbus_pool,
-        types::{DbusContext, DbusErrorEnum, TData, OK_STRING},
+        types::{DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
-        POOL_CONDVAR, POOL_SETUP_STATE,
     },
     engine::{
         CreateAction, DeleteAction, EncryptionInfo, Engine, EngineAction, KeyActions,
@@ -249,101 +248,11 @@ where
     Ok(vec![msg])
 }
 
-/// Handle the StratEngine pool case where udev events trigger pool set up.
-fn handle_pool_create_wait(
-    uuid: PoolUuid,
-    return_message: Message,
-    default_return: (bool, (dbus::Path<'static>, Vec<dbus::Path<'static>>)),
-) -> MethodResult {
-    let mut guard = pool_notify_lock!((*POOL_SETUP_STATE).lock(), return_message, default_return);
-    guard.insert(uuid, None);
-    // NOTE: Condvar guard is still acquired until wait starts so we
-    // do not need to check again as nothing can change the state
-    // between these two statements.
-    let (mut guard, timeout) = pool_notify_lock!(
-        (*POOL_CONDVAR).wait_timeout_while(guard, Duration::from_secs(120), |state| {
-            if let Some(paths) = state.get(&uuid) {
-                paths.is_none()
-            } else {
-                // End wait if pool is not in state so that we can return an
-                // error.
-                false
-            }
-        }),
-        return_message,
-        default_return
-    );
-    if timeout.timed_out() {
-        warn!("Create pool request timed out waiting for pool to be created");
-    }
-    if let Some(Some((pool_path, bd_paths))) = guard.remove(&uuid) {
-        let results = (true, (pool_path, bd_paths));
-        Ok(vec![return_message.append3(
-            results,
-            DbusErrorEnum::OK as u16,
-            OK_STRING.to_string(),
-        )])
-    } else {
-        let err = StratisError::Msg(format!(
-            "Pool with UUID {} was not found after creation was requested",
-            uuid
-        ));
-        let (rc, rs) = engine_to_dbus_err_tuple(&err);
-        Ok(vec![return_message.append3(default_return, rc, rs)])
-    }
-}
-
-/// Handle creating a pool on the D-Bus whether or not the set up is triggered
-/// by udev events.
-fn handle_pool_create<E>(
-    dbus_context: &DbusContext<E>,
-    uuid_action: CreateAction<PoolUuid>,
-    base_path: dbus::Path<'static>,
-    return_message: Message,
-    default_return: (bool, (dbus::Path<'static>, Vec<dbus::Path<'static>>)),
-) -> MethodResult
-where
-    E: 'static + Engine,
-{
-    match uuid_action {
-        CreateAction::Created(uuid) => {
-            if dbus_context.engine.is_sim() {
-                let guard = block_on(dbus_context.engine.get_pool(LockKey::Uuid(uuid)))
-                    .expect("sim engine immediately inserts pool");
-                let (pool_name, pool_uuid, pool) = guard.as_tuple();
-                let pool_path =
-                    create_dbus_pool(dbus_context, base_path, &pool_name, pool_uuid, pool);
-                let mut bd_paths = Vec::new();
-                for (bd_uuid, tier, bd) in pool.blockdevs() {
-                    bd_paths.push(create_dbus_blockdev(
-                        dbus_context,
-                        pool_path.clone(),
-                        bd_uuid,
-                        tier,
-                        bd,
-                    ));
-                }
-                Ok(vec![return_message.append3(
-                    (true, (pool_path, bd_paths)),
-                    DbusErrorEnum::OK as u16,
-                    OK_STRING.to_string(),
-                )])
-            } else {
-                handle_pool_create_wait(uuid, return_message, default_return)
-            }
-        }
-        CreateAction::Identity => Ok(vec![return_message.append3(
-            default_return,
-            DbusErrorEnum::OK as u16,
-            OK_STRING.to_string(),
-        )]),
-    }
-}
-
 pub fn create_pool<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
 where
     E: 'static + Engine,
 {
+    let base_path = m.path.get_name();
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -394,20 +303,50 @@ where
     };
 
     let dbus_context = m.tree.get_data();
-    let result = handle_action!(block_on(dbus_context.engine.create_pool(
+    let create_result = handle_action!(block_on(dbus_context.engine.create_pool(
         name,
         &devs.map(Path::new).collect::<Vec<&Path>>(),
         EncryptionInfo::from_options((key_desc, clevis_info)).as_ref(),
     )));
+    match create_result {
+        Ok(pool_uuid_action) => match pool_uuid_action {
+            CreateAction::Created(uuid) => {
+                let guard = match block_on(dbus_context.engine.get_pool(LockKey::Uuid(uuid))) {
+                    Some(g) => g,
+                    None => {
+                        let (rc, rs) = engine_to_dbus_err_tuple(&StratisError::Msg(
+                            format!("Pool with UUID {} was successfully started but appears to have been removed before it could be exposed on the D-Bus", uuid)
+                        ));
+                        return Ok(vec![return_message.append3(default_return, rc, rs)]);
+                    }
+                };
 
-    match result {
-        Ok(pool_uuid_action) => handle_pool_create::<E>(
-            dbus_context,
-            pool_uuid_action,
-            m.path.get_name().clone(),
-            return_message,
-            default_return,
-        ),
+                let (pool_name, pool_uuid, pool) = guard.as_tuple();
+                let pool_path =
+                    create_dbus_pool(dbus_context, base_path.clone(), &pool_name, pool_uuid, pool);
+                let mut bd_paths = Vec::new();
+                for (bd_uuid, tier, bd) in pool.blockdevs() {
+                    bd_paths.push(create_dbus_blockdev(
+                        dbus_context,
+                        pool_path.clone(),
+                        bd_uuid,
+                        tier,
+                        bd,
+                    ));
+                }
+
+                Ok(vec![return_message.append3(
+                    (true, (pool_path, bd_paths)),
+                    DbusErrorEnum::OK as u16,
+                    OK_STRING.to_string(),
+                )])
+            }
+            CreateAction::Identity => Ok(vec![return_message.append3(
+                default_return,
+                DbusErrorEnum::OK as u16,
+                OK_STRING.to_string(),
+            )]),
+        },
         Err(x) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&x);
             Ok(vec![return_message.append3(default_return, rc, rs)])

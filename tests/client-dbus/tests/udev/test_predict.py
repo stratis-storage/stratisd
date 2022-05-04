@@ -20,7 +20,6 @@ Test that predictions of space usage match the actual.
 import json
 import os
 import subprocess
-from time import sleep
 
 # isort: THIRDPARTY
 from justbytes import Range, TiB
@@ -101,6 +100,10 @@ def _possibly_add_filesystems(pool_object_path, *, fs_specs=None):
     if fs_specs is not None:
         pool_proxy = get_object(pool_object_path)
 
+        (real, pool_used_pre) = Pool.Properties.TotalPhysicalUsed.Get(pool_proxy)
+        if not real:
+            raise RuntimeError("Failed to get pool usage before creating filesystems.")
+
         (_, return_code, message,) = Pool.Methods.CreateFilesystems(
             pool_proxy,
             {"specs": map(lambda x: (x[0], (True, str(x[1].magnitude))), fs_specs)},
@@ -109,7 +112,12 @@ def _possibly_add_filesystems(pool_object_path, *, fs_specs=None):
         if return_code != 0:
             raise RuntimeError("Failed to create a requested filesystem: %s" % message)
 
-        sleep(5)  # Give the daemon a chance to update Pool size values.
+        (real, pool_used_post) = Pool.Properties.TotalPhysicalUsed.Get(pool_proxy)
+        if not real:
+            raise RuntimeError("Failed to get pool usage after creating filesystems.")
+
+        if Range(pool_used_post) - Range(pool_used_pre) == Range(0):
+            raise RuntimeError("No change in pool usage after creating filesystem.")
 
 
 def _get_block_device_sizes(pool_object_path, managed_objects):

@@ -308,8 +308,8 @@ impl Engine for StratEngine {
     ) -> Vec<SomeLockReadGuard<PoolUuid, Self::Pool>> {
         let mut ret_guards = Vec::new();
         let uuids = {
-            let mut ld_guard = self.liminal_devices.write().await;
             let mut pools_write_all = self.pools.write_all().await;
+            let mut ld_guard = self.liminal_devices.write().await;
             match spawn_blocking!({
                 events
                     .into_iter()
@@ -367,10 +367,16 @@ impl Engine for StratEngine {
                 .collect::<Vec<_>>();
             let cloned_enc_info = encryption_info.cloned();
 
-            let (pool_uuid, _) = spawn_blocking!({
-                let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
-                StratPool::initialize(&cloned_name, &borrowed_paths, cloned_enc_info.as_ref())
-            })??;
+            let pool_uuid = {
+                let mut pools = self.pools.write_all().await;
+                let (pool_uuid, pool) = spawn_blocking!({
+                    let borrowed_paths =
+                        cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
+                    StratPool::initialize(&cloned_name, &borrowed_paths, cloned_enc_info.as_ref())
+                })??;
+                pools.insert(Name::new(name.to_string()), pool_uuid, pool);
+                pool_uuid
+            };
 
             Ok(CreateAction::Created(pool_uuid))
         }
@@ -432,8 +438,8 @@ impl Engine for StratEngine {
         pool_uuid: PoolUuid,
         unlock_method: UnlockMethod,
     ) -> StratisResult<SetUnlockAction<DevUuid>> {
-        let mut ld_guard = self.liminal_devices.write().await;
         let pools_read_all = self.pools.read_all().await;
+        let mut ld_guard = self.liminal_devices.write().await;
         let unlocked =
             spawn_blocking!(ld_guard.unlock_pool(&*pools_read_all, pool_uuid, unlock_method,))??;
         Ok(SetUnlockAction::new(unlocked))

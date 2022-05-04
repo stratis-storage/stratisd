@@ -146,23 +146,6 @@ macro_rules! box_variant {
     };
 }
 
-macro_rules! pool_notify_lock {
-    ($expr:expr, $return_message:expr, $default_return:expr) => {{
-        match $expr {
-            Ok(g) => g,
-            Err(e) => {
-                let (rc, rs) = $crate::dbus_api::util::engine_to_dbus_err_tuple(
-                    &$crate::stratis::StratisError::Msg(format!(
-                        "stratisd has ended up in a bad state and is no longer able to report pool creation completion: {}",
-                        e,
-                    ))
-                );
-                return Ok(vec![$return_message.append3($default_return, rc, rs)]);
-            },
-        }
-    }}
-}
-
 macro_rules! uuid_to_path {
     ($read_lock:expr, $uuid:expr, $utype:ident) => {
         $read_lock

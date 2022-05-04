@@ -4,14 +4,13 @@
 
 use std::task::Poll;
 
-use dbus::Path;
 use futures::{pin_mut, poll};
 use tokio::sync::mpsc::UnboundedReceiver;
 
 use crate::{
     dbus_api::{
         blockdev::create_dbus_blockdev, filesystem::create_dbus_filesystem, pool::create_dbus_pool,
-        types::DbusContext, POOL_CONDVAR, POOL_SETUP_STATE,
+        types::DbusContext,
     },
     engine::{Engine, Name, Pool, PoolUuid, UdevEngineEvent},
     stratis::{StratisError, StratisResult},
@@ -69,10 +68,7 @@ where
         let pool_infos = self.dbus_context.engine.handle_events(events).await;
         for guard in pool_infos {
             let (pool_name, pool_uuid, pool) = guard.as_tuple();
-            let (pool_path, bd_paths) = self.register_pool(&pool_name, pool_uuid, pool);
-            let _ = spawn_blocking!({
-                Self::notify_pool_create(pool_uuid, pool_path, bd_paths);
-            });
+            self.register_pool(&pool_name, pool_uuid, pool);
         }
 
         let new_state = self.dbus_context.engine.locked_pools().await;
@@ -84,12 +80,7 @@ where
     }
 
     /// Register a pool in the engine with D-Bus.
-    pub fn register_pool(
-        &self,
-        pool_name: &Name,
-        pool_uuid: PoolUuid,
-        pool: &E::Pool,
-    ) -> (Path<'static>, Vec<Path<'static>>) {
+    pub fn register_pool(&self, pool_name: &Name, pool_uuid: PoolUuid, pool: &E::Pool) {
         let pool_path = create_dbus_pool(
             &self.dbus_context,
             self.path.clone(),
@@ -107,35 +98,8 @@ where
                 fs,
             );
         }
-        let mut bd_paths = Vec::new();
         for (uuid, tier, bd) in pool.blockdevs() {
-            bd_paths.push(create_dbus_blockdev(
-                &self.dbus_context,
-                pool_path.clone(),
-                uuid,
-                tier,
-                bd,
-            ));
+            create_dbus_blockdev(&self.dbus_context, pool_path.clone(), uuid, tier, bd);
         }
-
-        (pool_path, bd_paths)
-    }
-
-    fn notify_pool_create(
-        pool_uuid: PoolUuid,
-        pool_path: Path<'static>,
-        bd_paths: Vec<Path<'static>>,
-    ) {
-        let mut guard = match (*POOL_SETUP_STATE).lock() {
-            Ok(g) => g,
-            Err(e) => {
-                warn!("Failed to notify pool of creation completion: {}", e);
-                return;
-            }
-        };
-        if let Some(entry) = guard.get_mut(&pool_uuid) {
-            *entry = Some((pool_path, bd_paths));
-        }
-        (*POOL_CONDVAR).notify_all();
     }
 }

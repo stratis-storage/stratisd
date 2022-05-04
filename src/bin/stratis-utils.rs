@@ -242,6 +242,7 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
             .arg(
                 Arg::with_name("filesystem-size")
                 .long("filesystem-size")
+                .number_of_values(1)
                 .multiple(true)
                 .help("Size of filesystem to be made for this pool. May be specified multiple times, one for each filesystem. Units are bytes.")
                 .next_line_help(true)

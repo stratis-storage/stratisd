@@ -67,7 +67,12 @@ def _call_predict_usage(encrypted, device_sizes, *, fs_specs=None):
         + (["--encrypted"] if encrypted else []),
         stdout=subprocess.PIPE,
     ) as command:
-        outs, _ = command.communicate()
+        outs, errs = command.communicate()
+        if command.returncode != 0:
+            raise RuntimeError(
+                "Invocation of %s returned an error: %s, %s"
+                % (_STRATIS_PREDICT_USAGE, command.returncode, errs)
+            )
         prediction = json.loads(outs)
 
     return prediction

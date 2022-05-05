@@ -172,7 +172,7 @@ class TestSpaceUsagePrediction(UdevTest):
         prediction_change = post_used - pre_used
 
         self.assertGreaterEqual(prediction_change, change)
-        self.assertLess(prediction_change, 2 * change)
+        self.assertLessEqual(prediction_change, 2 * change)
 
     def _check_prediction(self, prediction, mopool):
         """

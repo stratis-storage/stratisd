@@ -102,6 +102,9 @@ def _possibly_add_filesystems(pool_object_path, *, fs_specs=None):
     :param str pool_object_path: the D-Bus object path
     :param fs_specs: the filesystem specs
     :type fs_specs: list of str * Range or NoneType
+
+    :returns: the change in size of pool's TotalPhysicalUsed value
+    :rtype: Range
     """
     if fs_specs is not None:
         pool_proxy = get_object(pool_object_path)
@@ -122,8 +125,9 @@ def _possibly_add_filesystems(pool_object_path, *, fs_specs=None):
         if not real:
             raise RuntimeError("Failed to get pool usage after creating filesystems.")
 
-        if Range(pool_used_post) - Range(pool_used_pre) == Range(0):
-            raise RuntimeError("No change in pool usage after creating filesystem.")
+        return Range(pool_used_post) - Range(pool_used_pre)
+
+    return Range(0)
 
 
 def _get_block_device_sizes(pool_object_path, managed_objects):
@@ -149,6 +153,26 @@ class TestSpaceUsagePrediction(UdevTest):
     """
     Test relations of prediction to reality.
     """
+
+    def _check_fs_prediction(self, pre_prediction, post_prediction, change):
+        """
+        Check the prediction for filesystems by comparing a prediction
+        before filesystems are added to one after filesystems are added.
+
+        It should be greater or equal to the actual change but no greater than
+        twice the actual change.
+
+        :param str pre_prediction: prediction before filesystems
+        :param str post_prediction: prediction after filesystems
+        :param Range change: the real change in TotalPhysicalUsed result
+        """
+        pre_used = Range(pre_prediction["used"])
+        post_used = Range(post_prediction["used"])
+
+        prediction_change = post_used - pre_used
+
+        self.assertGreaterEqual(prediction_change, change)
+        self.assertLess(prediction_change, 2 * change)
 
     def _check_prediction(self, prediction, mopool):
         """
@@ -190,6 +214,7 @@ class TestSpaceUsagePrediction(UdevTest):
         :type fs_specs: list of of str * Range or NoneType
         """
         proxy = get_object(TOP_OBJECT)
+
         managed_objects = ObjectManager.Methods.GetManagedObjects(proxy, {})
 
         pool_object_path, pool = next(
@@ -198,16 +223,20 @@ class TestSpaceUsagePrediction(UdevTest):
             .search(managed_objects)
         )
 
-        _possibly_add_filesystems(pool_object_path, fs_specs=fs_specs)
-
-        physical_sizes = _get_block_device_sizes(pool_object_path, managed_objects)
         mopool = MOPool(pool)
 
-        prediction = _call_predict_usage(
+        physical_sizes = _get_block_device_sizes(pool_object_path, managed_objects)
+        pre_prediction = _call_predict_usage(mopool.Encrypted(), physical_sizes)
+
+        self._check_prediction(pre_prediction, mopool)
+
+        change = _possibly_add_filesystems(pool_object_path, fs_specs=fs_specs)
+
+        post_prediction = _call_predict_usage(
             mopool.Encrypted(), physical_sizes, fs_specs=fs_specs
         )
 
-        self._check_prediction(prediction, mopool)
+        self._check_fs_prediction(pre_prediction, post_prediction, change)
 
     def test_prediction(self):
         """

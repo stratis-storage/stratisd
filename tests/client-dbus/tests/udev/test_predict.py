@@ -160,7 +160,7 @@ class TestSpaceUsagePrediction(UdevTest):
         before filesystems are added to one after filesystems are added.
 
         It should be greater or equal to the actual change but no greater than
-        twice the actual change.
+        eight times the actual change.
 
         :param str pre_prediction: prediction before filesystems
         :param str post_prediction: prediction after filesystems
@@ -172,7 +172,7 @@ class TestSpaceUsagePrediction(UdevTest):
         prediction_change = post_used - pre_used
 
         self.assertGreaterEqual(prediction_change, change)
-        self.assertLessEqual(prediction_change, 2 * change)
+        self.assertLessEqual(prediction_change, 8 * change)
 
     def _check_prediction(self, prediction, mopool):
         """

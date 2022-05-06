@@ -22,6 +22,74 @@ use stratisd::engine::{crypt_metadata_size, ThinPoolSizeParams, BDA};
 #[cfg(feature = "systemd_compat")]
 use crate::generators::{stratis_clevis_setup_generator, stratis_setup_generator};
 
+const FS_SIZE_LOOKUP_TABLE_LEN: usize = 27;
+const FS_SIZE_START_POWER: usize = 29;
+const FS_LOGICAL_SIZE_MAX: u128 = 36_028_797_018_963_968; // 32 PiB
+const FS_LOGICAL_SIZE_MIN: u128 = 536_870_912; // 512 MiB
+
+struct FSSizeLookup {
+    internal: Vec<u128>,
+}
+
+impl FSSizeLookup {
+    fn lookup(&self, logical_size: Bytes) -> Sectors {
+        let raw_size = *logical_size;
+        assert!(raw_size >= FS_LOGICAL_SIZE_MIN);
+        assert!(raw_size < FS_LOGICAL_SIZE_MAX);
+        // At FS_LOGICAL_SIZE_MAX there is an 8 integer range of floating
+        // point value that the u128 value may occupy. Given the large size
+        // om the number and that it is the log that is being taken this is
+        // of no concern for the correctness of the value.
+        #[allow(clippy::cast_precision_loss)]
+        let lg = f64::log2(raw_size as f64);
+        // The value of lg is in the double decimal digits; truncation is
+        // impossible.
+        #[allow(clippy::cast_possible_truncation)]
+        let result = f64::floor(lg) as usize + 1;
+        let index = result - FS_SIZE_START_POWER;
+
+        // The values are in Sectors, they are real values from a test
+        // so they must be realistic in that sense.
+        Bytes(self.internal[index]).sectors()
+    }
+}
+
+impl Default for FSSizeLookup {
+    fn default() -> Self {
+        let internal = vec![
+            20_971_520,
+            20_971_520,
+            22_020_096,
+            23_068_672,
+            23_068_672,
+            31_457_280,
+            34_603_008,
+            51_380_224,
+            84_934_656,
+            152_043_520,
+            286_261_248,
+            571_473_920,
+            1_108_344_832,
+            2_171_600_896,
+            2_171_600_896,
+            2_171_600_896,
+            2_171_600_896,
+            2_205_155_328,
+            2_273_312_768,
+            2_407_530_496,
+            2_675_965_952,
+            3_212_836_864,
+            4_286_578_688,
+            6_434_062_336,
+            10_729_029_632,
+            19_318_964_224,
+            36_498_833_408,
+        ];
+        assert!(internal.len() == FS_SIZE_LOOKUP_TABLE_LEN);
+        FSSizeLookup { internal }
+    }
+}
+
 #[derive(Debug)]
 struct ExecutableError(String);
 
@@ -56,6 +124,25 @@ fn predict_usage(
     device_sizes: Vec<Bytes>,
     filesystem_sizes: Option<Vec<Bytes>>,
 ) -> Result<(), Box<dyn Error>> {
+    filesystem_sizes
+        .as_ref()
+        .map(|sizes| {
+            sizes
+                .iter()
+                .map(|&val| {
+                    if !(FS_LOGICAL_SIZE_MIN..FS_LOGICAL_SIZE_MAX).contains(&val) {
+                        Err(Box::new(ExecutableError(format!(
+                            "Specified filesystem size {} is not within allowed limits.",
+                            val
+                        ))))
+                    } else {
+                        Ok(val)
+                    }
+                })
+                .collect::<Result<Vec<Bytes>, _>>()
+        })
+        .transpose()?;
+
     let crypt_metadata_size = if encrypted {
         Bytes(u128::from(crypt_metadata_size()))
     } else {
@@ -111,53 +198,9 @@ fn predict_usage(
             ))
         })?;
 
-    // Guess at size required by specified filesystems. Due to layout effects
-    // we can not predict precisely how much space will be required by xfs
-    // metadata, etc. We use the following formulas which are based on some
-    // observations of filesystem sizes on Stratis pools.
-    // If logical size (ls) requested is:
-    // <= 4 TiB, expected size use is 10 ^ (0.51 * log_10(ls) + 3)
-    // otherwise, expected size is 10 ^ (0.36 * log_10(ls) + 5)
-    // Sizes less than 512 MiB are rejected.
-    // For our data, this computation always overestimates the amount of the
-    // data required by the a filesystem, but always by less than 100%.
-    // The function is piecewise, because our data had a pronounced kink at
-    // 4 TiB. It is intuitively likely that, for larger
-    // filesystems, the proportion of space used by the metadata should be
-    // smaller, which justifies the piecewise nature somewhat.
-    // This function is ad-hoc and can be re-evaluated if a better model
-    // becomes available.
-
-    fn space_for_filesystem(logical_size: Bytes) -> Sectors {
-        let (m, b) = if logical_size < Bytes(4_398_046_511_104) {
-            (0.51f64, 3.0f64)
-        } else {
-            (0.36f64, 5.0f64)
-        };
-        // Truncation is of no concern. All truncated values are expected to
-        // have at least 10 digits to the left of the binary floating point
-        // radix, the truncated fractional values will be relatively trivial.
-        //
-        // It is possible to lose precision when casting the logical size to
-        // f64 when the logical size exceeds 4 PiB; this should not lead
-        // to any computational misbehavior, as the log of the value should
-        // change smoothly.
-        #[allow(clippy::cast_possible_truncation)]
-        #[allow(clippy::cast_precision_loss)]
-        let result = Bytes(10f64.powf(m * f64::log10(*logical_size as f64) + b) as u128);
-
-        let result_sectors = result.sectors();
-
-        // Round up to the nearest sector
-        if result_sectors.bytes() == result {
-            result_sectors
-        } else {
-            result_sectors + Sectors(1)
-        }
-    }
-
+    let lookup = FSSizeLookup::default();
     let fs_used: Option<Sectors> =
-        filesystem_sizes.map(|sizes| sizes.iter().map(|&sz| space_for_filesystem(sz)).sum());
+        filesystem_sizes.map(|sizes| sizes.iter().map(|&sz| lookup.lookup(sz)).sum());
 
     let avail_size = (*avail_size)
         .checked_sub(*fs_used.unwrap_or(Sectors(0)))
@@ -247,7 +290,7 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
                 .long("filesystem-size")
                 .number_of_values(1)
                 .multiple(true)
-                .help("Size of filesystem to be made for this pool. May be specified multiple times, one for each filesystem. Units are bytes.")
+                .help("Size of filesystem to be made for this pool. May be specified multiple times, one for each filesystem. Units are bytes. Must be at least 512 MiB and less than 4 PiB.")
                 .next_line_help(true)
             );
         let matches = parser.get_matches_from(&args);

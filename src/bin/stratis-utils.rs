@@ -173,9 +173,12 @@ fn predict_usage(
     let total_size_str = Value::String((*(total_size.bytes())).to_string());
     let used_size_str = Value::String((*(used_size.bytes())).to_string());
     let avail_size_str = Value::String((*(avail_size.bytes())).to_string());
+    let stratis_admin_str = Value::String((*(total_non_data.bytes())).to_string());
+    let stratis_metadata_str =
+        Value::String((*((total_size - non_metadata_size).bytes())).to_string());
 
     let json = json! {
-        {"total": total_size_str, "used": used_size_str, "free": avail_size_str}
+        {"total": total_size_str, "used": used_size_str, "free": avail_size_str, "stratis-admin-space": stratis_admin_str, "stratis-metadata-space": stratis_metadata_str}
     };
 
     println!("{}", json);

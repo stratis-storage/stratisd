@@ -277,6 +277,11 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
                     .help("Whether the pool will be encrypted."),
             )
             .arg(
+                Arg::with_name("no-overprovision")
+                .long("no-overprovision")
+                .help("Indicates that the pool does not allow overprovisioning>"),
+            )
+            .arg(
                 Arg::with_name("device-size")
                     .long("device-size")
                     .number_of_values(1)

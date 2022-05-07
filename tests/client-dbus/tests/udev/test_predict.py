@@ -45,6 +45,8 @@ from ._utils import (
 )
 
 _STRATIS_PREDICT_USAGE = os.environ["STRATIS_PREDICT_USAGE"]
+# Filesystem size limit should be no more than three times actual size
+_FILESYSTEM_MULT_LIMIT = 3
 
 
 def _call_predict_usage(encrypted, device_sizes, *, fs_specs=None):
@@ -160,7 +162,7 @@ class TestSpaceUsagePrediction(UdevTest):
         before filesystems are added to one after filesystems are added.
 
         It should be greater or equal to the actual change but no greater than
-        eight times the actual change.
+        a statical limit times the actual change.
 
         :param str pre_prediction: prediction before filesystems
         :param str post_prediction: prediction after filesystems
@@ -172,7 +174,7 @@ class TestSpaceUsagePrediction(UdevTest):
         prediction_change = post_used - pre_used
 
         self.assertGreaterEqual(prediction_change, change)
-        self.assertLessEqual(prediction_change, 8 * change)
+        self.assertLessEqual(prediction_change, _FILESYSTEM_MULT_LIMIT * change)
 
     def _check_prediction(self, prediction, mopool):
         """

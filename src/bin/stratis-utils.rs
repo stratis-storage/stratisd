@@ -121,6 +121,7 @@ fn base32_decode(var_name: &str, base32_str: &str) -> Result<(), Box<dyn Error>>
 // of filesystem sizes.
 fn predict_usage(
     encrypted: bool,
+    overprovisioned: bool,
     device_sizes: Vec<Bytes>,
     filesystem_sizes: Option<Vec<Bytes>>,
 ) -> Result<(), Box<dyn Error>> {
@@ -133,6 +134,11 @@ fn predict_usage(
                     if !(FS_LOGICAL_SIZE_MIN..FS_LOGICAL_SIZE_MAX).contains(&val) {
                         Err(Box::new(ExecutableError(format!(
                             "Specified filesystem size {} is not within allowed limits.",
+                            val
+                        ))))
+                    } else if val.sectors().bytes() != val {
+                        Err(Box::new(ExecutableError(format!(
+                            "Specified filesystem size {} is not a multiple of sctor size, 512.",
                             val
                         ))))
                     } else {
@@ -198,9 +204,13 @@ fn predict_usage(
             ))
         })?;
 
-    let lookup = FSSizeLookup::default();
-    let fs_used: Option<Sectors> =
-        filesystem_sizes.map(|sizes| sizes.iter().map(|&sz| lookup.lookup(sz)).sum());
+    let fs_used: Option<Sectors> = if overprovisioned {
+        let lookup = FSSizeLookup::default();
+
+        filesystem_sizes.map(|sizes| sizes.iter().map(|&sz| lookup.lookup(sz)).sum())
+    } else {
+        filesystem_sizes.map(|sizes| sizes.iter().map(|sz| sz.sectors()).sum())
+    };
 
     let avail_size = (*avail_size)
         .checked_sub(*fs_used.unwrap_or(Sectors(0)))
@@ -301,6 +311,7 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
         let matches = parser.get_matches_from(&args);
         predict_usage(
             matches.is_present("encrypted"),
+            !matches.is_present("no-overprovision"),
             matches
                 .values_of("device-size")
                 .map(|szs| {

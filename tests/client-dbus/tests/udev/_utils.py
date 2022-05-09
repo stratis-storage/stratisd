@@ -36,6 +36,7 @@ from stratisd_client_dbus import (
     Manager,
     MOPool,
     ObjectManager,
+    Pool,
     StratisdErrors,
     get_object,
     pools,
@@ -62,7 +63,9 @@ def random_string(length):
     )
 
 
-def create_pool(name, devices, *, key_description=None, clevis_info=None):
+def create_pool(
+    name, devices, *, key_description=None, clevis_info=None, overprovision=True
+):
     """
     Creates a stratis pool.
     :param name:    Name of pool
@@ -90,12 +93,18 @@ def create_pool(name, devices, *, key_description=None, clevis_info=None):
         },
     )
 
-    if exit_code == StratisdErrors.OK:
-        return result
+    if exit_code != StratisdErrors.OK:
+        raise RuntimeError(
+            "Unable to create a pool %s with devices %s: %s"
+            % (name, devices, error_str)
+        )
 
-    raise RuntimeError(
-        "Unable to create a pool %s with devices %s: %s" % (name, devices, error_str)
-    )
+    (_, (pool_object_path, _)) = result
+
+    if not overprovision:
+        Pool.Properties.Overprovisioning.Set(get_object(pool_object_path), False)
+
+    return result
 
 
 def get_pools(name=None):

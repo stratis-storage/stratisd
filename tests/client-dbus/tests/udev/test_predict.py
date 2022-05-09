@@ -22,7 +22,7 @@ import os
 import subprocess
 
 # isort: THIRDPARTY
-from justbytes import Range, TiB
+from justbytes import GiB, Range, TiB
 
 # isort: LOCAL
 from stratisd_client_dbus import (
@@ -49,7 +49,7 @@ _STRATIS_PREDICT_USAGE = os.environ["STRATIS_PREDICT_USAGE"]
 _FILESYSTEM_MULT_LIMIT = 3
 
 
-def _call_predict_usage(encrypted, device_sizes, *, fs_specs=None):
+def _call_predict_usage(encrypted, device_sizes, *, fs_specs=None, overprovision=True):
     """
     Call stratis-predict-usage and return JSON resut.
 
@@ -58,6 +58,7 @@ def _call_predict_usage(encrypted, device_sizes, *, fs_specs=None):
     :type device_sizes: list of str
     :param fs_specs: list of filesystem specs
     :type fs_specs: list of str * Range
+    :param bool overprovision: whether it is allowed to overprovision the pool
     """
     with subprocess.Popen(
         [_STRATIS_PREDICT_USAGE]
@@ -67,7 +68,8 @@ def _call_predict_usage(encrypted, device_sizes, *, fs_specs=None):
             if fs_specs is None
             else [("--filesystem-size=%s" % size.magnitude) for _, size in fs_specs]
         )
-        + (["--encrypted"] if encrypted else []),
+        + (["--encrypted"] if encrypted else [])
+        + ([] if overprovision else ["--no-overprovision"]),
         stdout=subprocess.PIPE,
     ) as command:
         outs, errs = command.communicate()
@@ -156,7 +158,9 @@ class TestSpaceUsagePrediction(UdevTest):
     Test relations of prediction to reality.
     """
 
-    def _check_fs_prediction(self, pre_prediction, post_prediction, change):
+    def _check_fs_prediction(
+        self, pre_prediction, post_prediction, change, *, overprovision=True
+    ):
         """
         Check the prediction for filesystems by comparing a prediction
         before filesystems are added to one after filesystems are added.
@@ -167,14 +171,20 @@ class TestSpaceUsagePrediction(UdevTest):
         :param str pre_prediction: prediction before filesystems
         :param str post_prediction: prediction after filesystems
         :param Range change: the real change in TotalPhysicalUsed result
+        :param bool overprovision: whether overprovisioning is allowed on pool
         """
         pre_used = Range(pre_prediction["used"])
         post_used = Range(post_prediction["used"])
 
         prediction_change = post_used - pre_used
 
-        self.assertGreaterEqual(prediction_change, change)
-        self.assertLessEqual(prediction_change, _FILESYSTEM_MULT_LIMIT * change)
+        if overprovision:
+            self.assertGreaterEqual(prediction_change, change)
+            self.assertLessEqual(prediction_change, _FILESYSTEM_MULT_LIMIT * change)
+        else:
+            # If no overprovisioning is allowed, the prediction will exceed the
+            # actual used for any filesystem.
+            self.assertLess(change, prediction_change)
 
     def _check_prediction(self, prediction, mopool):
         """
@@ -206,7 +216,7 @@ class TestSpaceUsagePrediction(UdevTest):
             self.assertEqual(mopool.TotalPhysicalSize(), total_prediction)
             self.assertEqual(total_physical_used, used_prediction)
 
-    def _test_prediction(self, pool_name, *, fs_specs=None):
+    def _test_prediction(self, pool_name, *, fs_specs=None, overprovision=True):
         """
         Helper function to verify that the prediction matches the reality to
         an acceptable degree.
@@ -214,6 +224,7 @@ class TestSpaceUsagePrediction(UdevTest):
         :param str pool_name: the name of the pool to test
         :param fs_specs: filesystems to create and test
         :type fs_specs: list of of str * Range or NoneType
+        :param bool overprovision: True if overprovisioning is allowed
         """
         proxy = get_object(TOP_OBJECT)
 
@@ -228,17 +239,24 @@ class TestSpaceUsagePrediction(UdevTest):
         mopool = MOPool(pool)
 
         physical_sizes = _get_block_device_sizes(pool_object_path, managed_objects)
-        pre_prediction = _call_predict_usage(mopool.Encrypted(), physical_sizes)
+        pre_prediction = _call_predict_usage(
+            mopool.Encrypted(), physical_sizes, overprovision=overprovision
+        )
 
         self._check_prediction(pre_prediction, mopool)
 
         change = _possibly_add_filesystems(pool_object_path, fs_specs=fs_specs)
 
         post_prediction = _call_predict_usage(
-            mopool.Encrypted(), physical_sizes, fs_specs=fs_specs
+            mopool.Encrypted(),
+            physical_sizes,
+            fs_specs=fs_specs,
+            overprovision=overprovision,
         )
 
-        self._check_fs_prediction(pre_prediction, post_prediction, change)
+        self._check_fs_prediction(
+            pre_prediction, post_prediction, change, overprovision=overprovision
+        )
 
     def test_prediction(self):
         """
@@ -281,3 +299,19 @@ class TestSpaceUsagePrediction(UdevTest):
             create_pool(pool_name, devnodes)
             self.wait_for_pools(1)
             self._test_prediction(pool_name, fs_specs=[("fs1", Range(1, TiB))])
+
+    def test_prediction_no_overprov(self):
+        """
+        Verify that the prediction of space used is within acceptable limits
+        when no overprovisioning is allowed.
+        """
+        device_tokens = self._lb_mgr.create_devices(4)
+        devnodes = self._lb_mgr.device_files(device_tokens)
+
+        with ServiceContextManager():
+            pool_name = random_string(5)
+            create_pool(pool_name, devnodes, overprovision=False)
+            self.wait_for_pools(1)
+            self._test_prediction(
+                pool_name, fs_specs=[("fs1", Range(2, GiB))], overprovision=False
+            )

@@ -4,7 +4,13 @@
 
 // Code to handle management of a pool's thinpool device.
 
-use std::{cmp::min, collections::HashMap, fmt, thread::sleep, time::Duration};
+use std::{
+    cmp::{max, min},
+    collections::HashMap,
+    fmt,
+    thread::sleep,
+    time::Duration,
+};
 
 use serde_json::{Map, Value};
 
@@ -657,6 +663,11 @@ impl ThinPool {
             data_segments,
             mdv_segments,
         };
+
+        let fs_limit = thin_pool_save.fs_limit.unwrap_or_else(|| {
+            max(fs_table.len(), convert_const!(DEFAULT_FS_LIMIT, u64, usize)) as u64
+        });
+
         Ok(ThinPool {
             thin_pool: thinpool_dev,
             segments,
@@ -667,7 +678,7 @@ impl ThinPool {
             thin_pool_status: digest,
             allocated_size: backstore.datatier_allocated_size(),
             used: status_to_usage(thin_pool_status),
-            fs_limit: thin_pool_save.fs_limit.unwrap_or(DEFAULT_FS_LIMIT),
+            fs_limit,
             enable_overprov: thin_pool_save.enable_overprov.unwrap_or(true),
         })
     }

@@ -222,7 +222,7 @@ macro_rules! handle_background_change {
         if let Some(path) = uuid_to_path!($read_lock, $uuid, $pat) {
             handle_signal_change!($self, path, $type, $( $interface => { $($prop, $data_to_prop, $prop_val),+ }),*)
         } else {
-            warn!("A {} property was changed in the engine but no {} with the corresponding UUID could be found in the D-Bus layer", $type, $type);
+            warn!("A {} property was changed in the engine but no {} with the corresponding UUID, {}, could be found in the D-Bus layer", $type, $type, $uuid);
         }
     }
 }

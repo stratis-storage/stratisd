@@ -29,11 +29,9 @@ jobs:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT ENVIRONMENT
           - image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
             toolchain: 1.60.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            skip_value: 0
           # MANDATORY CHECKS USING LOWEST SUPPORTED ENVIRONMENT PROXY
           - image: fedora:34  # LOWEST DEVELOPMENT ENVIRONMENT
             toolchain: 1.58.1  # LOWEST SUPPORTED RUST TOOLCHAIN
-            skip_value: 1
     runs-on: ubuntu-18.04
     container:
       image: ${{ matrix.image }}
@@ -84,7 +82,6 @@ jobs:
         run: >
           RUST_LOG=stratisd=debug
           STRATISD=/usr/libexec/stratisd
-          SKIP_DUPLICATE_NAMES_TEST=${{ matrix.skip_value }}
           PYTHONPATH=./src
           make udev-tests
         working-directory: ./tests/client-dbus

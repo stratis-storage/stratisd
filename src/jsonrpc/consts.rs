@@ -8,4 +8,3 @@ pub const OP_ERR: u16 = 1;
 pub const OP_OK_STR: &str = "OK";
 
 pub const RPC_SOCKADDR: &str = "/run/stratisd/stratisd-min-jsonrpc";
-pub const RPC_CONNADDR: &str = "/run/stratisd/stratisd-min-jsonrpc";

@@ -15,13 +15,23 @@ use nix::sys::{
     socket::{sendmsg, ControlMessage, MsgFlags},
     uio::IoVec,
 };
+use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
-    jsonrpc::interface::{StratisParams, StratisRet},
+    jsonrpc::interface::{IpcResult, StratisParams, StratisRet},
     stratis::StratisResult,
 };
 
-fn send_request(unix_fd: RawFd, vec: Vec<u8>, fd_opt: Option<RawFd>) -> StratisResult<()> {
+fn send_request<S, D>(
+    unix_stream: &mut UnixStream,
+    msg: &S,
+    fd_opt: Option<RawFd>,
+) -> StratisResult<D>
+where
+    S: Serialize,
+    D: DeserializeOwned,
+{
+    let vec = serde_json::to_vec(msg)?;
     let fd_vec: Vec<_> = fd_opt.into_iter().collect();
     let scm = if fd_vec.is_empty() {
         vec![]
@@ -29,13 +39,16 @@ fn send_request(unix_fd: RawFd, vec: Vec<u8>, fd_opt: Option<RawFd>) -> StratisR
         vec![ControlMessage::ScmRights(fd_vec.as_slice())]
     };
     sendmsg(
-        unix_fd,
+        unix_stream.as_raw_fd(),
         &[IoVec::from_slice(vec.as_slice())],
         scm.as_slice(),
         MsgFlags::empty(),
         None,
     )?;
-    Ok(())
+    let mut vec = vec![0; 65536];
+    let bytes_read = unix_stream.read(vec.as_mut_slice())?;
+    vec.truncate(bytes_read);
+    Ok(serde_json::from_slice(vec.as_slice())?)
 }
 
 pub struct StratisClient(UnixStream);
@@ -48,15 +61,7 @@ impl StratisClient {
         Ok(StratisClient(UnixStream::connect(path)?))
     }
 
-    pub fn request(&mut self, params: StratisParams) -> StratisResult<StratisRet> {
-        send_request(
-            self.0.as_raw_fd(),
-            serde_json::to_vec(&params.type_)?,
-            params.fd_opt,
-        )?;
-        let mut vec = vec![0; 65536];
-        let bytes_read = self.0.read(vec.as_mut_slice())?;
-        vec.truncate(bytes_read);
-        Ok(serde_json::from_slice(vec.as_slice())?)
+    pub fn request(&mut self, params: StratisParams) -> StratisResult<IpcResult<StratisRet>> {
+        send_request(&mut self.0, &params.type_, params.fd_opt)
     }
 }

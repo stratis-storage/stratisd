@@ -29,6 +29,7 @@ use nix::{
     },
     unistd::close,
 };
+use serde::Serialize;
 use tokio::{io::unix::AsyncFd, task::JoinHandle};
 
 #[cfg(feature = "systemd_compat")]
@@ -37,43 +38,43 @@ use crate::{
     engine::Engine,
     jsonrpc::{
         consts::RPC_SOCKADDR,
-        interface::{StratisParamType, StratisParams, StratisRet},
+        interface::{IpcResult, StratisParamType, StratisParams, StratisRet},
         server::{filesystem, key, pool, report, utils::stratis_result_to_return},
     },
     stratis::{StratisError, StratisResult},
 };
 
 impl StratisParams {
-    async fn process<E>(self, engine: Arc<E>) -> StratisRet
+    async fn process<E>(self, engine: Arc<E>) -> IpcResult<StratisRet>
     where
         E: Engine,
     {
         match self.type_ {
             StratisParamType::KeySet(key_desc) => {
-                let fd = expects_fd!(self.fd_opt, KeySet, None, true);
-                StratisRet::KeySet(stratis_result_to_return(
+                let fd = expects_fd!(self.fd_opt, true);
+                Ok(StratisRet::KeySet(stratis_result_to_return(
                     key::key_set(engine, &key_desc, fd).await,
                     None,
-                ))
+                )))
             }
             StratisParamType::KeyUnset(key_desc) => {
-                expects_fd!(self.fd_opt, KeyUnset, false, false);
-                StratisRet::KeyUnset(stratis_result_to_return(
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::KeyUnset(stratis_result_to_return(
                     key::key_unset(engine, &key_desc).await,
                     false,
-                ))
+                )))
             }
             StratisParamType::KeyList => {
-                expects_fd!(self.fd_opt, KeyUnset, false, false);
-                StratisRet::KeyList(stratis_result_to_return(
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::KeyList(stratis_result_to_return(
                     key::key_list(engine).await,
                     Vec::new(),
-                ))
+                )))
             }
             StratisParamType::PoolCreate(name, paths, encryption_info) => {
-                expects_fd!(self.fd_opt, PoolCreate, false, false);
+                expects_fd!(self.fd_opt, false);
                 let path_ref: Vec<_> = paths.iter().map(|p| p.as_path()).collect();
-                StratisRet::PoolCreate(stratis_result_to_return(
+                Ok(StratisRet::PoolCreate(stratis_result_to_return(
                     pool::pool_create(
                         engine,
                         name.as_str(),
@@ -82,143 +83,121 @@ impl StratisParams {
                     )
                     .await,
                     false,
-                ))
+                )))
             }
             StratisParamType::PoolRename(name, new_name) => {
-                expects_fd!(self.fd_opt, PoolRename, false, false);
-                StratisRet::PoolRename(stratis_result_to_return(
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::PoolRename(stratis_result_to_return(
                     pool::pool_rename(engine, name.as_str(), new_name.as_str()).await,
                     false,
-                ))
+                )))
             }
             StratisParamType::PoolAddData(name, paths) => {
-                expects_fd!(self.fd_opt, PoolAddData, false, false);
+                expects_fd!(self.fd_opt, false);
                 let path_ref: Vec<_> = paths.iter().map(|p| p.as_path()).collect();
-                StratisRet::PoolInitCache(stratis_result_to_return(
+                Ok(StratisRet::PoolInitCache(stratis_result_to_return(
                     pool::pool_add_data(engine, name.as_str(), path_ref.as_slice()).await,
                     false,
-                ))
+                )))
             }
             StratisParamType::PoolInitCache(name, paths) => {
-                expects_fd!(self.fd_opt, PoolInitCache, false, false);
+                expects_fd!(self.fd_opt, false);
                 let path_ref: Vec<_> = paths.iter().map(|p| p.as_path()).collect();
-                StratisRet::PoolInitCache(stratis_result_to_return(
+                Ok(StratisRet::PoolInitCache(stratis_result_to_return(
                     pool::pool_init_cache(engine, name.as_str(), path_ref.as_slice()).await,
                     false,
-                ))
+                )))
             }
             StratisParamType::PoolAddCache(name, paths) => {
-                expects_fd!(self.fd_opt, PoolAddCache, false, false);
+                expects_fd!(self.fd_opt, false);
                 let path_ref: Vec<_> = paths.iter().map(|p| p.as_path()).collect();
-                StratisRet::PoolAddCache(stratis_result_to_return(
+                Ok(StratisRet::PoolAddCache(stratis_result_to_return(
                     pool::pool_add_cache(engine, name.as_str(), path_ref.as_slice()).await,
                     false,
-                ))
+                )))
             }
             StratisParamType::PoolDestroy(name) => {
-                expects_fd!(self.fd_opt, PoolDestroy, false, false);
-                StratisRet::PoolDestroy(stratis_result_to_return(
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::PoolDestroy(stratis_result_to_return(
                     pool::pool_destroy(engine, name.as_str()).await,
                     false,
-                ))
+                )))
             }
             StratisParamType::PoolUnlock(unlock_method, uuid) => {
-                StratisRet::PoolUnlock(stratis_result_to_return(
+                Ok(StratisRet::PoolUnlock(stratis_result_to_return(
                     pool::pool_unlock(engine, unlock_method, uuid, self.fd_opt).await,
                     false,
-                ))
+                )))
             }
             StratisParamType::PoolList => {
-                if let Some(fd) = self.fd_opt {
-                    if let Err(e) = close(fd) {
-                        warn!(
-                            "Failed to close file descriptor {}: {}; a file \
-                            descriptor may have been leaked",
-                            fd, e,
-                        );
-                    }
-                }
-                StratisRet::PoolList(pool::pool_list(engine).await)
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::PoolList(pool::pool_list(engine).await))
             }
             StratisParamType::PoolIsEncrypted(uuid) => {
-                expects_fd!(self.fd_opt, PoolIsEncrypted, false, false);
-                StratisRet::PoolIsEncrypted(stratis_result_to_return(
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::PoolIsEncrypted(stratis_result_to_return(
                     pool::pool_is_encrypted(engine, uuid).await,
                     false,
-                ))
+                )))
             }
             StratisParamType::PoolIsLocked(uuid) => {
-                expects_fd!(self.fd_opt, PoolIsLocked, false, false);
-                StratisRet::PoolIsLocked(stratis_result_to_return(
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::PoolIsLocked(stratis_result_to_return(
                     pool::pool_is_locked(engine, uuid).await,
                     false,
-                ))
+                )))
             }
             StratisParamType::PoolIsBound(uuid) => {
-                expects_fd!(self.fd_opt, PoolIsBound, false, false);
-                StratisRet::PoolIsBound(stratis_result_to_return(
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::PoolIsBound(stratis_result_to_return(
                     pool::pool_is_bound(engine, uuid).await,
                     false,
-                ))
+                )))
             }
             StratisParamType::PoolHasPassphrase(uuid) => {
-                expects_fd!(self.fd_opt, PoolHasPassphrase, false, false);
-                StratisRet::PoolHasPassphrase(stratis_result_to_return(
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::PoolHasPassphrase(stratis_result_to_return(
                     pool::pool_has_passphrase(engine, uuid).await,
                     false,
-                ))
+                )))
             }
             StratisParamType::PoolClevisPin(uuid) => {
-                expects_fd!(self.fd_opt, PoolClevisPin, None, false);
-                StratisRet::PoolClevisPin(stratis_result_to_return(
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::PoolClevisPin(stratis_result_to_return(
                     pool::pool_clevis_pin(engine, uuid).await,
                     None,
-                ))
+                )))
             }
             StratisParamType::FsCreate(pool_name, fs_name) => {
-                expects_fd!(self.fd_opt, FsCreate, false, false);
-                StratisRet::FsCreate(stratis_result_to_return(
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::FsCreate(stratis_result_to_return(
                     filesystem::filesystem_create(engine, &pool_name, &fs_name).await,
                     false,
-                ))
+                )))
             }
             StratisParamType::FsList => {
-                if let Some(fd) = self.fd_opt {
-                    if let Err(e) = close(fd) {
-                        warn!(
-                            "Failed to close file descriptor {}: {}; a file \
-                            descriptor may have been leaked",
-                            fd, e,
-                        );
-                    }
-                }
-                StratisRet::FsList(filesystem::filesystem_list(engine).await)
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::FsList(
+                    filesystem::filesystem_list(engine).await,
+                ))
             }
             StratisParamType::FsDestroy(pool_name, fs_name) => {
-                expects_fd!(self.fd_opt, FsDestroy, false, false);
-                StratisRet::FsDestroy(stratis_result_to_return(
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::FsDestroy(stratis_result_to_return(
                     filesystem::filesystem_destroy(engine, &pool_name, &fs_name).await,
                     false,
-                ))
+                )))
             }
             StratisParamType::FsRename(pool_name, fs_name, new_fs_name) => {
-                expects_fd!(self.fd_opt, FsRename, false, false);
-                StratisRet::FsRename(stratis_result_to_return(
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::FsRename(stratis_result_to_return(
                     filesystem::filesystem_rename(engine, &pool_name, &fs_name, &new_fs_name).await,
                     false,
-                ))
+                )))
             }
             StratisParamType::Report => {
-                if let Some(fd) = self.fd_opt {
-                    if let Err(e) = close(fd) {
-                        warn!(
-                            "Failed to close file descriptor {}: {}; a file \
-                            descriptor may have been leaked",
-                            fd, e,
-                        );
-                    }
-                }
-                StratisRet::Report(report::report(engine).await)
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::Report(report::report(engine).await))
             }
         }
     }
@@ -252,10 +231,10 @@ where
         Ok(server)
     }
 
-    async fn handle_request(&mut self) -> StratisResult<Option<()>> {
+    async fn handle_request(&mut self) -> StratisResult<bool> {
         let request_handler = match self.listener.next().await {
             Some(req_res) => req_res?,
-            None => return Ok(None),
+            None => return Ok(false),
         };
         let engine = self.engine.clone();
         tokio::spawn(async move {
@@ -272,14 +251,14 @@ where
                 warn!("Failed to respond to request: {}", e);
             }
         });
-        Ok(Some(()))
+        Ok(true)
     }
 
     pub async fn run(mut self) {
         loop {
             match self.handle_request().await {
-                Ok(Some(())) => (),
-                Ok(None) => {
+                Ok(true) => (),
+                Ok(false) => {
                     info!("Unix socket listener can no longer accept connections; exiting...");
                     return;
                 }
@@ -291,46 +270,34 @@ where
     }
 }
 
-fn handle_cmsgs(mut cmsgs: Vec<ControlMessageOwned>) -> StratisResult<Option<RawFd>> {
-    if cmsgs.len() > 1 {
-        cmsgs
-            .into_iter()
-            .filter_map(|msg| {
-                if let ControlMessageOwned::ScmRights(vec) = msg {
-                    Some(vec)
-                } else {
-                    None
-                }
-            })
-            .for_each(|vec| {
-                for fd in vec {
-                    if let Err(e) = close(fd) {
-                        warn!("Failed to close file descriptor {}: {}", fd, e);
-                    }
-                }
-            });
-        return Err(StratisError::Msg(
-            "Unix packet contained more than one ancillary data message".to_string(),
-        ));
-    }
-
-    Ok(match cmsgs.pop() {
-        Some(ControlMessageOwned::ScmRights(mut vec)) => {
-            if vec.len() > 1 {
-                for fd in vec {
-                    if let Err(e) = close(fd) {
-                        warn!("Failed to close file descriptor {}: {}", fd, e);
-                    }
-                }
-                return Err(StratisError::Msg(
-                    "Received more than one file descriptor".to_string(),
-                ));
+fn handle_cmsgs(cmsgs: Vec<ControlMessageOwned>) -> StratisResult<Option<RawFd>> {
+    let mut fds = cmsgs
+        .into_iter()
+        .filter_map(|msg| {
+            if let ControlMessageOwned::ScmRights(vec) = msg {
+                Some(vec)
             } else {
-                vec.pop()
+                None
             }
-        }
-        _ => None,
-    })
+        })
+        .flatten()
+        .collect::<Vec<_>>();
+
+    if fds.len() > 1 {
+        fds.into_iter().for_each(|fd| {
+            if let Err(e) = close(fd) {
+                warn!(
+                    "Failed to close file descriptor {}: {}; potential for leaked file descriptor",
+                    fd, e
+                );
+            }
+        });
+        Err(StratisError::Msg(
+            "Unix packet contained more than one file descriptor".to_string(),
+        ))
+    } else {
+        Ok(fds.pop())
+    }
 }
 
 fn try_recvmsg(fd: RawFd) -> StratisResult<StratisParams> {
@@ -346,11 +313,15 @@ fn try_recvmsg(fd: RawFd) -> StratisResult<StratisParams> {
     let cmsgs = rmsg.cmsgs().collect();
     let fd_opt = handle_cmsgs(cmsgs)?;
     vec.truncate(rmsg.bytes);
-    Ok(serde_json::from_slice(vec.as_slice())
-        .map(|type_: StratisParamType| StratisParams { type_, fd_opt })?)
+    serde_json::from_slice(vec.as_slice())
+        .map(|type_| StratisParams { type_, fd_opt })
+        .map_err(StratisError::from)
 }
 
-fn try_sendmsg(fd: RawFd, ret: &StratisRet) -> StratisResult<()> {
+fn try_sendmsg<S>(fd: RawFd, ret: &S) -> StratisResult<()>
+where
+    S: Serialize,
+{
     let vec = serde_json::to_vec(ret)?;
     sendmsg(
         fd,
@@ -369,7 +340,7 @@ pub struct StratisUnixRequest {
 impl Future for StratisUnixRequest {
     type Output = StratisResult<StratisParams>;
 
-    fn poll(self: Pin<&mut Self>, ctxt: &mut Context<'_>) -> Poll<StratisResult<StratisParams>> {
+    fn poll(self: Pin<&mut Self>, ctxt: &mut Context<'_>) -> Poll<Self::Output> {
         let poll_res = ready!(self.fd.poll_read_ready(ctxt));
         let mut poll_guard = match poll_res {
             Ok(poll) => poll,
@@ -383,11 +354,11 @@ impl Future for StratisUnixRequest {
 
 pub struct StratisUnixResponse {
     fd: Arc<AsyncFd<RawFd>>,
-    ret: StratisRet,
+    ret: IpcResult<StratisRet>,
 }
 
 impl StratisUnixResponse {
-    pub fn new(fd: Arc<AsyncFd<RawFd>>, ret: StratisRet) -> StratisUnixResponse {
+    pub fn new(fd: Arc<AsyncFd<RawFd>>, ret: IpcResult<StratisRet>) -> StratisUnixResponse {
         StratisUnixResponse { fd, ret }
     }
 }

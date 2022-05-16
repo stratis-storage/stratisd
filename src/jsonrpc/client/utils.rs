@@ -14,7 +14,7 @@ macro_rules! do_request {
                 ),
                 fd_opt: Some($fd),
             }
-        )? {
+        )?.map_err($crate::stratis::StratisError::Msg)? {
             ret
         } else {
             return Err($crate::stratis::StratisError::Msg(
@@ -32,7 +32,7 @@ macro_rules! do_request {
                 ),
                 fd_opt: None,
             }
-        )? {
+        )?.map_err($crate::stratis::StratisError::Msg)? {
             ret
         } else {
             return Err($crate::stratis::StratisError::Msg(
@@ -48,7 +48,7 @@ macro_rules! do_request {
                 type_: $crate::jsonrpc::interface::StratisParamType::$request,
                 fd_opt: None,
             }
-        )? {
+        )?.map_err($crate::stratis::StratisError::Msg)? {
             ret
         } else {
             return Err($crate::stratis::StratisError::Msg(

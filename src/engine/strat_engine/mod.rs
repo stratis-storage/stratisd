@@ -12,6 +12,7 @@ mod keys;
 mod liminal;
 mod metadata;
 mod names;
+mod ns;
 mod pool;
 mod serde_structs;
 mod thinpool;
@@ -24,6 +25,7 @@ pub use self::{
     engine::StratEngine,
     keys::StratKeyActions,
     metadata::{StaticHeader, StaticHeaderResult, BDA},
+    ns::unshare_namespace,
 };
 
 #[cfg(test)]

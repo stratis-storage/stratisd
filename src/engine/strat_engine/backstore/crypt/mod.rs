@@ -50,7 +50,7 @@ mod tests {
                     },
                     shared::acquire_crypt_device,
                 },
-                keys::MemoryFilesystem,
+                ns::{unshare_namespace, MemoryFilesystem},
                 tests::{crypt, loopbacked, real},
             },
             types::{DevUuid, DevicePath, KeyDescription, PoolUuid, UnlockMethod},
@@ -348,6 +348,7 @@ mod tests {
             paths: &[&Path],
             key_desc: &KeyDescription,
         ) -> Result<(), Box<dyn Error>> {
+            unshare_namespace()?;
             let _memfs = MemoryFilesystem::new()?;
             let path = paths
                 .get(0)
@@ -392,6 +393,7 @@ mod tests {
     }
 
     fn test_clevis_initialize(paths: &[&Path]) {
+        unshare_namespace().unwrap();
         let _memfs = MemoryFilesystem::new().unwrap();
         let path = paths[0];
         let handle = CryptInitializer::new(

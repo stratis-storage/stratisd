@@ -770,8 +770,8 @@ mod tests {
 
     use crate::engine::strat_engine::{
         cmd,
-        keys::MemoryFilesystem,
         names::KeyDescription,
+        ns::{unshare_namespace, MemoryFilesystem},
         tests::{crypt, loopbacked, real},
     };
 
@@ -947,6 +947,7 @@ mod tests {
     }
 
     fn test_clevis_initialize(paths: &[&Path]) {
+        unshare_namespace().unwrap();
         let _memfs = MemoryFilesystem::new().unwrap();
         let mut mgr = BlockDevMgr::initialize(
             PoolUuid::new_v4(),
@@ -987,6 +988,7 @@ mod tests {
 
     fn test_clevis_both_initialize(paths: &[&Path]) {
         fn test_both(paths: &[&Path], key_desc: &KeyDescription) -> Result<(), Box<dyn Error>> {
+            unshare_namespace()?;
             let _memfs = MemoryFilesystem::new().unwrap();
             let mut mgr = BlockDevMgr::initialize(
                 PoolUuid::new_v4(),

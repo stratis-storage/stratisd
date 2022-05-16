@@ -18,12 +18,11 @@ use std::{
 use libc::{syscall, SYS_add_key, SYS_keyctl};
 use nix::{
     mount::{mount, umount, MsFlags},
-    sched::{unshare, CloneFlags},
     sys::{
         mman::{mmap, munmap, MapFlags, ProtFlags},
         stat::stat,
     },
-    unistd::{chown, gettid, Uid},
+    unistd::{chown, getpid, Uid},
 };
 use rand::{
     distributions::{Alphanumeric, Distribution},
@@ -36,13 +35,14 @@ use crate::{
     engine::{
         engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
         shared,
-        strat_engine::names::KeyDescription,
+        strat_engine::{
+            names::KeyDescription,
+            ns::{is_in_root_namespace, NS_TMPFS_LOCATION},
+        },
         types::{Key, MappingCreateAction, MappingDeleteAction, SizedKeyMemory},
     },
     stratis::{StratisError, StratisResult},
 };
-
-const INIT_MNT_NS_PATH: &str = "/proc/1/ns/mnt";
 
 /// A type corresponding to key IDs in the kernel keyring. In `libkeyutils`,
 /// this is represented as the C type `key_serial_t`.
@@ -415,77 +415,6 @@ impl KeyActions for StratKeyActions {
     }
 }
 
-/// A top-level tmpfs that can be made a private recursive mount so that any tmpfs
-/// mounts inside of it will not be visible to any process but stratisd.
-#[derive(Debug)]
-pub struct MemoryFilesystem;
-
-impl MemoryFilesystem {
-    pub const TMPFS_LOCATION: &'static str = "/run/stratisd/keyfiles";
-
-    pub fn new() -> StratisResult<MemoryFilesystem> {
-        let tmpfs_path = &Path::new(Self::TMPFS_LOCATION);
-        if tmpfs_path.exists() {
-            if !tmpfs_path.is_dir() {
-                return Err(StratisError::Io(io::Error::new(
-                    io::ErrorKind::AlreadyExists,
-                    format!("{} exists and is not a directory", tmpfs_path.display()),
-                )));
-            } else {
-                let stat_info = stat(Self::TMPFS_LOCATION)?;
-                let parent_path: PathBuf = vec![Self::TMPFS_LOCATION, ".."].iter().collect();
-                let parent_stat_info = stat(&parent_path)?;
-                if stat_info.st_dev != parent_stat_info.st_dev {
-                    info!("Mount found at {}; unmounting", Self::TMPFS_LOCATION);
-                    if let Err(e) = umount(Self::TMPFS_LOCATION) {
-                        warn!(
-                            "Failed to unmount filesystem at {}: {}",
-                            Self::TMPFS_LOCATION,
-                            e
-                        );
-                    }
-                }
-            }
-        } else {
-            create_dir_all(Self::TMPFS_LOCATION)?;
-        };
-        mount(
-            Some("tmpfs"),
-            Self::TMPFS_LOCATION,
-            Some("tmpfs"),
-            MsFlags::empty(),
-            Some("size=1M"),
-        )?;
-
-        mount::<str, str, str, str>(
-            None,
-            MemoryFilesystem::TMPFS_LOCATION,
-            None,
-            MsFlags::MS_SLAVE | MsFlags::MS_REC,
-            None,
-        )?;
-        Ok(MemoryFilesystem)
-    }
-}
-
-impl Drop for MemoryFilesystem {
-    fn drop(&mut self) {
-        if let Err(e) = umount(Self::TMPFS_LOCATION) {
-            warn!(
-                "Could not unmount temporary in memory storage for Clevis keyfiles: {}",
-                e
-            );
-        }
-    }
-}
-
-/// Check if the stratisd mount namespace for this thread is in the root namespace.
-fn is_in_root_namespace() -> StratisResult<bool> {
-    let pid_one_stat = stat(INIT_MNT_NS_PATH)?;
-    let self_stat = stat(format!("/proc/self/task/{}/ns/mnt", gettid()).as_str())?;
-    Ok(pid_one_stat.st_ino == self_stat.st_ino)
-}
-
 /// An in-memory filesystem that mounts a tmpfs that can house keyfiles so that they
 /// are never writen to disk. The interface aims to keep the keys in memory for as
 /// short of a period of time as possible (only for the duration of the operation
@@ -494,7 +423,7 @@ pub struct MemoryPrivateFilesystem(PathBuf);
 
 impl MemoryPrivateFilesystem {
     pub fn new() -> StratisResult<MemoryPrivateFilesystem> {
-        let tmpfs_path = &Path::new(MemoryFilesystem::TMPFS_LOCATION);
+        let tmpfs_path = &Path::new(NS_TMPFS_LOCATION);
         if tmpfs_path.exists() {
             if !tmpfs_path.is_dir() {
                 return Err(StratisError::Io(io::Error::new(
@@ -502,10 +431,8 @@ impl MemoryPrivateFilesystem {
                     format!("{} exists and is not a directory", tmpfs_path.display()),
                 )));
             } else {
-                let stat_info = stat(MemoryFilesystem::TMPFS_LOCATION)?;
-                let parent_path: PathBuf = vec![MemoryFilesystem::TMPFS_LOCATION, ".."]
-                    .iter()
-                    .collect();
+                let stat_info = stat(NS_TMPFS_LOCATION)?;
+                let parent_path: PathBuf = vec![NS_TMPFS_LOCATION, ".."].iter().collect();
                 let parent_stat_info = stat(&parent_path)?;
                 if stat_info.st_dev == parent_stat_info.st_dev {
                     return Err(StratisError::Io(io::Error::new(
@@ -520,7 +447,7 @@ impl MemoryPrivateFilesystem {
         } else {
             return Err(StratisError::Io(io::Error::new(
                 io::ErrorKind::NotFound,
-                format!("Path {} does not exist", MemoryFilesystem::TMPFS_LOCATION,),
+                format!("Path {} does not exist", NS_TMPFS_LOCATION,),
             )));
         };
         let random_string = Alphanumeric
@@ -528,23 +455,20 @@ impl MemoryPrivateFilesystem {
             .take(16)
             .map(char::from)
             .collect::<String>();
-        let private_fs_path = vec![MemoryFilesystem::TMPFS_LOCATION, &random_string]
-            .iter()
-            .collect();
+        let private_fs_path = vec![NS_TMPFS_LOCATION, &random_string].iter().collect();
         create_dir_all(&private_fs_path)?;
 
-        // Only create a new mount namespace if the thread is in the root namespace.
-        if is_in_root_namespace()? {
-            unshare(CloneFlags::CLONE_NEWNS)?;
-        }
-        // Check that the namespace is now different.
-        if is_in_root_namespace()? {
-            return Err(StratisError::Msg(
-                "It was detected that the in-memory key files would have ended up \
-                visible on the host system; aborting operation prior to generating \
-                in memory key file"
-                    .to_string(),
-            ));
+        // Don't do check as PID 1 as we may be in a container
+        if getpid().as_raw() != 1 {
+            // Check that the namespace is now different.
+            if is_in_root_namespace()? {
+                return Err(StratisError::Msg(
+                    "It was detected that the in-memory key files would have ended up \
+                    visible on the host system; aborting operation prior to generating \
+                    in memory key file"
+                        .to_string(),
+                ));
+            }
         }
 
         // Ensure that the original tmpfs mount point is private. This will work
@@ -555,7 +479,7 @@ impl MemoryPrivateFilesystem {
         // a physical device.
         mount::<str, str, str, str>(
             None,
-            MemoryFilesystem::TMPFS_LOCATION,
+            NS_TMPFS_LOCATION,
             None,
             MsFlags::MS_SLAVE | MsFlags::MS_REC,
             None,

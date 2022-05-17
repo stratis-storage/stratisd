@@ -4,7 +4,7 @@
 
 use std::{convert::TryFrom, error::Error, path::PathBuf};
 
-use clap::{App, Arg, ArgGroup, ArgMatches, SubCommand};
+use clap::{App, AppSettings, Arg, ArgGroup, ArgMatches, SubCommand};
 use serde_json::{json, Map, Value};
 
 use stratisd::{
@@ -22,6 +22,7 @@ fn parse_args() -> App<'static, 'static> {
                 .takes_value(false)
                 .required(false),
         )
+        .setting(AppSettings::SubcommandRequiredElseHelp)
         .subcommands(vec![
             SubCommand::with_name("key").subcommands(vec![
                 SubCommand::with_name("set")
@@ -134,16 +135,8 @@ fn get_paths_from_args<'a>(args: &'a ArgMatches<'a>) -> Vec<PathBuf> {
         .collect::<Vec<_>>()
 }
 
-fn get_long_help(app: &mut App<'_, '_>) -> Result<String, Box<dyn Error>> {
-    let mut help = Vec::new();
-    app.write_long_help(&mut help)?;
-    Ok(String::from_utf8(help)?)
-}
-
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut app = parse_args();
-    let long_help = get_long_help(&mut app)?;
-
+    let app = parse_args();
     let args = app.get_matches();
     if let Some(subcommand) = args.subcommand_matches("key") {
         if let Some(args) = subcommand.subcommand_matches("set") {
@@ -289,7 +282,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         })?;
         Ok(())
     } else {
-        println!("{}", long_help);
-        Ok(())
+        unreachable!("Parser requires a subcommand.")
     }
 }

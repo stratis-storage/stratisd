@@ -241,6 +241,7 @@ install-cfg:
 
 install: install-cfg
 	mkdir -p $(DESTDIR)$(UNITGENDIR)
+	mkdir -p $(DESTDIR)$(BINDIR)
 	install -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd
 	install -Dpm0755 -t $(DESTDIR)$(UDEVDIR) target/$(PROFILEDIR)/stratis-utils
 	mv -fv $(DESTDIR)$(UDEVDIR)/stratis-utils $(DESTDIR)$(UDEVDIR)/stratis-str-cmp

@@ -238,3 +238,41 @@ jobs:
           systemd-devel
       - name: Run cargo expand test
         run: make -f Makefile expand
+
+  python-based-tests:
+    runs-on: ubuntu-18.04
+    container:
+      image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
+      options: --privileged -v /dev:/dev
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies for Fedora
+        run: >
+          dnf install -y
+          asciidoc
+          clang
+          cryptsetup-devel
+          curl
+          dbus-daemon
+          dbus-devel
+          dbus-tools
+          device-mapper-persistent-data
+          libblkid-devel
+          make
+          python3-justbytes
+          systemd-devel
+          systemd-udev
+          xfsprogs
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: cargo
+          toolchain: 1.60.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          override: true
+      - name: Install all necessary Stratis files
+        run: make -f Makefile install-debug
+      - name: Check basic behavior of test_predict
+        run: >
+          STRATIS_PREDICT_USAGE=/usr/bin/stratis-predict-usage
+          PYTHONPATH=./src
+          make filesystem-predict-tests
+        working-directory: ./tests/client-dbus

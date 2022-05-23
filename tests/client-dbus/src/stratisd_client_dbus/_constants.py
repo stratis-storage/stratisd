@@ -20,11 +20,11 @@ TOP_OBJECT = "/org/storage/stratis3"
 
 REVISION_NUMBER = 2
 
-REVISION = "r%s" % REVISION_NUMBER
+REVISION = f"r{REVISION_NUMBER}"
 
-BLOCKDEV_INTERFACE = "org.storage.stratis3.blockdev.%s" % REVISION
-FETCH_PROPERTIES_INTERFACE = "org.storage.stratis3.FetchProperties.%s" % REVISION
-FILESYSTEM_INTERFACE = "org.storage.stratis3.filesystem.%s" % REVISION
-MANAGER_INTERFACE = "org.storage.stratis3.Manager.%s" % REVISION
-POOL_INTERFACE = "org.storage.stratis3.pool.%s" % REVISION
-REPORT_INTERFACE = "org.storage.stratis3.Report.%s" % REVISION
+BLOCKDEV_INTERFACE = f"org.storage.stratis3.blockdev.{REVISION}"
+FETCH_PROPERTIES_INTERFACE = f"org.storage.stratis3.FetchProperties.{REVISION}"
+FILESYSTEM_INTERFACE = f"org.storage.stratis3.filesystem.{REVISION}"
+MANAGER_INTERFACE = f"org.storage.stratis3.Manager.{REVISION}"
+POOL_INTERFACE = f"org.storage.stratis3.pool.{REVISION}"
+REPORT_INTERFACE = f"org.storage.stratis3.Report.{REVISION}"

@@ -62,11 +62,11 @@ def _call_predict_usage(encrypted, device_sizes, *, fs_specs=None, overprovision
     """
     with subprocess.Popen(
         [_STRATIS_PREDICT_USAGE, "pool"]
-        + ["--device-size=%s" % size for size in device_sizes]
+        + [f"--device-size={size}" for size in device_sizes]
         + (
             []
             if fs_specs is None
-            else [("--filesystem-size=%s" % size.magnitude) for _, size in fs_specs]
+            else [f"--filesystem-size={size.magnitude}" for _, size in fs_specs]
         )
         + (["--encrypted"] if encrypted else [])
         + ([] if overprovision else ["--no-overprovision"]),
@@ -75,8 +75,8 @@ def _call_predict_usage(encrypted, device_sizes, *, fs_specs=None, overprovision
         outs, errs = command.communicate()
         if command.returncode != 0:
             raise RuntimeError(
-                "Invocation of %s returned an error: %s, %s"
-                % (_STRATIS_PREDICT_USAGE, command.returncode, errs)
+                f"Invocation of {_STRATIS_PREDICT_USAGE} returned an error: "
+                f"{command.returncode}, {errs}"
             )
         prediction = json.loads(outs)
 
@@ -123,7 +123,7 @@ def _possibly_add_filesystems(pool_object_path, *, fs_specs=None):
         )
 
         if return_code != 0:
-            raise RuntimeError("Failed to create a requested filesystem: %s" % message)
+            raise RuntimeError(f"Failed to create a requested filesystem: {message}")
 
         (real, pool_used_post) = Pool.Properties.TotalPhysicalUsed.Get(pool_proxy)
         if not real:

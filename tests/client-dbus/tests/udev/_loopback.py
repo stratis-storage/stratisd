@@ -86,8 +86,8 @@ class LoopBackDevices:
             time.sleep(1)
 
         raise RuntimeError(
-            'Loopbacked devices "%s" were created, but udev does not seem to be able to find them'
-            % ", ".join(expected_device_files)
+            f'Loopbacked devices "{", ".join(expected_device_files)}" were created, '
+            f"but udev does not seem to be able to find them"
         )
 
     def create_devices(self, number):
@@ -103,7 +103,7 @@ class LoopBackDevices:
         """
         tokens = []
         for _ in range(number):
-            backing_file = os.path.join(self.dir, "block_device_%d" % self.count)
+            backing_file = os.path.join(self.dir, f"block_device_{self.count}")
             self.count += 1
 
             with open(backing_file, "ab") as dev:

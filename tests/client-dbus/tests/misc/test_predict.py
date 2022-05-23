@@ -44,11 +44,11 @@ def _call_predict_usage_pool(
     """
     with subprocess.Popen(
         [_STRATIS_PREDICT_USAGE, "pool"]
-        + ["--device-size=%s" % size.magnitude for size in device_sizes]
+        + [f"--device-size={size.magnitude}" for size in device_sizes]
         + (
             []
             if fs_sizes is None
-            else [("--filesystem-size=%s" % size.magnitude) for size in fs_sizes]
+            else [(f"--filesystem-size={size.magnitude}") for size in fs_sizes]
         )
         + (["--encrypted"] if encrypted else [])
         + ([] if overprovision else ["--no-overprovision"]),
@@ -57,8 +57,8 @@ def _call_predict_usage_pool(
         outs, errs = command.communicate()
         if command.returncode != 0:
             raise RuntimeError(
-                "Invocation of %s returned an error: %s, %s"
-                % (_STRATIS_PREDICT_USAGE, command.returncode, errs)
+                f"Invocation of {_STRATIS_PREDICT_USAGE} returned an error: "
+                f"{command.returncode,}, {errs}"
             )
         prediction = json.loads(outs)
 
@@ -76,15 +76,15 @@ def _call_predict_usage_filesystem(fs_sizes, overprovision):
 
     with subprocess.Popen(
         [_STRATIS_PREDICT_USAGE, "filesystem"]
-        + [("--filesystem-size=%s" % size.magnitude) for size in fs_sizes]
+        + [f"--filesystem-size={size.magnitude}" for size in fs_sizes]
         + ([] if overprovision else ["--no-overprovision"]),
         stdout=subprocess.PIPE,
     ) as command:
         outs, errs = command.communicate()
         if command.returncode != 0:
             raise RuntimeError(
-                "Invocation of %s returned an error: %s, %s"
-                % (_STRATIS_PREDICT_USAGE, command.returncode, errs)
+                f"Invocation of {_STRATIS_PREDICT_USAGE} returned an error: "
+                f"{command.returncode}, {errs}"
             )
         prediction = json.loads(outs)
 

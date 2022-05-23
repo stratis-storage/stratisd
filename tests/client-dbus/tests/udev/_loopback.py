@@ -44,7 +44,7 @@ def _generate_synthetic_udev_events(devnodes, event):
     for device in devnodes:
         device_name = os.path.split(device)[-1]
         ufile = os.path.join("/sys/block", device_name, "uevent")
-        with open(ufile, "w") as uevent:
+        with open(ufile, "w", encoding="utf-8") as uevent:
             uevent.write(event)
 
 

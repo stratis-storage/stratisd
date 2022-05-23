@@ -332,7 +332,7 @@ class KernelKey:
                 temp_file.write(key_data)
                 temp_file.flush()
 
-                with open(temp_file.name, "r") as fd_for_dbus:
+                with open(temp_file.name, "r", encoding="utf-8") as fd_for_dbus:
                     (_, return_code, message) = Manager.Methods.SetKey(
                         get_object(TOP_OBJECT),
                         {

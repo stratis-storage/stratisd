@@ -79,7 +79,12 @@ impl StratFilesystem {
         let mut thin_dev =
             ThinDev::new(get_dm(), &dm_name, Some(&dm_uuid), size, thinpool_dev, id)?;
 
-        if let Err(err) = create_fs(&thin_dev.devnode(), Some(StratisUuid::Fs(fs_uuid)), false) {
+        if let Err(err) = create_fs(
+            &thin_dev.devnode(),
+            Some(StratisUuid::Fs(fs_uuid)),
+            false,
+            false,
+        ) {
             udev_settle().unwrap_or_else(|err| {
                 warn!("{}", err);
                 sleep(Duration::from_secs(5));

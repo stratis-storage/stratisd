@@ -9,13 +9,16 @@ pub const STRATIS_BASE_SERVICE: &str = "org.storage.stratis3";
 
 pub const MANAGER_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.Manager.r0";
 pub const MANAGER_INTERFACE_NAME_3_1: &str = "org.storage.stratis3.Manager.r1";
+pub const MANAGER_INTERFACE_NAME_3_2: &str = "org.storage.stratis3.Manager.r2";
 pub const REPORT_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.Report.r0";
 pub const REPORT_INTERFACE_NAME_3_1: &str = "org.storage.stratis3.Report.r1";
+pub const REPORT_INTERFACE_NAME_3_2: &str = "org.storage.stratis3.Report.r2";
 
 pub const LOCKED_POOLS_PROP: &str = "LockedPools";
 
 pub const POOL_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.pool.r0";
 pub const POOL_INTERFACE_NAME_3_1: &str = "org.storage.stratis3.pool.r1";
+pub const POOL_INTERFACE_NAME_3_2: &str = "org.storage.stratis3.pool.r2";
 pub const POOL_NAME_PROP: &str = "Name";
 pub const POOL_UUID_PROP: &str = "Uuid";
 pub const POOL_HAS_CACHE_PROP: &str = "HasCache";
@@ -32,6 +35,7 @@ pub const POOL_NO_ALLOCABLE_SPACE_PROP: &str = "NoAllocSpace";
 
 pub const FILESYSTEM_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.filesystem.r0";
 pub const FILESYSTEM_INTERFACE_NAME_3_1: &str = "org.storage.stratis3.filesystem.r1";
+pub const FILESYSTEM_INTERFACE_NAME_3_2: &str = "org.storage.stratis3.filesystem.r2";
 pub const FILESYSTEM_NAME_PROP: &str = "Name";
 pub const FILESYSTEM_UUID_PROP: &str = "Uuid";
 pub const FILESYSTEM_USED_PROP: &str = "Used";
@@ -42,6 +46,7 @@ pub const FILESYSTEM_SIZE_PROP: &str = "Size";
 
 pub const BLOCKDEV_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.blockdev.r0";
 pub const BLOCKDEV_INTERFACE_NAME_3_1: &str = "org.storage.stratis3.blockdev.r1";
+pub const BLOCKDEV_INTERFACE_NAME_3_2: &str = "org.storage.stratis3.blockdev.r2";
 pub const BLOCKDEV_DEVNODE_PROP: &str = "Devnode";
 pub const BLOCKDEV_HARDWARE_INFO_PROP: &str = "HardwareInfo";
 pub const BLOCKDEV_USER_INFO_PROP: &str = "UserInfo";

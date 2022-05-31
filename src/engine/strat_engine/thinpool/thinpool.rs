@@ -8,10 +8,9 @@ use std::{
     cmp::{max, min},
     collections::HashMap,
     fmt,
-    thread::sleep,
-    time::Duration,
 };
 
+use retry::{delay::Fixed, retry_with_index};
 use serde_json::{Map, Value};
 
 use devicemapper::{
@@ -25,7 +24,7 @@ use crate::{
         engine::{DumpState, StateDiff},
         strat_engine::{
             backstore::Backstore,
-            cmd::{thin_check, thin_metadata_size, thin_repair, udev_settle},
+            cmd::{thin_check, thin_metadata_size, thin_repair},
             dm::get_dm,
             names::{
                 format_flex_ids, format_thin_ids, format_thinpool_ids, FlexRole, ThinPoolRole,
@@ -1181,11 +1180,13 @@ impl ThinPool {
             StratFilesystem::initialize(pool_uuid, &self.thin_pool, size, self.id_gen.new_id()?)?;
         let name = Name::new(name.to_owned());
         if let Err(err) = self.mdv.save_fs(&name, fs_uuid, &new_filesystem) {
-            udev_settle().unwrap_or_else(|err| {
-                warn!("{}", err);
-                sleep(Duration::from_secs(5));
-            });
-            if let Err(err2) = new_filesystem.destroy(&self.thin_pool) {
+            if let Err(err2) = retry_with_index(Fixed::from_millis(100).take(4), |i| {
+                trace!(
+                    "Cleanup new filesystem after failed save_fs() attempt {}",
+                    i
+                );
+                new_filesystem.destroy(&self.thin_pool)
+            }) {
                 error!(
                     "When handling failed save_fs(), fs.destroy() failed: {}",
                     err2

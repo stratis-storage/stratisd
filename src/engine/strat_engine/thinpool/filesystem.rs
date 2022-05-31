@@ -7,8 +7,6 @@ use std::{
     fs::{File, OpenOptions},
     io::{Read, Write},
     path::{Path, PathBuf},
-    thread::sleep,
-    time::Duration,
 };
 
 use chrono::{DateTime, TimeZone, Utc};
@@ -30,7 +28,7 @@ use crate::{
     engine::{
         engine::{DumpState, Filesystem, StateDiff},
         strat_engine::{
-            cmd::{create_fs, set_uuid, udev_settle, xfs_growfs},
+            cmd::{create_fs, set_uuid, xfs_growfs},
             devlinks,
             dm::get_dm,
             names::{format_thin_ids, ThinRole},
@@ -80,11 +78,13 @@ impl StratFilesystem {
             ThinDev::new(get_dm(), &dm_name, Some(&dm_uuid), size, thinpool_dev, id)?;
 
         if let Err(err) = create_fs(&thin_dev.devnode(), Some(StratisUuid::Fs(fs_uuid)), false) {
-            udev_settle().unwrap_or_else(|err| {
-                warn!("{}", err);
-                sleep(Duration::from_secs(5));
-            });
-            if let Err(err2) = thin_dev.destroy(get_dm(), thinpool_dev) {
+            if let Err(err2) = retry_with_index(Fixed::from_millis(100).take(4), |i| {
+                trace!(
+                    "Cleanup new thin device after failed create_fs() attempt {}",
+                    i
+                );
+                thin_dev.destroy(get_dm(), thinpool_dev)
+            }) {
                 error!(
                     "While handling create_fs error, thin_dev.destroy() failed: {}",
                     err2

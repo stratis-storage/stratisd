@@ -295,6 +295,7 @@ pub fn thin_repair(meta_dev: &Path, new_meta_dev: &Path) -> StratisResult<()> {
 }
 
 /// Call udevadm settle
+#[cfg(test)]
 pub fn udev_settle() -> StratisResult<()> {
     execute_cmd(Command::new(get_executable(UDEVADM).as_os_str()).arg("settle"))
 }

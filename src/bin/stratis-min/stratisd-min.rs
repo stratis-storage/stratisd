@@ -42,12 +42,6 @@ fn parse_args() -> App<'static, 'static> {
         )
 }
 
-fn get_long_help(app: &mut App<'_, '_>) -> Result<String, Box<dyn Error>> {
-    let mut help = Vec::new();
-    app.write_long_help(&mut help)?;
-    Ok(String::from_utf8(help)?)
-}
-
 /// To ensure only one instance of stratisd runs at a time, acquire an
 /// exclusive lock. Return an error if lock attempt fails.
 fn trylock_pid_file() -> StratisResult<File> {
@@ -119,8 +113,7 @@ fn trylock_pid_file() -> StratisResult<File> {
 
 fn main() -> Result<(), String> {
     fn main_box() -> Result<(), Box<dyn Error>> {
-        let mut app = parse_args();
-        let help = get_long_help(&mut app)?;
+        let app = parse_args();
         let args = app.get_matches();
 
         let _stratisd_min_file = trylock_pid_file()?;
@@ -137,13 +130,8 @@ fn main() -> Result<(), String> {
         }
         builder.init();
 
-        if args.is_present("-h") {
-            println!("{}", help);
-            Ok(())
-        } else {
-            run(args.is_present("sim"))?;
-            Ok(())
-        }
+        run(args.is_present("sim"))?;
+        Ok(())
     }
 
     main_box().map_err(|e| e.to_string())

@@ -117,30 +117,34 @@ fn trylock_pid_file() -> StratisResult<File> {
     Ok(stratisd_min_file)
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let mut app = parse_args();
-    let help = get_long_help(&mut app)?;
-    let args = app.get_matches();
+fn main() -> Result<(), String> {
+    fn main_box() -> Result<(), Box<dyn Error>> {
+        let mut app = parse_args();
+        let help = get_long_help(&mut app)?;
+        let args = app.get_matches();
 
-    let _stratisd_min_file = trylock_pid_file()?;
+        let _stratisd_min_file = trylock_pid_file()?;
 
-    let mut builder = Builder::new();
-    if let Some(log_level) = args.value_of("log_level") {
-        builder.filter(
-            Some("stratisd"),
-            LevelFilter::from_str(log_level)
-                .expect("argument parser only accepts valid log levels"),
-        );
-    } else if let Ok(s) = env::var("RUST_LOG") {
-        builder.parse_filters(&s);
+        let mut builder = Builder::new();
+        if let Some(log_level) = args.value_of("log_level") {
+            builder.filter(
+                Some("stratisd"),
+                LevelFilter::from_str(log_level)
+                    .expect("argument parser only accepts valid log levels"),
+            );
+        } else if let Ok(s) = env::var("RUST_LOG") {
+            builder.parse_filters(&s);
+        }
+        builder.init();
+
+        if args.is_present("-h") {
+            println!("{}", help);
+            Ok(())
+        } else {
+            run(args.is_present("sim"))?;
+            Ok(())
+        }
     }
-    builder.init();
 
-    if args.is_present("-h") {
-        println!("{}", help);
-        Ok(())
-    } else {
-        run(args.is_present("sim"))?;
-        Ok(())
-    }
+    main_box().map_err(|e| e.to_string())
 }

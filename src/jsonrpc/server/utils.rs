@@ -8,37 +8,26 @@ use crate::{
 };
 
 macro_rules! expects_fd {
-    ($fd_opt:expr, $ret:ident, $default:expr, true) => {
+    ($fd_opt:expr, true) => {
         match $fd_opt {
             Some(fd) => fd,
             None => {
-                let res = Err($crate::stratis::StratisError::Msg(
-                    "Method expected a file descriptor and did not receive one".to_string(),
-                ));
-                return $crate::jsonrpc::interface::StratisRet::$ret(
-                    $crate::jsonrpc::server::utils::stratis_result_to_return(res, $default),
-                );
+                return Err("Method expected a file descriptor and did not receive one".to_string());
             }
         }
     };
-    ($fd_opt:expr, $ret:ident, $default:expr, false) => {
+    ($fd_opt:expr, false) => {
         match $fd_opt {
             Some(fd) => {
                 if let Err(e) = nix::unistd::close(fd) {
                     warn!(
-                        "Failed to close file descriptor {}: {}; a file descriptor \
-                        may have been leaked",
+                        "Failed to close file descriptor {}: {}; a file descriptor may have been leaked",
                         fd, e,
                     );
+                    return Err("Method did not expect a file descriptor and received one anyway; file descriptor could not be closed and may have been leaked".to_string());
+                } else {
+                    return Err("Method did not expect a file descriptor and received one anyway; file descriptor was closed".to_string());
                 }
-                let res = Err($crate::stratis::StratisError::Msg(
-                    "Method did not expect a file descriptor and received one \
-                    anyway; file descriptor has been closed"
-                        .to_string(),
-                ));
-                return $crate::jsonrpc::interface::StratisRet::$ret(
-                    $crate::jsonrpc::server::utils::stratis_result_to_return(res, $default),
-                );
             }
             None => (),
         }

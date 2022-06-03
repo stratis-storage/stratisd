@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::{
     fs::{create_dir_all, remove_file},
     future::Future,
+    io::{IoSlice, IoSliceMut},
     os::unix::io::{AsRawFd, RawFd},
     path::Path,
     pin::Pin,
@@ -20,12 +21,9 @@ use futures::{
 };
 use nix::{
     fcntl::{fcntl, FcntlArg, OFlag},
-    sys::{
-        socket::{
-            accept, bind, listen, recvmsg, sendmsg, socket, AddressFamily, ControlMessageOwned,
-            MsgFlags, SockAddr, SockFlag, SockType,
-        },
-        uio::IoVec,
+    sys::socket::{
+        accept, bind, listen, recvmsg, sendmsg, socket, AddressFamily, ControlMessageOwned,
+        MsgFlags, SockFlag, SockType, UnixAddr,
     },
     unistd::close,
 };
@@ -303,9 +301,9 @@ fn handle_cmsgs(cmsgs: Vec<ControlMessageOwned>) -> StratisResult<Option<RawFd>>
 fn try_recvmsg(fd: RawFd) -> StratisResult<StratisParams> {
     let mut cmsg_space = cmsg_space!([RawFd; 1]);
     let mut vec = vec![0; 65536];
-    let rmsg = recvmsg(
+    let rmsg = recvmsg::<UnixAddr>(
         fd,
-        &[IoVec::from_mut_slice(vec.as_mut_slice())],
+        &mut [IoSliceMut::new(vec.as_mut_slice())],
         Some(&mut cmsg_space),
         MsgFlags::empty(),
     )?;
@@ -323,9 +321,9 @@ where
     S: Serialize,
 {
     let vec = serde_json::to_vec(ret)?;
-    sendmsg(
+    sendmsg::<UnixAddr>(
         fd,
-        &[IoVec::from_slice(vec.as_slice())],
+        &[IoSlice::new(vec.as_slice())],
         &[],
         MsgFlags::empty(),
         None,
@@ -403,7 +401,7 @@ impl StratisUnixListener {
             StratisError::Msg("Unrecognized flag types returned from fcntl".to_string())
         })?;
         fcntl(fd, FcntlArg::F_SETFL(flags | OFlag::O_NONBLOCK))?;
-        bind(fd, &SockAddr::new_unix(path.as_ref())?)?;
+        bind(fd, &UnixAddr::new(path.as_ref())?)?;
         listen(fd, 0)?;
         Ok(StratisUnixListener {
             fd: AsyncFd::new(fd)?,

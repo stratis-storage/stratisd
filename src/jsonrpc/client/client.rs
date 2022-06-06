@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    io::Read,
+    io::{IoSlice, Read},
     os::unix::{
         io::{AsRawFd, RawFd},
         net::UnixStream,
@@ -11,10 +11,7 @@ use std::{
     path::Path,
 };
 
-use nix::sys::{
-    socket::{sendmsg, ControlMessage, MsgFlags},
-    uio::IoVec,
-};
+use nix::sys::socket::{sendmsg, ControlMessage, MsgFlags, UnixAddr};
 use serde::{de::DeserializeOwned, Serialize};
 
 use crate::{
@@ -38,9 +35,9 @@ where
     } else {
         vec![ControlMessage::ScmRights(fd_vec.as_slice())]
     };
-    sendmsg(
+    sendmsg::<UnixAddr>(
         unix_stream.as_raw_fd(),
-        &[IoVec::from_slice(vec.as_slice())],
+        &[IoSlice::new(vec.as_slice())],
         scm.as_slice(),
         MsgFlags::empty(),
         None,

@@ -23,7 +23,7 @@ pub fn filesystem_list() -> StratisResult<()> {
     let devices_formatted: Vec<_> = paths.into_iter().map(|p| p.display().to_string()).collect();
     let uuids_formatted: Vec<_> = uuids
         .into_iter()
-        .map(|u| u.to_simple_ref().to_string())
+        .map(|u| u.as_simple().to_string())
         .collect();
     print_table!(
         "Pool Name", pool_names, "<";

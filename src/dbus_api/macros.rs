@@ -91,7 +91,7 @@ macro_rules! get_mut_pool {
 // Macro for formatting a Uuid object for transport on the D-Bus as a string
 macro_rules! uuid_to_string {
     ($uuid:expr) => {
-        $uuid.to_simple_ref().to_string()
+        $uuid.as_simple().to_string()
     };
 }
 

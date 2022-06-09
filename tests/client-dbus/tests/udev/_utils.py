@@ -259,7 +259,7 @@ class _Service:
 
         settle()
 
-        if list(processes("stratisd")) != []:
+        if next(processes("stratisd"), None) is not None:
             raise RuntimeError("A stratisd process is already running")
 
         service = subprocess.Popen(
@@ -299,7 +299,7 @@ class _Service:
         """
         self._service.send_signal(signal.SIGINT)
         self._service.wait()
-        if list(processes("stratisd")) != []:
+        if next(processes("stratisd"), None) is not None:
             raise RuntimeError("Failed to stop stratisd service")
 
 

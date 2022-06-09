@@ -11,7 +11,7 @@ use std::{
 
 use env_logger::Builder;
 
-use clap::{App, Arg};
+use clap::{Arg, Command};
 
 use pretty_hex::pretty_hex;
 
@@ -129,16 +129,16 @@ fn run(devpath: &str, print_bytes: bool) -> Result<(), String> {
 }
 
 fn main() {
-    let matches = App::new("stratis-dumpmetadata")
+    let matches = Command::new("stratis-dumpmetadata")
         .arg(
-            Arg::with_name("dev")
+            Arg::new("dev")
                 .required(true)
                 .help("Print metadata of given device"),
         )
         .arg(
-            Arg::with_name("print_bytes")
+            Arg::new("print_bytes")
                 .long("print-bytes")
-                .short("b")
+                .short('b')
                 .help("Print byte buffer of device"),
         )
         .get_matches();

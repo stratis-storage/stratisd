@@ -11,7 +11,7 @@ use std::{
     str::FromStr,
 };
 
-use clap::{App, Arg};
+use clap::{Arg, Command};
 use env_logger::Builder;
 use log::LevelFilter;
 use nix::{
@@ -24,18 +24,18 @@ use stratisd::stratis::{run, StratisError, StratisResult, VERSION};
 const STRATISD_PID_PATH: &str = "/run/stratisd.pid";
 const STRATISD_MIN_PID_PATH: &str = "/run/stratisd-min.pid";
 
-fn parse_args() -> App<'static, 'static> {
-    App::new("stratisd-min")
+fn parse_args() -> Command<'static> {
+    Command::new("stratisd-min")
         .version(VERSION)
         .arg(
-            Arg::with_name("log_level")
-                .empty_values(false)
+            Arg::new("log_level")
+                .forbid_empty_values(true)
                 .long("--log-level")
                 .possible_values(&["trace", "debug", "info", "warn", "error"])
                 .help("Sets level for generation of log messages."),
         )
         .arg(
-            Arg::with_name("sim")
+            Arg::new("sim")
                 .long("--sim")
                 .takes_value(false)
                 .help("Enables sim engine."),
@@ -113,8 +113,8 @@ fn trylock_pid_file() -> StratisResult<File> {
 
 fn main() -> Result<(), String> {
     fn main_box() -> Result<(), Box<dyn Error>> {
-        let app = parse_args();
-        let args = app.get_matches();
+        let cmd = parse_args();
+        let args = cmd.get_matches();
 
         let _stratisd_min_file = trylock_pid_file()?;
 

@@ -4,7 +4,7 @@
 
 use std::{convert::TryFrom, error::Error, path::PathBuf};
 
-use clap::{App, AppSettings, Arg, ArgGroup, ArgMatches, SubCommand};
+use clap::{Arg, ArgGroup, ArgMatches, Command};
 use serde_json::{json, Map, Value};
 
 use stratisd::{
@@ -13,59 +13,60 @@ use stratisd::{
     stratis::{StratisError, VERSION},
 };
 
-fn parse_args() -> App<'static, 'static> {
-    App::new("stratis-min")
+fn parse_args() -> Command<'static> {
+    Command::new("stratis-min")
         .version(VERSION)
         .arg(
-            Arg::with_name("debug")
+            Arg::new("debug")
                 .long("--debug")
                 .takes_value(false)
                 .required(false),
         )
-        .setting(AppSettings::SubcommandRequiredElseHelp)
+        .subcommand_required(true)
+        .arg_required_else_help(true)
         .subcommands(vec![
-            SubCommand::with_name("key").subcommands(vec![
-                SubCommand::with_name("set")
+            Command::new("key").subcommands(vec![
+                Command::new("set")
                     .group(
-                        ArgGroup::with_name("key_method")
+                        ArgGroup::new("key_method")
                             .arg("capture_key")
                             .arg("keyfile_path")
                             .required(true),
                     )
                     .arg(
-                        Arg::with_name("capture_key")
+                        Arg::new("capture_key")
                             .long("--capture-key")
                             .takes_value(false),
                     )
                     .arg(
-                        Arg::with_name("keyfile_path")
+                        Arg::new("keyfile_path")
                             .long("--keyfile-path")
                             .takes_value(true),
                     )
-                    .arg(Arg::with_name("key_desc").required(true)),
-                SubCommand::with_name("list"),
-                SubCommand::with_name("unset").arg(Arg::with_name("key_desc").required(true)),
+                    .arg(Arg::new("key_desc").required(true)),
+                Command::new("list"),
+                Command::new("unset").arg(Arg::new("key_desc").required(true)),
             ]),
-            SubCommand::with_name("pool").subcommands(vec![
-                SubCommand::with_name("unlock")
-                    .arg(Arg::with_name("unlock_method").required(true))
-                    .arg(Arg::with_name("pool_uuid").required(false))
+            Command::new("pool").subcommands(vec![
+                Command::new("unlock")
+                    .arg(Arg::new("unlock_method").required(true))
+                    .arg(Arg::new("pool_uuid").required(false))
                     .arg(
-                        Arg::with_name("prompt")
+                        Arg::new("prompt")
                             .long("--prompt")
                             .takes_value(false)
                             .requires("pool_uuid"),
                     ),
-                SubCommand::with_name("create")
-                    .arg(Arg::with_name("name").required(true))
-                    .arg(Arg::with_name("blockdevs").multiple(true).required(true))
+                Command::new("create")
+                    .arg(Arg::new("name").required(true))
                     .arg(
-                        Arg::with_name("key_desc")
-                            .long("--key-desc")
-                            .takes_value(true),
+                        Arg::new("blockdevs")
+                            .multiple_occurrences(true)
+                            .required(true),
                     )
+                    .arg(Arg::new("key_desc").long("--key-desc").takes_value(true))
                     .arg(
-                        Arg::with_name("clevis")
+                        Arg::new("clevis")
                             .long("--clevis")
                             .takes_value(true)
                             .possible_values(&["nbde", "tang", "tpm2"])
@@ -73,62 +74,71 @@ fn parse_args() -> App<'static, 'static> {
                             .requires_if("tang", "tang_args"),
                     )
                     .arg(
-                        Arg::with_name("tang_url")
+                        Arg::new("tang_url")
                             .long("--tang-url")
                             .takes_value(true)
-                            .required_if("clevis", "nbde")
-                            .required_if("clevis", "tang"),
+                            .required_if_eq("clevis", "nbde")
+                            .required_if_eq("clevis", "tang"),
                     )
                     .arg(
-                        Arg::with_name("thumbprint")
+                        Arg::new("thumbprint")
                             .long("--thumbprint")
                             .takes_value(true),
                     )
-                    .arg(
-                        Arg::with_name("trust_url")
-                            .long("--trust-url")
-                            .takes_value(false),
-                    )
+                    .arg(Arg::new("trust_url").long("--trust-url").takes_value(false))
                     .group(
-                        ArgGroup::with_name("tang_args")
+                        ArgGroup::new("tang_args")
                             .arg("thumbprint")
                             .arg("trust_url"),
                     ),
-                SubCommand::with_name("init-cache")
-                    .arg(Arg::with_name("name").required(true))
-                    .arg(Arg::with_name("blockdevs").multiple(true).required(true)),
-                SubCommand::with_name("rename")
-                    .arg(Arg::with_name("current_name").required(true))
-                    .arg(Arg::with_name("new_name").required(true)),
-                SubCommand::with_name("add-data")
-                    .arg(Arg::with_name("name").required(true))
-                    .arg(Arg::with_name("blockdevs").multiple(true).required(true)),
-                SubCommand::with_name("destroy").arg(Arg::with_name("name").required(true)),
-                SubCommand::with_name("is-encrypted")
-                    .arg(Arg::with_name("pool_uuid").required(true)),
-                SubCommand::with_name("is-locked").arg(Arg::with_name("pool_uuid").required(true)),
-                SubCommand::with_name("is-bound").arg(Arg::with_name("pool_uuid").required(true)),
-                SubCommand::with_name("has-passphrase")
-                    .arg(Arg::with_name("pool_uuid").required(true)),
-                SubCommand::with_name("clevis-pin").arg(Arg::with_name("pool_uuid").required(true)),
+                Command::new("init-cache")
+                    .arg(Arg::new("name").required(true))
+                    .arg(
+                        Arg::new("blockdevs")
+                            .multiple_occurrences(true)
+                            .required(true),
+                    ),
+                Command::new("rename")
+                    .arg(Arg::new("current_name").required(true))
+                    .arg(Arg::new("new_name").required(true)),
+                Command::new("add-data")
+                    .arg(Arg::new("name").required(true))
+                    .arg(
+                        Arg::new("blockdevs")
+                            .multiple_occurrences(true)
+                            .required(true),
+                    ),
+                Command::new("add-cache")
+                    .arg(Arg::new("name").required(true))
+                    .arg(
+                        Arg::new("blockdevs")
+                            .multiple_occurrences(true)
+                            .required(true),
+                    ),
+                Command::new("destroy").arg(Arg::new("name").required(true)),
+                Command::new("is-encrypted").arg(Arg::new("pool_uuid").required(true)),
+                Command::new("is-locked").arg(Arg::new("pool_uuid").required(true)),
+                Command::new("is-bound").arg(Arg::new("pool_uuid").required(true)),
+                Command::new("has-passphrase").arg(Arg::new("pool_uuid").required(true)),
+                Command::new("clevis-pin").arg(Arg::new("pool_uuid").required(true)),
             ]),
-            SubCommand::with_name("filesystem").subcommands(vec![
-                SubCommand::with_name("create")
-                    .arg(Arg::with_name("pool_name").required(true))
-                    .arg(Arg::with_name("fs_name").required(true)),
-                SubCommand::with_name("destroy")
-                    .arg(Arg::with_name("pool_name").required(true))
-                    .arg(Arg::with_name("fs_name").required(true)),
-                SubCommand::with_name("rename")
-                    .arg(Arg::with_name("pool_name").required(true))
-                    .arg(Arg::with_name("fs_name").required(true))
-                    .arg(Arg::with_name("new_fs_name").required(true)),
+            Command::new("filesystem").subcommands(vec![
+                Command::new("create")
+                    .arg(Arg::new("pool_name").required(true))
+                    .arg(Arg::new("fs_name").required(true)),
+                Command::new("destroy")
+                    .arg(Arg::new("pool_name").required(true))
+                    .arg(Arg::new("fs_name").required(true)),
+                Command::new("rename")
+                    .arg(Arg::new("pool_name").required(true))
+                    .arg(Arg::new("fs_name").required(true))
+                    .arg(Arg::new("new_fs_name").required(true)),
             ]),
-            SubCommand::with_name("report"),
+            Command::new("report"),
         ])
 }
 
-fn get_paths_from_args<'a>(args: &'a ArgMatches<'a>) -> Vec<PathBuf> {
+fn get_paths_from_args(args: &ArgMatches) -> Vec<PathBuf> {
     args.values_of("blockdevs")
         .expect("required")
         .map(PathBuf::from)
@@ -137,9 +147,9 @@ fn get_paths_from_args<'a>(args: &'a ArgMatches<'a>) -> Vec<PathBuf> {
 
 fn main() -> Result<(), String> {
     fn main_box() -> Result<(), Box<dyn Error>> {
-        let app = parse_args();
+        let cmd = parse_args();
 
-        let args = app.get_matches();
+        let args = cmd.get_matches();
         if let Some(subcommand) = args.subcommand_matches("key") {
             if let Some(args) = subcommand.subcommand_matches("set") {
                 key::key_set(

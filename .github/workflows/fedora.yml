@@ -53,7 +53,7 @@ jobs:
             components: cargo
     runs-on: ubuntu-18.04
     container:
-      image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
@@ -85,7 +85,7 @@ jobs:
             components: cargo
     runs-on: ubuntu-18.04
     container:
-      image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2

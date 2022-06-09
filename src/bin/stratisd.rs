@@ -11,7 +11,7 @@ use std::{
     str::FromStr,
 };
 
-use clap::{App, Arg};
+use clap::{Arg, Command};
 use env_logger::Builder;
 use log::LevelFilter;
 use nix::{
@@ -110,17 +110,13 @@ fn trylock_pid_file() -> StratisResult<File> {
 }
 
 fn main() {
-    let matches = App::new("stratisd")
+    let matches = Command::new("stratisd")
         .version(VERSION)
         .about("Stratis storage management")
+        .arg(Arg::new("sim").long("sim").help("Use simulator engine"))
         .arg(
-            Arg::with_name("sim")
-                .long("sim")
-                .help("Use simulator engine"),
-        )
-        .arg(
-            Arg::with_name("log-level")
-                .empty_values(false)
+            Arg::new("log-level")
+                .forbid_empty_values(true)
                 .long("log-level")
                 .possible_values(&["trace", "debug", "info", "warn", "error"])
                 .help("Sets level for generation of log messages."),

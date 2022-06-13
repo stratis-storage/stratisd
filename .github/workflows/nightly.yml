@@ -28,7 +28,7 @@ jobs:
             components: cargo
     runs-on: ubuntu-18.04
     container:
-      image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
@@ -65,7 +65,7 @@ jobs:
               COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../Cargo.toml FEDORA_RELEASE=f35 IGNORE_ARGS="--ignore-low clap --ignore-high=libblkid-rs" make -f ../../Makefile check-fedora-versions
     runs-on: ubuntu-18.04
     container:
-      image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies for Fedora
@@ -106,7 +106,7 @@ jobs:
           - tag: v3.0.4
     runs-on: ubuntu-18.04
     container:
-      image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
@@ -201,7 +201,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
+          - image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
             toolchain: 1.61.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             skip_value: 0
           - image: fedora:34  # LOWEST DEVELOPMENT ENVIRONMENT

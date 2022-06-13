@@ -60,26 +60,38 @@ pub const BLOCKDEV_TOTAL_SIZE_PROP: &str = "TotalPhysicalSize";
 
 /// Get a list of all the standard pool interfaces
 pub fn standard_pool_interfaces() -> Vec<String> {
-    [POOL_INTERFACE_NAME_3_0, POOL_INTERFACE_NAME_3_1]
-        .iter()
-        .map(|s| (*s).to_string())
-        .collect()
+    [
+        POOL_INTERFACE_NAME_3_0,
+        POOL_INTERFACE_NAME_3_1,
+        POOL_INTERFACE_NAME_3_2,
+    ]
+    .iter()
+    .map(|s| (*s).to_string())
+    .collect()
 }
 
 /// Get a list of all the standard filesystem interfaces
 pub fn standard_filesystem_interfaces() -> Vec<String> {
-    [FILESYSTEM_INTERFACE_NAME_3_0, FILESYSTEM_INTERFACE_NAME_3_1]
-        .iter()
-        .map(|s| (*s).to_string())
-        .collect()
+    [
+        FILESYSTEM_INTERFACE_NAME_3_0,
+        FILESYSTEM_INTERFACE_NAME_3_1,
+        FILESYSTEM_INTERFACE_NAME_3_2,
+    ]
+    .iter()
+    .map(|s| (*s).to_string())
+    .collect()
 }
 
 /// Get a list of all the standard blockdev interfaces
 pub fn standard_blockdev_interfaces() -> Vec<String> {
-    [BLOCKDEV_INTERFACE_NAME_3_0, BLOCKDEV_INTERFACE_NAME_3_1]
-        .iter()
-        .map(|s| (*s).to_string())
-        .collect()
+    [
+        BLOCKDEV_INTERFACE_NAME_3_0,
+        BLOCKDEV_INTERFACE_NAME_3_1,
+        BLOCKDEV_INTERFACE_NAME_3_2,
+    ]
+    .iter()
+    .map(|s| (*s).to_string())
+    .collect()
 }
 
 /// Get a list of all interfaces supported by a pool object.

@@ -249,6 +249,7 @@ class _Service:
     Start and stop stratisd.
     """
 
+    # pylint: disable=use-implicit-booleaness-not-comparison
     # pylint: disable=consider-using-with
     def start_service(self):
         """

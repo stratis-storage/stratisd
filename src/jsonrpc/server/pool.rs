@@ -208,7 +208,7 @@ where
     } else {
         Err(StratisError::Msg(format!(
             "Pool with UUID {} not found",
-            uuid.to_simple_ref()
+            uuid.as_simple()
         )))
     }
 }
@@ -225,7 +225,7 @@ where
     } else {
         Err(StratisError::Msg(format!(
             "Pool with UUID {} not found",
-            uuid.to_simple_ref()
+            uuid.as_simple()
         )))
     }
 }
@@ -246,7 +246,7 @@ where
     } else {
         Err(StratisError::Msg(format!(
             "Pool with UUID {} not found",
-            uuid.to_simple_ref()
+            uuid.as_simple()
         )))
     }
 }
@@ -267,7 +267,7 @@ where
     } else {
         Err(StratisError::Msg(format!(
             "Pool with UUID {} not found",
-            uuid.to_simple_ref()
+            uuid.as_simple()
         )))
     }
 }
@@ -289,7 +289,7 @@ where
     } else {
         Err(StratisError::Msg(format!(
             "Pool with UUID {} not found",
-            uuid.to_simple_ref()
+            uuid.as_simple()
         )))
     }
 }

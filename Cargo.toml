@@ -106,7 +106,7 @@ version = "5.0.0"
 optional = true
 
 [dependencies.uuid]
-version = "0.8.0"
+version = "1.0.0"
 features = ["serde", "v4"]
 
 [build-dependencies]

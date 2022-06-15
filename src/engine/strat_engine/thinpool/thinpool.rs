@@ -204,80 +204,106 @@ impl fmt::Display for ThinPoolStatusDigest {
 
 /// Returns the determined size of the data and metadata devices.
 ///
-/// This method implements something similar to a binary search. The upper and lower
-/// limits are data device sizes.  The upper limit should be the total available
-/// space (total_space) as this leaves no room for metadata. We can assume the data
-/// device will never be larger than this. The lower limit should be
-/// total_size - meta_size_for_total_size. Because the metadata size subtracted from
-/// the total size makes the data size smaller, the metadata size may also shrink
-/// so we can assume this is the lower bound.
+/// upper_limit is the upper bound for the data device size and will always
+/// be too large to fit on the pool when combined with metadata size.
 ///
-/// For each recursive iteration, this method determines what the metadata size is
-/// for a data size halfway between the upper and lower limit. If the halfway point
-/// total for data and metadata size is above the total space, it becomes the new
-/// upper limit. If it is below, it becomes the new lower limit. Once the two
-/// metadata sizes converge, the lower limit is returned as the upper limit and the
-/// corresponding metadata size added up is, by definition, always larger than the
-/// total size.
+/// lower_limit is the lower bound for the data device and will always be small
+/// enough to fit on the pool when combined with metadata size. Once the algorithm
+/// converges, the lower limit is the data device size that yields optimal
+/// space usage.
 ///
-/// This method will always return values that leave less than one data block free,
-/// thus optimizing storage usage.
+/// This method will always return optimal values that leave as little space as
+/// possible free, thus optimizing storage usage. Because the data device size
+/// must be a multiple of DATA_BLOCK_SIZE, there may be some free space left over
+/// in the optimal case. The unused space should not be larger than
+/// 2 * DATA_BLOCK_SIZE. Free space of size >= DATA_BLOCK_SIZE can occur
+/// if DATA_BLOCK_SIZE space is left and increasing the the data device size by
+/// DATA_BLOCK_SIZE results in an increase in the metadata device size as well.
+/// This would cause current_size + DATA_BLOCK_SIZE to be used as the upper limit
+/// instead of the lower limit as it would be too large to fit on the pool.
 ///
 /// Because this method needs to make room for the spare metadata space as well,
 /// you will see the metadata size multiplied by 2.
 ///
 /// This method is recursive.
+///
+/// Precondition: upper_limit + 2 * thin_metadata_size(upper_limit) > total_space
+/// Precondition: lower_limit + 2 * thin_metadata_size(upper_limit) <= total_space
 fn search(
     total_space: Sectors,
-    upper_limit: Sectors,
-    lower_limit: Sectors,
+    upper_limit: DataBlocks,
+    lower_limit: DataBlocks,
     fs_limit: u64,
 ) -> StratisResult<(Sectors, Sectors)> {
-    let upper_aligned = upper_limit / DATA_BLOCK_SIZE * DATA_BLOCK_SIZE;
-    let lower_aligned = lower_limit / DATA_BLOCK_SIZE * DATA_BLOCK_SIZE;
-
-    let (upper_meta_size, lower_meta_size) = (
-        thin_metadata_size(DATA_BLOCK_SIZE, upper_aligned, fs_limit)?,
-        thin_metadata_size(DATA_BLOCK_SIZE, lower_aligned, fs_limit)?,
-    );
-
     let diff = upper_limit - lower_limit;
-    let half_diff = diff / 2u64;
-    let half_limit = lower_aligned + half_diff;
-    let half_aligned = half_limit / DATA_BLOCK_SIZE * DATA_BLOCK_SIZE;
+    let half = lower_limit + diff / 2u64 + diff % 2u64;
+    let half_meta = thin_metadata_size(DATA_BLOCK_SIZE, datablocks_to_sectors(half), fs_limit)?;
 
-    let half_meta_size = thin_metadata_size(DATA_BLOCK_SIZE, half_aligned, fs_limit)?;
-
-    if upper_meta_size == lower_meta_size && half_aligned == lower_aligned {
-        Ok((lower_aligned, lower_meta_size))
-    } else if total_space <= half_aligned + 2u64 * half_meta_size {
-        search(total_space, half_aligned, lower_aligned, fs_limit)
+    if diff == DataBlocks(1) {
+        let upper_limit_sectors = datablocks_to_sectors(upper_limit);
+        let lower_limit_sectors = datablocks_to_sectors(lower_limit);
+        let upper_meta = thin_metadata_size(DATA_BLOCK_SIZE, upper_limit_sectors, fs_limit)?;
+        let lower_meta = thin_metadata_size(DATA_BLOCK_SIZE, lower_limit_sectors, fs_limit)?;
+        trace!(
+            "Upper data: {}, upper meta: {}, lower data: {}, lower meta: {}, total space: {}",
+            upper_limit_sectors,
+            upper_meta,
+            lower_limit_sectors,
+            lower_meta,
+            total_space
+        );
+        assert!(upper_limit_sectors + upper_meta * 2u64 > total_space);
+        assert!(lower_limit_sectors + lower_meta * 2u64 <= total_space);
+        Ok((lower_limit_sectors, lower_meta))
+    } else if datablocks_to_sectors(half) + half_meta * 2u64 > total_space {
+        search(total_space, half, lower_limit, fs_limit)
     } else {
-        search(total_space, upper_aligned, half_aligned, fs_limit)
+        search(total_space, upper_limit, half, fs_limit)
     }
 }
 
 /// This method divides the total space into optimized data and metadata size
 /// extensions. It returns values from search() respresenting the new total size
 /// of these devices.
+///
+/// available_space represents the amount of space on the thin pool that has not
+/// yet been allocated.
 fn divide_space(
     available_space: Sectors,
     current_data_size: Sectors,
     current_meta_size: Sectors,
     fs_limit: u64,
 ) -> StratisResult<(Sectors, Sectors)> {
-    let upper_data_aligned =
-        (current_data_size + available_space) / DATA_BLOCK_SIZE * DATA_BLOCK_SIZE;
+    // We add the expression at the end because sectors_to_datablocks is a floor
+    // function. If the available space is not aligned to DATA_BLOCK_SIZE, the
+    // remainder will be discarded.
+    //
+    // The below expression is added because if the remainder is zero, the
+    // total_space is guaranteed to be less than the total size calculated by
+    // the upper limit. The value of upper_data_aligned will be exact, not
+    // rounded down at all and so adding the additional metadata space guarantees
+    // that it will be larger than total_space. However, if the remainder is
+    // non-zero, we round up to the nearest data block which will always be
+    // a valid upper limit.
+    //
+    // This is required to satisfy the preconditions of search.
+    let upper_data_aligned = sectors_to_datablocks(current_data_size + available_space)
+        + if available_space % DATA_BLOCK_SIZE == Sectors(0) {
+            DataBlocks(0)
+        } else {
+            DataBlocks(1)
+        };
+    let upper_limit_meta_size = thin_metadata_size(
+        DATA_BLOCK_SIZE,
+        datablocks_to_sectors(upper_data_aligned),
+        fs_limit,
+    )?;
     let total_space = current_data_size + 2u64 * current_meta_size + available_space;
 
-    let upper_limit_meta_size = thin_metadata_size(DATA_BLOCK_SIZE, upper_data_aligned, fs_limit)?;
+    assert!(datablocks_to_sectors(upper_data_aligned) + upper_limit_meta_size * 2u64 > total_space);
+    assert!(current_data_size % DATA_BLOCK_SIZE == Sectors(0));
 
-    search(
-        total_space,
-        upper_data_aligned,
-        upper_data_aligned - 2u64 * upper_limit_meta_size,
-        fs_limit,
-    )
+    search(total_space, upper_data_aligned, DataBlocks(0), fs_limit)
 }
 
 /// Finds the optimized size for the data and metadata extension.

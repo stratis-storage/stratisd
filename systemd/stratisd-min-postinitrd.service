@@ -3,6 +3,8 @@ Description=Stratis minimal daemon
 Documentation=man:stratisd(8)
 DefaultDependencies=no
 StopWhenUnneeded=true
+After=systemd-udevd.service
+Requires=systemd-udevd.service
 
 [Service]
 Type=notify

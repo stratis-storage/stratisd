@@ -11,7 +11,7 @@ use std::{
     fmt::{self, Display},
 };
 
-use clap::{App, AppSettings, Arg, SubCommand};
+use clap::{Arg, Command};
 use data_encoding::BASE32_NOPAD;
 use serde_json::{json, Value};
 
@@ -283,14 +283,14 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
     let argv1 = args[0].as_str();
 
     if argv1.ends_with("stratis-str-cmp") {
-        let parser = App::new("stratis-str-cmp")
+        let parser = Command::new("stratis-str-cmp")
             .arg(
-                Arg::with_name("left")
+                Arg::new("left")
                     .help("First string to compare")
                     .required(true),
             )
             .arg(
-                Arg::with_name("right")
+                Arg::new("right")
                     .help("Second string to compare")
                     .required(true),
             );
@@ -300,14 +300,10 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
             matches.value_of("right").expect("required argument"),
         );
     } else if argv1.ends_with("stratis-base32-decode") {
-        let parser = App::new("stratis-base32-decode")
+        let parser = Command::new("stratis-base32-decode")
+            .arg(Arg::new("key").help("Key for output string").required(true))
             .arg(
-                Arg::with_name("key")
-                    .help("Key for output string")
-                    .required(true),
-            )
-            .arg(
-                Arg::with_name("value")
+                Arg::new("value")
                     .help("value to be decoded from base32 encoded sequence")
                     .required(true),
             );
@@ -317,58 +313,58 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
             matches.value_of("value").expect("required argument"),
         )?;
     } else if argv1.ends_with("stratis-predict-usage") {
-        let parser = App::new("stratis-predict-usage")
+        let parser = Command::new("stratis-predict-usage")
             .about("Predicts space usage for Stratis.")
-            .setting(AppSettings::SubcommandRequired)
+            .subcommand_required(true)
             .subcommands(vec![
-                SubCommand::with_name("pool")
+                Command::new("pool")
                     .about("Predicts the space usage when creating a Stratis pool.")
-                    .arg(Arg::with_name("encrypted")
+                    .arg(Arg::new("encrypted")
                         .long("encrypted")
                         .help("Whether the pool will be encrypted."),
                     )
                     .arg(
-                        Arg::with_name("no-overprovision")
+                        Arg::new("no-overprovision")
                         .long("no-overprovision")
                         .help("Indicates that the pool does not allow overprovisioning"),
                     )
                     .arg(
-                        Arg::with_name("device-size")
+                        Arg::new("device-size")
                             .long("device-size")
                             .number_of_values(1)
-                            .multiple(true)
+                            .multiple_occurrences(true)
                             .required(true)
                             .help("Size of device to be included in the pool. May be specified multiple times. Units are bytes.")
                             .next_line_help(true)
                     )
                     .arg(
-                        Arg::with_name("filesystem-size")
+                        Arg::new("filesystem-size")
                         .long("filesystem-size")
                         .number_of_values(1)
-                        .multiple(true)
+                        .multiple_occurrences(true)
                         .help("Size of filesystem to be made for this pool. May be specified multiple times, one for each filesystem. Units are bytes. Must be at least 512 MiB and less than 4 PiB.")
                         .next_line_help(true)
                     ),
-                SubCommand::with_name("filesystem")
+                Command::new("filesystem")
                     .about("Predicts the space usage when creating a Stratis filesystem.")
                     .arg(
-                        Arg::with_name("filesystem-size")
+                        Arg::new("filesystem-size")
                         .long("filesystem-size")
                         .number_of_values(1)
-                        .multiple(true)
+                        .multiple_occurrences(true)
                         .required(true)
                         .help("Size of filesystem to be made for this pool. May be specified multiple times, one for each filesystem. Units are bytes. Must be at least 512 MiB and less than 4 PiB.")
                         .next_line_help(true)
                     )
                     .arg(
-                        Arg::with_name("no-overprovision")
+                        Arg::new("no-overprovision")
                         .long("no-overprovision")
                         .help("Indicates that the pool does not allow overprovisioning"),
                     )]
             );
         let matches = parser.get_matches_from(&args);
         match matches.subcommand() {
-            ("pool", Some(sub_m)) => predict_pool_usage(
+            Some(("pool", sub_m)) => predict_pool_usage(
                 sub_m.is_present("encrypted"),
                 !sub_m.is_present("no-overprovision"),
                 sub_m
@@ -386,7 +382,7 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
                     })
                     .transpose()?,
             )?,
-            ("filesystem", Some(sub_m)) => predict_filesystem_usage(
+            Some(("filesystem", sub_m)) => predict_filesystem_usage(
                 !sub_m.is_present("no-overprovision"),
                 sub_m
                     .values_of("filesystem-size")
@@ -404,19 +400,19 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
     {
         #[cfg(feature = "systemd_compat")]
         if argv1.ends_with("stratis-clevis-setup-generator") {
-            let parser = App::new("stratis-clevis-setup-generator")
+            let parser = Command::new("stratis-clevis-setup-generator")
                 .arg(
-                    Arg::with_name("normal_priority_dir")
+                    Arg::new("normal_priority_dir")
                         .required(true)
                         .help("Directory in which to write a unit file for normal priority"),
                 )
                 .arg(
-                    Arg::with_name("early_priority_dir")
+                    Arg::new("early_priority_dir")
                         .required(true)
                         .help("Directory in which to write a unit file for early priority"),
                 )
                 .arg(
-                    Arg::with_name("late_priority_dir")
+                    Arg::new("late_priority_dir")
                         .required(true)
                         .help("Directory in which to write a unit file for late priority"),
                 );
@@ -428,19 +424,19 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
                     .to_string(),
             )?;
         } else if argv1.ends_with("stratis-setup-generator") {
-            let parser = App::new("stratis-setup-generator")
+            let parser = Command::new("stratis-setup-generator")
                 .arg(
-                    Arg::with_name("normal_priority_dir")
+                    Arg::new("normal_priority_dir")
                         .required(true)
                         .help("Directory in which to write a unit file for normal priority"),
                 )
                 .arg(
-                    Arg::with_name("early_priority_dir")
+                    Arg::new("early_priority_dir")
                         .required(true)
                         .help("Directory in which to write a unit file for early priority"),
                 )
                 .arg(
-                    Arg::with_name("late_priority_dir")
+                    Arg::new("late_priority_dir")
                         .required(true)
                         .help("Directory in which to write a unit file for late priority"),
                 );

@@ -136,4 +136,5 @@ class TestSpaceUsagePrediction(unittest.TestCase):
             subprocess.run([_STRATIS_PREDICT_USAGE], check=True)
 
         exception = c_m.exception
-        self.assertEqual(exception.returncode, 1)
+        # Clap v3 uses 2 as the exit status when displaying help
+        self.assertEqual(exception.returncode, 2)

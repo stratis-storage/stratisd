@@ -22,11 +22,14 @@ pub use crate::engine::{
     structures::Lockable,
     types::{
         actions::{
-            Clevis, CreateAction, DeleteAction, EngineAction, Key, MappingCreateAction,
+            Clevis, CreateAction, DeleteAction, EngineAction, GrowAction, Key, MappingCreateAction,
             MappingDeleteAction, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
             SetUnlockAction, StartAction, StopAction,
         },
-        diff::{Compare, Diff, PoolDiff, StratFilesystemDiff, StratPoolDiff, ThinPoolDiff},
+        diff::{
+            Compare, Diff, PoolDiff, StratBlockDevDiff, StratFilesystemDiff, StratPoolDiff,
+            ThinPoolDiff,
+        },
         keys::{EncryptionInfo, KeyDescription, PoolEncryptionInfo, SizedKeyMemory},
     },
 };

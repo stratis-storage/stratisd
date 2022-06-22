@@ -15,7 +15,7 @@ use tokio::sync::{OwnedRwLockReadGuard, OwnedRwLockWriteGuard, RwLock};
 
 use crate::{
     engine::{
-        engine::{Engine, Pool, Report},
+        engine::{Engine, HandleEvents, Pool, Report},
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         sim_engine::{keys::SimKeyActions, pool::SimPool},
         structures::{
@@ -170,11 +170,8 @@ impl Engine for SimEngine {
         }
     }
 
-    async fn handle_events(
-        &self,
-        _: Vec<UdevEngineEvent>,
-    ) -> Vec<SomeLockReadGuard<PoolUuid, Self::Pool>> {
-        Vec::new()
+    async fn handle_events(&self, _: Vec<UdevEngineEvent>) -> HandleEvents<Self::Pool> {
+        (Vec::new(), HashMap::new())
     }
 
     async fn destroy_pool(&self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {

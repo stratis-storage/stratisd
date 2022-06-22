@@ -23,15 +23,15 @@ use tokio::sync::{
     mpsc::UnboundedSender as TokioSender, OwnedRwLockReadGuard, OwnedRwLockWriteGuard, RwLock,
 };
 
-use devicemapper::Bytes;
+use devicemapper::{Bytes, Sectors};
 
 use crate::{
     dbus_api::{connection::DbusConnectionHandler, tree::DbusTreeHandler, udev::DbusUdevHandler},
     engine::{
-        total_allocated, total_used, ActionAvailability, Diff, Engine, ExclusiveGuard,
+        total_allocated, total_used, ActionAvailability, DevUuid, Diff, Engine, ExclusiveGuard,
         FilesystemUuid, Lockable, LockedPoolInfo, PoolDiff, PoolEncryptionInfo, PoolUuid,
-        SharedGuard, StoppedPoolInfo, StratFilesystemDiff, StratPoolDiff, StratisUuid,
-        ThinPoolDiff,
+        SharedGuard, StoppedPoolInfo, StratBlockDevDiff, StratFilesystemDiff, StratPoolDiff,
+        StratisUuid, ThinPoolDiff,
     },
 };
 
@@ -134,6 +134,7 @@ pub enum DbusAction<E> {
         SignalChange<Bytes>,
         SignalChange<bool>,
     ),
+    UdevBackgroundChange(DevUuid, SignalChange<Option<Sectors>>),
 }
 
 impl<E> DbusAction<E>
@@ -180,6 +181,18 @@ where
                     SignalChange::from(used),
                     SignalChange::from(size),
                 )
+            })
+            .collect()
+    }
+
+    /// Convert changed properties from blockdevs to a series of D-Bus actions.
+    pub fn from_bd_diffs(diffs: HashMap<DevUuid, StratBlockDevDiff>) -> Vec<Self> {
+        diffs
+            .into_iter()
+            .map(|(uuid, diff)| {
+                let StratBlockDevDiff { size } = diff;
+
+                DbusAction::UdevBackgroundChange(uuid, SignalChange::from(size))
             })
             .collect()
     }

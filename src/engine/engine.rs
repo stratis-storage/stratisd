@@ -24,15 +24,17 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, Key, KeyDescription, LockKey, LockedPoolInfo,
-            MappingCreateAction, MappingDeleteAction, Name, PoolDiff, PoolEncryptionInfo, PoolUuid,
-            RegenAction, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
-            SetUnlockAction, StartAction, StopAction, StoppedPoolInfo, StratFilesystemDiff,
-            UdevEngineEvent, UnlockMethod,
+            EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, LockKey,
+            LockedPoolInfo, MappingCreateAction, MappingDeleteAction, Name, PoolDiff,
+            PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, ReportType, SetCreateAction,
+            SetDeleteAction, SetUnlockAction, StartAction, StopAction, StoppedPoolInfo,
+            StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
         },
     },
     stratis::StratisResult,
 };
+
+use super::types::StratBlockDevDiff;
 
 pub const DEV_PATH: &str = "/dev/stratis";
 /// The maximum size of pool passphrases stored in the kernel keyring
@@ -115,6 +117,12 @@ pub trait BlockDev: Debug {
 
     /// Get the status of whether a block device is encrypted or not.
     fn is_encrypted(&self) -> bool;
+
+    /// Get the newly registered size, if any, of the block device.
+    ///
+    /// If internally the new size is None, the block device size is equal to that
+    /// registered in the BDA.
+    fn new_size(&self) -> Option<Sectors>;
 }
 
 pub trait Pool: Debug + Send + Sync {
@@ -311,7 +319,21 @@ pub trait Pool: Debug + Send + Sync {
 
     /// Returns a boolean indicating whether the pool is out of allocation space.
     fn out_of_alloc_space(&self) -> bool;
+
+    /// Grow either a specified device or all devices in a pool if the underlying
+    /// physical device or devices have changed in size.
+    fn grow_physical(
+        &mut self,
+        pool_name: &Name,
+        pool_uuid: PoolUuid,
+        device: DevUuid,
+    ) -> StratisResult<GrowAction<(PoolUuid, DevUuid)>>;
 }
+
+pub type HandleEvents<P> = (
+    Vec<SomeLockReadGuard<PoolUuid, P>>,
+    HashMap<DevUuid, StratBlockDevDiff>,
+);
 
 #[async_trait]
 pub trait Engine: Debug + Report + Send + Sync {
@@ -334,10 +356,7 @@ pub trait Engine: Debug + Report + Send + Sync {
     /// and its UUID.
     ///
     /// Precondition: the subsystem of the device evented on is "block".
-    async fn handle_events(
-        &self,
-        event: Vec<UdevEngineEvent>,
-    ) -> Vec<SomeLockReadGuard<PoolUuid, Self::Pool>>;
+    async fn handle_events(&self, event: Vec<UdevEngineEvent>) -> HandleEvents<Self::Pool>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.

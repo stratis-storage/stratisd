@@ -20,6 +20,7 @@ use devicemapper::DmNameBuf;
 
 use crate::{
     engine::{
+        engine::HandleEvents,
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         strat_engine::{
             cmd::verify_executables,
@@ -301,42 +302,66 @@ impl Engine for StratEngine {
     type Pool = StratPool;
     type KeyActions = StratKeyActions;
 
-    async fn handle_events(
-        &self,
-        events: Vec<UdevEngineEvent>,
-    ) -> Vec<SomeLockReadGuard<PoolUuid, Self::Pool>> {
+    async fn handle_events(&self, events: Vec<UdevEngineEvent>) -> HandleEvents<Self::Pool> {
         let mut ret_guards = Vec::new();
-        let uuids = {
-            let mut pools_write_all = self.pools.write_all().await;
-            let mut ld_guard = self.liminal_devices.write().await;
-            match spawn_blocking!({
-                events
-                    .into_iter()
-                    .filter_map(|event| {
-                        if let Some((name, uuid, pool)) =
-                            ld_guard.block_evaluate(&*pools_write_all, &event)
-                        {
-                            pools_write_all.insert(name, uuid, pool);
-                            Some(uuid)
-                        } else {
-                            None
+        let mut diffs = HashMap::new();
+
+        // Acquire a write lock here so that no concurrent accesses can occur between
+        // udev event handling and insertion into the pool.
+        //
+        // Failing to do this can cause two identical pools to be registered in
+        // internal data structures.
+        let mut pools_write_all = self.pools.write_all().await;
+        let mut ld_guard = self.liminal_devices.write().await;
+
+        match spawn_blocking!({
+            events
+                .iter()
+                .map(|event| {
+                    let uuid = if let Some((name, uuid, pool)) =
+                        ld_guard.block_evaluate(&*pools_write_all, event)
+                    {
+                        pools_write_all.insert(name, uuid, pool);
+                        Some(uuid)
+                    } else {
+                        None
+                    };
+                    match LiminalDevices::block_evaluate_size(&mut pools_write_all, event) {
+                        Ok(Some((dev_uuid, diff))) => (uuid, Some((dev_uuid, diff))),
+                        Ok(None) => (uuid, None),
+                        Err(e) => {
+                            warn!("Ignoring device size change handling due to error: {}", e);
+                            (uuid, None)
                         }
-                    })
-                    .collect::<Vec<_>>()
-            }) {
-                Ok(u) => u,
-                Err(e) => {
-                    warn!("Failed to handle udev events: {}", e);
-                    return ret_guards;
+                    }
+                })
+                .fold(
+                    (Vec::new(), HashMap::new()),
+                    |(mut uuids, mut diffs), (uuid, info)| {
+                        if let Some(u) = uuid {
+                            uuids.push(u);
+                        }
+                        if let Some((dev_uuid, diff)) = info {
+                            diffs.insert(dev_uuid, diff);
+                        }
+                        (uuids, diffs)
+                    },
+                )
+        }) {
+            Ok((uuids, diffs_thread)) => {
+                for uuid in uuids {
+                    if let Some(guard) = self.pools.read(LockKey::Uuid(uuid)).await {
+                        ret_guards.push(guard);
+                    }
                 }
+                diffs.extend(diffs_thread.into_iter());
+            }
+            Err(e) => {
+                warn!("Failed to handle udev events: {}", e);
             }
         };
-        for uuid in uuids {
-            if let Some(guard) = self.pools.read(LockKey::Uuid(uuid)).await {
-                ret_guards.push(guard);
-            }
-        }
-        ret_guards
+
+        (ret_guards, diffs)
     }
 
     async fn create_pool(

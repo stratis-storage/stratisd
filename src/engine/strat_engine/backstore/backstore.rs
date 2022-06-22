@@ -634,6 +634,10 @@ impl Backstore {
     pub fn rebind_clevis(&mut self) -> StratisResult<()> {
         self.data_tier.block_mgr.rebind_clevis()
     }
+
+    pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {
+        self.data_tier.grow(dev)
+    }
 }
 
 impl<'a> Into<Value> for &'a Backstore {

@@ -690,6 +690,17 @@ impl BlockDevMgr {
         }
     }
 
+    pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {
+        let bd = self
+            .block_devs
+            .iter_mut()
+            .find(|bd| bd.uuid() == dev)
+            .ok_or_else(|| {
+                StratisError::Msg(format!("Block device with UUID {} not found", dev))
+            })?;
+        bd.grow()
+    }
+
     /// Tear down devicemapper devices for the block devices in this BlockDevMgr.
     pub fn teardown(&mut self) -> StratisResult<()> {
         let mut errors = Vec::new();

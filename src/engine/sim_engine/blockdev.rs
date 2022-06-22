@@ -59,6 +59,10 @@ impl BlockDev for SimDev {
     fn is_encrypted(&self) -> bool {
         self.encryption_info.is_some()
     }
+
+    fn new_size(&self) -> Option<Sectors> {
+        None
+    }
 }
 
 impl SimDev {
@@ -122,6 +126,7 @@ impl<'a> Into<Value> for &'a SimDev {
             "path".to_string(),
             Value::from(self.devnode.display().to_string()),
         );
+        json.insert("size".to_string(), Value::from(self.size().to_string()));
         if let Some(EncryptionInfo::Both(kd, (pin, config))) = self.encryption_info.as_ref() {
             json.insert(
                 "key_description".to_string(),

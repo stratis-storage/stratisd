@@ -7,7 +7,7 @@ use dbus_tree::{MTSync, MethodErr, PropInfo, Tree};
 use futures::executor::block_on;
 
 use crate::{
-    dbus_api::types::TData,
+    dbus_api::{blockdev::prop_conv, types::TData},
     engine::{BlockDev, BlockDevTier, Engine, LockKey, Pool},
 };
 
@@ -136,4 +136,13 @@ where
     E: Engine,
 {
     (*dev.size().bytes()).to_string()
+}
+
+/// Generate D-Bus representation of new block device size.
+#[inline]
+pub fn blockdev_new_size_prop<E>(dev: &<E::Pool as Pool>::BlockDev) -> (bool, String)
+where
+    E: Engine,
+{
+    prop_conv::blockdev_new_size_to_prop(dev.new_size())
 }

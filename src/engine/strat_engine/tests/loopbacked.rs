@@ -4,7 +4,7 @@
 
 use std::{
     env,
-    fs::OpenOptions,
+    fs::{File, OpenOptions},
     mem::forget,
     os::unix::io::AsRawFd,
     panic,
@@ -15,7 +15,10 @@ use loopdev::{LoopControl, LoopDevice};
 
 use devicemapper::{Bytes, Sectors, IEC};
 
-use crate::engine::strat_engine::tests::{logger::init_logger, util::clean_up};
+use crate::{
+    engine::strat_engine::tests::{logger::init_logger, util::clean_up},
+    stratis::StratisResult,
+};
 
 /// Ways of specifying range of numbers of devices to use for tests.
 /// Unlike real tests, there is no AtLeast constructor, as, at least in theory
@@ -32,6 +35,7 @@ pub enum DeviceLimits {
 
 pub struct LoopTestDev {
     ld: LoopDevice,
+    backing_file: File,
 }
 
 impl LoopTestDev {
@@ -58,7 +62,18 @@ impl LoopTestDev {
         let ld = lc.next_free().unwrap();
         ld.attach_file(path).unwrap();
 
-        LoopTestDev { ld }
+        LoopTestDev {
+            ld,
+            backing_file: f,
+        }
+    }
+
+    /// Grow the device size by a factor of 2.
+    pub fn grow(&self) -> StratisResult<()> {
+        let current_len = self.backing_file.metadata()?.len();
+        self.backing_file.set_len(2 * current_len)?;
+        self.ld.set_capacity()?;
+        Ok(())
     }
 }
 
@@ -125,6 +140,60 @@ where
         };
 
         result.unwrap();
+
+        if let Some(td) = tear_down {
+            td.unwrap();
+        }
+    }
+}
+
+/// Run the designated tests according to the specification with one function being
+/// executed before the first device is doubled and one after.
+pub fn test_device_grow_with_spec<F1, F2>(limits: &DeviceLimits, test: F1, test_after_grow: F2)
+where
+    F1: Fn(&[&Path]) + panic::RefUnwindSafe,
+    F2: Fn(&[&Path]) + panic::RefUnwindSafe,
+{
+    let counts = get_device_counts(limits);
+
+    init_logger();
+
+    for (count, size) in counts {
+        let tmpdir = tempfile::Builder::new()
+            .prefix("stratis")
+            .tempdir()
+            .unwrap();
+        let loop_devices: Vec<LoopTestDev> = get_devices(count, size, &tmpdir);
+        let device_paths: Vec<PathBuf> =
+            loop_devices.iter().map(|x| x.ld.path().unwrap()).collect();
+        let device_paths: Vec<&Path> = device_paths.iter().map(|x| x.as_path()).collect();
+
+        clean_up().unwrap();
+
+        let result_pre_grow = panic::catch_unwind(|| {
+            test(&device_paths);
+        });
+
+        let loop_dev_grow_result = loop_devices.first().map(|l| l.grow());
+
+        let result_post_grow = if result_pre_grow.is_ok() {
+            panic::catch_unwind(|| test_after_grow(&device_paths))
+        } else {
+            Ok(())
+        };
+
+        let tear_down = if env::var("NO_TEST_CLEAN_UP") != Ok("1".to_string()) {
+            Some(clean_up())
+        } else {
+            forget(tmpdir);
+            loop_devices.into_iter().for_each(forget);
+            None
+        };
+
+        loop_dev_grow_result.unwrap().unwrap();
+
+        result_pre_grow.unwrap();
+        result_post_grow.unwrap();
 
         if let Some(td) = tear_down {
             td.unwrap();

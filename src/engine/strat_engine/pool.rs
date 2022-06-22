@@ -26,7 +26,7 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, Key, KeyDescription, Name, PoolDiff,
+            EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
             PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
             SetDeleteAction, StratFilesystemDiff, StratPoolDiff,
         },
@@ -323,12 +323,19 @@ impl StratPool {
         self.backstore.get_blockdev_by_uuid(uuid)
     }
 
-    #[pool_mutating_action("NoRequests")]
+    #[pool_mutating_action("NoPoolChanges")]
     pub fn get_mut_strat_blockdev(
         &mut self,
         uuid: DevUuid,
     ) -> StratisResult<Option<(BlockDevTier, &mut StratBlockDev)>> {
         Ok(self.backstore.get_mut_blockdev_by_uuid(uuid))
+    }
+
+    #[pool_mutating_action("NoPoolChanges")]
+    pub fn blockdevs_mut(
+        &mut self,
+    ) -> StratisResult<Vec<(DevUuid, BlockDevTier, &mut StratBlockDev)>> {
+        Ok(self.backstore.blockdevs_mut())
     }
 
     /// Destroy the pool.
@@ -790,11 +797,7 @@ impl Pool for StratPool {
     }
 
     fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &Self::BlockDev)> {
-        self.backstore
-            .blockdevs()
-            .iter()
-            .map(|&(u, t, b)| (u, t, b))
-            .collect()
+        self.backstore.blockdevs()
     }
 
     fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &Self::BlockDev)> {
@@ -871,6 +874,24 @@ impl Pool for StratPool {
     fn out_of_alloc_space(&self) -> bool {
         self.thin_pool.out_of_alloc_space()
     }
+
+    #[pool_mutating_action("NoRequests")]
+    fn grow_physical(
+        &mut self,
+        name: &Name,
+        pool_uuid: PoolUuid,
+        device: DevUuid,
+    ) -> StratisResult<GrowAction<(PoolUuid, DevUuid)>> {
+        let changed = self.backstore.grow(device)?;
+        if changed {
+            if self.thin_pool.set_queue_mode() {
+                self.write_metadata(name)?;
+            }
+            Ok(GrowAction::Grown((pool_uuid, device)))
+        } else {
+            Ok(GrowAction::Identity)
+        }
+    }
 }
 
 pub struct StratPoolState {
@@ -921,13 +942,14 @@ mod tests {
     use devicemapper::{Bytes, IEC, SECTOR_SIZE};
 
     use crate::engine::{
-        engine::Filesystem,
+        engine::{BlockDev, Filesystem},
         strat_engine::{
             cmd::udev_settle,
             tests::{loopbacked, real},
             thinpool::ThinPoolStatusDigest,
         },
-        types::EngineAction,
+        types::{EngineAction, LockKey},
+        Engine, StratEngine,
     };
 
     use super::*;
@@ -1320,6 +1342,91 @@ mod tests {
         real::test_with_spec(
             &real::DeviceLimits::Exactly(1, Some(Sectors(10 * IEC::Mi)), None),
             test_overprov,
+        );
+    }
+
+    /// Set up for testing physical device growth.
+    fn test_grow_physical_pre_grow(paths: &[&Path]) {
+        let pool_name = Name::new("pool".to_string());
+        let engine = StratEngine::initialize().unwrap();
+        let pool_uuid = test_async!(engine.create_pool(&*pool_name, paths, None))
+            .unwrap()
+            .changed()
+            .unwrap();
+        let mut guard = test_async!(engine.get_mut_pool(LockKey::Uuid(pool_uuid))).unwrap();
+        let (_, _, pool) = guard.as_mut_tuple();
+
+        let (_, fs_uuid, _) = pool
+            .create_filesystems(&*pool_name, pool_uuid, &[("stratis_test_filesystem", None)])
+            .unwrap()
+            .changed()
+            .unwrap()
+            .pop()
+            .unwrap();
+
+        let tmp_dir = tempfile::Builder::new()
+            .prefix("stratis_testing")
+            .tempdir()
+            .unwrap();
+        let new_file = tmp_dir.path().join("stratis_test.txt");
+        let write_block = &[0; 512_000];
+
+        {
+            let (_, fs) = pool.get_filesystem(fs_uuid).unwrap();
+            mount(
+                Some(&fs.devnode()),
+                tmp_dir.path(),
+                Some("xfs"),
+                MsFlags::empty(),
+                None as Option<&str>,
+            )
+            .unwrap();
+        }
+
+        let mut f = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(&new_file)
+            .unwrap();
+        while !pool.out_of_alloc_space() {
+            f.write_all(write_block).unwrap();
+            f.sync_all().unwrap();
+            pool.event_on(pool_uuid, &pool_name).unwrap();
+        }
+    }
+
+    /// Test that growing a physical device succeeds, the device has doubled in size,
+    /// and that the pool registers new available allocation space if it is out of space
+    /// at the time of device growth.
+    fn test_grow_physical_post_grow(_: &[&Path]) {
+        let engine = StratEngine::initialize().unwrap();
+
+        let mut pools = test_async!(engine.pools_mut());
+        assert!(pools.len() == 1);
+        let (pool_name, pool_uuid, pool) = pools.iter_mut().next().unwrap();
+
+        let (dev_uuid, size) = {
+            let blockdevs = pool.blockdevs();
+            let (dev_uuid, _, dev) = blockdevs.first().unwrap();
+            (*dev_uuid, dev.size())
+        };
+
+        assert!(pool.out_of_alloc_space());
+        pool.grow_physical(pool_name, *pool_uuid, dev_uuid)
+            .unwrap()
+            .changed()
+            .unwrap();
+        let (_, dev) = pool.get_blockdev(dev_uuid).unwrap();
+        assert_eq!(dev.size(), 2u64 * size);
+        assert!(!pool.out_of_alloc_space());
+    }
+
+    #[test]
+    fn loop_test_grow_physical() {
+        loopbacked::test_device_grow_with_spec(
+            &loopbacked::DeviceLimits::Exactly(2, Some(Sectors(10 * IEC::Mi))),
+            test_grow_physical_pre_grow,
+            test_grow_physical_post_grow,
         );
     }
 }

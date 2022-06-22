@@ -1,7 +1,12 @@
 #[cfg(test)]
 macro_rules! test_async {
     ($expr:expr) => {
-        tokio::runtime::Runtime::new().unwrap().block_on($expr)
+        tokio::task::LocalSet::new().block_on(
+            &tokio::runtime::Builder::new_current_thread()
+                .build()
+                .unwrap(),
+            $expr,
+        )
     };
 }
 

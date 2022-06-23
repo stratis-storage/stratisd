@@ -540,7 +540,7 @@ impl Engine for StratEngine {
 
 #[cfg(test)]
 mod test {
-    use std::{env, error::Error, ffi::OsStr, iter::once, path::Path};
+    use std::{env, error::Error, path::Path};
 
     use devicemapper::{Bytes, Sectors};
 
@@ -551,11 +551,8 @@ mod test {
             cmd,
             ns::unshare_namespace,
             tests::{crypt, dm_stratis_devices_remove, loopbacked, real, FailDevice},
-            udev::{CRYPTO_FS_TYPE, FS_TYPE_KEY},
         },
-        types::{
-            ActionAvailability, EngineAction, KeyDescription, UdevEngineDevice, UdevEngineEvent,
-        },
+        types::{ActionAvailability, EngineAction, KeyDescription},
     };
 
     use super::*;
@@ -774,40 +771,6 @@ mod test {
                         "Pool should be newly created".to_string(),
                     ))
                 })?;
-
-        let mut events = generate_events!();
-
-        // Hack because fail device does not show up as LUKS2 device in udev
-        let cxt = libudev::Context::new().expect("Creating udev context should succeed");
-        let mut enumerator =
-            libudev::Enumerator::new(&cxt).expect("Creating enumerator should succeed");
-        enumerator.match_is_initialized().unwrap();
-        let mut devices = enumerator
-            .scan_devices()
-            .expect("Scanning udev devices should succeed");
-
-        let fail_udev = devices
-            .find(|dev| dev.devnode() == Some(&fail_device.as_path().canonicalize().unwrap()))
-            .expect("Fail device must be in udev database");
-
-        events.push(UdevEngineEvent::new(
-            libudev::EventType::Add,
-            UdevEngineDevice::new(
-                fail_udev.is_initialized(),
-                fail_udev.devnode().map(|p| p.to_owned()),
-                fail_udev.devnum(),
-                fail_udev
-                    .properties()
-                    .map(|prop| (Box::from(prop.name()), Box::from(prop.value())))
-                    .chain(once((
-                        Box::from(OsStr::new(FS_TYPE_KEY)),
-                        Box::from(OsStr::new(CRYPTO_FS_TYPE)),
-                    )))
-                    .collect::<HashMap<_, _>>(),
-            ),
-        ));
-
-        test_async!(engine.handle_events(events));
 
         let res = needs_clean_up(engine, uuid, fail_device, operation);
 

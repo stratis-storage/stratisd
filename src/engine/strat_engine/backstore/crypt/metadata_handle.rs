@@ -21,6 +21,7 @@ pub struct CryptMetadataHandle {
     pub(super) physical_path: DevicePath,
     pub(super) identifiers: StratisIdentifiers,
     pub(super) encryption_info: EncryptionInfo,
+    pub(super) name: String,
 }
 
 impl CryptMetadataHandle {
@@ -28,11 +29,13 @@ impl CryptMetadataHandle {
         physical_path: DevicePath,
         identifiers: StratisIdentifiers,
         encryption_info: EncryptionInfo,
+        name: String,
     ) -> Self {
         CryptMetadataHandle {
             physical_path,
             identifiers,
             encryption_info,
+            name,
         }
     }
 
@@ -58,5 +61,10 @@ impl CryptMetadataHandle {
     /// Get the Stratis device identifiers for a given encrypted device.
     pub fn device_identifiers(&self) -> &StratisIdentifiers {
         &self.identifiers
+    }
+
+    /// Get the name of the activated device when it is activated.
+    pub fn name(&self) -> &str {
+        &self.name
     }
 }

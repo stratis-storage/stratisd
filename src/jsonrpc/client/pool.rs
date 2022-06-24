@@ -22,25 +22,30 @@ pub fn pool_create(
     do_request_standard!(PoolCreate, name, blockdevs, enc_info)
 }
 
-// stratis-min pool unlock
-pub fn pool_unlock(
-    unlock_method: UnlockMethod,
-    uuid: Option<PoolUuid>,
+// stratis-min pool start
+pub fn pool_start(
+    uuid: PoolUuid,
+    unlock_method: Option<UnlockMethod>,
     prompt: bool,
 ) -> StratisResult<()> {
     if prompt {
-        let password = rpassword::prompt_password_stdout("Enter passphrase followed by return:")?;
+        let password = rpassword::prompt_password_stdout("Enter passphrase followed by return: ")?;
         if password.is_empty() {
             return Ok(());
         }
-        do_request_standard!(PoolUnlock, unlock_method, uuid; {
+        do_request_standard!(PoolStart, uuid, unlock_method; {
             let (read_end, write_end) = pipe()?;
             write(write_end, password.as_bytes())?;
             read_end
         })
     } else {
-        do_request_standard!(PoolUnlock, unlock_method, uuid)
+        do_request_standard!(PoolStart, uuid, unlock_method)
     }
+}
+
+// stratis-min pool stop
+pub fn pool_stop(uuid: PoolUuid) -> StratisResult<()> {
+    do_request_standard!(PoolStop, uuid)
 }
 
 // stratis-min pool init-cache
@@ -125,13 +130,13 @@ pub fn pool_is_encrypted(uuid: PoolUuid) -> StratisResult<bool> {
     }
 }
 
-// stratis-min pool is-locked
-pub fn pool_is_locked(uuid: PoolUuid) -> StratisResult<bool> {
-    let (is_locked, rc, rs) = do_request!(PoolIsLocked, uuid);
+// stratis-min pool is-stopped
+pub fn pool_is_stopped(uuid: PoolUuid) -> StratisResult<bool> {
+    let (is_stopped, rc, rs) = do_request!(PoolIsStopped, uuid);
     if rc != 0 {
         Err(StratisError::Msg(rs))
     } else {
-        Ok(is_locked)
+        Ok(is_stopped)
     }
 }
 

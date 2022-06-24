@@ -690,6 +690,22 @@ impl BlockDevMgr {
             Ok(())
         }
     }
+
+    /// Tear down devicemapper devices for the block devices in this BlockDevMgr.
+    pub fn teardown(&mut self) -> StratisResult<()> {
+        let mut errors = Vec::new();
+        for bd in self.block_devs.iter_mut() {
+            if let Err(e) = bd.teardown() {
+                errors.push(e);
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(StratisError::BestEffortError("Failed to remove devicemapper devices for some or all physical devices in the pool".to_string(), errors))
+        }
+    }
 }
 
 fn operation_loop<'a, I, A>(blockdevs: I, action: A) -> StratisResult<()>

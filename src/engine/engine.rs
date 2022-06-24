@@ -27,7 +27,8 @@ use crate::{
             EncryptionInfo, FilesystemUuid, Key, KeyDescription, LockKey, LockedPoolInfo,
             MappingCreateAction, MappingDeleteAction, Name, PoolDiff, PoolEncryptionInfo, PoolUuid,
             RegenAction, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
-            SetUnlockAction, StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
+            SetUnlockAction, StartAction, StopAction, StoppedPoolInfo, StratFilesystemDiff,
+            UdevEngineEvent, UnlockMethod,
         },
     },
     stratis::StratisResult,
@@ -381,6 +382,10 @@ pub trait Engine: Debug + Report + Send + Sync {
     /// been set up and need to be unlocked to their encryption infos.
     async fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo>;
 
+    /// Get a mapping of pool UUIDs for pools that have not yet
+    /// been set up and need to be started to their device infos.
+    async fn stopped_pools(&self) -> HashMap<PoolUuid, StoppedPoolInfo>;
+
     /// Get all pools belonging to this engine.
     async fn pools(&self) -> AllLockReadGuard<PoolUuid, Self::Pool>;
 
@@ -406,6 +411,21 @@ pub trait Engine: Debug + Report + Send + Sync {
 
     /// Get the handler for kernel keyring operations mutably.
     async fn get_key_handler_mut(&self) -> ExclusiveGuard<OwnedRwLockWriteGuard<Self::KeyActions>>;
+
+    /// Start and set up a pool, creating all necessary devicemapper devices to
+    /// perform IO operations and start monitoring for events.
+    async fn start_pool(
+        &self,
+        pool_uuid: PoolUuid,
+        unlock_method: Option<UnlockMethod>,
+    ) -> StratisResult<StartAction<PoolUuid>>;
+
+    /// Stop and tear down a pool, storing the information for it to be started
+    /// again later.
+    async fn stop_pool(&self, pool_uuid: PoolUuid) -> StratisResult<StopAction<PoolUuid>>;
+
+    /// Refresh the state of all pools and liminal devices.
+    async fn refresh_state(&self) -> StratisResult<()>;
 
     /// Return true if this engine is the simulator engine, otherwise false.
     fn is_sim(&self) -> bool;

@@ -5,12 +5,13 @@
 use std::{
     convert::TryFrom,
     fs::OpenOptions,
-    io::{self, Write},
+    io::Write,
     path::{Path, PathBuf},
 };
 
 use data_encoding::BASE64URL_NOPAD;
 use either::Either;
+use retry::{delay::Fixed, retry_with_index, Error};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use tempfile::TempDir;
@@ -26,10 +27,10 @@ use crate::{
             backstore::crypt::{
                 consts::{
                     CLEVIS_LUKS_TOKEN_ID, CLEVIS_TANG_TRUST_URL, DEFAULT_CRYPT_KEYSLOTS_SIZE,
-                    DEFAULT_CRYPT_METADATA_SIZE, DEVICEMAPPER_PATH, LUKS2_TOKEN_ID,
-                    LUKS2_TOKEN_TYPE, SECTOR_SIZE, STRATIS_TOKEN_DEVNAME_KEY,
-                    STRATIS_TOKEN_DEV_UUID_KEY, STRATIS_TOKEN_ID, STRATIS_TOKEN_POOL_UUID_KEY,
-                    STRATIS_TOKEN_TYPE, TOKEN_KEYSLOTS_KEY, TOKEN_TYPE_KEY,
+                    DEFAULT_CRYPT_METADATA_SIZE, LUKS2_TOKEN_ID, LUKS2_TOKEN_TYPE, SECTOR_SIZE,
+                    STRATIS_TOKEN_DEVNAME_KEY, STRATIS_TOKEN_DEV_UUID_KEY, STRATIS_TOKEN_ID,
+                    STRATIS_TOKEN_POOL_UUID_KEY, STRATIS_TOKEN_TYPE, TOKEN_KEYSLOTS_KEY,
+                    TOKEN_TYPE_KEY,
                 },
                 handle::CryptHandle,
                 metadata_handle::CryptMetadataHandle,
@@ -226,6 +227,7 @@ pub fn setup_crypt_metadata_handle(
     physical_path: &Path,
 ) -> StratisResult<Option<CryptMetadataHandle>> {
     let identifiers = identifiers_from_metadata(device)?;
+    let name = name_from_metadata(device)?;
     let key_description = key_desc_from_metadata(device);
     let key_description = match key_description
         .as_ref()
@@ -259,6 +261,7 @@ pub fn setup_crypt_metadata_handle(
         DevicePath::new(physical_path)?,
         identifiers,
         encryption_info,
+        name,
     )))
 }
 
@@ -276,7 +279,7 @@ pub fn setup_crypt_handle(
 
     let name = name_from_metadata(device)?;
 
-    let activated_path = match unlock_method {
+    match unlock_method {
         Some(UnlockMethod::Keyring) => {
             activate(Either::Left((
                 device,
@@ -290,9 +293,7 @@ pub fn setup_crypt_handle(
         }
         Some(UnlockMethod::Clevis) => activate(Either::Right(physical_path), &name)?,
         None => {
-            if let Ok(CryptStatusInfo::Active | CryptStatusInfo::Busy) = libcryptsetup_rs::status(Some(device), &name) {
-                [DEVICEMAPPER_PATH, &name].iter().collect()
-            } else {
+            if let Err(_) | Ok(CryptStatusInfo::Inactive | CryptStatusInfo::Invalid) = libcryptsetup_rs::status(Some(device), &name) {
                 return Err(StratisError::Msg(
                     "Found a crypt device but it is not activated and no unlock method was provided".to_string(),
                 ));
@@ -300,11 +301,19 @@ pub fn setup_crypt_handle(
         },
     };
 
-    Ok(Some(CryptHandle::new_with_metadata_handle(
-        DevicePath::new(&activated_path)?,
-        name,
-        metadata_handle,
-    )))
+    match CryptHandle::new_with_metadata_handle(metadata_handle) {
+        Ok(h) => Ok(Some(h)),
+        Err(e) => {
+            if let Err(err) = ensure_inactive(device, &name) {
+                Err(StratisError::NoActionRollbackError {
+                    causal_error: Box::new(e),
+                    rollback_error: Box::new(err),
+                })
+            } else {
+                Err(e)
+            }
+        }
+    }
 }
 
 /// Create a device handle and load the LUKS2 header into memory from
@@ -619,7 +628,7 @@ fn activate_with_keyring(crypt_device: &mut CryptDevice, name: &str) -> StratisR
 pub fn activate(
     unlock_param: Either<(&mut CryptDevice, &KeyDescription), &Path>,
     name: &str,
-) -> StratisResult<PathBuf> {
+) -> StratisResult<()> {
     let crypt_device = match unlock_param {
         Either::Left((device, kd)) => {
             let key_description_missing = keys::search_key_persistent(kd)
@@ -652,18 +661,7 @@ pub fn activate(
     // Check activation status.
     device_is_active(crypt_device, name)?;
 
-    // Checking that the symlink was created may also be valuable in case a race
-    // condition occurs with udev.
-    let mut activated_path = PathBuf::from(DEVICEMAPPER_PATH);
-    activated_path.push(name);
-
-    // Can potentially use inotify with a timeout to wait for the symlink
-    // if race conditions become a problem.
-    if activated_path.exists() {
-        Ok(activated_path)
-    } else {
-        Err(StratisError::Io(io::Error::from(io::ErrorKind::NotFound)))
-    }
+    Ok(())
 }
 
 /// Get a list of all keyslots associated with the LUKS2 token.
@@ -714,19 +712,39 @@ pub fn get_keyslot_number(
 /// with devicemapper and cryptsetup. This method is idempotent and leaves
 /// the state as inactive.
 pub fn ensure_inactive(device: &mut CryptDevice, name: &str) -> StratisResult<()> {
-    if log_on_failure!(
+    let status = log_on_failure!(
         libcryptsetup_rs::status(Some(device), name),
         "Failed to determine status of device with name {}",
         name
-    ) == CryptStatusInfo::Active
-    {
-        log_on_failure!(
-            device
-                .activate_handle()
-                .deactivate(name, CryptDeactivateFlags::empty()),
-            "Failed to deactivate the crypt device with name {}",
-            name
-        );
+    );
+    match status {
+        CryptStatusInfo::Active => {
+            log_on_failure!(
+                device
+                    .activate_handle()
+                    .deactivate(name, CryptDeactivateFlags::empty()),
+                "Failed to deactivate the crypt device with name {}",
+                name
+            );
+        }
+        CryptStatusInfo::Busy => {
+            retry_with_index(Fixed::from_millis(100).take(2), |i| {
+                trace!("Crypt device deactivate attempt {}", i);
+                device
+                    .activate_handle()
+                    .deactivate(name, CryptDeactivateFlags::empty())
+                    .map_err(StratisError::Crypt)
+            })
+            .map_err(|e| match e {
+                Error::Internal(s) => StratisError::Chained(
+                    "Retries for crypt device deactivation failed with an internal error"
+                        .to_string(),
+                    Box::new(StratisError::Msg(s)),
+                ),
+                Error::Operation { error, .. } => error,
+            })?;
+        }
+        _ => (),
     }
     Ok(())
 }

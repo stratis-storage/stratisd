@@ -6,7 +6,7 @@ if [ -z "$STRATIS_ROOTFS_UUID" ]; then
 fi
 
 i=0
-while ! stratis-min pool is-locked "$STRATIS_ROOTFS_UUID" >/dev/null; do
+while ! stratis-min pool is-stopped "$STRATIS_ROOTFS_UUID" >/dev/null; do
 	echo Waiting on pool with UUID $STRATIS_ROOTFS_UUID...
 	sleep 1
 	if [ "$i" = 5 ]; then
@@ -15,10 +15,10 @@ while ! stratis-min pool is-locked "$STRATIS_ROOTFS_UUID" >/dev/null; do
 	i=$(($i + 1))
 done
 
-if $(stratis-min pool is-locked "$STRATIS_ROOTFS_UUID"); then
+if $(stratis-min pool is-stopped "$STRATIS_ROOTFS_UUID"); then
 	if $(stratis-min pool is-bound "$STRATIS_ROOTFS_UUID"); then
-		if ! stratis-min pool unlock clevis "$STRATIS_ROOTFS_UUID"; then
-			echo Failed to unlock pool with UUID $STRATIS_ROOTFS_UUID using Clevis >&2
+		if ! stratis-min pool start --unlock-method=clevis "$STRATIS_ROOTFS_UUID"; then
+			echo Failed to start pool with UUID $STRATIS_ROOTFS_UUID using Clevis >&2
 			exit 1
 		fi
 	fi

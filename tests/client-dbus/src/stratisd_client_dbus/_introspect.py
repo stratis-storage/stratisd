@@ -41,10 +41,16 @@ SPECS = {
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
-    <method name="UnlockPool">
+    <method name="StartPool">
       <arg name="pool_uuid" type="s" direction="in" />
-      <arg name="unlock_method" type="s" direction="in" />
-      <arg name="result" type="(bas)" direction="out" />
+      <arg name="unlock_method" type="(bs)" direction="in" />
+      <arg name="result" type="(b(oaoao))" direction="out" />
+      <arg name="return_code" type="q" direction="out" />
+      <arg name="return_string" type="s" direction="out" />
+    </method>
+    <method name="StopPool">
+      <arg name="pool" type="o" direction="in" />
+      <arg name="result" type="(bs)" direction="out" />
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
@@ -54,7 +60,7 @@ SPECS = {
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
-    <property name="LockedPools" type="a{sa{sv}}" access="read" />
+    <property name="StoppedPools" type="a{sa{sv}}" access="read" />
     <property name="Version" type="s" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>

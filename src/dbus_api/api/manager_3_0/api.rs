@@ -14,7 +14,7 @@ use crate::{
                 },
                 props::{get_locked_pools, get_version},
             },
-            prop_conv::LockedPools,
+            prop_conv::StoppedOrLockedPools,
         },
         consts,
         types::TData,
@@ -180,7 +180,7 @@ pub fn locked_pools_property<E>(
 where
     E: 'static + Engine,
 {
-    f.property::<LockedPools, _>(consts::LOCKED_POOLS_PROP, ())
+    f.property::<StoppedOrLockedPools, _>(consts::LOCKED_POOLS_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_locked_pools)

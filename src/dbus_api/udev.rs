@@ -49,7 +49,10 @@ where
         // is cached, the entire property will be considered changed if any
         // part changes, and it generally makes more sense to treat the
         // HashMap comparison as a diff in itself.
-        let original_state = self.dbus_context.engine.locked_pools().await;
+        let (original_locked_state, original_stopped_state) = (
+            self.dbus_context.engine.locked_pools().await,
+            self.dbus_context.engine.stopped_pools().await,
+        );
 
         loop {
             let recv = self.receiver.recv();
@@ -71,9 +74,13 @@ where
             self.register_pool(&pool_name, pool_uuid, pool);
         }
 
-        let new_state = self.dbus_context.engine.locked_pools().await;
-        if original_state != new_state {
-            self.dbus_context.push_locked_pools(new_state);
+        let new_locked_state = self.dbus_context.engine.locked_pools().await;
+        if original_locked_state != new_locked_state {
+            self.dbus_context.push_locked_pools(new_locked_state);
+        }
+        let new_stopped_state = self.dbus_context.engine.stopped_pools().await;
+        if original_stopped_state != new_stopped_state {
+            self.dbus_context.push_stopped_pools(new_stopped_state);
         }
 
         Ok(())

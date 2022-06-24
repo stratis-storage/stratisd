@@ -13,6 +13,7 @@ use crate::{
 };
 
 mod manager_3_0;
+mod manager_3_2;
 pub mod prop_conv;
 mod report_3_0;
 mod shared;
@@ -73,11 +74,13 @@ where
                 .add_m(manager_3_0::set_key_method(&f))
                 .add_m(manager_3_0::unset_key_method(&f))
                 .add_m(manager_3_0::list_keys_method(&f))
-                .add_m(manager_3_0::unlock_pool_method(&f))
                 .add_m(manager_3_0::destroy_pool_method(&f))
                 .add_m(manager_3_0::engine_state_report_method(&f))
+                .add_m(manager_3_2::start_pool_method(&f))
+                .add_m(manager_3_2::stop_pool_method(&f))
+                .add_m(manager_3_2::refresh_state_method(&f))
                 .add_p(manager_3_0::version_property(&f))
-                .add_p(manager_3_0::locked_pools_property(&f)),
+                .add_p(manager_3_2::stopped_pools_property(&f)),
         )
         .add(
             f.interface(consts::REPORT_INTERFACE_NAME_3_0, ())

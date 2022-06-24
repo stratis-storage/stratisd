@@ -35,10 +35,10 @@ use crate::{
         },
         types::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockKey,
-            LockedPoolInfo, PoolDiff, RenameAction, ReportType, SetUnlockAction,
-            StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
+            LockedPoolInfo, PoolDiff, RenameAction, ReportType, SetUnlockAction, StartAction,
+            StopAction, StoppedPoolInfo, StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
         },
-        Engine, Name, PoolUuid, Report,
+        Engine, Name, Pool, PoolUuid, Report,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -291,7 +291,7 @@ impl Report for StratEngine {
 
     fn get_report(&self, report_type: ReportType) -> Value {
         match report_type {
-            ReportType::ErroredPoolDevices => (&*self.liminal_devices.blocking_read()).into(),
+            ReportType::StoppedPools => (&*self.liminal_devices.blocking_read()).into(),
         }
     }
 }
@@ -313,7 +313,7 @@ impl Engine for StratEngine {
                 events
                     .into_iter()
                     .filter_map(|event| {
-                        if let Some((uuid, name, pool)) =
+                        if let Some((name, uuid, pool)) =
                             ld_guard.block_evaluate(&*pools_write_all, &event)
                         {
                             pools_write_all.insert(name, uuid, pool);
@@ -441,7 +441,12 @@ impl Engine for StratEngine {
         let mut ld_guard = self.liminal_devices.write().await;
         let unlocked =
             spawn_blocking!(ld_guard.unlock_pool(&*pools_read_all, pool_uuid, unlock_method,))??;
-        Ok(SetUnlockAction::new(unlocked))
+        Ok(SetUnlockAction::new(
+            unlocked
+                .into_iter()
+                .map(|(uuid, _)| uuid)
+                .collect::<Vec<_>>(),
+        ))
     }
 
     async fn get_pool(
@@ -460,6 +465,10 @@ impl Engine for StratEngine {
 
     async fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo> {
         self.liminal_devices.read().await.locked_pools()
+    }
+
+    async fn stopped_pools(&self) -> HashMap<PoolUuid, StoppedPoolInfo> {
+        self.liminal_devices.read().await.stopped_pools()
     }
 
     async fn pools(&self) -> AllLockReadGuard<PoolUuid, Self::Pool> {
@@ -533,6 +542,85 @@ impl Engine for StratEngine {
         self.key_handler.write().await
     }
 
+    async fn start_pool(
+        &self,
+        pool_uuid: PoolUuid,
+        unlock_method: Option<UnlockMethod>,
+    ) -> StratisResult<StartAction<PoolUuid>> {
+        if let Some(lock) = self.pools.read(LockKey::Uuid(pool_uuid)).await {
+            let (_, _, pool) = lock.as_tuple();
+            if pool.is_encrypted() && unlock_method.is_none() {
+                return Err(StratisError::Msg(format!(
+                    "Pool with UUID {} is encrypted but no unlock method was provided",
+                    pool_uuid,
+                )));
+            } else if !pool.is_encrypted() && unlock_method.is_some() {
+                return Err(StratisError::Msg(format!(
+                    "Pool with UUID {} is not encrypted but an unlock method was provided",
+                    pool_uuid,
+                )));
+            } else {
+                Ok(StartAction::Identity)
+            }
+        } else {
+            let mut pools = self.pools.write_all().await;
+            let (name, pool) =
+                self.liminal_devices
+                    .write()
+                    .await
+                    .start_pool(&*pools, pool_uuid, unlock_method)?;
+            pools.insert(name, pool_uuid, pool);
+            Ok(StartAction::Started(pool_uuid))
+        }
+    }
+
+    async fn stop_pool(&self, pool_uuid: PoolUuid) -> StratisResult<StopAction<PoolUuid>> {
+        let mut pools = self.pools.write_all().await;
+        if let Some((name, mut pool)) = pools.remove_by_uuid(pool_uuid) {
+            if let Err(e) = self
+                .liminal_devices
+                .write()
+                .await
+                .stop_pool(&name, pool_uuid, &mut pool)
+            {
+                pools.insert(name, pool_uuid, pool);
+                return Err(e);
+            } else {
+                return Ok(StopAction::Stopped(pool_uuid));
+            }
+        }
+
+        drop(pools);
+
+        if self
+            .liminal_devices
+            .read()
+            .await
+            .stopped_pools()
+            .get(&pool_uuid)
+            .is_some()
+        {
+            Ok(StopAction::Identity)
+        } else {
+            Err(StratisError::Msg(format!(
+                "Pool with UUID {} could not be found and cannot be stopped",
+                pool_uuid,
+            )))
+        }
+    }
+
+    async fn refresh_state(&self) -> StratisResult<()> {
+        let mut pools = self.pools.write_all().await;
+        *pools = Table::default();
+        let mut lim = self.liminal_devices.write().await;
+        *lim = LiminalDevices::default();
+        let pools_set_up = lim.setup_pools(find_all()?);
+        for (name, uuid, pool) in pools_set_up {
+            pools.insert(name, uuid, pool);
+        }
+        Ok(())
+    }
+
     fn is_sim(&self) -> bool {
         false
     }
@@ -550,7 +638,7 @@ mod test {
             backstore::crypt_metadata_size,
             cmd,
             ns::unshare_namespace,
-            tests::{crypt, dm_stratis_devices_remove, loopbacked, real, FailDevice},
+            tests::{crypt, loopbacked, real, FailDevice},
         },
         types::{ActionAvailability, EngineAction, KeyDescription},
     };
@@ -726,7 +814,7 @@ mod test {
         F: Fn(&mut StratPool) -> Result<(), Box<dyn Error>>,
     {
         fn needs_clean_up<F>(
-            engine: StratEngine,
+            engine: &StratEngine,
             uuid: PoolUuid,
             fail_device: &FailDevice,
             operation: F,
@@ -756,8 +844,6 @@ mod test {
 
             fail_device.stop_failing()?;
 
-            engine.teardown()?;
-
             Ok(())
         }
 
@@ -772,13 +858,12 @@ mod test {
                     ))
                 })?;
 
-        let res = needs_clean_up(engine, uuid, fail_device, operation);
+        let res = needs_clean_up(&engine, uuid, fail_device, operation);
 
-        dm_stratis_devices_remove()?;
+        test_async!(engine.stop_pool(uuid))?;
         res?;
 
-        let engine = StratEngine::initialize()?;
-        test_async!(engine.unlock_pool(uuid, unlock_method))?;
+        test_async!(engine.start_pool(uuid, Some(unlock_method)))?;
         test_async!(engine.destroy_pool(uuid))?;
         engine.teardown()?;
 
@@ -1112,10 +1197,49 @@ mod test {
     }
 
     #[test]
-    fn clevis_real_test_clevis_unbind_rollback() {
+    fn real_test_clevis_unbind_rollback() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(2, None, None),
             test_clevis_unbind_rollback,
         );
+    }
+
+    /// Test creating a pool and stopping it. Check that the pool is stopped and
+    /// then restart the engine, check that it is still stopped, and then start it.
+    fn test_start_stop(paths: &[&Path]) {
+        let engine = StratEngine::initialize().unwrap();
+        let name = "pool_name";
+        let uuid = test_async!(engine.create_pool(name, paths, None))
+            .unwrap()
+            .changed()
+            .unwrap();
+        assert!(test_async!(engine.stop_pool(uuid)).unwrap().is_changed());
+        assert_eq!(test_async!(engine.stopped_pools()).len(), 1);
+        assert_eq!(test_async!(engine.pools()).len(), 0);
+
+        engine.teardown().unwrap();
+
+        let engine = StratEngine::initialize().unwrap();
+        assert_eq!(test_async!(engine.stopped_pools()).len(), 1);
+        assert_eq!(test_async!(engine.pools()).len(), 0);
+
+        assert!(test_async!(engine.start_pool(uuid, None))
+            .unwrap()
+            .is_changed());
+        assert_eq!(test_async!(engine.stopped_pools()).len(), 0);
+        assert_eq!(test_async!(engine.pools()).len(), 1);
+    }
+
+    #[test]
+    fn loop_test_start_stop() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(2, 3, None),
+            test_start_stop,
+        );
+    }
+
+    #[test]
+    fn real_test_start_stop() {
+        real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_start_stop);
     }
 }

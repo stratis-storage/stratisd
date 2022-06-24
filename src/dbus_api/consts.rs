@@ -15,6 +15,7 @@ pub const REPORT_INTERFACE_NAME_3_1: &str = "org.storage.stratis3.Report.r1";
 pub const REPORT_INTERFACE_NAME_3_2: &str = "org.storage.stratis3.Report.r2";
 
 pub const LOCKED_POOLS_PROP: &str = "LockedPools";
+pub const STOPPED_POOLS_PROP: &str = "StoppedPools";
 
 pub const POOL_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.pool.r0";
 pub const POOL_INTERFACE_NAME_3_1: &str = "org.storage.stratis3.pool.r1";

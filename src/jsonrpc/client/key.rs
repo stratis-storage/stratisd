@@ -20,7 +20,7 @@ pub fn key_set(key_desc: KeyDescription, keyfile_path: Option<&str>) -> StratisR
         }
         None => {
             let password =
-                rpassword::prompt_password_stdout("Enter passphrase followed by return:")?;
+                rpassword::prompt_password_stdout("Enter passphrase followed by return: ")?;
             if password.is_empty() {
                 return Ok(());
             }

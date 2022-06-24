@@ -30,7 +30,8 @@ use crate::{
     engine::{
         total_allocated, total_used, ActionAvailability, Diff, Engine, ExclusiveGuard,
         FilesystemUuid, Lockable, LockedPoolInfo, PoolDiff, PoolEncryptionInfo, PoolUuid,
-        SharedGuard, StratFilesystemDiff, StratPoolDiff, StratisUuid, ThinPoolDiff,
+        SharedGuard, StoppedPoolInfo, StratFilesystemDiff, StratPoolDiff, StratisUuid,
+        ThinPoolDiff,
     },
 };
 
@@ -113,6 +114,7 @@ pub enum DbusAction<E> {
     PoolFsLimitChange(Path<'static>, u64),
     PoolOverprovModeChange(Path<'static>, bool),
     LockedPoolsChange(HashMap<PoolUuid, LockedPoolInfo>),
+    StoppedPoolsChange(HashMap<PoolUuid, StoppedPoolInfo>),
 
     FsBackgroundChange(
         FilesystemUuid,
@@ -420,6 +422,19 @@ where
         {
             warn!(
                 "Locked pool change event could not be sent to the processing thread; no signal will be sent out for the locked pool state change: {}",
+                e,
+            )
+        }
+    }
+
+    /// Send changed signal for changed stopped pool state.
+    pub fn push_stopped_pools(&self, stopped_pools: HashMap<PoolUuid, StoppedPoolInfo>) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::StoppedPoolsChange(stopped_pools))
+        {
+            warn!(
+                "Stopped pool change event could not be sent to the processing thread; no signal will be sent out for the stopped pool state change: {}",
                 e,
             )
         }

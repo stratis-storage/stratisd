@@ -14,9 +14,10 @@ use std::{
 
 use chrono::Utc;
 use itertools::Itertools;
+use nix::sys::stat::stat;
 
 use devicemapper::{Bytes, Device, Sectors, IEC};
-use libblkid_rs::BlkidProbe;
+use libblkid_rs::{BlkidCache, BlkidProbe};
 
 use crate::{
     engine::{
@@ -31,7 +32,10 @@ use crate::{
                 BDA,
             },
             names::KeyDescription,
-            udev::{block_device_apply, decide_ownership, get_udev_property, UdevOwnership},
+            udev::{
+                block_device_apply, decide_ownership, get_udev_property, UdevOwnership,
+                STRATIS_FS_TYPE,
+            },
         },
         types::{ClevisInfo, DevUuid, DevicePath, EncryptionInfo, PoolUuid},
     },
@@ -94,6 +98,50 @@ fn udev_info(
                 ))
             })
     })
+}
+
+/// Get the device number of a device by stat-ing the device node.
+fn get_devno_from_path(path: &Path) -> StratisResult<Device> {
+    let info = stat(path)?;
+    Ok(Device::from_kdev_t(convert_int!(info.st_rdev, u64, u32)?))
+}
+
+/// Find all devices that match the given pool and device UUIDs using libblkid.
+///
+/// This method is specifically a work around for cases where due to locking
+/// internally in stratisd, udev events cannot be used for device identification
+/// because they will not have the opportunity to be processed.
+pub fn find_stratis_devs_by_uuid(
+    pool_uuid: PoolUuid,
+    uuids: Vec<DevUuid>,
+) -> StratisResult<HashMap<DevUuid, (DevicePath, Device)>> {
+    let mut map = HashMap::new();
+    if uuids.is_empty() {
+        return Ok(map);
+    }
+
+    let mut cache = BlkidCache::get_cache(None)?;
+    cache.probe_all()?;
+    for dev in cache.iter().search("TYPE", STRATIS_FS_TYPE)? {
+        if let Some(dev) = cache.verify(dev) {
+            let devname = DevicePath::new(&dev.devname()?)?;
+            let dev_uuid = DevUuid::parse_str(cache.get_tag_value("UUID", &devname)?)?;
+            let dev_pool_uuid = PoolUuid::parse_str(cache.get_tag_value("POOL_UUID", &devname)?)?;
+            let devno = get_devno_from_path(&devname)?;
+
+            if dev_pool_uuid == pool_uuid && uuids.contains(&dev_uuid) {
+                info!(
+                    "Found device with path: {}, pool UUID: {}, device UUID: {} after unlock",
+                    devname.display(),
+                    dev_pool_uuid,
+                    dev_uuid
+                );
+                map.insert(dev_uuid, (DevicePath::new(&devname)?, devno));
+            }
+        }
+    }
+    cache.put_cache();
+    Ok(map)
 }
 
 /// Verify that udev information using a blkid probe to search for superblocks

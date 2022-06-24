@@ -121,9 +121,16 @@ impl StratisParams {
                     false,
                 )))
             }
-            StratisParamType::PoolUnlock(unlock_method, uuid) => {
-                Ok(StratisRet::PoolUnlock(stratis_result_to_return(
-                    pool::pool_unlock(engine, unlock_method, uuid, self.fd_opt).await,
+            StratisParamType::PoolStart(uuid, unlock_method) => {
+                Ok(StratisRet::PoolStart(stratis_result_to_return(
+                    pool::pool_start(engine, uuid, unlock_method, self.fd_opt).await,
+                    false,
+                )))
+            }
+            StratisParamType::PoolStop(uuid) => {
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::PoolStop(stratis_result_to_return(
+                    pool::pool_stop(engine, uuid).await,
                     false,
                 )))
             }
@@ -138,10 +145,10 @@ impl StratisParams {
                     false,
                 )))
             }
-            StratisParamType::PoolIsLocked(uuid) => {
+            StratisParamType::PoolIsStopped(uuid) => {
                 expects_fd!(self.fd_opt, false);
-                Ok(StratisRet::PoolIsLocked(stratis_result_to_return(
-                    pool::pool_is_locked(engine, uuid).await,
+                Ok(StratisRet::PoolIsStopped(stratis_result_to_return(
+                    pool::pool_is_stopped(engine, uuid).await,
                     false,
                 )))
             }

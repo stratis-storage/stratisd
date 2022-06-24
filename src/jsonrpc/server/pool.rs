@@ -18,39 +18,32 @@ use crate::{
     stratis::{StratisError, StratisResult},
 };
 
-// stratis-min pool unlock
-pub async fn pool_unlock<E>(
+// stratis-min pool start
+pub async fn pool_start<E>(
     engine: Arc<E>,
-    unlock_method: UnlockMethod,
-    pool_uuid: Option<PoolUuid>,
+    pool_uuid: PoolUuid,
+    unlock_method: Option<UnlockMethod>,
     prompt: Option<RawFd>,
 ) -> StratisResult<bool>
 where
     E: Engine,
 {
-    if let Some(uuid) = pool_uuid {
-        if let (Some(fd), Some(kd)) = (prompt, key_get_desc(engine.clone(), uuid).await?) {
-            key_set(engine.clone(), &kd, fd).await?;
-        }
+    if let (Some(fd), Some(kd)) = (prompt, key_get_desc(engine.clone(), pool_uuid).await?) {
+        key_set(engine.clone(), &kd, fd).await?;
     }
 
-    match pool_uuid {
-        Some(u) => Ok(engine
-            .unlock_pool(u, unlock_method)
-            .await?
-            .changed()
-            .is_some()),
-        None => {
-            let mut changed = false;
-            for (uuid, _) in engine.locked_pools().await {
-                let res = engine.unlock_pool(uuid, unlock_method).await;
-                if let Ok(ok) = res {
-                    changed |= ok.is_changed()
-                }
-            }
-            Ok(changed)
-        }
-    }
+    Ok(engine
+        .start_pool(pool_uuid, unlock_method)
+        .await?
+        .is_changed())
+}
+
+// stratis-min pool stop
+pub async fn pool_stop<E>(engine: Arc<E>, pool_uuid: PoolUuid) -> StratisResult<bool>
+where
+    E: Engine,
+{
+    Ok(engine.stop_pool(pool_uuid).await?.is_changed())
 }
 
 // stratis-min pool create
@@ -213,14 +206,14 @@ where
     }
 }
 
-// stratis-min pool is-locked
-pub async fn pool_is_locked<E>(engine: Arc<E>, uuid: PoolUuid) -> StratisResult<bool>
+// stratis-min pool is-stopped
+pub async fn pool_is_stopped<E>(engine: Arc<E>, uuid: PoolUuid) -> StratisResult<bool>
 where
     E: Engine,
 {
     if engine.get_pool(LockKey::Uuid(uuid)).await.is_some() {
         Ok(false)
-    } else if engine.locked_pools().await.get(&uuid).is_some() {
+    } else if engine.stopped_pools().await.get(&uuid).is_some() {
         Ok(true)
     } else {
         Err(StratisError::Msg(format!(

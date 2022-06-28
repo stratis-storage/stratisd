@@ -203,10 +203,8 @@ jobs:
         include:
           - image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
             toolchain: 1.61.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            skip_value: 0
           - image: fedora:34  # LOWEST DEVELOPMENT ENVIRONMENT
             toolchain: 1.54.0  # LOWEST SUPPORTED RUST TOOLCHAIN
-            skip_value: 1
     runs-on: ubuntu-18.04
     container:
       image: ${{ matrix.image }}

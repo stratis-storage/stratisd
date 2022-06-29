@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    cmp,
+    cmp, env,
     fs::OpenOptions,
     panic,
     path::{Path, PathBuf},
@@ -243,13 +243,23 @@ where
         let paths: Vec<PathBuf> = devices.iter().map(|x| x.as_path()).collect();
         let paths: Vec<&Path> = paths.iter().map(|x| x.as_path()).collect();
         let result = panic::catch_unwind(|| test(&paths));
-        let tear_down = clean_up();
+
+        let tear_down = if env::var("NO_TEST_CLEAN_UP") != Ok("1".to_string()) {
+            Some(clean_up())
+        } else {
+            None
+        };
 
         result.unwrap();
-        tear_down.unwrap();
 
-        for dev in devices.drain(..) {
-            dev.teardown();
+        if let Some(td) = tear_down {
+            td.unwrap();
+        }
+
+        if env::var("NO_TEST_CLEAN_UP") != Ok("1".to_string()) {
+            for dev in devices.drain(..) {
+                dev.teardown();
+            }
         }
     }
 }

@@ -44,3 +44,7 @@ Then (in root of source tree):
 ```bash
 $ make test-real
 ```
+
+To inspect a test stack after running a test, run the test command with the
+environment variable `NO_TEST_CLEAN_UP=1`. This will disable stack clean up
+after the test completes.

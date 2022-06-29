@@ -3,7 +3,9 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
+    env,
     fs::OpenOptions,
+    mem::forget,
     os::unix::io::AsRawFd,
     panic,
     path::{Path, PathBuf},
@@ -113,9 +115,19 @@ where
         let result = panic::catch_unwind(|| {
             test(&device_paths);
         });
-        let tear_down = clean_up();
+
+        let tear_down = if env::var("NO_TEST_CLEAN_UP") != Ok("1".to_string()) {
+            Some(clean_up())
+        } else {
+            forget(tmpdir);
+            loop_devices.into_iter().for_each(forget);
+            None
+        };
 
         result.unwrap();
-        tear_down.unwrap();
+
+        if let Some(td) = tear_down {
+            td.unwrap();
+        }
     }
 }

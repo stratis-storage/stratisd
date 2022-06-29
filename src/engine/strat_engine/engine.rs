@@ -1197,7 +1197,7 @@ mod test {
     }
 
     #[test]
-    fn real_test_clevis_unbind_rollback() {
+    fn clevis_real_test_clevis_unbind_rollback() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(2, None, None),
             test_clevis_unbind_rollback,

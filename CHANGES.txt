@@ -1,3 +1,71 @@
+stratisd 3.2.0
+==============
+Recommended Rust toolchain version: 1.62.0
+Lowest supported Rust toolchain version: 1.58.1
+
+Recommended development platform for Python development: Fedora 36
+
+- Increase minor version number:
+  https://github.com/stratis-storage/stratisd/pull/3020
+  https://github.com/stratis-storage/stratisd/pull/3006
+
+- Add ability to start and stop pools:
+  https://github.com/stratis-storage/stratisd/pull/3034
+  https://github.com/stratis-storage/stratisd/pull/2949
+
+- Ensure termination of algorithm for selecting size of thinpool sub-devices:
+  https://github.com/stratis-storage/stratisd/issues/3022
+  https://github.com/stratis-storage/stratisd/pull/3023
+
+- Make stratisd-min require systemd-udevd in systemd configuration file:
+  https://github.com/stratis-storage/stratisd/issues/3019
+  https://github.com/stratis-storage/stratisd/pull/3024
+
+- Never fail when dropping the MDV if it's already unmounted:
+  https://github.com/stratis-storage/stratisd/pull/3027
+
+- Use retry instead of using "udevadm settle" in stratisd:
+  https://github.com/stratis-storage/stratisd/issues/2989
+  https://github.com/stratis-storage/stratisd/pull/3000
+
+- Tidy up some parts of the JSON RPC implementation:
+  https://github.com/stratis-storage/stratisd/pull/2999
+
+- Use hyphenated format for filesystem UUIDs in stratis-min uniformly:
+  https://github.com/stratis-storage/stratisd/pull/3028
+
+- Increase clap dependency version to 3.1.0:
+  https://github.com/stratis-storage/stratisd/issues/3005
+  https://github.com/stratis-storage/stratisd/pull/3007
+
+- Increase nix dependency version to 0.24.0:
+  https://github.com/stratis-storage/stratisd/issues/3010
+  https://github.com/stratis-storage/stratisd/pull/3012
+
+- Increase uuid dependency version to 1.0.0:
+  https://github.com/stratis-storage/stratisd/pull/3013
+
+- Add NO_TEST_CLEAN_UP environment variable to help debug test failures:
+  https://github.com/stratis-storage/stratisd/pull/3033
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3044
+  https://github.com/stratis-storage/stratisd/pull/3043
+  https://github.com/stratis-storage/stratisd/pull/3042
+  https://github.com/stratis-storage/stratisd/pull/3041
+  https://github.com/stratis-storage/stratisd/pull/3038
+  https://github.com/stratis-storage/stratisd/pull/3036
+  https://github.com/stratis-storage/stratisd/pull/3032
+  https://github.com/stratis-storage/stratisd/pull/3025
+  https://github.com/stratis-storage/stratisd/pull/3017
+  https://github.com/stratis-storage/stratisd/pull/3016
+  https://github.com/stratis-storage/stratisd/pull/3015
+  https://github.com/stratis-storage/stratisd/pull/3014
+  https://github.com/stratis-storage/stratisd/pull/3008
+  https://github.com/stratis-storage/stratisd/pull/3003
+  https://github.com/stratis-storage/stratisd/pull/3002
+
+
 stratisd 3.1.0
 ==============
 Recommended Rust toolchain version: 1.60.0

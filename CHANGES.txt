@@ -1,3 +1,52 @@
+stratisd 3.2.0 (UNRELEASED)
+===========================
+Recommended Rust toolchain version: 1.61.0
+Lowest supported Rust toolchain version: 1.58.1
+
+Recommended development platform for Python development: Fedora 36
+
+- Increase minor version number:
+  https://github.com/stratis-storage/stratisd/pull/3020
+  https://github.com/stratis-storage/stratisd/pull/3006
+
+- Add ability to start and stop pools:
+  https://github.com/stratis-storage/stratisd/issues/2949
+
+- Use retry instead of using "udevadm settle" in stratisd:
+  https://github.com/stratis-storage/stratisd/issues/2989
+  https://github.com/stratis-storage/stratisd/pull/3000
+
+- Tidy up some parts of the JSON RPC implementation:
+  https://github.com/stratis-storage/stratisd/pull/2999
+
+- Use hyphenated format for filesystem UUIDs in stratis-min uniformly:
+  https://github.com/stratis-storage/stratisd/pull/3028
+
+- Increase clap dependency version to 3.1.0:
+  https://github.com/stratis-storage/stratisd/issues/3005
+  https://github.com/stratis-storage/stratisd/pull/3007
+
+- Increase nix dependency version to 0.24.0:
+  https://github.com/stratis-storage/stratisd/issues/3010
+  https://github.com/stratis-storage/stratisd/pull/3012
+
+- Increase uuid dependency version to 1.0.0:
+  https://github.com/stratis-storage/stratisd/pull/3013
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3036
+  https://github.com/stratis-storage/stratisd/pull/3034
+  https://github.com/stratis-storage/stratisd/pull/3032
+  https://github.com/stratis-storage/stratisd/pull/3025
+  https://github.com/stratis-storage/stratisd/pull/3017
+  https://github.com/stratis-storage/stratisd/pull/3016
+  https://github.com/stratis-storage/stratisd/pull/3015
+  https://github.com/stratis-storage/stratisd/pull/3014
+  https://github.com/stratis-storage/stratisd/pull/3008
+  https://github.com/stratis-storage/stratisd/pull/3003
+  https://github.com/stratis-storage/stratisd/pull/3002
+
+
 stratisd 3.1.0
 ==============
 Recommended Rust toolchain version: 1.60.0

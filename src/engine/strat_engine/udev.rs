@@ -32,13 +32,10 @@ pub fn block_enumerator(context: &libudev::Context) -> libudev::Result<libudev::
 /// Returns None if no udev property found for the given property name.
 /// Returns an error if the value of the property can not be converted to
 /// a string using the standard conversion for this OS.
-pub fn get_udev_property<T: AsRef<OsStr>>(
+pub fn get_udev_property<T: AsRef<OsStr> + fmt::Display>(
     device: &UdevEngineDevice,
     property_name: T,
-) -> Option<StratisResult<String>>
-where
-    T: fmt::Display,
-{
+) -> Option<StratisResult<String>> {
     device
         .property_value(&property_name)
         .map(|opt| opt.map(|s| s.to_string()))

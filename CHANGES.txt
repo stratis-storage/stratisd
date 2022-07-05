@@ -12,6 +12,10 @@ Recommended development platform for Python development: Fedora 36
 - Add ability to start and stop pools:
   https://github.com/stratis-storage/stratisd/issues/2949
 
+- Ensure termination of algorithm for selecting size of thinpool sub-devices:
+  https://github.com/stratis-storage/stratisd/issues/3022
+  https://github.com/stratis-storage/stratisd/pull/3023
+
 - Use retry instead of using "udevadm settle" in stratisd:
   https://github.com/stratis-storage/stratisd/issues/2989
   https://github.com/stratis-storage/stratisd/pull/3000
@@ -32,6 +36,9 @@ Recommended development platform for Python development: Fedora 36
 
 - Increase uuid dependency version to 1.0.0:
   https://github.com/stratis-storage/stratisd/pull/3013
+
+- Add NO_TEST_CLEAN_UP environment variable to help debug test failures:
+  https://github.com/stratis-storage/stratisd/pull/3033
 
 - Tidies and Maintenance:
   https://github.com/stratis-storage/stratisd/pull/3036

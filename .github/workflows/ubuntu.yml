@@ -28,28 +28,28 @@ jobs:
       matrix:
         include:
           - task: make -f Makefile clippy
-            toolchain: 1.61.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: clippy
           - task: make -f Makefile build
-            toolchain: 1.61.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile build-min
-            toolchain: 1.61.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile build-extras
-            toolchain: 1.61.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile docs-travis
-            toolchain: 1.61.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile test
-            toolchain: 1.61.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile release
-            toolchain: 1.61.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile release-min
-            toolchain: 1.61.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-18.04
     container:
@@ -85,7 +85,7 @@ jobs:
       matrix:
         include:
           - task: RUST_LOG=stratisd=debug make -f Makefile test-loop
-            toolchain: 1.61.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-18.04
     container:

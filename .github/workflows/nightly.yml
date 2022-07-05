@@ -16,7 +16,7 @@ jobs:
       matrix:
         include:
           - task: make -f Makefile audit
-            toolchain: 1.61.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           # Allowed because a failure may occur after a new Rust stable
           # version is released.
@@ -24,7 +24,7 @@ jobs:
             toolchain: stable
             components: clippy
           - task: cargo package
-            toolchain: 1.61.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-18.04
     container:
@@ -85,7 +85,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           components: cargo
-          toolchain: 1.61.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           override: true
       - name: Check out ci repo
         run: git clone https://github.com/stratis-storage/ci.git
@@ -127,7 +127,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           components: cargo
-          toolchain: 1.61.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           override: true
       - name: Run audit task on ${{ matrix.tag }}
         run: make -f Makefile audit
@@ -170,7 +170,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           components: cargo
-          toolchain: 1.61.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           override: true
       - name: Build stratisd
         run: make -f Makefile install-debug
@@ -202,7 +202,7 @@ jobs:
       matrix:
         include:
           - image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
-            toolchain: 1.61.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           - image: fedora:34  # LOWEST DEVELOPMENT ENVIRONMENT
             toolchain: 1.54.0  # LOWEST SUPPORTED RUST TOOLCHAIN
     runs-on: ubuntu-18.04

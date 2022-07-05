@@ -2,7 +2,7 @@
 name = "stratisd"
 version = "3.2.2"
 authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.org>"]
-edition = "2018"
+edition = "2021"
 build = "build.rs"
 description = "Stratis daemon"
 license-file = "LICENSE"

@@ -133,6 +133,7 @@ jobs:
         run: make -f Makefile audit
 
   legacy-cli-checks:
+    continue-on-error: true
     strategy:
       matrix:
         include:

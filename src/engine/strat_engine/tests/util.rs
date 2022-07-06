@@ -267,7 +267,11 @@ impl FailDevice {
                     num_sectors_after_start,
                     self.size - num_sectors_after_start,
                     "linear".to_string(),
-                    format!("{} 0", self.backing_device.display()),
+                    format!(
+                        "{} {}",
+                        self.backing_device.display(),
+                        num_sectors_after_start
+                    ),
                 ),
             ],
             DmOptions::default(),

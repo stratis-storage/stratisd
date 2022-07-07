@@ -1073,7 +1073,7 @@ dependencies = [
 
 [[package]]
 name = "stratisd"
-version = "3.1.0"
+version = "3.1.1"
 dependencies = [
  "async-trait",
  "bindgen 0.59.2",

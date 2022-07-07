@@ -708,7 +708,7 @@ impl<U, T> SomeLockWriteGuard<U, T>
 where
     U: AsUuid,
 {
-    pub fn as_tuple(&self) -> (Name, U, &mut T) {
+    pub fn as_mut_tuple(&mut self) -> (Name, U, &mut T) {
         (
             self.2.clone(),
             self.1,

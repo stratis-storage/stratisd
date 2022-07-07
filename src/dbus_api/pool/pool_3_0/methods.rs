@@ -57,8 +57,8 @@ where
         return_message
     );
 
-    let guard = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
-    let (pool_name, _, pool) = guard.as_tuple();
+    let mut guard = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let (pool_name, _, pool) = guard.as_mut_tuple();
 
     let filesystem_specs = match filesystems
         .map(|(name, size_opt)| {
@@ -159,8 +159,8 @@ where
         return_message
     );
 
-    let guard = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
-    let (pool_name, _, pool) = guard.as_tuple();
+    let mut guard = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let (pool_name, _, pool) = guard.as_mut_tuple();
 
     let mut filesystem_map: HashMap<FilesystemUuid, dbus::Path<'static>> = HashMap::new();
     for path in filesystems {
@@ -254,8 +254,8 @@ where
         }
     };
 
-    let guard = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
-    let (pool_name, _, pool) = guard.as_tuple();
+    let mut guard = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let (pool_name, _, pool) = guard.as_mut_tuple();
 
     let msg = match handle_action!(
         pool.snapshot_filesystem(&pool_name, pool_uuid, fs_uuid, snapshot_name),

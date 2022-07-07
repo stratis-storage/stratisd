@@ -955,8 +955,8 @@ mod tests {
         .unwrap()
         .changed()
         .unwrap();
-        let guard = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
-        let (pool_name, _, pool) = guard.as_tuple();
+        let mut guard = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
+        let (pool_name, _, pool) = guard.as_mut_tuple();
         let devices = [Path::new("/s/a"), Path::new("/s/b")];
         assert!(match pool
             .add_blockdevs(uuid, &*pool_name, &devices, BlockDevTier::Data)

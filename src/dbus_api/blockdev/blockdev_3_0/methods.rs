@@ -41,8 +41,8 @@ where
         return_message
     );
 
-    let guard = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
-    let (pool_name, _, pool) = guard.as_tuple();
+    let mut guard = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let (pool_name, _, pool) = guard.as_mut_tuple();
 
     let blockdev_uuid = typed_uuid!(blockdev_data.uuid; Dev; default_return; return_message);
     let result =

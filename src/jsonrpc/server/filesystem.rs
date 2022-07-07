@@ -22,11 +22,11 @@ pub async fn filesystem_create<E>(
 where
     E: Engine,
 {
-    let guard = engine
+    let mut guard = engine
         .get_mut_pool(LockKey::Name(Name::new(pool_name.to_owned())))
         .await
         .ok_or_else(|| StratisError::Msg(format!("No pool named {} found", pool_name)))?;
-    let (_, pool_uuid, pool) = guard.as_tuple();
+    let (_, pool_uuid, pool) = guard.as_mut_tuple();
     block_in_place(|| {
         Ok(pool
             .create_filesystems(pool_name, pool_uuid, &[(name, None)])?

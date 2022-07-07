@@ -97,20 +97,20 @@ impl StratEngine {
 
     fn spawn_pool_check_handling(
         joins: &mut PoolJoinHandles,
-        guard: SomeLockWriteGuard<PoolUuid, StratPool>,
+        mut guard: SomeLockWriteGuard<PoolUuid, StratPool>,
     ) {
         joins.push(spawn_blocking(move || {
-            let (name, uuid, pool) = guard.as_tuple();
+            let (name, uuid, pool) = guard.as_mut_tuple();
             Ok((uuid, pool.event_on(uuid, &name)?))
         }));
     }
 
     fn spawn_fs_check_handling(
         joins: &mut Vec<JoinHandle<StratisResult<HashMap<FilesystemUuid, StratFilesystemDiff>>>>,
-        guard: SomeLockWriteGuard<PoolUuid, StratPool>,
+        mut guard: SomeLockWriteGuard<PoolUuid, StratPool>,
     ) {
         joins.push(spawn_blocking(move || {
-            let (_, uuid, pool) = guard.as_tuple();
+            let (_, uuid, pool) = guard.as_mut_tuple();
             pool.fs_event_on(uuid)
         }));
     }

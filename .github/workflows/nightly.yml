@@ -205,7 +205,7 @@ jobs:
           - image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
             toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           - image: fedora:34  # LOWEST DEVELOPMENT ENVIRONMENT
-            toolchain: 1.54.0  # LOWEST SUPPORTED RUST TOOLCHAIN
+            toolchain: 1.58.1  # LOWEST SUPPORTED RUST TOOLCHAIN
     runs-on: ubuntu-18.04
     container:
       image: ${{ matrix.image }}

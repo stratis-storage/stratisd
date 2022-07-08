@@ -89,11 +89,11 @@ pub async fn pool_init_cache<E>(engine: Arc<E>, name: &str, paths: &[&Path]) -> 
 where
     E: Engine,
 {
-    let guard = engine
+    let mut guard = engine
         .get_mut_pool(LockKey::Name(Name::new(name.to_owned())))
         .await
         .ok_or_else(|| StratisError::Msg(format!("No pool named {} found", name)))?;
-    let (_, uuid, pool) = guard.as_tuple();
+    let (_, uuid, pool) = guard.as_mut_tuple();
     block_in_place(|| Ok(pool.init_cache(uuid, name, paths)?.is_changed()))
 }
 
@@ -151,11 +151,11 @@ async fn add_blockdevs<E>(
 where
     E: Engine,
 {
-    let guard = engine
+    let mut guard = engine
         .get_mut_pool(LockKey::Name(Name::new(name.to_owned())))
         .await
         .ok_or_else(|| StratisError::Msg(format!("No pool named {} found", name)))?;
-    let (_, uuid, pool) = guard.as_tuple();
+    let (_, uuid, pool) = guard.as_mut_tuple();
     block_in_place(|| {
         Ok(pool
             .add_blockdevs(uuid, name, blockdevs, tier)?
@@ -208,7 +208,7 @@ where
     } else {
         Err(StratisError::Msg(format!(
             "Pool with UUID {} not found",
-            uuid.to_simple_ref()
+            uuid.as_simple()
         )))
     }
 }
@@ -225,7 +225,7 @@ where
     } else {
         Err(StratisError::Msg(format!(
             "Pool with UUID {} not found",
-            uuid.to_simple_ref()
+            uuid.as_simple()
         )))
     }
 }
@@ -246,7 +246,7 @@ where
     } else {
         Err(StratisError::Msg(format!(
             "Pool with UUID {} not found",
-            uuid.to_simple_ref()
+            uuid.as_simple()
         )))
     }
 }
@@ -267,7 +267,7 @@ where
     } else {
         Err(StratisError::Msg(format!(
             "Pool with UUID {} not found",
-            uuid.to_simple_ref()
+            uuid.as_simple()
         )))
     }
 }
@@ -289,7 +289,7 @@ where
     } else {
         Err(StratisError::Msg(format!(
             "Pool with UUID {} not found",
-            uuid.to_simple_ref()
+            uuid.as_simple()
         )))
     }
 }

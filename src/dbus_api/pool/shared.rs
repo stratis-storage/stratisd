@@ -86,9 +86,9 @@ where
         Pool
     );
 
-    let guard = block_on(dbus_context.engine.get_mut_pool(LockKey::Uuid(pool_uuid)))
+    let mut guard = block_on(dbus_context.engine.get_mut_pool(LockKey::Uuid(pool_uuid)))
         .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
-    let (pool_name, _, pool) = guard.as_tuple();
+    let (pool_name, _, pool) = guard.as_mut_tuple();
 
     closure((pool_name, pool_uuid, pool))
 }
@@ -127,8 +127,8 @@ where
         return_message
     );
 
-    let guard = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
-    let (pool_name, _, pool) = guard.as_tuple();
+    let mut guard = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let (pool_name, _, pool) = guard.as_mut_tuple();
 
     let blockdevs = devs.map(Path::new).collect::<Vec<&Path>>();
 

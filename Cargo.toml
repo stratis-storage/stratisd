@@ -1,6 +1,6 @@
 [package]
 name = "stratisd"
-version = "3.1.0"
+version = "3.1.1"
 authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.org>"]
 edition = "2018"
 build = "build.rs"
@@ -106,7 +106,7 @@ version = "5.0.0"
 optional = true
 
 [dependencies.uuid]
-version = "0.8.0"
+version = "1.0.0"
 features = ["serde", "v4"]
 
 [build-dependencies]

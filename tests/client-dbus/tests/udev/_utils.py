@@ -58,9 +58,7 @@ def random_string(length):
     :param length: Length of random part of string
     :return: String
     """
-    return "stratis_{0}".format(
-        "".join(random.choice(string.ascii_uppercase) for _ in range(length))
-    )
+    return f'stratis_{"".join(random.choice(string.ascii_uppercase) for _ in range(length))}'
 
 
 def create_pool(
@@ -95,8 +93,7 @@ def create_pool(
 
     if exit_code != StratisdErrors.OK:
         raise RuntimeError(
-            "Unable to create a pool %s with devices %s: %s"
-            % (name, devices, error_str)
+            f"Unable to create a pool {name} with devices {devices}: {error_str}"
         )
 
     (_, (pool_object_path, _)) = result
@@ -184,8 +181,8 @@ def wait_for_udev_count(expected_num):
 
     if expected_num != found_num:
         raise RuntimeError(
-            "Found unexpected number of devnodes: expected number: %s != found number: %s"
-            % (expected_num, found_num)
+            f"Found unexpected number of devnodes: "
+            f"expected number: {expected_num} != found number: {found_num}"
         )
 
 
@@ -217,8 +214,8 @@ def wait_for_udev(fs_type, expected_paths):
 
     if expected_devnodes != found_devnodes:
         raise RuntimeError(
-            "Found unexpected devnodes: expected devnodes: %s != found_devnodes: %s"
-            % (", ".join(expected_devnodes), ", ".join(found_devnodes))
+            f'Found unexpected devnodes: expected devnodes: {", ".join(expected_devnodes)} '
+            f'!= found_devnodes: {", ".join(found_devnodes)}'
         )
 
 
@@ -262,7 +259,7 @@ class _Service:
 
         settle()
 
-        if list(processes("stratisd")) != []:
+        if next(processes("stratisd"), None) is not None:
             raise RuntimeError("A stratisd process is already running")
 
         service = subprocess.Popen(
@@ -286,7 +283,7 @@ class _Service:
         time.sleep(1)
         if service.poll() is not None:
             raise RuntimeError(
-                "Daemon unexpectedly exited with exit code %s" % service.returncode,
+                f"Daemon unexpectedly exited with exit code {service.returncode}"
             )
 
         if not dbus_interface_present:
@@ -302,7 +299,7 @@ class _Service:
         """
         self._service.send_signal(signal.SIGINT)
         self._service.wait()
-        if list(processes("stratisd")) != []:
+        if next(processes("stratisd"), None) is not None:
             raise RuntimeError("Failed to stop stratisd service")
 
 
@@ -335,7 +332,7 @@ class KernelKey:
                 temp_file.write(key_data)
                 temp_file.flush()
 
-                with open(temp_file.name, "r") as fd_for_dbus:
+                with open(temp_file.name, "r", encoding="utf-8") as fd_for_dbus:
                     (_, return_code, message) = Manager.Methods.SetKey(
                         get_object(TOP_OBJECT),
                         {
@@ -346,8 +343,7 @@ class KernelKey:
 
                 if return_code != StratisdErrors.OK:
                     raise RuntimeError(
-                        "Setting a key using stratisd failed with an error: %s"
-                        % message
+                        f"Setting a key using stratisd failed with an error: {message}"
                     )
 
         return [desc for (desc, _) in self._key_descs]
@@ -361,8 +357,7 @@ class KernelKey:
 
                 if return_code != StratisdErrors.OK:
                     raise RuntimeError(
-                        "Unsetting the key using stratisd failed with an error: %s"
-                        % message
+                        f"Unsetting the key using stratisd failed with an error: {message}"
                     )
 
         except RuntimeError as rexc:

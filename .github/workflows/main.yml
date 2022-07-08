@@ -5,7 +5,7 @@ name: stratisd CI
 on:
   push:
     branches:
-      - master
+      - patch-3.1.0
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'
@@ -13,7 +13,7 @@ on:
       - 'tests/**'
   pull_request:
     branches:
-      - master
+      - patch-3.1.0
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'
@@ -28,11 +28,11 @@ jobs:
       matrix:
         include:
           - task: make -f Makefile fmt-travis
-            toolchain: 1.60.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: rustfmt
     runs-on: ubuntu-18.04
     container:
-      image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
@@ -64,9 +64,9 @@ jobs:
               TANG_URL=tang
               RUST_LOG=stratisd=debug
               make -f Makefile test-clevis-loop
-            toolchain: 1.60.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-            image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
+            image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
     runs-on: ubuntu-18.04
     container:
       image: ${{ matrix.image }}
@@ -74,7 +74,7 @@ jobs:
     services:
       tang:
         # yamllint disable rule:line-length
-        image: ghcr.io/stratis-storage/stratisd/tang:35  # CURRENT DEVELOPMENT ENVIRONMENT
+        image: ghcr.io/stratis-storage/stratisd/tang:36  # CURRENT DEVELOPMENT ENVIRONMENT
         credentials:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
@@ -141,6 +141,9 @@ jobs:
         run: make -f Makefile install-debug
       - name: Check out stratis-cli
         run: git clone https://github.com/stratis-storage/stratis-cli.git
+      - name: Switch to version 3.1.0
+        run: git checkout tags/v3.1.0 -b v3.1.0
+        working-directory: ./stratis-cli
       - name: Set up for D-Bus
         run: |
           mkdir -p /var/lib/dbus
@@ -162,7 +165,7 @@ jobs:
   shell-checks:
     runs-on: ubuntu-18.04
     container:
-      image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies
@@ -187,7 +190,7 @@ jobs:
               make -f ../../Makefile verify-dependency-bounds
     runs-on: ubuntu-18.04
     container:
-      image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies for Fedora
@@ -207,7 +210,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           components: cargo
-          toolchain: 1.60.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           override: true
       - name: Check out ci repo
         run: git clone https://github.com/stratis-storage/ci.git
@@ -219,7 +222,7 @@ jobs:
     continue-on-error: true
     runs-on: ubuntu-18.04
     container:
-      image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -242,7 +245,7 @@ jobs:
   python-based-tests:
     runs-on: ubuntu-18.04
     container:
-      image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v2
@@ -266,7 +269,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           components: cargo
-          toolchain: 1.60.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           override: true
       - name: Install all necessary Stratis files
         run: make -f Makefile install-debug

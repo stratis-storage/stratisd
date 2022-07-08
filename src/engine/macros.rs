@@ -240,7 +240,7 @@ macro_rules! convert_test {
 // a signature buffer.
 macro_rules! uuid_to_string {
     ($uuid:expr) => {
-        $uuid.to_simple_ref().to_string()
+        $uuid.as_simple().to_string()
     };
 }
 

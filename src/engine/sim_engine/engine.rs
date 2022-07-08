@@ -140,6 +140,7 @@ impl Engine for SimEngine {
         }
     }
 
+    #[allow(rust_2021_incompatible_closure_captures)]
     async fn handle_events(
         &self,
         _: Vec<UdevEngineEvent>,

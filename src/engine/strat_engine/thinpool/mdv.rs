@@ -230,8 +230,20 @@ impl MetadataVol {
 impl Drop for MetadataVol {
     fn drop(&mut self) {
         fn drop_failure(mount_pt: &PathBuf) -> StratisResult<()> {
-            let mtpt_stat = stat(mount_pt)?;
-            let parent_stat = stat(&mount_pt.join(".."))?;
+            let mtpt_stat = match stat(mount_pt) {
+                Ok(s) => s,
+                Err(e) => match e {
+                    nix::errno::Errno::ENOENT => return Ok(()),
+                    e => return Err(StratisError::Nix(e)),
+                },
+            };
+            let parent_stat = match stat(&mount_pt.join("..")) {
+                Ok(s) => s,
+                Err(e) => match e {
+                    nix::errno::Errno::ENOENT => return Ok(()),
+                    e => return Err(StratisError::Nix(e)),
+                },
+            };
 
             if mtpt_stat.st_dev != parent_stat.st_dev {
                 if let Err(e) = retry_with_index(Fixed::from_millis(100).take(2), |i| {

@@ -5,14 +5,14 @@ name: stratisd python-based tests
 on:
   push:
     branches:
-      - master
+      - patch-3.1.0
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'
       - 'README_tests.md'
   pull_request:
     branches:
-      - master
+      - patch-3.1.0
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'
@@ -27,8 +27,8 @@ jobs:
       matrix:
         include:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT ENVIRONMENT
-          - image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
-            toolchain: 1.60.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          - image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
+            toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           # MANDATORY CHECKS USING LOWEST SUPPORTED ENVIRONMENT PROXY
           - image: fedora:34  # LOWEST DEVELOPMENT ENVIRONMENT
             toolchain: 1.58.1  # LOWEST SUPPORTED RUST TOOLCHAIN
@@ -90,12 +90,12 @@ jobs:
   python-based-checks_with_tang:
     runs-on: ubuntu-18.04
     container:
-      image: fedora:35  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     services:
       tang:
         # yamllint disable rule:line-length
-        image: ghcr.io/stratis-storage/stratisd/tang:35  # CURRENT DEVELOPMENT ENVIRONMENT
+        image: ghcr.io/stratis-storage/stratisd/tang:36  # CURRENT DEVELOPMENT ENVIRONMENT
         credentials:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
@@ -128,7 +128,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           components: cargo
-          toolchain: 1.60.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           override: true
       - name: Install all necessary Stratis files
         run: make -f Makefile install-debug

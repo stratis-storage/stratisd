@@ -277,12 +277,12 @@ impl StaticHeader {
         f: &mut F,
         sh: StaticHeader,
         repair_location: MetadataLocation,
-    ) -> StratisResult<Option<StaticHeader>>
+    ) -> StratisResult<StaticHeader>
     where
         F: Seek + SyncAll,
     {
         sh.write(f, repair_location)?;
-        Ok(Some(sh))
+        Ok(sh)
     }
 
     /// Replacement function for write_header
@@ -292,11 +292,11 @@ impl StaticHeader {
         _f: &mut F,
         sh: StaticHeader,
         _repair_location: MetadataLocation,
-    ) -> StratisResult<Option<StaticHeader>>
+    ) -> StratisResult<StaticHeader>
     where
         F: Seek + SyncAll,
     {
-        Ok(Some(sh))
+        Ok(sh)
     }
 
     /// Try to find a valid StaticHeader on a device.
@@ -322,7 +322,7 @@ impl StaticHeader {
     ) -> StratisResult<Option<StaticHeader>>
     where
         F: Read + Seek + SyncAll,
-        C: Fn(&mut F, StaticHeader, MetadataLocation) -> StratisResult<Option<StaticHeader>>,
+        C: Fn(&mut F, StaticHeader, MetadataLocation) -> StratisResult<StaticHeader>,
     {
         // Action taken when one sigblock is interpreted as invalid.
         //
@@ -337,7 +337,7 @@ impl StaticHeader {
                                              repair_location: MetadataLocation|
          -> StratisResult<Option<StaticHeader>> {
             if let Some(sh) = maybe_sh {
-                closure(f, sh, repair_location)
+                closure(f, sh, repair_location).map(Some)
             } else {
                 Err(sh_error)
             }
@@ -362,9 +362,9 @@ impl StaticHeader {
                 let err_str = "Appeared to be a Stratis device, but signature blocks disagree.";
                 Err(StratisError::Msg(err_str.into()))
             } else if sh_1.initialization_time > sh_2.initialization_time {
-                closure(f, sh_1, MetadataLocation::Second)
+                closure(f, sh_1, MetadataLocation::Second).map(Some)
             } else {
-                closure(f, sh_2, MetadataLocation::First)
+                closure(f, sh_2, MetadataLocation::First).map(Some)
             }
         };
 
@@ -386,8 +386,8 @@ impl StaticHeader {
             match (maybe_sh1, maybe_sh2) {
                 (Some(loc_1), Some(loc_2)) => compare_headers(f, loc_1, loc_2),
                 (None, None) => Ok(None),
-                (Some(loc_1), None) => closure(f, loc_1, MetadataLocation::Second),
-                (None, Some(loc_2)) => closure(f, loc_2, MetadataLocation::First),
+                (Some(loc_1), None) => closure(f, loc_1, MetadataLocation::Second).map(Some),
+                (None, Some(loc_2)) => closure(f, loc_2, MetadataLocation::First).map(Some),
             }
         };
 

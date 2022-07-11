@@ -1001,8 +1001,7 @@ fn identifiers_from_metadata(device: &mut CryptDevice) -> StratisResult<StratisI
 
 // Bytes occupied by crypt metadata
 pub fn crypt_metadata_size() -> Bytes {
-    2u64 * Bytes(u128::from(DEFAULT_CRYPT_METADATA_SIZE))
-        + Bytes(u128::from(DEFAULT_CRYPT_KEYSLOTS_SIZE))
+    2u64 * Bytes::from(DEFAULT_CRYPT_METADATA_SIZE) + Bytes::from(DEFAULT_CRYPT_KEYSLOTS_SIZE)
 }
 
 /// Back up the LUKS2 header to a temporary file.

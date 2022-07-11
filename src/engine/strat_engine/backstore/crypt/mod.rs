@@ -26,7 +26,6 @@ pub use self::{
 #[cfg(test)]
 mod tests {
     use std::{
-        convert::TryFrom,
         env,
         error::Error,
         ffi::CString,

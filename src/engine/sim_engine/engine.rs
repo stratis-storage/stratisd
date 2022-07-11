@@ -4,7 +4,6 @@
 
 use std::{
     collections::{hash_map::RandomState, HashMap, HashSet},
-    iter::FromIterator,
     path::Path,
     sync::Arc,
 };

@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{convert::TryFrom, os::unix::io::RawFd, path::Path, sync::Arc};
+use std::{os::unix::io::RawFd, path::Path, sync::Arc};
 
 use tokio::task::block_in_place;
 

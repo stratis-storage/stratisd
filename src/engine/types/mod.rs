@@ -5,7 +5,6 @@
 use std::{
     borrow::Borrow,
     collections::HashMap,
-    convert::TryFrom,
     ffi::OsStr,
     fmt::{self, Debug, Display},
     hash::Hash,

@@ -34,6 +34,10 @@ SPECS = {
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
+    <method name="RefreshState">
+      <arg name="return_code" type="q" direction="out" />
+      <arg name="return_string" type="s" direction="out" />
+    </method>
     <method name="SetKey">
       <arg name="key_desc" type="s" direction="in" />
       <arg name="key_fd" type="h" direction="in" />

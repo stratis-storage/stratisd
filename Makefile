@@ -301,10 +301,16 @@ test:
 	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 cargo test --all-features -- --skip real_ --skip loop_ --skip clevis_
 
 test-clevis-real:
-	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test clevis_real_
+	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test clevis_real_ -- --skip clevis_real_should_fail
+
+test-clevis-real-should-fail:
+	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test clevis_real_should_fail
 
 test-clevis-loop:
-	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test clevis_loop_
+	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test clevis_loop_ -- --skip clevis_loop_should_fail_
+
+test-clevis-loop-should-fail:
+	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test clevis_loop_should_fail_
 
 yamllint:
 	yamllint --strict .github/workflows/*.yml
@@ -382,7 +388,9 @@ check-fedora-versions: test-compare-fedora-versions
 	test-loop
 	test-real
 	test-clevis-loop
+	test-clevis-loop-should-fail
 	test-clevis-real
+	test-clevis-real-should-fail
 	test-compare-fedora-versions
 	test-set-lower-bounds
 	verify-dependency-bounds

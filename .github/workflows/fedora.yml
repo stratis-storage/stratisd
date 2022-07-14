@@ -45,6 +45,11 @@ jobs:
           - task: make -f Makefile test
             toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
+          - task: >-
+              TANG_URL=localhost
+              make -f Makefile test-clevis-loop-should-fail
+            toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            components: cargo
           - task: make -f Makefile release
             toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo

@@ -2,14 +2,14 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-// Handles invoking external binaries.
+// Handles invoking external executables.
 // This module assumes that, for a given machine, there is only one place
 // where the desired executable might be installed. It expects the engine
-// to identify that place at its initialization by invoking verify_binaries(),
-// and to exit immediately if verify_binaries() return an error. If this
+// to identify that place at its initialization by invoking verify_executables(),
+// and to exit immediately if verify_executables() return an error. If this
 // protocol is followed then when any command is executed the unique absolute
-// path of the binary for this machine will already have been identified.
-// However stratisd may run for a while and it is possible for the binary
+// path of the executable for this machine will already have been identified.
+// However stratisd may run for a while and it is possible for the executable
 // to be caused to be uninstalled while stratisd is being run. Therefore,
 // the existence of the file is checked before the command is invoked, and
 // an explicit error is returned if the executable can not be found.
@@ -39,22 +39,22 @@ use crate::{
 // The maximum allowable size of the thinpool metadata device
 const MAX_META_SIZE: MetaBlocks = MetaBlocks(255 * ((1 << 14) - 64));
 
-const BINARIES_PATHS: [&str; 4] = ["/usr/sbin", "/sbin", "/usr/bin", "/bin"];
+const EXECUTABLES_PATHS: [&str; 4] = ["/usr/sbin", "/sbin", "/usr/bin", "/bin"];
 
-/// Find the binary with the given name by looking in likely locations.
-/// Return None if no binary was found.
+/// Find the executable with the given name by looking in likely locations.
+/// Return None if no executable was found.
 /// Search an explicit list of directories rather than the user's PATH
 /// environment variable. stratisd may be running when there is no PATH
 /// variable set.
-fn find_binary(name: &str) -> Option<PathBuf> {
-    BINARIES_PATHS
+fn find_executable(name: &str) -> Option<PathBuf> {
+    EXECUTABLES_PATHS
         .iter()
         .map(|pre| [pre, name].iter().collect::<PathBuf>())
         .find(|path| path.exists())
 }
 
-// These are the external binaries that stratisd relies on.
-// Any change in this list requires a corresponding change to BINARIES,
+// These are the external executables that stratisd relies on.
+// Any change in this list requires a corresponding change to EXECUTABLES
 // and vice-versa.
 const MKFS_XFS: &str = "mkfs.xfs";
 const THIN_CHECK: &str = "thin_check";
@@ -111,54 +111,33 @@ const CLEVIS_EXEC_NAMES: &[&str] = &[
 ];
 
 lazy_static! {
-    static ref BINARIES: HashMap<String, Option<PathBuf>> = [
-        (MKFS_XFS.to_string(), find_binary(MKFS_XFS)),
-        (THIN_CHECK.to_string(), find_binary(THIN_CHECK)),
-        (THIN_REPAIR.to_string(), find_binary(THIN_REPAIR)),
-        (UDEVADM.to_string(), find_binary(UDEVADM)),
-        (XFS_DB.to_string(), find_binary(XFS_DB)),
-        (XFS_GROWFS.to_string(), find_binary(XFS_GROWFS)),
+    static ref EXECUTABLES: HashMap<String, Option<PathBuf>> = [
+        (MKFS_XFS.to_string(), find_executable(MKFS_XFS)),
+        (THIN_CHECK.to_string(), find_executable(THIN_CHECK)),
+        (THIN_REPAIR.to_string(), find_executable(THIN_REPAIR)),
+        (UDEVADM.to_string(), find_executable(UDEVADM)),
+        (XFS_DB.to_string(), find_executable(XFS_DB)),
+        (XFS_GROWFS.to_string(), find_executable(XFS_GROWFS)),
         (
             THIN_METADATA_SIZE.to_string(),
-            find_binary(THIN_METADATA_SIZE)
+            find_executable(THIN_METADATA_SIZE)
         ),
     ]
     .iter()
     .cloned()
     .collect();
-    static ref CLEVIS_BINARIES: Option<(PathBuf, PathBuf)> = CLEVIS_EXEC_NAMES
-        .iter()
-        .fold(Some(HashMap::new()), |hm, name| {
-            match (hm, find_binary(name)) {
-                (None, _) => None,
-                (Some(mut hm), Some(path)) => {
-                    hm.insert((*name).to_string(), path);
-                    Some(hm)
-                }
-                (_, None) => {
-                    info!(
-                        "Clevis executable {} not found; disabling Clevis support",
-                        name
-                    );
-                    None
-                }
-            }
-        })
-        .and_then(|mut hm| hm
-            .remove(CLEVIS)
-            .and_then(|c| hm.remove(JOSE).map(|j| (c, j))));
 }
 
-/// Verify that all binaries that the engine might invoke are available at some
+/// Verify that all exectuables that the engine might invoke are available at some
 /// path. Return an error if any are missing. Required to be called on engine
 /// initialization.
-pub fn verify_binaries() -> StratisResult<()> {
-    match BINARIES.iter().find(|&(_, path)| path.is_none()) {
+pub fn verify_executables() -> StratisResult<()> {
+    match EXECUTABLES.iter().find(|&(_, path)| path.is_none()) {
         None => Ok(()),
         Some((name, _)) => Err(StratisError::Msg(format!(
             "Unable to find executable \"{}\" in any of {}",
             name,
-            BINARIES_PATHS
+            EXECUTABLES_PATHS
                 .iter()
                 .map(|p| format!("\"{}\"", p))
                 .collect::<Vec<_>>()
@@ -198,37 +177,44 @@ fn execute_cmd(cmd: &mut Command) -> StratisResult<()> {
 }
 
 /// Get an absolute path for the executable with the given name.
-/// Precondition: verify_binaries() has already been invoked.
+/// Precondition: verify_executables() has already been invoked.
 fn get_executable(name: &str) -> &Path {
-    BINARIES
+    EXECUTABLES
         .get(name)
-        .expect("name arguments are all constants defined with BINARIES, lookup can not fail")
+        .expect("name arguments are all constants defined with EXECUTABLES, lookup can not fail")
         .as_ref()
-        .expect("verify_binaries() was previously called and returned no error")
+        .expect("verify_executables() was previously called and returned no error")
 }
 
-/// Get an absolute path for the Clevis executable or return an error if Clevis
+/// Get an absolute path for a Clevis-related executable or return an error if Clevis
 /// support is disabled.
-fn get_clevis_executable() -> StratisResult<&'static Path> {
-    Ok(CLEVIS_BINARIES.as_ref().map(|(c, _)| c).ok_or_else(|| {
-        StratisError::Msg(format!(
-            "Clevis has been disabled due to some of the required executables not \
-                being found on this system. Required executables are: {:?}",
-            CLEVIS_EXEC_NAMES,
-        ))
-    })?)
-}
+fn get_clevis_executable(name: &str) -> StratisResult<PathBuf> {
+    let mut execs_location = CLEVIS_EXEC_NAMES
+        .iter()
+        .map(|name| (name, find_executable(name)))
+        .collect::<HashMap<_, _>>();
 
-/// Get an absolute path for the jose executable or return an error if Clevis
-/// support is disabled.
-fn get_jose_executable() -> StratisResult<&'static Path> {
-    Ok(CLEVIS_BINARIES.as_ref().map(|(_, j)| j).ok_or_else(|| {
-        StratisError::Msg(format!(
-            "Clevis has been disabled due to some of the required executables not \
-                being found on this system. Required executables are: {:?}",
-            CLEVIS_EXEC_NAMES,
-        ))
-    })?)
+    let not_found = execs_location
+        .iter()
+        .filter_map(|(name, val)| if val.is_none() { Some(name) } else { None })
+        .collect::<Vec<_>>();
+
+    if not_found.is_empty() {
+        Ok(execs_location
+            .remove(&name)
+            .ok_or_else(|| {
+                StratisError::Msg(format!(
+                    "Executable {} is not in the list of Clevis executables tracked by stratisd",
+                    name,
+                ))
+            })?
+            .expect("not_found.is_empty()"))
+    } else {
+        Err(StratisError::Msg(format!(
+            "Clevis has been disabled due to some of the required executables not being found on this system. Required executables that were not found are: {:?}",
+            not_found,
+        )))
+    }
 }
 
 /// Create a filesystem on devnode. If uuid specified, set the UUID of the
@@ -309,7 +295,7 @@ pub fn clevis_luks_bind(
     json: &Value,
     yes: bool,
 ) -> StratisResult<()> {
-    let mut cmd = Command::new(get_clevis_executable()?);
+    let mut cmd = Command::new(get_clevis_executable(CLEVIS)?);
 
     cmd.arg("luks").arg("bind");
 
@@ -332,7 +318,7 @@ pub fn clevis_luks_bind(
 /// Unbind a LUKS device using clevis.
 pub fn clevis_luks_unbind(dev_path: &Path, keyslot: libc::c_uint) -> StratisResult<()> {
     execute_cmd(
-        Command::new(get_clevis_executable()?)
+        Command::new(get_clevis_executable(CLEVIS)?)
             .arg("luks")
             .arg("unbind")
             .arg("-d")
@@ -346,7 +332,7 @@ pub fn clevis_luks_unbind(dev_path: &Path, keyslot: libc::c_uint) -> StratisResu
 /// Unlock a device using the clevis CLI.
 pub fn clevis_luks_unlock(dev_path: &Path, dm_name: &str) -> StratisResult<()> {
     execute_cmd(
-        Command::new(get_clevis_executable()?)
+        Command::new(get_clevis_executable(CLEVIS)?)
             .arg("luks")
             .arg("unlock")
             .arg("-d")
@@ -358,7 +344,7 @@ pub fn clevis_luks_unlock(dev_path: &Path, dm_name: &str) -> StratisResult<()> {
 
 /// Safely query clevis for the decrypted passphrase stored on a LUKS2 volume.
 pub fn clevis_decrypt(jwe: &Value) -> StratisResult<SizedKeyMemory> {
-    let mut jose_child = Command::new(get_jose_executable()?)
+    let mut jose_child = Command::new(get_clevis_executable(JOSE)?)
         .arg("jwe")
         .arg("fmt")
         .arg("-i-")
@@ -388,7 +374,7 @@ pub fn clevis_decrypt(jwe: &Value) -> StratisResult<SizedKeyMemory> {
         })?
         .read_to_string(&mut jose_output)?;
 
-    let mut clevis_child = Command::new(get_clevis_executable()?)
+    let mut clevis_child = Command::new(get_clevis_executable(CLEVIS)?)
         .arg("decrypt")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -421,7 +407,7 @@ pub fn clevis_decrypt(jwe: &Value) -> StratisResult<SizedKeyMemory> {
 /// Regenerate the bindings for a device using the clevis CLI.
 pub fn clevis_luks_regen(dev_path: &Path, keyslot: c_uint) -> StratisResult<()> {
     execute_cmd(
-        Command::new(get_clevis_executable()?)
+        Command::new(get_clevis_executable(CLEVIS)?)
             .arg("luks")
             .arg("regen")
             .arg("-d")

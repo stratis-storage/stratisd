@@ -22,7 +22,7 @@ use crate::{
     engine::{
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         strat_engine::{
-            cmd::verify_binaries,
+            cmd::verify_executables,
             dm::get_dm,
             keys::StratKeyActions,
             liminal::{find_all, LiminalDevices},
@@ -75,10 +75,10 @@ impl StratEngine {
     ///
     /// Returns an error if the kernel doesn't support required DM features.
     /// Returns an error if there was an error reading device nodes.
-    /// Returns an error if the binaries on which it depends can not be found.
+    /// Returns an error if the executables on which it depends can not be found.
     pub fn initialize() -> StratisResult<StratEngine> {
         let fs = MemoryFilesystem::new()?;
-        verify_binaries()?;
+        verify_executables()?;
 
         let mut liminal_devices = LiminalDevices::default();
         let mut pools = Table::default();

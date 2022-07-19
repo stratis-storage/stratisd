@@ -6,7 +6,9 @@
 
 use std::{
     convert::From,
-    fs::{create_dir, create_dir_all, read_dir, remove_dir, remove_file, rename, OpenOptions},
+    fs::{
+        create_dir, create_dir_all, read_dir, remove_dir, remove_file, rename, File, OpenOptions,
+    },
     io::{prelude::*, ErrorKind},
     path::{Path, PathBuf},
 };
@@ -115,19 +117,25 @@ impl MetadataVol {
 
         let temp_path = path.with_extension("temp");
 
-        // Braces to ensure f is closed before renaming
         {
-            let mut f = OpenOptions::new()
+            let mut mdv_record_file = OpenOptions::new()
                 .write(true)
                 .create(true)
                 .open(&temp_path)?;
-            f.write_all(data.as_bytes())?;
 
-            // Try really hard to make sure it goes to disk
-            f.sync_all()?;
+            mdv_record_file.write_all(data.as_bytes())?;
+            // This ultimately results in an fsync() on the file.
+            mdv_record_file.sync_all()?;
         }
 
         rename(temp_path, path)?;
+
+        // fsync() on directory needs to occur after the rename because the rename
+        // is atomic but not durable until the fsync on the directory metadata is
+        // forced to disk.
+        //
+        // Failing to do so can result in a zero-sized file if a crash occurs.
+        File::open(self.mount_pt.join(FILESYSTEM_DIR))?.sync_all()?;
 
         Ok(())
     }
@@ -140,10 +148,19 @@ impl MetadataVol {
             .join(uuid_to_string!(fs_uuid))
             .with_extension("json");
 
-        if let Err(err) = remove_file(fs_path) {
-            if err.kind() != ErrorKind::NotFound {
+        let needs_fsync = if let Err(err) = remove_file(fs_path) {
+            if err.kind() == ErrorKind::NotFound {
+                false
+            } else {
                 return Err(From::from(err));
             }
+        } else {
+            true
+        };
+
+        if needs_fsync {
+            // Make file unlink durable.
+            File::open(self.mount_pt.join(FILESYSTEM_DIR))?.sync_all()?;
         }
 
         Ok(())

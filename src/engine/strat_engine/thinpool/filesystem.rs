@@ -236,71 +236,89 @@ impl StratFilesystem {
         }
     }
 
-    /// Check if filesystem is getting full and needs to be extended.
+    /// Check the filesystem usage and determine whether it should extend.
+    ///
+    /// TODO: deal with the thindev in a Fail state.
     ///
     /// Returns:
-    /// * (true, _) if metadata should be saved.
-    /// * (false, _) if metadata should not be saved.
-    /// TODO: deal with the thindev in a Fail state.
-    pub fn check(
-        &mut self,
-        remaining_size: Option<&mut Sectors>,
-    ) -> StratisResult<(bool, StratFilesystemDiff)> {
-        let mut needs_save = false;
-        let original_state = self.cached();
-        match self.thin_dev.status(get_dm(), DmOptions::default())? {
-            ThinStatus::Working(_) => {
-                if let Some(mount_point) = self.mount_points()?.first() {
-                    let (fs_total_bytes, fs_total_used_bytes) = fs_usage(mount_point)?;
-                    if 2u64 * fs_total_used_bytes > fs_total_bytes {
-                        let extend_size = Self::extend_size(
-                            self.thin_dev.size(),
-                            remaining_size.as_ref().map(|rem| **rem),
-                        );
-
-                        let old_table = self.thin_dev.table().table.clone();
-                        let mut new_table = old_table.clone();
-                        new_table.length = original_state.size.sectors() + extend_size;
-                        self.thin_dev.set_table(get_dm(), new_table)?;
-                        if let Err(causal) = xfs_growfs(mount_point) {
-                            if let Err(rollback) = self.thin_dev.set_table(get_dm(), old_table) {
-                                return Err(StratisError::RollbackError {
-                                    causal_error: Box::new(causal),
-                                    rollback_error: Box::new(StratisError::from(rollback)),
-                                    level: ActionAvailability::NoPoolChanges,
-                                });
-                            } else {
-                                return Err(causal);
-                            }
+    /// * Some(mount_point) if the filesystem should be extended
+    /// * None if the filesystem does not need to be extended
+    pub fn should_extend(&self) -> Option<PathBuf> {
+        fn should_extend_fail(fs: &StratFilesystem) -> StratisResult<Option<PathBuf>> {
+            match fs.thin_dev.status(get_dm(), DmOptions::default())? {
+                ThinStatus::Working(_) => {
+                    if let Some(mount_point) = fs.mount_points()?.first() {
+                        let (fs_total_bytes, fs_total_used_bytes) = fs_usage(mount_point)?;
+                        if 2u64 * fs_total_used_bytes > fs_total_bytes {
+                            return Ok(Some(mount_point.clone()));
                         }
-                        if let Some(rem_size) = remaining_size {
-                            *rem_size = Sectors(rem_size.saturating_sub(*extend_size))
-                        }
-                        needs_save = true;
                     }
+                    Ok(None)
                 }
+                ThinStatus::Error => {
+                    let error_msg = format!(
+                        "Unable to get status for filesystem thin device {}",
+                        fs.thin_dev.device()
+                    );
+                    Err(StratisError::Msg(error_msg))
+                }
+                _ => Ok(None),
             }
-            ThinStatus::Error => {
-                let error_msg = format!(
-                    "Unable to get status for filesystem thin device {}",
-                    self.thin_dev.device()
+        }
+
+        match should_extend_fail(self) {
+            Ok(mt_pt) => mt_pt,
+            Err(e) => {
+                warn!(
+                    "Checking whether the filesystem should be extended failed: {}; ignoring",
+                    e
                 );
-                return Err(StratisError::Msg(error_msg));
+                None
             }
-            _ => (),
-        };
-        Ok((needs_save, original_state.diff(&self.dump(()))))
+        }
+    }
+
+    /// Handle the extension once the filesystem has been determined to be getting full
+    /// and needs to be extended.
+    ///
+    /// Precondition: should_extend has returned Some(_) before invocation.
+    pub fn handle_extension(
+        &mut self,
+        mount_point: &Path,
+        extend_size: Sectors,
+    ) -> StratisResult<StratFilesystemDiff> {
+        let original_state = self.cached();
+
+        let old_table = self.thin_dev.table().table.clone();
+        let mut new_table = old_table.clone();
+        new_table.length = original_state.size.sectors() + extend_size;
+        self.thin_dev.set_table(get_dm(), new_table)?;
+        if let Err(causal) = xfs_growfs(mount_point) {
+            if let Err(rollback) = self.thin_dev.set_table(get_dm(), old_table) {
+                return Err(StratisError::RollbackError {
+                    causal_error: Box::new(causal),
+                    rollback_error: Box::new(StratisError::from(rollback)),
+                    level: ActionAvailability::NoPoolChanges,
+                });
+            } else {
+                return Err(causal);
+            }
+        }
+
+        Ok(original_state.diff(&self.dump(())))
     }
 
     /// Return an extend size for the thindev under the filesystem
     /// TODO: returning the current size will double the space provisioned to
     /// the thin device.  We should determine if this is a reasonable value.
-    fn extend_size(current_size: Sectors, remaining_size: Option<Sectors>) -> Sectors {
+    pub fn extend_size(current_size: Sectors, remaining_size: Option<&mut Sectors>) -> Sectors {
         if let Some(rem_size) = remaining_size {
             // Extend either by the remaining amount left before the data device
             // overprovisioning limit is reached if it is less than the size of the
             // filesystem or double the filesystem size.
-            min(rem_size, current_size)
+            let extend_size = min(*rem_size, current_size);
+            *rem_size -= extend_size;
+            extend_size
         } else {
             current_size
         }

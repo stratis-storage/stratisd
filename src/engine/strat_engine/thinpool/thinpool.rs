@@ -10,6 +10,7 @@ use std::{
     fmt,
 };
 
+use crossbeam::thread::scope;
 use retry::{delay::Fixed, retry_with_index};
 use serde_json::{Map, Value};
 
@@ -800,26 +801,95 @@ impl ThinPool {
             None
         };
 
-        for (name, uuid, fs) in self.filesystems.iter_mut() {
-            let should_warn_on_zero = remaining_space
-                .as_ref()
-                .map(|s| *s > Sectors(0))
-                .unwrap_or(false);
-            let (needs_save, prop_diff) = fs.check(remaining_space.as_mut())?;
-            if should_warn_on_zero && remaining_space == Some(Sectors(0)) {
-                warn!(
-                    "Overprovisioning protection must be disabled to extend the filesystem further"
-                );
-            }
+        if let Some(Sectors(0)) = remaining_space.as_ref() {
+            return Ok(HashMap::default());
+        };
 
-            updated.insert(*uuid, prop_diff);
-            if needs_save {
-                if let Err(e) = self.mdv.save_fs(name, *uuid, fs) {
-                    error!("Could not save MDV for fs with UUID {} and name {} belonging to pool with UUID {}, reason: {:?}",
-                                uuid, name, pool_uuid, e);
-                }
-            }
+        scope(|s| {
+            // This collect is needed to ensure all threads are spawned in
+            // parallel, not each thread being spawned and immediately joined
+            // in the next iterator step which would result in sequential
+            // iteration.
+            #[allow(clippy::needless_collect)]
+            let handles = self.filesystems.iter_mut()
+                .filter_map(|(name, uuid, fs)| {
+                    if let Some(mt_pt) = fs.should_extend() {
+                        let extend_size = StratFilesystem::extend_size(
+                            fs.thindev_size(),
+                            remaining_space.as_mut(),
+                        );
+                        if extend_size == Sectors(0) {
+                            None
+                        } else {
+                            Some((
+                                name,
+                                *uuid,
+                                fs,
+                                mt_pt,
+                                extend_size,
+                            ))
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .map(|(name, uuid, fs, mt_pt, extend_size)| {
+                    s.spawn(move |_| -> StratisResult<_> {
+                        let diff = fs.handle_extension(&mt_pt, extend_size)?;
+                        Ok((name, uuid, fs, diff))
+                    })
+                })
+                .collect::<Vec<_>>();
+
+            let needs_save = handles.into_iter()
+                .filter_map(|h| {
+                    h.join()
+                        .map_err(|_| {
+                            warn!("Failed to get status of filesystem extension");
+                        })
+                        .ok()
+                })
+                .fold(Vec::new(), |mut acc, res| {
+                    match res {
+                        Ok((name, uuid, fs, diff)) => {
+                            updated.insert(uuid, diff);
+                            acc.push((name, uuid, fs));
+                        }
+                        Err(e) => {
+                            warn!("Failed to extend filesystem: {}", e);
+                        }
+                    }
+                    acc
+                });
+
+            let mdv = &self.mdv;
+            // This collect is needed to ensure all threads are spawned in
+            // parallel, not each thread being spawned and immediately joined
+            // in the next iterator step which would result in sequential
+            // iteration.
+            #[allow(clippy::needless_collect)]
+            let handles = needs_save.into_iter()
+                .map(|(name, uuid, fs)| {
+                    s.spawn(move |_| {
+                        if let Err(e) = mdv.save_fs(name, uuid, fs) {
+                            error!("Could not save MDV for fs with UUID {} and name {} belonging to pool with UUID {}, reason: {:?}",
+                                        uuid, name, pool_uuid, e);
+                        }
+                    })
+                })
+                .collect::<Vec<_>>();
+           handles.into_iter().for_each(|h| if h.join().is_err() {
+                warn!("Failed to get status of MDV save");
+           });
+        })
+        .map_err(|_| StratisError::Msg("Failed to retrieve parallel filesystem extension status".to_string()))?;
+
+        if remaining_space == Some(Sectors(0)) {
+            warn!(
+                "Overprovisioning protection must be disabled or more space must be added to the pool to extend the filesystem further"
+            );
         }
+
         Ok(updated)
     }
 

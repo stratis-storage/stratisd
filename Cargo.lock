@@ -565,9 +565,9 @@ checksum = "349d5a591cd28b49e1d1037471617a32ddcda5731b99419008085f72d5a53836"
 
 [[package]]
 name = "libcryptsetup-rs"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a41b1f72b98b005aafcbc4c55ccf5e51e9b61c6d0855c21fe125b49d614085ea"
+checksum = "0fe68061beaa409d095b8010a37cb611685a627889aa29d79a0380c93ff89c13"
 dependencies = [
  "either",
  "lazy_static",
@@ -576,14 +576,14 @@ dependencies = [
  "pkg-config",
  "semver",
  "serde_json",
- "uuid 0.8.2",
+ "uuid 1.1.2",
 ]
 
 [[package]]
 name = "libcryptsetup-rs-sys"
-version = "0.1.6"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41ef25e923679fe233e3c109702829717404d1266c80d6f30236e82e7b2798dc"
+checksum = "0c136e640bca5c6394092ee31eb55b4b6a9b307c32fa2db8a1764efac8239f9c"
 dependencies = [
  "bindgen 0.59.2",
  "cc",
@@ -1239,9 +1239,6 @@ name = "uuid"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
-dependencies = [
- "getrandom",
-]
 
 [[package]]
 name = "uuid"

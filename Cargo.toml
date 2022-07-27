@@ -1,6 +1,6 @@
 [package]
 name = "stratisd"
-version = "3.1.1"
+version = "3.1.2"
 authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.org>"]
 edition = "2018"
 build = "build.rs"
@@ -46,6 +46,7 @@ byteorder = "1.2.3"
 clap = "2.23.0"
 crc = "2.0.0"
 data-encoding = "2.3.0"
+devicemapper = "0.32.1"
 either = "1.5.0"
 env_logger="0.9.0"
 futures = "0.3.11"
@@ -71,17 +72,12 @@ version = "0.4.16"
 default-features = false
 features = ["clock", "std"]
 
-[dependencies.devicemapper]
-version = "0.32.0"
-git = "https://github.com/stratis-storage/devicemapper-rs"
-branch = "crates-io-patch-0.32.0"
-
 [dependencies.stratisd_proc_macros]
 version = "0.1.0"
 path = "./stratisd_proc_macros"
 
 [dependencies.libcryptsetup-rs]
-version = "0.5.0"
+version = "0.5.1"
 features = ["mutex"]
 
 [dependencies.tokio]

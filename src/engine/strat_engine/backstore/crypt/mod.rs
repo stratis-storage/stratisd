@@ -385,7 +385,25 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
+    fn clevis_real_should_fail_test_both_initialize() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(1, None, Some(Sectors(1024 * 1024 * 1024 / 512))),
+            test_both_initialize,
+        );
+    }
+
+    #[test]
     fn clevis_loop_test_both_initialize() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(1, None),
+            test_both_initialize,
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn clevis_loop_should_fail_test_both_initialize() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Exactly(1, None),
             test_both_initialize,
@@ -424,7 +442,25 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
+    fn clevis_real_should_fail_test_initialize() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(1, None, Some(Sectors(1024 * 1024 * 1024 / 512))),
+            test_clevis_initialize,
+        );
+    }
+
+    #[test]
     fn clevis_loop_test_initialize() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(1, None),
+            test_clevis_initialize,
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn clevis_loop_should_fail_test_initialize() {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Exactly(1, None),
             test_clevis_initialize,

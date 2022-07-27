@@ -542,7 +542,7 @@ impl Engine for StratEngine {
 mod test {
     use std::{env, error::Error, path::Path};
 
-    use devicemapper::{Bytes, Sectors};
+    use devicemapper::Sectors;
 
     use crate::engine::{
         engine::Pool,
@@ -740,7 +740,7 @@ mod test {
                         Box::new(StratisError::Msg("Pool must be present".to_string()))
                     })?;
 
-                fail_device.start_failing(*Bytes(u128::from(crypt_metadata_size())).sectors())?;
+                fail_device.start_failing(*crypt_metadata_size().sectors())?;
                 if operation(&mut pool).is_ok() {
                     return Err(Box::new(StratisError::Msg(
                         "Clevis initialization should have failed".to_string(),

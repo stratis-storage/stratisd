@@ -5,14 +5,14 @@ name: stratisd python-based tests
 on:
   push:
     branches:
-      - master
+      - patch-3.2.0
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'
       - 'README_tests.md'
   pull_request:
     branches:
-      - master
+      - patch-3.2.0
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'

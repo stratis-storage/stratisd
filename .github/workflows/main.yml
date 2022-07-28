@@ -5,7 +5,7 @@ name: stratisd CI
 on:
   push:
     branches:
-      - master
+      - patch-3.2.0
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'
@@ -13,7 +13,7 @@ on:
       - 'tests/**'
   pull_request:
     branches:
-      - master
+      - patch-3.2.0
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'
@@ -141,6 +141,9 @@ jobs:
         run: make -f Makefile install-debug
       - name: Check out stratis-cli
         run: git clone https://github.com/stratis-storage/stratis-cli.git
+      - name: Switch to version 3.2.0
+        run: git checkout tags/v3.2.0 -b v3.2.0
+        working-directory: ./stratis-cli
       - name: Set up for D-Bus
         run: |
           mkdir -p /var/lib/dbus

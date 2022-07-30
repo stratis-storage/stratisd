@@ -10,6 +10,7 @@ use std::{
 };
 
 use data_encoding::BASE64URL_NOPAD;
+use devicemapper::Bytes;
 use either::Either;
 use retry::{delay::Fixed, retry_with_index, Error};
 use serde_json::{Map, Value};
@@ -767,7 +768,7 @@ pub fn wipe_fallback(path: &Path, causal_error: StratisError) -> StratisError {
             }
         }
     };
-    let size = match convert_int!(crypt_metadata_size(), u64, usize) {
+    let size = match convert_int!(*crypt_metadata_size(), u128, usize) {
         Ok(s) => s,
         Err(e) => {
             return StratisError::NoActionRollbackError {
@@ -999,8 +1000,8 @@ fn identifiers_from_metadata(device: &mut CryptDevice) -> StratisResult<StratisI
 }
 
 // Bytes occupied by crypt metadata
-pub fn crypt_metadata_size() -> u64 {
-    2 * DEFAULT_CRYPT_METADATA_SIZE + DEFAULT_CRYPT_KEYSLOTS_SIZE
+pub fn crypt_metadata_size() -> Bytes {
+    2u64 * Bytes::from(DEFAULT_CRYPT_METADATA_SIZE) + Bytes::from(DEFAULT_CRYPT_KEYSLOTS_SIZE)
 }
 
 /// Back up the LUKS2 header to a temporary file.

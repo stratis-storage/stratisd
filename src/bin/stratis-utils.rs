@@ -196,7 +196,7 @@ fn predict_pool_usage(
         .transpose()?;
 
     let crypt_metadata_size = if encrypted {
-        Bytes(u128::from(crypt_metadata_size()))
+        crypt_metadata_size()
     } else {
         Bytes(0)
     };

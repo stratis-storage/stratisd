@@ -141,9 +141,6 @@ where
     E: Engine,
 {
     /// Convert changed properties from a pool to a series of D-Bus actions.
-    ///
-    /// Precondition: Filtering of diffs that show no change has already been
-    /// done in the engine.
     pub fn from_pool_diffs(diffs: HashMap<PoolUuid, PoolDiff>) -> Vec<Self> {
         diffs
             .into_iter()
@@ -172,9 +169,6 @@ where
     }
 
     /// Convert changed properties from filesystems to a series of D-Bus actions.
-    ///
-    /// Precondition: Filtering of diffs that show no change has already been
-    /// done in the engine.
     pub fn from_fs_diffs(diffs: HashMap<FilesystemUuid, StratFilesystemDiff>) -> Vec<Self> {
         diffs
             .into_iter()

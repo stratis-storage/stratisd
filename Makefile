@@ -349,6 +349,13 @@ verify-dependency-bounds: test-set-lower-bounds
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
 	cargo build ${MANIFEST_PATH_ARGS} --all-targets --all-features
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY}" \
+	cargo test --no-run ${TARGET_ARGS}
+	${SET_LOWER_BOUNDS} ${MANIFEST_PATH_ARGS}
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY}" \
+	cargo test --no-run ${TARGET_ARGS}
 
 COMPARE_FEDORA_VERSIONS ?=
 test-compare-fedora-versions:

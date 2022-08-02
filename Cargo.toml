@@ -12,6 +12,7 @@ categories = ["filesystem"]
 exclude = [
     "docs",
     "dracut",
+    ".clippy.toml",
     ".gitignore",
     ".githooks/*",
     ".github/*",

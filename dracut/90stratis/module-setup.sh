@@ -5,8 +5,6 @@ check() {
 	require_binaries stratis-min \
 		/usr/libexec/stratisd-min \
 		$systemdutildir/system-generators/stratis-setup-generator \
-		thin_check \
-		thin_repair \
 		mkfs.xfs \
 		xfs_admin \
 		xfs_growfs \
@@ -14,7 +12,6 @@ check() {
 		udevadm \
 		plymouth \
 		/usr/sbin/plymouthd \
-		/usr/sbin/thin_metadata_size \
 		/usr/lib/udev/stratis-str-cmp \
 		/usr/lib/udev/stratis-base32-decode ||
 		return 1
@@ -37,8 +34,6 @@ install() {
 	# Stratis dependencies
 	inst_multiple stratis-min \
 		/usr/libexec/stratisd-min \
-		thin_check \
-		thin_repair \
 		mkfs.xfs \
 		xfs_admin \
 		xfs_growfs \
@@ -46,7 +41,6 @@ install() {
 		udevadm \
 		plymouth \
 		/usr/sbin/plymouthd \
-		/usr/sbin/thin_metadata_size \
 		/usr/lib/udev/stratis-str-cmp
 	ln ${initdir}/usr/lib/udev/stratis-str-cmp ${initdir}/usr/lib/udev/stratis-base32-decode
 

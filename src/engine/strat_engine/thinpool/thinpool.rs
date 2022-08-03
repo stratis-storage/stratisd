@@ -7,6 +7,7 @@
 use std::{
     cmp::{max, min},
     collections::HashMap,
+    convert::TryInto,
     fmt,
 };
 
@@ -24,7 +25,6 @@ use crate::{
         engine::{DumpState, StateDiff},
         strat_engine::{
             backstore::Backstore,
-            cmd::{thin_check, thin_metadata_size, thin_repair},
             dm::get_dm,
             names::{
                 format_flex_ids, format_thin_ids, format_thinpool_ids, FlexRole, ThinPoolRole,
@@ -39,6 +39,9 @@ use crate::{
     },
     stratis::{StratisError, StratisResult},
 };
+
+// The maximum allowable size of the thinpool metadata device
+const MAX_META_SIZE: MetaBlocks = MetaBlocks(255 * ((1 << 14) - 64));
 
 // Maximum number of thin devices (filesystems) allowed on a thin pool.
 // NOTE: This will eventually become a default configurable by the user.
@@ -69,6 +72,15 @@ mod consts {
     pub const DATA_ALLOC_SIZE: DataBlocks = DataBlocks(5 * IEC::Ki);
     // 4 GiB
     pub const DATA_LOWATER: DataBlocks = DataBlocks(4 * IEC::Ki);
+}
+
+fn engine_options() -> thinp::commands::engine::EngineOptions {
+    use thinp::commands::engine::*;
+    EngineOptions {
+        tool: ToolType::Thin,
+        engine_type: EngineType::Sync,
+        use_metadata_snap: false,
+    }
 }
 
 fn sectors_to_datablocks(sectors: Sectors) -> DataBlocks {
@@ -199,6 +211,26 @@ impl fmt::Display for ThinPoolStatusDigest {
             ThinPoolStatusDigest::Fail => write!(f, "Fail"),
             ThinPoolStatusDigest::Error => write!(f, "Error"),
         }
+    }
+}
+
+/// Determine the number of sectors required to house the specified parameters for
+/// the thin pool that determine metadata size.
+pub fn thin_metadata_size(
+    block_size: Sectors,
+    pool_size: Sectors,
+    max_thins: u64,
+) -> StratisResult<Sectors> {
+    use thinp::thin::metadata_size::*;
+    let result = metadata_size(&ThinMetadataSizeOptions {
+        nr_blocks: (pool_size.bytes() / block_size.bytes())
+            .try_into()
+            .map_err(|e: <u128 as TryInto<u64>>::Error| StratisError::Msg(e.to_string()))?,
+        max_thins,
+    });
+    match result {
+        Ok(size) => Ok(min(Sectors(size), MAX_META_SIZE.sectors())),
+        Err(e) => Err(StratisError::Msg(e.to_string())),
     }
 }
 
@@ -1672,7 +1704,19 @@ fn setup_metadev(
         // TODO: Refine policy about failure to run thin_check.
         // If, e.g., thin_check is unavailable, that doesn't necessarily
         // mean that data is corrupted.
-        if let Err(e) = thin_check(&meta_dev.devnode()) {
+        use thinp::thin::check::*;
+        let result = check(ThinCheckOptions {
+            input: &meta_dev.devnode(),
+            engine_opts: engine_options(),
+            sb_only: false,
+            skip_mappings: false,
+            ignore_non_fatal: false,
+            auto_repair: false,
+            clear_needs_check: false,
+            override_mapping_root: None,
+            report: thinp::commands::utils::mk_report(true),
+        });
+        if let Err(e) = result {
             warn!("Thin check failed: {}", e);
             meta_dev = attempt_thin_repair(pool_uuid, meta_dev, device, &spare_segments)?;
             return Ok((meta_dev, spare_segments, meta_segments));
@@ -1699,7 +1743,20 @@ fn attempt_thin_repair(
         segs_to_table(device, spare_segments),
     )?;
 
-    thin_repair(&meta_dev.devnode(), &new_meta_dev.devnode())?;
+    use thinp::thin::metadata_repair::SuperblockOverrides;
+    use thinp::thin::repair::*;
+    repair(ThinRepairOptions {
+        input: &meta_dev.devnode(),
+        output: &new_meta_dev.devnode(),
+        engine_opts: engine_options(),
+        report: thinp::commands::utils::mk_report(true),
+        overrides: SuperblockOverrides {
+            transaction_id: None,
+            data_block_size: None,
+            nr_data_blocks: None,
+        },
+    })
+    .map_err(|e| StratisError::Msg(e.to_string()))?;
 
     let name = meta_dev.name().to_owned();
     meta_dev.teardown(get_dm())?;

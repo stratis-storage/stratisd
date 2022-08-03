@@ -15,7 +15,6 @@
 // an explicit error is returned if the executable can not be found.
 
 use std::{
-    cmp::min,
     collections::HashMap,
     io::{Read, Write},
     path::{Path, PathBuf},
@@ -26,8 +25,6 @@ use libc::c_uint;
 use libcryptsetup_rs::SafeMemHandle;
 use serde_json::Value;
 
-use devicemapper::{MetaBlocks, Sectors};
-
 use crate::{
     engine::{
         engine::MAX_STRATIS_PASS_SIZE,
@@ -35,9 +32,6 @@ use crate::{
     },
     stratis::{StratisError, StratisResult},
 };
-
-// The maximum allowable size of the thinpool metadata device
-const MAX_META_SIZE: MetaBlocks = MetaBlocks(255 * ((1 << 14) - 64));
 
 const EXECUTABLES_PATHS: [&str; 4] = ["/usr/sbin", "/sbin", "/usr/bin", "/bin"];
 
@@ -57,10 +51,7 @@ fn find_executable(name: &str) -> Option<PathBuf> {
 // Any change in this list requires a corresponding change to EXECUTABLES
 // and vice-versa.
 const MKFS_XFS: &str = "mkfs.xfs";
-const THIN_CHECK: &str = "thin_check";
-const THIN_REPAIR: &str = "thin_repair";
 const UDEVADM: &str = "udevadm";
-const THIN_METADATA_SIZE: &str = "thin_metadata_size";
 const XFS_DB: &str = "xfs_db";
 const XFS_GROWFS: &str = "xfs_growfs";
 const CLEVIS: &str = "clevis";
@@ -113,15 +104,9 @@ const CLEVIS_EXEC_NAMES: &[&str] = &[
 lazy_static! {
     static ref EXECUTABLES: HashMap<String, Option<PathBuf>> = [
         (MKFS_XFS.to_string(), find_executable(MKFS_XFS)),
-        (THIN_CHECK.to_string(), find_executable(THIN_CHECK)),
-        (THIN_REPAIR.to_string(), find_executable(THIN_REPAIR)),
         (UDEVADM.to_string(), find_executable(UDEVADM)),
         (XFS_DB.to_string(), find_executable(XFS_DB)),
         (XFS_GROWFS.to_string(), find_executable(XFS_GROWFS)),
-        (
-            THIN_METADATA_SIZE.to_string(),
-            find_executable(THIN_METADATA_SIZE)
-        ),
     ]
     .iter()
     .cloned()
@@ -257,26 +242,6 @@ pub fn set_uuid(devnode: &Path, uuid: FilesystemUuid) -> StratisResult<()> {
             .arg("-x")
             .arg(format!("-c uuid {}", uuid))
             .arg(devnode),
-    )
-}
-
-/// Call thin_check on a thinpool
-pub fn thin_check(devnode: &Path) -> StratisResult<()> {
-    execute_cmd(
-        Command::new(get_executable(THIN_CHECK).as_os_str())
-            .arg("-q")
-            .arg(devnode),
-    )
-}
-
-/// Call thin_repair on a thinpool
-pub fn thin_repair(meta_dev: &Path, new_meta_dev: &Path) -> StratisResult<()> {
-    execute_cmd(
-        Command::new(get_executable(THIN_REPAIR).as_os_str())
-            .arg("-i")
-            .arg(meta_dev)
-            .arg("-o")
-            .arg(new_meta_dev),
     )
 }
 
@@ -416,51 +381,4 @@ pub fn clevis_luks_regen(dev_path: &Path, keyslot: c_uint) -> StratisResult<()> 
             .arg(keyslot.to_string())
             .arg("-q"),
     )
-}
-
-/// Determine the number of sectors required to house the specified parameters for
-/// the thin pool that determine metadata size.
-pub fn thin_metadata_size(
-    block_size: Sectors,
-    pool_size: Sectors,
-    max_thins: u64,
-) -> StratisResult<Sectors> {
-    let mut thin_meta_child = Command::new(get_executable(THIN_METADATA_SIZE))
-        .arg("-b")
-        .arg(format!("{}b", *block_size.bytes()))
-        .arg("-s")
-        .arg(format!("{}b", *pool_size.bytes()))
-        .arg("-m")
-        .arg(max_thins.to_string())
-        .arg("-n")
-        .stdout(Stdio::piped())
-        .spawn()?;
-    thin_meta_child.wait()?;
-    let mut output = String::new();
-    let is_ok = thin_meta_child.wait()?.code() == Some(0);
-    thin_meta_child
-        .stdout
-        .ok_or_else(|| {
-            StratisError::Msg(
-                "Spawned thin_metadata_size process had no stdout; cannot continue with metadata size requirement simulation"
-                    .to_string(),
-            )
-        })?
-        .read_to_string(&mut output)?;
-    if is_ok {
-        Ok(min(
-            Sectors(
-                output
-                    .trim()
-                    .parse::<u64>()
-                    .map_err(|e| StratisError::Msg(e.to_string()))?,
-            ),
-            MAX_META_SIZE.sectors(),
-        ))
-    } else {
-        Err(StratisError::Msg(format!(
-            "thin_metadata_size failed: {}",
-            output
-        )))
-    }
 }

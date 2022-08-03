@@ -39,8 +39,6 @@ use crate::{
 // The maximum allowable size of the thinpool metadata device
 const MAX_META_SIZE: MetaBlocks = MetaBlocks(255 * ((1 << 14) - 64));
 
-const EXECUTABLES_PATHS: [&str; 4] = ["/usr/sbin", "/sbin", "/usr/bin", "/bin"];
-
 /// Find the executable with the given name by looking in likely locations.
 /// Return None if no executable was found.
 /// Search an explicit list of directories rather than the user's PATH
@@ -49,7 +47,7 @@ const EXECUTABLES_PATHS: [&str; 4] = ["/usr/sbin", "/sbin", "/usr/bin", "/bin"];
 fn find_executable(name: &str) -> Option<PathBuf> {
     EXECUTABLES_PATHS
         .iter()
-        .map(|pre| [pre, name].iter().collect::<PathBuf>())
+        .map(|pre| [pre, &name.into()].iter().collect::<PathBuf>())
         .find(|path| path.exists())
 }
 
@@ -126,6 +124,13 @@ lazy_static! {
     .iter()
     .cloned()
     .collect();
+    static ref EXECUTABLES_PATHS: Vec<PathBuf> = match std::option_env!("EXECUTABLES_PATHS") {
+        Some(paths) => std::env::split_paths(paths).collect(),
+        None => ["/usr/sbin", "/sbin", "/usr/bin", "/bin"]
+            .iter()
+            .map(|p| p.into())
+            .collect(),
+    };
 }
 
 /// Verify that all exectuables that the engine might invoke are available at some
@@ -139,7 +144,7 @@ pub fn verify_executables() -> StratisResult<()> {
             name,
             EXECUTABLES_PATHS
                 .iter()
-                .map(|p| format!("\"{}\"", p))
+                .map(|p| format!("\"{}\"", p.display()))
                 .collect::<Vec<_>>()
                 .join(", "),
         ))),

@@ -135,7 +135,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           components: cargo
-          toolchain: 1.58.1  # LOWEST SUPPORTED RUST TOOLCHAIN
+          toolchain: 1.62.1  # LOWEST SUPPORTED RUST TOOLCHAIN
           override: true
       - name: Build stratisd
         run: make -f Makefile install-debug

@@ -76,6 +76,7 @@ jobs:
           cryptsetup-devel
           dbus-devel
           device-mapper-persistent-data
+          device-mapper-devel
           libblkid-devel
           make
           ncurses
@@ -109,9 +110,10 @@ jobs:
           clang
           cryptsetup-devel
           curl
-          device-mapper-persistent-data
           dbus-devel
           glibc-static
+          device-mapper-devel
+          device-mapper-persistent-data
           libblkid-devel
           make
           ncurses

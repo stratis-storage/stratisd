@@ -39,6 +39,7 @@ jobs:
           curl
           cryptsetup-devel
           dbus-devel
+          device-mapper-devel
           git
           libblkid-devel
           make

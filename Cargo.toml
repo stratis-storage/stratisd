@@ -78,7 +78,7 @@ version = "0.1.0"
 path = "./stratisd_proc_macros"
 
 [dependencies.libcryptsetup-rs]
-version = "0.5.1"
+version = "0.6.0"
 features = ["mutex"]
 
 [dependencies.tokio]

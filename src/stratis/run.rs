@@ -19,7 +19,9 @@ use tokio::{
 #[cfg(feature = "dbus_enabled")]
 use crate::dbus_api::DbusAction;
 use crate::{
-    engine::{unshare_namespace, Engine, SimEngine, StratEngine, UdevEngineEvent},
+    engine::{
+        set_up_crypt_logging, unshare_namespace, Engine, SimEngine, StratEngine, UdevEngineEvent,
+    },
     stratis::{
         dm::dm_event_thread, errors::StratisResult, ipc_support::setup, stratis::VERSION,
         timer::run_timers, udev_monitor::udev_thread,
@@ -48,6 +50,8 @@ pub fn run(sim: bool) -> StratisResult<()> {
     if !sim {
         unshare_namespace()?;
     }
+
+    set_up_crypt_logging();
 
     let runtime = Builder::new_multi_thread()
         .enable_all()

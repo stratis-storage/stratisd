@@ -1084,7 +1084,7 @@ mod tests {
             tests::{loopbacked, real},
             thinpool::ThinPoolStatusDigest,
         },
-        types::{EngineAction, LockKey},
+        types::{EngineAction, PoolIdentifier},
         Engine, StratEngine,
     };
 
@@ -1497,7 +1497,7 @@ mod tests {
             .unwrap()
             .changed()
             .unwrap();
-        let mut guard = test_async!(engine.get_mut_pool(LockKey::Uuid(pool_uuid))).unwrap();
+        let mut guard = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(pool_uuid))).unwrap();
         let (_, _, pool) = guard.as_mut_tuple();
 
         let (_, fs_uuid, _) = pool

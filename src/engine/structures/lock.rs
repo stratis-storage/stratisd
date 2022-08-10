@@ -22,7 +22,7 @@ use tokio::sync::{OwnedRwLockReadGuard, OwnedRwLockWriteGuard, RwLock};
 
 use crate::engine::{
     structures::Table,
-    types::{AsUuid, LockKey, Name},
+    types::{AsUuid, Name, PoolIdentifier},
 };
 
 pub struct SharedGuard<G>(G);
@@ -162,11 +162,11 @@ where
     }
 
     /// Convert a name or UUID into a pair of a name and UUID.
-    fn get_by_lock_key(&self, lock_key: &LockKey<U>) -> Option<(U, Name)> {
+    fn get_by_lock_key(&self, lock_key: &PoolIdentifier<U>) -> Option<(U, Name)> {
         match lock_key {
-            LockKey::Name(ref n) => unsafe { self.inner.get().as_ref() }
+            PoolIdentifier::Name(ref n) => unsafe { self.inner.get().as_ref() }
                 .and_then(|i| i.get_by_name(n).map(|(u, _)| (u, n.clone()))),
-            LockKey::Uuid(u) => unsafe { self.inner.get().as_ref() }
+            PoolIdentifier::Uuid(u) => unsafe { self.inner.get().as_ref() }
                 .and_then(|i| i.get_by_uuid(*u).map(|(n, _)| (*u, n))),
         }
     }
@@ -524,7 +524,7 @@ where
     T: Unpin,
 {
     /// Issue a read on a single element identified by a name or UUID.
-    pub async fn read(&self, key: LockKey<U>) -> Option<SomeLockReadGuard<U, T>> {
+    pub async fn read(&self, key: PoolIdentifier<U>) -> Option<SomeLockReadGuard<U, T>> {
         trace!("Acquiring read lock on pool {:?}", key);
         let idx = self.next_idx();
         let guard = SomeRead(self.clone(), key, AtomicBool::new(false), idx).await;
@@ -546,7 +546,7 @@ where
     }
 
     /// Issue a write on a single element identified by a name or UUID.
-    pub async fn write(&self, key: LockKey<U>) -> Option<SomeLockWriteGuard<U, T>> {
+    pub async fn write(&self, key: PoolIdentifier<U>) -> Option<SomeLockWriteGuard<U, T>> {
         trace!("Acquiring write lock on pool {:?}", key);
         let idx = self.next_idx();
         let guard = SomeWrite(self.clone(), key, AtomicBool::new(false), idx).await;
@@ -578,7 +578,7 @@ where
 }
 
 /// Future returned by AllOrSomeLock::read().
-struct SomeRead<U: AsUuid, T>(AllOrSomeLock<U, T>, LockKey<U>, AtomicBool, u64);
+struct SomeRead<U: AsUuid, T>(AllOrSomeLock<U, T>, PoolIdentifier<U>, AtomicBool, u64);
 
 impl<U, T> Future for SomeRead<U, T>
 where
@@ -685,7 +685,7 @@ where
 }
 
 /// Future returned by AllOrSomeLock::write().
-struct SomeWrite<U: AsUuid, T>(AllOrSomeLock<U, T>, LockKey<U>, AtomicBool, u64);
+struct SomeWrite<U: AsUuid, T>(AllOrSomeLock<U, T>, PoolIdentifier<U>, AtomicBool, u64);
 
 impl<U, T> Future for SomeWrite<U, T>
 where

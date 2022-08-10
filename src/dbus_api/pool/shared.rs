@@ -19,8 +19,8 @@ use crate::{
         util::{engine_to_dbus_err_tuple, get_next_arg},
     },
     engine::{
-        total_allocated, total_used, BlockDevTier, Diff, Engine, EngineAction, LockKey, Name, Pool,
-        PoolUuid, PropChangeAction,
+        total_allocated, total_used, BlockDevTier, Diff, Engine, EngineAction, Name, Pool,
+        PoolIdentifier, PoolUuid, PropChangeAction,
     },
 };
 
@@ -55,8 +55,12 @@ where
         Pool
     );
 
-    let guard = block_on(dbus_context.engine.get_pool(LockKey::Uuid(pool_uuid)))
-        .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
+    let guard = block_on(
+        dbus_context
+            .engine
+            .get_pool(PoolIdentifier::Uuid(pool_uuid)),
+    )
+    .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
     let (pool_name, _, pool) = guard.as_tuple();
 
     closure((pool_name, pool_uuid, pool))
@@ -86,8 +90,12 @@ where
         Pool
     );
 
-    let mut guard = block_on(dbus_context.engine.get_mut_pool(LockKey::Uuid(pool_uuid)))
-        .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
+    let mut guard = block_on(
+        dbus_context
+            .engine
+            .get_mut_pool(PoolIdentifier::Uuid(pool_uuid)),
+    )
+    .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
     let (pool_name, _, pool) = guard.as_mut_tuple();
 
     closure((pool_name, pool_uuid, pool))

@@ -394,9 +394,8 @@ pub enum MaybeInconsistent<T> {
     No(T),
 }
 
-/// Represents either a name or a UUID.
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum LockKey<U> {
+pub enum PoolIdentifier<U> {
     Name(Name),
     Uuid(U),
 }

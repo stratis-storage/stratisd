@@ -23,8 +23,8 @@ use crate::{
             SharedGuard, SomeLockReadGuard, SomeLockWriteGuard, Table,
         },
         types::{
-            CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockKey,
-            LockedPoolInfo, Name, PoolDevice, PoolDiff, PoolUuid, RenameAction, ReportType,
+            CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockedPoolInfo,
+            Name, PoolDevice, PoolDiff, PoolIdentifier, PoolUuid, RenameAction, ReportType,
             SetUnlockAction, StartAction, StopAction, StoppedPoolInfo, StratFilesystemDiff,
             UdevEngineEvent, UnlockMethod,
         },
@@ -144,7 +144,7 @@ impl Engine for SimEngine {
             }
         }
 
-        let guard = self.pools.read(LockKey::Name(name.clone())).await;
+        let guard = self.pools.read(PoolIdentifier::Name(name.clone())).await;
         match guard.as_ref().map(|g| g.as_tuple()) {
             Some((_, _, pool)) => create_pool_idempotent_or_err(pool, &name, blockdev_paths),
             None => {
@@ -175,7 +175,7 @@ impl Engine for SimEngine {
     }
 
     async fn destroy_pool(&self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {
-        if let Some(pool) = self.pools.read(LockKey::Uuid(uuid)).await {
+        if let Some(pool) = self.pools.read(PoolIdentifier::Uuid(uuid)).await {
             if pool.has_filesystems() {
                 return Err(StratisError::Msg("filesystems remaining on pool".into()));
             }
@@ -221,14 +221,14 @@ impl Engine for SimEngine {
 
     async fn get_pool(
         &self,
-        key: LockKey<PoolUuid>,
+        key: PoolIdentifier<PoolUuid>,
     ) -> Option<SomeLockReadGuard<PoolUuid, Self::Pool>> {
         get_pool!(self; key)
     }
 
     async fn get_mut_pool(
         &self,
-        key: LockKey<PoolUuid>,
+        key: PoolIdentifier<PoolUuid>,
     ) -> Option<SomeLockWriteGuard<PoolUuid, Self::Pool>> {
         get_mut_pool!(self; key)
     }
@@ -294,7 +294,7 @@ impl Engine for SimEngine {
         pool_uuid: PoolUuid,
         unlock_method: Option<UnlockMethod>,
     ) -> StratisResult<StartAction<PoolUuid>> {
-        if let Some(guard) = self.pools.read(LockKey::Uuid(pool_uuid)).await {
+        if let Some(guard) = self.pools.read(PoolIdentifier::Uuid(pool_uuid)).await {
             let (_, _, pool) = guard.as_tuple();
             if pool.is_encrypted() && unlock_method.is_none() {
                 return Err(StratisError::Msg(format!(
@@ -370,9 +370,10 @@ mod tests {
     #[test]
     /// When an engine has no pools, any name lookup should fail
     fn get_pool_err() {
-        assert!(
-            test_async!(SimEngine::default().get_pool(LockKey::Uuid(PoolUuid::new_v4()))).is_none()
-        );
+        assert!(test_async!(
+            SimEngine::default().get_pool(PoolIdentifier::Uuid(PoolUuid::new_v4()))
+        )
+        .is_none());
     }
 
     #[test]
@@ -417,7 +418,7 @@ mod tests {
             .changed()
             .unwrap();
         {
-            let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
+            let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
             pool.create_filesystems(pool_name, uuid, &[("test", None)])
                 .unwrap();
         }
@@ -461,10 +462,12 @@ mod tests {
             test_async!(engine.create_pool("name", strs_to_paths!([path, path]), None))
                 .unwrap()
                 .changed()
-                .map(|uuid| test_async!(engine.get_pool(LockKey::Uuid(uuid)))
-                    .unwrap()
-                    .blockdevs()
-                    .len()),
+                .map(
+                    |uuid| test_async!(engine.get_pool(PoolIdentifier::Uuid(uuid)))
+                        .unwrap()
+                        .blockdevs()
+                        .len()
+                ),
             Some(1)
         );
     }

@@ -24,9 +24,9 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, LockKey,
-            LockedPoolInfo, MappingCreateAction, MappingDeleteAction, Name, PoolDiff,
-            PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, ReportType, SetCreateAction,
+            EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, LockedPoolInfo,
+            MappingCreateAction, MappingDeleteAction, Name, PoolDiff, PoolEncryptionInfo,
+            PoolIdentifier, PoolUuid, RegenAction, RenameAction, ReportType, SetCreateAction,
             SetDeleteAction, SetUnlockAction, StartAction, StopAction, StoppedPoolInfo,
             StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
         },
@@ -394,13 +394,13 @@ pub trait Engine: Debug + Report + Send + Sync {
     /// Find the pool designated by name or UUID.
     async fn get_pool(
         &self,
-        key: LockKey<PoolUuid>,
+        key: PoolIdentifier<PoolUuid>,
     ) -> Option<SomeLockReadGuard<PoolUuid, Self::Pool>>;
 
     /// Get a mutable reference to the pool designated by name or UUID.
     async fn get_mut_pool(
         &self,
-        key: LockKey<PoolUuid>,
+        key: PoolIdentifier<PoolUuid>,
     ) -> Option<SomeLockWriteGuard<PoolUuid, Self::Pool>>;
 
     /// Get a mapping of encrypted pool UUIDs for pools that have not yet

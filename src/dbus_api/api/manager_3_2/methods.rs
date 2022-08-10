@@ -15,7 +15,7 @@ use crate::{
         types::{DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
-    engine::{Engine, LockKey, Pool, PoolUuid, StartAction, StopAction, UnlockMethod},
+    engine::{Engine, Pool, PoolIdentifier, PoolUuid, StartAction, StopAction, UnlockMethod},
     stratis::StratisError,
 };
 
@@ -63,7 +63,11 @@ where
         dbus_context.engine.start_pool(pool_uuid, unlock_method,)
     )) {
         Ok(StartAction::Started(_)) => {
-            let guard = match block_on(dbus_context.engine.get_pool(LockKey::Uuid(pool_uuid))) {
+            let guard = match block_on(
+                dbus_context
+                    .engine
+                    .get_pool(PoolIdentifier::Uuid(pool_uuid)),
+            ) {
                 Some(g) => g,
                 None => {
                     let (rc, rs) = engine_to_dbus_err_tuple(&StratisError::Msg(
@@ -152,12 +156,16 @@ where
     // for send_locked_signal does not matter as send_locked_signal is only
     // used when a pool is newly stopped which can only occur if the pool is found
     // here.
-    let send_locked_signal = block_on(dbus_context.engine.get_pool(LockKey::Uuid(pool_uuid)))
-        .map(|g| {
-            let (_, _, p) = g.as_tuple();
-            p.is_encrypted()
-        })
-        .unwrap_or(false);
+    let send_locked_signal = block_on(
+        dbus_context
+            .engine
+            .get_pool(PoolIdentifier::Uuid(pool_uuid)),
+    )
+    .map(|g| {
+        let (_, _, p) = g.as_tuple();
+        p.is_encrypted()
+    })
+    .unwrap_or(false);
 
     let msg = match handle_action!(block_on(dbus_context.engine.stop_pool(pool_uuid))) {
         Ok(StopAction::Stopped(_)) => {

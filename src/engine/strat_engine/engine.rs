@@ -36,8 +36,8 @@ use crate::{
             SharedGuard, SomeLockReadGuard, SomeLockWriteGuard, Table,
         },
         types::{
-            CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockKey,
-            LockedPoolInfo, PoolDiff, RenameAction, ReportType, SetUnlockAction, StartAction,
+            CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockedPoolInfo,
+            PoolDiff, PoolIdentifier, RenameAction, ReportType, SetUnlockAction, StartAction,
             StopAction, StoppedPoolInfo, StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
         },
         Engine, Name, Pool, PoolUuid, Report,
@@ -167,7 +167,7 @@ impl StratEngine {
     async fn pool_evented_dm(&self, pools: &HashSet<PoolUuid>) -> HashMap<PoolUuid, PoolDiff> {
         let mut joins = Vec::new();
         for uuid in pools {
-            if let Some(guard) = self.pools.write(LockKey::Uuid(*uuid)).await {
+            if let Some(guard) = self.pools.write(PoolIdentifier::Uuid(*uuid)).await {
                 Self::spawn_pool_check_handling(&mut joins, guard);
             } else {
                 warn!(
@@ -199,7 +199,7 @@ impl StratEngine {
     ) -> HashMap<FilesystemUuid, StratFilesystemDiff> {
         let mut joins = Vec::new();
         for uuid in pools {
-            if let Some(guard) = self.pools.write(LockKey::Uuid(*uuid)).await {
+            if let Some(guard) = self.pools.write(PoolIdentifier::Uuid(*uuid)).await {
                 Self::spawn_fs_check_handling(&mut joins, guard);
             } else {
                 warn!(
@@ -351,7 +351,7 @@ impl Engine for StratEngine {
         }) {
             Ok((uuids, diffs_thread)) => {
                 for uuid in uuids {
-                    if let Some(guard) = self.pools.read(LockKey::Uuid(uuid)).await {
+                    if let Some(guard) = self.pools.read(PoolIdentifier::Uuid(uuid)).await {
                         ret_guards.push(guard);
                     }
                 }
@@ -388,7 +388,7 @@ impl Engine for StratEngine {
 
         let (stratis_devices, unowned_devices) = devices.unpack();
 
-        let maybe_guard = self.pools.read(LockKey::Name(name.clone())).await;
+        let maybe_guard = self.pools.read(PoolIdentifier::Name(name.clone())).await;
         if let Some(guard) = maybe_guard {
             let (name, uuid, pool) = guard.as_tuple();
 
@@ -435,7 +435,7 @@ impl Engine for StratEngine {
     }
 
     async fn destroy_pool(&self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {
-        if let Some(pool) = self.pools.read(LockKey::Uuid(uuid)).await {
+        if let Some(pool) = self.pools.read(PoolIdentifier::Uuid(uuid)).await {
             if pool.has_filesystems() {
                 return Err(StratisError::Msg("filesystems remaining on pool".into()));
             };
@@ -504,14 +504,14 @@ impl Engine for StratEngine {
 
     async fn get_pool(
         &self,
-        key: LockKey<PoolUuid>,
+        key: PoolIdentifier<PoolUuid>,
     ) -> Option<SomeLockReadGuard<PoolUuid, Self::Pool>> {
         get_pool!(self; key)
     }
 
     async fn get_mut_pool(
         &self,
-        key: LockKey<PoolUuid>,
+        key: PoolIdentifier<PoolUuid>,
     ) -> Option<SomeLockWriteGuard<PoolUuid, Self::Pool>> {
         get_mut_pool!(self; key)
     }
@@ -600,7 +600,7 @@ impl Engine for StratEngine {
         pool_uuid: PoolUuid,
         unlock_method: Option<UnlockMethod>,
     ) -> StratisResult<StartAction<PoolUuid>> {
-        if let Some(lock) = self.pools.read(LockKey::Uuid(pool_uuid)).await {
+        if let Some(lock) = self.pools.read(PoolIdentifier::Uuid(pool_uuid)).await {
             let (_, _, pool) = lock.as_tuple();
             if pool.is_encrypted() && unlock_method.is_none() {
                 return Err(StratisError::Msg(format!(
@@ -715,7 +715,7 @@ mod test {
         let fs_name1 = "testfs1";
         let fs_name2 = "testfs2";
         let (fs_uuid1, fs_uuid2) = {
-            let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid1))).unwrap();
+            let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid1))).unwrap();
             let fs_uuid1 = pool
                 .create_filesystems(name1, uuid1, &[(fs_name1, None)])
                 .unwrap()
@@ -745,7 +745,7 @@ mod test {
         assert!(Path::new(&format!("/dev/stratis/{}/{}", name2, fs_name2)).exists());
 
         {
-            let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid1))).unwrap();
+            let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid1))).unwrap();
             pool.destroy_filesystems(
                 name2,
                 fs_uuid1
@@ -770,7 +770,7 @@ mod test {
         engine.teardown().unwrap();
 
         let engine = StratEngine::initialize().unwrap();
-        let pool_name: String = test_async!(engine.get_pool(LockKey::Uuid(uuid1)))
+        let pool_name: String = test_async!(engine.get_pool(PoolIdentifier::Uuid(uuid1)))
             .unwrap()
             .as_tuple()
             .0
@@ -825,22 +825,22 @@ mod test {
         let events = generate_events!();
         test_async!(engine.handle_events(events));
 
-        assert!(test_async!(engine.get_pool(LockKey::Uuid(uuid1))).is_some());
-        assert!(test_async!(engine.get_pool(LockKey::Uuid(uuid2))).is_some());
+        assert!(test_async!(engine.get_pool(PoolIdentifier::Uuid(uuid1))).is_some());
+        assert!(test_async!(engine.get_pool(PoolIdentifier::Uuid(uuid2))).is_some());
 
         engine.teardown().unwrap();
 
         let engine = StratEngine::initialize().unwrap();
 
-        assert!(test_async!(engine.get_pool(LockKey::Uuid(uuid1))).is_some());
-        assert!(test_async!(engine.get_pool(LockKey::Uuid(uuid2))).is_some());
+        assert!(test_async!(engine.get_pool(PoolIdentifier::Uuid(uuid1))).is_some());
+        assert!(test_async!(engine.get_pool(PoolIdentifier::Uuid(uuid2))).is_some());
 
         engine.teardown().unwrap();
 
         let engine = StratEngine::initialize().unwrap();
 
-        assert!(test_async!(engine.get_pool(LockKey::Uuid(uuid1))).is_some());
-        assert!(test_async!(engine.get_pool(LockKey::Uuid(uuid2))).is_some());
+        assert!(test_async!(engine.get_pool(PoolIdentifier::Uuid(uuid1))).is_some());
+        assert!(test_async!(engine.get_pool(PoolIdentifier::Uuid(uuid2))).is_some());
 
         engine.teardown().unwrap();
     }
@@ -876,8 +876,8 @@ mod test {
             F: Fn(&mut StratPool) -> Result<(), Box<dyn Error>>,
         {
             {
-                let mut pool =
-                    test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).ok_or_else(|| {
+                let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid)))
+                    .ok_or_else(|| {
                         Box::new(StratisError::Msg("Pool must be present".to_string()))
                     })?;
 

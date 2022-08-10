@@ -8,8 +8,11 @@ use either::Either;
 use serde_json::Value;
 
 use libcryptsetup_rs::{
-    CryptDevice, CryptInit, CryptVolumeKeyFlags, EncryptionFormat, KeyslotsSize, MetadataSize,
-    TokenInput,
+    consts::{
+        flags::CryptVolumeKey,
+        vals::{EncryptionFormat, KeyslotsSize, MetadataSize},
+    },
+    CryptDevice, CryptInit, TokenInput,
 };
 
 use crate::{
@@ -140,7 +143,7 @@ impl CryptInitializer {
                 None,
                 None,
                 keyfile.as_ref(),
-                CryptVolumeKeyFlags::empty(),
+                CryptVolumeKey::empty(),
             ),
             "Failed to initialize keyslot with provided key in keyring"
         );

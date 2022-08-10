@@ -12,7 +12,7 @@ use either::Either;
 use serde_json::Value;
 
 use devicemapper::Sectors;
-use libcryptsetup_rs::{c_uint, CryptDevice, EncryptionFormat, TokenInput};
+use libcryptsetup_rs::{c_uint, consts::vals::EncryptionFormat, CryptDevice, TokenInput};
 
 use crate::{
     engine::{

@@ -20,7 +20,7 @@ mod udev;
 mod writing;
 
 pub use self::{
-    backstore::{crypt_metadata_size, CLEVIS_TANG_TRUST_URL},
+    backstore::{crypt_metadata_size, set_up_crypt_logging, CLEVIS_TANG_TRUST_URL},
     dm::{get_dm, get_dm_init},
     engine::StratEngine,
     keys::StratKeyActions,

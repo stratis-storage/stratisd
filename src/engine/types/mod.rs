@@ -226,13 +226,13 @@ pub struct PoolDevice {
     pub uuid: DevUuid,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct LockedPoolInfo {
     pub info: PoolEncryptionInfo,
     pub devices: Vec<PoolDevice>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct StoppedPoolInfo {
     pub info: Option<PoolEncryptionInfo>,
     pub devices: Vec<PoolDevice>,

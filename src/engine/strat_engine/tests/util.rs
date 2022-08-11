@@ -97,7 +97,10 @@ pub fn dm_stratis_devices_remove() -> Result<()> {
             .iter()
             .map(|d| &d.0)
             .filter_map(|n| {
-                if !n.to_string().starts_with("stratis-1") {
+                if !n.to_string().starts_with("stratis-1")
+                    && !n.to_string().starts_with("stratis_fail_device")
+                    && !n.to_string().starts_with("stratis_test_device")
+                {
                     None
                 } else {
                     match get_dm().device_remove(&DevId::Name(n), DmOptions::default()) {

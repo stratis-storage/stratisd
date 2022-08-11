@@ -58,7 +58,7 @@ where
     fn next(&mut self) -> Option<(&'a Name, &'a U, &'a T)> {
         self.items
             .next()
-            .map(|(uuid, &(ref name, ref item))| (&*name, uuid, item))
+            .map(|(uuid, &(ref name, ref item))| (name, uuid, item))
     }
 
     #[inline]
@@ -81,7 +81,7 @@ where
     fn next(&mut self) -> Option<(&'a Name, &'a U, &'a mut T)> {
         self.items
             .next()
-            .map(|(uuid, &mut (ref name, ref mut item))| (&*name, uuid, item))
+            .map(|(uuid, &mut (ref name, ref mut item))| (name, uuid, item))
     }
 
     #[inline]
@@ -191,7 +191,7 @@ where
     /// Get item by name.
     pub fn get_by_name(&self, name: &str) -> Option<(U, &T)> {
         self.name_to_uuid
-            .get(&*name)
+            .get(name)
             .and_then(|uuid| self.items.get(uuid).map(|&(_, ref item)| (*uuid, item)))
     }
 

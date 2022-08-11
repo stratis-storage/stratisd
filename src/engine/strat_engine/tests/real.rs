@@ -19,6 +19,7 @@ use devicemapper::{
 };
 
 use crate::engine::strat_engine::{
+    cmd::udev_settle,
     device::blkdev_size,
     dm::get_dm,
     tests::{logger::init_logger, util::clean_up},
@@ -51,6 +52,7 @@ impl RealTestDev {
     /// Teardown a real test dev
     fn teardown(self) {
         wipe_sectors(self.as_path(), Sectors(0), Bytes::from(IEC::Mi).sectors()).unwrap();
+        udev_settle().unwrap();
         if let Some(mut ld) = self.dev.right() {
             ld.teardown(get_dm()).unwrap();
         }

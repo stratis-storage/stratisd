@@ -38,14 +38,14 @@ impl UnderlyingDevice {
     pub fn physical_path(&self) -> &Path {
         match self {
             UnderlyingDevice::Encrypted(handle) => handle.luks2_device_path(),
-            UnderlyingDevice::Unencrypted(path) => &*path,
+            UnderlyingDevice::Unencrypted(path) => path,
         }
     }
 
     pub fn metadata_path(&self) -> &Path {
         match self {
             UnderlyingDevice::Encrypted(handle) => handle.activated_device_path(),
-            UnderlyingDevice::Unencrypted(path) => &*path,
+            UnderlyingDevice::Unencrypted(path) => path,
         }
     }
 

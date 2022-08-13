@@ -70,7 +70,7 @@ sha2 = "0.10.1"
 tempfile = "3.0.2"
 
 [dependencies.chrono]
-version = "0.4.16"
+version = "0.4.20"
 default-features = false
 features = ["clock", "std"]
 

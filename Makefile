@@ -34,7 +34,7 @@ MIN_FEATURES = --no-default-features --features min
 SYSTEMD_FEATURES = --no-default-features --features min,systemd_compat
 EXTRAS_FEATURES =  --features extras
 
-DENY = -D warnings -D future-incompatible -D unused -D rust_2018_idioms -D rust_2021_compatibility -D nonstandard_style
+DENY = -D warnings -D future-incompatible -D unused -D rust_2018_idioms -D nonstandard_style
 
 CLIPPY_DENY = -D clippy::all -D clippy::cargo
 

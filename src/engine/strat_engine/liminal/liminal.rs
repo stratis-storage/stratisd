@@ -334,7 +334,7 @@ impl LiminalDevices {
             .filter_map(|pool_uuid| {
                 let luks_infos = luks_devices.remove(pool_uuid);
                 let stratis_infos = stratis_devices.remove(pool_uuid);
-                let mut infos: Vec<DeviceInfo> = stratis_infos
+                let infos: Vec<DeviceInfo> = stratis_infos
                     .unwrap_or_default()
                     .drain(..)
                     .map(DeviceInfo::Stratis)
@@ -346,33 +346,23 @@ impl LiminalDevices {
                     )
                     .collect();
 
-                for info in infos.iter() {
-                    let linfo = LInfo::from(info.clone());
-                    match linfo {
-                        LInfo::Luks(l) => {
+                let mut info_map = DeviceSet::new();
+                for info in infos {
+                    match &info {
+                        DeviceInfo::Luks(l) => {
                             self.uuid_lookup.insert(
-                                l.ids.devnode.clone(),
-                                (l.ids.identifiers.pool_uuid, l.ids.identifiers.device_uuid),
+                                l.info.devnode.clone(),
+                                (l.info.identifiers.pool_uuid, l.info.identifiers.device_uuid),
                             );
                         }
-                        LInfo::Stratis(s) => {
-                            if let Some(l) = s.luks.as_ref() {
-                                self.uuid_lookup.insert(
-                                    l.ids.devnode.clone(),
-                                    (l.ids.identifiers.pool_uuid, l.ids.identifiers.device_uuid),
-                                );
-                            }
+                        DeviceInfo::Stratis(s) => {
                             self.uuid_lookup.insert(
-                                s.ids.devnode.clone(),
-                                (s.ids.identifiers.pool_uuid, s.ids.identifiers.device_uuid),
+                                s.devnode.clone(),
+                                (s.identifiers.pool_uuid, s.identifiers.device_uuid),
                             );
                         }
                     }
-                }
 
-                let mut info_map = DeviceSet::new();
-                while !infos.is_empty() {
-                    let info: DeviceInfo = infos.pop().expect("!infos.is_empty()");
                     info_map.process_info_add(info);
                 }
 

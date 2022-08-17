@@ -10,6 +10,7 @@ use std::{
     path::Path,
 };
 
+use either::Either;
 use serde_json::Value;
 
 use crate::{
@@ -28,7 +29,7 @@ use crate::{
 };
 
 /// Info for a discovered LUKS device belonging to Stratis.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Debug, Eq, Hash, PartialEq)]
 pub struct LLuksInfo {
     /// Generic information + Stratis identifiers
     pub ids: StratisInfo,
@@ -72,7 +73,7 @@ impl<'a> Into<Value> for &'a LLuksInfo {
 }
 
 /// Info for a Stratis device.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Debug, Eq, Hash, PartialEq)]
 pub struct LStratisInfo {
     /// Generic information + Stratis identifiers
     pub ids: StratisInfo,
@@ -144,7 +145,7 @@ impl LStratisInfo {
 
 /// A unifying Info struct for Stratis or Luks devices. This struct is used
 /// for storing known information in DeviceSet and DeviceBag.
-#[derive(Debug, Eq, Hash, PartialEq, Clone)]
+#[derive(Debug, Eq, Hash, PartialEq)]
 pub enum LInfo {
     /// A Stratis device, which may be an encrypted device
     Stratis(LStratisInfo),
@@ -250,7 +251,7 @@ impl LInfo {
     // Combine two devices which have identical pool and device UUIDs.
     // The first argument is the older information, the second the newer.
     // Allow the newer information to supplant the older.
-    fn update(info_1: &LInfo, info_2: &DeviceInfo) -> Option<LInfo> {
+    fn update(info_1: LInfo, info_2: DeviceInfo) -> Either<LInfo, LInfo> {
         // Returns true if the information found via udev for two devices is
         // compatible, otherwise false.
         // Precondition: Stratis identifiers of devices are the same
@@ -270,36 +271,36 @@ impl LInfo {
 
         match (info_1, info_2) {
             (LInfo::Luks(luks_info), DeviceInfo::Stratis(strat_info)) => {
-                Some(LInfo::Stratis(LStratisInfo {
-                    ids: strat_info.clone(),
-                    luks: Some(luks_info.clone()),
+                Either::Left(LInfo::Stratis(LStratisInfo {
+                    ids: strat_info,
+                    luks: Some(luks_info),
                 }))
             }
             (LInfo::Stratis(strat_info), DeviceInfo::Luks(luks_info)) => {
                 if let Some(luks) = strat_info.luks.as_ref() {
-                    if !luks_luks_compatible(luks, luks_info) {
-                        return None;
+                    if !luks_luks_compatible(luks, &luks_info) {
+                        return Either::Right(LInfo::Stratis(strat_info));
                     }
                 }
-                Some(LInfo::Stratis(LStratisInfo {
-                    ids: strat_info.ids.clone(),
-                    luks: Some(LLuksInfo::from(luks_info.clone())),
+                Either::Left(LInfo::Stratis(LStratisInfo {
+                    ids: strat_info.ids,
+                    luks: Some(LLuksInfo::from(luks_info)),
                 }))
             }
             (LInfo::Luks(luks_info_1), DeviceInfo::Luks(luks_info_2)) => {
-                if !luks_luks_compatible(luks_info_1, luks_info_2) {
-                    None
+                if !luks_luks_compatible(&luks_info_1, &luks_info_2) {
+                    Either::Right(LInfo::Luks(luks_info_1))
                 } else {
-                    Some(LInfo::Luks(LLuksInfo::from(luks_info_2.clone())))
+                    Either::Left(LInfo::Luks(LLuksInfo::from(luks_info_2)))
                 }
             }
             (LInfo::Stratis(strat_info_1), DeviceInfo::Stratis(strat_info_2)) => {
-                if !stratis_stratis_compatible(strat_info_1, strat_info_2) {
-                    None
+                if !stratis_stratis_compatible(&strat_info_1, &strat_info_2) {
+                    Either::Right(LInfo::Stratis(strat_info_1))
                 } else {
-                    Some(LInfo::Stratis(LStratisInfo {
-                        ids: strat_info_2.clone(),
-                        luks: strat_info_1.luks.clone(),
+                    Either::Left(LInfo::Stratis(LStratisInfo {
+                        ids: strat_info_2,
+                        luks: strat_info_1.luks,
                     }))
                 }
             }
@@ -322,7 +323,7 @@ impl<'a> Iterator for Iter<'a> {
 }
 
 /// A set of devices, each distinguished by its unique device UUID.
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct DeviceSet {
     internal: HashMap<DevUuid, LInfo>,
 }
@@ -530,12 +531,12 @@ impl DeviceSet {
                 );
                 self.internal.insert(device_uuid, info.into());
             }
-            Some(removed) => match LInfo::update(&removed, &info) {
-                None => {
-                    warn!("Found a device information {} that conflicts with an existing registered device; ignoring", info);
-                    self.internal.insert(device_uuid, removed);
+            Some(removed) => match LInfo::update(removed, info) {
+                Either::Right(info) => {
+                    warn!("Found a device information that conflicts with an existing registered device; ignoring");
+                    self.internal.insert(device_uuid, info);
                 }
-                Some(info) => {
+                Either::Left(info) => {
                     info!(
                         "Device information {} replaces previous device information for the same device UUID in the set for its pool UUID",
                         info

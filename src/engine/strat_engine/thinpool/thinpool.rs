@@ -275,25 +275,12 @@ fn divide_space(
     current_meta_size: Sectors,
     fs_limit: u64,
 ) -> StratisResult<(Sectors, Sectors)> {
-    // We add the expression at the end because sectors_to_datablocks is a floor
-    // function. If the available space is not aligned to DATA_BLOCK_SIZE, the
-    // remainder will be discarded.
-    //
-    // The below expression is added because if the remainder is zero, the
-    // total_space is guaranteed to be less than the total size calculated by
-    // the upper limit. The value of upper_data_aligned will be exact, not
-    // rounded down at all and so adding the additional metadata space guarantees
-    // that it will be larger than total_space. However, if the remainder is
-    // non-zero, we round up to the nearest data block which will always be
-    // a valid upper limit.
+    // The below expression of DataBlocks(1) is added because we must round up to the
+    // next largest data block which will always be a valid upper limit.
     //
     // This is required to satisfy the preconditions of search.
-    let upper_data_aligned = sectors_to_datablocks(current_data_size + available_space)
-        + if available_space % DATA_BLOCK_SIZE == Sectors(0) {
-            DataBlocks(0)
-        } else {
-            DataBlocks(1)
-        };
+    let upper_data_aligned =
+        sectors_to_datablocks(current_data_size + available_space) + DataBlocks(1);
     let upper_limit_meta_size = thin_metadata_size(
         DATA_BLOCK_SIZE,
         datablocks_to_sectors(upper_data_aligned),
@@ -2481,5 +2468,20 @@ mod tests {
     #[test]
     fn real_test_set_device() {
         real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_set_device);
+    }
+
+    /// Test the case where the metadata does not grow at all when increased by
+    /// `available_space` and the data device size added to available space is a
+    /// divisible by `DATA_BLOCK_SIZE`. This previously triggered a bug where the
+    /// upper limit would be equal to the total size and trigger an assertion.
+    #[test]
+    fn test_divide_space() {
+        divide_space(
+            Sectors(2 * IEC::Ki),
+            Sectors(20 * IEC::Ki),
+            Sectors(808),
+            100,
+        )
+        .unwrap();
     }
 }

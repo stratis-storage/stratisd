@@ -65,6 +65,7 @@ jobs:
           apt-get install -y
           clang
           curl
+          device-mapper-persistent-data
           libblkid-dev
           libcryptsetup-dev
           libdbus-1-dev

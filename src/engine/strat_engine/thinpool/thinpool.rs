@@ -205,12 +205,12 @@ impl fmt::Display for ThinPoolStatusDigest {
 
 /// Returns the determined size of the data and metadata devices.
 ///
-/// upper_limit is the upper bound for the data device size and will always
-/// be too large to fit on the pool when combined with metadata size.
+/// upper_limit is the upper bound for the data device extension and will always
+/// be too large to fit on the pool when combined with metadata extension.
 ///
-/// lower_limit is the lower bound for the data device and will always be small
-/// enough to fit on the pool when combined with metadata size. Once the algorithm
-/// converges, the lower limit is the data device size that yields optimal
+/// lower_limit is the lower bound for the data extension and will always be small
+/// enough to fit on the pool when combined with metadata extension. Once the
+/// algorithm converges, the lower limit is the data device size that yields optimal
 /// space usage.
 ///
 /// This method will always return optimal values that leave as little space as
@@ -231,41 +231,70 @@ impl fmt::Display for ThinPoolStatusDigest {
 /// Precondition: upper_limit + 2 * thin_metadata_size(upper_limit) > total_space
 /// Precondition: lower_limit + 2 * thin_metadata_size(upper_limit) <= total_space
 fn search(
-    total_space: Sectors,
+    available_space: Sectors,
     upper_limit: DataBlocks,
     lower_limit: DataBlocks,
+    current_data_size: DataBlocks,
+    current_meta_size: Sectors,
     fs_limit: u64,
 ) -> StratisResult<(Sectors, Sectors)> {
     let diff = upper_limit - lower_limit;
     let half = lower_limit + diff / 2u64 + diff % 2u64;
     let half_meta = thin_metadata_size(DATA_BLOCK_SIZE, datablocks_to_sectors(half), fs_limit)?;
+    let half_data_ext = DataBlocks(half.saturating_sub(*current_data_size));
+    let half_meta_ext = Sectors(half_meta.saturating_sub(*current_meta_size));
 
     if diff == DataBlocks(1) {
         let upper_limit_sectors = datablocks_to_sectors(upper_limit);
         let lower_limit_sectors = datablocks_to_sectors(lower_limit);
         let upper_meta = thin_metadata_size(DATA_BLOCK_SIZE, upper_limit_sectors, fs_limit)?;
         let lower_meta = thin_metadata_size(DATA_BLOCK_SIZE, lower_limit_sectors, fs_limit)?;
+
+        let upper_data_ext =
+            Sectors(upper_limit_sectors.saturating_sub(*datablocks_to_sectors(current_data_size)));
+        let upper_meta_ext = Sectors(upper_meta.saturating_sub(*current_meta_size));
+        let lower_data_ext =
+            Sectors(lower_limit_sectors.saturating_sub(*datablocks_to_sectors(current_data_size)));
+        let lower_meta_ext = Sectors(lower_meta.saturating_sub(*current_meta_size));
+
         trace!(
-            "Upper data: {}, upper meta: {}, lower data: {}, lower meta: {}, total space: {}",
+            "Upper data: {}, upper meta: {}, lower data: {}, lower meta: {}, space to be allocated: {}",
             upper_limit_sectors,
             upper_meta,
             lower_limit_sectors,
             lower_meta,
-            total_space
+            available_space,
         );
-        assert!(upper_limit_sectors + upper_meta * 2u64 > total_space);
-        assert!(lower_limit_sectors + lower_meta * 2u64 <= total_space);
+        assert!(upper_data_ext + upper_meta_ext * 2u64 > available_space);
+        assert!(lower_data_ext + lower_meta_ext * 2u64 <= available_space);
         Ok((lower_limit_sectors, lower_meta))
-    } else if datablocks_to_sectors(half) + half_meta * 2u64 > total_space {
-        search(total_space, half, lower_limit, fs_limit)
+    } else if datablocks_to_sectors(half_data_ext) + half_meta_ext * 2u64 > available_space {
+        search(
+            available_space,
+            half,
+            lower_limit,
+            current_data_size,
+            current_meta_size,
+            fs_limit,
+        )
     } else {
-        search(total_space, upper_limit, half, fs_limit)
+        search(
+            available_space,
+            upper_limit,
+            half,
+            current_data_size,
+            current_meta_size,
+            fs_limit,
+        )
     }
 }
 
 /// This method divides the total space into optimized data and metadata size
 /// extensions. It returns values from search() respresenting the new total size
 /// of these devices.
+///
+/// The metadata size returned is the *minimum* required. If the metadata device is
+/// already larger than this value, no extension will be performed.
 ///
 /// available_space represents the amount of space on the thin pool that has not
 /// yet been allocated.
@@ -275,23 +304,26 @@ fn divide_space(
     current_meta_size: Sectors,
     fs_limit: u64,
 ) -> StratisResult<(Sectors, Sectors)> {
-    // The below expression of DataBlocks(1) is added because we must round up to the
-    // next largest data block which will always be a valid upper limit.
-    //
-    // This is required to satisfy the preconditions of search.
+    // 1 data block is added to the upper data limit to ensure that it is always
+    // larger than what the pool can actually hold. This is required to satisfy the
+    // preconditions of search.
     let upper_data_aligned =
         sectors_to_datablocks(current_data_size + available_space) + DataBlocks(1);
-    let upper_limit_meta_size = thin_metadata_size(
-        DATA_BLOCK_SIZE,
-        datablocks_to_sectors(upper_data_aligned),
-        fs_limit,
-    )?;
-    let total_space = current_data_size + 2u64 * current_meta_size + available_space;
 
-    assert!(datablocks_to_sectors(upper_data_aligned) + upper_limit_meta_size * 2u64 > total_space);
+    assert!(
+        Sectors(datablocks_to_sectors(upper_data_aligned).saturating_sub(*current_data_size))
+            > available_space
+    );
     assert!(current_data_size % DATA_BLOCK_SIZE == Sectors(0));
 
-    search(total_space, upper_data_aligned, DataBlocks(0), fs_limit)
+    search(
+        available_space,
+        upper_data_aligned,
+        DataBlocks(0),
+        sectors_to_datablocks(current_data_size),
+        current_meta_size,
+        fs_limit,
+    )
 }
 
 /// Finds the optimized size for the data and metadata extension.

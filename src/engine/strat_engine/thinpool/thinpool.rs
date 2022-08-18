@@ -786,16 +786,13 @@ impl ThinPool {
         backstore: &Backstore,
     ) -> StratisResult<HashMap<FilesystemUuid, StratFilesystemDiff>> {
         let mut updated = HashMap::default();
-        let data_size = self.thin_pool.data_dev().size();
-        let min_data_size = self.min_datadev_size(backstore)?;
         let mut remaining_space = if !self.enable_overprov {
-            let data_space = if self.out_of_alloc_space() || data_size > min_data_size {
-                data_size
-            } else {
-                min_data_size
-            };
             Some(Sectors(
-                data_space.saturating_sub(*self.filesystem_logical_size_sum()),
+                max(
+                    self.thin_pool.data_dev().size(),
+                    self.min_datadev_size(backstore)?,
+                )
+                .saturating_sub(*self.filesystem_logical_size_sum()),
             ))
         } else {
             None

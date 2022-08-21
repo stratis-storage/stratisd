@@ -158,7 +158,8 @@ bloat: ${HOME}/.cargo/bin/cargo-bloat
 	PATH=${HOME}/.cargo/bin:${PATH} cargo bloat --release --crates
 
 audit: ${HOME}/.cargo/bin/cargo-audit
-	PATH=${HOME}/.cargo/bin:${PATH} cargo audit -D warnings
+	# Remove --ignore when bindgen dependency is increased to ^0.60
+	PATH=${HOME}/.cargo/bin:${PATH} cargo audit -D warnings --ignore=RUSTSEC-2021-0139
 
 expand: ${HOME}/.cargo/bin/cargo-expand
 	PATH=${HOME}/.cargo/bin:${PATH} cargo expand --lib engine::strat_engine::pool

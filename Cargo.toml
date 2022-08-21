@@ -110,6 +110,8 @@ features = ["serde", "v4"]
 pkg-config = "0.3.18"
 
 [build-dependencies.bindgen]
+default_features = false
+features = ["runtime"]
 version = "0.59.0"
 optional = true
 

@@ -48,11 +48,11 @@ clap = "3.1.9"
 crc = "2.0.0"
 data-encoding = "2.3.0"
 devicemapper = "0.32.1"
-either = "1.5.0"
+either = "1.6.1"
 env_logger="0.9.0"
 futures = "0.3.11"
 itertools = "0.10.1"
-lazy_static = "1.2.0"
+lazy_static = "1.4.0"
 libblkid-rs = "0.2.0"
 libc = "0.2.121"
 libmount = "0.1.9"
@@ -112,7 +112,7 @@ pkg-config = "0.3.18"
 [build-dependencies.bindgen]
 default_features = false
 features = ["runtime"]
-version = "0.59.0"
+version = "0.59.1"
 optional = true
 
 [dev-dependencies]

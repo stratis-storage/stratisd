@@ -69,6 +69,7 @@ jobs:
           curl
           cryptsetup-devel
           dbus-devel
+          device-mapper-persistent-data
           libblkid-devel
           make
           systemd-devel

@@ -233,17 +233,27 @@ fn search(
     total_space: Sectors,
     upper_limit: DataBlocks,
     lower_limit: DataBlocks,
+    current_meta_size: Sectors,
     fs_limit: u64,
 ) -> StratisResult<(Sectors, Sectors)> {
     let diff = upper_limit - lower_limit;
     let half = lower_limit + diff / 2u64 + diff % 2u64;
-    let half_meta = thin_metadata_size(DATA_BLOCK_SIZE, datablocks_to_sectors(half), fs_limit)?;
+    let half_meta = max(
+        thin_metadata_size(DATA_BLOCK_SIZE, datablocks_to_sectors(half), fs_limit)?,
+        current_meta_size,
+    );
 
     if diff == DataBlocks(1) {
         let upper_limit_sectors = datablocks_to_sectors(upper_limit);
         let lower_limit_sectors = datablocks_to_sectors(lower_limit);
-        let upper_meta = thin_metadata_size(DATA_BLOCK_SIZE, upper_limit_sectors, fs_limit)?;
-        let lower_meta = thin_metadata_size(DATA_BLOCK_SIZE, lower_limit_sectors, fs_limit)?;
+        let upper_meta = max(
+            thin_metadata_size(DATA_BLOCK_SIZE, upper_limit_sectors, fs_limit)?,
+            current_meta_size,
+        );
+        let lower_meta = max(
+            thin_metadata_size(DATA_BLOCK_SIZE, lower_limit_sectors, fs_limit)?,
+            current_meta_size,
+        );
         trace!(
             "Upper data: {}, upper meta: {}, lower data: {}, lower meta: {}, total space: {}",
             upper_limit_sectors,
@@ -256,9 +266,9 @@ fn search(
         assert!(lower_limit_sectors + lower_meta * 2u64 <= total_space);
         Ok((lower_limit_sectors, lower_meta))
     } else if datablocks_to_sectors(half) + half_meta * 2u64 > total_space {
-        search(total_space, half, lower_limit, fs_limit)
+        search(total_space, half, lower_limit, current_meta_size, fs_limit)
     } else {
-        search(total_space, upper_limit, half, fs_limit)
+        search(total_space, upper_limit, half, current_meta_size, fs_limit)
     }
 }
 
@@ -287,23 +297,28 @@ fn divide_space(
     // a valid upper limit.
     //
     // This is required to satisfy the preconditions of search.
-    let upper_data_aligned = sectors_to_datablocks(current_data_size + available_space)
-        + if available_space % DATA_BLOCK_SIZE == Sectors(0) {
-            DataBlocks(0)
-        } else {
-            DataBlocks(1)
-        };
-    let upper_limit_meta_size = thin_metadata_size(
-        DATA_BLOCK_SIZE,
-        datablocks_to_sectors(upper_data_aligned),
-        fs_limit,
-    )?;
+    let upper_data_aligned =
+        sectors_to_datablocks(current_data_size + available_space) + DataBlocks(1);
+    let upper_limit_meta_size = max(
+        thin_metadata_size(
+            DATA_BLOCK_SIZE,
+            datablocks_to_sectors(upper_data_aligned),
+            fs_limit,
+        )?,
+        current_meta_size,
+    );
     let total_space = current_data_size + 2u64 * current_meta_size + available_space;
 
     assert!(datablocks_to_sectors(upper_data_aligned) + upper_limit_meta_size * 2u64 > total_space);
     assert!(current_data_size % DATA_BLOCK_SIZE == Sectors(0));
 
-    search(total_space, upper_data_aligned, DataBlocks(0), fs_limit)
+    search(
+        total_space,
+        upper_data_aligned,
+        DataBlocks(0),
+        current_meta_size,
+        fs_limit,
+    )
 }
 
 /// Finds the optimized size for the data and metadata extension.
@@ -2408,5 +2423,29 @@ mod tests {
     #[test]
     fn real_test_set_device() {
         real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_set_device);
+    }
+
+    // Regression tests
+
+    #[test]
+    fn test_divide_space_block_aligned() {
+        divide_space(
+            Sectors(2 * IEC::Ki),
+            Sectors(20 * IEC::Ki),
+            Sectors(808),
+            100,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn test_calculate_subdevice_extension() {
+        divide_space(
+            Sectors(2 * IEC::Ki),
+            Sectors(20 * IEC::Ki),
+            Sectors(808),
+            100,
+        )
+        .unwrap();
     }
 }

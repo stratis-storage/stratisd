@@ -1,3 +1,125 @@
+stratisd 3.3.0
+==============
+Recommended Rust toolchain version: 1.64.0
+Lowest supported Rust toolchain version: 1.62.1
+
+Recommended development platform for Python development: Fedora 36
+
+- Increase revision number to r3:
+  https://github.com/stratis-storage/stratisd/pull/3029
+
+- Add support for growing a physical device:
+  https://github.com/stratis-storage/stratisd/pull/3035
+
+- Parallelize per-pool filesystem extension:
+  https://github.com/stratis-storage/stratisd/issues/2851
+  https://github.com/stratis-storage/stratisd/pull/3057
+
+- Make metadata allocation eager; leave data allocation lazy:
+  https://github.com/stratis-storage/stratisd/issues/3086
+  https://github.com/stratis-storage/stratisd/pull/3097
+  https://github.com/stratis-storage/stratisd/pull/3096
+
+- Make remove udev events for devices in stopped pools properly handled:
+  https://github.com/stratis-storage/stratisd/pull/3087
+
+- fsync directory after renaming, creating, and deleting files in MDV:
+  https://github.com/stratis-storage/stratisd/issues/1481
+  https://github.com/stratis-storage/stratisd/pull/3055
+
+- Make checks for Clevis executables dynamic:
+  https://github.com/stratis-storage/stratisd/issues/3018
+  https://github.com/stratis-storage/stratisd/pull/3054
+  https://github.com/stratis-storage/stratisd/pull/3053
+
+- Log when a D-Bus property is set; make UserInfo a settable property:
+  https://github.com/stratis-storage/stratisd/issues/3126
+  https://github.com/stratis-storage/stratisd/pull/3131
+
+- Avoid doing some no-overprovisioning required checks unconditionally:
+  https://github.com/stratis-storage/stratisd/pull/3089
+
+- Parameterize some values in systemd unit files:
+  https://github.com/stratis-storage/stratisd/pull/3064
+
+- Allow using environment variable to specify paths for external dependencies:
+  https://github.com/stratis-storage/stratisd/pull/3067
+
+- Add more detail to error reported when two sigblocks fail to agree:
+  https://github.com/stratis-storage/stratisd/pull/3101
+
+- Track overprovisioning status in sim engine:
+  https://github.com/stratis-storage/stratisd/pull/3127
+
+- Increase libcryptsetup dependency requirement lower bound to 0.5.1:
+  https://github.com/stratis-storage/stratisd/pull/3062
+
+- Increase some dependency requirement lower bounds in Cargo.toml:
+  https://github.com/stratis-storage/stratisd/pull/3073
+
+- Increase chrono dependency requirement lower bound:
+  https://github.com/stratis-storage/stratisd/pull/3082
+
+- Increase pretty-hex dependency requirement lower bound:
+  https://github.com/stratis-storage/stratisd/pull/3092
+
+- Increase loopdev dependency requirement lower bound to 0.4.0:
+  https://github.com/stratis-storage/stratisd/pull/3094
+
+- Increase devicemapper dependency requirement lower bound to 0.32.1:
+  https://github.com/stratis-storage/stratisd/pull/3098
+
+- Increase libcryptsetup dependency requirement lower bound to 0.6.0:
+  https://github.com/stratis-storage/stratisd/pull/3075
+
+- Add man page for stratis-dumpmetadata:
+  https://github.com/stratis-storage/stratisd/pull/3104
+
+- Use edition 2021:
+  https://github.com/stratis-storage/stratisd/pull/3040
+
+- Add 'help' target to Makefile:
+  https://github.com/stratis-storage/stratisd/pull/3128
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3138
+  https://github.com/stratis-storage/stratisd/pull/3135
+  https://github.com/stratis-storage/stratisd/pull/3133
+  https://github.com/stratis-storage/stratisd/pull/3132
+  https://github.com/stratis-storage/stratisd/pull/3130
+  https://github.com/stratis-storage/stratisd/pull/3129
+  https://github.com/stratis-storage/stratisd/pull/3124
+  https://github.com/stratis-storage/stratisd/pull/3121
+  https://github.com/stratis-storage/stratisd/pull/3120
+  https://github.com/stratis-storage/stratisd/pull/3118
+  https://github.com/stratis-storage/stratisd/pull/3117
+  https://github.com/stratis-storage/stratisd/pull/3116
+  https://github.com/stratis-storage/stratisd/pull/3115
+  https://github.com/stratis-storage/stratisd/pull/3114
+  https://github.com/stratis-storage/stratisd/pull/3109
+  https://github.com/stratis-storage/stratisd/pull/3108
+  https://github.com/stratis-storage/stratisd/pull/3107
+  https://github.com/stratis-storage/stratisd/pull/3106
+  https://github.com/stratis-storage/stratisd/pull/3103
+  https://github.com/stratis-storage/stratisd/pull/3093
+  https://github.com/stratis-storage/stratisd/pull/3085
+  https://github.com/stratis-storage/stratisd/pull/3084
+  https://github.com/stratis-storage/stratisd/pull/3080
+  https://github.com/stratis-storage/stratisd/pull/3072
+  https://github.com/stratis-storage/stratisd/pull/3071
+  https://github.com/stratis-storage/stratisd/pull/3070
+  https://github.com/stratis-storage/stratisd/pull/3066
+  https://github.com/stratis-storage/stratisd/pull/3063
+  https://github.com/stratis-storage/stratisd/pull/3059
+  https://github.com/stratis-storage/stratisd/pull/3056
+  https://github.com/stratis-storage/stratisd/pull/3052
+  https://github.com/stratis-storage/stratisd/pull/3051
+  https://github.com/stratis-storage/stratisd/pull/3050
+  https://github.com/stratis-storage/stratisd/pull/3048
+  https://github.com/stratis-storage/stratisd/pull/3047
+  https://github.com/stratis-storage/stratisd/pull/3046
+
+
 stratisd 3.2.0
 ==============
 Recommended Rust toolchain version: 1.62.0

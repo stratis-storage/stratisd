@@ -5,5 +5,5 @@ DefaultDependencies=no
 Requires=stratisd-min-postinitrd.service
 
 [Service]
-ExecStart=/usr/lib/systemd/stratis-fstab-setup %i
+ExecStart=@UNITEXECDIR@/stratis-fstab-setup %i
 Type=oneshot

@@ -10,7 +10,7 @@ Requires=systemd-udevd.service
 Type=notify
 Environment="RUST_BACKTRACE=1"
 ExecStartPre=-mkdir -p /run/cryptsetup
-ExecStart=/usr/libexec/stratisd-min --log-level debug
+ExecStart=@LIBEXECDIR@/stratisd-min --log-level debug
 KillSignal=SIGINT
 KillMode=process
 Restart=on-abort

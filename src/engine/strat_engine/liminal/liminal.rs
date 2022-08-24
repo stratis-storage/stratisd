@@ -239,6 +239,22 @@ impl LiminalDevices {
         pool: &mut StratPool,
     ) -> StratisResult<()> {
         let devices = pool.stop(pool_name)?;
+        for (_, device) in devices.iter() {
+            match device {
+                LInfo::Luks(l) => {
+                    self.uuid_lookup.insert(
+                        l.ids.devnode.clone(),
+                        (l.ids.identifiers.pool_uuid, l.ids.identifiers.device_uuid),
+                    );
+                }
+                LInfo::Stratis(s) => {
+                    self.uuid_lookup.insert(
+                        s.ids.devnode.clone(),
+                        (s.ids.identifiers.pool_uuid, s.ids.identifiers.device_uuid),
+                    );
+                }
+            }
+        }
         self.stopped_pools.insert(pool_uuid, devices);
         Ok(())
     }

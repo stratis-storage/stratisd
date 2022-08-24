@@ -1248,7 +1248,7 @@ mod tests {
             .unwrap();
         assert!(pool
             .create_filesystems(
-                &*pool_name,
+                pool_name,
                 pool_uuid,
                 &[(
                     "stratis_test_filesystem",

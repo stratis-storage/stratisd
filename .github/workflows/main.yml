@@ -28,7 +28,7 @@ jobs:
       matrix:
         include:
           - task: make -f Makefile fmt-travis
-            toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.63.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: rustfmt
     runs-on: ubuntu-18.04
     container:
@@ -64,7 +64,7 @@ jobs:
               TANG_URL=tang
               RUST_LOG=stratisd=debug
               make -f Makefile test-clevis-loop
-            toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.63.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
             image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
     runs-on: ubuntu-18.04
@@ -108,7 +108,7 @@ jobs:
 
   stratis-cli-checks:
     runs-on: ubuntu-18.04
-    container: fedora:34  # LOWEST SUPPORTED ENVIRONMENT PROXY
+    container: fedora:34  # LOWEST DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v2
       - name: Install dependencies
@@ -135,7 +135,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           components: cargo
-          toolchain: 1.58.1  # LOWEST SUPPORTED RUST TOOLCHAIN
+          toolchain: 1.62.1  # LOWEST SUPPORTED RUST TOOLCHAIN
           override: true
       - name: Build stratisd
         run: make -f Makefile install-debug
@@ -210,7 +210,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           components: cargo
-          toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.63.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           override: true
       - name: Check out ci repo
         run: git clone https://github.com/stratis-storage/ci.git
@@ -269,7 +269,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           components: cargo
-          toolchain: 1.62.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.63.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           override: true
       - name: Install all necessary Stratis files
         run: make -f Makefile install-debug

@@ -97,7 +97,7 @@ uuid!(pub FilesystemUuid);
 
 uuid!(pub PoolUuid);
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub enum StratisUuid {
     Dev(DevUuid),
     Fs(FilesystemUuid),
@@ -109,9 +109,9 @@ impl Deref for StratisUuid {
 
     fn deref(&self) -> &Self::Target {
         match self {
-            StratisUuid::Dev(d) => &*d,
-            StratisUuid::Fs(f) => &*f,
-            StratisUuid::Pool(p) => &*p,
+            StratisUuid::Dev(d) => d,
+            StratisUuid::Fs(f) => f,
+            StratisUuid::Pool(p) => p,
         }
     }
 }
@@ -127,7 +127,7 @@ impl Display for StratisUuid {
 }
 
 /// Use Clevis or keyring to unlock LUKS volume.
-#[derive(Serialize, Deserialize, Clone, Copy, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Copy, Eq, PartialEq)]
 pub enum UnlockMethod {
     Clevis,
     Keyring,
@@ -220,19 +220,19 @@ impl<'a> TryFrom<&'a str> for ReportType {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct PoolDevice {
     pub devnode: PathBuf,
     pub uuid: DevUuid,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct LockedPoolInfo {
     pub info: PoolEncryptionInfo,
     pub devices: Vec<PoolDevice>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct StoppedPoolInfo {
     pub info: Option<PoolEncryptionInfo>,
     pub devices: Vec<PoolDevice>,
@@ -393,7 +393,7 @@ pub enum MaybeInconsistent<T> {
 }
 
 /// Represents either a name or a UUID.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum LockKey<U> {
     Name(Name),
     Uuid(U),

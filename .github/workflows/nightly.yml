@@ -61,8 +61,8 @@ jobs:
           - task: |
               COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../stratisd_proc_macros/Cargo.toml FEDORA_RELEASE=rawhide make -f ../../Makefile check-fedora-versions
               COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../stratisd_proc_macros/Cargo.toml FEDORA_RELEASE=f35 make -f ../../Makefile check-fedora-versions
-              COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../Cargo.toml FEDORA_RELEASE=rawhide make -f ../../Makefile check-fedora-versions
-              COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../Cargo.toml FEDORA_RELEASE=f35 IGNORE_ARGS="--ignore-high pretty-hex" make -f ../../Makefile check-fedora-versions
+              COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../Cargo.toml FEDORA_RELEASE=rawhide IGNORE_ARGS="--ignore-high=loopdev" make -f ../../Makefile check-fedora-versions
+              COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../Cargo.toml FEDORA_RELEASE=f35 IGNORE_ARGS="--ignore-high pretty-hex --ignore-high=loopdev" make -f ../../Makefile check-fedora-versions
     runs-on: ubuntu-18.04
     container:
       image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT

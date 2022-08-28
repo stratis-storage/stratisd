@@ -2,14 +2,17 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{convert::TryFrom, path::Path};
+use std::path::Path;
 
 use either::Either;
 use serde_json::Value;
 
 use libcryptsetup_rs::{
-    CryptDevice, CryptInit, CryptVolumeKeyFlags, EncryptionFormat, KeyslotsSize, MetadataSize,
-    TokenInput,
+    consts::{
+        flags::CryptVolumeKey,
+        vals::{EncryptionFormat, KeyslotsSize, MetadataSize},
+    },
+    CryptDevice, CryptInit, TokenInput,
 };
 
 use crate::{
@@ -140,7 +143,7 @@ impl CryptInitializer {
                 None,
                 None,
                 keyfile.as_ref(),
-                CryptVolumeKeyFlags::empty(),
+                CryptVolumeKey::empty(),
             ),
             "Failed to initialize keyslot with provided key in keyring"
         );

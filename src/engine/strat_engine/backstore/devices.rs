@@ -6,7 +6,6 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    convert::TryFrom,
     fs::OpenOptions,
     path::{Path, PathBuf},
     sync::Mutex,

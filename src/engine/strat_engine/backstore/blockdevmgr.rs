@@ -6,7 +6,6 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    convert::TryFrom,
     fs,
     path::{Path, PathBuf},
 };

@@ -34,7 +34,7 @@ MIN_FEATURES = --no-default-features --features min
 SYSTEMD_FEATURES = --no-default-features --features min,systemd_compat
 EXTRAS_FEATURES =  --features extras
 
-DENY = -D warnings -D future-incompatible -D unused -D rust_2018_idioms -D rust_2021_compatibility -D nonstandard_style
+DENY = -D warnings -D future-incompatible -D unused -D rust_2018_idioms -D nonstandard_style
 
 CLIPPY_DENY = -D clippy::all -D clippy::cargo
 
@@ -158,8 +158,7 @@ bloat: ${HOME}/.cargo/bin/cargo-bloat
 	PATH=${HOME}/.cargo/bin:${PATH} cargo bloat --release --crates
 
 audit: ${HOME}/.cargo/bin/cargo-audit
-	# Remove --ignore when bindgen dependency is increased to ^0.60
-	PATH=${HOME}/.cargo/bin:${PATH} cargo audit -D warnings --ignore=RUSTSEC-2021-0139
+	PATH=${HOME}/.cargo/bin:${PATH} cargo audit -D warnings
 
 expand: ${HOME}/.cargo/bin/cargo-expand
 	PATH=${HOME}/.cargo/bin:${PATH} cargo expand --lib engine::strat_engine::pool

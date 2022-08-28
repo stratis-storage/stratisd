@@ -4,10 +4,7 @@
 
 // Functions for dealing with stratis and device mapper names.
 
-use std::{
-    convert::TryFrom,
-    fmt::{self, Display},
-};
+use std::fmt::{self, Display};
 
 use devicemapper::{DmNameBuf, DmUuidBuf};
 
@@ -242,8 +239,6 @@ pub fn format_backstore_ids(pool_uuid: PoolUuid, role: CacheRole) -> (DmNameBuf,
 
 #[cfg(test)]
 mod tests {
-    use std::convert::TryFrom;
-
     use super::*;
 
     #[test]

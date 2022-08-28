@@ -20,13 +20,13 @@ pub use self::{
     metadata_handle::CryptMetadataHandle,
     shared::{
         back_up_luks_header, crypt_metadata_size, interpret_clevis_config, restore_luks_header,
+        set_up_crypt_logging,
     },
 };
 
 #[cfg(test)]
 mod tests {
     use std::{
-        convert::TryFrom,
         env,
         error::Error,
         ffi::CString,
@@ -38,7 +38,10 @@ mod tests {
     };
 
     use devicemapper::Sectors;
-    use libcryptsetup_rs::{CryptInit, CryptStatusInfo, Either, EncryptionFormat};
+    use libcryptsetup_rs::{
+        consts::vals::{CryptStatusInfo, EncryptionFormat},
+        CryptInit, Either,
+    };
 
     use crate::{
         engine::{

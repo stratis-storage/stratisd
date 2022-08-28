@@ -3,7 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
-    convert::TryFrom,
     fs::OpenOptions,
     io::Write,
     path::{Path, PathBuf},
@@ -18,8 +17,14 @@ use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 
 use libcryptsetup_rs::{
-    c_uint, CryptActivateFlags, CryptDeactivateFlags, CryptDevice, CryptInit, CryptStatusInfo,
-    CryptVolumeKeyFlags, CryptWipePattern, EncryptionFormat, LibcryptErr,
+    c_uint,
+    consts::{
+        flags::{CryptActivate, CryptDeactivate, CryptVolumeKey, CryptWipe},
+        vals::{
+            CryptDebugLevel, CryptLogLevel, CryptStatusInfo, CryptWipePattern, EncryptionFormat,
+        },
+    },
+    set_debug_level, set_log_callback, CryptDevice, CryptInit, LibcryptErr,
 };
 
 use crate::{
@@ -47,6 +52,24 @@ use crate::{
     },
     stratis::{StratisError, StratisResult},
 };
+
+/// Set up crypt logging to log cryptsetup debug information at the trace level.
+pub fn set_up_crypt_logging() {
+    fn logging_callback(level: CryptLogLevel, msg: &str, _: Option<&mut ()>) {
+        match level {
+            CryptLogLevel::Verbose | CryptLogLevel::DebugJson | CryptLogLevel::Debug => {
+                trace!("{}", msg)
+            }
+            CryptLogLevel::Normal => info!("{}", msg),
+            CryptLogLevel::Error => error!("{}", msg),
+        }
+    }
+
+    c_logging_callback!(c_logging_callback, (), logging_callback);
+
+    set_debug_level(CryptDebugLevel::All);
+    set_log_callback::<()>(Some(c_logging_callback), None);
+}
 
 pub struct StratisLuks2Token {
     pub devname: String,
@@ -182,7 +205,7 @@ pub fn add_keyring_keyslot(
                     None,
                     None,
                     key.as_ref(),
-                    CryptVolumeKeyFlags::empty(),
+                    CryptVolumeKey::empty(),
                 ),
                 "Failed to initialize keyslot with provided key in keyring"
             )
@@ -325,6 +348,7 @@ fn device_from_physical_path(physical_path: &Path) -> StratisResult<Option<Crypt
         "Failed to acquire a context for device {}",
         physical_path.display()
     );
+
     if device
         .context_handle()
         .load::<()>(Some(EncryptionFormat::Luks2), None)
@@ -616,7 +640,7 @@ fn activate_with_keyring(crypt_device: &mut CryptDevice, name: &str) -> StratisR
             Some(name),
             Some(LUKS2_TOKEN_ID),
             None,
-            CryptActivateFlags::empty(),
+            CryptActivate::empty(),
         ),
         "Failed to activate device with name {}",
         name
@@ -723,7 +747,7 @@ pub fn ensure_inactive(device: &mut CryptDevice, name: &str) -> StratisResult<()
             log_on_failure!(
                 device
                     .activate_handle()
-                    .deactivate(name, CryptDeactivateFlags::empty()),
+                    .deactivate(name, CryptDeactivate::empty()),
                 "Failed to deactivate the crypt device with name {}",
                 name
             );
@@ -733,7 +757,7 @@ pub fn ensure_inactive(device: &mut CryptDevice, name: &str) -> StratisResult<()
                 trace!("Crypt device deactivate attempt {}", i);
                 device
                     .activate_handle()
-                    .deactivate(name, CryptDeactivateFlags::empty())
+                    .deactivate(name, CryptDeactivate::empty())
                     .map_err(StratisError::Crypt)
             })
             .map_err(|e| match e {
@@ -841,7 +865,7 @@ pub fn ensure_wiped(
             0,
             total_luks2_metadata_size,
             convert_const!(SECTOR_SIZE, u64, usize),
-            false,
+            CryptWipe::empty(),
             None,
             None,
         ),
@@ -860,7 +884,7 @@ pub fn check_luks2_token(device: &mut CryptDevice) -> StratisResult<()> {
             None,
             Some(LUKS2_TOKEN_ID),
             None,
-            CryptActivateFlags::empty(),
+            CryptActivate::empty(),
         ),
         "libcryptsetup reported that the LUKS2 token is unable to \
         open the encrypted device; this could be due to a malformed \

@@ -21,6 +21,9 @@ extern crate lazy_static;
 extern crate serde_json;
 
 #[macro_use]
+extern crate libcryptsetup_rs;
+
+#[macro_use]
 mod macros;
 
 pub mod engine;

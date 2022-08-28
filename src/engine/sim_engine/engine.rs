@@ -4,7 +4,6 @@
 
 use std::{
     collections::{hash_map::RandomState, HashMap, HashSet},
-    iter::FromIterator,
     path::Path,
     sync::Arc,
 };
@@ -171,7 +170,6 @@ impl Engine for SimEngine {
         }
     }
 
-    #[allow(rust_2021_incompatible_closure_captures)]
     async fn handle_events(
         &self,
         _: Vec<UdevEngineEvent>,

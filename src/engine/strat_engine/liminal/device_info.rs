@@ -7,7 +7,6 @@
 use std::{
     collections::{hash_map, HashMap, HashSet},
     fmt,
-    iter::FromIterator,
     path::Path,
 };
 

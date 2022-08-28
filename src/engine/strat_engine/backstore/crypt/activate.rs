@@ -4,7 +4,7 @@
 
 use std::path::Path;
 
-use libcryptsetup_rs::CryptActivateFlags;
+use libcryptsetup_rs::consts::flags::CryptActivate;
 
 use crate::{
     engine::{
@@ -63,7 +63,7 @@ impl CryptActivationHandle {
                                 None,
                                 Some(keyslot),
                                 pass.as_ref(),
-                                CryptActivateFlags::empty(),
+                                CryptActivate::empty(),
                             ),
                             "libcryptsetup reported that the decrypted Clevis passphrase \
                             is unable to open the encrypted device"

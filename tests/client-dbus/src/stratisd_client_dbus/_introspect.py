@@ -6,8 +6,8 @@ SPECS = {
     </method>
   </interface>
 """,
-    "org.storage.stratis3.Manager.r3": """
-<interface name="org.storage.stratis3.Manager.r3">
+    "org.storage.stratis3.Manager.r4": """
+<interface name="org.storage.stratis3.Manager.r4">
     <method name="CreatePool">
       <arg name="name" type="s" direction="in" />
       <arg name="redundancy" type="(bq)" direction="in" />
@@ -70,8 +70,8 @@ SPECS = {
     </property>
   </interface>
 """,
-    "org.storage.stratis3.Report.r3": """
-<interface name="org.storage.stratis3.Report.r3">
+    "org.storage.stratis3.Report.r4": """
+<interface name="org.storage.stratis3.Report.r4">
     <method name="GetReport">
       <arg name="name" type="s" direction="in" />
       <arg name="result" type="s" direction="out" />
@@ -80,8 +80,8 @@ SPECS = {
     </method>
   </interface>
 """,
-    "org.storage.stratis3.blockdev.r3": """
-<interface name="org.storage.stratis3.blockdev.r3">
+    "org.storage.stratis3.blockdev.r4": """
+<interface name="org.storage.stratis3.blockdev.r4">
     <method name="SetUserInfo">
       <arg name="id" type="(bs)" direction="in" />
       <arg name="changed" type="(bs)" direction="out" />
@@ -116,8 +116,8 @@ SPECS = {
     </property>
   </interface>
 """,
-    "org.storage.stratis3.filesystem.r3": """
-<interface name="org.storage.stratis3.filesystem.r3">
+    "org.storage.stratis3.filesystem.r4": """
+<interface name="org.storage.stratis3.filesystem.r4">
     <method name="SetName">
       <arg name="name" type="s" direction="in" />
       <arg name="result" type="(bs)" direction="out" />
@@ -141,8 +141,8 @@ SPECS = {
     </property>
   </interface>
 """,
-    "org.storage.stratis3.pool.r3": """
-<interface name="org.storage.stratis3.pool.r3">
+    "org.storage.stratis3.pool.r4": """
+<interface name="org.storage.stratis3.pool.r4">
     <method name="AddCacheDevs">
       <arg name="devices" type="as" direction="in" />
       <arg name="results" type="(bao)" direction="out" />

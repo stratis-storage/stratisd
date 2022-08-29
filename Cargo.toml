@@ -1,6 +1,6 @@
 [package]
 name = "stratisd"
-version = "3.3.0"
+version = "3.4.0"
 authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.org>"]
 edition = "2021"
 rust-version = "1.62.1"  # LOWEST SUPPORTED RUST TOOLCHAIN

@@ -20,8 +20,8 @@ use crate::{
     engine::{
         engine::{BlockDev, Pool, MAX_STRATIS_PASS_SIZE},
         types::{
-            BlockDevTier, CreateAction, DevUuid, Diff, EncryptionInfo, Name, PoolEncryptionInfo,
-            PoolUuid, SetCreateAction,
+            BlockDevTier, CreateAction, DevUuid, Diff, EncryptionInfo, MaybeInconsistent, Name,
+            PoolEncryptionInfo, PoolUuid, SetCreateAction,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -247,6 +247,32 @@ pub fn validate_filesystem_size_specs<'a>(
         .collect::<StratisResult<HashMap<_, Sectors>>>()
 }
 
+/// Gather a collection of information from block devices that may or may not
+/// be encrypted.
+///
+/// The Option type for the input iterator indicates whether or not a device is
+/// encrypted. For encrypted devices, the iterator must return Some(_). For
+/// unencrypted devices, the iterator must return None. A mixture of both
+/// in the iterator will return an error.
+fn gather<I, T, R, F>(len: usize, iterator: I, f: F) -> StratisResult<Option<R>>
+where
+    I: Iterator<Item = Option<T>>,
+    F: Fn(Vec<T>) -> R,
+{
+    let infos = iterator.flatten().collect::<Vec<_>>();
+
+    // Return error if not all devices are either encrypted or unencrypted.
+    if infos.is_empty() {
+        Ok(None)
+    } else if infos.len() == len {
+        Ok(Some(f(infos)))
+    } else {
+        Err(StratisError::Msg(
+            "All devices in a pool must be either encrypted or unencrypted; found a mixture of both".to_string()
+        ))
+    }
+}
+
 /// Gather the encryption information from across multiple block devices.
 pub fn gather_encryption_info<'a, I>(
     len: usize,
@@ -255,18 +281,33 @@ pub fn gather_encryption_info<'a, I>(
 where
     I: Iterator<Item = Option<&'a EncryptionInfo>>,
 {
-    let encryption_infos = iterator.flatten().collect::<Vec<_>>();
+    gather(len, iterator, PoolEncryptionInfo::from)
+}
 
-    // Return error if not all devices are either encrypted or unencrypted.
-    if encryption_infos.is_empty() {
-        Ok(None)
-    } else if encryption_infos.len() == len {
-        Ok(Some(PoolEncryptionInfo::from(encryption_infos)))
-    } else {
-        Err(StratisError::Msg(
-            "All devices in a pool must be either encrypted or unencrypted; found a mixture of both".to_string()
-        ))
-    }
+/// Gather the pool name information from across multiple block devices.
+pub fn gather_pool_name<'a, I>(
+    len: usize,
+    iterator: I,
+) -> StratisResult<Option<MaybeInconsistent<Option<Name>>>>
+where
+    I: Iterator<Item = Option<Option<&'a Name>>>,
+{
+    gather(len, iterator, |mut names| {
+        let first_name = names.pop().expect("!names.is_empty()");
+        names.into_iter().fold(
+            MaybeInconsistent::No(first_name.cloned()),
+            |name, next| match name {
+                MaybeInconsistent::No(ref nopt) => {
+                    if nopt.as_ref() == next {
+                        name
+                    } else {
+                        MaybeInconsistent::Yes
+                    }
+                }
+                MaybeInconsistent::Yes => MaybeInconsistent::Yes,
+            },
+        )
+    })
 }
 
 /// Calculate the total used diff from a diff of the thin pool usage and metadata size.

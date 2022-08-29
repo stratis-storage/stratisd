@@ -12,7 +12,7 @@ use crate::{
             backstore::crypt::shared::{setup_crypt_device, setup_crypt_metadata_handle},
             metadata::StratisIdentifiers,
         },
-        types::{DevicePath, EncryptionInfo},
+        types::{DevicePath, EncryptionInfo, Name},
     },
     stratis::StratisResult,
 };
@@ -23,7 +23,8 @@ pub struct CryptMetadataHandle {
     pub(super) physical_path: DevicePath,
     pub(super) identifiers: StratisIdentifiers,
     pub(super) encryption_info: EncryptionInfo,
-    pub(super) name: String,
+    pub(super) activation_name: String,
+    pub(super) pool_name: Option<Name>,
     pub(super) device: Device,
 }
 
@@ -32,14 +33,16 @@ impl CryptMetadataHandle {
         physical_path: DevicePath,
         identifiers: StratisIdentifiers,
         encryption_info: EncryptionInfo,
-        name: String,
+        activation_name: String,
+        pool_name: Option<Name>,
         device: Device,
     ) -> Self {
         CryptMetadataHandle {
             physical_path,
             identifiers,
             encryption_info,
-            name,
+            activation_name,
+            pool_name,
             device,
         }
     }
@@ -69,8 +72,13 @@ impl CryptMetadataHandle {
     }
 
     /// Get the name of the activated device when it is activated.
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn activation_name(&self) -> &str {
+        &self.activation_name
+    }
+
+    /// Get the pool name recorded in the LUKS2 metadata.
+    pub fn pool_name(&self) -> Option<&Name> {
+        self.pool_name.as_ref()
     }
 
     /// Device number for LUKS2 device.

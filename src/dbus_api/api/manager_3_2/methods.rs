@@ -60,7 +60,9 @@ where
     };
 
     let ret = match handle_action!(block_on(
-        dbus_context.engine.start_pool(pool_uuid, unlock_method,)
+        dbus_context
+            .engine
+            .start_pool(PoolIdentifier::Uuid(pool_uuid), unlock_method)
     )) {
         Ok(StartAction::Started(_)) => {
             let guard = match block_on(
@@ -103,9 +105,9 @@ where
             }
 
             if pool.is_encrypted() {
-                dbus_context.push_locked_pools(block_on(dbus_context.engine.locked_pools()));
+                dbus_context.push_locked_pools(block_on(dbus_context.engine.locked_pools()).locked);
             }
-            dbus_context.push_stopped_pools(block_on(dbus_context.engine.stopped_pools()));
+            dbus_context.push_stopped_pools(block_on(dbus_context.engine.stopped_pools()).stopped);
 
             (true, (pool_path, bd_paths, fs_paths))
         }
@@ -171,9 +173,9 @@ where
         Ok(StopAction::Stopped(_)) => {
             dbus_context.push_remove(&pool_path, consts::pool_interface_list());
             if send_locked_signal {
-                dbus_context.push_locked_pools(block_on(dbus_context.engine.locked_pools()));
+                dbus_context.push_locked_pools(block_on(dbus_context.engine.locked_pools()).locked);
             }
-            dbus_context.push_stopped_pools(block_on(dbus_context.engine.stopped_pools()));
+            dbus_context.push_stopped_pools(block_on(dbus_context.engine.stopped_pools()).stopped);
             return_message.append3(
                 (true, uuid_to_string!(pool_uuid)),
                 DbusErrorEnum::OK as u16,

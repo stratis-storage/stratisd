@@ -52,8 +52,8 @@ where
         // part changes, and it generally makes more sense to treat the
         // HashMap comparison as a diff in itself.
         let (original_locked_state, original_stopped_state) = (
-            self.dbus_context.engine.locked_pools().await,
-            self.dbus_context.engine.stopped_pools().await,
+            self.dbus_context.engine.locked_pools().await.locked,
+            self.dbus_context.engine.stopped_pools().await.stopped,
         );
 
         loop {
@@ -76,11 +76,11 @@ where
             self.register_pool(&pool_name, pool_uuid, pool);
         }
 
-        let new_locked_state = self.dbus_context.engine.locked_pools().await;
+        let new_locked_state = self.dbus_context.engine.locked_pools().await.locked;
         if original_locked_state != new_locked_state {
             self.dbus_context.push_locked_pools(new_locked_state);
         }
-        let new_stopped_state = self.dbus_context.engine.stopped_pools().await;
+        let new_stopped_state = self.dbus_context.engine.stopped_pools().await.stopped;
         if original_stopped_state != new_stopped_state {
             self.dbus_context.push_stopped_pools(new_stopped_state);
         }

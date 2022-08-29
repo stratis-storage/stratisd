@@ -24,10 +24,10 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, LockedPoolInfo,
+            EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, LockedPoolsInfo,
             MappingCreateAction, MappingDeleteAction, Name, PoolDiff, PoolEncryptionInfo,
             PoolIdentifier, PoolUuid, RegenAction, RenameAction, ReportType, SetCreateAction,
-            SetDeleteAction, SetUnlockAction, StartAction, StopAction, StoppedPoolInfo,
+            SetDeleteAction, SetUnlockAction, StartAction, StopAction, StoppedPoolsInfo,
             StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
         },
     },
@@ -405,11 +405,11 @@ pub trait Engine: Debug + Report + Send + Sync {
 
     /// Get a mapping of encrypted pool UUIDs for pools that have not yet
     /// been set up and need to be unlocked to their encryption infos.
-    async fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo>;
+    async fn locked_pools(&self) -> LockedPoolsInfo;
 
     /// Get a mapping of pool UUIDs for pools that have not yet
     /// been set up and need to be started to their device infos.
-    async fn stopped_pools(&self) -> HashMap<PoolUuid, StoppedPoolInfo>;
+    async fn stopped_pools(&self) -> StoppedPoolsInfo;
 
     /// Get all pools belonging to this engine.
     async fn pools(&self) -> AllLockReadGuard<PoolUuid, Self::Pool>;
@@ -441,7 +441,7 @@ pub trait Engine: Debug + Report + Send + Sync {
     /// perform IO operations and start monitoring for events.
     async fn start_pool(
         &self,
-        pool_uuid: PoolUuid,
+        pool_id: PoolIdentifier<PoolUuid>,
         unlock_method: Option<UnlockMethod>,
     ) -> StratisResult<StartAction<PoolUuid>>;
 

@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use nix::unistd::{pipe, write};
 
 use crate::{
-    engine::{EncryptionInfo, PoolUuid, UnlockMethod},
+    engine::{EncryptionInfo, PoolIdentifier, PoolUuid, UnlockMethod},
     jsonrpc::client::utils::to_suffix_repr,
     print_table,
     stratis::{StratisError, StratisResult},
@@ -24,7 +24,7 @@ pub fn pool_create(
 
 // stratis-min pool start
 pub fn pool_start(
-    uuid: PoolUuid,
+    id: PoolIdentifier<PoolUuid>,
     unlock_method: Option<UnlockMethod>,
     prompt: bool,
 ) -> StratisResult<()> {
@@ -33,19 +33,19 @@ pub fn pool_start(
         if password.is_empty() {
             return Ok(());
         }
-        do_request_standard!(PoolStart, uuid, unlock_method; {
+        do_request_standard!(PoolStart, id, unlock_method; {
             let (read_end, write_end) = pipe()?;
             write(write_end, password.as_bytes())?;
             read_end
         })
     } else {
-        do_request_standard!(PoolStart, uuid, unlock_method)
+        do_request_standard!(PoolStart, id, unlock_method)
     }
 }
 
 // stratis-min pool stop
-pub fn pool_stop(uuid: PoolUuid) -> StratisResult<()> {
-    do_request_standard!(PoolStop, uuid)
+pub fn pool_stop(id: PoolIdentifier<PoolUuid>) -> StratisResult<()> {
+    do_request_standard!(PoolStop, id)
 }
 
 // stratis-min pool init-cache
@@ -121,8 +121,8 @@ pub fn pool_list() -> StratisResult<()> {
 }
 
 // stratis-min pool is-encrypted
-pub fn pool_is_encrypted(uuid: PoolUuid) -> StratisResult<bool> {
-    let (is_encrypted, rc, rs) = do_request!(PoolIsEncrypted, uuid);
+pub fn pool_is_encrypted(id: PoolIdentifier<PoolUuid>) -> StratisResult<bool> {
+    let (is_encrypted, rc, rs) = do_request!(PoolIsEncrypted, id);
     if rc != 0 {
         Err(StratisError::Msg(rs))
     } else {
@@ -131,8 +131,8 @@ pub fn pool_is_encrypted(uuid: PoolUuid) -> StratisResult<bool> {
 }
 
 // stratis-min pool is-stopped
-pub fn pool_is_stopped(uuid: PoolUuid) -> StratisResult<bool> {
-    let (is_stopped, rc, rs) = do_request!(PoolIsStopped, uuid);
+pub fn pool_is_stopped(id: PoolIdentifier<PoolUuid>) -> StratisResult<bool> {
+    let (is_stopped, rc, rs) = do_request!(PoolIsStopped, id);
     if rc != 0 {
         Err(StratisError::Msg(rs))
     } else {
@@ -141,8 +141,8 @@ pub fn pool_is_stopped(uuid: PoolUuid) -> StratisResult<bool> {
 }
 
 // stratis-min pool is-bound
-pub fn pool_is_bound(uuid: PoolUuid) -> StratisResult<bool> {
-    let (is_bound, rc, rs) = do_request!(PoolIsBound, uuid);
+pub fn pool_is_bound(id: PoolIdentifier<PoolUuid>) -> StratisResult<bool> {
+    let (is_bound, rc, rs) = do_request!(PoolIsBound, id);
     if rc != 0 {
         Err(StratisError::Msg(rs))
     } else {
@@ -151,8 +151,8 @@ pub fn pool_is_bound(uuid: PoolUuid) -> StratisResult<bool> {
 }
 
 // stratis-min pool has-passphrase
-pub fn pool_has_passphrase(uuid: PoolUuid) -> StratisResult<bool> {
-    let (has_passphrase, rc, rs) = do_request!(PoolHasPassphrase, uuid);
+pub fn pool_has_passphrase(id: PoolIdentifier<PoolUuid>) -> StratisResult<bool> {
+    let (has_passphrase, rc, rs) = do_request!(PoolHasPassphrase, id);
     if rc != 0 {
         Err(StratisError::Msg(rs))
     } else {
@@ -161,8 +161,8 @@ pub fn pool_has_passphrase(uuid: PoolUuid) -> StratisResult<bool> {
 }
 
 // stratis-min pool clevis-pin
-pub fn pool_clevis_pin(uuid: PoolUuid) -> StratisResult<String> {
-    let (clevis_pin, rc, rs) = do_request!(PoolClevisPin, uuid);
+pub fn pool_clevis_pin(id: PoolIdentifier<PoolUuid>) -> StratisResult<String> {
+    let (clevis_pin, rc, rs) = do_request!(PoolClevisPin, id);
     if rc != 0 {
         Err(StratisError::Msg(rs))
     } else {

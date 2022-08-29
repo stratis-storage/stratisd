@@ -119,6 +119,11 @@ impl BDA {
         self.header.identifiers.device_uuid
     }
 
+    /// The pool and device UUIDs for this device.
+    pub fn identifiers(&self) -> StratisIdentifiers {
+        self.header.identifiers
+    }
+
     /// The UUID of the device's pool.
     pub fn pool_uuid(&self) -> PoolUuid {
         self.header.identifiers.pool_uuid

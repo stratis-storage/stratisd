@@ -8,7 +8,10 @@ use clap::{Arg, ArgGroup, ArgMatches, Command};
 use serde_json::{json, Map, Value};
 
 use stratisd::{
-    engine::{EncryptionInfo, KeyDescription, PoolUuid, UnlockMethod, CLEVIS_TANG_TRUST_URL},
+    engine::{
+        EncryptionInfo, KeyDescription, Name, PoolIdentifier, PoolUuid, UnlockMethod,
+        CLEVIS_TANG_TRUST_URL,
+    },
     jsonrpc::client::{filesystem, key, pool, report},
     stratis::{StratisError, VERSION},
 };
@@ -49,7 +52,8 @@ fn parse_args() -> Command<'static> {
             ]),
             Command::new("pool").subcommands(vec![
                 Command::new("start")
-                    .arg(Arg::new("pool_uuid").required(true))
+                    .arg(Arg::new("id").required(true))
+                    .arg(Arg::new("name").long("--name").takes_value(false))
                     .arg(
                         Arg::new("unlock_method")
                             .long("--unlock-method")
@@ -61,7 +65,9 @@ fn parse_args() -> Command<'static> {
                             .takes_value(false)
                             .requires("unlock_method"),
                     ),
-                Command::new("stop").arg(Arg::new("pool_uuid").required(true)),
+                Command::new("stop")
+                    .arg(Arg::new("id").required(true))
+                    .arg(Arg::new("name").long("--name").takes_value(false)),
                 Command::new("create")
                     .arg(Arg::new("name").required(true))
                     .arg(
@@ -121,11 +127,21 @@ fn parse_args() -> Command<'static> {
                             .required(true),
                     ),
                 Command::new("destroy").arg(Arg::new("name").required(true)),
-                Command::new("is-encrypted").arg(Arg::new("pool_uuid").required(true)),
-                Command::new("is-stopped").arg(Arg::new("pool_uuid").required(true)),
-                Command::new("is-bound").arg(Arg::new("pool_uuid").required(true)),
-                Command::new("has-passphrase").arg(Arg::new("pool_uuid").required(true)),
-                Command::new("clevis-pin").arg(Arg::new("pool_uuid").required(true)),
+                Command::new("is-encrypted")
+                    .arg(Arg::new("name").long("--name").takes_value(false))
+                    .arg(Arg::new("id").required(true)),
+                Command::new("is-stopped")
+                    .arg(Arg::new("name").long("--name").takes_value(false))
+                    .arg(Arg::new("id").required(true)),
+                Command::new("is-bound")
+                    .arg(Arg::new("name").long("--name").takes_value(false))
+                    .arg(Arg::new("id").required(true)),
+                Command::new("has-passphrase")
+                    .arg(Arg::new("name").long("--name").takes_value(false))
+                    .arg(Arg::new("id").required(true)),
+                Command::new("clevis-pin")
+                    .arg(Arg::new("name").long("--name").takes_value(false))
+                    .arg(Arg::new("id").required(true)),
             ]),
             Command::new("filesystem").subcommands(vec![
                 Command::new("create")
@@ -175,7 +191,15 @@ fn main() -> Result<(), String> {
             }
         } else if let Some(subcommand) = args.subcommand_matches("pool") {
             if let Some(args) = subcommand.subcommand_matches("start") {
-                let uuid = PoolUuid::parse_str(args.value_of("pool_uuid").expect("required"))?;
+                let id = if args.is_present("name") {
+                    PoolIdentifier::Name(Name::new(
+                        args.value_of("id").expect("required").to_string(),
+                    ))
+                } else {
+                    PoolIdentifier::Uuid(PoolUuid::parse_str(
+                        args.value_of("id").expect("required"),
+                    )?)
+                };
                 let unlock_method = match args.value_of("unlock_method") {
                     Some(um) => Some(UnlockMethod::try_from(um)?),
                     None => None,
@@ -186,11 +210,19 @@ fn main() -> Result<(), String> {
                         "--prompt and an unlock_method of clevis are mutally exclusive".to_string(),
                     )));
                 }
-                pool::pool_start(uuid, unlock_method, prompt)?;
+                pool::pool_start(id, unlock_method, prompt)?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("stop") {
-                let uuid = PoolUuid::parse_str(args.value_of("pool_uuid").expect("required"))?;
-                pool::pool_stop(uuid)?;
+                let id = if args.is_present("name") {
+                    PoolIdentifier::Name(Name::new(
+                        args.value_of("id").expect("required").to_string(),
+                    ))
+                } else {
+                    PoolIdentifier::Uuid(PoolUuid::parse_str(
+                        args.value_of("id").expect("required"),
+                    )?)
+                };
+                pool::pool_stop(id)?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("create") {
                 let paths = get_paths_from_args(args);
@@ -245,29 +277,64 @@ fn main() -> Result<(), String> {
                 pool::pool_add_cache(args.value_of("name").expect("required").to_string(), paths)?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("is-encrypted") {
-                let uuid_str = args.value_of("pool_uuid").expect("required");
-                let uuid = PoolUuid::parse_str(uuid_str)?;
-                println!("{}", pool::pool_is_encrypted(uuid)?,);
+                let id = if args.is_present("name") {
+                    PoolIdentifier::Name(Name::new(
+                        args.value_of("id").expect("required").to_string(),
+                    ))
+                } else {
+                    PoolIdentifier::Uuid(PoolUuid::parse_str(
+                        args.value_of("id").expect("required"),
+                    )?)
+                };
+                println!("{}", pool::pool_is_encrypted(id)?);
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("is-stopped") {
-                let uuid_str = args.value_of("pool_uuid").expect("required");
-                let uuid = PoolUuid::parse_str(uuid_str)?;
-                println!("{}", pool::pool_is_stopped(uuid)?,);
+                let id = if args.is_present("name") {
+                    PoolIdentifier::Name(Name::new(
+                        args.value_of("id").expect("required").to_string(),
+                    ))
+                } else {
+                    PoolIdentifier::Uuid(PoolUuid::parse_str(
+                        args.value_of("id").expect("required"),
+                    )?)
+                };
+                println!("{}", pool::pool_is_stopped(id)?);
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("is-bound") {
-                let uuid_str = args.value_of("pool_uuid").expect("required");
-                let uuid = PoolUuid::parse_str(uuid_str)?;
-                println!("{}", pool::pool_is_bound(uuid)?,);
+                let id = if args.is_present("name") {
+                    PoolIdentifier::Name(Name::new(
+                        args.value_of("id").expect("required").to_string(),
+                    ))
+                } else {
+                    PoolIdentifier::Uuid(PoolUuid::parse_str(
+                        args.value_of("id").expect("required"),
+                    )?)
+                };
+                println!("{}", pool::pool_is_bound(id)?);
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("has-passphrase") {
-                let uuid_str = args.value_of("pool_uuid").expect("required");
-                let uuid = PoolUuid::parse_str(uuid_str)?;
-                println!("{}", pool::pool_has_passphrase(uuid)?,);
+                let id = if args.is_present("name") {
+                    PoolIdentifier::Name(Name::new(
+                        args.value_of("id").expect("required").to_string(),
+                    ))
+                } else {
+                    PoolIdentifier::Uuid(PoolUuid::parse_str(
+                        args.value_of("id").expect("required"),
+                    )?)
+                };
+                println!("{}", pool::pool_has_passphrase(id)?);
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("clevis-pin") {
-                let uuid_str = args.value_of("pool_uuid").expect("required");
-                let uuid = PoolUuid::parse_str(uuid_str)?;
-                println!("{}", pool::pool_clevis_pin(uuid)?,);
+                let id = if args.is_present("name") {
+                    PoolIdentifier::Name(Name::new(
+                        args.value_of("id").expect("required").to_string(),
+                    ))
+                } else {
+                    PoolIdentifier::Uuid(PoolUuid::parse_str(
+                        args.value_of("id").expect("required"),
+                    )?)
+                };
+                println!("{}", pool::pool_clevis_pin(id)?);
                 Ok(())
             } else {
                 pool::pool_list()?;

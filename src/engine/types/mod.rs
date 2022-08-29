@@ -158,7 +158,7 @@ pub enum BlockDevTier {
     Cache = 1,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct Name(String);
 
 impl Name {
@@ -234,10 +234,22 @@ pub struct LockedPoolInfo {
     pub devices: Vec<PoolDevice>,
 }
 
+#[derive(Default, Debug, Eq, PartialEq)]
+pub struct LockedPoolsInfo {
+    pub locked: HashMap<PoolUuid, LockedPoolInfo>,
+    pub name_to_uuid: HashMap<Name, PoolUuid>,
+}
+
 #[derive(Debug, Eq, PartialEq)]
 pub struct StoppedPoolInfo {
     pub info: Option<PoolEncryptionInfo>,
     pub devices: Vec<PoolDevice>,
+}
+
+#[derive(Default, Debug, Eq, PartialEq)]
+pub struct StoppedPoolsInfo {
+    pub stopped: HashMap<PoolUuid, StoppedPoolInfo>,
+    pub name_to_uuid: HashMap<Name, PoolUuid>,
 }
 
 /// A sendable event with all of the necessary information for the engine
@@ -394,8 +406,29 @@ pub enum MaybeInconsistent<T> {
     No(T),
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+impl<T> MaybeInconsistent<Option<T>> {
+    pub fn as_ref(&self) -> MaybeInconsistent<Option<&T>> {
+        match self {
+            MaybeInconsistent::Yes => MaybeInconsistent::Yes,
+            MaybeInconsistent::No(opt) => MaybeInconsistent::No(opt.as_ref()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PoolIdentifier<U> {
     Name(Name),
     Uuid(U),
+}
+
+impl<U> Display for PoolIdentifier<U>
+where
+    U: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PoolIdentifier::Name(n) => write!(f, "name {}", n),
+            PoolIdentifier::Uuid(u) => write!(f, "UUID {}", u),
+        }
+    }
 }

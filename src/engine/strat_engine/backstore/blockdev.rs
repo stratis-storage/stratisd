@@ -31,10 +31,11 @@ use crate::{
                 MetadataLocation, StaticHeader, BDA,
             },
             serde_structs::{BaseBlockDevSave, Recordable},
+            types::BDAResult,
         },
         types::{
-            Compare, DevUuid, DevicePath, EncryptionInfo, KeyDescription, PoolUuid, StateDiff,
-            StratBlockDevDiff,
+            Compare, DevUuid, DevicePath, EncryptionInfo, KeyDescription, Name, PoolUuid,
+            StateDiff, StratBlockDevDiff,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -79,7 +80,7 @@ impl UnderlyingDevice {
 #[derive(Debug)]
 pub struct StratBlockDev {
     dev: Device,
-    bda: BDA,
+    pub(in super::super) bda: BDA,
     used: RangeAllocator,
     user_info: Option<String>,
     hardware_info: Option<String>,
@@ -116,11 +117,14 @@ impl StratBlockDev {
         user_info: Option<String>,
         hardware_info: Option<String>,
         underlying_device: UnderlyingDevice,
-    ) -> StratisResult<StratBlockDev> {
+    ) -> BDAResult<StratBlockDev> {
         let mut segments = vec![(Sectors(0), bda.extended_size().sectors())];
         segments.extend(other_segments);
 
-        let allocator = RangeAllocator::new(bda.dev_size(), &segments)?;
+        let allocator = match RangeAllocator::new(bda.dev_size(), &segments) {
+            Ok(a) => a,
+            Err(e) => return Err((e, bda)),
+        };
 
         Ok(StratBlockDev {
             dev,
@@ -141,6 +145,11 @@ impl StratBlockDev {
     /// the cap device.
     pub fn device(&self) -> &Device {
         &self.dev
+    }
+
+    /// Returns the LUKS2 device's Device if encrypted
+    pub fn luks_device(&self) -> Option<&Device> {
+        self.underlying_device.crypt_handle().map(|ch| ch.device())
     }
 
     /// Returns the physical path of the block device structure.
@@ -251,14 +260,25 @@ impl StratBlockDev {
     }
 
     /// Get the encryption_info stored on the given encrypted blockdev.
-    ///
-    /// The `Cow` return type is required due to the optional `CryptHandle` type.
-    /// If the device is not encrypted, it must return an owned `EncryptionInfo`
-    /// structure.
     pub fn encryption_info(&self) -> Option<&EncryptionInfo> {
         self.underlying_device
             .crypt_handle()
             .map(|ch| ch.encryption_info())
+    }
+
+    /// Get the pool name for the given block device.
+    ///
+    /// Returns:
+    /// * Some(Some(_)) if the pool is encrypted and the pool name is set in the
+    /// metadata
+    /// * Some(None) if the pool is encrypted and the pool name is not set in the
+    /// metadata
+    /// * None if the pool is not encrypted
+    #[allow(clippy::option_option)]
+    pub fn pool_name(&self) -> Option<Option<&Name>> {
+        self.underlying_device
+            .crypt_handle()
+            .map(|ch| ch.pool_name())
     }
 
     /// Bind encrypted device using the given clevis configuration.
@@ -440,6 +460,14 @@ impl StratBlockDev {
 
                 Ok(true)
             }
+        }
+    }
+
+    /// Rename pool in metadata if it is encrypted.
+    pub fn rename_pool(&mut self, pool_name: Name) -> StratisResult<()> {
+        match self.underlying_device.crypt_handle_mut() {
+            Some(handle) => handle.rename_pool_in_metadata(pool_name),
+            None => Ok(()),
         }
     }
 

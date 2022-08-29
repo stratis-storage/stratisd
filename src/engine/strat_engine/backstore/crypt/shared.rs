@@ -24,7 +24,7 @@ use libcryptsetup_rs::{
             CryptDebugLevel, CryptLogLevel, CryptStatusInfo, CryptWipePattern, EncryptionFormat,
         },
     },
-    set_debug_level, set_log_callback, CryptDevice, CryptInit, LibcryptErr,
+    set_debug_level, set_log_callback, CryptDevice, CryptInit, LibcryptErr, TokenInput,
 };
 
 use crate::{
@@ -36,8 +36,8 @@ use crate::{
                         CLEVIS_LUKS_TOKEN_ID, CLEVIS_TANG_TRUST_URL, DEFAULT_CRYPT_KEYSLOTS_SIZE,
                         DEFAULT_CRYPT_METADATA_SIZE, LUKS2_SECTOR_SIZE, LUKS2_TOKEN_ID,
                         LUKS2_TOKEN_TYPE, STRATIS_TOKEN_DEVNAME_KEY, STRATIS_TOKEN_DEV_UUID_KEY,
-                        STRATIS_TOKEN_ID, STRATIS_TOKEN_POOL_UUID_KEY, STRATIS_TOKEN_TYPE,
-                        TOKEN_KEYSLOTS_KEY, TOKEN_TYPE_KEY,
+                        STRATIS_TOKEN_ID, STRATIS_TOKEN_POOLNAME_KEY, STRATIS_TOKEN_POOL_UUID_KEY,
+                        STRATIS_TOKEN_TYPE, TOKEN_KEYSLOTS_KEY, TOKEN_TYPE_KEY,
                     },
                     handle::CryptHandle,
                     metadata_handle::CryptMetadataHandle,
@@ -49,7 +49,7 @@ use crate::{
             metadata::StratisIdentifiers,
         },
         types::{
-            DevUuid, DevicePath, EncryptionInfo, KeyDescription, PoolUuid, SizedKeyMemory,
+            DevUuid, DevicePath, EncryptionInfo, KeyDescription, Name, PoolUuid, SizedKeyMemory,
             UnlockMethod,
         },
     },
@@ -77,17 +77,27 @@ pub fn set_up_crypt_logging() {
 pub struct StratisLuks2Token {
     pub devname: String,
     pub identifiers: StratisIdentifiers,
+    pub pool_name: Option<Name>,
 }
 
 impl Into<Value> for StratisLuks2Token {
     fn into(self) -> Value {
-        json!({
+        let mut object = json!({
             TOKEN_TYPE_KEY: STRATIS_TOKEN_TYPE,
             TOKEN_KEYSLOTS_KEY: [],
             STRATIS_TOKEN_DEVNAME_KEY: self.devname,
             STRATIS_TOKEN_POOL_UUID_KEY: self.identifiers.pool_uuid.to_string(),
             STRATIS_TOKEN_DEV_UUID_KEY: self.identifiers.device_uuid.to_string(),
-        })
+        });
+        if let Some(o) = object.as_object_mut() {
+            if let Some(n) = self.pool_name {
+                o.insert(
+                    STRATIS_TOKEN_POOLNAME_KEY.to_string(),
+                    Value::from(n.to_string()),
+                );
+            }
+        }
+        object
     }
 }
 
@@ -133,9 +143,16 @@ impl<'a> TryFrom<&'a Value> for StratisLuks2Token {
             STRATIS_TOKEN_DEV_UUID_KEY,
             DevUuid
         );
+        let pool_name = check_and_get_key!(
+            map.get(STRATIS_TOKEN_POOLNAME_KEY)
+                .and_then(|s| s.as_str())
+                .map(|s| Name::new(s.to_string())),
+            STRATIS_TOKEN_POOLNAME_KEY
+        );
         Ok(StratisLuks2Token {
             devname,
             identifiers: StratisIdentifiers::new(pool_uuid, dev_uuid),
+            pool_name: Some(pool_name),
         })
     }
 }
@@ -254,7 +271,8 @@ pub fn setup_crypt_metadata_handle(
     physical_path: &Path,
 ) -> StratisResult<Option<CryptMetadataHandle>> {
     let identifiers = identifiers_from_metadata(device)?;
-    let name = name_from_metadata(device)?;
+    let activation_name = activation_name_from_metadata(device)?;
+    let pool_name = pool_name_from_metadata(device)?;
     let key_description = key_desc_from_metadata(device);
     let devno = get_devno_from_path(physical_path)?;
     let key_description = match key_description
@@ -289,7 +307,8 @@ pub fn setup_crypt_metadata_handle(
         DevicePath::new(physical_path)?,
         identifiers,
         encryption_info,
-        name,
+        activation_name,
+        pool_name,
         devno,
     )))
 }
@@ -306,7 +325,7 @@ pub fn setup_crypt_handle(
         None => return Ok(None),
     };
 
-    let name = name_from_metadata(device)?;
+    let name = activation_name_from_metadata(device)?;
 
     match unlock_method {
         Some(UnlockMethod::Keyring) => {
@@ -952,7 +971,7 @@ pub fn read_key(key_description: &KeyDescription) -> StratisResult<Option<SizedK
 }
 
 /// Query the Stratis metadata for the device activation name.
-fn name_from_metadata(device: &mut CryptDevice) -> StratisResult<String> {
+fn activation_name_from_metadata(device: &mut CryptDevice) -> StratisResult<String> {
     let json = log_on_failure!(
         device.token_handle().json_get(STRATIS_TOKEN_ID),
         "Failed to get Stratis JSON token from LUKS2 metadata"
@@ -984,6 +1003,22 @@ fn name_from_metadata(device: &mut CryptDevice) -> StratisResult<String> {
 /// physical device.
 pub fn key_desc_from_metadata(device: &mut CryptDevice) -> Option<String> {
     device.token_handle().luks2_keyring_get(LUKS2_TOKEN_ID).ok()
+}
+
+/// Query the Stratis metadata for the pool name.
+pub fn pool_name_from_metadata(device: &mut CryptDevice) -> StratisResult<Option<Name>> {
+    Ok(StratisLuks2Token::try_from(&device.token_handle().json_get(STRATIS_TOKEN_ID)?)?.pool_name)
+}
+
+/// Replace the old pool name in the Stratis LUKS2 token.
+pub fn replace_pool_name(device: &mut CryptDevice, new_name: Name) -> StratisResult<()> {
+    let mut token =
+        StratisLuks2Token::try_from(&device.token_handle().json_get(STRATIS_TOKEN_ID)?)?;
+    token.pool_name = Some(new_name);
+    device
+        .token_handle()
+        .json_set(TokenInput::ReplaceToken(STRATIS_TOKEN_ID, &token.into()))?;
+    Ok(())
 }
 
 /// Query the Stratis metadata for the device identifiers.

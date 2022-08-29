@@ -42,6 +42,7 @@ use std::{
     collections::HashMap,
     fmt,
     fs::OpenOptions,
+    hash::{Hash, Hasher},
     path::{Path, PathBuf},
 };
 
@@ -52,75 +53,97 @@ use devicemapper::Device;
 use crate::engine::{
     strat_engine::{
         backstore::{CryptMetadataHandle, StratBlockDev},
-        metadata::{device_identifiers, StratisIdentifiers},
+        metadata::{static_header, StratisIdentifiers, BDA},
         udev::{
             block_enumerator, decide_ownership, UdevOwnership, CRYPTO_FS_TYPE, FS_TYPE_KEY,
             STRATIS_FS_TYPE,
         },
     },
-    types::{EncryptionInfo, PoolUuid, UdevEngineDevice, UdevEngineEvent},
+    types::{EncryptionInfo, Name, PoolUuid, UdevEngineDevice, UdevEngineEvent},
 };
 
-/// A miscellaneous group of identifiers found when identifying a LUKS
-/// device which belongs to Stratis.
-#[derive(Debug, Eq, Hash, PartialEq)]
-pub struct LuksInfo {
-    /// All the usual StratisInfo
-    pub info: StratisInfo,
-    /// Encryption information
-    pub encryption_info: EncryptionInfo,
-}
-
-impl fmt::Display for LuksInfo {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}, {}", self.info, self.encryption_info,)
-    }
-}
-
-/// A miscellaneous group of identifiers found when identifying a Stratis
-/// device.
-#[derive(Debug, Eq, Hash, PartialEq)]
-pub struct StratisInfo {
-    pub identifiers: StratisIdentifiers,
+/// Information related to device number and path for either a Stratis device
+/// or a Stratis LUKS2 device.
+#[derive(Debug, Hash, PartialEq, Eq)]
+pub struct StratisDevInfo {
     pub device_number: Device,
     pub devnode: PathBuf,
 }
 
-impl fmt::Display for StratisInfo {
+impl<'a> Into<Value> for &'a StratisDevInfo {
+    // Precondition: (&StratisIdentifiers).into() pattern matches
+    // Value::Object()
+    fn into(self) -> Value {
+        json!({
+            "major": Value::from(self.device_number.major),
+            "minor": Value::from(self.device_number.minor),
+            "devnode": Value::from(self.devnode.display().to_string())
+        })
+    }
+}
+
+impl fmt::Display for StratisDevInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{}, device number: \"{}\", devnode: \"{}\"",
-            self.identifiers,
+            "device number: \"{}\", devnode: \"{}\"",
             self.device_number,
             self.devnode.display()
         )
     }
 }
 
-impl<'a> Into<Value> for &'a StratisInfo {
-    // Precondition: (&StratisIdentifiers).into() pattern matches
-    // Value::Object()
-    fn into(self) -> Value {
-        let mut json = json!({
-            "major": Value::from(self.device_number.major),
-            "minor": Value::from(self.device_number.minor),
-            "devnode": Value::from(self.devnode.display().to_string())
-        });
-        if let Value::Object(ref mut map) = json {
-            map.extend(
-                if let Value::Object(map) =
-                    <&StratisIdentifiers as Into<Value>>::into(&self.identifiers)
-                {
-                    map.into_iter()
-                } else {
-                    unreachable!("StratisIdentifiers conversion returns a JSON object");
-                },
-            );
-        } else {
-            unreachable!("json!() always creates a JSON object")
-        };
-        json
+/// A miscellaneous group of identifiers found when identifying a LUKS
+/// device which belongs to Stratis.
+#[derive(Debug, Eq, Hash, PartialEq)]
+pub struct LuksInfo {
+    pub dev_info: StratisDevInfo,
+    pub identifiers: StratisIdentifiers,
+    /// Encryption information
+    pub encryption_info: EncryptionInfo,
+    /// Name of the pool stored in LUKS2 Stratis token
+    pub pool_name: Option<Name>,
+}
+
+impl fmt::Display for LuksInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}, {}, {}",
+            self.dev_info, self.identifiers, self.encryption_info,
+        )
+    }
+}
+
+/// A miscellaneous group of identifiers found when identifying a Stratis
+/// device.
+#[derive(Debug)]
+pub struct StratisInfo {
+    pub bda: BDA,
+    pub dev_info: StratisDevInfo,
+}
+
+impl PartialEq for StratisInfo {
+    fn eq(&self, rhs: &Self) -> bool {
+        self.bda.identifiers() == rhs.bda.identifiers() && self.dev_info == rhs.dev_info
+    }
+}
+
+impl Eq for StratisInfo {}
+
+impl Hash for StratisInfo {
+    fn hash<H>(&self, hasher: &mut H)
+    where
+        H: Hasher,
+    {
+        self.bda.identifiers().hash(hasher);
+        self.dev_info.hash(hasher);
+    }
+}
+
+impl fmt::Display for StratisInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}, {}", self.bda.identifiers(), self.dev_info,)
     }
 }
 
@@ -135,8 +158,8 @@ pub enum DeviceInfo {
 impl DeviceInfo {
     pub fn stratis_identifiers(&self) -> StratisIdentifiers {
         match self {
-            DeviceInfo::Luks(info) => info.info.identifiers,
-            DeviceInfo::Stratis(info) => info.identifiers,
+            DeviceInfo::Luks(info) => info.identifiers,
+            DeviceInfo::Stratis(info) => info.bda.identifiers(),
         }
     }
 
@@ -148,25 +171,29 @@ impl DeviceInfo {
     }
 }
 
-impl From<&StratBlockDev> for DeviceInfo {
-    fn from(bd: &StratBlockDev) -> Self {
-        fn stratis_info_from_bd(bd: &StratBlockDev) -> StratisInfo {
-            StratisInfo {
-                device_number: *bd.device(),
-                devnode: bd.physical_path().to_owned(),
+impl From<StratBlockDev> for DeviceInfo {
+    fn from(bd: StratBlockDev) -> Self {
+        match (bd.encryption_info(), bd.pool_name(), bd.luks_device()) {
+            (Some(ei), Some(pname), Some(dev)) => DeviceInfo::Luks(LuksInfo {
+                encryption_info: ei.clone(),
+                dev_info: StratisDevInfo {
+                    device_number: *dev,
+                    devnode: bd.physical_path().to_owned(),
+                },
                 identifiers: StratisIdentifiers {
                     pool_uuid: bd.pool_uuid(),
                     device_uuid: bd.uuid(),
                 },
-            }
-        }
-
-        match bd.encryption_info() {
-            Some(ei) => DeviceInfo::Luks(LuksInfo {
-                encryption_info: ei.clone(),
-                info: stratis_info_from_bd(bd),
+                pool_name: pname.cloned(),
             }),
-            None => DeviceInfo::Stratis(stratis_info_from_bd(bd)),
+            (None, None, None) => DeviceInfo::Stratis(StratisInfo {
+                dev_info: StratisDevInfo {
+                    device_number: *bd.device(),
+                    devnode: bd.physical_path().to_owned(),
+                },
+                bda: bd.bda,
+            }),
+            (_, _, _) => unreachable!("If bd.is_encrypted(), all are Some(_)"),
         }
     }
 }
@@ -190,16 +217,13 @@ fn device_to_devno_wrapper(device: &UdevEngineDevice) -> Result<Device, String> 
         .map(Device::from)
 }
 
-// A wrapper around the metadata module's device_identifers method
+// A wrapper around the metadata module's process for reading the BDA
 // which also handles failure to open a device for reading.
 // Returns an error if the device could not be opened for reading.
 // Returns Ok(Err(...)) if there was an error while reading the
-// Stratis identifiers from the device.
-// Returns Ok(Ok(None)) if the identifers did not appear to be on
-// the device.
-fn device_identifiers_wrapper(
-    devnode: &Path,
-) -> Result<Result<Option<StratisIdentifiers>, String>, String> {
+// BDA from the device.
+// Returns Ok(Ok(None)) if the BDA did not appear to be on the device.
+pub fn bda_wrapper(devnode: &Path) -> Result<Result<Option<BDA>, String>, String> {
     OpenOptions::new()
         .read(true)
         .open(devnode)
@@ -212,13 +236,13 @@ fn device_identifiers_wrapper(
             )
         })
         .map(|f| {
-            device_identifiers(f).map_err(|err| {
-                format!(
-                    "encountered an error while reading Stratis header for device {}: {}",
-                    devnode.display(),
-                    err
-                )
-            })
+            let header =
+                static_header(f).map_err(|_| "failed to read static header".to_string())?;
+            match header {
+                Some(h) => Ok(BDA::load(h, f)
+                    .map_err(|_| "failed to read MDA or MDA was invalid".to_string())?),
+                None => Ok(None),
+            }
         })
 }
 
@@ -245,12 +269,13 @@ fn process_luks_device(dev: &UdevEngineDevice) -> Option<LuksInfo> {
                     None
                 }
                 Ok(Some(handle)) => Some(LuksInfo {
-                    info: StratisInfo {
-                        identifiers: *handle.device_identifiers(),
+                    dev_info: StratisDevInfo {
                         device_number,
                         devnode: handle.luks2_device_path().to_path_buf(),
                     },
+                    identifiers: *handle.device_identifiers(),
                     encryption_info: handle.encryption_info().to_owned(),
+                    pool_name: handle.pool_name().cloned(),
                 }),
             },
         },
@@ -265,10 +290,7 @@ fn process_luks_device(dev: &UdevEngineDevice) -> Option<LuksInfo> {
 fn process_stratis_device(dev: &UdevEngineDevice) -> Option<StratisInfo> {
     match dev.devnode() {
         Some(devnode) => {
-            match (
-                device_to_devno_wrapper(dev),
-                device_identifiers_wrapper(devnode),
-            ) {
+            match (device_to_devno_wrapper(dev), bda_wrapper(devnode)) {
                 (Err(err), _) | (_, Err(err) | Ok(Err(err))) => {
                     warn!("udev identified device {} as a Stratis device but {}, disregarding the device",
                           devnode.display(),
@@ -280,10 +302,12 @@ fn process_stratis_device(dev: &UdevEngineDevice) -> Option<StratisInfo> {
                           devnode.display());
                     None
                 }
-                (Ok(device_number), Ok(Ok(Some(identifiers)))) => Some(StratisInfo {
-                    identifiers,
-                    device_number,
-                    devnode: devnode.to_path_buf(),
+                (Ok(device_number), Ok(Ok(Some(bda)))) => Some(StratisInfo {
+                    bda,
+                    dev_info: StratisDevInfo {
+                        device_number,
+                        devnode: devnode.to_path_buf(),
+                    },
                 }),
             }
         }
@@ -305,7 +329,7 @@ fn find_all_luks_devices() -> libudev::Result<HashMap<PoolUuid, Vec<LuksInfo>>> 
         .scan_devices()?
         .filter_map(|dev| identify_luks_device(&UdevEngineDevice::from(&dev)))
         .fold(HashMap::new(), |mut acc, info| {
-            acc.entry(info.info.identifiers.pool_uuid)
+            acc.entry(info.identifiers.pool_uuid)
                 .or_insert_with(Vec::new)
                 .push(info);
             acc
@@ -323,7 +347,7 @@ fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, Vec<StratisIn
         .scan_devices()?
         .filter_map(|dev| identify_stratis_device(&UdevEngineDevice::from(&dev)))
         .fold(HashMap::new(), |mut acc, info| {
-            acc.entry(info.identifiers.pool_uuid)
+            acc.entry(info.bda.identifiers().pool_uuid)
                 .or_insert_with(Vec::new)
                 .push(info);
             acc
@@ -501,9 +525,11 @@ mod tests {
             key_description: &KeyDescription,
         ) -> Result<(), Box<dyn Error>> {
             let pool_uuid = PoolUuid::new_v4();
+            let pool_name = Name::new("pool_name".to_string());
 
             let devices = initialize_devices(
                 get_devices(paths)?,
+                pool_name,
                 pool_uuid,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_description.clone())),
@@ -525,17 +551,17 @@ mod tests {
                         )
                     })?;
 
-                if info.info.identifiers.pool_uuid != pool_uuid {
+                if info.identifiers.pool_uuid != pool_uuid {
                     return Err(Box::new(StratisError::Msg(format!(
                         "Discovered pool UUID {} != expected pool UUID {}",
-                        info.info.identifiers.pool_uuid, pool_uuid
+                        info.identifiers.pool_uuid, pool_uuid
                     ))));
                 }
 
-                if info.info.devnode != dev.physical_path() {
+                if info.dev_info.devnode != dev.physical_path() {
                     return Err(Box::new(StratisError::Msg(format!(
                         "Discovered device node {} != expected device node {}",
-                        info.info.devnode.display(),
+                        info.dev_info.devnode.display(),
                         dev.physical_path().display()
                     ))));
                 }
@@ -577,11 +603,13 @@ mod tests {
                         StratisError::Msg("No Stratis metadata found on specified device".into())
                     })?;
 
-                if info.identifiers.pool_uuid != pool_uuid || info.devnode != dev.metadata_path() {
+                if info.bda.identifiers().pool_uuid != pool_uuid
+                    || info.dev_info.devnode != dev.metadata_path()
+                {
                     return Err(Box::new(StratisError::Msg(format!(
                         "Wrong identifiers and devnode found on Stratis block device: found: pool UUID: {}, device node; {} != expected: pool UUID: {}, device node: {}",
-                        info.identifiers.pool_uuid,
-                        info.devnode.display(),
+                        info.bda.identifiers().pool_uuid,
+                        info.dev_info.devnode.display(),
                         pool_uuid,
                         dev.metadata_path().display()),
                     )));
@@ -615,9 +643,11 @@ mod tests {
         assert!(!paths.is_empty());
 
         let pool_uuid = PoolUuid::new_v4();
+        let pool_name = Name::new("pool_name".to_string());
 
         initialize_devices(
             get_devices(paths).unwrap(),
+            pool_name,
             pool_uuid,
             MDADataSize::default(),
             None,
@@ -630,8 +660,8 @@ mod tests {
                 .unwrap()
                 .unwrap()
                 .unwrap();
-            assert_eq!(info.identifiers.pool_uuid, pool_uuid);
-            assert_eq!(&&info.devnode, path);
+            assert_eq!(info.bda.identifiers().pool_uuid, pool_uuid);
+            assert_eq!(&&info.dev_info.devnode, path);
 
             assert_eq!(
                 block_device_apply(&device_path, process_luks_device)

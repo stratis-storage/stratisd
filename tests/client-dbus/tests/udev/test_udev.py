@@ -267,8 +267,9 @@ class UdevTest3(UdevTest):
             ((changed, _), exit_code, _) = Manager.Methods.StartPool(
                 get_object(TOP_OBJECT),
                 {
-                    "pool_uuid": pool_uuid,
+                    "id": pool_uuid,
                     "unlock_method": (True, str(EncryptionMethod.KEYRING)),
+                    "id_type": "uuid",
                 },
             )
             if key_spec is None:
@@ -369,8 +370,9 @@ class UdevTest4(UdevTest):
             ((changed, _), exit_code, _) = Manager.Methods.StartPool(
                 get_object(TOP_OBJECT),
                 {
-                    "pool_uuid": pool_uuid,
+                    "id": pool_uuid,
                     "unlock_method": (True, str(EncryptionMethod.KEYRING)),
+                    "id_type": "uuid",
                 },
             )
             # This should always fail because a pool cannot be successfully
@@ -388,8 +390,9 @@ class UdevTest4(UdevTest):
             ((changed, _), exit_code, _) = Manager.Methods.StartPool(
                 get_object(TOP_OBJECT),
                 {
-                    "pool_uuid": pool_uuid,
+                    "id": pool_uuid,
                     "unlock_method": (True, str(EncryptionMethod.KEYRING)),
+                    "id_type": "uuid",
                 },
             )
 
@@ -515,8 +518,9 @@ class UdevTest5(UdevTest):
                 ) = Manager.Methods.StartPool(
                     get_object(TOP_OBJECT),
                     {
-                        "pool_uuid": pool_uuid,
+                        "id": pool_uuid,
                         "unlock_method": (True, str(EncryptionMethod.KEYRING)),
+                        "id_type": "uuid",
                     },
                 )
                 if exit_code == StratisdErrors.OK and changed:
@@ -551,8 +555,9 @@ class UdevTest5(UdevTest):
                         ((changed, _), exit_code, _) = Manager.Methods.StartPool(
                             get_object(TOP_OBJECT),
                             {
-                                "pool_uuid": pool_uuid,
+                                "id": pool_uuid,
                                 "unlock_method": (True, str(EncryptionMethod.KEYRING)),
+                                "id_type": "uuid",
                             },
                         )
 

@@ -14,6 +14,7 @@ use crate::{
 
 mod manager_3_0;
 mod manager_3_2;
+mod manager_3_4;
 pub mod prop_conv;
 mod report_3_0;
 mod shared;
@@ -104,7 +105,7 @@ where
                 .add_m(manager_3_0::list_keys_method(&f))
                 .add_m(manager_3_0::destroy_pool_method(&f))
                 .add_m(manager_3_0::engine_state_report_method(&f))
-                .add_m(manager_3_2::start_pool_method(&f))
+                .add_m(manager_3_4::start_pool_method(&f))
                 .add_m(manager_3_2::stop_pool_method(&f))
                 .add_m(manager_3_2::refresh_state_method(&f))
                 .add_p(manager_3_0::version_property(&f))

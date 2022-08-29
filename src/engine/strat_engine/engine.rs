@@ -36,9 +36,9 @@ use crate::{
             SharedGuard, SomeLockReadGuard, SomeLockWriteGuard, Table,
         },
         types::{
-            CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockedPoolInfo,
+            CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockedPoolsInfo,
             PoolDiff, PoolIdentifier, RenameAction, ReportType, SetUnlockAction, StartAction,
-            StopAction, StoppedPoolInfo, StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
+            StopAction, StoppedPoolsInfo, StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
         },
         Engine, Name, Pool, PoolUuid, Report,
     },
@@ -473,7 +473,13 @@ impl Engine for StratEngine {
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
 
         let cloned_new_name = new_name.clone();
-        let (res, pool) = spawn_blocking!((pool.write_metadata(&cloned_new_name), pool))?;
+        let (res, pool) = spawn_blocking!({
+            let res = pool.rename_pool(&cloned_new_name);
+            (
+                res.and_then(|_| pool.write_metadata(&cloned_new_name)),
+                pool,
+            )
+        })?;
         if let Err(err) = res {
             guard.insert(old_name, uuid, pool);
             Err(err)
@@ -516,11 +522,11 @@ impl Engine for StratEngine {
         get_mut_pool!(self; key)
     }
 
-    async fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo> {
+    async fn locked_pools(&self) -> LockedPoolsInfo {
         self.liminal_devices.read().await.locked_pools()
     }
 
-    async fn stopped_pools(&self) -> HashMap<PoolUuid, StoppedPoolInfo> {
+    async fn stopped_pools(&self) -> StoppedPoolsInfo {
         self.liminal_devices.read().await.stopped_pools()
     }
 
@@ -597,11 +603,11 @@ impl Engine for StratEngine {
 
     async fn start_pool(
         &self,
-        pool_uuid: PoolUuid,
+        id: PoolIdentifier<PoolUuid>,
         unlock_method: Option<UnlockMethod>,
     ) -> StratisResult<StartAction<PoolUuid>> {
-        if let Some(lock) = self.pools.read(PoolIdentifier::Uuid(pool_uuid)).await {
-            let (_, _, pool) = lock.as_tuple();
+        if let Some(lock) = self.pools.read(id.clone()).await {
+            let (_, pool_uuid, pool) = lock.as_tuple();
             if pool.is_encrypted() && unlock_method.is_none() {
                 return Err(StratisError::Msg(format!(
                     "Pool with UUID {} is encrypted but no unlock method was provided",
@@ -617,11 +623,11 @@ impl Engine for StratEngine {
             }
         } else {
             let mut pools = self.pools.write_all().await;
-            let (name, pool) =
+            let (name, pool_uuid, pool) =
                 self.liminal_devices
                     .write()
                     .await
-                    .start_pool(&pools, pool_uuid, unlock_method)?;
+                    .start_pool(&pools, id, unlock_method)?;
             pools.insert(name, pool_uuid, pool);
             Ok(StartAction::Started(pool_uuid))
         }
@@ -650,6 +656,7 @@ impl Engine for StratEngine {
             .read()
             .await
             .stopped_pools()
+            .stopped
             .get(&pool_uuid)
             .is_some()
         {
@@ -916,7 +923,7 @@ mod test {
         test_async!(engine.stop_pool(uuid))?;
         res?;
 
-        test_async!(engine.start_pool(uuid, Some(unlock_method)))?;
+        test_async!(engine.start_pool(PoolIdentifier::Uuid(uuid), Some(unlock_method)))?;
         test_async!(engine.destroy_pool(uuid))?;
         engine.teardown()?;
 
@@ -1267,19 +1274,21 @@ mod test {
             .changed()
             .unwrap();
         assert!(test_async!(engine.stop_pool(uuid)).unwrap().is_changed());
-        assert_eq!(test_async!(engine.stopped_pools()).len(), 1);
+        assert_eq!(test_async!(engine.stopped_pools()).stopped.len(), 1);
         assert_eq!(test_async!(engine.pools()).len(), 0);
 
         engine.teardown().unwrap();
 
         let engine = StratEngine::initialize().unwrap();
-        assert_eq!(test_async!(engine.stopped_pools()).len(), 1);
+        assert_eq!(test_async!(engine.stopped_pools()).stopped.len(), 1);
         assert_eq!(test_async!(engine.pools()).len(), 0);
 
-        assert!(test_async!(engine.start_pool(uuid, None))
-            .unwrap()
-            .is_changed());
-        assert_eq!(test_async!(engine.stopped_pools()).len(), 0);
+        assert!(
+            test_async!(engine.start_pool(PoolIdentifier::Uuid(uuid), None))
+                .unwrap()
+                .is_changed()
+        );
+        assert_eq!(test_async!(engine.stopped_pools()).stopped.len(), 0);
         assert_eq!(test_async!(engine.pools()).len(), 1);
     }
 

@@ -46,7 +46,8 @@ SPECS = {
       <arg name="return_string" type="s" direction="out" />
     </method>
     <method name="StartPool">
-      <arg name="pool_uuid" type="s" direction="in" />
+      <arg name="id" type="s" direction="in" />
+      <arg name="id_type" type="s" direction="in" />
       <arg name="unlock_method" type="(bs)" direction="in" />
       <arg name="result" type="(b(oaoao))" direction="out" />
       <arg name="return_code" type="q" direction="out" />

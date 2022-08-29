@@ -4,7 +4,7 @@
 
 // Code to handle the backing store of a pool.
 
-use std::cmp;
+use std::{cmp, collections::HashMap};
 
 use chrono::{DateTime, Utc};
 use serde_json::Value;
@@ -23,13 +23,16 @@ use crate::{
                 transaction::RequestTransaction,
             },
             dm::get_dm,
-            metadata::MDADataSize,
+            metadata::{MDADataSize, BDA},
             names::{format_backstore_ids, CacheRole},
             serde_structs::{BackstoreSave, CapSave, Recordable},
+            shared::bds_to_bdas,
+            types::BDARecordResult,
             writing::wipe_sectors,
         },
         types::{
-            BlockDevTier, DevUuid, EncryptionInfo, KeyDescription, PoolEncryptionInfo, PoolUuid,
+            BlockDevTier, DevUuid, EncryptionInfo, KeyDescription, Name, PoolEncryptionInfo,
+            PoolUuid,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -131,29 +134,69 @@ impl Backstore {
         datadevs: Vec<StratBlockDev>,
         cachedevs: Vec<StratBlockDev>,
         last_update_time: DateTime<Utc>,
-    ) -> StratisResult<Backstore> {
+    ) -> BDARecordResult<Backstore> {
         let block_mgr = BlockDevMgr::new(datadevs, Some(last_update_time));
         let data_tier = DataTier::setup(block_mgr, &backstore_save.data_tier)?;
         let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
-        let origin = LinearDev::setup(
+        let origin = match LinearDev::setup(
             get_dm(),
             &dm_name,
             Some(&dm_uuid),
             map_to_dm(&data_tier.segments),
-        )?;
+        ) {
+            Ok(origin) => origin,
+            Err(e) => {
+                return Err((
+                    StratisError::from(e),
+                    data_tier
+                        .block_mgr
+                        .into_bdas()
+                        .into_iter()
+                        .chain(bds_to_bdas(cachedevs))
+                        .collect::<HashMap<_, _>>(),
+                ));
+            }
+        };
 
         let (cache_tier, cache, origin) = if !cachedevs.is_empty() {
             let block_mgr = BlockDevMgr::new(cachedevs, Some(last_update_time));
             match backstore_save.cache_tier {
                 Some(ref cache_tier_save) => {
-                    let cache_tier = CacheTier::setup(block_mgr, cache_tier_save)?;
+                    let cache_tier = match CacheTier::setup(block_mgr, cache_tier_save) {
+                        Ok(ct) => ct,
+                        Err((e, mut bdas)) => {
+                            bdas.extend(data_tier.block_mgr.into_bdas());
+                            return Err((e, bdas));
+                        }
+                    };
 
-                    let cache_device = make_cache(pool_uuid, &cache_tier, origin, false)?;
+                    let cache_device = match make_cache(pool_uuid, &cache_tier, origin, false) {
+                        Ok(cd) => cd,
+                        Err(e) => {
+                            return Err((
+                                e,
+                                data_tier
+                                    .block_mgr
+                                    .into_bdas()
+                                    .into_iter()
+                                    .chain(cache_tier.block_mgr.into_bdas())
+                                    .collect::<HashMap<_, _>>(),
+                            ));
+                        }
+                    };
                     (Some(cache_tier), Some(cache_device), None)
                 }
                 None => {
                     let err_msg = "Cachedevs exist, but cache metdata does not exist";
-                    return Err(StratisError::Msg(err_msg.into()));
+                    return Err((
+                        StratisError::Msg(err_msg.into()),
+                        data_tier
+                            .block_mgr
+                            .into_bdas()
+                            .into_iter()
+                            .chain(block_mgr.into_bdas())
+                            .collect::<HashMap<_, _>>(),
+                    ));
                 }
             }
         } else {
@@ -179,12 +222,14 @@ impl Backstore {
     ///
     /// WARNING: metadata changing event
     pub fn initialize(
+        pool_name: Name,
         pool_uuid: PoolUuid,
         devices: UnownedDevices,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<Backstore> {
         let data_tier = DataTier::new(BlockDevMgr::initialize(
+            pool_name,
             pool_uuid,
             devices,
             mda_data_size,
@@ -210,6 +255,7 @@ impl Backstore {
     // Postcondition: self.cache.is_some() && self.linear.is_none()
     pub fn init_cache(
         &mut self,
+        pool_name: Name,
         pool_uuid: PoolUuid,
         devices: UnownedDevices,
     ) -> StratisResult<Vec<DevUuid>> {
@@ -221,8 +267,13 @@ impl Backstore {
                 // If it is desired to change a cache dev to a data dev, it
                 // should be removed and then re-added in order to ensure
                 // that the MDA region is set to the correct size.
-                let bdm =
-                    BlockDevMgr::initialize(pool_uuid, devices, MDADataSize::default(), None)?;
+                let bdm = BlockDevMgr::initialize(
+                    pool_name,
+                    pool_uuid,
+                    devices,
+                    MDADataSize::default(),
+                    None,
+                )?;
 
                 let cache_tier = CacheTier::new(bdm)?;
 
@@ -262,6 +313,7 @@ impl Backstore {
     // Precondition: self.cache.is_some() && self.linear.is_none()
     pub fn add_cachedevs(
         &mut self,
+        pool_name: Name,
         pool_uuid: PoolUuid,
         devices: UnownedDevices,
     ) -> StratisResult<Vec<DevUuid>> {
@@ -271,7 +323,8 @@ impl Backstore {
                     .cache
                     .as_mut()
                     .expect("cache_tier.is_some() <=> self.cache.is_some()");
-                let (uuids, (cache_change, meta_change)) = cache_tier.add(pool_uuid, devices)?;
+                let (uuids, (cache_change, meta_change)) =
+                    cache_tier.add(pool_name, pool_uuid, devices)?;
 
                 if cache_change {
                     let table = map_to_dm(&cache_tier.cache_segments);
@@ -298,10 +351,11 @@ impl Backstore {
     /// backstore exists at all, so there is no need to create it.
     pub fn add_datadevs(
         &mut self,
+        pool_name: Name,
         pool_uuid: PoolUuid,
         devices: UnownedDevices,
     ) -> StratisResult<Vec<DevUuid>> {
-        self.data_tier.add(pool_uuid, devices)
+        self.data_tier.add(pool_name, pool_uuid, devices)
     }
 
     /// Extend the cap device whether it is a cache or not. Create the DM
@@ -508,16 +562,40 @@ impl Backstore {
     }
 
     /// Teardown the DM devices in the backstore.
-    pub fn teardown(&mut self) -> StratisResult<()> {
-        match self.cache {
-            Some(ref mut cache) => cache.teardown(get_dm())?,
+    pub fn teardown(&mut self) -> StratisResult<Vec<StratBlockDev>> {
+        let mut devs = match self
+            .cache
+            .as_mut()
+            .and_then(|c| self.cache_tier.as_mut().map(|ct| (c, ct)))
+        {
+            Some((cache, cache_tier)) => {
+                cache.teardown(get_dm())?;
+                cache_tier.block_mgr.teardown()?
+            }
             None => {
                 if let Some(ref mut linear) = self.linear {
                     linear.teardown(get_dm())?;
                 }
+                Vec::new()
             }
         };
-        self.data_tier.block_mgr.teardown()
+        devs.extend(self.data_tier.block_mgr.teardown()?);
+        Ok(devs)
+    }
+
+    /// Consume the backstore and convert it into a set of BDAs representing
+    /// all data and cache devices.
+    pub fn into_bdas(self) -> HashMap<DevUuid, BDA> {
+        self.data_tier
+            .block_mgr
+            .into_bdas()
+            .into_iter()
+            .chain(
+                self.cache_tier
+                    .map(|ct| ct.block_mgr.into_bdas())
+                    .unwrap_or_default(),
+            )
+            .collect::<HashMap<_, _>>()
     }
 
     /// Return the device that this tier is currently using.
@@ -634,6 +712,10 @@ impl Backstore {
     pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {
         self.data_tier.grow(dev)
     }
+
+    pub fn rename_pool(&mut self, new_name: &Name) -> StratisResult<()> {
+        self.data_tier.block_mgr.rename_pool(new_name)
+    }
 }
 
 impl<'a> Into<Value> for &'a Backstore {
@@ -738,8 +820,15 @@ mod tests {
         let initdatadevs = get_devices(initdatapaths).unwrap();
         let initcachedevs = get_devices(initcachepaths).unwrap();
 
-        let mut backstore =
-            Backstore::initialize(pool_uuid, initdatadevs, MDADataSize::default(), None).unwrap();
+        let pool_name = Name::new("pool_name".to_string());
+        let mut backstore = Backstore::initialize(
+            pool_name.clone(),
+            pool_uuid,
+            initdatadevs,
+            MDADataSize::default(),
+            None,
+        )
+        .unwrap();
 
         invariant(&backstore);
 
@@ -750,7 +839,9 @@ mod tests {
             .unwrap();
         backstore.commit_alloc(pool_uuid, transaction).unwrap();
 
-        let cache_uuids = backstore.init_cache(pool_uuid, initcachedevs).unwrap();
+        let cache_uuids = backstore
+            .init_cache(pool_name.clone(), pool_uuid, initcachedevs)
+            .unwrap();
 
         invariant(&backstore);
 
@@ -774,11 +865,15 @@ mod tests {
             CacheDevStatus::Fail => panic!("cache is in a failed state"),
         }
 
-        let data_uuids = backstore.add_datadevs(pool_uuid, datadevs).unwrap();
+        let data_uuids = backstore
+            .add_datadevs(pool_name.clone(), pool_uuid, datadevs)
+            .unwrap();
         invariant(&backstore);
         assert_eq!(data_uuids.len(), datadevpaths.len());
 
-        let cache_uuids = backstore.add_cachedevs(pool_uuid, cachedevs).unwrap();
+        let cache_uuids = backstore
+            .add_cachedevs(pool_name, pool_uuid, cachedevs)
+            .unwrap();
         invariant(&backstore);
         assert_eq!(cache_uuids.len(), cachedevpaths.len());
 
@@ -827,12 +922,19 @@ mod tests {
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let pool_uuid = PoolUuid::new_v4();
+        let pool_name = Name::new("pool_name".to_string());
 
         let devices1 = get_devices(paths1).unwrap();
         let devices2 = get_devices(paths2).unwrap();
 
-        let mut backstore =
-            Backstore::initialize(pool_uuid, devices1, MDADataSize::default(), None).unwrap();
+        let mut backstore = Backstore::initialize(
+            pool_name.clone(),
+            pool_uuid,
+            devices1,
+            MDADataSize::default(),
+            None,
+        )
+        .unwrap();
 
         for path in paths1 {
             assert_eq!(
@@ -855,7 +957,9 @@ mod tests {
 
         let old_device = backstore.device();
 
-        backstore.init_cache(pool_uuid, devices2).unwrap();
+        backstore
+            .init_cache(pool_name, pool_uuid, devices2)
+            .unwrap();
 
         for path in paths2 {
             assert_eq!(

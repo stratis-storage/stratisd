@@ -359,8 +359,11 @@ impl StaticHeader {
             if sh_1 == sh_2 {
                 Ok(Some(sh_1))
             } else if sh_1.initialization_time == sh_2.initialization_time {
-                let err_str = "Appeared to be a Stratis device, but signature blocks disagree.";
-                Err(StratisError::Msg(err_str.into()))
+                let err_str = format!(
+                    "Appeared to be a Stratis device, but signature blocks {:?} and {:?} disagree",
+                    sh_1, sh_2
+                );
+                Err(StratisError::Msg(err_str))
             } else if sh_1.initialization_time > sh_2.initialization_time {
                 closure(f, sh_1, MetadataLocation::Second).map(Some)
             } else {

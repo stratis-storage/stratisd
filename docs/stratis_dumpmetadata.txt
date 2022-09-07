@@ -1,0 +1,41 @@
+stratis_dumpmetadata(8)
+=======================
+
+NAME
+----
+stratis_dumpmetadata - Dump metadata content of Stratis pools
+
+SYNOPSIS
+--------
+  stratis_dumpmetadata <dev>
+
+DESCRIPTION
+-----------
+*stratis_dumpmetadata* prints the metadata content of a Stratis pool that
+is present on a given block device.
+
+GLOBAL OPTIONS
+--------------
+-h, --help::
+	Print help information.
+-p, --print-bytes::
+        Print byte buffer of device.
+
+
+SEE ALSO
+--------
+stratis(8)
+
+REPORTING BUGS & DEVELOPMENT
+-----------------------------
+GitHub for issues and development::
+       https://github.com/stratis-storage/project
+Mailing list::
+	stratis-devel@lists.fedorahosted.org for general development
+	discussion
+
+LICENSE
+-------
+stratisd is licensed under the *Mozilla Public License, Version 2.0*. Software
+distributed under this license is distributed on an "AS IS" BASIS, WITHOUT
+WARRANTIES OR CONDITIONS OF ANY KIND, either expressed or implied.

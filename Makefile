@@ -32,7 +32,7 @@ PROFILEDIR ?= release
 
 MIN_FEATURES = --no-default-features --features min
 SYSTEMD_FEATURES = --no-default-features --features min,systemd_compat
-EXTRAS_FEATURES =  --features extras
+EXTRAS_FEATURES =  --no-default-features --features extras,min
 
 DENY = -D warnings -D future-incompatible -D unused -D rust_2018_idioms -D nonstandard_style
 

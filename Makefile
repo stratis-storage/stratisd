@@ -36,7 +36,7 @@ EXTRAS_FEATURES =  --no-default-features --features extras,min
 
 DENY = -D warnings -D future-incompatible -D unused -D rust_2018_idioms -D nonstandard_style
 
-CLIPPY_DENY = -D clippy::all -D clippy::cargo
+CLIPPY_DENY = -D clippy::all -D clippy::cargo -A clippy::multiple-crate-versions
 
 # Explicitly allow these lints because they don't seem helpful
 # doc_markdown: we would rather have useful than well-formatted docs
@@ -328,14 +328,10 @@ docs/stratisd.8: docs/stratisd.txt
 clippy-macros:
 	cd stratisd_proc_macros && RUSTFLAGS="${DENY}" cargo clippy --all-targets --all-features -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 
-# stratisd requires the most recent version of libmount, which is over 2 years
-# old and requires some older versions of nix and cfg-if which are not
-# semantic version compatible with the new ones that stratisd requires
-STRATISD_CLIPPY_DENY = ${CLIPPY_DENY} -A clippy::multiple-crate-versions
 clippy: clippy-macros
-	RUSTFLAGS="${DENY}" cargo clippy --all-targets -- ${STRATISD_CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
-	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${MIN_FEATURES} -- ${STRATISD_CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
-	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${SYSTEMD_FEATURES} -- ${STRATISD_CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+	RUSTFLAGS="${DENY}" cargo clippy --all-targets -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${MIN_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${SYSTEMD_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 
 SET_LOWER_BOUNDS ?=
 test-set-lower-bounds:

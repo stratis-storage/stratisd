@@ -312,8 +312,8 @@ docs-travis: docs-rust
 docs-rust:
 	cargo doc --no-deps
 
-docs/stratisd.8: docs/stratisd.txt
-	a2x -f manpage docs/stratisd.txt
+docs/%.8: docs/%.txt
+	a2x -f manpage $<
 
 clippy-macros:
 	cd stratisd_proc_macros && RUSTFLAGS="${DENY}" cargo clippy --all-targets --all-features -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}

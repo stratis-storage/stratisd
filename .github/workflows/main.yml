@@ -138,7 +138,7 @@ jobs:
           toolchain: 1.62.1  # LOWEST SUPPORTED RUST TOOLCHAIN
           override: true
       - name: Build stratisd
-        run: make -f Makefile install-debug
+        run: PROFILEDIR=debug make -f Makefile build-and-install
       - name: Check out stratis-cli
         run: git clone https://github.com/stratis-storage/stratis-cli.git
       - name: Set up for D-Bus
@@ -263,7 +263,7 @@ jobs:
           toolchain: 1.63.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           override: true
       - name: Install all necessary Stratis files
-        run: make -f Makefile install-debug
+        run: PROFILEDIR=debug make -f Makefile build-and-install
       - name: Check basic behavior of test_predict
         run: >
           STRATIS_PREDICT_USAGE=/usr/bin/stratis-predict-usage

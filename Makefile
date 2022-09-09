@@ -22,6 +22,12 @@ BINDIR ?= $(PREFIX)/bin
 # alternative is "debug"
 PROFILEDIR ?= release
 
+ifeq ($(PROFILEDIR), debug)
+  RELEASE_FLAG =
+else
+  RELEASE_FLAG = --release
+endif
+
 MIN_FEATURES = --no-default-features --features min
 SYSTEMD_FEATURES = --no-default-features --features min,systemd_compat
 EXTRAS_FEATURES =  --no-default-features --features extras,min
@@ -177,44 +183,42 @@ fmt-shell-ci:
 build:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build ${TARGET_ARGS}
+	cargo build ${RELEASE_FLAG} ${TARGET_ARGS}
 
 build-tests:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo test --no-run ${TARGET_ARGS}
+	cargo test --no-run ${RELEASE_FLAG} ${TARGET_ARGS}
 
 build-extras:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build ${EXTRAS_FEATURES} ${TARGET_ARGS}
+	cargo build ${RELEASE_FLAG} ${EXTRAS_FEATURES} ${TARGET_ARGS}
 
 build-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build --bin=stratis-min --bin=stratisd-min --bin=stratis-utils \
+	cargo build ${RELEASE_FLAG} \
+	--bin=stratis-min --bin=stratisd-min --bin=stratis-utils \
 	${SYSTEMD_FEATURES} ${TARGET_ARGS}
-
-release-min:
-	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
-	cargo build --release --bin=stratis-min --bin=stratisd-min \
-	--bin=stratis-utils ${SYSTEMD_FEATURES} ${TARGET_ARGS}
 
 stratis-dumpmetadata:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build --bin=stratis_dumpmetadata ${EXTRAS_FEATURES} ${TARGET_ARGS}
+	cargo build ${RELEASE_FLAG} \
+	--bin=stratis_dumpmetadata ${EXTRAS_FEATURES} ${TARGET_ARGS}
 
 stratis-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build --bin=stratis-min ${MIN_FEATURES} ${TARGET_ARGS}
+	cargo build ${RELEASE_FLAG} \
+	--bin=stratis-min ${MIN_FEATURES} ${TARGET_ARGS}
 
 stratisd-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build --bin=stratisd-min ${SYSTEMD_FEATURES} ${TARGET_ARGS}
+	cargo build ${RELEASE_FLAG} \
+	--bin=stratisd-min ${SYSTEMD_FEATURES} ${TARGET_ARGS}
 
 install-cfg:
 	mkdir -p $(DESTDIR)$(UNITDIR)
@@ -247,11 +251,7 @@ install: install-cfg
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd-min
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(UNITEXECDIR) systemd/stratis-fstab-setup
 
-install-release: release release-min docs/stratisd.8
-	${MAKE} install
-
-install-debug: build build-min docs/stratisd.8
-	${MAKE} install PROFILEDIR=debug
+build-and-install: build build-min docs/stratisd.8 install
 
 # remove installed configuration files
 clean-cfg:
@@ -281,9 +281,6 @@ clean-primary:
 
 # remove installed items
 clean: clean-cfg clean-ancillary clean-primary
-
-release:
-	RUSTFLAGS="${DENY}" cargo build --release
 
 test-loop:
 	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test loop_ -- --skip clevis_loop_
@@ -349,8 +346,6 @@ clippy: clippy-macros
 	install-cfg
 	license
 	outdated
-	release
-	release-min
 	test
 	test-loop
 	test-real

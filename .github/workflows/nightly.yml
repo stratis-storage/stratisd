@@ -171,7 +171,7 @@ jobs:
           toolchain: 1.63.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           override: true
       - name: Build stratisd
-        run: make -f Makefile install-debug
+        run: PROFILEDIR=debug make -f Makefile build-and-install
       - name: Check out stratis-cli
         run: git clone https://github.com/stratis-storage/stratis-cli.git
       - name: Checkout tag
@@ -237,7 +237,7 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
           override: true
       - name: Install all necessary Stratis files
-        run: make -f Makefile install-debug
+        run: PROFILEDIR=debug make -f Makefile build-and-install
       - name: Start udev
         run: /usr/lib/systemd/systemd-udevd &
       - name: Set up for D-Bus

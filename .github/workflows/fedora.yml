@@ -30,13 +30,13 @@ jobs:
           - task: make -f Makefile clippy
             toolchain: 1.63.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: clippy
-          - task: make -f Makefile build
+          - task: PROFILEDIR=debug make -f Makefile build
             toolchain: 1.63.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-          - task: make -f Makefile build-min
+          - task: PROFILEDIR=debug make -f Makefile build-min
             toolchain: 1.63.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-          - task: make -f Makefile build-extras
+          - task: PROFILEDIR=debug make -f Makefile build-extras
             toolchain: 1.63.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile docs-travis
@@ -50,10 +50,10 @@ jobs:
               make -f Makefile test-clevis-loop-should-fail
             toolchain: 1.63.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-          - task: make -f Makefile release
+          - task: make -f Makefile build
             toolchain: 1.63.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-          - task: make -f Makefile release-min
+          - task: make -f Makefile build-min
             toolchain: 1.63.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-18.04
@@ -115,7 +115,7 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
           override: true
       - name: Install all necessary Stratis files
-        run: make -f Makefile install-release
+        run: make -f Makefile build-and-install
       - name: Start udev
         run: /usr/lib/systemd/systemd-udevd &
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain

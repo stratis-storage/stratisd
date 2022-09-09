@@ -251,8 +251,7 @@ install: install-cfg
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd-min
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(UNITEXECDIR) systemd/stratis-fstab-setup
 
-build-and-install: build build-min docs/stratisd.8
-	${MAKE} install
+build-and-install: build build-min docs/stratisd.8 install
 
 # remove installed configuration files
 clean-cfg:

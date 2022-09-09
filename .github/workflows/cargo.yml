@@ -26,10 +26,8 @@ jobs:
         include:
           # yamllint disable rule:line-length
           - task: |
-              COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../stratisd_proc_macros/Cargo.toml FEDORA_RELEASE=rawhide IGNORE_ARGS="--ignore-category low" make -f ../../Makefile check-fedora-versions
-              COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../stratisd_proc_macros/Cargo.toml FEDORA_RELEASE=f35 IGNORE_ARGS="--ignore-category low" make -f ../../Makefile check-fedora-versions
-              COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../Cargo.toml FEDORA_RELEASE=rawhide IGNORE_ARGS="--ignore-category low" make -f ../../Makefile check-fedora-versions
-              COMPARE_FEDORA_VERSIONS=./compare_fedora_versions MANIFEST_PATH=../../Cargo.toml FEDORA_RELEASE=f35 IGNORE_ARGS="--ignore-category low --ignore-high pretty-hex" make -f ../../Makefile check-fedora-versions
+              COMPARE_FEDORA_VERSIONS=./ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=rawhide IGNORE_ARGS="--ignore-category low" make -f Makefile_dependencies check-fedora-versions
+              COMPARE_FEDORA_VERSIONS=./ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=f35 IGNORE_ARGS="--ignore-category low --ignore-high pretty-hex" make -f Makefile_dependencies check-fedora-versions
     runs-on: ubuntu-18.04
     container:
       image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
@@ -58,4 +56,3 @@ jobs:
         run: git clone https://github.com/stratis-storage/ci.git
       - name: Run ${{ matrix.task }}
         run: ${{ matrix.task }}
-        working-directory: ./ci/dependency_management

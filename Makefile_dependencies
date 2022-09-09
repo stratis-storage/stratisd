@@ -1,0 +1,41 @@
+ifeq ($(origin MANIFEST_PATH), undefined)
+else
+  MANIFEST_PATH_ARGS = --manifest-path=${MANIFEST_PATH}
+endif
+
+ifeq ($(origin FEDORA_RELEASE), undefined)
+else
+  FEDORA_RELEASE_ARGS = --release=${FEDORA_RELEASE}
+endif
+
+IGNORE_ARGS ?=
+
+SET_LOWER_BOUNDS ?=
+test-set-lower-bounds:
+	echo "Testing that SET_LOWER_BOUNDS environment variable is set to a valid path"
+	test -e "${SET_LOWER_BOUNDS}"
+
+verify-dependency-bounds: test-set-lower-bounds
+	make -f Makefile build
+	${SET_LOWER_BOUNDS} ${MANIFEST_PATH_ARGS}
+	make -f Makefile build
+	make -f Makefile build-min
+	${SET_LOWER_BOUNDS} ${MANIFEST_PATH_ARGS}
+	make -f Makefile build-min
+	make -f Makefile build-tests
+	${SET_LOWER_BOUNDS} ${MANIFEST_PATH_ARGS}
+	make -f Makefile build-tests
+
+COMPARE_FEDORA_VERSIONS ?=
+test-compare-fedora-versions:
+	echo "Testing that COMPARE_FEDORA_VERSIONS environment variable is set to a valid path"
+	test -e "${COMPARE_FEDORA_VERSIONS}"
+
+check-fedora-versions: test-compare-fedora-versions
+	${COMPARE_FEDORA_VERSIONS} ${MANIFEST_PATH_ARGS} ${FEDORA_RELEASE_ARGS} ${IGNORE_ARGS}
+
+.PHONY:
+	check-fedora-versions
+	test-compare-fedora-versions
+	test-set-lower-bounds
+	verify-dependency-bounds

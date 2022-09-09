@@ -3,16 +3,6 @@ else
   TARGET_ARGS = --target=${TARGET}
 endif
 
-ifeq ($(origin MANIFEST_PATH), undefined)
-else
-  MANIFEST_PATH_ARGS = --manifest-path=${MANIFEST_PATH}
-endif
-
-ifeq ($(origin FEDORA_RELEASE), undefined)
-else
-  FEDORA_RELEASE_ARGS = --release=${FEDORA_RELEASE}
-endif
-
 IGNORE_ARGS ?=
 
 DESTDIR ?=
@@ -333,41 +323,11 @@ clippy: clippy-macros
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${MIN_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${SYSTEMD_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 
-SET_LOWER_BOUNDS ?=
-test-set-lower-bounds:
-	echo "Testing that SET_LOWER_BOUNDS environment variable is set to a valid path"
-	test -e "${SET_LOWER_BOUNDS}"
-
-verify-dependency-bounds: test-set-lower-bounds
-	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
-	cargo build ${MANIFEST_PATH_ARGS} --all-targets --all-features
-	${SET_LOWER_BOUNDS} ${MANIFEST_PATH_ARGS}
-	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
-	cargo build ${MANIFEST_PATH_ARGS} --all-targets --all-features
-	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
-	cargo test --no-run ${TARGET_ARGS}
-	${SET_LOWER_BOUNDS} ${MANIFEST_PATH_ARGS}
-	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
-	cargo test --no-run ${TARGET_ARGS}
-
-COMPARE_FEDORA_VERSIONS ?=
-test-compare-fedora-versions:
-	echo "Testing that COMPARE_FEDORA_VERSIONS environment variable is set to a valid path"
-	test -e "${COMPARE_FEDORA_VERSIONS}"
-
-check-fedora-versions: test-compare-fedora-versions
-	${COMPARE_FEDORA_VERSIONS} ${MANIFEST_PATH_ARGS} ${FEDORA_RELEASE_ARGS} ${IGNORE_ARGS}
-
 .PHONY:
 	audit
 	bloat
 	build
 	build-min
-	check-fedora-versions
 	clean
 	clean-ancillary
 	clean-cfg
@@ -396,7 +356,4 @@ check-fedora-versions: test-compare-fedora-versions
 	test-clevis-loop-should-fail
 	test-clevis-real
 	test-clevis-real-should-fail
-	test-compare-fedora-versions
-	test-set-lower-bounds
-	verify-dependency-bounds
 	yamllint

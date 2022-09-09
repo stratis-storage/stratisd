@@ -178,13 +178,8 @@ jobs:
       matrix:
         include:
           - task: >
-              SET_LOWER_BOUNDS=./set_lower_bounds
-              MANIFEST_PATH=../../stratisd_proc_macros/Cargo.toml
-              make -f ../../Makefile verify-dependency-bounds
-          - task: >
-              SET_LOWER_BOUNDS=./set_lower_bounds
-              MANIFEST_PATH=../../Cargo.toml
-              make -f ../../Makefile verify-dependency-bounds
+              SET_LOWER_BOUNDS=./ci/dependency_management/set_lower_bounds
+              make -f Makefile_dependencies verify-dependency-bounds
     runs-on: ubuntu-18.04
     container:
       image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
@@ -213,7 +208,6 @@ jobs:
         run: git clone https://github.com/stratis-storage/ci.git
       - name: Run ${{ matrix.task }}
         run: ${{ matrix.task }}
-        working-directory: ./ci/dependency_management
 
   expand-macros:
     continue-on-error: true

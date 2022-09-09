@@ -3,17 +3,9 @@ else
   TARGET_ARGS = --target=${TARGET}
 endif
 
-ifeq ($(origin MANIFEST_PATH), undefined)
-else
-  MANIFEST_PATH_ARGS = --manifest-path=${MANIFEST_PATH}
-endif
-
-ifeq ($(origin FEDORA_RELEASE), undefined)
-else
-  FEDORA_RELEASE_ARGS = --release=${FEDORA_RELEASE}
-endif
-
 IGNORE_ARGS ?=
+
+INSTALL ?= /usr/bin/install
 
 DESTDIR ?=
 PREFIX ?= /usr
@@ -226,34 +218,34 @@ stratisd-min:
 
 install-cfg:
 	mkdir -p $(DESTDIR)$(UNITDIR)
-	install -Dpm0644 -t $(DESTDIR)$(DATADIR)/dbus-1/system.d stratisd.conf
-	install -Dpm0644 -t $(DESTDIR)$(MANDIR)/man8 docs/stratisd.8
-	install -Dpm0644 -t $(DESTDIR)$(UDEVDIR)/rules.d udev/61-stratisd.rules
+	$(INSTALL) -Dpm0644 -t $(DESTDIR)$(DATADIR)/dbus-1/system.d stratisd.conf
+	$(INSTALL) -Dpm0644 -t $(DESTDIR)$(MANDIR)/man8 docs/stratisd.8
+	$(INSTALL) -Dpm0644 -t $(DESTDIR)$(UDEVDIR)/rules.d udev/61-stratisd.rules
 	sed 's|@LIBEXECDIR@|$(LIBEXECDIR)|' systemd/stratisd.service.in > $(DESTDIR)$(UNITDIR)/stratisd.service
-	install -Dpm0755 -d $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis
-	install -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/module-setup.sh
-	install -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/stratis-rootfs-setup
-	install -Dpm0644 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/stratisd-min.service
-	install -Dpm0644 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/61-stratisd.rules
-	install -Dpm0755 -d $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis-clevis
-	install -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis-clevis dracut/90stratis-clevis/module-setup.sh
-	install -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis-clevis dracut/90stratis-clevis/stratis-clevis-rootfs-setup
+	$(INSTALL) -Dpm0755 -d $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/module-setup.sh
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/stratis-rootfs-setup
+	$(INSTALL) -Dpm0644 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/stratisd-min.service
+	$(INSTALL) -Dpm0644 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/61-stratisd.rules
+	$(INSTALL) -Dpm0755 -d $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis-clevis
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis-clevis dracut/90stratis-clevis/module-setup.sh
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis-clevis dracut/90stratis-clevis/stratis-clevis-rootfs-setup
 	sed 's|@LIBEXECDIR@|$(LIBEXECDIR)|' systemd/stratisd-min-postinitrd.service.in > $(DESTDIR)$(UNITDIR)/stratisd-min-postinitrd.service
 	sed 's|@UNITEXECDIR@|$(UNITEXECDIR)|' systemd/stratis-fstab-setup@.service.in > $(DESTDIR)$(UNITDIR)/stratis-fstab-setup@.service
 
 install: install-cfg
 	mkdir -p $(DESTDIR)$(UNITGENDIR)
 	mkdir -p $(DESTDIR)$(BINDIR)
-	install -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd
-	install -Dpm0755 -t $(DESTDIR)$(UDEVDIR) target/$(PROFILEDIR)/stratis-utils
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(UDEVDIR) target/$(PROFILEDIR)/stratis-utils
 	mv -fv $(DESTDIR)$(UDEVDIR)/stratis-utils $(DESTDIR)$(UDEVDIR)/stratis-str-cmp
 	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(UDEVDIR)/stratis-base32-decode
 	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(BINDIR)/stratis-predict-usage
 	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(UNITGENDIR)/stratis-clevis-setup-generator
 	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(UNITGENDIR)/stratis-setup-generator
-	install -Dpm0755 -t $(DESTDIR)$(BINDIR) target/$(PROFILEDIR)/stratis-min
-	install -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd-min
-	install -Dpm0755 -t $(DESTDIR)$(UNITEXECDIR) systemd/stratis-fstab-setup
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(BINDIR) target/$(PROFILEDIR)/stratis-min
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd-min
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(UNITEXECDIR) systemd/stratis-fstab-setup
 
 install-release: release release-min docs/stratisd.8
 	${MAKE} install
@@ -322,8 +314,8 @@ docs-travis: docs-rust
 docs-rust:
 	cargo doc --no-deps
 
-docs/stratisd.8: docs/stratisd.txt
-	a2x -f manpage docs/stratisd.txt
+docs/%.8: docs/%.txt
+	a2x -f manpage $<
 
 clippy-macros:
 	cd stratisd_proc_macros && RUSTFLAGS="${DENY}" cargo clippy --all-targets --all-features -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
@@ -333,41 +325,11 @@ clippy: clippy-macros
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${MIN_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${SYSTEMD_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 
-SET_LOWER_BOUNDS ?=
-test-set-lower-bounds:
-	echo "Testing that SET_LOWER_BOUNDS environment variable is set to a valid path"
-	test -e "${SET_LOWER_BOUNDS}"
-
-verify-dependency-bounds: test-set-lower-bounds
-	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
-	cargo build ${MANIFEST_PATH_ARGS} --all-targets --all-features
-	${SET_LOWER_BOUNDS} ${MANIFEST_PATH_ARGS}
-	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
-	cargo build ${MANIFEST_PATH_ARGS} --all-targets --all-features
-	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
-	cargo test --no-run ${TARGET_ARGS}
-	${SET_LOWER_BOUNDS} ${MANIFEST_PATH_ARGS}
-	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
-	cargo test --no-run ${TARGET_ARGS}
-
-COMPARE_FEDORA_VERSIONS ?=
-test-compare-fedora-versions:
-	echo "Testing that COMPARE_FEDORA_VERSIONS environment variable is set to a valid path"
-	test -e "${COMPARE_FEDORA_VERSIONS}"
-
-check-fedora-versions: test-compare-fedora-versions
-	${COMPARE_FEDORA_VERSIONS} ${MANIFEST_PATH_ARGS} ${FEDORA_RELEASE_ARGS} ${IGNORE_ARGS}
-
 .PHONY:
 	audit
 	bloat
 	build
 	build-min
-	check-fedora-versions
 	clean
 	clean-ancillary
 	clean-cfg
@@ -396,7 +358,4 @@ check-fedora-versions: test-compare-fedora-versions
 	test-clevis-loop-should-fail
 	test-clevis-real
 	test-clevis-real-should-fail
-	test-compare-fedora-versions
-	test-set-lower-bounds
-	verify-dependency-bounds
 	yamllint

@@ -23,7 +23,7 @@ from stratisd_client_dbus import Manager, Pool, StratisdErrors, get_object
 from stratisd_client_dbus._constants import TOP_OBJECT
 from stratisd_client_dbus._stratisd_constants import EncryptionMethod
 
-from ._loopback import UDEV_ADD_EVENT
+from ._loopback import UDEV_ADD_EVENT, UDEV_REMOVE_EVENT
 from ._utils import (
     CRYPTO_LUKS_FS_TYPE,
     STRATIS_FS_TYPE,
@@ -652,3 +652,136 @@ class UdevTest6(UdevTest):
         See documentation for _simple_stop_test.
         """
         self._simple_stop_test()
+
+
+class UdevTest7(UdevTest):
+    """
+    A test that verifies that encrypted and unencrypted pools can be started by name.
+
+    An encrypted and unencrypted pool are created and stopped. Devices are removed
+    from both pools and starting the pool by name should fail for both pools. The
+    devices are then readded and the pools should successfully be able to be started
+    by name.
+    """
+
+    def _simple_start_by_name_test(self):
+        """
+        A simple test of stopping pools.
+
+        * Create an encrypted and unencrypted pool
+        * Stop the pools
+        * Remove devices from each pool
+        * Attempt to start by name which should fail
+        * Add the devices back
+        * Starting the pools by name should succeeed
+        """
+        num_devices = 4
+        device_tokens = self._lb_mgr.create_devices(num_devices)
+        devnodes = self._lb_mgr.device_files(device_tokens)
+
+        with OptionalKeyServiceContextManager(
+            key_spec=[("testkey", "testpassword")]
+        ) as key_desc:
+            self.wait_for_pools(0)
+
+            (_, (pool_object_path_enc, _)) = create_pool(
+                "encrypted", devnodes[:2], key_description=key_desc[0]
+            )
+            (_, (pool_object_path, _)) = create_pool("unencrypted", devnodes[2:])
+
+            self.wait_for_pools(2)
+
+            ((changed, _), exit_code, _) = Manager.Methods.StopPool(
+                get_object(TOP_OBJECT),
+                {"pool": pool_object_path_enc},
+            )
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(changed, True)
+            ((changed, _), exit_code, _) = Manager.Methods.StopPool(
+                get_object(TOP_OBJECT),
+                {"pool": pool_object_path},
+            )
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(changed, True)
+
+            self.wait_for_pools(0)
+
+            self.assertEqual(
+                len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))),
+                2,
+            )
+
+            self._lb_mgr.generate_synthetic_udev_events(
+                device_tokens[1:3], UDEV_REMOVE_EVENT
+            )
+            settle()
+
+            ((changed, _), exit_code, _) = Manager.Methods.StartPool(
+                get_object(TOP_OBJECT),
+                {
+                    "id": "encrypted",
+                    "unlock_method": (True, str(EncryptionMethod.KEYRING)),
+                    "id_type": "name",
+                },
+            )
+            self.assertFalse(changed)
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(
+                len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))),
+                2,
+            )
+
+            ((changed, _), exit_code, _) = Manager.Methods.StartPool(
+                get_object(TOP_OBJECT),
+                {
+                    "id": "unencrypted",
+                    "unlock_method": (False, ""),
+                    "id_type": "name",
+                },
+            )
+            self.assertFalse(changed)
+            self.assertEqual(exit_code, 1)
+            self.assertEqual(
+                len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))),
+                2,
+            )
+
+            self._lb_mgr.generate_synthetic_udev_events(
+                device_tokens[1:3], UDEV_ADD_EVENT
+            )
+            settle()
+
+            ((changed, _), exit_code, _) = Manager.Methods.StartPool(
+                get_object(TOP_OBJECT),
+                {
+                    "id": "encrypted",
+                    "unlock_method": (True, str(EncryptionMethod.KEYRING)),
+                    "id_type": "name",
+                },
+            )
+            self.assertTrue(changed)
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))),
+                1,
+            )
+            ((changed, _), exit_code, _) = Manager.Methods.StartPool(
+                get_object(TOP_OBJECT),
+                {
+                    "id": "unencrypted",
+                    "unlock_method": (False, ""),
+                    "id_type": "name",
+                },
+            )
+            self.assertTrue(changed)
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(
+                len(Manager.Properties.StoppedPools.Get(get_object(TOP_OBJECT))),
+                0,
+            )
+
+    def test_simple_start_by_name(self):
+        """
+        See documentation for _simple_start_by_name_test.
+        """
+        self._simple_start_by_name_test()

@@ -242,6 +242,7 @@ impl Engine for SimEngine {
             StoppedPoolsInfo::default(),
             |mut st, (name, uuid, pool)| {
                 st.name_to_uuid.insert(name.clone(), *uuid);
+                st.uuid_to_name.insert(*uuid, name.clone());
                 st.stopped.insert(
                     *uuid,
                     StoppedPoolInfo {

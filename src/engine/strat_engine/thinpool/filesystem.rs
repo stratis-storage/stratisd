@@ -309,8 +309,6 @@ impl StratFilesystem {
     }
 
     /// Return an extend size for the thindev under the filesystem
-    /// TODO: returning the current size will double the space provisioned to
-    /// the thin device.  We should determine if this is a reasonable value.
     pub fn extend_size(current_size: Sectors, remaining_size: Option<&mut Sectors>) -> Sectors {
         if let Some(rem_size) = remaining_size {
             // Extend either by the remaining amount left before the data device

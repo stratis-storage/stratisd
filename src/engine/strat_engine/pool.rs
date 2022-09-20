@@ -284,8 +284,6 @@ impl StratPool {
 
     /// Called when a DM device in this pool has generated an event. This method
     /// handles checking pools.
-    // TODO: Just check the device that evented. Currently checks
-    // everything.
     #[pool_mutating_action("NoPoolChanges")]
     pub fn event_on(&mut self, pool_uuid: PoolUuid, pool_name: &Name) -> StratisResult<PoolDiff> {
         let cached = self.cached();

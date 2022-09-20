@@ -238,8 +238,6 @@ impl StratFilesystem {
 
     /// Check the filesystem usage and determine whether it should extend.
     ///
-    /// TODO: deal with the thindev in a Fail state.
-    ///
     /// Returns:
     /// * Some(mount_point) if the filesystem should be extended
     /// * None if the filesystem does not need to be extended

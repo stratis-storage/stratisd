@@ -92,7 +92,6 @@ impl StratFilesystem {
                 // This will result in a dangling DM device that will prevent
                 // the thinpool from being destroyed, and wasted space in the
                 // thinpool.
-                // TODO: Recover. But how?
             }
             return Err(err);
         }

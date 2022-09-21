@@ -92,7 +92,6 @@ impl StratFilesystem {
                 // This will result in a dangling DM device that will prevent
                 // the thinpool from being destroyed, and wasted space in the
                 // thinpool.
-                // TODO: Recover. But how?
             }
             return Err(err);
         }
@@ -238,8 +237,6 @@ impl StratFilesystem {
 
     /// Check the filesystem usage and determine whether it should extend.
     ///
-    /// TODO: deal with the thindev in a Fail state.
-    ///
     /// Returns:
     /// * Some(mount_point) if the filesystem should be extended
     /// * None if the filesystem does not need to be extended
@@ -309,8 +306,6 @@ impl StratFilesystem {
     }
 
     /// Return an extend size for the thindev under the filesystem
-    /// TODO: returning the current size will double the space provisioned to
-    /// the thin device.  We should determine if this is a reasonable value.
     pub fn extend_size(current_size: Sectors, remaining_size: Option<&mut Sectors>) -> Sectors {
         if let Some(rem_size) = remaining_size {
             // Extend either by the remaining amount left before the data device

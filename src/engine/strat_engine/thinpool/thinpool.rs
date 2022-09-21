@@ -688,8 +688,6 @@ impl ThinPool {
         for (name, uuid, fs) in filesystems {
             let evicted = fs_table.insert(name, uuid, fs);
             if evicted.is_some() {
-                // TODO: Recover here. Failing the entire pool setup because
-                // of this is too harsh.
                 let err_msg = "filesystems with duplicate UUID or name specified in metadata";
                 return Err(StratisError::Msg(err_msg.into()));
             }

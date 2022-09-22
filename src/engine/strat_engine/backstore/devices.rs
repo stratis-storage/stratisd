@@ -264,6 +264,12 @@ pub struct DeviceInfo {
     pub size: Bytes,
 }
 
+/// Devices that have all been identified as Stratis devices.
+#[derive(Debug)]
+pub struct StratisDevices {
+    inner: HashMap<PoolUuid, HashMap<DevUuid, DeviceInfo>>,
+}
+
 /// A list of device paths is converted into this structure.
 /// Invariants:
 /// * DeviceInfo devnode values are unique.
@@ -273,6 +279,21 @@ pub struct DeviceInfo {
 pub struct ProcessedPathInfos {
     pub stratis_devices: HashMap<PoolUuid, HashMap<DevUuid, DeviceInfo>>,
     pub unclaimed_devices: Vec<DeviceInfo>,
+}
+
+impl ProcessedPathInfos {
+    /// Unpack ProcessedPathInfos into devices owned by Stratis and
+    /// into unowned devices.
+    fn unpack(self) -> (StratisDevices, UnownedDevices) {
+        (
+            StratisDevices {
+                inner: self.stratis_devices,
+            },
+            UnownedDevices {
+                inner: self.unclaimed_devices,
+            },
+        )
+    }
 }
 
 impl TryFrom<&[&Path]> for ProcessedPathInfos {
@@ -405,11 +426,12 @@ fn check_device_ids(
     current_uuids: &HashSet<DevUuid>,
     devices: ProcessedPathInfos,
 ) -> StratisResult<UnownedDevices> {
-    let mut pools = devices.stratis_devices;
-    let this_pool: Option<HashMap<DevUuid, DeviceInfo>> = pools.remove(&pool_uuid);
+    let (mut pools, unowned) = devices.unpack();
+    let this_pool: Option<HashMap<DevUuid, DeviceInfo>> = pools.inner.remove(&pool_uuid);
 
-    if !pools.is_empty() {
+    if !pools.inner.is_empty() {
         let error_string = pools
+            .inner
             .iter()
             .map(|(pool_uuid, devs)| {
                 format!(
@@ -472,9 +494,7 @@ fn check_device_ids(
         }
     }
 
-    Ok(UnownedDevices {
-        inner: devices.unclaimed_devices,
-    })
+    Ok(unowned)
 }
 
 /// Combine the functionality of process_devices and check_device_ids.

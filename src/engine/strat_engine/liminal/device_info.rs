@@ -240,6 +240,7 @@ impl LInfo {
                         None
                     }
                 } else {
+                    warn!("Device with pool UUID {}, device UUID {} appears to have been removed but the path did not match the known Stratis device with these identifiers", pool_uuid, dev_uuid);
                     Some(LInfo::Stratis(sinfo))
                 }
             }

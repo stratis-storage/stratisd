@@ -280,6 +280,35 @@ impl StratisDevices {
         let this_pool = self.inner.remove(&uuid);
         (this_pool, StratisDevices { inner: self.inner })
     }
+
+    // Return an error message on the assumption that these devices have
+    // been identified as belonging to another pool.
+    fn error_on_not_empty(&self) -> StratisResult<()> {
+        let errors = self
+            .inner
+            .iter()
+            .map(|(pool_uuid, devs)| {
+                format!(
+                    "devices ({}) appear to belong to Stratis pool with UUID {}",
+                    devs.iter()
+                        .map(|(_, info)| info.devnode.display().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    pool_uuid
+                )
+            })
+            .collect::<Vec<_>>();
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            let error_message = format!(
+                "Some devices specified appear to be already in use by other Stratis pools: {}",
+                errors.join("; ")
+            );
+            Err(StratisError::Msg(error_message))
+        }
+    }
 }
 
 /// A list of device paths is converted into this structure.
@@ -441,28 +470,7 @@ fn check_device_ids(
     let (pools, unowned) = devices.unpack();
     let (this_pool, other_pools) = pools.partition(pool_uuid);
 
-    if !other_pools.inner.is_empty() {
-        let error_string = other_pools
-            .inner
-            .iter()
-            .map(|(pool_uuid, devs)| {
-                format!(
-                    "devices ({}) appear to belong to Stratis pool with UUID {}",
-                    devs.iter()
-                        .map(|(_, info)| info.devnode.display().to_string())
-                        .collect::<Vec<_>>()
-                        .join(", "),
-                    pool_uuid
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("; ");
-        let error_message = format!(
-            "Some devices specified appear to be already in use by other Stratis pools: {}",
-            error_string
-        );
-        return Err(StratisError::Msg(error_message));
-    }
+    other_pools.error_on_not_empty()?;
 
     if let Some(mut this_pool) = this_pool {
         let (mut included, mut not_included) = (vec![], vec![]);

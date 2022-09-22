@@ -270,6 +270,18 @@ pub struct StratisDevices {
     inner: HashMap<PoolUuid, HashMap<DevUuid, DeviceInfo>>,
 }
 
+impl StratisDevices {
+    // Given a pool UUID partition the devices into two divisions;
+    // those that belong to the pool and those that do not.
+    fn partition(
+        mut self,
+        uuid: PoolUuid,
+    ) -> (Option<HashMap<DevUuid, DeviceInfo>>, StratisDevices) {
+        let this_pool = self.inner.remove(&uuid);
+        (this_pool, StratisDevices { inner: self.inner })
+    }
+}
+
 /// A list of device paths is converted into this structure.
 /// Invariants:
 /// * DeviceInfo devnode values are unique.
@@ -426,11 +438,11 @@ fn check_device_ids(
     current_uuids: &HashSet<DevUuid>,
     devices: ProcessedPathInfos,
 ) -> StratisResult<UnownedDevices> {
-    let (mut pools, unowned) = devices.unpack();
-    let this_pool: Option<HashMap<DevUuid, DeviceInfo>> = pools.inner.remove(&pool_uuid);
+    let (pools, unowned) = devices.unpack();
+    let (this_pool, other_pools) = pools.partition(pool_uuid);
 
-    if !pools.inner.is_empty() {
-        let error_string = pools
+    if !other_pools.inner.is_empty() {
+        let error_string = other_pools
             .inner
             .iter()
             .map(|(pool_uuid, devs)| {

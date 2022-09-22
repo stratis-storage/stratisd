@@ -267,7 +267,6 @@ pub struct DeviceInfo {
 /// A list of device paths is converted into this structure.
 /// Invariants:
 /// * DeviceInfo devnode values are unique.
-/// * DeviceInfo id_wwn values are unique, if present.
 /// * DeviceInfo devno values are unique.
 /// * DeviceInfo.size value meets the required Stratis minimum.
 #[derive(Debug)]

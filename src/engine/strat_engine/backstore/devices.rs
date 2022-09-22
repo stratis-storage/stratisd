@@ -366,6 +366,17 @@ impl TryFrom<&[&Path]> for ProcessedPathInfos {
     }
 }
 
+/// A list of device paths that have been determined to be unowned, and thus
+/// can be initialized by stratisd.
+/// Invariants:
+/// * DeviceInfo devnode values are unique.
+/// * DeviceInfo devno values are unique.
+/// * DeviceInfo.size value meets the required Stratis minimum.
+#[derive(Debug)]
+pub struct UnownedDevices {
+    inner: Vec<DeviceInfo>,
+}
+
 // Check coherence of pool and device UUIDs against a set of current UUIDs.
 // If the selection of devices is incompatible with the current
 // state of the set, or simply invalid, return an error.
@@ -393,7 +404,7 @@ fn check_device_ids(
     pool_uuid: PoolUuid,
     current_uuids: &HashSet<DevUuid>,
     devices: ProcessedPathInfos,
-) -> StratisResult<Vec<DeviceInfo>> {
+) -> StratisResult<UnownedDevices> {
     let mut pools = devices.stratis_devices;
     let this_pool: Option<HashMap<DevUuid, DeviceInfo>> = pools.remove(&pool_uuid);
 
@@ -461,7 +472,9 @@ fn check_device_ids(
         }
     }
 
-    Ok(devices.unclaimed_devices)
+    Ok(UnownedDevices {
+        inner: devices.unclaimed_devices,
+    })
 }
 
 /// Combine the functionality of process_devices and check_device_ids.
@@ -471,7 +484,7 @@ pub fn process_and_verify_devices(
     pool_uuid: PoolUuid,
     current_uuids: &HashSet<DevUuid>,
     paths: &[&Path],
-) -> StratisResult<Vec<DeviceInfo>> {
+) -> StratisResult<UnownedDevices> {
     check_device_ids(
         pool_uuid,
         current_uuids,
@@ -490,7 +503,7 @@ pub fn process_and_verify_devices(
 /// Precondition: Each device's DeviceInfo struct contains all necessary
 /// information about the device.
 pub fn initialize_devices(
-    devices: Vec<DeviceInfo>,
+    devices: UnownedDevices,
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
     encryption_info: Option<&EncryptionInfo>,
@@ -708,13 +721,13 @@ pub fn initialize_devices(
 
     /// Initialize all provided devices with Stratis metadata.
     fn initialize_all(
-        devices: Vec<DeviceInfo>,
+        devices: UnownedDevices,
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<Vec<StratBlockDev>> {
         let mut initialized_blockdevs: Vec<StratBlockDev> = Vec::new();
-        for dev_info in devices {
+        for dev_info in devices.inner {
             match initialize_one(&dev_info, pool_uuid, mda_data_size, encryption_info) {
                 Ok(blockdev) => initialized_blockdevs.push(blockdev),
                 Err(err) => {
@@ -732,6 +745,7 @@ pub fn initialize_devices(
     }
 
     let device_paths = devices
+        .inner
         .iter()
         .map(|d| d.devnode.clone())
         .collect::<Vec<_>>();
@@ -812,7 +826,7 @@ mod tests {
         }
 
         let mut blockdevs = initialize_devices(
-            dev_infos,
+            UnownedDevices { inner: dev_infos },
             pool_uuid,
             MDADataSize::default(),
             key_description
@@ -875,6 +889,7 @@ mod tests {
                     .collect::<Vec<_>>()
                     .as_slice(),
             )?
+            .inner
             .is_empty()
             {
                 return Err(Box::new(StratisError::Msg(
@@ -910,7 +925,7 @@ mod tests {
                     .collect::<Vec<_>>()
                     .as_slice(),
             ) {
-                if !infos.is_empty() {
+                if !infos.inner.is_empty() {
                     return Err(Box::new(StratisError::Msg(
                         "Failed to eliminate devices already initialized for this pool from list of devices to initialize".to_string()
                     )));
@@ -941,7 +956,7 @@ mod tests {
             )));
         }
 
-        if key_description.is_none() && !result?.is_empty() {
+        if key_description.is_none() && !result?.inner.is_empty() {
             return Err(Box::new(StratisError::Msg(
                         "Failed to filter all previously initialized devices which should have all been eliminated on the basis of already belonging to pool with the given pool UUID".to_string()
                 )));
@@ -1077,7 +1092,7 @@ mod tests {
         }
 
         if initialize_devices(
-            dev_infos,
+            UnownedDevices { inner: dev_infos },
             pool_uuid,
             MDADataSize::default(),
             key_desc

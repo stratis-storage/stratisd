@@ -278,6 +278,9 @@ pub struct ProcessedPathInfos {
 impl TryFrom<&[&Path]> for ProcessedPathInfos {
     type Error = StratisError;
 
+    // Returns an error if information on any device can not be found
+    // If paths is not empty then, either an error is returned OR at least one
+    // of the fields of the result is not empty.
     fn try_from(paths: &[&Path]) -> StratisResult<Self> {
         let canonical_paths = paths
             .iter()

@@ -27,7 +27,9 @@ use crate::{
                     back_up_luks_header, interpret_clevis_config, restore_luks_header,
                     CryptActivationHandle,
                 },
-                devices::{initialize_devices, process_and_verify_devices, wipe_blockdevs},
+                devices::{
+                    initialize_devices, process_and_verify_devices, wipe_blockdevs, UnownedDevices,
+                },
                 range_alloc::PerDevSegments,
                 transaction::RequestTransaction,
             },
@@ -143,12 +145,10 @@ impl BlockDevMgr {
     /// Initialize a new StratBlockDevMgr with specified pool and devices.
     pub fn initialize(
         pool_uuid: PoolUuid,
-        paths: &[&Path],
+        devices: UnownedDevices,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<BlockDevMgr> {
-        let devices = process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?;
-
         Ok(BlockDevMgr::new(
             initialize_devices(devices, pool_uuid, mda_data_size, encryption_info)?,
             None,
@@ -808,9 +808,10 @@ mod tests {
     /// After 2 Sectors have been allocated, that amount must also be included
     /// in balance.
     fn test_blockdevmgr_used(paths: &[&Path]) {
+        let pool_uuid = PoolUuid::new_v4();
+        let devices = process_and_verify_devices(pool_uuid, &HashSet::new(), paths).unwrap();
         let mut mgr =
-            BlockDevMgr::initialize(PoolUuid::new_v4(), paths, MDADataSize::default(), None)
-                .unwrap();
+            BlockDevMgr::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
         assert_eq!(mgr.avail_space() + mgr.metadata_size(), mgr.size());
 
         let allocated = Sectors(2);
@@ -845,7 +846,7 @@ mod tests {
             let pool_uuid = PoolUuid::new_v4();
             let mut bdm = BlockDevMgr::initialize(
                 pool_uuid,
-                &paths[..2],
+                process_and_verify_devices(pool_uuid, &HashSet::new(), &paths[..2])?,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
             )?;
@@ -887,7 +888,7 @@ mod tests {
             let pool_uuid = PoolUuid::new_v4();
             let mut bdm = BlockDevMgr::initialize(
                 pool_uuid,
-                &paths[..2],
+                process_and_verify_devices(pool_uuid, &HashSet::new(), &paths[..2])?,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
             )?;
@@ -934,12 +935,17 @@ mod tests {
         let uuid = PoolUuid::new_v4();
         let uuid2 = PoolUuid::new_v4();
 
-        let mut bd_mgr =
-            BlockDevMgr::initialize(uuid, paths1, MDADataSize::default(), None).unwrap();
+        let mut bd_mgr = BlockDevMgr::initialize(
+            uuid,
+            process_and_verify_devices(uuid, &HashSet::new(), paths1).unwrap(),
+            MDADataSize::default(),
+            None,
+        )
+        .unwrap();
         cmd::udev_settle().unwrap();
 
         assert_matches!(
-            BlockDevMgr::initialize(uuid2, paths1, MDADataSize::default(), None),
+            process_and_verify_devices(uuid2, &HashSet::new(), paths1),
             Err(_)
         );
 
@@ -948,7 +954,13 @@ mod tests {
         assert_matches!(bd_mgr.add(uuid, paths1), Ok(_));
         assert_eq!(bd_mgr.block_devs.len(), original_length);
 
-        BlockDevMgr::initialize(uuid, paths2, MDADataSize::default(), None).unwrap();
+        BlockDevMgr::initialize(
+            uuid,
+            process_and_verify_devices(uuid, &HashSet::new(), paths2).unwrap(),
+            MDADataSize::default(),
+            None,
+        )
+        .unwrap();
         cmd::udev_settle().unwrap();
 
         assert_matches!(bd_mgr.add(uuid, paths2), Err(_));
@@ -975,9 +987,10 @@ mod tests {
     fn test_clevis_initialize(paths: &[&Path]) {
         unshare_namespace().unwrap();
         let _memfs = MemoryFilesystem::new().unwrap();
+        let pool_uuid = PoolUuid::new_v4();
         let mut mgr = BlockDevMgr::initialize(
-            PoolUuid::new_v4(),
-            paths,
+            pool_uuid,
+            process_and_verify_devices(pool_uuid, &HashSet::new(), paths).unwrap(),
             MDADataSize::default(),
             Some(&EncryptionInfo::ClevisInfo((
                 "tang".to_string(),
@@ -1034,9 +1047,10 @@ mod tests {
         fn test_both(paths: &[&Path], key_desc: &KeyDescription) -> Result<(), Box<dyn Error>> {
             unshare_namespace()?;
             let _memfs = MemoryFilesystem::new().unwrap();
+            let pool_uuid = PoolUuid::new_v4();
             let mut mgr = BlockDevMgr::initialize(
-                PoolUuid::new_v4(),
-                paths,
+                pool_uuid,
+                process_and_verify_devices(pool_uuid, &HashSet::new(), paths).unwrap(),
                 MDADataSize::default(),
                 Some(&EncryptionInfo::Both(
                     key_desc.clone(),

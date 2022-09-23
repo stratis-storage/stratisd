@@ -231,7 +231,10 @@ impl Recordable<CacheTierSave> for CacheTier {
 #[cfg(test)]
 mod tests {
 
+    use std::collections::HashSet;
+
     use crate::engine::strat_engine::{
+        backstore::devices::process_and_verify_devices,
         metadata::MDADataSize,
         tests::{loopbacked, real},
     };
@@ -248,7 +251,13 @@ mod tests {
 
         let pool_uuid = PoolUuid::new_v4();
 
-        let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MDADataSize::default(), None).unwrap();
+        let mgr = BlockDevMgr::initialize(
+            pool_uuid,
+            process_and_verify_devices(pool_uuid, &HashSet::new(), paths1).unwrap(),
+            MDADataSize::default(),
+            None,
+        )
+        .unwrap();
 
         let mut cache_tier = CacheTier::new(mgr).unwrap();
 

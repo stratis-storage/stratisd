@@ -264,6 +264,53 @@ pub struct DeviceInfo {
     pub size: Bytes,
 }
 
+/// Devices that have all been identified as Stratis devices.
+#[derive(Debug)]
+pub struct StratisDevices {
+    inner: HashMap<PoolUuid, HashMap<DevUuid, DeviceInfo>>,
+}
+
+impl StratisDevices {
+    // Given a pool UUID partition the devices into two divisions;
+    // those that belong to the pool and those that do not.
+    fn partition(
+        mut self,
+        uuid: PoolUuid,
+    ) -> (Option<HashMap<DevUuid, DeviceInfo>>, StratisDevices) {
+        let this_pool = self.inner.remove(&uuid);
+        (this_pool, StratisDevices { inner: self.inner })
+    }
+
+    // Return an error message on the assumption that these devices have
+    // been identified as belonging to another pool.
+    fn error_on_not_empty(&self) -> StratisResult<()> {
+        let errors = self
+            .inner
+            .iter()
+            .map(|(pool_uuid, devs)| {
+                format!(
+                    "devices ({}) appear to belong to Stratis pool with UUID {}",
+                    devs.iter()
+                        .map(|(_, info)| info.devnode.display().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                    pool_uuid
+                )
+            })
+            .collect::<Vec<_>>();
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            let error_message = format!(
+                "Some devices specified appear to be already in use by other Stratis pools: {}",
+                errors.join("; ")
+            );
+            Err(StratisError::Msg(error_message))
+        }
+    }
+}
+
 /// A list of device paths is converted into this structure.
 /// Invariants:
 /// * DeviceInfo devnode values are unique.
@@ -275,9 +322,27 @@ pub struct ProcessedPathInfos {
     pub unclaimed_devices: Vec<DeviceInfo>,
 }
 
+impl ProcessedPathInfos {
+    /// Unpack ProcessedPathInfos into devices owned by Stratis and
+    /// into unowned devices.
+    fn unpack(self) -> (StratisDevices, UnownedDevices) {
+        (
+            StratisDevices {
+                inner: self.stratis_devices,
+            },
+            UnownedDevices {
+                inner: self.unclaimed_devices,
+            },
+        )
+    }
+}
+
 impl TryFrom<&[&Path]> for ProcessedPathInfos {
     type Error = StratisError;
 
+    // Returns an error if information on any device can not be found
+    // If paths is not empty then, either an error is returned OR at least one
+    // of the fields of the result is not empty.
     fn try_from(paths: &[&Path]) -> StratisResult<Self> {
         let canonical_paths = paths
             .iter()
@@ -363,6 +428,17 @@ impl TryFrom<&[&Path]> for ProcessedPathInfos {
     }
 }
 
+/// A list of device paths that have been determined to be unowned, and thus
+/// can be initialized by stratisd.
+/// Invariants:
+/// * DeviceInfo devnode values are unique.
+/// * DeviceInfo devno values are unique.
+/// * DeviceInfo.size value meets the required Stratis minimum.
+#[derive(Debug)]
+pub struct UnownedDevices {
+    inner: Vec<DeviceInfo>,
+}
+
 // Check coherence of pool and device UUIDs against a set of current UUIDs.
 // If the selection of devices is incompatible with the current
 // state of the set, or simply invalid, return an error.
@@ -390,31 +466,11 @@ fn check_device_ids(
     pool_uuid: PoolUuid,
     current_uuids: &HashSet<DevUuid>,
     devices: ProcessedPathInfos,
-) -> StratisResult<Vec<DeviceInfo>> {
-    let mut pools = devices.stratis_devices;
-    let this_pool: Option<HashMap<DevUuid, DeviceInfo>> = pools.remove(&pool_uuid);
+) -> StratisResult<UnownedDevices> {
+    let (pools, unowned) = devices.unpack();
+    let (this_pool, other_pools) = pools.partition(pool_uuid);
 
-    if !pools.is_empty() {
-        let error_string = pools
-            .iter()
-            .map(|(pool_uuid, devs)| {
-                format!(
-                    "devices ({}) appear to belong to Stratis pool with UUID {}",
-                    devs.iter()
-                        .map(|(_, info)| info.devnode.display().to_string())
-                        .collect::<Vec<_>>()
-                        .join(", "),
-                    pool_uuid
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("; ");
-        let error_message = format!(
-            "Some devices specified appear to be already in use by other Stratis pools: {}",
-            error_string
-        );
-        return Err(StratisError::Msg(error_message));
-    }
+    other_pools.error_on_not_empty()?;
 
     if let Some(mut this_pool) = this_pool {
         let (mut included, mut not_included) = (vec![], vec![]);
@@ -458,7 +514,7 @@ fn check_device_ids(
         }
     }
 
-    Ok(devices.unclaimed_devices)
+    Ok(unowned)
 }
 
 /// Combine the functionality of process_devices and check_device_ids.
@@ -468,7 +524,7 @@ pub fn process_and_verify_devices(
     pool_uuid: PoolUuid,
     current_uuids: &HashSet<DevUuid>,
     paths: &[&Path],
-) -> StratisResult<Vec<DeviceInfo>> {
+) -> StratisResult<UnownedDevices> {
     check_device_ids(
         pool_uuid,
         current_uuids,
@@ -487,7 +543,7 @@ pub fn process_and_verify_devices(
 /// Precondition: Each device's DeviceInfo struct contains all necessary
 /// information about the device.
 pub fn initialize_devices(
-    devices: Vec<DeviceInfo>,
+    devices: UnownedDevices,
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
     encryption_info: Option<&EncryptionInfo>,
@@ -705,13 +761,13 @@ pub fn initialize_devices(
 
     /// Initialize all provided devices with Stratis metadata.
     fn initialize_all(
-        devices: Vec<DeviceInfo>,
+        devices: UnownedDevices,
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<Vec<StratBlockDev>> {
         let mut initialized_blockdevs: Vec<StratBlockDev> = Vec::new();
-        for dev_info in devices {
+        for dev_info in devices.inner {
             match initialize_one(&dev_info, pool_uuid, mda_data_size, encryption_info) {
                 Ok(blockdev) => initialized_blockdevs.push(blockdev),
                 Err(err) => {
@@ -729,6 +785,7 @@ pub fn initialize_devices(
     }
 
     let device_paths = devices
+        .inner
         .iter()
         .map(|d| d.devnode.clone())
         .collect::<Vec<_>>();
@@ -809,7 +866,7 @@ mod tests {
         }
 
         let mut blockdevs = initialize_devices(
-            dev_infos,
+            UnownedDevices { inner: dev_infos },
             pool_uuid,
             MDADataSize::default(),
             key_description
@@ -872,6 +929,7 @@ mod tests {
                     .collect::<Vec<_>>()
                     .as_slice(),
             )?
+            .inner
             .is_empty()
             {
                 return Err(Box::new(StratisError::Msg(
@@ -907,7 +965,7 @@ mod tests {
                     .collect::<Vec<_>>()
                     .as_slice(),
             ) {
-                if !infos.is_empty() {
+                if !infos.inner.is_empty() {
                     return Err(Box::new(StratisError::Msg(
                         "Failed to eliminate devices already initialized for this pool from list of devices to initialize".to_string()
                     )));
@@ -938,7 +996,7 @@ mod tests {
             )));
         }
 
-        if key_description.is_none() && !result?.is_empty() {
+        if key_description.is_none() && !result?.inner.is_empty() {
             return Err(Box::new(StratisError::Msg(
                         "Failed to filter all previously initialized devices which should have all been eliminated on the basis of already belonging to pool with the given pool UUID".to_string()
                 )));
@@ -1074,7 +1132,7 @@ mod tests {
         }
 
         if initialize_devices(
-            dev_infos,
+            UnownedDevices { inner: dev_infos },
             pool_uuid,
             MDADataSize::default(),
             key_desc

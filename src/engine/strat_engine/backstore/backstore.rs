@@ -309,7 +309,15 @@ impl Backstore {
         pool_uuid: PoolUuid,
         paths: &[&Path],
     ) -> StratisResult<Vec<DevUuid>> {
-        self.data_tier.add(pool_uuid, paths)
+        let current_uuids = self
+            .datadevs()
+            .iter()
+            .map(|(uuid, _)| *uuid)
+            .collect::<HashSet<_>>();
+
+        let devices = process_and_verify_devices(pool_uuid, &current_uuids, paths)?;
+
+        self.data_tier.add(pool_uuid, devices)
     }
 
     /// Extend the cap device whether it is a cache or not. Create the DM

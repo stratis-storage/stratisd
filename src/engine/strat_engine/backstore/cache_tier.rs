@@ -4,7 +4,7 @@
 
 // Code to handle the backing store of a pool.
 
-use std::path::Path;
+use std::{collections::HashSet, path::Path};
 
 use devicemapper::{Sectors, IEC, SECTOR_SIZE};
 
@@ -14,6 +14,7 @@ use crate::{
             backstore::{
                 blockdev::StratBlockDev,
                 blockdevmgr::{BlkDevSegment, BlockDevMgr},
+                devices::process_and_verify_devices,
                 shared::{coalesce_blkdevsegs, metadata_to_segment},
             },
             serde_structs::{BaseDevSave, BlockDevSave, CacheTierSave, Recordable},
@@ -100,7 +101,15 @@ impl CacheTier {
         pool_uuid: PoolUuid,
         paths: &[&Path],
     ) -> StratisResult<(Vec<DevUuid>, (bool, bool))> {
-        let uuids = self.block_mgr.add(pool_uuid, paths)?;
+        let current_uuids = self
+            .blockdevs()
+            .iter()
+            .map(|(uuid, _)| *uuid)
+            .collect::<HashSet<_>>();
+
+        let devices = process_and_verify_devices(pool_uuid, &current_uuids, paths)?;
+
+        let uuids = self.block_mgr.add(pool_uuid, devices)?;
 
         let avail_space = self.block_mgr.avail_space();
 

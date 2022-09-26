@@ -4,7 +4,7 @@
 
 // Code to handle the backing store of a pool.
 
-use std::path::Path;
+use std::{collections::HashSet, path::Path};
 
 use devicemapper::Sectors;
 
@@ -14,6 +14,7 @@ use crate::{
             backstore::{
                 blockdev::StratBlockDev,
                 blockdevmgr::{BlkDevSegment, BlockDevMgr},
+                devices::process_and_verify_devices,
                 shared::{coalesce_blkdevsegs, metadata_to_segment},
                 transaction::RequestTransaction,
             },
@@ -68,7 +69,14 @@ impl DataTier {
     /// corresponding to the specified paths.
     /// WARNING: metadata changing event
     pub fn add(&mut self, pool_uuid: PoolUuid, paths: &[&Path]) -> StratisResult<Vec<DevUuid>> {
-        self.block_mgr.add(pool_uuid, paths)
+        let current_uuids = self
+            .blockdevs()
+            .iter()
+            .map(|(uuid, _)| *uuid)
+            .collect::<HashSet<_>>();
+
+        let devices = process_and_verify_devices(pool_uuid, &current_uuids, paths)?;
+        self.block_mgr.add(pool_uuid, devices)
     }
 
     /// Allocate a region for all sector size requests from unallocated segments in

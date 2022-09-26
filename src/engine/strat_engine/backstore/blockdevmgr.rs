@@ -4,11 +4,10 @@
 
 // Code to handle a collection of block devices.
 
-use std::{
-    collections::{HashMap, HashSet},
-    fs,
-    path::{Path, PathBuf},
-};
+#[cfg(test)]
+use std::collections::HashSet;
+
+use std::{collections::HashMap, fs, path::PathBuf};
 
 use chrono::{DateTime, Duration, Utc};
 use rand::{seq::IteratorRandom, thread_rng};
@@ -27,9 +26,7 @@ use crate::{
                     back_up_luks_header, interpret_clevis_config, restore_luks_header,
                     CryptActivationHandle,
                 },
-                devices::{
-                    initialize_devices, process_and_verify_devices, wipe_blockdevs, UnownedDevices,
-                },
+                devices::{initialize_devices, wipe_blockdevs, UnownedDevices},
                 range_alloc::PerDevSegments,
                 transaction::RequestTransaction,
             },
@@ -180,7 +177,11 @@ impl BlockDevMgr {
     /// Add paths to self.
     /// Return the uuids of all blockdevs corresponding to paths that were
     /// added.
-    pub fn add(&mut self, pool_uuid: PoolUuid, paths: &[&Path]) -> StratisResult<Vec<DevUuid>> {
+    pub fn add(
+        &mut self,
+        pool_uuid: PoolUuid,
+        devices: UnownedDevices,
+    ) -> StratisResult<Vec<DevUuid>> {
         let this_pool_uuid = self.block_devs.get(0).map(|bd| bd.pool_uuid());
         if this_pool_uuid.is_some() && this_pool_uuid != Some(pool_uuid) {
             return Err(StratisError::Msg(
@@ -189,13 +190,6 @@ impl BlockDevMgr {
                         pool_uuid)
             ));
         }
-
-        let current_uuids = self
-            .block_devs
-            .iter()
-            .map(|bd| bd.uuid())
-            .collect::<HashSet<_>>();
-        let devices = process_and_verify_devices(pool_uuid, &current_uuids, paths)?;
 
         let encryption_info = pool_enc_to_enc!(self.encryption_info());
         if let Some(ref ei) = encryption_info {
@@ -792,9 +786,10 @@ impl Recordable<Vec<BaseBlockDevSave>> for BlockDevMgr {
 
 #[cfg(test)]
 mod tests {
-    use std::{env, error::Error};
+    use std::{collections::HashSet, env, error::Error, path::Path};
 
     use crate::engine::strat_engine::{
+        backstore::devices::process_and_verify_devices,
         cmd,
         names::KeyDescription,
         ns::{unshare_namespace, MemoryFilesystem},
@@ -844,14 +839,18 @@ mod tests {
     fn test_blockdevmgr_same_key(paths: &[&Path]) {
         fn test_with_key(paths: &[&Path], key_desc: &KeyDescription) -> Result<(), Box<dyn Error>> {
             let pool_uuid = PoolUuid::new_v4();
+
+            let devices1 = process_and_verify_devices(pool_uuid, &HashSet::new(), &paths[..2])?;
+            let devices2 = process_and_verify_devices(pool_uuid, &HashSet::new(), &paths[2..3])?;
+
             let mut bdm = BlockDevMgr::initialize(
                 pool_uuid,
-                process_and_verify_devices(pool_uuid, &HashSet::new(), &paths[..2])?,
+                devices1,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
             )?;
 
-            if bdm.add(pool_uuid, &paths[2..3]).is_err() {
+            if bdm.add(pool_uuid, devices2).is_err() {
                 Err(Box::new(StratisError::Msg(
                     "Adding a blockdev with the same key to an encrypted pool should succeed"
                         .to_string(),
@@ -886,16 +885,20 @@ mod tests {
     fn test_blockdevmgr_changed_key(paths: &[&Path]) {
         fn test_with_key(paths: &[&Path], key_desc: &KeyDescription) -> Result<(), Box<dyn Error>> {
             let pool_uuid = PoolUuid::new_v4();
+
+            let devices1 = process_and_verify_devices(pool_uuid, &HashSet::new(), &paths[..2])?;
+            let devices2 = process_and_verify_devices(pool_uuid, &HashSet::new(), &paths[2..3])?;
+
             let mut bdm = BlockDevMgr::initialize(
                 pool_uuid,
-                process_and_verify_devices(pool_uuid, &HashSet::new(), &paths[..2])?,
+                devices1,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
             )?;
 
             crypt::change_key(key_desc)?;
 
-            if bdm.add(pool_uuid, &paths[2..3]).is_ok() {
+            if bdm.add(pool_uuid, devices2).is_ok() {
                 Err(Box::new(StratisError::Msg(
                     "Adding a blockdev with a new key to an encrypted pool should fail".to_string(),
                 )))
@@ -935,7 +938,7 @@ mod tests {
         let uuid = PoolUuid::new_v4();
         let uuid2 = PoolUuid::new_v4();
 
-        let mut bd_mgr = BlockDevMgr::initialize(
+        let bd_mgr = BlockDevMgr::initialize(
             uuid,
             process_and_verify_devices(uuid, &HashSet::new(), paths1).unwrap(),
             MDADataSize::default(),
@@ -949,10 +952,20 @@ mod tests {
             Err(_)
         );
 
-        let original_length = bd_mgr.block_devs.len();
-        assert_matches!(bd_mgr.add(uuid2, paths1), Err(_));
-        assert_matches!(bd_mgr.add(uuid, paths1), Ok(_));
-        assert_eq!(bd_mgr.block_devs.len(), original_length);
+        assert_matches!(
+            process_and_verify_devices(uuid2, &HashSet::new(), paths1),
+            Err(_)
+        );
+
+        let current_uuids = bd_mgr
+            .blockdevs()
+            .iter()
+            .map(|(uuid, _)| *uuid)
+            .collect::<HashSet<_>>();
+        assert_matches!(
+            process_and_verify_devices(uuid, &current_uuids, paths1),
+            Ok(_)
+        );
 
         BlockDevMgr::initialize(
             uuid,
@@ -963,7 +976,10 @@ mod tests {
         .unwrap();
         cmd::udev_settle().unwrap();
 
-        assert_matches!(bd_mgr.add(uuid, paths2), Err(_));
+        assert_matches!(
+            process_and_verify_devices(uuid, &HashSet::new(), paths2),
+            Err(_)
+        );
 
         bd_mgr.invariant()
     }

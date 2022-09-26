@@ -71,7 +71,7 @@ impl<'a> Into<Value> for &'a SimEngine {
                 .collect()
             ),
             "stopped_pools": Value::Array(
-                (&*block_on(self.stopped_pools.read())).iter().map(|(name, uuid, pool)| {
+                (*block_on(self.stopped_pools.read())).iter().map(|(name, uuid, pool)| {
                     let json = json!({
                         "pool_uuid": uuid.to_string(),
                         "name": name.to_string(),
@@ -99,7 +99,7 @@ impl Report for SimEngine {
         match report_type {
             ReportType::StoppedPools => {
                 json!({
-                    "stopped_pools": (&*block_on(self.stopped_pools.read())).iter().map(|(name, uuid, pool)| {
+                    "stopped_pools": (*block_on(self.stopped_pools.read())).iter().map(|(name, uuid, pool)| {
                         let json = json!({
                             "pool_uuid": uuid.to_string(),
                             "name": name.to_string(),

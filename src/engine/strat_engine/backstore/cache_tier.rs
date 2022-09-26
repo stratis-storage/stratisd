@@ -4,8 +4,6 @@
 
 // Code to handle the backing store of a pool.
 
-use std::{collections::HashSet, path::Path};
-
 use devicemapper::{Sectors, IEC, SECTOR_SIZE};
 
 use crate::{
@@ -14,7 +12,7 @@ use crate::{
             backstore::{
                 blockdev::StratBlockDev,
                 blockdevmgr::{BlkDevSegment, BlockDevMgr},
-                devices::process_and_verify_devices,
+                devices::UnownedDevices,
                 shared::{coalesce_blkdevsegs, metadata_to_segment},
             },
             serde_structs::{BaseDevSave, BlockDevSave, CacheTierSave, Recordable},
@@ -99,16 +97,8 @@ impl CacheTier {
     pub fn add(
         &mut self,
         pool_uuid: PoolUuid,
-        paths: &[&Path],
+        devices: UnownedDevices,
     ) -> StratisResult<(Vec<DevUuid>, (bool, bool))> {
-        let current_uuids = self
-            .blockdevs()
-            .iter()
-            .map(|(uuid, _)| *uuid)
-            .collect::<HashSet<_>>();
-
-        let devices = process_and_verify_devices(pool_uuid, &current_uuids, paths)?;
-
         let uuids = self.block_mgr.add(pool_uuid, devices)?;
 
         let avail_space = self.block_mgr.avail_space();
@@ -240,7 +230,7 @@ impl Recordable<CacheTierSave> for CacheTier {
 #[cfg(test)]
 mod tests {
 
-    use std::collections::HashSet;
+    use std::{collections::HashSet, path::Path};
 
     use crate::engine::strat_engine::{
         backstore::devices::process_and_verify_devices,
@@ -260,13 +250,11 @@ mod tests {
 
         let pool_uuid = PoolUuid::new_v4();
 
-        let mgr = BlockDevMgr::initialize(
-            pool_uuid,
-            process_and_verify_devices(pool_uuid, &HashSet::new(), paths1).unwrap(),
-            MDADataSize::default(),
-            None,
-        )
-        .unwrap();
+        let devices1 = process_and_verify_devices(pool_uuid, &HashSet::new(), paths1).unwrap();
+        let devices2 = process_and_verify_devices(pool_uuid, &HashSet::new(), paths2).unwrap();
+
+        let mgr =
+            BlockDevMgr::initialize(pool_uuid, devices1, MDADataSize::default(), None).unwrap();
 
         let mut cache_tier = CacheTier::new(mgr).unwrap();
 
@@ -289,7 +277,7 @@ mod tests {
         assert_eq!(cache_tier.block_mgr.avail_space(), Sectors(0));
         assert_eq!(size - metadata_size, allocated + cache_metadata_size);
 
-        let (_, (cache, meta)) = cache_tier.add(pool_uuid, paths2).unwrap();
+        let (_, (cache, meta)) = cache_tier.add(pool_uuid, devices2).unwrap();
         // TODO: Ultimately, it should be the case that meta can be true.
         assert!(cache);
         assert!(!meta);

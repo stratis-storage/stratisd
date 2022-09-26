@@ -273,13 +273,19 @@ impl Backstore {
         pool_uuid: PoolUuid,
         paths: &[&Path],
     ) -> StratisResult<Vec<DevUuid>> {
+        let current_uuids = self
+            .cachedevs()
+            .iter()
+            .map(|(uuid, _)| *uuid)
+            .collect::<HashSet<_>>();
         match self.cache_tier {
             Some(ref mut cache_tier) => {
                 let cache_device = self
                     .cache
                     .as_mut()
                     .expect("cache_tier.is_some() <=> self.cache.is_some()");
-                let (uuids, (cache_change, meta_change)) = cache_tier.add(pool_uuid, paths)?;
+                let devices = process_and_verify_devices(pool_uuid, &current_uuids, paths)?;
+                let (uuids, (cache_change, meta_change)) = cache_tier.add(pool_uuid, devices)?;
 
                 if cache_change {
                     let table = map_to_dm(&cache_tier.cache_segments);

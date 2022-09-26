@@ -436,7 +436,7 @@ impl TryFrom<&[&Path]> for ProcessedPathInfos {
 /// * DeviceInfo.size value meets the required Stratis minimum.
 #[derive(Debug)]
 pub struct UnownedDevices {
-    inner: Vec<DeviceInfo>,
+    pub(super) inner: Vec<DeviceInfo>,
 }
 
 // Check coherence of pool and device UUIDs against a set of current UUIDs.

@@ -113,28 +113,25 @@ pub fn dm_stratis_devices_remove() -> Result<()> {
 
         // Retries if no progress has been made.
         if !remain.is_empty() && !progress_made {
-            remain = remain
-                .into_iter()
-                .filter(|name| {
-                    for _ in 0..3 {
-                        match get_dm().device_remove(&DevId::Name(name), DmOptions::default()) {
-                            Ok(_) => {
-                                progress_made = true;
-                                return false;
-                            }
-                            Err(e) => {
-                                debug!(
-                                    "Failed to remove device {} on retry: {}",
-                                    name.to_string(),
-                                    e
-                                );
-                                sleep(Duration::from_secs(1));
-                            }
+            remain.retain(|name| {
+                for _ in 0..3 {
+                    match get_dm().device_remove(&DevId::Name(name), DmOptions::default()) {
+                        Ok(_) => {
+                            progress_made = true;
+                            return false;
+                        }
+                        Err(e) => {
+                            debug!(
+                                "Failed to remove device {} on retry: {}",
+                                name.to_string(),
+                                e
+                            );
+                            sleep(Duration::from_secs(1));
                         }
                     }
-                    true
-                })
-                .collect();
+                }
+                true
+            });
         }
 
         Ok((progress_made, remain))

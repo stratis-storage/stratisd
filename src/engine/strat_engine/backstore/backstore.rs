@@ -19,7 +19,7 @@ use crate::{
                 blockdevmgr::{map_to_dm, BlockDevMgr},
                 cache_tier::CacheTier,
                 data_tier::DataTier,
-                devices::process_and_verify_devices,
+                devices::{process_and_verify_devices, UnownedDevices},
                 transaction::RequestTransaction,
             },
             dm::get_dm,
@@ -271,20 +271,14 @@ impl Backstore {
     pub fn add_cachedevs(
         &mut self,
         pool_uuid: PoolUuid,
-        paths: &[&Path],
+        devices: UnownedDevices,
     ) -> StratisResult<Vec<DevUuid>> {
-        let current_uuids = self
-            .cachedevs()
-            .iter()
-            .map(|(uuid, _)| *uuid)
-            .collect::<HashSet<_>>();
         match self.cache_tier {
             Some(ref mut cache_tier) => {
                 let cache_device = self
                     .cache
                     .as_mut()
                     .expect("cache_tier.is_some() <=> self.cache.is_some()");
-                let devices = process_and_verify_devices(pool_uuid, &current_uuids, paths)?;
                 let (uuids, (cache_change, meta_change)) = cache_tier.add(pool_uuid, devices)?;
 
                 if cache_change {
@@ -313,16 +307,8 @@ impl Backstore {
     pub fn add_datadevs(
         &mut self,
         pool_uuid: PoolUuid,
-        paths: &[&Path],
+        devices: UnownedDevices,
     ) -> StratisResult<Vec<DevUuid>> {
-        let current_uuids = self
-            .datadevs()
-            .iter()
-            .map(|(uuid, _)| *uuid)
-            .collect::<HashSet<_>>();
-
-        let devices = process_and_verify_devices(pool_uuid, &current_uuids, paths)?;
-
         self.data_tier.add(pool_uuid, devices)
     }
 
@@ -744,6 +730,12 @@ mod tests {
         let (datadevpaths, initdatapaths) = paths.split_at(1);
 
         let pool_uuid = PoolUuid::new_v4();
+
+        let datadevs =
+            process_and_verify_devices(pool_uuid, &HashSet::new(), datadevpaths).unwrap();
+        let cachedevs =
+            process_and_verify_devices(pool_uuid, &HashSet::new(), cachedevpaths).unwrap();
+
         let mut backstore =
             Backstore::initialize(pool_uuid, initdatapaths, MDADataSize::default(), None).unwrap();
 
@@ -780,11 +772,11 @@ mod tests {
             CacheDevStatus::Fail => panic!("cache is in a failed state"),
         }
 
-        let data_uuids = backstore.add_datadevs(pool_uuid, datadevpaths).unwrap();
+        let data_uuids = backstore.add_datadevs(pool_uuid, datadevs).unwrap();
         invariant(&backstore);
         assert_eq!(data_uuids.len(), datadevpaths.len());
 
-        let cache_uuids = backstore.add_cachedevs(pool_uuid, cachedevpaths).unwrap();
+        let cache_uuids = backstore.add_cachedevs(pool_uuid, cachedevs).unwrap();
         invariant(&backstore);
         assert_eq!(cache_uuids.len(), cachedevpaths.len());
 

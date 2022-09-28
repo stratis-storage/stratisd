@@ -1622,6 +1622,7 @@ fn attempt_thin_repair(
 #[cfg(test)]
 mod tests {
     use std::{
+        collections::HashSet,
         fs::OpenOptions,
         io::{BufWriter, Read, Write},
         path::Path,
@@ -1635,6 +1636,7 @@ mod tests {
         engine::Filesystem,
         shared::DEFAULT_THIN_DEV_SIZE,
         strat_engine::{
+            backstore::process_and_verify_devices,
             cmd,
             metadata::MDADataSize,
             tests::{loopbacked, real},
@@ -1747,6 +1749,10 @@ mod tests {
         let pool_name = "pool";
         let pool_uuid = PoolUuid::new_v4();
         let (first_path, remaining_paths) = paths.split_at(1);
+
+        let remaining_devices =
+            process_and_verify_devices(pool_uuid, &HashSet::new(), remaining_paths).unwrap();
+
         let mut backstore =
             Backstore::initialize(pool_uuid, first_path, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
@@ -1826,7 +1832,9 @@ mod tests {
         };
 
         // Add block devices to the pool and run check() to extend
-        backstore.add_datadevs(pool_uuid, remaining_paths).unwrap();
+        backstore
+            .add_datadevs(pool_uuid, remaining_devices)
+            .unwrap();
         pool.check(pool_uuid, &mut backstore).unwrap();
         // Verify the pool is back in a Good state
         match pool

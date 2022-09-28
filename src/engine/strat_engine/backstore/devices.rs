@@ -273,14 +273,14 @@ pub struct StratisDevices {
 impl StratisDevices {
     // Given a pool UUID partition the devices into two divisions;
     // those that belong to the pool and those that do not.
-    fn partition(mut self, uuid: PoolUuid) -> (HashMap<DevUuid, DeviceInfo>, StratisDevices) {
+    pub fn partition(mut self, uuid: PoolUuid) -> (HashMap<DevUuid, DeviceInfo>, StratisDevices) {
         let this_pool = self.inner.remove(&uuid).unwrap_or_default();
         (this_pool, StratisDevices { inner: self.inner })
     }
 
     // Return an error message on the assumption that these devices have
     // been identified as belonging to another pool.
-    fn error_on_not_empty(&self) -> StratisResult<()> {
+    pub fn error_on_not_empty(&self) -> StratisResult<()> {
         let errors = self
             .inner
             .iter()
@@ -322,7 +322,7 @@ pub struct ProcessedPathInfos {
 impl ProcessedPathInfos {
     /// Unpack ProcessedPathInfos into devices owned by Stratis and
     /// into unowned devices.
-    fn unpack(self) -> (StratisDevices, UnownedDevices) {
+    pub fn unpack(self) -> (StratisDevices, UnownedDevices) {
         (
             StratisDevices {
                 inner: self.stratis_devices,

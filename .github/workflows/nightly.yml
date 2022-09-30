@@ -26,7 +26,7 @@ jobs:
           - task: cargo package
             toolchain: 1.64.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     container:
       image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
@@ -61,7 +61,7 @@ jobs:
           - task: |
               COMPARE_FEDORA_VERSIONS=./ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=rawhide make -f Makefile_dependencies check-fedora-versions
               COMPARE_FEDORA_VERSIONS=./ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=f35 IGNORE_ARGS="--ignore-high pretty-hex" make -f Makefile_dependencies check-fedora-versions
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     container:
       image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
@@ -101,7 +101,7 @@ jobs:
           - tag: v3.0.2
           - tag: v3.0.3
           - tag: v3.0.4
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     container:
       image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
@@ -140,7 +140,7 @@ jobs:
             tag: v3.0.0
           - image: fedora:35  # PINNED DEVELOPMENT ENVIRONMENT
             tag: v3.0.1
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     container: ${{ matrix.image }}
     steps:
       - uses: actions/checkout@v2
@@ -203,7 +203,7 @@ jobs:
             toolchain: 1.64.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           - image: fedora:34  # LOWEST DEVELOPMENT ENVIRONMENT
             toolchain: 1.62.1  # LOWEST SUPPORTED RUST TOOLCHAIN
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     container:
       image: ${{ matrix.image }}
       options: --privileged -v /dev:/dev

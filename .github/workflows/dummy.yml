@@ -14,7 +14,7 @@ on:
 
 jobs:
   dummy:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
       - name: Run dummy test
         run: echo "I exist to be Required in Github branch protection rules"

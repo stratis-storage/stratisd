@@ -42,7 +42,7 @@ jobs:
           - dependencies: yamllint
             task: make -f Makefile yamllint
             working-directory: .
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     container: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v2

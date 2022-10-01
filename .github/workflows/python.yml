@@ -32,7 +32,7 @@ jobs:
           # MANDATORY CHECKS USING LOWEST SUPPORTED ENVIRONMENT PROXY
           - image: fedora:34  # LOWEST DEVELOPMENT ENVIRONMENT
             toolchain: 1.62.1  # LOWEST SUPPORTED RUST TOOLCHAIN
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     container:
       image: ${{ matrix.image }}
       options: --privileged -v /dev:/dev
@@ -88,7 +88,7 @@ jobs:
 
   # PYTHON-BASED TESTS WITH TANG
   python-based-checks_with_tang:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     container:
       image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev

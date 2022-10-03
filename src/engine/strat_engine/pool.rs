@@ -163,7 +163,7 @@ impl StratPool {
 
         let thinpool = ThinPool::new(
             pool_uuid,
-            match ThinPoolSizeParams::new(backstore.available_in_backstore()) {
+            match ThinPoolSizeParams::new(backstore.datatier_usable_size()) {
                 Ok(ref params) => params,
                 Err(e) => {
                     let _ = backstore.destroy();
@@ -406,7 +406,7 @@ impl StratPool {
                 .map(|(_, _, fs)| fs.thindev_size())
                 .sum::<Sectors>()
                 + increase
-                > self.thin_pool.min_datadev_size(&self.backstore)?
+                > self.thin_pool.total_fs_limit(&self.backstore)
         {
             Err(StratisError::Msg(format!(
                 "Overprovisioning is disabled on this pool and increasing total filesystems size by {} would result in overprovisioning",
@@ -1237,6 +1237,7 @@ mod tests {
             .unwrap()
             .pop()
             .unwrap();
+        udev_settle().unwrap();
         assert!(pool
             .set_overprov_mode(&Name::new(pool_name.to_string()), false)
             .is_err());

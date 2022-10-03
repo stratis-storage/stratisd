@@ -273,11 +273,8 @@ pub struct StratisDevices {
 impl StratisDevices {
     // Given a pool UUID partition the devices into two divisions;
     // those that belong to the pool and those that do not.
-    fn partition(
-        mut self,
-        uuid: PoolUuid,
-    ) -> (Option<HashMap<DevUuid, DeviceInfo>>, StratisDevices) {
-        let this_pool = self.inner.remove(&uuid);
+    fn partition(mut self, uuid: PoolUuid) -> (HashMap<DevUuid, DeviceInfo>, StratisDevices) {
+        let this_pool = self.inner.remove(&uuid).unwrap_or_default();
         (this_pool, StratisDevices { inner: self.inner })
     }
 
@@ -468,22 +465,21 @@ fn check_device_ids(
     devices: ProcessedPathInfos,
 ) -> StratisResult<UnownedDevices> {
     let (pools, unowned) = devices.unpack();
-    let (this_pool, other_pools) = pools.partition(pool_uuid);
+    let (mut this_pool, other_pools) = pools.partition(pool_uuid);
 
     other_pools.error_on_not_empty()?;
 
-    if let Some(mut this_pool) = this_pool {
-        let (mut included, mut not_included) = (vec![], vec![]);
-        for (dev_uuid, info) in this_pool.drain() {
-            if current_uuids.contains(&dev_uuid) {
-                included.push((dev_uuid, info))
-            } else {
-                not_included.push((dev_uuid, info))
-            }
+    let (mut included, mut not_included) = (vec![], vec![]);
+    for (dev_uuid, info) in this_pool.drain() {
+        if current_uuids.contains(&dev_uuid) {
+            included.push((dev_uuid, info))
+        } else {
+            not_included.push((dev_uuid, info))
         }
+    }
 
-        if !not_included.is_empty() {
-            let error_message = format!(
+    if !not_included.is_empty() {
+        let error_message = format!(
                 "Devices ({}) appear to be already in use by this pool which has UUID {}; they may be in use by the other tier",
                 not_included
                     .iter()
@@ -492,11 +488,11 @@ fn check_device_ids(
                     .join(", "),
                 pool_uuid
             );
-            return Err(StratisError::Msg(error_message));
-        }
+        return Err(StratisError::Msg(error_message));
+    }
 
-        if !included.is_empty() {
-            info!(
+    if !included.is_empty() {
+        info!(
                 "Devices [{}] appear to be already in use by this pool which has UUID {}; omitting from the set of devices to initialize",
                 included
                     .iter()
@@ -511,7 +507,6 @@ fn check_device_ids(
                     .join(", "),
                 pool_uuid
             );
-        }
     }
 
     Ok(unowned)

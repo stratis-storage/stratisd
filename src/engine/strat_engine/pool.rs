@@ -690,6 +690,11 @@ impl Pool for StratPool {
                     );
                     return Err(StratisError::Msg(error_message));
                 };
+
+                if unowned_devices.is_empty() {
+                    return Ok((SetCreateAction::new(vec![]), None));
+                }
+
                 self.thin_pool.suspend()?;
                 let bdev_info_res = self.backstore.add_cachedevs(pool_uuid, unowned_devices);
                 self.thin_pool.resume()?;
@@ -708,6 +713,10 @@ impl Pool for StratPool {
                     );
                     return Err(StratisError::Msg(error_message));
                 };
+
+                if unowned_devices.is_empty() {
+                    return Ok((SetCreateAction::new(vec![]), None));
+                }
 
                 let cached = self.cached();
 

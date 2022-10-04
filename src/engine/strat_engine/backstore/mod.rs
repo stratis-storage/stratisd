@@ -14,6 +14,9 @@ mod range_alloc;
 mod shared;
 mod transaction;
 
+#[cfg(test)]
+pub use self::devices::process_and_verify_devices;
+
 pub use self::{
     backstore::Backstore,
     blockdev::{StratBlockDev, UnderlyingDevice},
@@ -21,8 +24,5 @@ pub use self::{
         crypt_metadata_size, set_up_crypt_logging, CryptActivationHandle, CryptHandle,
         CryptMetadataHandle, CLEVIS_TANG_TRUST_URL,
     },
-    devices::{
-        find_stratis_devs_by_uuid, initialize_devices, process_and_verify_devices,
-        ProcessedPathInfos,
-    },
+    devices::{find_stratis_devs_by_uuid, initialize_devices, ProcessedPathInfos},
 };

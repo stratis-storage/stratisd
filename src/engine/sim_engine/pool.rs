@@ -37,6 +37,7 @@ pub struct SimPool {
     cache_devs: HashMap<DevUuid, SimDev>,
     filesystems: Table<FilesystemUuid, SimFilesystem>,
     fs_limit: u64,
+    enable_overprov: bool,
 }
 
 impl SimPool {
@@ -50,6 +51,7 @@ impl SimPool {
                 cache_devs: HashMap::new(),
                 filesystems: Table::default(),
                 fs_limit: 10,
+                enable_overprov: true,
             },
         )
     }
@@ -665,10 +667,11 @@ impl Pool for SimPool {
     }
 
     fn overprov_enabled(&self) -> bool {
-        true
+        self.enable_overprov
     }
 
-    fn set_overprov_mode(&mut self, _: &Name, _: bool) -> StratisResult<()> {
+    fn set_overprov_mode(&mut self, _: &Name, enabled: bool) -> StratisResult<()> {
+        self.enable_overprov = enabled;
         Ok(())
     }
 

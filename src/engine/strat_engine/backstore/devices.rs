@@ -440,6 +440,10 @@ impl UnownedDevices {
     pub fn is_empty(&self) -> bool {
         self.inner.is_empty()
     }
+
+    pub fn unpack(self) -> Vec<DeviceInfo> {
+        self.inner
+    }
 }
 
 // Check coherence of pool and device UUIDs against a set of current UUIDs.
@@ -465,6 +469,7 @@ impl UnownedDevices {
 // Note that this method _should_ be somewhat temporary. We hope that in
 // another step the functionality contained will be hoisted up closer to
 // the D-Bus/engine interface, as it computes some idempotency information.
+#[cfg(test)]
 fn check_device_ids(
     pool_uuid: PoolUuid,
     current_uuids: &HashSet<DevUuid>,
@@ -521,6 +526,7 @@ fn check_device_ids(
 /// Combine the functionality of process_devices and check_device_ids.
 /// It is useful to guarantee that check_device_ids is called only with
 /// the result of invoking process_devices.
+#[cfg(test)]
 pub fn process_and_verify_devices(
     pool_uuid: PoolUuid,
     current_uuids: &HashSet<DevUuid>,

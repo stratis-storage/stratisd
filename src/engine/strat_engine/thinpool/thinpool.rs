@@ -2240,6 +2240,7 @@ mod tests {
 
         let pool_name = "pool";
         let pool_uuid = PoolUuid::new_v4();
+        let devices1 = process_and_verify_devices(pool_uuid, &HashSet::new(), paths1).unwrap();
         let devices = process_and_verify_devices(pool_uuid, &HashSet::new(), paths2).unwrap();
 
         let mut backstore =
@@ -2299,7 +2300,7 @@ mod tests {
         let old_device = backstore
             .device()
             .expect("Space already allocated from backstore, backstore must have device");
-        backstore.init_cache(pool_uuid, paths1).unwrap();
+        backstore.init_cache(pool_uuid, devices1).unwrap();
         let new_device = backstore
             .device()
             .expect("Space already allocated from backstore, backstore must have device");

@@ -480,17 +480,64 @@ impl Pool for StratPool {
                 "Use of a cache is not supported with an encrypted pool".to_string(),
             ));
         }
+
+        let devices = ProcessedPathInfos::try_from(blockdevs)?;
+        let (stratis_devices, unowned_devices) = devices.unpack();
+        let (this_pool, other_pools) = stratis_devices.partition(pool_uuid);
+
+        other_pools.error_on_not_empty()?;
+
+        let (in_pool, out_pool): (Vec<_>, Vec<_>) = this_pool
+            .iter()
+            .map(|(dev_uuid, _)| {
+                self.backstore
+                    .get_blockdev_by_uuid(*dev_uuid)
+                    .map(|(tier, _)| (*dev_uuid, tier))
+            })
+            .partition(|v| v.is_some());
+
+        if !out_pool.is_empty() {
+            let error_message = format!(
+                    "Devices ({}) appear to be already in use by this pool which has UUID {} but this pool has no record of them",
+                    out_pool
+                    .iter()
+                    .map(|opt| this_pool.get(&opt.expect("was looked up").0).expect("partitioned from this_pool").devnode.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                    pool_uuid
+                );
+            return Err(StratisError::Msg(error_message));
+        };
+
+        let (datadevs, cachedevs): (Vec<_>, Vec<_>) = in_pool
+            .iter()
+            .map(|opt| opt.expect("in_pool devices are Some"))
+            .partition(|(_, tier)| *tier == BlockDevTier::Data);
+
+        if !datadevs.is_empty() {
+            let error_message = format!(
+                "Devices ({}) appear to be already in use by this pool which has UUID {} in the data tier",
+                datadevs
+                    .iter()
+                    .map(|(uuid, _)| this_pool.get(uuid).expect("partitioned from this_pool").devnode.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                pool_uuid
+            );
+            return Err(StratisError::Msg(error_message));
+        };
+
         if !self.has_cache() {
-            if blockdevs.is_empty() {
+            if unowned_devices.is_empty() {
                 return Err(StratisError::Msg(
-                    "At least one blockdev path is required to initialize a cache.".to_string(),
+                    "At least one device is reqired to initialize a cache.".to_string(),
                 ));
             }
 
             self.thin_pool.suspend()?;
             let devices_result = self
                 .backstore
-                .init_cache(pool_uuid, blockdevs)
+                .init_cache(pool_uuid, unowned_devices)
                 .and_then(|bdi| {
                     self.thin_pool
                         .set_device(self.backstore.device().expect(
@@ -505,7 +552,22 @@ impl Pool for StratPool {
             Ok(SetCreateAction::new(devices))
         } else {
             init_cache_idempotent_or_err(
-                blockdevs,
+                &cachedevs
+                    .iter()
+                    .map(|(uuid, _)| {
+                        this_pool
+                            .get(uuid)
+                            .expect("partitioned from this_pool")
+                            .devnode
+                            .as_path()
+                    })
+                    .chain(
+                        unowned_devices
+                            .unpack()
+                            .iter()
+                            .map(|info| info.devnode.as_path()),
+                    )
+                    .collect::<Vec<_>>(),
                 self.backstore
                     .cachedevs()
                     .into_iter()

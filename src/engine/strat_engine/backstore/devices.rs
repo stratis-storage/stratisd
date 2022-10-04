@@ -436,6 +436,12 @@ pub struct UnownedDevices {
     pub(super) inner: Vec<DeviceInfo>,
 }
 
+impl UnownedDevices {
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+}
+
 // Check coherence of pool and device UUIDs against a set of current UUIDs.
 // If the selection of devices is incompatible with the current
 // state of the set, or simply invalid, return an error.

@@ -180,11 +180,10 @@ impl Backstore {
     /// WARNING: metadata changing event
     pub fn initialize(
         pool_uuid: PoolUuid,
-        paths: &[&Path],
+        devices: UnownedDevices,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<Backstore> {
-        let devices = process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?;
         let data_tier = DataTier::new(BlockDevMgr::initialize(
             pool_uuid,
             devices,
@@ -736,8 +735,11 @@ mod tests {
         let cachedevs =
             process_and_verify_devices(pool_uuid, &HashSet::new(), cachedevpaths).unwrap();
 
+        let initdatadevs =
+            process_and_verify_devices(pool_uuid, &HashSet::new(), initdatapaths).unwrap();
+
         let mut backstore =
-            Backstore::initialize(pool_uuid, initdatapaths, MDADataSize::default(), None).unwrap();
+            Backstore::initialize(pool_uuid, initdatadevs, MDADataSize::default(), None).unwrap();
 
         invariant(&backstore);
 
@@ -826,8 +828,10 @@ mod tests {
 
         let pool_uuid = PoolUuid::new_v4();
 
+        let devices1 = process_and_verify_devices(pool_uuid, &HashSet::new(), paths1).unwrap();
+
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths1, MDADataSize::default(), None).unwrap();
+            Backstore::initialize(pool_uuid, devices1, MDADataSize::default(), None).unwrap();
 
         for path in paths1 {
             assert_eq!(

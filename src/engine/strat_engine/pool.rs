@@ -155,11 +155,20 @@ impl StratPool {
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = PoolUuid::new_v4();
 
+        let devices = ProcessedPathInfos::try_from(paths)?;
+        let (stratis_devices, unowned_devices) = devices.unpack();
+
+        stratis_devices.error_on_not_empty()?;
+
         // FIXME: Initializing with the minimum MDA size is not necessarily
         // enough. If there are enough devices specified, more space will be
         // required.
-        let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), encryption_info)?;
+        let mut backstore = Backstore::initialize(
+            pool_uuid,
+            unowned_devices,
+            MDADataSize::default(),
+            encryption_info,
+        )?;
 
         let thinpool = ThinPool::new(
             pool_uuid,

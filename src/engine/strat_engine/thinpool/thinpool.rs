@@ -803,11 +803,10 @@ impl ThinPool {
         Ok(())
     }
 
-    /// Set the pool IO mode to queue writes when out of space.
+    /// Set the pool IO mode to error on writes when out of space.
     ///
-    /// This mode should be enabled when the pool has space to allocate to the pool.
-    /// This prevents unnecessary IO errors while the pools is being extended and
-    /// the writes can then be processed after the extension.
+    /// This mode should be enabled when the pool is out of space to allocate to the
+    /// pool.
     fn set_error_mode(&mut self) -> bool {
         if !self.out_of_alloc_space() {
             if let Err(e) = self.thin_pool.error_if_no_space(get_dm()) {
@@ -824,10 +823,11 @@ impl ThinPool {
         }
     }
 
-    /// Set the pool IO mode to error on writes when out of space.
+    /// Set the pool IO mode to queue writes when out of space.
     ///
-    /// This mode should be enabled when the pool is out of space to allocate to the
-    /// pool.
+    /// This mode should be enabled when the pool has space to allocate to the pool.
+    /// This prevents unnecessary IO errors while the pools is being extended and
+    /// the writes can then be processed after the extension.
     pub fn set_queue_mode(&mut self) -> bool {
         if self.out_of_alloc_space() {
             if let Err(e) = self.thin_pool.queue_if_no_space(get_dm()) {

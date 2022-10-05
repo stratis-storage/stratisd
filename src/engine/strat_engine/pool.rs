@@ -18,7 +18,7 @@ use crate::{
             validate_paths,
         },
         strat_engine::{
-            backstore::{Backstore, ProcessedPathInfos, StratBlockDev},
+            backstore::{Backstore, ProcessedPathInfos, StratBlockDev, UnownedDevices},
             liminal::{DeviceInfo, DeviceSet, LInfo},
             metadata::MDADataSize,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
@@ -150,25 +150,16 @@ impl StratPool {
     /// Precondition: p.is_absolute() is true for all p in paths
     pub fn initialize(
         name: &str,
-        paths: &[&Path],
+        devices: UnownedDevices,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = PoolUuid::new_v4();
 
-        let devices = ProcessedPathInfos::try_from(paths)?;
-        let (stratis_devices, unowned_devices) = devices.unpack();
-
-        stratis_devices.error_on_not_empty()?;
-
         // FIXME: Initializing with the minimum MDA size is not necessarily
         // enough. If there are enough devices specified, more space will be
         // required.
-        let mut backstore = Backstore::initialize(
-            pool_uuid,
-            unowned_devices,
-            MDADataSize::default(),
-            encryption_info,
-        )?;
+        let mut backstore =
+            Backstore::initialize(pool_uuid, devices, MDADataSize::default(), encryption_info)?;
 
         let thinpool = ThinPool::new(
             pool_uuid,
@@ -1123,26 +1114,6 @@ mod tests {
             .all(|(_, _, bd)| bd.metadata_path().is_absolute()))
     }
 
-    /// Verify that a pool with no devices does not have the minimum amount of
-    /// space required.
-    fn test_empty_pool(paths: &[&Path]) {
-        assert_eq!(paths.len(), 0);
-        assert_matches!(
-            StratPool::initialize("stratis_test_pool", paths, None),
-            Err(_)
-        );
-    }
-
-    #[test]
-    fn loop_test_empty_pool() {
-        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Exactly(0, None), test_empty_pool);
-    }
-
-    #[test]
-    fn real_test_empty_pool() {
-        real::test_with_spec(&real::DeviceLimits::Exactly(0, None, None), test_empty_pool);
-    }
-
     /// Test that initializing a cache causes metadata to be updated. Verify
     /// that data written before the cache was initialized can be read
     /// afterwards.
@@ -1151,8 +1122,12 @@ mod tests {
 
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
+        let devices2 = ProcessedPathInfos::try_from(paths2).unwrap();
+        let (stratis_devices, unowned_devices2) = devices2.unpack();
+        stratis_devices.error_on_not_empty().unwrap();
+
         let name = "stratis-test-pool";
-        let (uuid, mut pool) = StratPool::initialize(name, paths2, None).unwrap();
+        let (uuid, mut pool) = StratPool::initialize(name, unowned_devices2, None).unwrap();
         invariant(&pool, name);
 
         let metadata1 = pool.record(name);
@@ -1234,8 +1209,12 @@ mod tests {
         let (cache_path, data_paths) = paths.split_at(1);
         let (data_path, data_paths) = data_paths.split_at(1);
 
+        let devices = ProcessedPathInfos::try_from(data_path).unwrap();
+        let (stratis_devices, unowned_devices) = devices.unpack();
+        stratis_devices.error_on_not_empty().unwrap();
+
         let name = "stratis-test-pool";
-        let (uuid, mut pool) = StratPool::initialize(name, data_path, None).unwrap();
+        let (uuid, mut pool) = StratPool::initialize(name, unowned_devices, None).unwrap();
         invariant(&pool, name);
 
         pool.init_cache(uuid, name, cache_path).unwrap();
@@ -1270,8 +1249,12 @@ mod tests {
 
         let (paths1, paths2) = paths.split_at(1);
 
+        let devices1 = ProcessedPathInfos::try_from(paths1).unwrap();
+        let (stratis_devices, unowned_devices1) = devices1.unpack();
+        stratis_devices.error_on_not_empty().unwrap();
+
         let name = "stratis-test-pool";
-        let (pool_uuid, mut pool) = StratPool::initialize(name, paths1, None).unwrap();
+        let (pool_uuid, mut pool) = StratPool::initialize(name, unowned_devices1, None).unwrap();
         invariant(&pool, name);
 
         let fs_name = "stratis_test_filesystem";
@@ -1343,7 +1326,12 @@ mod tests {
         assert!(paths.len() > 1);
 
         let name = "stratis-test-pool";
-        let (_, mut pool) = StratPool::initialize(name, paths, None).unwrap();
+
+        let devices = ProcessedPathInfos::try_from(paths).unwrap();
+        let (stratis_devices, unowned_devices) = devices.unpack();
+        stratis_devices.error_on_not_empty().unwrap();
+
+        let (_, mut pool) = StratPool::initialize(name, unowned_devices, None).unwrap();
         invariant(&pool, name);
 
         assert_eq!(pool.action_avail, ActionAvailability::Full);
@@ -1354,7 +1342,12 @@ mod tests {
         udev_settle().unwrap();
 
         let name = "stratis-test-pool";
-        let (_, mut pool) = StratPool::initialize(name, paths, None).unwrap();
+
+        let devices = ProcessedPathInfos::try_from(paths).unwrap();
+        let (stratis_devices, unowned_devices) = devices.unpack();
+        stratis_devices.error_on_not_empty().unwrap();
+
+        let (_, mut pool) = StratPool::initialize(name, unowned_devices, None).unwrap();
         invariant(&pool, name);
 
         assert_eq!(pool.action_avail, ActionAvailability::Full);
@@ -1388,7 +1381,13 @@ mod tests {
         assert!(paths.len() == 1);
 
         let pool_name = "pool";
-        let (pool_uuid, mut pool) = StratPool::initialize(pool_name, paths, None).unwrap();
+
+        let devices = ProcessedPathInfos::try_from(paths).unwrap();
+        let (stratis_devices, unowned_devices) = devices.unpack();
+        stratis_devices.error_on_not_empty().unwrap();
+
+        let (pool_uuid, mut pool) =
+            StratPool::initialize(pool_name, unowned_devices, None).unwrap();
 
         let (_, fs_uuid, _) = pool
             .create_filesystems(

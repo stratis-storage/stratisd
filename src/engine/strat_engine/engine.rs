@@ -23,6 +23,7 @@ use crate::{
         engine::HandleEvents,
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         strat_engine::{
+            backstore::ProcessedPathInfos,
             cmd::verify_executables,
             dm::get_dm,
             keys::StratKeyActions,
@@ -375,28 +376,55 @@ impl Engine for StratEngine {
 
         validate_paths(blockdev_paths)?;
 
+        let cloned_paths = blockdev_paths
+            .iter()
+            .map(|p| p.to_path_buf())
+            .collect::<Vec<_>>();
+
+        let devices = spawn_blocking!({
+            let borrowed_paths = cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
+            ProcessedPathInfos::try_from(borrowed_paths.as_slice())
+        })??;
+
+        let (stratis_devices, unowned_devices) = devices.unpack();
+
         let maybe_guard = self.pools.read(LockKey::Name(name.clone())).await;
         if let Some(guard) = maybe_guard {
-            let (name, _, pool) = guard.as_tuple();
-            create_pool_idempotent_or_err(pool, &name, blockdev_paths)
-        } else if blockdev_paths.is_empty() {
-            Err(StratisError::Msg(
-                "At least one blockdev is required to create a pool.".to_string(),
-            ))
+            let (name, uuid, pool) = guard.as_tuple();
+
+            let (this_pool, other_pools) = stratis_devices.partition(uuid);
+            other_pools.error_on_not_empty()?;
+
+            create_pool_idempotent_or_err(
+                pool,
+                &name,
+                &this_pool
+                    .iter()
+                    .map(|(_, info)| info.devnode.as_path())
+                    .chain(
+                        unowned_devices
+                            .unpack()
+                            .iter()
+                            .map(|info| info.devnode.as_path()),
+                    )
+                    .collect::<Vec<_>>(),
+            )
         } else {
+            stratis_devices.error_on_not_empty()?;
+
+            if unowned_devices.is_empty() {
+                return Err(StratisError::Msg(
+                    "At least one blockdev is required to create a pool.".to_string(),
+                ));
+            }
+
             let cloned_name = name.clone();
-            let cloned_paths = blockdev_paths
-                .iter()
-                .map(|p| p.to_path_buf())
-                .collect::<Vec<_>>();
             let cloned_enc_info = encryption_info.cloned();
 
             let pool_uuid = {
                 let mut pools = self.pools.write_all().await;
                 let (pool_uuid, pool) = spawn_blocking!({
-                    let borrowed_paths =
-                        cloned_paths.iter().map(|p| p.as_path()).collect::<Vec<_>>();
-                    StratPool::initialize(&cloned_name, &borrowed_paths, cloned_enc_info.as_ref())
+                    StratPool::initialize(&cloned_name, unowned_devices, cloned_enc_info.as_ref())
                 })??;
                 pools.insert(Name::new(name.to_string()), pool_uuid, pool);
                 pool_uuid

@@ -674,7 +674,7 @@ mod tests {
     use devicemapper::{CacheDevStatus, DataBlocks, DmOptions, IEC};
 
     use crate::engine::strat_engine::{
-        backstore::process_and_verify_devices,
+        backstore::devices::process_and_verify_devices,
         metadata::device_identifiers,
         tests::{loopbacked, real},
     };

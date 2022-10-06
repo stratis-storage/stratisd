@@ -1622,7 +1622,6 @@ fn attempt_thin_repair(
 #[cfg(test)]
 mod tests {
     use std::{
-        collections::HashSet,
         fs::OpenOptions,
         io::{BufWriter, Read, Write},
         path::Path,
@@ -1636,7 +1635,7 @@ mod tests {
         engine::Filesystem,
         shared::DEFAULT_THIN_DEV_SIZE,
         strat_engine::{
-            backstore::process_and_verify_devices,
+            backstore::{ProcessedPathInfos, UnownedDevices},
             cmd,
             metadata::MDADataSize,
             tests::{loopbacked, real},
@@ -1648,6 +1647,15 @@ mod tests {
 
     #[allow(clippy::cast_possible_truncation)]
     const BYTES_PER_WRITE: usize = 2 * IEC::Ki as usize * SECTOR_SIZE as usize;
+
+    fn get_devices(paths: &[&Path]) -> StratisResult<UnownedDevices> {
+        ProcessedPathInfos::try_from(paths)
+            .map(|ps| ps.unpack())
+            .map(|(sds, uds)| {
+                sds.error_on_not_empty().unwrap();
+                uds
+            })
+    }
 
     /// Test lazy allocation.
     /// Verify that ThinPool::new() succeeds.
@@ -1663,7 +1671,7 @@ mod tests {
     fn test_lazy_allocation(paths: &[&Path]) {
         let pool_uuid = PoolUuid::new_v4();
 
-        let devices = process_and_verify_devices(pool_uuid, &HashSet::new(), paths).unwrap();
+        let devices = get_devices(paths).unwrap();
 
         let mut backstore =
             Backstore::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
@@ -1752,10 +1760,8 @@ mod tests {
         let pool_uuid = PoolUuid::new_v4();
         let (first_path, remaining_paths) = paths.split_at(1);
 
-        let first_devices =
-            process_and_verify_devices(pool_uuid, &HashSet::new(), first_path).unwrap();
-        let remaining_devices =
-            process_and_verify_devices(pool_uuid, &HashSet::new(), remaining_paths).unwrap();
+        let first_devices = get_devices(first_path).unwrap();
+        let remaining_devices = get_devices(remaining_paths).unwrap();
 
         let mut backstore =
             Backstore::initialize(pool_uuid, first_devices, MDADataSize::default(), None).unwrap();
@@ -1883,7 +1889,7 @@ mod tests {
         let pool_name = "pool";
         let pool_uuid = PoolUuid::new_v4();
 
-        let devices = process_and_verify_devices(pool_uuid, &HashSet::new(), paths).unwrap();
+        let devices = get_devices(paths).unwrap();
 
         let mut backstore =
             Backstore::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
@@ -1996,7 +2002,9 @@ mod tests {
         let name2 = "name2";
 
         let pool_uuid = PoolUuid::new_v4();
-        let devices = process_and_verify_devices(pool_uuid, &HashSet::new(), paths).unwrap();
+
+        let devices = get_devices(paths).unwrap();
+
         let mut backstore =
             Backstore::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
@@ -2058,7 +2066,9 @@ mod tests {
     fn test_pool_setup(paths: &[&Path]) {
         let pool_name = "pool";
         let pool_uuid = PoolUuid::new_v4();
-        let devices = process_and_verify_devices(pool_uuid, &HashSet::new(), paths).unwrap();
+
+        let devices = get_devices(paths).unwrap();
+
         let mut backstore =
             Backstore::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
@@ -2129,7 +2139,9 @@ mod tests {
     /// same thin id and verifying that it fails.
     fn test_thindev_destroy(paths: &[&Path]) {
         let pool_uuid = PoolUuid::new_v4();
-        let devices = process_and_verify_devices(pool_uuid, &HashSet::new(), paths).unwrap();
+
+        let devices = get_devices(paths).unwrap();
+
         let mut backstore =
             Backstore::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
@@ -2188,7 +2200,9 @@ mod tests {
     fn test_suspend_resume(paths: &[&Path]) {
         let pool_name = "pool";
         let pool_uuid = PoolUuid::new_v4();
-        let devices = process_and_verify_devices(pool_uuid, &HashSet::new(), paths).unwrap();
+
+        let devices = get_devices(paths).unwrap();
+
         let mut backstore =
             Backstore::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
         let mut pool = ThinPool::new(
@@ -2240,8 +2254,9 @@ mod tests {
 
         let pool_name = "pool";
         let pool_uuid = PoolUuid::new_v4();
-        let devices1 = process_and_verify_devices(pool_uuid, &HashSet::new(), paths1).unwrap();
-        let devices = process_and_verify_devices(pool_uuid, &HashSet::new(), paths2).unwrap();
+
+        let devices1 = get_devices(paths1).unwrap();
+        let devices = get_devices(paths2).unwrap();
 
         let mut backstore =
             Backstore::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();

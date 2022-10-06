@@ -669,12 +669,12 @@ impl Recordable<BackstoreSave> for Backstore {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, fs::OpenOptions, path::Path};
+    use std::{fs::OpenOptions, path::Path};
 
     use devicemapper::{CacheDevStatus, DataBlocks, DmOptions, IEC};
 
     use crate::engine::strat_engine::{
-        backstore::devices::process_and_verify_devices,
+        backstore::devices::{ProcessedPathInfos, UnownedDevices},
         metadata::device_identifiers,
         tests::{loopbacked, real},
     };
@@ -708,6 +708,15 @@ mod tests {
         assert!(backstore.next <= backstore.size())
     }
 
+    fn get_devices(paths: &[&Path]) -> StratisResult<UnownedDevices> {
+        ProcessedPathInfos::try_from(paths)
+            .map(|ps| ps.unpack())
+            .map(|(sds, uds)| {
+                sds.error_on_not_empty().unwrap();
+                uds
+            })
+    }
+
     /// Test adding cachedevs to the backstore.
     /// When cachedevs are added, cache tier, etc. must exist.
     /// Nonetheless, because nothing is written or read, cache usage ought
@@ -724,16 +733,10 @@ mod tests {
 
         let pool_uuid = PoolUuid::new_v4();
 
-        let datadevs =
-            process_and_verify_devices(pool_uuid, &HashSet::new(), datadevpaths).unwrap();
-        let cachedevs =
-            process_and_verify_devices(pool_uuid, &HashSet::new(), cachedevpaths).unwrap();
-
-        let initdatadevs =
-            process_and_verify_devices(pool_uuid, &HashSet::new(), initdatapaths).unwrap();
-
-        let initcachedevs =
-            process_and_verify_devices(pool_uuid, &HashSet::new(), initcachepaths).unwrap();
+        let datadevs = get_devices(datadevpaths).unwrap();
+        let cachedevs = get_devices(cachedevpaths).unwrap();
+        let initdatadevs = get_devices(initdatapaths).unwrap();
+        let initcachedevs = get_devices(initcachepaths).unwrap();
 
         let mut backstore =
             Backstore::initialize(pool_uuid, initdatadevs, MDADataSize::default(), None).unwrap();
@@ -825,8 +828,8 @@ mod tests {
 
         let pool_uuid = PoolUuid::new_v4();
 
-        let devices1 = process_and_verify_devices(pool_uuid, &HashSet::new(), paths1).unwrap();
-        let devices2 = process_and_verify_devices(pool_uuid, &HashSet::new(), paths2).unwrap();
+        let devices1 = get_devices(paths1).unwrap();
+        let devices2 = get_devices(paths2).unwrap();
 
         let mut backstore =
             Backstore::initialize(pool_uuid, devices1, MDADataSize::default(), None).unwrap();

@@ -171,15 +171,24 @@ impl Recordable<DataTierSave> for DataTier {
 #[cfg(test)]
 mod tests {
 
-    use std::{collections::HashSet, path::Path};
+    use std::path::Path;
 
     use crate::engine::strat_engine::{
-        backstore::devices::process_and_verify_devices,
+        backstore::devices::{ProcessedPathInfos, UnownedDevices},
         metadata::MDADataSize,
         tests::{loopbacked, real},
     };
 
     use super::*;
+
+    fn get_devices(paths: &[&Path]) -> StratisResult<UnownedDevices> {
+        ProcessedPathInfos::try_from(paths)
+            .map(|ps| ps.unpack())
+            .map(|(sds, uds)| {
+                sds.error_on_not_empty().unwrap();
+                uds
+            })
+    }
 
     /// Put the data tier through some paces. Make it, alloc a small amount,
     /// add some more blockdevs, allocate enough that the newly added blockdevs
@@ -191,8 +200,8 @@ mod tests {
 
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
-        let devices1 = process_and_verify_devices(pool_uuid, &HashSet::new(), paths1).unwrap();
-        let devices2 = process_and_verify_devices(pool_uuid, &HashSet::new(), paths2).unwrap();
+        let devices1 = get_devices(paths1).unwrap();
+        let devices2 = get_devices(paths2).unwrap();
 
         let mgr =
             BlockDevMgr::initialize(pool_uuid, devices1, MDADataSize::default(), None).unwrap();

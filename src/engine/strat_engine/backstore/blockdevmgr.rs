@@ -786,10 +786,10 @@ impl Recordable<Vec<BaseBlockDevSave>> for BlockDevMgr {
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashSet, env, error::Error, path::Path};
+    use std::{env, error::Error, path::Path};
 
     use crate::engine::strat_engine::{
-        backstore::devices::process_and_verify_devices,
+        backstore::devices::{ProcessedPathInfos, UnownedDevices},
         cmd,
         names::KeyDescription,
         ns::{unshare_namespace, MemoryFilesystem},
@@ -798,13 +798,19 @@ mod tests {
 
     use super::*;
 
+    fn get_devices(paths: &[&Path]) -> StratisResult<UnownedDevices> {
+        ProcessedPathInfos::try_from(paths)
+            .map(|ps| ps.unpack())
+            .and_then(|(sds, uds)| sds.error_on_not_empty().map(|_| uds))
+    }
+
     /// Verify that initially,
     /// size() - metadata_size() = avail_space().
     /// After 2 Sectors have been allocated, that amount must also be included
     /// in balance.
     fn test_blockdevmgr_used(paths: &[&Path]) {
         let pool_uuid = PoolUuid::new_v4();
-        let devices = process_and_verify_devices(pool_uuid, &HashSet::new(), paths).unwrap();
+        let devices = get_devices(paths).unwrap();
         let mut mgr =
             BlockDevMgr::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
         assert_eq!(mgr.avail_space() + mgr.metadata_size(), mgr.size());
@@ -840,8 +846,8 @@ mod tests {
         fn test_with_key(paths: &[&Path], key_desc: &KeyDescription) -> Result<(), Box<dyn Error>> {
             let pool_uuid = PoolUuid::new_v4();
 
-            let devices1 = process_and_verify_devices(pool_uuid, &HashSet::new(), &paths[..2])?;
-            let devices2 = process_and_verify_devices(pool_uuid, &HashSet::new(), &paths[2..3])?;
+            let devices1 = get_devices(&paths[..2])?;
+            let devices2 = get_devices(&paths[2..3])?;
 
             let mut bdm = BlockDevMgr::initialize(
                 pool_uuid,
@@ -886,8 +892,8 @@ mod tests {
         fn test_with_key(paths: &[&Path], key_desc: &KeyDescription) -> Result<(), Box<dyn Error>> {
             let pool_uuid = PoolUuid::new_v4();
 
-            let devices1 = process_and_verify_devices(pool_uuid, &HashSet::new(), &paths[..2])?;
-            let devices2 = process_and_verify_devices(pool_uuid, &HashSet::new(), &paths[2..3])?;
+            let devices1 = get_devices(&paths[..2])?;
+            let devices2 = get_devices(&paths[2..3])?;
 
             let mut bdm = BlockDevMgr::initialize(
                 pool_uuid,
@@ -940,46 +946,48 @@ mod tests {
 
         let bd_mgr = BlockDevMgr::initialize(
             uuid,
-            process_and_verify_devices(uuid, &HashSet::new(), paths1).unwrap(),
+            get_devices(paths1).unwrap(),
             MDADataSize::default(),
             None,
         )
         .unwrap();
         cmd::udev_settle().unwrap();
 
-        assert_matches!(
-            process_and_verify_devices(uuid2, &HashSet::new(), paths1),
-            Err(_)
-        );
+        assert_matches!(get_devices(paths1), Err(_));
 
-        assert_matches!(
-            process_and_verify_devices(uuid2, &HashSet::new(), paths1),
-            Err(_)
-        );
+        assert!(ProcessedPathInfos::try_from(paths1)
+            .unwrap()
+            .unpack()
+            .0
+            .partition(uuid2)
+            .0
+            .is_empty());
 
-        let current_uuids = bd_mgr
-            .blockdevs()
-            .iter()
-            .map(|(uuid, _)| *uuid)
-            .collect::<HashSet<_>>();
-        assert_matches!(
-            process_and_verify_devices(uuid, &current_uuids, paths1),
-            Ok(_)
-        );
+        assert!(!ProcessedPathInfos::try_from(paths1)
+            .unwrap()
+            .unpack()
+            .0
+            .partition(uuid)
+            .0
+            .is_empty());
 
         BlockDevMgr::initialize(
             uuid,
-            process_and_verify_devices(uuid, &HashSet::new(), paths2).unwrap(),
+            get_devices(paths2).unwrap(),
             MDADataSize::default(),
             None,
         )
         .unwrap();
+
         cmd::udev_settle().unwrap();
 
-        assert_matches!(
-            process_and_verify_devices(uuid, &HashSet::new(), paths2),
-            Err(_)
-        );
+        assert!(!ProcessedPathInfos::try_from(paths2)
+            .unwrap()
+            .unpack()
+            .0
+            .partition(uuid)
+            .0
+            .is_empty());
 
         bd_mgr.invariant()
     }
@@ -1006,7 +1014,7 @@ mod tests {
         let pool_uuid = PoolUuid::new_v4();
         let mut mgr = BlockDevMgr::initialize(
             pool_uuid,
-            process_and_verify_devices(pool_uuid, &HashSet::new(), paths).unwrap(),
+            get_devices(paths).unwrap(),
             MDADataSize::default(),
             Some(&EncryptionInfo::ClevisInfo((
                 "tang".to_string(),
@@ -1066,7 +1074,7 @@ mod tests {
             let pool_uuid = PoolUuid::new_v4();
             let mut mgr = BlockDevMgr::initialize(
                 pool_uuid,
-                process_and_verify_devices(pool_uuid, &HashSet::new(), paths).unwrap(),
+                get_devices(paths).unwrap(),
                 MDADataSize::default(),
                 Some(&EncryptionInfo::Both(
                     key_desc.clone(),

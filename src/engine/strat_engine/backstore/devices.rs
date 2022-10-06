@@ -446,99 +446,6 @@ impl UnownedDevices {
     }
 }
 
-// Check coherence of pool and device UUIDs against a set of current UUIDs.
-// If the selection of devices is incompatible with the current
-// state of the set, or simply invalid, return an error.
-//
-// Postcondition: There are no infos returned from this method that
-// represent information about Stratis devices. If any device with
-// Stratis identifiers was in the list of devices passed to the function
-// either:
-// * It was filtered out of the list, because its device UUID was
-// found in current_uuids
-// * An error was returned because it was unsuitable, for example,
-// its pool UUID did not match the pool_uuid argument
-//
-// Precondition: This method is called only with the result of
-// process_devices. Currently, this guarantees that all LUKS devices,
-// for example, have been eliminated from the devices that are being
-// checked. Thus, the absence of stratisd identifiers for a particular
-// device should ensure that the device does not belong to Stratis.
-//
-// FIXME:
-// Note that this method _should_ be somewhat temporary. We hope that in
-// another step the functionality contained will be hoisted up closer to
-// the D-Bus/engine interface, as it computes some idempotency information.
-#[cfg(test)]
-fn check_device_ids(
-    pool_uuid: PoolUuid,
-    current_uuids: &HashSet<DevUuid>,
-    devices: ProcessedPathInfos,
-) -> StratisResult<UnownedDevices> {
-    let (pools, unowned) = devices.unpack();
-    let (mut this_pool, other_pools) = pools.partition(pool_uuid);
-
-    other_pools.error_on_not_empty()?;
-
-    let (mut included, mut not_included) = (vec![], vec![]);
-    for (dev_uuid, info) in this_pool.drain() {
-        if current_uuids.contains(&dev_uuid) {
-            included.push((dev_uuid, info))
-        } else {
-            not_included.push((dev_uuid, info))
-        }
-    }
-
-    if !not_included.is_empty() {
-        let error_message = format!(
-                "Devices ({}) appear to be already in use by this pool which has UUID {}; they may be in use by the other tier",
-                not_included
-                    .iter()
-                    .map(|(_, info)| info.devnode.display().to_string())
-                    .collect::<Vec<_>>()
-                    .join(", "),
-                pool_uuid
-            );
-        return Err(StratisError::Msg(error_message));
-    }
-
-    if !included.is_empty() {
-        info!(
-                "Devices [{}] appear to be already in use by this pool which has UUID {}; omitting from the set of devices to initialize",
-                included
-                    .iter()
-                    .map(|(dev_uuid, info)| {
-                        format!(
-                            "(device node: {}, device UUID: {})",
-                            info.devnode.display(),
-                            dev_uuid
-                        )
-                    })
-                    .collect::<Vec<_>>()
-                    .join(", "),
-                pool_uuid
-            );
-    }
-
-    Ok(unowned)
-}
-
-/// Combine the functionality of process_devices and check_device_ids.
-/// It is useful to guarantee that check_device_ids is called only with
-/// the result of invoking process_devices.
-#[cfg(test)]
-pub fn process_and_verify_devices(
-    pool_uuid: PoolUuid,
-    current_uuids: &HashSet<DevUuid>,
-    paths: &[&Path],
-) -> StratisResult<UnownedDevices> {
-    check_device_ids(
-        pool_uuid,
-        current_uuids,
-        ProcessedPathInfos::try_from(paths)?,
-    )
-}
-
 /// Initialze devices in devices.
 /// Clean up previously initialized devices if initialization of any single
 /// device fails during initialization. Log at the warning level if cleanup
@@ -918,24 +825,17 @@ mod tests {
             )));
         }
 
-        let initialized_uuids: HashSet<DevUuid> = stratis_identifiers
-            .iter()
-            .map(|ids| {
-                ids.expect("returned in line above if any are None")
-                    .device_uuid
-            })
-            .collect();
-
         if key_description.is_none() {
-            if !process_and_verify_devices(
-                pool_uuid,
-                &initialized_uuids,
+            if !ProcessedPathInfos::try_from(
                 stratis_devnodes
                     .iter()
                     .map(|p| p.as_path())
                     .collect::<Vec<_>>()
                     .as_slice(),
-            )?
+            )
+            .unwrap()
+            .unpack()
+            .1
             .inner
             .is_empty()
             {
@@ -944,70 +844,63 @@ mod tests {
                 )));
             }
 
-            if process_and_verify_devices(
-                pool_uuid,
-                &HashSet::new(),
+            if ProcessedPathInfos::try_from(
                 stratis_devnodes
                     .iter()
                     .map(|p| p.as_path())
                     .collect::<Vec<_>>()
                     .as_slice(),
             )
-            .is_ok()
+            .unwrap()
+            .unpack()
+            .0
+            .partition(pool_uuid)
+            .1
+            .error_on_not_empty()
+            .is_err()
             {
                 return Err(Box::new(StratisError::Msg(
-                "Failed to return an error when some device processed was not in the set of already initialized devices".to_string()
+                    "Failed to return an error when some device processed was not in the set of already initialized devices".to_string()
                 )));
             }
         } else {
             // The devices will be rejected with an errorif they were the
             // minimum size when initialized.
-
-            if let Ok(infos) = process_and_verify_devices(
-                pool_uuid,
-                &initialized_uuids,
+            if let Ok(infos) = ProcessedPathInfos::try_from(
                 stratis_devnodes
                     .iter()
                     .map(|p| p.as_path())
                     .collect::<Vec<_>>()
                     .as_slice(),
             ) {
-                if !infos.inner.is_empty() {
+                if !infos.unpack().0.partition(pool_uuid).1.inner.is_empty() {
                     return Err(Box::new(StratisError::Msg(
                         "Failed to eliminate devices already initialized for this pool from list of devices to initialize".to_string()
                     )));
                 }
             }
+
+            if ProcessedPathInfos::try_from(paths).is_ok() {
+                return Err(Box::new(StratisError::Msg(
+                    "Failed to return an error when encountering devices that are LUKS2"
+                        .to_string(),
+                )));
+            }
         }
 
-        if process_and_verify_devices(
-            PoolUuid::new_v4(),
-            &initialized_uuids,
+        if let Ok(infos) = ProcessedPathInfos::try_from(
             stratis_devnodes
                 .iter()
                 .map(|p| p.as_path())
                 .collect::<Vec<_>>()
                 .as_slice(),
-        )
-        .is_ok()
-        {
-            return Err(Box::new(StratisError::Msg(
-                "Failed to return an error when processing devices for a pool UUID which is not the same as that for which the devices were initialized".to_string()
-            )));
-        }
-
-        let result = process_and_verify_devices(pool_uuid, &initialized_uuids, paths);
-        if key_description.is_some() && result.is_ok() {
-            return Err(Box::new(StratisError::Msg(
-                "Failed to return an error when encountering devices that are LUKS2".to_string(),
-            )));
-        }
-
-        if key_description.is_none() && !result?.inner.is_empty() {
-            return Err(Box::new(StratisError::Msg(
-                        "Failed to filter all previously initialized devices which should have all been eliminated on the basis of already belonging to pool with the given pool UUID".to_string()
+        ) {
+            if !infos.unpack().0.partition(PoolUuid::new_v4()).0.is_empty() {
+                return Err(Box::new(StratisError::Msg(
+                    "Failed to leave devices in StratisDevices when processing devices for a pool UUID which is not the same as that for which the devices were initialized".to_string()
                 )));
-        }
+            }
+        };
 
         wipe_blockdevs(&mut blockdevs)?;
 

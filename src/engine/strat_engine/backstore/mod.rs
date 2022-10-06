@@ -14,9 +14,6 @@ mod range_alloc;
 mod shared;
 mod transaction;
 
-#[cfg(test)]
-pub use self::devices::process_and_verify_devices;
-
 pub use self::{
     backstore::Backstore,
     blockdev::{StratBlockDev, UnderlyingDevice},

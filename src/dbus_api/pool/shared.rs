@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::path::Path;
+use std::{fmt::Display, path::Path};
 
 use dbus::{
     arg::{Array, IterAppend},
@@ -20,7 +20,7 @@ use crate::{
     },
     engine::{
         total_allocated, total_used, BlockDevTier, Diff, Engine, EngineAction, LockKey, Name, Pool,
-        PoolUuid,
+        PoolUuid, PropChangeAction,
     },
 };
 
@@ -62,13 +62,13 @@ where
     closure((pool_name, pool_uuid, pool))
 }
 
-pub fn pool_set_operation<F, E>(
+pub fn pool_set_operation<F, R, E>(
     tree: &Tree<MTSync<TData<E>>, TData<E>>,
     object_path: &dbus::Path<'static>,
     closure: F,
-) -> Result<(), String>
+) -> Result<R, String>
 where
-    F: Fn((Name, PoolUuid, &mut E::Pool)) -> Result<(), String>,
+    F: Fn((Name, PoolUuid, &mut E::Pool)) -> Result<R, String>,
     E: 'static + Engine,
 {
     let dbus_context = tree.get_data();
@@ -240,16 +240,22 @@ where
 
 /// Set a pool property. The property is found by means of the setter method which
 /// takes a mutable reference to a Pool and sets the property on the pool.
-pub fn set_pool_property<F, E>(
+pub fn set_pool_property<F, R, E>(
     p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+    prop_name: &str,
     setter: F,
-) -> Result<(), MethodErr>
+) -> Result<PropChangeAction<R>, MethodErr>
 where
-    F: Fn((Name, PoolUuid, &mut E::Pool)) -> Result<(), String>,
+    F: Fn((Name, PoolUuid, &mut E::Pool)) -> Result<PropChangeAction<R>, String>,
     E: 'static + Engine,
+    R: Display,
 {
-    pool_set_operation(p.tree, p.path.get_name(), setter).map_err(|ref e| MethodErr::failed(e))?;
-    Ok(())
+    info!("Setting property {}", prop_name);
+    // Using clippy's suggested code causes a compilation error
+    #[allow(clippy::redundant_closure)]
+    let res =
+        pool_set_operation(p.tree, p.path.get_name(), setter).map_err(|ref e| MethodErr::failed(e));
+    handle_action!(res)
 }
 
 /// Generate D-Bus representation of name property.
@@ -343,12 +349,17 @@ pub fn set_pool_fs_limit<E>(
     pool_uuid: PoolUuid,
     pool: &mut E::Pool,
     new_limit: u64,
-) -> Result<(), String>
+) -> Result<PropChangeAction<u64>, String>
 where
     E: 'static + Engine,
 {
-    pool.set_fs_limit(name, pool_uuid, new_limit)
-        .map_err(|e| e.to_string())
+    if pool.fs_limit() == new_limit {
+        Ok(PropChangeAction::Identity)
+    } else {
+        pool.set_fs_limit(name, pool_uuid, new_limit)
+            .map(|_| PropChangeAction::NewValue(new_limit))
+            .map_err(|e| e.to_string())
+    }
 }
 
 /// Generate a D-Bus representation of whether the pool has disabled overprovisioning
@@ -367,12 +378,17 @@ pub fn pool_set_overprov_mode<E>(
     pool: &mut E::Pool,
     name: &Name,
     enabled: bool,
-) -> Result<(), String>
+) -> Result<PropChangeAction<bool>, String>
 where
     E: 'static + Engine,
 {
-    pool.set_overprov_mode(name, enabled)
-        .map_err(|e| e.to_string())
+    if pool.overprov_enabled() == enabled {
+        Ok(PropChangeAction::Identity)
+    } else {
+        pool.set_overprov_mode(name, enabled)
+            .map(|_| PropChangeAction::NewValue(enabled))
+            .map_err(|e| e.to_string())
+    }
 }
 
 /// Generate a D-Bus representation of whether the pool has remaining space to

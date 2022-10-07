@@ -25,7 +25,7 @@ use devicemapper::{Bytes, Sectors};
 use crate::{
     dbus_api::{
         api::prop_conv::{locked_pools_to_prop, stopped_pools_to_prop},
-        blockdev::prop_conv::blockdev_new_size_to_prop,
+        blockdev::prop_conv::{blockdev_new_size_to_prop, blockdev_user_info_to_prop},
         consts,
         filesystem::prop_conv::{fs_size_to_prop, fs_used_to_prop},
         pool::prop_conv::{
@@ -617,6 +617,36 @@ where
         }
     }
 
+    /// Send a signal indicating that the blockdev user info has changed.
+    fn handle_blockdev_user_info_change(&self, path: Path<'static>, new_user_info: Option<String>) {
+        let user_info_prop = blockdev_user_info_to_prop(new_user_info);
+        if let Err(e) = self.property_changed_invalidated_signal(
+            &path,
+            prop_hashmap!(
+                consts::POOL_INTERFACE_NAME_3_1 => {
+                    Vec::new(),
+                    consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
+                    box_variant!(user_info_prop.clone())
+                },
+                consts::POOL_INTERFACE_NAME_3_2 => {
+                    Vec::new(),
+                    consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
+                    box_variant!(user_info_prop.clone())
+                },
+                consts::POOL_INTERFACE_NAME_3_3 => {
+                    Vec::new(),
+                    consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
+                    box_variant!(user_info_prop)
+                }
+            ),
+        ) {
+            warn!(
+                "Failed to send a signal over D-Bus indicating blockdev user info change: {}",
+                e
+            );
+        }
+    }
+
     /// Send a signal indicating that the pool overprovisioning mode has changed.
     fn handle_pool_overprov_mode_change(&self, path: Path<'static>, new_mode: bool) {
         if let Err(e) = self.property_changed_invalidated_signal(
@@ -807,6 +837,10 @@ where
             }
             DbusAction::StoppedPoolsChange(pools) => {
                 self.handle_stopped_pools_change(pools);
+                Ok(true)
+            }
+            DbusAction::BlockdevUserInfoChange(path, new_user_info) => {
+                self.handle_blockdev_user_info_change(path, new_user_info);
                 Ok(true)
             }
             DbusAction::PoolForegroundChange(item, new_used, new_alloc, new_size, new_no_space) => {

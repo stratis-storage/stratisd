@@ -11,3 +11,9 @@ use crate::dbus_api::util::option_to_tuple;
 pub fn blockdev_new_size_to_prop(new_size: Option<Sectors>) -> (bool, String) {
     option_to_tuple(new_size.map(|s| (*s.bytes()).to_string()), String::new())
 }
+
+/// Generate D-Bus representation of block device user info property.
+#[inline]
+pub fn blockdev_user_info_to_prop(user_info: Option<String>) -> (bool, String) {
+    option_to_tuple(user_info, String::new())
+}

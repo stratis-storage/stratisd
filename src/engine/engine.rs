@@ -277,6 +277,12 @@ pub trait Pool: Debug + Send + Sync {
     /// Get the blockdev in this pool with this UUID.
     fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &Self::BlockDev)>;
 
+    /// Get the blockdev mutably in this pool with this UUID.
+    fn get_mut_blockdev(
+        &mut self,
+        uuid: DevUuid,
+    ) -> StratisResult<Option<(BlockDevTier, &mut Self::BlockDev)>>;
+
     /// Set the user-settable string associated with the blockdev specified
     /// by the uuid.
     fn set_blockdev_user_info(

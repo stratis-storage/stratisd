@@ -23,8 +23,8 @@ pub use crate::engine::{
     types::{
         actions::{
             Clevis, CreateAction, DeleteAction, EngineAction, GrowAction, Key, MappingCreateAction,
-            MappingDeleteAction, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
-            SetUnlockAction, StartAction, StopAction,
+            MappingDeleteAction, PropChangeAction, RegenAction, RenameAction, SetCreateAction,
+            SetDeleteAction, SetUnlockAction, StartAction, StopAction, ToDisplay,
         },
         diff::{
             Compare, Diff, PoolDiff, StratBlockDevDiff, StratFilesystemDiff, StratPoolDiff,

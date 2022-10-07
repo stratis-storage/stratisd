@@ -115,6 +115,7 @@ pub enum DbusAction<E> {
     PoolOverprovModeChange(Path<'static>, bool),
     LockedPoolsChange(HashMap<PoolUuid, LockedPoolInfo>),
     StoppedPoolsChange(HashMap<PoolUuid, StoppedPoolInfo>),
+    BlockdevUserInfoChange(Path<'static>, Option<String>),
 
     FsBackgroundChange(
         FilesystemUuid,
@@ -442,6 +443,19 @@ where
         {
             warn!(
                 "Stopped pool change event could not be sent to the processing thread; no signal will be sent out for the stopped pool state change: {}",
+                e,
+            )
+        }
+    }
+
+    /// Send changed signal for changed blockdev user info property.
+    pub fn push_blockdev_user_info_change(&self, path: &Path<'static>, user_info: Option<String>) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::BlockdevUserInfoChange(path.clone(), user_info))
+        {
+            warn!(
+                "Block device User info change event could not be sent to the processing thread; no signal will be sent out for the block device user info state change: {}",
                 e,
             )
         }

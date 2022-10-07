@@ -8,7 +8,7 @@
 //! effect of the action at the time the action is requested. The action was
 //! completed succesfully; this type indicates what changes had to be made.
 
-use std::fmt::{self, Display};
+use std::fmt::{self, Debug, Display};
 
 use devicemapper::Sectors;
 
@@ -717,6 +717,65 @@ impl<T> EngineAction for GrowAction<T> {
         match self {
             GrowAction::Identity => None,
             GrowAction::Grown(t) => Some(t),
+        }
+    }
+}
+
+/// Convert a value to a displayable format.
+pub trait ToDisplay {
+    type Display: Display;
+
+    fn to_display(&self) -> Self::Display;
+}
+
+/// Return type when setting a settable property.
+pub enum PropChangeAction<T> {
+    Identity,
+    NewValue(T),
+}
+
+impl<T> ToDisplay for PropChangeAction<Option<T>>
+where
+    T: Display,
+{
+    type Display = PropChangeAction<String>;
+
+    fn to_display(&self) -> PropChangeAction<String> {
+        match self {
+            PropChangeAction::Identity => PropChangeAction::Identity,
+            PropChangeAction::NewValue(Some(v)) => {
+                PropChangeAction::NewValue(format!("a value of {}", v))
+            }
+            PropChangeAction::NewValue(None) => {
+                PropChangeAction::NewValue("an empty value".to_string())
+            }
+        }
+    }
+}
+
+impl<T> Display for PropChangeAction<T>
+where
+    T: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PropChangeAction::Identity => write!(f, "No change was made to the given property"),
+            PropChangeAction::NewValue(v) => write!(f, "Property was changed to {}", v),
+        }
+    }
+}
+
+impl<T> EngineAction for PropChangeAction<T> {
+    type Return = T;
+
+    fn is_changed(&self) -> bool {
+        matches!(self, PropChangeAction::NewValue(_))
+    }
+
+    fn changed(self) -> Option<Self::Return> {
+        match self {
+            PropChangeAction::NewValue(t) => Some(t),
+            PropChangeAction::Identity => None,
         }
     }
 }

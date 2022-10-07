@@ -4,19 +4,21 @@
 
 // Functions for dealing with devices.
 
-use std::{fs::File, os::unix::prelude::AsRawFd};
+use std::fs::File;
+
+use iocuddle::{Group, Ioctl, Read};
 
 use devicemapper::Bytes;
 
-use crate::stratis::{StratisError, StratisResult};
+use crate::stratis::StratisResult;
 
-ioctl_read!(blkgetsize64, 0x12, 114, u64);
+const BLK: Group = Group::new(0x12);
+
+const BLKGETSIZE64: Ioctl<Read, &u64> = unsafe { BLK.read(114) };
 
 pub fn blkdev_size(file: &File) -> StratisResult<Bytes> {
-    let mut val: u64 = 0;
-
-    match unsafe { blkgetsize64(file.as_raw_fd(), &mut val) } {
-        Err(x) => Err(StratisError::Nix(x)),
-        Ok(_) => Ok(Bytes::from(val)),
-    }
+    BLKGETSIZE64
+        .ioctl(file)
+        .map(|(_, res)| Bytes::from(res))
+        .map_err(|e| e.into())
 }

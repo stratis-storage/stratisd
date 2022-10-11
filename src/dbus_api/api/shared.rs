@@ -162,7 +162,6 @@ where
     R: dbus::arg::Append,
     E: Engine,
 {
-    #[allow(clippy::redundant_closure)]
     i.append(manager_operation(p.tree, getter).map_err(|ref e| MethodErr::failed(e))?);
     Ok(())
 }

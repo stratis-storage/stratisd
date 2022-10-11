@@ -232,7 +232,6 @@ where
     R: dbus::arg::Append,
     E: 'static + Engine,
 {
-    #[allow(clippy::redundant_closure)]
     i.append(
         pool_operation(p.tree, p.path.get_name(), getter).map_err(|ref e| MethodErr::failed(e))?,
     );
@@ -249,8 +248,6 @@ where
     F: Fn((Name, PoolUuid, &mut E::Pool)) -> Result<(), String>,
     E: 'static + Engine,
 {
-    // Using clippy's suggested code causes a compilation error
-    #[allow(clippy::redundant_closure)]
     pool_set_operation(p.tree, p.path.get_name(), setter).map_err(|ref e| MethodErr::failed(e))?;
     Ok(())
 }

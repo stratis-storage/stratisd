@@ -35,7 +35,7 @@ jobs:
       image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -80,7 +80,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
         options: --privileged -p 80:80
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -110,7 +110,7 @@ jobs:
     runs-on: ubuntu-20.04
     container: fedora:34  # LOWEST DEVELOPMENT ENVIRONMENT
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install dependencies
         run: >
           dnf install -y
@@ -164,7 +164,7 @@ jobs:
     container:
       image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install dependencies
         run: >
           dnf install -y
@@ -184,7 +184,7 @@ jobs:
     container:
       image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -215,7 +215,7 @@ jobs:
     container:
       image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
           components: cargo
@@ -239,7 +239,7 @@ jobs:
       image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Install dependencies for Fedora
         run: >
           dnf install -y

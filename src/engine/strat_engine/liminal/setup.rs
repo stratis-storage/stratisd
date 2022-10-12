@@ -17,7 +17,7 @@ use devicemapper::Sectors;
 use crate::{
     engine::{
         strat_engine::{
-            backstore::{CryptHandle, StratBlockDev, UnderlyingDevice},
+            backstore::{BlockSizes, CryptHandle, StratBlockDev, UnderlyingDevice},
             device::blkdev_size,
             liminal::device_info::LStratisInfo,
             metadata::{StaticHeader, BDA},
@@ -218,6 +218,8 @@ pub fn get_blockdevs(
             },
         )?;
 
+        let blksizes = BlockSizes::read(&OpenOptions::new().read(true).open(&info.ids.devnode)?)?;
+
         let dev_uuid = bda.dev_uuid();
 
         // Locate the device in the metadata using its uuid. Return the device
@@ -261,6 +263,7 @@ pub fn get_blockdevs(
                     Some(handle) => UnderlyingDevice::Encrypted(handle),
                     None => UnderlyingDevice::Unencrypted(DevicePath::new(physical_path)?),
                 },
+                blksizes,
             )?,
         ))
     }

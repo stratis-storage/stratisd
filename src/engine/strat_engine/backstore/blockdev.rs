@@ -22,6 +22,7 @@ use crate::{
         strat_engine::{
             backstore::{
                 crypt::CryptHandle,
+                devices::BlockSizes,
                 range_alloc::{PerDevSegments, RangeAllocator},
                 transaction::RequestTransaction,
             },
@@ -85,6 +86,7 @@ pub struct StratBlockDev {
     hardware_info: Option<String>,
     underlying_device: UnderlyingDevice,
     new_size: Option<Sectors>,
+    blksizes: BlockSizes,
 }
 
 impl StratBlockDev {
@@ -116,6 +118,7 @@ impl StratBlockDev {
         user_info: Option<String>,
         hardware_info: Option<String>,
         underlying_device: UnderlyingDevice,
+        blksizes: BlockSizes,
     ) -> StratisResult<StratBlockDev> {
         let mut segments = vec![(Sectors(0), bda.extended_size().sectors())];
         segments.extend(other_segments);
@@ -130,6 +133,7 @@ impl StratBlockDev {
             hardware_info,
             underlying_device,
             new_size: None,
+            blksizes,
         })
     }
 
@@ -259,6 +263,11 @@ impl StratBlockDev {
         self.underlying_device
             .crypt_handle()
             .map(|ch| ch.encryption_info())
+    }
+
+    /// Block size information
+    pub fn blksizes(&self) -> BlockSizes {
+        self.blksizes
     }
 
     /// Bind encrypted device using the given clevis configuration.

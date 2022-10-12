@@ -1,5 +1,3 @@
-#[cfg(feature = "min")]
-#[cfg_attr(feature = "dbus_enabled", allow(dead_code))]
 #[macro_use]
 extern crate nix;
 

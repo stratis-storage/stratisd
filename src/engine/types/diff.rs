@@ -4,7 +4,7 @@
 
 use std::ops::{Deref, DerefMut};
 
-use devicemapper::Bytes;
+use devicemapper::{Bytes, Sectors};
 
 /// This interface defines a generic way to compare whether two values of
 /// the same type have changed or remained the same.
@@ -42,6 +42,14 @@ impl<T> Diff<T> {
     /// Determines whether the contained value was changed or unchanged.
     pub fn is_changed(&self) -> bool {
         matches!(self, Diff::Changed(_))
+    }
+
+    /// Return the changed variant or None if it is unchanged.
+    pub fn changed(self) -> Option<T> {
+        match self {
+            Diff::Changed(c) => Some(c),
+            Diff::Unchanged(_) => None,
+        }
     }
 }
 
@@ -92,4 +100,10 @@ pub struct StratFilesystemDiff {
 pub struct PoolDiff {
     pub thin_pool: ThinPoolDiff,
     pub pool: StratPoolDiff,
+}
+
+/// Represents the difference between two dumped states for a block device.
+#[derive(Debug)]
+pub struct StratBlockDevDiff {
+    pub size: Diff<Option<Sectors>>,
 }

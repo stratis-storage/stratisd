@@ -685,3 +685,38 @@ impl<T> EngineAction for StopAction<T> {
         }
     }
 }
+
+/// Action indicating the result of growing a block device or block devices in a pool.
+pub enum GrowAction<T> {
+    Identity,
+    Grown(T),
+}
+
+impl Display for GrowAction<(PoolUuid, DevUuid)> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GrowAction::Identity => write!(
+                f,
+                "No changes to block device size were detected; no action taken"
+            ),
+            GrowAction::Grown((pool_uuid, dev_uuid)) => {
+                write!(f, "Block device with UUID {} belonging to pool with UUID {} was successfully grown and more space is now available to the pool", dev_uuid, pool_uuid)
+            }
+        }
+    }
+}
+
+impl<T> EngineAction for GrowAction<T> {
+    type Return = T;
+
+    fn is_changed(&self) -> bool {
+        matches!(self, GrowAction::Grown(_))
+    }
+
+    fn changed(self) -> Option<Self::Return> {
+        match self {
+            GrowAction::Identity => None,
+            GrowAction::Grown(t) => Some(t),
+        }
+    }
+}

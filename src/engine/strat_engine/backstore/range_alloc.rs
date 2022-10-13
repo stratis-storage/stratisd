@@ -409,6 +409,14 @@ impl RangeAllocator {
             .union(&segs)
             .expect("all segments verified to be in available ranges");
     }
+
+    /// Increase the available size of the RangeAlloc data structure.
+    ///
+    /// Precondition: new_size > self.limit
+    pub fn increase_size(&mut self, new_size: Sectors) {
+        assert!(new_size > self.segments.limit);
+        self.segments.limit = new_size;
+    }
 }
 
 #[cfg(test)]

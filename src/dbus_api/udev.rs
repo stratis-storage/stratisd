@@ -9,8 +9,10 @@ use tokio::sync::mpsc::UnboundedReceiver;
 
 use crate::{
     dbus_api::{
-        blockdev::create_dbus_blockdev, filesystem::create_dbus_filesystem, pool::create_dbus_pool,
-        types::DbusContext,
+        blockdev::create_dbus_blockdev,
+        filesystem::create_dbus_filesystem,
+        pool::create_dbus_pool,
+        types::{DbusAction, DbusContext},
     },
     engine::{Engine, Name, Pool, PoolUuid, UdevEngineEvent},
     stratis::{StratisError, StratisResult},
@@ -68,7 +70,7 @@ where
             }
         }
 
-        let pool_infos = self.dbus_context.engine.handle_events(events).await;
+        let (pool_infos, dev_infos) = self.dbus_context.engine.handle_events(events).await;
         for guard in pool_infos {
             let (pool_name, pool_uuid, pool) = guard.as_tuple();
             self.register_pool(&pool_name, pool_uuid, pool);
@@ -81,6 +83,15 @@ where
         let new_stopped_state = self.dbus_context.engine.stopped_pools().await;
         if original_stopped_state != new_stopped_state {
             self.dbus_context.push_stopped_pools(new_stopped_state);
+        }
+
+        for action in DbusAction::from_bd_diffs(dev_infos) {
+            if let Err(e) = self.dbus_context.sender.send(action) {
+                warn!(
+                    "Failed to update D-Bus layer with block device event changes: {}",
+                    e
+                );
+            }
         }
 
         Ok(())

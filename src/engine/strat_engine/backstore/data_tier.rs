@@ -148,6 +148,10 @@ impl DataTier {
     pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut StratBlockDev)> {
         self.block_mgr.blockdevs_mut()
     }
+
+    pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {
+        self.block_mgr.grow(dev)
+    }
 }
 
 impl Recordable<DataTierSave> for DataTier {

@@ -12,7 +12,11 @@ use either::Either;
 use serde_json::Value;
 
 use devicemapper::Sectors;
-use libcryptsetup_rs::{c_uint, consts::vals::EncryptionFormat, CryptDevice, TokenInput};
+use libcryptsetup_rs::{
+    c_uint,
+    consts::{flags::CryptActivate, vals::EncryptionFormat},
+    CryptDevice, TokenInput,
+};
 
 use crate::{
     engine::{
@@ -22,8 +26,8 @@ use crate::{
                 metadata_handle::CryptMetadataHandle,
                 shared::{
                     acquire_crypt_device, add_keyring_keyslot, clevis_info_from_metadata,
-                    ensure_wiped, get_keyslot_number, interpret_clevis_config, setup_crypt_device,
-                    setup_crypt_handle,
+                    ensure_wiped, get_keyslot_number, interpret_clevis_config, read_key,
+                    setup_crypt_device, setup_crypt_handle,
                 },
             },
             cmd::{clevis_decrypt, clevis_luks_bind, clevis_luks_regen, clevis_luks_unbind},
@@ -388,5 +392,43 @@ impl CryptHandle {
             "Failed to get device size for encrypted logical device"
         );
         Ok(Sectors(active_device.size))
+    }
+
+    /// Changed the encrypted device size
+    /// `None` will fill up the entire underlying physical device.
+    /// `Some(_)` will resize the device to the given number of sectors.
+    pub fn resize(&self, size: Option<Sectors>) -> StratisResult<()> {
+        let processed_size = match size {
+            Some(s) => {
+                if s == Sectors(0) {
+                    return Err(StratisError::Msg(
+                        "Cannot specify a crypt device size of zero".to_string(),
+                    ));
+                } else {
+                    *s
+                }
+            }
+            None => 0,
+        };
+        let mut crypt = self.acquire_crypt_device()?;
+        let passphrase = if let Some(kd) = self.encryption_info().key_description() {
+            read_key(kd)?.ok_or_else(|| {
+                StratisError::Msg("Failed to find key with key description".to_string())
+            })?
+        } else if self.encryption_info().clevis_info().is_some() {
+            Self::clevis_decrypt(&mut crypt)?.expect("Already checked token exists")
+        } else {
+            unreachable!("Must be encrypted")
+        };
+        crypt.activate_handle().activate_by_passphrase(
+            None,
+            None,
+            passphrase.as_ref(),
+            CryptActivate::KEYRING_KEY,
+        )?;
+        crypt
+            .context_handle()
+            .resize(self.name(), processed_size)
+            .map_err(StratisError::Crypt)
     }
 }

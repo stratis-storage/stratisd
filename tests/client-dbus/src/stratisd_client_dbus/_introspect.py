@@ -97,6 +97,7 @@ SPECS = {
     <property name="InitializationTime" type="t" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>
+    <property name="NewPhysicalSize" type="s" access="read" />
     <property name="PhysicalPath" type="s" access="read">
       <annotation name="org.freedesktop.DBus.Property.EmitsChangedSignal" value="const" />
     </property>
@@ -176,6 +177,12 @@ SPECS = {
     <method name="DestroyFilesystems">
       <arg name="filesystems" type="ao" direction="in" />
       <arg name="results" type="(bas)" direction="out" />
+      <arg name="return_code" type="q" direction="out" />
+      <arg name="return_string" type="s" direction="out" />
+    </method>
+    <method name="GrowPhysicalDevice">
+      <arg name="dev" type="s" direction="in" />
+      <arg name="results" type="b" direction="out" />
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>

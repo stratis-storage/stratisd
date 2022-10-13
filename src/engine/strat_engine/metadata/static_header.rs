@@ -109,6 +109,17 @@ where
         .map(|sh| sh.map(|sh| sh.identifiers))
 }
 
+/// Get the static header from any Stratis device.
+/// If there is an error while obtaining these values return the error.
+/// If the device does not appear to be a Stratis device, return None.
+pub fn static_header<F>(f: &mut F) -> StratisResult<Option<StaticHeader>>
+where
+    F: Read + Seek + SyncAll,
+{
+    let read_results = StaticHeader::read_sigblocks(f);
+    StaticHeader::repair_sigblocks(f, read_results, StaticHeader::write_header)
+}
+
 /// Remove Stratis identifying information from device.
 pub fn disown_device<F>(f: &mut F) -> StratisResult<()>
 where

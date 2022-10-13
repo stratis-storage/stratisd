@@ -14,9 +14,11 @@ use serde_json::Value;
 
 use crate::{
     engine::{
-        engine::Pool,
+        engine::{DumpState, Pool, StateDiff},
         strat_engine::{
-            backstore::{find_stratis_devs_by_uuid, CryptActivationHandle, CryptHandle},
+            backstore::{
+                find_stratis_devs_by_uuid, CryptActivationHandle, CryptHandle, StratBlockDev,
+            },
             liminal::{
                 device_info::{DeviceSet, LInfo, LLuksInfo, LStratisInfo},
                 identify::{identify_block_device, DeviceInfo, LuksInfo, StratisInfo},
@@ -28,8 +30,10 @@ use crate::{
         },
         structures::Table,
         types::{
-            DevUuid, LockedPoolInfo, Name, PoolUuid, StoppedPoolInfo, UdevEngineEvent, UnlockMethod,
+            DevUuid, LockedPoolInfo, Name, PoolUuid, StoppedPoolInfo, StratBlockDevDiff,
+            UdevEngineEvent, UnlockMethod,
         },
+        BlockDevTier,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -276,6 +280,31 @@ impl LiminalDevices {
             .collect()
     }
 
+    /// Calculate whether block device size has changed.
+    fn handle_size_change(
+        tier: BlockDevTier,
+        dev_uuid: DevUuid,
+        dev: &mut StratBlockDev,
+    ) -> Option<(DevUuid, StratBlockDevDiff)> {
+        if tier == BlockDevTier::Data {
+            let orig = dev.cached();
+            match dev.calc_new_size() {
+                Ok(Some(s)) => Some((dev_uuid, orig.diff(&dev.dump(s)))),
+                Err(e) => {
+                    warn!(
+                        "Failed to determine device size for {}: {}",
+                        dev.devnode().display(),
+                        e
+                    );
+                    None
+                }
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
     /// Take maps of pool UUIDs to sets of devices and return a list of
     /// information about created pools.
     ///
@@ -348,7 +377,25 @@ impl LiminalDevices {
                 }
 
                 self.try_setup_started_pool(&table, *pool_uuid, info_map)
-                    .map(|(pool_name, pool)| (pool_name, *pool_uuid, pool))
+                    .map(|(pool_name, mut pool)| {
+                        match pool.blockdevs_mut() {
+                            Ok(blockdevs) => {
+                                for (dev_uuid, tier, blockdev) in blockdevs {
+                                    if let Some(size) =
+                                        Self::handle_size_change(tier, dev_uuid, blockdev)
+                                            .and_then(|(_, d)| d.size.changed())
+                                            .and_then(|c| c)
+                                    {
+                                        blockdev.set_new_size(size);
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                warn!("Failed to check size of block devices in newly set up pool: {}", e);
+                            }
+                        }
+                        (pool_name, *pool_uuid, pool)
+                    })
             })
             .collect::<Vec<(Name, PoolUuid, StratPool)>>()
     }
@@ -477,6 +524,48 @@ impl LiminalDevices {
                 None
             }
         }
+    }
+
+    /// On udev events, stratisd checks whether block devices have changed in size.
+    /// This allows us to update the user with the new size if it has changed.
+    /// This method runs a check on device size on each udev change or add event
+    /// to determine whether the size has indeed changed so we can update it in
+    /// our internal data structures.
+    pub fn block_evaluate_size(
+        pools: &mut Table<PoolUuid, StratPool>,
+        event: &UdevEngineEvent,
+    ) -> StratisResult<Option<(DevUuid, StratBlockDevDiff)>> {
+        let mut ret = None;
+
+        let event_type = event.event_type();
+        let device_path = match event.device().devnode() {
+            Some(d) => d,
+            None => return Ok(None),
+        };
+        let device_info = match event_type {
+            libudev::EventType::Add | libudev::EventType::Change => {
+                if device_path.exists() {
+                    identify_block_device(event)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        };
+
+        if event_type == libudev::EventType::Add || event_type == libudev::EventType::Change {
+            if let Some(di) = device_info {
+                let pool_uuid = di.stratis_identifiers().pool_uuid;
+                let dev_uuid = di.stratis_identifiers().device_uuid;
+                if let Some((_, pool)) = pools.get_mut_by_uuid(pool_uuid) {
+                    if let Some((tier, dev)) = pool.get_mut_strat_blockdev(dev_uuid)? {
+                        ret = Self::handle_size_change(tier, dev_uuid, dev);
+                    }
+                }
+            }
+        }
+
+        Ok(ret)
     }
 
     /// Given some information gathered about a single Stratis device, determine

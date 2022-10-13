@@ -4,7 +4,11 @@
 
 // Code to handle a single block device.
 
-use std::{fs::OpenOptions, path::Path};
+use std::{
+    cmp::Ordering,
+    fs::{File, OpenOptions},
+    path::Path,
+};
 
 use chrono::{DateTime, TimeZone, Utc};
 use serde_json::Value;
@@ -13,17 +17,25 @@ use devicemapper::{Device, Sectors};
 
 use crate::{
     engine::{
-        engine::BlockDev,
+        crypt_metadata_size,
+        engine::{BlockDev, DumpState},
         strat_engine::{
             backstore::{
                 crypt::CryptHandle,
                 range_alloc::{PerDevSegments, RangeAllocator},
                 transaction::RequestTransaction,
             },
-            metadata::{disown_device, BDAExtendedSize, BlockdevSize, MDADataSize, BDA},
+            device::blkdev_size,
+            metadata::{
+                disown_device, static_header, BDAExtendedSize, BlockdevSize, MDADataSize,
+                MetadataLocation, StaticHeader, BDA,
+            },
             serde_structs::{BaseBlockDevSave, Recordable},
         },
-        types::{DevUuid, DevicePath, EncryptionInfo, KeyDescription, PoolUuid},
+        types::{
+            Compare, DevUuid, DevicePath, EncryptionInfo, KeyDescription, PoolUuid, StateDiff,
+            StratBlockDevDiff,
+        },
     },
     stratis::{StratisError, StratisResult},
 };
@@ -72,6 +84,7 @@ pub struct StratBlockDev {
     user_info: Option<String>,
     hardware_info: Option<String>,
     underlying_device: UnderlyingDevice,
+    new_size: Option<Sectors>,
 }
 
 impl StratBlockDev {
@@ -116,6 +129,7 @@ impl StratBlockDev {
             user_info,
             hardware_info,
             underlying_device,
+            new_size: None,
         })
     }
 
@@ -298,6 +312,137 @@ impl StratBlockDev {
         crypt_handle.rebind_clevis()
     }
 
+    /// Calculate the new size of the block device specified by physical_path.
+    ///
+    /// Returns:
+    /// * `None` if the size hasn't changed or is equal to the current size recorded
+    /// in the metadata.
+    /// * Otherwise, `Some(_)`
+    pub fn calc_new_size(&self) -> StratisResult<Option<Sectors>> {
+        let s = Self::scan_blkdev_size(
+            self.physical_path(),
+            self.underlying_device.crypt_handle().is_some(),
+        )?;
+        if Some(s) == self.new_size
+            || (self.new_size.is_none() && s == self.bda.dev_size().sectors())
+        {
+            Ok(None)
+        } else {
+            Ok(Some(s))
+        }
+    }
+
+    /// Scan the block device specified by physical_path for its size.
+    pub fn scan_blkdev_size(physical_path: &Path, is_encrypted: bool) -> StratisResult<Sectors> {
+        Ok(blkdev_size(&File::open(physical_path)?)?.sectors()
+            - if is_encrypted {
+                crypt_metadata_size().sectors()
+            } else {
+                Sectors(0)
+            })
+    }
+
+    /// Set the newly detected size of a block device.
+    pub fn set_new_size(&mut self, new_size: Sectors) {
+        match self.bda.dev_size().cmp(&BlockdevSize::new(new_size)) {
+            Ordering::Greater => {
+                warn!(
+                    "The given device with path: {}, UUID; {} appears to have shrunk; you may experience data loss",
+                    self.devnode().display(),
+                    self.bda.dev_uuid(),
+                );
+                self.new_size = Some(new_size);
+            }
+            Ordering::Less => {
+                self.new_size = Some(new_size);
+            }
+            Ordering::Equal => {
+                self.new_size = None;
+            }
+        }
+    }
+
+    /// Grow the block device if the underlying physical device has grown in size.
+    /// Return an error and leave the size as is if the device has shrunk.
+    /// Do nothing if the device is the same size as recorded in the metadata.
+    ///
+    /// This method does not need to block IO to the extended crypt device prior
+    /// to rollback because of per-pool locking. Growing the device will acquire
+    /// an exclusive lock on the pool and therefore the thin pool cannot be
+    /// extended to use the larger or unencrypted block device size until the
+    /// transaction has been completed successfully.
+    pub fn grow(&mut self) -> StratisResult<bool> {
+        /// Precondition: size > h.blkdev_size
+        fn needs_rollback(bd: &mut StratBlockDev, size: BlockdevSize) -> StratisResult<()> {
+            let mut f = OpenOptions::new()
+                .write(true)
+                .read(true)
+                .open(bd.metadata_path())?;
+            let mut h = static_header(&mut f)?.ok_or_else(|| {
+                StratisError::Msg(format!(
+                    "No static header found on device {}",
+                    bd.metadata_path().display()
+                ))
+            })?;
+
+            h.blkdev_size = size;
+            let h = StaticHeader::write_header(&mut f, h, MetadataLocation::Both)?;
+
+            bd.bda.header = h;
+            bd.used.increase_size(size.sectors());
+
+            Ok(())
+        }
+
+        fn rollback(
+            causal_error: StratisError,
+            info: Option<(&CryptHandle, BlockdevSize)>,
+        ) -> StratisError {
+            if let Some((h, cs)) = info {
+                if let Err(e) = h.resize(Some(cs.sectors())) {
+                    StratisError::NoActionRollbackError { causal_error: Box::new(causal_error), rollback_error: Box::new(StratisError::Chained("Failed to rollback crypt device growth; no changes were made to the Stratis metadata so no IO will be written to the newly extended portions of the crypt device; future growth operations on the same device are safe".to_string(), Box::new(e))) }
+                } else {
+                    causal_error
+                }
+            } else {
+                causal_error
+            }
+        }
+
+        let size = BlockdevSize::new(Self::scan_blkdev_size(
+            self.physical_path(),
+            self.underlying_device.crypt_handle().is_some(),
+        )?);
+        let metadata_size = self.bda.dev_size();
+        match size.cmp(&metadata_size) {
+            Ordering::Less => Err(StratisError::Msg(
+                "The underlying device appears to have shrunk; you may experience data loss"
+                    .to_string(),
+            )),
+            Ordering::Equal => Ok(false),
+            Ordering::Greater => {
+                let info = if let Some(h) = self.underlying_device.crypt_handle() {
+                    let orig_size = BlockdevSize::new(
+                        blkdev_size(&File::open(self.metadata_path())?)?.sectors(),
+                    );
+                    h.resize(None)?;
+                    Some(orig_size)
+                } else {
+                    None
+                };
+
+                if let Err(e) = needs_rollback(self, size) {
+                    return Err(rollback(
+                        e,
+                        info.and_then(|os| self.underlying_device.crypt_handle().map(|h| (h, os))),
+                    ));
+                }
+
+                Ok(true)
+            }
+        }
+    }
+
     /// If a pool is encrypted, tear down the cryptsetup devicemapper devices on the
     /// physical device.
     pub fn teardown(&mut self) -> StratisResult<()> {
@@ -331,6 +476,10 @@ impl<'a> Into<Value> for &'a StratBlockDev {
             } else {
                 unreachable!("EncryptionInfo conversion returns a JSON object");
             };
+        }
+        map.insert("size".to_string(), Value::from(self.size().to_string()));
+        if let Some(new_size) = self.new_size {
+            map.insert("new_size".to_string(), Value::from(new_size.to_string()));
         }
         json
     }
@@ -366,6 +515,10 @@ impl BlockDev for StratBlockDev {
     fn is_encrypted(&self) -> bool {
         self.encryption_info().is_some()
     }
+
+    fn new_size(&self) -> Option<Sectors> {
+        self.new_size
+    }
 }
 
 impl Recordable<BaseBlockDevSave> for StratBlockDev {
@@ -374,6 +527,38 @@ impl Recordable<BaseBlockDevSave> for StratBlockDev {
             uuid: self.uuid(),
             user_info: self.user_info.clone(),
             hardware_info: self.hardware_info.clone(),
+        }
+    }
+}
+
+pub struct StratBlockDevState {
+    new_size: Option<Sectors>,
+}
+
+impl StateDiff for StratBlockDevState {
+    type Diff = StratBlockDevDiff;
+
+    fn diff(&self, new_state: &Self) -> Self::Diff {
+        StratBlockDevDiff {
+            size: self.new_size.compare(&new_state.new_size),
+        }
+    }
+}
+
+impl<'a> DumpState<'a> for StratBlockDev {
+    type State = StratBlockDevState;
+    type DumpInput = Sectors;
+
+    fn cached(&self) -> Self::State {
+        StratBlockDevState {
+            new_size: self.new_size,
+        }
+    }
+
+    fn dump(&mut self, input: Self::DumpInput) -> Self::State {
+        self.set_new_size(input);
+        StratBlockDevState {
+            new_size: self.new_size,
         }
     }
 }

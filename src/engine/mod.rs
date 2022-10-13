@@ -17,8 +17,9 @@ pub use self::{
         EncryptionInfo, EngineAction, FilesystemUuid, KeyDescription, LockKey, Lockable,
         LockedPoolInfo, MappingCreateAction, MappingDeleteAction, MaybeInconsistent, Name,
         PoolDiff, PoolEncryptionInfo, PoolUuid, RenameAction, ReportType, SetCreateAction,
-        SetDeleteAction, StartAction, StopAction, StoppedPoolInfo, StratFilesystemDiff,
-        StratPoolDiff, StratisUuid, ThinPoolDiff, UdevEngineEvent, UnlockMethod,
+        SetDeleteAction, StartAction, StopAction, StoppedPoolInfo, StratBlockDevDiff,
+        StratFilesystemDiff, StratPoolDiff, StratisUuid, ThinPoolDiff, UdevEngineEvent,
+        UnlockMethod,
     },
 };
 

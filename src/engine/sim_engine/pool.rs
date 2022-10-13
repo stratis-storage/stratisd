@@ -23,7 +23,7 @@ use crate::{
         structures::Table,
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, Key, KeyDescription, Name, PoolDiff,
+            EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
             PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
             SetDeleteAction,
         },
@@ -677,6 +677,15 @@ impl Pool for SimPool {
 
     fn out_of_alloc_space(&self) -> bool {
         false
+    }
+
+    fn grow_physical(
+        &mut self,
+        _: &Name,
+        _: PoolUuid,
+        _: DevUuid,
+    ) -> StratisResult<GrowAction<(PoolUuid, DevUuid)>> {
+        Ok(GrowAction::Identity)
     }
 }
 

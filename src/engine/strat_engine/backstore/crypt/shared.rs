@@ -9,13 +9,13 @@ use std::{
 };
 
 use data_encoding::BASE64URL_NOPAD;
-use devicemapper::Bytes;
 use either::Either;
 use retry::{delay::Fixed, retry_with_index, Error};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 
+use devicemapper::Bytes;
 use libcryptsetup_rs::{
     c_uint,
     consts::{
@@ -927,7 +927,7 @@ fn stratis_token_is_valid(json: &Value) -> bool {
 /// but no error occurred.
 ///
 /// Requires cryptsetup 2.3
-fn read_key(key_description: &KeyDescription) -> StratisResult<Option<SizedKeyMemory>> {
+pub fn read_key(key_description: &KeyDescription) -> StratisResult<Option<SizedKeyMemory>> {
     let read_key_result = keys::read_key_persistent(key_description);
     if read_key_result.is_err() {
         warn!(

@@ -1,0 +1,13 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+use devicemapper::Sectors;
+
+use crate::dbus_api::util::option_to_tuple;
+
+/// Generate D-Bus representation of block device new size property.
+#[inline]
+pub fn blockdev_new_size_to_prop(new_size: Option<Sectors>) -> (bool, String) {
+    option_to_tuple(new_size.map(|s| (*s.bytes()).to_string()), String::new())
+}

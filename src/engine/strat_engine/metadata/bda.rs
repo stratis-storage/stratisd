@@ -23,7 +23,7 @@ use crate::{
 
 #[derive(Debug)]
 pub struct BDA {
-    header: StaticHeader,
+    pub(in super::super) header: StaticHeader,
     regions: mda::MDARegions,
 }
 

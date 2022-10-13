@@ -61,6 +61,7 @@ pub const BLOCKDEV_POOL_PROP: &str = "Pool";
 pub const BLOCKDEV_UUID_PROP: &str = "Uuid";
 pub const BLOCKDEV_TIER_PROP: &str = "Tier";
 pub const BLOCKDEV_PHYSICAL_PATH_PROP: &str = "PhysicalPath";
+pub const BLOCKDEV_NEW_SIZE_PROP: &str = "NewPhysicalSize";
 
 pub const BLOCKDEV_TOTAL_SIZE_PROP: &str = "TotalPhysicalSize";
 

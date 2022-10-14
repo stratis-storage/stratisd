@@ -7,7 +7,7 @@ use dbus_tree::{MTSync, MethodErr, PropInfo, Tree};
 use futures::executor::block_on;
 
 use crate::{
-    dbus_api::{blockdev::prop_conv, types::TData},
+    dbus_api::{blockdev::prop_conv, types::TData, util::option_to_tuple},
     engine::{BlockDev, BlockDevTier, Engine, LockKey, Pool},
 };
 
@@ -91,8 +91,7 @@ pub fn blockdev_hardware_info_prop<E>(dev: &<E::Pool as Pool>::BlockDev) -> (boo
 where
     E: Engine,
 {
-    dev.hardware_info()
-        .map_or_else(|| (false, "".to_owned()), |val| (true, val.to_owned()))
+    option_to_tuple(dev.hardware_info().map(|s| s.to_owned()), String::new())
 }
 
 /// Generate D-Bus representation of user info property.
@@ -101,8 +100,7 @@ pub fn blockdev_user_info_prop<E>(dev: &<E::Pool as Pool>::BlockDev) -> (bool, S
 where
     E: Engine,
 {
-    dev.user_info()
-        .map_or_else(|| (false, "".to_owned()), |val| (true, val.to_owned()))
+    option_to_tuple(dev.user_info().map(|s| s.to_owned()), String::new())
 }
 
 /// Generate D-Bus representation of initialization time property.

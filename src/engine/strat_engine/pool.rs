@@ -516,12 +516,6 @@ impl Pool for StratPool {
     ) -> StratisResult<SetCreateAction<DevUuid>> {
         validate_paths(blockdevs)?;
 
-        if self.is_encrypted() {
-            return Err(StratisError::Msg(
-                "Use of a cache is not supported with an encrypted pool".to_string(),
-            ));
-        }
-
         let devices = ProcessedPathInfos::try_from(blockdevs)?;
         let (stratis_devices, unowned_devices) = devices.unpack();
         let (this_pool, other_pools) = stratis_devices.partition(pool_uuid);

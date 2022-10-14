@@ -269,7 +269,10 @@ impl Backstore {
                     pool_uuid,
                     devices,
                     MDADataSize::default(),
-                    None,
+                    self.data_tier_encryption_info()
+                        .map(EncryptionInfo::try_from)
+                        .transpose()?
+                        .as_ref(),
                 )?;
 
                 let cache_tier = CacheTier::new(bdm)?;

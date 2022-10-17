@@ -801,7 +801,15 @@ impl Pool for StratPool {
     }
 
     fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &Self::BlockDev)> {
-        self.get_strat_blockdev(uuid).map(|(t, b)| (t, b))
+        self.get_strat_blockdev(uuid)
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn get_mut_blockdev(
+        &mut self,
+        uuid: DevUuid,
+    ) -> StratisResult<Option<(BlockDevTier, &mut Self::BlockDev)>> {
+        self.get_mut_strat_blockdev(uuid)
     }
 
     #[pool_mutating_action("NoRequests")]

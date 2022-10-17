@@ -617,6 +617,19 @@ impl Pool for SimPool {
             })
     }
 
+    fn get_mut_blockdev(
+        &mut self,
+        uuid: DevUuid,
+    ) -> StratisResult<Option<(BlockDevTier, &mut Self::BlockDev)>> {
+        Ok(match self.block_devs.get_mut(&uuid) {
+            Some(bd) => Some((BlockDevTier::Data, bd)),
+            None => self
+                .cache_devs
+                .get_mut(&uuid)
+                .map(|bd| (BlockDevTier::Cache, bd)),
+        })
+    }
+
     fn set_blockdev_user_info(
         &mut self,
         _pool_name: &str,

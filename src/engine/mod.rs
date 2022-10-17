@@ -14,12 +14,12 @@ pub use self::{
     structures::{ExclusiveGuard, SharedGuard, Table},
     types::{
         ActionAvailability, BlockDevTier, ClevisInfo, CreateAction, DeleteAction, DevUuid, Diff,
-        EncryptionInfo, EngineAction, FilesystemUuid, KeyDescription, LockKey, Lockable,
-        LockedPoolInfo, MappingCreateAction, MappingDeleteAction, MaybeInconsistent, Name,
-        PoolDiff, PoolEncryptionInfo, PoolUuid, RenameAction, ReportType, SetCreateAction,
-        SetDeleteAction, StartAction, StopAction, StoppedPoolInfo, StratBlockDevDiff,
-        StratFilesystemDiff, StratPoolDiff, StratisUuid, ThinPoolDiff, UdevEngineEvent,
-        UnlockMethod,
+        EncryptionInfo, EngineAction, FilesystemUuid, GrowAction, KeyDescription, LockKey,
+        Lockable, LockedPoolInfo, MappingCreateAction, MappingDeleteAction, MaybeInconsistent,
+        Name, PoolDiff, PoolEncryptionInfo, PoolUuid, PropChangeAction, RenameAction, ReportType,
+        SetCreateAction, SetDeleteAction, StartAction, StopAction, StoppedPoolInfo,
+        StratBlockDevDiff, StratFilesystemDiff, StratPoolDiff, StratisUuid, ThinPoolDiff,
+        ToDisplay, UdevEngineEvent, UnlockMethod,
     },
 };
 

@@ -252,7 +252,6 @@ fn check_dev(device_info: &DeviceInfo) -> StratisResult<()> {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct BlockSizes {
-    #[allow(dead_code)]
     pub(super) physical_sector_size: Bytes,
     pub(super) logical_sector_size: Bytes,
 }
@@ -465,6 +464,18 @@ impl UnownedDevices {
 
     pub fn unpack(self) -> Vec<DeviceInfo> {
         self.inner
+    }
+
+    /// Return a map of block sizes to device infos
+    pub fn blocksizes(&self) -> HashMap<BlockSizes, Vec<&DeviceInfo>> {
+        let mut block_size_groups = HashMap::new();
+        for info in self.inner.iter() {
+            block_size_groups
+                .entry(info.blksizes)
+                .or_insert_with(Vec::new)
+                .push(info);
+        }
+        block_size_groups
     }
 }
 

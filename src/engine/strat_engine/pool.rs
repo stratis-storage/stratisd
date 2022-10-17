@@ -552,6 +552,12 @@ impl Pool for StratPool {
                 ));
             }
 
+            let block_size_summary = unowned_devices.blocksizes();
+            if block_size_summary.len() > 1 {
+                let err_str = "The devices specified for the cache tier do not have uniform physcal and logical block sizes.".into();
+                return Err(StratisError::Msg(err_str));
+            }
+
             self.thin_pool.suspend()?;
             let devices_result = self
                 .backstore
@@ -784,6 +790,12 @@ impl Pool for StratPool {
                     return Ok((SetCreateAction::new(vec![]), None));
                 }
 
+                let block_size_summary = unowned_devices.blocksizes();
+                if block_size_summary.len() > 1 {
+                    let err_str = "The devices specified to be added to the cache tier do not have uniform physcal and logical block sizes.".into();
+                    return Err(StratisError::Msg(err_str));
+                }
+
                 self.thin_pool.suspend()?;
                 let bdev_info_res = self.backstore.add_cachedevs(pool_uuid, unowned_devices);
                 self.thin_pool.resume()?;
@@ -805,6 +817,12 @@ impl Pool for StratPool {
 
                 if unowned_devices.is_empty() {
                     return Ok((SetCreateAction::new(vec![]), None));
+                }
+
+                let block_size_summary = unowned_devices.blocksizes();
+                if block_size_summary.len() > 1 {
+                    let err_str = "The devices specified to be added to the data tier do not have uniform physcal and logical block sizes.".into();
+                    return Err(StratisError::Msg(err_str));
                 }
 
                 let cached = self.cached();

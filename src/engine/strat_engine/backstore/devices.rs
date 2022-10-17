@@ -250,11 +250,9 @@ fn check_dev(device_info: &DeviceInfo) -> StratisResult<()> {
     }
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct BlockSizes {
-    #[allow(dead_code)]
     physical_sector_size: Bytes,
-    #[allow(dead_code)]
     logical_sector_size: Bytes,
 }
 
@@ -466,6 +464,22 @@ impl UnownedDevices {
 
     pub fn unpack(self) -> Vec<DeviceInfo> {
         self.inner
+    }
+
+    /// Return an error if the block sizes are not identical.
+    pub fn error_on_inconsistent_block_size(&self) -> StratisResult<()> {
+        let mut block_size_groups = HashMap::new();
+        for info in self.inner.iter() {
+            block_size_groups
+                .entry(info.blksizes)
+                .or_insert_with(Vec::new)
+                .push(info);
+        }
+        if block_size_groups.len() > 1 {
+            Err(StratisError::Msg("Inconsistent block sizes".to_string()))
+        } else {
+            Ok(())
+        }
     }
 }
 

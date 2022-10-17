@@ -525,6 +525,8 @@ impl Pool for StratPool {
                 ));
             }
 
+            unowned_devices.error_on_inconsistent_block_size()?;
+
             self.thin_pool.suspend()?;
             let devices_result = self
                 .backstore
@@ -757,6 +759,8 @@ impl Pool for StratPool {
                     return Ok((SetCreateAction::new(vec![]), None));
                 }
 
+                unowned_devices.error_on_inconsistent_block_size()?;
+
                 self.thin_pool.suspend()?;
                 let bdev_info_res = self.backstore.add_cachedevs(pool_uuid, unowned_devices);
                 self.thin_pool.resume()?;
@@ -779,6 +783,8 @@ impl Pool for StratPool {
                 if unowned_devices.is_empty() {
                     return Ok((SetCreateAction::new(vec![]), None));
                 }
+
+                unowned_devices.error_on_inconsistent_block_size()?;
 
                 let cached = self.cached();
 

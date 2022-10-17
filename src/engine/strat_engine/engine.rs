@@ -418,6 +418,8 @@ impl Engine for StratEngine {
                 ));
             }
 
+            unowned_devices.error_on_inconsistent_block_size()?;
+
             let cloned_name = name.clone();
             let cloned_enc_info = encryption_info.cloned();
 

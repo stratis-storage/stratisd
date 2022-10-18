@@ -162,8 +162,7 @@ bloat: ${HOME}/.cargo/bin/cargo-bloat
 
 ## Run cargo audit
 audit: ${HOME}/.cargo/bin/cargo-audit
-	# Remove --ignore when bindgen dependency is increased to ^0.60
-	PATH=${HOME}/.cargo/bin:${PATH} cargo audit -D warnings --ignore=RUSTSEC-2021-0139
+	PATH=${HOME}/.cargo/bin:${PATH} cargo audit -D warnings
 
 ## Run cargo expand
 expand: ${HOME}/.cargo/bin/cargo-expand

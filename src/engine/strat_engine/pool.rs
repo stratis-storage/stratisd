@@ -525,7 +525,12 @@ impl Pool for StratPool {
                 ));
             }
 
-            unowned_devices.error_on_inconsistent_block_size()?;
+            let data_block_sizes = self.backstore.blocksize_info().0;
+            if data_block_sizes.len() == 1 {
+                unowned_devices.error_on_inconsistent_block_size(Some(
+                    data_block_sizes.into_iter().next().expect("at least one"),
+                ))?;
+            }
 
             self.thin_pool.suspend()?;
             let devices_result = self
@@ -759,7 +764,12 @@ impl Pool for StratPool {
                     return Ok((SetCreateAction::new(vec![]), None));
                 }
 
-                unowned_devices.error_on_inconsistent_block_size()?;
+                let cache_block_sizes = self.backstore.blocksize_info().1.expect("has cache");
+                if cache_block_sizes.len() == 1 {
+                    unowned_devices.error_on_inconsistent_block_size(Some(
+                        cache_block_sizes.into_iter().next().expect("at least one"),
+                    ))?;
+                }
 
                 self.thin_pool.suspend()?;
                 let bdev_info_res = self.backstore.add_cachedevs(pool_uuid, unowned_devices);
@@ -784,7 +794,12 @@ impl Pool for StratPool {
                     return Ok((SetCreateAction::new(vec![]), None));
                 }
 
-                unowned_devices.error_on_inconsistent_block_size()?;
+                let data_block_sizes = self.backstore.blocksize_info().0;
+                if data_block_sizes.len() == 1 {
+                    unowned_devices.error_on_inconsistent_block_size(Some(
+                        data_block_sizes.into_iter().next().expect("at least one"),
+                    ))?;
+                }
 
                 let cached = self.cached();
 

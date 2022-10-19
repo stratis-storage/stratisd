@@ -4,7 +4,7 @@
 
 // Code to handle the backing store of a pool.
 
-use std::cmp;
+use std::{cmp, collections::HashSet};
 
 use chrono::{DateTime, Utc};
 use serde_json::Value;
@@ -19,7 +19,7 @@ use crate::{
                 blockdevmgr::{map_to_dm, BlockDevMgr},
                 cache_tier::CacheTier,
                 data_tier::DataTier,
-                devices::UnownedDevices,
+                devices::{BlockSizes, UnownedDevices},
                 transaction::RequestTransaction,
             },
             dm::get_dm,
@@ -633,6 +633,15 @@ impl Backstore {
 
     pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {
         self.data_tier.grow(dev)
+    }
+
+    pub fn blocksize_info(&self) -> (HashSet<BlockSizes>, Option<HashSet<BlockSizes>>) {
+        (
+            self.data_tier.block_mgr.blocksize_info(),
+            self.cache_tier
+                .as_ref()
+                .map(|ct| ct.block_mgr.blocksize_info()),
+        )
     }
 }
 

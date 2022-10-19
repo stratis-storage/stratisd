@@ -86,8 +86,7 @@ pub struct StratBlockDev {
     hardware_info: Option<String>,
     underlying_device: UnderlyingDevice,
     new_size: Option<Sectors>,
-    #[allow(dead_code)]
-    blksizes: BlockSizes,
+    pub(super) blksizes: BlockSizes,
 }
 
 impl StratBlockDev {

@@ -467,7 +467,7 @@ impl UnownedDevices {
     }
 
     /// Return an error if the block sizes are not identical.
-    pub fn error_on_inconsistent_block_size(&self) -> StratisResult<()> {
+    pub fn error_on_inconsistent_block_size(&self, other: Option<BlockSizes>) -> StratisResult<()> {
         let mut block_size_groups = HashMap::new();
         for info in self.inner.iter() {
             block_size_groups
@@ -475,8 +475,16 @@ impl UnownedDevices {
                 .or_insert_with(Vec::new)
                 .push(info);
         }
-        if block_size_groups.len() > 1 {
+        if block_size_groups.is_empty() {
+            Ok(())
+        } else if block_size_groups.len() > 1 {
             Err(StratisError::Msg("Inconsistent block sizes".to_string()))
+        } else if let Some(other) = other {
+            if block_size_groups.keys().next().expect("at least one") == &other {
+                Ok(())
+            } else {
+                Err(StratisError::Msg("Inconsistent block sizes".to_string()))
+            }
         } else {
             Ok(())
         }

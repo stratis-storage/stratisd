@@ -4,10 +4,11 @@
 
 // Code to handle a collection of block devices.
 
-#[cfg(test)]
-use std::collections::HashSet;
-
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    fs,
+    path::PathBuf,
+};
 
 use chrono::{DateTime, Duration, Utc};
 use rand::{seq::IteratorRandom, thread_rng};
@@ -26,7 +27,7 @@ use crate::{
                     back_up_luks_header, interpret_clevis_config, restore_luks_header,
                     CryptActivationHandle,
                 },
-                devices::{initialize_devices, wipe_blockdevs, UnownedDevices},
+                devices::{initialize_devices, wipe_blockdevs, BlockSizes, UnownedDevices},
                 range_alloc::PerDevSegments,
                 transaction::RequestTransaction,
             },
@@ -432,6 +433,14 @@ impl BlockDevMgr {
             self.block_devs.iter().map(|bd| bd.encryption_info()),
         )
         .expect("Cannot create a pool out of both encrypted and unencrypted devices")
+    }
+
+    /// The set of distinct block sizes that occur
+    pub fn blocksize_info(&self) -> HashSet<BlockSizes> {
+        self.block_devs
+            .iter()
+            .map(|bd| bd.blksizes)
+            .collect::<HashSet<_>>()
     }
 
     pub fn is_encrypted(&self) -> bool {

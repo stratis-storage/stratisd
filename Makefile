@@ -223,7 +223,7 @@ stratis-dumpmetadata:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
 	cargo build ${RELEASE_FLAG} \
-	--bin=stratis_dumpmetadata ${EXTRAS_FEATURES} ${TARGET_ARGS}
+	--bin=stratis-dumpmetadata ${EXTRAS_FEATURES} ${TARGET_ARGS}
 
 ## Build stratis-min for early userspace
 stratis-min:

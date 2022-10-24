@@ -13,7 +13,7 @@ use crate::{
                 blockdev::StratBlockDev,
                 blockdevmgr::BlockDevMgr,
                 devices::UnownedDevices,
-                shared::{coalesce_blkdevsegs, metadata_to_segment, BlkDevSegment},
+                shared::{metadata_to_segment, AllocatedAbove, BlkDevSegment},
                 transaction::RequestTransaction,
             },
             serde_structs::{BaseDevSave, BlockDevSave, DataTierSave, Recordable},
@@ -29,7 +29,7 @@ pub struct DataTier {
     /// Manages the individual block devices
     pub block_mgr: BlockDevMgr,
     /// The list of segments granted by block_mgr and used by dm_device
-    pub segments: Vec<BlkDevSegment>,
+    pub segments: AllocatedAbove,
 }
 
 impl DataTier {
@@ -40,10 +40,12 @@ impl DataTier {
         let mapper = |ld: &BaseDevSave| -> StratisResult<BlkDevSegment> {
             metadata_to_segment(&uuid_to_devno, ld)
         };
-        let segments = data_tier_save.blockdev.allocs[0]
-            .iter()
-            .map(&mapper)
-            .collect::<StratisResult<Vec<_>>>()?;
+        let segments = AllocatedAbove {
+            inner: data_tier_save.blockdev.allocs[0]
+                .iter()
+                .map(&mapper)
+                .collect::<StratisResult<Vec<_>>>()?,
+        };
 
         Ok(DataTier {
             block_mgr,
@@ -59,7 +61,7 @@ impl DataTier {
     pub fn new(block_mgr: BlockDevMgr) -> DataTier {
         DataTier {
             block_mgr,
-            segments: vec![],
+            segments: AllocatedAbove { inner: vec![] },
         }
     }
 
@@ -86,7 +88,7 @@ impl DataTier {
     pub fn alloc_commit(&mut self, transaction: RequestTransaction) -> StratisResult<()> {
         let segments = transaction.get_blockdevmgr();
         self.block_mgr.commit_space(transaction)?;
-        self.segments = coalesce_blkdevsegs(&self.segments, &segments);
+        self.segments.coalesce_blkdevsegs(&segments);
 
         Ok(())
     }
@@ -94,10 +96,7 @@ impl DataTier {
     /// The sum of the lengths of all the sectors that have been mapped to an
     /// upper device.
     pub fn allocated(&self) -> Sectors {
-        self.segments
-            .iter()
-            .map(|x| x.segment.length)
-            .sum::<Sectors>()
+        self.segments.size()
     }
 
     /// The total size of all the blockdevs combined

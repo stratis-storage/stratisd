@@ -13,7 +13,7 @@ use crate::{
                 blockdev::StratBlockDev,
                 blockdevmgr::BlockDevMgr,
                 devices::UnownedDevices,
-                shared::{coalesce_blkdevsegs, metadata_to_segment, BlkDevSegment},
+                shared::{metadata_to_segment, AllocatedAbove, BlkDevSegment},
             },
             serde_structs::{BaseDevSave, BlockDevSave, CacheTierSave, Recordable},
         },
@@ -37,10 +37,10 @@ pub struct CacheTier {
     pub block_mgr: BlockDevMgr,
     /// The list of segments granted by block_mgr and used by the cache
     /// device.
-    pub cache_segments: Vec<BlkDevSegment>,
+    pub cache_segments: AllocatedAbove,
     /// The list of segments granted by block_mgr and used by the metadata
     /// device.
-    pub meta_segments: Vec<BlkDevSegment>,
+    pub meta_segments: AllocatedAbove,
 }
 
 impl CacheTier {
@@ -63,15 +63,19 @@ impl CacheTier {
             metadata_to_segment(&uuid_to_devno, ld)
         };
 
-        let meta_segments = cache_tier_save.blockdev.allocs[1]
-            .iter()
-            .map(&mapper)
-            .collect::<StratisResult<Vec<_>>>()?;
+        let meta_segments = AllocatedAbove {
+            inner: cache_tier_save.blockdev.allocs[1]
+                .iter()
+                .map(&mapper)
+                .collect::<StratisResult<Vec<_>>>()?,
+        };
 
-        let cache_segments = cache_tier_save.blockdev.allocs[0]
-            .iter()
-            .map(&mapper)
-            .collect::<StratisResult<Vec<_>>>()?;
+        let cache_segments = AllocatedAbove {
+            inner: cache_tier_save.blockdev.allocs[0]
+                .iter()
+                .map(&mapper)
+                .collect::<StratisResult<Vec<_>>>()?,
+        };
 
         Ok(CacheTier {
             block_mgr,
@@ -105,14 +109,7 @@ impl CacheTier {
 
         // FIXME: This check will become unnecessary when cache metadata device
         // can be increased dynamically.
-        if avail_space
-            + self
-                .cache_segments
-                .iter()
-                .map(|x| x.segment.length)
-                .sum::<Sectors>()
-            > MAX_CACHE_SIZE
-        {
+        if avail_space + self.cache_segments.size() > MAX_CACHE_SIZE {
             self.block_mgr.remove_blockdevs(&uuids)?;
             return Err(StratisError::Msg(format!(
                 "The size of the cache sub-device may not exceed {}",
@@ -132,7 +129,7 @@ impl CacheTier {
                 e
             )));
         }
-        self.cache_segments = coalesce_blkdevsegs(&self.cache_segments, &segments);
+        self.cache_segments.coalesce_blkdevsegs(&segments);
 
         Ok((uuids, (true, false)))
     }
@@ -167,8 +164,12 @@ impl CacheTier {
         let trans = block_mgr
             .request_space(&[meta_space, avail_space - meta_space])?
             .expect("asked for exactly the space available, must get");
-        let meta_segments = trans.get_segs_for_req(0).expect("segments.len() == 2");
-        let cache_segments = trans.get_segs_for_req(1).expect("segments.len() == 2");
+        let meta_segments = AllocatedAbove {
+            inner: trans.get_segs_for_req(0).expect("segments.len() == 2"),
+        };
+        let cache_segments = AllocatedAbove {
+            inner: trans.get_segs_for_req(1).expect("segments.len() == 2"),
+        };
         if let Err(e) = block_mgr.commit_space(trans) {
             block_mgr.destroy_all()?;
             return Err(StratisError::Msg(format!(
@@ -269,19 +270,11 @@ mod tests {
 
         // A cache tier w/ some devices and everything promptly allocated to
         // the tier.
-        let cache_metadata_size = cache_tier
-            .meta_segments
-            .iter()
-            .map(|x| x.segment.length)
-            .sum::<Sectors>();
+        let cache_metadata_size = cache_tier.meta_segments.size();
 
         let mut metadata_size = cache_tier.block_mgr.metadata_size();
         let mut size = cache_tier.block_mgr.size();
-        let mut allocated = cache_tier
-            .cache_segments
-            .iter()
-            .map(|x| x.segment.length)
-            .sum::<Sectors>();
+        let mut allocated = cache_tier.cache_segments.size();
 
         assert_eq!(cache_tier.block_mgr.avail_space(), Sectors(0));
         assert_eq!(size - metadata_size, allocated + cache_metadata_size);
@@ -297,11 +290,7 @@ mod tests {
 
         metadata_size = cache_tier.block_mgr.metadata_size();
         size = cache_tier.block_mgr.size();
-        allocated = cache_tier
-            .cache_segments
-            .iter()
-            .map(|x| x.segment.length)
-            .sum::<Sectors>();
+        allocated = cache_tier.cache_segments.size();
         assert_eq!(size - metadata_size, allocated + cache_metadata_size);
 
         cache_tier.destroy().unwrap();

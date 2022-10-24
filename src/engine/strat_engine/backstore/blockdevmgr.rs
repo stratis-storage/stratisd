@@ -14,7 +14,7 @@ use rand::{seq::IteratorRandom, thread_rng};
 use serde_json::Value;
 use tempfile::TempDir;
 
-use devicemapper::{Bytes, Device, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine};
+use devicemapper::{Bytes, Device, Sectors};
 
 use crate::{
     engine::{
@@ -28,10 +28,11 @@ use crate::{
                 },
                 devices::{initialize_devices, wipe_blockdevs, UnownedDevices},
                 range_alloc::PerDevSegments,
+                shared::{BlkDevSegment, Segment},
                 transaction::RequestTransaction,
             },
             metadata::{MDADataSize, BDA},
-            serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
+            serde_structs::{BaseBlockDevSave, Recordable},
             shared::bds_to_bdas,
         },
         types::{
@@ -43,81 +44,6 @@ use crate::{
 };
 
 const MAX_NUM_TO_WRITE: usize = 10;
-
-/// struct to represent a continuous set of sectors on a disk
-#[derive(Debug, Clone)]
-pub struct Segment {
-    /// The offset into the device where this segment starts.
-    pub(super) start: Sectors,
-    /// The length of the segment.
-    pub(super) length: Sectors,
-    /// The device the segment is within.
-    pub(super) device: Device,
-}
-
-impl Segment {
-    /// Create a new Segment with given attributes
-    pub fn new(device: Device, start: Sectors, length: Sectors) -> Segment {
-        Segment {
-            start,
-            length,
-            device,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct BlkDevSegment {
-    pub(super) uuid: DevUuid,
-    pub(super) segment: Segment,
-}
-
-impl BlkDevSegment {
-    pub fn new(uuid: DevUuid, segment: Segment) -> BlkDevSegment {
-        BlkDevSegment { uuid, segment }
-    }
-
-    pub fn to_segment(&self) -> Segment {
-        self.segment.clone()
-    }
-}
-
-impl Recordable<Vec<BaseDevSave>> for Vec<BlkDevSegment> {
-    fn record(&self) -> Vec<BaseDevSave> {
-        self.iter()
-            .map(|bseg| BaseDevSave {
-                parent: bseg.uuid,
-                start: bseg.segment.start,
-                length: bseg.segment.length,
-            })
-            .collect::<Vec<_>>()
-    }
-}
-
-/// Build a linear dev target table from BlkDevSegments. This is useful for
-/// calls to the devicemapper library.
-pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<TargetLine<LinearDevTargetParams>> {
-    let mut table = Vec::new();
-    let mut logical_start_offset = Sectors(0);
-
-    let segments = bsegs
-        .iter()
-        .map(|bseg| bseg.to_segment())
-        .collect::<Vec<_>>();
-    for segment in segments {
-        let (physical_start_offset, length) = (segment.start, segment.length);
-        let params = LinearTargetParams::new(segment.device, physical_start_offset);
-        let line = TargetLine::new(
-            logical_start_offset,
-            length,
-            LinearDevTargetParams::Linear(params),
-        );
-        table.push(line);
-        logical_start_offset += length;
-    }
-
-    table
-}
 
 #[derive(Debug)]
 pub struct BlockDevMgr {

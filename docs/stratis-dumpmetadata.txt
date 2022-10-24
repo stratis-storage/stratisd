@@ -1,17 +1,17 @@
-stratis_dumpmetadata(8)
+stratis-dumpmetadata(8)
 =======================
 
 NAME
 ----
-stratis_dumpmetadata - Dump metadata content of Stratis pools
+stratis-dumpmetadata - Dump metadata content of Stratis pools
 
 SYNOPSIS
 --------
-  stratis_dumpmetadata <dev>
+  stratis-dumpmetadata <dev>
 
 DESCRIPTION
 -----------
-*stratis_dumpmetadata* prints the metadata content of a Stratis pool that
+*stratis-dumpmetadata* prints the metadata content of a Stratis pool that
 is present on a given block device.
 
 GLOBAL OPTIONS

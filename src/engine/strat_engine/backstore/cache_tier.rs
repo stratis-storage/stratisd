@@ -11,9 +11,9 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
-                blockdevmgr::{BlkDevSegment, BlockDevMgr},
+                blockdevmgr::BlockDevMgr,
                 devices::UnownedDevices,
-                shared::{coalesce_blkdevsegs, metadata_to_segment},
+                shared::{coalesce_blkdevsegs, metadata_to_segment, BlkDevSegment},
             },
             serde_structs::{BaseDevSave, BlockDevSave, CacheTierSave, Recordable},
         },

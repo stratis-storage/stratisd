@@ -37,7 +37,7 @@ mod tests {
         ptr, slice,
     };
 
-    use devicemapper::Sectors;
+    use devicemapper::{Bytes, Sectors, IEC};
     use libcryptsetup_rs::{
         consts::vals::{CryptStatusInfo, EncryptionFormat},
         CryptInit, Either,
@@ -319,7 +319,7 @@ mod tests {
     #[test]
     fn real_test_crypt_device_ops() {
         real::test_with_spec(
-            &real::DeviceLimits::Exactly(1, None, Some(Sectors(1024 * 1024 * 1024 / 512))),
+            &real::DeviceLimits::Exactly(1, None, Some(Sectors(2 * IEC::Mi))),
             test_crypt_device_ops,
         );
     }
@@ -339,8 +339,8 @@ mod tests {
                 )
                 .unwrap();
             let (metadata, keyslot) = context.settings_handle().get_metadata_size().unwrap();
-            assert_eq!(DEFAULT_CRYPT_METADATA_SIZE, *metadata);
-            assert_eq!(DEFAULT_CRYPT_KEYSLOTS_SIZE, *keyslot);
+            assert_eq!(DEFAULT_CRYPT_METADATA_SIZE, Bytes::from(*metadata));
+            assert_eq!(DEFAULT_CRYPT_KEYSLOTS_SIZE, Bytes::from(*keyslot));
         }
 
         loopbacked::test_with_spec(&loopbacked::DeviceLimits::Exactly(1, None), test_defaults);

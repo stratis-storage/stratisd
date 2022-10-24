@@ -82,8 +82,8 @@ impl CryptInitializer {
             self.physical_path.display()
         );
         device.settings_handle().set_metadata_size(
-            MetadataSize::try_from(DEFAULT_CRYPT_METADATA_SIZE)?,
-            KeyslotsSize::try_from(DEFAULT_CRYPT_KEYSLOTS_SIZE)?,
+            MetadataSize::try_from(convert_int!(*DEFAULT_CRYPT_METADATA_SIZE, u128, u64)?)?,
+            KeyslotsSize::try_from(convert_int!(*DEFAULT_CRYPT_KEYSLOTS_SIZE, u128, u64)?)?,
         )?;
         self
             .initialize_with_err(&mut device, key_description, clevis_parsed)

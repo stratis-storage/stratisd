@@ -33,10 +33,10 @@ use crate::{
             backstore::crypt::{
                 consts::{
                     CLEVIS_LUKS_TOKEN_ID, CLEVIS_TANG_TRUST_URL, DEFAULT_CRYPT_KEYSLOTS_SIZE,
-                    DEFAULT_CRYPT_METADATA_SIZE, LUKS2_TOKEN_ID, LUKS2_TOKEN_TYPE, SECTOR_SIZE,
-                    STRATIS_TOKEN_DEVNAME_KEY, STRATIS_TOKEN_DEV_UUID_KEY, STRATIS_TOKEN_ID,
-                    STRATIS_TOKEN_POOL_UUID_KEY, STRATIS_TOKEN_TYPE, TOKEN_KEYSLOTS_KEY,
-                    TOKEN_TYPE_KEY,
+                    DEFAULT_CRYPT_METADATA_SIZE, LUKS2_SECTOR_SIZE, LUKS2_TOKEN_ID,
+                    LUKS2_TOKEN_TYPE, STRATIS_TOKEN_DEVNAME_KEY, STRATIS_TOKEN_DEV_UUID_KEY,
+                    STRATIS_TOKEN_ID, STRATIS_TOKEN_POOL_UUID_KEY, STRATIS_TOKEN_TYPE,
+                    TOKEN_KEYSLOTS_KEY, TOKEN_TYPE_KEY,
                 },
                 handle::CryptHandle,
                 metadata_handle::CryptMetadataHandle,
@@ -774,10 +774,11 @@ pub fn ensure_inactive(device: &mut CryptDevice, name: &str) -> StratisResult<()
     Ok(())
 }
 
-/// Align the number of bytes to the nearest multiple of `SECTOR_SIZE`
+/// Align the number of bytes to the nearest multiple of `LUKS2_SECTOR_SIZE`
 /// above the current value.
-fn ceiling_sector_size_alignment(bytes: u64) -> u64 {
-    bytes + (SECTOR_SIZE - (bytes % SECTOR_SIZE))
+fn ceiling_sector_size_alignment(bytes: Bytes) -> Bytes {
+    let round = *LUKS2_SECTOR_SIZE - 1;
+    Bytes::from((*bytes + round) & !round)
 }
 
 /// Fallback method for wiping a crypt device where a handle to the encrypted device
@@ -855,7 +856,13 @@ pub fn ensure_wiped(
     );
     debug!("Metadata size of LUKS2 device: {}", *md_size);
     debug!("Keyslot area size of LUKS2 device: {}", *ks_size);
-    let total_luks2_metadata_size = ceiling_sector_size_alignment(*md_size * 2 + *ks_size);
+    assert!(*md_size % 4096 == 0);
+    let total_luks2_metadata_size = *md_size * 2
+        + convert_int!(
+            *ceiling_sector_size_alignment(Bytes::from(*ks_size)),
+            u128,
+            u64
+        )?;
     debug!("Aligned total size: {}", total_luks2_metadata_size);
 
     log_on_failure!(
@@ -864,7 +871,7 @@ pub fn ensure_wiped(
             CryptWipePattern::Zero,
             0,
             total_luks2_metadata_size,
-            convert_const!(SECTOR_SIZE, u64, usize),
+            convert_const!(*LUKS2_SECTOR_SIZE, u128, usize),
             CryptWipe::empty(),
             None,
             None,
@@ -1025,7 +1032,7 @@ fn identifiers_from_metadata(device: &mut CryptDevice) -> StratisResult<StratisI
 
 // Bytes occupied by crypt metadata
 pub fn crypt_metadata_size() -> Bytes {
-    2u64 * Bytes::from(DEFAULT_CRYPT_METADATA_SIZE) + Bytes::from(DEFAULT_CRYPT_KEYSLOTS_SIZE)
+    2u64 * DEFAULT_CRYPT_METADATA_SIZE + ceiling_sector_size_alignment(DEFAULT_CRYPT_KEYSLOTS_SIZE)
 }
 
 /// Back up the LUKS2 header to a temporary file.

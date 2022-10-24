@@ -4,13 +4,16 @@
 
 // Methods that are shared by the cache tier and the data tier.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use devicemapper::{Device, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine};
 
 use crate::{
     engine::{
-        strat_engine::serde_structs::{BaseDevSave, Recordable},
+        strat_engine::{
+            backstore::{blockdev::StratBlockDev, devices::BlockSizes},
+            serde_structs::{BaseDevSave, Recordable},
+        },
         types::DevUuid,
     },
     stratis::{StratisError, StratisResult},
@@ -130,6 +133,89 @@ impl AllocatedAbove {
                 collect
             },
         );
+    }
+
+    /// A set of UUIDs of every device that is allocated from.
+    pub fn uuids(&self) -> HashSet<DevUuid> {
+        self.inner
+            .iter()
+            .map(|seg| seg.uuid)
+            .collect::<HashSet<DevUuid>>()
+    }
+}
+
+/// A partition of blockdevs in a BlockDevMgr between those in use by
+/// upper layers and those that are not.
+pub struct BlockDevPartition<'a> {
+    pub(super) used: Vec<(DevUuid, &'a StratBlockDev)>,
+    pub(super) unused: Vec<(DevUuid, &'a StratBlockDev)>,
+}
+
+/// A summary of block sizes for a BlockDevMgr, distinguishing between used
+/// and unused.
+pub struct BlockSizeSummary {
+    pub(super) used: HashMap<BlockSizes, HashSet<DevUuid>>,
+    pub(super) unused: HashMap<BlockSizes, HashSet<DevUuid>>,
+}
+
+impl<'a> From<BlockDevPartition<'a>> for BlockSizeSummary {
+    fn from(pair: BlockDevPartition<'a>) -> BlockSizeSummary {
+        let mut used = HashMap::new();
+        for (u, bd) in pair.used {
+            used.entry(bd.blksizes())
+                .or_insert_with(HashSet::default)
+                .insert(u);
+        }
+
+        let mut unused: HashMap<BlockSizes, _> = HashMap::new();
+        for (u, bd) in pair.unused {
+            unused
+                .entry(bd.blksizes())
+                .or_insert_with(HashSet::default)
+                .insert(u);
+        }
+
+        BlockSizeSummary { used, unused }
+    }
+}
+
+impl BlockSizeSummary {
+    /// Check that, as far as is known, the current arrangement of device
+    /// block sizes will not cause untoward behavior during the lifetime of
+    /// the pool.
+    pub fn validate(&self) -> StratisResult<()> {
+        // It is not practically possible that all the data devices in the data
+        // tier or all the the cache devices in the cache tier will be
+        // completely unused during stratisd's normal execution. This condition
+        // is here for logical completeness and in case an unused data or cache
+        // tier is made for testing.
+        if self.used.is_empty() {
+            return if self.unused.len() > 1 {
+                let error_str = "The devices in this pool have inconsistent block sizes. This is an unpredictable situation, and could lead to umnountable file systems if the pool is extended. Consider remaking the pool using devices with consistent block sizes.".to_string();
+                Err(StratisError::Msg(error_str))
+            } else {
+                Ok(())
+            };
+        }
+
+        let largest_logical_used = self
+            .used
+            .keys()
+            .map(|x| x.logical_sector_size)
+            .max()
+            .expect("returned early if used was empty");
+
+        if self
+            .unused
+            .keys()
+            .map(|x| x.logical_sector_size)
+            .any(|s| s > largest_logical_used)
+        {
+            let error_str = format!("Some unused block devices in the pool have a logical sector size that is larger than the largest logical sector size ({}) of any of the devices that are in use. This could lead to unmountable filesystems if the pool is extended. Consider moving your data to another pool.", largest_logical_used);
+            Err(StratisError::Msg(error_str))
+        } else {
+            Ok(())
+        }
     }
 }
 

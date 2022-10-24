@@ -13,7 +13,7 @@ use crate::{
                 blockdev::StratBlockDev,
                 blockdevmgr::BlockDevMgr,
                 devices::UnownedDevices,
-                shared::{metadata_to_segment, AllocatedAbove, BlkDevSegment},
+                shared::{metadata_to_segment, AllocatedAbove, BlkDevSegment, BlockDevPartition},
             },
             serde_structs::{BaseDevSave, BlockDevSave, CacheTierSave, Recordable},
         },
@@ -214,6 +214,26 @@ impl CacheTier {
         self.block_mgr
             .get_mut_blockdev_by_uuid(uuid)
             .map(|bd| (BlockDevTier::Cache, bd))
+    }
+
+    /// Return the partition of the block devs that are in use by the cache
+    /// sub-device and those that are not, but may be in use later.
+    pub fn partition_cache_by_use(&self) -> BlockDevPartition<'_> {
+        let meta_uuids = self.meta_segments.uuids();
+        let cache_uuids = self.cache_segments.uuids();
+        let blockdevs = self.block_mgr.blockdevs();
+
+        let (used, other): (Vec<_>, Vec<_>) = blockdevs
+            .iter()
+            .partition(|(uuid, _)| cache_uuids.contains(uuid));
+        let (mut unused, meta_other): (Vec<_>, Vec<_>) = other
+            .iter()
+            .partition(|(uuid, _)| meta_uuids.contains(uuid));
+
+        unused.retain(|(_, bd)| bd.available() > Sectors(0));
+        unused.extend_from_slice(&meta_other);
+
+        BlockDevPartition { used, unused }
     }
 }
 

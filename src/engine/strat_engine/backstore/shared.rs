@@ -54,9 +54,18 @@ impl BlkDevSegment {
     }
 }
 
-impl Recordable<Vec<BaseDevSave>> for Vec<BlkDevSegment> {
+/// A structure that records the segments of devices that belong to a
+/// BlockDevMgr that are allocated to a layer above. The ordering of the
+/// segments in the vectors must be preserved.
+#[derive(Debug)]
+pub struct AllocatedAbove {
+    pub(super) inner: Vec<BlkDevSegment>,
+}
+
+impl Recordable<Vec<BaseDevSave>> for AllocatedAbove {
     fn record(&self) -> Vec<BaseDevSave> {
-        self.iter()
+        self.inner
+            .iter()
             .map(|bseg| BaseDevSave {
                 parent: bseg.uuid,
                 start: bseg.segment.start,
@@ -66,30 +75,64 @@ impl Recordable<Vec<BaseDevSave>> for Vec<BlkDevSegment> {
     }
 }
 
-/// Build a linear dev target table from BlkDevSegments. This is useful for
-/// calls to the devicemapper library.
-pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<TargetLine<LinearDevTargetParams>> {
-    let mut table = Vec::new();
-    let mut logical_start_offset = Sectors(0);
-
-    let segments = bsegs
-        .iter()
-        .map(|bseg| bseg.to_segment())
-        .collect::<Vec<_>>();
-    for segment in segments {
-        let (physical_start_offset, length) = (segment.start, segment.length);
-        let params = LinearTargetParams::new(segment.device, physical_start_offset);
-        let line = TargetLine::new(
-            logical_start_offset,
-            length,
-            LinearDevTargetParams::Linear(params),
-        );
-        table.push(line);
-        logical_start_offset += length;
+impl AllocatedAbove {
+    /// Total size in the contained segments.
+    pub fn size(&self) -> Sectors {
+        self.inner.iter().map(|x| x.segment.length).sum::<Sectors>()
     }
 
-    table
+    /// Build a linear dev target table from BlkDevSegments. This is useful for
+    /// calls to the devicemapper library.
+    pub fn map_to_dm(&self) -> Vec<TargetLine<LinearDevTargetParams>> {
+        let mut table = Vec::new();
+        let mut logical_start_offset = Sectors(0);
+
+        let segments = self
+            .inner
+            .iter()
+            .map(|bseg| bseg.to_segment())
+            .collect::<Vec<_>>();
+        for segment in segments {
+            let (physical_start_offset, length) = (segment.start, segment.length);
+            let params = LinearTargetParams::new(segment.device, physical_start_offset);
+            let line = TargetLine::new(
+                logical_start_offset,
+                length,
+                LinearDevTargetParams::Linear(params),
+            );
+            table.push(line);
+            logical_start_offset += length;
+        }
+
+        table
+    }
+
+    /// Append the second list of BlkDevSegments to the first, or if the last
+    /// segment of the first argument is adjacent to the first segment of the
+    /// second argument, merge those two together.
+    /// Postcondition: left.len() + right.len() - 1 <= result.len()
+    /// Postcondition: result.len() <= left.len() + right.len()
+    pub fn coalesce_blkdevsegs(&mut self, right: &[BlkDevSegment]) {
+        self.inner = self.inner.iter().chain(right.iter()).cloned().fold(
+            Vec::with_capacity(self.inner.len() + right.len()),
+            |mut collect, seg| {
+                if let Some(left) = collect.last_mut() {
+                    if left.uuid == seg.uuid
+                        && (left.segment.start + left.segment.length == seg.segment.start)
+                    {
+                        left.segment.length += seg.segment.length;
+                    } else {
+                        collect.push(seg);
+                    }
+                } else {
+                    collect.push(seg);
+                }
+                collect
+            },
+        );
+    }
 }
+
 /// Given a function that translates a Stratis UUID to a device
 /// number, and some metadata that describes a particular segment within
 /// a device by means of its Stratis UUID, and its start and offset w/in the
@@ -113,29 +156,4 @@ pub fn metadata_to_segment(
                 Segment::new(*device, base_dev_save.start, base_dev_save.length),
             )
         })
-}
-
-/// Append the second list of BlkDevSegments to the first, or if the last
-/// segment of the first argument is adjacent to the first segment of the
-/// second argument, merge those two together.
-/// Postcondition: left.len() + right.len() - 1 <= result.len()
-/// Postcondition: result.len() <= left.len() + right.len()
-pub fn coalesce_blkdevsegs(left: &[BlkDevSegment], right: &[BlkDevSegment]) -> Vec<BlkDevSegment> {
-    left.iter().chain(right.iter()).cloned().fold(
-        Vec::with_capacity(left.len() + right.len()),
-        |mut collect, seg| {
-            if let Some(left) = collect.last_mut() {
-                if left.uuid == seg.uuid
-                    && (left.segment.start + left.segment.length == seg.segment.start)
-                {
-                    left.segment.length += seg.segment.length;
-                } else {
-                    collect.push(seg);
-                }
-            } else {
-                collect.push(seg);
-            }
-            collect
-        },
-    )
 }

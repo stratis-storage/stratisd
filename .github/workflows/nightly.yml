@@ -10,6 +10,42 @@ on:
   workflow_dispatch:
 
 jobs:
+  jobs:
+    strategy:
+      matrix:
+        include:
+          - task: cargo package
+            toolchain: 1.64.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            components: cargo
+          - task: make -f Makefile stratis-dumpmetadata
+            toolchain: 1.64.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            components: cargo
+    runs-on: ubuntu-20.04
+    container:
+      image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install dependencies for Fedora
+        run: >
+          dnf install -y
+          clang
+          curl
+          cryptsetup-devel
+          dbus-devel
+          libblkid-devel
+          make
+          openssl-devel
+          python-requests
+          python-semantic_version
+          systemd-devel
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: ${{ matrix.components }}
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
+        run: ${{ matrix.task }}
+
   allowed_failures:
     continue-on-error: true
     strategy:
@@ -23,13 +59,9 @@ jobs:
           - task: make -f Makefile clippy
             toolchain: stable
             components: clippy
-          - task: cargo package
-            toolchain: 1.64.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
     runs-on: ubuntu-20.04
     container:
       image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
-      options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies for Fedora

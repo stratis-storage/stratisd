@@ -9,7 +9,7 @@ use std::{
 
 use devicemapper::Sectors;
 
-use crate::engine::strat_engine::backstore::blockdevmgr::BlkDevSegment;
+use crate::engine::strat_engine::backstore::shared::BlkDevSegment;
 
 /// This transaction data structure keeps a list of segments associated with block
 /// devices, segments from the cap device, and a map associating each cap device

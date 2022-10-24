@@ -15,11 +15,8 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::{
-                blockdev::StratBlockDev,
-                blockdevmgr::{map_to_dm, BlockDevMgr},
-                cache_tier::CacheTier,
-                data_tier::DataTier,
-                devices::UnownedDevices,
+                blockdev::StratBlockDev, blockdevmgr::BlockDevMgr, cache_tier::CacheTier,
+                data_tier::DataTier, devices::UnownedDevices, shared::map_to_dm,
                 transaction::RequestTransaction,
             },
             dm::get_dm,

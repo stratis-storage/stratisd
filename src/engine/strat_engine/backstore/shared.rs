@@ -6,19 +6,90 @@
 
 use std::collections::HashMap;
 
-use devicemapper::Device;
+use devicemapper::{Device, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine};
 
 use crate::{
     engine::{
-        strat_engine::{
-            backstore::blockdevmgr::{BlkDevSegment, Segment},
-            serde_structs::BaseDevSave,
-        },
+        strat_engine::serde_structs::{BaseDevSave, Recordable},
         types::DevUuid,
     },
     stratis::{StratisError, StratisResult},
 };
 
+/// struct to represent a continuous set of sectors on a disk
+#[derive(Debug, Clone)]
+pub struct Segment {
+    /// The offset into the device where this segment starts.
+    pub(super) start: Sectors,
+    /// The length of the segment.
+    pub(super) length: Sectors,
+    /// The device the segment is within.
+    pub(super) device: Device,
+}
+
+impl Segment {
+    /// Create a new Segment with given attributes
+    pub fn new(device: Device, start: Sectors, length: Sectors) -> Segment {
+        Segment {
+            start,
+            length,
+            device,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct BlkDevSegment {
+    pub(super) uuid: DevUuid,
+    pub(super) segment: Segment,
+}
+
+impl BlkDevSegment {
+    pub fn new(uuid: DevUuid, segment: Segment) -> BlkDevSegment {
+        BlkDevSegment { uuid, segment }
+    }
+
+    pub fn to_segment(&self) -> Segment {
+        self.segment.clone()
+    }
+}
+
+impl Recordable<Vec<BaseDevSave>> for Vec<BlkDevSegment> {
+    fn record(&self) -> Vec<BaseDevSave> {
+        self.iter()
+            .map(|bseg| BaseDevSave {
+                parent: bseg.uuid,
+                start: bseg.segment.start,
+                length: bseg.segment.length,
+            })
+            .collect::<Vec<_>>()
+    }
+}
+
+/// Build a linear dev target table from BlkDevSegments. This is useful for
+/// calls to the devicemapper library.
+pub fn map_to_dm(bsegs: &[BlkDevSegment]) -> Vec<TargetLine<LinearDevTargetParams>> {
+    let mut table = Vec::new();
+    let mut logical_start_offset = Sectors(0);
+
+    let segments = bsegs
+        .iter()
+        .map(|bseg| bseg.to_segment())
+        .collect::<Vec<_>>();
+    for segment in segments {
+        let (physical_start_offset, length) = (segment.start, segment.length);
+        let params = LinearTargetParams::new(segment.device, physical_start_offset);
+        let line = TargetLine::new(
+            logical_start_offset,
+            length,
+            LinearDevTargetParams::Linear(params),
+        );
+        table.push(line);
+        logical_start_offset += length;
+    }
+
+    table
+}
 /// Given a function that translates a Stratis UUID to a device
 /// number, and some metadata that describes a particular segment within
 /// a device by means of its Stratis UUID, and its start and offset w/in the

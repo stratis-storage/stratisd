@@ -27,7 +27,7 @@ exclude = [
 
 [[bin]]
 name = "stratis-dumpmetadata"
-required-features = ["extras"]
+required-features = ["extras", "min"]
 
 [[bin]]
 name = "stratis-min"

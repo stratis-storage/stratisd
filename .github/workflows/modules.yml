@@ -1,0 +1,58 @@
+---
+name: stratisd cargo modules
+
+# yamllint disable-line rule:truthy
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '**/Cargo.toml'
+      - '.github/workflows/cargo.yml'
+  pull_request:
+    branches:
+      - master
+    paths:
+      - '**/Cargo.toml'
+      - '.github/workflows/cargo.yml'
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  checks-with-ci-repo:
+    strategy:
+      matrix:
+        include:
+          # yamllint disable rule:line-length
+          - task: |
+              COMPARE_FEDORA_VERSIONS=./ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=rawhide IGNORE_ARGS="--ignore-category low" make -f Makefile_dependencies check-fedora-versions
+              COMPARE_FEDORA_VERSIONS=./ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=f35 IGNORE_ARGS="--ignore-category low --ignore-high pretty-hex" make -f Makefile_dependencies check-fedora-versions
+    runs-on: ubuntu-20.04
+    container:
+      image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install dependencies for Fedora
+        run: >
+          dnf install -y
+          clang
+          curl
+          cryptsetup-devel
+          dbus-devel
+          git
+          libblkid-devel
+          make
+          openssl-devel
+          python-requests
+          python-semantic_version
+          systemd-devel
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: cargo
+          toolchain: 1.64.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          override: true
+      - name: Check out ci repo
+        run: git clone https://github.com/stratis-storage/ci.git
+      - name: Run ${{ matrix.task }}
+        run: ${{ matrix.task }}

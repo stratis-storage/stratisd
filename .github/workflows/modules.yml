@@ -1,0 +1,50 @@
+---
+name: stratisd cargo modules
+
+# yamllint disable-line rule:truthy
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '**/mod.rs'
+  pull_request:
+    branches:
+      - master
+    paths:
+      - '**/mod.rs'
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  generate-tree:
+    runs-on: ubuntu-20.04
+    container:
+      image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install dependencies for Fedora
+        run: >
+          dnf install -y
+          clang
+          curl
+          cryptsetup-devel
+          dbus-devel
+          git
+          libblkid-devel
+          make
+          openssl-devel
+          python-requests
+          python-semantic_version
+          systemd-devel
+          dot
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: cargo
+          toolchain: 1.64.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          override: true
+      - name: Install cargo modules
+        run: cargo install cargo-modules
+      - name: Generate module tree
+        run: cargo modules generate tree --package stratisd --lib

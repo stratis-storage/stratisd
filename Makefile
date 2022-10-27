@@ -204,11 +204,8 @@ build-tests:
 	RUSTFLAGS="${DENY}" \
 	cargo test --no-run ${RELEASE_FLAG} ${TARGET_ARGS}
 
-## Build stratisd extra binaries
-build-extras:
-	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
-	cargo build ${RELEASE_FLAG} ${EXTRAS_FEATURES} ${TARGET_ARGS}
+## Build binaries for future stratis-tools package
+build-tools: stratis-dumpmetadata
 
 ## Build stratisd-min and stratis-min for early userspace
 build-min:
@@ -244,6 +241,7 @@ install-cfg:
 	mkdir -p $(DESTDIR)$(UNITDIR)
 	$(INSTALL) -Dpm0644 -t $(DESTDIR)$(DATADIR)/dbus-1/system.d stratisd.conf
 	$(INSTALL) -Dpm0644 -t $(DESTDIR)$(MANDIR)/man8 docs/stratisd.8
+	$(INSTALL) -Dpm0644 -t $(DESTDIR)$(MANDIR)/man8 docs/stratis-dumpmetadata.8
 	$(INSTALL) -Dpm0644 -t $(DESTDIR)$(UDEVDIR)/rules.d udev/61-stratisd.rules
 	sed 's|@LIBEXECDIR@|$(LIBEXECDIR)|' systemd/stratisd.service.in > $(DESTDIR)$(UNITDIR)/stratisd.service
 	$(INSTALL) -Dpm0755 -d $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis
@@ -268,17 +266,19 @@ install: install-cfg
 	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(BINDIR)/stratis-predict-usage
 	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(UNITGENDIR)/stratis-clevis-setup-generator
 	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(UNITGENDIR)/stratis-setup-generator
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(BINDIR) target/$(PROFILEDIR)/stratis-dumpmetadata
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(BINDIR) target/$(PROFILEDIR)/stratis-min
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd-min
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(UNITEXECDIR) systemd/stratis-fstab-setup
 
 ## Build and install stratisd binaries and configuration
-build-and-install: build build-min docs/stratisd.8 install
+build-and-install: build build-min build-tools docs/stratisd.8 docs/stratis-dumpmetadata.8 install
 
 ## Remove installed configuration files
 clean-cfg:
 	rm -fv $(DESTDIR)$(DATADIR)/dbus-1/system.d/stratisd.conf
 	rm -fv $(DESTDIR)$(MANDIR)/man8/stratisd.8
+	rm -fv $(DESTDIR)$(MANDIR)/man8/stratis-dumpmetadata.8
 	rm -fv $(DESTDIR)$(UDEVDIR)/rules.d/*-stratisd.rules
 	rm -fv $(DESTDIR)$(UNITDIR)/stratisd.service
 	rm -rfv $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis
@@ -291,6 +291,7 @@ clean-ancillary:
 	rm -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp
 	rm -fv $(DESTDIR)$(UDEVDIR)/stratis-base32-decode
 	rm -fv $(DESTDIR)$(BINDIR)/stratis-predict-usage
+	rm -fv $(DESTDIR)$(BINDIR)/stratis-dumpmetadata
 	rm -fv $(DESTDIR)$(UNITGENDIR)/stratis-setup-generator
 	rm -fv $(DESTDIR)$(UNITGENDIR)/stratis-clevis-setup-generator
 	rm -fv $(DESTDIR)$(UNITEXECDIR)/stratis-fstab-setup

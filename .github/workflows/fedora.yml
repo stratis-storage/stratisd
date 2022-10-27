@@ -36,7 +36,7 @@ jobs:
           - task: PROFILEDIR=debug make -f Makefile build-min
             toolchain: 1.64.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-          - task: PROFILEDIR=debug make -f Makefile build-extras
+          - task: PROFILEDIR=debug make -f Makefile build-tools
             toolchain: 1.64.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile docs-travis

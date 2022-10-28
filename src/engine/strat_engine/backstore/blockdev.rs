@@ -227,11 +227,6 @@ impl StratBlockDev {
         self.bda.dev_size()
     }
 
-    /// The total size of the allocated portions of the Stratis block device.
-    pub fn total_allocated_size(&self) -> BlockdevSize {
-        self.used.size()
-    }
-
     /// The maximum size of variable length metadata that can be accommodated.
     /// self.max_metadata_size() < self.metadata_size()
     pub fn max_metadata_size(&self) -> MDADataSize {
@@ -441,6 +436,11 @@ impl StratBlockDev {
                 Ok(true)
             }
         }
+    }
+
+    #[cfg(test)]
+    pub fn invariant(&self) {
+        assert!(self.total_size() == self.used.size());
     }
 
     /// If a pool is encrypted, tear down the cryptsetup devicemapper devices on the

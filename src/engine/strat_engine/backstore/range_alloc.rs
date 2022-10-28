@@ -339,6 +339,7 @@ impl RangeAllocator {
     }
 
     /// The maximum allocation from this manager
+    #[cfg(test)]
     pub fn size(&self) -> BlockdevSize {
         BlockdevSize::new(self.segments.limit())
     }

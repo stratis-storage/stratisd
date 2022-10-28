@@ -460,6 +460,10 @@ impl BlockDevMgr {
             let info_set = encryption_infos.iter().collect::<HashSet<_>>();
             assert!(info_set.len() == 1);
         }
+
+        for bd in self.block_devs.iter() {
+            bd.invariant();
+        }
     }
 
     /// Bind all devices in the given blockdev manager using the given clevis

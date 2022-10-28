@@ -197,28 +197,25 @@ pub fn get_blockdevs(
         cache_map: &HashMap<DevUuid, (usize, &BaseBlockDevSave)>,
         segment_table: &HashMap<DevUuid, Vec<(Sectors, Sectors)>>,
     ) -> StratisResult<(BlockDevTier, StratBlockDev)> {
+        let (blkdev_size, blksizes) = {
+            let file = OpenOptions::new().read(true).open(&info.ids.devnode)?;
+            (blkdev_size(&file)?, BlockSizes::read(&file)?)
+        };
+
         // Return an error if apparent size of Stratis block device appears to
         // have decreased since metadata was recorded or if size of block
         // device could not be obtained.
-        blkdev_size(&OpenOptions::new().read(true).open(&info.ids.devnode)?).and_then(
-            |actual_size| {
-                let actual_size_sectors = actual_size.sectors();
-                let recorded_size = bda.dev_size().sectors();
-                if actual_size_sectors < recorded_size {
-                    let err_msg = format!(
-                        "Stratis device with {} had recorded size {}, but actual size is less at {}",
-                        info.ids,
-                        recorded_size,
-                        actual_size_sectors
-                    );
-                    Err(StratisError::Msg(err_msg))
-                } else {
-                    Ok(())
-                }
-            },
-        )?;
-
-        let blksizes = BlockSizes::read(&OpenOptions::new().read(true).open(&info.ids.devnode)?)?;
+        let actual_size_sectors = blkdev_size.sectors();
+        let recorded_size = bda.dev_size().sectors();
+        if actual_size_sectors < recorded_size {
+            let err_msg = format!(
+                "Stratis device with {} had recorded size {}, but actual size is less at {}",
+                info.ids, recorded_size, actual_size_sectors
+            );
+            Err(StratisError::Msg(err_msg))
+        } else {
+            Ok(())
+        }?;
 
         let dev_uuid = bda.dev_uuid();
 

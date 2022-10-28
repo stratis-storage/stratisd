@@ -29,7 +29,7 @@ use crate::{
                     bda_wrapper, identify_block_device, DeviceInfo, LuksInfo, StratisDevInfo,
                     StratisInfo,
                 },
-                setup::{get_blockdevs, get_metadata, get_pool_state},
+                setup::{get_blockdevs, get_metadata},
             },
             metadata::{StratisIdentifiers, BDA},
             pool::StratPool,
@@ -1000,8 +1000,7 @@ fn setup_pool(
         }
     };
 
-    let state = get_pool_state(pool_einfo);
-    StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata, state)
+    StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata, pool_einfo)
         .map(|(name, mut pool)| {
             if matches!(pool_name, MaybeInconsistent::Yes | MaybeInconsistent::No(None)) || MaybeInconsistent::No(Some(&name)) != pool_name.as_ref() {
                 if let Err(e) = pool.rename_pool(&name) {

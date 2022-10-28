@@ -459,12 +459,12 @@ pub fn find_all() -> libudev::Result<(
 #[cfg(test)]
 mod tests {
 
-    use std::{collections::HashSet, error::Error};
+    use std::error::Error;
 
     use crate::{
         engine::{
             strat_engine::{
-                backstore::{initialize_devices, process_and_verify_devices},
+                backstore::{initialize_devices, ProcessedPathInfos, UnownedDevices},
                 cmd::create_fs,
                 metadata::MDADataSize,
                 tests::{crypt, loopbacked, real},
@@ -472,10 +472,19 @@ mod tests {
             },
             types::{DevicePath, EncryptionInfo, KeyDescription},
         },
-        stratis::StratisError,
+        stratis::{StratisError, StratisResult},
     };
 
     use super::*;
+
+    fn get_devices(paths: &[&Path]) -> StratisResult<UnownedDevices> {
+        ProcessedPathInfos::try_from(paths)
+            .map(|ps| ps.unpack())
+            .map(|(sds, uds)| {
+                sds.error_on_not_empty().unwrap();
+                uds
+            })
+    }
 
     /// Test that an encrypted device initialized by stratisd is properly
     /// recognized.
@@ -494,7 +503,7 @@ mod tests {
             let pool_uuid = PoolUuid::new_v4();
 
             let devices = initialize_devices(
-                process_and_verify_devices(pool_uuid, &HashSet::new(), paths)?,
+                get_devices(paths)?,
                 pool_uuid,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_description.clone())),
@@ -608,7 +617,7 @@ mod tests {
         let pool_uuid = PoolUuid::new_v4();
 
         initialize_devices(
-            process_and_verify_devices(pool_uuid, &HashSet::new(), paths).unwrap(),
+            get_devices(paths).unwrap(),
             pool_uuid,
             MDADataSize::default(),
             None,

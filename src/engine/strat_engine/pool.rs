@@ -18,7 +18,7 @@ use crate::{
             validate_paths,
         },
         strat_engine::{
-            backstore::{Backstore, StratBlockDev},
+            backstore::{Backstore, ProcessedPathInfos, StratBlockDev, UnownedDevices},
             liminal::{DeviceInfo, DeviceSet, LInfo},
             metadata::MDADataSize,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
@@ -150,7 +150,7 @@ impl StratPool {
     /// Precondition: p.is_absolute() is true for all p in paths
     pub fn initialize(
         name: &str,
-        paths: &[&Path],
+        devices: UnownedDevices,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<(PoolUuid, StratPool)> {
         let pool_uuid = PoolUuid::new_v4();
@@ -159,7 +159,7 @@ impl StratPool {
         // enough. If there are enough devices specified, more space will be
         // required.
         let mut backstore =
-            Backstore::initialize(pool_uuid, paths, MDADataSize::default(), encryption_info)?;
+            Backstore::initialize(pool_uuid, devices, MDADataSize::default(), encryption_info)?;
 
         let thinpool = ThinPool::new(
             pool_uuid,
@@ -471,17 +471,64 @@ impl Pool for StratPool {
                 "Use of a cache is not supported with an encrypted pool".to_string(),
             ));
         }
+
+        let devices = ProcessedPathInfos::try_from(blockdevs)?;
+        let (stratis_devices, unowned_devices) = devices.unpack();
+        let (this_pool, other_pools) = stratis_devices.partition(pool_uuid);
+
+        other_pools.error_on_not_empty()?;
+
+        let (in_pool, out_pool): (Vec<_>, Vec<_>) = this_pool
+            .iter()
+            .map(|(dev_uuid, _)| {
+                self.backstore
+                    .get_blockdev_by_uuid(*dev_uuid)
+                    .map(|(tier, _)| (*dev_uuid, tier))
+            })
+            .partition(|v| v.is_some());
+
+        if !out_pool.is_empty() {
+            let error_message = format!(
+                    "Devices ({}) appear to be already in use by this pool which has UUID {} but this pool has no record of them",
+                    out_pool
+                    .iter()
+                    .map(|opt| this_pool.get(&opt.expect("was looked up").0).expect("partitioned from this_pool").devnode.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                    pool_uuid
+                );
+            return Err(StratisError::Msg(error_message));
+        };
+
+        let (datadevs, cachedevs): (Vec<_>, Vec<_>) = in_pool
+            .iter()
+            .map(|opt| opt.expect("in_pool devices are Some"))
+            .partition(|(_, tier)| *tier == BlockDevTier::Data);
+
+        if !datadevs.is_empty() {
+            let error_message = format!(
+                "Devices ({}) appear to be already in use by this pool which has UUID {} in the data tier",
+                datadevs
+                    .iter()
+                    .map(|(uuid, _)| this_pool.get(uuid).expect("partitioned from this_pool").devnode.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                pool_uuid
+            );
+            return Err(StratisError::Msg(error_message));
+        };
+
         if !self.has_cache() {
-            if blockdevs.is_empty() {
+            if unowned_devices.is_empty() {
                 return Err(StratisError::Msg(
-                    "At least one blockdev path is required to initialize a cache.".to_string(),
+                    "At least one device is reqired to initialize a cache.".to_string(),
                 ));
             }
 
             self.thin_pool.suspend()?;
             let devices_result = self
                 .backstore
-                .init_cache(pool_uuid, blockdevs)
+                .init_cache(pool_uuid, unowned_devices)
                 .and_then(|bdi| {
                     self.thin_pool
                         .set_device(self.backstore.device().expect(
@@ -496,7 +543,22 @@ impl Pool for StratPool {
             Ok(SetCreateAction::new(devices))
         } else {
             init_cache_idempotent_or_err(
-                blockdevs,
+                &cachedevs
+                    .iter()
+                    .map(|(uuid, _)| {
+                        this_pool
+                            .get(uuid)
+                            .expect("partitioned from this_pool")
+                            .devnode
+                            .as_path()
+                    })
+                    .chain(
+                        unowned_devices
+                            .unpack()
+                            .iter()
+                            .map(|info| info.devnode.as_path()),
+                    )
+                    .collect::<Vec<_>>(),
                 self.backstore
                     .cachedevs()
                     .into_iter()
@@ -641,42 +703,108 @@ impl Pool for StratPool {
                     pool_name
                 )
             ));
-        } else if paths.is_empty() {
-            //TODO: Substitute is_empty check with process_and_verify_devices
-            return Ok((SetCreateAction::new(vec![]), None));
-        } else if tier == BlockDevTier::Cache {
-            // If adding cache devices, must suspend the pool; the cache
-            // must be augmented with the new devices.
-            self.thin_pool.suspend()?;
-            let bdev_info_res = self.backstore.add_cachedevs(pool_uuid, paths);
-            self.thin_pool.resume()?;
-            let bdev_info = bdev_info_res?;
-            Ok((SetCreateAction::new(bdev_info), None))
         } else {
-            let cached = self.cached();
+            let devices = ProcessedPathInfos::try_from(paths)?;
+            let (stratis_devices, unowned_devices) = devices.unpack();
+            let (this_pool, other_pools) = stratis_devices.partition(pool_uuid);
 
-            // If just adding data devices, no need to suspend the pool.
-            // No action will be taken on the DM devices.
-            let bdev_info = self.backstore.add_datadevs(pool_uuid, paths)?;
-            self.thin_pool.set_queue_mode();
+            other_pools.error_on_not_empty()?;
 
-            // Adding data devices does not change the state of the thin
-            // pool at all. However, if the thin pool is in a state
-            // where it would request an allocation from the backstore the
-            // addition of the new data devs may have changed its context
-            // so that it can satisfy the allocation request where
-            // previously it could not. Run check() in case that is true.
-            let check = match self.thin_pool.check(pool_uuid, &mut self.backstore) {
-                Ok((_, thin_pool)) => {
-                    let pool = cached.diff(&self.dump(()));
-                    Some(PoolDiff { thin_pool, pool })
-                }
-                Err(e) => {
-                    warn!("Failed to check the thin pool for status changes; some information may not be able to reported to the IPC layer: {}", e);
-                    None
-                }
+            let (in_pool, out_pool): (Vec<_>, Vec<_>) = this_pool
+                .iter()
+                .map(|(dev_uuid, _)| {
+                    self.backstore
+                        .get_blockdev_by_uuid(*dev_uuid)
+                        .map(|(tier, _)| (*dev_uuid, tier))
+                })
+                .partition(|v| v.is_some());
+
+            if !out_pool.is_empty() {
+                let error_message = format!(
+                    "Devices ({}) appear to be already in use by this pool which has UUID {} but this pool has no record of them",
+                    out_pool
+                    .iter()
+                    .map(|opt| this_pool.get(&opt.expect("was looked up").0).expect("partitioned from this_pool").devnode.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(", "),
+                    pool_uuid
+                );
+                return Err(StratisError::Msg(error_message));
             };
-            Ok((SetCreateAction::new(bdev_info), check))
+
+            let (datadevs, cachedevs): (Vec<_>, Vec<_>) = in_pool
+                .iter()
+                .map(|opt| opt.expect("in_pool devices are Some"))
+                .partition(|(_, tier)| *tier == BlockDevTier::Data);
+
+            if tier == BlockDevTier::Cache {
+                // If adding cache devices, must suspend the pool; the cache
+                // must be augmented with the new devices.
+                if !datadevs.is_empty() {
+                    let error_message = format!(
+                        "Devices ({}) appear to be already in use by this pool which has UUID {}, but in the data tier not the cache tier",
+                        datadevs
+                        .iter()
+                        .map(|(uuid, _)| this_pool.get(uuid).expect("partitioned from this_pool").devnode.display().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                        pool_uuid
+                    );
+                    return Err(StratisError::Msg(error_message));
+                };
+
+                if unowned_devices.is_empty() {
+                    return Ok((SetCreateAction::new(vec![]), None));
+                }
+
+                self.thin_pool.suspend()?;
+                let bdev_info_res = self.backstore.add_cachedevs(pool_uuid, unowned_devices);
+                self.thin_pool.resume()?;
+                let bdev_info = bdev_info_res?;
+                Ok((SetCreateAction::new(bdev_info), None))
+            } else {
+                if !cachedevs.is_empty() {
+                    let error_message = format!(
+                        "Devices ({}) appear to be already in use by this pool which has UUID {}, but in the cache tier not the data tier",
+                        cachedevs
+                        .iter()
+                        .map(|(uuid, _)| this_pool.get(uuid).expect("partitioned from this_pool").devnode.display().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                        pool_uuid
+                    );
+                    return Err(StratisError::Msg(error_message));
+                };
+
+                if unowned_devices.is_empty() {
+                    return Ok((SetCreateAction::new(vec![]), None));
+                }
+
+                let cached = self.cached();
+
+                // If just adding data devices, no need to suspend the pool.
+                // No action will be taken on the DM devices.
+                let bdev_info = self.backstore.add_datadevs(pool_uuid, unowned_devices)?;
+                self.thin_pool.set_queue_mode();
+
+                // Adding data devices does not change the state of the thin
+                // pool at all. However, if the thin pool is in a state
+                // where it would request an allocation from the backstore the
+                // addition of the new data devs may have changed its context
+                // so that it can satisfy the allocation request where
+                // previously it could not. Run check() in case that is true.
+                let check = match self.thin_pool.check(pool_uuid, &mut self.backstore) {
+                    Ok((_, thin_pool)) => {
+                        let pool = cached.diff(&self.dump(()));
+                        Some(PoolDiff { thin_pool, pool })
+                    }
+                    Err(e) => {
+                        warn!("Failed to check the thin pool for status changes; some information may not be able to reported to the IPC layer: {}", e);
+                        None
+                    }
+                };
+                Ok((SetCreateAction::new(bdev_info), check))
+            }
         };
         self.write_metadata(pool_name)?;
         bdev_info
@@ -986,26 +1114,6 @@ mod tests {
             .all(|(_, _, bd)| bd.metadata_path().is_absolute()))
     }
 
-    /// Verify that a pool with no devices does not have the minimum amount of
-    /// space required.
-    fn test_empty_pool(paths: &[&Path]) {
-        assert_eq!(paths.len(), 0);
-        assert_matches!(
-            StratPool::initialize("stratis_test_pool", paths, None),
-            Err(_)
-        );
-    }
-
-    #[test]
-    fn loop_test_empty_pool() {
-        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Exactly(0, None), test_empty_pool);
-    }
-
-    #[test]
-    fn real_test_empty_pool() {
-        real::test_with_spec(&real::DeviceLimits::Exactly(0, None, None), test_empty_pool);
-    }
-
     /// Test that initializing a cache causes metadata to be updated. Verify
     /// that data written before the cache was initialized can be read
     /// afterwards.
@@ -1014,8 +1122,12 @@ mod tests {
 
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
+        let devices2 = ProcessedPathInfos::try_from(paths2).unwrap();
+        let (stratis_devices, unowned_devices2) = devices2.unpack();
+        stratis_devices.error_on_not_empty().unwrap();
+
         let name = "stratis-test-pool";
-        let (uuid, mut pool) = StratPool::initialize(name, paths2, None).unwrap();
+        let (uuid, mut pool) = StratPool::initialize(name, unowned_devices2, None).unwrap();
         invariant(&pool, name);
 
         let metadata1 = pool.record(name);
@@ -1097,8 +1209,12 @@ mod tests {
         let (cache_path, data_paths) = paths.split_at(1);
         let (data_path, data_paths) = data_paths.split_at(1);
 
+        let devices = ProcessedPathInfos::try_from(data_path).unwrap();
+        let (stratis_devices, unowned_devices) = devices.unpack();
+        stratis_devices.error_on_not_empty().unwrap();
+
         let name = "stratis-test-pool";
-        let (uuid, mut pool) = StratPool::initialize(name, data_path, None).unwrap();
+        let (uuid, mut pool) = StratPool::initialize(name, unowned_devices, None).unwrap();
         invariant(&pool, name);
 
         pool.init_cache(uuid, name, cache_path).unwrap();
@@ -1133,8 +1249,12 @@ mod tests {
 
         let (paths1, paths2) = paths.split_at(1);
 
+        let devices1 = ProcessedPathInfos::try_from(paths1).unwrap();
+        let (stratis_devices, unowned_devices1) = devices1.unpack();
+        stratis_devices.error_on_not_empty().unwrap();
+
         let name = "stratis-test-pool";
-        let (pool_uuid, mut pool) = StratPool::initialize(name, paths1, None).unwrap();
+        let (pool_uuid, mut pool) = StratPool::initialize(name, unowned_devices1, None).unwrap();
         invariant(&pool, name);
 
         let fs_name = "stratis_test_filesystem";
@@ -1206,7 +1326,12 @@ mod tests {
         assert!(paths.len() > 1);
 
         let name = "stratis-test-pool";
-        let (_, mut pool) = StratPool::initialize(name, paths, None).unwrap();
+
+        let devices = ProcessedPathInfos::try_from(paths).unwrap();
+        let (stratis_devices, unowned_devices) = devices.unpack();
+        stratis_devices.error_on_not_empty().unwrap();
+
+        let (_, mut pool) = StratPool::initialize(name, unowned_devices, None).unwrap();
         invariant(&pool, name);
 
         assert_eq!(pool.action_avail, ActionAvailability::Full);
@@ -1217,7 +1342,12 @@ mod tests {
         udev_settle().unwrap();
 
         let name = "stratis-test-pool";
-        let (_, mut pool) = StratPool::initialize(name, paths, None).unwrap();
+
+        let devices = ProcessedPathInfos::try_from(paths).unwrap();
+        let (stratis_devices, unowned_devices) = devices.unpack();
+        stratis_devices.error_on_not_empty().unwrap();
+
+        let (_, mut pool) = StratPool::initialize(name, unowned_devices, None).unwrap();
         invariant(&pool, name);
 
         assert_eq!(pool.action_avail, ActionAvailability::Full);
@@ -1251,7 +1381,13 @@ mod tests {
         assert!(paths.len() == 1);
 
         let pool_name = "pool";
-        let (pool_uuid, mut pool) = StratPool::initialize(pool_name, paths, None).unwrap();
+
+        let devices = ProcessedPathInfos::try_from(paths).unwrap();
+        let (stratis_devices, unowned_devices) = devices.unpack();
+        stratis_devices.error_on_not_empty().unwrap();
+
+        let (pool_uuid, mut pool) =
+            StratPool::initialize(pool_name, unowned_devices, None).unwrap();
 
         let (_, fs_uuid, _) = pool
             .create_filesystems(

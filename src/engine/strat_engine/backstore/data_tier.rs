@@ -4,8 +4,6 @@
 
 // Code to handle the backing store of a pool.
 
-use std::path::Path;
-
 use devicemapper::Sectors;
 
 use crate::{
@@ -14,6 +12,7 @@ use crate::{
             backstore::{
                 blockdev::StratBlockDev,
                 blockdevmgr::{BlkDevSegment, BlockDevMgr},
+                devices::UnownedDevices,
                 shared::{coalesce_blkdevsegs, metadata_to_segment},
                 transaction::RequestTransaction,
             },
@@ -67,8 +66,12 @@ impl DataTier {
     /// Add the given paths to self. Return UUIDs of the new blockdevs
     /// corresponding to the specified paths.
     /// WARNING: metadata changing event
-    pub fn add(&mut self, pool_uuid: PoolUuid, paths: &[&Path]) -> StratisResult<Vec<DevUuid>> {
-        self.block_mgr.add(pool_uuid, paths)
+    pub fn add(
+        &mut self,
+        pool_uuid: PoolUuid,
+        devices: UnownedDevices,
+    ) -> StratisResult<Vec<DevUuid>> {
+        self.block_mgr.add(pool_uuid, devices)
     }
 
     /// Allocate a region for all sector size requests from unallocated segments in
@@ -168,23 +171,40 @@ impl Recordable<DataTierSave> for DataTier {
 #[cfg(test)]
 mod tests {
 
+    use std::path::Path;
+
     use crate::engine::strat_engine::{
+        backstore::devices::{ProcessedPathInfos, UnownedDevices},
         metadata::MDADataSize,
         tests::{loopbacked, real},
     };
 
     use super::*;
 
+    fn get_devices(paths: &[&Path]) -> StratisResult<UnownedDevices> {
+        ProcessedPathInfos::try_from(paths)
+            .map(|ps| ps.unpack())
+            .map(|(sds, uds)| {
+                sds.error_on_not_empty().unwrap();
+                uds
+            })
+    }
+
     /// Put the data tier through some paces. Make it, alloc a small amount,
     /// add some more blockdevs, allocate enough that the newly added blockdevs
     /// must be allocated from for success.
     fn test_add_and_alloc(paths: &[&Path]) {
         assert!(paths.len() > 1);
-        let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let pool_uuid = PoolUuid::new_v4();
 
-        let mgr = BlockDevMgr::initialize(pool_uuid, paths1, MDADataSize::default(), None).unwrap();
+        let (paths1, paths2) = paths.split_at(paths.len() / 2);
+
+        let devices1 = get_devices(paths1).unwrap();
+        let devices2 = get_devices(paths2).unwrap();
+
+        let mgr =
+            BlockDevMgr::initialize(pool_uuid, devices1, MDADataSize::default(), None).unwrap();
 
         let mut data_tier = DataTier::new(mgr);
 
@@ -193,7 +213,6 @@ mod tests {
         let mut allocated = data_tier.allocated();
         assert_eq!(allocated, Sectors(0));
         assert!(size != Sectors(0));
-        assert_eq!(paths1.len(), data_tier.blockdevs().len());
 
         let last_request_amount = size;
 
@@ -208,12 +227,12 @@ mod tests {
         assert_eq!(data_tier.size(), size);
         allocated = data_tier.allocated();
 
-        data_tier.add(pool_uuid, paths2).unwrap();
+        data_tier.add(pool_uuid, devices2).unwrap();
 
         // A data tier w/ additional blockdevs added
         assert!(data_tier.size() > size);
         assert_eq!(data_tier.allocated(), allocated);
-        assert_eq!(paths1.len() + paths2.len(), data_tier.blockdevs().len());
+        assert_eq!(paths.len(), data_tier.blockdevs().len());
         size = data_tier.size();
 
         // Allocate enough to get into the newly added block devices

@@ -188,20 +188,19 @@ pub fn get_blockdevs(
         cache_map: &HashMap<DevUuid, (usize, &BaseBlockDevSave)>,
         segment_table: &HashMap<DevUuid, Vec<(Sectors, Sectors)>>,
     ) -> BDAResult<(BlockDevTier, StratBlockDev)> {
+        let (actual_size, blksizes) = match OpenOptions::new()
+            .read(true)
+            .open(&info.dev_info.devnode)
+            .map_err(StratisError::from)
+            .and_then(|f| blkdev_size(&f).and_then(|bs| BlockSizes::read(&f).map(|v| (bs, v))))
+        {
+            Ok(vals) => vals,
+            Err(err) => return Err((err, bda)),
+        };
+
         // Return an error if apparent size of Stratis block device appears to
         // have decreased since metadata was recorded or if size of block
         // device could not be obtained.
-        let actual_size = match blkdev_size(&match OpenOptions::new()
-            .read(true)
-            .open(&info.dev_info.devnode)
-        {
-            Ok(f) => f,
-            Err(e) => return Err((StratisError::from(e), bda)),
-        }) {
-            Ok(s) => s,
-            Err(e) => return Err((e, bda)),
-        };
-
         let actual_size_sectors = actual_size.sectors();
         let recorded_size = bda.dev_size().sectors();
         if actual_size_sectors < recorded_size {
@@ -214,16 +213,6 @@ pub fn get_blockdevs(
             );
             return Err((StratisError::Msg(err_msg), bda));
         }
-
-        let blksizes = match OpenOptions::new()
-            .read(true)
-            .open(&info.dev_info.devnode)
-            .map_err(StratisError::from)
-            .and_then(|f| BlockSizes::read(&f))
-        {
-            Ok(bs) => bs,
-            Err(e) => return Err((e, bda)),
-        };
 
         let dev_uuid = bda.dev_uuid();
 

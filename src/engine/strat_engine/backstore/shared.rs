@@ -23,10 +23,6 @@ use crate::{
 /// number, and some metadata that describes a particular segment within
 /// a device by means of its Stratis UUID, and its start and offset w/in the
 /// device, return the corresponding BlkDevSegment structure.
-// This method necessarily takes a reference to a Box because it receives
-// the value from a function, and there is no other way for the function to
-// be returned from a closure.
-// In future, it may be possible to address this better with FnBox.
 pub fn metadata_to_segment(
     uuid_to_devno: &HashMap<DevUuid, Device>,
     base_dev_save: &BaseDevSave,

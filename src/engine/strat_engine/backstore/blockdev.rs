@@ -76,6 +76,26 @@ impl UnderlyingDevice {
     }
 }
 
+/// How much can be allocated to upper layers, i.e, is not taken up by
+/// Stratis metadata.
+pub struct AllocatableSize(Sectors);
+
+impl AllocatableSize {
+    pub fn new(value: Sectors) -> AllocatableSize {
+        AllocatableSize(value)
+    }
+
+    pub fn sectors(self) -> Sectors {
+        self.0
+    }
+}
+
+impl Default for AllocatableSize {
+    fn default() -> AllocatableSize {
+        AllocatableSize(Sectors(0))
+    }
+}
+
 #[derive(Debug)]
 pub struct StratBlockDev {
     dev: Device,
@@ -227,10 +247,21 @@ impl StratBlockDev {
         self.bda.dev_size()
     }
 
+    /// The space in the blockdev that can be allocated to upper layers, i.e.,
+    /// is not used by Stratis for metadata.
+    pub fn total_allocatable_size(&self) -> AllocatableSize {
+        AllocatableSize::new(self.total_size().sectors() - self.metadata_size().sectors())
+    }
+
     /// The maximum size of variable length metadata that can be accommodated.
     /// self.max_metadata_size() < self.metadata_size()
     pub fn max_metadata_size(&self) -> MDADataSize {
         self.bda.max_data_size()
+    }
+
+    /// Whether or not the blockdev is in use by upper layers.
+    pub fn in_use(&self) -> bool {
+        self.total_allocatable_size().sectors() > self.available()
     }
 
     /// Set the user info on this blockdev.

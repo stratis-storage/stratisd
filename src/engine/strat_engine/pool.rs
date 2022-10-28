@@ -134,6 +134,21 @@ fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
     Ok(())
 }
 
+// Takes a set of information determined about the pool in liminal devices and
+// determines what the state of the pool should be when it is set up.
+fn get_pool_state(info: Option<PoolEncryptionInfo>) -> ActionAvailability {
+    if let Some(i) = info {
+        if i.is_inconsistent() {
+            warn!("Metadata for encryption inconsistent across devices in pool");
+            ActionAvailability::NoRequests
+        } else {
+            ActionAvailability::Full
+        }
+    } else {
+        ActionAvailability::Full
+    }
+}
+
 #[derive(Debug)]
 pub struct StratPool {
     backstore: Backstore,
@@ -212,15 +227,25 @@ impl StratPool {
         cachedevs: Vec<StratBlockDev>,
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
-        action_avail: ActionAvailability,
+        encryption_info: Option<PoolEncryptionInfo>,
     ) -> StratisResult<(Name, StratPool)> {
         check_metadata(metadata)?;
 
         let mut backstore =
             Backstore::setup(uuid, &metadata.backstore, datadevs, cachedevs, timestamp)?;
-        let action_avail = max(action_avail, backstore.action_availability());
+        let action_avail = max(
+            get_pool_state(encryption_info),
+            backstore.action_availability(),
+        );
 
         let pool_name = &metadata.name;
+
+        if action_avail != ActionAvailability::Full {
+            warn!(
+                "Disabling some actions for pool {} with UUID {}; pool is designated {}",
+                pool_name, uuid, action_avail
+            );
+        }
 
         let mut thinpool = ThinPool::setup(
             pool_name,

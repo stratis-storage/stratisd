@@ -22,7 +22,7 @@ use crate::{
             liminal::{
                 device_info::{DeviceSet, LInfo, LLuksInfo, LStratisInfo},
                 identify::{identify_block_device, DeviceInfo, LuksInfo, StratisInfo},
-                setup::{get_bdas, get_blockdevs, get_metadata, get_pool_state},
+                setup::{get_bdas, get_blockdevs, get_metadata},
             },
             metadata::{StratisIdentifiers, BDA},
             pool::StratPool,
@@ -790,8 +790,15 @@ fn setup_pool(
         }
     };
 
-    let state = get_pool_state(encryption_info);
-    StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata, state).map_err(|err| {
+    StratPool::setup(
+        pool_uuid,
+        datadevs,
+        cachedevs,
+        timestamp,
+        &metadata,
+        encryption_info,
+    )
+    .map_err(|err| {
         StratisError::Chained(
             format!(
                 "An attempt to set up pool with UUID {} from the assembled devices failed",

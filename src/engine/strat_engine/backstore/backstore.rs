@@ -16,7 +16,8 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev, blockdevmgr::BlockDevMgr, cache_tier::CacheTier,
-                data_tier::DataTier, devices::UnownedDevices, transaction::RequestTransaction,
+                data_tier::DataTier, devices::UnownedDevices, shared::BlockSizeSummary,
+                transaction::RequestTransaction,
             },
             dm::get_dm,
             metadata::MDADataSize,
@@ -25,7 +26,8 @@ use crate::{
             writing::wipe_sectors,
         },
         types::{
-            BlockDevTier, DevUuid, EncryptionInfo, KeyDescription, PoolEncryptionInfo, PoolUuid,
+            ActionAvailability, BlockDevTier, DevUuid, EncryptionInfo, KeyDescription,
+            PoolEncryptionInfo, PoolUuid,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -629,6 +631,24 @@ impl Backstore {
 
     pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {
         self.data_tier.grow(dev)
+    }
+
+    /// What the pool's action availability should be
+    pub fn action_availability(&self) -> ActionAvailability {
+        let data_tier_bs_summary: BlockSizeSummary = self.data_tier.partition_by_use().into();
+        let cache_tier_bs_summary: Option<BlockSizeSummary> = self
+            .cache_tier
+            .as_ref()
+            .map(|ct| ct.partition_cache_by_use().into());
+        if let Err(err) = data_tier_bs_summary.validate() {
+            warn!("Disabling pool changes for this pool: {}", err);
+            ActionAvailability::NoPoolChanges
+        } else if let Some(Err(err)) = cache_tier_bs_summary.map(|ct| ct.validate()) {
+            warn!("Disabling pool changes for this pool: {}", err);
+            ActionAvailability::NoPoolChanges
+        } else {
+            ActionAvailability::Full
+        }
     }
 }
 

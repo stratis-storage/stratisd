@@ -13,7 +13,7 @@ use crate::{
                 blockdev::StratBlockDev,
                 blockdevmgr::BlockDevMgr,
                 devices::UnownedDevices,
-                shared::{metadata_to_segment, AllocatedAbove, BlkDevSegment},
+                shared::{metadata_to_segment, AllocatedAbove, BlkDevSegment, BlockDevPartition},
                 transaction::RequestTransaction,
             },
             serde_structs::{BaseDevSave, BlockDevSave, DataTierSave, Recordable},
@@ -153,6 +153,14 @@ impl DataTier {
 
     pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {
         self.block_mgr.grow(dev)
+    }
+
+    /// Return the partition of the block devs that are in use and those
+    /// that are not.
+    pub fn partition_by_use(&self) -> BlockDevPartition<'_> {
+        let blockdevs = self.block_mgr.blockdevs();
+        let (used, unused) = blockdevs.iter().partition(|(_, bd)| bd.in_use());
+        BlockDevPartition { used, unused }
     }
 }
 

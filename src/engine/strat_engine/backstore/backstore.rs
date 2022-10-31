@@ -16,7 +16,8 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev, blockdevmgr::BlockDevMgr, cache_tier::CacheTier,
-                data_tier::DataTier, devices::UnownedDevices, transaction::RequestTransaction,
+                data_tier::DataTier, devices::UnownedDevices, shared::BlockSizeSummary,
+                transaction::RequestTransaction,
             },
             dm::get_dm,
             metadata::{MDADataSize, BDA},
@@ -27,8 +28,8 @@ use crate::{
             writing::wipe_sectors,
         },
         types::{
-            BlockDevTier, DevUuid, EncryptionInfo, KeyDescription, Name, PoolEncryptionInfo,
-            PoolUuid,
+            ActionAvailability, BlockDevTier, DevUuid, EncryptionInfo, KeyDescription, Name,
+            PoolEncryptionInfo, PoolUuid,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -711,6 +712,41 @@ impl Backstore {
 
     pub fn rename_pool(&mut self, new_name: &Name) -> StratisResult<()> {
         self.data_tier.block_mgr.rename_pool(new_name)
+    }
+
+    /// A summary of block sizes
+    pub fn block_size_summary(&self, tier: BlockDevTier) -> Option<BlockSizeSummary> {
+        match tier {
+            BlockDevTier::Data => Some(self.data_tier.partition_by_use().into()),
+            BlockDevTier::Cache => self
+                .cache_tier
+                .as_ref()
+                .map(|ct| ct.partition_cache_by_use().into()),
+        }
+    }
+
+    /// What the pool's action availability should be
+    pub fn action_availability(&self) -> ActionAvailability {
+        let data_tier_bs_summary = self
+            .block_size_summary(BlockDevTier::Data)
+            .expect("always exists");
+        let cache_tier_bs_summary: Option<BlockSizeSummary> =
+            self.block_size_summary(BlockDevTier::Cache);
+        if let Err(err) = data_tier_bs_summary.validate() {
+            warn!("Disabling pool changes for this pool: {}", err);
+            ActionAvailability::NoPoolChanges
+        } else if let Some(Err(err)) = cache_tier_bs_summary.map(|ct| ct.validate()) {
+            // NOTE: This condition should be impossible. Since the cache is
+            // always expanded to include all its devices, and an attempt to add
+            // more devices than the cache can use causes the devices to be
+            // rejected, there should be no unused devices in a cache. If, for
+            // some reason this condition fails, though, NoPoolChanges would
+            // be the correct state to put the pool in.
+            warn!("Disabling pool changes for this pool: {}", err);
+            ActionAvailability::NoPoolChanges
+        } else {
+            ActionAvailability::Full
+        }
     }
 }
 

@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{collections::HashMap, path::Path, vec::Vec};
+use std::{cmp::max, collections::HashMap, path::Path, vec::Vec};
 
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
@@ -227,6 +227,8 @@ impl StratPool {
 
         let mut backstore =
             Backstore::setup(uuid, &metadata.backstore, datadevs, cachedevs, timestamp)?;
+        let action_avail = max(action_avail, backstore.action_availability());
+
         let pool_name = &metadata.name;
 
         let mut thinpool = match ThinPool::setup(
@@ -546,6 +548,29 @@ impl Pool for StratPool {
                 ));
             }
 
+            let block_size_summary = unowned_devices.blocksizes();
+            if block_size_summary.len() > 1 {
+                let err_str = "The devices specified for the cache tier do not all have the same physical sector size or do not all have the same logical sector size.".into();
+                return Err(StratisError::Msg(err_str));
+            }
+
+            let current_data_logical_sector_size = self
+                .backstore
+                .block_size_summary(BlockDevTier::Data)
+                .expect("always exists for data tier")
+                .validate()
+                .expect("All operations prevented if validate() function returns an error")
+                .logical_sector_size;
+            let cache_logical_sector_size = block_size_summary
+                .keys()
+                .next()
+                .expect("unowned_devices is not empty")
+                .logical_sector_size;
+            if cache_logical_sector_size != current_data_logical_sector_size {
+                let err_str = format!("The logical sector size of the devices proposed for the cache tier, {}, does not match the effective logical sector size of the data tier, {}", cache_logical_sector_size, current_data_logical_sector_size);
+                return Err(StratisError::Msg(err_str));
+            }
+
             self.thin_pool.suspend()?;
             let devices_result = self
                 .backstore
@@ -778,6 +803,27 @@ impl Pool for StratPool {
                     return Ok((SetCreateAction::new(vec![]), None));
                 }
 
+                let block_size_summary = unowned_devices.blocksizes();
+                if block_size_summary.len() > 1 {
+                    let err_str = "The devices specified to be added to the cache tier do not all have the same physical sector size or do not all have the same logical sector size.".into();
+                    return Err(StratisError::Msg(err_str));
+                }
+
+                let current_sector_sizes = self
+                    .backstore
+                    .block_size_summary(BlockDevTier::Cache)
+                    .expect("already returned if no cache tier")
+                    .validate()
+                    .expect("All devices of the cache tier must be in use, so there can only be one representative logical sector size.");
+                let added_sector_sizes = block_size_summary
+                    .keys()
+                    .next()
+                    .expect("unowned devices is not empty");
+                if added_sector_sizes != &current_sector_sizes {
+                    let err_str = format!("The sector sizes of the devices proposed for extending the cache tier, {}, do not match the effective sector sizes of the existing cache devices, {}", added_sector_sizes, current_sector_sizes);
+                    return Err(StratisError::Msg(err_str));
+                }
+
                 self.thin_pool.suspend()?;
                 let bdev_info_res = self.backstore.add_cachedevs(
                     Name::new(pool_name.to_string()),
@@ -803,6 +849,27 @@ impl Pool for StratPool {
 
                 if unowned_devices.is_empty() {
                     return Ok((SetCreateAction::new(vec![]), None));
+                }
+
+                let block_size_summary = unowned_devices.blocksizes();
+                if block_size_summary.len() > 1 {
+                    let err_str = "The devices specified to be added to the data tier do not have uniform physcal and logical sector sizes.".into();
+                    return Err(StratisError::Msg(err_str));
+                }
+
+                let current_sector_sizes = self
+                    .backstore
+                    .block_size_summary(BlockDevTier::Data)
+                    .expect("always exists")
+                    .validate()
+                    .expect("All operations prevented if validate() function on data tier block size sumary returns an error");
+                let added_sector_sizes = block_size_summary
+                    .keys()
+                    .next()
+                    .expect("unowned devices is not empty");
+                if added_sector_sizes != &current_sector_sizes {
+                    let err_str = format!("The sector sizes of the devices proposed for extending the data tier, {}, do not match the effective sector sizes of the existing data devices, {}", added_sector_sizes, current_sector_sizes);
+                    return Err(StratisError::Msg(err_str));
                 }
 
                 let cached = self.cached();

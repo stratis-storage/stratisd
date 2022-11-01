@@ -187,7 +187,7 @@ pub fn locked_pools_prop<E>(e: &E) -> StoppedOrLockedPools
 where
     E: Engine,
 {
-    prop_conv::locked_pools_to_prop(&block_on(e.locked_pools()).locked)
+    prop_conv::locked_pools_to_prop(&block_on(e.locked_pools()))
 }
 
 /// Generate D-Bus representation of stopped pools
@@ -196,5 +196,5 @@ pub fn stopped_pools_prop<E>(e: &E) -> StoppedOrLockedPools
 where
     E: Engine,
 {
-    prop_conv::stopped_pools_to_prop(&block_on(e.stopped_pools()).stopped)
+    prop_conv::stopped_pools_to_prop(&block_on(e.stopped_pools()))
 }

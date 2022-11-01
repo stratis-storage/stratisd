@@ -238,6 +238,7 @@ pub struct LockedPoolInfo {
 pub struct LockedPoolsInfo {
     pub locked: HashMap<PoolUuid, LockedPoolInfo>,
     pub name_to_uuid: HashMap<Name, PoolUuid>,
+    pub uuid_to_name: HashMap<PoolUuid, Name>,
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -250,6 +251,7 @@ pub struct StoppedPoolInfo {
 pub struct StoppedPoolsInfo {
     pub stopped: HashMap<PoolUuid, StoppedPoolInfo>,
     pub name_to_uuid: HashMap<Name, PoolUuid>,
+    pub uuid_to_name: HashMap<PoolUuid, Name>,
 }
 
 /// A sendable event with all of the necessary information for the engine

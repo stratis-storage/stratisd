@@ -300,6 +300,12 @@ impl LiminalDevices {
     pub fn locked_pools(&self) -> LockedPoolsInfo {
         LockedPoolsInfo {
             name_to_uuid: self.name_to_uuid.clone(),
+            uuid_to_name: self
+                .name_to_uuid
+                .clone()
+                .into_iter()
+                .map(|(name, uuid)| (uuid, name))
+                .collect::<HashMap<_, _>>(),
             locked: self
                 .stopped_pools
                 .iter()
@@ -314,6 +320,12 @@ impl LiminalDevices {
     pub fn stopped_pools(&self) -> StoppedPoolsInfo {
         StoppedPoolsInfo {
             name_to_uuid: self.name_to_uuid.clone(),
+            uuid_to_name: self
+                .name_to_uuid
+                .clone()
+                .into_iter()
+                .map(|(name, uuid)| (uuid, name))
+                .collect::<HashMap<_, _>>(),
             stopped: self
                 .stopped_pools
                 .iter()

@@ -8,69 +8,67 @@ use dbus::arg::{RefArg, Variant};
 
 use crate::{
     dbus_api::util::result_option_to_tuple,
-    engine::{LockedPoolInfo, PoolUuid, StoppedPoolInfo},
+    engine::{LockedPoolsInfo, StoppedPoolsInfo},
 };
 
 /// D-Bus representation of locked pools.
 pub type StoppedOrLockedPools = HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>;
 
 /// Convert a locked pool data structure to a property format.
-pub fn locked_pools_to_prop(pools: &HashMap<PoolUuid, LockedPoolInfo>) -> StoppedOrLockedPools {
+pub fn locked_pools_to_prop(pools: &LockedPoolsInfo) -> StoppedOrLockedPools {
     pools
+        .locked
         .iter()
         .map(|(u, locked)| {
-            (
-                uuid_to_string!(u),
-                vec![
-                    (
-                        "key_description".to_string(),
-                        Variant(Box::new(result_option_to_tuple(
-                            locked
-                                .info
-                                .key_description()
-                                .map(|opt| opt.map(|kd| kd.as_application_str().to_string())),
-                            String::new(),
-                        )) as Box<dyn RefArg>),
-                    ),
-                    (
-                        "clevis_info".to_string(),
-                        Variant(Box::new(result_option_to_tuple(
-                            locked
-                                .info
-                                .clevis_info()
-                                .map(|opt| opt.map(|(pin, cfg)| (pin.to_owned(), cfg.to_string()))),
-                            (String::new(), String::new()),
-                        )) as Box<dyn RefArg>),
-                    ),
-                    (
-                        "devs".to_string(),
-                        Variant(Box::new(
-                            locked
-                                .devices
-                                .iter()
-                                .map(|d| {
-                                    let mut map = HashMap::new();
-                                    map.insert(
-                                        "devnode".to_string(),
-                                        d.devnode.display().to_string(),
-                                    );
-                                    map.insert("uuid".to_string(), uuid_to_string!(d.uuid));
-                                    map
-                                })
-                                .collect::<Vec<_>>(),
-                        )),
-                    ),
-                ]
-                .into_iter()
-                .collect::<HashMap<_, _>>(),
-            )
+            let uuid = uuid_to_string!(u);
+            let mut info = HashMap::new();
+            info.insert(
+                "key_description".to_string(),
+                Variant(Box::new(result_option_to_tuple(
+                    locked
+                        .info
+                        .key_description()
+                        .map(|opt| opt.map(|kd| kd.as_application_str().to_string())),
+                    String::new(),
+                )) as Box<dyn RefArg>),
+            );
+            info.insert(
+                "clevis_info".to_string(),
+                Variant(Box::new(result_option_to_tuple(
+                    locked
+                        .info
+                        .clevis_info()
+                        .map(|opt| opt.map(|(pin, cfg)| (pin.to_owned(), cfg.to_string()))),
+                    (String::new(), String::new()),
+                )) as Box<dyn RefArg>),
+            );
+            info.insert(
+                "devs".to_string(),
+                Variant(Box::new(
+                    locked
+                        .devices
+                        .iter()
+                        .map(|d| {
+                            let mut map = HashMap::new();
+                            map.insert("devnode".to_string(), d.devnode.display().to_string());
+                            map.insert("uuid".to_string(), uuid_to_string!(d.uuid));
+                            map
+                        })
+                        .collect::<Vec<_>>(),
+                )),
+            );
+            if let Some(name) = pools.uuid_to_name.get(u) {
+                info.insert("name".to_string(), Variant(Box::new(name.to_string())));
+            }
+            (uuid, info)
         })
-        .collect()
+        .collect::<HashMap<_, _>>()
 }
 
 /// Convert a stopped pool data structure to a property format.
-pub fn stopped_pools_to_prop(pools: &HashMap<PoolUuid, StoppedPoolInfo>) -> StoppedOrLockedPools {
+pub fn stopped_pools_to_prop(pools: &StoppedPoolsInfo) -> StoppedOrLockedPools {
     pools
+        .stopped
         .iter()
         .map(|(u, stopped)| {
             let mut map = HashMap::new();
@@ -94,6 +92,9 @@ pub fn stopped_pools_to_prop(pools: &HashMap<PoolUuid, StoppedPoolInfo>) -> Stop
                     )) as Box<dyn RefArg>),
                 );
             }
+            if let Some(name) = pools.uuid_to_name.get(u) {
+                map.insert("name".to_string(), Variant(Box::new(name.to_string())));
+            }
             map.insert(
                 "devs".to_string(),
                 Variant(Box::new(
@@ -111,5 +112,5 @@ pub fn stopped_pools_to_prop(pools: &HashMap<PoolUuid, StoppedPoolInfo>) -> Stop
             );
             (uuid_to_string!(u), map)
         })
-        .collect()
+        .collect::<HashMap<_, _>>()
 }

@@ -107,9 +107,9 @@ where
             }
 
             if pool.is_encrypted() {
-                dbus_context.push_locked_pools(block_on(dbus_context.engine.locked_pools()).locked);
+                dbus_context.push_locked_pools(block_on(dbus_context.engine.locked_pools()));
             }
-            dbus_context.push_stopped_pools(block_on(dbus_context.engine.stopped_pools()).stopped);
+            dbus_context.push_stopped_pools(block_on(dbus_context.engine.stopped_pools()));
 
             (true, (pool_path, bd_paths, fs_paths))
         }

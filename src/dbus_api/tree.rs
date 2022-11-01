@@ -39,8 +39,8 @@ use crate::{
         util::{poll_exit_and_future, thread_safe_to_dbus_sendable},
     },
     engine::{
-        ActionAvailability, DevUuid, Engine, FilesystemUuid, LockedPoolInfo, PoolEncryptionInfo,
-        PoolUuid, StoppedPoolInfo, StratisUuid,
+        ActionAvailability, DevUuid, Engine, FilesystemUuid, LockedPoolsInfo, PoolEncryptionInfo,
+        PoolUuid, StoppedPoolsInfo, StratisUuid,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -429,7 +429,7 @@ where
     }
 
     /// Handle a change of locked pools registered in the engine.
-    fn handle_locked_pools_change(&self, locked_pools: HashMap<PoolUuid, LockedPoolInfo>) {
+    fn handle_locked_pools_change(&self, locked_pools: LockedPoolsInfo) {
         if self
             .property_changed_invalidated_signal(
                 &Path::new(consts::STRATIS_BASE_PATH).expect("Valid path"),
@@ -453,7 +453,7 @@ where
     }
 
     /// Handle a change of stopped pools registered in the engine.
-    fn handle_stopped_pools_change(&self, stopped_pools: HashMap<PoolUuid, StoppedPoolInfo>) {
+    fn handle_stopped_pools_change(&self, stopped_pools: StoppedPoolsInfo) {
         if self
             .property_changed_invalidated_signal(
                 &Path::new(consts::STRATIS_BASE_PATH).expect("Valid path"),

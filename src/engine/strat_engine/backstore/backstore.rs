@@ -783,7 +783,13 @@ mod tests {
                 _ => panic!("impossible; see first assertion"),
             }
         );
-        assert!(backstore.next <= backstore.size())
+        assert!(backstore.next <= backstore.size());
+
+        backstore.data_tier.invariant();
+
+        if let Some(cache_tier) = &backstore.cache_tier {
+            cache_tier.invariant()
+        }
     }
 
     fn get_devices(paths: &[&Path]) -> StratisResult<UnownedDevices> {

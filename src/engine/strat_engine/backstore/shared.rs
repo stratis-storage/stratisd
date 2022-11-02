@@ -4,6 +4,9 @@
 
 // Methods that are shared by the cache tier and the data tier.
 
+#[cfg(test)]
+use std::collections::HashSet;
+
 use std::collections::HashMap;
 
 use devicemapper::{Device, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine};
@@ -130,6 +133,15 @@ impl AllocatedAbove {
                 collect
             },
         );
+    }
+
+    /// A set of UUIDs of every device that is allocated from.
+    #[cfg(test)]
+    pub fn uuids(&self) -> HashSet<DevUuid> {
+        self.inner
+            .iter()
+            .map(|seg| seg.uuid)
+            .collect::<HashSet<DevUuid>>()
     }
 }
 

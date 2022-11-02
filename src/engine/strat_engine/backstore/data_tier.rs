@@ -4,6 +4,9 @@
 
 // Code to handle the backing store of a pool.
 
+#[cfg(test)]
+use std::collections::HashSet;
+
 use devicemapper::Sectors;
 
 use crate::{
@@ -154,6 +157,19 @@ impl DataTier {
     pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {
         self.block_mgr.grow(dev)
     }
+
+    #[cfg(test)]
+    pub fn invariant(&self) {
+        let allocated_uuids = self.segments.uuids();
+        let in_use_uuids = self
+            .block_mgr
+            .blockdevs()
+            .iter()
+            .filter(|(_, bd)| bd.in_use())
+            .map(|(u, _)| *u)
+            .collect::<HashSet<_>>();
+        assert_eq!(allocated_uuids, in_use_uuids);
+    }
 }
 
 impl Recordable<DataTierSave> for DataTier {
@@ -206,6 +222,7 @@ mod tests {
             BlockDevMgr::initialize(pool_uuid, devices1, MDADataSize::default(), None).unwrap();
 
         let mut data_tier = DataTier::new(mgr);
+        data_tier.invariant();
 
         // A data_tier w/ some devices but nothing allocated
         let mut size = data_tier.size();
@@ -220,6 +237,7 @@ mod tests {
 
         let transaction = data_tier.alloc_request(&[request_amount]).unwrap().unwrap();
         data_tier.alloc_commit(transaction).unwrap();
+        data_tier.invariant();
 
         // A data tier w/ some amount allocated
         assert!(data_tier.allocated() >= request_amount);
@@ -227,6 +245,7 @@ mod tests {
         allocated = data_tier.allocated();
 
         data_tier.add(pool_uuid, devices2).unwrap();
+        data_tier.invariant();
 
         // A data tier w/ additional blockdevs added
         assert!(data_tier.size() > size);
@@ -240,6 +259,7 @@ mod tests {
             .unwrap()
             .unwrap();
         data_tier.alloc_commit(transaction).unwrap();
+        data_tier.invariant();
 
         assert!(data_tier.allocated() >= request_amount + last_request_amount);
         assert_eq!(data_tier.size(), size);

@@ -27,9 +27,9 @@ use crate::{
 #[derive(Debug)]
 pub struct DataTier {
     /// Manages the individual block devices
-    pub block_mgr: BlockDevMgr,
+    pub(super) block_mgr: BlockDevMgr,
     /// The list of segments granted by block_mgr and used by dm_device
-    pub segments: AllocatedAbove,
+    pub(super) segments: AllocatedAbove,
 }
 
 impl DataTier {

@@ -558,6 +558,22 @@ impl Pool for StratPool {
                 return Err(StratisError::Msg(err_str));
             }
 
+            let current_logical_sector_size = self
+                .backstore
+                .block_size_summary(BlockDevTier::Data)
+                .expect("always exists for data tier")
+                .validate()
+                .expect("All operations prevented if validate() function returns an error");
+            let data_block_size = block_size_summary
+                .keys()
+                .next()
+                .expect("unowned_devices is not empty")
+                .logical_sector_size;
+            if data_block_size != current_logical_sector_size {
+                let err_str = format!("The logical block size of the devices proposed for the cache tier, {}, does not match the logical block size of the data tier, {}", data_block_size, current_logical_sector_size);
+                return Err(StratisError::Msg(err_str));
+            }
+
             self.thin_pool.suspend()?;
             let devices_result = self
                 .backstore

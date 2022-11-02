@@ -35,13 +35,13 @@ const MAX_CACHE_SIZE: Sectors = Sectors(32 * IEC::Ti / SECTOR_SIZE as u64);
 #[derive(Debug)]
 pub struct CacheTier {
     /// Manages the individual block devices
-    pub block_mgr: BlockDevMgr,
+    pub(super) block_mgr: BlockDevMgr,
     /// The list of segments granted by block_mgr and used by the cache
     /// device.
-    pub cache_segments: AllocatedAbove,
+    pub(super) cache_segments: AllocatedAbove,
     /// The list of segments granted by block_mgr and used by the metadata
     /// device.
-    pub meta_segments: AllocatedAbove,
+    pub(super) meta_segments: AllocatedAbove,
 }
 
 impl CacheTier {

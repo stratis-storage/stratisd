@@ -233,6 +233,12 @@ impl StratBlockDev {
         self.bda.max_data_size()
     }
 
+    /// Whether or not the blockdev is in use by upper layers. It is if the
+    /// sum of the blocks used exceeds the Stratis metadata size.
+    pub fn in_use(&self) -> bool {
+        self.used.used() > self.metadata_size().sectors()
+    }
+
     /// Set the user info on this blockdev.
     /// The user_info may be None, which unsets user info.
     /// Returns true if the user info was changed, otherwise false.

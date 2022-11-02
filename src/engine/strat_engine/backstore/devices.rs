@@ -252,8 +252,8 @@ fn check_dev(device_info: &DeviceInfo) -> StratisResult<()> {
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct BlockSizes {
-    pub(super) physical_sector_size: Bytes,
-    pub(super) logical_sector_size: Bytes,
+    pub physical_sector_size: Bytes,
+    pub logical_sector_size: Bytes,
 }
 
 impl BlockSizes {

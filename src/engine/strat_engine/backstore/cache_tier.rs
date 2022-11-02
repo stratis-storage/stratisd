@@ -4,6 +4,9 @@
 
 // Code to handle the backing store of a pool.
 
+#[cfg(test)]
+use std::collections::HashSet;
+
 use devicemapper::{Sectors, IEC, SECTOR_SIZE};
 
 use crate::{
@@ -221,6 +224,24 @@ impl CacheTier {
             .get_mut_blockdev_by_uuid(uuid)
             .map(|bd| (BlockDevTier::Cache, bd))
     }
+
+    #[cfg(test)]
+    pub fn invariant(&self) {
+        let allocated_uuids = self
+            .cache_segments
+            .uuids()
+            .union(&self.meta_segments.uuids())
+            .cloned()
+            .collect::<HashSet<_>>();
+        let in_use_uuids = self
+            .block_mgr
+            .blockdevs()
+            .iter()
+            .filter(|(_, bd)| bd.in_use())
+            .map(|(u, _)| *u)
+            .collect::<HashSet<_>>();
+        assert_eq!(allocated_uuids, in_use_uuids);
+    }
 }
 
 impl Recordable<CacheTierSave> for CacheTier {
@@ -280,6 +301,7 @@ mod tests {
         .unwrap();
 
         let mut cache_tier = CacheTier::new(mgr).unwrap();
+        cache_tier.invariant();
 
         // A cache tier w/ some devices and everything promptly allocated to
         // the tier.
@@ -293,6 +315,7 @@ mod tests {
         assert_eq!(size - metadata_size, allocated + cache_metadata_size);
 
         let (_, (cache, meta)) = cache_tier.add(pool_name, pool_uuid, devices2).unwrap();
+        cache_tier.invariant();
         // TODO: Ultimately, it should be the case that meta can be true.
         assert!(cache);
         assert!(!meta);

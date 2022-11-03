@@ -857,6 +857,22 @@ impl Pool for StratPool {
                     return Err(StratisError::Msg(err_str));
                 }
 
+                let current_logical_sector_size = self
+                    .backstore
+                    .block_size_summary(BlockDevTier::Data)
+                    .expect("always exists")
+                    .validate()
+                    .expect("All operations prevented if validate() function on data tier block size sumary returns an error");
+                let data_block_size = block_size_summary
+                    .keys()
+                    .next()
+                    .expect("unowned devices is not empty")
+                    .logical_sector_size;
+                if data_block_size != current_logical_sector_size {
+                    let err_str = format!("The logical block size of the devices proposed for extending the data tier, {}, does not match the logical block size of the existing data devices, {}", data_block_size, current_logical_sector_size);
+                    return Err(StratisError::Msg(err_str));
+                }
+
                 let cached = self.cached();
 
                 // If just adding data devices, no need to suspend the pool.

@@ -6,6 +6,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
+    fmt,
     fs::{File, OpenOptions},
     path::{Path, PathBuf},
     sync::Mutex,
@@ -264,6 +265,16 @@ impl BlockSizes {
             physical_sector_size,
             logical_sector_size,
         })
+    }
+}
+
+impl fmt::Display for BlockSizes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "BLKSSSZGET: {}, BLKPBSZGET: {}",
+            self.logical_sector_size, self.physical_sector_size
+        )
     }
 }
 

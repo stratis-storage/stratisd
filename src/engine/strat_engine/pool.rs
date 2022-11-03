@@ -833,6 +833,22 @@ impl Pool for StratPool {
                     return Err(StratisError::Msg(err_str));
                 }
 
+                let current_logical_sector_size = self
+                    .backstore
+                    .block_size_summary(BlockDevTier::Cache)
+                    .expect("already returned if no cache tier")
+                    .validate()
+                    .expect("All devices of the cache tier must be in use, so there can only be one representative logical sector size.");
+                let cache_block_size = block_size_summary
+                    .keys()
+                    .next()
+                    .expect("unowned devices is not empty")
+                    .logical_sector_size;
+                if cache_block_size != current_logical_sector_size {
+                    let err_str = format!("The logical block size of the devices proposed for extending the cache tier, {}, does not match the logical block size of the existing cache devices, {}", cache_block_size, current_logical_sector_size);
+                    return Err(StratisError::Msg(err_str));
+                }
+
                 self.thin_pool.suspend()?;
                 let bdev_info_res = self.backstore.add_cachedevs(
                     Name::new(pool_name.to_string()),

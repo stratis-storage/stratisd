@@ -100,7 +100,7 @@ fn udev_info(
 }
 
 /// Get the device number of a device by stat-ing the device node.
-fn get_devno_from_path(path: &Path) -> StratisResult<Device> {
+pub fn get_devno_from_path(path: &Path) -> StratisResult<Device> {
     let info = stat(path)?;
     Ok(Device::from_kdev_t(convert_int!(info.st_rdev, u64, u32)?))
 }
@@ -462,14 +462,6 @@ pub fn initialize_devices(
     mda_data_size: MDADataSize,
     encryption_info: Option<&EncryptionInfo>,
 ) -> StratisResult<Vec<StratBlockDev>> {
-    /// Map a major/minor device number of a physical device
-    /// to the corresponding major/minor number of the encrypted
-    /// device that uses the physical device as storage.
-    fn map_device_nums(logical_path: &Path) -> StratisResult<Device> {
-        let result = nix::sys::stat::stat(logical_path)?;
-        Ok(Device::from(result.st_rdev))
-    }
-
     /// Initialize an encrypted device on the given physical device
     /// using the pool and device UUIDs of the new Stratis block device
     /// and the key description for the key to use for encrypting the
@@ -502,7 +494,7 @@ pub fn initialize_devices(
                 return Err(error);
             }
         };
-        map_device_nums(handle.activated_device_path()).map(|dn| (handle, dn, device_size))
+        get_devno_from_path(handle.activated_device_path()).map(|dn| (handle, dn, device_size))
     }
 
     fn initialize_stratis_metadata(

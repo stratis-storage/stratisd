@@ -529,6 +529,10 @@ impl<'a> Into<Value> for &'a StratBlockDev {
         if let Some(new_size) = self.new_size {
             map.insert("new_size".to_string(), Value::from(new_size.to_string()));
         }
+        map.insert(
+            "blksizes".to_string(),
+            Value::from(self.blksizes.to_string()),
+        );
         json
     }
 }

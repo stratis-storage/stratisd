@@ -911,7 +911,9 @@ mod tests {
                         "LUKS2 metadata on Stratis devices was not successfully wiped".to_string(),
                     )));
                 }
-            } else if device_identifiers(&mut OpenOptions::new().read(true).open(path)?)? != None {
+            } else if (device_identifiers(&mut OpenOptions::new().read(true).open(path)?)?)
+                .is_some()
+            {
                 return Err(Box::new(StratisError::Msg(
                     "Metadata on Stratis devices was not successfully wiped".to_string(),
                 )));

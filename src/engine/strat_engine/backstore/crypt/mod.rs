@@ -208,9 +208,9 @@ mod tests {
 
             const WINDOW_SIZE: usize = 1024 * 1024;
             let mut devicenode = OpenOptions::new().write(true).open(logical_path)?;
-            let mut random_buffer = Box::new([0; WINDOW_SIZE]);
-            File::open("/dev/urandom")?.read_exact(&mut *random_buffer)?;
-            devicenode.write_all(&*random_buffer)?;
+            let mut random_buffer = Box::new(vec![0; WINDOW_SIZE].into_boxed_slice());
+            File::open("/dev/urandom")?.read_exact(&mut random_buffer)?;
+            devicenode.write_all(&random_buffer)?;
             std::mem::drop(devicenode);
 
             let dev_path_cstring = CString::new(path.to_str().ok_or_else(|| {

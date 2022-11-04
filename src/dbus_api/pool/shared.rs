@@ -135,7 +135,7 @@ where
     let result = match op {
         BlockDevOp::InitCache => {
             let res = handle_action!(
-                pool.init_cache(pool_uuid, &*pool_name, &blockdevs),
+                pool.init_cache(pool_uuid, &pool_name, &blockdevs),
                 dbus_context,
                 pool_path.get_name()
             );
@@ -144,7 +144,7 @@ where
         }
         BlockDevOp::AddCache => {
             handle_action!(
-                pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Cache,)
+                pool.add_blockdevs(pool_uuid, &pool_name, &blockdevs, BlockDevTier::Cache,)
                     .map(|(act, _)| { act }),
                 dbus_context,
                 pool_path.get_name()
@@ -152,7 +152,7 @@ where
         }
         BlockDevOp::AddData => {
             handle_action!(
-                pool.add_blockdevs(pool_uuid, &*pool_name, &blockdevs, BlockDevTier::Data,)
+                pool.add_blockdevs(pool_uuid, &pool_name, &blockdevs, BlockDevTier::Data,)
                     .map(|(act, diff)| {
                         if act.is_changed() {
                             if let Some(d) = diff {

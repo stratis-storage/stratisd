@@ -982,7 +982,7 @@ mod tests {
         let (pool_name, _, pool) = guard.as_mut_tuple();
         let devices = [Path::new("/s/a"), Path::new("/s/b")];
         assert!(match pool
-            .add_blockdevs(uuid, &*pool_name, &devices, BlockDevTier::Data)
+            .add_blockdevs(uuid, &pool_name, &devices, BlockDevTier::Data)
             .ok()
             .and_then(|c| c.0.changed())
         {

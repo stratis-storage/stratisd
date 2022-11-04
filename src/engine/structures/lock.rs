@@ -34,7 +34,7 @@ where
     type Target = T;
 
     fn deref(&self) -> &T {
-        &*self.0
+        &self.0
     }
 }
 
@@ -54,7 +54,7 @@ where
     type Target = T;
 
     fn deref(&self) -> &T {
-        &*self.0
+        &self.0
     }
 }
 

@@ -55,7 +55,7 @@ impl CryptMetadataHandle {
     /// Return the path to the device node of the underlying storage device
     /// for the encrypted device.
     pub fn luks2_device_path(&self) -> &Path {
-        &*self.physical_path
+        &self.physical_path
     }
 
     /// Get the Stratis device identifiers for a given encrypted device.

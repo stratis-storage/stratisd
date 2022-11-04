@@ -1782,7 +1782,7 @@ mod tests {
             )
             .unwrap();
 
-        let write_buf = &[8u8; BYTES_PER_WRITE];
+        let write_buf = &vec![8u8; BYTES_PER_WRITE].into_boxed_slice();
         let source_tmp_dir = tempfile::Builder::new()
             .prefix("stratis_testing")
             .tempdir()

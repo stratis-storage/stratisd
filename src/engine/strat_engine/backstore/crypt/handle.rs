@@ -127,7 +127,7 @@ impl CryptHandle {
     /// storage device. In an encrypted pool, this is the path that can be used to read
     /// the Stratis blockdev metatdata.
     pub fn activated_device_path(&self) -> &Path {
-        &*self.activated_path
+        &self.activated_path
     }
 
     /// Return the name of the activated devicemapper device.

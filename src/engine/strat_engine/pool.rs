@@ -1493,7 +1493,7 @@ mod tests {
     fn test_grow_physical_pre_grow(paths: &[&Path]) {
         let pool_name = Name::new("pool".to_string());
         let engine = StratEngine::initialize().unwrap();
-        let pool_uuid = test_async!(engine.create_pool(&*pool_name, paths, None))
+        let pool_uuid = test_async!(engine.create_pool(&pool_name, paths, None))
             .unwrap()
             .changed()
             .unwrap();
@@ -1501,7 +1501,7 @@ mod tests {
         let (_, _, pool) = guard.as_mut_tuple();
 
         let (_, fs_uuid, _) = pool
-            .create_filesystems(&*pool_name, pool_uuid, &[("stratis_test_filesystem", None)])
+            .create_filesystems(&pool_name, pool_uuid, &[("stratis_test_filesystem", None)])
             .unwrap()
             .changed()
             .unwrap()

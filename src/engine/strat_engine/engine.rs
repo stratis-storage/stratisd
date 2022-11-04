@@ -320,7 +320,7 @@ impl Engine for StratEngine {
                 .iter()
                 .map(|event| {
                     let uuid = if let Some((name, uuid, pool)) =
-                        ld_guard.block_evaluate(&*pools_write_all, event)
+                        ld_guard.block_evaluate(&pools_write_all, event)
                     {
                         pools_write_all.insert(name, uuid, pool);
                         Some(uuid)
@@ -493,7 +493,7 @@ impl Engine for StratEngine {
         let pools_read_all = self.pools.read_all().await;
         let mut ld_guard = self.liminal_devices.write().await;
         let unlocked =
-            spawn_blocking!(ld_guard.unlock_pool(&*pools_read_all, pool_uuid, unlock_method,))??;
+            spawn_blocking!(ld_guard.unlock_pool(&pools_read_all, pool_uuid, unlock_method,))??;
         Ok(SetUnlockAction::new(
             unlocked
                 .into_iter()
@@ -621,7 +621,7 @@ impl Engine for StratEngine {
                 self.liminal_devices
                     .write()
                     .await
-                    .start_pool(&*pools, pool_uuid, unlock_method)?;
+                    .start_pool(&pools, pool_uuid, unlock_method)?;
             pools.insert(name, pool_uuid, pool);
             Ok(StartAction::Started(pool_uuid))
         }

@@ -241,6 +241,15 @@ impl CacheTier {
             .map(|(u, _)| *u)
             .collect::<HashSet<_>>();
         assert_eq!(allocated_uuids, in_use_uuids);
+
+        let uuids = self
+            .block_mgr
+            .blockdevs()
+            .iter()
+            .map(|(u, _)| *u)
+            .collect::<HashSet<_>>();
+
+        assert_eq!(uuids, in_use_uuids);
     }
 }
 

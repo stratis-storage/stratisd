@@ -158,7 +158,7 @@ where
     /// Convert a name or UUID into a pair of a name and UUID.
     fn get_by_lock_key(&self, lock_key: &LockKey<U>) -> Option<(U, Name)> {
         match lock_key {
-            LockKey::Name(ref n) => self.inner.get_by_name(&**n).map(|(u, _)| (u, n.clone())),
+            LockKey::Name(ref n) => self.inner.get_by_name(n).map(|(u, _)| (u, n.clone())),
             LockKey::Uuid(u) => self.inner.get_by_uuid(*u).map(|(n, _)| (*u, n)),
         }
     }

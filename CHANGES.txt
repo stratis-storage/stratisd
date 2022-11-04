@@ -1,3 +1,64 @@
+stratisd 3.4.0 (UNRELEASED)
+===========================
+Recommended Rust toolchain version: 1.65.0
+Lowest supported Rust toolchain version: 1.62.1
+
+Recommended development platform for Python development: Fedora 36
+
+- Increase revision number to r4:
+  https://github.com/stratis-storage/stratisd/pull/3100
+
+- Restrict combinations of certain sector sizes in block devices:
+  https://github.com/stratis-storage/stratisd/issues/2880
+  https://github.com/stratis-storage/stratisd/pull/3181
+
+- Allow starting pools by name:
+  https://github.com/stratis-storage/stratisd/issues/3078
+  https://github.com/stratis-storage/stratisd/pull/3079
+
+- stratisd checks for presence of 'udevadm' on startup only in test:
+  https://github.com/stratis-storage/stratisd/issues/3175
+  https://github.com/stratis-storage/stratisd/pull/3176
+
+- Fix underestimation of crypt metadata size:
+  https://github.com/stratis-storage/stratisd/pull/3139
+
+- Improvements to internal locking structure:
+  https://github.com/stratis-storage/stratisd/pull/3166
+
+- Process device paths before starting initialization of backstore:
+  https://github.com/stratis-storage/stratisd/pull/3119
+
+- Use timestamp_opt instead of timestamp method:
+  https://github.com/stratis-storage/stratisd/pull/3167
+
+- Miscellaneous improvements to stratis-dumpmetadata:
+  https://github.com/stratis-storage/stratisd/pull/3146
+  https://github.com/stratis-storage/stratisd/pull/3143
+
+- Fix an error string:
+  https://github.com/stratis-storage/stratisd/pull/3163
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3179
+  https://github.com/stratis-storage/stratisd/pull/3172
+  https://github.com/stratis-storage/stratisd/pull/3170
+  https://github.com/stratis-storage/stratisd/pull/3169
+  https://github.com/stratis-storage/stratisd/pull/3165
+  https://github.com/stratis-storage/stratisd/pull/3162
+  https://github.com/stratis-storage/stratisd/pull/3161
+  https://github.com/stratis-storage/stratisd/pull/3160
+  https://github.com/stratis-storage/stratisd/pull/3159
+  https://github.com/stratis-storage/stratisd/pull/3158
+  https://github.com/stratis-storage/stratisd/pull/3157
+  https://github.com/stratis-storage/stratisd/pull/3152
+  https://github.com/stratis-storage/stratisd/pull/3150
+  https://github.com/stratis-storage/stratisd/pull/3149
+  https://github.com/stratis-storage/stratisd/pull/3144
+  https://github.com/stratis-storage/stratisd/pull/3142
+  https://github.com/stratis-storage/stratisd/pull/3083
+
+
 stratisd 3.3.0
 ==============
 Recommended Rust toolchain version: 1.64.0

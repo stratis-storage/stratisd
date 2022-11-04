@@ -804,7 +804,7 @@ mod tests {
             .map(|dev| {
                 OpenOptions::new()
                     .read(true)
-                    .open(&dev)
+                    .open(dev)
                     .map_err(|err| err.into())
                     .and_then(|mut f| device_identifiers(&mut f))
             })

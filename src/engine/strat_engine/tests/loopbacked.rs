@@ -49,7 +49,7 @@ impl LoopTestDev {
             .read(true)
             .write(true)
             .create(true)
-            .open(&path)
+            .open(path)
             .unwrap();
 
         nix::unistd::ftruncate(

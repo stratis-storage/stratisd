@@ -31,7 +31,7 @@ fn parse_args() -> Command<'static> {
             Arg::new("log_level")
                 .forbid_empty_values(true)
                 .long("--log-level")
-                .possible_values(&["trace", "debug", "info", "warn", "error"])
+                .possible_values(["trace", "debug", "info", "warn", "error"])
                 .help("Sets level for generation of log messages."),
         )
         .arg(

@@ -74,7 +74,7 @@ fn parse_args() -> Command<'static> {
                         Arg::new("clevis")
                             .long("--clevis")
                             .takes_value(true)
-                            .possible_values(&["nbde", "tang", "tpm2"])
+                            .possible_values(["nbde", "tang", "tpm2"])
                             .requires_if("nbde", "tang_args")
                             .requires_if("tang", "tang_args"),
                     )

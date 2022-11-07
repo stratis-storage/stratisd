@@ -63,6 +63,8 @@ where
     G: DerefMut,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
+        // See: https://github.com/rust-lang/rust-clippy/issues/9763
+        #[allow(clippy::explicit_auto_deref)]
         &mut *self.0
     }
 }

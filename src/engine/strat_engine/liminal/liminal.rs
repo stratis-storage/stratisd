@@ -41,6 +41,7 @@ use crate::{
         types::{
             DevUuid, LockedPoolsInfo, MaybeInconsistent, Name, PoolEncryptionInfo, PoolIdentifier,
             PoolUuid, StoppedPoolsInfo, StratBlockDevDiff, UdevEngineEvent, UnlockMethod,
+            UuidOrConflict,
         },
         BlockDevTier,
     },
@@ -57,7 +58,7 @@ pub struct LiminalDevices {
     /// Devices that have not yet been set up or have been stopped.
     stopped_pools: HashMap<PoolUuid, DeviceSet>,
     /// Lookup data structure for name to UUID mapping for starting pools by name.
-    name_to_uuid: HashMap<Name, PoolUuid>,
+    name_to_uuid: HashMap<Name, UuidOrConflict>,
 }
 
 impl LiminalDevices {
@@ -177,9 +178,11 @@ impl LiminalDevices {
     ) -> StratisResult<(Name, PoolUuid, StratPool)> {
         let pool_uuid = match id {
             PoolIdentifier::Uuid(u) => u,
-            PoolIdentifier::Name(n) => *self.name_to_uuid.get(&n).ok_or_else(|| {
-                StratisError::Msg(format!("Could not find a pool with name {}", n))
-            })?,
+            PoolIdentifier::Name(n) => self
+                .name_to_uuid
+                .get(&n)
+                .ok_or_else(|| StratisError::Msg(format!("Could not find a pool with name {}", n)))
+                .and_then(|uc| uc.to_result())?,
         };
         let encryption_info = self
             .stopped_pools
@@ -284,13 +287,14 @@ impl LiminalDevices {
             }
         }
         self.stopped_pools.insert(pool_uuid, devices);
-        if let Some(conf_uuid) = self.name_to_uuid.get(pool_name).copied() {
-            if conf_uuid != pool_uuid {
-                self.name_to_uuid.remove(pool_name);
-                warn!("Found conflicting names for stopped pools; UUID will be required to start pools with UUID {} or {}", conf_uuid, pool_uuid);
+        if let Some(maybe_conflict) = self.name_to_uuid.get_mut(pool_name) {
+            maybe_conflict.add(pool_uuid);
+            if let UuidOrConflict::Conflict(set) = maybe_conflict {
+                warn!("Found conflicting names for stopped pools; UUID will be required to start pools with UUIDs {}", set.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(", "));
             }
         } else {
-            self.name_to_uuid.insert(pool_name.clone(), pool_uuid);
+            self.name_to_uuid
+                .insert(pool_name.clone(), UuidOrConflict::Uuid(pool_uuid));
         }
         Ok(())
     }
@@ -299,12 +303,25 @@ impl LiminalDevices {
     /// locked to their encryption info in the set of pools that are not yet set up.
     pub fn locked_pools(&self) -> LockedPoolsInfo {
         LockedPoolsInfo {
-            name_to_uuid: self.name_to_uuid.clone(),
+            name_to_uuid: self
+                .name_to_uuid
+                .iter()
+                .filter_map(|(name, maybe_conflict)| {
+                    maybe_conflict
+                        .to_result()
+                        .ok()
+                        .map(|uuid| (name.clone(), uuid))
+                })
+                .collect::<HashMap<_, _>>(),
             uuid_to_name: self
                 .name_to_uuid
-                .clone()
-                .into_iter()
-                .map(|(name, uuid)| (uuid, name))
+                .iter()
+                .filter_map(|(name, maybe_conflict)| {
+                    maybe_conflict
+                        .to_result()
+                        .ok()
+                        .map(|uuid| (uuid, name.clone()))
+                })
                 .collect::<HashMap<_, _>>(),
             locked: self
                 .stopped_pools
@@ -319,12 +336,25 @@ impl LiminalDevices {
     /// Get a mapping of pool UUIDs to device sets for all stopped pools.
     pub fn stopped_pools(&self) -> StoppedPoolsInfo {
         StoppedPoolsInfo {
-            name_to_uuid: self.name_to_uuid.clone(),
+            name_to_uuid: self
+                .name_to_uuid
+                .iter()
+                .filter_map(|(name, maybe_conflict)| {
+                    maybe_conflict
+                        .to_result()
+                        .ok()
+                        .map(|uuid| (name.clone(), uuid))
+                })
+                .collect::<HashMap<_, _>>(),
             uuid_to_name: self
                 .name_to_uuid
-                .clone()
-                .into_iter()
-                .map(|(name, uuid)| (uuid, name))
+                .iter()
+                .filter_map(|(name, maybe_conflict)| {
+                    maybe_conflict
+                        .to_result()
+                        .ok()
+                        .map(|uuid| (uuid, name.clone()))
+                })
                 .collect::<HashMap<_, _>>(),
             stopped: self
                 .stopped_pools
@@ -424,13 +454,14 @@ impl LiminalDevices {
 
                 match info_map.pool_name() {
                     Ok(MaybeInconsistent::No(Some(name))) => {
-                        if let Some(conf_uuid) = self.name_to_uuid.get(&name).copied() {
-                            if &conf_uuid != pool_uuid {
-                                self.name_to_uuid.remove(&name);
-                                warn!("Found conflicting names for stopped pools; UUID will be required to start pools with UUID {} or {}", conf_uuid, pool_uuid);
+                        if let Some(maybe_conflict) = self.name_to_uuid.get_mut(&name) {
+                            maybe_conflict.add(*pool_uuid);
+                            if let UuidOrConflict::Conflict(set) = maybe_conflict {
+                                warn!("Found conflicting names for stopped pools; UUID will be required to start pools with UUIDs {}", set.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(", "));
                             }
                         } else {
-                            self.name_to_uuid.insert(name, *pool_uuid);
+                            self.name_to_uuid
+                                .insert(name, UuidOrConflict::Uuid(*pool_uuid));
                         }
                     },
                     Err(e) => {
@@ -526,7 +557,13 @@ impl LiminalDevices {
                 self.name_to_uuid = self
                     .name_to_uuid
                     .drain()
-                    .filter(|(_, p)| *p != pool_uuid)
+                    .filter_map(|(n, mut maybe_conflict)| {
+                        if maybe_conflict.remove(&pool_uuid) {
+                            None
+                        } else {
+                            Some((n, maybe_conflict))
+                        }
+                    })
                     .collect();
                 info!(
                     "Pool with name \"{}\" and UUID \"{}\" set up",
@@ -611,7 +648,13 @@ impl LiminalDevices {
                 self.name_to_uuid = self
                     .name_to_uuid
                     .drain()
-                    .filter(|(_, p)| *p != pool_uuid)
+                    .filter_map(|(n, mut maybe_conflict)| {
+                        if maybe_conflict.remove(&pool_uuid) {
+                            None
+                        } else {
+                            Some((n, maybe_conflict))
+                        }
+                    })
                     .collect();
                 info!(
                     "Pool with name \"{}\" and UUID \"{}\" set up",
@@ -734,13 +777,14 @@ impl LiminalDevices {
                     devices.process_info_add(info);
                     match devices.pool_name() {
                         Ok(MaybeInconsistent::No(Some(name))) => {
-                            if let Some(conf_uuid) = self.name_to_uuid.get(&name).copied() {
-                                if conf_uuid != pool_uuid {
-                                    self.name_to_uuid.remove(&name);
-                                    warn!("Found conflicting names for stopped pools; UUID will be required to start pools with UUID {} or {}", conf_uuid, pool_uuid);
+                            if let Some(maybe_conflict) = self.name_to_uuid.get_mut(&name) {
+                                maybe_conflict.add(pool_uuid);
+                                if let UuidOrConflict::Conflict(set) = maybe_conflict {
+                                    warn!("Found conflicting names for stopped pools; UUID will be required to start pools with UUIDs {}", set.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(", "));
                                 }
                             } else {
-                                self.name_to_uuid.insert(name, pool_uuid);
+                                self.name_to_uuid
+                                    .insert(name.clone(), UuidOrConflict::Uuid(pool_uuid));
                             }
                         }
                         Err(e) => {
@@ -773,21 +817,28 @@ impl LiminalDevices {
                 self.uuid_lookup.remove(device_path);
                 match devices.pool_name() {
                     Ok(MaybeInconsistent::No(Some(name))) => {
-                        if let Some(conf_uuid) = self.name_to_uuid.get(&name).copied() {
-                            if conf_uuid != pool_uuid {
-                                self.name_to_uuid.remove(&name);
-                                warn!("Found conflicting names for stopped pools; UUID will be required to start pools with UUID {} or {}", conf_uuid, pool_uuid);
+                        if let Some(maybe_conflict) = self.name_to_uuid.get_mut(&name) {
+                            maybe_conflict.add(pool_uuid);
+                            if let UuidOrConflict::Conflict(set) = maybe_conflict {
+                                warn!("Found conflicting names for stopped pools; UUID will be required to start pools with UUIDs {}", set.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(", "));
                             }
                         } else {
-                            self.name_to_uuid.insert(name, pool_uuid);
+                            self.name_to_uuid
+                                .insert(name, UuidOrConflict::Uuid(pool_uuid));
                         }
                     }
                     _ => {
                         self.name_to_uuid = self
                             .name_to_uuid
                             .drain()
-                            .filter(|(_, uuid)| uuid != &pool_uuid)
-                            .collect::<HashMap<_, _>>();
+                            .filter_map(|(n, mut maybe_conflict)| {
+                                if maybe_conflict.remove(&pool_uuid) {
+                                    None
+                                } else {
+                                    Some((n, maybe_conflict))
+                                }
+                            })
+                            .collect();
                     }
                 }
 
@@ -833,10 +884,13 @@ impl<'a> Into<Value> for &'a LiminalDevices {
             "name_to_pool_uuid_map": Value::Object(
                 self.name_to_uuid
                     .iter()
-                    .map(|(name, pool_uuid)| {
+                    .map(|(name, maybe_conflict)| {
                         (
                             name.to_string(),
-                            Value::from(pool_uuid.to_string()),
+                            match maybe_conflict {
+                                UuidOrConflict::Uuid(u) => Value::from(u.to_string()),
+                                UuidOrConflict::Conflict(set) => Value::from(set.iter().map(|u| Value::from(u.to_string())).collect::<Vec<_>>())
+                            },
                         )
                     })
                     .collect::<Map<_, _>>()

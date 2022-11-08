@@ -187,7 +187,7 @@ macro_rules! init_cache_generate_error_string {
              resolve this error, the block devices requested in the input should be the \
              same as the block devices in the existing cache.",
             device_list_check_num!(
-                $input,
+                $exists,
                 (
                     "; the existing cache contains \
                      the block device {} which the input did not include",
@@ -196,7 +196,7 @@ macro_rules! init_cache_generate_error_string {
                 )
             ),
             device_list_check_num!(
-                $exists,
+                $input,
                 (
                     "; the input requested block device {} which does not exist in the already \
                      initialized cache",

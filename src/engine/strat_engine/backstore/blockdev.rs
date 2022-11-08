@@ -133,7 +133,12 @@ impl StratBlockDev {
         })
     }
 
-    /// Returns the blockdev's Device
+    /// Returns the blockdev's Device. For unencrypted devices, this is the physical,
+    /// unencrypted device. For encrypted devices, this is the logical, unlocked
+    /// device on top of LUKS2.
+    ///
+    /// Practically, this is the device number that should be used when constructing
+    /// the cap device.
     pub fn device(&self) -> &Device {
         &self.dev
     }

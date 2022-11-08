@@ -4,6 +4,8 @@
 
 use std::path::Path;
 
+use devicemapper::Device;
+
 use crate::{
     engine::{
         strat_engine::{
@@ -22,6 +24,7 @@ pub struct CryptMetadataHandle {
     pub(super) identifiers: StratisIdentifiers,
     pub(super) encryption_info: EncryptionInfo,
     pub(super) name: String,
+    pub(super) device: Device,
 }
 
 impl CryptMetadataHandle {
@@ -30,12 +33,14 @@ impl CryptMetadataHandle {
         identifiers: StratisIdentifiers,
         encryption_info: EncryptionInfo,
         name: String,
+        device: Device,
     ) -> Self {
         CryptMetadataHandle {
             physical_path,
             identifiers,
             encryption_info,
             name,
+            device,
         }
     }
 
@@ -66,5 +71,10 @@ impl CryptMetadataHandle {
     /// Get the name of the activated device when it is activated.
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// Device number for LUKS2 device.
+    pub fn device(&self) -> &Device {
+        &self.device
     }
 }

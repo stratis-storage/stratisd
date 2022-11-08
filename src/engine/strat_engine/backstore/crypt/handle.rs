@@ -11,7 +11,7 @@ use std::{
 use either::Either;
 use serde_json::Value;
 
-use devicemapper::Sectors;
+use devicemapper::{Device, Sectors};
 use libcryptsetup_rs::{
     c_uint,
     consts::{flags::CryptActivate, vals::EncryptionFormat},
@@ -21,14 +21,17 @@ use libcryptsetup_rs::{
 use crate::{
     engine::{
         strat_engine::{
-            backstore::crypt::{
-                consts::{CLEVIS_LUKS_TOKEN_ID, LUKS2_TOKEN_ID},
-                metadata_handle::CryptMetadataHandle,
-                shared::{
-                    acquire_crypt_device, add_keyring_keyslot, clevis_info_from_metadata,
-                    ensure_wiped, get_keyslot_number, interpret_clevis_config, read_key,
-                    setup_crypt_device, setup_crypt_handle,
+            backstore::{
+                crypt::{
+                    consts::{CLEVIS_LUKS_TOKEN_ID, LUKS2_TOKEN_ID},
+                    metadata_handle::CryptMetadataHandle,
+                    shared::{
+                        acquire_crypt_device, add_keyring_keyslot, clevis_info_from_metadata,
+                        ensure_wiped, get_keyslot_number, interpret_clevis_config, read_key,
+                        setup_crypt_device, setup_crypt_handle,
+                    },
                 },
+                devices::get_devno_from_path,
             },
             cmd::{clevis_decrypt, clevis_luks_bind, clevis_luks_regen, clevis_luks_unbind},
             dm::DEVICEMAPPER_PATH,
@@ -63,11 +66,13 @@ impl CryptHandle {
         encryption_info: EncryptionInfo,
         name: String,
     ) -> StratisResult<CryptHandle> {
+        let device = get_devno_from_path(&physical_path)?;
         CryptHandle::new_with_metadata_handle(CryptMetadataHandle::new(
             physical_path,
             identifiers,
             encryption_info,
             name,
+            device,
         ))
     }
 
@@ -133,6 +138,11 @@ impl CryptHandle {
     /// Return the name of the activated devicemapper device.
     pub fn name(&self) -> &str {
         self.metadata_handle.name()
+    }
+
+    /// Device number for the LUKS2 encrypted device.
+    pub fn device(&self) -> &Device {
+        self.metadata_handle.device()
     }
 
     /// Get the Stratis device identifiers for a given encrypted device.

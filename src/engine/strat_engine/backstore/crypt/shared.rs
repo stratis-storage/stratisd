@@ -30,16 +30,19 @@ use libcryptsetup_rs::{
 use crate::{
     engine::{
         strat_engine::{
-            backstore::crypt::{
-                consts::{
-                    CLEVIS_LUKS_TOKEN_ID, CLEVIS_TANG_TRUST_URL, DEFAULT_CRYPT_KEYSLOTS_SIZE,
-                    DEFAULT_CRYPT_METADATA_SIZE, LUKS2_SECTOR_SIZE, LUKS2_TOKEN_ID,
-                    LUKS2_TOKEN_TYPE, STRATIS_TOKEN_DEVNAME_KEY, STRATIS_TOKEN_DEV_UUID_KEY,
-                    STRATIS_TOKEN_ID, STRATIS_TOKEN_POOL_UUID_KEY, STRATIS_TOKEN_TYPE,
-                    TOKEN_KEYSLOTS_KEY, TOKEN_TYPE_KEY,
+            backstore::{
+                crypt::{
+                    consts::{
+                        CLEVIS_LUKS_TOKEN_ID, CLEVIS_TANG_TRUST_URL, DEFAULT_CRYPT_KEYSLOTS_SIZE,
+                        DEFAULT_CRYPT_METADATA_SIZE, LUKS2_SECTOR_SIZE, LUKS2_TOKEN_ID,
+                        LUKS2_TOKEN_TYPE, STRATIS_TOKEN_DEVNAME_KEY, STRATIS_TOKEN_DEV_UUID_KEY,
+                        STRATIS_TOKEN_ID, STRATIS_TOKEN_POOL_UUID_KEY, STRATIS_TOKEN_TYPE,
+                        TOKEN_KEYSLOTS_KEY, TOKEN_TYPE_KEY,
+                    },
+                    handle::CryptHandle,
+                    metadata_handle::CryptMetadataHandle,
                 },
-                handle::CryptHandle,
-                metadata_handle::CryptMetadataHandle,
+                devices::get_devno_from_path,
             },
             cmd::clevis_luks_unlock,
             keys,
@@ -253,6 +256,7 @@ pub fn setup_crypt_metadata_handle(
     let identifiers = identifiers_from_metadata(device)?;
     let name = name_from_metadata(device)?;
     let key_description = key_desc_from_metadata(device);
+    let devno = get_devno_from_path(physical_path)?;
     let key_description = match key_description
         .as_ref()
         .map(|kd| KeyDescription::from_system_key_desc(kd))
@@ -286,6 +290,7 @@ pub fn setup_crypt_metadata_handle(
         identifiers,
         encryption_info,
         name,
+        devno,
     )))
 }
 

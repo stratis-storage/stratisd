@@ -558,19 +558,20 @@ impl Pool for StratPool {
                 return Err(StratisError::Msg(err_str));
             }
 
-            let current_logical_sector_size = self
+            let current_data_logical_sector_size = self
                 .backstore
                 .block_size_summary(BlockDevTier::Data)
                 .expect("always exists for data tier")
                 .validate()
-                .expect("All operations prevented if validate() function returns an error");
-            let data_block_size = block_size_summary
+                .expect("All operations prevented if validate() function returns an error")
+                .logical_sector_size;
+            let cache_logical_sector_size = block_size_summary
                 .keys()
                 .next()
                 .expect("unowned_devices is not empty")
                 .logical_sector_size;
-            if data_block_size != current_logical_sector_size {
-                let err_str = format!("The logical block size of the devices proposed for the cache tier, {}, does not match the logical block size of the data tier, {}", data_block_size, current_logical_sector_size);
+            if cache_logical_sector_size != current_data_logical_sector_size {
+                let err_str = format!("The logical block size of the devices proposed for the cache tier, {}, does not match the logical block size of the data tier, {}", cache_logical_sector_size, current_data_logical_sector_size);
                 return Err(StratisError::Msg(err_str));
             }
 
@@ -812,19 +813,18 @@ impl Pool for StratPool {
                     return Err(StratisError::Msg(err_str));
                 }
 
-                let current_logical_sector_size = self
+                let current_sector_sizes = self
                     .backstore
                     .block_size_summary(BlockDevTier::Cache)
                     .expect("already returned if no cache tier")
                     .validate()
                     .expect("All devices of the cache tier must be in use, so there can only be one representative logical sector size.");
-                let cache_block_size = block_size_summary
+                let added_sector_sizes = block_size_summary
                     .keys()
                     .next()
-                    .expect("unowned devices is not empty")
-                    .logical_sector_size;
-                if cache_block_size != current_logical_sector_size {
-                    let err_str = format!("The logical block size of the devices proposed for extending the cache tier, {}, does not match the logical block size of the existing cache devices, {}", cache_block_size, current_logical_sector_size);
+                    .expect("unowned devices is not empty");
+                if added_sector_sizes != &current_sector_sizes {
+                    let err_str = format!("The block sizes of the devices proposed for extending the cache tier, {}, do not match the block size of the existing cache devices, {}", added_sector_sizes, current_sector_sizes);
                     return Err(StratisError::Msg(err_str));
                 }
 
@@ -857,19 +857,18 @@ impl Pool for StratPool {
                     return Err(StratisError::Msg(err_str));
                 }
 
-                let current_logical_sector_size = self
+                let current_sector_sizes = self
                     .backstore
                     .block_size_summary(BlockDevTier::Data)
                     .expect("always exists")
                     .validate()
                     .expect("All operations prevented if validate() function on data tier block size sumary returns an error");
-                let data_block_size = block_size_summary
+                let added_sector_sizes = block_size_summary
                     .keys()
                     .next()
-                    .expect("unowned devices is not empty")
-                    .logical_sector_size;
-                if data_block_size != current_logical_sector_size {
-                    let err_str = format!("The logical block size of the devices proposed for extending the data tier, {}, does not match the logical block size of the existing data devices, {}", data_block_size, current_logical_sector_size);
+                    .expect("unowned devices is not empty");
+                if added_sector_sizes != &current_sector_sizes {
+                    let err_str = format!("The sector sizes of the devices proposed for extending the data tier, {}, do not match the sector sizes of the existing data devices, {}", added_sector_sizes, current_sector_sizes);
                     return Err(StratisError::Msg(err_str));
                 }
 

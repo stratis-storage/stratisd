@@ -6,7 +6,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use devicemapper::{Bytes, Device, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine};
+use devicemapper::{Device, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine};
 
 use crate::{
     engine::{
@@ -186,7 +186,7 @@ impl BlockSizeSummary {
     /// the pool.
     /// Returns the logical block size that will alway be used by the cap
     /// device if this size exists.
-    pub fn validate(&self) -> StratisResult<Bytes> {
+    pub fn validate(&self) -> StratisResult<BlockSizes> {
         // It is not practically possible that all the data devices in the data
         // tier or all the the cache devices in the cache tier will be
         // completely unused during stratisd's normal execution. This condition
@@ -197,14 +197,13 @@ impl BlockSizeSummary {
                 let error_str = "The devices in this pool have inconsistent block sizes. This is an unpredictable situation, and could lead to umnountable file systems if the pool is extended. Consider remaking the pool using devices with consistent block sizes.".to_string();
                 Err(StratisError::Msg(error_str))
             } else {
-                let logical_size = self
+                let block_sizes = self
                     .unused
                     .keys()
-                    .map(|x| x.logical_sector_size)
                     .next()
                     .expect("returned early if unused was empty");
 
-                Ok(logical_size)
+                Ok(*block_sizes)
             };
         }
 
@@ -222,10 +221,28 @@ impl BlockSizeSummary {
             .any(|s| s > largest_logical_used)
         {
             let error_str = format!("Some unused block devices in the pool have a logical sector size that is larger than the largest logical sector size ({}) of any of the devices that are in use. This could lead to unmountable filesystems if the pool is extended. Consider moving your data to another pool.", largest_logical_used);
-            Err(StratisError::Msg(error_str))
-        } else {
-            Ok(largest_logical_used)
+            return Err(StratisError::Msg(error_str));
         }
+
+        let largest_physical_used = self
+            .used
+            .keys()
+            .map(|x| x.physical_sector_size)
+            .max()
+            .expect("returned early if used was empty");
+        if self
+            .unused
+            .keys()
+            .map(|x| x.physical_sector_size)
+            .any(|s| s > largest_physical_used)
+        {
+            let error_str = format!("Some unused block devices in the pool have a physical sector size that is larger than the largest physical sector size ({}) of any of the devices that are in use. This could lead to unmountable filesystems if the pool is extended. Consider moving your data to another pool.", largest_physical_used);
+            return Err(StratisError::Msg(error_str));
+        }
+        Ok(BlockSizes {
+            logical_sector_size: largest_logical_used,
+            physical_sector_size: largest_physical_used,
+        })
     }
 }
 

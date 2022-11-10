@@ -15,9 +15,7 @@ use crate::{
 pub type StoppedOrLockedPools = HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>>;
 
 /// Convert a locked pool data structure to a property format.
-pub fn locked_pools_to_prop(
-    pools: &HashMap<PoolUuid, LockedPoolInfo>,
-) -> HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>> {
+pub fn locked_pools_to_prop(pools: &HashMap<PoolUuid, LockedPoolInfo>) -> StoppedOrLockedPools {
     pools
         .iter()
         .map(|(u, locked)| {
@@ -71,9 +69,7 @@ pub fn locked_pools_to_prop(
 }
 
 /// Convert a stopped pool data structure to a property format.
-pub fn stopped_pools_to_prop(
-    pools: &HashMap<PoolUuid, StoppedPoolInfo>,
-) -> HashMap<String, HashMap<String, Variant<Box<dyn RefArg>>>> {
+pub fn stopped_pools_to_prop(pools: &HashMap<PoolUuid, StoppedPoolInfo>) -> StoppedOrLockedPools {
     pools
         .iter()
         .map(|(u, stopped)| {

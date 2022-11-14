@@ -4,13 +4,14 @@
 
 use std::{
     any::type_name,
+    cell::UnsafeCell,
     collections::{HashMap, HashSet, VecDeque},
     fmt::{self, Debug, Display},
     future::Future,
     ops::{Deref, DerefMut},
     pin::Pin,
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, Ordering},
         Arc, Mutex, MutexGuard,
     },
     task::{Context, Poll, Waker},
@@ -128,9 +129,12 @@ struct LockRecord<U, T> {
     all_write_locked: bool,
     read_locked: HashMap<U, u64>,
     write_locked: HashSet<U>,
-    inner: Table<U, T>,
+    // UnsafeCell is used here to provide interior mutability and avoid any undefined
+    // behavior around immutable references being converted to mutable references.
+    inner: UnsafeCell<Table<U, T>>,
     waiting: VecDeque<Waiter<U>>,
     woken: HashMap<u64, WaitType<U>>,
+    next_idx: u64,
 }
 
 impl<U, T> LockRecord<U, T>
@@ -160,8 +164,10 @@ where
     /// Convert a name or UUID into a pair of a name and UUID.
     fn get_by_lock_key(&self, lock_key: &LockKey<U>) -> Option<(U, Name)> {
         match lock_key {
-            LockKey::Name(ref n) => self.inner.get_by_name(n).map(|(u, _)| (u, n.clone())),
-            LockKey::Uuid(u) => self.inner.get_by_uuid(*u).map(|(n, _)| (*u, n)),
+            LockKey::Name(ref n) => unsafe { self.inner.get().as_ref() }
+                .and_then(|i| i.get_by_name(n).map(|(u, _)| (u, n.clone()))),
+            LockKey::Uuid(u) => unsafe { self.inner.get().as_ref() }
+                .and_then(|i| i.get_by_uuid(*u).map(|(n, _)| (*u, n))),
         }
     }
 
@@ -389,6 +395,20 @@ where
             }
         }
     }
+
+    /// Remove the internal state of a given future that has been cancelled.
+    fn cancel(&mut self, idx: u64) {
+        self.waiting = self
+            .waiting
+            .drain(..)
+            .filter(|waiter| waiter.idx != idx)
+            .collect::<VecDeque<_>>();
+        self.woken = self
+            .woken
+            .drain()
+            .filter(|(i, _)| i != &idx)
+            .collect::<HashMap<_, _>>();
+    }
 }
 
 impl<U, T> Display for LockRecord<U, T>
@@ -403,6 +423,7 @@ where
             .field("write_locked", &self.write_locked)
             .field("waiting", &self.waiting)
             .field("woken", &self.woken)
+            .field("next_idx", &self.next_idx)
             .finish()
     }
 }
@@ -447,7 +468,6 @@ where
 pub struct AllOrSomeLock<U, T> {
     /// Inner record of acquired locks.
     lock_record: Arc<Mutex<LockRecord<U, T>>>,
-    next_idx: Arc<AtomicU64>,
 }
 
 impl<U, T> AllOrSomeLock<U, T>
@@ -462,11 +482,11 @@ where
                 all_write_locked: false,
                 read_locked: HashMap::new(),
                 write_locked: HashSet::new(),
-                inner,
+                inner: UnsafeCell::new(inner),
                 waiting: VecDeque::new(),
                 woken: HashMap::new(),
+                next_idx: 0,
             })),
-            next_idx: Arc::new(AtomicU64::new(0)),
         }
     }
 
@@ -476,13 +496,24 @@ where
             .lock()
             .expect("lock record mutex only locked internally")
     }
+
+    /// Returns the index for a future and increments the index count for the next future when
+    /// it is created.
+    ///
+    /// This counter performs wrapping addition so the maximum number of futures supported by
+    /// this lock is u64::MAX.
+    fn next_idx(&self) -> u64 {
+        let mut lock_record = self.acquire_mutex();
+        let idx = lock_record.next_idx;
+        lock_record.next_idx = lock_record.next_idx.wrapping_add(1);
+        idx
+    }
 }
 
 impl<U, T> Clone for AllOrSomeLock<U, T> {
     fn clone(&self) -> Self {
         AllOrSomeLock {
             lock_record: Arc::clone(&self.lock_record),
-            next_idx: Arc::clone(&self.next_idx),
         }
     }
 }
@@ -495,7 +526,8 @@ where
     /// Issue a read on a single element identified by a name or UUID.
     pub async fn read(&self, key: LockKey<U>) -> Option<SomeLockReadGuard<U, T>> {
         trace!("Acquiring read lock on pool {:?}", key);
-        let guard = SomeRead(self.clone(), key, AtomicBool::new(false), self.next_idx()).await;
+        let idx = self.next_idx();
+        let guard = SomeRead(self.clone(), key, AtomicBool::new(false), idx).await;
         if guard.is_some() {
             trace!("Read lock acquired");
         } else {
@@ -507,7 +539,8 @@ where
     /// Issue a read on all elements.
     pub async fn read_all(&self) -> AllLockReadGuard<U, T> {
         trace!("Acquiring read lock on all pools");
-        let guard = AllRead(self.clone(), AtomicBool::new(false), self.next_idx()).await;
+        let idx = self.next_idx();
+        let guard = AllRead(self.clone(), AtomicBool::new(false), idx).await;
         trace!("All read lock acquired");
         guard
     }
@@ -515,7 +548,8 @@ where
     /// Issue a write on a single element identified by a name or UUID.
     pub async fn write(&self, key: LockKey<U>) -> Option<SomeLockWriteGuard<U, T>> {
         trace!("Acquiring write lock on pool {:?}", key);
-        let guard = SomeWrite(self.clone(), key, AtomicBool::new(false), self.next_idx()).await;
+        let idx = self.next_idx();
+        let guard = SomeWrite(self.clone(), key, AtomicBool::new(false), idx).await;
         if guard.is_some() {
             trace!("Write lock acquired");
         } else {
@@ -527,22 +561,10 @@ where
     /// Issue a write on all elements.
     pub async fn write_all(&self) -> AllLockWriteGuard<U, T> {
         trace!("Acquiring write lock on all pools");
-        let guard = AllWrite(self.clone(), AtomicBool::new(false), self.next_idx()).await;
+        let idx = self.next_idx();
+        let guard = AllWrite(self.clone(), AtomicBool::new(false), idx).await;
         trace!("All write lock acquired");
         guard
-    }
-
-    /// Returns the index for a future and increments the index count for the next future when
-    /// it is created.
-    ///
-    /// This counter performs wrapping addition so the maximum number of futures supported by
-    /// this lock is u64::MAX
-    fn next_idx(&self) -> u64 {
-        self.next_idx
-            .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |idx| {
-                Some((idx + 1) % u64::MAX)
-            })
-            .expect("Wrapping index update cannot fail")
     }
 }
 
@@ -556,14 +578,7 @@ where
 }
 
 /// Future returned by AllOrSomeLock::read().
-struct SomeRead<U, T>(AllOrSomeLock<U, T>, LockKey<U>, AtomicBool, u64);
-
-impl<U, T> Unpin for SomeRead<U, T>
-where
-    U: AsUuid + Unpin,
-    T: Unpin,
-{
-}
+struct SomeRead<U: AsUuid, T>(AllOrSomeLock<U, T>, LockKey<U>, AtomicBool, u64);
 
 impl<U, T> Future for SomeRead<U, T>
 where
@@ -589,7 +604,10 @@ where
             Poll::Pending
         } else {
             lock_record.add_read_lock(uuid, Some(self.3));
-            let (_, rf) = lock_record.inner.get_by_uuid(uuid).expect("Checked above");
+            let (_, rf) = unsafe { lock_record.inner.get().as_ref() }
+                .expect("cannot be null")
+                .get_by_uuid(uuid)
+                .expect("Checked above");
             Poll::Ready(Some(SomeLockReadGuard(
                 self.0.clone(),
                 uuid,
@@ -599,6 +617,16 @@ where
         };
 
         poll
+    }
+}
+
+impl<U, T> Drop for SomeRead<U, T>
+where
+    U: AsUuid,
+{
+    fn drop(&mut self) {
+        let mut lock_record = self.0.acquire_mutex();
+        lock_record.cancel(self.3);
     }
 }
 
@@ -657,14 +685,7 @@ where
 }
 
 /// Future returned by AllOrSomeLock::write().
-struct SomeWrite<U, T>(AllOrSomeLock<U, T>, LockKey<U>, AtomicBool, u64);
-
-impl<U, T> Unpin for SomeWrite<U, T>
-where
-    U: AsUuid + Unpin,
-    T: Unpin,
-{
-}
+struct SomeWrite<U: AsUuid, T>(AllOrSomeLock<U, T>, LockKey<U>, AtomicBool, u64);
 
 impl<U, T> Future for SomeWrite<U, T>
 where
@@ -690,16 +711,29 @@ where
             Poll::Pending
         } else {
             lock_record.add_write_lock(uuid, Some(self.3));
-            let (_, rf) = lock_record.inner.get_by_uuid(uuid).expect("Checked above");
+            let (_, rf) = unsafe { lock_record.inner.get().as_mut() }
+                .expect("cannot be null")
+                .get_mut_by_uuid(uuid)
+                .expect("Checked above");
             Poll::Ready(Some(SomeLockWriteGuard(
                 self.0.clone(),
                 uuid,
                 name,
-                rf as *const _ as *mut _,
+                rf as *mut _,
             )))
         };
 
         poll
+    }
+}
+
+impl<U, T> Drop for SomeWrite<U, T>
+where
+    U: AsUuid,
+{
+    fn drop(&mut self) {
+        let mut lock_record = self.0.acquire_mutex();
+        lock_record.cancel(self.3);
     }
 }
 
@@ -767,7 +801,7 @@ where
 }
 
 /// Future returned by AllOrSomeLock::real_all().
-struct AllRead<U, T>(AllOrSomeLock<U, T>, AtomicBool, u64);
+struct AllRead<U: AsUuid, T>(AllOrSomeLock<U, T>, AtomicBool, u64);
 
 impl<U, T> Future for AllRead<U, T>
 where
@@ -786,11 +820,21 @@ where
             lock_record.add_read_all_lock(self.2);
             Poll::Ready(AllLockReadGuard(
                 self.0.clone(),
-                &lock_record.inner as *const _,
+                lock_record.inner.get() as *const _,
             ))
         };
 
         poll
+    }
+}
+
+impl<U, T> Drop for AllRead<U, T>
+where
+    U: AsUuid,
+{
+    fn drop(&mut self) {
+        let mut lock_record = self.0.acquire_mutex();
+        lock_record.cancel(self.2);
     }
 }
 
@@ -809,8 +853,8 @@ where
         assert!(lock_record.write_locked.is_empty());
         assert!(!lock_record.all_write_locked);
 
-        let guards = lock_record
-            .inner
+        let guards = unsafe { lock_record.inner.get().as_ref() }
+            .expect("cannot be null")
             .iter()
             .map(|(n, u, t)| {
                 (
@@ -868,7 +912,7 @@ where
 }
 
 /// Future returned by AllOrSomeLock::write_all().
-struct AllWrite<U, T>(AllOrSomeLock<U, T>, AtomicBool, u64);
+struct AllWrite<U: AsUuid, T>(AllOrSomeLock<U, T>, AtomicBool, u64);
 
 impl<U, T> Future for AllWrite<U, T>
 where
@@ -885,13 +929,20 @@ where
             Poll::Pending
         } else {
             lock_record.add_write_all_lock(self.2);
-            Poll::Ready(AllLockWriteGuard(
-                self.0.clone(),
-                &lock_record.inner as *const _ as *mut _,
-            ))
+            Poll::Ready(AllLockWriteGuard(self.0.clone(), lock_record.inner.get()))
         };
 
         poll
+    }
+}
+
+impl<U, T> Drop for AllWrite<U, T>
+where
+    U: AsUuid,
+{
+    fn drop(&mut self) {
+        let mut lock_record = self.0.acquire_mutex();
+        lock_record.cancel(self.2);
     }
 }
 
@@ -911,13 +962,13 @@ where
         assert!(lock_record.write_locked.is_empty());
         assert_eq!(lock_record.all_read_locked, 0);
 
-        let guards = lock_record
-            .inner
-            .iter()
+        let guards = unsafe { lock_record.inner.get().as_mut() }
+            .expect("cannot be null")
+            .iter_mut()
             .map(|(n, u, t)| {
                 (
                     *u,
-                    SomeLockWriteGuard(self.0.clone(), *u, n.clone(), t as *const _ as *mut _),
+                    SomeLockWriteGuard(self.0.clone(), *u, n.clone(), t as *mut _),
                 )
             })
             .collect::<Vec<_>>();
@@ -975,5 +1026,32 @@ where
         lock_record.remove_write_all_lock();
         lock_record.wake();
         trace!("All write lock dropped");
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use futures::poll;
+
+    use crate::engine::types::PoolUuid;
+
+    #[test]
+    fn test_cancelled_future() {
+        let lock = AllOrSomeLock::new(Table::<PoolUuid, bool>::default());
+        let _write_all = test_async!(lock.write_all());
+        let read_all = Box::pin(lock.read_all());
+        assert!(matches!(
+            test_async!(async { poll!(read_all) }),
+            Poll::Pending
+        ));
+        let read_all = Box::pin(lock.read_all());
+        assert!(matches!(
+            test_async!(async { poll!(read_all) }),
+            Poll::Pending
+        ));
+        let len = lock.lock_record.lock().unwrap().waiting.len();
+        assert_eq!(len, 0);
     }
 }

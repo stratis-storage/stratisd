@@ -505,6 +505,7 @@ impl<'a> Into<Value> for &'a StratBlockDev {
             "blksizes".to_string(),
             Value::from(self.blksizes.to_string()),
         );
+        map.insert("in_use".to_string(), Value::from(self.in_use()));
         json
     }
 }

@@ -325,15 +325,13 @@ impl MDAHeader {
         match LittleEndian::read_u64(&buf[8..16]) {
             0 => None,
             used => {
-                let secs = LittleEndian::read_u64(&buf[16..24]);
-
-                // Signed cast is safe, highest order bit of each value
-                // read is guaranteed to be 0.
-                assert!(secs <= std::i64::MAX as u64);
+                let secs: i64 = LittleEndian::read_u64(&buf[16..24])
+                    .try_into()
+                    .expect("highest order bit guaranteed 0");
 
                 Some(MDAHeader {
                     used: MetaDataSize::new(Bytes::from(used)),
-                    last_updated: Utc.timestamp(secs as i64, LittleEndian::read_u32(&buf[24..28])),
+                    last_updated: Utc.timestamp(secs, LittleEndian::read_u32(&buf[24..28])),
                     data_crc: LittleEndian::read_u32(&buf[4..8]),
                 })
             }

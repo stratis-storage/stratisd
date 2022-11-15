@@ -10,7 +10,7 @@ use std::{
     path::Path,
 };
 
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Utc};
 use serde_json::Value;
 
 use devicemapper::{Device, Sectors};
@@ -508,9 +508,7 @@ impl BlockDev for StratBlockDev {
     }
 
     fn initialization_time(&self) -> DateTime<Utc> {
-        // This cast will result in an incorrect, negative value starting in
-        // the year 292,277,026,596. :-)
-        Utc.timestamp(self.bda.initialization_time() as i64, 0)
+        self.bda.initialization_time()
     }
 
     fn size(&self) -> Sectors {

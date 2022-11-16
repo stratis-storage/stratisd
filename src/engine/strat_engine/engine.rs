@@ -420,7 +420,7 @@ impl Engine for StratEngine {
 
             let block_size_summary = unowned_devices.blocksizes();
             if block_size_summary.len() > 1 {
-                let err_str = "The devices specified for initializing the pool do not have uniform physcal and logical block sizes.".into();
+                let err_str = "The devices specified for initializing the pool do not have uniform physical and logical sector sizes.".into();
                 return Err(StratisError::Msg(err_str));
             }
 

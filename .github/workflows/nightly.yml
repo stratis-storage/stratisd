@@ -46,6 +46,31 @@ jobs:
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
+  check_future_dependencies:
+    runs-on: ubuntu-20.04
+    container:
+      image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install dependencies for Fedora
+        run: >
+          dnf install -y
+          clang
+          cryptsetup-devel
+          dbus-devel
+          libblkid-devel
+          make
+          systemd-devel
+      - uses: actions-rs/toolchain@v1
+        with:
+          components: cargo
+          toolchain: 1.65.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          override: true
+      - name: Run cargo-update
+        run: cargo update
+      - name: Run cargo-clippy
+        run: make clippy
+
   allowed_failures:
     continue-on-error: true
     strategy:

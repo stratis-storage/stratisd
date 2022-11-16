@@ -9,6 +9,7 @@ use std::{
 };
 
 use byteorder::{ByteOrder, LittleEndian};
+use chrono::{DateTime, TimeZone, Utc};
 use crc::{Crc, CRC_32_ISCSI};
 use serde_json::Value;
 
@@ -16,6 +17,7 @@ use devicemapper::{Sectors, IEC, SECTOR_SIZE};
 
 use crate::{
     engine::{
+        shared::unsigned_to_timestamp,
         strat_engine::{
             metadata::sizes::{
                 static_header_size, BDAExtendedSize, BlockdevSize, MDADataSize, MDASize,
@@ -135,8 +137,7 @@ pub struct StaticHeader {
     pub mda_size: MDASize,
     pub reserved_size: ReservedSize,
     pub flags: u64,
-    /// Seconds portion of DateTime<Utc> value.
-    pub initialization_time: u64,
+    pub initialization_time: DateTime<Utc>,
 }
 
 impl StaticHeader {
@@ -144,7 +145,7 @@ impl StaticHeader {
         identifiers: StratisIdentifiers,
         mda_data_size: MDADataSize,
         blkdev_size: BlockdevSize,
-        initialization_time: u64,
+        initialization_time: DateTime<Utc>,
     ) -> StaticHeader {
         StaticHeader {
             blkdev_size,
@@ -152,7 +153,10 @@ impl StaticHeader {
             mda_size: mda_data_size.region_size().mda_size(),
             reserved_size: ReservedSize::new(RESERVED_SECTORS),
             flags: 0,
-            initialization_time,
+            // Must succeed, since seconds must be valid
+            initialization_time: Utc
+                .timestamp_opt(initialization_time.timestamp(), 0)
+                .unwrap(),
         }
     }
 
@@ -498,7 +502,10 @@ impl StaticHeader {
         buf[64..96].clone_from_slice(uuid_to_string!(self.identifiers.device_uuid).as_bytes());
         LittleEndian::write_u64(&mut buf[96..104], *self.mda_size.sectors());
         LittleEndian::write_u64(&mut buf[104..112], *self.reserved_size.sectors());
-        LittleEndian::write_u64(&mut buf[120..128], self.initialization_time);
+        LittleEndian::write_u64(
+            &mut buf[120..128],
+            self.initialization_time.timestamp() as u64,
+        );
 
         let hdr_crc = CASTAGNOLI.checksum(&buf[4..bytes!(static_header_size::SIGBLOCK_SECTORS)]);
         LittleEndian::write_u32(&mut buf[..4], hdr_crc);
@@ -537,13 +544,15 @@ impl StaticHeader {
 
         let mda_size = MDASize(Sectors(LittleEndian::read_u64(&buf[96..104])));
 
+        let initialization_time = unsigned_to_timestamp(LittleEndian::read_u64(&buf[120..128]), 0)?;
+
         Ok(Some(StaticHeader {
             identifiers: StratisIdentifiers::new(pool_uuid, dev_uuid),
             blkdev_size,
             mda_size,
             reserved_size: ReservedSize::new(Sectors(LittleEndian::read_u64(&buf[104..112]))),
             flags: 0,
-            initialization_time: LittleEndian::read_u64(&buf[120..128]),
+            initialization_time,
         }))
     }
 
@@ -566,11 +575,14 @@ pub mod tests {
 
     use proptest::{option, prelude::BoxedStrategy, strategy::Strategy};
 
-    use chrono::Utc;
+    use chrono::{TimeZone, Utc};
 
     use devicemapper::{Bytes, Sectors, IEC};
 
-    use crate::engine::strat_engine::metadata::sizes::{static_header_size, MDADataSize};
+    use crate::engine::{
+        shared::now_to_timestamp,
+        strat_engine::metadata::sizes::{static_header_size, MDADataSize},
+    };
 
     use super::*;
 
@@ -616,7 +628,7 @@ pub mod tests {
             StratisIdentifiers::new(pool_uuid, dev_uuid),
             mda_data_size,
             BlockdevSize::new(blkdev_size),
-            Utc::now().timestamp() as u64,
+            Utc::now(),
         )
     }
 
@@ -732,13 +744,13 @@ pub mod tests {
     fn test_rewrite_older_sigblock() {
         let sh = random_static_header(10000, 4);
 
-        let ts = Utc::now().timestamp() as u64;
+        let ts = now_to_timestamp();
         let sh_older = StaticHeader {
             initialization_time: ts,
             ..sh
         };
         let sh_newer = StaticHeader {
-            initialization_time: ts + 1,
+            initialization_time: Utc.timestamp_opt(ts.timestamp() + 1, 0).unwrap(),
             ..sh
         };
         assert_ne!(sh_older, sh_newer);

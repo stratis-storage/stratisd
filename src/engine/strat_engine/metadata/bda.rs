@@ -33,7 +33,7 @@ impl Default for BDA {
             StratisIdentifiers::new(PoolUuid::nil(), DevUuid::nil()),
             MDADataSize::default(),
             BlockdevSize::default(),
-            0,
+            DateTime::default(),
         )
     }
 }
@@ -43,7 +43,7 @@ impl BDA {
         identifiers: StratisIdentifiers,
         mda_data_size: MDADataSize,
         blkdev_size: BlockdevSize,
-        initialization_time: u64,
+        initialization_time: DateTime<Utc>,
     ) -> BDA {
         let header =
             StaticHeader::new(identifiers, mda_data_size, blkdev_size, initialization_time);
@@ -140,7 +140,7 @@ impl BDA {
     }
 
     /// Timestamp when the device was initialized.
-    pub fn initialization_time(&self) -> u64 {
+    pub fn initialization_time(&self) -> DateTime<Utc> {
         self.header.initialization_time
     }
 }
@@ -170,7 +170,7 @@ mod tests {
                 sh.identifiers,
                 sh.mda_size.region_size().data_size(),
                 sh.blkdev_size,
-                Utc::now().timestamp() as u64,
+                Utc::now(),
             );
             bda.initialize(&mut buf).unwrap();
             let read_results = StaticHeader::read_sigblocks(&mut buf);
@@ -201,7 +201,7 @@ mod tests {
             sh.identifiers,
             sh.mda_size.region_size().data_size(),
             sh.blkdev_size,
-            Utc::now().timestamp() as u64,
+            Utc::now(),
         );
         bda.initialize(&mut buf).unwrap();
 
@@ -251,7 +251,7 @@ mod tests {
                 sh.identifiers,
                 sh.mda_size.region_size().data_size(),
                 sh.blkdev_size,
-                Utc::now().timestamp() as u64,
+                Utc::now(),
             );
             bda.initialize(&mut buf).unwrap();
             let current_time = Utc::now();

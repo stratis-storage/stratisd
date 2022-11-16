@@ -9,7 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Utc};
 use data_encoding::BASE32_NOPAD;
 use retry::{delay::Fixed, retry_with_index};
 use serde_json::{Map, Value};
@@ -27,6 +27,7 @@ use nix::{
 use crate::{
     engine::{
         engine::{DumpState, Filesystem, StateDiff},
+        shared::unsigned_to_timestamp,
         strat_engine::{
             cmd::{create_fs, set_uuid, xfs_growfs},
             devlinks,
@@ -113,6 +114,8 @@ impl StratFilesystem {
         fssave: &FilesystemSave,
     ) -> StratisResult<StratFilesystem> {
         let (dm_name, dm_uuid) = format_thin_ids(pool_uuid, ThinRole::Filesystem(fssave.uuid));
+        let created = unsigned_to_timestamp(fssave.created, 0)?;
+
         let thin_dev = ThinDev::setup(
             get_dm(),
             &dm_name,
@@ -124,7 +127,7 @@ impl StratFilesystem {
         Ok(StratFilesystem {
             used: init_used(&thin_dev),
             thin_dev,
-            created: Utc.timestamp(fssave.created as i64, 0),
+            created,
         })
     }
 

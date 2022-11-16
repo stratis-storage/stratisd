@@ -529,7 +529,7 @@ pub fn initialize_devices(
             StratisIdentifiers::new(pool_uuid, dev_uuid),
             mda_data_size,
             data_size,
-            Utc::now().timestamp() as u64,
+            Utc::now(),
         );
 
         bda.initialize(&mut f)?;

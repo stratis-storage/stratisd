@@ -4,13 +4,14 @@
 
 use std::path::{Path, PathBuf};
 
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
 
 use devicemapper::{Bytes, Sectors, IEC};
 
 use crate::engine::{
     engine::BlockDev,
+    shared::now_to_timestamp,
     types::{DevUuid, EncryptionInfo, KeyDescription},
 };
 
@@ -20,7 +21,7 @@ pub struct SimDev {
     devnode: PathBuf,
     user_info: Option<String>,
     hardware_info: Option<String>,
-    initialization_time: u64,
+    initialization_time: DateTime<Utc>,
     encryption_info: Option<EncryptionInfo>,
 }
 
@@ -49,7 +50,7 @@ impl BlockDev for SimDev {
     }
 
     fn initialization_time(&self) -> DateTime<Utc> {
-        Utc.timestamp(self.initialization_time as i64, 0)
+        self.initialization_time
     }
 
     fn size(&self) -> Sectors {
@@ -74,7 +75,7 @@ impl SimDev {
                 devnode: devnode.to_owned(),
                 user_info: None,
                 hardware_info: None,
-                initialization_time: Utc::now().timestamp() as u64,
+                initialization_time: now_to_timestamp(),
                 encryption_info: encryption_info.cloned(),
             },
         )

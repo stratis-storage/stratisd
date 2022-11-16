@@ -10,6 +10,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use chrono::{DateTime, LocalResult, TimeZone, Utc};
 use nix::poll::{poll, PollFd, PollFlags};
 use regex::Regex;
 
@@ -290,6 +291,31 @@ pub fn total_allocated(allocated: &Diff<Bytes>, metadata_size: &Diff<Bytes>) -> 
         (Diff::Unchanged(a), Diff::Changed(m)) => Diff::Changed(*a + *m),
         (Diff::Changed(a), Diff::Changed(m)) => Diff::Changed(*a + *m),
     }
+}
+
+/// Convert a u64 value representing seconds, and a u32 value representing
+/// nanoseconds to a timestamp.
+pub fn unsigned_to_timestamp(secs: u64, nanos: u32) -> StratisResult<DateTime<Utc>> {
+    let secs_arg = secs.try_into();
+    match secs_arg {
+        Ok(val) => match Utc.timestamp_opt(val, nanos) {
+            LocalResult::Single(timestamp) => Ok(timestamp),
+            _ => Err(StratisError::Msg(format!(
+                "{} (for seconds) and {} (for nanoseconds) are not valid timestamp args",
+                val, nanos,
+            ))),
+        },
+        Err(_) => Err(StratisError::Msg(format!(
+            "{} can not be converted into i64 to be used as seconds value in timestamp",
+            secs
+        ))),
+    }
+}
+
+/// Return a timestamp which is equal to Utc::now() truncated to the nearest
+/// second.
+pub fn now_to_timestamp() -> DateTime<Utc> {
+    Utc.timestamp_opt(Utc::now().timestamp(), 0).unwrap()
 }
 
 #[cfg(test)]

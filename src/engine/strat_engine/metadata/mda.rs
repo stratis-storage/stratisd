@@ -8,15 +8,18 @@ use std::{
 };
 
 use byteorder::{ByteOrder, LittleEndian};
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::{DateTime, Utc};
 use crc::{Crc, CRC_32_ISCSI};
 
 use devicemapper::Bytes;
 
 use crate::{
-    engine::strat_engine::{
-        metadata::sizes::{mda_size, MDADataSize, MDARegionSize, MDASize},
-        writing::SyncAll,
+    engine::{
+        shared::unsigned_to_timestamp,
+        strat_engine::{
+            metadata::sizes::{mda_size, MDADataSize, MDARegionSize, MDASize},
+            writing::SyncAll,
+        },
     },
     stratis::{StratisError, StratisResult},
 };
@@ -310,7 +313,7 @@ pub struct MDAHeader {
 impl Default for MDAHeader {
     fn default() -> MDAHeader {
         MDAHeader {
-            last_updated: Utc.timestamp(0, 0),
+            last_updated: DateTime::default(),
             used: MetaDataSize::new(Bytes(0)),
             data_crc: 0,
         }
@@ -321,22 +324,20 @@ impl MDAHeader {
     /// Parse a valid MDAHeader from buf.
     /// If the amount used by the variable length metadata is 0, return None,
     /// as this means that no variable length metadata has been written.
-    fn parse_buf(buf: &[u8; mda_size::_MDA_REGION_HDR_SIZE]) -> Option<MDAHeader> {
+    fn parse_buf(buf: &[u8; mda_size::_MDA_REGION_HDR_SIZE]) -> Option<StratisResult<MDAHeader>> {
         match LittleEndian::read_u64(&buf[8..16]) {
             0 => None,
-            used => {
-                let secs = LittleEndian::read_u64(&buf[16..24]);
-
-                // Signed cast is safe, highest order bit of each value
-                // read is guaranteed to be 0.
-                assert!(secs <= std::i64::MAX as u64);
-
-                Some(MDAHeader {
+            used => Some(
+                unsigned_to_timestamp(
+                    LittleEndian::read_u64(&buf[16..24]),
+                    LittleEndian::read_u32(&buf[24..28]),
+                )
+                .map(|last_updated| MDAHeader {
                     used: MetaDataSize::new(Bytes::from(used)),
-                    last_updated: Utc.timestamp(secs as i64, LittleEndian::read_u32(&buf[24..28])),
+                    last_updated,
                     data_crc: LittleEndian::read_u32(&buf[4..8]),
-                })
-            }
+                }),
+            ),
         }
     }
 
@@ -367,7 +368,7 @@ impl MDAHeader {
             )));
         }
 
-        Ok(MDAHeader::parse_buf(buf))
+        MDAHeader::parse_buf(buf).transpose()
     }
 
     fn to_buf(&self) -> [u8; mda_size::_MDA_REGION_HDR_SIZE] {
@@ -416,7 +417,7 @@ impl MDAHeader {
 mod tests {
     use std::io::Cursor;
 
-    use chrono::Utc;
+    use chrono::{TimeZone, Utc};
     use proptest::{collection, num};
 
     use super::*;
@@ -474,7 +475,8 @@ mod tests {
                       nsec in 0..UTC_TIMESTAMP_NSECS_BOUND) {
 
             let header = MDAHeader {
-                last_updated: Utc.timestamp(sec, nsec),
+                // Argument values are correct by construction
+                last_updated: Utc.timestamp_opt(sec, nsec).unwrap(),
                 used: MetaDataSize::new(Bytes::from(data.len())),
                 data_crc: CASTAGNOLI.checksum(data),
             };

@@ -558,7 +558,7 @@ impl Pool for StratPool {
 
             let block_size_summary = unowned_devices.blocksizes();
             if block_size_summary.len() > 1 {
-                let err_str = "The devices specified for the cache tier do not have uniform physcal and logical block sizes.".into();
+                let err_str = "The devices specified for the cache tier do not have uniform physcal and logical sector sizes.".into();
                 return Err(StratisError::Msg(err_str));
             }
 
@@ -575,7 +575,7 @@ impl Pool for StratPool {
                 .expect("unowned_devices is not empty")
                 .logical_sector_size;
             if cache_logical_sector_size != current_data_logical_sector_size {
-                let err_str = format!("The logical block size of the devices proposed for the cache tier, {}, does not match the logical block size of the data tier, {}", cache_logical_sector_size, current_data_logical_sector_size);
+                let err_str = format!("The logical sector size of the devices proposed for the cache tier, {}, does not match the effective logical sector size of the data tier, {}", cache_logical_sector_size, current_data_logical_sector_size);
                 return Err(StratisError::Msg(err_str));
             }
 
@@ -813,7 +813,7 @@ impl Pool for StratPool {
 
                 let block_size_summary = unowned_devices.blocksizes();
                 if block_size_summary.len() > 1 {
-                    let err_str = "The devices specified to be added to the cache tier do not have uniform physcal and logical block sizes.".into();
+                    let err_str = "The devices specified to be added to the cache tier do not have uniform physical and logical sector sizes.".into();
                     return Err(StratisError::Msg(err_str));
                 }
 
@@ -828,7 +828,7 @@ impl Pool for StratPool {
                     .next()
                     .expect("unowned devices is not empty");
                 if added_sector_sizes != &current_sector_sizes {
-                    let err_str = format!("The block sizes of the devices proposed for extending the cache tier, {}, do not match the block size of the existing cache devices, {}", added_sector_sizes, current_sector_sizes);
+                    let err_str = format!("The sector sizes of the devices proposed for extending the cache tier, {}, do not match the effective sector sizes of the existing cache devices, {}", added_sector_sizes, current_sector_sizes);
                     return Err(StratisError::Msg(err_str));
                 }
 
@@ -857,7 +857,7 @@ impl Pool for StratPool {
 
                 let block_size_summary = unowned_devices.blocksizes();
                 if block_size_summary.len() > 1 {
-                    let err_str = "The devices specified to be added to the data tier do not have uniform physcal and logical block sizes.".into();
+                    let err_str = "The devices specified to be added to the data tier do not have uniform physcal and logical sector sizes.".into();
                     return Err(StratisError::Msg(err_str));
                 }
 
@@ -872,7 +872,7 @@ impl Pool for StratPool {
                     .next()
                     .expect("unowned devices is not empty");
                 if added_sector_sizes != &current_sector_sizes {
-                    let err_str = format!("The sector sizes of the devices proposed for extending the data tier, {}, do not match the sector sizes of the existing data devices, {}", added_sector_sizes, current_sector_sizes);
+                    let err_str = format!("The sector sizes of the devices proposed for extending the data tier, {}, do not match the effective sector sizes of the existing data devices, {}", added_sector_sizes, current_sector_sizes);
                     return Err(StratisError::Msg(err_str));
                 }
 

@@ -271,7 +271,9 @@ impl StratPool {
             metadata_size,
         };
 
-        // Change the pool to started at this point not that the pool has been set up.
+        // The value of the started field in the pool metadata needs to be
+        // updated unless the value is already present in the metadata and has
+        // value true.
         needs_save |= !metadata.started.unwrap_or(false);
 
         if needs_save {

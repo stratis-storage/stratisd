@@ -271,10 +271,12 @@ impl StratPool {
         let mut needs_save = metadata.thinpool_dev.fs_limit.is_none()
             || metadata.thinpool_dev.feature_args.is_none();
 
-        needs_save |= match thinpool.check(uuid, &mut backstore) {
-            Ok(check) => check.0,
-            Err(e) => return Err((e, backstore.into_bdas())),
-        };
+        if action_avail != ActionAvailability::NoPoolChanges {
+            needs_save |= match thinpool.check(uuid, &mut backstore) {
+                Ok(check) => check.0,
+                Err(e) => return Err((e, backstore.into_bdas())),
+            };
+        }
 
         let metadata_size = backstore.datatier_metadata_size();
         let mut pool = StratPool {

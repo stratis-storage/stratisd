@@ -56,10 +56,12 @@ jobs:
         run: >
           dnf install -y
           clang
+          curl
           cryptsetup-devel
           dbus-devel
           libblkid-devel
           make
+          openssl-devel
           systemd-devel
       - uses: actions-rs/toolchain@v1
         with:
@@ -69,7 +71,9 @@ jobs:
       - name: Run cargo-update
         run: cargo update
       - name: Run cargo-clippy
-        run: make clippy
+        run: make -f Makefile clippy
+      - name: Run cargo-audit
+        run: make -f Makefile audit
 
   allowed_failures:
     continue-on-error: true
@@ -152,12 +156,11 @@ jobs:
     strategy:
       matrix:
         include:
-          - tag: v3.1.0
-          - tag: v3.0.0
-          - tag: v3.0.1
-          - tag: v3.0.2
-          - tag: v3.0.3
-          - tag: v3.0.4
+          - tag: v3.3.0
+          - tag: v3.2.3
+          - tag: v3.2.2
+          - tag: v3.2.1
+          - tag: v3.2.0
     runs-on: ubuntu-20.04
     container:
       image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT

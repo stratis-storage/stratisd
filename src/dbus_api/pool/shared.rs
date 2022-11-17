@@ -251,8 +251,6 @@ where
     R: Display,
 {
     info!("Setting property {}", prop_name);
-    // Using clippy's suggested code causes a compilation error
-    #[allow(clippy::redundant_closure)]
     let res =
         pool_set_operation(p.tree, p.path.get_name(), setter).map_err(|ref e| MethodErr::failed(e));
     handle_action!(res)

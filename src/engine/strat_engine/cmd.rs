@@ -57,6 +57,7 @@ fn find_executable(name: &str) -> Option<PathBuf> {
 const MKFS_XFS: &str = "mkfs.xfs";
 const THIN_CHECK: &str = "thin_check";
 const THIN_REPAIR: &str = "thin_repair";
+#[cfg(test)]
 const UDEVADM: &str = "udevadm";
 const THIN_METADATA_SIZE: &str = "thin_metadata_size";
 const XFS_DB: &str = "xfs_db";
@@ -113,6 +114,7 @@ lazy_static! {
         (MKFS_XFS.to_string(), find_executable(MKFS_XFS)),
         (THIN_CHECK.to_string(), find_executable(THIN_CHECK)),
         (THIN_REPAIR.to_string(), find_executable(THIN_REPAIR)),
+        #[cfg(test)]
         (UDEVADM.to_string(), find_executable(UDEVADM)),
         (XFS_DB.to_string(), find_executable(XFS_DB)),
         (XFS_GROWFS.to_string(), find_executable(XFS_GROWFS)),

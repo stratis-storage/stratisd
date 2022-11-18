@@ -22,7 +22,9 @@ use crate::{
             liminal::{DeviceInfo, DeviceSet, LInfo},
             metadata::MDADataSize,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
+            shared::tiers_to_bdas,
             thinpool::{StratFilesystem, ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
+            types::BDARecordResult,
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
@@ -158,8 +160,13 @@ impl StratPool {
         // FIXME: Initializing with the minimum MDA size is not necessarily
         // enough. If there are enough devices specified, more space will be
         // required.
-        let mut backstore =
-            Backstore::initialize(pool_uuid, devices, MDADataSize::default(), encryption_info)?;
+        let mut backstore = Backstore::initialize(
+            Name::new(name.to_string()),
+            pool_uuid,
+            devices,
+            MDADataSize::default(),
+            encryption_info,
+        )?;
 
         let thinpool = ThinPool::new(
             pool_uuid,
@@ -213,26 +220,34 @@ impl StratPool {
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
         action_avail: ActionAvailability,
-    ) -> StratisResult<(Name, StratPool)> {
-        check_metadata(metadata)?;
+    ) -> BDARecordResult<(Name, StratPool)> {
+        if let Err(e) = check_metadata(metadata) {
+            return Err((e, tiers_to_bdas(datadevs, cachedevs, None)));
+        }
 
         let mut backstore =
             Backstore::setup(uuid, &metadata.backstore, datadevs, cachedevs, timestamp)?;
         let pool_name = &metadata.name;
 
-        let mut thinpool = ThinPool::setup(
+        let mut thinpool = match ThinPool::setup(
             pool_name,
             uuid,
             &metadata.thinpool_dev,
             &metadata.flex_devs,
             &backstore,
-        )?;
+        ) {
+            Ok(tp) => tp,
+            Err(e) => return Err((e, backstore.into_bdas())),
+        };
 
         // TODO: Remove in stratisd 4.0
         let mut needs_save = metadata.thinpool_dev.fs_limit.is_none()
             || metadata.thinpool_dev.feature_args.is_none();
 
-        needs_save |= thinpool.check(uuid, &mut backstore)?.0;
+        needs_save |= match thinpool.check(uuid, &mut backstore) {
+            Ok(check) => check.0,
+            Err(e) => return Err((e, backstore.into_bdas())),
+        };
 
         let metadata_size = backstore.datatier_metadata_size();
         let mut pool = StratPool {
@@ -246,7 +261,9 @@ impl StratPool {
         needs_save |= !metadata.started.unwrap_or(false);
 
         if needs_save {
-            pool.write_metadata(pool_name)?;
+            if let Err(e) = pool.write_metadata(pool_name) {
+                return Err((e, pool.backstore.into_bdas()));
+            }
         }
 
         Ok((Name::new(pool_name.to_owned()), pool))
@@ -270,7 +287,8 @@ impl StratPool {
     #[cfg(test)]
     pub fn teardown(&mut self) -> StratisResult<()> {
         self.thin_pool.teardown()?;
-        self.backstore.teardown()
+        self.backstore.teardown()?;
+        Ok(())
     }
 
     pub fn has_filesystems(&self) -> bool {
@@ -368,12 +386,10 @@ impl StratPool {
         data.started = Some(false);
         let json = serde_json::to_string(&data)?;
         self.backstore.save_state(json.as_bytes())?;
-        self.backstore.teardown()?;
-        Ok(self
-            .backstore
-            .blockdevs()
+        let bds = self.backstore.teardown()?;
+        Ok(bds
             .into_iter()
-            .map(|(uuid, _, bd)| (uuid, LInfo::from(DeviceInfo::from(bd))))
+            .map(|bd| (bd.uuid(), LInfo::from(DeviceInfo::from(bd))))
             .collect::<DeviceSet>())
     }
 
@@ -422,6 +438,11 @@ impl StratPool {
         } else {
             Ok(())
         }
+    }
+
+    /// Rename the pool in the LUKS2 metadata if it is encrypted.
+    pub fn rename_pool(&mut self, new_name: &Name) -> StratisResult<()> {
+        self.backstore.rename_pool(new_name)
     }
 }
 
@@ -528,7 +549,7 @@ impl Pool for StratPool {
             self.thin_pool.suspend()?;
             let devices_result = self
                 .backstore
-                .init_cache(pool_uuid, unowned_devices)
+                .init_cache(Name::new(pool_name.to_string()), pool_uuid, unowned_devices)
                 .and_then(|bdi| {
                     self.thin_pool
                         .set_device(self.backstore.device().expect(
@@ -758,7 +779,11 @@ impl Pool for StratPool {
                 }
 
                 self.thin_pool.suspend()?;
-                let bdev_info_res = self.backstore.add_cachedevs(pool_uuid, unowned_devices);
+                let bdev_info_res = self.backstore.add_cachedevs(
+                    Name::new(pool_name.to_string()),
+                    pool_uuid,
+                    unowned_devices,
+                );
                 self.thin_pool.resume()?;
                 let bdev_info = bdev_info_res?;
                 Ok((SetCreateAction::new(bdev_info), None))
@@ -784,7 +809,11 @@ impl Pool for StratPool {
 
                 // If just adding data devices, no need to suspend the pool.
                 // No action will be taken on the DM devices.
-                let bdev_info = self.backstore.add_datadevs(pool_uuid, unowned_devices)?;
+                let bdev_info = self.backstore.add_datadevs(
+                    Name::new(pool_name.to_string()),
+                    pool_uuid,
+                    unowned_devices,
+                )?;
                 self.thin_pool.set_queue_mode();
 
                 // Adding data devices does not change the state of the thin
@@ -1084,7 +1113,7 @@ mod tests {
             tests::{loopbacked, real},
             thinpool::ThinPoolStatusDigest,
         },
-        types::{EngineAction, LockKey},
+        types::{EngineAction, PoolIdentifier},
         Engine, StratEngine,
     };
 
@@ -1497,7 +1526,7 @@ mod tests {
             .unwrap()
             .changed()
             .unwrap();
-        let mut guard = test_async!(engine.get_mut_pool(LockKey::Uuid(pool_uuid))).unwrap();
+        let mut guard = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(pool_uuid))).unwrap();
         let (_, _, pool) = guard.as_mut_tuple();
 
         let (_, fs_uuid, _) = pool

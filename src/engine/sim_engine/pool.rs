@@ -709,7 +709,7 @@ mod tests {
 
     use crate::engine::{
         sim_engine::SimEngine,
-        types::{EngineAction, LockKey},
+        types::{EngineAction, PoolIdentifier},
         Engine,
     };
 
@@ -728,7 +728,7 @@ mod tests {
         .unwrap()
         .changed()
         .unwrap();
-        let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
         assert_matches!(
             pool.rename_filesystem(pool_name, FilesystemUuid::new_v4(), "new_name"),
             Ok(RenameAction::NoSource)
@@ -748,7 +748,7 @@ mod tests {
         .unwrap()
         .changed()
         .unwrap();
-        let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
         let infos = pool
             .create_filesystems(pool_name, uuid, &[("old_name", None)])
             .unwrap()
@@ -776,7 +776,7 @@ mod tests {
         .unwrap()
         .changed()
         .unwrap();
-        let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
         let results = pool
             .create_filesystems(pool_name, uuid, &[(old_name, None), (new_name, None)])
             .unwrap()
@@ -803,7 +803,7 @@ mod tests {
         .unwrap()
         .changed()
         .unwrap();
-        let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
         assert_matches!(
             pool.rename_filesystem(pool_name, FilesystemUuid::new_v4(), new_name),
             Ok(RenameAction::NoSource)
@@ -823,7 +823,7 @@ mod tests {
         .unwrap()
         .changed()
         .unwrap();
-        let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
         assert!(match pool.destroy_filesystems(pool_name, &[]) {
             Ok(uuids) => !uuids.is_changed(),
             _ => false,
@@ -843,7 +843,7 @@ mod tests {
         .unwrap()
         .changed()
         .unwrap();
-        let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
         assert_matches!(
             pool.destroy_filesystems(pool_name, &[FilesystemUuid::new_v4()]),
             Ok(_)
@@ -863,7 +863,7 @@ mod tests {
         .unwrap()
         .changed()
         .unwrap();
-        let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
         let fs_results = pool
             .create_filesystems(pool_name, uuid, &[("fs_name", None)])
             .unwrap()
@@ -889,7 +889,7 @@ mod tests {
         .unwrap()
         .changed()
         .unwrap();
-        let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
         let fs = pool.create_filesystems(pool_name, uuid, &[]).unwrap();
         assert!(!fs.is_changed())
     }
@@ -907,7 +907,7 @@ mod tests {
         .unwrap()
         .changed()
         .unwrap();
-        let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
         assert!(match pool
             .create_filesystems(pool_name, uuid, &[("name", None)])
             .ok()
@@ -932,7 +932,7 @@ mod tests {
         .unwrap()
         .changed()
         .unwrap();
-        let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
         pool.create_filesystems(pool_name, uuid, &[(fs_name, None)])
             .unwrap();
         let set_create_action = pool
@@ -955,7 +955,7 @@ mod tests {
         .unwrap()
         .changed()
         .unwrap();
-        let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
+        let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
         assert!(match pool
             .create_filesystems(pool_name, uuid, &[(fs_name, None), (fs_name, None)])
             .ok()
@@ -978,7 +978,7 @@ mod tests {
         .unwrap()
         .changed()
         .unwrap();
-        let mut guard = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
+        let mut guard = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
         let (pool_name, _, pool) = guard.as_mut_tuple();
         let devices = [Path::new("/s/a"), Path::new("/s/b")];
         assert!(match pool

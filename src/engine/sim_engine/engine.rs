@@ -23,10 +23,10 @@ use crate::{
             SharedGuard, SomeLockReadGuard, SomeLockWriteGuard, Table,
         },
         types::{
-            CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockKey,
-            LockedPoolInfo, Name, PoolDevice, PoolDiff, PoolUuid, RenameAction, ReportType,
-            SetUnlockAction, StartAction, StopAction, StoppedPoolInfo, StratFilesystemDiff,
-            UdevEngineEvent, UnlockMethod,
+            CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockedPoolsInfo,
+            Name, PoolDevice, PoolDiff, PoolIdentifier, PoolUuid, RenameAction, ReportType,
+            SetUnlockAction, StartAction, StopAction, StoppedPoolInfo, StoppedPoolsInfo,
+            StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -144,7 +144,7 @@ impl Engine for SimEngine {
             }
         }
 
-        let guard = self.pools.read(LockKey::Name(name.clone())).await;
+        let guard = self.pools.read(PoolIdentifier::Name(name.clone())).await;
         match guard.as_ref().map(|g| g.as_tuple()) {
             Some((_, _, pool)) => create_pool_idempotent_or_err(pool, &name, blockdev_paths),
             None => {
@@ -175,7 +175,7 @@ impl Engine for SimEngine {
     }
 
     async fn destroy_pool(&self, uuid: PoolUuid) -> StratisResult<DeleteAction<PoolUuid>> {
-        if let Some(pool) = self.pools.read(LockKey::Uuid(uuid)).await {
+        if let Some(pool) = self.pools.read(PoolIdentifier::Uuid(uuid)).await {
             if pool.has_filesystems() {
                 return Err(StratisError::Msg("filesystems remaining on pool".into()));
             }
@@ -221,41 +221,45 @@ impl Engine for SimEngine {
 
     async fn get_pool(
         &self,
-        key: LockKey<PoolUuid>,
+        key: PoolIdentifier<PoolUuid>,
     ) -> Option<SomeLockReadGuard<PoolUuid, Self::Pool>> {
         get_pool!(self; key)
     }
 
     async fn get_mut_pool(
         &self,
-        key: LockKey<PoolUuid>,
+        key: PoolIdentifier<PoolUuid>,
     ) -> Option<SomeLockWriteGuard<PoolUuid, Self::Pool>> {
         get_mut_pool!(self; key)
     }
 
-    async fn locked_pools(&self) -> HashMap<PoolUuid, LockedPoolInfo> {
-        HashMap::new()
+    async fn locked_pools(&self) -> LockedPoolsInfo {
+        LockedPoolsInfo::default()
     }
 
-    async fn stopped_pools(&self) -> HashMap<PoolUuid, StoppedPoolInfo> {
-        let mut map = HashMap::new();
-        for (_, uuid, pool) in self.stopped_pools.read().await.iter() {
-            map.insert(
-                *uuid,
-                StoppedPoolInfo {
-                    info: pool.encryption_info(),
-                    devices: pool
-                        .blockdevs()
-                        .into_iter()
-                        .map(|(dev_uuid, _, bd)| PoolDevice {
-                            devnode: bd.devnode().to_path_buf(),
-                            uuid: dev_uuid,
-                        })
-                        .collect::<Vec<_>>(),
-                },
-            );
-        }
-        map
+    async fn stopped_pools(&self) -> StoppedPoolsInfo {
+        self.stopped_pools.read().await.iter().fold(
+            StoppedPoolsInfo::default(),
+            |mut st, (name, uuid, pool)| {
+                st.name_to_uuid.insert(name.clone(), *uuid);
+                st.uuid_to_name.insert(*uuid, name.clone());
+                st.stopped.insert(
+                    *uuid,
+                    StoppedPoolInfo {
+                        info: pool.encryption_info(),
+                        devices: pool
+                            .blockdevs()
+                            .into_iter()
+                            .map(|(dev_uuid, _, bd)| PoolDevice {
+                                devnode: bd.devnode().to_path_buf(),
+                                uuid: dev_uuid,
+                            })
+                            .collect::<Vec<_>>(),
+                    },
+                );
+                st
+            },
+        )
     }
 
     async fn pools(&self) -> AllLockReadGuard<PoolUuid, Self::Pool> {
@@ -291,11 +295,11 @@ impl Engine for SimEngine {
 
     async fn start_pool(
         &self,
-        pool_uuid: PoolUuid,
+        id: PoolIdentifier<PoolUuid>,
         unlock_method: Option<UnlockMethod>,
     ) -> StratisResult<StartAction<PoolUuid>> {
-        if let Some(guard) = self.pools.read(LockKey::Uuid(pool_uuid)).await {
-            let (_, _, pool) = guard.as_tuple();
+        if let Some(guard) = self.pools.read(id.clone()).await {
+            let (_, pool_uuid, pool) = guard.as_tuple();
             if pool.is_encrypted() && unlock_method.is_none() {
                 return Err(StratisError::Msg(format!(
                     "Pool with UUID {} is encrypted but no unlock method was provided",
@@ -310,17 +314,32 @@ impl Engine for SimEngine {
                 Ok(StartAction::Identity)
             }
         } else {
-            let (name, pool) = self
-                .stopped_pools
-                .write()
-                .await
-                .remove_by_uuid(pool_uuid)
-                .ok_or_else(|| {
-                    StratisError::Msg(format!(
-                        "Pool with UUID {} was not found and cannot be started",
-                        pool_uuid
-                    ))
-                })?;
+            let (name, pool_uuid, pool) = match id {
+                PoolIdentifier::Name(n) => self
+                    .stopped_pools
+                    .write()
+                    .await
+                    .remove_by_name(&n)
+                    .ok_or_else(|| {
+                        StratisError::Msg(format!(
+                            "Pool with name {} was not found and cannot be started",
+                            n,
+                        ))
+                    })
+                    .map(|(u, p)| (n, u, p))?,
+                PoolIdentifier::Uuid(u) => self
+                    .stopped_pools
+                    .write()
+                    .await
+                    .remove_by_uuid(u)
+                    .ok_or_else(|| {
+                        StratisError::Msg(format!(
+                            "Pool with UUID {} was not found and cannot be started",
+                            u,
+                        ))
+                    })
+                    .map(|(n, p)| (n, u, p))?,
+            };
             self.pools.write_all().await.insert(name, pool_uuid, pool);
             Ok(StartAction::Started(pool_uuid))
         }
@@ -370,9 +389,10 @@ mod tests {
     #[test]
     /// When an engine has no pools, any name lookup should fail
     fn get_pool_err() {
-        assert!(
-            test_async!(SimEngine::default().get_pool(LockKey::Uuid(PoolUuid::new_v4()))).is_none()
-        );
+        assert!(test_async!(
+            SimEngine::default().get_pool(PoolIdentifier::Uuid(PoolUuid::new_v4()))
+        )
+        .is_none());
     }
 
     #[test]
@@ -417,7 +437,7 @@ mod tests {
             .changed()
             .unwrap();
         {
-            let mut pool = test_async!(engine.get_mut_pool(LockKey::Uuid(uuid))).unwrap();
+            let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
             pool.create_filesystems(pool_name, uuid, &[("test", None)])
                 .unwrap();
         }
@@ -461,10 +481,12 @@ mod tests {
             test_async!(engine.create_pool("name", strs_to_paths!([path, path]), None))
                 .unwrap()
                 .changed()
-                .map(|uuid| test_async!(engine.get_pool(LockKey::Uuid(uuid)))
-                    .unwrap()
-                    .blockdevs()
-                    .len()),
+                .map(
+                    |uuid| test_async!(engine.get_pool(PoolIdentifier::Uuid(uuid)))
+                        .unwrap()
+                        .blockdevs()
+                        .len()
+                ),
             Some(1)
         );
     }

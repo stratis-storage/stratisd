@@ -27,8 +27,8 @@ use crate::{
                     metadata_handle::CryptMetadataHandle,
                     shared::{
                         acquire_crypt_device, add_keyring_keyslot, clevis_info_from_metadata,
-                        ensure_wiped, get_keyslot_number, interpret_clevis_config, read_key,
-                        setup_crypt_device, setup_crypt_handle,
+                        ensure_inactive, ensure_wiped, get_keyslot_number, interpret_clevis_config,
+                        read_key, replace_pool_name, setup_crypt_device, setup_crypt_handle,
                     },
                 },
                 devices::get_devno_from_path,
@@ -38,7 +38,7 @@ use crate::{
             keys::MemoryPrivateFilesystem,
             metadata::StratisIdentifiers,
         },
-        types::{DevicePath, EncryptionInfo, KeyDescription, SizedKeyMemory},
+        types::{DevicePath, EncryptionInfo, KeyDescription, Name, SizedKeyMemory},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -64,14 +64,16 @@ impl CryptHandle {
         physical_path: DevicePath,
         identifiers: StratisIdentifiers,
         encryption_info: EncryptionInfo,
-        name: String,
+        activation_name: String,
+        pool_name: Option<Name>,
     ) -> StratisResult<CryptHandle> {
         let device = get_devno_from_path(&physical_path)?;
         CryptHandle::new_with_metadata_handle(CryptMetadataHandle::new(
             physical_path,
             identifiers,
             encryption_info,
-            name,
+            activation_name,
+            pool_name,
             device,
         ))
     }
@@ -81,7 +83,7 @@ impl CryptHandle {
     ) -> StratisResult<CryptHandle> {
         let activated_path = DevicePath::new(
             &once(DEVICEMAPPER_PATH)
-                .chain(once(metadata_handle.name()))
+                .chain(once(metadata_handle.activation_name()))
                 .collect::<PathBuf>(),
         )?;
         Ok(CryptHandle {
@@ -136,8 +138,13 @@ impl CryptHandle {
     }
 
     /// Return the name of the activated devicemapper device.
-    pub fn name(&self) -> &str {
-        self.metadata_handle.name()
+    pub fn activation_name(&self) -> &str {
+        self.metadata_handle.activation_name()
+    }
+
+    /// Return the pool name recorded in the LUKS2 metadata.
+    pub fn pool_name(&self) -> Option<&Name> {
+        self.metadata_handle.pool_name()
     }
 
     /// Device number for the LUKS2 encrypted device.
@@ -358,6 +365,12 @@ impl CryptHandle {
         Ok(())
     }
 
+    /// Rename the pool in the LUKS2 token.
+    pub fn rename_pool_in_metadata(&mut self, pool_name: Name) -> StratisResult<()> {
+        let mut device = self.acquire_crypt_device()?;
+        replace_pool_name(&mut device, pool_name)
+    }
+
     /// Decrypt a Clevis passphrase and return it securely.
     fn clevis_decrypt(device: &mut CryptDevice) -> StratisResult<Option<SizedKeyMemory>> {
         let mut token = match device.token_handle().json_get(CLEVIS_LUKS_TOKEN_ID).ok() {
@@ -379,7 +392,7 @@ impl CryptHandle {
 
     /// Deactivate the device referenced by the current device handle.
     pub fn deactivate(&self) -> StratisResult<()> {
-        super::shared::ensure_inactive(&mut self.acquire_crypt_device()?, self.name())
+        ensure_inactive(&mut self.acquire_crypt_device()?, self.activation_name())
     }
 
     /// Wipe all LUKS2 metadata on the device safely using libcryptsetup.
@@ -387,14 +400,14 @@ impl CryptHandle {
         ensure_wiped(
             &mut self.acquire_crypt_device()?,
             self.luks2_device_path(),
-            self.name(),
+            self.activation_name(),
         )
     }
 
     /// Get the size of the logical device built on the underlying encrypted physical
     /// device. `devicemapper` will return the size in terms of number of sectors.
     pub fn logical_device_size(&self) -> StratisResult<Sectors> {
-        let name = self.name().to_owned();
+        let name = self.activation_name().to_owned();
         let active_device = log_on_failure!(
             self.acquire_crypt_device()?
                 .runtime_handle(&name)
@@ -438,7 +451,7 @@ impl CryptHandle {
         )?;
         crypt
             .context_handle()
-            .resize(self.name(), processed_size)
+            .resize(self.activation_name(), processed_size)
             .map_err(StratisError::Crypt)
     }
 }

@@ -121,16 +121,16 @@ impl StratisParams {
                     false,
                 )))
             }
-            StratisParamType::PoolStart(uuid, unlock_method) => {
+            StratisParamType::PoolStart(id, unlock_method) => {
                 Ok(StratisRet::PoolStart(stratis_result_to_return(
-                    pool::pool_start(engine, uuid, unlock_method, self.fd_opt).await,
+                    pool::pool_start(engine, id, unlock_method, self.fd_opt).await,
                     false,
                 )))
             }
-            StratisParamType::PoolStop(uuid) => {
+            StratisParamType::PoolStop(id) => {
                 expects_fd!(self.fd_opt, false);
                 Ok(StratisRet::PoolStop(stratis_result_to_return(
-                    pool::pool_stop(engine, uuid).await,
+                    pool::pool_stop(engine, id).await,
                     false,
                 )))
             }
@@ -138,38 +138,38 @@ impl StratisParams {
                 expects_fd!(self.fd_opt, false);
                 Ok(StratisRet::PoolList(pool::pool_list(engine).await))
             }
-            StratisParamType::PoolIsEncrypted(uuid) => {
+            StratisParamType::PoolIsEncrypted(id) => {
                 expects_fd!(self.fd_opt, false);
                 Ok(StratisRet::PoolIsEncrypted(stratis_result_to_return(
-                    pool::pool_is_encrypted(engine, uuid).await,
+                    pool::pool_is_encrypted(engine, id).await,
                     false,
                 )))
             }
-            StratisParamType::PoolIsStopped(uuid) => {
+            StratisParamType::PoolIsStopped(id) => {
                 expects_fd!(self.fd_opt, false);
                 Ok(StratisRet::PoolIsStopped(stratis_result_to_return(
-                    pool::pool_is_stopped(engine, uuid).await,
+                    pool::pool_is_stopped(engine, id).await,
                     false,
                 )))
             }
-            StratisParamType::PoolIsBound(uuid) => {
+            StratisParamType::PoolIsBound(id) => {
                 expects_fd!(self.fd_opt, false);
                 Ok(StratisRet::PoolIsBound(stratis_result_to_return(
-                    pool::pool_is_bound(engine, uuid).await,
+                    pool::pool_is_bound(engine, id).await,
                     false,
                 )))
             }
-            StratisParamType::PoolHasPassphrase(uuid) => {
+            StratisParamType::PoolHasPassphrase(id) => {
                 expects_fd!(self.fd_opt, false);
                 Ok(StratisRet::PoolHasPassphrase(stratis_result_to_return(
-                    pool::pool_has_passphrase(engine, uuid).await,
+                    pool::pool_has_passphrase(engine, id).await,
                     false,
                 )))
             }
-            StratisParamType::PoolClevisPin(uuid) => {
+            StratisParamType::PoolClevisPin(id) => {
                 expects_fd!(self.fd_opt, false);
                 Ok(StratisRet::PoolClevisPin(stratis_result_to_return(
-                    pool::pool_clevis_pin(engine, uuid).await,
+                    pool::pool_clevis_pin(engine, id).await,
                     None,
                 )))
             }

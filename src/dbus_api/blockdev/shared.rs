@@ -9,7 +9,8 @@ use futures::executor::block_on;
 use crate::{
     dbus_api::{blockdev::prop_conv, types::TData, util::option_to_tuple},
     engine::{
-        BlockDev, BlockDevTier, DevUuid, Engine, LockKey, Name, Pool, PropChangeAction, ToDisplay,
+        BlockDev, BlockDevTier, DevUuid, Engine, Name, Pool, PoolIdentifier, PropChangeAction,
+        ToDisplay,
     },
 };
 
@@ -50,8 +51,12 @@ where
         Pool
     );
 
-    let pool = block_on(dbus_context.engine.get_pool(LockKey::Uuid(pool_uuid)))
-        .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
+    let pool = block_on(
+        dbus_context
+            .engine
+            .get_pool(PoolIdentifier::Uuid(pool_uuid)),
+    )
+    .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
     let (tier, blockdev) = pool
         .get_blockdev(blockdev_uuid)
         .ok_or_else(|| format!("no blockdev with uuid {}", blockdev_data.uuid))?;
@@ -94,8 +99,12 @@ where
         Pool
     );
 
-    let mut pool = block_on(dbus_context.engine.get_mut_pool(LockKey::Uuid(pool_uuid)))
-        .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
+    let mut pool = block_on(
+        dbus_context
+            .engine
+            .get_mut_pool(PoolIdentifier::Uuid(pool_uuid)),
+    )
+    .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
     let (name, _, pool) = pool.as_mut_tuple();
     closure(&name, pool, blockdev_uuid)
 }

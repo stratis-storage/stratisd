@@ -29,8 +29,8 @@ use crate::{
     dbus_api::{connection::DbusConnectionHandler, tree::DbusTreeHandler, udev::DbusUdevHandler},
     engine::{
         total_allocated, total_used, ActionAvailability, DevUuid, Diff, Engine, ExclusiveGuard,
-        FilesystemUuid, Lockable, LockedPoolInfo, PoolDiff, PoolEncryptionInfo, PoolUuid,
-        SharedGuard, StoppedPoolInfo, StratBlockDevDiff, StratFilesystemDiff, StratPoolDiff,
+        FilesystemUuid, Lockable, LockedPoolsInfo, PoolDiff, PoolEncryptionInfo, PoolUuid,
+        SharedGuard, StoppedPoolsInfo, StratBlockDevDiff, StratFilesystemDiff, StratPoolDiff,
         StratisUuid, ThinPoolDiff,
     },
 };
@@ -113,8 +113,8 @@ pub enum DbusAction<E> {
     PoolSizeChange(Path<'static>, Bytes),
     PoolFsLimitChange(Path<'static>, u64),
     PoolOverprovModeChange(Path<'static>, bool),
-    LockedPoolsChange(HashMap<PoolUuid, LockedPoolInfo>),
-    StoppedPoolsChange(HashMap<PoolUuid, StoppedPoolInfo>),
+    LockedPoolsChange(LockedPoolsInfo),
+    StoppedPoolsChange(StoppedPoolsInfo),
     BlockdevUserInfoChange(Path<'static>, Option<String>),
 
     FsBackgroundChange(
@@ -423,7 +423,7 @@ where
     }
 
     /// Send changed signal for changed locked pool state.
-    pub fn push_locked_pools(&self, locked_pools: HashMap<PoolUuid, LockedPoolInfo>) {
+    pub fn push_locked_pools(&self, locked_pools: LockedPoolsInfo) {
         if let Err(e) = self
             .sender
             .send(DbusAction::LockedPoolsChange(locked_pools))
@@ -436,7 +436,7 @@ where
     }
 
     /// Send changed signal for changed stopped pool state.
-    pub fn push_stopped_pools(&self, stopped_pools: HashMap<PoolUuid, StoppedPoolInfo>) {
+    pub fn push_stopped_pools(&self, stopped_pools: StoppedPoolsInfo) {
         if let Err(e) = self
             .sender
             .send(DbusAction::StoppedPoolsChange(stopped_pools))

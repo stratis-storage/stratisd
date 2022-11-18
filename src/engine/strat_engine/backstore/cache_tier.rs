@@ -16,8 +16,9 @@ use crate::{
                 shared::{coalesce_blkdevsegs, metadata_to_segment},
             },
             serde_structs::{BaseDevSave, BlockDevSave, CacheTierSave, Recordable},
+            types::BDARecordResult,
         },
-        types::{BlockDevTier, DevUuid, PoolUuid},
+        types::{BlockDevTier, DevUuid, Name, PoolUuid},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -49,13 +50,13 @@ impl CacheTier {
     pub fn setup(
         block_mgr: BlockDevMgr,
         cache_tier_save: &CacheTierSave,
-    ) -> StratisResult<CacheTier> {
+    ) -> BDARecordResult<CacheTier> {
         if block_mgr.avail_space() != Sectors(0) {
             let err_msg = format!(
                 "{} unallocated to device; probable metadata corruption",
                 block_mgr.avail_space()
             );
-            return Err(StratisError::Msg(err_msg));
+            return Err((StratisError::Msg(err_msg), block_mgr.into_bdas()));
         }
 
         let uuid_to_devno = block_mgr.uuid_to_devno();
@@ -63,15 +64,23 @@ impl CacheTier {
             metadata_to_segment(&uuid_to_devno, ld)
         };
 
-        let meta_segments = cache_tier_save.blockdev.allocs[1]
+        let meta_segments = match cache_tier_save.blockdev.allocs[1]
             .iter()
             .map(&mapper)
-            .collect::<StratisResult<Vec<_>>>()?;
+            .collect::<StratisResult<Vec<_>>>()
+        {
+            Ok(ms) => ms,
+            Err(e) => return Err((e, block_mgr.into_bdas())),
+        };
 
-        let cache_segments = cache_tier_save.blockdev.allocs[0]
+        let cache_segments = match cache_tier_save.blockdev.allocs[0]
             .iter()
             .map(&mapper)
-            .collect::<StratisResult<Vec<_>>>()?;
+            .collect::<StratisResult<Vec<_>>>()
+        {
+            Ok(cs) => cs,
+            Err(e) => return Err((e, block_mgr.into_bdas())),
+        };
 
         Ok(CacheTier {
             block_mgr,
@@ -96,10 +105,11 @@ impl CacheTier {
     // with the size of cache sub-device.
     pub fn add(
         &mut self,
+        pool_name: Name,
         pool_uuid: PoolUuid,
         devices: UnownedDevices,
     ) -> StratisResult<(Vec<DevUuid>, (bool, bool))> {
-        let uuids = self.block_mgr.add(pool_uuid, devices)?;
+        let uuids = self.block_mgr.add(pool_name, pool_uuid, devices)?;
 
         let avail_space = self.block_mgr.avail_space();
 
@@ -258,12 +268,19 @@ mod tests {
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let pool_uuid = PoolUuid::new_v4();
+        let pool_name = Name::new("pool_name".to_string());
 
         let devices1 = get_devices(paths1).unwrap();
         let devices2 = get_devices(paths2).unwrap();
 
-        let mgr =
-            BlockDevMgr::initialize(pool_uuid, devices1, MDADataSize::default(), None).unwrap();
+        let mgr = BlockDevMgr::initialize(
+            pool_name.clone(),
+            pool_uuid,
+            devices1,
+            MDADataSize::default(),
+            None,
+        )
+        .unwrap();
 
         let mut cache_tier = CacheTier::new(mgr).unwrap();
 
@@ -286,7 +303,7 @@ mod tests {
         assert_eq!(cache_tier.block_mgr.avail_space(), Sectors(0));
         assert_eq!(size - metadata_size, allocated + cache_metadata_size);
 
-        let (_, (cache, meta)) = cache_tier.add(pool_uuid, devices2).unwrap();
+        let (_, (cache, meta)) = cache_tier.add(pool_name, pool_uuid, devices2).unwrap();
         // TODO: Ultimately, it should be the case that meta can be true.
         assert!(cache);
         assert!(!meta);

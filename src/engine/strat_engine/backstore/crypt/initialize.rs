@@ -34,7 +34,7 @@ use crate::{
             metadata::StratisIdentifiers,
             names::format_crypt_name,
         },
-        types::{ClevisInfo, DevUuid, DevicePath, EncryptionInfo, KeyDescription, PoolUuid},
+        types::{ClevisInfo, DevUuid, DevicePath, EncryptionInfo, KeyDescription, Name, PoolUuid},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -62,6 +62,7 @@ impl CryptInitializer {
     /// Initialize a device with the provided key description and Clevis info.
     pub fn initialize(
         self,
+        pool_name: Name,
         key_description: Option<&KeyDescription>,
         clevis_info: Option<&ClevisInfo>,
     ) -> StratisResult<CryptHandle> {
@@ -86,7 +87,7 @@ impl CryptInitializer {
             KeyslotsSize::try_from(convert_int!(*DEFAULT_CRYPT_KEYSLOTS_SIZE, u128, u64)?)?,
         )?;
         self
-            .initialize_with_err(&mut device, key_description, clevis_parsed)
+            .initialize_with_err(&mut device, &pool_name, key_description, clevis_parsed)
             .and_then(|path| clevis_info_from_metadata(&mut device).map(|ci| (path, ci)))
             .and_then(|(_, clevis_info)| {
                 let encryption_info =
@@ -97,6 +98,7 @@ impl CryptInitializer {
                     self.identifiers,
                     encryption_info,
                     self.activation_name.clone(),
+                    Some(pool_name),
                 )
             })
             .map_err(|e| {
@@ -207,6 +209,7 @@ impl CryptInitializer {
     fn initialize_with_err(
         &self,
         device: &mut CryptDevice,
+        pool_name: &Name,
         key_description: Option<&KeyDescription>,
         clevis_info: Option<(&str, &Value, bool)>,
     ) -> StratisResult<()> {
@@ -236,6 +239,7 @@ impl CryptInitializer {
                 &StratisLuks2Token {
                     devname: self.activation_name.clone(),
                     identifiers: self.identifiers,
+                    pool_name: Some(pool_name.clone()),
                 }
                 .into(),
             )),

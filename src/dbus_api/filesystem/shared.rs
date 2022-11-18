@@ -9,7 +9,7 @@ use futures::executor::block_on;
 
 use crate::{
     dbus_api::{filesystem::prop_conv, types::TData},
-    engine::{Engine, Filesystem, LockKey, Name, Pool},
+    engine::{Engine, Filesystem, Name, Pool, PoolIdentifier},
 };
 
 /// Get execute a given closure providing a filesystem object and return
@@ -48,8 +48,12 @@ where
         Pool
     );
 
-    let guard = block_on(dbus_context.engine.get_pool(LockKey::Uuid(pool_uuid)))
-        .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
+    let guard = block_on(
+        dbus_context
+            .engine
+            .get_pool(PoolIdentifier::Uuid(pool_uuid)),
+    )
+    .ok_or_else(|| format!("no pool corresponding to uuid {}", &pool_uuid))?;
     let (pool_name, _, pool) = guard.as_tuple();
     let filesystem_uuid = typed_uuid_string_err!(filesystem_data.uuid; Fs);
     let (fs_name, fs) = pool

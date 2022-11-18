@@ -392,7 +392,7 @@ class OptionalKeyServiceContextManager:
         """
         Initialize a context manager with an optional list of keys
         :param key_spec: Key description and data for kernel keys to be added
-        :type key_spec: list of (str, bytes) or NoneType
+        :type key_spec: list of (str, str) or NoneType
         """
         self._ctxt_manager = ServiceContextManager()
         self._keys = KernelKey([]) if key_spec is None else KernelKey(key_spec)

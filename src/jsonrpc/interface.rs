@@ -8,7 +8,9 @@ use std::{os::unix::io::RawFd, path::PathBuf};
 
 use serde_json::Value;
 
-use crate::engine::{EncryptionInfo, FilesystemUuid, KeyDescription, PoolUuid, UnlockMethod};
+use crate::engine::{
+    EncryptionInfo, FilesystemUuid, KeyDescription, PoolIdentifier, PoolUuid, UnlockMethod,
+};
 
 pub type PoolListType = (
     Vec<String>,
@@ -39,14 +41,14 @@ pub enum StratisParamType {
     PoolInitCache(String, Vec<PathBuf>),
     PoolAddCache(String, Vec<PathBuf>),
     PoolDestroy(String),
-    PoolStart(PoolUuid, Option<UnlockMethod>),
-    PoolStop(PoolUuid),
+    PoolStart(PoolIdentifier<PoolUuid>, Option<UnlockMethod>),
+    PoolStop(PoolIdentifier<PoolUuid>),
     PoolList,
-    PoolIsEncrypted(PoolUuid),
-    PoolIsStopped(PoolUuid),
-    PoolIsBound(PoolUuid),
-    PoolHasPassphrase(PoolUuid),
-    PoolClevisPin(PoolUuid),
+    PoolIsEncrypted(PoolIdentifier<PoolUuid>),
+    PoolIsStopped(PoolIdentifier<PoolUuid>),
+    PoolIsBound(PoolIdentifier<PoolUuid>),
+    PoolHasPassphrase(PoolIdentifier<PoolUuid>),
+    PoolClevisPin(PoolIdentifier<PoolUuid>),
     FsCreate(String, String),
     FsDestroy(String, String),
     FsRename(String, String, String),

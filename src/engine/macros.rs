@@ -38,7 +38,9 @@ macro_rules! rename_pre_sync {
 macro_rules! rename_pre_async {
     ($s:expr; $uuid:expr; $new_name:expr; $not_found:expr; $same:expr) => {{
         let old_name = {
-            let guard = $s.read($crate::engine::types::LockKey::Uuid($uuid)).await;
+            let guard = $s
+                .read($crate::engine::types::PoolIdentifier::Uuid($uuid))
+                .await;
             match guard.as_ref().map(|g| g.as_tuple()) {
                 Some((name, _, _)) => name,
                 None => return $not_found,
@@ -50,7 +52,7 @@ macro_rules! rename_pre_async {
         }
 
         if $s
-            .read($crate::engine::types::LockKey::Name($new_name))
+            .read($crate::engine::types::PoolIdentifier::Name($new_name))
             .await
             .is_some()
         {

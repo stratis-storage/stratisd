@@ -7,45 +7,57 @@
 use std::{
     collections::{hash_map, HashMap, HashSet},
     fmt,
+    hash::{Hash, Hasher},
     path::Path,
 };
 
+use either::Either;
 use serde_json::Value;
 
 use crate::{
     engine::{
-        shared::gather_encryption_info,
+        shared::{gather_encryption_info, gather_pool_name},
         strat_engine::{
-            liminal::identify::{DeviceInfo, LuksInfo, StratisInfo},
-            metadata::StratisIdentifiers,
+            liminal::{
+                identify::{DeviceInfo, LuksInfo, StratisDevInfo, StratisInfo},
+                setup::get_name,
+            },
+            metadata::{StratisIdentifiers, BDA},
         },
         types::{
-            DevUuid, EncryptionInfo, LockedPoolInfo, PoolDevice, PoolEncryptionInfo, PoolUuid,
-            StoppedPoolInfo,
+            DevUuid, EncryptionInfo, LockedPoolInfo, MaybeInconsistent, Name, PoolDevice,
+            PoolEncryptionInfo, PoolUuid, StoppedPoolInfo,
         },
     },
     stratis::StratisResult,
 };
 
 /// Info for a discovered LUKS device belonging to Stratis.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Debug, Eq, Hash, PartialEq)]
 pub struct LLuksInfo {
-    /// Generic information + Stratis identifiers
-    pub ids: StratisInfo,
+    pub dev_info: StratisDevInfo,
+    pub identifiers: StratisIdentifiers,
     pub encryption_info: EncryptionInfo,
+    pub pool_name: Option<Name>,
 }
 
 impl fmt::Display for LLuksInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}, {}", self.ids, self.encryption_info)
+        write!(
+            f,
+            "{}, {}, {}",
+            self.dev_info, self.identifiers, self.encryption_info
+        )
     }
 }
 
 impl From<LuksInfo> for LLuksInfo {
     fn from(info: LuksInfo) -> LLuksInfo {
         LLuksInfo {
-            ids: info.info,
+            dev_info: info.dev_info,
+            identifiers: info.identifiers,
             encryption_info: info.encryption_info,
+            pool_name: info.pool_name,
         }
     }
 }
@@ -54,10 +66,19 @@ impl<'a> Into<Value> for &'a LLuksInfo {
     // Precondition: (&StratisInfo).into() pattern matches Value::Object()
     // Precondition: (&EncryptionInfo).into() pattern matches Value::Object()
     fn into(self) -> Value {
-        let mut json = <&StratisInfo as Into<Value>>::into(&self.ids);
+        let mut json = <&StratisDevInfo as Into<Value>>::into(&self.dev_info);
         let map = json
             .as_object_mut()
             .expect("StratisInfo conversion returns a JSON object");
+        map.extend(
+            if let Value::Object(id_map) =
+                <&StratisIdentifiers as Into<Value>>::into(&self.identifiers)
+            {
+                id_map.into_iter()
+            } else {
+                unreachable!("StratisIdentifiers conversion returns a JSON object");
+            },
+        );
         map.extend(
             if let Value::Object(enc_map) =
                 <&EncryptionInfo as Into<Value>>::into(&self.encryption_info)
@@ -67,19 +88,120 @@ impl<'a> Into<Value> for &'a LLuksInfo {
                 unreachable!("EncryptionInfo conversion returns a JSON object");
             },
         );
+        if let Some(ref n) = self.pool_name {
+            map.insert("pool_name".to_string(), Value::from(n.to_string()));
+        }
         json
     }
 }
 
+/// Convert a reference to a HashMap to an owned HashMap with borrowed values.
+pub fn stratis_infos_ref(
+    infos: &HashMap<DevUuid, LStratisInfo>,
+) -> HashMap<DevUuid, &LStratisInfo> {
+    infos
+        .iter()
+        .map(|(dev_uuid, info)| (*dev_uuid, info))
+        .collect::<HashMap<_, _>>()
+}
+
+/// Split a `Vec<LStratisInfo>` into a `Vec` of BDAs and a `Vec` of the remaining
+/// information contained by `Vec<LStratisInfo>`.
+pub fn split_stratis_infos(
+    infos: HashMap<DevUuid, LStratisInfo>,
+) -> (HashMap<DevUuid, LStratisDevInfo>, HashMap<DevUuid, BDA>) {
+    infos.into_iter().fold(
+        (HashMap::new(), HashMap::new()),
+        |(mut new_infos, mut bdas), (dev_uuid, info)| {
+            new_infos.insert(
+                dev_uuid,
+                LStratisDevInfo {
+                    dev_info: info.dev_info,
+                    luks: info.luks,
+                },
+            );
+            bdas.insert(dev_uuid, info.bda);
+            (new_infos, bdas)
+        },
+    )
+}
+
+/// Merge BDAs with the rest of the device information.
+///
+/// Precondition: infos.keys() == bdas.keys()
+pub fn reconstruct_stratis_infos(
+    mut infos: HashMap<DevUuid, LStratisDevInfo>,
+    mut bdas: HashMap<DevUuid, BDA>,
+) -> DeviceSet {
+    let uuids = infos.keys().copied().collect::<HashSet<_>>();
+    assert_eq!(uuids, bdas.keys().copied().collect::<HashSet<_>>());
+
+    uuids
+        .into_iter()
+        .map(|uuid| {
+            let info = infos.remove(&uuid).expect("infos.keys() == bdas.keys()");
+            let bda = bdas.remove(&uuid).expect("infos.keys() == bdas.keys()");
+            (
+                uuid,
+                LInfo::Stratis(LStratisInfo {
+                    dev_info: info.dev_info,
+                    luks: info.luks,
+                    bda,
+                }),
+            )
+        })
+        .collect::<DeviceSet>()
+}
+
 /// Info for a Stratis device.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct LStratisInfo {
-    /// Generic information + Stratis identifiers
-    pub ids: StratisInfo,
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct LStratisDevInfo {
+    pub dev_info: StratisDevInfo,
     /// Luks information. The information will be set if this is a Stratis
     /// device which is an activated encrypted device, and will be
     /// information about that physical device.
     pub luks: Option<LLuksInfo>,
+}
+
+impl From<LStratisInfo> for (LStratisDevInfo, BDA) {
+    fn from(info: LStratisInfo) -> Self {
+        (
+            LStratisDevInfo {
+                dev_info: info.dev_info,
+                luks: info.luks,
+            },
+            info.bda,
+        )
+    }
+}
+
+/// Info for a Stratis device.
+#[derive(Debug)]
+pub struct LStratisInfo {
+    pub dev_info: StratisDevInfo,
+    pub bda: BDA,
+    /// Luks information. The information will be set if this is a Stratis
+    /// device which is an activated encrypted device, and will be
+    /// information about that physical device.
+    pub luks: Option<LLuksInfo>,
+}
+
+impl PartialEq for LStratisInfo {
+    fn eq(&self, rhs: &Self) -> bool {
+        self.bda.identifiers() == rhs.bda.identifiers() && self.dev_info == rhs.dev_info
+    }
+}
+
+impl Eq for LStratisInfo {}
+
+impl Hash for LStratisInfo {
+    fn hash<H>(&self, hasher: &mut H)
+    where
+        H: Hasher,
+    {
+        self.bda.identifiers().hash(hasher);
+        self.dev_info.hash(hasher);
+    }
 }
 
 impl fmt::Display for LStratisInfo {
@@ -87,11 +209,13 @@ impl fmt::Display for LStratisInfo {
         if let Some(info) = &self.luks {
             write!(
                 f,
-                "logical device with {} and physical device with {}",
-                self.ids, info
+                "logical device with {}, {} and physical device with {}",
+                self.bda.identifiers(),
+                self.dev_info,
+                info
             )
         } else {
-            write!(f, "{}", self.ids)
+            write!(f, "{}, {}", self.bda.identifiers(), self.dev_info)
         }
     }
 }
@@ -99,7 +223,8 @@ impl fmt::Display for LStratisInfo {
 impl From<StratisInfo> for LStratisInfo {
     fn from(info: StratisInfo) -> LStratisInfo {
         LStratisInfo {
-            ids: info,
+            dev_info: info.dev_info,
+            bda: info.bda,
             luks: None,
         }
     }
@@ -116,7 +241,16 @@ impl<'a> Into<Value> for &'a LStratisInfo {
             .unwrap_or_else(|| json!({}));
         if let Value::Object(ref mut map) = json {
             map.extend(
-                if let Value::Object(map) = <&StratisInfo as Into<Value>>::into(&self.ids) {
+                if let Value::Object(map) = <&StratisDevInfo as Into<Value>>::into(&self.dev_info) {
+                    map.into_iter()
+                } else {
+                    unreachable!("StratisInfo conversion returns a JSON object");
+                },
+            );
+            map.extend(
+                if let Value::Object(map) =
+                    <&StratisIdentifiers as Into<Value>>::into(&self.bda.identifiers())
+                {
                     map.into_iter()
                 } else {
                     unreachable!("StratisInfo conversion returns a JSON object");
@@ -135,16 +269,16 @@ impl LStratisInfo {
         assert!(match &self.luks {
             None => true,
             Some(luks) =>
-                luks.ids.identifiers == self.ids.identifiers
-                    && luks.ids.devnode != self.ids.devnode
-                    && luks.ids.device_number != self.ids.device_number,
+                luks.identifiers == self.bda.identifiers()
+                    && luks.dev_info.devnode != self.dev_info.devnode
+                    && luks.dev_info.device_number != self.dev_info.device_number,
         });
     }
 }
 
 /// A unifying Info struct for Stratis or Luks devices. This struct is used
 /// for storing known information in DeviceSet and DeviceBag.
-#[derive(Debug, Eq, Hash, PartialEq, Clone)]
+#[derive(Debug, Eq, Hash, PartialEq)]
 pub enum LInfo {
     /// A Stratis device, which may be an encrypted device
     Stratis(LStratisInfo),
@@ -184,8 +318,8 @@ impl<'a> Into<Value> for &'a LInfo {
 impl LInfo {
     pub fn stratis_identifiers(&self) -> StratisIdentifiers {
         match self {
-            LInfo::Luks(info) => info.ids.identifiers,
-            LInfo::Stratis(info) => info.ids.identifiers,
+            LInfo::Luks(info) => info.identifiers,
+            LInfo::Stratis(info) => info.bda.identifiers(),
         }
     }
 
@@ -220,7 +354,7 @@ impl LInfo {
     ) -> Option<LInfo> {
         match info {
             LInfo::Luks(linfo) => {
-                if linfo.ids.devnode == path {
+                if linfo.dev_info.devnode == path {
                     None
                 } else {
                     warn!("Device with pool UUID {}, device UUID {} appears to have been removed but the path did not match the known Stratis device with these identifiers", pool_uuid, dev_uuid);
@@ -228,10 +362,10 @@ impl LInfo {
                 }
             }
             LInfo::Stratis(sinfo) => {
-                if Some(path) == sinfo.luks.as_ref().map(|i| i.ids.devnode.as_path()) {
+                if Some(path) == sinfo.luks.as_ref().map(|i| i.dev_info.devnode.as_path()) {
                     info!("Encrypted backing device with pool UUID {}, device UUID {} is no longer available; removing activated devicemapper device as well", pool_uuid, dev_uuid);
                     None
-                } else if path == sinfo.ids.devnode {
+                } else if path == sinfo.dev_info.devnode {
                     if let Some(l) = sinfo.luks {
                         info!("Encrypted Stratis device with pool UUID {}, device UUID {} is no longer available; marking encrypted backing device as closed", pool_uuid, dev_uuid);
                         Some(LInfo::Luks(l))
@@ -250,56 +384,79 @@ impl LInfo {
     // Combine two devices which have identical pool and device UUIDs.
     // The first argument is the older information, the second the newer.
     // Allow the newer information to supplant the older.
-    fn update(info_1: &LInfo, info_2: &DeviceInfo) -> Option<LInfo> {
+    fn update(info_1: LInfo, info_2: DeviceInfo) -> Either<LInfo, LInfo> {
         // Returns true if the information found via udev for two devices is
         // compatible, otherwise false.
         // Precondition: Stratis identifiers of devices are the same
         fn luks_luks_compatible(info_1: &LLuksInfo, info_2: &LuksInfo) -> bool {
-            assert_eq!(info_1.ids.identifiers, info_2.info.identifiers);
-            info_1.ids.device_number == info_2.info.device_number
+            assert_eq!(info_1.identifiers, info_2.identifiers);
+            if info_1.dev_info.device_number == info_2.dev_info.device_number
                 && info_1.encryption_info == info_2.encryption_info
+            {
+                true
+            } else {
+                warn!(
+                    "LUKS info conflicts: {}, {} conflicts with {}, {}",
+                    info_1.dev_info.device_number,
+                    info_1.encryption_info,
+                    info_2.dev_info.device_number,
+                    info_2.encryption_info
+                );
+                false
+            }
         }
 
         // Returns true if the information found via udev for two devices is
         // compatible, otherwise false.
         // Precondition: Stratis identifiers of devices are the same
         fn stratis_stratis_compatible(info_1: &LStratisInfo, info_2: &StratisInfo) -> bool {
-            assert_eq!(info_1.ids.identifiers, info_2.identifiers);
-            info_1.ids.device_number == info_2.device_number
+            assert_eq!(info_1.bda.identifiers(), info_2.bda.identifiers());
+            if info_1.dev_info.device_number == info_2.dev_info.device_number {
+                true
+            } else {
+                warn!(
+                    "Stratis info conflicts: {} conflicts with {}",
+                    info_1.dev_info.device_number, info_2.dev_info.device_number
+                );
+                false
+            }
         }
 
         match (info_1, info_2) {
             (LInfo::Luks(luks_info), DeviceInfo::Stratis(strat_info)) => {
-                Some(LInfo::Stratis(LStratisInfo {
-                    ids: strat_info.clone(),
-                    luks: Some(luks_info.clone()),
+                Either::Left(LInfo::Stratis(LStratisInfo {
+                    dev_info: strat_info.dev_info,
+                    bda: strat_info.bda,
+                    luks: Some(luks_info),
                 }))
             }
             (LInfo::Stratis(strat_info), DeviceInfo::Luks(luks_info)) => {
                 if let Some(luks) = strat_info.luks.as_ref() {
-                    if !luks_luks_compatible(luks, luks_info) {
-                        return None;
+                    if !luks_luks_compatible(luks, &luks_info) {
+                        return Either::Right(LInfo::Stratis(strat_info));
                     }
                 }
-                Some(LInfo::Stratis(LStratisInfo {
-                    ids: strat_info.ids.clone(),
-                    luks: Some(LLuksInfo::from(luks_info.clone())),
+                Either::Left(LInfo::Stratis(LStratisInfo {
+                    dev_info: strat_info.dev_info,
+                    bda: strat_info.bda,
+                    luks: Some(LLuksInfo::from(luks_info)),
                 }))
             }
             (LInfo::Luks(luks_info_1), DeviceInfo::Luks(luks_info_2)) => {
-                if !luks_luks_compatible(luks_info_1, luks_info_2) {
-                    None
+                if !luks_luks_compatible(&luks_info_1, &luks_info_2) {
+                    Either::Right(LInfo::Luks(luks_info_1))
                 } else {
-                    Some(LInfo::Luks(LLuksInfo::from(luks_info_2.clone())))
+                    Either::Left(LInfo::Luks(LLuksInfo::from(luks_info_2)))
                 }
             }
             (LInfo::Stratis(strat_info_1), DeviceInfo::Stratis(strat_info_2)) => {
-                if !stratis_stratis_compatible(strat_info_1, strat_info_2) {
-                    None
+                if !stratis_stratis_compatible(&strat_info_1, &strat_info_2) {
+                    Either::Right(LInfo::Stratis(strat_info_1))
                 } else {
-                    Some(LInfo::Stratis(LStratisInfo {
-                        ids: strat_info_2.clone(),
-                        luks: strat_info_1.luks.clone(),
+                    Either::Left(LInfo::Stratis(LStratisInfo {
+                        dev_info: strat_info_2.dev_info,
+                        bda: strat_info_2.bda,
+                        luks: strat_info_1.luks,
                     }))
                 }
             }
@@ -322,7 +479,7 @@ impl<'a> Iterator for Iter<'a> {
 }
 
 /// A set of devices, each distinguished by its unique device UUID.
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct DeviceSet {
     internal: HashMap<DevUuid, LInfo>,
 }
@@ -366,16 +523,34 @@ impl DeviceSet {
 
     /// Return a view of the DeviceSet as a set of wholly opened devices.
     /// Return None if some of the devices are unopened.
-    pub fn as_opened_set(&self) -> Option<HashMap<DevUuid, &LStratisInfo>> {
+    fn as_opened_set(&self) -> Option<HashMap<DevUuid, &LStratisInfo>> {
         if self.some_closed() {
             None
         } else {
             Some(
                 self.internal
                     .iter()
-                    .map(|(pool_uuid, info)| match info {
+                    .map(|(dev_uuid, info)| match info {
                         LInfo::Luks(_) => unreachable!("!self.some_closed() is satisfied"),
-                        LInfo::Stratis(info) => (*pool_uuid, info),
+                        LInfo::Stratis(info) => (*dev_uuid, info),
+                    })
+                    .collect(),
+            )
+        }
+    }
+
+    /// Return a view of the DeviceSet as a set of wholly opened devices.
+    /// Return Either::Right(_) if some of the devices are unopened.
+    pub fn into_opened_set(self) -> Either<HashMap<DevUuid, LStratisInfo>, Self> {
+        if self.some_closed() {
+            Either::Right(self)
+        } else {
+            Either::Left(
+                self.internal
+                    .into_iter()
+                    .map(|(dev_uuid, info)| match info {
+                        LInfo::Luks(_) => unreachable!("!self.some_closed() is satisfied"),
+                        LInfo::Stratis(info) => (dev_uuid, info),
                     })
                     .collect(),
             )
@@ -395,6 +570,22 @@ impl DeviceSet {
             self.internal.len(),
             self.internal.iter().map(|(_, info)| info.encryption_info()),
         )
+    }
+
+    /// Get the name, if available, of the pool formed by the devices
+    /// in this DeviceSet.
+    pub fn pool_name(&self) -> StratisResult<MaybeInconsistent<Option<Name>>> {
+        match self.as_opened_set() {
+            Some(set) => get_name(set).map(MaybeInconsistent::No),
+            None => gather_pool_name(
+                self.internal.len(),
+                self.internal.iter().map(|(_, info)| match info {
+                    LInfo::Stratis(s) => s.luks.as_ref().map(|l| l.pool_name.as_ref()),
+                    LInfo::Luks(l) => Some(l.pool_name.as_ref()),
+                }),
+            )
+            .map(|opt| opt.expect("self.as_opened_set().is_some() if pool is unencrypted")),
+        }
     }
 
     /// The encryption information and devices registered for locked pools to be
@@ -423,9 +614,9 @@ impl DeviceSet {
                 .map(|(uuid, l)| {
                     let devnode = match l {
                         LInfo::Stratis(strat_info) => {
-                            strat_info.luks.as_ref().map(|l| l.ids.devnode.clone())
+                            strat_info.luks.as_ref().map(|l| l.dev_info.devnode.clone())
                         }
-                        LInfo::Luks(luks_info) => Some(luks_info.ids.devnode.clone()),
+                        LInfo::Luks(luks_info) => Some(luks_info.dev_info.devnode.clone()),
                     };
                     devnode.map(|devnode| PoolDevice {
                         devnode,
@@ -470,9 +661,9 @@ impl DeviceSet {
                         LInfo::Stratis(strat_info) => strat_info
                             .luks
                             .as_ref()
-                            .map(|l| l.ids.devnode.clone())
-                            .unwrap_or_else(|| strat_info.ids.devnode.clone()),
-                        LInfo::Luks(luks_info) => luks_info.ids.devnode.clone(),
+                            .map(|l| l.dev_info.devnode.clone())
+                            .unwrap_or_else(|| strat_info.dev_info.devnode.clone()),
+                        LInfo::Luks(luks_info) => luks_info.dev_info.devnode.clone(),
                     };
                     PoolDevice {
                         devnode,
@@ -489,7 +680,7 @@ impl DeviceSet {
     pub fn process_info_remove(&mut self, path: &Path, pool_uuid: PoolUuid, dev_uuid: DevUuid) {
         match self.internal.remove(&dev_uuid) {
             Some(LInfo::Luks(linfo)) => {
-                if path == linfo.ids.devnode {
+                if path == linfo.dev_info.devnode {
                     info!(
                         "Device with pool UUID {}, device UUID {} is no longer available",
                         pool_uuid, dev_uuid
@@ -500,9 +691,9 @@ impl DeviceSet {
                 }
             }
             Some(LInfo::Stratis(sinfo)) => {
-                if Some(path) == sinfo.luks.as_ref().map(|i| i.ids.devnode.as_path()) {
+                if Some(path) == sinfo.luks.as_ref().map(|i| i.dev_info.devnode.as_path()) {
                     info!("Encrypted backing device with pool UUID {}, device UUID {} is no longer available; removing activated devicemapper device as well", pool_uuid, dev_uuid);
-                } else if path == sinfo.ids.devnode {
+                } else if path == sinfo.dev_info.devnode {
                     if let Some(l) = sinfo.luks {
                         info!("Encrypted Stratis device with pool UUID {}, device UUID {} is no longer available; marking encrypted backing device as closed", pool_uuid, dev_uuid);
                         self.internal.insert(dev_uuid, LInfo::Luks(l));
@@ -530,12 +721,12 @@ impl DeviceSet {
                 );
                 self.internal.insert(device_uuid, info.into());
             }
-            Some(removed) => match LInfo::update(&removed, &info) {
-                None => {
-                    warn!("Found a device information {} that conflicts with an existing registered device; ignoring", info);
-                    self.internal.insert(device_uuid, removed);
+            Some(removed) => match LInfo::update(removed, info) {
+                Either::Right(info) => {
+                    warn!("Found a device information that conflicts with an existing registered device; ignoring");
+                    self.internal.insert(device_uuid, info);
                 }
-                Some(info) => {
+                Either::Left(info) => {
                     info!(
                         "Device information {} replaces previous device information for the same device UUID in the set for its pool UUID",
                         info

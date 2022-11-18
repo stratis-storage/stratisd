@@ -12,6 +12,7 @@ pub const TOKEN_KEYSLOTS_KEY: &str = "keyslots";
 pub const STRATIS_TOKEN_DEVNAME_KEY: &str = "activation_name";
 pub const STRATIS_TOKEN_POOL_UUID_KEY: &str = "pool_uuid";
 pub const STRATIS_TOKEN_DEV_UUID_KEY: &str = "device_uuid";
+pub const STRATIS_TOKEN_POOLNAME_KEY: &str = "pool_name";
 
 pub const STRATIS_TOKEN_ID: c_uint = 0;
 pub const LUKS2_TOKEN_ID: c_uint = 1;

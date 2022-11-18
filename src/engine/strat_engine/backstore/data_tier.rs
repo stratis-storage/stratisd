@@ -17,8 +17,9 @@ use crate::{
                 transaction::RequestTransaction,
             },
             serde_structs::{BaseDevSave, BlockDevSave, DataTierSave, Recordable},
+            types::BDARecordResult,
         },
-        types::{BlockDevTier, DevUuid, PoolUuid},
+        types::{BlockDevTier, DevUuid, Name, PoolUuid},
     },
     stratis::StratisResult,
 };
@@ -35,15 +36,22 @@ pub struct DataTier {
 impl DataTier {
     /// Setup a previously existing data layer from the block_mgr and
     /// previously allocated segments.
-    pub fn setup(block_mgr: BlockDevMgr, data_tier_save: &DataTierSave) -> StratisResult<DataTier> {
+    pub fn setup(
+        block_mgr: BlockDevMgr,
+        data_tier_save: &DataTierSave,
+    ) -> BDARecordResult<DataTier> {
         let uuid_to_devno = block_mgr.uuid_to_devno();
         let mapper = |ld: &BaseDevSave| -> StratisResult<BlkDevSegment> {
             metadata_to_segment(&uuid_to_devno, ld)
         };
-        let segments = data_tier_save.blockdev.allocs[0]
+        let segments = match data_tier_save.blockdev.allocs[0]
             .iter()
             .map(&mapper)
-            .collect::<StratisResult<Vec<_>>>()?;
+            .collect::<StratisResult<Vec<_>>>()
+        {
+            Ok(s) => s,
+            Err(e) => return Err((e, block_mgr.into_bdas())),
+        };
 
         Ok(DataTier {
             block_mgr,
@@ -68,10 +76,11 @@ impl DataTier {
     /// WARNING: metadata changing event
     pub fn add(
         &mut self,
+        pool_name: Name,
         pool_uuid: PoolUuid,
         devices: UnownedDevices,
     ) -> StratisResult<Vec<DevUuid>> {
-        self.block_mgr.add(pool_uuid, devices)
+        self.block_mgr.add(pool_name, pool_uuid, devices)
     }
 
     /// Allocate a region for all sector size requests from unallocated segments in
@@ -197,14 +206,21 @@ mod tests {
         assert!(paths.len() > 1);
 
         let pool_uuid = PoolUuid::new_v4();
+        let pool_name = Name::new("pool_name".to_string());
 
         let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
         let devices1 = get_devices(paths1).unwrap();
         let devices2 = get_devices(paths2).unwrap();
 
-        let mgr =
-            BlockDevMgr::initialize(pool_uuid, devices1, MDADataSize::default(), None).unwrap();
+        let mgr = BlockDevMgr::initialize(
+            pool_name.clone(),
+            pool_uuid,
+            devices1,
+            MDADataSize::default(),
+            None,
+        )
+        .unwrap();
 
         let mut data_tier = DataTier::new(mgr);
 
@@ -227,7 +243,7 @@ mod tests {
         assert_eq!(data_tier.size(), size);
         allocated = data_tier.allocated();
 
-        data_tier.add(pool_uuid, devices2).unwrap();
+        data_tier.add(pool_name, pool_uuid, devices2).unwrap();
 
         // A data tier w/ additional blockdevs added
         assert!(data_tier.size() > size);

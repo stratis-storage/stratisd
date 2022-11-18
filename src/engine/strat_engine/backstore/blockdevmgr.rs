@@ -30,11 +30,12 @@ use crate::{
                 range_alloc::PerDevSegments,
                 transaction::RequestTransaction,
             },
-            metadata::MDADataSize,
+            metadata::{MDADataSize, BDA},
             serde_structs::{BaseBlockDevSave, BaseDevSave, Recordable},
+            shared::bds_to_bdas,
         },
         types::{
-            ActionAvailability, DevUuid, EncryptionInfo, KeyDescription, PoolEncryptionInfo,
+            ActionAvailability, DevUuid, EncryptionInfo, KeyDescription, Name, PoolEncryptionInfo,
             PoolUuid,
         },
     },
@@ -141,15 +142,27 @@ impl BlockDevMgr {
 
     /// Initialize a new StratBlockDevMgr with specified pool and devices.
     pub fn initialize(
+        pool_name: Name,
         pool_uuid: PoolUuid,
         devices: UnownedDevices,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<BlockDevMgr> {
         Ok(BlockDevMgr::new(
-            initialize_devices(devices, pool_uuid, mda_data_size, encryption_info)?,
+            initialize_devices(
+                devices,
+                pool_name,
+                pool_uuid,
+                mda_data_size,
+                encryption_info,
+            )?,
             None,
         ))
+    }
+
+    /// Convert the BlockDevMgr into a collection of BDAs.
+    pub fn into_bdas(self) -> HashMap<DevUuid, BDA> {
+        bds_to_bdas(self.block_devs)
     }
 
     /// Get a hashmap that maps UUIDs to Devices.
@@ -179,6 +192,7 @@ impl BlockDevMgr {
     /// added.
     pub fn add(
         &mut self,
+        pool_name: Name,
         pool_uuid: PoolUuid,
         devices: UnownedDevices,
     ) -> StratisResult<Vec<DevUuid>> {
@@ -206,6 +220,7 @@ impl BlockDevMgr {
         // saved.
         let bds = initialize_devices(
             devices,
+            pool_name,
             pool_uuid,
             MDADataSize::default(),
             encryption_info.as_ref(),
@@ -699,19 +714,41 @@ impl BlockDevMgr {
         bd.grow()
     }
 
-    /// Tear down devicemapper devices for the block devices in this BlockDevMgr.
-    pub fn teardown(&mut self) -> StratisResult<()> {
-        let mut errors = Vec::new();
-        for bd in self.block_devs.iter_mut() {
-            if let Err(e) = bd.teardown() {
-                errors.push(e);
-            }
+    /// Rename pool name in LUKS2 token if pool is encrypted.
+    pub fn rename_pool(&mut self, new_name: &Name) -> StratisResult<()> {
+        if self.is_encrypted() {
+            operation_loop(
+                self.blockdevs_mut().into_iter().map(|(_, bd)| bd),
+                |blockdev| blockdev.rename_pool(new_name.clone()),
+            )?;
         }
+        Ok(())
+    }
 
-        if errors.is_empty() {
-            Ok(())
+    /// Tear down devicemapper devices for the block devices in this BlockDevMgr.
+    pub fn teardown(&mut self) -> StratisResult<Vec<StratBlockDev>> {
+        let (oks, errs) = self
+            .block_devs
+            .drain(..)
+            .map(|mut bd| {
+                bd.teardown()?;
+                Ok(bd)
+            })
+            .partition::<Vec<_>, _>(|res| res.is_ok());
+        let (oks, errs) = (
+            oks.into_iter().filter_map(|ok| ok.ok()).collect::<Vec<_>>(),
+            errs.into_iter()
+                .filter_map(|err| match err {
+                    Ok(_) => None,
+                    Err(e) => Some(e),
+                })
+                .collect::<Vec<_>>(),
+        );
+
+        if errs.is_empty() {
+            Ok(oks)
         } else {
-            Err(StratisError::BestEffortError("Failed to remove devicemapper devices for some or all physical devices in the pool".to_string(), errors))
+            Err(StratisError::BestEffortError("Failed to remove devicemapper devices for some or all physical devices in the pool".to_string(), errs))
         }
     }
 }
@@ -814,9 +851,11 @@ mod tests {
     /// in balance.
     fn test_blockdevmgr_used(paths: &[&Path]) {
         let pool_uuid = PoolUuid::new_v4();
+        let pool_name = Name::new("pool_name".to_string());
         let devices = get_devices(paths).unwrap();
         let mut mgr =
-            BlockDevMgr::initialize(pool_uuid, devices, MDADataSize::default(), None).unwrap();
+            BlockDevMgr::initialize(pool_name, pool_uuid, devices, MDADataSize::default(), None)
+                .unwrap();
         assert_eq!(mgr.avail_space() + mgr.metadata_size(), mgr.size());
 
         let allocated = Sectors(2);
@@ -853,14 +892,16 @@ mod tests {
             let devices1 = get_devices(&paths[..2])?;
             let devices2 = get_devices(&paths[2..3])?;
 
+            let pool_name = Name::new("pool_name".to_string());
             let mut bdm = BlockDevMgr::initialize(
+                pool_name.clone(),
                 pool_uuid,
                 devices1,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
             )?;
 
-            if bdm.add(pool_uuid, devices2).is_err() {
+            if bdm.add(pool_name, pool_uuid, devices2).is_err() {
                 Err(Box::new(StratisError::Msg(
                     "Adding a blockdev with the same key to an encrypted pool should succeed"
                         .to_string(),
@@ -899,7 +940,9 @@ mod tests {
             let devices1 = get_devices(&paths[..2])?;
             let devices2 = get_devices(&paths[2..3])?;
 
+            let pool_name = Name::new("pool_name".to_string());
             let mut bdm = BlockDevMgr::initialize(
+                pool_name.clone(),
                 pool_uuid,
                 devices1,
                 MDADataSize::default(),
@@ -908,7 +951,7 @@ mod tests {
 
             crypt::change_key(key_desc)?;
 
-            if bdm.add(pool_uuid, devices2).is_ok() {
+            if bdm.add(pool_name, pool_uuid, devices2).is_ok() {
                 Err(Box::new(StratisError::Msg(
                     "Adding a blockdev with a new key to an encrypted pool should fail".to_string(),
                 )))
@@ -947,8 +990,11 @@ mod tests {
 
         let uuid = PoolUuid::new_v4();
         let uuid2 = PoolUuid::new_v4();
+        let pool_name1 = Name::new("pool_name1".to_string());
+        let pool_name2 = Name::new("pool_name2".to_string());
 
         let bd_mgr = BlockDevMgr::initialize(
+            pool_name1,
             uuid,
             get_devices(paths1).unwrap(),
             MDADataSize::default(),
@@ -976,6 +1022,7 @@ mod tests {
             .is_empty());
 
         BlockDevMgr::initialize(
+            pool_name2,
             uuid,
             get_devices(paths2).unwrap(),
             MDADataSize::default(),
@@ -1014,9 +1061,11 @@ mod tests {
 
     fn test_clevis_initialize(paths: &[&Path]) {
         unshare_namespace().unwrap();
+        let pool_name = Name::new("pool_name".to_string());
         let _memfs = MemoryFilesystem::new().unwrap();
         let pool_uuid = PoolUuid::new_v4();
         let mut mgr = BlockDevMgr::initialize(
+            pool_name,
             pool_uuid,
             get_devices(paths).unwrap(),
             MDADataSize::default(),
@@ -1076,7 +1125,9 @@ mod tests {
             unshare_namespace()?;
             let _memfs = MemoryFilesystem::new().unwrap();
             let pool_uuid = PoolUuid::new_v4();
+            let pool_name = Name::new("pool_name".to_string());
             let mut mgr = BlockDevMgr::initialize(
+                pool_name,
                 pool_uuid,
                 get_devices(paths).unwrap(),
                 MDADataSize::default(),

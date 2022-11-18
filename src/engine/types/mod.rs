@@ -4,10 +4,11 @@
 
 use std::{
     borrow::Borrow,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     ffi::OsStr,
     fmt::{self, Debug, Display},
     hash::Hash,
+    iter::once,
     ops::Deref,
     path::{Path, PathBuf},
 };
@@ -158,7 +159,7 @@ pub enum BlockDevTier {
     Cache = 1,
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct Name(String);
 
 impl Name {
@@ -234,10 +235,24 @@ pub struct LockedPoolInfo {
     pub devices: Vec<PoolDevice>,
 }
 
+#[derive(Default, Debug, Eq, PartialEq)]
+pub struct LockedPoolsInfo {
+    pub locked: HashMap<PoolUuid, LockedPoolInfo>,
+    pub name_to_uuid: HashMap<Name, PoolUuid>,
+    pub uuid_to_name: HashMap<PoolUuid, Name>,
+}
+
 #[derive(Debug, Eq, PartialEq)]
 pub struct StoppedPoolInfo {
     pub info: Option<PoolEncryptionInfo>,
     pub devices: Vec<PoolDevice>,
+}
+
+#[derive(Default, Debug, Eq, PartialEq)]
+pub struct StoppedPoolsInfo {
+    pub stopped: HashMap<PoolUuid, StoppedPoolInfo>,
+    pub name_to_uuid: HashMap<Name, PoolUuid>,
+    pub uuid_to_name: HashMap<PoolUuid, Name>,
 }
 
 /// A sendable event with all of the necessary information for the engine
@@ -394,9 +409,95 @@ pub enum MaybeInconsistent<T> {
     No(T),
 }
 
-/// Represents either a name or a UUID.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum LockKey<U> {
+impl<T> MaybeInconsistent<Option<T>> {
+    pub fn as_ref(&self) -> MaybeInconsistent<Option<&T>> {
+        match self {
+            MaybeInconsistent::Yes => MaybeInconsistent::Yes,
+            MaybeInconsistent::No(opt) => MaybeInconsistent::No(opt.as_ref()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub enum PoolIdentifier<U> {
     Name(Name),
     Uuid(U),
+}
+
+impl<U> Display for PoolIdentifier<U>
+where
+    U: Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PoolIdentifier::Name(n) => write!(f, "name {}", n),
+            PoolIdentifier::Uuid(u) => write!(f, "UUID {}", u),
+        }
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub enum UuidOrConflict {
+    Uuid(PoolUuid),
+    Conflict(HashSet<PoolUuid>),
+}
+
+impl UuidOrConflict {
+    fn invariant(&self) -> bool {
+        if let UuidOrConflict::Conflict(set) = self {
+            set.len() > 1
+        } else {
+            true
+        }
+    }
+
+    /// Returns Ok(_) if no conflict was found and Err(_) otherwise.
+    pub fn to_result(&self) -> StratisResult<PoolUuid> {
+        assert!(self.invariant());
+        match self {
+            UuidOrConflict::Uuid(u) => Ok(*u),
+            UuidOrConflict::Conflict(set) => Err(StratisError::Msg(format!(
+                "Found conflicting UUIDs for the same pool name: {}; please use UUID for operation",
+                set.iter()
+                    .map(|u| u.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ))),
+        }
+    }
+
+    /// Add a UUID to the set of conflicts.
+    pub fn add(&mut self, uuid: PoolUuid) {
+        assert!(self.invariant());
+        match self {
+            UuidOrConflict::Uuid(u) => {
+                if *u != uuid {
+                    *self = UuidOrConflict::Conflict(
+                        once(*u).chain(once(uuid)).collect::<HashSet<_>>(),
+                    );
+                }
+            }
+            UuidOrConflict::Conflict(set) => {
+                set.insert(uuid);
+            }
+        }
+    }
+
+    /// Remove a UUID from the set of conflicts. If remove() returns true, the
+    /// entire entry should be removed from the HashMap containing names and
+    /// potential UUID conflicts.
+    pub fn remove(&mut self, uuid: &PoolUuid) -> bool {
+        assert!(self.invariant());
+        match self {
+            UuidOrConflict::Uuid(u) => u == uuid,
+            UuidOrConflict::Conflict(set) => {
+                set.remove(uuid);
+                if set.len() == 1 {
+                    let last_elem = set.drain().next().expect("Some(_) checked above");
+                    *self = UuidOrConflict::Uuid(last_elem);
+                }
+                false
+            }
+        }
+    }
 }

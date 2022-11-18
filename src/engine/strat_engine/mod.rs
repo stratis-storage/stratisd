@@ -15,7 +15,9 @@ mod names;
 mod ns;
 mod pool;
 mod serde_structs;
+mod shared;
 mod thinpool;
+mod types;
 mod udev;
 mod writing;
 

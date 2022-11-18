@@ -36,7 +36,7 @@ use crate::{
                 STRATIS_FS_TYPE,
             },
         },
-        types::{ClevisInfo, DevUuid, DevicePath, EncryptionInfo, PoolUuid},
+        types::{ClevisInfo, DevUuid, DevicePath, EncryptionInfo, Name, PoolUuid},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -458,6 +458,7 @@ impl UnownedDevices {
 /// information about the device.
 pub fn initialize_devices(
     devices: UnownedDevices,
+    pool_name: Name,
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
     encryption_info: Option<&EncryptionInfo>,
@@ -471,13 +472,14 @@ pub fn initialize_devices(
     /// process and clean up the device that it has just initialized.
     fn initialize_encrypted(
         physical_path: &Path,
+        pool_name: Name,
         pool_uuid: PoolUuid,
         dev_uuid: DevUuid,
         key_description: Option<&KeyDescription>,
         enable_clevis: Option<&ClevisInfo>,
     ) -> StratisResult<(CryptHandle, Device, Sectors)> {
         let handle = CryptInitializer::new(DevicePath::new(physical_path)?, pool_uuid, dev_uuid)
-            .initialize(key_description, enable_clevis)?;
+            .initialize(pool_name, key_description, enable_clevis)?;
 
         let device_size = match handle.logical_device_size() {
             Ok(size) => size,
@@ -534,7 +536,7 @@ pub fn initialize_devices(
 
         bda.initialize(&mut f)?;
 
-        StratBlockDev::new(devno, bda, &[], None, hw_id, underlying_device)
+        StratBlockDev::new(devno, bda, &[], None, hw_id, underlying_device).map_err(|(e, _)| e)
     }
 
     /// Clean up an encrypted device after initialization failure.
@@ -595,6 +597,7 @@ pub fn initialize_devices(
     // fails before that.
     fn initialize_one(
         dev_info: &DeviceInfo,
+        pool_name: Name,
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
@@ -603,6 +606,7 @@ pub fn initialize_devices(
         let (handle, devno, blockdev_size) = if let Some(ei) = encryption_info {
             initialize_encrypted(
                 &dev_info.devnode,
+                pool_name,
                 pool_uuid,
                 dev_uuid,
                 ei.key_description(),
@@ -668,13 +672,20 @@ pub fn initialize_devices(
     /// Initialize all provided devices with Stratis metadata.
     fn initialize_all(
         devices: UnownedDevices,
+        pool_name: Name,
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<Vec<StratBlockDev>> {
         let mut initialized_blockdevs: Vec<StratBlockDev> = Vec::new();
         for dev_info in devices.inner {
-            match initialize_one(&dev_info, pool_uuid, mda_data_size, encryption_info) {
+            match initialize_one(
+                &dev_info,
+                pool_name.clone(),
+                pool_uuid,
+                mda_data_size,
+                encryption_info,
+            ) {
                 Ok(blockdev) => initialized_blockdevs.push(blockdev),
                 Err(err) => {
                     if let Err(err) = wipe_blockdevs(&mut initialized_blockdevs) {
@@ -703,7 +714,13 @@ pub fn initialize_devices(
         guard.extend(device_paths.iter().cloned());
     }
 
-    let res = initialize_all(devices, pool_uuid, mda_data_size, encryption_info);
+    let res = initialize_all(
+        devices,
+        pool_name,
+        pool_uuid,
+        mda_data_size,
+        encryption_info,
+    );
 
     {
         let mut guard = (*BLOCKDEVS_IN_PROGRESS).lock().expect("Should not panic");
@@ -763,6 +780,7 @@ mod tests {
         key_description: Option<&KeyDescription>,
     ) -> Result<(), Box<dyn Error>> {
         let pool_uuid = PoolUuid::new_v4();
+        let pool_name = Name::new("pool_name".to_string());
         let dev_infos: Vec<_> = ProcessedPathInfos::try_from(paths)?.unclaimed_devices;
 
         if dev_infos.len() != paths.len() {
@@ -773,6 +791,7 @@ mod tests {
 
         let mut blockdevs = initialize_devices(
             UnownedDevices { inner: dev_infos },
+            pool_name,
             pool_uuid,
             MDADataSize::default(),
             key_description
@@ -1004,6 +1023,7 @@ mod tests {
 
         let mut dev_infos = ProcessedPathInfos::try_from(paths)?.unclaimed_devices;
         let pool_uuid = PoolUuid::new_v4();
+        let pool_name = Name::new("pool_name".to_string());
 
         if dev_infos.len() != paths.len() {
             return Err(Box::new(StratisError::Msg(
@@ -1027,6 +1047,7 @@ mod tests {
 
         if initialize_devices(
             UnownedDevices { inner: dev_infos },
+            pool_name,
             pool_uuid,
             MDADataSize::default(),
             key_desc

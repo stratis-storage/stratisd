@@ -8,7 +8,7 @@ use chrono::SecondsFormat;
 use tokio::task::block_in_place;
 
 use crate::{
-    engine::{Engine, EngineAction, Filesystem, LockKey, Name, Pool},
+    engine::{Engine, EngineAction, Filesystem, Name, Pool, PoolIdentifier},
     jsonrpc::interface::FsListType,
     stratis::{StratisError, StratisResult},
 };
@@ -23,7 +23,7 @@ where
     E: Engine,
 {
     let mut guard = engine
-        .get_mut_pool(LockKey::Name(Name::new(pool_name.to_owned())))
+        .get_mut_pool(PoolIdentifier::Name(Name::new(pool_name.to_owned())))
         .await
         .ok_or_else(|| StratisError::Msg(format!("No pool named {} found", pool_name)))?;
     let (_, pool_uuid, pool) = guard.as_mut_tuple();
@@ -74,7 +74,7 @@ where
     E: Engine,
 {
     let mut pool = engine
-        .get_mut_pool(LockKey::Name(Name::new(pool_name.to_owned())))
+        .get_mut_pool(PoolIdentifier::Name(Name::new(pool_name.to_owned())))
         .await
         .ok_or_else(|| StratisError::Msg(format!("No pool named {} found", pool_name)))?;
     let (uuid, _) = pool
@@ -94,7 +94,7 @@ where
     E: Engine,
 {
     let mut pool = engine
-        .get_mut_pool(LockKey::Name(Name::new(pool_name.to_owned())))
+        .get_mut_pool(PoolIdentifier::Name(Name::new(pool_name.to_owned())))
         .await
         .ok_or_else(|| StratisError::Msg(format!("No pool named {} found", pool_name)))?;
     let (uuid, _) = pool

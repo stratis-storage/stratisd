@@ -21,7 +21,7 @@ use crate::{
     },
     engine::{
         CreateAction, DeleteAction, EncryptionInfo, Engine, EngineAction, KeyActions,
-        KeyDescription, LockKey, MappingCreateAction, MappingDeleteAction, Pool, PoolUuid,
+        KeyDescription, MappingCreateAction, MappingDeleteAction, Pool, PoolIdentifier, PoolUuid,
         UnlockMethod,
     },
     stratis::StratisError,
@@ -311,7 +311,8 @@ where
     match create_result {
         Ok(pool_uuid_action) => match pool_uuid_action {
             CreateAction::Created(uuid) => {
-                let guard = match block_on(dbus_context.engine.get_pool(LockKey::Uuid(uuid))) {
+                let guard = match block_on(dbus_context.engine.get_pool(PoolIdentifier::Uuid(uuid)))
+                {
                     Some(g) => g,
                     None => {
                         let (rc, rs) = engine_to_dbus_err_tuple(&StratisError::Msg(

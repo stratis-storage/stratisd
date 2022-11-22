@@ -43,9 +43,7 @@ pub fn blkdev_logical_sector_size(file: &File) -> StratisResult<Bytes> {
             e
         ))
     })?;
-    // Allowed because the size should be less than u16::MAX
-    #[allow(clippy::cast_possible_truncation)]
-    Ok(Bytes::from(val as u16))
+    Ok(Bytes::from(convert_int!(val, c_int, u16)?))
 }
 
 pub fn blkdev_physical_sector_size(file: &File) -> StratisResult<Bytes> {
@@ -56,7 +54,5 @@ pub fn blkdev_physical_sector_size(file: &File) -> StratisResult<Bytes> {
             e
         ))
     })?;
-    // Allowed because the size should be less than u16::MAX
-    #[allow(clippy::cast_possible_truncation)]
-    Ok(Bytes::from(val as u16))
+    Ok(Bytes::from(convert_int!(val, c_int, u16)?))
 }

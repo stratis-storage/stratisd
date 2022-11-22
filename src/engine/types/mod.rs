@@ -277,8 +277,8 @@ impl UdevEngineEvent {
     }
 }
 
-impl<'a> From<&'a libudev::Event<'a>> for UdevEngineEvent {
-    fn from(e: &'a libudev::Event<'a>) -> UdevEngineEvent {
+impl<'a> From<&'a libudev::Event> for UdevEngineEvent {
+    fn from(e: &'a libudev::Event) -> UdevEngineEvent {
         UdevEngineEvent {
             event_type: e.event_type(),
             device: UdevEngineDevice::from(e.device()),
@@ -344,8 +344,8 @@ impl UdevEngineDevice {
     }
 }
 
-impl<'a> From<&'a libudev::Device<'a>> for UdevEngineDevice {
-    fn from(d: &'a libudev::Device<'a>) -> UdevEngineDevice {
+impl<'a> From<&'a libudev::Device> for UdevEngineDevice {
+    fn from(d: &'a libudev::Device) -> UdevEngineDevice {
         UdevEngineDevice {
             is_initialized: d.is_initialized(),
             devnode: d.devnode().map(|p| p.to_owned()),

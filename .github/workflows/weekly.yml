@@ -84,10 +84,9 @@ jobs:
           make
           openssl-devel
           systemd-devel
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
           toolchain: 1.65.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-          override: true
       - name: Run audit task on ${{ matrix.tag }}
         run: make -f Makefile audit

@@ -73,11 +73,10 @@ jobs:
           libblkid-devel
           make
           systemd-devel
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
-          override: true
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
@@ -109,11 +108,10 @@ jobs:
           systemd-devel
           systemd-udev
           xfsprogs
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
-          override: true
       - name: Install all necessary Stratis files
         run: make -f Makefile build-and-install
       - name: Start udev

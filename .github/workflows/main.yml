@@ -46,11 +46,10 @@ jobs:
           libblkid-devel
           make
           systemd-devel
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
-          override: true
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
@@ -98,11 +97,10 @@ jobs:
           xfsprogs
       - name: Start udev
         run: /usr/lib/systemd/systemd-udevd &
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
-          override: true
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
@@ -132,11 +130,10 @@ jobs:
           python3-psutil
           python3-wcwidth
           systemd-devel
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
           toolchain: 1.62.1  # LOWEST SUPPORTED RUST TOOLCHAIN
-          override: true
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-and-install
       - name: Check out stratis-cli
@@ -199,11 +196,10 @@ jobs:
           python-requests
           python-semantic_version
           systemd-devel
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
           toolchain: 1.65.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-          override: true
       - name: Check out ci repo
         run: git clone https://github.com/stratis-storage/ci.git
       - name: Run ${{ matrix.task }}
@@ -216,11 +212,10 @@ jobs:
       image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
           toolchain: nightly  # cargo expand can only be run on nightly
-          override: true
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -257,11 +252,10 @@ jobs:
           systemd-devel
           systemd-udev
           xfsprogs
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
           toolchain: 1.65.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-          override: true
       - name: Install all necessary Stratis files
         run: PROFILEDIR=debug make -f Makefile build-and-install
       - name: Check basic behavior of test_predict

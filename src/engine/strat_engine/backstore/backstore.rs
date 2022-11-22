@@ -736,6 +736,12 @@ impl Backstore {
             warn!("Disabling pool changes for this pool: {}", err);
             ActionAvailability::NoPoolChanges
         } else if let Some(Err(err)) = cache_tier_bs_summary.map(|ct| ct.validate()) {
+            // NOTE: This condition should be impossible. Since the cache is
+            // always expanded to include all its devices, and an attempt to add
+            // more devices than the cache can use causes the devices to be
+            // rejected, there should be no unused devices in a cache. If, for
+            // some reason this condition fails, though, NoPoolChanges would
+            // be the correct state to put the pool in.
             warn!("Disabling pool changes for this pool: {}", err);
             ActionAvailability::NoPoolChanges
         } else {

@@ -38,11 +38,10 @@ jobs:
           python-requests
           python-semantic_version
           systemd-devel
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
-          override: true
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
@@ -63,11 +62,10 @@ jobs:
           make
           openssl-devel
           systemd-devel
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
           toolchain: 1.65.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-          override: true
       - name: Run cargo-update
         run: cargo update
       - name: Run cargo-clippy
@@ -106,11 +104,10 @@ jobs:
           python-requests
           python-semantic_version
           systemd-devel
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
-          override: true
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
@@ -134,11 +131,10 @@ jobs:
           python-requests
           python-semantic_version
           systemd-devel
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
           toolchain: 1.65.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-          override: true
       - name: Check out ci repo
         run: git clone https://github.com/stratis-storage/ci.git
       - name: Run comparisons of version specs with available Fedora packages
@@ -178,11 +174,10 @@ jobs:
           make
           openssl-devel
           systemd-devel
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
           toolchain: 1.65.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-          override: true
       - name: Run audit task on ${{ matrix.tag }}
         run: make -f Makefile audit
 
@@ -222,11 +217,10 @@ jobs:
           python3-psutil
           python3-wcwidth
           systemd-devel
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
           toolchain: 1.65.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-          override: true
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-and-install
       - name: Check out stratis-cli
@@ -288,11 +282,10 @@ jobs:
           systemd-devel
           systemd-udev
           xfsprogs
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
           toolchain: ${{ matrix.toolchain }}
-          override: true
       - name: Install all necessary Stratis files
         run: PROFILEDIR=debug make -f Makefile build-and-install
       - name: Start udev

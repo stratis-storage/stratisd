@@ -72,11 +72,10 @@ jobs:
           libudev-dev
           make
           thin-provisioning-tools
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
-          override: true
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
@@ -113,11 +112,10 @@ jobs:
           thin-provisioning-tools
           udev
           xfsprogs
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@master
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
-          override: true
       - name: Install all necessary Stratis files
         run: make -f Makefile build-and-install
       - name: Start udev

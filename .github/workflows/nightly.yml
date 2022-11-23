@@ -64,7 +64,7 @@ jobs:
           systemd-devel
       - uses: dtolnay/rust-toolchain@master
         with:
-          components: cargo
+          components: cargo, clippy
           toolchain: 1.65.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - name: Run cargo-update
         run: cargo update

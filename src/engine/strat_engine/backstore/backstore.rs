@@ -15,11 +15,8 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::{
-                blockdev::StratBlockDev,
-                blockdevmgr::{map_to_dm, BlockDevMgr},
-                cache_tier::CacheTier,
-                data_tier::DataTier,
-                devices::UnownedDevices,
+                blockdev::StratBlockDev, blockdevmgr::BlockDevMgr, cache_tier::CacheTier,
+                data_tier::DataTier, devices::UnownedDevices, shared::BlockSizeSummary,
                 transaction::RequestTransaction,
             },
             dm::get_dm,
@@ -31,8 +28,8 @@ use crate::{
             writing::wipe_sectors,
         },
         types::{
-            BlockDevTier, DevUuid, EncryptionInfo, KeyDescription, Name, PoolEncryptionInfo,
-            PoolUuid,
+            ActionAvailability, BlockDevTier, DevUuid, EncryptionInfo, KeyDescription, Name,
+            PoolEncryptionInfo, PoolUuid,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -55,7 +52,7 @@ fn make_cache(
         get_dm(),
         &dm_name,
         Some(&dm_uuid),
-        map_to_dm(&cache_tier.meta_segments),
+        cache_tier.meta_segments.map_to_dm(),
     )?;
 
     if new {
@@ -72,7 +69,7 @@ fn make_cache(
         get_dm(),
         &dm_name,
         Some(&dm_uuid),
-        map_to_dm(&cache_tier.cache_segments),
+        cache_tier.cache_segments.map_to_dm(),
     )?;
 
     let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::Cache);
@@ -142,7 +139,7 @@ impl Backstore {
             get_dm(),
             &dm_name,
             Some(&dm_uuid),
-            map_to_dm(&data_tier.segments),
+            data_tier.segments.map_to_dm(),
         ) {
             Ok(origin) => origin,
             Err(e) => {
@@ -327,7 +324,7 @@ impl Backstore {
                     cache_tier.add(pool_name, pool_uuid, devices)?;
 
                 if cache_change {
-                    let table = map_to_dm(&cache_tier.cache_segments);
+                    let table = cache_tier.cache_segments.map_to_dm();
                     cache_device.set_cache_table(get_dm(), table)?;
                     cache_device.resume(get_dm())?;
                 }
@@ -336,7 +333,7 @@ impl Backstore {
                 // meta segments. That means that this code is dead. But,
                 // when CacheTier::add() is fixed, this code will become live.
                 if meta_change {
-                    let table = map_to_dm(&cache_tier.meta_segments);
+                    let table = cache_tier.meta_segments.map_to_dm();
                     cache_device.set_meta_table(get_dm(), table)?;
                     cache_device.resume(get_dm())?;
                 }
@@ -365,13 +362,13 @@ impl Backstore {
         let create = match (self.cache.as_mut(), self.linear.as_mut()) {
             (None, None) => true,
             (Some(cache), None) => {
-                let table = map_to_dm(&self.data_tier.segments);
+                let table = self.data_tier.segments.map_to_dm();
                 cache.set_origin_table(get_dm(), table)?;
                 cache.resume(get_dm())?;
                 false
             }
             (None, Some(linear)) => {
-                let table = map_to_dm(&self.data_tier.segments);
+                let table = self.data_tier.segments.map_to_dm();
                 linear.set_table(get_dm(), table)?;
                 linear.resume(get_dm())?;
                 false
@@ -380,7 +377,7 @@ impl Backstore {
         };
 
         if create {
-            let table = map_to_dm(&self.data_tier.segments);
+            let table = self.data_tier.segments.map_to_dm();
             let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
             let origin = LinearDev::setup(get_dm(), &dm_name, Some(&dm_uuid), table)?;
             self.linear = Some(origin);
@@ -716,6 +713,41 @@ impl Backstore {
     pub fn rename_pool(&mut self, new_name: &Name) -> StratisResult<()> {
         self.data_tier.block_mgr.rename_pool(new_name)
     }
+
+    /// A summary of block sizes
+    pub fn block_size_summary(&self, tier: BlockDevTier) -> Option<BlockSizeSummary> {
+        match tier {
+            BlockDevTier::Data => Some(self.data_tier.partition_by_use().into()),
+            BlockDevTier::Cache => self
+                .cache_tier
+                .as_ref()
+                .map(|ct| ct.partition_cache_by_use().into()),
+        }
+    }
+
+    /// What the pool's action availability should be
+    pub fn action_availability(&self) -> ActionAvailability {
+        let data_tier_bs_summary = self
+            .block_size_summary(BlockDevTier::Data)
+            .expect("always exists");
+        let cache_tier_bs_summary: Option<BlockSizeSummary> =
+            self.block_size_summary(BlockDevTier::Cache);
+        if let Err(err) = data_tier_bs_summary.validate() {
+            warn!("Disabling pool changes for this pool: {}", err);
+            ActionAvailability::NoPoolChanges
+        } else if let Some(Err(err)) = cache_tier_bs_summary.map(|ct| ct.validate()) {
+            // NOTE: This condition should be impossible. Since the cache is
+            // always expanded to include all its devices, and an attempt to add
+            // more devices than the cache can use causes the devices to be
+            // rejected, there should be no unused devices in a cache. If, for
+            // some reason this condition fails, though, NoPoolChanges would
+            // be the correct state to put the pool in.
+            warn!("Disabling pool changes for this pool: {}", err);
+            ActionAvailability::NoPoolChanges
+        } else {
+            ActionAvailability::Full
+        }
+    }
 }
 
 impl<'a> Into<Value> for &'a Backstore {
@@ -787,7 +819,13 @@ mod tests {
                 _ => panic!("impossible; see first assertion"),
             }
         );
-        assert!(backstore.next <= backstore.size())
+        assert!(backstore.next <= backstore.size());
+
+        backstore.data_tier.invariant();
+
+        if let Some(cache_tier) = &backstore.cache_tier {
+            cache_tier.invariant()
+        }
     }
 
     fn get_devices(paths: &[&Path]) -> StratisResult<UnownedDevices> {

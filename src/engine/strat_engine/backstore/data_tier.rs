@@ -4,6 +4,9 @@
 
 // Code to handle the backing store of a pool.
 
+#[cfg(test)]
+use std::collections::HashSet;
+
 use devicemapper::Sectors;
 
 use crate::{
@@ -11,9 +14,9 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
-                blockdevmgr::{BlkDevSegment, BlockDevMgr},
+                blockdevmgr::BlockDevMgr,
                 devices::UnownedDevices,
-                shared::{coalesce_blkdevsegs, metadata_to_segment},
+                shared::{metadata_to_segment, AllocatedAbove, BlkDevSegment, BlockDevPartition},
                 transaction::RequestTransaction,
             },
             serde_structs::{BaseDevSave, BlockDevSave, DataTierSave, Recordable},
@@ -28,9 +31,9 @@ use crate::{
 #[derive(Debug)]
 pub struct DataTier {
     /// Manages the individual block devices
-    pub block_mgr: BlockDevMgr,
+    pub(super) block_mgr: BlockDevMgr,
     /// The list of segments granted by block_mgr and used by dm_device
-    pub segments: Vec<BlkDevSegment>,
+    pub(super) segments: AllocatedAbove,
 }
 
 impl DataTier {
@@ -49,7 +52,7 @@ impl DataTier {
             .map(&mapper)
             .collect::<StratisResult<Vec<_>>>()
         {
-            Ok(s) => s,
+            Ok(s) => AllocatedAbove { inner: s },
             Err(e) => return Err((e, block_mgr.into_bdas())),
         };
 
@@ -67,7 +70,7 @@ impl DataTier {
     pub fn new(block_mgr: BlockDevMgr) -> DataTier {
         DataTier {
             block_mgr,
-            segments: vec![],
+            segments: AllocatedAbove { inner: vec![] },
         }
     }
 
@@ -95,7 +98,7 @@ impl DataTier {
     pub fn alloc_commit(&mut self, transaction: RequestTransaction) -> StratisResult<()> {
         let segments = transaction.get_blockdevmgr();
         self.block_mgr.commit_space(transaction)?;
-        self.segments = coalesce_blkdevsegs(&self.segments, &segments);
+        self.segments.coalesce_blkdevsegs(&segments);
 
         Ok(())
     }
@@ -103,10 +106,7 @@ impl DataTier {
     /// The sum of the lengths of all the sectors that have been mapped to an
     /// upper device.
     pub fn allocated(&self) -> Sectors {
-        self.segments
-            .iter()
-            .map(|x| x.segment.length)
-            .sum::<Sectors>()
+        self.segments.size()
     }
 
     /// The total size of all the blockdevs combined
@@ -163,6 +163,27 @@ impl DataTier {
 
     pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {
         self.block_mgr.grow(dev)
+    }
+
+    /// Return the partition of the block devs that are in use and those
+    /// that are not.
+    pub fn partition_by_use(&self) -> BlockDevPartition<'_> {
+        let blockdevs = self.block_mgr.blockdevs();
+        let (used, unused) = blockdevs.iter().partition(|(_, bd)| bd.in_use());
+        BlockDevPartition { used, unused }
+    }
+
+    #[cfg(test)]
+    pub fn invariant(&self) {
+        let allocated_uuids = self.segments.uuids();
+        let in_use_uuids = self
+            .block_mgr
+            .blockdevs()
+            .iter()
+            .filter(|(_, bd)| bd.in_use())
+            .map(|(u, _)| *u)
+            .collect::<HashSet<_>>();
+        assert_eq!(allocated_uuids, in_use_uuids);
     }
 }
 
@@ -223,6 +244,7 @@ mod tests {
         .unwrap();
 
         let mut data_tier = DataTier::new(mgr);
+        data_tier.invariant();
 
         // A data_tier w/ some devices but nothing allocated
         let mut size = data_tier.size();
@@ -237,6 +259,7 @@ mod tests {
 
         let transaction = data_tier.alloc_request(&[request_amount]).unwrap().unwrap();
         data_tier.alloc_commit(transaction).unwrap();
+        data_tier.invariant();
 
         // A data tier w/ some amount allocated
         assert!(data_tier.allocated() >= request_amount);
@@ -244,6 +267,7 @@ mod tests {
         allocated = data_tier.allocated();
 
         data_tier.add(pool_name, pool_uuid, devices2).unwrap();
+        data_tier.invariant();
 
         // A data tier w/ additional blockdevs added
         assert!(data_tier.size() > size);
@@ -257,6 +281,7 @@ mod tests {
             .unwrap()
             .unwrap();
         data_tier.alloc_commit(transaction).unwrap();
+        data_tier.invariant();
 
         assert!(data_tier.allocated() >= request_amount + last_request_amount);
         assert_eq!(data_tier.size(), size);

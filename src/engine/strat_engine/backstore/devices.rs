@@ -6,7 +6,8 @@
 
 use std::{
     collections::{HashMap, HashSet},
-    fs::OpenOptions,
+    fmt,
+    fs::{File, OpenOptions},
     path::{Path, PathBuf},
     sync::Mutex,
 };
@@ -25,7 +26,7 @@ use crate::{
                 blockdev::{StratBlockDev, UnderlyingDevice},
                 crypt::{CryptHandle, CryptInitializer},
             },
-            device::blkdev_size,
+            device::{blkdev_logical_sector_size, blkdev_physical_sector_size, blkdev_size},
             metadata::{
                 device_identifiers, disown_device, BlockdevSize, MDADataSize, StratisIdentifiers,
                 BDA,
@@ -201,6 +202,7 @@ fn dev_info(devnode: &DevicePath) -> StratisResult<(DeviceInfo, Option<StratisId
 
             let mut f = OpenOptions::new().read(true).write(true).open(&**devnode)?;
             let dev_size = blkdev_size(&f)?;
+            let blksizes = BlockSizes::read(&f)?;
 
             let stratis_identifiers = device_identifiers(&mut f).map_err(|err| {
                 let error_message = format!(
@@ -225,6 +227,7 @@ fn dev_info(devnode: &DevicePath) -> StratisResult<(DeviceInfo, Option<StratisId
                     devnode: devnode.to_path_buf(),
                     id_wwn: hw_id,
                     size: dev_size,
+                    blksizes,
                 },
                 stratis_identifiers,
             ))
@@ -248,6 +251,33 @@ fn check_dev(device_info: &DeviceInfo) -> StratisResult<()> {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct BlockSizes {
+    pub physical_sector_size: Bytes,
+    pub logical_sector_size: Bytes,
+}
+
+impl BlockSizes {
+    pub fn read(f: &File) -> StratisResult<BlockSizes> {
+        let physical_sector_size = blkdev_physical_sector_size(f)?;
+        let logical_sector_size = blkdev_logical_sector_size(f)?;
+        Ok(BlockSizes {
+            physical_sector_size,
+            logical_sector_size,
+        })
+    }
+}
+
+impl fmt::Display for BlockSizes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "BLKSSSZGET: {}, BLKPBSZGET: {}",
+            self.logical_sector_size, self.physical_sector_size
+        )
+    }
+}
+
 /// A miscellaneous grab bag of useful information required to decide whether
 /// a device should be allowed to be initialized by Stratis or to be used
 /// when initializing a device.
@@ -262,6 +292,8 @@ pub struct DeviceInfo {
     pub id_wwn: Option<StratisResult<String>>,
     /// The total size of the device
     pub size: Bytes,
+    /// Block size information
+    pub blksizes: BlockSizes,
 }
 
 /// Devices that have all been identified as Stratis devices.
@@ -444,6 +476,18 @@ impl UnownedDevices {
     pub fn unpack(self) -> Vec<DeviceInfo> {
         self.inner
     }
+
+    /// Return a map of block sizes to device infos
+    pub fn blocksizes(&self) -> HashMap<BlockSizes, Vec<&DeviceInfo>> {
+        let mut block_size_groups = HashMap::new();
+        for info in self.inner.iter() {
+            block_size_groups
+                .entry(info.blksizes)
+                .or_insert_with(Vec::new)
+                .push(info);
+        }
+        block_size_groups
+    }
 }
 
 /// Initialze devices in devices.
@@ -506,6 +550,7 @@ pub fn initialize_devices(
         dev_uuid: DevUuid,
         sizes: (MDADataSize, BlockdevSize),
         id_wwn: &Option<StratisResult<String>>,
+        blksizes: BlockSizes,
     ) -> StratisResult<StratBlockDev> {
         let (mda_data_size, data_size) = sizes;
         let mut f = OpenOptions::new()
@@ -536,7 +581,8 @@ pub fn initialize_devices(
 
         bda.initialize(&mut f)?;
 
-        StratBlockDev::new(devno, bda, &[], None, hw_id, underlying_device).map_err(|(e, _)| e)
+        StratBlockDev::new(devno, bda, &[], None, hw_id, underlying_device, blksizes)
+            .map_err(|(e, _)| e)
     }
 
     /// Clean up an encrypted device after initialization failure.
@@ -644,6 +690,7 @@ pub fn initialize_devices(
                     dev_uuid,
                     (mda_data_size, BlockdevSize::new(blockdev_size)),
                     &dev_info.id_wwn,
+                    dev_info.blksizes,
                 );
                 if let Err(err) = blockdev {
                     Err(clean_up_encrypted(&mut handle_clone, err))
@@ -659,6 +706,7 @@ pub fn initialize_devices(
                     dev_uuid,
                     (mda_data_size, BlockdevSize::new(blockdev_size)),
                     &dev_info.id_wwn,
+                    dev_info.blksizes,
                 );
                 if let Err(err) = blockdev {
                     Err(clean_up_unencrypted(physical_path, err))
@@ -1040,6 +1088,7 @@ mod tests {
                 devno: old_info.devno,
                 id_wwn: None,
                 size: old_info.size,
+                blksizes: old_info.blksizes,
             };
 
             dev_infos.push(new_info);

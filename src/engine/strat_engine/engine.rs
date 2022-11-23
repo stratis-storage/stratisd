@@ -418,6 +418,12 @@ impl Engine for StratEngine {
                 ));
             }
 
+            let block_size_summary = unowned_devices.blocksizes();
+            if block_size_summary.len() > 1 {
+                let err_str = "The devices specified for initializing the pool do do not all have the same physical sector size or do not all have the same logical sector size.".into();
+                return Err(StratisError::Msg(err_str));
+            }
+
             let cloned_name = name.clone();
             let cloned_enc_info = encryption_info.cloned();
 

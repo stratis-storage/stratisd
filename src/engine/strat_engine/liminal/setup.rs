@@ -18,7 +18,7 @@ use devicemapper::Sectors;
 use crate::{
     engine::{
         strat_engine::{
-            backstore::{CryptHandle, StratBlockDev, UnderlyingDevice},
+            backstore::{BlockSizes, CryptHandle, StratBlockDev, UnderlyingDevice},
             device::blkdev_size,
             liminal::device_info::{LStratisDevInfo, LStratisInfo},
             metadata::BDA,
@@ -26,7 +26,7 @@ use crate::{
             shared::{bds_to_bdas, tiers_to_bdas},
             types::{BDARecordResult, BDAResult},
         },
-        types::{ActionAvailability, BlockDevTier, DevUuid, DevicePath, Name, PoolEncryptionInfo},
+        types::{BlockDevTier, DevUuid, DevicePath, Name},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -188,20 +188,19 @@ pub fn get_blockdevs(
         cache_map: &HashMap<DevUuid, (usize, &BaseBlockDevSave)>,
         segment_table: &HashMap<DevUuid, Vec<(Sectors, Sectors)>>,
     ) -> BDAResult<(BlockDevTier, StratBlockDev)> {
+        let (actual_size, blksizes) = match OpenOptions::new()
+            .read(true)
+            .open(&info.dev_info.devnode)
+            .map_err(StratisError::from)
+            .and_then(|f| blkdev_size(&f).and_then(|bs| BlockSizes::read(&f).map(|v| (bs, v))))
+        {
+            Ok(vals) => vals,
+            Err(err) => return Err((err, bda)),
+        };
+
         // Return an error if apparent size of Stratis block device appears to
         // have decreased since metadata was recorded or if size of block
         // device could not be obtained.
-        let actual_size = match blkdev_size(&match OpenOptions::new()
-            .read(true)
-            .open(&info.dev_info.devnode)
-        {
-            Ok(f) => f,
-            Err(e) => return Err((StratisError::from(e), bda)),
-        }) {
-            Ok(s) => s,
-            Err(e) => return Err((e, bda)),
-        };
-
         let actual_size_sectors = actual_size.sectors();
         let recorded_size = bda.dev_size().sectors();
         if actual_size_sectors < recorded_size {
@@ -268,6 +267,7 @@ pub fn get_blockdevs(
                 bd_save.user_info.clone(),
                 bd_save.hardware_info.clone(),
                 underlying_device,
+                blksizes,
             )?,
         ))
     }
@@ -362,19 +362,4 @@ pub fn get_blockdevs(
     };
 
     Ok((datadevs, cachedevs))
-}
-
-/// Takes a set of information determined about the pool in liminal devices and
-/// determines what the state of the pool should be when it is set up.
-pub fn get_pool_state(info: Option<PoolEncryptionInfo>) -> ActionAvailability {
-    if let Some(i) = info {
-        if i.is_inconsistent() {
-            warn!("Metadata for encryption inconsistent across devices in pool; disabling mutating IPC requests for this pool");
-            ActionAvailability::NoRequests
-        } else {
-            ActionAvailability::Full
-        }
-    } else {
-        ActionAvailability::Full
-    }
 }

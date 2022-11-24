@@ -22,6 +22,8 @@ const INIT_MNT_NS_PATH: &str = "/proc/1/ns/mnt";
 /// Path to where private namespace mounts are mounted
 pub const NS_TMPFS_LOCATION: &str = "/run/stratisd/ns_mounts";
 
+/// Unshare the mount namespace if the stratisd mount namespace for this thread is in the root namespace.
+// Precondition: If running in a container, PID is not 1 OR the container does share the host PID.
 pub fn unshare_namespace() -> StratisResult<()> {
     // Only create a new mount namespace if the thread is in the root namespace.
     if is_in_root_namespace()? {

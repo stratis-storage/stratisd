@@ -301,7 +301,7 @@ where
                         consts::POOL_AVAIL_ACTIONS_PROP.to_string() =>
                         box_variant!(avail_prop.clone())
                     },
-                    consts::POOL_INTERFACE_NAME_3_3 => {
+                    consts::POOL_INTERFACE_NAME_3_4 => {
                         Vec::new(),
                         consts::POOL_AVAIL_ACTIONS_PROP.to_string() =>
                         box_variant!(avail_prop)
@@ -702,6 +702,11 @@ where
                 consts::POOL_INTERFACE_NAME_3_3 => {
                     Vec::new(),
                     consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
+                    box_variant!(user_info_prop.clone())
+                },
+                consts::POOL_INTERFACE_NAME_3_4 => {
+                    Vec::new(),
+                    consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
                     box_variant!(user_info_prop)
                 }
             ),
@@ -843,6 +848,11 @@ where
             Dev,
             "blockdev",
             consts::BLOCKDEV_INTERFACE_NAME_3_3 => {
+                consts::BLOCKDEV_NEW_SIZE_PROP.to_string(),
+                blockdev_new_size_to_prop,
+                new_size
+            },
+            consts::BLOCKDEV_INTERFACE_NAME_3_4 => {
                 consts::BLOCKDEV_NEW_SIZE_PROP.to_string(),
                 blockdev_new_size_to_prop,
                 new_size

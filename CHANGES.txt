@@ -1,3 +1,14 @@
+stratisd 3.4.1
+==============
+Recommended Rust toolchain version: 1.65.0
+Lowest supported Rust toolchain version: 1.62.1
+
+Recommended development platform for Python development: Fedora 36
+
+- Add some D-Bus signal code missing in revision 4 of some interfaces:
+  https://github.com/stratis-storage/stratisd/pull/3187
+
+
 stratisd 3.4.0
 ==============
 Recommended Rust toolchain version: 1.65.0

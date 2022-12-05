@@ -95,7 +95,7 @@ where
         .await
         .ok_or_else(|| StratisError::Msg(format!("No pool named {} found", name)))?;
     let (_, uuid, pool) = guard.as_mut_tuple();
-    block_in_place(|| Ok(pool.init_cache(uuid, name, paths)?.is_changed()))
+    block_in_place(|| Ok(pool.init_cache(uuid, name, paths, true)?.is_changed()))
 }
 
 // stratis-min pool rename

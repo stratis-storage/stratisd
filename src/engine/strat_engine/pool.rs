@@ -513,8 +513,15 @@ impl Pool for StratPool {
         pool_uuid: PoolUuid,
         pool_name: &str,
         blockdevs: &[&Path],
+        supports_encrypted: bool,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
         validate_paths(blockdevs)?;
+
+        if self.is_encrypted() && !supports_encrypted {
+            return Err(StratisError::Msg(
+                "Use of a cache is not supported with an encrypted pool".to_string(),
+            ));
+        }
 
         let devices = ProcessedPathInfos::try_from(blockdevs)?;
         let (stratis_devices, unowned_devices) = devices.unpack();
@@ -1283,7 +1290,7 @@ mod tests {
                 .unwrap();
         }
 
-        pool.init_cache(uuid, name, paths1).unwrap();
+        pool.init_cache(uuid, name, paths1, true).unwrap();
         invariant(&pool, name);
 
         let metadata2 = pool.record(name);
@@ -1334,7 +1341,7 @@ mod tests {
         let (uuid, mut pool) = StratPool::initialize(name, unowned_devices, None).unwrap();
         invariant(&pool, name);
 
-        pool.init_cache(uuid, name, cache_path).unwrap();
+        pool.init_cache(uuid, name, cache_path, true).unwrap();
         invariant(&pool, name);
 
         pool.add_blockdevs(uuid, name, data_paths, BlockDevTier::Data)

@@ -150,6 +150,7 @@ pub trait Pool: Debug + Send + Sync {
         pool_uuid: PoolUuid,
         pool_name: &str,
         blockdevs: &[&Path],
+        supports_encrypted: bool,
     ) -> StratisResult<SetCreateAction<DevUuid>>;
 
     /// Creates the filesystems specified by specs.

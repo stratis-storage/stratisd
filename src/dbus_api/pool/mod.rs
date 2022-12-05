@@ -16,6 +16,7 @@ use crate::{
 mod pool_3_0;
 mod pool_3_1;
 mod pool_3_3;
+mod pool_3_5;
 pub mod prop_conv;
 mod shared;
 
@@ -191,7 +192,7 @@ where
                 .add_m(pool_3_0::add_blockdevs_method(&f))
                 .add_m(pool_3_0::bind_clevis_method(&f))
                 .add_m(pool_3_0::unbind_clevis_method(&f))
-                .add_m(pool_3_0::init_cache_method(&f))
+                .add_m(pool_3_5::init_cache_method(&f))
                 .add_m(pool_3_0::add_cachedevs_method(&f))
                 .add_m(pool_3_0::bind_keyring_method(&f))
                 .add_m(pool_3_0::unbind_keyring_method(&f))

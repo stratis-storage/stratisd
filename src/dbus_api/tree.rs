@@ -177,6 +177,11 @@ where
                         vec![consts::FILESYSTEM_DEVNODE_PROP.into()],
                         consts::FILESYSTEM_NAME_PROP.to_string() =>
                         Variant(new_name.box_clone())
+                    },
+                    consts::FILESYSTEM_INTERFACE_NAME_3_5 => {
+                        vec![consts::FILESYSTEM_DEVNODE_PROP.into()],
+                        consts::FILESYSTEM_NAME_PROP.to_string() =>
+                        Variant(new_name.box_clone())
                     }
                 },
             )
@@ -221,6 +226,11 @@ where
                         Vec::new(),
                         consts::POOL_NAME_PROP.to_string() =>
                         Variant(new_name.box_clone())
+                    },
+                    consts::POOL_INTERFACE_NAME_3_5 => {
+                        Vec::new(),
+                        consts::POOL_NAME_PROP.to_string() =>
+                        Variant(new_name.box_clone())
                     }
                 },
             )
@@ -258,6 +268,9 @@ where
                                 vec![consts::FILESYSTEM_DEVNODE_PROP.into()]
                             },
                             consts::FILESYSTEM_INTERFACE_NAME_3_4 => {
+                                vec![consts::FILESYSTEM_DEVNODE_PROP.into()]
+                            },
+                            consts::FILESYSTEM_INTERFACE_NAME_3_5 => {
                                 vec![consts::FILESYSTEM_DEVNODE_PROP.into()]
                             }
                         },
@@ -304,6 +317,11 @@ where
                     consts::POOL_INTERFACE_NAME_3_4 => {
                         Vec::new(),
                         consts::POOL_AVAIL_ACTIONS_PROP.to_string() =>
+                        box_variant!(avail_prop.clone())
+                    },
+                    consts::POOL_INTERFACE_NAME_3_5 => {
+                        Vec::new(),
+                        consts::POOL_AVAIL_ACTIONS_PROP.to_string() =>
                         box_variant!(avail_prop)
                     }
                 },
@@ -342,6 +360,11 @@ where
                         box_variant!(kd_prop.clone())
                     },
                     consts::POOL_INTERFACE_NAME_3_4 => {
+                        Vec::new(),
+                        consts::POOL_KEY_DESC_PROP.to_string() =>
+                        box_variant!(kd_prop.clone())
+                    },
+                    consts::POOL_INTERFACE_NAME_3_5 => {
                         Vec::new(),
                         consts::POOL_KEY_DESC_PROP.to_string() =>
                         box_variant!(kd_prop)
@@ -384,6 +407,11 @@ where
                     consts::POOL_INTERFACE_NAME_3_4 => {
                         Vec::new(),
                         consts::POOL_CLEVIS_INFO_PROP.to_string() =>
+                        box_variant!(ci_prop.clone())
+                    },
+                    consts::POOL_INTERFACE_NAME_3_5 => {
+                        Vec::new(),
+                        consts::POOL_CLEVIS_INFO_PROP.to_string() =>
                         box_variant!(ci_prop)
                     }
                 },
@@ -417,6 +445,10 @@ where
                         consts::POOL_HAS_CACHE_PROP.to_string() => box_variant!(b)
                     },
                     consts::POOL_INTERFACE_NAME_3_4 => {
+                        Vec::new(),
+                        consts::POOL_HAS_CACHE_PROP.to_string() => box_variant!(b)
+                    },
+                    consts::POOL_INTERFACE_NAME_3_5 => {
                         Vec::new(),
                         consts::POOL_HAS_CACHE_PROP.to_string() => box_variant!(b)
                     }
@@ -469,6 +501,11 @@ where
                         box_variant!(stopped_pools_to_prop(&stopped_pools))
                     },
                     consts::MANAGER_INTERFACE_NAME_3_4 => {
+                        Vec::new(),
+                        consts::STOPPED_POOLS_PROP.to_string() =>
+                        box_variant!(stopped_pools_to_prop(&stopped_pools))
+                    },
+                    consts::MANAGER_INTERFACE_NAME_3_5 => {
                         Vec::new(),
                         consts::STOPPED_POOLS_PROP.to_string() =>
                         box_variant!(stopped_pools_to_prop(&stopped_pools))
@@ -529,6 +566,14 @@ where
                 new_size
             },
             consts::FILESYSTEM_INTERFACE_NAME_3_4 => {
+                consts::FILESYSTEM_USED_PROP.to_string(),
+                fs_used_to_prop,
+                new_used,
+                consts::FILESYSTEM_SIZE_PROP.to_string(),
+                fs_size_to_prop,
+                new_size
+            },
+            consts::FILESYSTEM_INTERFACE_NAME_3_5 => {
                 consts::FILESYSTEM_USED_PROP.to_string(),
                 fs_used_to_prop,
                 new_used,
@@ -606,6 +651,17 @@ where
                 consts::POOL_NO_ALLOCABLE_SPACE_PROP.to_string(),
                 |x| x,
                 new_no_space
+            },
+            consts::POOL_INTERFACE_NAME_3_5 => {
+                consts::POOL_TOTAL_USED_PROP.to_string(),
+                pool_used_to_prop,
+                new_used,
+                consts::POOL_ALLOC_SIZE_PROP.to_string(),
+                pool_alloc_to_prop,
+                new_alloc,
+                consts::POOL_NO_ALLOCABLE_SPACE_PROP.to_string(),
+                |x| x,
+                new_no_space
             }
         );
     }
@@ -636,6 +692,11 @@ where
                     box_variant!(pool_size_to_prop(new_size))
                 },
                 consts::POOL_INTERFACE_NAME_3_4 => {
+                    Vec::new(),
+                    consts::POOL_TOTAL_SIZE_PROP.to_string() =>
+                    box_variant!(pool_size_to_prop(new_size))
+                },
+                consts::POOL_INTERFACE_NAME_3_5 => {
                     Vec::new(),
                     consts::POOL_TOTAL_SIZE_PROP.to_string() =>
                     box_variant!(pool_size_to_prop(new_size))
@@ -673,6 +734,11 @@ where
                     Vec::new(),
                     consts::POOL_FS_LIMIT_PROP.to_string() =>
                     box_variant!(new_fs_limit)
+                },
+                consts::POOL_INTERFACE_NAME_3_5 => {
+                    Vec::new(),
+                    consts::POOL_FS_LIMIT_PROP.to_string() =>
+                    box_variant!(new_fs_limit)
                 }
             ),
         ) {
@@ -707,6 +773,11 @@ where
                 consts::POOL_INTERFACE_NAME_3_4 => {
                     Vec::new(),
                     consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
+                    box_variant!(user_info_prop.clone())
+                },
+                consts::POOL_INTERFACE_NAME_3_5 => {
+                    Vec::new(),
+                    consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
                     box_variant!(user_info_prop)
                 }
             ),
@@ -739,6 +810,11 @@ where
                     box_variant!(new_mode)
                 },
                 consts::POOL_INTERFACE_NAME_3_4 => {
+                    Vec::new(),
+                    consts::POOL_OVERPROV_PROP.to_string() =>
+                    box_variant!(new_mode)
+                },
+                consts::POOL_INTERFACE_NAME_3_5 => {
                     Vec::new(),
                     consts::POOL_OVERPROV_PROP.to_string() =>
                     box_variant!(new_mode)
@@ -831,6 +907,20 @@ where
                 consts::POOL_NO_ALLOCABLE_SPACE_PROP.to_string(),
                 |x| x,
                 new_no_space
+            },
+            consts::POOL_INTERFACE_NAME_3_5 => {
+                consts::POOL_TOTAL_USED_PROP.to_string(),
+                pool_used_to_prop,
+                new_used,
+                consts::POOL_ALLOC_SIZE_PROP.to_string(),
+                pool_alloc_to_prop,
+                new_alloc,
+                consts::POOL_TOTAL_SIZE_PROP.to_string(),
+                pool_size_to_prop,
+                new_size,
+                consts::POOL_NO_ALLOCABLE_SPACE_PROP.to_string(),
+                |x| x,
+                new_no_space
             }
         );
     }
@@ -853,6 +943,11 @@ where
                 new_size
             },
             consts::BLOCKDEV_INTERFACE_NAME_3_4 => {
+                consts::BLOCKDEV_NEW_SIZE_PROP.to_string(),
+                blockdev_new_size_to_prop,
+                new_size
+            },
+            consts::BLOCKDEV_INTERFACE_NAME_3_5 => {
                 consts::BLOCKDEV_NEW_SIZE_PROP.to_string(),
                 blockdev_new_size_to_prop,
                 new_size

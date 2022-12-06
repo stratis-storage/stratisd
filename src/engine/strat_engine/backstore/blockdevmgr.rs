@@ -759,7 +759,7 @@ mod tests {
         backstore::devices::{ProcessedPathInfos, UnownedDevices},
         cmd,
         names::KeyDescription,
-        ns::{unshare_namespace, MemoryFilesystem},
+        ns::{unshare_mount_namespace, MemoryFilesystem},
         tests::{crypt, loopbacked, real},
     };
 
@@ -986,7 +986,7 @@ mod tests {
     }
 
     fn test_clevis_initialize(paths: &[&Path]) {
-        unshare_namespace().unwrap();
+        unshare_mount_namespace().unwrap();
         let pool_name = Name::new("pool_name".to_string());
         let _memfs = MemoryFilesystem::new().unwrap();
         let pool_uuid = PoolUuid::new_v4();
@@ -1048,7 +1048,7 @@ mod tests {
 
     fn test_clevis_both_initialize(paths: &[&Path]) {
         fn test_both(paths: &[&Path], key_desc: &KeyDescription) -> Result<(), Box<dyn Error>> {
-            unshare_namespace()?;
+            unshare_mount_namespace()?;
             let _memfs = MemoryFilesystem::new().unwrap();
             let pool_uuid = PoolUuid::new_v4();
             let pool_name = Name::new("pool_name".to_string());

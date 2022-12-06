@@ -24,17 +24,17 @@ pub const NS_TMPFS_LOCATION: &str = "/run/stratisd/ns_mounts";
 
 /// Unshare the mount namespace if the stratisd mount namespace for this thread is in the root namespace.
 // Precondition: If running in a container, PID is not 1 OR the container does share the host PID.
-pub fn unshare_namespace() -> StratisResult<()> {
+pub fn unshare_mount_namespace() -> StratisResult<()> {
     // Only create a new mount namespace if the thread is in the root namespace.
-    if is_in_root_namespace()? {
+    if is_in_root_mount_namespace()? {
         unshare(CloneFlags::CLONE_NEWNS)?;
     }
-    assert!(!is_in_root_namespace()?);
+    assert!(!is_in_root_mount_namespace()?);
     Ok(())
 }
 
 /// Check if the stratisd mount namespace for this thread is in the root namespace.
-pub fn is_in_root_namespace() -> StratisResult<bool> {
+pub fn is_in_root_mount_namespace() -> StratisResult<bool> {
     let pid_one_stat = stat(INIT_MNT_NS_PATH)?;
     let self_stat = stat(format!("/proc/self/task/{}/ns/mnt", gettid()).as_str())?;
     Ok(pid_one_stat.st_ino == self_stat.st_ino && pid_one_stat.st_dev == self_stat.st_dev)

@@ -53,7 +53,7 @@ mod tests {
                     },
                     shared::acquire_crypt_device,
                 },
-                ns::{unshare_namespace, MemoryFilesystem},
+                ns::{unshare_mount_namespace, MemoryFilesystem},
                 tests::{crypt, loopbacked, real},
             },
             types::{DevUuid, DevicePath, KeyDescription, Name, PoolUuid, UnlockMethod},
@@ -354,7 +354,7 @@ mod tests {
             paths: &[&Path],
             key_desc: &KeyDescription,
         ) -> Result<(), Box<dyn Error>> {
-            unshare_namespace()?;
+            unshare_mount_namespace()?;
             let _memfs = MemoryFilesystem::new()?;
             let path = paths
                 .get(0)
@@ -419,7 +419,7 @@ mod tests {
     }
 
     fn test_clevis_initialize(paths: &[&Path]) {
-        unshare_namespace().unwrap();
+        unshare_mount_namespace().unwrap();
         let _memfs = MemoryFilesystem::new().unwrap();
         let path = paths[0];
         let pool_name = Name::new("pool_name".to_string());

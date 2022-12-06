@@ -703,7 +703,7 @@ mod test {
         strat_engine::{
             backstore::crypt_metadata_size,
             cmd,
-            ns::unshare_namespace,
+            ns::unshare_mount_namespace,
             tests::{crypt, loopbacked, real, FailDevice},
         },
         types::{ActionAvailability, EngineAction, KeyDescription},
@@ -713,7 +713,7 @@ mod test {
 
     /// Verify that a pool rename causes the pool metadata to get the new name.
     fn test_pool_rename(paths: &[&Path]) {
-        unshare_namespace().unwrap();
+        unshare_mount_namespace().unwrap();
         let engine = StratEngine::initialize().unwrap();
 
         let name1 = "name1";
@@ -913,7 +913,7 @@ mod test {
             Ok(())
         }
 
-        unshare_namespace()?;
+        unshare_mount_namespace()?;
         let engine = StratEngine::initialize()?;
         let uuid =
             test_async!(engine.create_pool(name, paths_with_fail_device, Some(encryption_info)))?

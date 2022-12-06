@@ -22,7 +22,8 @@ use nix::unistd::getpid;
 use crate::dbus_api::DbusAction;
 use crate::{
     engine::{
-        set_up_crypt_logging, unshare_namespace, Engine, SimEngine, StratEngine, UdevEngineEvent,
+        set_up_crypt_logging, unshare_mount_namespace, Engine, SimEngine, StratEngine,
+        UdevEngineEvent,
     },
     stratis::{
         dm::dm_event_thread, errors::StratisResult, ipc_support::setup, stratis::VERSION,
@@ -51,16 +52,16 @@ async fn signal_thread() -> StratisResult<()> {
 pub fn run(sim: bool) -> StratisResult<()> {
     if !sim {
         // If stratisd is running as PID 1, then it is definitely in a container and the
-        // unshare_namespace() command method will fail silently, since the mount namespace will
+        // unshare_mount_namespace() command method will fail silently, since the mount namespace will
         // remain the same after the unshare command. Also, containers give us a native mount
         // isolation so unsharing the mount namespace is unnecessary. So any filesystem mounts
         // inside a container won't be visible by the host.
         //
         // Note that it is possible for stratisd to be running in a container and not as PID 1, but
         // this situation is less easily detected. However, stratisd will not fail in the
-        // unshare_namespace() method if that is the case.
+        // unshare_mount_namespace() method if that is the case.
         if getpid().as_raw() != 1 {
-            unshare_namespace()?;
+            unshare_mount_namespace()?;
         } else {
             debug!("Running as PID 1, not unsharing mount namespace");
         }

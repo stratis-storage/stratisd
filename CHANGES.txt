@@ -1,3 +1,21 @@
+stratisd 3.4.2
+==============
+Recommended Rust toolchain version: 1.65.0
+Lowest supported Rust toolchain version: 1.62.1
+
+Recommended development platform for Python development: Fedora 36
+
+- Increase amount of space allocated for metadata:
+  https://github.com/stratis-storage/stratisd/issues/3192
+  https://github.com/stratis-storage/stratisd/pull/3191
+
+- Do not unshare mount namespace if stratisd PID is 1:
+  https://github.com/stratis-storage/stratisd/pull/3186
+
+- Increase bindgen dependency specification to 0.63.0:
+  https://github.com/stratis-storage/stratisd/pull/3188
+
+
 stratisd 3.4.1
 ==============
 Recommended Rust toolchain version: 1.65.0

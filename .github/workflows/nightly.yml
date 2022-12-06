@@ -242,6 +242,7 @@ jobs:
         run: >
           RUST_LOG=stratisd=debug
           STRATISD=/usr/libexec/stratisd
+          STRATIS_SKIP_UNSTABLE_TEST=1
           PYTHONPATH=./src
           make dbus-tests
         working-directory: ./stratis-cli

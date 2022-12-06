@@ -36,8 +36,14 @@ use crate::{
     stratis::{StratisError, StratisResult},
 };
 
-// The maximum allowable size of the thinpool metadata device
+/// The maximum allowable size of the thinpool metadata device
 const MAX_META_SIZE: MetaBlocks = MetaBlocks(255 * ((1 << 14) - 64));
+/// This constant is an empirical value. Traditional IO patterns that cause break
+/// do not cause the metadata to exceed 8 times the prediction by thin_metadata_size.
+/// While this works as an upfront estimate for metadata size, we also listen for
+/// the low water mark on the metadata device if needed space exceeds 8 times the
+/// prediction.
+const THIN_META_MULT_FACTOR: u64 = 8;
 
 /// Find the executable with the given name by looking in likely locations.
 /// Return None if no executable was found.
@@ -456,12 +462,13 @@ pub fn thin_metadata_size(
         .read_to_string(&mut output)?;
     if is_ok {
         Ok(min(
-            Sectors(
-                output
-                    .trim()
-                    .parse::<u64>()
-                    .map_err(|e| StratisError::Msg(e.to_string()))?,
-            ),
+            THIN_META_MULT_FACTOR
+                * Sectors(
+                    output
+                        .trim()
+                        .parse::<u64>()
+                        .map_err(|e| StratisError::Msg(e.to_string()))?,
+                ),
             MAX_META_SIZE.sectors(),
         ))
     } else {

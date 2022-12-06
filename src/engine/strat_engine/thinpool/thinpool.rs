@@ -249,10 +249,21 @@ impl ThinPoolSizeParams {
 }
 
 /// Convert the thin pool status to usage information.
-fn status_to_usage(status: Option<ThinPoolStatus>) -> Option<ThinPoolUsage> {
+fn status_to_usage(status: Option<&ThinPoolStatus>) -> Option<&ThinPoolUsage> {
     status.and_then(|s| {
         if let ThinPoolStatus::Working(w) = s {
-            Some(w.usage)
+            Some(&w.usage)
+        } else {
+            None
+        }
+    })
+}
+
+/// Convert the thin pool status to the metadata low water mark.
+fn status_to_meta_lowater(status: Option<&ThinPoolStatus>) -> Option<MetaBlocks> {
+    status.and_then(|s| {
+        if let ThinPoolStatus::Working(w) = s {
+            w.meta_low_water.map(MetaBlocks)
         } else {
             None
         }
@@ -288,9 +299,8 @@ pub struct ThinPool {
     /// layer. All DM components obtain their storage from this layer.
     /// The device will change if the backstore adds or removes a cache.
     backstore_device: Device,
-    thin_pool_status: Option<ThinPoolStatusDigest>,
+    thin_pool_status: Option<ThinPoolStatus>,
     allocated_size: Sectors,
-    used: Option<ThinPoolUsage>,
     fs_limit: u64,
     enable_overprov: bool,
 }
@@ -395,7 +405,6 @@ impl ThinPool {
         )?;
 
         let thin_pool_status = thinpool_dev.status(get_dm(), DmOptions::default()).ok();
-        let digest = thin_pool_status.as_ref().map(|s| s.into());
         let segments = Segments {
             meta_segments: vec![meta_segments],
             meta_spare_segments: vec![spare_segments],
@@ -409,9 +418,8 @@ impl ThinPool {
             filesystems: Table::default(),
             mdv,
             backstore_device,
-            thin_pool_status: digest,
+            thin_pool_status,
             allocated_size: backstore.datatier_allocated_size(),
-            used: status_to_usage(thin_pool_status),
             fs_limit: DEFAULT_FS_LIMIT,
             enable_overprov: true,
         })
@@ -530,7 +538,6 @@ impl ThinPool {
 
         let thin_ids: Vec<ThinDevId> = filesystem_metadatas.iter().map(|x| x.thin_id).collect();
         let thin_pool_status = thinpool_dev.status(get_dm(), DmOptions::default()).ok();
-        let digest = thin_pool_status.as_ref().map(|s| s.into());
         let segments = Segments {
             meta_segments,
             meta_spare_segments: spare_segments,
@@ -549,9 +556,8 @@ impl ThinPool {
             filesystems: fs_table,
             mdv,
             backstore_device,
-            thin_pool_status: digest,
+            thin_pool_status,
             allocated_size: backstore.datatier_allocated_size(),
-            used: status_to_usage(thin_pool_status),
             fs_limit,
             enable_overprov: thin_pool_save.enable_overprov.unwrap_or(true),
         })
@@ -560,15 +566,14 @@ impl ThinPool {
     /// Get the last cached value for the total amount of space used on the pool.
     /// Stratis metadata size will be added a layer about my StratPool.
     pub fn total_physical_used(&self) -> Option<Sectors> {
-        calc_total_physical_used(self.data_used(), &self.segments)
+        calc_total_physical_used(self.used().map(|(du, _)| du), &self.segments)
     }
 
-    /// Get the last cached value for the total amount of data space used on the
-    /// thin pool.
-    fn data_used(&self) -> Option<Sectors> {
-        self.used
-            .as_ref()
-            .map(|u| datablocks_to_sectors(u.used_data))
+    /// Get the last cached value for the total amount of space used on the
+    /// thin pool in the data and metadata devices.
+    fn used(&self) -> Option<(Sectors, MetaBlocks)> {
+        status_to_usage(self.thin_pool_status.as_ref())
+            .map(|u| (datablocks_to_sectors(u.used_data), u.used_meta))
     }
 
     /// Run status checks and take actions on the thinpool and its components.
@@ -591,8 +596,19 @@ impl ThinPool {
         let old_state = self.cached();
 
         // This block will only perform an extension if the check() method
-        // is being called when block devices have been newly added to the pool.
-        match self.extend_thin_meta_device(pool_uuid, backstore, None) {
+        // is being called when block devices have been newly added to the pool or
+        // the metadata low water mark has been reached.
+        match self.extend_thin_meta_device(
+            pool_uuid,
+            backstore,
+            None,
+            self.used()
+                .and_then(|(_, mu)| {
+                    status_to_meta_lowater(self.thin_pool_status.as_ref())
+                        .map(|ml| self.thin_pool.meta_dev().size().metablocks() - mu < ml)
+                })
+                .unwrap_or(false),
+        ) {
             (changed, Ok(_)) => {
                 should_save |= changed;
             }
@@ -602,8 +618,8 @@ impl ThinPool {
             }
         };
 
-        if let Some(usage) = self.data_used() {
-            if self.thin_pool.data_dev().size() - usage < datablocks_to_sectors(DATA_LOWATER)
+        if let Some((data_usage, _)) = self.used() {
+            if self.thin_pool.data_dev().size() - data_usage < datablocks_to_sectors(DATA_LOWATER)
                 && !self.out_of_alloc_space()
             {
                 let amount_allocated = match self.extend_thin_data_device(pool_uuid, backstore) {
@@ -754,7 +770,7 @@ impl ThinPool {
     /// If there has been a change, log that change at the info or warn level
     /// as appropriate.
     fn set_state(&mut self, thin_pool_status: Option<ThinPoolStatus>) {
-        let current_status = self.thin_pool_status;
+        let current_status = self.thin_pool_status.as_ref().map(|s| s.into());
         let new_status: Option<ThinPoolStatusDigest> = thin_pool_status.as_ref().map(|s| s.into());
 
         if current_status != new_status {
@@ -783,8 +799,7 @@ impl ThinPool {
             }
         }
 
-        self.thin_pool_status = new_status;
-        self.used = status_to_usage(thin_pool_status);
+        self.thin_pool_status = thin_pool_status;
     }
 
     /// Tear down the components managed here: filesystems, the MDV,
@@ -948,11 +963,16 @@ impl ThinPool {
     }
 
     /// Extend thinpool's meta dev.
+    ///
+    /// If is_lowater is true, it was determined that the low water mark has been
+    /// crossed for metadata and the device size should be doubled instead of
+    /// recalculated via thin_metadata_size.
     fn extend_thin_meta_device(
         &mut self,
         pool_uuid: PoolUuid,
         backstore: &mut Backstore,
         new_thin_limit: Option<u64>,
+        is_lowater: bool,
     ) -> (bool, StratisResult<Sectors>) {
         fn do_extend(
             thinpooldev: &mut ThinPoolDev,
@@ -1027,13 +1047,20 @@ impl ThinPool {
             }
         }
 
-        let new_meta_size = match thin_metadata_size(
-            DATA_BLOCK_SIZE,
-            backstore.datatier_usable_size(),
-            new_thin_limit.unwrap_or(self.fs_limit),
-        ) {
-            Ok(nms) => nms,
-            Err(e) => return (false, Err(e)),
+        let new_meta_size = if is_lowater {
+            min(
+                2u64 * self.thin_pool.meta_dev().size(),
+                backstore.datatier_usable_size(),
+            )
+        } else {
+            match thin_metadata_size(
+                DATA_BLOCK_SIZE,
+                backstore.datatier_usable_size(),
+                new_thin_limit.unwrap_or(self.fs_limit),
+            ) {
+                Ok(nms) => nms,
+                Err(e) => return (false, Err(e)),
+            }
         };
         let current_meta_size = self.thin_pool.meta_dev().size();
         let meta_growth = Sectors(new_meta_size.saturating_sub(*current_meta_size));
@@ -1235,8 +1262,8 @@ impl ThinPool {
     }
 
     #[cfg(test)]
-    pub fn state(&self) -> Option<&ThinPoolStatusDigest> {
-        self.thin_pool_status.as_ref()
+    pub fn state(&self) -> Option<ThinPoolStatusDigest> {
+        self.thin_pool_status.as_ref().map(|s| s.into())
     }
 
     /// Rename a filesystem within the thin pool.
@@ -1417,7 +1444,7 @@ impl ThinPool {
             )
         } else {
             let (mut should_save, res) =
-                self.extend_thin_meta_device(pool_uuid, backstore, Some(new_limit));
+                self.extend_thin_meta_device(pool_uuid, backstore, Some(new_limit), false);
             if res.is_ok() {
                 self.fs_limit = new_limit;
                 should_save = true;
@@ -1705,7 +1732,7 @@ mod tests {
             .unwrap();
             i += 1;
 
-            let init_used = pool.data_used().unwrap();
+            let init_used = pool.used().unwrap().0;
             let init_size = pool.thin_pool.data_dev().size();
             let (changed, diff) = pool.check(pool_uuid, &mut backstore).unwrap();
             if init_size - init_used < datablocks_to_sectors(DATA_LOWATER) {

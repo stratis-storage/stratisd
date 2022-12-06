@@ -37,7 +37,7 @@ use crate::{
         shared,
         strat_engine::{
             names::KeyDescription,
-            ns::{is_in_root_namespace, NS_TMPFS_LOCATION},
+            ns::{is_in_root_mount_namespace, NS_TMPFS_LOCATION},
         },
         types::{Key, MappingCreateAction, MappingDeleteAction, SizedKeyMemory},
     },
@@ -461,7 +461,7 @@ impl MemoryPrivateFilesystem {
         // Don't do check as PID 1 as we may be in a container
         if getpid().as_raw() != 1 {
             // Check that the namespace is now different.
-            if is_in_root_namespace()? {
+            if is_in_root_mount_namespace()? {
                 return Err(StratisError::Msg(
                     "It was detected that the in-memory key files would have ended up \
                     visible on the host system; aborting operation prior to generating \

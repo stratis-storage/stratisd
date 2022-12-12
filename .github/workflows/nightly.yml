@@ -186,6 +186,12 @@ jobs:
     strategy:
       matrix:
         include:
+          - image: fedora:36  # PINNED DEVELOPMENT ENVIRONMENT
+            tag: v3.4.0
+          - image: fedora:36  # PINNED DEVELOPMENT ENVIRONMENT
+            tag: v3.3.0
+          - image: fedora:35  # PINNED DEVELOPMENT ENVIRONMENT
+            tag: v3.2.0
           - image: fedora:35  # PINNED DEVELOPMENT ENVIRONMENT
             tag: v3.1.0
           - image: fedora:35  # PINNED DEVELOPMENT ENVIRONMENT
@@ -242,6 +248,7 @@ jobs:
         run: >
           RUST_LOG=stratisd=debug
           STRATISD=/usr/libexec/stratisd
+          STRATIS_SKIP_UNSTABLE_TEST=1
           PYTHONPATH=./src
           make dbus-tests
         working-directory: ./stratis-cli

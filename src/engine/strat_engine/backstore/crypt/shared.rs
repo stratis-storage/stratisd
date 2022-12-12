@@ -143,16 +143,14 @@ impl<'a> TryFrom<&'a Value> for StratisLuks2Token {
             STRATIS_TOKEN_DEV_UUID_KEY,
             DevUuid
         );
-        let pool_name = check_and_get_key!(
-            map.get(STRATIS_TOKEN_POOLNAME_KEY)
-                .and_then(|s| s.as_str())
-                .map(|s| Name::new(s.to_string())),
-            STRATIS_TOKEN_POOLNAME_KEY
-        );
+        let pool_name = map
+            .get(STRATIS_TOKEN_POOLNAME_KEY)
+            .and_then(|s| s.as_str())
+            .map(|s| Name::new(s.to_string()));
         Ok(StratisLuks2Token {
             devname,
             identifiers: StratisIdentifiers::new(pool_uuid, dev_uuid),
-            pool_name: Some(pool_name),
+            pool_name,
         })
     }
 }

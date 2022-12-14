@@ -870,7 +870,8 @@ mod test {
 
     fn create_pool_and_test_rollback<F>(
         name: &str,
-        paths_with_fail_device: &[&Path],
+        data_paths: &[&Path],
+        cache_paths: Option<&[&Path]>,
         fail_device: &FailDevice,
         encryption_info: &EncryptionInfo,
         operation: F,
@@ -880,32 +881,24 @@ mod test {
         F: Fn(&mut StratPool) -> Result<(), Box<dyn Error>>,
     {
         fn needs_clean_up<F>(
-            engine: &StratEngine,
-            uuid: PoolUuid,
+            pool: &mut StratPool,
             fail_device: &FailDevice,
             operation: F,
         ) -> Result<(), Box<dyn Error>>
         where
             F: Fn(&mut StratPool) -> Result<(), Box<dyn Error>>,
         {
-            {
-                let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid)))
-                    .ok_or_else(|| {
-                        Box::new(StratisError::Msg("Pool must be present".to_string()))
-                    })?;
+            fail_device.start_failing(*crypt_metadata_size().sectors())?;
+            if operation(pool).is_ok() {
+                return Err(Box::new(StratisError::Msg(
+                    "Clevis initialization should have failed".to_string(),
+                )));
+            }
 
-                fail_device.start_failing(*crypt_metadata_size().sectors())?;
-                if operation(&mut pool).is_ok() {
-                    return Err(Box::new(StratisError::Msg(
-                        "Clevis initialization should have failed".to_string(),
-                    )));
-                }
-
-                if pool.avail_actions() != ActionAvailability::Full {
-                    return Err(Box::new(StratisError::Msg(
-                        "Pool should have rolled back the change entirely".to_string(),
-                    )));
-                }
+            if pool.avail_actions() != ActionAvailability::Full {
+                return Err(Box::new(StratisError::Msg(
+                    "Pool should have rolled back the change entirely".to_string(),
+                )));
             }
 
             fail_device.stop_failing()?;
@@ -915,16 +908,26 @@ mod test {
 
         unshare_mount_namespace()?;
         let engine = StratEngine::initialize()?;
-        let uuid =
-            test_async!(engine.create_pool(name, paths_with_fail_device, Some(encryption_info)))?
-                .changed()
-                .ok_or_else(|| {
-                    Box::new(StratisError::Msg(
-                        "Pool should be newly created".to_string(),
-                    ))
-                })?;
+        let uuid = test_async!(engine.create_pool(name, data_paths, Some(encryption_info)))?
+            .changed()
+            .ok_or_else(|| {
+                Box::new(StratisError::Msg(
+                    "Pool should be newly created".to_string(),
+                ))
+            })?;
+        let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid)))
+            .ok_or_else(|| Box::new(StratisError::Msg("Pool must be present".to_string())))?;
 
-        let res = needs_clean_up(&engine, uuid, fail_device, operation);
+        let init_res = if let Some(cds) = cache_paths {
+            pool.init_cache(uuid, name, cds, true)
+                .map(|_| ())
+                .map_err(|e| Box::new(e) as Box<dyn Error>)
+        } else {
+            Ok(())
+        };
+
+        let res = init_res.and_then(|_| needs_clean_up(&mut pool, fail_device, operation));
+        drop(pool);
 
         test_async!(engine.stop_pool(uuid))?;
         res?;
@@ -955,6 +958,7 @@ mod test {
             create_pool_and_test_rollback(
                 name,
                 paths_with_fail_device.as_slice(),
+                None,
                 &fail_device,
                 &EncryptionInfo::ClevisInfo((
                     "tang".to_string(),
@@ -1014,6 +1018,7 @@ mod test {
             create_pool_and_test_rollback(
                 name,
                 paths_with_fail_device.as_slice(),
+                None,
                 &fail_device,
                 &EncryptionInfo::KeyDesc(key_desc1.to_owned()),
                 |pool| {
@@ -1067,6 +1072,7 @@ mod test {
             create_pool_and_test_rollback(
                 name,
                 paths_with_fail_device.as_slice(),
+                None,
                 &fail_device,
                 &EncryptionInfo::Both(
                     key_desc.to_owned(),
@@ -1126,6 +1132,7 @@ mod test {
             create_pool_and_test_rollback(
                 name,
                 paths_with_fail_device.as_slice(),
+                None,
                 &fail_device,
                 &EncryptionInfo::KeyDesc(key_desc.to_owned()),
                 |pool| {
@@ -1178,6 +1185,7 @@ mod test {
         create_pool_and_test_rollback(
             name,
             paths_with_fail_device.as_slice(),
+            None,
             &fail_device,
             &EncryptionInfo::ClevisInfo((
                 "tang".to_string(),
@@ -1230,6 +1238,7 @@ mod test {
             create_pool_and_test_rollback(
                 name,
                 paths_with_fail_device.as_slice(),
+                None,
                 &fail_device,
                 &EncryptionInfo::Both(
                     key_desc.to_owned(),
@@ -1267,6 +1276,64 @@ mod test {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(2, None, None),
             test_clevis_unbind_rollback,
+        );
+    }
+
+    /// Test the creation of a pool with a passphrase, keyring rebind, and unlock
+    /// after rollback.
+    fn test_keyring_rebind_with_cache_rollback(paths: &[&Path]) {
+        fn test(
+            paths: &[&Path],
+            key_desc1: &KeyDescription,
+            key_desc2: &KeyDescription,
+        ) -> Result<(), Box<dyn Error>> {
+            let mut paths = paths.to_vec();
+            let last_device = paths.pop().ok_or_else(|| {
+                StratisError::Msg("Test requires at least one device".to_string())
+            })?;
+            let fail_device = FailDevice::new(last_device, "stratis_fail_device")?;
+            cmd::udev_settle()?;
+            let fail_device_path = fail_device.as_path();
+            paths.push(&fail_device_path);
+            let (data, cache) = paths.split_at(1);
+
+            let name = "pool";
+
+            create_pool_and_test_rollback(
+                name,
+                data,
+                Some(cache),
+                &fail_device,
+                &EncryptionInfo::KeyDesc(key_desc1.to_owned()),
+                |pool| {
+                    pool.rebind_keyring(key_desc2)?;
+                    // Change the key to ensure that the second key description
+                    // is not the one that causes it to unlock successfully.
+                    crypt::change_key(key_desc2)?;
+                    Ok(())
+                },
+                UnlockMethod::Keyring,
+            )?;
+
+            Ok(())
+        }
+
+        crypt::insert_and_cleanup_two_keys(paths, test)
+    }
+
+    #[test]
+    fn loop_test_keyring_rebind_with_cache_rollback() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(3, None),
+            test_keyring_rebind_with_cache_rollback,
+        );
+    }
+
+    #[test]
+    fn real_test_keyring_rebind_with_cache_rollback() {
+        real::test_with_spec(
+            &real::DeviceLimits::AtLeast(3, None, None),
+            test_keyring_rebind_with_cache_rollback,
         );
     }
 

@@ -1002,7 +1002,21 @@ fn setup_pool(
 
     StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata, pool_einfo)
         .map(|(name, mut pool)| {
-            if matches!(pool_name, MaybeInconsistent::Yes | MaybeInconsistent::No(None)) || MaybeInconsistent::No(Some(&name)) != pool_name.as_ref() {
+            if matches!(pool_name, MaybeInconsistent::Yes | MaybeInconsistent::No(None)) || MaybeInconsistent::No(Some(&name)) != pool_name.as_ref() || pool.blockdevs().iter().map(|(_, _, bd)| {
+                bd.pool_name()
+            }).fold(false, |acc, next| {
+                match next {
+                    Some(Some(name)) => {
+                        if MaybeInconsistent::No(Some(name)) == pool_name.as_ref() {
+                            acc
+                        } else {
+                            true
+                        }
+                    },
+                    Some(None) => true,
+                    None => false,
+                }
+            }) {
                 if let Err(e) = pool.rename_pool(&name) {
                     warn!("Pool will not be able to be started by name; pool name metadata in LUKS2 token is not consistent across all devices: {}", e);
                 }

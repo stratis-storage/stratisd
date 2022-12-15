@@ -26,6 +26,7 @@ use crate::{
 
 pub enum BlockDevOp {
     InitCache,
+    InitCacheWithEnc,
     AddCache,
     AddData,
 }
@@ -143,7 +144,16 @@ where
     let result = match op {
         BlockDevOp::InitCache => {
             let res = handle_action!(
-                pool.init_cache(pool_uuid, &pool_name, &blockdevs),
+                pool.init_cache(pool_uuid, &pool_name, &blockdevs, false),
+                dbus_context,
+                pool_path.get_name()
+            );
+            dbus_context.push_pool_cache_change(pool_path.get_name(), true);
+            res
+        }
+        BlockDevOp::InitCacheWithEnc => {
+            let res = handle_action!(
+                pool.init_cache(pool_uuid, &pool_name, &blockdevs, true),
                 dbus_context,
                 pool_path.get_name()
             );

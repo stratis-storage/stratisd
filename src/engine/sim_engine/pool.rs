@@ -188,10 +188,11 @@ impl Pool for SimPool {
         _pool_uuid: PoolUuid,
         _pool_name: &str,
         blockdevs: &[&Path],
+        supports_encrypted: bool,
     ) -> StratisResult<SetCreateAction<DevUuid>> {
         validate_paths(blockdevs)?;
 
-        if self.is_encrypted() {
+        if self.is_encrypted() && !supports_encrypted {
             return Err(StratisError::Msg(
                 "Use of a cache is not supported with an encrypted pool".to_string(),
             ));

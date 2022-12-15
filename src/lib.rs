@@ -12,7 +12,7 @@ extern crate proptest;
 
 #[cfg(test)]
 #[macro_use]
-extern crate matches;
+extern crate assert_matches;
 
 #[macro_use]
 extern crate lazy_static;

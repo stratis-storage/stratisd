@@ -2079,7 +2079,7 @@ mod tests {
         assert!(!Path::new(&format!("/dev/stratis/{}/{}", pool_name, name1)).exists());
         assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, name2)).exists());
 
-        assert_matches!(action, Some(_));
+        assert_eq!(action, Some(true));
         let flexdevs: FlexDevsSave = pool.record();
         let thinpoolsave: ThinPoolDevSave = pool.record();
 

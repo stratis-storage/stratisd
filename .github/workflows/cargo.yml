@@ -19,6 +19,12 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
+# cancel the in-progress workflow when PR is refreshed.
+# yamllint disable rule:line-length
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.head_ref || github.sha }}
+  cancel-in-progress: true
+
 jobs:
   checks-with-ci-repo:
     runs-on: ubuntu-20.04

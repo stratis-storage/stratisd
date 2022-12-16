@@ -721,7 +721,7 @@ impl Pool for StratPool {
 
         let spec_map = validate_filesystem_size_specs(specs)?;
 
-        let increase = spec_map.iter().map(|(_, size)| *size).sum::<Sectors>();
+        let increase = spec_map.values().copied().sum::<Sectors>();
         self.check_overprov(increase)?;
 
         spec_map.iter().fold(Ok(()), |res, (name, size)| {

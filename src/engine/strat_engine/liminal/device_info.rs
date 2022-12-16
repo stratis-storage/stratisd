@@ -568,7 +568,7 @@ impl DeviceSet {
     pub fn encryption_info(&self) -> StratisResult<Option<PoolEncryptionInfo>> {
         gather_encryption_info(
             self.internal.len(),
-            self.internal.iter().map(|(_, info)| info.encryption_info()),
+            self.internal.values().map(|info| info.encryption_info()),
         )
     }
 
@@ -579,7 +579,7 @@ impl DeviceSet {
             Some(set) => get_name(set).map(MaybeInconsistent::No),
             None => gather_pool_name(
                 self.internal.len(),
-                self.internal.iter().map(|(_, info)| match info {
+                self.internal.values().map(|info| match info {
                     LInfo::Stratis(s) => s.luks.as_ref().map(|l| l.pool_name.as_ref()),
                     LInfo::Luks(l) => Some(l.pool_name.as_ref()),
                 }),
@@ -604,7 +604,7 @@ impl DeviceSet {
     pub fn locked_pool_info(&self) -> Option<LockedPoolInfo> {
         gather_encryption_info(
             self.internal.len(),
-            self.internal.iter().map(|(_, info)| info.encryption_info()),
+            self.internal.values().map(|info| info.encryption_info()),
         )
         .ok()
         .and_then(|info| info)
@@ -648,7 +648,7 @@ impl DeviceSet {
     pub fn stopped_pool_info(&self) -> Option<StoppedPoolInfo> {
         gather_encryption_info(
             self.internal.len(),
-            self.internal.iter().map(|(_, info)| info.encryption_info()),
+            self.internal.values().map(|info| info.encryption_info()),
         )
         .ok()
         .map(|info| StoppedPoolInfo {

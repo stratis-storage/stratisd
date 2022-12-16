@@ -399,8 +399,8 @@ impl Engine for StratEngine {
                 pool,
                 &name,
                 &this_pool
-                    .iter()
-                    .map(|(_, info)| info.devnode.as_path())
+                    .values()
+                    .map(|info| info.devnode.as_path())
                     .chain(
                         unowned_devices
                             .unpack()

@@ -530,8 +530,8 @@ impl Pool for StratPool {
         other_pools.error_on_not_empty()?;
 
         let (in_pool, out_pool): (Vec<_>, Vec<_>) = this_pool
-            .iter()
-            .map(|(dev_uuid, _)| {
+            .keys()
+            .map(|dev_uuid| {
                 self.backstore
                     .get_blockdev_by_uuid(*dev_uuid)
                     .map(|(tier, _)| (*dev_uuid, tier))
@@ -785,8 +785,8 @@ impl Pool for StratPool {
             other_pools.error_on_not_empty()?;
 
             let (in_pool, out_pool): (Vec<_>, Vec<_>) = this_pool
-                .iter()
-                .map(|(dev_uuid, _)| {
+                .keys()
+                .map(|dev_uuid| {
                     self.backstore
                         .get_blockdev_by_uuid(*dev_uuid)
                         .map(|(tier, _)| (*dev_uuid, tier))

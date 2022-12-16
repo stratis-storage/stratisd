@@ -1583,7 +1583,7 @@ mod tests {
         let mut f = OpenOptions::new()
             .create(true)
             .write(true)
-            .open(&new_file)
+            .open(new_file)
             .unwrap();
         let mut written = Sectors(0);
         while written.bytes() < half_init_size {
@@ -1654,7 +1654,7 @@ mod tests {
         let mut f = OpenOptions::new()
             .create(true)
             .write(true)
-            .open(&new_file)
+            .open(new_file)
             .unwrap();
         while !pool.out_of_alloc_space() {
             f.write_all(write_block).unwrap();

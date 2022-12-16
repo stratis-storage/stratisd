@@ -1673,7 +1673,7 @@ mod tests {
     use super::*;
 
     #[allow(clippy::cast_possible_truncation)]
-    const BYTES_PER_WRITE: usize = 2 * IEC::Ki as usize * SECTOR_SIZE as usize;
+    const BYTES_PER_WRITE: usize = 2 * IEC::Ki as usize * SECTOR_SIZE;
 
     fn get_devices(paths: &[&Path]) -> StratisResult<UnownedDevices> {
         ProcessedPathInfos::try_from(paths)

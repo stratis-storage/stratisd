@@ -10,7 +10,6 @@ SPECS = {
 <interface name="org.storage.stratis3.Manager.r5">
     <method name="CreatePool">
       <arg name="name" type="s" direction="in" />
-      <arg name="redundancy" type="(bq)" direction="in" />
       <arg name="devices" type="as" direction="in" />
       <arg name="key_desc" type="(bs)" direction="in" />
       <arg name="clevis_info" type="(b(ss))" direction="in" />

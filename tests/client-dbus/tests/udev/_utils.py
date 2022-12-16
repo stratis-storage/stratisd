@@ -80,7 +80,6 @@ def create_pool(
         get_object(TOP_OBJECT),
         {
             "name": name,
-            "redundancy": (True, 0),
             "devices": devices,
             "key_desc": (False, "")
             if key_description is None

@@ -150,7 +150,7 @@ impl StratFilesystem {
             .collect::<PathBuf>();
             OpenOptions::new()
                 .write(true)
-                .open(&uevent_file)?
+                .open(uevent_file)?
                 .write_all(
                     format!(
                         "{} {} STRATISPOOLNAME={} STRATISFSNAME={}",

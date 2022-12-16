@@ -359,7 +359,7 @@ impl ThinPool {
         // docs: device-mapper/thin-provisioning.txt: Setting up a fresh
         // pool device.
         wipe_sectors(
-            &meta_dev.devnode(),
+            meta_dev.devnode(),
             Sectors(0),
             min(Sectors(8), meta_dev.size()),
         )?;

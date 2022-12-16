@@ -359,7 +359,7 @@ impl ThinPool {
         // docs: device-mapper/thin-provisioning.txt: Setting up a fresh
         // pool device.
         wipe_sectors(
-            &meta_dev.devnode(),
+            meta_dev.devnode(),
             Sectors(0),
             min(Sectors(8), meta_dev.size()),
         )?;
@@ -1673,7 +1673,7 @@ mod tests {
     use super::*;
 
     #[allow(clippy::cast_possible_truncation)]
-    const BYTES_PER_WRITE: usize = 2 * IEC::Ki as usize * SECTOR_SIZE as usize;
+    const BYTES_PER_WRITE: usize = 2 * IEC::Ki as usize * SECTOR_SIZE;
 
     fn get_devices(paths: &[&Path]) -> StratisResult<UnownedDevices> {
         ProcessedPathInfos::try_from(paths)

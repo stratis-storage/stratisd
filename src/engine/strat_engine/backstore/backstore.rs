@@ -65,7 +65,7 @@ fn make_cache(
     if new {
         // See comment in ThinPool::new() method
         wipe_sectors(
-            &meta.devnode(),
+            meta.devnode(),
             Sectors(0),
             cmp::min(Sectors(8), meta.size()),
         )?;

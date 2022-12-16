@@ -177,7 +177,7 @@ impl MetadataVol {
                 continue;
             }
 
-            let mut f = OpenOptions::new().read(true).open(&dir_e.path())?;
+            let mut f = OpenOptions::new().read(true).open(dir_e.path())?;
             let mut data = Vec::new();
             f.read_to_end(&mut data)?;
 

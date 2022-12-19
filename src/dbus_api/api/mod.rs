@@ -15,6 +15,7 @@ use crate::{
 mod manager_3_0;
 mod manager_3_2;
 mod manager_3_4;
+mod manager_3_5;
 pub mod prop_conv;
 mod report_3_0;
 mod shared;
@@ -113,7 +114,7 @@ where
         )
         .add(
             f.interface(consts::MANAGER_INTERFACE_NAME_3_5, ())
-                .add_m(manager_3_0::create_pool_method(&f))
+                .add_m(manager_3_5::create_pool_method(&f))
                 .add_m(manager_3_0::set_key_method(&f))
                 .add_m(manager_3_0::unset_key_method(&f))
                 .add_m(manager_3_0::list_keys_method(&f))

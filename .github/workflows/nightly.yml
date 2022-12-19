@@ -278,6 +278,7 @@ jobs:
           dbus-devel
           dbus-tools
           device-mapper-persistent-data
+          glibc-static
           libblkid-devel
           make
           python3-dbus

@@ -36,6 +36,9 @@ EXTRAS_FEATURES =  --no-default-features --features extras,min
 
 DENY = -D warnings -D future-incompatible -D unused -D rust_2018_idioms -D nonstandard_style
 
+STATIC_FLAG = -C target-feature=+crt-static
+STATIC_TARGET = x86_64-unknown-linux-gnu
+
 CLIPPY_DENY = -D clippy::all -D clippy::cargo -A clippy::multiple-crate-versions
 
 # Explicitly allow these lints because they don't seem helpful
@@ -197,6 +200,8 @@ build:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
 	cargo build ${RELEASE_FLAG} ${TARGET_ARGS}
+	@# purge the stratis-str-cmp and stratis-base32-decode binaries which are built statically with build-udev-utils
+	@rm -f target/$(PROFILEDIR)/{stratis-str-cmp*,stratis-base32-decode*}
 
 ## Build the stratisd test suite
 build-tests:
@@ -217,6 +222,16 @@ build-min:
 	cargo build ${RELEASE_FLAG} \
 	--bin=stratis-min --bin=stratisd-min --bin=stratis-utils \
 	${SYSTEMD_FEATURES} ${TARGET_ARGS}
+
+## Build stratis-base32-decode and stratis-str-cmp statically
+build-udev-utils:
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY} ${STATIC_FLAG}" \
+	cargo build ${RELEASE_FLAG} \
+	--bin=stratis-str-cmp --bin=stratis-base32-decode \
+	--target=${STATIC_TARGET}
+	@ldd target/${STATIC_TARGET}/${PROFILEDIR}/stratis-str-cmp|grep --quiet --silent "statically linked" || (echo "stratis-str-cmp is not statically linked" && exit 1)
+	@ldd target/${STATIC_TARGET}/${PROFILEDIR}/stratis-base32-decode|grep --quiet --silent "statically linked" || (echo "stratis-base32-decode is not statically linked" && exit 1)
 
 ## Build the stratis-dumpmetadata program
 stratis-dumpmetadata:
@@ -262,18 +277,19 @@ install: install-cfg
 	mkdir -p $(DESTDIR)$(UNITGENDIR)
 	mkdir -p $(DESTDIR)$(BINDIR)
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd
-	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(UDEVDIR) target/$(PROFILEDIR)/stratis-utils
-	mv -fv $(DESTDIR)$(UDEVDIR)/stratis-utils $(DESTDIR)$(UDEVDIR)/stratis-str-cmp
-	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(UDEVDIR)/stratis-base32-decode
-	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(BINDIR)/stratis-predict-usage
-	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(UNITGENDIR)/stratis-clevis-setup-generator
-	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(UNITGENDIR)/stratis-setup-generator
-	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(BINDIR) target/$(PROFILEDIR)/stratis-min
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd-min
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(UDEVDIR) target/$(STATIC_TARGET)/$(PROFILEDIR)/stratis-base32-decode
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(UDEVDIR) target/$(STATIC_TARGET)/$(PROFILEDIR)/stratis-str-cmp
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(UNITEXECDIR) systemd/stratis-fstab-setup
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(BINDIR) target/$(PROFILEDIR)/stratis-min
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(BINDIR) target/$(PROFILEDIR)/stratis-utils
+	mv --force --verbose $(DESTDIR)$(BINDIR)/stratis-utils $(DESTDIR)$(BINDIR)/stratis-predict-usage
+	ln --force --verbose $(DESTDIR)$(BINDIR)/stratis-predict-usage $(DESTDIR)$(UNITGENDIR)/stratis-clevis-setup-generator
+	ln --force --verbose $(DESTDIR)$(BINDIR)/stratis-predict-usage $(DESTDIR)$(UNITGENDIR)/stratis-setup-generator
+
 
 ## Build and install stratisd binaries and configuration
-build-and-install: build build-min docs/stratisd.8 install
+build-and-install: build build-min build-udev-utils docs/stratisd.8 install
 
 ## Remove installed configuration files
 clean-cfg:
@@ -361,6 +377,7 @@ clippy: clippy-macros
 	bloat
 	build
 	build-min
+	build-udev-utils
 	clean
 	clean-ancillary
 	clean-cfg

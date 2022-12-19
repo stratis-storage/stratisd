@@ -40,6 +40,14 @@ path = "src/bin/stratis-min/stratisd-min.rs"
 required-features = ["min"]
 
 [[bin]]
+name = "stratis-str-cmp"
+path = "src/bin/udev-lib/stratis-str-cmp.rs"
+
+[[bin]]
+name = "stratis-base32-decode"
+path = "src/bin/udev-lib/stratis-base32-decode.rs"
+
+[[bin]]
 name = "stratis-utils"
 
 [dependencies]

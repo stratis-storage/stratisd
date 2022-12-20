@@ -157,10 +157,63 @@ where
 {
     let context = libudev::Context::new()?;
     let mut enumerator = block_enumerator(&context)?;
-
     Ok(enumerator
         .scan_devices()?
         .filter(|dev| dev.is_initialized())
         .find(|x| x.devnode().map_or(false, |d| **device_path == *d))
         .map(|ref d| f(&UdevEngineDevice::from(d))))
+}
+
+/// Return true if udev queue is empty and no events are being processed.
+#[cfg(test)]
+pub fn is_udev_queue_empty() -> StratisResult<()> {
+    // Path to udev queue's file, this file is empty when it exists. It assesses whether udev events are
+    // being processed. When the file disappears from the filesystem, it means the queue is empty
+    const UDEV_QUEUE_FILE_PATH: &str = "/run/udev/queue";
+
+    let udev_queue_file_path = &std::path::Path::new(UDEV_QUEUE_FILE_PATH);
+
+    // If the file exists then the queue is not empty and we return an error
+    if udev_queue_file_path.exists() {
+        Err(StratisError::Msg(format!(
+            "Udev queue file {} exists",
+            UDEV_QUEUE_FILE_PATH
+        )))
+    } else {
+        Ok(())
+    }
+}
+
+/// Settle waits for the udev event queue to be empty, this is blocking operation.
+/// It will timeout after 120 sec just like the 'udevadm settle' command does
+/// For reference, this how udev does it https://github.com/systemd/systemd/blob/main/src/shared/udev-util.c#L567-L570
+#[cfg(test)]
+pub fn settle() -> StratisResult<()> {
+    if let Err(e) = retry::retry(
+        retry::delay::Exponential::from_millis(100).take(10),
+        is_udev_queue_empty,
+    ) {
+        return Err(match e {
+            retry::Error::Internal(msg) => StratisError::Msg(msg),
+            retry::Error::Operation { error, .. } => StratisError::Chained(
+                "Failed to wait for udev queue to be empty, events are still being processed"
+                    .to_string(),
+                Box::new(error),
+            ),
+        });
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::engine::strat_engine::udev::settle;
+
+    #[test]
+    fn test_settle() {
+        // This is probably just fine to run this way, unless your system is stuck with an udev
+        // event... It's more or less a noop, unless the file '/run/udev/queue' exists and never
+        // gets removed, which is a sign of a problem.
+        settle().unwrap();
+    }
 }

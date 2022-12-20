@@ -16,9 +16,9 @@ use devicemapper::{DevId, DmFlags, DmName, DmNameBuf, DmOptions, DM};
 
 use crate::{
     engine::strat_engine::{
-        cmd::udev_settle,
         device::blkdev_size,
         dm::{get_dm, get_dm_init},
+        udev::settle,
     },
     stratis::StratisResult,
 };
@@ -148,7 +148,7 @@ pub fn dm_stratis_devices_remove() -> Result<()> {
     }
 
     || -> Result<()> {
-        udev_settle().unwrap();
+        settle().unwrap();
         get_dm_init().map_err(|_| Error::Msg("Unable to initialize DM".into()))?;
         do_while_progress().and_then(|remain| {
             if !remain.is_empty() {

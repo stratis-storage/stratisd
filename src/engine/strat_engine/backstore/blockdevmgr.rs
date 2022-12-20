@@ -442,8 +442,8 @@ mod tests {
     use crate::engine::{
         strat_engine::{
             backstore::devices::{ProcessedPathInfos, UnownedDevices},
-            cmd,
             tests::{crypt, loopbacked, real},
+            udev::settle,
         },
         types::KeyDescription,
     };
@@ -612,7 +612,7 @@ mod tests {
             None,
         )
         .unwrap();
-        cmd::udev_settle().unwrap();
+        settle().unwrap();
 
         assert_matches!(get_devices(paths1), Err(_));
 
@@ -641,7 +641,7 @@ mod tests {
         )
         .unwrap();
 
-        cmd::udev_settle().unwrap();
+        settle().unwrap();
 
         assert!(!ProcessedPathInfos::try_from(paths2)
             .unwrap()

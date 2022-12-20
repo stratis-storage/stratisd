@@ -1663,9 +1663,9 @@ mod tests {
         shared::DEFAULT_THIN_DEV_SIZE,
         strat_engine::{
             backstore::{ProcessedPathInfos, UnownedDevices},
-            cmd,
             metadata::MDADataSize,
             tests::{loopbacked, real},
+            udev::settle,
             writing::SyncAll,
         },
     };
@@ -1951,9 +1951,16 @@ mod tests {
             .create_filesystem(pool_name, pool_uuid, filesystem_name, DEFAULT_THIN_DEV_SIZE)
             .unwrap();
 
-        cmd::udev_settle().unwrap();
+        settle().unwrap();
 
-        assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, filesystem_name)).exists());
+        retry_operation!(
+            if Path::new(&format!("/dev/stratis/{}/{}", pool_name, filesystem_name)).exists() {
+                Ok(())
+            } else {
+                debug!("device path did not change after rename");
+                Err(())
+            }
+        );
 
         let write_buf = &[8u8; SECTOR_SIZE];
         let file_count = 10;
@@ -1993,11 +2000,26 @@ mod tests {
             .snapshot_filesystem(pool_name, pool_uuid, fs_uuid, snapshot_name)
             .unwrap();
 
-        cmd::udev_settle().unwrap();
+        settle().unwrap();
 
         // Assert both symlinks are still present.
-        assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, filesystem_name)).exists());
-        assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, snapshot_name)).exists());
+        retry_operation!(
+            if Path::new(&format!("/dev/stratis/{}/{}", pool_name, filesystem_name)).exists() {
+                Ok(())
+            } else {
+                debug!("device path did not change after rename");
+                Err(())
+            }
+        );
+
+        retry_operation!(
+            if Path::new(&format!("/dev/stratis/{}/{}", pool_name, snapshot_name)).exists() {
+                Ok(())
+            } else {
+                debug!("device path did not change after rename");
+                Err(())
+            }
+        );
 
         let mut read_buf = [0u8; SECTOR_SIZE];
         let snapshot_tmp_dir = tempfile::Builder::new()
@@ -2067,17 +2089,38 @@ mod tests {
             .create_filesystem(pool_name, pool_uuid, name1, DEFAULT_THIN_DEV_SIZE)
             .unwrap();
 
-        cmd::udev_settle().unwrap();
+        settle().unwrap();
 
-        assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, name1)).exists());
+        retry_operation!(
+            if Path::new(&format!("/dev/stratis/{}/{}", pool_name, name1)).exists() {
+                Ok(())
+            } else {
+                debug!("assert device path changed after rename");
+                Err(())
+            }
+        );
 
         let action = pool.rename_filesystem(pool_name, fs_uuid, name2).unwrap();
 
-        cmd::udev_settle().unwrap();
+        settle().unwrap();
 
         // Check that the symlink has been renamed.
-        assert!(!Path::new(&format!("/dev/stratis/{}/{}", pool_name, name1)).exists());
-        assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, name2)).exists());
+        retry_operation!(
+            if !Path::new(&format!("/dev/stratis/{}/{}", pool_name, name2)).exists() {
+                Ok(())
+            } else {
+                debug!("assert device path changed after rename");
+                Err(())
+            }
+        );
+
+        retry_operation!(
+            if Path::new(&format!("/dev/stratis/{}/{}", pool_name, name2)).exists() {
+                Ok(())
+            } else {
+                Err(())
+            }
+        );
 
         assert_eq!(action, Some(true));
         let flexdevs: FlexDevsSave = pool.record();

@@ -702,9 +702,9 @@ mod test {
         engine::Pool,
         strat_engine::{
             backstore::crypt_metadata_size,
-            cmd,
             ns::unshare_mount_namespace,
             tests::{crypt, loopbacked, real, FailDevice},
+            udev::{self, settle},
         },
         types::{ActionAvailability, EngineAction, KeyDescription},
     };
@@ -742,20 +742,56 @@ mod test {
             (fs_uuid1, fs_uuid2)
         };
 
-        cmd::udev_settle().unwrap();
+        settle().unwrap();
 
-        assert!(Path::new(&format!("/dev/stratis/{}/{}", name1, fs_name1)).exists());
-        assert!(Path::new(&format!("/dev/stratis/{}/{}", name1, fs_name2)).exists());
+        retry_operation!(
+            if Path::new(&format!("/dev/stratis/{}/{}", name1, fs_name1)).exists() {
+                Ok(())
+            } else {
+                Err(())
+            }
+        );
+        retry_operation!(
+            if Path::new(&format!("/dev/stratis/{}/{}", name1, fs_name2)).exists() {
+                Ok(())
+            } else {
+                Err(())
+            }
+        );
 
         let name2 = "name2";
         let action = test_async!(engine.rename_pool(uuid1, name2)).unwrap();
 
-        cmd::udev_settle().unwrap();
+        settle().unwrap();
 
-        assert!(!Path::new(&format!("/dev/stratis/{}/{}", name1, fs_name1)).exists());
-        assert!(!Path::new(&format!("/dev/stratis/{}/{}", name1, fs_name2)).exists());
-        assert!(Path::new(&format!("/dev/stratis/{}/{}", name2, fs_name1)).exists());
-        assert!(Path::new(&format!("/dev/stratis/{}/{}", name2, fs_name2)).exists());
+        retry_operation!(
+            if !Path::new(&format!("/dev/stratis/{}/{}", name1, fs_name1)).exists() {
+                Ok(())
+            } else {
+                Err(())
+            }
+        );
+        retry_operation!(
+            if !Path::new(&format!("/dev/stratis/{}/{}", name1, fs_name2)).exists() {
+                Ok(())
+            } else {
+                Err(())
+            }
+        );
+        retry_operation!(
+            if Path::new(&format!("/dev/stratis/{}/{}", name2, fs_name1)).exists() {
+                Ok(())
+            } else {
+                Err(())
+            }
+        );
+        retry_operation!(
+            if Path::new(&format!("/dev/stratis/{}/{}", name2, fs_name2)).exists() {
+                Ok(())
+            } else {
+                Err(())
+            }
+        );
 
         {
             let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid1))).unwrap();
@@ -948,7 +984,12 @@ mod test {
                 StratisError::Msg("Test requires at least one device".to_string())
             })?;
             let fail_device = FailDevice::new(last_device, "stratis_fail_device")?;
-            cmd::udev_settle()?;
+            settle()?;
+            retry_operation!(if fail_device.as_path().exists() {
+                Ok(())
+            } else {
+                Err(())
+            });
             let fail_device_path = fail_device.as_path();
             paths_with_fail_device.push(&fail_device_path);
 
@@ -1009,7 +1050,12 @@ mod test {
                 StratisError::Msg("Test requires at least one device".to_string())
             })?;
             let fail_device = FailDevice::new(last_device, "stratis_fail_device")?;
-            cmd::udev_settle()?;
+            settle()?;
+            retry_operation!(if fail_device.as_path().exists() {
+                Ok(())
+            } else {
+                Err(())
+            });
             let fail_device_path = fail_device.as_path();
             paths_with_fail_device.push(&fail_device_path);
 
@@ -1062,7 +1108,12 @@ mod test {
                 StratisError::Msg("Test requires at least one device".to_string())
             })?;
             let fail_device = FailDevice::new(last_device, "stratis_fail_device")?;
-            cmd::udev_settle()?;
+            settle()?;
+            retry_operation!(if fail_device.as_path().exists() {
+                Ok(())
+            } else {
+                Err(())
+            });
             let fail_device_path = fail_device.as_path();
             paths_with_fail_device.push(&fail_device_path);
 
@@ -1122,7 +1173,12 @@ mod test {
                 StratisError::Msg("Test requires at least one device".to_string())
             })?;
             let fail_device = FailDevice::new(last_device, "stratis_fail_device")?;
-            cmd::udev_settle()?;
+            settle()?;
+            retry_operation!(if fail_device.as_path().exists() {
+                Ok(())
+            } else {
+                Err(())
+            });
             let fail_device_path = fail_device.as_path();
             paths_with_fail_device.push(&fail_device_path);
 
@@ -1175,7 +1231,12 @@ mod test {
         let mut paths_with_fail_device = paths.to_vec();
         let last_device = paths_with_fail_device.pop().unwrap();
         let fail_device = FailDevice::new(last_device, "stratis_fail_device").unwrap();
-        cmd::udev_settle().unwrap();
+        settle().unwrap();
+        retry_operation!(if fail_device.as_path().exists() {
+            Ok(())
+        } else {
+            Err(())
+        });
         let fail_device_path = fail_device.as_path();
         paths_with_fail_device.push(&fail_device_path);
 
@@ -1228,7 +1289,12 @@ mod test {
                 StratisError::Msg("Test requires at least one device".to_string())
             })?;
             let fail_device = FailDevice::new(last_device, "stratis_fail_device")?;
-            cmd::udev_settle()?;
+            settle()?;
+            retry_operation!(if fail_device.as_path().exists() {
+                Ok(())
+            } else {
+                Err(())
+            });
             let fail_device_path = fail_device.as_path();
             paths_with_fail_device.push(&fail_device_path);
 
@@ -1292,7 +1358,12 @@ mod test {
                 StratisError::Msg("Test requires at least one device".to_string())
             })?;
             let fail_device = FailDevice::new(last_device, "stratis_fail_device")?;
-            cmd::udev_settle()?;
+            udev::settle()?;
+            retry_operation!(if fail_device.as_path().exists() {
+                Ok(())
+            } else {
+                Err(())
+            });
             let fail_device_path = fail_device.as_path();
             paths.push(&fail_device_path);
             let (data, cache) = paths.split_at(1);

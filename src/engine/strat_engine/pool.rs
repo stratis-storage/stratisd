@@ -1204,9 +1204,9 @@ mod tests {
     use crate::engine::{
         engine::{BlockDev, Filesystem},
         strat_engine::{
-            cmd::udev_settle,
             tests::{loopbacked, real},
             thinpool::ThinPoolStatusDigest,
+            udev::settle,
         },
         types::{EngineAction, PoolIdentifier},
         Engine, StratEngine,
@@ -1463,11 +1463,11 @@ mod tests {
         assert_eq!(pool.action_avail, ActionAvailability::NoRequests);
 
         pool.destroy().unwrap();
-        udev_settle().unwrap();
+        settle().unwrap();
 
         let name = "stratis-test-pool";
 
-        let devices = ProcessedPathInfos::try_from(paths).unwrap();
+        let devices = retry_operation!(ProcessedPathInfos::try_from(paths));
         let (stratis_devices, unowned_devices) = devices.unpack();
         stratis_devices.error_on_not_empty().unwrap();
 
@@ -1527,7 +1527,7 @@ mod tests {
             .unwrap()
             .pop()
             .unwrap();
-        udev_settle().unwrap();
+        settle().unwrap();
         assert!(pool
             .set_overprov_mode(&Name::new(pool_name.to_string()), false)
             .is_err());

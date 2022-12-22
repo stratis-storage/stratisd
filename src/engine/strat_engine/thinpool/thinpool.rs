@@ -1663,9 +1663,9 @@ mod tests {
         shared::DEFAULT_THIN_DEV_SIZE,
         strat_engine::{
             backstore::{ProcessedPathInfos, UnownedDevices},
-            cmd,
             metadata::MDADataSize,
             tests::{loopbacked, real},
+            udev::settle,
             writing::SyncAll,
         },
     };
@@ -1951,7 +1951,7 @@ mod tests {
             .create_filesystem(pool_name, pool_uuid, filesystem_name, DEFAULT_THIN_DEV_SIZE)
             .unwrap();
 
-        cmd::udev_settle().unwrap();
+        settle().unwrap();
 
         assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, filesystem_name)).exists());
 
@@ -1993,7 +1993,7 @@ mod tests {
             .snapshot_filesystem(pool_name, pool_uuid, fs_uuid, snapshot_name)
             .unwrap();
 
-        cmd::udev_settle().unwrap();
+        settle().unwrap();
 
         // Assert both symlinks are still present.
         assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, filesystem_name)).exists());
@@ -2067,13 +2067,13 @@ mod tests {
             .create_filesystem(pool_name, pool_uuid, name1, DEFAULT_THIN_DEV_SIZE)
             .unwrap();
 
-        cmd::udev_settle().unwrap();
+        settle().unwrap();
 
         assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, name1)).exists());
 
         let action = pool.rename_filesystem(pool_name, fs_uuid, name2).unwrap();
 
-        cmd::udev_settle().unwrap();
+        settle().unwrap();
 
         // Check that the symlink has been renamed.
         assert!(!Path::new(&format!("/dev/stratis/{}/{}", pool_name, name1)).exists());

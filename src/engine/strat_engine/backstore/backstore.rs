@@ -1095,10 +1095,10 @@ mod tests {
 
     use crate::engine::strat_engine::{
         backstore::devices::{ProcessedPathInfos, UnownedDevices},
-        cmd,
         metadata::device_identifiers,
         ns::{unshare_mount_namespace, MemoryFilesystem},
         tests::{crypt, loopbacked, real},
+        udev::settle,
     };
 
     use super::*;
@@ -1350,7 +1350,7 @@ mod tests {
             ))),
         )
         .unwrap();
-        cmd::udev_settle().unwrap();
+        settle().unwrap();
 
         matches!(
             backstore.bind_clevis(
@@ -1416,7 +1416,7 @@ mod tests {
                     ),
                 )),
             )?;
-            cmd::udev_settle()?;
+            settle()?;
 
             if backstore.bind_clevis(
                 "tang",

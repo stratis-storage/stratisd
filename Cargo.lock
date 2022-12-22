@@ -400,9 +400,9 @@ dependencies = [
 
 [[package]]
 name = "devicemapper"
-version = "0.32.2"
+version = "0.32.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1597557fb0ad85ea4cd3a848e1580d3620a6fd87bb16d9193db862f913a7029d"
+checksum = "1da7c273a50833e1fbbff5b71b06fd1f3f00356b0fa1d392a21ee8b4aabb2a1e"
 dependencies = [
  "bitflags",
  "devicemapper-sys",

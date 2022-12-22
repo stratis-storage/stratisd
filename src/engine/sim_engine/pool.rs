@@ -84,7 +84,7 @@ impl SimPool {
     fn encryption_info(&self) -> Option<PoolEncryptionInfo> {
         gather_encryption_info(
             self.block_devs.len(),
-            self.block_devs.iter().map(|(_, bd)| bd.encryption_info()),
+            self.block_devs.values().map(|bd| bd.encryption_info()),
         )
         .expect("sim engine cannot create pools with encrypted and unencrypted devices together")
     }
@@ -209,9 +209,7 @@ impl Pool for SimPool {
         } else {
             init_cache_idempotent_or_err(
                 blockdevs,
-                self.cache_devs
-                    .iter()
-                    .map(|(_, bd)| bd.devnode().to_owned()),
+                self.cache_devs.values().map(|bd| bd.devnode().to_owned()),
             )
         }
     }

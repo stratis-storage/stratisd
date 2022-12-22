@@ -529,8 +529,8 @@ impl Pool for StratPool {
         other_pools.error_on_not_empty()?;
 
         let (in_pool, out_pool): (Vec<_>, Vec<_>) = this_pool
-            .iter()
-            .map(|(dev_uuid, _)| {
+            .keys()
+            .map(|dev_uuid| {
                 self.backstore
                     .get_blockdev_by_uuid(*dev_uuid)
                     .map(|(tier, _)| (*dev_uuid, tier))
@@ -721,7 +721,7 @@ impl Pool for StratPool {
 
         let spec_map = validate_filesystem_size_specs(specs)?;
 
-        let increase = spec_map.iter().map(|(_, size)| *size).sum::<Sectors>();
+        let increase = spec_map.values().copied().sum::<Sectors>();
         self.check_overprov(increase)?;
 
         spec_map.iter().fold(Ok(()), |res, (name, size)| {
@@ -784,8 +784,8 @@ impl Pool for StratPool {
             other_pools.error_on_not_empty()?;
 
             let (in_pool, out_pool): (Vec<_>, Vec<_>) = this_pool
-                .iter()
-                .map(|(dev_uuid, _)| {
+                .keys()
+                .map(|dev_uuid| {
                     self.backstore
                         .get_blockdev_by_uuid(*dev_uuid)
                         .map(|(tier, _)| (*dev_uuid, tier))
@@ -1582,7 +1582,7 @@ mod tests {
         let mut f = OpenOptions::new()
             .create(true)
             .write(true)
-            .open(&new_file)
+            .open(new_file)
             .unwrap();
         let mut written = Sectors(0);
         while written.bytes() < half_init_size {
@@ -1653,7 +1653,7 @@ mod tests {
         let mut f = OpenOptions::new()
             .create(true)
             .write(true)
-            .open(&new_file)
+            .open(new_file)
             .unwrap();
         while !pool.out_of_alloc_space() {
             f.write_all(write_block).unwrap();

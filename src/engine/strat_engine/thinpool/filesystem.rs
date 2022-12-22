@@ -150,7 +150,7 @@ impl StratFilesystem {
             .collect::<PathBuf>();
             OpenOptions::new()
                 .write(true)
-                .open(&uevent_file)?
+                .open(uevent_file)?
                 .write_all(
                     format!(
                         "{} {} STRATISPOOLNAME={} STRATISFSNAME={}",
@@ -357,7 +357,9 @@ impl StratFilesystem {
         let mut ret_vec = Vec::new();
         for mp in parser {
             match mp {
-                Ok(mount) => {
+                Ok(mount) =>
+                {
+                    #[allow(clippy::unnecessary_cast)]
                     if mount.major as u64 == major && mount.minor as u64 == minor {
                         ret_vec.push(PathBuf::from(&mount.mount_point));
                     }
@@ -453,6 +455,7 @@ pub fn fs_usage(mount_point: &Path) -> StratisResult<(Bytes, Bytes)> {
     let stat = statvfs(mount_point)?;
 
     // Upcast all arch-dependent variable width values to u64
+    #[allow(clippy::unnecessary_cast)]
     let (block_size, blocks, blocks_free) = (
         stat.block_size() as u64,
         stat.blocks() as u64,

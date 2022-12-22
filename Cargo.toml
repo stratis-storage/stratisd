@@ -1,6 +1,6 @@
 [package]
 name = "stratisd"
-version = "3.4.3"
+version = "3.4.4"
 authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.org>"]
 edition = "2021"
 rust-version = "1.62.1"  # LOWEST SUPPORTED RUST TOOLCHAIN
@@ -49,7 +49,7 @@ clap = "3.1.9"
 crc = "2.0.0"
 crossbeam = "0.8.0"
 data-encoding = "2.3.0"
-devicemapper = "0.32.2"
+devicemapper = "0.32.3"
 either = "1.6.1"
 env_logger="0.9.0"
 futures = "0.3.11"

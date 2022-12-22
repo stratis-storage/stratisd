@@ -1,3 +1,14 @@
+stratisd 3.4.4
+==============
+Recommended Rust toolchain version: 1.65.0
+Lowest supported Rust toolchain version: 1.62.1
+
+Recommended development platform for Python development: Fedora 37
+
+- Cherry pick from master branch:
+  https://github.com/stratis-storage/stratisd/pull/3212
+
+
 stratisd 3.4.3
 ==============
 Recommended Rust toolchain version: 1.65.0

@@ -5,6 +5,8 @@
 //! udev-related methods
 use std::{ffi::OsStr, fmt};
 
+#[cfg(test)]
+pub use crate::engine::strat_engine::udev::tests::settle;
 use crate::{
     engine::types::{DevicePath, UdevEngineDevice},
     stratis::{StratisError, StratisResult},
@@ -164,56 +166,120 @@ where
         .map(|ref d| f(&UdevEngineDevice::from(d))))
 }
 
-/// Return true if udev queue is empty and no events are being processed.
-#[cfg(test)]
-pub fn is_udev_queue_empty() -> StratisResult<()> {
-    // Path to udev queue's file, this file is empty when it exists. It assesses whether udev events are
-    // being processed. When the file disappears from the filesystem, it means the queue is empty
-    const UDEV_QUEUE_FILE_PATH: &str = "/run/udev/queue";
-
-    let udev_queue_file_path = &std::path::Path::new(UDEV_QUEUE_FILE_PATH);
-
-    // If the file exists then the queue is not empty and we return an error
-    if udev_queue_file_path.exists() {
-        Err(StratisError::Msg(format!(
-            "Udev queue file {} exists",
-            UDEV_QUEUE_FILE_PATH
-        )))
-    } else {
-        Ok(())
-    }
-}
-
-/// Settle waits for the udev event queue to be empty, this is blocking operation.
-/// It will timeout after 120 sec just like the 'udevadm settle' command does
-/// For reference, this how udev does it https://github.com/systemd/systemd/blob/main/src/shared/udev-util.c#L567-L570
-#[cfg(test)]
-pub fn settle() -> StratisResult<()> {
-    if let Err(e) = retry::retry(
-        retry::delay::Exponential::from_millis(100).take(10),
-        is_udev_queue_empty,
-    ) {
-        return Err(match e {
-            retry::Error::Internal(msg) => StratisError::Msg(msg),
-            retry::Error::Operation { error, .. } => StratisError::Chained(
-                "Failed to wait for udev queue to be empty, events are still being processed"
-                    .to_string(),
-                Box::new(error),
-            ),
-        });
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::engine::strat_engine::udev::settle;
+    use super::*;
 
-    #[test]
-    fn test_settle() {
-        // This is probably just fine to run this way, unless your system is stuck with an udev
-        // event... It's more or less a noop, unless the file '/run/udev/queue' exists and never
-        // gets removed, which is a sign of a problem.
-        settle().unwrap();
+    use std::{collections::VecDeque, io, os::unix::io::AsRawFd};
+
+    use nix::sys::inotify::{AddWatchFlags, InitFlags, Inotify, InotifyEvent};
+    use tokio::{
+        io::unix::AsyncFd,
+        time::{timeout, Duration},
+    };
+
+    const UDEV_QUEUE_FILE_PATH: &str = "/run/udev/queue";
+
+    /// Return true if udev queue is empty and no events are being processed.
+    fn is_udev_queue_empty() -> StratisResult<()> {
+        // Path to udev queue's file, this file is empty when it exists. It assesses whether udev events are
+        // being processed. When the file disappears from the filesystem, it means the queue is empty
+        let udev_queue_file_path = &std::path::Path::new(UDEV_QUEUE_FILE_PATH);
+
+        // If the file exists then the queue is not empty and we return an error
+        if udev_queue_file_path.exists() {
+            Err(StratisError::Msg(format!(
+                "Udev queue file {} exists",
+                UDEV_QUEUE_FILE_PATH
+            )))
+        } else {
+            Ok(())
+        }
+    }
+
+    pub struct InotifyAsync {
+        ino: Inotify,
+        events: VecDeque<InotifyEvent>,
+    }
+
+    impl InotifyAsync {
+        const UDEV_DIR: &str = "/run/udev";
+
+        fn new() -> StratisResult<Self> {
+            let ino = Inotify::init(InitFlags::IN_NONBLOCK | InitFlags::IN_CLOEXEC)?;
+            ino.add_watch(
+                Self::UDEV_DIR,
+                AddWatchFlags::IN_CREATE | AddWatchFlags::IN_DELETE,
+            )?;
+            Ok(InotifyAsync {
+                ino,
+                events: VecDeque::new(),
+            })
+        }
+
+        async fn get_event(&mut self) -> StratisResult<InotifyEvent> {
+            if let Some(event) = self.events.pop_front() {
+                Ok(event)
+            } else {
+                let fd = AsyncFd::new(self.ino.as_raw_fd())?;
+                loop {
+                    let mut guard = fd.readable().await?;
+                    match guard.try_io(|_| {
+                        self.ino
+                            .read_events()
+                            .map_err(|e| io::Error::from_raw_os_error(e as i32))
+                    }) {
+                        Ok(Ok(events)) => {
+                            self.events = events.into_iter().collect::<VecDeque<_>>();
+                            break;
+                        }
+                        Ok(Err(e)) => return Err(StratisError::from(e)),
+                        Err(_) => {
+                            trace!("Spurious wakeup");
+                        }
+                    }
+                }
+                Ok(self
+                    .events
+                    .pop_front()
+                    .expect("Must have received an event"))
+            }
+        }
+    }
+
+    /// Settle waits for the udev event queue to be empty, this is blocking operation.
+    /// It will timeout after 120 sec just like the 'udevadm settle' command does
+    /// For reference, this how udev does it https://github.com/systemd/systemd/blob/main/src/shared/udev-util.c#L567-L570
+    pub fn settle() -> StratisResult<()> {
+        match test_async!(async {
+            timeout(Duration::from_secs(120), async {
+                let mut async_inotify = InotifyAsync::new()?;
+                loop {
+                    let event = async_inotify.get_event().await?;
+                    if event.mask == AddWatchFlags::IN_DELETE
+                        && event.name
+                            == Some(
+                                OsStr::new(
+                                    std::path::Path::new(UDEV_QUEUE_FILE_PATH)
+                                        .file_name()
+                                        .expect("Must have a name"),
+                                )
+                                .to_os_string(),
+                            )
+                        && is_udev_queue_empty().is_ok()
+                    {
+                        break;
+                    }
+                }
+                Ok(())
+            })
+            .await
+        }) {
+            Ok(Ok(_)) => Ok(()),
+            Ok(Err(e)) => Err(e),
+            Err(_) => Err(StratisError::Msg(
+                "Timed out waiting for udev queue to clear".to_string(),
+            )),
+        }
     }
 }

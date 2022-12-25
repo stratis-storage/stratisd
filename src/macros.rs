@@ -3,6 +3,8 @@ macro_rules! test_async {
     ($expr:expr) => {
         tokio::task::LocalSet::new().block_on(
             &tokio::runtime::Builder::new_current_thread()
+                .enable_io()
+                .enable_time()
                 .build()
                 .unwrap(),
             $expr,

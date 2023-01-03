@@ -30,9 +30,9 @@ else
   RELEASE_FLAG = --release
 endif
 
-MIN_FEATURES = --no-default-features --features min
-SYSTEMD_FEATURES = --no-default-features --features min,systemd_compat
-EXTRAS_FEATURES =  --no-default-features --features extras,min
+MIN_FEATURES = --no-default-features --features engine,min
+SYSTEMD_FEATURES = --no-default-features --features engine,min,systemd_compat
+EXTRAS_FEATURES =  --no-default-features --features engine,extras,min
 
 DENY = -D warnings -D future-incompatible -D unused -D rust_2018_idioms -D nonstandard_style
 

@@ -27,7 +27,7 @@ async fn check_pool_and_fs<E>(
     where
         E: Engine,
     {
-        #[cfg(feature = "min")]
+        #[cfg(not(feature = "dbus_enabled"))]
         {
             let _ = engine.pool_evented(None).await;
             let _ = engine.fs_evented(None).await;

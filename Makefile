@@ -28,9 +28,10 @@ else
   RELEASE_FLAG = --release
 endif
 
+ENGINE_FEATURES = --no-default-features --features engine
 MIN_FEATURES = --no-default-features --features engine,min
 SYSTEMD_FEATURES = --no-default-features --features engine,min,systemd_compat
-EXTRAS_FEATURES =  --no-default-features --features engine,extras,min
+EXTRAS_FEATURES =  --no-default-features --features engine,extras
 
 DENY = -D warnings -D future-incompatible -D unused -D rust_2018_idioms -D nonstandard_style
 
@@ -189,6 +190,12 @@ fmt-shell:
 ## Check shell formatting with shfmt for CI
 fmt-shell-ci:
 	shfmt -d .
+
+## Build the core engine only
+build-engine:
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY}" \
+	cargo build ${RELEASE_FLAG} ${ENGINE_FEATURES} ${TARGET_ARGS}
 
 ## Build stratisd
 build:

@@ -20,14 +20,18 @@ use nix::unistd::getpid;
 
 #[cfg(feature = "dbus_enabled")]
 use crate::dbus_api::DbusAction;
+
+#[cfg(any(feature = "dbus_enabled", feature = "min"))]
+use crate::stratis::ipc_support::setup;
+
 use crate::{
     engine::{
         set_up_crypt_logging, unshare_mount_namespace, Engine, SimEngine, StratEngine,
         UdevEngineEvent,
     },
     stratis::{
-        dm::dm_event_thread, errors::StratisResult, ipc_support::setup, stratis::VERSION,
-        timer::run_timers, udev_monitor::udev_thread,
+        dm::dm_event_thread, errors::StratisResult, stratis::VERSION, timer::run_timers,
+        udev_monitor::udev_thread,
     },
 };
 
@@ -90,11 +94,15 @@ pub fn run(sim: bool) -> StratisResult<()> {
     runtime.block_on(async move {
         async fn start_threads<E>(engine: Arc<E>, sim: bool) -> StratisResult<()> where E: 'static + Engine {
             let (trigger, should_exit) = channel(1);
+
+            #[allow(unused_variables)]
             let (udev_sender, udev_receiver) = unbounded_channel::<UdevEngineEvent>();
             #[cfg(feature = "dbus_enabled")]
             let (dbus_sender, dbus_receiver) = unbounded_channel::<DbusAction<E>>();
 
             let join_udev = udev_thread(udev_sender, should_exit);
+
+            #[cfg(any(feature = "dbus_enabled", feature = "min"))]
             let join_ipc = setup(
                 engine.clone(),
                 udev_receiver,
@@ -119,6 +127,7 @@ pub fn run(sim: bool) -> StratisResult<()> {
                 dbus_sender,
             );
 
+            #[cfg(any(feature = "dbus_enabled", feature = "min"))]
             select! {
                 res = join_udev => {
                     if let Err(e) = res {
@@ -135,6 +144,33 @@ pub fn run(sim: bool) -> StratisResult<()> {
                         info!("The IPC thread exited; shutting down stratisd...");
                     }
                 },
+                Err(e) = join_dm => {
+                    error!("The devicemapper thread exited with an error: {}; shutting down stratisd...", e);
+                    return Err(e);
+                },
+                res = join_timer => {
+                    if let Err(e) = res {
+                        error!("The timer thread exited with an error: {}; shutting down stratisd...", e);
+                        return Err(e);
+                    } else {
+                        info!("The timer thread exited; shutting down stratisd...");
+                    }
+                },
+                _ = join_signal => {
+                    info!("Caught SIGINT; exiting...");
+                },
+            }
+
+            #[cfg(all(not(feature = "dbus_enabled"), not(feature = "min")))]
+            select! {
+                res = join_udev => {
+                    if let Err(e) = res {
+                        error!("The udev thread exited with an error: {}; shutting down stratisd...", e);
+                        return Err(e);
+                    } else {
+                        info!("The udev thread exited; shutting down stratisd...");
+                    }
+                }
                 Err(e) = join_dm => {
                     error!("The devicemapper thread exited with an error: {}; shutting down stratisd...", e);
                     return Err(e);

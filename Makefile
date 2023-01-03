@@ -220,8 +220,16 @@ build-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
 	cargo build ${RELEASE_FLAG} \
-	--bin=stratis-min --bin=stratisd-min --bin=stratis-utils \
+	--bin=stratis-min --bin=stratisd-min \
 	${SYSTEMD_FEATURES} ${TARGET_ARGS}
+
+## Build only the utils executable (does not require IPC support)
+build-utils:
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY}" \
+	cargo build ${RELEASE_FLAG} \
+	--bin=stratis-utils \
+	${ENGINE_FEATURES} ${TARGET_ARGS}
 
 ## Build the stratis-dumpmetadata program
 stratis-dumpmetadata:
@@ -278,7 +286,7 @@ install: install-cfg
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(UNITEXECDIR) systemd/stratis-fstab-setup
 
 ## Build and install stratisd binaries and configuration
-build-and-install: build build-min docs/stratisd.8 install
+build-and-install: build build-min build-utils docs/stratisd.8 install
 
 ## Remove installed configuration files
 clean-cfg:

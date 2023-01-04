@@ -22,7 +22,7 @@ pub const SUBSYSTEM_BLOCK: &str = "block";
 
 /// Make an enumerator for enumerating block devices. Return an error if there
 /// was any udev-related error.
-pub fn block_enumerator(context: &libudev::Context) -> libudev::Result<libudev::Enumerator<'_>> {
+pub fn block_enumerator(context: &libudev::Context) -> libudev::Result<libudev::Enumerator> {
     let mut enumerator = libudev::Enumerator::new(context)?;
     enumerator.match_subsystem(SUBSYSTEM_BLOCK)?;
     Ok(enumerator)

@@ -69,12 +69,12 @@ pub async fn udev_thread(
 
 /// A facility for listening for and handling udev events that stratisd
 /// considers interesting.
-struct UdevMonitor<'a> {
-    socket: libudev::MonitorSocket<'a>,
+struct UdevMonitor {
+    socket: libudev::MonitorSocket,
 }
 
-impl<'a> UdevMonitor<'a> {
-    fn create(context: &'a libudev::Context) -> StratisResult<UdevMonitor<'a>> {
+impl UdevMonitor {
+    fn create(context: &libudev::Context) -> StratisResult<UdevMonitor> {
         let mut monitor = libudev::Monitor::new(context)?;
         monitor.match_subsystem("block")?;
 
@@ -83,12 +83,12 @@ impl<'a> UdevMonitor<'a> {
         Ok(UdevMonitor { socket })
     }
 
-    pub fn poll(&mut self) -> Option<Event<'a>> {
+    pub fn poll(&mut self) -> Option<Event> {
         self.socket.receive_event()
     }
 }
 
-impl<'a> AsRawFd for UdevMonitor<'a> {
+impl AsRawFd for UdevMonitor {
     fn as_raw_fd(&self) -> RawFd {
         self.socket.as_raw_fd()
     }

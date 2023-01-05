@@ -95,8 +95,11 @@ pub fn run(sim: bool) -> StratisResult<()> {
         async fn start_threads<E>(engine: Arc<E>, sim: bool) -> StratisResult<()> where E: 'static + Engine {
             let (trigger, should_exit) = channel(1);
 
-            #[allow(unused_variables)]
+            #[cfg(any(feature = "dbus_enabled", feature = "min"))]
             let (udev_sender, udev_receiver) = unbounded_channel::<UdevEngineEvent>();
+            #[cfg(all(not(feature = "dbus_enabled"), not(feature = "min")))]
+            let (udev_sender, _) = unbounded_channel::<UdevEngineEvent>();
+
             #[cfg(feature = "dbus_enabled")]
             let (dbus_sender, dbus_receiver) = unbounded_channel::<DbusAction<E>>();
 

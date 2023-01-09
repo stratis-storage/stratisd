@@ -28,6 +28,7 @@ pub enum StratisError {
         causal_error: Box<StratisError>,
         rollback_error: Box<StratisError>,
     },
+    ActionDisabled(ActionAvailability),
     OutOfSpaceError(String),
     Io(io::Error),
     Nix(nix::Error),
@@ -119,6 +120,9 @@ impl fmt::Display for StratisError {
             }
             StratisError::OutOfSpaceError(ref msg) => {
                 write!(f, "Pool is out of space and cannot be extended: {}", msg)
+            }
+            StratisError::ActionDisabled(ref level) => {
+                write!(f, "Pool is in state {:?} where this action cannot be performed until the issue is resolved manually", level)
             }
             StratisError::Io(ref err) => write!(f, "IO error: {}", err),
             StratisError::Nix(ref err) => write!(f, "Nix error: {}", err),

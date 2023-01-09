@@ -123,6 +123,7 @@ impl StratEngine {
             .into_iter()
             .filter_map(|res| match res {
                 Ok(Ok(tup)) => Some(tup),
+                Ok(Err(StratisError::ActionDisabled(_))) => None,
                 Ok(Err(e)) => {
                     warn!("Pool checks failed with error: {}", e);
                     None

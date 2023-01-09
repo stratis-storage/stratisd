@@ -28,12 +28,12 @@ fn add_method_guards(method: &mut ImplItemMethod, level: Ident) {
                 if &ident.to_string() == "StratisResult" {
                     parse::<Stmt>(TokenStream::from(quote! {
                         if self.action_avail >= crate::engine::types::ActionAvailability::#level {
-                            return Err(crate::stratis::StratisError::Msg(format!(
-                                "Pool is in state {:?} where mutable actions cannot be performed until the issue is resolved manually",
-                                self.action_avail
-                            )));
+                            return Err(crate::stratis::StratisError::ActionDisabled(
+                                self.action_avail.clone()
+                            ));
                         }
-                    })).expect("This block should be a valid statement")
+                    }))
+                    .expect("This block should be a valid statement")
                 } else {
                     panic!("The only return type currently supported for mutable actions is StratisResult<_>; found return type {} for method {}", ident, method.sig.ident);
                 }

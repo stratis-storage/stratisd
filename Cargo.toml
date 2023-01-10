@@ -121,6 +121,7 @@ optional = true
 [dependencies.libcryptsetup-rs]
 version = "0.6.0"
 features = ["mutex"]
+optional = true
 
 [dependencies.libmount]
 version = "0.1.9"
@@ -225,6 +226,7 @@ engine = [
     "lazy_static",
     "libblkid-rs",
     "libc",
+    "libcryptsetup-rs",
     "libmount",
     "libudev",
     "log",

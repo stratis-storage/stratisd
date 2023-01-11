@@ -23,7 +23,7 @@ use crate::{
         structures::Table,
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
+            EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name,
             PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
             SetDeleteAction,
         },
@@ -265,7 +265,7 @@ impl Pool for SimPool {
         _pool_name: &str,
         paths: &[&Path],
         tier: BlockDevTier,
-    ) -> StratisResult<(SetCreateAction<DevUuid>, Option<PoolDiff>)> {
+    ) -> StratisResult<SetCreateAction<DevUuid>> {
         validate_paths(paths)?;
 
         if tier == BlockDevTier::Cache && !self.has_cache() {
@@ -276,7 +276,7 @@ impl Pool for SimPool {
 
         if paths.is_empty() {
             // Treat adding no new blockdev as the empty set.
-            return Ok((SetCreateAction::new(vec![]), None));
+            return Ok(SetCreateAction::new(vec![]));
         }
 
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
@@ -314,7 +314,7 @@ impl Pool for SimPool {
         };
 
         the_vec.extend(filtered_device_pairs);
-        Ok((SetCreateAction::new(ret_uuids), None))
+        Ok(SetCreateAction::new(ret_uuids))
     }
 
     fn bind_clevis(
@@ -983,7 +983,7 @@ mod tests {
         assert!(match pool
             .add_blockdevs(uuid, &pool_name, &devices, BlockDevTier::Data)
             .ok()
-            .and_then(|c| c.0.changed())
+            .and_then(|c| c.changed())
         {
             Some(devs) => devs.len() == devices.len(),
             _ => false,

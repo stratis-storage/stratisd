@@ -901,6 +901,7 @@ impl Pool for StratPool {
                     unowned_devices,
                 )?;
                 self.thin_pool.set_queue_mode();
+                self.thin_pool.clear_out_of_meta_flag();
 
                 Ok(SetCreateAction::new(bdev_info))
             }

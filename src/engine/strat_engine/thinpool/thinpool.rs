@@ -303,6 +303,7 @@ pub struct ThinPool {
     allocated_size: Sectors,
     fs_limit: u64,
     enable_overprov: bool,
+    out_of_meta_space: bool,
 }
 
 impl ThinPool {
@@ -422,6 +423,7 @@ impl ThinPool {
             allocated_size: backstore.datatier_allocated_size(),
             fs_limit: DEFAULT_FS_LIMIT,
             enable_overprov: true,
+            out_of_meta_space: false,
         })
     }
 
@@ -560,6 +562,7 @@ impl ThinPool {
             allocated_size: backstore.datatier_allocated_size(),
             fs_limit,
             enable_overprov: thin_pool_save.enable_overprov.unwrap_or(true),
+            out_of_meta_space: false,
         })
     }
 
@@ -598,25 +601,27 @@ impl ThinPool {
         // This block will only perform an extension if the check() method
         // is being called when block devices have been newly added to the pool or
         // the metadata low water mark has been reached.
-        match self.extend_thin_meta_device(
-            pool_uuid,
-            backstore,
-            None,
-            self.used()
-                .and_then(|(_, mu)| {
-                    status_to_meta_lowater(self.thin_pool_status.as_ref())
-                        .map(|ml| self.thin_pool.meta_dev().size().metablocks() - mu < ml)
-                })
-                .unwrap_or(false),
-        ) {
-            (changed, Ok(_)) => {
-                should_save |= changed;
-            }
-            (changed, Err(e)) => {
-                should_save |= changed;
-                warn!("Device extension failed: {}", e);
-            }
-        };
+        if !self.out_of_meta_space {
+            match self.extend_thin_meta_device(
+                pool_uuid,
+                backstore,
+                None,
+                self.used()
+                    .and_then(|(_, mu)| {
+                        status_to_meta_lowater(self.thin_pool_status.as_ref())
+                            .map(|ml| self.thin_pool.meta_dev().size().metablocks() - mu < ml)
+                    })
+                    .unwrap_or(false),
+            ) {
+                (changed, Ok(_)) => {
+                    should_save |= changed;
+                }
+                (changed, Err(e)) => {
+                    should_save |= changed;
+                    warn!("Device extension failed: {}", e);
+                }
+            };
+        }
 
         if let Some((data_usage, _)) = self.used() {
             if self.thin_pool.data_dev().size() - data_usage < datablocks_to_sectors(DATA_LOWATER)
@@ -1077,16 +1082,23 @@ impl ThinPool {
                 self.filesystem_logical_size_sum() + INITIAL_MDV_SIZE + 2u64 * current_meta_size;
             match total.cmp(&backstore.datatier_usable_size()) {
                 Ordering::Less => (),
-                Ordering::Equal => return (false, Err(StratisError::Msg(
-                    "Metdata cannot be extended any further without adding more space or enabling overprovisioning; the sum of filesystem sizes is as large as all space not used for metadata".to_string()
-                ))),
-                Ordering::Greater => return (false, Err(StratisError::Msg(
-                    "Detected a size of MDV, filesystem sizes and metadata size that is greater than available space in the pool while overprovisioning is disabled; please file a bug report".to_string()
-                ))),
+                Ordering::Equal => {
+                    self.out_of_meta_space = true;
+                    return (false, Err(StratisError::Msg(
+                        "Metdata cannot be extended any further without adding more space or enabling overprovisioning; the sum of filesystem sizes is as large as all space not used for metadata".to_string()
+                    )));
+                }
+                Ordering::Greater => {
+                    self.out_of_meta_space = true;
+                    return (false, Err(StratisError::Msg(
+                        "Detected a size of MDV, filesystem sizes and metadata size that is greater than available space in the pool while overprovisioning is disabled; please file a bug report".to_string()
+                    )));
+                }
             }
         }
 
         if meta_growth > backstore.available_in_backstore() {
+            self.out_of_meta_space = true;
             (
                 self.set_error_mode(),
                 Err(StratisError::Msg(
@@ -1250,6 +1262,7 @@ impl ThinPool {
         match self.filesystems.remove_by_uuid(uuid) {
             Some((fs_name, mut fs)) => match fs.destroy(&self.thin_pool) {
                 Ok(_) => {
+                    self.clear_out_of_meta_flag();
                     if let Err(err) = self.mdv.rm_fs(uuid) {
                         error!("Could not remove metadata for fs with UUID {} and name {} belonging to pool {}, reason: {:?}",
                                uuid,
@@ -1495,10 +1508,16 @@ impl ThinPool {
             }
         } else if !self.enable_overprov && enabled {
             self.enable_overprov = true;
+            self.clear_out_of_meta_flag();
             (true, Ok(()))
         } else {
             (false, Ok(()))
         }
+    }
+
+    /// Indicate to the pool that it may now have more room for metadata growth.
+    pub fn clear_out_of_meta_flag(&mut self) {
+        self.out_of_meta_space = false;
     }
 }
 

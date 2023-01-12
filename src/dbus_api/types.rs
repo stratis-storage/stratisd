@@ -460,29 +460,6 @@ where
             )
         }
     }
-
-    /// Send changed signal for changed pool properties.
-    pub fn push_pool_foreground_change(
-        &self,
-        path: &Path<'static>,
-        new_used: Diff<Option<Bytes>>,
-        new_alloc: Diff<Bytes>,
-        new_size: Diff<Bytes>,
-        out_of_alloc_space: Diff<bool>,
-    ) {
-        if let Err(e) = self.sender.send(DbusAction::PoolForegroundChange(
-            path.clone(),
-            SignalChange::from(new_used),
-            SignalChange::from(new_alloc),
-            SignalChange::from(new_size),
-            SignalChange::from(out_of_alloc_space),
-        )) {
-            warn!(
-                "Pool allocated size change event could not be sent to the processing thread; no signal will be sent out for the pool allocated size state change: {}",
-                e,
-            )
-        }
-    }
 }
 
 #[derive(Debug)]

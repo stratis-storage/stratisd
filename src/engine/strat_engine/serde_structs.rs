@@ -37,6 +37,7 @@ pub struct PoolSave {
     pub backstore: BackstoreSave,
     pub flex_devs: FlexDevsSave,
     pub thinpool_dev: ThinPoolDevSave,
+    // TODO: This data type should no longer be optional in Stratis 4.0
     #[serde(skip_serializing_if = "Option::is_none")]
     pub started: Option<bool>,
 }

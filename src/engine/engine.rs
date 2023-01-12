@@ -177,7 +177,7 @@ pub trait Pool: Debug + Send + Sync {
         pool_name: &str,
         paths: &[&Path],
         tier: BlockDevTier,
-    ) -> StratisResult<(SetCreateAction<DevUuid>, Option<PoolDiff>)>;
+    ) -> StratisResult<SetCreateAction<DevUuid>>;
 
     /// Bind all devices in the given pool for automated unlocking
     /// using clevis.

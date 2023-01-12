@@ -241,7 +241,7 @@ impl StratPool {
             return Err((e, tiers_to_bdas(datadevs, cachedevs, None)));
         }
 
-        let mut backstore =
+        let backstore =
             Backstore::setup(uuid, &metadata.backstore, datadevs, cachedevs, timestamp)?;
         let action_avail = get_pool_state(encryption_info, &backstore);
 
@@ -254,7 +254,7 @@ impl StratPool {
             );
         }
 
-        let mut thinpool = match ThinPool::setup(
+        let thinpool = match ThinPool::setup(
             pool_name,
             uuid,
             &metadata.thinpool_dev,
@@ -268,13 +268,6 @@ impl StratPool {
         // TODO: Remove in stratisd 4.0
         let mut needs_save = metadata.thinpool_dev.fs_limit.is_none()
             || metadata.thinpool_dev.feature_args.is_none();
-
-        if action_avail != ActionAvailability::NoPoolChanges {
-            needs_save |= match thinpool.check(uuid, &mut backstore) {
-                Ok(check) => check.0,
-                Err(e) => return Err((e, backstore.into_bdas())),
-            };
-        }
 
         let metadata_size = backstore.datatier_metadata_size();
         let mut pool = StratPool {
@@ -766,7 +759,7 @@ impl Pool for StratPool {
         pool_name: &str,
         paths: &[&Path],
         tier: BlockDevTier,
-    ) -> StratisResult<(SetCreateAction<DevUuid>, Option<PoolDiff>)> {
+    ) -> StratisResult<SetCreateAction<DevUuid>> {
         validate_paths(paths)?;
 
         let bdev_info = if tier == BlockDevTier::Cache && !self.has_cache() {
@@ -828,7 +821,7 @@ impl Pool for StratPool {
                 };
 
                 if unowned_devices.is_empty() {
-                    return Ok((SetCreateAction::new(vec![]), None));
+                    return Ok(SetCreateAction::new(vec![]));
                 }
 
                 let block_size_summary = unowned_devices.blocksizes();
@@ -860,7 +853,7 @@ impl Pool for StratPool {
                 );
                 self.thin_pool.resume()?;
                 let bdev_info = bdev_info_res?;
-                Ok((SetCreateAction::new(bdev_info), None))
+                Ok(SetCreateAction::new(bdev_info))
             } else {
                 if !cachedevs.is_empty() {
                     let error_message = format!(
@@ -876,7 +869,7 @@ impl Pool for StratPool {
                 };
 
                 if unowned_devices.is_empty() {
-                    return Ok((SetCreateAction::new(vec![]), None));
+                    return Ok(SetCreateAction::new(vec![]));
                 }
 
                 let block_size_summary = unowned_devices.blocksizes();
@@ -900,8 +893,6 @@ impl Pool for StratPool {
                     return Err(StratisError::Msg(err_str));
                 }
 
-                let cached = self.cached();
-
                 // If just adding data devices, no need to suspend the pool.
                 // No action will be taken on the DM devices.
                 let bdev_info = self.backstore.add_datadevs(
@@ -911,23 +902,7 @@ impl Pool for StratPool {
                 )?;
                 self.thin_pool.set_queue_mode();
 
-                // Adding data devices does not change the state of the thin
-                // pool at all. However, if the thin pool is in a state
-                // where it would request an allocation from the backstore the
-                // addition of the new data devs may have changed its context
-                // so that it can satisfy the allocation request where
-                // previously it could not. Run check() in case that is true.
-                let check = match self.thin_pool.check(pool_uuid, &mut self.backstore) {
-                    Ok((_, thin_pool)) => {
-                        let pool = cached.diff(&self.dump(()));
-                        Some(PoolDiff { thin_pool, pool })
-                    }
-                    Err(e) => {
-                        warn!("Failed to check the thin pool for status changes; some information may not be able to reported to the IPC layer: {}", e);
-                        None
-                    }
-                };
-                Ok((SetCreateAction::new(bdev_info), check))
+                Ok(SetCreateAction::new(bdev_info))
             }
         };
         self.write_metadata(pool_name)?;
@@ -1416,6 +1391,12 @@ mod tests {
 
             pool.add_blockdevs(pool_uuid, name, paths2, BlockDevTier::Data)
                 .unwrap();
+
+            let pool_diff = pool
+                .event_on(pool_uuid, &Name::new(name.to_string()))
+                .unwrap();
+
+            assert!(pool_diff.thin_pool.allocated_size.is_changed());
 
             match pool.thin_pool.state() {
                 Some(ThinPoolStatusDigest::Good) => (),

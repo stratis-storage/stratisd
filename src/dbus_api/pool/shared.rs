@@ -19,8 +19,7 @@ use crate::{
         util::{engine_to_dbus_err_tuple, get_next_arg},
     },
     engine::{
-        total_allocated, total_used, BlockDevTier, Diff, Engine, EngineAction, Name, Pool,
-        PoolIdentifier, PoolUuid, PropChangeAction,
+        BlockDevTier, Engine, EngineAction, Name, Pool, PoolIdentifier, PoolUuid, PropChangeAction,
     },
 };
 
@@ -162,33 +161,14 @@ where
         }
         BlockDevOp::AddCache => {
             handle_action!(
-                pool.add_blockdevs(pool_uuid, &pool_name, &blockdevs, BlockDevTier::Cache,)
-                    .map(|(act, _)| { act }),
+                pool.add_blockdevs(pool_uuid, &pool_name, &blockdevs, BlockDevTier::Cache,),
                 dbus_context,
                 pool_path.get_name()
             )
         }
         BlockDevOp::AddData => {
             handle_action!(
-                pool.add_blockdevs(pool_uuid, &pool_name, &blockdevs, BlockDevTier::Data,)
-                    .map(|(act, diff)| {
-                        if act.is_changed() {
-                            if let Some(d) = diff {
-                                assert!(d.pool.metadata_size.is_changed());
-                                dbus_context.push_pool_foreground_change(
-                                    pool_path.get_name(),
-                                    total_used(&d.thin_pool.used, &d.pool.metadata_size),
-                                    total_allocated(
-                                        &d.thin_pool.allocated_size,
-                                        &d.pool.metadata_size,
-                                    ),
-                                    Diff::Changed(pool.total_physical_size().bytes()),
-                                    d.pool.out_of_alloc_space,
-                                )
-                            }
-                        }
-                        act
-                    }),
+                pool.add_blockdevs(pool_uuid, &pool_name, &blockdevs, BlockDevTier::Data,),
                 dbus_context,
                 pool_path.get_name()
             )

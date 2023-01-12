@@ -15,13 +15,22 @@ test-set-lower-bounds:
 	echo "Testing that SET_LOWER_BOUNDS environment variable is set to a valid path"
 	test -e "${SET_LOWER_BOUNDS}"
 
-verify-dependency-bounds: test-set-lower-bounds
+verify-dependency-bounds: test-set-lower-bounds vdb-build vdb-min vdb-tests
+
+vdb-build:
+	cargo clean
 	make -f Makefile build
 	${SET_LOWER_BOUNDS} ${MANIFEST_PATH_ARGS}
 	make -f Makefile build
+
+vdb-min:
+	cargo clean
 	make -f Makefile build-min
 	${SET_LOWER_BOUNDS} ${MANIFEST_PATH_ARGS}
 	make -f Makefile build-min
+
+vdb-tests:
+	cargo clean
 	make -f Makefile build-tests
 	${SET_LOWER_BOUNDS} ${MANIFEST_PATH_ARGS}
 	make -f Makefile build-tests

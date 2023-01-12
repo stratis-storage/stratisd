@@ -884,8 +884,6 @@ impl ThinPool {
             data_existing_segments: &mut Vec<(Sectors, Sectors)>,
             data_extend_size: Sectors,
         ) -> StratisResult<Sectors> {
-            thinpooldev.suspend(get_dm(), DmOptions::default())?;
-
             info!(
                 "Attempting to extend thinpool data sub-device belonging to pool {} by {}",
                 pool_uuid, data_extend_size
@@ -906,14 +904,19 @@ impl ThinPool {
                     let data_segments =
                         data_segment.map(|seg| coalesce_segs(data_existing_segments, &[seg]));
                     if let Some(mut ds) = data_segments {
+                        thinpooldev.suspend(get_dm(), DmOptions::default())?;
                         // Leaves data device suspended
-                        thinpooldev.set_data_table(get_dm(), segs_to_table(device, &ds))?;
+                        let res = thinpooldev.set_data_table(get_dm(), segs_to_table(device, &ds));
 
-                        data_existing_segments.clear();
-                        data_existing_segments.append(&mut ds);
+                        if res.is_ok() {
+                            data_existing_segments.clear();
+                            data_existing_segments.append(&mut ds);
+                        }
+
+                        thinpooldev.resume(get_dm())?;
+
+                        res?;
                     }
-
-                    thinpooldev.resume(get_dm())?;
 
                     if let Some(seg) = data_segment {
                         info!(
@@ -982,8 +985,6 @@ impl ThinPool {
             spare_meta_existing_segments: &mut Vec<(Sectors, Sectors)>,
             meta_extend_size: Sectors,
         ) -> StratisResult<Sectors> {
-            thinpooldev.suspend(get_dm(), DmOptions::default())?;
-
             info!(
                 "Attempting to extend thinpool meta sub-device belonging to pool {} by {}",
                 pool_uuid, meta_extend_size
@@ -1012,17 +1013,23 @@ impl ThinPool {
                     });
 
                     if let Some((mut ms, mut sms)) = meta_and_spare_segments {
+                        thinpooldev.suspend(get_dm(), DmOptions::default())?;
+
                         // Leaves meta device suspended
-                        thinpooldev.set_meta_table(get_dm(), segs_to_table(device, &ms))?;
+                        let res = thinpooldev.set_meta_table(get_dm(), segs_to_table(device, &ms));
 
-                        meta_existing_segments.clear();
-                        meta_existing_segments.append(&mut ms);
+                        if res.is_ok() {
+                            meta_existing_segments.clear();
+                            meta_existing_segments.append(&mut ms);
 
-                        spare_meta_existing_segments.clear();
-                        spare_meta_existing_segments.append(&mut sms);
+                            spare_meta_existing_segments.clear();
+                            spare_meta_existing_segments.append(&mut sms);
+                        }
+
+                        thinpooldev.resume(get_dm())?;
+
+                        res?;
                     }
-
-                    thinpooldev.resume(get_dm())?;
 
                     if let Some((seg, _)) = meta_and_spare_segment {
                         info!(

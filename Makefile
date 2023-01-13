@@ -5,8 +5,6 @@ endif
 
 .DEFAULT_GOAL := help
 
-IGNORE_ARGS ?=
-
 INSTALL ?= /usr/bin/install
 
 DESTDIR ?=

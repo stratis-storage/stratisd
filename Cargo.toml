@@ -26,6 +26,10 @@ exclude = [
 ]
 
 [[bin]]
+name = "stratisd"
+required-features = ["engine"]
+
+[[bin]]
 name = "stratis-dumpmetadata"
 required-features = ["engine", "extras", "min"]
 
@@ -38,6 +42,16 @@ required-features = ["engine", "min"]
 name = "stratisd-min"
 path = "src/bin/stratis-min/stratisd-min.rs"
 required-features = ["engine", "min"]
+
+[[bin]]
+name = "stratis-str-cmp"
+path = "src/bin/udev-lib/stratis-str-cmp.rs"
+required-features = ["udev_scripts"]
+
+[[bin]]
+name = "stratis-base32-decode"
+path = "src/bin/udev-lib/stratis-base32-decode.rs"
+required-features = ["udev_scripts"]
 
 [[bin]]
 name = "stratis-utils"
@@ -248,3 +262,4 @@ dbus_enabled = ["dbus", "dbus-tree"]
 extras = ["pretty-hex"]
 min = ["rpassword"]
 systemd_compat = ["bindgen"]
+udev_scripts = ["data-encoding"]

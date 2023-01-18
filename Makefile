@@ -31,8 +31,11 @@ endif
 MIN_FEATURES = --no-default-features --features engine,min
 SYSTEMD_FEATURES = --no-default-features --features engine,min,systemd_compat
 EXTRAS_FEATURES =  --no-default-features --features engine,extras,min
+UDEV_FEATURES = --no-default-features --features udev_scripts
 
 DENY = -D warnings -D future-incompatible -D unused -D rust_2018_idioms -D nonstandard_style
+
+STATIC_FLAG = -C target-feature=+crt-static
 
 CLIPPY_DENY = -D clippy::all -D clippy::cargo -A clippy::multiple-crate-versions
 
@@ -216,6 +219,33 @@ build-min:
 	--bin=stratis-min --bin=stratisd-min --bin=stratis-utils \
 	${SYSTEMD_FEATURES} ${TARGET_ARGS}
 
+## Build stratis-str-cmp binary
+build-stratis-str-cmp:
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY}" \
+	cargo rustc ${RELEASE_FLAG}  \
+	--bin=stratis-str-cmp \
+	${UDEV_FEATURES} \
+	${TARGET_ARGS} \
+	-- ${STATIC_FLAG}
+	@ldd target/${PROFILEDIR}/stratis-str-cmp|grep --quiet --silent "statically linked" || (echo "stratis-str-cmp is not statically linked" && exit 1)
+
+## Build stratis-base32-decode binary
+build-stratis-base32-decode:
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY}" \
+	cargo rustc ${RELEASE_FLAG}  \
+	--bin=stratis-base32-decode \
+	${UDEV_FEATURES} \
+	${TARGET_ARGS} \
+	-- ${STATIC_FLAG}
+	@ldd target/${PROFILEDIR}/stratis-base32-decode|grep --quiet --silent "statically linked" || (echo "stratis-base32-decode is not statically linked" && exit 1)
+
+## Build stratis-base32-decode and stratis-str-cmp statically
+# Extra arguments to `rustc` can only be passed to one target
+# so we use two distinct targets to build the two binaries
+build-udev-utils: build-stratis-str-cmp build-stratis-base32-decode
+
 ## Build the stratis-dumpmetadata program
 stratis-dumpmetadata:
 	PKG_CONFIG_ALLOW_CROSS=1 \
@@ -260,18 +290,19 @@ install: install-cfg
 	mkdir -p $(DESTDIR)$(UNITGENDIR)
 	mkdir -p $(DESTDIR)$(BINDIR)
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd
-	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(UDEVDIR) target/$(PROFILEDIR)/stratis-utils
-	mv -fv $(DESTDIR)$(UDEVDIR)/stratis-utils $(DESTDIR)$(UDEVDIR)/stratis-str-cmp
-	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(UDEVDIR)/stratis-base32-decode
-	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(BINDIR)/stratis-predict-usage
-	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(UNITGENDIR)/stratis-clevis-setup-generator
-	ln -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp $(DESTDIR)$(UNITGENDIR)/stratis-setup-generator
-	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(BINDIR) target/$(PROFILEDIR)/stratis-min
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd-min
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(UDEVDIR) target/$(PROFILEDIR)/stratis-base32-decode
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(UDEVDIR) target/$(PROFILEDIR)/stratis-str-cmp
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(UNITEXECDIR) systemd/stratis-fstab-setup
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(BINDIR) target/$(PROFILEDIR)/stratis-min
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(BINDIR) target/$(PROFILEDIR)/stratis-utils
+	mv --force --verbose $(DESTDIR)$(BINDIR)/stratis-utils $(DESTDIR)$(BINDIR)/stratis-predict-usage
+	ln --force --verbose $(DESTDIR)$(BINDIR)/stratis-predict-usage $(DESTDIR)$(UNITGENDIR)/stratis-clevis-setup-generator
+	ln --force --verbose $(DESTDIR)$(BINDIR)/stratis-predict-usage $(DESTDIR)$(UNITGENDIR)/stratis-setup-generator
+
 
 ## Build and install stratisd binaries and configuration
-build-and-install: build build-min docs/stratisd.8 install
+build-and-install: build build-min build-udev-utils docs/stratisd.8 install
 
 ## Remove installed configuration files
 clean-cfg:
@@ -353,12 +384,16 @@ clippy: clippy-macros
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${MIN_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${SYSTEMD_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${UDEV_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 
 .PHONY:
 	audit
 	bloat
 	build
 	build-min
+	build-udev-utils
+	build-stratis-base32-decode
+	build-stratis-str-cmp
 	clean
 	clean-ancillary
 	clean-cfg

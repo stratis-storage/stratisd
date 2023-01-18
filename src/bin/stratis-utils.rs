@@ -12,7 +12,6 @@ use std::{
 };
 
 use clap::{Arg, Command};
-use data_encoding::BASE32_NOPAD;
 use serde_json::{json, Value};
 
 use devicemapper::{Bytes, Sectors};
@@ -114,21 +113,6 @@ impl Display for ExecutableError {
 }
 
 impl Error for ExecutableError {}
-
-/// Compare two strings and output on stdout 0 if they match and 1 if they do not.
-fn string_compare(arg1: &str, arg2: &str) {
-    if arg1 == arg2 {
-        println!("0");
-    } else {
-        println!("1");
-    }
-}
-
-fn base32_decode(var_name: &str, base32_str: &str) -> Result<(), Box<dyn Error>> {
-    let base32_decoded = String::from_utf8(BASE32_NOPAD.decode(base32_str.as_bytes())?)?;
-    println!("{}={}", var_name, base32_decoded);
-    Ok(())
-}
 
 // Get a prediction of filesystem size given a list of filesystem sizes and
 // whether or not the pool allows overprovisioning.
@@ -282,37 +266,7 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
     let args = env::args().collect::<Vec<_>>();
     let argv1 = args[0].as_str();
 
-    if argv1.ends_with("stratis-str-cmp") {
-        let parser = Command::new("stratis-str-cmp")
-            .arg(
-                Arg::new("left")
-                    .help("First string to compare")
-                    .required(true),
-            )
-            .arg(
-                Arg::new("right")
-                    .help("Second string to compare")
-                    .required(true),
-            );
-        let matches = parser.get_matches_from(&args);
-        string_compare(
-            matches.value_of("left").expect("required argument"),
-            matches.value_of("right").expect("required argument"),
-        );
-    } else if argv1.ends_with("stratis-base32-decode") {
-        let parser = Command::new("stratis-base32-decode")
-            .arg(Arg::new("key").help("Key for output string").required(true))
-            .arg(
-                Arg::new("value")
-                    .help("value to be decoded from base32 encoded sequence")
-                    .required(true),
-            );
-        let matches = parser.get_matches_from(&args);
-        base32_decode(
-            matches.value_of("key").expect("required argument"),
-            matches.value_of("value").expect("required argument"),
-        )?;
-    } else if argv1.ends_with("stratis-predict-usage") {
+    if argv1.ends_with("stratis-predict-usage") {
         let parser = Command::new("stratis-predict-usage")
             .about("Predicts space usage for Stratis.")
             .subcommand_required(true)

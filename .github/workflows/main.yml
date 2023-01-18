@@ -126,6 +126,7 @@ jobs:
           dbus-devel
           libblkid-devel
           git
+          glibc-static
           make
           python3-coverage
           python3-dbus-client-gen
@@ -252,6 +253,7 @@ jobs:
           dbus-devel
           dbus-tools
           device-mapper-persistent-data
+          glibc-static
           libblkid-devel
           make
           python3-justbytes

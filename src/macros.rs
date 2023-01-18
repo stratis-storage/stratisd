@@ -10,6 +10,7 @@ macro_rules! test_async {
     };
 }
 
+#[cfg(feature = "engine")]
 macro_rules! spawn_blocking {
     ($expr:expr) => {
         tokio::task::spawn_blocking(move || $expr)

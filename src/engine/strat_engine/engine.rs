@@ -150,6 +150,7 @@ impl StratEngine {
                     acc.extend(hm);
                     acc
                 }
+                Ok(Err(StratisError::ActionDisabled(_))) => acc,
                 Ok(Err(e)) => {
                     warn!("Filesystem checks failed with error: {}", e);
                     acc

@@ -197,7 +197,9 @@ fmt-shell-ci:
 build:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build ${RELEASE_FLAG} ${TARGET_ARGS}
+	cargo build ${RELEASE_FLAG} \
+	--bin=stratisd \
+	${TARGET_ARGS}
 
 ## Build the stratisd test suite
 build-tests:

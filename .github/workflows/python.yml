@@ -33,39 +33,36 @@ jobs:
       matrix:
         include:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT ENVIRONMENT
-          - image: fedora:37  # CURRENT DEVELOPMENT ENVIRONMENT
-            toolchain: 1.66.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          - toolchain: 1.66.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           # MANDATORY CHECKS USING LOWEST SUPPORTED ENVIRONMENT PROXY
-          - image: fedora:34  # LOWEST DEVELOPMENT ENVIRONMENT
-            toolchain: 1.62.1  # LOWEST SUPPORTED RUST TOOLCHAIN
-    runs-on: ubuntu-20.04
-    container:
-      image: ${{ matrix.image }}
-      options: --privileged -v /dev:/dev
+          - toolchain: 1.62.1  # LOWEST SUPPORTED RUST TOOLCHAIN
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies for Fedora
         run: >
-          dnf install -y
+          DEBIAN_FRONTEND=noninteractive
+          sudo apt-get install -y
           asciidoc
           clang
-          cryptsetup-devel
           curl
-          dbus-daemon
-          dbus-devel
-          dbus-tools
-          device-mapper-persistent-data
-          glibc-static
-          libblkid-devel
+          libblkid-dev
+          libcryptsetup-dev
+          libdbus-1-dev
+          libsystemd-dev
+          libudev-dev
           make
-          python3-dbus
-          python3-dbus-client-gen
-          python3-dbus-python-client-gen
-          python3-psutil
-          python3-pyudev
-          systemd-devel
-          systemd-udev
+          thin-provisioning-tools
+          udev
           xfsprogs
+      - name: Install Python dependencies
+        run: >
+          sudo python -m pip install
+          dbus-python
+          dbus-client-gen
+          dbus-python-client-gen
+          psutil
+          pyudev
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
@@ -73,25 +70,18 @@ jobs:
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd
-        run: PROFILEDIR=debug make -f Makefile install
-      - name: Start udev
-        run: /usr/lib/systemd/systemd-udevd &
-      - name: Set up for D-Bus
-        run: |
-          mkdir -p /var/lib/dbus
-          dbus-uuidgen > /var/lib/dbus/machine-id
-          mkdir -p /var/run/dbus
-      - name: Start D-Bus
-        run: >
-          dbus-daemon
-          --config-file=/usr/share/dbus-1/system.conf
-          --print-address
+        run: sudo make PROFILEDIR=debug -f Makefile install
+      - name: Workaround for dbus inotify
+        run: sudo cp stratisd.conf /usr/share/dbus-1/system.d
+      - name: Reload udev
+        run: sudo udevadm control --reload
       - name: Tests on ${{ matrix.image }} using Rust ${{ matrix.toolchain }}
         run: >
+          sudo make
           RUST_LOG=stratisd=debug
           STRATISD=/usr/libexec/stratisd
           PYTHONPATH=./src
-          make udev-tests
+          udev-tests
         working-directory: ./tests/client-dbus
 
   # PYTHON-BASED TESTS WITH TANG
@@ -99,7 +89,7 @@ jobs:
     runs-on: ubuntu-20.04
     container:
       image: fedora:37  # CURRENT DEVELOPMENT ENVIRONMENT
-      options: --privileged -v /dev:/dev
+      options: --privileged -v /dev:/dev --userns=host --ipc=host -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1 -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev
     services:
       tang:
         # yamllint disable rule:line-length
@@ -119,9 +109,7 @@ jobs:
           clevis-luks
           cryptsetup-devel
           curl
-          dbus-daemon
           dbus-devel
-          dbus-tools
           device-mapper-persistent-data
           glibc-static
           libblkid-devel
@@ -142,18 +130,10 @@ jobs:
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd
         run: PROFILEDIR=debug make -f Makefile install
-      - name: Start udev
-        run: /usr/lib/systemd/systemd-udevd &
-      - name: Set up for D-Bus
-        run: |
-          mkdir -p /var/lib/dbus
-          dbus-uuidgen > /var/lib/dbus/machine-id
-          mkdir -p /var/run/dbus
-      - name: Start D-Bus
-        run: >
-          dbus-daemon
-          --config-file=/usr/share/dbus-1/system.conf
-          --print-address
+      - name: Workaround for dbus inotify
+        run: cp stratisd.conf /usr/share/dbus-1/system.d
+      - name: Reload udev
+        run: udevadm control --reload
       - name: Run D-Bus based bind tests
         run: >
           TANG_URL=tang

@@ -199,7 +199,9 @@ jobs:
           - image: fedora:35  # PINNED DEVELOPMENT ENVIRONMENT
             tag: v3.0.1
     runs-on: ubuntu-20.04
-    container: ${{ matrix.image }}
+    container:
+      image: ${{ matrix.image }}
+      options: --privileged --userns=host --ipc=host -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies for Fedora
@@ -208,8 +210,6 @@ jobs:
           asciidoc
           clang
           cryptsetup-devel
-          dbus-daemon
-          dbus-tools
           dbus-devel
           libblkid-devel
           git
@@ -236,16 +236,6 @@ jobs:
       - name: Checkout tag
         run: git checkout tags/${{ matrix.tag }} -b ${{ matrix.tag }}
         working-directory: ./stratis-cli
-      - name: Set up for D-Bus
-        run: |
-          mkdir -p /var/lib/dbus
-          dbus-uuidgen > /var/lib/dbus/machine-id
-          mkdir -p /var/run/dbus
-      - name: Start D-Bus
-        run: >
-          dbus-daemon
-          --config-file=/usr/share/dbus-1/system.conf
-          --print-address
       - name: Run stratis-cli tests
         run: >
           RUST_LOG=stratisd=debug
@@ -266,7 +256,7 @@ jobs:
     runs-on: ubuntu-20.04
     container:
       image: ${{ matrix.image }}
-      options: --privileged -v /dev:/dev
+      options: --privileged -v /dev:/dev -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1 -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies for Fedora
@@ -276,9 +266,7 @@ jobs:
           clang
           cryptsetup-devel
           curl
-          dbus-daemon
           dbus-devel
-          dbus-tools
           device-mapper-persistent-data
           glibc-static
           libblkid-devel
@@ -300,18 +288,8 @@ jobs:
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd
         run: PROFILEDIR=debug make -f Makefile install
-      - name: Start udev
-        run: /usr/lib/systemd/systemd-udevd &
-      - name: Set up for D-Bus
-        run: |
-          mkdir -p /var/lib/dbus
-          dbus-uuidgen > /var/lib/dbus/machine-id
-          mkdir -p /var/run/dbus
-      - name: Start D-Bus
-        run: >
-          dbus-daemon
-          --config-file=/usr/share/dbus-1/system.conf
-          --print-address
+      - name: Reload udev
+        run: udevadm control --reload
       - name: Tests on ${{ matrix.image }} using Rust ${{ matrix.toolchain }}
         run: >
           RUST_LOG=stratisd=debug

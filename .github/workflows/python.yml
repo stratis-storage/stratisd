@@ -86,7 +86,7 @@ jobs:
 
   # PYTHON-BASED TESTS WITH TANG
   python-based-checks_with_tang:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     container:
       image: fedora:37  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev --userns=host --ipc=host -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1 -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev

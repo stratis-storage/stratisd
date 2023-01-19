@@ -22,7 +22,7 @@ jobs:
             components: cargo
     runs-on: ubuntu-20.04
     container:
-      image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:37  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies for Fedora
@@ -48,7 +48,7 @@ jobs:
   check_future_dependencies:
     runs-on: ubuntu-20.04
     container:
-      image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:37  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies for Fedora
@@ -88,7 +88,7 @@ jobs:
             components: clippy
     runs-on: ubuntu-20.04
     container:
-      image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:37  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies for Fedora
@@ -114,7 +114,7 @@ jobs:
   checks-with-ci-repo:
     runs-on: ubuntu-20.04
     container:
-      image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:37  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies for Fedora
@@ -156,7 +156,7 @@ jobs:
           - tag: v3.2.0
     runs-on: ubuntu-20.04
     container:
-      image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:37  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v3
@@ -257,7 +257,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - image: fedora:36  # CURRENT DEVELOPMENT ENVIRONMENT
+          - image: fedora:37  # CURRENT DEVELOPMENT ENVIRONMENT
             toolchain: 1.66.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           - image: fedora:34  # LOWEST DEVELOPMENT ENVIRONMENT
             toolchain: 1.62.1  # LOWEST SUPPORTED RUST TOOLCHAIN

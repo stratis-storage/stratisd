@@ -64,7 +64,7 @@ jobs:
           - tag: v3.0.2
           - tag: v3.0.1
           - tag: v3.0.0
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     container:
       image: fedora:37  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev

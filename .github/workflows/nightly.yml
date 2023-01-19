@@ -20,7 +20,7 @@ jobs:
           - task: make -f Makefile stratis-dumpmetadata
             toolchain: 1.66.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     container:
       image: fedora:37  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
@@ -46,7 +46,7 @@ jobs:
         run: ${{ matrix.task }}
 
   check_future_dependencies:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     container:
       image: fedora:37  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
@@ -86,7 +86,7 @@ jobs:
           - task: make -f Makefile clippy
             toolchain: stable
             components: clippy
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     container:
       image: fedora:37  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
@@ -112,7 +112,7 @@ jobs:
         run: ${{ matrix.task }}
 
   checks-with-ci-repo:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     container:
       image: fedora:37  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
@@ -154,7 +154,7 @@ jobs:
           - tag: v3.2.2
           - tag: v3.2.1
           - tag: v3.2.0
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     container:
       image: fedora:37  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
@@ -198,7 +198,7 @@ jobs:
             tag: v3.0.0
           - image: fedora:35  # PINNED DEVELOPMENT ENVIRONMENT
             tag: v3.0.1
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     container: ${{ matrix.image }}
     steps:
       - uses: actions/checkout@v3
@@ -261,7 +261,7 @@ jobs:
             toolchain: 1.66.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           - image: fedora:34  # LOWEST DEVELOPMENT ENVIRONMENT
             toolchain: 1.62.1  # LOWEST SUPPORTED RUST TOOLCHAIN
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     container:
       image: ${{ matrix.image }}
       options: --privileged -v /dev:/dev

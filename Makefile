@@ -269,13 +269,24 @@ stratisd-min:
 	cargo build ${RELEASE_FLAG} \
 	--bin=stratisd-min ${SYSTEMD_FEATURES} ${TARGET_ARGS}
 
-## Install stratisd configuration
-install-cfg:
-	mkdir -p $(DESTDIR)$(UNITDIR)
-	$(INSTALL) -Dpm0644 -t $(DESTDIR)$(DATADIR)/dbus-1/system.d stratisd.conf
-	$(INSTALL) -Dpm0644 -t $(DESTDIR)$(MANDIR)/man8 docs/stratisd.8
+## Install udev configuration
+install-udev-cfg:
+	mkdir -p $(DESTDIR)$(UDEVDIR)/rules.d
 	$(INSTALL) -Dpm0644 -t $(DESTDIR)$(UDEVDIR)/rules.d udev/61-stratisd.rules
-	sed 's|@LIBEXECDIR@|$(LIBEXECDIR)|' systemd/stratisd.service.in > $(DESTDIR)$(UNITDIR)/stratisd.service
+
+## Install man pages
+install-man-cfg:
+	mkdir -p $(DESTDIR)$(MANDIR)/man8
+	$(INSTALL) -Dpm0644 -t $(DESTDIR)$(MANDIR)/man8 docs/stratisd.8
+
+## Install dbus config
+install-dbus-cfg:
+	mkdir -p $(DESTDIR)$(DATADIR)/dbus-1/system.d
+	$(INSTALL) -Dpm0644 -t $(DESTDIR)$(DATADIR)/dbus-1/system.d stratisd.conf
+
+## Install dracut modules
+install-dracut-cfg:
+	mkdir -p $(DESTDIR)$(DRACUTDIR)/modules.d
 	$(INSTALL) -Dpm0755 -d $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/module-setup.sh
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/stratis-rootfs-setup
@@ -284,23 +295,43 @@ install-cfg:
 	$(INSTALL) -Dpm0755 -d $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis-clevis
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis-clevis dracut/90stratis-clevis/module-setup.sh
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis-clevis dracut/90stratis-clevis/stratis-clevis-rootfs-setup
+
+## Install systemd configuration
+install-systemd-cfg:
+	mkdir -p $(DESTDIR)$(UNITDIR)
+	sed 's|@LIBEXECDIR@|$(LIBEXECDIR)|' systemd/stratisd.service.in > $(DESTDIR)$(UNITDIR)/stratisd.service
 	sed 's|@LIBEXECDIR@|$(LIBEXECDIR)|' systemd/stratisd-min-postinitrd.service.in > $(DESTDIR)$(UNITDIR)/stratisd-min-postinitrd.service
 	sed 's|@UNITEXECDIR@|$(UNITEXECDIR)|' systemd/stratis-fstab-setup@.service.in > $(DESTDIR)$(UNITDIR)/stratis-fstab-setup@.service
 
-## Install stratisd binaries and configuration
-install: install-cfg
-	mkdir -p $(DESTDIR)$(UNITGENDIR)
+## Install binaries
+install-binaries:
 	mkdir -p $(DESTDIR)$(BINDIR)
-	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd
-	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd-min
-	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(UDEVDIR) target/$(PROFILEDIR)/stratis-base32-decode
-	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(UDEVDIR) target/$(PROFILEDIR)/stratis-str-cmp
-	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(UNITEXECDIR) systemd/stratis-fstab-setup
+	mkdir -p $(DESTDIR)$(UNITGENDIR)
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(BINDIR) target/$(PROFILEDIR)/stratis-min
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(BINDIR) target/$(PROFILEDIR)/stratis-utils
 	mv --force --verbose $(DESTDIR)$(BINDIR)/stratis-utils $(DESTDIR)$(BINDIR)/stratis-predict-usage
 	ln --force --verbose $(DESTDIR)$(BINDIR)/stratis-predict-usage $(DESTDIR)$(UNITGENDIR)/stratis-clevis-setup-generator
 	ln --force --verbose $(DESTDIR)$(BINDIR)/stratis-predict-usage $(DESTDIR)$(UNITGENDIR)/stratis-setup-generator
+
+## Install udev binaries
+install-udev-binaries:
+	mkdir -p $(DESTDIR)$(UDEVDIR)
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(UDEVDIR) target/$(PROFILEDIR)/stratis-base32-decode
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(UDEVDIR) target/$(PROFILEDIR)/stratis-str-cmp
+
+## Install fstab script
+install-fstab-script:
+	mkdir -p $(DESTDIR)$(UNITEXECDIR)
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(UNITEXECDIR) systemd/stratis-fstab-setup
+
+## Install daemons
+install-daemons:
+	mkdir -p $(DESTDIR)$(LIBEXECDIR)
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd-min
+
+## Install all stratisd files
+install: install-udev-cfg install-man-cfg install-dbus-cfg install-dracut-cfg install-systemd-cfg install-binaries install-udev-binaries install-fstab-script install-daemons
 
 
 ## Build and install stratisd binaries and configuration
@@ -413,7 +444,15 @@ clippy: clippy-macros
 	fmt-macros-travis
 	help
 	install
-	install-cfg
+	install-binaries
+	install-daemons
+	install-dbus-cfg
+	install-dracut-cfg
+	install-fstab-script
+	install-man-cfg
+	install-systemd-cfg
+	install-udev-binaries
+	install-udev-cfg
 	license
 	outdated
 	test

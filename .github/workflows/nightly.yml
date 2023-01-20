@@ -228,7 +228,9 @@ jobs:
           components: cargo
           toolchain: 1.66.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - name: Build stratisd
-        run: PROFILEDIR=debug make -f Makefile build-and-install
+        run: PROFILEDIR=debug make -f Makefile build-all
+      - name: Install stratisd
+        run: PROFILEDIR=debug make -f Makefile install
       - name: Check out stratis-cli
         run: git clone https://github.com/stratis-storage/stratis-cli.git
       - name: Checkout tag
@@ -294,8 +296,10 @@ jobs:
         with:
           components: cargo
           toolchain: ${{ matrix.toolchain }}
-      - name: Install all necessary Stratis files
-        run: PROFILEDIR=debug make -f Makefile build-and-install
+      - name: Build stratisd
+        run: PROFILEDIR=debug make -f Makefile build-all
+      - name: Install stratisd
+        run: PROFILEDIR=debug make -f Makefile install
       - name: Start udev
         run: /usr/lib/systemd/systemd-udevd &
       - name: Set up for D-Bus

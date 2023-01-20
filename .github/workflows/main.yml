@@ -98,6 +98,7 @@ jobs:
           dbus-devel
           libblkid-devel
           make
+          sudo
           systemd-devel
           systemd-udev
           xfsprogs
@@ -142,7 +143,9 @@ jobs:
           components: cargo
           toolchain: 1.62.1  # LOWEST SUPPORTED RUST TOOLCHAIN
       - name: Build stratisd
-        run: PROFILEDIR=debug make -f Makefile build-and-install
+        run: PROFILEDIR=debug make -f Makefile build-all
+      - name: Install stratisd
+        run: PROFILEDIR=debug make -f Makefile install
       - name: Check out stratis-cli
         run: git clone https://github.com/stratis-storage/stratis-cli.git
       - name: Set up for D-Bus
@@ -264,8 +267,10 @@ jobs:
         with:
           components: cargo
           toolchain: 1.66.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-      - name: Install all necessary Stratis files
-        run: PROFILEDIR=debug make -f Makefile build-and-install
+      - name: Build stratisd
+        run: PROFILEDIR=debug make -f Makefile build-all
+      - name: Install stratisd
+        run: PROFILEDIR=debug make -f Makefile install
       - name: Check basic behavior of test_predict
         run: >
           STRATIS_PREDICT_USAGE=/usr/bin/stratis-predict-usage

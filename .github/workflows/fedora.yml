@@ -78,6 +78,7 @@ jobs:
           device-mapper-persistent-data
           libblkid-devel
           make
+          sudo
           systemd-devel
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -112,6 +113,7 @@ jobs:
           glibc-static
           libblkid-devel
           make
+          sudo
           systemd-devel
           systemd-udev
           xfsprogs
@@ -119,8 +121,10 @@ jobs:
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
-      - name: Install all necessary Stratis files
-        run: make -f Makefile build-and-install
+      - name: Build stratisd
+        run: PROFILEDIR=debug make -f Makefile build-all
+      - name: Install stratisd
+        run: PROFILEDIR=debug make -f Makefile install
       - name: Start udev
         run: /usr/lib/systemd/systemd-udevd &
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain

@@ -77,6 +77,7 @@ jobs:
           libsystemd-dev
           libudev-dev
           make
+          sudo
           thin-provisioning-tools
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -114,6 +115,7 @@ jobs:
           libsystemd-dev
           libudev-dev
           make
+          sudo
           systemd
           thin-provisioning-tools
           udev
@@ -122,8 +124,10 @@ jobs:
         with:
           components: ${{ matrix.components }}
           toolchain: ${{ matrix.toolchain }}
-      - name: Install all necessary Stratis files
-        run: make -f Makefile build-and-install
+      - name: Build stratisd
+        run: PROFILEDIR=debug make -f Makefile build-all
+      - name: Install stratisd
+        run: PROFILEDIR=debug make -f Makefile install
       - name: Start udev
         run: /usr/lib/systemd/systemd-udevd &
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain

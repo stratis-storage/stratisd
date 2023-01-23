@@ -711,14 +711,14 @@ checksum = "830d08ce1d1d941e6b30645f1a0eb5643013d835ce3779a5fc208261dbe10f55"
 
 [[package]]
 name = "libblkid-rs"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04dacb7181b4754a7f22341164a7742352bbbb7ed5f88eacc627fb70d0b23faa"
+checksum = "de9a402d7e440c9f84431b566cbc523140e9354610a4dca35aa7b927400cb040"
 dependencies = [
  "either",
  "libblkid-rs-sys",
  "libc",
- "uuid 0.8.2",
+ "uuid",
 ]
 
 [[package]]
@@ -751,7 +751,7 @@ dependencies = [
  "pkg-config",
  "semver",
  "serde_json",
- "uuid 1.2.2",
+ "uuid",
 ]
 
 [[package]]
@@ -1301,7 +1301,7 @@ dependencies = [
  "stratisd_proc_macros",
  "tempfile",
  "tokio",
- "uuid 1.2.2",
+ "uuid",
 ]
 
 [[package]]
@@ -1404,12 +1404,6 @@ name = "unicode-width"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c0edd1e5b14653f783770bce4a4dabb4a5108a5370a5f5d8cfe8710c361f6c8b"
-
-[[package]]
-name = "uuid"
-version = "0.8.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
 
 [[package]]
 name = "uuid"

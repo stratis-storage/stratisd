@@ -125,7 +125,7 @@ version = "1.4.0"
 optional = true
 
 [dependencies.libblkid-rs]
-version = "0.2.0"
+version = "0.3.0"
 optional = true
 
 [dependencies.libc]

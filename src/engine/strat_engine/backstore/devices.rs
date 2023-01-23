@@ -125,8 +125,8 @@ pub fn find_stratis_devs_by_uuid(
     for dev in cache.iter().search("TYPE", STRATIS_FS_TYPE)? {
         if let Some(dev) = cache.verify(dev) {
             let devname = DevicePath::new(&dev.devname()?)?;
-            let dev_uuid = DevUuid::parse_str(cache.get_tag_value("UUID", &devname)?)?;
-            let dev_pool_uuid = PoolUuid::parse_str(cache.get_tag_value("POOL_UUID", &devname)?)?;
+            let dev_uuid = DevUuid::parse_str(&cache.get_tag_value("UUID", &devname)?)?;
+            let dev_pool_uuid = PoolUuid::parse_str(&cache.get_tag_value("POOL_UUID", &devname)?)?;
             let devno = get_devno_from_path(&devname)?;
 
             if dev_pool_uuid == pool_uuid && uuids.contains(&dev_uuid) {

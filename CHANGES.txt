@@ -1,3 +1,78 @@
+stratisd 3.5.0
+==============
+Recommended Rust toolchain version: 1.66.1
+Lowest supported Rust toolchain version: 1.62.1
+
+Recommended development platform for Python development: Fedora 37
+
+- Increase revision number to r5:
+  https://github.com/stratis-storage/stratisd/pull/3100
+
+- Encrypt an encrypted pool's cache:
+  https://github.com/stratis-storage/stratisd/issues/3136
+  https://github.com/stratis-storage/stratisd/pull/3137
+
+- Increase devicemapper-rs dependency version bound to 0.32.3:
+  https://github.com/stratis-storage/stratisd/pull/3209
+
+- Do not require pool name field in LUKS2 metadata:
+  https://github.com/stratis-storage/stratisd/issues/3200
+  https://github.com/stratis-storage/stratisd/pull/3201
+
+- Do not expect redundancy value in CreatePool parameters:
+  https://github.com/stratis-storage/stratisd/issues/2969
+  https://github.com/stratis-storage/stratisd/pull/3207
+
+- Do not log the same message repeatedly when pool is in NoPoolChanges state:
+  https://github.com/stratis-storage/stratisd/issues/3171
+  https://github.com/stratis-storage/stratisd/pull/3229
+  https://github.com/stratis-storage/stratisd/pull/3220
+
+- Do not log the same message repeatedly when pool is out of metadata space:
+  https://github.com/stratis-storage/stratisd/pull/3224
+
+- Increase libblkid-rs dependency lower bound to 0.3.0:
+  https://github.com/stratis-storage/stratisd/pull/3239
+
+- Increase nix dependency lower bound to 0.26.0:
+  https://github.com/stratis-storage/stratisd/pull/3240
+
+- Do not do thinpool check as part of setup of data device add D-Bus calls:
+  https://github.com/stratis-storage/stratisd/pull/3223
+
+- Reorder suspend and resume when extending thin devices:
+  https://github.com/stratis-storage/stratisd/issues/3097
+  https://github.com/stratis-storage/stratisd/pull/3225
+
+- Compile binaries used by udev rules statically:
+  https://github.com/stratis-storage/stratisd/issues/3195
+  https://github.com/stratis-storage/stratisd/pull/3210
+
+- Make all dependencies optional and included in at least one feature:
+  https://github.com/stratis-storage/stratisd/pull/3221
+  https://github.com/stratis-storage/stratisd/pull/3218
+
+- Use license field with SPDX license for stratisd_proc_macros:
+  https://github.com/stratis-storage/stratisd/pull/3222
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3238
+  https://github.com/stratis-storage/stratisd/pull/3237
+  https://github.com/stratis-storage/stratisd/pull/3235
+  https://github.com/stratis-storage/stratisd/pull/3232
+  https://github.com/stratis-storage/stratisd/pull/3228
+  https://github.com/stratis-storage/stratisd/pull/3227
+  https://github.com/stratis-storage/stratisd/pull/3226
+  https://github.com/stratis-storage/stratisd/pull/3219
+  https://github.com/stratis-storage/stratisd/pull/3217
+  https://github.com/stratis-storage/stratisd/pull/3215
+  https://github.com/stratis-storage/stratisd/pull/3208
+  https://github.com/stratis-storage/stratisd/pull/3206
+  https://github.com/stratis-storage/stratisd/pull/3205
+  https://github.com/stratis-storage/stratisd/pull/3198
+  https://github.com/stratis-storage/stratisd/pull/3154
+
+
 stratisd 3.4.2
 ==============
 Recommended Rust toolchain version: 1.65.0

@@ -308,16 +308,18 @@ fn handle_cmsgs(cmsgs: Vec<ControlMessageOwned>) -> StratisResult<Option<RawFd>>
 fn try_recvmsg(fd: RawFd) -> StratisResult<StratisParams> {
     let mut cmsg_space = cmsg_space!([RawFd; 1]);
     let mut vec = vec![0; 65536];
-    let rmsg = recvmsg::<UnixAddr>(
-        fd,
-        &mut [IoSliceMut::new(vec.as_mut_slice())],
-        Some(&mut cmsg_space),
-        MsgFlags::empty(),
-    )?;
+    let (cmsgs, bytes) = {
+        let rmsg = recvmsg::<UnixAddr>(
+            fd,
+            &mut [IoSliceMut::new(vec.as_mut_slice())],
+            Some(&mut cmsg_space),
+            MsgFlags::empty(),
+        )?;
+        (rmsg.cmsgs().collect(), rmsg.bytes)
+    };
 
-    let cmsgs = rmsg.cmsgs().collect();
     let fd_opt = handle_cmsgs(cmsgs)?;
-    vec.truncate(rmsg.bytes);
+    vec.truncate(bytes);
     serde_json::from_slice(vec.as_slice())
         .map(|type_| StratisParams { type_, fd_opt })
         .map_err(StratisError::from)

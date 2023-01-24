@@ -7,12 +7,13 @@ use std::{
     fs::{create_dir_all, remove_file, set_permissions, File, OpenOptions, Permissions},
     io::{self, Read, Write},
     mem::size_of,
+    num::NonZeroUsize,
     os::unix::{
         fs::PermissionsExt,
         io::{AsRawFd, RawFd},
     },
     path::{Path, PathBuf},
-    ptr, slice, str,
+    slice, str,
 };
 
 use libc::{syscall, SYS_add_key, SYS_keyctl};
@@ -547,7 +548,7 @@ impl Drop for MemoryPrivateFilesystem {
 
 /// Keyfile integration with Clevis for keys so that they are never written to disk.
 /// This struct will handle memory mapping and locking internally to avoid disk usage.
-pub struct MemoryMappedKeyfile(*mut libc::c_void, usize, PathBuf);
+pub struct MemoryMappedKeyfile(*mut libc::c_void, NonZeroUsize, PathBuf);
 
 impl MemoryMappedKeyfile {
     pub fn new(file_path: &Path, key_data: SizedKeyMemory) -> StratisResult<MemoryMappedKeyfile> {
@@ -566,11 +567,12 @@ impl MemoryMappedKeyfile {
         assert!(Uid::current().is_root());
         chown(file_path, Some(Uid::current()), None)?;
         set_permissions(file_path, Permissions::from_mode(0o600))?;
-        let needed_keyfile_length = key_data.as_ref().len();
-        keyfile.set_len(convert_int!(needed_keyfile_length, usize, u64)?)?;
+        let needed_keyfile_length = NonZeroUsize::new(key_data.as_ref().len())
+            .ok_or_else(|| StratisError::Msg("Zero sized keyfile provided".to_string()))?;
+        keyfile.set_len(convert_int!(needed_keyfile_length.get(), usize, u64)?)?;
         let mem = unsafe {
             mmap(
-                ptr::null_mut(),
+                None,
                 needed_keyfile_length,
                 ProtFlags::PROT_WRITE,
                 MapFlags::MAP_SHARED | MapFlags::MAP_LOCKED,
@@ -578,7 +580,8 @@ impl MemoryMappedKeyfile {
                 0,
             )
         }?;
-        let mut slice = unsafe { slice::from_raw_parts_mut(mem as *mut u8, needed_keyfile_length) };
+        let mut slice =
+            unsafe { slice::from_raw_parts_mut(mem as *mut u8, needed_keyfile_length.get()) };
         slice.write_all(key_data.as_ref())?;
         Ok(MemoryMappedKeyfile(
             mem,
@@ -594,16 +597,16 @@ impl MemoryMappedKeyfile {
 
 impl AsRef<[u8]> for MemoryMappedKeyfile {
     fn as_ref(&self) -> &[u8] {
-        unsafe { slice::from_raw_parts(self.0 as *const u8, self.1) }
+        unsafe { slice::from_raw_parts(self.0 as *const u8, self.1.get()) }
     }
 }
 
 impl Drop for MemoryMappedKeyfile {
     fn drop(&mut self) {
         {
-            unsafe { SafeBorrowedMemZero::from_ptr(self.0, self.1) };
+            unsafe { SafeBorrowedMemZero::from_ptr(self.0, self.1.get()) };
         }
-        if let Err(e) = unsafe { munmap(self.0, self.1) } {
+        if let Err(e) = unsafe { munmap(self.0, self.1.get()) } {
             warn!("Could not unmap temporary keyfile: {}", e);
         }
         if let Err(e) = remove_file(self.keyfile_path()) {

@@ -57,7 +57,7 @@ jobs:
           - task: make -f Makefile build-min
             toolchain: 1.66.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     container:
       image: ubuntu:jammy
       options: --privileged -v /dev:/dev
@@ -94,10 +94,10 @@ jobs:
           - task: RUST_LOG=stratisd=debug make -f Makefile test-loop
             toolchain: 1.66.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     container:
       image: ubuntu:jammy
-      options: --privileged -v /dev:/dev
+      options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev --ipc=host
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies for Ubuntu
@@ -128,7 +128,7 @@ jobs:
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd
         run: PROFILEDIR=debug make -f Makefile install
-      - name: Start udev
-        run: /usr/lib/systemd/systemd-udevd &
+      - name: Reload udev
+        run: udevadm control --reload
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}

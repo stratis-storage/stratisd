@@ -240,7 +240,7 @@ impl MDARegions {
         match (&self.mda_headers[0], &self.mda_headers[1]) {
             (&None, _) => 0,
             (_, &None) => 1,
-            (&Some(ref mda0), &Some(ref mda1)) => match mda0.last_updated.cmp(&mda1.last_updated) {
+            (Some(mda0), Some(mda1)) => match mda0.last_updated.cmp(&mda1.last_updated) {
                 Ordering::Less => 0,
                 Ordering::Equal | Ordering::Greater => 1,
             },

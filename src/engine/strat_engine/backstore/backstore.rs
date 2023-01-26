@@ -1122,8 +1122,8 @@ mod tests {
             backstore.data_tier.allocated(),
             match (&backstore.linear, &backstore.cache) {
                 (None, None) => Sectors(0),
-                (&None, &Some(ref cache)) => cache.size(),
-                (&Some(ref linear), &None) => linear.size(),
+                (&None, Some(cache)) => cache.size(),
+                (Some(linear), &None) => linear.size(),
                 _ => panic!("impossible; see first assertion"),
             }
         );

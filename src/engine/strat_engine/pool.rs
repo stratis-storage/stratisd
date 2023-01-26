@@ -186,9 +186,15 @@ impl StratPool {
             pool_uuid,
             match ThinPoolSizeParams::new(backstore.datatier_usable_size()) {
                 Ok(ref params) => params,
-                Err(e) => {
-                    let _ = backstore.destroy();
-                    return Err(e);
+                Err(causal_error) => {
+                    if let Err(cleanup_err) = backstore.destroy() {
+                        warn!("Failed to clean up Stratis metadata for incompletely set up pool with UUID {}: {}.", pool_uuid, cleanup_err);
+                        return Err(StratisError::NoActionRollbackError {
+                            causal_error: Box::new(causal_error),
+                            rollback_error: Box::new(cleanup_err),
+                        });
+                    }
+                    return Err(causal_error);
                 }
             },
             DATA_BLOCK_SIZE,
@@ -197,9 +203,15 @@ impl StratPool {
 
         let thinpool = match thinpool {
             Ok(thinpool) => thinpool,
-            Err(err) => {
-                let _ = backstore.destroy();
-                return Err(err);
+            Err(causal_error) => {
+                if let Err(cleanup_err) = backstore.destroy() {
+                    warn!("Failed to clean up Stratis metadata for incompletely set up pool with UUID {}: {}.", pool_uuid, cleanup_err);
+                    return Err(StratisError::NoActionRollbackError {
+                        causal_error: Box::new(causal_error),
+                        rollback_error: Box::new(cleanup_err),
+                    });
+                }
+                return Err(causal_error);
             }
         };
 

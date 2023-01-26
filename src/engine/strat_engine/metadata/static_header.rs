@@ -215,7 +215,7 @@ impl StaticHeader {
     {
         let signature_block = self.sigblock_to_buf();
         let zeroed = [0u8; bytes!(static_header_size::POST_SIGBLOCK_PADDING_SECTORS)];
-        f.seek(SeekFrom::Start(0))?;
+        f.rewind()?;
 
         // Write to a static header region in the static header.
         fn write_region<F>(f: &mut F, signature_block: &[u8], zeroed: &[u8]) -> io::Result<()>
@@ -562,7 +562,7 @@ impl StaticHeader {
         F: Seek + SyncAll,
     {
         let zeroed = [0u8; bytes!(static_header_size::STATIC_HEADER_SECTORS)];
-        f.seek(SeekFrom::Start(0))?;
+        f.rewind()?;
         f.write_all(&zeroed)?;
         f.sync_all()?;
         Ok(())

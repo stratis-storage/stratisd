@@ -125,13 +125,11 @@ fn get_filesystem_prediction(
         .map(|&val| {
             if !(FS_LOGICAL_SIZE_MIN..FS_LOGICAL_SIZE_MAX).contains(&val) {
                 Err(Box::new(ExecutableError(format!(
-                    "Specified filesystem size {} is not within allowed limits.",
-                    val
+                    "Specified filesystem size {val} is not within allowed limits."
                 ))))
             } else if val.sectors().bytes() != val {
                 Err(Box::new(ExecutableError(format!(
-                    "Specified filesystem size {} is not a multiple of sector size, 512.",
-                    val
+                    "Specified filesystem size {val} is not a multiple of sector size, 512."
                 ))))
             } else {
                 Ok(val)
@@ -161,7 +159,7 @@ fn predict_filesystem_usage(
         {"used": used_size_str}
     };
 
-    println!("{}", json);
+    println!("{json}");
 
     Ok(())
 }
@@ -256,7 +254,7 @@ fn predict_pool_usage(
         {"total": total_size_str, "used": used_size_str, "free": avail_size_str, "stratis-admin-space": stratis_admin_str, "stratis-metadata-space": stratis_metadata_str}
     };
 
-    println!("{}", json);
+    println!("{json}");
 
     Ok(())
 }
@@ -409,8 +407,7 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
         )));
     } else {
         return Err(Box::new(ExecutableError(format!(
-            "{} is not a recognized executable name",
-            argv1
+            "{argv1} is not a recognized executable name"
         ))));
     }
 

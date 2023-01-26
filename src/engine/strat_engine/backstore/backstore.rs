@@ -666,8 +666,7 @@ impl Backstore {
         self.get_mut_blockdev_by_uuid(uuid).map_or_else(
             || {
                 Err(StratisError::Msg(format!(
-                    "Blockdev with a UUID of {} was not found",
-                    uuid
+                    "Blockdev with a UUID of {uuid} was not found"
                 )))
             },
             |(_, b)| {
@@ -746,9 +745,8 @@ impl Backstore {
                 Ok(false)
             } else {
                 Err(StratisError::Msg(format!(
-                    "Block devices have already been bound with pin {} and config {}; \
-                        requested pin {} and config {} can't be applied",
-                    existing_pin, existing_info, pin, parsed_config,
+                    "Block devices have already been bound with pin {existing_pin} and config {existing_info}; \
+                        requested pin {pin} and config {parsed_config} can't be applied"
                 )))
             }
         } else {

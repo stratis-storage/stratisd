@@ -73,10 +73,10 @@ where
         PoolIdentifier::Name(ref n) => locked
             .name_to_uuid
             .get(n)
-            .ok_or_else(|| StratisError::Msg(format!("Pool with name {} not found", n)))?,
+            .ok_or_else(|| StratisError::Msg(format!("Pool with name {n} not found")))?,
     }) {
         info.info.key_description().map(|opt| opt.cloned())
     } else {
-        Err(StratisError::Msg(format!("Pool with {} not found", id)))
+        Err(StratisError::Msg(format!("Pool with {id} not found")))
     }
 }

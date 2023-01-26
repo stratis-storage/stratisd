@@ -171,8 +171,7 @@ impl BlockDevMgr {
             }
             if !found {
                 return Err(StratisError::Msg(format!(
-                    "Blockdev corresponding to UUID: {} not found.",
-                    uuid
+                    "Blockdev corresponding to UUID: {uuid} not found."
                 )));
             }
         }
@@ -395,9 +394,7 @@ impl BlockDevMgr {
             .block_devs
             .iter_mut()
             .find(|bd| bd.uuid() == dev)
-            .ok_or_else(|| {
-                StratisError::Msg(format!("Block device with UUID {} not found", dev))
-            })?;
+            .ok_or_else(|| StratisError::Msg(format!("Block device with UUID {dev} not found")))?;
         bd.grow()
     }
 

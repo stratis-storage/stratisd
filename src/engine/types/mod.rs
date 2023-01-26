@@ -144,8 +144,7 @@ impl<'a> TryFrom<&'a str> for UnlockMethod {
             "keyring" => Ok(UnlockMethod::Keyring),
             "clevis" => Ok(UnlockMethod::Clevis),
             _ => Err(StratisError::Msg(format!(
-                "{} is an invalid unlock method",
-                s
+                "{s} is an invalid unlock method"
             ))),
         }
     }
@@ -216,8 +215,7 @@ impl<'a> TryFrom<&'a str> for ReportType {
         match name {
             "stopped_pools" => Ok(ReportType::StoppedPools),
             _ => Err(StratisError::Msg(format!(
-                "Report name {} not understood",
-                name
+                "Report name {name} not understood"
             ))),
         }
     }
@@ -430,8 +428,8 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            PoolIdentifier::Name(n) => write!(f, "name {}", n),
-            PoolIdentifier::Uuid(u) => write!(f, "UUID {}", u),
+            PoolIdentifier::Name(n) => write!(f, "name {n}"),
+            PoolIdentifier::Uuid(u) => write!(f, "UUID {u}"),
         }
     }
 }

@@ -164,10 +164,8 @@ impl MDARegions {
         let used = Bytes::from(data.len());
         let max_available = self.max_data_size().bytes();
         if used > max_available {
-            let err_msg = format!(
-                "metadata length {} exceeds region available {}",
-                used, max_available
-            );
+            let err_msg =
+                format!("metadata length {used} exceeds region available {max_available}");
             return Err(StratisError::Msg(err_msg));
         }
 
@@ -355,16 +353,14 @@ impl MDAHeader {
         let hdr_version = buf[28];
         if hdr_version != STRAT_REGION_HDR_VERSION {
             return Err(StratisError::Msg(format!(
-                "Unknown region header version: {}",
-                hdr_version
+                "Unknown region header version: {hdr_version}"
             )));
         }
 
         let metadata_version = buf[29];
         if metadata_version != STRAT_METADATA_VERSION {
             return Err(StratisError::Msg(format!(
-                "Unknown metadata version: {}",
-                metadata_version
+                "Unknown metadata version: {metadata_version}"
             )));
         }
 

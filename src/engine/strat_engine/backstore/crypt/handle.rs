@@ -224,8 +224,7 @@ impl CryptHandle {
 
         let keyslots = self.keyslots(CLEVIS_LUKS_TOKEN_ID)?.ok_or_else(|| {
             StratisError::Msg(format!(
-                "Token slot {} appears to be empty; could not determine keyslots",
-                CLEVIS_LUKS_TOKEN_ID,
+                "Token slot {CLEVIS_LUKS_TOKEN_ID} appears to be empty; could not determine keyslots"
             ))
         })?;
         for keyslot in keyslots {
@@ -382,9 +381,8 @@ impl CryptHandle {
             .and_then(|map| map.remove("jwe"))
             .ok_or_else(|| {
                 StratisError::Msg(format!(
-                    "Token slot {} is occupied but does not appear to be a Clevis \
-                        token; aborting",
-                    CLEVIS_LUKS_TOKEN_ID,
+                    "Token slot {CLEVIS_LUKS_TOKEN_ID} is occupied but does not appear to be a Clevis \
+                        token; aborting"
                 ))
             })?;
         clevis_decrypt(&jwe).map(Some)

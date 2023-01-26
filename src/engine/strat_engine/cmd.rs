@@ -164,8 +164,7 @@ pub fn verify_executables() -> StratisResult<()> {
 fn execute_cmd(cmd: &mut Command) -> StratisResult<()> {
     match cmd.output() {
         Err(err) => Err(StratisError::Msg(format!(
-            "Failed to execute command {:?}, err: {:?}",
-            cmd, err
+            "Failed to execute command {cmd:?}, err: {err:?}"
         ))),
         Ok(result) => {
             if result.status.success() {
@@ -180,8 +179,7 @@ fn execute_cmd(cmd: &mut Command) -> StratisResult<()> {
                 let std_out_txt = String::from_utf8_lossy(&result.stdout);
                 let std_err_txt = String::from_utf8_lossy(&result.stderr);
                 let err_msg = format!(
-                    "Command failed: cmd: {:?}, exit reason: {} stdout: {} stderr: {}",
-                    cmd, exit_reason, std_out_txt, std_err_txt
+                    "Command failed: cmd: {cmd:?}, exit reason: {exit_reason} stdout: {std_out_txt} stderr: {std_err_txt}"
                 );
                 Err(StratisError::Msg(err_msg))
             }
@@ -217,15 +215,13 @@ fn get_clevis_executable(name: &str) -> StratisResult<PathBuf> {
             .remove(&name)
             .ok_or_else(|| {
                 StratisError::Msg(format!(
-                    "Executable {} is not in the list of Clevis executables tracked by stratisd",
-                    name,
+                    "Executable {name} is not in the list of Clevis executables tracked by stratisd"
                 ))
             })?
             .expect("not_found.is_empty()"))
     } else {
         Err(StratisError::Msg(format!(
-            "Clevis has been disabled due to some of the required executables not being found on this system. Required executables that were not found are: {:?}",
-            not_found,
+            "Clevis has been disabled due to some of the required executables not being found on this system. Required executables that were not found are: {not_found:?}"
         )))
     }
 }
@@ -244,7 +240,7 @@ pub fn create_fs(devnode: &Path, uuid: Option<StratisUuid>, noalign: bool) -> St
 
     if let Some(uuid) = uuid {
         command.arg("-m");
-        command.arg(format!("uuid={}", uuid));
+        command.arg(format!("uuid={uuid}"));
     }
     if noalign {
         command.arg("-d");
@@ -268,7 +264,7 @@ pub fn set_uuid(devnode: &Path, uuid: FilesystemUuid) -> StratisResult<()> {
     execute_cmd(
         Command::new(get_executable(XFS_DB).as_os_str())
             .arg("-x")
-            .arg(format!("-c uuid {}", uuid))
+            .arg(format!("-c uuid {uuid}"))
             .arg(devnode),
     )
 }
@@ -473,8 +469,7 @@ pub fn thin_metadata_size(
         ))
     } else {
         Err(StratisError::Msg(format!(
-            "thin_metadata_size failed: {}",
-            output
+            "thin_metadata_size failed: {output}"
         )))
     }
 }

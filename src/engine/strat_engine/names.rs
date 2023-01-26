@@ -19,7 +19,7 @@ const FORMAT_VERSION: u16 = 1;
 /// Prefix for the key descriptions added into the kernel keyring to indicate
 /// that they were added by Stratis.
 fn key_description_prefix() -> String {
-    format!("stratis-{}-key-", FORMAT_VERSION)
+    format!("stratis-{FORMAT_VERSION}-key-")
 }
 
 impl KeyDescription {

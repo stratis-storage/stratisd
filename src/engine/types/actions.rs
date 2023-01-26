@@ -63,7 +63,7 @@ impl Display for CreateAction<PoolUuid> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CreateAction::Created(uuid) => {
-                write!(f, "Pool with UUID {} was created successfully", uuid)
+                write!(f, "Pool with UUID {uuid} was created successfully")
             }
             CreateAction::Identity => {
                 write!(
@@ -323,7 +323,7 @@ impl Display for SetCreateAction<(&str, FilesystemUuid, Sectors)> {
                 "The following filesystems {} were successfully created",
                 self.changed
                     .iter()
-                    .map(|(n, u, s)| format!("name: {}, UUID: {}, size: {}", n, u, s))
+                    .map(|(n, u, s)| format!("name: {n}, UUID: {u}, size: {s}"))
                     .collect::<Vec<_>>()
                     .join("; ")
             )
@@ -388,7 +388,7 @@ impl Display for RenameAction<DevUuid> {
                 )
             }
             RenameAction::Renamed(uuid) => {
-                write!(f, "Device with UUID {} was successfully renamed", uuid)
+                write!(f, "Device with UUID {uuid} was successfully renamed")
             }
             RenameAction::NoSource => {
                 write!(f, "The device requested to be renamed does not exist")
@@ -407,7 +407,7 @@ impl Display for RenameAction<FilesystemUuid> {
                 )
             }
             RenameAction::Renamed(uuid) => {
-                write!(f, "Filesystem with UUID {} was successfully renamed", uuid)
+                write!(f, "Filesystem with UUID {uuid} was successfully renamed")
             }
             RenameAction::NoSource => {
                 write!(f, "The filesystem requested to be renamed does not exist")
@@ -423,7 +423,7 @@ impl Display for RenameAction<PoolUuid> {
                 write!(f, "Pool is already named the target name; no action taken")
             }
             RenameAction::Renamed(uuid) => {
-                write!(f, "Pool with UUID {} was successfully renamed", uuid)
+                write!(f, "Pool with UUID {uuid} was successfully renamed")
             }
             RenameAction::NoSource => {
                 write!(f, "The pool requested to be renamed does not exist")
@@ -504,7 +504,7 @@ impl Display for DeleteAction<PoolUuid> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DeleteAction::Deleted(uuid) => {
-                write!(f, "Pool with UUID {} was deleted successfully", uuid)
+                write!(f, "Pool with UUID {uuid} was deleted successfully")
             }
             DeleteAction::Identity => {
                 write!(
@@ -630,7 +630,7 @@ impl Display for StartAction<PoolUuid> {
                 "The requested pool is already started; no action was taken"
             ),
             StartAction::Started(uuid) => {
-                write!(f, "The pool with UUID {} was successfully started", uuid)
+                write!(f, "The pool with UUID {uuid} was successfully started")
             }
         }
     }
@@ -665,7 +665,7 @@ impl Display for StopAction<PoolUuid> {
                 "The requested pool is already stopped; no action was taken"
             ),
             StopAction::Stopped(uuid) => {
-                write!(f, "The pool with UUID {} was successfully stopped", uuid)
+                write!(f, "The pool with UUID {uuid} was successfully stopped")
             }
         }
     }
@@ -700,7 +700,7 @@ impl Display for GrowAction<(PoolUuid, DevUuid)> {
                 "No changes to block device size were detected; no action taken"
             ),
             GrowAction::Grown((pool_uuid, dev_uuid)) => {
-                write!(f, "Block device with UUID {} belonging to pool with UUID {} was successfully grown and more space is now available to the pool", dev_uuid, pool_uuid)
+                write!(f, "Block device with UUID {dev_uuid} belonging to pool with UUID {pool_uuid} was successfully grown and more space is now available to the pool")
             }
         }
     }
@@ -744,7 +744,7 @@ where
         match self {
             PropChangeAction::Identity => PropChangeAction::Identity,
             PropChangeAction::NewValue(Some(v)) => {
-                PropChangeAction::NewValue(format!("a value of {}", v))
+                PropChangeAction::NewValue(format!("a value of {v}"))
             }
             PropChangeAction::NewValue(None) => {
                 PropChangeAction::NewValue("an empty value".to_string())
@@ -760,7 +760,7 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             PropChangeAction::Identity => write!(f, "No change was made to the given property"),
-            PropChangeAction::NewValue(v) => write!(f, "Property was changed to {}", v),
+            PropChangeAction::NewValue(v) => write!(f, "Property was changed to {v}"),
         }
     }
 }

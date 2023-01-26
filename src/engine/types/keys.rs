@@ -128,11 +128,10 @@ impl fmt::Display for EncryptionInfo {
         if let Some((pin, config)) = self.clevis_info() {
             write!(
                 f,
-                "{}, clevis pin: \"{}\", clevis configuration: \"{}\"",
-                key_desc_str, pin, config
+                "{key_desc_str}, clevis pin: \"{pin}\", clevis configuration: \"{config}\""
             )
         } else {
-            write!(f, "{}, no Clevis information", key_desc_str)
+            write!(f, "{key_desc_str}, no Clevis information")
         }
     }
 }
@@ -363,8 +362,7 @@ impl TryFrom<String> for KeyDescription {
     fn try_from(s: String) -> StratisResult<KeyDescription> {
         if s.contains(';') {
             Err(StratisError::Msg(format!(
-                "Key description {} contains a ';'",
-                s
+                "Key description {s} contains a ';'"
             )))
         } else {
             Ok(KeyDescription(s))

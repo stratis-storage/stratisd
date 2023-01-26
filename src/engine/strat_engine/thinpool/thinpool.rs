@@ -935,9 +935,7 @@ impl ThinPool {
                 Ok(None) => Ok(Sectors(0)),
                 Err(err) => {
                     error!(
-                        "Attempted to extend a thinpool data sub-device belonging to pool with uuid {} but failed with error: {:?}",
-                        pool_uuid,
-                        err
+                        "Attempted to extend a thinpool data sub-device belonging to pool with uuid {pool_uuid} but failed with error: {err:?}"
                     );
                     Err(err)
                 }
@@ -950,8 +948,7 @@ impl ThinPool {
             return (
                 self.set_error_mode(),
                 Err(StratisError::OutOfSpaceError(format!(
-                    "{} requested but no space is available",
-                    DATA_ALLOC_SIZE,
+                    "{DATA_ALLOC_SIZE} requested but no space is available"
                 ))),
             );
         }
@@ -1458,8 +1455,7 @@ impl ThinPool {
             (
                 false,
                 Err(StratisError::Msg(format!(
-                    "Currently Stratis can only handle a filesystem limit of up to {}",
-                    max_fs_limit
+                    "Currently Stratis can only handle a filesystem limit of up to {max_fs_limit}"
                 ))),
             )
         } else {
@@ -1499,8 +1495,7 @@ impl ThinPool {
 
             if self.filesystem_logical_size_sum() > data_limit {
                 (false, Err(StratisError::Msg(format!(
-                    "Cannot disable overprovisioning on a pool that is already overprovisioned; the sum of the logical sizes of all filesystems and snapshots must be less than the data space available to the thin pool ({}) to disable overprovisioning",
-                    data_limit
+                    "Cannot disable overprovisioning on a pool that is already overprovisioned; the sum of the logical sizes of all filesystems and snapshots must be less than the data space available to the thin pool ({data_limit}) to disable overprovisioning"
                 ))))
             } else {
                 self.enable_overprov = false;
@@ -1752,7 +1747,7 @@ mod tests {
             pool.create_filesystem(
                 "testpool",
                 pool_uuid,
-                format!("testfs{}", i).as_str(),
+                format!("testfs{i}").as_str(),
                 Sectors(2 * IEC::Gi),
             )
             .unwrap();
@@ -1979,7 +1974,7 @@ mod tests {
 
         cmd::udev_settle().unwrap();
 
-        assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, filesystem_name)).exists());
+        assert!(Path::new(&format!("/dev/stratis/{pool_name}/{filesystem_name}")).exists());
 
         let write_buf = &[8u8; SECTOR_SIZE];
         let file_count = 10;
@@ -2000,7 +1995,7 @@ mod tests {
             )
             .unwrap();
             for i in 0..file_count {
-                let file_path = source_tmp_dir.path().join(format!("stratis_test{}.txt", i));
+                let file_path = source_tmp_dir.path().join(format!("stratis_test{i}.txt"));
                 let mut f = BufWriter::with_capacity(
                     convert_test!(IEC::Mi, u64, usize),
                     OpenOptions::new()
@@ -2022,8 +2017,8 @@ mod tests {
         cmd::udev_settle().unwrap();
 
         // Assert both symlinks are still present.
-        assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, filesystem_name)).exists());
-        assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, snapshot_name)).exists());
+        assert!(Path::new(&format!("/dev/stratis/{pool_name}/{filesystem_name}")).exists());
+        assert!(Path::new(&format!("/dev/stratis/{pool_name}/{snapshot_name}")).exists());
 
         let mut read_buf = [0u8; SECTOR_SIZE];
         let snapshot_tmp_dir = tempfile::Builder::new()
@@ -2040,9 +2035,7 @@ mod tests {
             )
             .unwrap();
             for i in 0..file_count {
-                let file_path = snapshot_tmp_dir
-                    .path()
-                    .join(format!("stratis_test{}.txt", i));
+                let file_path = snapshot_tmp_dir.path().join(format!("stratis_test{i}.txt"));
                 let mut f = OpenOptions::new().read(true).open(file_path).unwrap();
                 f.read_exact(&mut read_buf).unwrap();
                 assert_eq!(read_buf[0..SECTOR_SIZE], write_buf[0..SECTOR_SIZE]);
@@ -2095,15 +2088,15 @@ mod tests {
 
         cmd::udev_settle().unwrap();
 
-        assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, name1)).exists());
+        assert!(Path::new(&format!("/dev/stratis/{pool_name}/{name1}")).exists());
 
         let action = pool.rename_filesystem(pool_name, fs_uuid, name2).unwrap();
 
         cmd::udev_settle().unwrap();
 
         // Check that the symlink has been renamed.
-        assert!(!Path::new(&format!("/dev/stratis/{}/{}", pool_name, name1)).exists());
-        assert!(Path::new(&format!("/dev/stratis/{}/{}", pool_name, name2)).exists());
+        assert!(!Path::new(&format!("/dev/stratis/{pool_name}/{name1}")).exists());
+        assert!(Path::new(&format!("/dev/stratis/{pool_name}/{name2}")).exists());
 
         assert_eq!(action, Some(true));
         let flexdevs: FlexDevsSave = pool.record();

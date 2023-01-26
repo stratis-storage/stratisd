@@ -115,8 +115,7 @@ impl PerDevSegments {
             end
         } else {
             return Err(StratisError::Msg(format!(
-                "range ({}, {}) extends beyond maximum possible size",
-                start, len
+                "range ({start}, {len}) extends beyond maximum possible size"
             )));
         };
 
@@ -133,8 +132,7 @@ impl PerDevSegments {
             let prev_len: Sectors = *self.used.get(&prev).expect("see precondition");
             if prev + prev_len > start {
                 return Err(StratisError::Msg(format!(
-                    "range to add ({}, {}) overlaps previous range ({}, {})",
-                    start, len, prev, prev_len
+                    "range to add ({start}, {len}) overlaps previous range ({prev}, {prev_len})"
                 )));
             }
 
@@ -150,8 +148,7 @@ impl PerDevSegments {
         let (res, rhs) = if let Some(next) = next {
             if new_start + new_len > next {
                 return Err(StratisError::Msg(format!(
-                    "range to add ({}, {}) overlaps subsequent range starting at {}",
-                    new_start, new_len, next
+                    "range to add ({new_start}, {new_len}) overlaps subsequent range starting at {next}"
                 )));
             }
 

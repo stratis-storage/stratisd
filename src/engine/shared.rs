@@ -138,30 +138,26 @@ pub fn set_key_shared(key_fd: RawFd, memory: &mut [u8]) -> StratisResult<usize> 
 pub fn validate_name(name: &str) -> StratisResult<()> {
     if name.contains('\u{0}') {
         return Err(StratisError::Msg(format!(
-            "Name contains NULL characters: {}",
-            name
+            "Name contains NULL characters: {name}"
         )));
     }
     if name == "." || name == ".." {
-        return Err(StratisError::Msg(format!("Name is . or .. : {}", name)));
+        return Err(StratisError::Msg(format!("Name is . or .. : {name}")));
     }
     // Linux has a maximum filename length of 255 bytes
     if name.len() > 255 {
         return Err(StratisError::Msg(format!(
-            "Name has more than 255 bytes: {}",
-            name
+            "Name has more than 255 bytes: {name}"
         )));
     }
     if name.len() != name.trim().len() {
         return Err(StratisError::Msg(format!(
-            "Name contains leading or trailing space: {}",
-            name
+            "Name contains leading or trailing space: {name}"
         )));
     }
     if name.chars().any(|c| c.is_control()) {
         return Err(StratisError::Msg(format!(
-            "Name contains control characters: {}",
-            name
+            "Name contains control characters: {name}"
         )));
     }
     lazy_static! {
@@ -170,22 +166,19 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
     }
     if NAME_UDEVREGEX.is_match(name) {
         return Err(StratisError::Msg(format!(
-            "Name contains characters not allowed in udev symlinks: {}",
-            name
+            "Name contains characters not allowed in udev symlinks: {name}"
         )));
     }
 
     let name_path = Path::new(name);
     if name_path.components().count() != 1 {
         return Err(StratisError::Msg(format!(
-            "Name is a path with 0 or more than 1 components: {}",
-            name
+            "Name is a path with 0 or more than 1 components: {name}"
         )));
     }
     if name_path.is_absolute() {
         return Err(StratisError::Msg(format!(
-            "Name is an absolute path: {}",
-            name
+            "Name is an absolute path: {name}"
         )));
     }
     Ok(())
@@ -223,18 +216,15 @@ pub fn validate_filesystem_size_specs<'a>(
                     let size_sectors = size.sectors();
                     if size_sectors.bytes() != size {
                         Err(StratisError::Msg(format!(
-                            "Requested size of filesystem {} must be divisble by {}",
-                            name, SECTOR_SIZE
+                            "Requested size of filesystem {name} must be divisble by {SECTOR_SIZE}"
                         )))
                     } else if size_sectors < MIN_THIN_DEV_SIZE {
                         Err(StratisError::Msg(format!(
-                            "Requested size of filesystem {} is {} which is less than minimum required: {}",
-                            name, size_sectors, MIN_THIN_DEV_SIZE
+                            "Requested size of filesystem {name} is {size_sectors} which is less than minimum required: {MIN_THIN_DEV_SIZE}"
                         )))
                     } else if size_sectors > MAX_THIN_DEV_SIZE {
                         Err(StratisError::Msg(format!(
-                            "Requested size of filesystem {} is {} which is greater than maximum allowed: {}",
-                            name, size_sectors, MAX_THIN_DEV_SIZE
+                            "Requested size of filesystem {name} is {size_sectors} which is greater than maximum allowed: {MAX_THIN_DEV_SIZE}"
                         )))
                     } else {
                         Ok(size_sectors)
@@ -342,13 +332,11 @@ pub fn unsigned_to_timestamp(secs: u64, nanos: u32) -> StratisResult<DateTime<Ut
         Ok(val) => match Utc.timestamp_opt(val, nanos) {
             LocalResult::Single(timestamp) => Ok(timestamp),
             _ => Err(StratisError::Msg(format!(
-                "{} (for seconds) and {} (for nanoseconds) are not valid timestamp args",
-                val, nanos,
+                "{val} (for seconds) and {nanos} (for nanoseconds) are not valid timestamp args"
             ))),
         },
         Err(_) => Err(StratisError::Msg(format!(
-            "{} can not be converted into i64 to be used as seconds value in timestamp",
-            secs
+            "{secs} can not be converted into i64 to be used as seconds value in timestamp"
         ))),
     }
 }

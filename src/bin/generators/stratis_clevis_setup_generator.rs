@@ -23,11 +23,10 @@ Before=stratis-setup.service
 
 [Service]
 Type=oneshot
-Environment='STRATIS_ROOTFS_UUID={}'
+Environment='STRATIS_ROOTFS_UUID={pool_uuid}'
 ExecStart=/usr/lib/systemd/stratis-clevis-rootfs-setup
 RemainAfterExit=yes
-",
-        pool_uuid,
+"
     )
 }
 
@@ -42,10 +41,7 @@ fn generator_with_err(early_dir: String) -> Result<(), Box<dyn Error>> {
     {
         Some(uuid) => uuid,
         None => {
-            warn!(
-                "{} kernel command line parameter not found; disabling generator",
-                pool_uuid_key
-            );
+            warn!("{pool_uuid_key} kernel command line parameter not found; disabling generator");
             return Ok(());
         }
     };

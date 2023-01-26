@@ -74,7 +74,7 @@ pub fn run(sim: bool) -> StratisResult<()> {
         .thread_name_fn(|| {
             static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
             let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-            format!("stratis-wt-{}", id)
+            format!("stratis-wt-{id}")
         })
         .on_thread_start(|| {
             static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);

@@ -80,8 +80,7 @@ fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
 
     if allocated_from_cap != next {
         let err_msg = format!(
-            "{} used in thinpool, but {} allocated from backstore cap device",
-            next, allocated_from_cap
+            "{next} used in thinpool, but {allocated_from_cap} allocated from backstore cap device"
         );
         return Err(StratisError::Msg(err_msg));
     }
@@ -126,8 +125,7 @@ fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
 
         if next > total_allocated {
             let err_msg = format!(
-                "{} allocated to cap device, but {} allocated to flex devs",
-                next, total_allocated
+                "{next} allocated to cap device, but {total_allocated} allocated to flex devs"
             );
             return Err(StratisError::Msg(err_msg));
         }
@@ -394,7 +392,7 @@ impl StratPool {
     fn check_fs_limit(&self, new_fs: usize) -> StratisResult<()> {
         let fs_limit = self.fs_limit();
         if convert_int!(fs_limit, u64, usize)? < self.filesystems().len() + new_fs {
-            Err(StratisError::Msg(format!("The pool limit of {} filesystems has already been reached; increase the filesystem limit on the pool to continue", fs_limit)))
+            Err(StratisError::Msg(format!("The pool limit of {fs_limit} filesystems has already been reached; increase the filesystem limit on the pool to continue")))
         } else {
             Ok(())
         }
@@ -454,8 +452,7 @@ impl StratPool {
                 > self.thin_pool.total_fs_limit(&self.backstore)
         {
             Err(StratisError::Msg(format!(
-                "Overprovisioning is disabled on this pool and increasing total filesystems size by {} would result in overprovisioning",
-                increase
+                "Overprovisioning is disabled on this pool and increasing total filesystems size by {increase} would result in overprovisioning"
             )))
         } else {
             Ok(())
@@ -588,7 +585,7 @@ impl Pool for StratPool {
                 .expect("unowned_devices is not empty")
                 .logical_sector_size;
             if cache_logical_sector_size != current_data_logical_sector_size {
-                let err_str = format!("The logical sector size of the devices proposed for the cache tier, {}, does not match the effective logical sector size of the data tier, {}", cache_logical_sector_size, current_data_logical_sector_size);
+                let err_str = format!("The logical sector size of the devices proposed for the cache tier, {cache_logical_sector_size}, does not match the effective logical sector size of the data tier, {current_data_logical_sector_size}");
                 return Err(StratisError::Msg(err_str));
             }
 
@@ -765,9 +762,7 @@ impl Pool for StratPool {
         let bdev_info = if tier == BlockDevTier::Cache && !self.has_cache() {
             return Err(StratisError::Msg(
                 format!(
-                    "No cache has been initialized for pool with UUID {} and name {}; it is therefore impossible to add additional devices to the cache",
-                    pool_uuid,
-                    pool_name
+                    "No cache has been initialized for pool with UUID {pool_uuid} and name {pool_name}; it is therefore impossible to add additional devices to the cache"
                 )
             ));
         } else {
@@ -841,7 +836,7 @@ impl Pool for StratPool {
                     .next()
                     .expect("unowned devices is not empty");
                 if added_sector_sizes != &current_sector_sizes {
-                    let err_str = format!("The sector sizes of the devices proposed for extending the cache tier, {}, do not match the effective sector sizes of the existing cache devices, {}", added_sector_sizes, current_sector_sizes);
+                    let err_str = format!("The sector sizes of the devices proposed for extending the cache tier, {added_sector_sizes}, do not match the effective sector sizes of the existing cache devices, {current_sector_sizes}");
                     return Err(StratisError::Msg(err_str));
                 }
 
@@ -889,7 +884,7 @@ impl Pool for StratPool {
                     .next()
                     .expect("unowned devices is not empty");
                 if added_sector_sizes != &current_sector_sizes {
-                    let err_str = format!("The sector sizes of the devices proposed for extending the data tier, {}, do not match the effective sector sizes of the existing data devices, {}", added_sector_sizes, current_sector_sizes);
+                    let err_str = format!("The sector sizes of the devices proposed for extending the data tier, {added_sector_sizes}, do not match the effective sector sizes of the existing data devices, {current_sector_sizes}");
                     return Err(StratisError::Msg(err_str));
                 }
 
@@ -960,8 +955,7 @@ impl Pool for StratPool {
                 .get_filesystem_by_uuid(origin_uuid)
                 .ok_or_else(|| {
                     StratisError::Msg(format!(
-                        "Filesystem with UUID {} could not be found",
-                        origin_uuid
+                        "Filesystem with UUID {origin_uuid} could not be found"
                     ))
                 })?
                 .1

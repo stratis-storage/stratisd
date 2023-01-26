@@ -83,18 +83,18 @@ impl StratisError {
 impl fmt::Display for StratisError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
-            StratisError::Msg(ref s) => write!(f, "{}", s),
-            StratisError::Chained(ref s, ref chained) => write!(f, "{}; {}", s, chained),
+            StratisError::Msg(ref s) => write!(f, "{s}"),
+            StratisError::Chained(ref s, ref chained) => write!(f, "{s}; {chained}"),
             StratisError::BestEffortError(ref s, ref errs) => {
                 if errs.is_empty() {
-                    write!(f, "{}", s)
+                    write!(f, "{s}")
                 } else {
                     let errs_string = errs
                         .iter()
                         .map(|err| err.to_string())
                         .collect::<Vec<_>>()
                         .join("; ");
-                    write!(f, "{}; {}", s, errs_string)
+                    write!(f, "{s}; {errs_string}")
                 }
             }
             StratisError::RollbackError {
@@ -104,8 +104,7 @@ impl fmt::Display for StratisError {
             } => {
                 write!(
                     f,
-                    "Rollback failed; causal_error: {}, rollback error: {}; putting pool in action availability state {}",
-                    causal_error, rollback_error, level,
+                    "Rollback failed; causal_error: {causal_error}, rollback error: {rollback_error}; putting pool in action availability state {level}"
                 )
             }
             StratisError::NoActionRollbackError {
@@ -114,36 +113,35 @@ impl fmt::Display for StratisError {
             } => {
                 write!(
                     f,
-                    "Rollback failed; causal_error: {}, rollback error: {}",
-                    causal_error, rollback_error
+                    "Rollback failed; causal_error: {causal_error}, rollback error: {rollback_error}"
                 )
             }
             StratisError::OutOfSpaceError(ref msg) => {
-                write!(f, "Pool is out of space and cannot be extended: {}", msg)
+                write!(f, "Pool is out of space and cannot be extended: {msg}")
             }
             StratisError::ActionDisabled(ref level) => {
-                write!(f, "Pool is in state {:?} where this action cannot be performed until the issue is resolved manually", level)
+                write!(f, "Pool is in state {level:?} where this action cannot be performed until the issue is resolved manually")
             }
-            StratisError::Io(ref err) => write!(f, "IO error: {}", err),
-            StratisError::Nix(ref err) => write!(f, "Nix error: {}", err),
-            StratisError::Uuid(ref err) => write!(f, "Uuid error: {}", err),
-            StratisError::Utf8(ref err) => write!(f, "Utf8 error: {}", err),
-            StratisError::Serde(ref err) => write!(f, "Serde error: {}", err),
-            StratisError::Decode(ref err) => write!(f, "Data encoding error: {}", err),
-            StratisError::DM(ref err) => write!(f, "DM error: {}", err),
-            StratisError::Crypt(ref err) => write!(f, "Cryptsetup error: {}", err),
-            StratisError::Recv(ref err) => write!(f, "Synchronization channel error: {}", err),
-            StratisError::Null(ref err) => write!(f, "C string conversion error: {}", err),
-            StratisError::Join(ref err) => write!(f, "Failed to join thread: {}", err),
+            StratisError::Io(ref err) => write!(f, "IO error: {err}"),
+            StratisError::Nix(ref err) => write!(f, "Nix error: {err}"),
+            StratisError::Uuid(ref err) => write!(f, "Uuid error: {err}"),
+            StratisError::Utf8(ref err) => write!(f, "Utf8 error: {err}"),
+            StratisError::Serde(ref err) => write!(f, "Serde error: {err}"),
+            StratisError::Decode(ref err) => write!(f, "Data encoding error: {err}"),
+            StratisError::DM(ref err) => write!(f, "DM error: {err}"),
+            StratisError::Crypt(ref err) => write!(f, "Cryptsetup error: {err}"),
+            StratisError::Recv(ref err) => write!(f, "Synchronization channel error: {err}"),
+            StratisError::Null(ref err) => write!(f, "C string conversion error: {err}"),
+            StratisError::Join(ref err) => write!(f, "Failed to join thread: {err}"),
             StratisError::Blkid(ref err) => {
-                write!(f, "Failed to probe device using blkid: {}", err)
+                write!(f, "Failed to probe device using blkid: {err}")
             }
 
             #[cfg(feature = "dbus_enabled")]
             StratisError::Dbus(ref err) => {
                 write!(f, "Dbus error: {}", err.message().unwrap_or("Unknown"))
             }
-            StratisError::Udev(ref err) => write!(f, "Udev error: {}", err),
+            StratisError::Udev(ref err) => write!(f, "Udev error: {err}"),
         }
     }
 }

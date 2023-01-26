@@ -337,9 +337,8 @@ impl Pool for SimPool {
                 Ok(CreateAction::Identity)
             } else {
                 Err(StratisError::Msg(format!(
-                    "This pool is already bound with clevis pin {} and config {};
-                        this differs from the requested pin {} and config {}",
-                    current_pin, current_info, pin, clevis_info,
+                    "This pool is already bound with clevis pin {current_pin} and config {current_info};
+                        this differs from the requested pin {pin} and config {clevis_info}"
                 )))
             }
         } else {

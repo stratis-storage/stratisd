@@ -65,10 +65,7 @@ where
             tuple_to_option(size_opt)
                 .map(|val| {
                     val.parse::<u128>().map_err(|_| {
-                        format!(
-                            "Could not parse filesystem size string {} to integer value",
-                            val
-                        )
+                        format!("Could not parse filesystem size string {val} to integer value")
                     })
                 })
                 .transpose()
@@ -248,7 +245,7 @@ where
             return_message
         ),
         None => {
-            let message = format!("no data for object path {}", filesystem);
+            let message = format!("no data for object path {filesystem}");
             let (rc, rs) = (DbusErrorEnum::ERROR as u16, message);
             return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
@@ -329,7 +326,7 @@ where
         pool_path.get_name()
     ) {
         Ok(RenameAction::NoSource) => {
-            let error_message = format!("engine doesn't know about pool {}", pool_uuid);
+            let error_message = format!("engine doesn't know about pool {pool_uuid}");
             let (rc, rs) = (DbusErrorEnum::ERROR as u16, error_message);
             return_message.append3(default_return, rc, rs)
         }
@@ -604,8 +601,7 @@ where
         }
         Ok(RenameAction::NoSource) => {
             let error_message = format!(
-                "pool with UUID {} is not currently bound to a keyring passphrase",
-                pool_uuid
+                "pool with UUID {pool_uuid} is not currently bound to a keyring passphrase"
             );
             let (rc, rs) = (DbusErrorEnum::ERROR as u16, error_message);
             return_message.append3(default_return, rc, rs)

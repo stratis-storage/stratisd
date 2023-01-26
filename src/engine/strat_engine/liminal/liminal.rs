@@ -111,15 +111,13 @@ impl LiminalDevices {
                 if let Ok(None) = encryption_info {
                     return Err(StratisError::Msg(
                         format!(
-                            "Attempted to unlock set of devices belonging to an unencrypted pool with UUID {}",
-                            pool_uuid,
+                            "Attempted to unlock set of devices belonging to an unencrypted pool with UUID {pool_uuid}"
                         ),
                     ));
                 } else if let Err(e) = encryption_info {
                     return Err(StratisError::Chained(
                         format!(
-                            "Error in the encryption information for pool with UUID {}",
-                            pool_uuid,
+                            "Error in the encryption information for pool with UUID {pool_uuid}"
                         ),
                         Box::new(e),
                     ));
@@ -151,15 +149,13 @@ impl LiminalDevices {
                         vec![]
                     } else {
                         return Err(StratisError::Msg(format!(
-                            "Pool with UUID {} is not encrypted and cannot be unlocked.",
-                            pool_uuid,
+                            "Pool with UUID {pool_uuid} is not encrypted and cannot be unlocked."
                         )));
                     }
                 }
                 None => {
                     return Err(StratisError::Msg(format!(
-                        "No devices with UUID {} have been registered with stratisd.",
-                        pool_uuid,
+                        "No devices with UUID {pool_uuid} have been registered with stratisd."
                     )))
                 }
             },
@@ -181,7 +177,7 @@ impl LiminalDevices {
             PoolIdentifier::Name(n) => self
                 .name_to_uuid
                 .get(&n)
-                .ok_or_else(|| StratisError::Msg(format!("Could not find a pool with name {}", n)))
+                .ok_or_else(|| StratisError::Msg(format!("Could not find a pool with name {n}")))
                 .and_then(|uc| uc.to_result())?,
         };
         let encryption_info = self
@@ -189,24 +185,21 @@ impl LiminalDevices {
             .get(&pool_uuid)
             .ok_or_else(|| {
                 StratisError::Msg(format!(
-                    "Requested pool with UUID {} was not found in stopped pools",
-                    pool_uuid
+                    "Requested pool with UUID {pool_uuid} was not found in stopped pools"
                 ))
             })?
             .encryption_info();
         let unlocked_devices = match (encryption_info, unlock_method) {
             (Ok(Some(_)), None) => {
                 return Err(StratisError::Msg(format!(
-                    "Pool with UUID {} is encrypted but no unlock method was provided",
-                    pool_uuid,
+                    "Pool with UUID {pool_uuid} is encrypted but no unlock method was provided"
                 )));
             }
             (Ok(None), None) => Vec::new(),
             (Ok(Some(_)), Some(method)) => self.unlock_pool(pools, pool_uuid, method)?,
             (Ok(None), Some(_)) => {
                 return Err(StratisError::Msg(format!(
-                    "Pool with UUID {} is not encrypted but an unlock method was provided",
-                    pool_uuid,
+                    "Pool with UUID {pool_uuid} is not encrypted but an unlock method was provided"
                 )));
             }
             (Err(e), _) => return Err(e),
@@ -534,8 +527,7 @@ impl LiminalDevices {
             Either::Left(i) => i,
             Either::Right(ds) => {
                 let err = StratisError::Msg(format!(
-                    "Some of the devices in pool with UUID {} are unopened",
-                    pool_uuid,
+                    "Some of the devices in pool with UUID {pool_uuid} are unopened"
                 ));
                 info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {}", err);
                 if !ds.is_empty() {
@@ -625,8 +617,7 @@ impl LiminalDevices {
             Either::Left(i) => i,
             Either::Right(ds) => {
                 let err = StratisError::Msg(format!(
-                    "Some of the devices in pool with UUID {} are unopened",
-                    pool_uuid,
+                    "Some of the devices in pool with UUID {pool_uuid} are unopened"
                 ));
                 info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {}", err);
                 if !ds.is_empty() {
@@ -920,14 +911,12 @@ fn load_stratis_metadata(
         Ok(opt) => opt
             .ok_or_else(|| {
                 StratisError::Msg(format!(
-                    "No metadata found on devices associated with pool UUID {}",
-                    pool_uuid
+                    "No metadata found on devices associated with pool UUID {pool_uuid}"
                 ))
             }),
         Err(err) => Err(StratisError::Chained(
             format!(
-                "There was an error encountered when reading the metadata for the devices found for pool with UUID {}",
-                pool_uuid,
+                "There was an error encountered when reading the metadata for the devices found for pool with UUID {pool_uuid}"
             ),
             Box::new(err),
         ))
@@ -976,8 +965,7 @@ fn setup_pool(
     if datadevs.get(0).is_none() {
         return Err((
             StratisError::Msg(format!(
-                "There do not appear to be any data devices in the set with pool UUID {}",
-                pool_uuid
+                "There do not appear to be any data devices in the set with pool UUID {pool_uuid}"
             )),
             tiers_to_bdas(datadevs, cachedevs, None),
         ));
@@ -1026,8 +1014,7 @@ fn setup_pool(
         .map_err(|(err, bdas)| {
             (StratisError::Chained(
                 format!(
-                    "An attempt to set up pool with UUID {} from the assembled devices failed",
-                    pool_uuid
+                    "An attempt to set up pool with UUID {pool_uuid} from the assembled devices failed"
                 ),
                 Box::new(err),
             ), bdas)

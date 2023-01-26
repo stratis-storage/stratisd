@@ -424,8 +424,7 @@ pub fn interpret_clevis_config(pin: &str, clevis_config: &mut Value) -> StratisR
                 .unwrap_or(false)
         } else {
             return Err(StratisError::Msg(format!(
-                "configuration for Clevis is is not in JSON object format: {}",
-                clevis_config
+                "configuration for Clevis is is not in JSON object format: {clevis_config}"
             )));
         }
     } else {
@@ -516,9 +515,8 @@ fn sss_dispatch(json: &Value) -> StratisResult<Value> {
             // of the JSON blob with a period.
             let json_s = Some(s.split_once('.').map_or(&**s, |x| x.0)).ok_or_else(|| {
                 StratisError::Msg(format!(
-                    "Splitting string {} on character '.' did not result in \
-                        at least one string segment.",
-                    s,
+                    "Splitting string {s} on character '.' did not result in \
+                        at least one string segment."
                 ))
             })?;
 
@@ -534,8 +532,7 @@ fn sss_dispatch(json: &Value) -> StratisResult<Value> {
                     return Err(StratisError::Msg(format!(
                         "There appears to be a data type that is not an array in \
                             the data structure being used to construct the sss JSON config
-                            under pin name {}",
-                        pin,
+                            under pin name {pin}"
                     )))
                 }
             };
@@ -629,8 +626,7 @@ fn device_is_active(device: Option<&mut CryptDevice>, device_name: &str) -> Stra
                 device_name,
             );
             Err(StratisError::Msg(format!(
-                "Device {} was activated but is reporting that it is inactive",
-                device_name,
+                "Device {device_name} was activated but is reporting that it is inactive"
             )))
         }
         Ok(CryptStatusInfo::Invalid) => {
@@ -640,13 +636,11 @@ fn device_is_active(device: Option<&mut CryptDevice>, device_name: &str) -> Stra
                 device_name,
             );
             Err(StratisError::Msg(format!(
-                "Device {} was activated but is reporting an invalid status",
-                device_name,
+                "Device {device_name} was activated but is reporting an invalid status"
             )))
         }
         Err(e) => Err(StratisError::Msg(format!(
-            "Failed to fetch status for device name {}: {}",
-            device_name, e,
+            "Failed to fetch status for device name {device_name}: {e}"
         ))),
     }
 }
@@ -978,15 +972,13 @@ fn activation_name_from_metadata(device: &mut CryptDevice) -> StratisResult<Stri
         json.get(STRATIS_TOKEN_DEVNAME_KEY)
             .ok_or_else(|| {
                 StratisError::Msg(format!(
-                    "Missing JSON value for {}",
-                    STRATIS_TOKEN_DEVNAME_KEY
+                    "Missing JSON value for {STRATIS_TOKEN_DEVNAME_KEY}"
                 ))
             })
             .and_then(|type_val| {
                 type_val.as_str().ok_or_else(|| {
                     StratisError::Msg(format!(
-                        "Malformed JSON value for {}",
-                        STRATIS_TOKEN_DEVNAME_KEY
+                        "Malformed JSON value for {STRATIS_TOKEN_DEVNAME_KEY}"
                     ))
                 })
             })
@@ -1029,15 +1021,13 @@ fn identifiers_from_metadata(device: &mut CryptDevice) -> StratisResult<StratisI
         json.get(STRATIS_TOKEN_POOL_UUID_KEY)
             .ok_or_else(|| {
                 StratisError::Msg(format!(
-                    "Missing JSON value for {}",
-                    STRATIS_TOKEN_POOL_UUID_KEY
+                    "Missing JSON value for {STRATIS_TOKEN_POOL_UUID_KEY}"
                 ))
             })
             .and_then(|type_val| {
                 type_val.as_str().ok_or_else(|| {
                     StratisError::Msg(format!(
-                        "Malformed JSON value for {}",
-                        STRATIS_TOKEN_POOL_UUID_KEY
+                        "Malformed JSON value for {STRATIS_TOKEN_POOL_UUID_KEY}"
                     ))
                 })
             })
@@ -1049,15 +1039,13 @@ fn identifiers_from_metadata(device: &mut CryptDevice) -> StratisResult<StratisI
         json.get(STRATIS_TOKEN_DEV_UUID_KEY)
             .ok_or_else(|| {
                 StratisError::Msg(format!(
-                    "Missing JSON value for {}",
-                    STRATIS_TOKEN_DEV_UUID_KEY
+                    "Missing JSON value for {STRATIS_TOKEN_DEV_UUID_KEY}"
                 ))
             })
             .and_then(|type_val| {
                 type_val.as_str().ok_or_else(|| {
                     StratisError::Msg(format!(
-                        "Malformed JSON value for {}",
-                        STRATIS_TOKEN_DEV_UUID_KEY
+                        "Malformed JSON value for {STRATIS_TOKEN_DEV_UUID_KEY}"
                     ))
                 })
             })

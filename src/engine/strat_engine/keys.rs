@@ -337,8 +337,7 @@ impl KeyIdList {
 
             if keyctl_buffer.is_empty() {
                 return Err(StratisError::Msg(format!(
-                    "Kernel key description for key {} appeared to be entirely empty",
-                    id
+                    "Kernel key description for key {id} appeared to be entirely empty"
                 )));
             }
 
@@ -448,7 +447,7 @@ impl MemoryPrivateFilesystem {
         } else {
             return Err(StratisError::Io(io::Error::new(
                 io::ErrorKind::NotFound,
-                format!("Path {} does not exist", NS_TMPFS_LOCATION,),
+                format!("Path {NS_TMPFS_LOCATION} does not exist"),
             )));
         };
         let random_string = Alphanumeric

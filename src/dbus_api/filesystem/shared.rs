@@ -33,7 +33,7 @@ where
     let filesystem_data = filesystem_path
         .get_data()
         .as_ref()
-        .ok_or_else(|| format!("no data for object path {}", object_path))?;
+        .ok_or_else(|| format!("no data for object path {object_path}"))?;
 
     let pool_path = tree
         .get(&filesystem_data.parent)
@@ -43,7 +43,7 @@ where
         pool_path
             .get_data()
             .as_ref()
-            .ok_or_else(|| format!("no data for object path {}", object_path))?
+            .ok_or_else(|| format!("no data for object path {object_path}"))?
             .uuid;
         Pool
     );

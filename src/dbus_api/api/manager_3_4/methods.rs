@@ -46,8 +46,7 @@ where
             "name" => PoolIdentifier::Name(Name::new(id_str.to_string())),
             _ => {
                 let (rc, rs) = engine_to_dbus_err_tuple(&StratisError::Msg(format!(
-                    "ID type {} not recognized",
-                    id_type_str,
+                    "ID type {id_type_str} not recognized"
                 )));
                 return Ok(vec![return_message.append3(default_return, rc, rs)]);
             }
@@ -75,7 +74,7 @@ where
                 Some(g) => g,
                 None => {
                     let (rc, rs) = engine_to_dbus_err_tuple(&StratisError::Msg(
-                        format!("Pool with {:?} was successfully started but appears to have been removed before it could be exposed on the D-Bus", id)
+                        format!("Pool with {id:?} was successfully started but appears to have been removed before it could be exposed on the D-Bus")
                     ));
                     return Ok(vec![return_message.append3(default_return, rc, rs)]);
                 }

@@ -202,7 +202,7 @@ fn get_attr_level(attrs: &mut Vec<Attribute>) -> Option<Ident> {
             ..
         }) = attr
             .parse_meta()
-            .unwrap_or_else(|_| panic!("Attribute {:?} cannot be parsed", attr))
+            .unwrap_or_else(|_| panic!("Attribute {attr:?} cannot be parsed"))
         {
             if path
                 == &parse_str("pool_mutating_action").expect("pool_mutating_action is valid path")
@@ -234,7 +234,7 @@ fn has_attribute(attrs: &mut Vec<Attribute>, attribute: &str) -> bool {
     for (i, attr) in attrs.iter().enumerate() {
         if let Meta::Path(path) = attr
             .parse_meta()
-            .unwrap_or_else(|_| panic!("Attribute {:?} cannot be parsed", attr))
+            .unwrap_or_else(|_| panic!("Attribute {attr:?} cannot be parsed"))
         {
             if path == parse_str(attribute).expect("pool_mutating_action is valid path") {
                 index = Some(i);

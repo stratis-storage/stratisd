@@ -375,8 +375,7 @@ impl StaticHeader {
                 Ok(Some(sh_1))
             } else if sh_1.initialization_time == sh_2.initialization_time {
                 let err_str = format!(
-                    "Appeared to be a Stratis device, but signature blocks {:?} and {:?} disagree",
-                    sh_1, sh_2
+                    "Appeared to be a Stratis device, but signature blocks {sh_1:?} and {sh_2:?} disagree"
                 );
                 Err(StratisError::Msg(err_str))
             } else if sh_1.initialization_time > sh_2.initialization_time {
@@ -534,8 +533,7 @@ impl StaticHeader {
         let version = buf[28];
         if version != STRAT_SIGBLOCK_VERSION {
             return Err(StratisError::Msg(format!(
-                "Unknown sigblock version: {}",
-                version
+                "Unknown sigblock version: {version}"
             )));
         }
 

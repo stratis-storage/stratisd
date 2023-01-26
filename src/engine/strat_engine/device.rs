@@ -39,8 +39,7 @@ pub fn blkdev_logical_sector_size(file: &File) -> StratisResult<Bytes> {
     let mut val = 0i32 as c_int; // util-linux uses int* as out-arg for ioctl
     unsafe { blksszget(file.as_raw_fd(), &mut val) }.map_err(|e| {
         StratisError::Msg(format!(
-            "Error reading logical sector size (BLKSSZGET): {}",
-            e
+            "Error reading logical sector size (BLKSSZGET): {e}"
         ))
     })?;
     Ok(Bytes::from(convert_int!(val, c_int, u16)?))
@@ -50,8 +49,7 @@ pub fn blkdev_physical_sector_size(file: &File) -> StratisResult<Bytes> {
     let mut val = 0i32 as c_int; // util-linux uses int* as out-arg for ioctl
     unsafe { blkpbszget(file.as_raw_fd(), &mut val) }.map_err(|e| {
         StratisError::Msg(format!(
-            "Error reading physical sector size (BLKPBSZGET): {}",
-            e
+            "Error reading physical sector size (BLKPBSZGET): {e}"
         ))
     })?;
     Ok(Bytes::from(convert_int!(val, c_int, u16)?))

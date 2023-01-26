@@ -397,8 +397,7 @@ impl TryFrom<&[&Path]> for ProcessedPathInfos {
             .collect::<StratisResult<Vec<(DeviceInfo, Option<StratisIdentifiers>)>>>()
             .map_err(|err| {
                 let error_message = format!(
-                    "At least one of the devices specified was unsuitable for initialization: {}",
-                    err
+                    "At least one of the devices specified was unsuitable for initialization: {err}"
                 );
                 StratisError::Msg(error_message)
             })?;
@@ -757,7 +756,7 @@ pub fn initialize_devices(
     {
         let mut guard = (*BLOCKDEVS_IN_PROGRESS).lock().expect("Should not panic");
         if device_paths.iter().any(|dev| guard.contains(dev)) {
-            return Err(StratisError::Msg(format!("An initialization operation is already in progress with at least one of the following devices: {:?}", device_paths)));
+            return Err(StratisError::Msg(format!("An initialization operation is already in progress with at least one of the following devices: {device_paths:?}")));
         }
         guard.extend(device_paths.iter().cloned());
     }

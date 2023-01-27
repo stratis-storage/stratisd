@@ -220,7 +220,7 @@ impl BlockSizeSummary {
             .map(|x| x.logical_sector_size)
             .any(|s| s > largest_logical_used)
         {
-            let error_str = format!("Some unused block devices in the pool have a logical sector size that is larger than the largest logical sector size ({}) of any of the devices that are in use. This could lead to unmountable filesystems if the pool is extended. Consider moving your data to another pool.", largest_logical_used);
+            let error_str = format!("Some unused block devices in the pool have a logical sector size that is larger than the largest logical sector size ({largest_logical_used}) of any of the devices that are in use. This could lead to unmountable filesystems if the pool is extended. Consider moving your data to another pool.");
             return Err(StratisError::Msg(error_str));
         }
 
@@ -236,7 +236,7 @@ impl BlockSizeSummary {
             .map(|x| x.physical_sector_size)
             .any(|s| s > largest_physical_used)
         {
-            let error_str = format!("Some unused block devices in the pool have a physical sector size that is larger than the largest physical sector size ({}) of any of the devices that are in use. This could lead to unmountable filesystems if the pool is extended. Consider moving your data to another pool.", largest_physical_used);
+            let error_str = format!("Some unused block devices in the pool have a physical sector size that is larger than the largest physical sector size ({largest_physical_used}) of any of the devices that are in use. This could lead to unmountable filesystems if the pool is extended. Consider moving your data to another pool.");
             return Err(StratisError::Msg(error_str));
         }
         Ok(BlockSizes {

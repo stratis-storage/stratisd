@@ -158,8 +158,8 @@ pub trait Pool: Debug + Send + Sync {
     /// Returns an error if any of the specified names are already in use
     /// for filesystems in this pool. If the same name is passed multiple
     /// times, the size associated with the last item is used.
-    fn create_filesystems<'a, 'b>(
-        &'a mut self,
+    fn create_filesystems<'b>(
+        &mut self,
         pool_name: &str,
         pool_uuid: PoolUuid,
         specs: &[(&'b str, Option<Bytes>)],
@@ -208,8 +208,8 @@ pub trait Pool: Debug + Send + Sync {
     /// Returns a list of the filesystems found, and actually destroyed.
     /// This list will be a subset of the uuids passed in fs_uuids.
     /// Precondition: All filesystems given must be unmounted.
-    fn destroy_filesystems<'a>(
-        &'a mut self,
+    fn destroy_filesystems(
+        &mut self,
         pool_name: &str,
         fs_uuids: &[FilesystemUuid],
     ) -> StratisResult<SetDeleteAction<FilesystemUuid>>;

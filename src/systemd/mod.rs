@@ -13,7 +13,7 @@ use crate::stratis::{StratisError, StratisResult};
 fn serialize_pairs(pairs: HashMap<String, String>) -> String {
     pairs
         .iter()
-        .map(|(key, value)| format!("{}={}", key, value))
+        .map(|(key, value)| format!("{key}={value}"))
         .fold(String::new(), |mut string, key_value_pair| {
             string += key_value_pair.as_str();
             string += "\n";

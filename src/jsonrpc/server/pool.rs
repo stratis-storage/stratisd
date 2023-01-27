@@ -47,7 +47,7 @@ where
                 .pools()
                 .await
                 .get_by_name(&n)
-                .ok_or_else(|| StratisError::Msg(format!("Pool with name {} not found", n)))?
+                .ok_or_else(|| StratisError::Msg(format!("Pool with name {n} not found")))?
                 .0
         }
     };
@@ -81,7 +81,7 @@ where
         .get_pool(PoolIdentifier::Name(Name::new(name.to_owned())))
         .await
         .map(|g| g.as_tuple().1)
-        .ok_or_else(|| StratisError::Msg(format!("No pool named {} found", name)))?;
+        .ok_or_else(|| StratisError::Msg(format!("No pool named {name} found")))?;
     Ok(engine.destroy_pool(uuid).await?.is_changed())
 }
 
@@ -93,7 +93,7 @@ where
     let mut guard = engine
         .get_mut_pool(PoolIdentifier::Name(Name::new(name.to_owned())))
         .await
-        .ok_or_else(|| StratisError::Msg(format!("No pool named {} found", name)))?;
+        .ok_or_else(|| StratisError::Msg(format!("No pool named {name} found")))?;
     let (_, uuid, pool) = guard.as_mut_tuple();
     block_in_place(|| Ok(pool.init_cache(uuid, name, paths, true)?.is_changed()))
 }
@@ -111,7 +111,7 @@ where
         .get_pool(PoolIdentifier::Name(Name::new(current_name.to_owned())))
         .await
         .map(|g| g.as_tuple().1)
-        .ok_or_else(|| StratisError::Msg(format!("No pool named {} found", current_name)))?;
+        .ok_or_else(|| StratisError::Msg(format!("No pool named {current_name} found")))?;
     Ok(match engine.rename_pool(uuid, new_name).await? {
         RenameAction::Identity => false,
         RenameAction::Renamed(_) => true,
@@ -155,7 +155,7 @@ where
     let mut guard = engine
         .get_mut_pool(PoolIdentifier::Name(Name::new(name.to_owned())))
         .await
-        .ok_or_else(|| StratisError::Msg(format!("No pool named {} found", name)))?;
+        .ok_or_else(|| StratisError::Msg(format!("No pool named {name} found")))?;
     let (_, uuid, pool) = guard.as_mut_tuple();
     block_in_place(|| {
         Ok(pool
@@ -214,13 +214,13 @@ where
             PoolIdentifier::Name(ref n) => locked
                 .name_to_uuid
                 .get(n)
-                .ok_or_else(|| StratisError::Msg(format!("Could not find pool with name {}", n)))?,
+                .ok_or_else(|| StratisError::Msg(format!("Could not find pool with name {n}")))?,
         })
         .is_some()
     {
         Ok(true)
     } else {
-        Err(StratisError::Msg(format!("Pool with {} not found", id)))
+        Err(StratisError::Msg(format!("Pool with {id} not found")))
     }
 }
 
@@ -239,13 +239,13 @@ where
             PoolIdentifier::Name(ref n) => stopped
                 .name_to_uuid
                 .get(n)
-                .ok_or_else(|| StratisError::Msg(format!("Could not find pool with name {}", n)))?,
+                .ok_or_else(|| StratisError::Msg(format!("Could not find pool with name {n}")))?,
         })
         .is_some()
     {
         Ok(true)
     } else {
-        Err(StratisError::Msg(format!("Pool with {} not found", id)))
+        Err(StratisError::Msg(format!("Pool with {id} not found")))
     }
 }
 
@@ -266,14 +266,11 @@ where
         PoolIdentifier::Name(ref n) => locked
             .name_to_uuid
             .get(n)
-            .ok_or_else(|| StratisError::Msg(format!("Could not find pool with name {}", n)))?,
+            .ok_or_else(|| StratisError::Msg(format!("Could not find pool with name {n}")))?,
     }) {
         Ok(info.info.clevis_info()?.is_some())
     } else {
-        Err(StratisError::Msg(format!(
-            "Pool with UUID {} not found",
-            id,
-        )))
+        Err(StratisError::Msg(format!("Pool with UUID {id} not found")))
     }
 }
 
@@ -297,11 +294,11 @@ where
         PoolIdentifier::Name(ref n) => locked
             .name_to_uuid
             .get(n)
-            .ok_or_else(|| StratisError::Msg(format!("Could not find pool with name {}", n)))?,
+            .ok_or_else(|| StratisError::Msg(format!("Could not find pool with name {n}")))?,
     }) {
         Ok(info.info.key_description()?.is_some())
     } else {
-        Err(StratisError::Msg(format!("Pool with {} not found", id)))
+        Err(StratisError::Msg(format!("Pool with {id} not found")))
     }
 }
 
@@ -326,10 +323,10 @@ where
         PoolIdentifier::Name(ref n) => locked
             .name_to_uuid
             .get(n)
-            .ok_or_else(|| StratisError::Msg(format!("Could not find pool with name {}", n)))?,
+            .ok_or_else(|| StratisError::Msg(format!("Could not find pool with name {n}")))?,
     }) {
         Ok(info.info.clevis_info()?.map(|(pin, _)| pin.clone()))
     } else {
-        Err(StratisError::Msg(format!("Pool with {} not found", id)))
+        Err(StratisError::Msg(format!("Pool with {id} not found")))
     }
 }

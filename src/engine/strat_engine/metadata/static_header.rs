@@ -215,7 +215,7 @@ impl StaticHeader {
     {
         let signature_block = self.sigblock_to_buf();
         let zeroed = [0u8; bytes!(static_header_size::POST_SIGBLOCK_PADDING_SECTORS)];
-        f.seek(SeekFrom::Start(0))?;
+        f.rewind()?;
 
         // Write to a static header region in the static header.
         fn write_region<F>(f: &mut F, signature_block: &[u8], zeroed: &[u8]) -> io::Result<()>
@@ -375,8 +375,7 @@ impl StaticHeader {
                 Ok(Some(sh_1))
             } else if sh_1.initialization_time == sh_2.initialization_time {
                 let err_str = format!(
-                    "Appeared to be a Stratis device, but signature blocks {:?} and {:?} disagree",
-                    sh_1, sh_2
+                    "Appeared to be a Stratis device, but signature blocks {sh_1:?} and {sh_2:?} disagree"
                 );
                 Err(StratisError::Msg(err_str))
             } else if sh_1.initialization_time > sh_2.initialization_time {
@@ -534,8 +533,7 @@ impl StaticHeader {
         let version = buf[28];
         if version != STRAT_SIGBLOCK_VERSION {
             return Err(StratisError::Msg(format!(
-                "Unknown sigblock version: {}",
-                version
+                "Unknown sigblock version: {version}"
             )));
         }
 
@@ -562,7 +560,7 @@ impl StaticHeader {
         F: Seek + SyncAll,
     {
         let zeroed = [0u8; bytes!(static_header_size::STATIC_HEADER_SECTORS)];
-        f.seek(SeekFrom::Start(0))?;
+        f.rewind()?;
         f.write_all(&zeroed)?;
         f.sync_all()?;
         Ok(())

@@ -58,7 +58,7 @@ where
     fn next(&mut self) -> Option<(&'a Name, &'a U, &'a T)> {
         self.items
             .next()
-            .map(|(uuid, &(ref name, ref item))| (name, uuid, item))
+            .map(|(uuid, (name, item))| (name, uuid, item))
     }
 
     #[inline]
@@ -192,14 +192,14 @@ where
     pub fn get_by_name(&self, name: &str) -> Option<(U, &T)> {
         self.name_to_uuid
             .get(name)
-            .and_then(|uuid| self.items.get(uuid).map(|&(_, ref item)| (*uuid, item)))
+            .and_then(|uuid| self.items.get(uuid).map(|(_, item)| (*uuid, item)))
     }
 
     /// Get item by uuid.
     pub fn get_by_uuid(&self, uuid: U) -> Option<(Name, &T)> {
         self.items
             .get(&uuid)
-            .map(|&(ref name, ref item)| (name.clone(), item))
+            .map(|(name, item)| (name.clone(), item))
     }
 
     /// Get mutable item by name.
@@ -305,7 +305,7 @@ mod tests {
     where
         U: AsUuid,
     {
-        for (uuid, &(ref name, _)) in &table.items {
+        for (uuid, (name, _)) in &table.items {
             assert_eq!(uuid, &table.name_to_uuid[name])
         }
 

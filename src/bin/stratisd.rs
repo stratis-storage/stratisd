@@ -56,10 +56,7 @@ fn trylock_pid_file() -> StratisResult<File> {
         .open(STRATISD_PID_PATH)
         .map_err(|err| {
             StratisError::Chained(
-                format!(
-                    "Failed to create or open the stratisd PID file at {}",
-                    STRATISD_PID_PATH
-                ),
+                format!("Failed to create or open the stratisd PID file at {STRATISD_PID_PATH}"),
                 Box::new(StratisError::from(err)),
             )
         })?;
@@ -76,8 +73,7 @@ fn trylock_pid_file() -> StratisResult<File> {
             }
 
             Err(StratisError::Msg(format!(
-                "Daemon already running with supposed pid: {}",
-                buf
+                "Daemon already running with supposed pid: {buf}"
             )))
         }
     };
@@ -90,8 +86,7 @@ fn trylock_pid_file() -> StratisResult<File> {
         .map_err(|err| {
             StratisError::Chained(
                 format!(
-                    "Failed to create or open the stratisd-min PID file at {}",
-                    STRATISD_MIN_PID_PATH
+                    "Failed to create or open the stratisd-min PID file at {STRATISD_MIN_PID_PATH}"
                 ),
                 Box::new(StratisError::from(err)),
             )
@@ -138,7 +133,7 @@ fn main() {
     };
 
     if let Err(err) = result {
-        eprintln!("{}", err);
+        eprintln!("{err}");
         exit(1);
     } else {
         exit(0);

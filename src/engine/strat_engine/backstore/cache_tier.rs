@@ -121,8 +121,7 @@ impl CacheTier {
         if avail_space + self.cache_segments.size() > MAX_CACHE_SIZE {
             self.block_mgr.remove_blockdevs(&uuids)?;
             return Err(StratisError::Msg(format!(
-                "The size of the cache sub-device may not exceed {}",
-                MAX_CACHE_SIZE
+                "The size of the cache sub-device may not exceed {MAX_CACHE_SIZE}"
             )));
         }
 
@@ -134,8 +133,7 @@ impl CacheTier {
         if let Err(e) = self.block_mgr.commit_space(trans) {
             self.block_mgr.remove_blockdevs(&uuids)?;
             return Err(StratisError::Msg(format!(
-                "Failed to commit metadata changes: {}",
-                e
+                "Failed to commit metadata changes: {e}"
             )));
         }
         self.cache_segments.coalesce_blkdevsegs(&segments);
@@ -165,8 +163,7 @@ impl CacheTier {
         if avail_space - meta_space > MAX_CACHE_SIZE {
             block_mgr.destroy_all()?;
             return Err(StratisError::Msg(format!(
-                "The size of the cache sub-device may not exceed {}",
-                MAX_CACHE_SIZE
+                "The size of the cache sub-device may not exceed {MAX_CACHE_SIZE}"
             )));
         }
 
@@ -182,8 +179,7 @@ impl CacheTier {
         if let Err(e) = block_mgr.commit_space(trans) {
             block_mgr.destroy_all()?;
             return Err(StratisError::Msg(format!(
-                "Failed to commit metadata changes: {}",
-                e
+                "Failed to commit metadata changes: {e}"
             )));
         }
 

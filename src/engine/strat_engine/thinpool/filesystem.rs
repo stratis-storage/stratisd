@@ -232,8 +232,7 @@ impl StratFilesystem {
                 })
             }
             Err(e) => Err(StratisError::Msg(format!(
-                "failed to create {} snapshot for {} - {}",
-                snapshot_name, snapshot_fs_name, e
+                "failed to create {snapshot_name} snapshot for {snapshot_fs_name} - {e}"
             ))),
         }
     }

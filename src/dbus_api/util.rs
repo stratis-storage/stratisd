@@ -128,7 +128,7 @@ where
     let data = path
         .get_data()
         .as_ref()
-        .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
+        .ok_or_else(|| MethodErr::failed(&format!("no data for object path {object_path}")))?;
 
     i.append(uuid_to_string!(data.uuid));
     Ok(())
@@ -151,7 +151,7 @@ where
     let data = path
         .get_data()
         .as_ref()
-        .ok_or_else(|| MethodErr::failed(&format!("no data for object path {}", object_path)))?;
+        .ok_or_else(|| MethodErr::failed(&format!("no data for object path {object_path}")))?;
 
     i.append(data.parent.clone());
     Ok(())

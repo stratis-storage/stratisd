@@ -35,7 +35,7 @@ where
     let blockdev_data = blockdev_path
         .get_data()
         .as_ref()
-        .ok_or_else(|| format!("no data for object path {}", object_path))?;
+        .ok_or_else(|| format!("no data for object path {object_path}"))?;
     let blockdev_uuid = typed_uuid_string_err!(blockdev_data.uuid; Dev);
 
     let pool_path = tree
@@ -46,7 +46,7 @@ where
         pool_path
             .get_data()
             .as_ref()
-            .ok_or_else(|| format!("no data for object path {}", object_path))?
+            .ok_or_else(|| format!("no data for object path {object_path}"))?
             .uuid;
         Pool
     );
@@ -83,7 +83,7 @@ where
     let blockdev_data = blockdev_path
         .get_data()
         .as_ref()
-        .ok_or_else(|| format!("no data for object path {}", object_path))?;
+        .ok_or_else(|| format!("no data for object path {object_path}"))?;
     let blockdev_uuid = typed_uuid_string_err!(blockdev_data.uuid; Dev);
 
     let pool_path = tree
@@ -94,7 +94,7 @@ where
         pool_path
             .get_data()
             .as_ref()
-            .ok_or_else(|| format!("no data for object path {}", object_path))?
+            .ok_or_else(|| format!("no data for object path {object_path}"))?
             .uuid;
         Pool
     );
@@ -188,7 +188,7 @@ where
 {
     if pool
         .get_blockdev(dev_uuid)
-        .ok_or_else(|| format!("Blockdev with UUID {} not found", dev_uuid))?
+        .ok_or_else(|| format!("Blockdev with UUID {dev_uuid} not found"))?
         .1
         .user_info()
         == user_info

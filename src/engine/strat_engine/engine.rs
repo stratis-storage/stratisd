@@ -239,10 +239,7 @@ impl StratEngine {
         if untorndown_pools.is_empty() {
             Ok(())
         } else {
-            let err_msg = format!(
-                "Failed to teardown already set up pools: {:?}",
-                untorndown_pools
-            );
+            let err_msg = format!("Failed to teardown already set up pools: {untorndown_pools:?}");
             Err(StratisError::Msg(err_msg))
         }
     }
@@ -618,13 +615,11 @@ impl Engine for StratEngine {
             let (_, pool_uuid, pool) = lock.as_tuple();
             if pool.is_encrypted() && unlock_method.is_none() {
                 return Err(StratisError::Msg(format!(
-                    "Pool with UUID {} is encrypted but no unlock method was provided",
-                    pool_uuid,
+                    "Pool with UUID {pool_uuid} is encrypted but no unlock method was provided"
                 )));
             } else if !pool.is_encrypted() && unlock_method.is_some() {
                 return Err(StratisError::Msg(format!(
-                    "Pool with UUID {} is not encrypted but an unlock method was provided",
-                    pool_uuid,
+                    "Pool with UUID {pool_uuid} is not encrypted but an unlock method was provided"
                 )));
             } else {
                 Ok(StartAction::Identity)
@@ -671,8 +666,7 @@ impl Engine for StratEngine {
             Ok(StopAction::Identity)
         } else {
             Err(StratisError::Msg(format!(
-                "Pool with UUID {} could not be found and cannot be stopped",
-                pool_uuid,
+                "Pool with UUID {pool_uuid} could not be found and cannot be stopped"
             )))
         }
     }
@@ -746,18 +740,18 @@ mod test {
 
         cmd::udev_settle().unwrap();
 
-        assert!(Path::new(&format!("/dev/stratis/{}/{}", name1, fs_name1)).exists());
-        assert!(Path::new(&format!("/dev/stratis/{}/{}", name1, fs_name2)).exists());
+        assert!(Path::new(&format!("/dev/stratis/{name1}/{fs_name1}")).exists());
+        assert!(Path::new(&format!("/dev/stratis/{name1}/{fs_name2}")).exists());
 
         let name2 = "name2";
         let action = test_async!(engine.rename_pool(uuid1, name2)).unwrap();
 
         cmd::udev_settle().unwrap();
 
-        assert!(!Path::new(&format!("/dev/stratis/{}/{}", name1, fs_name1)).exists());
-        assert!(!Path::new(&format!("/dev/stratis/{}/{}", name1, fs_name2)).exists());
-        assert!(Path::new(&format!("/dev/stratis/{}/{}", name2, fs_name1)).exists());
-        assert!(Path::new(&format!("/dev/stratis/{}/{}", name2, fs_name2)).exists());
+        assert!(!Path::new(&format!("/dev/stratis/{name1}/{fs_name1}")).exists());
+        assert!(!Path::new(&format!("/dev/stratis/{name1}/{fs_name2}")).exists());
+        assert!(Path::new(&format!("/dev/stratis/{name2}/{fs_name1}")).exists());
+        assert!(Path::new(&format!("/dev/stratis/{name2}/{fs_name2}")).exists());
 
         {
             let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid1))).unwrap();

@@ -66,11 +66,11 @@ mod cleanup_errors {
     impl fmt::Display for Error {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             match self {
-                Error::Ioe(err) => write!(f, "IO error: {}", err),
-                Error::Nix(err) => write!(f, "Nix error: {}", err),
-                Error::Msg(err) => write!(f, "{}", err),
-                Error::Chained(msg, err) => write!(f, "{}: {}", msg, err),
-                Error::Dm(err) => write!(f, "DM error: {}", err),
+                Error::Ioe(err) => write!(f, "IO error: {err}"),
+                Error::Nix(err) => write!(f, "Nix error: {err}"),
+                Error::Msg(err) => write!(f, "{err}"),
+                Error::Chained(msg, err) => write!(f, "{msg}: {err}"),
+                Error::Dm(err) => write!(f, "DM error: {err}"),
             }
         }
     }
@@ -152,7 +152,7 @@ pub fn dm_stratis_devices_remove() -> Result<()> {
         get_dm_init().map_err(|_| Error::Msg("Unable to initialize DM".into()))?;
         do_while_progress().and_then(|remain| {
             if !remain.is_empty() {
-                Err(format!("Some Stratis DM devices remaining: {:?}", remain).into())
+                Err(format!("Some Stratis DM devices remaining: {remain:?}").into())
             } else {
                 Ok(())
             }

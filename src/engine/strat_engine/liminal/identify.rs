@@ -201,8 +201,8 @@ impl From<StratBlockDev> for DeviceInfo {
 impl fmt::Display for DeviceInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            DeviceInfo::Luks(info) => write!(f, "LUKS device description: {}", info),
-            DeviceInfo::Stratis(info) => write!(f, "Stratis device description: {}", info),
+            DeviceInfo::Luks(info) => write!(f, "LUKS device description: {info}"),
+            DeviceInfo::Stratis(info) => write!(f, "Stratis device description: {info}"),
         }
     }
 }

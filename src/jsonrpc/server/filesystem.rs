@@ -25,7 +25,7 @@ where
     let mut guard = engine
         .get_mut_pool(PoolIdentifier::Name(Name::new(pool_name.to_owned())))
         .await
-        .ok_or_else(|| StratisError::Msg(format!("No pool named {} found", pool_name)))?;
+        .ok_or_else(|| StratisError::Msg(format!("No pool named {pool_name} found")))?;
     let (_, pool_uuid, pool) = guard.as_mut_tuple();
     block_in_place(|| {
         Ok(pool
@@ -76,10 +76,10 @@ where
     let mut pool = engine
         .get_mut_pool(PoolIdentifier::Name(Name::new(pool_name.to_owned())))
         .await
-        .ok_or_else(|| StratisError::Msg(format!("No pool named {} found", pool_name)))?;
+        .ok_or_else(|| StratisError::Msg(format!("No pool named {pool_name} found")))?;
     let (uuid, _) = pool
         .get_filesystem_by_name(&Name::new(fs_name.to_string()))
-        .ok_or_else(|| StratisError::Msg(format!("No filesystem named {} found", fs_name)))?;
+        .ok_or_else(|| StratisError::Msg(format!("No filesystem named {fs_name} found")))?;
     block_in_place(|| Ok(pool.destroy_filesystems(pool_name, &[uuid])?.is_changed()))
 }
 
@@ -96,10 +96,10 @@ where
     let mut pool = engine
         .get_mut_pool(PoolIdentifier::Name(Name::new(pool_name.to_owned())))
         .await
-        .ok_or_else(|| StratisError::Msg(format!("No pool named {} found", pool_name)))?;
+        .ok_or_else(|| StratisError::Msg(format!("No pool named {pool_name} found")))?;
     let (uuid, _) = pool
         .get_filesystem_by_name(&Name::new(fs_name.to_string()))
-        .ok_or_else(|| StratisError::Msg(format!("No filesystem named {} found", fs_name)))?;
+        .ok_or_else(|| StratisError::Msg(format!("No filesystem named {fs_name} found")))?;
     block_in_place(|| {
         Ok(pool
             .rename_filesystem(pool_name, uuid, new_fs_name)?

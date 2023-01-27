@@ -73,7 +73,7 @@ where
                 Some(g) => g,
                 None => {
                     let (rc, rs) = engine_to_dbus_err_tuple(&StratisError::Msg(
-                        format!("Pool with UUID {} was successfully started but appears to have been removed before it could be exposed on the D-Bus", pool_uuid)
+                        format!("Pool with UUID {pool_uuid} was successfully started but appears to have been removed before it could be exposed on the D-Bus")
                     ));
                     return Ok(vec![return_message.append3(default_return, rc, rs)]);
                 }

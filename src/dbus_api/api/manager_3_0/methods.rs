@@ -275,7 +275,7 @@ where
             return Ok(vec![return_message.append3(
                 default_return,
                 1u16,
-                format!("code {} does not correspond to any redundancy", n),
+                format!("code {n} does not correspond to any redundancy"),
             )]);
         }
     }
@@ -316,7 +316,7 @@ where
                     Some(g) => g,
                     None => {
                         let (rc, rs) = engine_to_dbus_err_tuple(&StratisError::Msg(
-                            format!("Pool with UUID {} was successfully started but appears to have been removed before it could be exposed on the D-Bus", uuid)
+                            format!("Pool with UUID {uuid} was successfully started but appears to have been removed before it could be exposed on the D-Bus")
                         ));
                         return Ok(vec![return_message.append3(default_return, rc, rs)]);
                     }

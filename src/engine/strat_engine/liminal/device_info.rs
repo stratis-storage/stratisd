@@ -289,8 +289,8 @@ pub enum LInfo {
 impl fmt::Display for LInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            LInfo::Stratis(info) => write!(f, "Stratis device with {}", info),
-            LInfo::Luks(info) => write!(f, "LUKS device belonging to Stratis with {}", info),
+            LInfo::Stratis(info) => write!(f, "Stratis device with {info}"),
+            LInfo::Luks(info) => write!(f, "LUKS device belonging to Stratis with {info}"),
         }
     }
 }

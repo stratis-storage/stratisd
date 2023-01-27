@@ -285,13 +285,13 @@ mod tests {
                     Ok(s) => {
                         return Err(Box::new(io::Error::new(
                             io::ErrorKind::Other,
-                            format!("Crypt device is in invalid state {:?}", s),
+                            format!("Crypt device is in invalid state {s:?}"),
                         )))
                     }
                     Err(e) => {
                         return Err(Box::new(io::Error::new(
                             io::ErrorKind::Other,
-                            format!("Checking device status returned error: {}", e),
+                            format!("Checking device status returned error: {e}"),
                         )))
                     }
                 }

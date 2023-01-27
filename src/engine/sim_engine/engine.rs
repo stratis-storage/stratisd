@@ -302,13 +302,11 @@ impl Engine for SimEngine {
             let (_, pool_uuid, pool) = guard.as_tuple();
             if pool.is_encrypted() && unlock_method.is_none() {
                 return Err(StratisError::Msg(format!(
-                    "Pool with UUID {} is encrypted but no unlock method was provided",
-                    pool_uuid,
+                    "Pool with UUID {pool_uuid} is encrypted but no unlock method was provided"
                 )));
             } else if !pool.is_encrypted() && unlock_method.is_some() {
                 return Err(StratisError::Msg(format!(
-                    "Pool with UUID {} is not encrypted but an unlock method was provided",
-                    pool_uuid,
+                    "Pool with UUID {pool_uuid} is not encrypted but an unlock method was provided"
                 )));
             } else {
                 Ok(StartAction::Identity)
@@ -322,8 +320,7 @@ impl Engine for SimEngine {
                     .remove_by_name(&n)
                     .ok_or_else(|| {
                         StratisError::Msg(format!(
-                            "Pool with name {} was not found and cannot be started",
-                            n,
+                            "Pool with name {n} was not found and cannot be started"
                         ))
                     })
                     .map(|(u, p)| (n, u, p))?,
@@ -334,8 +331,7 @@ impl Engine for SimEngine {
                     .remove_by_uuid(u)
                     .ok_or_else(|| {
                         StratisError::Msg(format!(
-                            "Pool with UUID {} was not found and cannot be started",
-                            u,
+                            "Pool with UUID {u} was not found and cannot be started"
                         ))
                     })
                     .map(|(n, p)| (n, u, p))?,
@@ -362,8 +358,7 @@ impl Engine for SimEngine {
             Ok(StopAction::Stopped(pool_uuid))
         } else {
             Err(StratisError::Msg(format!(
-                "Pool with UUID {} was not found and cannot be stopped",
-                pool_uuid
+                "Pool with UUID {pool_uuid} was not found and cannot be stopped"
             )))
         }
     }

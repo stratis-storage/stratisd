@@ -339,8 +339,7 @@ pub fn get_blockdevs(
             bdas.extend(bds_to_bdas(cachedevs));
             return Err((
                 StratisError::Msg(format!(
-                    "Data devices did not appear consistent with metadata: {}",
-                    err
+                    "Data devices did not appear consistent with metadata: {err}"
                 )),
                 bdas,
             ));
@@ -353,8 +352,7 @@ pub fn get_blockdevs(
             bdas.extend(bds_to_bdas(datadevs));
             return Err((
                 StratisError::Msg(format!(
-                    "Cache devices did not appear consistent with metadata: {}",
-                    err
+                    "Cache devices did not appear consistent with metadata: {err}"
                 )),
                 bdas,
             ));

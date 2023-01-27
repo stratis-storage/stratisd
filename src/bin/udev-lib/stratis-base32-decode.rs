@@ -7,7 +7,7 @@ use std::{env, error::Error};
 
 fn base32_decode(var_name: &str, base32_str: &str) -> Result<(), Box<dyn Error>> {
     let base32_decoded = String::from_utf8(BASE32_NOPAD.decode(base32_str.as_bytes())?)?;
-    println!("{}={}", var_name, base32_decoded);
+    println!("{var_name}={base32_decoded}");
     Ok(())
 }
 

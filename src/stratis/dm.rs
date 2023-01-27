@@ -118,8 +118,7 @@ fn setup_dm() -> StratisResult<AsyncFd<RawFd>> {
     let minor_dm_version = dm.version()?.1;
     if minor_dm_version < REQUIRED_DM_MINOR_VERSION {
         let err_msg = format!(
-            "Requires DM minor version {} but kernel only supports {}",
-            REQUIRED_DM_MINOR_VERSION, minor_dm_version
+            "Requires DM minor version {REQUIRED_DM_MINOR_VERSION} but kernel only supports {minor_dm_version}"
         );
         Err(StratisError::Msg(err_msg))
     } else {

@@ -215,8 +215,8 @@ impl Pool for SimPool {
         }
     }
 
-    fn create_filesystems<'a, 'b>(
-        &'a mut self,
+    fn create_filesystems<'b>(
+        &mut self,
         _pool_name: &str,
         _pool_uuid: PoolUuid,
         specs: &[(&'b str, Option<Bytes>)],
@@ -337,9 +337,8 @@ impl Pool for SimPool {
                 Ok(CreateAction::Identity)
             } else {
                 Err(StratisError::Msg(format!(
-                    "This pool is already bound with clevis pin {} and config {};
-                        this differs from the requested pin {} and config {}",
-                    current_pin, current_info, pin, clevis_info,
+                    "This pool is already bound with clevis pin {current_pin} and config {current_info};
+                        this differs from the requested pin {pin} and config {clevis_info}"
                 )))
             }
         } else {
@@ -479,8 +478,8 @@ impl Pool for SimPool {
         }
     }
 
-    fn destroy_filesystems<'a>(
-        &'a mut self,
+    fn destroy_filesystems(
+        &mut self,
         _pool_name: &str,
         fs_uuids: &[FilesystemUuid],
     ) -> StratisResult<SetDeleteAction<FilesystemUuid>> {

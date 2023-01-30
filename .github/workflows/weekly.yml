@@ -56,6 +56,11 @@ jobs:
     strategy:
       matrix:
         include:
+          - tag: v3.4.4
+          - tag: v3.4.3
+          - tag: v3.4.2
+          - tag: v3.4.1
+          - tag: v3.4.0
           - tag: v3.3.0
           - tag: v3.2.3
           - tag: v3.2.2

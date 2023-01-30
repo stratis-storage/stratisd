@@ -197,6 +197,8 @@ jobs:
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd
         run: PROFILEDIR=debug make -f Makefile install
+      - name: Workaround for dbus inotify
+        run: cp stratisd.conf /usr/share/dbus-1/system.d
       - name: Check out stratis-cli
         run: git clone https://github.com/stratis-storage/stratis-cli.git
       - name: Checkout tag

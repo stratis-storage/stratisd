@@ -8,9 +8,9 @@ use std::{
     cmp::{max, min, Ordering},
     collections::HashMap,
     fmt,
+    thread::scope,
 };
 
-use crossbeam::thread::scope;
 use retry::{delay::Fixed, retry_with_index};
 use serde_json::{Map, Value};
 
@@ -689,7 +689,9 @@ impl ThinPool {
             // in the next iterator step which would result in sequential
             // iteration.
             #[allow(clippy::needless_collect)]
-            let handles = self.filesystems.iter_mut()
+            let handles = self
+                .filesystems
+                .iter_mut()
                 .filter_map(|(name, uuid, fs)| {
                     if let Some(mt_pt) = fs.should_extend() {
                         let extend_size = StratFilesystem::extend_size(
@@ -699,27 +701,22 @@ impl ThinPool {
                         if extend_size == Sectors(0) {
                             None
                         } else {
-                            Some((
-                                name,
-                                *uuid,
-                                fs,
-                                mt_pt,
-                                extend_size,
-                            ))
+                            Some((name, *uuid, fs, mt_pt, extend_size))
                         }
                     } else {
                         None
                     }
                 })
                 .map(|(name, uuid, fs, mt_pt, extend_size)| {
-                    s.spawn(move |_| -> StratisResult<_> {
+                    s.spawn(move || -> StratisResult<_> {
                         let diff = fs.handle_extension(&mt_pt, extend_size)?;
                         Ok((name, uuid, fs, diff))
                     })
                 })
                 .collect::<Vec<_>>();
 
-            let needs_save = handles.into_iter()
+            let needs_save = handles
+                .into_iter()
                 .filter_map(|h| {
                     h.join()
                         .map_err(|_| {
@@ -748,7 +745,7 @@ impl ThinPool {
             #[allow(clippy::needless_collect)]
             let handles = needs_save.into_iter()
                 .map(|(name, uuid, fs)| {
-                    s.spawn(move |_| {
+                    s.spawn(move || {
                         if let Err(e) = mdv.save_fs(name, uuid, fs) {
                             error!("Could not save MDV for fs with UUID {} and name {} belonging to pool with UUID {}, reason: {:?}",
                                         uuid, name, pool_uuid, e);
@@ -756,11 +753,12 @@ impl ThinPool {
                     })
                 })
                 .collect::<Vec<_>>();
-           handles.into_iter().for_each(|h| if h.join().is_err() {
-                warn!("Failed to get status of MDV save");
-           });
-        })
-        .map_err(|_| StratisError::Msg("Failed to retrieve parallel filesystem extension status".to_string()))?;
+            handles.into_iter().for_each(|h| {
+                if h.join().is_err() {
+                    warn!("Failed to get status of MDV save");
+                }
+            });
+        });
 
         if remaining_space == Some(Sectors(0)) {
             warn!(

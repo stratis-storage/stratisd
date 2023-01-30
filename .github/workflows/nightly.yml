@@ -150,6 +150,8 @@ jobs:
       matrix:
         include:
           - image: fedora:36  # PINNED DEVELOPMENT ENVIRONMENT
+            tag: v3.4.1
+          - image: fedora:36  # PINNED DEVELOPMENT ENVIRONMENT
             tag: v3.4.0
           - image: fedora:36  # PINNED DEVELOPMENT ENVIRONMENT
             tag: v3.3.0
@@ -176,6 +178,7 @@ jobs:
           dbus-devel
           libblkid-devel
           git
+          glibc-static
           make
           python3-coverage
           python3-dbus-client-gen

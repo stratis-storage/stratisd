@@ -262,7 +262,7 @@ class _Service:
             raise RuntimeError("A stratisd process is already running")
 
         service = subprocess.Popen(
-            [_STRATISD],
+            [x for x in _STRATISD.split(" ") if x != ""],
             text=True,
         )
 

@@ -375,6 +375,10 @@ clean: clean-cfg clean-ancillary clean-primary
 test-loop:
 	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test loop_ -- --skip clevis_loop_
 
+## Tests run under valgrind with loop devices
+test-loop-valgrind:
+	RUST_TEST_THREADS=1 sudo -E valgrind --leak-check=full --num-callers=500 $(shell RUSTFLAGS="${DENY}" cargo test --no-run --all-features --message-format=json 2>/dev/null | jq -r 'select(.target.src_path == "'${PWD}/src/lib.rs'") | select(.executable != null) | .executable') loop_ --skip real_ --skip clevis_
+
 ## Tests with real devices
 test-real:
 	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test real_ -- --skip clevis_real_
@@ -382,6 +386,10 @@ test-real:
 ## Basic tests
 test:
 	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 cargo test --all-features -- --skip real_ --skip loop_ --skip clevis_ --skip test_stratis_min_ --skip test_stratisd_min_
+
+## Basic tests run under valgrind
+test-valgrind:
+	RUST_TEST_THREADS=1 valgrind --leak-check=full --num-callers=500 $(shell RUSTFLAGS="${DENY}" cargo test --no-run --all-features --message-format=json 2>/dev/null | jq -r 'select(.target.src_path == "'${PWD}/src/lib.rs'") | select(.executable != null) | .executable') --skip real_ --skip loop_ --skip clevis_
 
 ## Clevis tests with real devices
 test-clevis-real:
@@ -395,9 +403,17 @@ test-clevis-real-should-fail:
 test-clevis-loop:
 	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test clevis_loop_ -- --skip clevis_loop_should_fail_
 
+## Clevis tests with loop devices with valgrind
+test-clevis-loop-valgrind:
+	RUST_TEST_THREADS=1 sudo -E valgrind --leak-check=full --num-callers=500 $(shell RUSTFLAGS="${DENY}" cargo test --no-run --all-features --message-format=json 2>/dev/null | jq -r 'select(.target.src_path == "'${PWD}/src/lib.rs'") | select(.executable != null) | .executable') clevis_loop_ --skip clevis_loop_should_fail_
+
 ## Clevis loop device tests that are expected to fail
 test-clevis-loop-should-fail:
 	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test clevis_loop_should_fail_
+
+## Clevis loop device tests that are expected to fail run under valgrind
+test-clevis-loop-should-fail-valgrind:
+	RUST_TEST_THREADS=1 sudo -E valgrind --leak-check=full --num-callers=500 $(shell RUSTFLAGS="${DENY}" cargo test --no-run --all-features --message-format=json 2>/dev/null | jq -r 'select(.target.src_path == "'${PWD}/src/lib.rs'") | select(.executable != null) | .executable') clevis_loop_should_fail_
 
 ## Test stratisd-min CLI
 test-stratisd-min:
@@ -471,10 +487,14 @@ clippy: clippy-macros
 	license
 	outdated
 	test
+	test-valgrind
 	test-loop
+	test-loop-valgrind
 	test-real
 	test-clevis-loop
+	test-clevis-loop-valgrind
 	test-clevis-loop-should-fail
+	test-clevis-loop-should-fail-valgrind
 	test-clevis-real
 	test-clevis-real-should-fail
 	yamllint

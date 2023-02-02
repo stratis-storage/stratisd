@@ -42,6 +42,7 @@ jobs:
           git
           libblkid-devel
           make
+          ncurses
           openssl-devel
           python-requests
           python-semantic_version

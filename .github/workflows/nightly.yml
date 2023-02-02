@@ -34,6 +34,7 @@ jobs:
           dbus-devel
           libblkid-devel
           make
+          ncurses
           openssl-devel
           python-requests
           python-semantic_version
@@ -60,6 +61,7 @@ jobs:
           dbus-devel
           libblkid-devel
           make
+          ncurses
           openssl-devel
           systemd-devel
       - uses: dtolnay/rust-toolchain@master
@@ -100,6 +102,7 @@ jobs:
           dbus-devel
           libblkid-devel
           make
+          ncurses
           openssl-devel
           python-requests
           python-semantic_version
@@ -127,6 +130,7 @@ jobs:
           git
           libblkid-devel
           make
+          ncurses
           openssl-devel
           python-requests
           python-semantic_version
@@ -180,6 +184,7 @@ jobs:
           git
           glibc-static
           make
+          ncurses
           python3-coverage
           python3-dbus-client-gen
           python3-dbus-python-client-gen

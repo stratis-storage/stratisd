@@ -43,6 +43,7 @@ jobs:
         run: >
           dnf install -y
           make
+          ncurses
           python-unversioned-command
           ${{ matrix.dependencies }}
       - name: Display Python version
@@ -92,6 +93,7 @@ jobs:
           dbus-devel
           libblkid-devel
           make
+          ncurses
           openssl-devel
           systemd-devel
       - uses: dtolnay/rust-toolchain@master

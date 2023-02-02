@@ -51,6 +51,7 @@ jobs:
           dbus-devel
           libblkid-devel
           make
+          ncurses
           systemd-devel
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -98,6 +99,7 @@ jobs:
           dbus-devel
           libblkid-devel
           make
+          ncurses
           sudo
           systemd-devel
           systemd-udev
@@ -129,6 +131,7 @@ jobs:
           git
           glibc-static
           make
+          ncurses
           python3-coverage
           python3-dbus-client-gen
           python3-dbus-python-client-gen
@@ -168,6 +171,7 @@ jobs:
         run: >
           dnf install -y
           make
+          ncurses
           shfmt
       - name: Run shell check
         run: make -f Makefile fmt-shell-ci
@@ -194,6 +198,7 @@ jobs:
           git
           libblkid-devel
           make
+          ncurses
           openssl-devel
           python-requests
           python-semantic_version
@@ -226,6 +231,7 @@ jobs:
           dbus-devel
           libblkid-devel
           make
+          ncurses
           systemd-devel
       - name: Run cargo expand test
         run: make -f Makefile expand
@@ -249,6 +255,7 @@ jobs:
           glibc-static
           libblkid-devel
           make
+          ncurses
           python3-justbytes
           systemd-devel
           systemd-udev

@@ -114,6 +114,7 @@ jobs:
           glibc-static
           libblkid-devel
           make
+          ncurses
           python3-dbus
           python3-dbus-client-gen
           python3-dbus-python-client-gen

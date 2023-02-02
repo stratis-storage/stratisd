@@ -78,6 +78,7 @@ jobs:
           device-mapper-persistent-data
           libblkid-devel
           make
+          ncurses
           sudo
           systemd-devel
       - uses: dtolnay/rust-toolchain@master
@@ -113,6 +114,7 @@ jobs:
           glibc-static
           libblkid-devel
           make
+          ncurses
           sudo
           systemd-devel
           systemd-udev

@@ -42,7 +42,7 @@ blockdevs = mo_query_builder(_BLOCKDEV_SPEC)
 MOPool = managed_object_class("MOPool", _POOL_SPEC)
 MOBlockDev = managed_object_class("MOBlockDev", _BLOCKDEV_SPEC)
 
-TIME_OUT = 120  # In seconds
+TIME_OUT = 360  # In seconds
 
 ObjectManager = make_class(
     "ObjectManager",

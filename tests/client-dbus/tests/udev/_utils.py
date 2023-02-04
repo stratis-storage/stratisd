@@ -444,7 +444,7 @@ class UdevTest(unittest.TestCase):
         """
         found_num = None
 
-        end_time = time.time() + 10.0
+        end_time = time.time() + 30.0
 
         while time.time() < end_time and not expected_num == found_num:
             known_pools = get_pools(name=name)

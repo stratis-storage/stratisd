@@ -1,3 +1,27 @@
+stratisd 3.5.1
+==============
+Recommended Rust toolchain version: 1.67.0
+Lowest supported Rust toolchain version: 1.66.1
+
+Recommended development platform for Python development: Fedora 37
+
+- Do not link statically compiled udev-related binaries:
+  https://github.com/stratis-storage/stratisd/pull/3256
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3253
+  https://github.com/stratis-storage/stratisd/pull/3252
+  https://github.com/stratis-storage/stratisd/pull/3251
+  https://github.com/stratis-storage/stratisd/pull/3249
+  https://github.com/stratis-storage/stratisd/pull/3248
+  https://github.com/stratis-storage/stratisd/pull/3247
+  https://github.com/stratis-storage/stratisd/pull/3246
+  https://github.com/stratis-storage/stratisd/pull/3245
+  https://github.com/stratis-storage/stratisd/pull/3244
+  https://github.com/stratis-storage/stratisd/pull/3234
+  https://github.com/stratis-storage/stratisd/pull/3231
+
+
 stratisd 3.5.0
 ==============
 Recommended Rust toolchain version: 1.66.1

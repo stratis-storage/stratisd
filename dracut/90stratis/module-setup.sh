@@ -47,8 +47,8 @@ install() {
 		plymouth \
 		/usr/sbin/plymouthd \
 		/usr/sbin/thin_metadata_size \
+		/usr/lib/udev/stratis-base32-decode \
 		/usr/lib/udev/stratis-str-cmp
-	ln ${initdir}/usr/lib/udev/stratis-str-cmp ${initdir}/usr/lib/udev/stratis-base32-decode
 
 	# Dracut dependencies
 	inst_multiple $systemdutildir/system-generators/stratis-setup-generator \

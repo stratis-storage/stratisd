@@ -207,12 +207,6 @@ build-tests:
 	RUSTFLAGS="${DENY}" \
 	cargo test --no-run ${RELEASE_FLAG} ${TARGET_ARGS}
 
-## Build stratisd extra binaries
-build-extras:
-	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
-	cargo build ${RELEASE_FLAG} ${EXTRAS_FEATURES} ${TARGET_ARGS}
-
 ## Build stratisd-min and stratis-min for early userspace
 build-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \

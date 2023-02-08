@@ -17,9 +17,6 @@ jobs:
           - task: cargo package
             toolchain: 1.67.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-          - task: make -f Makefile stratis-dumpmetadata
-            toolchain: 1.67.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
     runs-on: ubuntu-22.04
     container:
       image: fedora:37  # CURRENT DEVELOPMENT ENVIRONMENT

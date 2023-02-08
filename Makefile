@@ -329,7 +329,7 @@ install: install-udev-cfg install-man-cfg install-dbus-cfg install-dracut-cfg in
 
 
 ## Build all stratisd binaries and configuration
-build-all: build build-min build-udev-utils docs/stratisd.8
+build-all: build build-min build-udev-utils docs/stratisd.8 stratis-dumpmetadata docs/stratis-dumpmetadata.8
 
 ## Remove installed configuration files
 clean-cfg:

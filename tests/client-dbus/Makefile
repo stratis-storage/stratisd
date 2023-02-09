@@ -35,5 +35,9 @@ predict-tests:
 filesystem-predict-tests:
 	python3 -m unittest ${UNITTEST_OPTS} tests.misc.test_predict
 
+.PHONY: dump-metadata-tests
+dump-metadata-tests:
+	python3 -m unittest ${UNITTEST_OPTS} tests.udev.test_dump
+
 .PHONY: tests
 tests: udev-tests misc-tests

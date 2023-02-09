@@ -15,7 +15,7 @@ test-set-lower-bounds:
 	echo "Testing that SET_LOWER_BOUNDS environment variable is set to a valid path"
 	test -e "${SET_LOWER_BOUNDS}"
 
-verify-dependency-bounds: test-set-lower-bounds vdb-build vdb-min vdb-tests
+verify-dependency-bounds: test-set-lower-bounds vdb-build vdb-min vdb-tests vdb-stratis-dumpmetadata
 
 vdb-build:
 	cargo clean
@@ -34,6 +34,13 @@ vdb-tests:
 	make -f Makefile build-tests
 	${SET_LOWER_BOUNDS} ${MANIFEST_PATH_ARGS}
 	make -f Makefile build-tests
+
+vdb-stratis-dumpmetadata:
+	cargo clean
+	make -f Makefile stratis-dumpmetadata
+	${SET_LOWER_BOUNDS} ${MANIFEST_PATH_ARGS}
+	make -f Makefile stratis-dumpmetadata
+
 
 COMPARE_FEDORA_VERSIONS ?=
 test-compare-fedora-versions:

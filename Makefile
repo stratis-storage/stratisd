@@ -207,12 +207,6 @@ build-tests:
 	RUSTFLAGS="${DENY}" \
 	cargo test --no-run ${RELEASE_FLAG} ${TARGET_ARGS}
 
-## Build stratisd extra binaries
-build-extras:
-	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
-	cargo build ${RELEASE_FLAG} ${EXTRAS_FEATURES} ${TARGET_ARGS}
-
 ## Build stratisd-min and stratis-min for early userspace
 build-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
@@ -278,6 +272,7 @@ install-udev-cfg:
 install-man-cfg:
 	mkdir -p $(DESTDIR)$(MANDIR)/man8
 	$(INSTALL) -Dpm0644 -t $(DESTDIR)$(MANDIR)/man8 docs/stratisd.8
+	$(INSTALL) -Dpm0644 -t $(DESTDIR)$(MANDIR)/man8 docs/stratis-dumpmetadata.8
 
 ## Install dbus config
 install-dbus-cfg:
@@ -309,6 +304,7 @@ install-binaries:
 	mkdir -p $(DESTDIR)$(UNITGENDIR)
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(BINDIR) target/$(PROFILEDIR)/stratis-min
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(BINDIR) target/$(PROFILEDIR)/stratis-utils
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(BINDIR) target/$(PROFILEDIR)/stratis-dumpmetadata
 	mv --force --verbose $(DESTDIR)$(BINDIR)/stratis-utils $(DESTDIR)$(BINDIR)/stratis-predict-usage
 	ln --force --verbose $(DESTDIR)$(BINDIR)/stratis-predict-usage $(DESTDIR)$(UNITGENDIR)/stratis-clevis-setup-generator
 	ln --force --verbose $(DESTDIR)$(BINDIR)/stratis-predict-usage $(DESTDIR)$(UNITGENDIR)/stratis-setup-generator
@@ -335,12 +331,13 @@ install: install-udev-cfg install-man-cfg install-dbus-cfg install-dracut-cfg in
 
 
 ## Build all stratisd binaries and configuration
-build-all: build build-min build-udev-utils docs/stratisd.8
+build-all: build build-min build-udev-utils docs/stratisd.8 stratis-dumpmetadata docs/stratis-dumpmetadata.8
 
 ## Remove installed configuration files
 clean-cfg:
 	rm -fv $(DESTDIR)$(DATADIR)/dbus-1/system.d/stratisd.conf
 	rm -fv $(DESTDIR)$(MANDIR)/man8/stratisd.8
+	rm -fv $(DESTDIR)$(MANDIR)/man8/stratis-dumpmetadata.8
 	rm -fv $(DESTDIR)$(UDEVDIR)/rules.d/*-stratisd.rules
 	rm -fv $(DESTDIR)$(UNITDIR)/stratisd.service
 	rm -rfv $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis
@@ -353,6 +350,7 @@ clean-ancillary:
 	rm -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp
 	rm -fv $(DESTDIR)$(UDEVDIR)/stratis-base32-decode
 	rm -fv $(DESTDIR)$(BINDIR)/stratis-predict-usage
+	rm -fv $(DESTDIR)$(BINDIR)/stratis-dumpmetadata
 	rm -fv $(DESTDIR)$(UNITGENDIR)/stratis-setup-generator
 	rm -fv $(DESTDIR)$(UNITGENDIR)/stratis-clevis-setup-generator
 	rm -fv $(DESTDIR)$(UNITEXECDIR)/stratis-fstab-setup

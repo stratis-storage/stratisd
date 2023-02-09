@@ -75,13 +75,14 @@ jobs:
         run: sudo cp stratisd.conf /usr/share/dbus-1/system.d
       - name: Reload udev
         run: sudo udevadm control --reload
-      - name: Tests on ${{ matrix.image }} using Rust ${{ matrix.toolchain }}
+      - name: Tests using Rust ${{ matrix.toolchain }}
         run: >
           sudo make
           RUST_LOG=stratisd=debug
+          STRATIS_DUMPMETADATA=/usr/bin/stratis-dumpmetadata
           STRATISD=/usr/libexec/stratisd
           PYTHONPATH=./src
-          udev-tests
+          udev-tests dump-metadata-tests
         working-directory: ./tests/client-dbus
 
   # PYTHON-BASED TESTS WITH TANG

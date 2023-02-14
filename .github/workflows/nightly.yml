@@ -215,6 +215,53 @@ jobs:
           make dbus-tests
         working-directory: ./stratis-cli
 
+  tests-with-testing-repo:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install dependencies
+        run: >
+          DEBIAN_FRONTEND=noninteractive
+          sudo apt-get install -y
+          asciidoc
+          clang
+          curl
+          libblkid-dev
+          libcryptsetup-dev
+          libdbus-1-dev
+          libsystemd-dev
+          libudev-dev
+          make
+          thin-provisioning-tools
+          udev
+          xfsprogs
+      - name: Install Python dependencies
+        run: >
+          sudo python -m pip install
+          dbus-python
+          dbus-python-client-gen
+          psutil
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          components: cargo
+          toolchain: 1.66.1  # LOWEST SUPPORTED RUST TOOLCHAIN
+      - name: Build stratisd
+        run: PROFILEDIR=debug make -f Makefile build-all
+      - name: Install stratisd
+        run: sudo make PROFILEDIR=debug -f Makefile install
+      - name: Workaround for dbus inotify
+        run: sudo cp stratisd.conf /usr/share/dbus-1/system.d
+      - name: Reload udev
+        run: sudo udevadm control --reload
+      - name: Clone testing repo
+        run: git clone https://github.com/stratis-storage/testing.git
+      - name: Run stratisd_cert.py using Rust ${{ matrix.toolchain }}
+        run: >
+          sudo
+          RUST_LOG=stratisd=debug
+          python3 test_harness.py stratisd_cert
+        working-directory: ./testing
+
   python-based-tests:
     strategy:
       matrix:

@@ -33,7 +33,7 @@ jobs:
       matrix:
         include:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT ENVIRONMENT
-          - toolchain: 1.67.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          - toolchain: 1.67.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           # MANDATORY CHECKS USING LOWEST SUPPORTED ENVIRONMENT PROXY
           - toolchain: 1.66.1  # LOWEST SUPPORTED RUST TOOLCHAIN
     runs-on: ubuntu-22.04
@@ -127,7 +127,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.67.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.67.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd

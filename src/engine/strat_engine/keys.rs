@@ -357,7 +357,7 @@ impl KeyIdList {
     }
 }
 
-/// Unset the key with ID `key_id` in the root peristent keyring.
+/// Unset the key with ID `key_id` in the root persistent keyring.
 fn unset_key(key_id: KeySerial) -> StratisResult<()> {
     let keyring_id = get_persistent_keyring()?;
 
@@ -416,7 +416,7 @@ impl KeyActions for StratKeyActions {
 }
 
 /// An in-memory filesystem that mounts a tmpfs that can house keyfiles so that they
-/// are never writen to disk. The interface aims to keep the keys in memory for as
+/// are never written to disk. The interface aims to keep the keys in memory for as
 /// short of a period of time as possible (only for the duration of the operation
 /// that the keyfile is needed for).
 pub struct MemoryPrivateFilesystem(PathBuf);

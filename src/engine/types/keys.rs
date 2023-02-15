@@ -341,7 +341,7 @@ where
     }
 }
 
-/// A data type respresenting a key description for the kernel keyring
+/// A data type representing a key description for the kernel keyring
 #[derive(Clone, Debug, Eq, Hash, PartialEq, Serialize, Deserialize)]
 pub struct KeyDescription(String);
 

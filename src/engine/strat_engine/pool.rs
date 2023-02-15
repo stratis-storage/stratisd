@@ -562,7 +562,7 @@ impl Pool for StratPool {
         if !self.has_cache() {
             if unowned_devices.is_empty() {
                 return Err(StratisError::Msg(
-                    "At least one device is reqired to initialize a cache.".to_string(),
+                    "At least one device is required to initialize a cache.".to_string(),
                 ));
             }
 
@@ -878,7 +878,7 @@ impl Pool for StratPool {
                     .block_size_summary(BlockDevTier::Data)
                     .expect("always exists")
                     .validate()
-                    .expect("All operations prevented if validate() function on data tier block size sumary returns an error");
+                    .expect("All operations prevented if validate() function on data tier block size summary returns an error");
                 let added_sector_sizes = block_size_summary
                     .keys()
                     .next()

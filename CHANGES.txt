@@ -998,7 +998,7 @@ YAML linter: yamllint (1.26.0)
   https://github.com/stratis-storage/stratisd/issues/1495
   https://github.com/stratis-storage/stratisd/pull/2392
 
-- Emit log entries at info level for every succesful call of a D-Bus method
+- Emit log entries at info level for every successful call of a D-Bus method
   that might mutate some state:
   https://github.com/stratis-storage/stratisd/issues/1648
   https://github.com/stratis-storage/stratisd/pull/2401

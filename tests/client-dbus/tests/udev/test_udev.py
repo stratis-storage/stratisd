@@ -673,7 +673,7 @@ class UdevTest7(UdevTest):
         * Remove devices from each pool
         * Attempt to start by name which should fail
         * Add the devices back
-        * Starting the pools by name should succeeed
+        * Starting the pools by name should succeed
         """
         num_devices = 4
         device_tokens = self._lb_mgr.create_devices(num_devices)

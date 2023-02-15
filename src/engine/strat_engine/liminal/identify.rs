@@ -10,7 +10,7 @@
 //!
 //! The methods rely to a greater or lesser extent on libudev.
 //!
-//! They have the following invocation heirarchy:
+//! They have the following invocation hierarchy:
 //! find_all*
 //!  |
 //! find_all_*_devices

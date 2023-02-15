@@ -184,7 +184,7 @@ impl BlockSizeSummary {
     /// Check that, as far as is known, the current arrangement of device
     /// block sizes will not cause untoward behavior during the lifetime of
     /// the pool.
-    /// Returns the logical block size that will alway be used by the cap
+    /// Returns the logical block size that will always be used by the cap
     /// device if this size exists.
     pub fn validate(&self) -> StratisResult<BlockSizes> {
         // It is not practically possible that all the data devices in the data

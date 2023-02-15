@@ -74,7 +74,7 @@ impl BDA {
         F: Read + Seek + SyncAll,
     {
         // Assume that, since a valid StaticHeader was found on the device,
-        // that this implies that BDA::initialize() was succesfully executed
+        // that this implies that BDA::initialize() was successfully executed
         // sometime in the past. Since that is the case, valid MDA headers
         // were written to the device. Returns an error if there is an error
         // when loading the MDARegions, which can only be caused by an I/O

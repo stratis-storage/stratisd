@@ -489,7 +489,7 @@ impl UnownedDevices {
     }
 }
 
-/// Initialze devices in devices.
+/// Initialize devices in devices.
 /// Clean up previously initialized devices if initialization of any single
 /// device fails during initialization. Log at the warning level if cleanup
 /// fails.

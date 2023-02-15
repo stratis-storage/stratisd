@@ -1022,7 +1022,7 @@ fn setup_pool(
 }
 
 /// Rollback an unlock operation for some or all devices of a pool that have been
-/// unlocked prior to the failure occuring.
+/// unlocked prior to the failure occurring.
 fn handle_unlock_rollback(causal_error: StratisError, handles: Vec<CryptHandle>) -> StratisError {
     for handle in handles {
         if let Err(e) = handle.deactivate() {

@@ -1080,7 +1080,7 @@ impl ThinPool {
                 Ordering::Equal => {
                     self.out_of_meta_space = true;
                     return (false, Err(StratisError::Msg(
-                        "Metdata cannot be extended any further without adding more space or enabling overprovisioning; the sum of filesystem sizes is as large as all space not used for metadata".to_string()
+                        "Metadata cannot be extended any further without adding more space or enabling overprovisioning; the sum of filesystem sizes is as large as all space not used for metadata".to_string()
                     )));
                 }
                 Ordering::Greater => {

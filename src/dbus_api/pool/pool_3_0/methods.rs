@@ -181,7 +181,7 @@ where
     );
     let msg = match result {
         Ok(uuids) => {
-            // Only get changed values here as non-existant filesystems will have been filtered out
+            // Only get changed values here as non-existent filesystems will have been filtered out
             // before calling destroy_filesystems
             let uuid_vec: Vec<String> = if let Some(ref changed_uuids) = uuids.changed() {
                 for uuid in changed_uuids {

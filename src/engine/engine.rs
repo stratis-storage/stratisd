@@ -258,7 +258,7 @@ pub trait Pool: Debug + Send + Sync {
 
     /// The number of Sectors in this pool that are currently in use by the
     /// pool for some purpose, and therefore not available for future use,
-    /// by any subcomponent of Stratis, either for internal managment or to
+    /// by any subcomponent of Stratis, either for internal management or to
     /// store user data.
     fn total_physical_used(&self) -> Option<Sectors>;
 

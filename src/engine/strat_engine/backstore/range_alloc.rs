@@ -21,7 +21,7 @@ use crate::{
 /// index. This is principally useful for the range allocator.
 /// It enforces some invariants:
 /// * No 0 length segment
-/// * No continguous segments; if two segments would be contiguous they are
+/// * No contiguous segments; if two segments would be contiguous they are
 /// coalesced into a single segment.
 /// * No overlapping segments
 /// * No segments that extend beyond limit

@@ -191,7 +191,7 @@ impl Backstore {
                     (Some(cache_tier), Some(cache_device), None)
                 }
                 None => {
-                    let err_msg = "Cachedevs exist, but cache metdata does not exist";
+                    let err_msg = "Cachedevs exist, but cache metadata does not exist";
                     return Err((
                         StratisError::Msg(err_msg.into()),
                         data_tier

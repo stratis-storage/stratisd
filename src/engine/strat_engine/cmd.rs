@@ -141,7 +141,7 @@ lazy_static! {
     };
 }
 
-/// Verify that all exectuables that the engine might invoke are available at some
+/// Verify that all executables that the engine might invoke are available at some
 /// path. Return an error if any are missing. Required to be called on engine
 /// initialization.
 pub fn verify_executables() -> StratisResult<()> {

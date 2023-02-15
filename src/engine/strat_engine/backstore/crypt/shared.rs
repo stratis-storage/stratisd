@@ -167,7 +167,7 @@ pub fn acquire_crypt_device(physical_path: &Path) -> StratisResult<CryptDevice> 
     })
 }
 
-/// Get the passphrase associated with a given key desription.
+/// Get the passphrase associated with a given key description.
 fn key_desc_to_passphrase(key_description: &KeyDescription) -> StratisResult<SizedKeyMemory> {
     let key_option = log_on_failure!(
         read_key(key_description),
@@ -647,7 +647,7 @@ fn device_is_active(device: Option<&mut CryptDevice>, device_name: &str) -> Stra
 
 /// Activate device by LUKS2 keyring token.
 ///
-/// Precondition: The key description has been verfified to be present in the keyring
+/// Precondition: The key description has been verified to be present in the keyring
 /// if matches!(unlock_method, UnlockMethod::Keyring).
 fn activate_with_keyring(crypt_device: &mut CryptDevice, name: &str) -> StratisResult<()> {
     // Activate by token

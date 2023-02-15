@@ -35,9 +35,9 @@ struct FSSizeLookup {
 }
 
 impl FSSizeLookup {
-    /// Calculate a predicted usage for the given logical fileystem size.
+    /// Calculate a predicted usage for the given logical filesystem size.
     /// Find the index of the entry in the table such that the logical
-    /// fileystem size for which the data was recorded is at least as much as
+    /// filesystem size for which the data was recorded is at least as much as
     /// the logical_size argument, but no greater than twice as much, and
     /// return the value.
     /// The formula is:

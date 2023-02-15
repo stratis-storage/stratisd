@@ -6,7 +6,7 @@
 //! pool, filesystem, or blockdev. Each action type is designed to support
 //! idempotency. In every case, the action type is used to indicate the
 //! effect of the action at the time the action is requested. The action was
-//! completed succesfully; this type indicates what changes had to be made.
+//! completed successfully; this type indicates what changes had to be made.
 
 use std::fmt::{self, Debug, Display};
 

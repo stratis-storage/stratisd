@@ -132,7 +132,7 @@ impl CryptHandle {
 
     /// Return the path to the device node of the decrypted contents of the encrypted
     /// storage device. In an encrypted pool, this is the path that can be used to read
-    /// the Stratis blockdev metatdata.
+    /// the Stratis blockdev metadata.
     pub fn activated_device_path(&self) -> &Path {
         &self.activated_path
     }

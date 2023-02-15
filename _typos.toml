@@ -1,0 +1,9 @@
+[default.extend-words]
+# Misidentified as misspellings of "start" or "strata"
+Strat = "Strat"
+strat = "strat"
+STRAT = "STRAT"
+
+[files]
+# typos tries to correct the spelling of D-Bus signatures
+extend-exclude = ["_introspect.py", "api.rs"]

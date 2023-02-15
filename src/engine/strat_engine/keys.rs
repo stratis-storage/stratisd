@@ -349,7 +349,7 @@ impl KeyIdList {
                     )
                 })?;
             let parsed_string = parse_keyctl_describe_string(keyctl_str)?;
-            if let Some(kd) = KeyDescription::from_system_key_desc(&parsed_string).map(|k| k.expect("parse_keyctl_desribe_string() ensures the key description can not have semi-colons in it")) {
+            if let Some(kd) = KeyDescription::from_system_key_desc(&parsed_string).map(|k| k.expect("parse_keyctl_describe_string() ensures the key description can not have semi-colons in it")) {
                 key_descs.push(kd);
             }
         }

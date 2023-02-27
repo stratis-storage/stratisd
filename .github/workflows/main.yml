@@ -88,14 +88,12 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies for Fedora
-        # cracklib-dicts: https://github.com/stratis-storage/project/issues/581
         run: >
           dnf install -y
           clang
           cryptsetup-devel
           clevis
           clevis-luks
-          cracklib-dicts
           curl
           device-mapper-persistent-data
           dbus-devel

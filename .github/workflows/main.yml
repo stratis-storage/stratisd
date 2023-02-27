@@ -104,6 +104,10 @@ jobs:
           systemd-devel
           systemd-udev
           xfsprogs
+          libpwquality
+      # See: https://github.com/stratis-storage/project/issues/581
+      - name: Upgrade libpwquality
+        run: dnf upgrade --refresh --advisory=FEDORA-2023-4021d4c044
       - uses: dtolnay/rust-toolchain@master
         with:
           components: ${{ matrix.components }}

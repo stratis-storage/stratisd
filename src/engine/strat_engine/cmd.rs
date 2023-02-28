@@ -19,9 +19,10 @@ use std::{
     collections::HashMap,
     io::{Read, Write},
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::{Command, Output, Stdio},
 };
 
+use either::Either;
 use libc::c_uint;
 use libcryptsetup_rs::SafeMemHandle;
 use serde_json::Value;
@@ -166,24 +167,28 @@ fn execute_cmd(cmd: &mut Command) -> StratisResult<()> {
         Err(err) => Err(StratisError::Msg(format!(
             "Failed to execute command {cmd:?}, err: {err:?}"
         ))),
-        Ok(result) => {
-            if result.status.success() {
-                Ok(())
-            } else {
-                let exit_reason = result
-                    .status
-                    .code()
-                    .map_or(String::from("process terminated by signal"), |ec| {
-                        ec.to_string()
-                    });
-                let std_out_txt = String::from_utf8_lossy(&result.stdout);
-                let std_err_txt = String::from_utf8_lossy(&result.stderr);
-                let err_msg = format!(
-                    "Command failed: cmd: {cmd:?}, exit reason: {exit_reason} stdout: {std_out_txt} stderr: {std_err_txt}"
-                );
-                Err(StratisError::Msg(err_msg))
-            }
-        }
+        Ok(output) => handle_output(cmd, output),
+    }
+}
+
+/// Handle the output of an executed command. Return an error if invoking the
+/// command fails or if the command itself fails.
+fn handle_output(cmd: &mut Command, output: Output) -> StratisResult<()> {
+    if output.status.success() {
+        Ok(())
+    } else {
+        let exit_reason = output
+            .status
+            .code()
+            .map_or(String::from("process terminated by signal"), |ec| {
+                ec.to_string()
+            });
+        let std_out_txt = String::from_utf8_lossy(&output.stdout);
+        let std_err_txt = String::from_utf8_lossy(&output.stderr);
+        let err_msg = format!(
+            "Command failed: cmd: {cmd:?}, exit reason: {exit_reason} stdout: {std_out_txt} stderr: {std_err_txt}"
+        );
+        Err(StratisError::Msg(err_msg))
     }
 }
 
@@ -298,7 +303,7 @@ pub fn udev_settle() -> StratisResult<()> {
 /// Bind a LUKS device using clevis.
 pub fn clevis_luks_bind(
     dev_path: &Path,
-    keyfile_path: &Path,
+    existing_auth: Either<c_uint, SizedKeyMemory>,
     slot: c_uint,
     pin: &str,
     json: &Value,
@@ -312,16 +317,33 @@ pub fn clevis_luks_bind(
         cmd.arg("-y");
     };
 
-    cmd.arg("-d")
-        .arg(dev_path.display().to_string())
-        .arg("-k")
-        .arg(keyfile_path)
-        .arg("-t")
+    cmd.arg("-d").arg(dev_path.display().to_string());
+
+    if let Either::Left(token_slot) = existing_auth {
+        cmd.arg("-e").arg(token_slot.to_string());
+    }
+
+    cmd.arg("-t")
         .arg(slot.to_string())
         .arg(pin)
         .arg(json.to_string());
 
-    execute_cmd(&mut cmd)
+    match existing_auth {
+        Either::Left(_) => execute_cmd(&mut cmd),
+        Either::Right(ref key) => {
+            cmd.stdin(Stdio::piped());
+            let mut child = cmd.spawn()?;
+            let stdin = child.stdin.as_mut().ok_or_else(|| {
+                StratisError::Msg(
+                    "Could not provide passphrase to clevis bind via stdin".to_string(),
+                )
+            })?;
+            stdin.write_all(key.as_ref())?;
+            stdin.write_all("\n".as_bytes())?;
+            let output = child.wait_with_output()?;
+            handle_output(&mut cmd, output)
+        }
+    }
 }
 
 /// Unbind a LUKS device using clevis.
@@ -369,8 +391,6 @@ pub fn clevis_decrypt(jwe: &Value) -> StratisResult<SizedKeyMemory> {
         )
     })?;
     jose_stdin.write_all(jwe.to_string().as_bytes())?;
-
-    jose_child.wait()?;
 
     let mut jose_output = String::new();
     jose_child

@@ -8,6 +8,7 @@ use std::{
 };
 
 use either::Either;
+use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use serde_json::{to_value, Value};
 
 use devicemapper::{Device, DmName, DmNameBuf, Sectors};
@@ -17,11 +18,12 @@ use libcryptsetup_rs::{
         flags::{CryptActivate, CryptVolumeKey},
         vals::{EncryptionFormat, KeyslotsSize, MetadataSize},
     },
-    CryptDevice, CryptInit, CryptParamsLuks2, CryptParamsLuks2Ref, TokenInput,
+    CryptDevice, CryptInit, CryptParamsLuks2, CryptParamsLuks2Ref, SafeMemHandle, TokenInput,
 };
 
 use crate::{
     engine::{
+        engine::MAX_STRATIS_PASS_SIZE,
         strat_engine::{
             backstore::{
                 crypt::{
@@ -42,7 +44,6 @@ use crate::{
             },
             cmd::{clevis_decrypt, clevis_luks_bind, clevis_luks_regen, clevis_luks_unbind},
             dm::DEVICEMAPPER_PATH,
-            keys::MemoryPrivateFilesystem,
             metadata::StratisIdentifiers,
             names::format_crypt_name,
         },
@@ -246,29 +247,28 @@ impl CryptHandle {
         physical_path: &Path,
         (pin, json, yes): (&str, &Value, bool),
     ) -> StratisResult<()> {
-        let fs = log_on_failure!(
-            MemoryPrivateFilesystem::new(),
-            "Failed to initialize in memory filesystem for temporary keyfile for
-            Clevis binding"
-        );
-        let keyfile = log_on_failure!(
-            fs.rand_key(),
-            "Failed to generate a key with random data for Clevis initialization"
-        );
+        let (_, key_data) = thread_rng()
+            .sample_iter(Alphanumeric)
+            .take(MAX_STRATIS_PASS_SIZE)
+            .fold(
+                (0, SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?),
+                |(idx, mut mem), ch| {
+                    mem.as_mut()[idx] = ch;
+                    (idx + 1, mem)
+                },
+            );
 
+        let key = SizedKeyMemory::new(key_data, MAX_STRATIS_PASS_SIZE);
         let keyslot = log_on_failure!(
-            device.keyslot_handle().add_by_key(
-                None,
-                None,
-                keyfile.as_ref(),
-                CryptVolumeKey::empty(),
-            ),
+            device
+                .keyslot_handle()
+                .add_by_key(None, None, key.as_ref(), CryptVolumeKey::empty(),),
             "Failed to initialize keyslot with provided key in keyring"
         );
 
         clevis_luks_bind(
             physical_path,
-            keyfile.keyfile_path(),
+            Either::Right(key),
             CLEVIS_LUKS_TOKEN_ID,
             pin,
             json,
@@ -298,10 +298,14 @@ impl CryptHandle {
     ) -> StratisResult<()> {
         Self::initialize_with_keyring(device, key_description)?;
 
-        let fs = MemoryPrivateFilesystem::new()?;
-        fs.key_op(key_description, |kf| {
-            clevis_luks_bind(physical_path, kf, CLEVIS_LUKS_TOKEN_ID, pin, json, yes)
-        })?;
+        clevis_luks_bind(
+            physical_path,
+            Either::Left(LUKS2_TOKEN_ID),
+            CLEVIS_LUKS_TOKEN_ID,
+            pin,
+            json,
+            yes,
+        )?;
 
         // Need to reload device here to refresh the state of the device
         // after being modified by Clevis.
@@ -474,28 +478,14 @@ impl CryptHandle {
         let mut json_owned = json.clone();
         let yes = interpret_clevis_config(pin, &mut json_owned)?;
 
-        let key_desc = self
-            .metadata
-            .encryption_info
-            .key_description()
-            .ok_or_else(|| {
-                StratisError::Msg(
-                    "Clevis binding requires a registered key description for the device \
-                    but none was found"
-                        .to_string(),
-                )
-            })?;
-        let memfs = MemoryPrivateFilesystem::new()?;
-        memfs.key_op(key_desc, |keyfile_path| {
-            clevis_luks_bind(
-                self.luks2_device_path(),
-                keyfile_path,
-                CLEVIS_LUKS_TOKEN_ID,
-                pin,
-                &json_owned,
-                yes,
-            )
-        })?;
+        clevis_luks_bind(
+            self.luks2_device_path(),
+            Either::Left(LUKS2_TOKEN_ID),
+            CLEVIS_LUKS_TOKEN_ID,
+            pin,
+            &json_owned,
+            yes,
+        )?;
         self.metadata.encryption_info =
             self.metadata
                 .encryption_info

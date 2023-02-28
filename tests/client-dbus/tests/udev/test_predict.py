@@ -51,7 +51,7 @@ _FILESYSTEM_MULT_LIMIT = 3
 
 def _call_predict_usage(encrypted, device_sizes, *, fs_specs=None, overprovision=True):
     """
-    Call stratis-predict-usage and return JSON resut.
+    Call stratis-predict-usage and return JSON result.
 
     :param bool encrypted: true if pool is to be encrypted
     :param device_sizes: list of sizes of devices for pool

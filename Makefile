@@ -148,6 +148,9 @@ ${HOME}/.cargo/bin/cargo-audit:
 ${HOME}/.cargo/bin/cargo-expand:
 	cargo install cargo-expand
 
+${HOME}/.cargo/bin/typos:
+	cargo install typos-cli
+
 ## Run cargo outdated
 outdated: ${HOME}/.cargo/bin/cargo-outdated
 	PATH=${HOME}/.cargo/bin:${PATH} cargo outdated
@@ -168,6 +171,10 @@ audit: ${HOME}/.cargo/bin/cargo-audit
 ## Run cargo expand
 expand: ${HOME}/.cargo/bin/cargo-expand
 	PATH=${HOME}/.cargo/bin:${PATH} cargo expand --lib engine::strat_engine::pool
+
+## Check for spelling errors
+check-typos: ${HOME}/.cargo/bin/typos
+	PATH=${HOME}/.cargo/bin:${PATH} typos
 
 ## Run cargo fmt
 fmt: fmt-macros
@@ -426,6 +433,7 @@ clippy: clippy-macros
 	build-udev-utils
 	build-stratis-base32-decode
 	build-stratis-str-cmp
+	check-typos
 	clean
 	clean-ancillary
 	clean-cfg

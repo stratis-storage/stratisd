@@ -333,26 +333,30 @@ dependencies = [
 
 [[package]]
 name = "devicemapper"
-version = "0.32.3"
+version = "0.33.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1da7c273a50833e1fbbff5b71b06fd1f3f00356b0fa1d392a21ee8b4aabb2a1e"
+checksum = "e645b7ca36b156ce45a2fdb51f86cd26c549f6034ee25233830054006789f7aa"
 dependencies = [
  "bitflags",
  "devicemapper-sys",
+ "env_logger",
  "lazy_static",
- "nix 0.24.3",
+ "log",
+ "nix 0.26.2",
+ "rand",
+ "retry",
  "semver",
  "serde",
 ]
 
 [[package]]
 name = "devicemapper-sys"
-version = "0.1.3"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d2aad5bae6bc8a217f8c398c5737122966cbd35f19dd223433606225ec48285"
+checksum = "f0b0f9d16560f830ae6e90b769017333c4561d2c84f39e7aa7d935d2e7bcbc4c"
 dependencies = [
- "bindgen 0.59.2",
- "nix 0.24.3",
+ "bindgen 0.63.0",
+ "nix 0.26.2",
 ]
 
 [[package]]
@@ -801,15 +805,6 @@ checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 
 [[package]]
 name = "memoffset"
-version = "0.6.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5aa361d4faea93603064a027415f07bd8e1d5c88c9fbf68bf56a285428fd79ce"
-dependencies = [
- "autocfg",
-]
-
-[[package]]
-name = "memoffset"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5de893c32cde5f383baa4c04c5d6dbdd735cfd4a794b0debdb2bb1b421da5ff4"
@@ -850,18 +845,6 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.24.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa52e972a9a719cecb6864fb88568781eb706bac2cd1d4f04a648542dbf78069"
-dependencies = [
- "bitflags",
- "cfg-if 1.0.0",
- "libc",
- "memoffset 0.6.5",
-]
-
-[[package]]
-name = "nix"
 version = "0.26.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bfdda3d196821d6af13126e40375cdf7da646a96114af134d5f417a9a1dc8e1a"
@@ -869,7 +852,7 @@ dependencies = [
  "bitflags",
  "cfg-if 1.0.0",
  "libc",
- "memoffset 0.7.1",
+ "memoffset",
  "pin-utils",
  "static_assertions",
 ]

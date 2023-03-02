@@ -161,14 +161,16 @@ where
         }
         BlockDevOp::AddCache => {
             handle_action!(
-                pool.add_blockdevs(pool_uuid, &pool_name, &blockdevs, BlockDevTier::Cache,),
+                pool.add_blockdevs(pool_uuid, &pool_name, &blockdevs, BlockDevTier::Cache,)
+                    .map(|(act, _)| { act }),
                 dbus_context,
                 pool_path.get_name()
             )
         }
         BlockDevOp::AddData => {
             handle_action!(
-                pool.add_blockdevs(pool_uuid, &pool_name, &blockdevs, BlockDevTier::Data,),
+                pool.add_blockdevs(pool_uuid, &pool_name, &blockdevs, BlockDevTier::Data,)
+                    .map(|(act, _)| { act }),
                 dbus_context,
                 pool_path.get_name()
             )

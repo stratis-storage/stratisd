@@ -160,6 +160,7 @@ where
     block_in_place(|| {
         Ok(pool
             .add_blockdevs(uuid, name, blockdevs, tier)?
+            .0
             .is_changed())
     })
 }

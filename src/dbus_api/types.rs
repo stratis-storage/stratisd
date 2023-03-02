@@ -468,7 +468,7 @@ where
             SignalChange::from(out_of_alloc_space),
         )) {
             warn!(
-                "Pool allocated size change event could not be sent to the processing thread; no signal will be sent out for the pool allocated size state change: {}",
+                "Pool foreground change event could not be sent to the processing thread; no signal will be sent out for the pool foreground state change: {}",
                 e,
             )
         }

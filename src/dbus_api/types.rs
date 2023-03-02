@@ -128,13 +128,7 @@ pub enum DbusAction<E> {
         SignalChange<Bytes>,
         SignalChange<bool>,
     ),
-    PoolForegroundChange(
-        Path<'static>,
-        SignalChange<Option<Bytes>>,
-        SignalChange<Bytes>,
-        SignalChange<Bytes>,
-        SignalChange<bool>,
-    ),
+    PoolForegroundChange(Path<'static>, SignalChange<Bytes>, SignalChange<bool>),
     UdevBackgroundChange(DevUuid, SignalChange<Option<Sectors>>),
 }
 
@@ -465,15 +459,11 @@ where
     pub fn push_pool_foreground_change(
         &self,
         path: &Path<'static>,
-        new_used: Diff<Option<Bytes>>,
-        new_alloc: Diff<Bytes>,
         new_size: Diff<Bytes>,
         out_of_alloc_space: Diff<bool>,
     ) {
         if let Err(e) = self.sender.send(DbusAction::PoolForegroundChange(
             path.clone(),
-            SignalChange::from(new_used),
-            SignalChange::from(new_alloc),
             SignalChange::from(new_size),
             SignalChange::from(out_of_alloc_space),
         )) {

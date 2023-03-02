@@ -832,8 +832,6 @@ where
     fn handle_pool_foreground_change(
         &self,
         path: Path<'static>,
-        new_used: SignalChange<Option<Bytes>>,
-        new_alloc: SignalChange<Bytes>,
         new_size: SignalChange<Bytes>,
         new_no_space: SignalChange<bool>,
     ) {
@@ -842,23 +840,11 @@ where
             &path,
             "pool",
             consts::POOL_INTERFACE_NAME_3_0 => {
-                consts::POOL_TOTAL_USED_PROP.to_string(),
-                pool_used_to_prop,
-                new_used,
-                consts::POOL_ALLOC_SIZE_PROP.to_string(),
-                pool_alloc_to_prop,
-                new_alloc,
                 consts::POOL_TOTAL_SIZE_PROP.to_string(),
                 pool_size_to_prop,
                 new_size
             },
             consts::POOL_INTERFACE_NAME_3_1 => {
-                consts::POOL_TOTAL_USED_PROP.to_string(),
-                pool_used_to_prop,
-                new_used,
-                consts::POOL_ALLOC_SIZE_PROP.to_string(),
-                pool_alloc_to_prop,
-                new_alloc,
                 consts::POOL_TOTAL_SIZE_PROP.to_string(),
                 pool_size_to_prop,
                 new_size,
@@ -867,12 +853,6 @@ where
                 new_no_space
             },
             consts::POOL_INTERFACE_NAME_3_2 => {
-                consts::POOL_TOTAL_USED_PROP.to_string(),
-                pool_used_to_prop,
-                new_used,
-                consts::POOL_ALLOC_SIZE_PROP.to_string(),
-                pool_alloc_to_prop,
-                new_alloc,
                 consts::POOL_TOTAL_SIZE_PROP.to_string(),
                 pool_size_to_prop,
                 new_size,
@@ -881,12 +861,6 @@ where
                 new_no_space
             },
             consts::POOL_INTERFACE_NAME_3_3 => {
-                consts::POOL_TOTAL_USED_PROP.to_string(),
-                pool_used_to_prop,
-                new_used,
-                consts::POOL_ALLOC_SIZE_PROP.to_string(),
-                pool_alloc_to_prop,
-                new_alloc,
                 consts::POOL_TOTAL_SIZE_PROP.to_string(),
                 pool_size_to_prop,
                 new_size,
@@ -895,12 +869,6 @@ where
                 new_no_space
             },
             consts::POOL_INTERFACE_NAME_3_4 => {
-                consts::POOL_TOTAL_USED_PROP.to_string(),
-                pool_used_to_prop,
-                new_used,
-                consts::POOL_ALLOC_SIZE_PROP.to_string(),
-                pool_alloc_to_prop,
-                new_alloc,
                 consts::POOL_TOTAL_SIZE_PROP.to_string(),
                 pool_size_to_prop,
                 new_size,
@@ -909,12 +877,6 @@ where
                 new_no_space
             },
             consts::POOL_INTERFACE_NAME_3_5 => {
-                consts::POOL_TOTAL_USED_PROP.to_string(),
-                pool_used_to_prop,
-                new_used,
-                consts::POOL_ALLOC_SIZE_PROP.to_string(),
-                pool_alloc_to_prop,
-                new_alloc,
                 consts::POOL_TOTAL_SIZE_PROP.to_string(),
                 pool_size_to_prop,
                 new_size,
@@ -1033,14 +995,8 @@ where
                 self.handle_blockdev_user_info_change(path, new_user_info);
                 Ok(true)
             }
-            DbusAction::PoolForegroundChange(item, new_used, new_alloc, new_size, new_no_space) => {
-                self.handle_pool_foreground_change(
-                    item,
-                    new_used,
-                    new_alloc,
-                    new_size,
-                    new_no_space,
-                );
+            DbusAction::PoolForegroundChange(item, new_size, new_no_space) => {
+                self.handle_pool_foreground_change(item, new_size, new_no_space);
                 Ok(true)
             }
             DbusAction::FsBackgroundChange(uuid, new_used, new_size) => {

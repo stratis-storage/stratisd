@@ -11,7 +11,7 @@ use std::{
     fmt::{self, Display},
 };
 
-use clap::{Arg, Command};
+use clap::{Arg, ArgAction, Command};
 use serde_json::{json, Value};
 
 use devicemapper::{Bytes, Sectors};
@@ -284,7 +284,7 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
                         Arg::new("device-size")
                             .long("device-size")
                             .number_of_values(1)
-                            .multiple_occurrences(true)
+                            .action(ArgAction::Append)
                             .required(true)
                             .help("Size of device to be included in the pool. May be specified multiple times. Units are bytes.")
                             .next_line_help(true)
@@ -293,7 +293,7 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
                         Arg::new("filesystem-size")
                         .long("filesystem-size")
                         .number_of_values(1)
-                        .multiple_occurrences(true)
+                        .action(ArgAction::Append)
                         .help("Size of filesystem to be made for this pool. May be specified multiple times, one for each filesystem. Units are bytes. Must be at least 512 MiB and less than 4 PiB.")
                         .next_line_help(true)
                     ),
@@ -303,7 +303,7 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
                         Arg::new("filesystem-size")
                         .long("filesystem-size")
                         .number_of_values(1)
-                        .multiple_occurrences(true)
+                        .action(ArgAction::Append)
                         .required(true)
                         .help("Size of filesystem to be made for this pool. May be specified multiple times, one for each filesystem. Units are bytes. Must be at least 512 MiB and less than 4 PiB.")
                         .next_line_help(true)
@@ -317,17 +317,17 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
         let matches = parser.get_matches_from(&args);
         match matches.subcommand() {
             Some(("pool", sub_m)) => predict_pool_usage(
-                sub_m.is_present("encrypted"),
-                !sub_m.is_present("no-overprovision"),
+                sub_m.get_flag("encrypted"),
+                !sub_m.get_flag("no-overprovision"),
                 sub_m
-                    .values_of("device-size")
+                    .get_many::<String>("device-size")
                     .map(|szs| {
                         szs.map(|sz| sz.parse::<u128>().map(Bytes))
                             .collect::<Result<Vec<_>, _>>()
                     })
                     .expect("required argument")?,
                 sub_m
-                    .values_of("filesystem-size")
+                    .get_many::<String>("filesystem-size")
                     .map(|szs| {
                         szs.map(|sz| sz.parse::<u128>().map(Bytes))
                             .collect::<Result<Vec<_>, _>>()
@@ -335,9 +335,9 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
                     .transpose()?,
             )?,
             Some(("filesystem", sub_m)) => predict_filesystem_usage(
-                !sub_m.is_present("no-overprovision"),
+                !sub_m.get_flag("no-overprovision"),
                 sub_m
-                    .values_of("filesystem-size")
+                    .get_many::<String>("filesystem-size")
                     .map(|szs| {
                         szs.map(|sz| sz.parse::<u128>().map(Bytes))
                             .collect::<Result<Vec<_>, _>>()

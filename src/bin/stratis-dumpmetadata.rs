@@ -142,11 +142,14 @@ fn main() {
                 .help("Print byte buffer of device"),
         )
         .get_matches();
-    let devpath = matches.value_of("dev").unwrap();
+    let devpath = matches
+        .get_one::<String>("dev")
+        .map(|s| s.as_str())
+        .unwrap();
 
     initialize_log();
 
-    match run(devpath, matches.is_present("print_bytes")) {
+    match run(devpath, matches.get_flag("print_bytes")) {
         Ok(()) => {}
         Err(e) => {
             eprintln!("Error encountered: {}", e);

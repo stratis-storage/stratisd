@@ -11,7 +11,7 @@ use std::{
     str::FromStr,
 };
 
-use clap::{Arg, Command};
+use clap::{Arg, ArgAction, Command};
 use env_logger::Builder;
 use libc::pid_t;
 use log::LevelFilter;
@@ -121,12 +121,16 @@ fn main() {
     let matches = Command::new("stratisd")
         .version(VERSION)
         .about("Stratis storage management")
-        .arg(Arg::new("sim").long("sim").help("Use simulator engine"))
+        .arg(
+            Arg::new("sim")
+                .action(ArgAction::SetTrue)
+                .long("sim")
+                .help("Use simulator engine"),
+        )
         .arg(
             Arg::new("log-level")
-                .forbid_empty_values(true)
+                .value_parser(["trace", "debug", "info", "warn", "error"])
                 .long("log-level")
-                .possible_values(["trace", "debug", "info", "warn", "error"])
                 .help("Sets level for generation of log messages."),
         )
         .get_matches();
@@ -139,8 +143,8 @@ fn main() {
         match lock_file {
             Err(err) => Err(err),
             Ok(_) => {
-                initialize_log(matches.value_of("log-level"));
-                run(matches.is_present("sim"))
+                initialize_log(matches.get_one::<String>("log-level").map(|s| s.as_str()));
+                run(matches.get_flag("sim"))
             }
         }
     };

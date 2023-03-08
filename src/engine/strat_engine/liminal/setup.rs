@@ -299,11 +299,13 @@ pub fn get_blockdevs(
     ) -> BDARecordResult<Vec<StratBlockDev>> {
         let mut uuids = HashSet::new();
         let mut duplicate_uuids = Vec::new();
+        let mut metadata_version = HashSet::new();
         for dev in &devs {
             let dev_uuid = dev.uuid();
             if !uuids.insert(dev_uuid) {
                 duplicate_uuids.push(dev_uuid);
             }
+            metadata_version.insert(dev.metadata_version());
         }
 
         if !duplicate_uuids.is_empty() {
@@ -312,6 +314,16 @@ pub fn get_blockdevs(
                 duplicate_uuids.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(", ")
             );
             return Err((StratisError::Msg(err_msg), bds_to_bdas(devs)));
+        }
+
+        if metadata_version.len() > 1 {
+            return Err((
+                StratisError::Msg(format!(
+                    "Found mismatching metadata versions across block devices: {:?}",
+                    metadata_version,
+                )),
+                bds_to_bdas(devs),
+            ));
         }
 
         let recorded_uuids: HashSet<_> = dev_map.keys().cloned().collect();

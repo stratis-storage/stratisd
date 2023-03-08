@@ -37,7 +37,7 @@ use crate::{
         },
         types::{
             Compare, DevUuid, DevicePath, Diff, EncryptionInfo, KeyDescription, Name, PoolUuid,
-            StateDiff, StratBlockDevDiff,
+            StateDiff, StratBlockDevDiff, StratSigblockVersion,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -557,6 +557,11 @@ impl StratBlockDev {
         } else {
             Ok(())
         }
+    }
+
+    /// Get metadata version from static header
+    pub fn metadata_version(&self) -> StratSigblockVersion {
+        self.bda.sigblock_version()
     }
 }
 

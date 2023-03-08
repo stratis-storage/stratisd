@@ -37,7 +37,7 @@ use crate::{
                 STRATIS_FS_TYPE,
             },
         },
-        types::{DevUuid, DevicePath, EncryptionInfo, Name, PoolUuid},
+        types::{DevUuid, DevicePath, EncryptionInfo, Name, PoolUuid, StratSigblockVersion},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -579,6 +579,7 @@ pub fn initialize_devices(
         };
 
         let bda = BDA::new(
+            StratSigblockVersion::V1,
             StratisIdentifiers::new(pool_uuid, dev_uuid),
             mda_data_size,
             data_size,

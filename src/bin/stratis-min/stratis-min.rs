@@ -16,15 +16,10 @@ use stratisd::{
     stratis::{StratisError, VERSION},
 };
 
-fn parse_args() -> Command<'static> {
+fn parse_args() -> Command {
     Command::new("stratis-min")
         .version(VERSION)
-        .arg(
-            Arg::new("debug")
-                .long("--debug")
-                .takes_value(false)
-                .required(false),
-        )
+        .arg(Arg::new("debug").long("debug").num_args(0).required(false))
         .subcommand_required(true)
         .arg_required_else_help(true)
         .subcommands(vec![
@@ -36,16 +31,8 @@ fn parse_args() -> Command<'static> {
                             .arg("keyfile_path")
                             .required(true),
                     )
-                    .arg(
-                        Arg::new("capture_key")
-                            .long("--capture-key")
-                            .takes_value(false),
-                    )
-                    .arg(
-                        Arg::new("keyfile_path")
-                            .long("--keyfile-path")
-                            .takes_value(true),
-                    )
+                    .arg(Arg::new("capture_key").long("capture-key").num_args(0))
+                    .arg(Arg::new("keyfile_path").long("keyfile-path").num_args(1))
                     .arg(Arg::new("key_desc").required(true)),
                 Command::new("list"),
                 Command::new("unset").arg(Arg::new("key_desc").required(true)),
@@ -53,21 +40,17 @@ fn parse_args() -> Command<'static> {
             Command::new("pool").subcommands(vec![
                 Command::new("start")
                     .arg(Arg::new("id").required(true))
-                    .arg(Arg::new("name").long("--name").takes_value(false))
-                    .arg(
-                        Arg::new("unlock_method")
-                            .long("--unlock-method")
-                            .takes_value(true),
-                    )
+                    .arg(Arg::new("name").long("name").num_args(0))
+                    .arg(Arg::new("unlock_method").long("unlock-method").num_args(1))
                     .arg(
                         Arg::new("prompt")
-                            .long("--prompt")
-                            .takes_value(false)
+                            .long("prompt")
+                            .num_args(0)
                             .requires("unlock_method"),
                     ),
                 Command::new("stop")
                     .arg(Arg::new("id").required(true))
-                    .arg(Arg::new("name").long("--name").takes_value(false)),
+                    .arg(Arg::new("name").long("name").num_args(0)),
                 Command::new("create")
                     .arg(Arg::new("name").required(true))
                     .arg(
@@ -75,28 +58,24 @@ fn parse_args() -> Command<'static> {
                             .action(ArgAction::Append)
                             .required(true),
                     )
-                    .arg(Arg::new("key_desc").long("--key-desc").takes_value(true))
+                    .arg(Arg::new("key_desc").long("key-desc").num_args(1))
                     .arg(
                         Arg::new("clevis")
-                            .long("--clevis")
-                            .takes_value(true)
+                            .long("clevis")
+                            .num_args(1)
                             .value_parser(["nbde", "tang", "tpm2"])
                             .requires_if("nbde", "tang_args")
                             .requires_if("tang", "tang_args"),
                     )
                     .arg(
                         Arg::new("tang_url")
-                            .long("--tang-url")
-                            .takes_value(true)
+                            .long("tang-url")
+                            .num_args(1)
                             .required_if_eq("clevis", "nbde")
                             .required_if_eq("clevis", "tang"),
                     )
-                    .arg(
-                        Arg::new("thumbprint")
-                            .long("--thumbprint")
-                            .takes_value(true),
-                    )
-                    .arg(Arg::new("trust_url").long("--trust-url").takes_value(false))
+                    .arg(Arg::new("thumbprint").long("thumbprint").num_args(1))
+                    .arg(Arg::new("trust_url").long("trust-url").num_args(0))
                     .group(
                         ArgGroup::new("tang_args")
                             .arg("thumbprint")
@@ -128,19 +107,19 @@ fn parse_args() -> Command<'static> {
                     ),
                 Command::new("destroy").arg(Arg::new("name").required(true)),
                 Command::new("is-encrypted")
-                    .arg(Arg::new("name").long("--name").takes_value(false))
+                    .arg(Arg::new("name").long("name").num_args(0))
                     .arg(Arg::new("id").required(true)),
                 Command::new("is-stopped")
-                    .arg(Arg::new("name").long("--name").takes_value(false))
+                    .arg(Arg::new("name").long("name").num_args(0))
                     .arg(Arg::new("id").required(true)),
                 Command::new("is-bound")
-                    .arg(Arg::new("name").long("--name").takes_value(false))
+                    .arg(Arg::new("name").long("name").num_args(0))
                     .arg(Arg::new("id").required(true)),
                 Command::new("has-passphrase")
-                    .arg(Arg::new("name").long("--name").takes_value(false))
+                    .arg(Arg::new("name").long("name").num_args(0))
                     .arg(Arg::new("id").required(true)),
                 Command::new("clevis-pin")
-                    .arg(Arg::new("name").long("--name").takes_value(false))
+                    .arg(Arg::new("name").long("name").num_args(0))
                     .arg(Arg::new("id").required(true)),
             ]),
             Command::new("filesystem").subcommands(vec![
@@ -425,4 +404,13 @@ fn main() -> Result<(), String> {
     }
 
     main_box().map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod test {
+    use super::parse_args;
+    #[test]
+    fn test_stratis_min_parse_args() {
+        parse_args().debug_assert();
+    }
 }

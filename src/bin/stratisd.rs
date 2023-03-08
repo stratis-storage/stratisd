@@ -117,8 +117,8 @@ fn trylock_pid_file() -> StratisResult<File> {
     stratisd_file
 }
 
-fn main() {
-    let matches = Command::new("stratisd")
+fn parse_args() -> Command {
+    Command::new("stratisd")
         .version(VERSION)
         .about("Stratis storage management")
         .arg(
@@ -133,7 +133,10 @@ fn main() {
                 .long("log-level")
                 .help("Sets level for generation of log messages."),
         )
-        .get_matches();
+}
+
+fn main() {
+    let matches = parse_args().get_matches();
 
     // Using a let-expression here so that the scope of the lock file
     // is the rest of the block.
@@ -154,5 +157,15 @@ fn main() {
         exit(1);
     } else {
         exit(0);
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_stratisd_parse_args() {
+        parse_args().debug_assert();
     }
 }

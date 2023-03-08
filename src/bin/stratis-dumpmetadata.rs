@@ -11,7 +11,7 @@ use std::{
 
 use env_logger::Builder;
 
-use clap::{Arg, Command};
+use clap::{Arg, ArgAction, Command};
 
 use pretty_hex::pretty_hex;
 
@@ -128,8 +128,8 @@ fn run(devpath: &str, print_bytes: bool) -> Result<(), String> {
     Ok(())
 }
 
-fn main() {
-    let matches = Command::new("stratis-dumpmetadata")
+fn parse_args() -> Command {
+    Command::new("stratis-dumpmetadata")
         .arg(
             Arg::new("dev")
                 .required(true)
@@ -138,10 +138,15 @@ fn main() {
         .arg(
             Arg::new("print_bytes")
                 .long("print-bytes")
+                .action(ArgAction::SetTrue)
+                .num_args(0)
                 .short('b')
                 .help("Print byte buffer of device"),
         )
-        .get_matches();
+}
+
+fn main() {
+    let matches = parse_args().get_matches();
     let devpath = matches
         .get_one::<String>("dev")
         .map(|s| s.as_str())
@@ -155,5 +160,15 @@ fn main() {
             eprintln!("Error encountered: {}", e);
             process::exit(1);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_args;
+
+    #[test]
+    fn test_dumpmetadata_parse_args() {
+        parse_args().debug_assert();
     }
 }

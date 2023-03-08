@@ -24,19 +24,19 @@ use stratisd::stratis::{run, StratisError, StratisResult, VERSION};
 const STRATISD_PID_PATH: &str = "/run/stratisd.pid";
 const STRATISD_MIN_PID_PATH: &str = "/run/stratisd-min.pid";
 
-fn parse_args() -> Command<'static> {
+fn parse_args() -> Command {
     Command::new("stratisd-min")
         .version(VERSION)
         .arg(
             Arg::new("log_level")
                 .value_parser(["trace", "debug", "info", "warn", "error"])
-                .long("--log-level")
+                .long("log-level")
                 .help("Sets level for generation of log messages."),
         )
         .arg(
             Arg::new("sim")
-                .long("--sim")
-                .takes_value(false)
+                .long("sim")
+                .num_args(0)
                 .help("Enables sim engine."),
         )
 }
@@ -128,4 +128,13 @@ fn main() -> Result<(), String> {
     }
 
     main_box().map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod test {
+    use super::parse_args;
+    #[test]
+    fn test_stratisd_min_parse_args() {
+        parse_args().debug_assert();
+    }
 }

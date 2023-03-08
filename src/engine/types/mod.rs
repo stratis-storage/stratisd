@@ -500,3 +500,32 @@ impl UuidOrConflict {
         }
     }
 }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum StratSigblockVersion {
+    V1 = 1,
+    V2 = 2,
+}
+
+impl TryFrom<u8> for StratSigblockVersion {
+    type Error = StratisError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            1u8 => Ok(StratSigblockVersion::V1),
+            2u8 => Ok(StratSigblockVersion::V2),
+            _ => Err(StratisError::Msg(format!(
+                "Unknown sigblock version: {value}"
+            ))),
+        }
+    }
+}
+
+impl From<StratSigblockVersion> for u8 {
+    fn from(version: StratSigblockVersion) -> Self {
+        match version {
+            StratSigblockVersion::V1 => 1u8,
+            StratSigblockVersion::V2 => 2u8,
+        }
+    }
+}

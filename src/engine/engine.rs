@@ -28,7 +28,7 @@ use crate::{
             MappingCreateAction, MappingDeleteAction, Name, PoolDiff, PoolEncryptionInfo,
             PoolIdentifier, PoolUuid, RegenAction, RenameAction, ReportType, SetCreateAction,
             SetDeleteAction, SetUnlockAction, StartAction, StopAction, StoppedPoolsInfo,
-            StratFilesystemDiff, StratPoolDiff, UdevEngineEvent, UnlockMethod,
+            StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
         },
     },
     stratis::StratisResult,
@@ -177,7 +177,7 @@ pub trait Pool: Debug + Send + Sync {
         pool_name: &str,
         paths: &[&Path],
         tier: BlockDevTier,
-    ) -> StratisResult<(SetCreateAction<DevUuid>, Option<StratPoolDiff>)>;
+    ) -> StratisResult<(SetCreateAction<DevUuid>, Option<PoolDiff>)>;
 
     /// Bind all devices in the given pool for automated unlocking
     /// using clevis.

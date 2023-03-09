@@ -81,6 +81,15 @@ pub struct ThinPoolDiff {
     pub used: Diff<Option<Bytes>>,
 }
 
+impl Default for ThinPoolDiff {
+    fn default() -> Self {
+        ThinPoolDiff {
+            allocated_size: Diff::Unchanged(),
+            used: Diff::Unchanged(),
+        }
+    }
+}
+
 /// Change in attributes of a Stratis pool that may need to be reported to the
 /// IPC layer.
 #[derive(Debug)]

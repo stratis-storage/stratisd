@@ -52,6 +52,7 @@ jobs:
           curl
           cryptsetup-devel
           dbus-devel
+          device-mapper-devel
           libblkid-devel
           make
           ncurses
@@ -100,8 +101,9 @@ jobs:
           clevis-luks
           cracklib-dicts
           curl
-          device-mapper-persistent-data
           dbus-devel
+          device-mapper-devel
+          device-mapper-persistent-data
           libblkid-devel
           make
           ncurses
@@ -132,6 +134,7 @@ jobs:
           dbus-daemon
           dbus-tools
           dbus-devel
+          device-mapper-devel
           libblkid-devel
           git
           glibc-static
@@ -200,6 +203,7 @@ jobs:
           curl
           cryptsetup-devel
           dbus-devel
+          device-mapper-devel
           git
           libblkid-devel
           make
@@ -234,6 +238,7 @@ jobs:
           clang
           cryptsetup-devel
           dbus-devel
+          device-mapper-devel
           libblkid-devel
           make
           ncurses
@@ -256,6 +261,8 @@ jobs:
           cryptsetup-devel
           curl
           dbus-devel
+          dbus-tools
+          device-mapper-devel
           device-mapper-persistent-data
           glibc-static
           libblkid-devel

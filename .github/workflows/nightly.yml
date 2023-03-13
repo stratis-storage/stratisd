@@ -29,6 +29,7 @@ jobs:
           curl
           cryptsetup-devel
           dbus-devel
+          device-mapper-devel
           libblkid-devel
           make
           ncurses
@@ -124,6 +125,7 @@ jobs:
           curl
           cryptsetup-devel
           dbus-devel
+          device-mapper-devel
           git
           libblkid-devel
           make
@@ -177,6 +179,7 @@ jobs:
           clang
           cryptsetup-devel
           dbus-devel
+          device-mapper-devel
           libblkid-devel
           git
           glibc-static

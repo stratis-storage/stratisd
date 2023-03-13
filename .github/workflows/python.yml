@@ -51,6 +51,7 @@ jobs:
           libblkid-dev
           libcryptsetup-dev
           libdbus-1-dev
+          libdevmapper-dev
           libsystemd-dev
           libudev-dev
           make
@@ -115,6 +116,8 @@ jobs:
           cracklib-dicts
           curl
           dbus-devel
+          dbus-tools
+          device-mapper-devel
           device-mapper-persistent-data
           glibc-static
           libblkid-devel

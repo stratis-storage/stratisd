@@ -13,10 +13,13 @@ use std::{
 
 use clap::{Arg, Command};
 use env_logger::Builder;
+use libc::pid_t;
 use log::LevelFilter;
 use nix::{
+    errno::Errno,
     fcntl::{flock, FlockArg},
-    unistd::getpid,
+    sys::signal::{kill, Signal},
+    unistd::{getpid, Pid},
 };
 
 use stratisd::stratis::{run, StratisError, StratisResult, VERSION};
@@ -78,7 +81,7 @@ fn trylock_pid_file() -> StratisResult<File> {
         }
     };
 
-    let f = OpenOptions::new()
+    let mut f = OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
@@ -91,6 +94,16 @@ fn trylock_pid_file() -> StratisResult<File> {
                 Box::new(StratisError::from(err)),
             )
         })?;
+
+    if let Err(Errno::EWOULDBLOCK) = flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
+        let mut string = String::new();
+        f.read_to_string(&mut string)?;
+        let pid = string
+            .parse::<pid_t>()
+            .map_err(|_| StratisError::Msg(format!("Failed to parse {} as PID", string)))?;
+        kill(Pid::from_raw(pid), Signal::SIGINT)?;
+    }
+
     match flock(f.as_raw_fd(), FlockArg::LockExclusive) {
         Ok(_) => drop(f),
         Err(e) => {

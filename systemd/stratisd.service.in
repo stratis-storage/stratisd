@@ -2,6 +2,7 @@
 Description=Stratis daemon
 Documentation=man:stratisd(8)
 DefaultDependencies=no
+After=sysinit.target
 
 [Service]
 BusName=org.storage.stratis3
@@ -13,4 +14,4 @@ KillMode=process
 Restart=on-abort
 
 [Install]
-WantedBy=sysinit.target
+WantedBy=multi-user.target

@@ -2,9 +2,9 @@
 Description=Stratis minimal daemon
 Documentation=man:stratisd(8)
 DefaultDependencies=no
-StopWhenUnneeded=true
 After=systemd-udevd.service
 Requires=systemd-udevd.service
+Before=local-fs.target
 
 [Service]
 Type=notify
@@ -14,3 +14,6 @@ ExecStart=@LIBEXECDIR@/stratisd-min --log-level debug
 KillSignal=SIGINT
 KillMode=process
 Restart=on-abort
+
+[Install]
+WantedBy=local-fs.target

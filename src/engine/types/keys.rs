@@ -142,10 +142,6 @@ impl fmt::Display for EncryptionInfo {
 // serves no obvious purpose to stringify it and then hash it.
 // Necessary Hash Property: \forall x_1, x_2 in EncryptionInfo,
 // if x_1 == x_2, then hash(x_1) == hash(x_2) obviously holds.
-#[allow(unknown_lints)]
-#[allow(renamed_and_removed_lints)]
-#[allow(clippy::derive_hash_xor_eq)]
-#[allow(clippy::derived_hash_with_manual_eq)]
 impl Hash for EncryptionInfo {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.key_description().hash(state);

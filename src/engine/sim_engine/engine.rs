@@ -84,8 +84,9 @@ impl<'a> Into<Value> for &'a SimEngine {
                         unreachable!("json!() output is always JSON object");
                     }
                 })
-                .collect()
+                .collect(),
             ),
+            "partially_constructed_pools": Value::Array(Vec::new())
         })
     }
 }

@@ -171,30 +171,45 @@ impl DeviceInfo {
     }
 }
 
-impl From<StratBlockDev> for DeviceInfo {
+impl From<StratBlockDev> for Vec<DeviceInfo> {
     fn from(bd: StratBlockDev) -> Self {
+        let mut device_infos = Vec::new();
         match (bd.encryption_info(), bd.pool_name(), bd.luks_device()) {
-            (Some(ei), Some(pname), Some(dev)) => DeviceInfo::Luks(LuksInfo {
-                encryption_info: ei.clone(),
-                dev_info: StratisDevInfo {
-                    device_number: *dev,
-                    devnode: bd.physical_path().to_owned(),
-                },
-                identifiers: StratisIdentifiers {
-                    pool_uuid: bd.pool_uuid(),
-                    device_uuid: bd.uuid(),
-                },
-                pool_name: pname.cloned(),
-            }),
-            (None, None, None) => DeviceInfo::Stratis(StratisInfo {
+            (Some(ei), Some(pname), Some(dev)) => {
+                if bd.physical_path().exists() {
+                    device_infos.push(DeviceInfo::Luks(LuksInfo {
+                        encryption_info: ei.clone(),
+                        dev_info: StratisDevInfo {
+                            device_number: *dev,
+                            devnode: bd.physical_path().to_owned(),
+                        },
+                        identifiers: StratisIdentifiers {
+                            pool_uuid: bd.pool_uuid(),
+                            device_uuid: bd.uuid(),
+                        },
+                        pool_name: pname.cloned(),
+                    }));
+                    if bd.metadata_path().exists() {
+                        device_infos.push(DeviceInfo::Stratis(StratisInfo {
+                            dev_info: StratisDevInfo {
+                                device_number: *bd.device(),
+                                devnode: bd.metadata_path().to_owned(),
+                            },
+                            bda: bd.bda,
+                        }));
+                    }
+                }
+            }
+            (None, None, None) => device_infos.push(DeviceInfo::Stratis(StratisInfo {
                 dev_info: StratisDevInfo {
                     device_number: *bd.device(),
                     devnode: bd.physical_path().to_owned(),
                 },
                 bda: bd.bda,
-            }),
+            })),
             (_, _, _) => unreachable!("If bd.is_encrypted(), all are Some(_)"),
         }
+        device_infos
     }
 }
 

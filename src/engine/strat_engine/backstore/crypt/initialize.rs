@@ -54,7 +54,7 @@ impl CryptInitializer {
     ) -> CryptInitializer {
         CryptInitializer {
             physical_path,
-            activation_name: format_crypt_name(&dev_uuid),
+            activation_name: format_crypt_name(&dev_uuid).to_string(),
             identifiers: StratisIdentifiers::new(pool_uuid, dev_uuid),
         }
     }

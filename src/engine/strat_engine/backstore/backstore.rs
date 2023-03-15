@@ -569,25 +569,24 @@ impl Backstore {
     }
 
     /// Teardown the DM devices in the backstore.
-    pub fn teardown(&mut self) -> StratisResult<Vec<StratBlockDev>> {
-        let mut devs = match self
+    pub fn teardown(&mut self) -> StratisResult<()> {
+        match self
             .cache
             .as_mut()
             .and_then(|c| self.cache_tier.as_mut().map(|ct| (c, ct)))
         {
             Some((cache, cache_tier)) => {
                 cache.teardown(get_dm())?;
-                cache_tier.block_mgr.teardown()?
+                cache_tier.block_mgr.teardown()?;
             }
             None => {
                 if let Some(ref mut linear) = self.linear {
                     linear.teardown(get_dm())?;
                 }
-                Vec::new()
             }
         };
-        devs.extend(self.data_tier.block_mgr.teardown()?);
-        Ok(devs)
+        self.data_tier.block_mgr.teardown()?;
+        Ok(())
     }
 
     /// Consume the backstore and convert it into a set of BDAs representing
@@ -603,6 +602,18 @@ impl Backstore {
                     .unwrap_or_default(),
             )
             .collect::<HashMap<_, _>>()
+    }
+
+    /// Drain the backstore devices into a set of all data and cache devices.
+    pub fn drain_bds(&mut self) -> Vec<StratBlockDev> {
+        let mut bds = self.data_tier.block_mgr.drain_bds();
+        bds.extend(
+            self.cache_tier
+                .as_mut()
+                .map(|ct| ct.block_mgr.drain_bds())
+                .unwrap_or_default(),
+        );
+        bds
     }
 
     /// Return the device that this tier is currently using.

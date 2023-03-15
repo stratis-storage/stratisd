@@ -19,8 +19,8 @@ use crate::{
         },
         strat_engine::{
             backstore::{Backstore, ProcessedPathInfos, StratBlockDev, UnownedDevices},
-            liminal::{DeviceInfo, DeviceSet, LInfo},
-            metadata::MDADataSize,
+            liminal::DeviceSet,
+            metadata::{MDADataSize, BDA},
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             shared::tiers_to_bdas,
             thinpool::{StratFilesystem, ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
@@ -318,7 +318,7 @@ impl StratPool {
     /// Teardown a pool.
     #[cfg(test)]
     pub fn teardown(&mut self) -> StratisResult<()> {
-        self.thin_pool.teardown()?;
+        self.thin_pool.teardown().map_err(|(e, _)| e)?;
         self.backstore.teardown()?;
         Ok(())
     }
@@ -390,9 +390,9 @@ impl StratPool {
     ///
     /// This method is not a mutating action as the pool should be allowed
     /// to be destroyed even if the metadata is inconsistent.
-    pub fn destroy(&mut self) -> StratisResult<()> {
+    pub fn destroy(&mut self) -> Result<(), (StratisError, bool)> {
         self.thin_pool.teardown()?;
-        self.backstore.destroy()?;
+        self.backstore.destroy().map_err(|e| (e, false))?;
         Ok(())
     }
 
@@ -408,17 +408,27 @@ impl StratPool {
 
     /// Stop a pool, consuming it and converting it into a set of devices to be
     /// set up again later.
-    pub fn stop(&mut self, pool_name: &Name) -> StratisResult<DeviceSet> {
+    pub fn stop(&mut self, pool_name: &Name) -> Result<DeviceSet, (StratisError, bool)> {
         self.thin_pool.teardown()?;
         let mut data = self.record(pool_name);
         data.started = Some(false);
-        let json = serde_json::to_string(&data)?;
-        self.backstore.save_state(json.as_bytes())?;
-        let bds = self.backstore.teardown()?;
-        Ok(bds
-            .into_iter()
-            .map(|bd| (bd.uuid(), LInfo::from(DeviceInfo::from(bd))))
-            .collect::<DeviceSet>())
+        let json = serde_json::to_string(&data).map_err(|e| (StratisError::from(e), false))?;
+        self.backstore
+            .save_state(json.as_bytes())
+            .map_err(|e| (e, false))?;
+        self.backstore.teardown().map_err(|e| (e, false))?;
+        let bds = self.backstore.drain_bds();
+        Ok(DeviceSet::from(bds))
+    }
+
+    /// Convert a pool into a record of BDAs for the given block devices in the pool.
+    pub fn into_bdas(self) -> HashMap<DevUuid, BDA> {
+        self.backstore.into_bdas()
+    }
+
+    /// Drain pool block devices into a record of block devices in the pool.
+    pub fn drain_bds(&mut self) -> Vec<StratBlockDev> {
+        self.backstore.drain_bds()
     }
 
     #[cfg(test)]

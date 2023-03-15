@@ -61,12 +61,13 @@ impl KeyDescription {
 ///             < 128
 ///
 /// which is equivalent to len(format!("{}", FORMAT_VERSION) < 73
-pub fn format_crypt_name(dev_uuid: &DevUuid) -> String {
-    format!(
+pub fn format_crypt_name(dev_uuid: &DevUuid) -> DmNameBuf {
+    let value = format!(
         "stratis-{}-private-{}-crypt",
         FORMAT_VERSION,
         uuid_to_string!(dev_uuid)
-    )
+    );
+    DmNameBuf::new(value).expect("FORMAT_VERSION display length < 73")
 }
 
 #[derive(Clone, Copy)]

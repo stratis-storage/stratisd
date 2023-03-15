@@ -27,7 +27,7 @@ use crate::{
             cmd::verify_executables,
             dm::get_dm,
             keys::StratKeyActions,
-            liminal::{find_all, LiminalDevices},
+            liminal::{find_all, DeviceSet, LiminalDevices},
             ns::MemoryFilesystem,
             pool::StratPool,
         },
@@ -453,9 +453,20 @@ impl Engine for StratEngine {
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
 
-        let (res, pool) = spawn_blocking!((pool.destroy(), pool))?;
-        if let Err(err) = res {
+        let (res, mut pool) = spawn_blocking!((pool.destroy(), pool))?;
+        if let Err((err, true)) = res {
             guard.insert(pool_name, uuid, pool);
+            Err(err)
+        } else if let Err((err, false)) = res {
+            // We use blkid to scan for existing devices with this pool UUID and device UUIDs
+            // because some of the block devices could have been destroyed above. Using the
+            // cached data structures alone could result in phantom devices that have already
+            // been destroyed but are still recorded in the stopped pool.
+            let device_set = DeviceSet::from(pool.drain_bds());
+            self.liminal_devices
+                .write()
+                .await
+                .handle_stopped_pool(uuid, device_set);
             Err(err)
         } else {
             Ok(DeleteAction::Deleted(uuid))
@@ -638,30 +649,22 @@ impl Engine for StratEngine {
 
     async fn stop_pool(&self, pool_uuid: PoolUuid) -> StratisResult<StopAction<PoolUuid>> {
         let mut pools = self.pools.write_all().await;
-        if let Some((name, mut pool)) = pools.remove_by_uuid(pool_uuid) {
-            if let Err(e) = self
-                .liminal_devices
+        if let Some((name, pool)) = pools.remove_by_uuid(pool_uuid) {
+            self.liminal_devices
                 .write()
                 .await
-                .stop_pool(&name, pool_uuid, &mut pool)
-            {
-                pools.insert(name, pool_uuid, pool);
-                return Err(e);
-            } else {
-                return Ok(StopAction::Stopped(pool_uuid));
-            }
+                .stop_pool(&mut pools, name, pool_uuid, pool)?;
+            return Ok(StopAction::Stopped(pool_uuid));
         }
 
         drop(pools);
 
-        if self
-            .liminal_devices
-            .read()
-            .await
-            .stopped_pools()
-            .stopped
-            .get(&pool_uuid)
-            .is_some()
+        let stopped_pools = self.liminal_devices.read().await.stopped_pools();
+        if stopped_pools.stopped.get(&pool_uuid).is_some()
+            || stopped_pools
+                .partially_constructed
+                .get(&pool_uuid)
+                .is_some()
         {
             Ok(StopAction::Identity)
         } else {

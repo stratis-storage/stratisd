@@ -810,16 +810,25 @@ impl ThinPool {
 
     /// Tear down the components managed here: filesystems, the MDV,
     /// and the actual thinpool device itself.
-    pub fn teardown(&mut self) -> StratisResult<()> {
+    ///
+    /// Err(_) contains a tuple with a bool as the second element indicating whether or not
+    /// there are filesystems that were unable to be torn down. This distinction exists because
+    /// if filesystems remain, the pool could receive IO and should remain in set up pool data
+    /// structures. However if all filesystems were torn down, the pool can be moved to
+    /// the designation of partially constructed pools as no IO can be received on the pool
+    /// and it has been partially torn down.
+    pub fn teardown(&mut self) -> Result<(), (StratisError, bool)> {
         // Must succeed in tearing down all filesystems before the
         // thinpool..
         for (_, _, ref mut fs) in &mut self.filesystems {
-            fs.teardown()?;
+            fs.teardown().map_err(|e| (e, true))?;
         }
-        self.thin_pool.teardown(get_dm())?;
+        self.thin_pool
+            .teardown(get_dm())
+            .map_err(|e| (StratisError::from(e), false))?;
 
         // ..but MDV has no DM dependencies with the above
-        self.mdv.teardown()?;
+        self.mdv.teardown().map_err(|e| (e, false))?;
 
         Ok(())
     }

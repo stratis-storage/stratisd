@@ -20,6 +20,7 @@ use crate::{
             backstore::{
                 find_stratis_devs_by_uuid, CryptActivationHandle, CryptHandle, StratBlockDev,
             },
+            dm::{has_leftover_devices, stop_partially_constructed_pool},
             liminal::{
                 device_info::{
                     reconstruct_stratis_infos, split_stratis_infos, stratis_infos_ref, DeviceSet,
@@ -57,6 +58,9 @@ pub struct LiminalDevices {
     uuid_lookup: HashMap<PathBuf, (PoolUuid, DevUuid)>,
     /// Devices that have not yet been set up or have been stopped.
     stopped_pools: HashMap<PoolUuid, DeviceSet>,
+    /// Devices that have been left in a partially constructed state either during start
+    /// or stop.
+    partially_constructed_pools: HashMap<PoolUuid, DeviceSet>,
     /// Lookup data structure for name to UUID mapping for starting pools by name.
     name_to_uuid: HashMap<Name, UuidOrConflict>,
 }
@@ -105,7 +109,11 @@ impl LiminalDevices {
             }
         }
 
-        let unlocked = match self.stopped_pools.get(&pool_uuid) {
+        let unlocked = match self
+            .stopped_pools
+            .get(&pool_uuid)
+            .or_else(|| self.partially_constructed_pools.get(&pool_uuid))
+        {
             Some(map) => {
                 let encryption_info = map.encryption_info();
                 if let Ok(None) = encryption_info {
@@ -180,12 +188,16 @@ impl LiminalDevices {
                 .ok_or_else(|| StratisError::Msg(format!("Could not find a pool with name {n}")))
                 .and_then(|uc| uc.to_result())?,
         };
+        // Here we take a reference to entries in stopped pools because the call to unlock_pool
+        // below requires the pool being unlocked to still have its entry in stopped_pools.
+        // Removing it here would cause an error.
         let encryption_info = self
             .stopped_pools
             .get(&pool_uuid)
+            .or_else(|| self.partially_constructed_pools.get(&pool_uuid))
             .ok_or_else(|| {
                 StratisError::Msg(format!(
-                    "Requested pool with UUID {pool_uuid} was not found in stopped pools"
+                    "Requested pool with UUID {pool_uuid} was not found in stopped or partially constructed pools"
                 ))
             })?
             .encryption_info();
@@ -217,6 +229,7 @@ impl LiminalDevices {
         let mut stopped_pool = self
             .stopped_pools
             .remove(&pool_uuid)
+            .or_else(|| self.partially_constructed_pools.remove(&pool_uuid))
             .expect("Checked above");
         match find_stratis_devs_by_uuid(pool_uuid, uuids) {
             Ok(infos) => infos.into_iter().for_each(|(dev_uuid, (path, devno))| {
@@ -240,8 +253,8 @@ impl LiminalDevices {
             }),
             Err(e) => {
                 warn!("Failed to scan for newly unlocked Stratis devices: {}", e);
-                self.stopped_pools.insert(pool_uuid, stopped_pool);
-                return Err(handle_unlock_rollback(e, handles));
+                let err = handle_unlock_rollback(e, handles);
+                return Err(err);
             }
         };
 
@@ -255,11 +268,22 @@ impl LiminalDevices {
     /// in an internal data structure for later starting.
     pub fn stop_pool(
         &mut self,
-        pool_name: &Name,
+        pools: &mut Table<PoolUuid, StratPool>,
+        pool_name: Name,
         pool_uuid: PoolUuid,
-        pool: &mut StratPool,
+        mut pool: StratPool,
     ) -> StratisResult<()> {
-        let devices = pool.stop(pool_name)?;
+        let (devices, err) = match pool.stop(&pool_name) {
+            Ok(devs) => (devs, None),
+            Err((e, true)) => {
+                pools.insert(pool_name, pool_uuid, pool);
+                return Err(e);
+            }
+            Err((e, false)) => {
+                warn!("Failed to stop pool; placing in partially constructed pools");
+                (DeviceSet::from(pool.drain_bds()), Some(e))
+            }
+        };
         for (_, device) in devices.iter() {
             match device {
                 LInfo::Luks(l) => {
@@ -279,8 +303,12 @@ impl LiminalDevices {
                 }
             }
         }
-        self.stopped_pools.insert(pool_uuid, devices);
-        if let Some(maybe_conflict) = self.name_to_uuid.get_mut(pool_name) {
+        if err.is_some() {
+            self.partially_constructed_pools.insert(pool_uuid, devices);
+        } else {
+            self.stopped_pools.insert(pool_uuid, devices);
+        }
+        if let Some(maybe_conflict) = self.name_to_uuid.get_mut(&pool_name) {
             maybe_conflict.add(pool_uuid);
             if let UuidOrConflict::Conflict(set) = maybe_conflict {
                 warn!("Found conflicting names for stopped pools; UUID will be required to start pools with UUIDs {}", set.iter().map(|u| u.to_string()).collect::<Vec<_>>().join(", "));
@@ -289,7 +317,11 @@ impl LiminalDevices {
             self.name_to_uuid
                 .insert(pool_name.clone(), UuidOrConflict::Uuid(pool_uuid));
         }
-        Ok(())
+        if let Some(e) = err {
+            Err(e)
+        } else {
+            Ok(())
+        }
     }
 
     /// Get a mapping of pool UUIDs from all of the LUKS2 devices that are currently
@@ -351,6 +383,13 @@ impl LiminalDevices {
                 .collect::<HashMap<_, _>>(),
             stopped: self
                 .stopped_pools
+                .iter()
+                .filter_map(|(pool_uuid, map)| {
+                    map.stopped_pool_info().map(|info| (*pool_uuid, info))
+                })
+                .collect(),
+            partially_constructed: self
+                .partially_constructed_pools
                 .iter()
                 .filter_map(|(pool_uuid, map)| {
                     map.stopped_pool_info().map(|info| (*pool_uuid, info))
@@ -530,9 +569,7 @@ impl LiminalDevices {
                     "Some of the devices in pool with UUID {pool_uuid} are unopened"
                 ));
                 info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {}", err);
-                if !ds.is_empty() {
-                    self.stopped_pools.insert(pool_uuid, ds);
-                }
+                self.handle_stopped_pool(pool_uuid, ds);
                 return Err(err);
             }
         };
@@ -566,9 +603,7 @@ impl LiminalDevices {
             Err((err, bdas)) => {
                 info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {}", err);
                 let device_set = reconstruct_stratis_infos(infos, bdas);
-                if !device_set.is_empty() {
-                    self.stopped_pools.insert(pool_uuid, device_set);
-                }
+                self.handle_stopped_pool(pool_uuid, device_set);
                 Err(err)
             }
         }
@@ -620,9 +655,7 @@ impl LiminalDevices {
                     "Some of the devices in pool with UUID {pool_uuid} are unopened"
                 ));
                 info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {}", err);
-                if !ds.is_empty() {
-                    self.stopped_pools.insert(pool_uuid, ds);
-                }
+                self.handle_stopped_pool(pool_uuid, ds);
                 return None;
             }
         };
@@ -655,9 +688,7 @@ impl LiminalDevices {
             }
             Ok(Either::Right(bdas)) => {
                 let device_set = reconstruct_stratis_infos(infos, bdas);
-                if !device_set.is_empty() {
-                    self.stopped_pools.insert(pool_uuid, device_set);
-                }
+                self.handle_stopped_pool(pool_uuid, device_set);
                 None
             }
             Err((err, bdas)) => {
@@ -842,6 +873,29 @@ impl LiminalDevices {
             None
         }
     }
+
+    pub fn handle_stopped_pool(&mut self, pool_uuid: PoolUuid, device_set: DeviceSet) {
+        if !device_set.is_empty() {
+            let device_uuids = device_set
+                .iter()
+                .map(|(dev_uuid, _)| *dev_uuid)
+                .collect::<Vec<_>>();
+            if has_leftover_devices(pool_uuid, &device_uuids) {
+                match stop_partially_constructed_pool(pool_uuid, &device_set) {
+                    Ok(_) => {
+                        assert!(!has_leftover_devices(pool_uuid, &device_uuids,));
+                        self.stopped_pools.insert(pool_uuid, device_set);
+                    }
+                    Err(_) => {
+                        self.partially_constructed_pools
+                            .insert(pool_uuid, device_set);
+                    }
+                }
+            } else {
+                self.stopped_pools.insert(pool_uuid, device_set);
+            }
+        }
+    }
 }
 
 impl<'a> Into<Value> for &'a LiminalDevices {
@@ -849,6 +903,17 @@ impl<'a> Into<Value> for &'a LiminalDevices {
         json!({
             "stopped_pools": Value::Array(
                 self.stopped_pools
+                    .iter()
+                    .map(|(uuid, set)| {
+                        json!({
+                            "pool_uuid": uuid.to_string(),
+                            "devices": <&DeviceSet as Into<Value>>::into(set),
+                        })
+                    })
+                    .collect()
+            ),
+            "partially_constructed_pools": Value::Array(
+                self.partially_constructed_pools
                     .iter()
                     .map(|(uuid, set)| {
                         json!({

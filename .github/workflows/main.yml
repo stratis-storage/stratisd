@@ -221,31 +221,6 @@ jobs:
       - name: Run ${{ matrix.task }}
         run: ${{ matrix.task }}
 
-  expand-macros:
-    continue-on-error: true
-    runs-on: ubuntu-22.04
-    container:
-      image: fedora:37  # CURRENT DEVELOPMENT ENVIRONMENT
-    steps:
-      - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          components: cargo
-          toolchain: nightly  # cargo expand can only be run on nightly
-      - name: Install dependencies for Fedora
-        run: >
-          dnf install -y
-          clang
-          cryptsetup-devel
-          dbus-devel
-          device-mapper-devel
-          libblkid-devel
-          make
-          ncurses
-          systemd-devel
-      - name: Run cargo expand test
-        run: make -f Makefile expand
-
   python-based-tests:
     runs-on: ubuntu-22.04
     container:

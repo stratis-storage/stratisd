@@ -1,3 +1,41 @@
+stratisd 3.5.2
+==============
+Recommended Rust toolchain version: 1.68.0
+Lowest supported Rust toolchain version: 1.66.1
+
+Recommended development platform for Python development: Fedora 37
+
+- Increase devicemapper-rs dependency lower bound to 0.33.1:
+  https://github.com/stratis-storage/stratisd/pull/3283
+  https://github.com/stratis-storage/stratisd/pull/3069
+
+- Reorder early boot stratisd services:
+  https://github.com/stratis-storage/stratisd/pull/3269
+
+- Prepare for stratis-dumpmetadata release:
+  https://github.com/stratis-storage/stratisd/pull/3258
+
+- Log if error when wiping just initialized devices:
+  https://github.com/stratis-storage/stratisd/pull/3242
+
+- Increase crc dependency version lower bound to 3.0.0:
+  https://github.com/stratis-storage/stratisd/pull/3279
+
+- Add typos CI check:
+  https://github.com/stratis-storage/stratisd/pull/3262
+  https://github.com/stratis-storage/stratisd/pull/3260
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3282
+  https://github.com/stratis-storage/stratisd/pull/3281
+  https://github.com/stratis-storage/stratisd/pull/3278
+  https://github.com/stratis-storage/stratisd/pull/3277
+  https://github.com/stratis-storage/stratisd/pull/3270
+  https://github.com/stratis-storage/stratisd/pull/3263
+  https://github.com/stratis-storage/stratisd/pull/3261
+  https://github.com/stratis-storage/stratisd/pull/3259
+
+
 stratisd 3.5.1
 ==============
 Recommended Rust toolchain version: 1.67.0

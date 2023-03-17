@@ -3,6 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 use std::{
+    fmt::{self, Formatter},
     fs::OpenOptions,
     io::Write,
     path::{Path, PathBuf},
@@ -10,12 +11,17 @@ use std::{
 
 use data_encoding::BASE64URL_NOPAD;
 use either::Either;
-use retry::{delay::Fixed, retry_with_index, Error};
-use serde_json::{Map, Value};
+use retry::{delay::Fixed, retry_with_index, Error as RetryError};
+use serde::{
+    de::{Error, MapAccess, Visitor},
+    ser::SerializeMap,
+    Deserialize, Deserializer, Serialize, Serializer,
+};
+use serde_json::{from_value, to_value, Map, Value};
 use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 
-use devicemapper::Bytes;
+use devicemapper::{Bytes, DmName, DmNameBuf};
 use libcryptsetup_rs::{
     c_uint,
     consts::{
@@ -24,7 +30,7 @@ use libcryptsetup_rs::{
             CryptDebugLevel, CryptLogLevel, CryptStatusInfo, CryptWipePattern, EncryptionFormat,
         },
     },
-    set_debug_level, set_log_callback, CryptDevice, CryptInit, LibcryptErr, TokenInput,
+    set_debug_level, set_log_callback, CryptDevice, CryptInit, TokenInput,
 };
 
 use crate::{
@@ -75,83 +81,181 @@ pub fn set_up_crypt_logging() {
 }
 
 pub struct StratisLuks2Token {
-    pub devname: String,
+    pub devname: DmNameBuf,
     pub identifiers: StratisIdentifiers,
     pub pool_name: Option<Name>,
 }
 
-impl Into<Value> for StratisLuks2Token {
-    fn into(self) -> Value {
-        let mut object = json!({
-            TOKEN_TYPE_KEY: STRATIS_TOKEN_TYPE,
-            TOKEN_KEYSLOTS_KEY: [],
-            STRATIS_TOKEN_DEVNAME_KEY: self.devname,
-            STRATIS_TOKEN_POOL_UUID_KEY: self.identifiers.pool_uuid.to_string(),
-            STRATIS_TOKEN_DEV_UUID_KEY: self.identifiers.device_uuid.to_string(),
-        });
-        if let Some(o) = object.as_object_mut() {
-            if let Some(n) = self.pool_name {
-                o.insert(
-                    STRATIS_TOKEN_POOLNAME_KEY.to_string(),
-                    Value::from(n.to_string()),
-                );
-            }
+impl Serialize for StratisLuks2Token {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut map_serializer = serializer.serialize_map(None)?;
+        map_serializer.serialize_entry(TOKEN_TYPE_KEY, STRATIS_TOKEN_TYPE)?;
+        map_serializer.serialize_entry::<_, [u32; 0]>(TOKEN_KEYSLOTS_KEY, &[])?;
+        map_serializer.serialize_entry(STRATIS_TOKEN_DEVNAME_KEY, &self.devname.to_string())?;
+        map_serializer.serialize_entry(
+            STRATIS_TOKEN_POOL_UUID_KEY,
+            &self.identifiers.pool_uuid.to_string(),
+        )?;
+        map_serializer.serialize_entry(
+            STRATIS_TOKEN_DEV_UUID_KEY,
+            &self.identifiers.device_uuid.to_string(),
+        )?;
+        if let Some(ref pn) = self.pool_name {
+            map_serializer.serialize_entry(STRATIS_TOKEN_POOLNAME_KEY, pn)?;
         }
-        object
+        map_serializer.end()
     }
 }
 
-impl<'a> TryFrom<&'a Value> for StratisLuks2Token {
-    type Error = StratisError;
+impl<'de> Deserialize<'de> for StratisLuks2Token {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct StratisTokenVisitor;
 
-    fn try_from(v: &Value) -> StratisResult<StratisLuks2Token> {
-        let map = if let Value::Object(m) = v {
-            m
-        } else {
-            return Err(StratisError::Crypt(LibcryptErr::InvalidConversion));
-        };
+        impl<'de> Visitor<'de> for StratisTokenVisitor {
+            type Value = StratisLuks2Token;
 
-        check_key!(
-            map.get(TOKEN_TYPE_KEY).and_then(|v| v.as_str()) != Some(STRATIS_TOKEN_TYPE),
-            "type",
-            STRATIS_TOKEN_TYPE
-        );
-        check_key!(
-            map.get(TOKEN_KEYSLOTS_KEY).and_then(|v| v.as_array()) != Some(&Vec::new()),
-            "keyslots",
-            "[]"
-        );
-        let devname = check_and_get_key!(
-            map.get(STRATIS_TOKEN_DEVNAME_KEY)
-                .and_then(|s| s.as_str())
-                .map(|s| s.to_string()),
-            STRATIS_TOKEN_DEVNAME_KEY
-        );
-        let pool_uuid = check_and_get_key!(
-            map.get(STRATIS_TOKEN_POOL_UUID_KEY)
-                .and_then(|s| s.as_str())
-                .map(|s| s.to_string()),
-            PoolUuid::parse_str,
-            STRATIS_TOKEN_POOL_UUID_KEY,
-            PoolUuid
-        );
-        let dev_uuid = check_and_get_key!(
-            map.get(STRATIS_TOKEN_DEV_UUID_KEY)
-                .and_then(|s| s.as_str())
-                .map(|s| s.to_string()),
-            DevUuid::parse_str,
-            STRATIS_TOKEN_DEV_UUID_KEY,
-            DevUuid
-        );
-        let pool_name = map
-            .get(STRATIS_TOKEN_POOLNAME_KEY)
-            .and_then(|s| s.as_str())
-            .map(|s| Name::new(s.to_string()));
-        Ok(StratisLuks2Token {
-            devname,
-            identifiers: StratisIdentifiers::new(pool_uuid, dev_uuid),
-            pool_name,
-        })
+            fn expecting(&self, f: &mut Formatter<'_>) -> fmt::Result {
+                write!(f, "a Stratis LUKS2 token")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: MapAccess<'de>,
+            {
+                let mut token_type = None;
+                let mut token_keyslots = None;
+                let mut d_name = None;
+                let mut p_uuid = None;
+                let mut d_uuid = None;
+                let mut p_name = None;
+
+                while let Some((k, v)) = map.next_entry::<String, Value>()? {
+                    match k.as_str() {
+                        TOKEN_TYPE_KEY => {
+                            token_type = Some(v);
+                        }
+                        TOKEN_KEYSLOTS_KEY => {
+                            token_keyslots = Some(v);
+                        }
+                        STRATIS_TOKEN_DEVNAME_KEY => {
+                            d_name = Some(v);
+                        }
+                        STRATIS_TOKEN_POOL_UUID_KEY => {
+                            p_uuid = Some(v);
+                        }
+                        STRATIS_TOKEN_DEV_UUID_KEY => {
+                            d_uuid = Some(v);
+                        }
+                        STRATIS_TOKEN_POOLNAME_KEY => {
+                            p_name = Some(v);
+                        }
+                        st => {
+                            return Err(A::Error::custom(format!("Found unrecognized key {st}")));
+                        }
+                    }
+                }
+
+                token_type
+                    .ok_or_else(|| A::Error::custom(format!("Missing field {TOKEN_TYPE_KEY}")))
+                    .and_then(|ty| match ty {
+                        Value::String(s) => {
+                            if s == STRATIS_TOKEN_TYPE {
+                                Ok(())
+                            } else {
+                                Err(A::Error::custom(format!(
+                                    "Incorrect value for {TOKEN_TYPE_KEY}: {s}"
+                                )))
+                            }
+                        }
+                        _ => Err(A::Error::custom(format!(
+                            "Unrecognized value type for {TOKEN_TYPE_KEY}"
+                        ))),
+                    })
+                    .and_then(|_| {
+                        let value = token_keyslots.ok_or_else(|| {
+                            A::Error::custom(format!("Missing field {TOKEN_KEYSLOTS_KEY}"))
+                        })?;
+                        match value {
+                            Value::Array(a) => {
+                                if a.is_empty() {
+                                    Ok(())
+                                } else {
+                                    Err(A::Error::custom(format!(
+                                        "Found non-empty array for {TOKEN_KEYSLOTS_KEY}"
+                                    )))
+                                }
+                            }
+                            _ => Err(A::Error::custom(format!(
+                                "Unrecognized value type for {TOKEN_TYPE_KEY}"
+                            ))),
+                        }
+                    })
+                    .and_then(|_| {
+                        let value = d_name.ok_or_else(|| {
+                            A::Error::custom(format!("Missing field {STRATIS_TOKEN_DEVNAME_KEY}"))
+                        })?;
+                        match value {
+                            Value::String(s) => DmNameBuf::new(s).map_err(A::Error::custom),
+                            _ => Err(A::Error::custom(format!(
+                                "Unrecognized value type for {STRATIS_TOKEN_DEVNAME_KEY}"
+                            ))),
+                        }
+                    })
+                    .and_then(|dev_name| {
+                        let value = p_uuid.ok_or_else(|| {
+                            A::Error::custom(format!("Missing field {STRATIS_TOKEN_POOL_UUID_KEY}"))
+                        })?;
+                        match value {
+                            Value::String(s) => PoolUuid::parse_str(&s)
+                                .map(|uuid| (dev_name, uuid))
+                                .map_err(A::Error::custom),
+                            _ => Err(A::Error::custom(format!(
+                                "Unrecognized value type for {STRATIS_TOKEN_POOL_UUID_KEY}"
+                            ))),
+                        }
+                    })
+                    .and_then(|(dev_name, pool_uuid)| {
+                        let value = d_uuid.ok_or_else(|| {
+                            A::Error::custom(format!("Missing field {STRATIS_TOKEN_DEV_UUID_KEY}"))
+                        })?;
+                        match value {
+                            Value::String(s) => DevUuid::parse_str(&s)
+                                .map(|uuid| (dev_name, pool_uuid, uuid))
+                                .map_err(A::Error::custom),
+                            _ => Err(A::Error::custom(format!(
+                                "Unrecognized value type for {STRATIS_TOKEN_DEV_UUID_KEY}"
+                            ))),
+                        }
+                    })
+                    .and_then(|(devname, pool_uuid, device_uuid)| {
+                        let pool_name = match p_name {
+                            Some(Value::String(s)) => Some(Name::new(s)),
+                            Some(_) => {
+                                return Err(A::Error::custom(format!(
+                                    "Unrecognized value type for {STRATIS_TOKEN_POOLNAME_KEY}"
+                                )))
+                            }
+                            None => None,
+                        };
+                        Ok(StratisLuks2Token {
+                            devname,
+                            identifiers: StratisIdentifiers {
+                                pool_uuid,
+                                device_uuid,
+                            },
+                            pool_name,
+                        })
+                    })
+            }
+        }
+
+        deserializer.deserialize_map(StratisTokenVisitor)
     }
 }
 
@@ -339,7 +443,7 @@ pub fn setup_crypt_handle(
         }
         Some(UnlockMethod::Clevis) => activate(Either::Right(physical_path), &name)?,
         None => {
-            if let Err(_) | Ok(CryptStatusInfo::Inactive | CryptStatusInfo::Invalid) = libcryptsetup_rs::status(Some(device), &name) {
+            if let Err(_) | Ok(CryptStatusInfo::Inactive | CryptStatusInfo::Invalid) = libcryptsetup_rs::status(Some(device), &name.to_string()) {
                 return Err(StratisError::Msg(
                     "Found a crypt device but it is not activated and no unlock method was provided".to_string(),
                 ));
@@ -588,7 +692,7 @@ fn is_encrypted_stratis_device(device: &mut CryptDevice) -> bool {
                 return Err(StratisError::Msg("LUKS2 token is invalid".to_string()));
             }
         }
-        if let Some(ref st) = stratis_token {
+        if let Some(st) = stratis_token {
             if !stratis_token_is_valid(st) {
                 return Err(StratisError::Msg("Stratis token is invalid".to_string()));
             }
@@ -608,8 +712,8 @@ fn is_encrypted_stratis_device(device: &mut CryptDevice) -> bool {
         .unwrap_or(false)
 }
 
-fn device_is_active(device: Option<&mut CryptDevice>, device_name: &str) -> StratisResult<()> {
-    match libcryptsetup_rs::status(device, device_name) {
+fn device_is_active(device: Option<&mut CryptDevice>, device_name: &DmName) -> StratisResult<()> {
+    match libcryptsetup_rs::status(device, &device_name.to_string()) {
         Ok(CryptStatusInfo::Active) => Ok(()),
         Ok(CryptStatusInfo::Busy) => {
             info!(
@@ -649,11 +753,11 @@ fn device_is_active(device: Option<&mut CryptDevice>, device_name: &str) -> Stra
 ///
 /// Precondition: The key description has been verified to be present in the keyring
 /// if matches!(unlock_method, UnlockMethod::Keyring).
-fn activate_with_keyring(crypt_device: &mut CryptDevice, name: &str) -> StratisResult<()> {
+fn activate_with_keyring(crypt_device: &mut CryptDevice, name: &DmName) -> StratisResult<()> {
     // Activate by token
     log_on_failure!(
         crypt_device.token_handle().activate_by_token::<()>(
-            Some(name),
+            Some(&name.to_string()),
             Some(LUKS2_TOKEN_ID),
             None,
             CryptActivate::empty(),
@@ -668,7 +772,7 @@ fn activate_with_keyring(crypt_device: &mut CryptDevice, name: &str) -> StratisR
 /// Stratis token.
 pub fn activate(
     unlock_param: Either<(&mut CryptDevice, &KeyDescription), &Path>,
-    name: &str,
+    name: &DmName,
 ) -> StratisResult<()> {
     let crypt_device = match unlock_param {
         Either::Left((device, kd)) => {
@@ -752,9 +856,9 @@ pub fn get_keyslot_number(
 /// a destructive action. `name` should be the name of the device as registered
 /// with devicemapper and cryptsetup. This method is idempotent and leaves
 /// the state as inactive.
-pub fn ensure_inactive(device: &mut CryptDevice, name: &str) -> StratisResult<()> {
+pub fn ensure_inactive(device: &mut CryptDevice, name: &DmName) -> StratisResult<()> {
     let status = log_on_failure!(
-        libcryptsetup_rs::status(Some(device), name),
+        libcryptsetup_rs::status(Some(device), &name.to_string()),
         "Failed to determine status of device with name {}",
         name
     );
@@ -763,7 +867,7 @@ pub fn ensure_inactive(device: &mut CryptDevice, name: &str) -> StratisResult<()
             log_on_failure!(
                 device
                     .activate_handle()
-                    .deactivate(name, CryptDeactivate::empty()),
+                    .deactivate(&name.to_string(), CryptDeactivate::empty()),
                 "Failed to deactivate the crypt device with name {}",
                 name
             );
@@ -773,16 +877,16 @@ pub fn ensure_inactive(device: &mut CryptDevice, name: &str) -> StratisResult<()
                 trace!("Crypt device deactivate attempt {}", i);
                 device
                     .activate_handle()
-                    .deactivate(name, CryptDeactivate::empty())
+                    .deactivate(&name.to_string(), CryptDeactivate::empty())
                     .map_err(StratisError::Crypt)
             })
             .map_err(|e| match e {
-                Error::Internal(s) => StratisError::Chained(
+                RetryError::Internal(s) => StratisError::Chained(
                     "Retries for crypt device deactivation failed with an internal error"
                         .to_string(),
                     Box::new(StratisError::Msg(s)),
                 ),
-                Error::Operation { error, .. } => error,
+                RetryError::Operation { error, .. } => error,
             })?;
         }
         _ => (),
@@ -836,7 +940,7 @@ pub fn wipe_fallback(path: &Path, causal_error: StratisError) -> StratisError {
 pub fn ensure_wiped(
     device: &mut CryptDevice,
     physical_path: &Path,
-    name: &str,
+    name: &DmName,
 ) -> StratisResult<()> {
     ensure_inactive(device, name)?;
     let keyslot_number = get_keyslot_number(device, LUKS2_TOKEN_ID);
@@ -928,10 +1032,10 @@ fn luks2_token_type_is_valid(json: &Value) -> bool {
 }
 
 /// Validate that the Stratis token is present and valid
-fn stratis_token_is_valid(json: &Value) -> bool {
+fn stratis_token_is_valid(json: Value) -> bool {
     debug!("Stratis LUKS2 token: {}", json);
 
-    let result = StratisLuks2Token::try_from(json);
+    let result = from_value::<StratisLuks2Token>(json);
     if let Err(ref e) = result {
         debug!(
             "LUKS2 token in the Stratis token slot does not appear \
@@ -963,30 +1067,8 @@ pub fn read_key(key_description: &KeyDescription) -> StratisResult<Option<SizedK
 }
 
 /// Query the Stratis metadata for the device activation name.
-fn activation_name_from_metadata(device: &mut CryptDevice) -> StratisResult<String> {
-    let json = log_on_failure!(
-        device.token_handle().json_get(STRATIS_TOKEN_ID),
-        "Failed to get Stratis JSON token from LUKS2 metadata"
-    );
-    let name = log_on_failure!(
-        json.get(STRATIS_TOKEN_DEVNAME_KEY)
-            .ok_or_else(|| {
-                StratisError::Msg(format!(
-                    "Missing JSON value for {STRATIS_TOKEN_DEVNAME_KEY}"
-                ))
-            })
-            .and_then(|type_val| {
-                type_val.as_str().ok_or_else(|| {
-                    StratisError::Msg(format!(
-                        "Malformed JSON value for {STRATIS_TOKEN_DEVNAME_KEY}"
-                    ))
-                })
-            })
-            .map(|type_str| type_str.to_string()),
-        "Could not get value for key {} from Stratis JSON token",
-        STRATIS_TOKEN_DEVNAME_KEY
-    );
-    Ok(name)
+fn activation_name_from_metadata(device: &mut CryptDevice) -> StratisResult<DmNameBuf> {
+    Ok(from_value::<StratisLuks2Token>(device.token_handle().json_get(STRATIS_TOKEN_ID)?)?.devname)
 }
 
 /// Query the Stratis metadata for the key description used to unlock the
@@ -997,63 +1079,30 @@ pub fn key_desc_from_metadata(device: &mut CryptDevice) -> Option<String> {
 
 /// Query the Stratis metadata for the pool name.
 pub fn pool_name_from_metadata(device: &mut CryptDevice) -> StratisResult<Option<Name>> {
-    Ok(StratisLuks2Token::try_from(&device.token_handle().json_get(STRATIS_TOKEN_ID)?)?.pool_name)
+    Ok(
+        from_value::<StratisLuks2Token>(device.token_handle().json_get(STRATIS_TOKEN_ID)?)?
+            .pool_name,
+    )
 }
 
 /// Replace the old pool name in the Stratis LUKS2 token.
 pub fn replace_pool_name(device: &mut CryptDevice, new_name: Name) -> StratisResult<()> {
     let mut token =
-        StratisLuks2Token::try_from(&device.token_handle().json_get(STRATIS_TOKEN_ID)?)?;
+        from_value::<StratisLuks2Token>(device.token_handle().json_get(STRATIS_TOKEN_ID)?)?;
     token.pool_name = Some(new_name);
-    device
-        .token_handle()
-        .json_set(TokenInput::ReplaceToken(STRATIS_TOKEN_ID, &token.into()))?;
+    device.token_handle().json_set(TokenInput::ReplaceToken(
+        STRATIS_TOKEN_ID,
+        &to_value(token)?,
+    ))?;
     Ok(())
 }
 
 /// Query the Stratis metadata for the device identifiers.
 fn identifiers_from_metadata(device: &mut CryptDevice) -> StratisResult<StratisIdentifiers> {
-    let json = log_on_failure!(
-        device.token_handle().json_get(STRATIS_TOKEN_ID),
-        "Failed to get Stratis JSON token from LUKS2 metadata"
-    );
-    let pool_uuid = log_on_failure!(
-        json.get(STRATIS_TOKEN_POOL_UUID_KEY)
-            .ok_or_else(|| {
-                StratisError::Msg(format!(
-                    "Missing JSON value for {STRATIS_TOKEN_POOL_UUID_KEY}"
-                ))
-            })
-            .and_then(|type_val| {
-                type_val.as_str().ok_or_else(|| {
-                    StratisError::Msg(format!(
-                        "Malformed JSON value for {STRATIS_TOKEN_POOL_UUID_KEY}"
-                    ))
-                })
-            })
-            .and_then(PoolUuid::parse_str),
-        "Could not get value for key {} from Stratis JSON token",
-        STRATIS_TOKEN_POOL_UUID_KEY
-    );
-    let dev_uuid = log_on_failure!(
-        json.get(STRATIS_TOKEN_DEV_UUID_KEY)
-            .ok_or_else(|| {
-                StratisError::Msg(format!(
-                    "Missing JSON value for {STRATIS_TOKEN_DEV_UUID_KEY}"
-                ))
-            })
-            .and_then(|type_val| {
-                type_val.as_str().ok_or_else(|| {
-                    StratisError::Msg(format!(
-                        "Malformed JSON value for {STRATIS_TOKEN_DEV_UUID_KEY}"
-                    ))
-                })
-            })
-            .and_then(|type_str| DevUuid::parse_str(type_str).map_err(StratisError::from)),
-        "Could not get value for key {} from Stratis JSON token",
-        STRATIS_TOKEN_DEV_UUID_KEY
-    );
-    Ok(StratisIdentifiers::new(pool_uuid, dev_uuid))
+    Ok(
+        from_value::<StratisLuks2Token>(device.token_handle().json_get(STRATIS_TOKEN_ID)?)?
+            .identifiers,
+    )
 }
 
 // Bytes occupied by crypt metadata

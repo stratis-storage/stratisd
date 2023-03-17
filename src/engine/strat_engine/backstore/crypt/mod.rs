@@ -274,11 +274,11 @@ mod tests {
                 libc::close(fd);
             };
 
-            let device_name = handle.activation_name().to_owned();
+            let device_name = handle.activation_name();
             loop {
                 match libcryptsetup_rs::status(
                     Some(&mut handle.acquire_crypt_device().unwrap()),
-                    &device_name,
+                    &device_name.to_string(),
                 ) {
                     Ok(CryptStatusInfo::Busy) => (),
                     Ok(CryptStatusInfo::Active) => break,

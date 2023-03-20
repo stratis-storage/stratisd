@@ -768,7 +768,7 @@ impl Pool for StratPool {
         pool_name: &str,
         paths: &[&Path],
         tier: BlockDevTier,
-    ) -> StratisResult<(SetCreateAction<DevUuid>, Option<StratPoolDiff>)> {
+    ) -> StratisResult<(SetCreateAction<DevUuid>, Option<PoolDiff>)> {
         validate_paths(paths)?;
 
         let bdev_info = if tier == BlockDevTier::Cache && !self.has_cache() {
@@ -914,7 +914,10 @@ impl Pool for StratPool {
 
                 Ok((
                     SetCreateAction::new(bdev_info),
-                    Some(cached.diff(&self.dump(()))),
+                    Some(PoolDiff {
+                        thin_pool: self.thin_pool.cached().diff(&self.thin_pool.cached()),
+                        pool: cached.diff(&self.dump(())),
+                    }),
                 ))
             }
         };

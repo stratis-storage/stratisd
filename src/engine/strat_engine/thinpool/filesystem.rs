@@ -36,7 +36,7 @@ use crate::{
             serde_structs::FilesystemSave,
         },
         types::{
-            ActionAvailability, Compare, FilesystemUuid, Name, PoolUuid, StratFilesystemDiff,
+            ActionAvailability, Compare, Diff, FilesystemUuid, Name, PoolUuid, StratFilesystemDiff,
             StratisUuid,
         },
     },
@@ -426,6 +426,13 @@ impl StateDiff for StratFilesystemState {
         StratFilesystemDiff {
             size: self.size.compare(&new_state.size),
             used: self.used.compare(&new_state.used),
+        }
+    }
+
+    fn unchanged(&self) -> Self::Diff {
+        StratFilesystemDiff {
+            size: Diff::Unchanged(self.size),
+            used: Diff::Unchanged(self.used),
         }
     }
 }

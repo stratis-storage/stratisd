@@ -28,7 +28,7 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
+            Diff, EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
             PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
             SetDeleteAction, StratFilesystemDiff, StratPoolDiff,
         },
@@ -915,7 +915,7 @@ impl Pool for StratPool {
                 Ok((
                     SetCreateAction::new(bdev_info),
                     Some(PoolDiff {
-                        thin_pool: self.thin_pool.cached().diff(&self.thin_pool.cached()),
+                        thin_pool: self.thin_pool.cached().unchanged(),
                         pool: cached.diff(&self.dump(())),
                     }),
                 ))
@@ -1156,6 +1156,13 @@ impl StateDiff for StratPoolState {
         StratPoolDiff {
             metadata_size: self.metadata_size.compare(&other.metadata_size),
             out_of_alloc_space: self.out_of_alloc_space.compare(&other.out_of_alloc_space),
+        }
+    }
+
+    fn unchanged(&self) -> Self::Diff {
+        StratPoolDiff {
+            metadata_size: Diff::Unchanged(self.metadata_size),
+            out_of_alloc_space: Diff::Unchanged(self.out_of_alloc_space),
         }
     }
 }

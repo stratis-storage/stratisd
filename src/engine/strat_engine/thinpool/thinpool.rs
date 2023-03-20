@@ -36,7 +36,7 @@ use crate::{
             writing::wipe_sectors,
         },
         structures::Table,
-        types::{Compare, FilesystemUuid, Name, PoolUuid, StratFilesystemDiff, ThinPoolDiff},
+        types::{Compare, Diff, FilesystemUuid, Name, PoolUuid, StratFilesystemDiff, ThinPoolDiff},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -1549,6 +1549,13 @@ impl StateDiff for ThinPoolState {
         ThinPoolDiff {
             allocated_size: self.allocated_size.compare(&new_state.allocated_size),
             used: self.used.compare(&new_state.used),
+        }
+    }
+
+    fn unchanged(&self) -> Self::Diff {
+        ThinPoolDiff {
+            allocated_size: Diff::Unchanged(self.allocated_size),
+            used: Diff::Unchanged(self.used),
         }
     }
 }

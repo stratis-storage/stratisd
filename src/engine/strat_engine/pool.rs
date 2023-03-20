@@ -1168,7 +1168,7 @@ impl<'a> DumpState<'a> for StratPool {
         }
     }
 
-    fn dump(&mut self, _: ()) -> Self::State {
+    fn dump(&mut self, _: Self::DumpInput) -> Self::State {
         self.metadata_size = self.backstore.datatier_metadata_size();
         StratPoolState {
             metadata_size: self.metadata_size.bytes(),

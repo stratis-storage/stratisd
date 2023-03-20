@@ -15,7 +15,7 @@ use retry::{delay::Fixed, retry_with_index};
 use serde_json::{Map, Value};
 
 use devicemapper::{
-    Bytes, DmDevice, DmName, DmOptions, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev,
+    Bytes, DevId, DmDevice, DmName, DmOptions, DmUuid, Sectors, ThinDev, ThinDevId, ThinPoolDev,
     ThinStatus,
 };
 
@@ -31,7 +31,7 @@ use crate::{
         strat_engine::{
             cmd::{create_fs, set_uuid, xfs_growfs},
             devlinks,
-            dm::get_dm,
+            dm::{get_dm, thin_device},
             names::{format_thin_ids, ThinRole},
             serde_structs::FilesystemSave,
         },
@@ -322,8 +322,9 @@ impl StratFilesystem {
     }
 
     /// Tear down the filesystem.
-    pub fn teardown(&mut self) -> StratisResult<()> {
-        self.thin_dev.teardown(get_dm())?;
+    pub fn teardown(pool_uuid: PoolUuid, fs_uuid: FilesystemUuid) -> StratisResult<()> {
+        let device = thin_device(pool_uuid, fs_uuid);
+        get_dm().device_remove(&DevId::Name(&device), DmOptions::default())?;
         Ok(())
     }
 

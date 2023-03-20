@@ -11,7 +11,6 @@ use std::{
 
 use data_encoding::BASE64URL_NOPAD;
 use either::Either;
-use retry::{delay::Fixed, retry_with_index, Error as RetryError};
 use serde::{
     de::{Error, MapAccess, Visitor},
     ser::SerializeMap,
@@ -21,11 +20,11 @@ use serde_json::{from_value, to_value, Map, Value};
 use sha2::{Digest, Sha256};
 use tempfile::TempDir;
 
-use devicemapper::{Bytes, DmName, DmNameBuf};
+use devicemapper::{Bytes, DevId, DmName, DmNameBuf, DmOptions};
 use libcryptsetup_rs::{
     c_uint,
     consts::{
-        flags::{CryptActivate, CryptDeactivate, CryptVolumeKey, CryptWipe},
+        flags::{CryptActivate, CryptVolumeKey, CryptWipe},
         vals::{
             CryptDebugLevel, CryptLogLevel, CryptStatusInfo, CryptWipePattern, EncryptionFormat,
         },
@@ -51,6 +50,7 @@ use crate::{
                 devices::get_devno_from_path,
             },
             cmd::clevis_luks_unlock,
+            dm::get_dm,
             keys,
             metadata::StratisIdentifiers,
         },
@@ -863,31 +863,8 @@ pub fn ensure_inactive(device: &mut CryptDevice, name: &DmName) -> StratisResult
         name
     );
     match status {
-        CryptStatusInfo::Active => {
-            log_on_failure!(
-                device
-                    .activate_handle()
-                    .deactivate(&name.to_string(), CryptDeactivate::empty()),
-                "Failed to deactivate the crypt device with name {}",
-                name
-            );
-        }
-        CryptStatusInfo::Busy => {
-            retry_with_index(Fixed::from_millis(100).take(2), |i| {
-                trace!("Crypt device deactivate attempt {}", i);
-                device
-                    .activate_handle()
-                    .deactivate(&name.to_string(), CryptDeactivate::empty())
-                    .map_err(StratisError::Crypt)
-            })
-            .map_err(|e| match e {
-                RetryError::Internal(s) => StratisError::Chained(
-                    "Retries for crypt device deactivation failed with an internal error"
-                        .to_string(),
-                    Box::new(StratisError::Msg(s)),
-                ),
-                RetryError::Operation { error, .. } => error,
-            })?;
+        CryptStatusInfo::Active | CryptStatusInfo::Busy => {
+            get_dm().device_remove(&DevId::Name(name), DmOptions::default())?;
         }
         _ => (),
     }

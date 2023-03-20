@@ -47,8 +47,13 @@ impl fmt::Display for LLuksInfo {
         write!(
             f,
             "{}, {}, {}",
-            self.dev_info, self.identifiers, self.encryption_info
-        )
+            self.dev_info, self.identifiers, self.encryption_info,
+        )?;
+        if let Some(ref pn) = self.pool_name {
+            write!(f, ", {}", pn)
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -499,6 +504,15 @@ impl FromIterator<(DevUuid, LInfo)> for DeviceSet {
         DeviceSet {
             internal: HashMap::from_iter(i),
         }
+    }
+}
+
+impl IntoIterator for DeviceSet {
+    type Item = <HashMap<DevUuid, LInfo> as IntoIterator>::Item;
+    type IntoIter = <HashMap<DevUuid, LInfo> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.internal.into_iter()
     }
 }
 

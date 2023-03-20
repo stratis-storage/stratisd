@@ -26,7 +26,7 @@ use crate::{
                 shared::BlockSizeSummary,
                 transaction::RequestTransaction,
             },
-            dm::get_dm,
+            dm::{get_dm, list_of_backstore_devices, remove_optional_devices},
             metadata::{MDADataSize, BDA},
             names::{format_backstore_ids, CacheRole},
             serde_structs::{BackstoreSave, CapSave, Recordable},
@@ -550,43 +550,23 @@ impl Backstore {
     }
 
     /// Destroy the entire store.
-    pub fn destroy(&mut self) -> StratisResult<()> {
-        match self.cache {
-            Some(ref mut cache) => {
-                cache.teardown(get_dm())?;
-                self.cache_tier
-                    .as_mut()
-                    .expect("if dm_device is cache, cache tier exists")
-                    .destroy()?;
-            }
-            None => {
-                if let Some(ref mut linear) = self.linear {
-                    linear.teardown(get_dm())?;
-                }
-            }
-        };
+    pub fn destroy(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
+        let devs = list_of_backstore_devices(pool_uuid);
+        remove_optional_devices(devs)?;
+        if let Some(ref mut cache_tier) = self.cache_tier {
+            cache_tier.destroy()?;
+        }
         self.data_tier.destroy()
     }
 
     /// Teardown the DM devices in the backstore.
-    pub fn teardown(&mut self) -> StratisResult<()> {
-        match self
-            .cache
-            .as_mut()
-            .and_then(|c| self.cache_tier.as_mut().map(|ct| (c, ct)))
-        {
-            Some((cache, cache_tier)) => {
-                cache.teardown(get_dm())?;
-                cache_tier.block_mgr.teardown()?;
-            }
-            None => {
-                if let Some(ref mut linear) = self.linear {
-                    linear.teardown(get_dm())?;
-                }
-            }
-        };
-        self.data_tier.block_mgr.teardown()?;
-        Ok(())
+    pub fn teardown(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
+        let devs = list_of_backstore_devices(pool_uuid);
+        remove_optional_devices(devs)?;
+        if let Some(ref mut cache_tier) = self.cache_tier {
+            cache_tier.block_mgr.teardown()?;
+        }
+        self.data_tier.block_mgr.teardown()
     }
 
     /// Consume the backstore and convert it into a set of BDAs representing
@@ -1252,7 +1232,7 @@ mod tests {
             CacheDevStatus::Fail => panic!("cache is in a failed state"),
         }
 
-        backstore.destroy().unwrap();
+        backstore.destroy(pool_uuid).unwrap();
     }
 
     #[test]
@@ -1333,7 +1313,7 @@ mod tests {
 
         assert_ne!(backstore.device(), old_device);
 
-        backstore.destroy().unwrap();
+        backstore.destroy(pool_uuid).unwrap();
     }
 
     #[test]

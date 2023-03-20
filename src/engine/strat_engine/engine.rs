@@ -233,7 +233,7 @@ impl StratEngine {
         let mut untorndown_pools = Vec::new();
         let mut write_all = block_on(self.pools.write_all());
         for (_, uuid, pool) in write_all.iter_mut() {
-            pool.teardown()
+            pool.teardown(*uuid)
                 .unwrap_or_else(|_| untorndown_pools.push(uuid));
         }
         if untorndown_pools.is_empty() {
@@ -453,7 +453,7 @@ impl Engine for StratEngine {
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
 
-        let (res, mut pool) = spawn_blocking!((pool.destroy(), pool))?;
+        let (res, mut pool) = spawn_blocking!((pool.destroy(uuid), pool))?;
         if let Err((err, true)) = res {
             guard.insert(pool_name, uuid, pool);
             Err(err)

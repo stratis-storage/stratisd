@@ -187,7 +187,7 @@ impl StratPool {
             match ThinPoolSizeParams::new(backstore.datatier_usable_size()) {
                 Ok(ref params) => params,
                 Err(causal_error) => {
-                    if let Err(cleanup_err) = backstore.destroy() {
+                    if let Err(cleanup_err) = backstore.destroy(pool_uuid) {
                         warn!("Failed to clean up Stratis metadata for incompletely set up pool with UUID {}: {}.", pool_uuid, cleanup_err);
                         return Err(StratisError::NoActionRollbackError {
                             causal_error: Box::new(causal_error),
@@ -204,7 +204,7 @@ impl StratPool {
         let thinpool = match thinpool {
             Ok(thinpool) => thinpool,
             Err(causal_error) => {
-                if let Err(cleanup_err) = backstore.destroy() {
+                if let Err(cleanup_err) = backstore.destroy(pool_uuid) {
                     warn!("Failed to clean up Stratis metadata for incompletely set up pool with UUID {}: {}.", pool_uuid, cleanup_err);
                     return Err(StratisError::NoActionRollbackError {
                         causal_error: Box::new(causal_error),
@@ -317,9 +317,9 @@ impl StratPool {
 
     /// Teardown a pool.
     #[cfg(test)]
-    pub fn teardown(&mut self) -> StratisResult<()> {
-        self.thin_pool.teardown().map_err(|(e, _)| e)?;
-        self.backstore.teardown()?;
+    pub fn teardown(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
+        self.thin_pool.teardown(pool_uuid).map_err(|(e, _)| e)?;
+        self.backstore.teardown(pool_uuid)?;
         Ok(())
     }
 
@@ -390,9 +390,9 @@ impl StratPool {
     ///
     /// This method is not a mutating action as the pool should be allowed
     /// to be destroyed even if the metadata is inconsistent.
-    pub fn destroy(&mut self) -> Result<(), (StratisError, bool)> {
-        self.thin_pool.teardown()?;
-        self.backstore.destroy().map_err(|e| (e, false))?;
+    pub fn destroy(&mut self, pool_uuid: PoolUuid) -> Result<(), (StratisError, bool)> {
+        self.thin_pool.teardown(pool_uuid)?;
+        self.backstore.destroy(pool_uuid).map_err(|e| (e, false))?;
         Ok(())
     }
 
@@ -408,15 +408,19 @@ impl StratPool {
 
     /// Stop a pool, consuming it and converting it into a set of devices to be
     /// set up again later.
-    pub fn stop(&mut self, pool_name: &Name) -> Result<DeviceSet, (StratisError, bool)> {
-        self.thin_pool.teardown()?;
+    pub fn stop(
+        &mut self,
+        pool_name: &Name,
+        pool_uuid: PoolUuid,
+    ) -> Result<DeviceSet, (StratisError, bool)> {
+        self.thin_pool.teardown(pool_uuid)?;
         let mut data = self.record(pool_name);
         data.started = Some(false);
         let json = serde_json::to_string(&data).map_err(|e| (StratisError::from(e), false))?;
         self.backstore
             .save_state(json.as_bytes())
             .map_err(|e| (e, false))?;
-        self.backstore.teardown().map_err(|e| (e, false))?;
+        self.backstore.teardown(pool_uuid).map_err(|e| (e, false))?;
         let bds = self.backstore.drain_bds();
         Ok(DeviceSet::from(bds))
     }
@@ -1304,7 +1308,7 @@ mod tests {
         }
         assert_eq!(&buf, bytestring);
         umount(tmp_dir.path()).unwrap();
-        pool.teardown().unwrap();
+        pool.teardown(uuid).unwrap();
     }
 
     #[test]
@@ -1344,7 +1348,7 @@ mod tests {
         pool.add_blockdevs(uuid, name, data_paths, BlockDevTier::Data)
             .unwrap();
 
-        pool.teardown().unwrap();
+        pool.teardown(uuid).unwrap();
     }
 
     #[test]
@@ -1459,14 +1463,14 @@ mod tests {
         let (stratis_devices, unowned_devices) = devices.unpack();
         stratis_devices.error_on_not_empty().unwrap();
 
-        let (_, mut pool) = StratPool::initialize(name, unowned_devices, None).unwrap();
+        let (uuid, mut pool) = StratPool::initialize(name, unowned_devices, None).unwrap();
         invariant(&pool, name);
 
         assert_eq!(pool.action_avail, ActionAvailability::Full);
         assert!(pool.return_rollback_failure().is_err());
         assert_eq!(pool.action_avail, ActionAvailability::NoRequests);
 
-        pool.destroy().unwrap();
+        pool.destroy(uuid).unwrap();
         udev_settle().unwrap();
 
         let name = "stratis-test-pool";

@@ -26,7 +26,7 @@ use crate::{
         strat_engine::{
             backstore::Backstore,
             cmd::{thin_check, thin_metadata_size, thin_repair},
-            dm::get_dm,
+            dm::{get_dm, list_of_thin_pool_devices, remove_optional_devices},
             names::{
                 format_flex_ids, format_thin_ids, format_thinpool_ids, FlexRole, ThinPoolRole,
                 ThinRole,
@@ -817,18 +817,17 @@ impl ThinPool {
     /// structures. However if all filesystems were torn down, the pool can be moved to
     /// the designation of partially constructed pools as no IO can be received on the pool
     /// and it has been partially torn down.
-    pub fn teardown(&mut self) -> Result<(), (StratisError, bool)> {
+    pub fn teardown(&mut self, pool_uuid: PoolUuid) -> Result<(), (StratisError, bool)> {
         // Must succeed in tearing down all filesystems before the
         // thinpool..
-        for (_, _, ref mut fs) in &mut self.filesystems {
-            fs.teardown().map_err(|e| (e, true))?;
+        for (_, fs_uuid, _) in &mut self.filesystems {
+            StratFilesystem::teardown(pool_uuid, *fs_uuid).map_err(|e| (e, true))?;
         }
-        self.thin_pool
-            .teardown(get_dm())
-            .map_err(|e| (StratisError::from(e), false))?;
+        let devs = list_of_thin_pool_devices(pool_uuid);
+        remove_optional_devices(devs).map_err(|e| (e, false))?;
 
         // ..but MDV has no DM dependencies with the above
-        self.mdv.teardown().map_err(|e| (e, false))?;
+        self.mdv.teardown(pool_uuid).map_err(|e| (e, false))?;
 
         Ok(())
     }
@@ -2143,7 +2142,7 @@ mod tests {
         let flexdevs: FlexDevsSave = pool.record();
         let thinpoolsave: ThinPoolDevSave = pool.record();
 
-        retry_operation!(pool.teardown());
+        retry_operation!(pool.teardown(pool_uuid));
 
         let pool =
             ThinPool::setup(pool_name, pool_uuid, &thinpoolsave, &flexdevs, &backstore).unwrap();
@@ -2275,7 +2274,7 @@ mod tests {
         retry_operation!(pool.destroy_filesystem(pool_name, fs_uuid));
         let flexdevs: FlexDevsSave = pool.record();
         let thinpooldevsave: ThinPoolDevSave = pool.record();
-        pool.teardown().unwrap();
+        pool.teardown(pool_uuid).unwrap();
 
         // Check that destroyed fs is not present in MDV. If the record
         // had been left on the MDV that didn't match a thin_id in the

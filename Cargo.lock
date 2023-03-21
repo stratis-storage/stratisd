@@ -339,7 +339,7 @@ checksum = "e645b7ca36b156ce45a2fdb51f86cd26c549f6034ee25233830054006789f7aa"
 dependencies = [
  "bitflags",
  "devicemapper-sys",
- "env_logger",
+ "env_logger 0.9.3",
  "lazy_static",
  "log",
  "nix 0.26.2",
@@ -383,6 +383,19 @@ checksum = "a12e6657c4c97ebab115a42dcee77225f7f482cdd841cf7088c657a42e9e00e7"
 dependencies = [
  "atty",
  "humantime",
+ "log",
+ "regex",
+ "termcolor",
+]
+
+[[package]]
+name = "env_logger"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "85cdab6a89accf66733ad5a1693a4dcced6aeff64602b634530dd73c1f3ee9f0"
+dependencies = [
+ "humantime",
+ "is-terminal",
  "log",
  "regex",
  "termcolor",
@@ -635,6 +648,18 @@ name = "iocuddle"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d8972d5be69940353d5347a1344cb375d9b457d6809b428b05bb1ca2fb9ce007"
+
+[[package]]
+name = "is-terminal"
+version = "0.4.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8687c819457e979cc940d09cb16e42a1bf70aa6b60a549de6d3a62a0ee90c69e"
+dependencies = [
+ "hermit-abi 0.3.1",
+ "io-lifetimes",
+ "rustix",
+ "windows-sys 0.45.0",
+]
 
 [[package]]
 name = "itertools"
@@ -1248,7 +1273,7 @@ dependencies = [
  "dbus-tree",
  "devicemapper",
  "either",
- "env_logger",
+ "env_logger 0.10.0",
  "futures",
  "iocuddle",
  "itertools",

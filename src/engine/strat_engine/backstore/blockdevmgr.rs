@@ -71,6 +71,7 @@ impl BlockDevMgr {
                 pool_uuid,
                 mda_data_size,
                 encryption_info,
+                None,
             )?,
             None,
         ))
@@ -138,6 +139,7 @@ impl BlockDevMgr {
             pool_uuid,
             MDADataSize::default(),
             encryption_info.as_ref(),
+            None,
         )?;
         let bdev_uuids = bds.iter().map(|bd| bd.uuid()).collect();
         self.block_devs.extend(bds);

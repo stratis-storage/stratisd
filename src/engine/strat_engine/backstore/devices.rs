@@ -507,6 +507,7 @@ pub fn initialize_devices(
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
     encryption_info: Option<&EncryptionInfo>,
+    sector_size: Option<u32>,
 ) -> StratisResult<Vec<StratBlockDev>> {
     /// Initialize an encrypted device on the given physical device
     /// using the pool and device UUIDs of the new Stratis block device
@@ -522,9 +523,10 @@ pub fn initialize_devices(
         dev_uuid: DevUuid,
         key_description: Option<&KeyDescription>,
         enable_clevis: Option<&ClevisInfo>,
+        sector_size: Option<u32>,
     ) -> StratisResult<(CryptHandle, Device, Sectors)> {
         let handle = CryptInitializer::new(DevicePath::new(physical_path)?, pool_uuid, dev_uuid)
-            .initialize(pool_name, key_description, enable_clevis)?;
+            .initialize(pool_name, key_description, enable_clevis, sector_size)?;
 
         let device_size = match handle.logical_device_size() {
             Ok(size) => size,
@@ -648,6 +650,7 @@ pub fn initialize_devices(
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
+        sector_size: Option<u32>,
     ) -> StratisResult<StratBlockDev> {
         let dev_uuid = DevUuid::new_v4();
         let (handle, devno, blockdev_size) = if let Some(ei) = encryption_info {
@@ -658,6 +661,7 @@ pub fn initialize_devices(
                 dev_uuid,
                 ei.key_description(),
                 ei.clevis_info(),
+                sector_size,
             )
             .map(|(handle, devno, devsize)| {
                 debug!(
@@ -725,6 +729,7 @@ pub fn initialize_devices(
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
+        sector_size: Option<u32>,
     ) -> StratisResult<Vec<StratBlockDev>> {
         let mut initialized_blockdevs: Vec<StratBlockDev> = Vec::new();
         for dev_info in devices.inner {
@@ -734,6 +739,7 @@ pub fn initialize_devices(
                 pool_uuid,
                 mda_data_size,
                 encryption_info,
+                sector_size,
             ) {
                 Ok(blockdev) => initialized_blockdevs.push(blockdev),
                 Err(err) => {
@@ -769,6 +775,7 @@ pub fn initialize_devices(
         pool_uuid,
         mda_data_size,
         encryption_info,
+        sector_size,
     );
 
     {
@@ -846,6 +853,7 @@ mod tests {
             key_description
                 .map(|kd| EncryptionInfo::KeyDesc(kd.clone()))
                 .as_ref(),
+            None,
         )?;
 
         if blockdevs.len() != paths.len() {
@@ -1103,6 +1111,7 @@ mod tests {
             key_desc
                 .map(|kd| EncryptionInfo::KeyDesc(kd.clone()))
                 .as_ref(),
+            None,
         )
         .is_ok()
         {

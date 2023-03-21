@@ -78,7 +78,7 @@ mod tests {
         let dev_uuid = DevUuid::new_v4();
 
         let result = CryptInitializer::new(DevicePath::new(path).unwrap(), pool_uuid, dev_uuid)
-            .initialize(pool_name, Some(&key_description), None);
+            .initialize(pool_name, Some(&key_description), None, None);
 
         // Initialization cannot occur with a non-existent key
         assert!(result.is_err());
@@ -119,7 +119,7 @@ mod tests {
                 let dev_uuid = DevUuid::new_v4();
 
                 let handle = CryptInitializer::new(DevicePath::new(path)?, pool_uuid, dev_uuid)
-                    .initialize(pool_name.clone(), Some(key_desc), None)?;
+                    .initialize(pool_name.clone(), Some(key_desc), None, None)?;
                 handles.push(handle);
             }
 
@@ -206,7 +206,7 @@ mod tests {
             let dev_uuid = DevUuid::new_v4();
 
             let handle = CryptInitializer::new(DevicePath::new(path)?, pool_uuid, dev_uuid)
-                .initialize(pool_name, Some(key_desc), None)?;
+                .initialize(pool_name, Some(key_desc), None, None)?;
             let logical_path = handle.activated_device_path();
 
             const WINDOW_SIZE: usize = 1024 * 1024;
@@ -373,6 +373,7 @@ mod tests {
                     "tang".to_string(),
                     json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true}),
                 )),
+                None,
             )?;
 
             let mut device = acquire_crypt_device(handle.luks2_device_path())?;
@@ -436,6 +437,7 @@ mod tests {
                 "tang".to_string(),
                 json!({"url": env::var("TANG_URL").unwrap(), "stratis:tang:trust_url": true}),
             )),
+            None,
         )
         .unwrap();
 

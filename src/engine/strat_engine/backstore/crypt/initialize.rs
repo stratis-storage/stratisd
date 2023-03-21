@@ -13,7 +13,7 @@ use libcryptsetup_rs::{
         flags::CryptVolumeKey,
         vals::{EncryptionFormat, KeyslotsSize, MetadataSize},
     },
-    CryptDevice, CryptInit, TokenInput,
+    CryptDevice, CryptInit, CryptParamsLuks2, CryptParamsLuks2Ref, TokenInput,
 };
 
 use crate::{
@@ -66,6 +66,7 @@ impl CryptInitializer {
         pool_name: Name,
         key_description: Option<&KeyDescription>,
         clevis_info: Option<&ClevisInfo>,
+        sector_size: Option<u32>,
     ) -> StratisResult<CryptHandle> {
         let mut clevis_info_owned =
             clevis_info.map(|(pin, config)| (pin.to_owned(), config.clone()));
@@ -76,6 +77,17 @@ impl CryptInitializer {
             }
             None => None,
         };
+
+        let luks2_params = sector_size.map(|sector_size| CryptParamsLuks2 {
+            pbkdf: None,
+            integrity: None,
+            integrity_params: None,
+            data_alignment: 0,
+            data_device: None,
+            sector_size,
+            label: None,
+            subsystem: None,
+        });
 
         let mut device = log_on_failure!(
             CryptInit::init(&self.physical_path),
@@ -88,7 +100,7 @@ impl CryptInitializer {
             KeyslotsSize::try_from(convert_int!(*DEFAULT_CRYPT_KEYSLOTS_SIZE, u128, u64)?)?,
         )?;
         self
-            .initialize_with_err(&mut device, &pool_name, key_description, clevis_parsed)
+            .initialize_with_err(&mut device, &pool_name, key_description, clevis_parsed, luks2_params.as_ref())
             .and_then(|path| clevis_info_from_metadata(&mut device).map(|ci| (path, ci)))
             .and_then(|(_, clevis_info)| {
                 let encryption_info =
@@ -213,14 +225,20 @@ impl CryptInitializer {
         pool_name: &Name,
         key_description: Option<&KeyDescription>,
         clevis_info: Option<(&str, &Value, bool)>,
+        luks2_params: Option<&CryptParamsLuks2>,
     ) -> StratisResult<()> {
+        let mut luks2_params_ref: Option<CryptParamsLuks2Ref<'_>> = luks2_params.map(|lp| {
+            lp.try_into()
+                .expect("the luks2_param struct was constructed by stratisd, so it is valid")
+        });
+
         log_on_failure!(
-            device.context_handle().format::<()>(
+            device.context_handle().format::<CryptParamsLuks2Ref<'_>>(
                 EncryptionFormat::Luks2,
                 ("aes", "xts-plain64"),
                 None,
                 libcryptsetup_rs::Either::Right(STRATIS_MEK_SIZE),
-                None,
+                luks2_params_ref.as_mut(),
             ),
             "Failed to format device {} with LUKS2 header",
             self.physical_path.display()

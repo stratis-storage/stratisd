@@ -188,13 +188,28 @@ pub fn get_blockdevs(
         cache_map: &HashMap<DevUuid, (usize, &BaseBlockDevSave)>,
         segment_table: &HashMap<DevUuid, Vec<(Sectors, Sectors)>>,
     ) -> BDAResult<(BlockDevTier, StratBlockDev)> {
-        let (actual_size, blksizes) = match OpenOptions::new()
+        let actual_size = match OpenOptions::new()
             .read(true)
             .open(&info.dev_info.devnode)
             .map_err(StratisError::from)
-            .and_then(|f| blkdev_size(&f).and_then(|bs| BlockSizes::read(&f).map(|v| (bs, v))))
+            .and_then(|f| blkdev_size(&f))
         {
-            Ok(vals) => vals,
+            Ok(actual_size) => actual_size,
+            Err(err) => return Err((err, bda)),
+        };
+
+        let blksizes_devnode = match &info.luks {
+            Some(li) => &li.dev_info.devnode,
+            None => &info.dev_info.devnode,
+        };
+
+        let blksizes = match OpenOptions::new()
+            .read(true)
+            .open(blksizes_devnode)
+            .map_err(StratisError::from)
+            .and_then(|f| BlockSizes::read(&f))
+        {
+            Ok(blksizes) => blksizes,
             Err(err) => return Err((err, bda)),
         };
 

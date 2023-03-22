@@ -300,7 +300,7 @@ where
     })
 }
 
-/// Calculate the total used diff from a diff of the thin pool usage and metadata size.
+/// Calculate the total used diff from the thin pool usage and metadata size.
 pub fn total_used(used: &Diff<Option<Bytes>>, metadata_size: &Diff<Bytes>) -> Diff<Option<Bytes>> {
     let changed = matches!(
         (used, metadata_size),

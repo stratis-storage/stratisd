@@ -28,7 +28,7 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
+            Diff, EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
             PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
             SetDeleteAction, StratFilesystemDiff, StratPoolDiff,
         },
@@ -768,7 +768,7 @@ impl Pool for StratPool {
         pool_name: &str,
         paths: &[&Path],
         tier: BlockDevTier,
-    ) -> StratisResult<SetCreateAction<DevUuid>> {
+    ) -> StratisResult<(SetCreateAction<DevUuid>, Option<PoolDiff>)> {
         validate_paths(paths)?;
 
         let bdev_info = if tier == BlockDevTier::Cache && !self.has_cache() {
@@ -828,7 +828,7 @@ impl Pool for StratPool {
                 };
 
                 if unowned_devices.is_empty() {
-                    return Ok(SetCreateAction::new(vec![]));
+                    return Ok((SetCreateAction::new(vec![]), None));
                 }
 
                 let block_size_summary = unowned_devices.blocksizes();
@@ -860,7 +860,7 @@ impl Pool for StratPool {
                 );
                 self.thin_pool.resume()?;
                 let bdev_info = bdev_info_res?;
-                Ok(SetCreateAction::new(bdev_info))
+                Ok((SetCreateAction::new(bdev_info), None))
             } else {
                 if !cachedevs.is_empty() {
                     let error_message = format!(
@@ -876,7 +876,7 @@ impl Pool for StratPool {
                 };
 
                 if unowned_devices.is_empty() {
-                    return Ok(SetCreateAction::new(vec![]));
+                    return Ok((SetCreateAction::new(vec![]), None));
                 }
 
                 let block_size_summary = unowned_devices.blocksizes();
@@ -900,6 +900,8 @@ impl Pool for StratPool {
                     return Err(StratisError::Msg(err_str));
                 }
 
+                let cached = self.cached();
+
                 // If just adding data devices, no need to suspend the pool.
                 // No action will be taken on the DM devices.
                 let bdev_info = self.backstore.add_datadevs(
@@ -910,7 +912,13 @@ impl Pool for StratPool {
                 self.thin_pool.set_queue_mode();
                 self.thin_pool.clear_out_of_meta_flag();
 
-                Ok(SetCreateAction::new(bdev_info))
+                Ok((
+                    SetCreateAction::new(bdev_info),
+                    Some(PoolDiff {
+                        thin_pool: self.thin_pool.cached().unchanged(),
+                        pool: cached.diff(&self.dump(())),
+                    }),
+                ))
             }
         };
         self.write_metadata(pool_name)?;
@@ -1150,6 +1158,13 @@ impl StateDiff for StratPoolState {
             out_of_alloc_space: self.out_of_alloc_space.compare(&other.out_of_alloc_space),
         }
     }
+
+    fn unchanged(&self) -> Self::Diff {
+        StratPoolDiff {
+            metadata_size: Diff::Unchanged(self.metadata_size),
+            out_of_alloc_space: Diff::Unchanged(self.out_of_alloc_space),
+        }
+    }
 }
 
 impl<'a> DumpState<'a> for StratPool {
@@ -1163,7 +1178,7 @@ impl<'a> DumpState<'a> for StratPool {
         }
     }
 
-    fn dump(&mut self, _: ()) -> Self::State {
+    fn dump(&mut self, _: Self::DumpInput) -> Self::State {
         self.metadata_size = self.backstore.datatier_metadata_size();
         StratPoolState {
             metadata_size: self.metadata_size.bytes(),

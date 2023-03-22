@@ -177,7 +177,7 @@ pub trait Pool: Debug + Send + Sync {
         pool_name: &str,
         paths: &[&Path],
         tier: BlockDevTier,
-    ) -> StratisResult<SetCreateAction<DevUuid>>;
+    ) -> StratisResult<(SetCreateAction<DevUuid>, Option<PoolDiff>)>;
 
     /// Bind all devices in the given pool for automated unlocking
     /// using clevis.
@@ -465,6 +465,9 @@ pub trait StateDiff {
     /// the new_state argument as this method should always return the new values
     /// for any properties that are inconsistent.
     fn diff(&self, new_state: &Self) -> Self::Diff;
+
+    /// Return all contained values unchanged.
+    fn unchanged(&self) -> Self::Diff;
 }
 
 /// Dump all of the necessary state for the given data structure that may change.

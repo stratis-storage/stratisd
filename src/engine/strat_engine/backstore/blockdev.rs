@@ -35,7 +35,7 @@ use crate::{
             types::BDAResult,
         },
         types::{
-            Compare, DevUuid, DevicePath, EncryptionInfo, KeyDescription, Name, PoolUuid,
+            Compare, DevUuid, DevicePath, Diff, EncryptionInfo, KeyDescription, Name, PoolUuid,
             StateDiff, StratBlockDevDiff,
         },
     },
@@ -592,6 +592,12 @@ impl StateDiff for StratBlockDevState {
     fn diff(&self, new_state: &Self) -> Self::Diff {
         StratBlockDevDiff {
             size: self.new_size.compare(&new_state.new_size),
+        }
+    }
+
+    fn unchanged(&self) -> Self::Diff {
+        StratBlockDevDiff {
+            size: Diff::Unchanged(self.new_size),
         }
     }
 }

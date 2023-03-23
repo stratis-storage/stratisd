@@ -93,7 +93,7 @@ impl StratisParams {
             StratisParamType::PoolAddData(name, paths) => {
                 expects_fd!(self.fd_opt, false);
                 let path_ref: Vec<_> = paths.iter().map(|p| p.as_path()).collect();
-                Ok(StratisRet::PoolInitCache(stratis_result_to_return(
+                Ok(StratisRet::PoolAddData(stratis_result_to_return(
                     pool::pool_add_data(engine, name.as_str(), path_ref.as_slice()).await,
                     false,
                 )))

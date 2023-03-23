@@ -588,22 +588,37 @@ impl Pool for StratPool {
                 return Err(StratisError::Msg(err_str));
             }
 
-            let current_data_logical_sector_size = self
+            let cache_sector_sizes = block_size_summary
+                .keys()
+                .next()
+                .expect("unowned_devices is not empty");
+
+            let current_data_sector_sizes = self
                 .backstore
                 .block_size_summary(BlockDevTier::Data)
                 .expect("always exists for data tier")
                 .validate()
-                .expect("All operations prevented if validate() function returns an error")
-                .logical_sector_size;
-            let cache_logical_sector_size = block_size_summary
-                .keys()
-                .next()
-                .expect("unowned_devices is not empty")
-                .logical_sector_size;
-            if cache_logical_sector_size != current_data_logical_sector_size {
-                let err_str = format!("The logical sector size of the devices proposed for the cache tier, {cache_logical_sector_size}, does not match the effective logical sector size of the data tier, {current_data_logical_sector_size}");
+                .expect("All operations prevented if validate() function returns an error");
+
+            if cache_sector_sizes.logical_sector_size
+                != current_data_sector_sizes.base.logical_sector_size
+            {
+                let err_str = "The logical sector size of the devices proposed for the cache tier does not match the effective logical sector size of the data tier".to_string();
                 return Err(StratisError::Msg(err_str));
             }
+
+            let sector_size = if self.is_encrypted() {
+                Some(convert_int!(
+                    *current_data_sector_sizes
+                        .crypt
+                        .expect("pool is encrypted")
+                        .logical_sector_size,
+                    u128,
+                    u32
+                )?)
+            } else {
+                None
+            };
 
             self.thin_pool.suspend()?;
             let devices_result = self
@@ -612,7 +627,7 @@ impl Pool for StratPool {
                     Name::new(pool_name.to_string()),
                     pool_uuid,
                     unowned_devices,
-                    None,
+                    sector_size,
                 )
                 .and_then(|bdi| {
                     self.thin_pool
@@ -845,6 +860,10 @@ impl Pool for StratPool {
                     let err_str = "The devices specified to be added to the cache tier do not all have the same physical sector size or do not all have the same logical sector size.".into();
                     return Err(StratisError::Msg(err_str));
                 }
+                let added_sector_sizes = block_size_summary
+                    .keys()
+                    .next()
+                    .expect("unowned devices is not empty");
 
                 let current_sector_sizes = self
                     .backstore
@@ -852,21 +871,31 @@ impl Pool for StratPool {
                     .expect("already returned if no cache tier")
                     .validate()
                     .expect("All devices of the cache tier must be in use, so there can only be one representative logical sector size.");
-                let added_sector_sizes = block_size_summary
-                    .keys()
-                    .next()
-                    .expect("unowned devices is not empty");
-                if added_sector_sizes != &current_sector_sizes {
-                    let err_str = format!("The sector sizes of the devices proposed for extending the cache tier, {added_sector_sizes}, do not match the effective sector sizes of the existing cache devices, {current_sector_sizes}");
+
+                if !(&current_sector_sizes.base == added_sector_sizes) {
+                    let err_str = format!("The sector sizes of the devices proposed for extending the cache tier, {added_sector_sizes}, do not match the effective sector sizes of the existing cache devices, {0}", current_sector_sizes.base);
                     return Err(StratisError::Msg(err_str));
                 }
+
+                let sector_size = if self.is_encrypted() {
+                    Some(convert_int!(
+                        *current_sector_sizes
+                            .crypt
+                            .expect("pool is encrypted")
+                            .logical_sector_size,
+                        u128,
+                        u32
+                    )?)
+                } else {
+                    None
+                };
 
                 self.thin_pool.suspend()?;
                 let bdev_info_res = self.backstore.add_cachedevs(
                     Name::new(pool_name.to_string()),
                     pool_uuid,
                     unowned_devices,
-                    None,
+                    sector_size,
                 );
                 self.thin_pool.resume()?;
                 let bdev_info = bdev_info_res?;
@@ -895,20 +924,35 @@ impl Pool for StratPool {
                     return Err(StratisError::Msg(err_str));
                 }
 
+                let added_sector_sizes = block_size_summary
+                    .keys()
+                    .next()
+                    .expect("unowned devices is not empty");
+
                 let current_sector_sizes = self
                     .backstore
                     .block_size_summary(BlockDevTier::Data)
                     .expect("always exists")
                     .validate()
                     .expect("All operations prevented if validate() function on data tier block size summary returns an error");
-                let added_sector_sizes = block_size_summary
-                    .keys()
-                    .next()
-                    .expect("unowned devices is not empty");
-                if added_sector_sizes != &current_sector_sizes {
-                    let err_str = format!("The sector sizes of the devices proposed for extending the data tier, {added_sector_sizes}, do not match the effective sector sizes of the existing data devices, {current_sector_sizes}");
+
+                if !(&current_sector_sizes.base == added_sector_sizes) {
+                    let err_str = format!("The sector sizes of the devices proposed for extending the data tier, {added_sector_sizes}, do not match the effective sector sizes of the existing data devices, {0}", current_sector_sizes.base);
                     return Err(StratisError::Msg(err_str));
                 }
+
+                let sector_size = if self.is_encrypted() {
+                    Some(convert_int!(
+                        *current_sector_sizes
+                            .crypt
+                            .expect("pool is encrypted")
+                            .logical_sector_size,
+                        u128,
+                        u32
+                    )?)
+                } else {
+                    None
+                };
 
                 let cached = self.cached();
 
@@ -918,7 +962,7 @@ impl Pool for StratPool {
                     Name::new(pool_name.to_string()),
                     pool_uuid,
                     unowned_devices,
-                    None,
+                    sector_size,
                 )?;
                 self.thin_pool.set_queue_mode();
                 self.thin_pool.clear_out_of_meta_flag();

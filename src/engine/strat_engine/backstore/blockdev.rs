@@ -6,6 +6,7 @@
 
 use std::{
     cmp::Ordering,
+    fmt,
     fs::{File, OpenOptions},
     path::Path,
 };
@@ -78,6 +79,26 @@ impl UnderlyingDevice {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct StratSectorSizes {
+    pub base: BlockSizes,
+    pub crypt: Option<BlockSizes>,
+}
+
+impl fmt::Display for StratSectorSizes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "base: {}, crypt: {}",
+            self.base,
+            &self
+                .crypt
+                .map(|sz| sz.to_string())
+                .unwrap_or("None".to_string())
+        )
+    }
+}
+
 #[derive(Debug)]
 pub struct StratBlockDev {
     dev: Device,
@@ -87,7 +108,7 @@ pub struct StratBlockDev {
     hardware_info: Option<String>,
     underlying_device: UnderlyingDevice,
     new_size: Option<Sectors>,
-    blksizes: BlockSizes,
+    blksizes: StratSectorSizes,
 }
 
 impl StratBlockDev {
@@ -119,7 +140,6 @@ impl StratBlockDev {
         user_info: Option<String>,
         hardware_info: Option<String>,
         underlying_device: UnderlyingDevice,
-        blksizes: BlockSizes,
     ) -> BDAResult<StratBlockDev> {
         let mut segments = vec![(Sectors(0), bda.extended_size().sectors())];
         segments.extend(other_segments);
@@ -127,6 +147,40 @@ impl StratBlockDev {
         let allocator = match RangeAllocator::new(bda.dev_size(), &segments) {
             Ok(a) => a,
             Err(e) => return Err((e, bda)),
+        };
+
+        let base_blksizes = match OpenOptions::new()
+            .read(true)
+            .open(underlying_device.physical_path())
+            .map_err(StratisError::from)
+            .and_then(|f| BlockSizes::read(&f))
+        {
+            Ok(blksizes) => blksizes,
+            Err(e) => return Err((e, bda)),
+        };
+
+        let blksizes = match underlying_device {
+            UnderlyingDevice::Encrypted(_) => {
+                let metadata_path = underlying_device.metadata_path();
+                let crypt_blksizes = match OpenOptions::new()
+                    .read(true)
+                    .open(metadata_path)
+                    .map_err(StratisError::from)
+                    .and_then(|f| BlockSizes::read(&f))
+                {
+                    Ok(blksizes) => blksizes,
+                    Err(e) => return Err((e, bda)),
+                };
+
+                StratSectorSizes {
+                    base: base_blksizes,
+                    crypt: Some(crypt_blksizes),
+                }
+            }
+            UnderlyingDevice::Unencrypted(_) => StratSectorSizes {
+                base: base_blksizes,
+                crypt: None,
+            },
         };
 
         Ok(StratBlockDev {
@@ -292,7 +346,7 @@ impl StratBlockDev {
     }
 
     /// Block size information
-    pub fn blksizes(&self) -> BlockSizes {
+    pub fn blksizes(&self) -> StratSectorSizes {
         self.blksizes
     }
 

@@ -557,7 +557,6 @@ pub fn initialize_devices(
         dev_uuid: DevUuid,
         sizes: (MDADataSize, BlockdevSize),
         id_wwn: &Option<StratisResult<String>>,
-        blksizes: BlockSizes,
     ) -> StratisResult<StratBlockDev> {
         let (mda_data_size, data_size) = sizes;
         let mut f = OpenOptions::new()
@@ -588,8 +587,7 @@ pub fn initialize_devices(
 
         bda.initialize(&mut f)?;
 
-        StratBlockDev::new(devno, bda, &[], None, hw_id, underlying_device, blksizes)
-            .map_err(|(e, _)| e)
+        StratBlockDev::new(devno, bda, &[], None, hw_id, underlying_device).map_err(|(e, _)| e)
     }
 
     /// Clean up an encrypted device after initialization failure.
@@ -698,7 +696,6 @@ pub fn initialize_devices(
                     dev_uuid,
                     (mda_data_size, BlockdevSize::new(blockdev_size)),
                     &dev_info.id_wwn,
-                    dev_info.blksizes,
                 );
                 if let Err(err) = blockdev {
                     Err(clean_up_encrypted(&mut handle_clone, err))
@@ -714,7 +711,6 @@ pub fn initialize_devices(
                     dev_uuid,
                     (mda_data_size, BlockdevSize::new(blockdev_size)),
                     &dev_info.id_wwn,
-                    dev_info.blksizes,
                 );
                 if let Err(err) = blockdev {
                     Err(clean_up_unencrypted(physical_path, err))

@@ -18,7 +18,7 @@ use devicemapper::Sectors;
 use crate::{
     engine::{
         strat_engine::{
-            backstore::{BlockSizes, CryptHandle, StratBlockDev, UnderlyingDevice},
+            backstore::{CryptHandle, StratBlockDev, UnderlyingDevice},
             device::blkdev_size,
             liminal::device_info::{LStratisDevInfo, LStratisInfo},
             metadata::BDA,
@@ -200,21 +200,6 @@ pub fn get_blockdevs(
             Err(err) => return Err((err, bda)),
         };
 
-        let blksizes_devnode = match &info.luks {
-            Some(li) => &li.dev_info.devnode,
-            None => &info.dev_info.devnode,
-        };
-
-        let blksizes = match OpenOptions::new()
-            .read(true)
-            .open(blksizes_devnode)
-            .map_err(StratisError::from)
-            .and_then(|f| BlockSizes::read(&f))
-        {
-            Ok(blksizes) => blksizes,
-            Err(err) => return Err((err, bda)),
-        };
-
         // Return an error if apparent size of Stratis block device appears to
         // have decreased since metadata was recorded or if size of block
         // device could not be obtained.
@@ -280,7 +265,6 @@ pub fn get_blockdevs(
                 bd_save.user_info.clone(),
                 bd_save.hardware_info.clone(),
                 underlying_device,
-                blksizes,
             )?,
         ))
     }

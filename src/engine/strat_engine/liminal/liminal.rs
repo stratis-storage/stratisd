@@ -327,6 +327,20 @@ impl LiminalDevices {
         }
     }
 
+    /// Tear down a partially constructed pool.
+    pub fn stop_partially_constructed_pool(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
+        if let Some(device_set) = self.partially_constructed_pools.get(&pool_uuid) {
+            stop_partially_constructed_pool(
+                pool_uuid,
+                &device_set
+                    .iter()
+                    .map(|(dev_uuid, _)| *dev_uuid)
+                    .collect::<Vec<_>>(),
+            )?;
+        }
+        Ok(())
+    }
+
     /// Get a mapping of pool UUIDs from all of the LUKS2 devices that are currently
     /// locked to their encryption info in the set of pools that are not yet set up.
     pub fn locked_pools(&self) -> LockedPoolsInfo {

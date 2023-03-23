@@ -601,12 +601,14 @@ class UdevTest6(UdevTest):
         num_devices = 2
         device_tokens = self._lb_mgr.create_devices(num_devices)
         devnodes = self._lb_mgr.device_files(device_tokens)
+        pool_name1 = random_string(5)
+        pool_name2 = random_string(5)
 
         with OptionalKeyServiceContextManager():
             self.wait_for_pools(0)
 
-            (_, (pool_object_path, _)) = create_pool(random_string(5), devnodes[:1])
-            create_pool(random_string(5), devnodes[1:])
+            create_pool(pool_name1, devnodes[:1])
+            create_pool(pool_name2, devnodes[1:])
 
             self.wait_for_pools(2)
 
@@ -621,7 +623,10 @@ class UdevTest6(UdevTest):
 
             ((changed, _), exit_code, _) = Manager.Methods.StopPool(
                 get_object(TOP_OBJECT),
-                {"pool": pool_object_path},
+                {
+                    "id": pool_name1,
+                    "id_type": "name",
+                },
             )
             self.assertEqual(exit_code, 0)
             self.assertEqual(changed, True)
@@ -684,22 +689,20 @@ class UdevTest7(UdevTest):
         ) as key_desc:
             self.wait_for_pools(0)
 
-            (_, (pool_object_path_enc, _)) = create_pool(
-                "encrypted", devnodes[:2], key_description=key_desc[0]
-            )
-            (_, (pool_object_path, _)) = create_pool("unencrypted", devnodes[2:])
+            create_pool("encrypted", devnodes[:2], key_description=key_desc[0])
+            create_pool("unencrypted", devnodes[2:])
 
             self.wait_for_pools(2)
 
             ((changed, _), exit_code, _) = Manager.Methods.StopPool(
                 get_object(TOP_OBJECT),
-                {"pool": pool_object_path_enc},
+                {"id": "encrypted", "id_type": "name"},
             )
             self.assertEqual(exit_code, 0)
             self.assertEqual(changed, True)
             ((changed, _), exit_code, _) = Manager.Methods.StopPool(
                 get_object(TOP_OBJECT),
-                {"pool": pool_object_path},
+                {"id": "unencrypted", "id_type": "name"},
             )
             self.assertEqual(exit_code, 0)
             self.assertEqual(changed, True)

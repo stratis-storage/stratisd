@@ -53,7 +53,8 @@ SPECS = {
       <arg name="return_string" type="s" direction="out" />
     </method>
     <method name="StopPool">
-      <arg name="pool" type="o" direction="in" />
+      <arg name="id" type="s" direction="in" />
+      <arg name="id_type" type="s" direction="in" />
       <arg name="result" type="(bs)" direction="out" />
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />

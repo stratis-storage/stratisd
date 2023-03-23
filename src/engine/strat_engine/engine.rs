@@ -657,29 +657,49 @@ impl Engine for StratEngine {
         }
     }
 
-    async fn stop_pool(&self, pool_uuid: PoolUuid) -> StratisResult<StopAction<PoolUuid>> {
+    async fn stop_pool(
+        &self,
+        pool_id: PoolIdentifier<PoolUuid>,
+        has_partially_constructed: bool,
+    ) -> StratisResult<StopAction<PoolUuid>> {
+        let id_str = pool_id.to_string();
+
+        let stopped_pools = self.liminal_devices.read().await.stopped_pools();
+        let pool_uuid = match pool_id {
+            PoolIdentifier::Name(ref n) => stopped_pools.name_to_uuid.get(n),
+            PoolIdentifier::Uuid(ref u) => Some(u),
+        };
+        if let Some(pool_uuid) = pool_uuid {
+            if has_partially_constructed {
+                if stopped_pools.stopped.get(pool_uuid).is_some() {
+                    return Ok(StopAction::Identity);
+                } else if stopped_pools.partially_constructed.get(pool_uuid).is_some() {
+                    self.liminal_devices
+                        .write()
+                        .await
+                        .stop_partially_constructed_pool(*pool_uuid)?;
+                    return Ok(StopAction::CleanedUp(*pool_uuid));
+                }
+            } else if stopped_pools.stopped.get(pool_uuid).is_some()
+                || stopped_pools.partially_constructed.get(pool_uuid).is_some()
+            {
+                return Ok(StopAction::Identity);
+            }
+        }
+
         let mut pools = self.pools.write_all().await;
-        if let Some((name, pool)) = pools.remove_by_uuid(pool_uuid) {
+        if let Some((name, pool_uuid, pool)) = match pool_id {
+            PoolIdentifier::Name(n) => pools.remove_by_name(&n).map(|(u, p)| (n, u, p)),
+            PoolIdentifier::Uuid(u) => pools.remove_by_uuid(u).map(|(n, p)| (n, u, p)),
+        } {
             self.liminal_devices
                 .write()
                 .await
                 .stop_pool(&mut pools, name, pool_uuid, pool)?;
-            return Ok(StopAction::Stopped(pool_uuid));
-        }
-
-        drop(pools);
-
-        let stopped_pools = self.liminal_devices.read().await.stopped_pools();
-        if stopped_pools.stopped.get(&pool_uuid).is_some()
-            || stopped_pools
-                .partially_constructed
-                .get(&pool_uuid)
-                .is_some()
-        {
-            Ok(StopAction::Identity)
+            Ok(StopAction::Stopped(pool_uuid))
         } else {
             Err(StratisError::Msg(format!(
-                "Pool with UUID {pool_uuid} could not be found and cannot be stopped"
+                "Pool with UUID {id_str} could not be found and cannot be stopped"
             )))
         }
     }
@@ -938,7 +958,7 @@ mod test {
         let res = init_res.and_then(|_| needs_clean_up(&mut pool, fail_device, operation));
         drop(pool);
 
-        test_async!(engine.stop_pool(uuid))?;
+        test_async!(engine.stop_pool(PoolIdentifier::Uuid(uuid), true))?;
         res?;
 
         test_async!(engine.start_pool(PoolIdentifier::Uuid(uuid), Some(unlock_method)))?;
@@ -1360,7 +1380,11 @@ mod test {
             .unwrap()
             .changed()
             .unwrap();
-        assert!(test_async!(engine.stop_pool(uuid)).unwrap().is_changed());
+        assert!(
+            test_async!(engine.stop_pool(PoolIdentifier::Uuid(uuid), true))
+                .unwrap()
+                .is_changed()
+        );
         assert_eq!(test_async!(engine.stopped_pools()).stopped.len(), 1);
         assert_eq!(test_async!(engine.pools()).len(), 0);
 

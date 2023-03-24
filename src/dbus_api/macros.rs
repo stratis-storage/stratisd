@@ -148,22 +148,19 @@ macro_rules! box_variant {
 
 macro_rules! uuid_to_path {
     ($read_lock:expr, $uuid:expr, $utype:ident) => {
-        $read_lock
-            .iter()
-            .filter_map(|opath| {
-                opath.get_data().as_ref().and_then(|data| {
-                    if let $crate::engine::StratisUuid::$utype(u) = data.uuid {
-                        if u == $uuid {
-                            Some(opath.get_name())
-                        } else {
-                            None
-                        }
+        $read_lock.iter().find_map(|opath| {
+            opath.get_data().as_ref().and_then(|data| {
+                if let $crate::engine::StratisUuid::$utype(u) = data.uuid {
+                    if u == $uuid {
+                        Some(opath.get_name())
                     } else {
                         None
                     }
-                })
+                } else {
+                    None
+                }
             })
-            .next()
+        })
     };
 }
 

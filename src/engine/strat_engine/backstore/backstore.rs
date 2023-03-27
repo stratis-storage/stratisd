@@ -240,6 +240,7 @@ impl Backstore {
             devices,
             mda_data_size,
             encryption_info,
+            None,
         )?);
 
         Ok(Backstore {
@@ -264,6 +265,7 @@ impl Backstore {
         pool_name: Name,
         pool_uuid: PoolUuid,
         devices: UnownedDevices,
+        sector_size: Option<u32>,
     ) -> StratisResult<Vec<DevUuid>> {
         match self.cache_tier {
             Some(_) => unreachable!("self.cache.is_none()"),
@@ -282,6 +284,7 @@ impl Backstore {
                         .map(EncryptionInfo::try_from)
                         .transpose()?
                         .as_ref(),
+                    sector_size,
                 )?;
 
                 let cache_tier = CacheTier::new(bdm)?;
@@ -325,6 +328,7 @@ impl Backstore {
         pool_name: Name,
         pool_uuid: PoolUuid,
         devices: UnownedDevices,
+        sector_size: Option<u32>,
     ) -> StratisResult<Vec<DevUuid>> {
         match self.cache_tier {
             Some(ref mut cache_tier) => {
@@ -333,7 +337,7 @@ impl Backstore {
                     .as_mut()
                     .expect("cache_tier.is_some() <=> self.cache.is_some()");
                 let (uuids, (cache_change, meta_change)) =
-                    cache_tier.add(pool_name, pool_uuid, devices)?;
+                    cache_tier.add(pool_name, pool_uuid, devices, sector_size)?;
 
                 if cache_change {
                     let table = cache_tier.cache_segments.map_to_dm();
@@ -363,8 +367,10 @@ impl Backstore {
         pool_name: Name,
         pool_uuid: PoolUuid,
         devices: UnownedDevices,
+        sector_size: Option<u32>,
     ) -> StratisResult<Vec<DevUuid>> {
-        self.data_tier.add(pool_name, pool_uuid, devices)
+        self.data_tier
+            .add(pool_name, pool_uuid, devices, sector_size)
     }
 
     /// Extend the cap device whether it is a cache or not. Create the DM
@@ -1180,7 +1186,7 @@ mod tests {
         backstore.commit_alloc(pool_uuid, transaction).unwrap();
 
         let cache_uuids = backstore
-            .init_cache(pool_name.clone(), pool_uuid, initcachedevs)
+            .init_cache(pool_name.clone(), pool_uuid, initcachedevs, None)
             .unwrap();
 
         invariant(&backstore);
@@ -1206,13 +1212,13 @@ mod tests {
         }
 
         let data_uuids = backstore
-            .add_datadevs(pool_name.clone(), pool_uuid, datadevs)
+            .add_datadevs(pool_name.clone(), pool_uuid, datadevs, None)
             .unwrap();
         invariant(&backstore);
         assert_eq!(data_uuids.len(), datadevpaths.len());
 
         let cache_uuids = backstore
-            .add_cachedevs(pool_name, pool_uuid, cachedevs)
+            .add_cachedevs(pool_name, pool_uuid, cachedevs, None)
             .unwrap();
         invariant(&backstore);
         assert_eq!(cache_uuids.len(), cachedevpaths.len());
@@ -1298,7 +1304,7 @@ mod tests {
         let old_device = backstore.device();
 
         backstore
-            .init_cache(pool_name, pool_uuid, devices2)
+            .init_cache(pool_name, pool_uuid, devices2, None)
             .unwrap();
 
         for path in paths2 {

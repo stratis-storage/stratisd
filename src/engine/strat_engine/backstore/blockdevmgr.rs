@@ -64,6 +64,7 @@ impl BlockDevMgr {
         devices: UnownedDevices,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
+        sector_size: Option<u32>,
     ) -> StratisResult<BlockDevMgr> {
         Ok(BlockDevMgr::new(
             initialize_devices(
@@ -72,7 +73,7 @@ impl BlockDevMgr {
                 pool_uuid,
                 mda_data_size,
                 encryption_info,
-                None,
+                sector_size,
             )?,
             None,
         ))
@@ -104,6 +105,7 @@ impl BlockDevMgr {
         pool_name: Name,
         pool_uuid: PoolUuid,
         devices: UnownedDevices,
+        sector_size: Option<u32>,
     ) -> StratisResult<Vec<DevUuid>> {
         let this_pool_uuid = self.block_devs.get(0).map(|bd| bd.pool_uuid());
         if this_pool_uuid.is_some() && this_pool_uuid != Some(pool_uuid) {
@@ -140,7 +142,7 @@ impl BlockDevMgr {
             pool_uuid,
             MDADataSize::default(),
             encryption_info.as_ref(),
-            None,
+            sector_size,
         )?;
         let bdev_uuids = bds.iter().map(|bd| bd.uuid()).collect();
         self.block_devs.extend(bds);
@@ -458,9 +460,15 @@ mod tests {
         let pool_uuid = PoolUuid::new_v4();
         let pool_name = Name::new("pool_name".to_string());
         let devices = get_devices(paths).unwrap();
-        let mut mgr =
-            BlockDevMgr::initialize(pool_name, pool_uuid, devices, MDADataSize::default(), None)
-                .unwrap();
+        let mut mgr = BlockDevMgr::initialize(
+            pool_name,
+            pool_uuid,
+            devices,
+            MDADataSize::default(),
+            None,
+            None,
+        )
+        .unwrap();
         assert_eq!(mgr.avail_space() + mgr.metadata_size(), mgr.size());
 
         let allocated = Sectors(2);
@@ -504,9 +512,10 @@ mod tests {
                 devices1,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
+                None,
             )?;
 
-            if bdm.add(pool_name, pool_uuid, devices2).is_err() {
+            if bdm.add(pool_name, pool_uuid, devices2, None).is_err() {
                 Err(Box::new(StratisError::Msg(
                     "Adding a blockdev with the same key to an encrypted pool should succeed"
                         .to_string(),
@@ -552,11 +561,12 @@ mod tests {
                 devices1,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
+                None,
             )?;
 
             crypt::change_key(key_desc)?;
 
-            if bdm.add(pool_name, pool_uuid, devices2).is_ok() {
+            if bdm.add(pool_name, pool_uuid, devices2, None).is_ok() {
                 Err(Box::new(StratisError::Msg(
                     "Adding a blockdev with a new key to an encrypted pool should fail".to_string(),
                 )))
@@ -604,6 +614,7 @@ mod tests {
             get_devices(paths1).unwrap(),
             MDADataSize::default(),
             None,
+            None,
         )
         .unwrap();
         cmd::udev_settle().unwrap();
@@ -631,6 +642,7 @@ mod tests {
             uuid,
             get_devices(paths2).unwrap(),
             MDADataSize::default(),
+            None,
             None,
         )
         .unwrap();

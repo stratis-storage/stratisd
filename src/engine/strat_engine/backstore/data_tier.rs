@@ -82,8 +82,10 @@ impl DataTier {
         pool_name: Name,
         pool_uuid: PoolUuid,
         devices: UnownedDevices,
+        sector_size: Option<u32>,
     ) -> StratisResult<Vec<DevUuid>> {
-        self.block_mgr.add(pool_name, pool_uuid, devices)
+        self.block_mgr
+            .add(pool_name, pool_uuid, devices, sector_size)
     }
 
     /// Allocate a region for all sector size requests from unallocated segments in
@@ -240,6 +242,7 @@ mod tests {
             devices1,
             MDADataSize::default(),
             None,
+            None,
         )
         .unwrap();
 
@@ -266,7 +269,7 @@ mod tests {
         assert_eq!(data_tier.size(), size);
         allocated = data_tier.allocated();
 
-        data_tier.add(pool_name, pool_uuid, devices2).unwrap();
+        data_tier.add(pool_name, pool_uuid, devices2, None).unwrap();
         data_tier.invariant();
 
         // A data tier w/ additional blockdevs added

@@ -608,7 +608,7 @@ impl Pool for StratPool {
             self.thin_pool.suspend()?;
             let devices_result = self
                 .backstore
-                .init_cache(Name::new(pool_name.to_string()), pool_uuid, unowned_devices)
+                .init_cache(Name::new(pool_name.to_string()), pool_uuid, unowned_devices, None)
                 .and_then(|bdi| {
                     self.thin_pool
                         .set_device(self.backstore.device().expect(
@@ -861,6 +861,7 @@ impl Pool for StratPool {
                     Name::new(pool_name.to_string()),
                     pool_uuid,
                     unowned_devices,
+                    None,
                 );
                 self.thin_pool.resume()?;
                 let bdev_info = bdev_info_res?;
@@ -912,6 +913,7 @@ impl Pool for StratPool {
                     Name::new(pool_name.to_string()),
                     pool_uuid,
                     unowned_devices,
+                    None,
                 )?;
                 self.thin_pool.set_queue_mode();
                 self.thin_pool.clear_out_of_meta_flag();

@@ -1950,6 +1950,7 @@ mod tests {
                 Name::new(pool_name.to_string()),
                 pool_uuid,
                 remaining_devices,
+                None,
             )
             .unwrap();
         pool.check(pool_uuid, &mut backstore).unwrap();
@@ -2449,7 +2450,7 @@ mod tests {
             .device()
             .expect("Space already allocated from backstore, backstore must have device");
         backstore
-            .init_cache(Name::new(pool_name.to_string()), pool_uuid, devices1)
+            .init_cache(Name::new(pool_name.to_string()), pool_uuid, devices1, None)
             .unwrap();
         let new_device = backstore
             .device()

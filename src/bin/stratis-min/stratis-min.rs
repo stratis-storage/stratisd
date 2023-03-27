@@ -4,7 +4,7 @@
 
 use std::{error::Error, path::PathBuf};
 
-use clap::{Arg, ArgGroup, ArgMatches, Command};
+use clap::{Arg, ArgAction, ArgGroup, ArgMatches, Command};
 use serde_json::{json, Map, Value};
 
 use stratisd::{
@@ -16,15 +16,10 @@ use stratisd::{
     stratis::{StratisError, VERSION},
 };
 
-fn parse_args() -> Command<'static> {
+fn parse_args() -> Command {
     Command::new("stratis-min")
         .version(VERSION)
-        .arg(
-            Arg::new("debug")
-                .long("--debug")
-                .takes_value(false)
-                .required(false),
-        )
+        .arg(Arg::new("debug").long("debug").num_args(0).required(false))
         .subcommand_required(true)
         .arg_required_else_help(true)
         .subcommands(vec![
@@ -36,16 +31,8 @@ fn parse_args() -> Command<'static> {
                             .arg("keyfile_path")
                             .required(true),
                     )
-                    .arg(
-                        Arg::new("capture_key")
-                            .long("--capture-key")
-                            .takes_value(false),
-                    )
-                    .arg(
-                        Arg::new("keyfile_path")
-                            .long("--keyfile-path")
-                            .takes_value(true),
-                    )
+                    .arg(Arg::new("capture_key").long("capture-key").num_args(0))
+                    .arg(Arg::new("keyfile_path").long("keyfile-path").num_args(1))
                     .arg(Arg::new("key_desc").required(true)),
                 Command::new("list"),
                 Command::new("unset").arg(Arg::new("key_desc").required(true)),
@@ -53,50 +40,42 @@ fn parse_args() -> Command<'static> {
             Command::new("pool").subcommands(vec![
                 Command::new("start")
                     .arg(Arg::new("id").required(true))
-                    .arg(Arg::new("name").long("--name").takes_value(false))
-                    .arg(
-                        Arg::new("unlock_method")
-                            .long("--unlock-method")
-                            .takes_value(true),
-                    )
+                    .arg(Arg::new("name").long("name").num_args(0))
+                    .arg(Arg::new("unlock_method").long("unlock-method").num_args(1))
                     .arg(
                         Arg::new("prompt")
-                            .long("--prompt")
-                            .takes_value(false)
+                            .long("prompt")
+                            .num_args(0)
                             .requires("unlock_method"),
                     ),
                 Command::new("stop")
                     .arg(Arg::new("id").required(true))
-                    .arg(Arg::new("name").long("--name").takes_value(false)),
+                    .arg(Arg::new("name").long("name").num_args(0)),
                 Command::new("create")
                     .arg(Arg::new("name").required(true))
                     .arg(
                         Arg::new("blockdevs")
-                            .multiple_occurrences(true)
+                            .action(ArgAction::Append)
                             .required(true),
                     )
-                    .arg(Arg::new("key_desc").long("--key-desc").takes_value(true))
+                    .arg(Arg::new("key_desc").long("key-desc").num_args(1))
                     .arg(
                         Arg::new("clevis")
-                            .long("--clevis")
-                            .takes_value(true)
-                            .possible_values(["nbde", "tang", "tpm2"])
+                            .long("clevis")
+                            .num_args(1)
+                            .value_parser(["nbde", "tang", "tpm2"])
                             .requires_if("nbde", "tang_args")
                             .requires_if("tang", "tang_args"),
                     )
                     .arg(
                         Arg::new("tang_url")
-                            .long("--tang-url")
-                            .takes_value(true)
+                            .long("tang-url")
+                            .num_args(1)
                             .required_if_eq("clevis", "nbde")
                             .required_if_eq("clevis", "tang"),
                     )
-                    .arg(
-                        Arg::new("thumbprint")
-                            .long("--thumbprint")
-                            .takes_value(true),
-                    )
-                    .arg(Arg::new("trust_url").long("--trust-url").takes_value(false))
+                    .arg(Arg::new("thumbprint").long("thumbprint").num_args(1))
+                    .arg(Arg::new("trust_url").long("trust-url").num_args(0))
                     .group(
                         ArgGroup::new("tang_args")
                             .arg("thumbprint")
@@ -106,7 +85,7 @@ fn parse_args() -> Command<'static> {
                     .arg(Arg::new("name").required(true))
                     .arg(
                         Arg::new("blockdevs")
-                            .multiple_occurrences(true)
+                            .action(ArgAction::Append)
                             .required(true),
                     ),
                 Command::new("rename")
@@ -116,31 +95,31 @@ fn parse_args() -> Command<'static> {
                     .arg(Arg::new("name").required(true))
                     .arg(
                         Arg::new("blockdevs")
-                            .multiple_occurrences(true)
+                            .action(ArgAction::Append)
                             .required(true),
                     ),
                 Command::new("add-cache")
                     .arg(Arg::new("name").required(true))
                     .arg(
                         Arg::new("blockdevs")
-                            .multiple_occurrences(true)
+                            .action(ArgAction::Append)
                             .required(true),
                     ),
                 Command::new("destroy").arg(Arg::new("name").required(true)),
                 Command::new("is-encrypted")
-                    .arg(Arg::new("name").long("--name").takes_value(false))
+                    .arg(Arg::new("name").long("name").num_args(0))
                     .arg(Arg::new("id").required(true)),
                 Command::new("is-stopped")
-                    .arg(Arg::new("name").long("--name").takes_value(false))
+                    .arg(Arg::new("name").long("name").num_args(0))
                     .arg(Arg::new("id").required(true)),
                 Command::new("is-bound")
-                    .arg(Arg::new("name").long("--name").takes_value(false))
+                    .arg(Arg::new("name").long("name").num_args(0))
                     .arg(Arg::new("id").required(true)),
                 Command::new("has-passphrase")
-                    .arg(Arg::new("name").long("--name").takes_value(false))
+                    .arg(Arg::new("name").long("name").num_args(0))
                     .arg(Arg::new("id").required(true)),
                 Command::new("clevis-pin")
-                    .arg(Arg::new("name").long("--name").takes_value(false))
+                    .arg(Arg::new("name").long("name").num_args(0))
                     .arg(Arg::new("id").required(true)),
             ]),
             Command::new("filesystem").subcommands(vec![
@@ -160,7 +139,7 @@ fn parse_args() -> Command<'static> {
 }
 
 fn get_paths_from_args(args: &ArgMatches) -> Vec<PathBuf> {
-    args.values_of("blockdevs")
+    args.get_many::<String>("blockdevs")
         .expect("required")
         .map(PathBuf::from)
         .collect::<Vec<_>>()
@@ -175,14 +154,14 @@ fn main() -> Result<(), String> {
             if let Some(args) = subcommand.subcommand_matches("set") {
                 key::key_set(
                     KeyDescription::try_from(
-                        args.value_of("key_desc").expect("required").to_string(),
+                        args.get_one::<String>("key_desc").expect("required"),
                     )?,
-                    args.value_of("keyfile_path"),
+                    args.get_one::<String>("keyfile_path").map(|s| s.as_str()),
                 )?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("unset") {
                 key::key_unset(KeyDescription::try_from(
-                    args.value_of("key_desc").expect("required").to_string(),
+                    args.get_one::<String>("key_desc").expect("required"),
                 )?)?;
                 Ok(())
             } else {
@@ -191,20 +170,23 @@ fn main() -> Result<(), String> {
             }
         } else if let Some(subcommand) = args.subcommand_matches("pool") {
             if let Some(args) = subcommand.subcommand_matches("start") {
-                let id = if args.is_present("name") {
+                let id = if args.get_flag("name") {
                     PoolIdentifier::Name(Name::new(
-                        args.value_of("id").expect("required").to_string(),
+                        args.get_one::<String>("id").expect("required").to_owned(),
                     ))
                 } else {
                     PoolIdentifier::Uuid(PoolUuid::parse_str(
-                        args.value_of("id").expect("required"),
+                        args.get_one::<String>("id")
+                            .map(|s| s.as_str())
+                            .expect("required"),
                     )?)
                 };
-                let unlock_method = match args.value_of("unlock_method") {
-                    Some(um) => Some(UnlockMethod::try_from(um)?),
-                    None => None,
-                };
-                let prompt = args.is_present("prompt");
+                let unlock_method =
+                    match args.get_one::<String>("unlock_method").map(|s| s.as_str()) {
+                        Some(um) => Some(UnlockMethod::try_from(um)?),
+                        None => None,
+                    };
+                let prompt = args.get_flag("prompt");
                 if prompt && unlock_method == Some(UnlockMethod::Clevis) {
                     return Err(Box::new(StratisError::Msg(
                         "--prompt and an unlock_method of clevis are mutally exclusive".to_string(),
@@ -213,34 +195,43 @@ fn main() -> Result<(), String> {
                 pool::pool_start(id, unlock_method, prompt)?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("stop") {
-                let id = if args.is_present("name") {
+                let id = if args.get_flag("name") {
                     PoolIdentifier::Name(Name::new(
-                        args.value_of("id").expect("required").to_string(),
+                        args.get_one::<String>("id").expect("required").to_owned(),
                     ))
                 } else {
                     PoolIdentifier::Uuid(PoolUuid::parse_str(
-                        args.value_of("id").expect("required"),
+                        args.get_one::<String>("id")
+                            .map(|s| s.as_str())
+                            .expect("required"),
                     )?)
                 };
                 pool::pool_stop(id)?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("create") {
                 let paths = get_paths_from_args(args);
-                let key_description = match args.value_of("key_desc").map(|s| s.to_owned()) {
+                let key_description = match args.get_one::<String>("key_desc").map(|s| s.to_owned())
+                {
                     Some(string) => Some(KeyDescription::try_from(string)?),
                     None => None,
                 };
-                let pin = args.value_of("clevis");
+                let pin = args.get_one::<String>("clevis").map(|s| s.as_str());
                 let clevis_info = match pin {
                     Some("nbde" | "tang") => {
                         let mut json = Map::new();
                         json.insert(
                             "url".to_string(),
-                            Value::from(args.value_of("tang_url").expect("Required")),
+                            Value::from(
+                                args.get_one::<String>("tang_url")
+                                    .map(|s| s.as_str())
+                                    .expect("Required"),
+                            ),
                         );
-                        if args.is_present("trust_url") {
+                        if args.get_flag("trust_url") {
                             json.insert(CLEVIS_TANG_TRUST_URL.to_string(), Value::from(true));
-                        } else if let Some(thp) = args.value_of("thumbprint") {
+                        } else if let Some(thp) =
+                            args.get_one::<String>("thumbprint").map(|s| s.as_str())
+                        {
                             json.insert("thp".to_string(), Value::from(thp));
                         }
                         pin.map(|p| (p.to_string(), Value::from(json)))
@@ -250,88 +241,111 @@ fn main() -> Result<(), String> {
                     None => None,
                 };
                 pool::pool_create(
-                    args.value_of("name").expect("required").to_string(),
+                    args.get_one::<String>("name").expect("required").to_owned(),
                     paths,
                     EncryptionInfo::from_options((key_description, clevis_info)),
                 )?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("destroy") {
-                pool::pool_destroy(args.value_of("name").expect("required").to_string())?;
+                pool::pool_destroy(args.get_one::<String>("name").expect("required").to_owned())?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("init-cache") {
                 let paths = get_paths_from_args(args);
-                pool::pool_init_cache(args.value_of("name").expect("required").to_string(), paths)?;
+                pool::pool_init_cache(
+                    args.get_one::<String>("name").expect("required").to_owned(),
+                    paths,
+                )?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("rename") {
                 pool::pool_rename(
-                    args.value_of("current_name").expect("required").to_string(),
-                    args.value_of("new_name").expect("required").to_string(),
+                    args.get_one::<String>("current_name")
+                        .expect("required")
+                        .to_owned(),
+                    args.get_one::<String>("new_name")
+                        .expect("required")
+                        .to_owned(),
                 )?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("add-data") {
                 let paths = get_paths_from_args(args);
-                pool::pool_add_data(args.value_of("name").expect("required").to_string(), paths)?;
+                pool::pool_add_data(
+                    args.get_one::<String>("name").expect("required").to_owned(),
+                    paths,
+                )?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("add-cache") {
                 let paths = get_paths_from_args(args);
-                pool::pool_add_cache(args.value_of("name").expect("required").to_string(), paths)?;
+                pool::pool_add_cache(
+                    args.get_one::<String>("name").expect("required").to_owned(),
+                    paths,
+                )?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("is-encrypted") {
-                let id = if args.is_present("name") {
+                let id = if args.get_flag("name") {
                     PoolIdentifier::Name(Name::new(
-                        args.value_of("id").expect("required").to_string(),
+                        args.get_one::<String>("id").expect("required").to_owned(),
                     ))
                 } else {
                     PoolIdentifier::Uuid(PoolUuid::parse_str(
-                        args.value_of("id").expect("required"),
+                        args.get_one::<String>("id")
+                            .map(|s| s.as_str())
+                            .expect("required"),
                     )?)
                 };
                 println!("{}", pool::pool_is_encrypted(id)?);
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("is-stopped") {
-                let id = if args.is_present("name") {
+                let id = if args.get_flag("name") {
                     PoolIdentifier::Name(Name::new(
-                        args.value_of("id").expect("required").to_string(),
+                        args.get_one::<String>("id").expect("required").to_owned(),
                     ))
                 } else {
                     PoolIdentifier::Uuid(PoolUuid::parse_str(
-                        args.value_of("id").expect("required"),
+                        args.get_one::<String>("id")
+                            .map(|s| s.as_str())
+                            .expect("required"),
                     )?)
                 };
                 println!("{}", pool::pool_is_stopped(id)?);
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("is-bound") {
-                let id = if args.is_present("name") {
+                let id = if args.get_flag("name") {
                     PoolIdentifier::Name(Name::new(
-                        args.value_of("id").expect("required").to_string(),
+                        args.get_one::<String>("id").expect("required").to_owned(),
                     ))
                 } else {
                     PoolIdentifier::Uuid(PoolUuid::parse_str(
-                        args.value_of("id").expect("required"),
+                        args.get_one::<String>("id")
+                            .map(|s| s.as_str())
+                            .expect("required"),
                     )?)
                 };
                 println!("{}", pool::pool_is_bound(id)?);
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("has-passphrase") {
-                let id = if args.is_present("name") {
+                let id = if args.get_flag("name") {
                     PoolIdentifier::Name(Name::new(
-                        args.value_of("id").expect("required").to_string(),
+                        args.get_one::<String>("id").expect("required").to_owned(),
                     ))
                 } else {
                     PoolIdentifier::Uuid(PoolUuid::parse_str(
-                        args.value_of("id").expect("required"),
+                        args.get_one::<String>("id")
+                            .map(|s| s.as_str())
+                            .expect("required"),
                     )?)
                 };
                 println!("{}", pool::pool_has_passphrase(id)?);
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("clevis-pin") {
-                let id = if args.is_present("name") {
+                let id = if args.get_flag("name") {
                     PoolIdentifier::Name(Name::new(
-                        args.value_of("id").expect("required").to_string(),
+                        args.get_one::<String>("id").expect("required").to_owned(),
                     ))
                 } else {
                     PoolIdentifier::Uuid(PoolUuid::parse_str(
-                        args.value_of("id").expect("required"),
+                        args.get_one::<String>("id")
+                            .map(|s| s.as_str())
+                            .expect("required"),
                     )?)
                 };
                 println!("{}", pool::pool_clevis_pin(id)?);
@@ -343,21 +357,35 @@ fn main() -> Result<(), String> {
         } else if let Some(subcommand) = args.subcommand_matches("filesystem") {
             if let Some(args) = subcommand.subcommand_matches("create") {
                 filesystem::filesystem_create(
-                    args.value_of("pool_name").expect("required").to_string(),
-                    args.value_of("fs_name").expect("required").to_string(),
+                    args.get_one::<String>("pool_name")
+                        .expect("required")
+                        .to_owned(),
+                    args.get_one::<String>("fs_name")
+                        .expect("required")
+                        .to_owned(),
                 )?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("destroy") {
                 filesystem::filesystem_destroy(
-                    args.value_of("pool_name").expect("required").to_string(),
-                    args.value_of("fs_name").expect("required").to_string(),
+                    args.get_one::<String>("pool_name")
+                        .expect("required")
+                        .to_owned(),
+                    args.get_one::<String>("fs_name")
+                        .expect("required")
+                        .to_owned(),
                 )?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("rename") {
                 filesystem::filesystem_rename(
-                    args.value_of("pool_name").expect("required").to_string(),
-                    args.value_of("fs_name").expect("required").to_string(),
-                    args.value_of("new_fs_name").expect("required").to_string(),
+                    args.get_one::<String>("pool_name")
+                        .expect("required")
+                        .to_owned(),
+                    args.get_one::<String>("fs_name")
+                        .expect("required")
+                        .to_owned(),
+                    args.get_one::<String>("new_fs_name")
+                        .expect("required")
+                        .to_owned(),
                 )?;
                 Ok(())
             } else {
@@ -376,4 +404,13 @@ fn main() -> Result<(), String> {
     }
 
     main_box().map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod test {
+    use super::parse_args;
+    #[test]
+    fn test_stratis_min_parse_args() {
+        parse_args().debug_assert();
+    }
 }

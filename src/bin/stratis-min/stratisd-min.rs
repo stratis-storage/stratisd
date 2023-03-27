@@ -24,20 +24,19 @@ use stratisd::stratis::{run, StratisError, StratisResult, VERSION};
 const STRATISD_PID_PATH: &str = "/run/stratisd.pid";
 const STRATISD_MIN_PID_PATH: &str = "/run/stratisd-min.pid";
 
-fn parse_args() -> Command<'static> {
+fn parse_args() -> Command {
     Command::new("stratisd-min")
         .version(VERSION)
         .arg(
             Arg::new("log_level")
-                .forbid_empty_values(true)
-                .long("--log-level")
-                .possible_values(["trace", "debug", "info", "warn", "error"])
+                .value_parser(["trace", "debug", "info", "warn", "error"])
+                .long("log-level")
                 .help("Sets level for generation of log messages."),
         )
         .arg(
             Arg::new("sim")
-                .long("--sim")
-                .takes_value(false)
+                .long("sim")
+                .num_args(0)
                 .help("Enables sim engine."),
         )
 }
@@ -113,7 +112,7 @@ fn main() -> Result<(), String> {
         let _stratisd_min_file = trylock_pid_file()?;
 
         let mut builder = Builder::new();
-        if let Some(log_level) = args.value_of("log_level") {
+        if let Some(log_level) = args.get_one::<String>("log_level").map(|s| s.as_str()) {
             builder.filter(
                 Some("stratisd"),
                 LevelFilter::from_str(log_level)
@@ -124,9 +123,18 @@ fn main() -> Result<(), String> {
         }
         builder.init();
 
-        run(args.is_present("sim"))?;
+        run(args.get_flag("sim"))?;
         Ok(())
     }
 
     main_box().map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod test {
+    use super::parse_args;
+    #[test]
+    fn test_stratisd_min_parse_args() {
+        parse_args().debug_assert();
+    }
 }

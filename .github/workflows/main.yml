@@ -169,6 +169,48 @@ jobs:
           make dbus-tests
         working-directory: ./stratis-cli
 
+  stratis-min-cli-checks:
+    runs-on: ubuntu-22.04
+    container:
+      image: fedora:37  # CURRENT DEVELOPMENT ENVIRONMENT
+      options: --privileged --userns=host --ipc=host -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install dependencies
+        run: >
+          dnf install -y
+          asciidoc
+          clang
+          cryptsetup-devel
+          dbus-daemon
+          dbus-tools
+          dbus-devel
+          device-mapper-devel
+          device-mapper-persistent-data
+          libblkid-devel
+          git
+          glibc-static
+          make
+          ncurses
+          python3-coverage
+          python3-dbus-client-gen
+          python3-dbus-python-client-gen
+          python3-justbytes
+          python3-dateutil
+          python3-packaging
+          python3-psutil
+          python3-wcwidth
+          systemd-devel
+          xfsprogs
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          components: cargo
+          toolchain: 1.68.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+      - name: Run stratisd-min cli tests
+        run: make test-stratisd-min
+      - name: Run stratis-min cli tests
+        run: make test-stratis-min
+
   shell-checks:
     runs-on: ubuntu-22.04
     container:

@@ -11,7 +11,11 @@ use std::{
     fmt::{self, Display},
 };
 
-use clap::{Arg, Command};
+use clap::{Arg, ArgAction, Command};
+
+#[cfg(feature = "systemd_compat")]
+use clap::builder::Str;
+
 use serde_json::{json, Value};
 
 use devicemapper::{Bytes, Sectors};
@@ -259,13 +263,9 @@ fn predict_pool_usage(
     Ok(())
 }
 
-/// Parse the arguments based on which hard link was accessed.
-fn parse_args() -> Result<(), Box<dyn Error>> {
-    let args = env::args().collect::<Vec<_>>();
-    let argv1 = args[0].as_str();
-
-    if argv1.ends_with("stratis-predict-usage") {
-        let parser = Command::new("stratis-predict-usage")
+// Parse arguments for stratis_predict_usage command.
+fn predict_usage_parse_args() -> Command {
+    Command::new("stratis-predict-usage")
             .about("Predicts space usage for Stratis.")
             .subcommand_required(true)
             .subcommands(vec![
@@ -273,18 +273,20 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
                     .about("Predicts the space usage when creating a Stratis pool.")
                     .arg(Arg::new("encrypted")
                         .long("encrypted")
+                        .action(ArgAction::SetTrue)
                         .help("Whether the pool will be encrypted."),
                     )
                     .arg(
                         Arg::new("no-overprovision")
                         .long("no-overprovision")
+                        .action(ArgAction::SetTrue)
                         .help("Indicates that the pool does not allow overprovisioning"),
                     )
                     .arg(
                         Arg::new("device-size")
                             .long("device-size")
-                            .number_of_values(1)
-                            .multiple_occurrences(true)
+                            .num_args(1)
+                            .action(ArgAction::Append)
                             .required(true)
                             .help("Size of device to be included in the pool. May be specified multiple times. Units are bytes.")
                             .next_line_help(true)
@@ -292,8 +294,8 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
                     .arg(
                         Arg::new("filesystem-size")
                         .long("filesystem-size")
-                        .number_of_values(1)
-                        .multiple_occurrences(true)
+                        .num_args(1)
+                        .action(ArgAction::Append)
                         .help("Size of filesystem to be made for this pool. May be specified multiple times, one for each filesystem. Units are bytes. Must be at least 512 MiB and less than 4 PiB.")
                         .next_line_help(true)
                     ),
@@ -302,8 +304,8 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
                     .arg(
                         Arg::new("filesystem-size")
                         .long("filesystem-size")
-                        .number_of_values(1)
-                        .multiple_occurrences(true)
+                        .num_args(1)
+                        .action(ArgAction::Append)
                         .required(true)
                         .help("Size of filesystem to be made for this pool. May be specified multiple times, one for each filesystem. Units are bytes. Must be at least 512 MiB and less than 4 PiB.")
                         .next_line_help(true)
@@ -311,23 +313,54 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
                     .arg(
                         Arg::new("no-overprovision")
                         .long("no-overprovision")
+                        .action(ArgAction::SetTrue)
                         .help("Indicates that the pool does not allow overprovisioning"),
                     )]
-            );
+            )
+}
+
+// Parse arguments for stratis generator commands.
+#[cfg(feature = "systemd_compat")]
+fn generator_parse_args(generator: impl Into<Str>) -> Command {
+    Command::new(generator)
+        .arg(
+            Arg::new("normal_priority_dir")
+                .required(true)
+                .help("Directory in which to write a unit file for normal priority"),
+        )
+        .arg(
+            Arg::new("early_priority_dir")
+                .required(true)
+                .help("Directory in which to write a unit file for early priority"),
+        )
+        .arg(
+            Arg::new("late_priority_dir")
+                .required(true)
+                .help("Directory in which to write a unit file for late priority"),
+        )
+}
+
+/// Parse the arguments based on which hard link was accessed.
+fn parse_args() -> Result<(), Box<dyn Error>> {
+    let args = env::args().collect::<Vec<_>>();
+    let argv1 = args[0].as_str();
+
+    if argv1.ends_with("stratis-predict-usage") {
+        let parser = predict_usage_parse_args();
         let matches = parser.get_matches_from(&args);
         match matches.subcommand() {
             Some(("pool", sub_m)) => predict_pool_usage(
-                sub_m.is_present("encrypted"),
-                !sub_m.is_present("no-overprovision"),
+                sub_m.get_flag("encrypted"),
+                !sub_m.get_flag("no-overprovision"),
                 sub_m
-                    .values_of("device-size")
+                    .get_many::<String>("device-size")
                     .map(|szs| {
                         szs.map(|sz| sz.parse::<u128>().map(Bytes))
                             .collect::<Result<Vec<_>, _>>()
                     })
                     .expect("required argument")?,
                 sub_m
-                    .values_of("filesystem-size")
+                    .get_many::<String>("filesystem-size")
                     .map(|szs| {
                         szs.map(|sz| sz.parse::<u128>().map(Bytes))
                             .collect::<Result<Vec<_>, _>>()
@@ -335,9 +368,9 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
                     .transpose()?,
             )?,
             Some(("filesystem", sub_m)) => predict_filesystem_usage(
-                !sub_m.is_present("no-overprovision"),
+                !sub_m.get_flag("no-overprovision"),
                 sub_m
-                    .values_of("filesystem-size")
+                    .get_many::<String>("filesystem-size")
                     .map(|szs| {
                         szs.map(|sz| sz.parse::<u128>().map(Bytes))
                             .collect::<Result<Vec<_>, _>>()
@@ -352,52 +385,22 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
     {
         #[cfg(feature = "systemd_compat")]
         if argv1.ends_with("stratis-clevis-setup-generator") {
-            let parser = Command::new("stratis-clevis-setup-generator")
-                .arg(
-                    Arg::new("normal_priority_dir")
-                        .required(true)
-                        .help("Directory in which to write a unit file for normal priority"),
-                )
-                .arg(
-                    Arg::new("early_priority_dir")
-                        .required(true)
-                        .help("Directory in which to write a unit file for early priority"),
-                )
-                .arg(
-                    Arg::new("late_priority_dir")
-                        .required(true)
-                        .help("Directory in which to write a unit file for late priority"),
-                );
+            let parser = generator_parse_args("stratis-clevis-setup-generator");
             let matches = parser.get_matches_from(&args);
             stratis_clevis_setup_generator::generator(
                 matches
-                    .value_of("early_priority_dir")
+                    .get_one::<String>("early_priority_dir")
                     .expect("required")
-                    .to_string(),
+                    .to_owned(),
             )?;
         } else if argv1.ends_with("stratis-setup-generator") {
-            let parser = Command::new("stratis-setup-generator")
-                .arg(
-                    Arg::new("normal_priority_dir")
-                        .required(true)
-                        .help("Directory in which to write a unit file for normal priority"),
-                )
-                .arg(
-                    Arg::new("early_priority_dir")
-                        .required(true)
-                        .help("Directory in which to write a unit file for early priority"),
-                )
-                .arg(
-                    Arg::new("late_priority_dir")
-                        .required(true)
-                        .help("Directory in which to write a unit file for late priority"),
-                );
+            let parser = generator_parse_args("stratis-setup-generator");
             let matches = parser.get_matches_from(&args);
             stratis_setup_generator::generator(
                 matches
-                    .value_of("early_priority_dir")
+                    .get_one::<String>("early_priority_dir")
                     .expect("required")
-                    .to_string(),
+                    .to_owned(),
             )?;
         }
 
@@ -419,4 +422,20 @@ fn parse_args() -> Result<(), Box<dyn Error>> {
 /// invoked.
 fn main() -> Result<(), Box<dyn Error>> {
     parse_args()
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_predict_usage_parse_args() {
+        predict_usage_parse_args().debug_assert();
+    }
+
+    #[test]
+    #[cfg(feature = "systemd_compat")]
+    fn test_generator_parse_args() {
+        generator_parse_args("stratis-generator").debug_assert();
+    }
 }

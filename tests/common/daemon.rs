@@ -16,7 +16,7 @@ fn start_stratisd_min(sim: bool) -> Result<Child, Box<dyn std::error::Error>> {
         cmd.arg("--sim");
     }
     let child = cmd.spawn().expect("stratisd-min failed to start");
-    thread::sleep(time::Duration::from_millis(250));
+    thread::sleep(time::Duration::from_secs(1));
     Ok(child)
 }
 

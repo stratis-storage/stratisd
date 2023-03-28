@@ -828,8 +828,8 @@ impl Backstore {
                 Err(StratisError::Msg(format!(
                     "Block devices have already been bound with key description {}; \
                         requested key description {} can't be applied",
-                    key_desc.as_application_str(),
                     kd.as_application_str(),
+                    key_desc.as_application_str(),
                 )))
             }
         } else {

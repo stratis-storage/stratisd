@@ -818,10 +818,17 @@ impl ThinPool {
     /// the designation of partially constructed pools as no IO can be received on the pool
     /// and it has been partially torn down.
     pub fn teardown(&mut self, pool_uuid: PoolUuid) -> Result<(), (StratisError, bool)> {
+        let fs_uuids = self
+            .filesystems
+            .iter()
+            .map(|(_, fs_uuid, _)| *fs_uuid)
+            .collect::<Vec<_>>();
+
         // Must succeed in tearing down all filesystems before the
         // thinpool..
-        for (_, fs_uuid, _) in &mut self.filesystems {
-            StratFilesystem::teardown(pool_uuid, *fs_uuid).map_err(|e| (e, true))?;
+        for fs_uuid in fs_uuids {
+            StratFilesystem::teardown(pool_uuid, fs_uuid).map_err(|e| (e, true))?;
+            self.filesystems.remove_by_uuid(fs_uuid);
         }
         let devs = list_of_thin_pool_devices(pool_uuid);
         remove_optional_devices(devs).map_err(|e| (e, false))?;

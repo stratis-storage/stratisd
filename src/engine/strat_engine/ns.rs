@@ -82,7 +82,7 @@ impl MemoryFilesystem {
         mount::<str, str, str, str>(
             None,
             NS_TMPFS_LOCATION,
-            None,
+            Some("tmpfs"),
             MsFlags::MS_SLAVE | MsFlags::MS_REC,
             None,
         )?;

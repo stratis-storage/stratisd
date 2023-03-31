@@ -6,7 +6,7 @@
 
 use std::{
     cmp::{max, min, Ordering},
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fmt,
     thread::scope,
 };
@@ -651,11 +651,13 @@ impl ThinPool {
     }
 
     /// Sum the logical size of all filesystems on the pool.
-    fn filesystem_logical_size_sum(&self) -> Sectors {
-        self.filesystems
+    pub fn filesystem_logical_size_sum(&self) -> StratisResult<Sectors> {
+        Ok(self
+            .mdv
+            .filesystems()?
             .iter()
-            .map(|(_, _, fs)| fs.thindev_size())
-            .sum()
+            .map(|fssave| fssave.size)
+            .sum())
     }
 
     /// Check all filesystems on this thin pool and return which had their sizes
@@ -668,12 +670,13 @@ impl ThinPool {
     ) -> StratisResult<HashMap<FilesystemUuid, StratFilesystemDiff>> {
         let mut updated = HashMap::default();
         let mut remaining_space = if !self.enable_overprov {
+            let sum = self.filesystem_logical_size_sum()?;
             Some(Sectors(
                 room_for_data(
                     backstore.datatier_usable_size(),
                     self.thin_pool.meta_dev().size(),
                 )
-                .saturating_sub(*self.filesystem_logical_size_sum()),
+                .saturating_sub(*sum),
             ))
         } else {
             None
@@ -1073,8 +1076,13 @@ impl ThinPool {
         let meta_growth = Sectors(new_meta_size.saturating_sub(*current_meta_size));
 
         if !self.overprov_enabled() && meta_growth > Sectors(0) {
-            let total: Sectors =
-                self.filesystem_logical_size_sum() + INITIAL_MDV_SIZE + 2u64 * current_meta_size;
+            let sum = match self.filesystem_logical_size_sum() {
+                Ok(s) => s,
+                Err(e) => {
+                    return (false, Err(e));
+                }
+            };
+            let total: Sectors = sum + INITIAL_MDV_SIZE + 2u64 * current_meta_size;
             match total.cmp(&backstore.datatier_usable_size()) {
                 Ordering::Less => (),
                 Ordering::Equal => {
@@ -1166,6 +1174,19 @@ impl ThinPool {
         name: &str,
         size: Sectors,
     ) -> StratisResult<FilesystemUuid> {
+        if self
+            .mdv
+            .filesystems()?
+            .into_iter()
+            .map(|fssave| fssave.name)
+            .collect::<HashSet<_>>()
+            .contains(name)
+        {
+            return Err(StratisError::Msg(format!(
+                "Pool {pool_name} already has a record of filesystem name {name}"
+            )));
+        }
+
         let (fs_uuid, mut new_filesystem) =
             StratFilesystem::initialize(pool_uuid, &self.thin_pool, size, self.id_gen.new_id()?)?;
         let name = Name::new(name.to_owned());
@@ -1491,7 +1512,13 @@ impl ThinPool {
         if self.enable_overprov && !enabled {
             let data_limit = self.total_fs_limit(backstore);
 
-            if self.filesystem_logical_size_sum() > data_limit {
+            let sum = match self.filesystem_logical_size_sum() {
+                Ok(s) => s,
+                Err(e) => {
+                    return (false, Err(e));
+                }
+            };
+            if sum > data_limit {
                 (false, Err(StratisError::Msg(format!(
                     "Cannot disable overprovisioning on a pool that is already overprovisioned; the sum of the logical sizes of all filesystems and snapshots must be less than the data space available to the thin pool ({data_limit}) to disable overprovisioning"
                 ))))

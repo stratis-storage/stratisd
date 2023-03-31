@@ -454,13 +454,7 @@ impl StratPool {
     /// overprovisioning if it is determined to be the end result.
     fn check_overprov(&self, increase: Sectors) -> StratisResult<()> {
         if !self.thin_pool.overprov_enabled()
-            && self
-                .thin_pool
-                .filesystems()
-                .iter()
-                .map(|(_, _, fs)| fs.thindev_size())
-                .sum::<Sectors>()
-                + increase
+            && self.thin_pool.filesystem_logical_size_sum()? + increase
                 > self.thin_pool.total_fs_limit(&self.backstore)
         {
             Err(StratisError::Msg(format!(

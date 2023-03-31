@@ -6,7 +6,7 @@
 
 use std::{
     cmp::{max, min, Ordering},
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fmt,
     thread::scope,
 };
@@ -1166,6 +1166,19 @@ impl ThinPool {
         name: &str,
         size: Sectors,
     ) -> StratisResult<FilesystemUuid> {
+        if self
+            .mdv
+            .filesystems()?
+            .into_iter()
+            .map(|fssave| fssave.name)
+            .collect::<HashSet<_>>()
+            .contains(name)
+        {
+            return Err(StratisError::Msg(format!(
+                "Pool {pool_name} already has a record of filesystem name {name}"
+            )));
+        }
+
         let (fs_uuid, mut new_filesystem) =
             StratFilesystem::initialize(pool_uuid, &self.thin_pool, size, self.id_gen.new_id()?)?;
         let name = Name::new(name.to_owned());

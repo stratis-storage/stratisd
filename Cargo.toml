@@ -85,6 +85,8 @@ optional = true
 
 [dependencies.devicemapper]
 version = "0.33.1"
+git="https://github.com/bmr-cymru/devicemapper-rs"
+branch="bmr-private-devices"
 optional = true
 
 [dependencies.dbus]

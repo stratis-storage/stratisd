@@ -72,10 +72,6 @@ impl SimPool {
             })
     }
 
-    fn datadevs_encrypted(&self) -> bool {
-        self.encryption_info().is_some()
-    }
-
     #[allow(clippy::unused_self)]
     pub fn destroy(&mut self) -> StratisResult<()> {
         Ok(())
@@ -651,7 +647,7 @@ impl Pool for SimPool {
     }
 
     fn is_encrypted(&self) -> bool {
-        self.datadevs_encrypted()
+        self.encryption_info().is_some()
     }
 
     fn encryption_info(&self) -> Option<PoolEncryptionInfo> {

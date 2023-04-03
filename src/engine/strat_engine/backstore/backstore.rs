@@ -276,7 +276,7 @@ impl Backstore {
                     pool_uuid,
                     devices,
                     MDADataSize::default(),
-                    self.data_tier_encryption_info()
+                    self.encryption_info()
                         .map(EncryptionInfo::try_from)
                         .transpose()?
                         .as_ref(),
@@ -679,12 +679,14 @@ impl Backstore {
         )
     }
 
-    pub fn data_tier_is_encrypted(&self) -> bool {
+    pub fn is_encrypted(&self) -> bool {
+        if let Some(ref ct) = self.cache_tier {
+            assert_eq!(
+                self.data_tier.block_mgr.is_encrypted(),
+                ct.block_mgr.is_encrypted()
+            );
+        }
         self.data_tier.block_mgr.is_encrypted()
-    }
-
-    pub fn data_tier_encryption_info(&self) -> Option<PoolEncryptionInfo> {
-        self.data_tier.block_mgr.encryption_info()
     }
 
     pub fn has_cache(&self) -> bool {
@@ -692,12 +694,13 @@ impl Backstore {
     }
 
     /// Gather the encryption information for all block devices in the backstore.
-    pub fn encryption_info(&self) -> StratisResult<Option<PoolEncryptionInfo>> {
+    pub fn encryption_info(&self) -> Option<PoolEncryptionInfo> {
         let blockdevs = self.blockdevs();
         gather_encryption_info(
             blockdevs.len(),
             blockdevs.iter().map(|(_, _, bd)| bd.encryption_info()),
         )
+        .expect("All devices must be either encrypted or unencrypted for the pool to be set up")
     }
 
     /// Bind all devices in the given backstore using the given clevis
@@ -709,7 +712,7 @@ impl Backstore {
     /// * Returns Err(_) if an inconsistency was found in the metadata across pools
     /// or binding failed.
     pub fn bind_clevis(&mut self, pin: &str, clevis_info: &Value) -> StratisResult<bool> {
-        let encryption_info = match pool_enc_to_enc!(self.encryption_info()?) {
+        let encryption_info = match pool_enc_to_enc!(self.encryption_info()) {
             Some(ei) => ei,
             None => {
                 return Err(StratisError::Msg(
@@ -766,7 +769,7 @@ impl Backstore {
     /// * Returns Err(_) if an inconsistency was found in the metadata across pools
     /// or unbinding failed.
     pub fn unbind_clevis(&mut self) -> StratisResult<bool> {
-        let encryption_info = match pool_enc_to_enc!(self.encryption_info()?) {
+        let encryption_info = match pool_enc_to_enc!(self.encryption_info()) {
             Some(ei) => ei,
             None => {
                 return Err(StratisError::Msg(
@@ -795,7 +798,7 @@ impl Backstore {
     /// * Returns Err(_) if an inconsistency was found in the metadata across pools
     /// or binding failed.
     pub fn bind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<bool> {
-        let encryption_info = match pool_enc_to_enc!(self.encryption_info()?) {
+        let encryption_info = match pool_enc_to_enc!(self.encryption_info()) {
             Some(ei) => ei,
             None => {
                 return Err(StratisError::Msg(
@@ -850,7 +853,7 @@ impl Backstore {
     /// * Returns Err(_) if an inconsistency was found in the metadata across pools
     /// or unbinding failed.
     pub fn unbind_keyring(&mut self) -> StratisResult<bool> {
-        let encryption_info = match pool_enc_to_enc!(self.encryption_info()?) {
+        let encryption_info = match pool_enc_to_enc!(self.encryption_info()) {
             Some(ei) => ei,
             None => {
                 return Err(StratisError::Msg(
@@ -880,7 +883,7 @@ impl Backstore {
     /// * Ok(Some(false)) if the pool is already bound to this key description.
     /// * Err(_) if an operation fails while changing the passphrase.
     pub fn rebind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<Option<bool>> {
-        let encryption_info = match pool_enc_to_enc!(self.encryption_info()?) {
+        let encryption_info = match pool_enc_to_enc!(self.encryption_info()) {
             Some(ei) => ei,
             None => {
                 return Err(StratisError::Msg(
@@ -914,7 +917,7 @@ impl Backstore {
     /// so this method will either fail to regenerate the bindings or it will
     /// result in a metadata change.
     pub fn rebind_clevis(&mut self) -> StratisResult<()> {
-        let encryption_info = match pool_enc_to_enc!(self.encryption_info()?) {
+        let encryption_info = match pool_enc_to_enc!(self.encryption_info()) {
             Some(ei) => ei,
             None => {
                 return Err(StratisError::Msg(
@@ -943,7 +946,7 @@ impl Backstore {
 
     /// Rename pool name in LUKS2 token if pool is encrypted.
     pub fn rename_pool(&mut self, new_name: &Name) -> StratisResult<()> {
-        if self.encryption_info()?.is_some() {
+        if self.encryption_info().is_some() {
             operation_loop(
                 self.blockdevs_mut().into_iter().map(|(_, _, bd)| bd),
                 |blockdev| blockdev.rename_pool(new_name.clone()),

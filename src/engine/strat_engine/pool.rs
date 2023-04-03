@@ -365,10 +365,6 @@ impl StratPool {
         }
     }
 
-    fn datadevs_encrypted(&self) -> bool {
-        self.backstore.data_tier_is_encrypted()
-    }
-
     pub fn get_strat_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &StratBlockDev)> {
         self.backstore.get_blockdev_by_uuid(uuid)
     }
@@ -1071,11 +1067,11 @@ impl Pool for StratPool {
     }
 
     fn is_encrypted(&self) -> bool {
-        self.datadevs_encrypted()
+        self.backstore.is_encrypted()
     }
 
     fn encryption_info(&self) -> Option<PoolEncryptionInfo> {
-        self.backstore.data_tier_encryption_info()
+        self.backstore.encryption_info()
     }
 
     fn avail_actions(&self) -> ActionAvailability {

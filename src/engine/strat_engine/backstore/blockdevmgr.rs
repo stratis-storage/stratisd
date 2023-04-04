@@ -81,6 +81,11 @@ impl BlockDevMgr {
         bds_to_bdas(self.block_devs)
     }
 
+    /// Drain the BlockDevMgr block devices into a collection of block devices.
+    pub fn drain_bds(&mut self) -> Vec<StratBlockDev> {
+        self.block_devs.drain(..).collect::<Vec<_>>()
+    }
+
     /// Get a hashmap that maps UUIDs to Devices.
     pub fn uuid_to_devno(&self) -> HashMap<DevUuid, Device> {
         self.block_devs
@@ -399,27 +404,16 @@ impl BlockDevMgr {
     }
 
     /// Tear down devicemapper devices for the block devices in this BlockDevMgr.
-    pub fn teardown(&mut self) -> StratisResult<Vec<StratBlockDev>> {
-        let (oks, errs) = self
-            .block_devs
-            .drain(..)
-            .map(|mut bd| {
-                bd.teardown()?;
-                Ok(bd)
-            })
-            .partition::<Vec<_>, _>(|res| res.is_ok());
-        let (oks, errs) = (
-            oks.into_iter().filter_map(|ok| ok.ok()).collect::<Vec<_>>(),
-            errs.into_iter()
-                .filter_map(|err| match err {
-                    Ok(_) => None,
-                    Err(e) => Some(e),
-                })
-                .collect::<Vec<_>>(),
-        );
+    pub fn teardown(&mut self) -> StratisResult<()> {
+        let errs = self.block_devs.iter_mut().fold(Vec::new(), |mut errs, bd| {
+            if let Err(e) = bd.teardown() {
+                errs.push(e);
+            }
+            errs
+        });
 
         if errs.is_empty() {
-            Ok(oks)
+            Ok(())
         } else {
             Err(StratisError::BestEffortError("Failed to remove devicemapper devices for some or all physical devices in the pool".to_string(), errs))
         }

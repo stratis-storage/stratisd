@@ -5,8 +5,9 @@
 use std::path::Path;
 
 use either::Either;
-use serde_json::Value;
+use serde_json::{to_value, Value};
 
+use devicemapper::{DmName, DmNameBuf};
 use libcryptsetup_rs::{
     consts::{
         flags::CryptVolumeKey,
@@ -43,7 +44,7 @@ use crate::{
 pub struct CryptInitializer {
     physical_path: DevicePath,
     identifiers: StratisIdentifiers,
-    activation_name: String,
+    activation_name: DmNameBuf,
 }
 
 impl CryptInitializer {
@@ -236,12 +237,11 @@ impl CryptInitializer {
         log_on_failure!(
             device.token_handle().json_set(TokenInput::ReplaceToken(
                 STRATIS_TOKEN_ID,
-                &StratisLuks2Token {
+                &to_value(&StratisLuks2Token {
                     devname: self.activation_name.clone(),
                     identifiers: self.identifiers,
                     pool_name: Some(pool_name.clone()),
-                }
-                .into(),
+                })?,
             )),
             "Failed to create the Stratis token"
         );
@@ -259,7 +259,7 @@ impl CryptInitializer {
     pub fn rollback(
         device: &mut CryptDevice,
         physical_path: &Path,
-        name: &str,
+        name: &DmName,
     ) -> StratisResult<()> {
         ensure_wiped(device, physical_path, name)
     }

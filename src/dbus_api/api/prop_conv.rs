@@ -70,6 +70,7 @@ pub fn stopped_pools_to_prop(pools: &StoppedPoolsInfo) -> StoppedOrLockedPools {
     pools
         .stopped
         .iter()
+        .chain(pools.partially_constructed.iter())
         .map(|(u, stopped)| {
             let mut map = HashMap::new();
             if let Some(enc_info) = stopped.info.as_ref() {

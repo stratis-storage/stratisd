@@ -232,16 +232,19 @@ where
 {
     let stopped = engine.stopped_pools().await;
     if engine.get_pool(id.clone()).await.is_some() {
-        Ok(false)
-    } else if stopped
+        return Ok(false);
+    }
+    let pool_uuid = match id {
+        PoolIdentifier::Uuid(ref u) => u,
+        PoolIdentifier::Name(ref n) => stopped
+            .name_to_uuid
+            .get(n)
+            .ok_or_else(|| StratisError::Msg(format!("Could not find pool with name {n}")))?,
+    };
+    if stopped
         .stopped
-        .get(match id {
-            PoolIdentifier::Uuid(ref u) => u,
-            PoolIdentifier::Name(ref n) => stopped
-                .name_to_uuid
-                .get(n)
-                .ok_or_else(|| StratisError::Msg(format!("Could not find pool with name {n}")))?,
-        })
+        .get(pool_uuid)
+        .or_else(|| stopped.partially_constructed.get(pool_uuid))
         .is_some()
     {
         Ok(true)

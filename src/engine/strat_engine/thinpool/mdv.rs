@@ -19,13 +19,15 @@ use nix::{
 };
 use retry::{delay::Fixed, retry_with_index};
 
-use devicemapper::{DmDevice, DmOptions, LinearDev, LinearDevTargetParams, Sectors, TargetLine};
+use devicemapper::{
+    DevId, DmDevice, DmOptions, LinearDev, LinearDevTargetParams, Sectors, TargetLine,
+};
 
 use crate::{
     engine::{
         strat_engine::{
             cmd::create_fs,
-            dm::get_dm,
+            dm::{get_dm, mdv_device},
             ns::NS_TMPFS_LOCATION,
             serde_structs::FilesystemSave,
             thinpool::filesystem::{fs_usage, StratFilesystem},
@@ -188,7 +190,7 @@ impl MetadataVol {
     }
 
     /// Tear down a Metadata Volume.
-    pub fn teardown(&mut self) -> StratisResult<()> {
+    pub fn teardown(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
         if let Err(e) = retry_with_index(Fixed::from_millis(100).take(2), |i| {
             trace!("MDV unmount attempt {}", i);
             umount(&self.mount_pt)
@@ -206,7 +208,8 @@ impl MetadataVol {
             warn!("Could not remove MDV mount point: {}", err);
         }
 
-        self.dev.teardown(get_dm())?;
+        let dev = mdv_device(pool_uuid);
+        get_dm().device_remove(&DevId::Name(&dev), DmOptions::default())?;
 
         Ok(())
     }

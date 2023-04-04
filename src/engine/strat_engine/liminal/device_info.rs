@@ -18,6 +18,7 @@ use crate::{
     engine::{
         shared::{gather_encryption_info, gather_pool_name},
         strat_engine::{
+            backstore::StratBlockDev,
             liminal::{
                 identify::{DeviceInfo, LuksInfo, StratisDevInfo, StratisInfo},
                 setup::get_name,
@@ -46,8 +47,13 @@ impl fmt::Display for LLuksInfo {
         write!(
             f,
             "{}, {}, {}",
-            self.dev_info, self.identifiers, self.encryption_info
-        )
+            self.dev_info, self.identifiers, self.encryption_info,
+        )?;
+        if let Some(ref pn) = self.pool_name {
+            write!(f, ", {}", pn)
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -498,6 +504,28 @@ impl FromIterator<(DevUuid, LInfo)> for DeviceSet {
         DeviceSet {
             internal: HashMap::from_iter(i),
         }
+    }
+}
+
+impl IntoIterator for DeviceSet {
+    type Item = <HashMap<DevUuid, LInfo> as IntoIterator>::Item;
+    type IntoIter = <HashMap<DevUuid, LInfo> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.internal.into_iter()
+    }
+}
+
+impl From<Vec<StratBlockDev>> for DeviceSet {
+    fn from(vec: Vec<StratBlockDev>) -> Self {
+        vec.into_iter()
+            .flat_map(|bd| {
+                let dev_uuid = bd.uuid();
+                Vec::<DeviceInfo>::from(bd)
+                    .into_iter()
+                    .map(move |info| (dev_uuid, LInfo::from(info)))
+            })
+            .collect::<DeviceSet>()
     }
 }
 

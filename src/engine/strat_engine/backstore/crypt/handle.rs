@@ -11,7 +11,7 @@ use std::{
 use either::Either;
 use serde_json::Value;
 
-use devicemapper::{Device, Sectors};
+use devicemapper::{Device, DmName, DmNameBuf, Sectors};
 use libcryptsetup_rs::{
     c_uint,
     consts::{flags::CryptActivate, vals::EncryptionFormat},
@@ -64,7 +64,7 @@ impl CryptHandle {
         physical_path: DevicePath,
         identifiers: StratisIdentifiers,
         encryption_info: EncryptionInfo,
-        activation_name: String,
+        activation_name: DmNameBuf,
         pool_name: Option<Name>,
     ) -> StratisResult<CryptHandle> {
         let device = get_devno_from_path(&physical_path)?;
@@ -82,8 +82,8 @@ impl CryptHandle {
         metadata_handle: CryptMetadataHandle,
     ) -> StratisResult<CryptHandle> {
         let activated_path = DevicePath::new(
-            &once(DEVICEMAPPER_PATH)
-                .chain(once(metadata_handle.activation_name()))
+            &once(DEVICEMAPPER_PATH.to_string())
+                .chain(once(metadata_handle.activation_name().to_string()))
                 .collect::<PathBuf>(),
         )?;
         Ok(CryptHandle {
@@ -138,7 +138,7 @@ impl CryptHandle {
     }
 
     /// Return the name of the activated devicemapper device.
-    pub fn activation_name(&self) -> &str {
+    pub fn activation_name(&self) -> &DmName {
         self.metadata_handle.activation_name()
     }
 
@@ -408,7 +408,7 @@ impl CryptHandle {
         let name = self.activation_name().to_owned();
         let active_device = log_on_failure!(
             self.acquire_crypt_device()?
-                .runtime_handle(&name)
+                .runtime_handle(&name.to_string())
                 .get_active_device(),
             "Failed to get device size for encrypted logical device"
         );
@@ -449,7 +449,7 @@ impl CryptHandle {
         )?;
         crypt
             .context_handle()
-            .resize(self.activation_name(), processed_size)
+            .resize(&self.activation_name().to_string(), processed_size)
             .map_err(StratisError::Crypt)
     }
 }

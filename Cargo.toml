@@ -84,7 +84,7 @@ version = "2.3.0"
 optional = true
 
 [dependencies.devicemapper]
-version = "0.33.1"
+version = "0.33.3"
 optional = true
 
 [dependencies.dbus]

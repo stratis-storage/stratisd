@@ -361,6 +361,38 @@ mod tests {
         loopbacked::test_with_spec(&loopbacked::DeviceLimits::Exactly(1, None), test_defaults);
     }
 
+    #[test]
+    // Test passing an unusual, larger sector size for cryptsetup. 4096 should
+    // be no smaller than the physical sector size of the loop device, and
+    // should be allowed by cryptsetup.
+    fn loop_test_set_sector_size() {
+        fn the_test(paths: &[&Path]) {
+            fn test_set_sector_size(
+                paths: &[&Path],
+                key_description: &KeyDescription,
+            ) -> std::result::Result<(), Box<dyn Error>> {
+                let pool_uuid = PoolUuid::new_v4();
+                let pool_name = Name::new("pool_name".to_string());
+                let dev_uuid = DevUuid::new_v4();
+
+                CryptHandle::initialize(
+                    paths[0],
+                    pool_uuid,
+                    dev_uuid,
+                    pool_name,
+                    &EncryptionInfo::KeyDesc(key_description.clone()),
+                    Some(4096u32),
+                )
+                .map(|_| ())
+                .map_err(|e| e.into())
+            }
+
+            crypt::insert_and_cleanup_key(paths, test_set_sector_size);
+        }
+
+        loopbacked::test_with_spec(&loopbacked::DeviceLimits::Exactly(1, None), the_test);
+    }
+
     fn test_both_initialize(paths: &[&Path]) {
         fn both_initialize(
             paths: &[&Path],

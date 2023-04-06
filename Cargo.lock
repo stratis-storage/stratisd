@@ -360,8 +360,7 @@ dependencies = [
 [[package]]
 name = "devicemapper"
 version = "0.33.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc9076a6cb8ea32b2d975474450fae8b28201c8d5af5ae4e2f5401a7f3ab4225"
+source = "git+https://github.com/bmr-cymru/devicemapper-rs?branch=bmr-create-options#7b538ff67051f70be9e7ba4c2b82c62166b96481"
 dependencies = [
  "bitflags 1.3.2",
  "devicemapper-sys",
@@ -378,8 +377,7 @@ dependencies = [
 [[package]]
 name = "devicemapper-sys"
 version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0b0f9d16560f830ae6e90b769017333c4561d2c84f39e7aa7d935d2e7bcbc4c"
+source = "git+https://github.com/bmr-cymru/devicemapper-rs?branch=bmr-create-options#7b538ff67051f70be9e7ba4c2b82c62166b96481"
 dependencies = [
  "bindgen 0.63.0",
  "nix 0.26.2",

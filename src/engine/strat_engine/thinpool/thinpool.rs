@@ -354,6 +354,7 @@ impl ThinPool {
             &dm_name,
             Some(&dm_uuid),
             segs_to_table(backstore_device, &[meta_segments]),
+            Some(DmOptions::private()),
         )?;
 
         // Wipe the first 4 KiB, i.e. 8 sectors as recommended in kernel DM
@@ -371,6 +372,7 @@ impl ThinPool {
             &dm_name,
             Some(&dm_uuid),
             segs_to_table(backstore_device, &[data_segments]),
+            Some(DmOptions::private()),
         )?;
 
         let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::MetadataVolume);
@@ -379,6 +381,7 @@ impl ThinPool {
             &dm_name,
             Some(&dm_uuid),
             segs_to_table(backstore_device, &[mdv_segments]),
+            Some(DmOptions::private()),
         )?;
         let mdv = MetadataVol::initialize(pool_uuid, mdv_dev)?;
 
@@ -403,6 +406,7 @@ impl ThinPool {
                 "no_discard_passdown".to_string(),
                 "skip_block_zeroing".to_string(),
             ],
+            Some(DmOptions::private()),
         )?;
 
         let thin_pool_status = thinpool_dev.status(get_dm(), DmOptions::default()).ok();
@@ -463,6 +467,7 @@ impl ThinPool {
             &dm_name,
             Some(&dm_uuid),
             segs_to_table(backstore_device, &data_segments),
+            Some(DmOptions::private()),
         )?;
 
         // TODO: Remove in stratisd 4.0.
@@ -492,6 +497,7 @@ impl ThinPool {
                         "error_if_no_space".to_owned(),
                     ]
                 }),
+            Some(DmOptions::private()),
         )?;
 
         // TODO: Remove in stratisd 4.0.
@@ -505,6 +511,7 @@ impl ThinPool {
             &dm_name,
             Some(&dm_uuid),
             segs_to_table(backstore_device, &mdv_segments),
+            Some(DmOptions::private()),
         )?;
         let mdv = MetadataVol::setup(pool_uuid, mdv_dev)?;
         let filesystem_metadatas = mdv.filesystems()?;
@@ -1672,6 +1679,7 @@ fn setup_metadev(
         &dm_name,
         Some(&dm_uuid),
         segs_to_table(device, &meta_segments),
+        Some(DmOptions::private()),
     )?;
 
     if !device_exists(get_dm(), thinpool_name)? {
@@ -1703,6 +1711,7 @@ fn attempt_thin_repair(
         &dm_name,
         Some(&dm_uuid),
         segs_to_table(device, spare_segments),
+        Some(DmOptions::private()),
     )?;
 
     thin_repair(&meta_dev.devnode(), &new_meta_dev.devnode())?;

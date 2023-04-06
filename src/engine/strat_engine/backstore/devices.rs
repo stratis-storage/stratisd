@@ -161,8 +161,10 @@ fn verify_device_with_blkid(path: &DevicePath) -> StratisResult<(Option<i32>, Op
     let superblock_type = probe.lookup_value("TYPE").ok();
 
     debug!(
-        "Verifying device using blkid probe: superblock probe: {:?}, number of partitions: {:?}",
-        superblock_type, num_parts
+        "Verifying device {} using blkid probe: superblock probe: {:?}, number of partitions: {:?}",
+        path.display(),
+        superblock_type,
+        num_parts
     );
 
     Ok((num_parts, superblock_type))

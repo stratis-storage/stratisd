@@ -294,7 +294,11 @@ impl StratPool {
 
         if needs_save {
             if let Err(e) = pool.write_metadata(pool_name) {
-                return Err((e, pool.backstore.into_bdas()));
+                if pool.action_avail == ActionAvailability::NoPoolChanges {
+                    warn!("Pool-level metadata could not be written for pool with name {} and UUID {} because pool is in a limited availability state, {},  which prevents any pool actions; pool will remain set up", pool_name, uuid, pool.action_avail);
+                } else {
+                    return Err((e, pool.backstore.into_bdas()));
+                }
             }
         }
 

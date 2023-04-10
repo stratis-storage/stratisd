@@ -24,20 +24,19 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::{StratBlockDev, UnderlyingDevice},
-                crypt::{CryptHandle, CryptInitializer},
+                crypt::CryptHandle,
             },
             device::{blkdev_logical_sector_size, blkdev_physical_sector_size, blkdev_size},
             metadata::{
                 device_identifiers, disown_device, BlockdevSize, MDADataSize, StratisIdentifiers,
                 BDA,
             },
-            names::KeyDescription,
             udev::{
                 block_device_apply, decide_ownership, get_udev_property, UdevOwnership,
                 STRATIS_FS_TYPE,
             },
         },
-        types::{ClevisInfo, DevUuid, DevicePath, EncryptionInfo, Name, PoolUuid},
+        types::{DevUuid, DevicePath, EncryptionInfo, Name, PoolUuid},
     },
     stratis::{StratisError, StratisResult},
 };
@@ -520,11 +519,15 @@ pub fn initialize_devices(
         pool_name: Name,
         pool_uuid: PoolUuid,
         dev_uuid: DevUuid,
-        key_description: Option<&KeyDescription>,
-        enable_clevis: Option<&ClevisInfo>,
+        encryption_info: &EncryptionInfo,
     ) -> StratisResult<(CryptHandle, Device, Sectors)> {
-        let handle = CryptInitializer::new(DevicePath::new(physical_path)?, pool_uuid, dev_uuid)
-            .initialize(pool_name, key_description, enable_clevis)?;
+        let handle = CryptHandle::initialize(
+            physical_path,
+            pool_uuid,
+            dev_uuid,
+            pool_name,
+            encryption_info,
+        )?;
 
         let device_size = match handle.logical_device_size() {
             Ok(size) => size,
@@ -651,31 +654,25 @@ pub fn initialize_devices(
     ) -> StratisResult<StratBlockDev> {
         let dev_uuid = DevUuid::new_v4();
         let (handle, devno, blockdev_size) = if let Some(ei) = encryption_info {
-            initialize_encrypted(
-                &dev_info.devnode,
-                pool_name,
-                pool_uuid,
-                dev_uuid,
-                ei.key_description(),
-                ei.clevis_info(),
-            )
-            .map(|(handle, devno, devsize)| {
-                debug!(
-                    "Info on physical device {}, logical device {}",
-                    &dev_info.devnode.display(),
-                    handle.activated_device_path().display(),
-                );
-                debug!(
-                    "Physical device size: {}, logical device size: {}",
-                    dev_info.size,
-                    devsize.bytes(),
-                );
-                debug!(
-                    "Physical device numbers: {}, logical device numbers: {}",
-                    dev_info.devno, devno,
-                );
-                (Some(handle), devno, devsize)
-            })?
+            initialize_encrypted(&dev_info.devnode, pool_name, pool_uuid, dev_uuid, ei).map(
+                |(handle, devno, devsize)| {
+                    debug!(
+                        "Info on physical device {}, logical device {}",
+                        &dev_info.devnode.display(),
+                        handle.activated_device_path().display(),
+                    );
+                    debug!(
+                        "Physical device size: {}, logical device size: {}",
+                        dev_info.size,
+                        devsize.bytes(),
+                    );
+                    debug!(
+                        "Physical device numbers: {}, logical device numbers: {}",
+                        dev_info.devno, devno,
+                    );
+                    (Some(handle), devno, devsize)
+                },
+            )?
         } else {
             (None, dev_info.devno, dev_info.size.sectors())
         };
@@ -813,10 +810,13 @@ pub fn wipe_blockdevs(blockdevs: &mut [StratBlockDev]) -> StratisResult<()> {
 mod tests {
     use std::{error::Error, fs::OpenOptions};
 
-    use crate::engine::strat_engine::{
-        backstore::crypt::CryptHandle,
-        metadata::device_identifiers,
-        tests::{crypt, loopbacked, real},
+    use crate::engine::{
+        strat_engine::{
+            backstore::crypt::CryptHandle,
+            metadata::device_identifiers,
+            tests::{crypt, loopbacked, real},
+        },
+        types::KeyDescription,
     };
 
     use super::*;
@@ -966,7 +966,7 @@ mod tests {
 
         for path in paths {
             if key_description.is_some() {
-                if CryptHandle::setup(path)?.is_some() {
+                if CryptHandle::load_metadata(path)?.is_some() {
                     return Err(Box::new(StratisError::Msg(
                         "LUKS2 metadata on Stratis devices was not successfully wiped".to_string(),
                     )));
@@ -1117,7 +1117,7 @@ mod tests {
         // identifiers as all the other paths that were initialized.
         for path in paths {
             if key_desc.is_some() {
-                if CryptHandle::setup(path)?.is_some() {
+                if CryptHandle::load_metadata(path)?.is_some() {
                     return Err(Box::new(StratisError::Msg(format!(
                         "Device {} should have no LUKS2 metadata",
                         path.display()

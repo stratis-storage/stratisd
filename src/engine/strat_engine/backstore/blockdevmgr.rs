@@ -19,6 +19,7 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
+                crypt::CryptHandle,
                 devices::{initialize_devices, wipe_blockdevs, UnownedDevices},
                 range_alloc::PerDevSegments,
                 shared::{BlkDevSegment, Segment},
@@ -26,7 +27,7 @@ use crate::{
             },
             metadata::{MDADataSize, BDA},
             serde_structs::{BaseBlockDevSave, Recordable},
-            shared::{bds_to_bdas, can_unlock},
+            shared::bds_to_bdas,
         },
         types::{DevUuid, EncryptionInfo, Name, PoolEncryptionInfo, PoolUuid},
     },
@@ -114,7 +115,7 @@ impl BlockDevMgr {
 
         let encryption_info = pool_enc_to_enc!(self.encryption_info());
         if let Some(ref ei) = encryption_info {
-            if !can_unlock(
+            if !CryptHandle::can_unlock(
                 self.block_devs
                     .get(0)
                     .expect("Must have at least one blockdev")

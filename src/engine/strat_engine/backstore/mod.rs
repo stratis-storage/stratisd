@@ -17,10 +17,7 @@ mod transaction;
 pub use self::{
     backstore::Backstore,
     blockdev::{StratBlockDev, UnderlyingDevice},
-    crypt::{
-        crypt_metadata_size, set_up_crypt_logging, CryptActivationHandle, CryptHandle,
-        CryptMetadataHandle, CLEVIS_TANG_TRUST_URL,
-    },
+    crypt::{crypt_metadata_size, set_up_crypt_logging, CryptHandle, CLEVIS_TANG_TRUST_URL},
     devices::{
         find_stratis_devs_by_uuid, initialize_devices, BlockSizes, ProcessedPathInfos,
         UnownedDevices,

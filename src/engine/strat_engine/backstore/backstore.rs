@@ -20,7 +20,9 @@ use crate::{
                 blockdev::StratBlockDev,
                 blockdevmgr::BlockDevMgr,
                 cache_tier::CacheTier,
-                crypt::{back_up_luks_header, interpret_clevis_config, restore_luks_header},
+                crypt::{
+                    back_up_luks_header, interpret_clevis_config, restore_luks_header, CryptHandle,
+                },
                 data_tier::DataTier,
                 devices::UnownedDevices,
                 shared::BlockSizeSummary,
@@ -30,7 +32,7 @@ use crate::{
             metadata::{MDADataSize, BDA},
             names::{format_backstore_ids, CacheRole},
             serde_structs::{BackstoreSave, CapSave, Recordable},
-            shared::{bds_to_bdas, can_unlock},
+            shared::bds_to_bdas,
             types::BDARecordResult,
             writing::wipe_sectors,
         },
@@ -726,7 +728,7 @@ impl Backstore {
             }
 
             if (existing_pin.as_str(), &config_to_check) == (pin, &parsed_config)
-                && can_unlock(
+                && CryptHandle::can_unlock(
                     self.blockdevs()
                         .get(0)
                         .expect("Must have at least one blockdev")
@@ -800,7 +802,7 @@ impl Backstore {
 
         if let Some(kd) = encryption_info.key_description() {
             if kd == key_desc {
-                if can_unlock(
+                if CryptHandle::can_unlock(
                     self.blockdevs()
                         .get(0)
                         .expect("Must have at least one blockdev")

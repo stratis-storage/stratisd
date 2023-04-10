@@ -45,12 +45,12 @@ use crate::{
                         STRATIS_TOKEN_TYPE, TOKEN_KEYSLOTS_KEY, TOKEN_TYPE_KEY,
                     },
                     handle::CryptHandle,
-                    metadata_handle::CryptMetadataHandle,
                 },
                 devices::get_devno_from_path,
             },
             cmd::clevis_luks_unlock,
             dm::get_dm,
+            dm::DEVICEMAPPER_PATH,
             keys,
             metadata::StratisIdentifiers,
         },
@@ -61,6 +61,8 @@ use crate::{
     },
     stratis::{StratisError, StratisResult},
 };
+
+use super::handle::CryptMetadata;
 
 /// Set up crypt logging to log cryptsetup debug information at the trace level.
 pub fn set_up_crypt_logging() {
@@ -367,15 +369,19 @@ pub fn setup_crypt_device(physical_path: &Path) -> StratisResult<Option<CryptDev
     }
 }
 
-/// Set up a handle to a crypt device for accessing metadata on the device.
-pub fn setup_crypt_metadata_handle(
-    device: &mut CryptDevice,
-    physical_path: &Path,
-) -> StratisResult<Option<CryptMetadataHandle>> {
-    let identifiers = identifiers_from_metadata(device)?;
-    let activation_name = activation_name_from_metadata(device)?;
-    let pool_name = pool_name_from_metadata(device)?;
-    let key_description = key_desc_from_metadata(device);
+/// Load crypt device metadata.
+pub fn load_crypt_metadata(physical_path: &Path) -> StratisResult<Option<CryptMetadata>> {
+    let physical = DevicePath::new(physical_path)?;
+
+    let mut device = match setup_crypt_device(physical_path)? {
+        Some(d) => d,
+        None => return Ok(None),
+    };
+
+    let identifiers = identifiers_from_metadata(&mut device)?;
+    let activation_name = activation_name_from_metadata(&mut device)?;
+    let pool_name = pool_name_from_metadata(&mut device)?;
+    let key_description = key_desc_from_metadata(&mut device);
     let devno = get_devno_from_path(physical_path)?;
     let key_description = match key_description
         .as_ref()
@@ -396,23 +402,24 @@ pub fn setup_crypt_metadata_handle(
         }
         None => None,
     };
-    let clevis_info = clevis_info_from_metadata(device)?;
+    let clevis_info = clevis_info_from_metadata(&mut device)?;
 
-    let encryption_info = match (key_description, clevis_info) {
-        (Some(kd), Some(ci)) => EncryptionInfo::Both(kd, ci),
-        (Some(kd), _) => EncryptionInfo::KeyDesc(kd),
-        (_, Some(ci)) => EncryptionInfo::ClevisInfo(ci),
-        (None, None) => return Ok(None),
-    };
+    let encryption_info = EncryptionInfo::from_options((key_description, clevis_info))
+        .expect("Must have at least one unlock method");
 
-    Ok(Some(CryptMetadataHandle::new(
-        DevicePath::new(physical_path)?,
+    let path = vec![DEVICEMAPPER_PATH, &activation_name.to_string()]
+        .into_iter()
+        .collect::<PathBuf>();
+    let activated_path = path.canonicalize().unwrap_or(path);
+    Ok(Some(CryptMetadata {
+        physical_path: physical,
         identifiers,
         encryption_info,
         activation_name,
         pool_name,
-        devno,
-    )))
+        device: devno,
+        activated_path,
+    }))
 }
 
 /// Set up a handle to a crypt device using either Clevis or the keyring to activate
@@ -422,48 +429,41 @@ pub fn setup_crypt_handle(
     physical_path: &Path,
     unlock_method: Option<UnlockMethod>,
 ) -> StratisResult<Option<CryptHandle>> {
-    let metadata_handle = match setup_crypt_metadata_handle(device, physical_path)? {
-        Some(handle) => handle,
+    let metadata = match load_crypt_metadata(physical_path)? {
+        Some(m) => m,
         None => return Ok(None),
     };
 
-    let name = activation_name_from_metadata(device)?;
-
-    match unlock_method {
-        Some(UnlockMethod::Keyring) => {
-            activate(Either::Left((
-                device,
-                metadata_handle.encryption_info().key_description()
-                    .ok_or_else(|| {
-                        StratisError::Msg(
-                            "Unlock action was specified to be keyring but not key description is present in the metadata".to_string(),
-                        )
-                    })?,
-            )), &name)?
-        }
-        Some(UnlockMethod::Clevis) => activate(Either::Right(physical_path), &name)?,
-        None => {
-            if let Err(_) | Ok(CryptStatusInfo::Inactive | CryptStatusInfo::Invalid) = libcryptsetup_rs::status(Some(device), &name.to_string()) {
-                return Err(StratisError::Msg(
-                    "Found a crypt device but it is not activated and no unlock method was provided".to_string(),
-                ));
+    if !vec![DEVICEMAPPER_PATH, &metadata.activation_name.to_string()]
+        .into_iter()
+        .collect::<PathBuf>()
+        .exists()
+    {
+        match unlock_method {
+            Some(UnlockMethod::Keyring) => {
+                activate(Either::Left((
+                    device,
+                    metadata.encryption_info.key_description()
+                        .ok_or_else(|| {
+                            StratisError::Msg(
+                                "Unlock action was specified to be keyring but not key description is present in the metadata".to_string(),
+                            )
+                        })?,
+                )), &metadata.activation_name)?
             }
-        },
-    };
-
-    match CryptHandle::new_with_metadata_handle(metadata_handle) {
-        Ok(h) => Ok(Some(h)),
-        Err(e) => {
-            if let Err(err) = ensure_inactive(device, &name) {
-                Err(StratisError::NoActionRollbackError {
-                    causal_error: Box::new(e),
-                    rollback_error: Box::new(err),
-                })
-            } else {
-                Err(e)
-            }
-        }
+            Some(UnlockMethod::Clevis) => activate(Either::Right(physical_path), &metadata.activation_name)?,
+            None => (),
+        };
     }
+
+    Ok(Some(CryptHandle::new(
+        metadata.physical_path,
+        metadata.identifiers.pool_uuid,
+        metadata.identifiers.device_uuid,
+        metadata.encryption_info,
+        metadata.pool_name,
+        metadata.device,
+    )))
 }
 
 /// Create a device handle and load the LUKS2 header into memory from

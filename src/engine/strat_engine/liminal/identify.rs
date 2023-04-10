@@ -52,7 +52,7 @@ use devicemapper::Device;
 
 use crate::engine::{
     strat_engine::{
-        backstore::{CryptMetadataHandle, StratBlockDev},
+        backstore::{CryptHandle, StratBlockDev},
         metadata::{static_header, StratisIdentifiers, BDA},
         udev::{
             block_enumerator, decide_ownership, UdevOwnership, CRYPTO_FS_TYPE, FS_TYPE_KEY,
@@ -264,35 +264,25 @@ pub fn bda_wrapper(devnode: &Path) -> Result<Result<Option<BDA>, String>, String
 /// Process a device which udev information indicates is a LUKS device.
 fn process_luks_device(dev: &UdevEngineDevice) -> Option<LuksInfo> {
     match dev.devnode() {
-        Some(devnode) => match device_to_devno_wrapper(dev) {
+        Some(devnode) => match CryptHandle::load_metadata(devnode) {
+            Ok(None) => None,
             Err(err) => {
                 warn!(
-                    "udev identified device {} as a Stratis device but {}, disregarding the device",
-                    devnode.display(),
-                    err
-                );
-                None
-            }
-            Ok(device_number) => match CryptMetadataHandle::setup(devnode) {
-                Ok(None) => None,
-                Err(err) => {
-                    warn!(
                             "udev identified device {} as a LUKS device, but could not read LUKS header from the device, disregarding the device: {}",
                             devnode.display(),
                             err,
                             );
-                    None
-                }
-                Ok(Some(handle)) => Some(LuksInfo {
-                    dev_info: StratisDevInfo {
-                        device_number,
-                        devnode: handle.luks2_device_path().to_path_buf(),
-                    },
-                    identifiers: *handle.device_identifiers(),
-                    encryption_info: handle.encryption_info().to_owned(),
-                    pool_name: handle.pool_name().cloned(),
-                }),
-            },
+                None
+            }
+            Ok(Some(metadata)) => Some(LuksInfo {
+                dev_info: StratisDevInfo {
+                    device_number: metadata.device,
+                    devnode: metadata.physical_path.to_path_buf(),
+                },
+                identifiers: metadata.identifiers,
+                encryption_info: metadata.encryption_info,
+                pool_name: metadata.pool_name,
+            }),
         },
         None => {
             warn!("udev identified a device as a LUKS2 device, but the udev entry for the device had no device node, disregarding device");

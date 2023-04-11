@@ -17,7 +17,7 @@ use libcryptsetup_rs::{
         flags::{CryptActivate, CryptVolumeKey},
         vals::{EncryptionFormat, KeyslotsSize, MetadataSize},
     },
-    CryptDevice, CryptInit, TokenInput,
+    CryptDevice, CryptInit, CryptParamsLuks2, CryptParamsLuks2Ref, TokenInput,
 };
 
 use crate::{
@@ -175,8 +175,21 @@ impl CryptHandle {
         dev_uuid: DevUuid,
         pool_name: Name,
         encryption_info: &EncryptionInfo,
+        sector_size: Option<u32>,
     ) -> StratisResult<Self> {
         let activation_name = format_crypt_name(&dev_uuid);
+
+        let luks2_params = sector_size.map(|sector_size| CryptParamsLuks2 {
+            pbkdf: None,
+            integrity: None,
+            integrity_params: None,
+            data_alignment: 0,
+            data_device: None,
+            sector_size,
+            label: None,
+            subsystem: None,
+        });
+
         let mut device = log_on_failure!(
             CryptInit::init(physical_path),
             "Failed to acquire context for device {} while initializing; \
@@ -187,7 +200,7 @@ impl CryptHandle {
             MetadataSize::try_from(convert_int!(*DEFAULT_CRYPT_METADATA_SIZE, u128, u64)?)?,
             KeyslotsSize::try_from(convert_int!(*DEFAULT_CRYPT_KEYSLOTS_SIZE, u128, u64)?)?,
         )?;
-        Self::initialize_with_err(&mut device, physical_path, pool_uuid, dev_uuid, &pool_name, encryption_info)
+        Self::initialize_with_err(&mut device, physical_path, pool_uuid, dev_uuid, &pool_name, encryption_info, luks2_params.as_ref())
             .and_then(|path| clevis_info_from_metadata(&mut device).map(|ci| (path, ci)))
             .and_then(|(_, clevis_info)| {
                 let encryption_info =
@@ -309,14 +322,18 @@ impl CryptHandle {
         dev_uuid: DevUuid,
         pool_name: &Name,
         encryption_info: &EncryptionInfo,
+        luks2_params: Option<&CryptParamsLuks2>,
     ) -> StratisResult<()> {
+        let mut luks2_params_ref: Option<CryptParamsLuks2Ref<'_>> =
+            luks2_params.map(|lp| lp.try_into()).transpose()?;
+
         log_on_failure!(
-            device.context_handle().format::<()>(
+            device.context_handle().format::<CryptParamsLuks2Ref<'_>>(
                 EncryptionFormat::Luks2,
                 ("aes", "xts-plain64"),
                 None,
                 libcryptsetup_rs::Either::Right(STRATIS_MEK_SIZE),
-                None,
+                luks2_params_ref.as_mut()
             ),
             "Failed to format device {} with LUKS2 header",
             physical_path.display()

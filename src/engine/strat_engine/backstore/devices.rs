@@ -506,6 +506,7 @@ pub fn initialize_devices(
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
     encryption_info: Option<&EncryptionInfo>,
+    sector_size: Option<u32>,
 ) -> StratisResult<Vec<StratBlockDev>> {
     /// Initialize an encrypted device on the given physical device
     /// using the pool and device UUIDs of the new Stratis block device
@@ -520,6 +521,7 @@ pub fn initialize_devices(
         pool_uuid: PoolUuid,
         dev_uuid: DevUuid,
         encryption_info: &EncryptionInfo,
+        sector_size: Option<u32>,
     ) -> StratisResult<(CryptHandle, Device, Sectors)> {
         let handle = CryptHandle::initialize(
             physical_path,
@@ -527,6 +529,7 @@ pub fn initialize_devices(
             dev_uuid,
             pool_name,
             encryption_info,
+            sector_size,
         )?;
 
         let device_size = match handle.logical_device_size() {
@@ -651,28 +654,35 @@ pub fn initialize_devices(
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
+        sector_size: Option<u32>,
     ) -> StratisResult<StratBlockDev> {
         let dev_uuid = DevUuid::new_v4();
         let (handle, devno, blockdev_size) = if let Some(ei) = encryption_info {
-            initialize_encrypted(&dev_info.devnode, pool_name, pool_uuid, dev_uuid, ei).map(
-                |(handle, devno, devsize)| {
-                    debug!(
-                        "Info on physical device {}, logical device {}",
-                        &dev_info.devnode.display(),
-                        handle.activated_device_path().display(),
-                    );
-                    debug!(
-                        "Physical device size: {}, logical device size: {}",
-                        dev_info.size,
-                        devsize.bytes(),
-                    );
-                    debug!(
-                        "Physical device numbers: {}, logical device numbers: {}",
-                        dev_info.devno, devno,
-                    );
-                    (Some(handle), devno, devsize)
-                },
-            )?
+            initialize_encrypted(
+                &dev_info.devnode,
+                pool_name,
+                pool_uuid,
+                dev_uuid,
+                ei,
+                sector_size,
+            )
+            .map(|(handle, devno, devsize)| {
+                debug!(
+                    "Info on physical device {}, logical device {}",
+                    &dev_info.devnode.display(),
+                    handle.activated_device_path().display(),
+                );
+                debug!(
+                    "Physical device size: {}, logical device size: {}",
+                    dev_info.size,
+                    devsize.bytes(),
+                );
+                debug!(
+                    "Physical device numbers: {}, logical device numbers: {}",
+                    dev_info.devno, devno,
+                );
+                (Some(handle), devno, devsize)
+            })?
         } else {
             (None, dev_info.devno, dev_info.size.sectors())
         };
@@ -722,6 +732,7 @@ pub fn initialize_devices(
         pool_uuid: PoolUuid,
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
+        sector_size: Option<u32>,
     ) -> StratisResult<Vec<StratBlockDev>> {
         let mut initialized_blockdevs: Vec<StratBlockDev> = Vec::new();
         for dev_info in devices.inner {
@@ -731,6 +742,7 @@ pub fn initialize_devices(
                 pool_uuid,
                 mda_data_size,
                 encryption_info,
+                sector_size,
             ) {
                 Ok(blockdev) => initialized_blockdevs.push(blockdev),
                 Err(err) => {
@@ -766,6 +778,7 @@ pub fn initialize_devices(
         pool_uuid,
         mda_data_size,
         encryption_info,
+        sector_size,
     );
 
     {
@@ -846,6 +859,7 @@ mod tests {
             key_description
                 .map(|kd| EncryptionInfo::KeyDesc(kd.clone()))
                 .as_ref(),
+            None,
         )?;
 
         if blockdevs.len() != paths.len() {
@@ -1103,6 +1117,7 @@ mod tests {
             key_desc
                 .map(|kd| EncryptionInfo::KeyDesc(kd.clone()))
                 .as_ref(),
+            None,
         )
         .is_ok()
         {

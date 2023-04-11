@@ -77,6 +77,7 @@ mod tests {
             dev_uuid,
             pool_name,
             &EncryptionInfo::KeyDesc(key_description),
+            None,
         );
 
         // Initialization cannot occur with a non-existent key
@@ -123,6 +124,7 @@ mod tests {
                     dev_uuid,
                     pool_name.clone(),
                     &EncryptionInfo::KeyDesc(key_desc.clone()),
+                    None,
                 )?;
                 handles.push(handle);
             }
@@ -215,6 +217,7 @@ mod tests {
                 dev_uuid,
                 pool_name,
                 &EncryptionInfo::KeyDesc(key_desc.clone()),
+                None,
             )?;
             let logical_path = handle.activated_device_path();
 
@@ -382,6 +385,7 @@ mod tests {
                         json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true}),
                     ),
                 ),
+                None,
             )?;
 
             let mut device = acquire_crypt_device(handle.luks2_device_path())?;
@@ -442,6 +446,7 @@ mod tests {
                 "tang".to_string(),
                 json!({"url": env::var("TANG_URL").unwrap(), "stratis:tang:trust_url": true}),
             )),
+            None,
         )
         .unwrap();
 

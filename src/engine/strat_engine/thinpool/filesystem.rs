@@ -75,8 +75,15 @@ impl StratFilesystem {
     ) -> StratisResult<(FilesystemUuid, StratFilesystem)> {
         let fs_uuid = FilesystemUuid::new_v4();
         let (dm_name, dm_uuid) = format_thin_ids(pool_uuid, ThinRole::Filesystem(fs_uuid));
-        let mut thin_dev =
-            ThinDev::new(get_dm(), &dm_name, Some(&dm_uuid), size, thinpool_dev, id)?;
+        let mut thin_dev = ThinDev::new(
+            get_dm(),
+            &dm_name,
+            Some(&dm_uuid),
+            size,
+            thinpool_dev,
+            id,
+            Some(DmOptions::default()),
+        )?;
 
         if let Err(err) = create_fs(&thin_dev.devnode(), Some(StratisUuid::Fs(fs_uuid)), false) {
             if let Err(err2) = retry_with_index(Fixed::from_millis(100).take(4), |i| {
@@ -123,6 +130,7 @@ impl StratFilesystem {
             fssave.size,
             thinpool_dev,
             fssave.thin_id,
+            Some(DmOptions::default()),
         )?;
         Ok(StratFilesystem {
             used: init_used(&thin_dev),
@@ -192,6 +200,7 @@ impl StratFilesystem {
             snapshot_dm_uuid,
             thin_pool,
             snapshot_thin_id,
+            Some(DmOptions::default()),
         ) {
             Ok(thin_dev) => {
                 // If the source is mounted, XFS puts a dummy record in the

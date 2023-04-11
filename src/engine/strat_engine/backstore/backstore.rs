@@ -10,7 +10,7 @@ use chrono::{DateTime, Utc};
 use serde_json::Value;
 use tempfile::TempDir;
 
-use devicemapper::{CacheDev, Device, DmDevice, LinearDev, Sectors};
+use devicemapper::{CacheDev, Device, DmDevice, DmOptions, LinearDev, Sectors};
 
 use crate::{
     engine::{
@@ -62,6 +62,7 @@ fn make_cache(
         &dm_name,
         Some(&dm_uuid),
         cache_tier.meta_segments.map_to_dm(),
+        Some(DmOptions::private()),
     )?;
 
     if new {
@@ -79,6 +80,7 @@ fn make_cache(
         &dm_name,
         Some(&dm_uuid),
         cache_tier.cache_segments.map_to_dm(),
+        Some(DmOptions::private()),
     )?;
 
     let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::Cache);
@@ -90,6 +92,7 @@ fn make_cache(
         cache,
         origin,
         CACHE_BLOCK_SIZE,
+        Some(DmOptions::private()),
     )?)
 }
 
@@ -149,6 +152,7 @@ impl Backstore {
             &dm_name,
             Some(&dm_uuid),
             data_tier.segments.map_to_dm(),
+            Some(DmOptions::private()),
         ) {
             Ok(origin) => origin,
             Err(e) => {
@@ -391,7 +395,13 @@ impl Backstore {
         if create {
             let table = self.data_tier.segments.map_to_dm();
             let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
-            let origin = LinearDev::setup(get_dm(), &dm_name, Some(&dm_uuid), table)?;
+            let origin = LinearDev::setup(
+                get_dm(),
+                &dm_name,
+                Some(&dm_uuid),
+                table,
+                Some(DmOptions::private()),
+            )?;
             self.linear = Some(origin);
         }
 

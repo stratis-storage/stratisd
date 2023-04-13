@@ -351,5 +351,5 @@ jobs:
         run: >
           sudo
           RUST_LOG=stratisd=debug
-          python3 test_harness.py stratisd_cert --monitor-dbus
+          python3 test_harness.py stratisd_cert --monitor-dbus --verify-devices
         working-directory: ./testing

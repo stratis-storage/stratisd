@@ -538,6 +538,7 @@ mod tests {
                 pool_uuid,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_description.clone())),
+                None,
             )?;
 
             for dev in devices {
@@ -655,6 +656,7 @@ mod tests {
             pool_name,
             pool_uuid,
             MDADataSize::default(),
+            None,
             None,
         )
         .unwrap();

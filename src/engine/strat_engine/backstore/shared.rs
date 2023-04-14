@@ -6,12 +6,15 @@
 
 use std::collections::{HashMap, HashSet};
 
-use devicemapper::{Device, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine};
+use devicemapper::{Bytes, Device, LinearDevTargetParams, LinearTargetParams, Sectors, TargetLine};
 
 use crate::{
     engine::{
         strat_engine::{
-            backstore::{blockdev::StratBlockDev, devices::BlockSizes},
+            backstore::{
+                blockdev::{StratBlockDev, StratSectorSizes},
+                devices::BlockSizes,
+            },
             serde_structs::{BaseDevSave, Recordable},
         },
         types::DevUuid,
@@ -155,8 +158,8 @@ pub struct BlockDevPartition<'a> {
 /// A summary of block sizes for a BlockDevMgr, distinguishing between used
 /// and unused.
 pub struct BlockSizeSummary {
-    pub(super) used: HashMap<BlockSizes, HashSet<DevUuid>>,
-    pub(super) unused: HashMap<BlockSizes, HashSet<DevUuid>>,
+    pub(super) used: HashMap<StratSectorSizes, HashSet<DevUuid>>,
+    pub(super) unused: HashMap<StratSectorSizes, HashSet<DevUuid>>,
 }
 
 impl<'a> From<BlockDevPartition<'a>> for BlockSizeSummary {
@@ -168,7 +171,7 @@ impl<'a> From<BlockDevPartition<'a>> for BlockSizeSummary {
                 .insert(u);
         }
 
-        let mut unused: HashMap<BlockSizes, _> = HashMap::new();
+        let mut unused: HashMap<StratSectorSizes, _> = HashMap::new();
         for (u, bd) in pair.unused {
             unused
                 .entry(bd.blksizes())
@@ -180,13 +183,37 @@ impl<'a> From<BlockDevPartition<'a>> for BlockSizeSummary {
     }
 }
 
+/// Group a particular pair of sector sizes, either logical or physical.
+struct SectorSizes {
+    base: Bytes,
+    crypt: Option<Bytes>,
+}
+
+impl StratSectorSizes {
+    /// The logical sector sizes.
+    fn logical_sector_sizes(&self) -> SectorSizes {
+        SectorSizes {
+            crypt: self.crypt.map(|c| c.logical_sector_size),
+            base: self.base.logical_sector_size,
+        }
+    }
+
+    /// The two physical sectors sizes.
+    fn physical_sector_sizes(&self) -> SectorSizes {
+        SectorSizes {
+            crypt: self.crypt.map(|c| c.physical_sector_size),
+            base: self.base.physical_sector_size,
+        }
+    }
+}
+
 impl BlockSizeSummary {
     /// Check that, as far as is known, the current arrangement of device
     /// block sizes will not cause untoward behavior during the lifetime of
     /// the pool.
-    /// Returns the logical block size that will always be used by the cap
-    /// device if this size exists.
-    pub fn validate(&self) -> StratisResult<BlockSizes> {
+    /// Returns a representative StratSectorSizes object or an error if no
+    /// representative object can be found.
+    pub fn validate(&self) -> StratisResult<StratSectorSizes> {
         // It is not practically possible that all the data devices in the data
         // tier or all the the cache devices in the cache tier will be
         // completely unused during stratisd's normal execution. This condition
@@ -207,41 +234,56 @@ impl BlockSizeSummary {
             };
         }
 
+        // crypt logical sector size is a ceiling on the base logical sector
+        // size. This means that the largest base logical sector size must be
+        // on the same device as the largest logical crypt sector size.
         let largest_logical_used = self
             .used
             .keys()
-            .map(|x| x.logical_sector_size)
-            .max()
+            .map(|x| x.logical_sector_sizes())
+            .max_by(|x, y| (x.crypt, x.base).cmp(&(y.crypt, y.base)))
             .expect("returned early if used was empty");
 
         if self
             .unused
             .keys()
-            .map(|x| x.logical_sector_size)
-            .any(|s| s > largest_logical_used)
+            .map(|x| x.logical_sector_sizes())
+            .any(|s| (s.crypt, s.base) > (largest_logical_used.crypt, largest_logical_used.base))
         {
-            let error_str = format!("Some unused block devices in the pool have a logical sector size that is larger than the largest logical sector size ({largest_logical_used}) of any of the devices that are in use. This could lead to unmountable filesystems if the pool is extended. Consider moving your data to another pool.");
+            let error_str = "Some unused block devices in the pool have a logical sector size that is larger than the largest logical sector size of any of the devices that are in use. This could lead to unmountable filesystems if the pool is extended. Consider moving your data to another pool.".to_string();
             return Err(StratisError::Msg(error_str));
         }
 
+        // Physical used for crypt and base device are probably the same.
+        // But it is safer to assume that they are different when comparing.
+        // However, I can't imagine anyway in which the crypt physical size
+        // would be less than the base physical size.
         let largest_physical_used = self
             .used
             .keys()
-            .map(|x| x.physical_sector_size)
-            .max()
+            .map(|x| x.physical_sector_sizes())
+            .max_by(|x, y| (x.crypt, x.base).cmp(&(y.crypt, y.base)))
             .expect("returned early if used was empty");
         if self
             .unused
             .keys()
-            .map(|x| x.physical_sector_size)
-            .any(|s| s > largest_physical_used)
+            .map(|x| x.physical_sector_sizes())
+            .any(|s| (s.crypt, s.base) > (largest_physical_used.crypt, largest_physical_used.base))
         {
-            let error_str = format!("Some unused block devices in the pool have a physical sector size that is larger than the largest physical sector size ({largest_physical_used}) of any of the devices that are in use. This could lead to unmountable filesystems if the pool is extended. Consider moving your data to another pool.");
+            let error_str = "Some unused block devices in the pool have a physical sector size that is larger than the largest physical sector size of any of the devices that are in use. This could lead to unmountable filesystems if the pool is extended. Consider moving your data to another pool.".to_string();
             return Err(StratisError::Msg(error_str));
         }
-        Ok(BlockSizes {
-            logical_sector_size: largest_logical_used,
-            physical_sector_size: largest_physical_used,
+        Ok(StratSectorSizes {
+            base: BlockSizes {
+                logical_sector_size: largest_logical_used.base,
+                physical_sector_size: largest_physical_used.base,
+            },
+            crypt: largest_logical_used.crypt.map(|c| BlockSizes {
+                logical_sector_size: c,
+                physical_sector_size: largest_physical_used
+                    .crypt
+                    .expect("logical_sector_size_used.crypt exists"),
+            }),
         })
     }
 }

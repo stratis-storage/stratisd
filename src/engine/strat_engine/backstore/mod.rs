@@ -16,10 +16,7 @@ mod transaction;
 
 pub use self::{
     backstore::Backstore,
-    blockdev::{StratBlockDev, UnderlyingDevice},
+    blockdev::{StratBlockDev, StratSectorSizes, UnderlyingDevice},
     crypt::{crypt_metadata_size, set_up_crypt_logging, CryptHandle, CLEVIS_TANG_TRUST_URL},
-    devices::{
-        find_stratis_devs_by_uuid, initialize_devices, BlockSizes, ProcessedPathInfos,
-        UnownedDevices,
-    },
+    devices::{find_stratis_devs_by_uuid, initialize_devices, ProcessedPathInfos, UnownedDevices},
 };

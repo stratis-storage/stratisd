@@ -111,8 +111,11 @@ impl CacheTier {
         pool_name: Name,
         pool_uuid: PoolUuid,
         devices: UnownedDevices,
+        sector_size: Option<u32>,
     ) -> StratisResult<(Vec<DevUuid>, (bool, bool))> {
-        let uuids = self.block_mgr.add(pool_name, pool_uuid, devices)?;
+        let uuids = self
+            .block_mgr
+            .add(pool_name, pool_uuid, devices, sector_size)?;
 
         let avail_space = self.block_mgr.avail_space();
 
@@ -310,6 +313,7 @@ mod tests {
             devices1,
             MDADataSize::default(),
             None,
+            None,
         )
         .unwrap();
 
@@ -327,7 +331,9 @@ mod tests {
         assert_eq!(cache_tier.block_mgr.avail_space(), Sectors(0));
         assert_eq!(size - metadata_size, allocated + cache_metadata_size);
 
-        let (_, (cache, meta)) = cache_tier.add(pool_name, pool_uuid, devices2).unwrap();
+        let (_, (cache, meta)) = cache_tier
+            .add(pool_name, pool_uuid, devices2, None)
+            .unwrap();
         cache_tier.invariant();
         // TODO: Ultimately, it should be the case that meta can be true.
         assert!(cache);

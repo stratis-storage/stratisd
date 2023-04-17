@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 use assert_cmd::Command;
 use common::test_with_stratisd_min_sim;
-use predicates::prelude::*;
+use predicates::prelude::predicate;
 
 mod common;
 

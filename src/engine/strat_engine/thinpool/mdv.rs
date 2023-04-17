@@ -9,7 +9,7 @@ use std::{
     fs::{
         create_dir, create_dir_all, read_dir, remove_dir, remove_file, rename, File, OpenOptions,
     },
-    io::{prelude::*, ErrorKind},
+    io::{ErrorKind, Read, Write},
     path::{Path, PathBuf},
 };
 

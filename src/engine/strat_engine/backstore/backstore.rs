@@ -1346,7 +1346,7 @@ mod tests {
             MDADataSize::default(),
             Some(&EncryptionInfo::ClevisInfo((
                 "tang".to_string(),
-                json!({"url": env::var("TANG_URL").unwrap(), "stratis:tang:trust_url": true}),
+                json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true}),
             ))),
         )
         .unwrap();
@@ -1355,7 +1355,7 @@ mod tests {
         matches!(
             backstore.bind_clevis(
                 "tang",
-                &json!({"url": env::var("TANG_URL").unwrap(), "stratis:tang:trust_url": true})
+                &json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true})
             ),
             Ok(false)
         );
@@ -1412,7 +1412,7 @@ mod tests {
                     key_desc.clone(),
                     (
                         "tang".to_string(),
-                        json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true}),
+                        json!({"url": env::var("TANG_URL").map_err(|_| StratisError::Msg("TANG_URL env var required".to_string()))?, "stratis:tang:trust_url": true}),
                     ),
                 )),
             )?;
@@ -1420,7 +1420,7 @@ mod tests {
 
             if backstore.bind_clevis(
                 "tang",
-                &json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true}),
+                &json!({"url": env::var("TANG_URL").map_err(|_| StratisError::Msg("TANG_URL env var required".to_string()))?, "stratis:tang:trust_url": true}),
             )? {
                 return Err(Box::new(StratisError::Msg(
                     "Clevis bind idempotence test failed".to_string(),
@@ -1463,7 +1463,7 @@ mod tests {
 
             if !(backstore.bind_clevis(
                 "tang",
-                &json!({"url": env::var("TANG_URL")?, "stratis:tang:trust_url": true}),
+                &json!({"url": env::var("TANG_URL").map_err(|_| StratisError::Msg("TANG_URL env var required".to_string()))?, "stratis:tang:trust_url": true}),
             )?) {
                 return Err(Box::new(StratisError::Msg(
                     "Clevis bind test failed".to_string(),

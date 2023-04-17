@@ -953,7 +953,8 @@ mod test {
             paths_with_fail_device.push(&fail_device_path);
 
             let name = "pool";
-            let tang_url = env::var("TANG_URL")?;
+            let tang_url = env::var("TANG_URL")
+                .map_err(|_| StratisError::Msg("TANG_URL env var required".to_string()))?;
 
             create_pool_and_test_rollback(
                 name,
@@ -1067,7 +1068,8 @@ mod test {
             paths_with_fail_device.push(&fail_device_path);
 
             let name = "pool";
-            let tang_url = env::var("TANG_URL")?;
+            let tang_url = env::var("TANG_URL")
+                .map_err(|_| StratisError::Msg("TANG_URL env var required".to_string()))?;
 
             create_pool_and_test_rollback(
                 name,
@@ -1127,7 +1129,8 @@ mod test {
             paths_with_fail_device.push(&fail_device_path);
 
             let name = "pool";
-            let tang_url = env::var("TANG_URL")?;
+            let tang_url = env::var("TANG_URL")
+                .map_err(|_| StratisError::Msg("TANG_URL env var required".to_string()))?;
 
             create_pool_and_test_rollback(
                 name,
@@ -1180,7 +1183,7 @@ mod test {
         paths_with_fail_device.push(&fail_device_path);
 
         let name = "pool";
-        let tang_url = env::var("TANG_URL").unwrap();
+        let tang_url = env::var("TANG_URL").expect("TANG_URL env var required");
 
         create_pool_and_test_rollback(
             name,
@@ -1233,7 +1236,8 @@ mod test {
             paths_with_fail_device.push(&fail_device_path);
 
             let name = "pool";
-            let tang_url = env::var("TANG_URL")?;
+            let tang_url = env::var("TANG_URL")
+                .map_err(|_| StratisError::Msg("TANG_URL env var required".to_string()))?;
 
             create_pool_and_test_rollback(
                 name,

@@ -125,7 +125,7 @@ version = "0.3.0"
 optional = true
 
 [dependencies.libc]
-version = "0.2.137"
+version = "0.2.141"
 optional = true
 
 [dependencies.libcryptsetup-rs]

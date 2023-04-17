@@ -1,3 +1,53 @@
+stratisd 3.5.3
+==============
+Recommended Rust toolchain version: 1.68.0
+Lowest supported Rust toolchain version: 1.66.1
+
+Recommended development platform for Python development: Fedora 37
+
+- Send out D-Bus signals properly when blockdevs are added to pool:
+  https://github.com/stratis-storage/stratisd/issues/3267
+  https://github.com/stratis-storage/stratisd/pull/3288
+
+- Roll back devicemapper creation when pool setup fails as well as on stop:
+  https://github.com/stratis-storage/stratisd/pull/3285
+
+- Ensure that torndown filesystems are not ignored when relevant:
+  https://github.com/stratis-storage/stratisd/pull/3300
+
+- Increase devicemapper dependency lower bound to 0.33.4:
+  https://github.com/stratis-storage/stratisd/issues/3301
+  https://github.com/stratis-storage/stratisd/pull/3316
+  https://github.com/stratis-storage/stratisd/pull/3305
+
+- Make encryption status calculation include cache devices:
+  https://github.com/stratis-storage/stratisd/pull/3303
+
+- Take into account the sector size of crypt devices:
+  https://github.com/stratis-storage/stratisd/issues/3290
+  https://github.com/stratis-storage/stratisd/pull/3312
+
+- Increase clap dependency lower bound to 4.1.0;
+  add testing infrastructure for stratis-min, stratisd-min IPC:
+  https://github.com/stratis-storage/stratisd/pull/3298
+  https://github.com/stratis-storage/stratisd/pull/3294
+  https://github.com/stratis-storage/stratisd/pull/3273
+
+- General crypt module improvements:
+  https://github.com/stratis-storage/stratisd/pull/3311
+
+- Increase env_logger dependency lower bound to 0.10.0:
+  https://github.com/stratis-storage/stratisd/pull/3289
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3314
+  https://github.com/stratis-storage/stratisd/pull/3310
+  https://github.com/stratis-storage/stratisd/pull/3309
+  https://github.com/stratis-storage/stratisd/pull/3296
+  https://github.com/stratis-storage/stratisd/pull/3255
+  https://github.com/stratis-storage/stratisd/pull/3254
+
+
 stratisd 3.5.2
 ==============
 Recommended Rust toolchain version: 1.68.0

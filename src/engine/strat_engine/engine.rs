@@ -36,9 +36,9 @@ use crate::{
             SharedGuard, SomeLockReadGuard, SomeLockWriteGuard, Table,
         },
         types::{
-            CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockedPoolsInfo,
-            PoolDiff, PoolIdentifier, RenameAction, ReportType, SetUnlockAction, StartAction,
-            StopAction, StoppedPoolsInfo, StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
+            CreateAction, DeleteAction, EncryptionInfo, FilesystemUuid, LockedPoolsInfo, PoolDiff,
+            PoolIdentifier, RenameAction, ReportType, StartAction, StopAction, StoppedPoolsInfo,
+            StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
         },
         Engine, Name, Pool, PoolUuid, Report,
     },
@@ -505,23 +505,6 @@ impl Engine for StratEngine {
             pool.udev_pool_change(&new_name);
             Ok(RenameAction::Renamed(uuid))
         }
-    }
-
-    async fn unlock_pool(
-        &self,
-        pool_uuid: PoolUuid,
-        unlock_method: UnlockMethod,
-    ) -> StratisResult<SetUnlockAction<DevUuid>> {
-        let pools_read_all = self.pools.read_all().await;
-        let mut ld_guard = self.liminal_devices.write().await;
-        let unlocked =
-            spawn_blocking!(ld_guard.unlock_pool(&pools_read_all, pool_uuid, unlock_method,))??;
-        Ok(SetUnlockAction::new(
-            unlocked
-                .into_iter()
-                .map(|(uuid, _)| uuid)
-                .collect::<Vec<_>>(),
-        ))
     }
 
     async fn get_pool(

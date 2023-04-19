@@ -23,10 +23,10 @@ use crate::{
             SharedGuard, SomeLockReadGuard, SomeLockWriteGuard, Table,
         },
         types::{
-            CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockedPoolsInfo,
-            Name, PoolDevice, PoolDiff, PoolIdentifier, PoolUuid, RenameAction, ReportType,
-            SetUnlockAction, StartAction, StopAction, StoppedPoolInfo, StoppedPoolsInfo,
-            StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
+            CreateAction, DeleteAction, EncryptionInfo, FilesystemUuid, LockedPoolsInfo, Name,
+            PoolDevice, PoolDiff, PoolIdentifier, PoolUuid, RenameAction, ReportType, StartAction,
+            StopAction, StoppedPoolInfo, StoppedPoolsInfo, StratFilesystemDiff, UdevEngineEvent,
+            UnlockMethod,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -210,14 +210,6 @@ impl Engine for SimEngine {
 
         guard.insert(new_name, uuid, pool);
         Ok(RenameAction::Renamed(uuid))
-    }
-
-    async fn unlock_pool(
-        &self,
-        _pool_uuid: PoolUuid,
-        _unlock_method: UnlockMethod,
-    ) -> StratisResult<SetUnlockAction<DevUuid>> {
-        Ok(SetUnlockAction::empty())
     }
 
     async fn get_pool(

@@ -15,13 +15,14 @@ use crate::{
     dbus_api::{
         blockdev::create_dbus_blockdev,
         consts,
+        filesystem::create_dbus_filesystem,
         pool::create_dbus_pool,
         types::{DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
     engine::{
-        CreateAction, DeleteAction, EncryptionInfo, Engine, EngineAction, KeyActions,
-        KeyDescription, MappingCreateAction, MappingDeleteAction, Pool, PoolIdentifier, PoolUuid,
+        CreateAction, DeleteAction, EncryptionInfo, Engine, KeyActions, KeyDescription,
+        MappingCreateAction, MappingDeleteAction, Pool, PoolIdentifier, PoolUuid, StartAction,
         UnlockMethod,
     },
     stratis::StratisError,
@@ -167,6 +168,7 @@ pub fn unlock_pool<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodR
 where
     E: 'static + Engine,
 {
+    let base_path = m.path.get_name();
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -176,8 +178,8 @@ where
 
     let pool_uuid_str: &str = get_next_arg(&mut iter, 0)?;
     let pool_uuid_result = PoolUuid::parse_str(pool_uuid_str);
-    let pool_uuid = match pool_uuid_result {
-        Ok(uuid) => uuid,
+    let id = match pool_uuid_result {
+        Ok(uuid) => PoolIdentifier::Uuid(uuid),
         Err(e) => {
             let e = StratisError::Chained(
                 "Malformed UUID passed to UnlockPool".to_string(),
@@ -198,30 +200,75 @@ where
         }
     };
 
-    let msg = match handle_action!(block_on(
-        dbus_context.engine.unlock_pool(pool_uuid, unlock_method)
+    let ret = match handle_action!(block_on(
+        dbus_context
+            .engine
+            .start_pool(id.clone(), Some(unlock_method))
     )) {
-        Ok(unlock_action) => match unlock_action.changed() {
-            Some(vec) => {
-                let str_uuids: Vec<_> = vec.into_iter().map(|u| uuid_to_string!(u)).collect();
-                return_message.append3(
-                    (true, str_uuids),
-                    DbusErrorEnum::OK as u16,
-                    OK_STRING.to_string(),
-                )
+        Ok(StartAction::Started(_)) => {
+            let guard = match block_on(dbus_context.engine.get_pool(id.clone())) {
+                Some(g) => g,
+                None => {
+                    let (rc, rs) = engine_to_dbus_err_tuple(&StratisError::Msg(
+                        format!("Pool with {id:?} was successfully started but appears to have been removed before it could be exposed on the D-Bus")
+                    ));
+                    return Ok(vec![return_message.append3(default_return, rc, rs)]);
+                }
+            };
+
+            let (pool_name, pool_uuid, pool) = guard.as_tuple();
+            let pool_path =
+                create_dbus_pool(dbus_context, base_path.clone(), &pool_name, pool_uuid, pool);
+            let mut bd_paths = Vec::new();
+            for (bd_uuid, tier, bd) in pool.blockdevs() {
+                bd_paths.push(create_dbus_blockdev(
+                    dbus_context,
+                    pool_path.clone(),
+                    bd_uuid,
+                    tier,
+                    bd,
+                ));
             }
-            None => return_message.append3(
-                default_return,
-                DbusErrorEnum::OK as u16,
-                OK_STRING.to_string(),
-            ),
-        },
+            let mut fs_paths = Vec::new();
+            for (name, fs_uuid, fs) in pool.filesystems() {
+                fs_paths.push(create_dbus_filesystem(
+                    dbus_context,
+                    pool_path.clone(),
+                    &pool_name,
+                    &name,
+                    fs_uuid,
+                    fs,
+                ));
+            }
+
+            if pool.is_encrypted() {
+                dbus_context.push_locked_pools(block_on(dbus_context.engine.locked_pools()));
+            }
+            dbus_context.push_stopped_pools(block_on(dbus_context.engine.stopped_pools()));
+
+            // If stratisd can not set up a pool it will tear down all DM
+            // devices including crypt devices. Therefore, the set of devices
+            // belonging to the setup pool and the set of unlocked devices
+            // should be the same.
+            let unlocked_uuids = pool
+                .blockdevs()
+                .into_iter()
+                .map(|(u, _, _)| uuid_to_string!(u))
+                .collect();
+
+            (true, unlocked_uuids)
+        }
+        Ok(StartAction::Identity) => default_return,
         Err(e) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e);
-            return_message.append3(default_return, rc, rs)
+            return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };
-    Ok(vec![msg])
+    Ok(vec![return_message.append3(
+        ret,
+        DbusErrorEnum::OK as u16,
+        OK_STRING.to_string(),
+    )])
 }
 
 pub fn engine_state_report<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult

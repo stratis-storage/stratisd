@@ -86,8 +86,8 @@ impl LiminalDevices {
         );
     }
 
-    /// Unlock the liminal encrypted devices that correspond to the given pool UUID.
-    pub fn unlock_pool(
+    // Unlock the liminal encrypted devices that correspond to the given pool UUID.
+    fn unlock_pool(
         &mut self,
         pools: &Table<PoolUuid, StratPool>,
         pool_uuid: PoolUuid,
@@ -178,7 +178,7 @@ impl LiminalDevices {
         pools: &Table<PoolUuid, StratPool>,
         id: PoolIdentifier<PoolUuid>,
         unlock_method: Option<UnlockMethod>,
-    ) -> StratisResult<(Name, PoolUuid, StratPool)> {
+    ) -> StratisResult<(Name, PoolUuid, StratPool, Vec<DevUuid>)> {
         let pool_uuid = match id {
             PoolIdentifier::Uuid(u) => u,
             PoolIdentifier::Name(n) => self
@@ -234,7 +234,7 @@ impl LiminalDevices {
             .iter()
             .map(|(dev_uuid, _)| *dev_uuid)
             .collect::<Vec<_>>();
-        match find_stratis_devs_by_uuid(pool_uuid, uuids) {
+        match find_stratis_devs_by_uuid(pool_uuid, &uuids) {
             Ok(infos) => infos.into_iter().for_each(|(dev_uuid, (path, devno))| {
                 if let Ok(Ok(Some(bda))) = bda_wrapper(&path) {
                     self.uuid_lookup
@@ -262,7 +262,7 @@ impl LiminalDevices {
         };
 
         match self.try_setup_pool(pools, pool_uuid, stopped_pool, handles) {
-            Ok((name, pool)) => Ok((name, pool_uuid, pool)),
+            Ok((name, pool)) => Ok((name, pool_uuid, pool, uuids)),
             Err(e) => Err(handle_unlock_rollback(e, all_uuids)),
         }
     }

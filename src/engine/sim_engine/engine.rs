@@ -9,6 +9,7 @@ use std::{
 };
 
 use async_trait::async_trait;
+use either::Either;
 use futures::executor::block_on;
 use serde_json::{json, Value};
 use tokio::sync::{OwnedRwLockReadGuard, OwnedRwLockWriteGuard, RwLock};
@@ -25,8 +26,8 @@ use crate::{
         types::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockedPoolsInfo,
             Name, PoolDevice, PoolDiff, PoolIdentifier, PoolUuid, RenameAction, ReportType,
-            SetUnlockAction, StartAction, StopAction, StoppedPoolInfo, StoppedPoolsInfo,
-            StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
+            SetUnlockAction, StartAction, StartPoolInvocationContext, StopAction, StoppedPoolInfo,
+            StoppedPoolsInfo, StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -212,14 +213,6 @@ impl Engine for SimEngine {
         Ok(RenameAction::Renamed(uuid))
     }
 
-    async fn unlock_pool(
-        &self,
-        _pool_uuid: PoolUuid,
-        _unlock_method: UnlockMethod,
-    ) -> StratisResult<SetUnlockAction<DevUuid>> {
-        Ok(SetUnlockAction::empty())
-    }
-
     async fn get_pool(
         &self,
         key: PoolIdentifier<PoolUuid>,
@@ -298,7 +291,8 @@ impl Engine for SimEngine {
         &self,
         id: PoolIdentifier<PoolUuid>,
         unlock_method: Option<UnlockMethod>,
-    ) -> StratisResult<StartAction<PoolUuid>> {
+        invocation_context: StartPoolInvocationContext,
+    ) -> StratisResult<Either<StartAction<PoolUuid>, SetUnlockAction<DevUuid>>> {
         if let Some(guard) = self.pools.read(id.clone()).await {
             let (_, pool_uuid, pool) = guard.as_tuple();
             if pool.is_encrypted() && unlock_method.is_none() {
@@ -310,7 +304,10 @@ impl Engine for SimEngine {
                     "Pool with UUID {pool_uuid} is not encrypted but an unlock method was provided"
                 )));
             } else {
-                Ok(StartAction::Identity)
+                Ok(match invocation_context {
+                    StartPoolInvocationContext::Start => Either::Left(StartAction::Identity),
+                    StartPoolInvocationContext::Unlock => Either::Right(SetUnlockAction::empty()),
+                })
             }
         } else {
             let (name, pool_uuid, pool) = match id {
@@ -338,7 +335,11 @@ impl Engine for SimEngine {
                     .map(|(n, p)| (n, u, p))?,
             };
             self.pools.write_all().await.insert(name, pool_uuid, pool);
-            Ok(StartAction::Started(pool_uuid))
+
+            Ok(match invocation_context {
+                StartPoolInvocationContext::Start => Either::Left(StartAction::Started(pool_uuid)),
+                StartPoolInvocationContext::Unlock => Either::Right(SetUnlockAction::new(vec![])),
+            })
         }
     }
 

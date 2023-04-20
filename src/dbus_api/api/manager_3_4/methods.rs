@@ -4,6 +4,7 @@
 
 use dbus::{Message, Path};
 use dbus_tree::{MTSync, MethodInfo, MethodResult};
+use either::Either;
 use futures::executor::block_on;
 
 use crate::{
@@ -14,7 +15,10 @@ use crate::{
         types::{DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
-    engine::{Engine, Name, Pool, PoolIdentifier, PoolUuid, StartAction, UnlockMethod},
+    engine::{
+        Engine, Name, Pool, PoolIdentifier, PoolUuid, StartAction, StartPoolInvocationContext,
+        UnlockMethod,
+    },
     stratis::StratisError,
 };
 
@@ -66,10 +70,12 @@ where
         }
     };
 
-    let ret = match handle_action!(block_on(
-        dbus_context.engine.start_pool(id.clone(), unlock_method)
-    )) {
-        Ok(StartAction::Started(_)) => {
+    let ret = match handle_action!(block_on(dbus_context.engine.start_pool(
+        id.clone(),
+        unlock_method,
+        StartPoolInvocationContext::Start
+    ))) {
+        Ok(Either::Left(StartAction::Started(_))) => {
             let guard = match block_on(dbus_context.engine.get_pool(id.clone())) {
                 Some(g) => g,
                 None => {
@@ -112,7 +118,8 @@ where
 
             (true, (pool_path, bd_paths, fs_paths))
         }
-        Ok(StartAction::Identity) => default_return,
+        Ok(Either::Left(StartAction::Identity)) => default_return,
+        Ok(Either::Right(_)) => unreachable!("start_pool was invoked with Start argument"),
         Err(e) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e);
             return Ok(vec![return_message.append3(default_return, rc, rs)]);

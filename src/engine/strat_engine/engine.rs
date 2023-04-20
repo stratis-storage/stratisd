@@ -9,6 +9,7 @@ use std::{
 };
 
 use async_trait::async_trait;
+use either::Either;
 use futures::{executor::block_on, future::join_all};
 use serde_json::Value;
 use tokio::{
@@ -38,7 +39,8 @@ use crate::{
         types::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockedPoolsInfo,
             PoolDiff, PoolIdentifier, RenameAction, ReportType, SetUnlockAction, StartAction,
-            StopAction, StoppedPoolsInfo, StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
+            StartPoolInvocationContext, StopAction, StoppedPoolsInfo, StratFilesystemDiff,
+            UdevEngineEvent, UnlockMethod,
         },
         Engine, Name, Pool, PoolUuid, Report,
     },
@@ -507,23 +509,6 @@ impl Engine for StratEngine {
         }
     }
 
-    async fn unlock_pool(
-        &self,
-        pool_uuid: PoolUuid,
-        unlock_method: UnlockMethod,
-    ) -> StratisResult<SetUnlockAction<DevUuid>> {
-        let pools_read_all = self.pools.read_all().await;
-        let mut ld_guard = self.liminal_devices.write().await;
-        let unlocked =
-            spawn_blocking!(ld_guard.unlock_pool(&pools_read_all, pool_uuid, unlock_method,))??;
-        Ok(SetUnlockAction::new(
-            unlocked
-                .into_iter()
-                .map(|(uuid, _)| uuid)
-                .collect::<Vec<_>>(),
-        ))
-    }
-
     async fn get_pool(
         &self,
         key: PoolIdentifier<PoolUuid>,
@@ -621,7 +606,8 @@ impl Engine for StratEngine {
         &self,
         id: PoolIdentifier<PoolUuid>,
         unlock_method: Option<UnlockMethod>,
-    ) -> StratisResult<StartAction<PoolUuid>> {
+        invocation_context: StartPoolInvocationContext,
+    ) -> StratisResult<Either<StartAction<PoolUuid>, SetUnlockAction<DevUuid>>> {
         if let Some(lock) = self.pools.read(id.clone()).await {
             let (_, pool_uuid, pool) = lock.as_tuple();
             if pool.is_encrypted() && unlock_method.is_none() {
@@ -633,17 +619,26 @@ impl Engine for StratEngine {
                     "Pool with UUID {pool_uuid} is not encrypted but an unlock method was provided"
                 )));
             } else {
-                Ok(StartAction::Identity)
+                Ok(match invocation_context {
+                    StartPoolInvocationContext::Start => Either::Left(StartAction::Identity),
+                    StartPoolInvocationContext::Unlock => Either::Right(SetUnlockAction::empty()),
+                })
             }
         } else {
             let mut pools = self.pools.write_all().await;
-            let (name, pool_uuid, pool) =
-                self.liminal_devices
-                    .write()
-                    .await
-                    .start_pool(&pools, id, unlock_method)?;
+            let (name, pool_uuid, pool, unlocked_uuids) = self
+                .liminal_devices
+                .write()
+                .await
+                .start_pool(&pools, id, unlock_method)?;
             pools.insert(name, pool_uuid, pool);
-            Ok(StartAction::Started(pool_uuid))
+
+            Ok(match invocation_context {
+                StartPoolInvocationContext::Start => Either::Left(StartAction::Started(pool_uuid)),
+                StartPoolInvocationContext::Unlock => {
+                    Either::Right(SetUnlockAction::new(unlocked_uuids))
+                }
+            })
         }
     }
 
@@ -931,7 +926,11 @@ mod test {
         test_async!(engine.stop_pool(uuid))?;
         res?;
 
-        test_async!(engine.start_pool(PoolIdentifier::Uuid(uuid), Some(unlock_method)))?;
+        test_async!(engine.start_pool(
+            PoolIdentifier::Uuid(uuid),
+            Some(unlock_method),
+            StartPoolInvocationContext::Start
+        ))?;
         test_async!(engine.destroy_pool(uuid))?;
         cmd::udev_settle()?;
         engine.teardown()?;
@@ -1360,11 +1359,15 @@ mod test {
         assert_eq!(test_async!(engine.stopped_pools()).stopped.len(), 1);
         assert_eq!(test_async!(engine.pools()).len(), 0);
 
-        assert!(
-            test_async!(engine.start_pool(PoolIdentifier::Uuid(uuid), None))
-                .unwrap()
-                .is_changed()
-        );
+        assert!(test_async!(engine.start_pool(
+            PoolIdentifier::Uuid(uuid),
+            None,
+            StartPoolInvocationContext::Start
+        ))
+        .unwrap()
+        .left()
+        .expect("start_pool was invoked with Start argument")
+        .is_changed());
         assert_eq!(test_async!(engine.stopped_pools()).stopped.len(), 0);
         assert_eq!(test_async!(engine.pools()).len(), 1);
     }

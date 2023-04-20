@@ -500,3 +500,8 @@ impl UuidOrConflict {
         }
     }
 }
+
+pub enum StartPoolInvocationContext {
+    Unlock,
+    Start,
+}

@@ -9,6 +9,7 @@ use dbus::{
     Message,
 };
 use dbus_tree::{MTSync, MethodInfo, MethodResult};
+use either::Either;
 use futures::executor::block_on;
 
 use crate::{
@@ -21,9 +22,9 @@ use crate::{
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
     engine::{
-        CreateAction, DeleteAction, EncryptionInfo, Engine, KeyActions, KeyDescription,
-        MappingCreateAction, MappingDeleteAction, Pool, PoolIdentifier, PoolUuid, StartAction,
-        UnlockMethod,
+        CreateAction, DeleteAction, EncryptionInfo, Engine, EngineAction, KeyActions,
+        KeyDescription, MappingCreateAction, MappingDeleteAction, Pool, PoolIdentifier, PoolUuid,
+        StartPoolInvocationContext, UnlockMethod,
     },
     stratis::StratisError,
 };
@@ -200,12 +201,12 @@ where
         }
     };
 
-    let ret = match handle_action!(block_on(
-        dbus_context
-            .engine
-            .start_pool(id.clone(), Some(unlock_method))
-    )) {
-        Ok(StartAction::Started(_)) => {
+    let ret = match handle_action!(block_on(dbus_context.engine.start_pool(
+        id.clone(),
+        Some(unlock_method),
+        StartPoolInvocationContext::Unlock,
+    ))) {
+        Ok(Either::Right(unlock_action)) => {
             let guard = match block_on(dbus_context.engine.get_pool(id.clone())) {
                 Some(g) => g,
                 None => {
@@ -246,19 +247,17 @@ where
             }
             dbus_context.push_stopped_pools(block_on(dbus_context.engine.stopped_pools()));
 
-            // If stratisd can not set up a pool it will tear down all DM
-            // devices including crypt devices. Therefore, the set of devices
-            // belonging to the setup pool and the set of unlocked devices
-            // should be the same.
-            let unlocked_uuids = pool
-                .blockdevs()
-                .into_iter()
-                .map(|(u, _, _)| uuid_to_string!(u))
-                .collect();
-
-            (true, unlocked_uuids)
+            (
+                true,
+                unlock_action
+                    .changed()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|u| uuid_to_string!(u))
+                    .collect::<Vec<_>>(),
+            )
         }
-        Ok(StartAction::Identity) => default_return,
+        Ok(Either::Left(_)) => unreachable!("start_pool was invoked with Unlock argument"),
         Err(e) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e);
             return Ok(vec![return_message.append3(default_return, rc, rs)]);

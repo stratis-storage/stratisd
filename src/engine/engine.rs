@@ -11,6 +11,7 @@ use std::{
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use either::Either;
 use serde_json::Value;
 use tokio::sync::{OwnedRwLockReadGuard, OwnedRwLockWriteGuard};
 
@@ -27,8 +28,8 @@ use crate::{
             EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, LockedPoolsInfo,
             MappingCreateAction, MappingDeleteAction, Name, PoolDiff, PoolEncryptionInfo,
             PoolIdentifier, PoolUuid, RegenAction, RenameAction, ReportType, SetCreateAction,
-            SetDeleteAction, SetUnlockAction, StartAction, StopAction, StoppedPoolsInfo,
-            StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
+            SetDeleteAction, SetUnlockAction, StartAction, StartPoolInvocationContext, StopAction,
+            StoppedPoolsInfo, StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
         },
     },
     stratis::StratisResult,
@@ -380,18 +381,6 @@ pub trait Engine: Debug + Report + Send + Sync {
         new_name: &str,
     ) -> StratisResult<RenameAction<PoolUuid>>;
 
-    /// Unlock all encrypted devices registered under a given pool UUID.
-    /// This method returns a `Vec<DevUuid>`. This `Vec` will contain UUIDs of
-    /// devices that were newly unlocked while ignoring devices that are already
-    /// in the unlocked state. If some devices are able to be unlocked
-    /// and some fail, an error is returned as all devices should be able to
-    /// be unlocked if the necessary key is in the keyring.
-    async fn unlock_pool(
-        &self,
-        uuid: PoolUuid,
-        unlock_method: UnlockMethod,
-    ) -> StratisResult<SetUnlockAction<DevUuid>>;
-
     /// Find the pool designated by name or UUID.
     async fn get_pool(
         &self,
@@ -444,7 +433,8 @@ pub trait Engine: Debug + Report + Send + Sync {
         &self,
         pool_id: PoolIdentifier<PoolUuid>,
         unlock_method: Option<UnlockMethod>,
-    ) -> StratisResult<StartAction<PoolUuid>>;
+        invocation_context: StartPoolInvocationContext,
+    ) -> StratisResult<Either<StartAction<PoolUuid>, SetUnlockAction<DevUuid>>>;
 
     /// Stop and tear down a pool, storing the information for it to be started
     /// again later.

@@ -112,7 +112,7 @@ pub fn get_devno_from_path(path: &Path) -> StratisResult<Device> {
 /// because they will not have the opportunity to be processed.
 pub fn find_stratis_devs_by_uuid(
     pool_uuid: PoolUuid,
-    uuids: Vec<DevUuid>,
+    uuids: &Vec<DevUuid>,
 ) -> StratisResult<HashMap<DevUuid, (DevicePath, Device)>> {
     let mut map = HashMap::new();
     if uuids.is_empty() {

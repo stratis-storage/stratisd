@@ -9,7 +9,7 @@ use tokio::task::block_in_place;
 use crate::{
     engine::{
         BlockDevTier, CreateAction, EncryptionInfo, Engine, EngineAction, Name, Pool,
-        PoolIdentifier, PoolUuid, RenameAction, UnlockMethod,
+        PoolIdentifier, PoolUuid, RenameAction, StartPoolInvocationContext, UnlockMethod,
     },
     jsonrpc::{
         interface::PoolListType,
@@ -32,7 +32,12 @@ where
         key_set(engine.clone(), &kd, fd).await?;
     }
 
-    Ok(engine.start_pool(id, unlock_method).await?.is_changed())
+    Ok(engine
+        .start_pool(id, unlock_method, StartPoolInvocationContext::Start)
+        .await?
+        .left()
+        .expect("start_pool was invoked with Start argument")
+        .is_changed())
 }
 
 // stratis-min pool stop

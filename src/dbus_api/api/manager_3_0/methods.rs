@@ -15,6 +15,7 @@ use crate::{
     dbus_api::{
         blockdev::create_dbus_blockdev,
         consts,
+        filesystem::create_dbus_filesystem,
         pool::create_dbus_pool,
         types::{DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
@@ -22,7 +23,7 @@ use crate::{
     engine::{
         CreateAction, DeleteAction, EncryptionInfo, Engine, EngineAction, KeyActions,
         KeyDescription, MappingCreateAction, MappingDeleteAction, Pool, PoolIdentifier, PoolUuid,
-        UnlockMethod,
+        SetUnlockAction, UnlockMethod,
     },
     stratis::StratisError,
 };
@@ -167,6 +168,7 @@ pub fn unlock_pool<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodR
 where
     E: 'static + Engine,
 {
+    let base_path = m.path.get_name();
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -198,30 +200,66 @@ where
         }
     };
 
-    let msg = match handle_action!(block_on(
+    let ret = match handle_action!(block_on(
         dbus_context.engine.unlock_pool(pool_uuid, unlock_method)
     )) {
-        Ok(unlock_action) => match unlock_action.changed() {
-            Some(vec) => {
-                let str_uuids: Vec<_> = vec.into_iter().map(|u| uuid_to_string!(u)).collect();
-                return_message.append3(
-                    (true, str_uuids),
-                    DbusErrorEnum::OK as u16,
-                    OK_STRING.to_string(),
-                )
+        Ok(unlock_action @ SetUnlockAction::Started(_)) => {
+            let pool_id = PoolIdentifier::Uuid(pool_uuid);
+            let guard = match block_on(dbus_context.engine.get_pool(pool_id.clone())) {
+                Some(g) => g,
+                None => {
+                    let (rc, rs) = engine_to_dbus_err_tuple(&StratisError::Msg(
+                        format!("Pool with {pool_id:?} was successfully started but appears to have been removed before it could be exposed on the D-Bus")
+                    ));
+                    return Ok(vec![return_message.append3(default_return, rc, rs)]);
+                }
+            };
+
+            let (pool_name, pool_uuid, pool) = guard.as_tuple();
+            let pool_path =
+                create_dbus_pool(dbus_context, base_path.clone(), &pool_name, pool_uuid, pool);
+
+            for (bd_uuid, tier, bd) in pool.blockdevs() {
+                create_dbus_blockdev(dbus_context, pool_path.clone(), bd_uuid, tier, bd);
             }
-            None => return_message.append3(
-                default_return,
-                DbusErrorEnum::OK as u16,
-                OK_STRING.to_string(),
-            ),
-        },
+
+            for (name, fs_uuid, fs) in pool.filesystems() {
+                create_dbus_filesystem(
+                    dbus_context,
+                    pool_path.clone(),
+                    &pool_name,
+                    &name,
+                    fs_uuid,
+                    fs,
+                );
+            }
+
+            assert!(pool.is_encrypted());
+
+            dbus_context.push_locked_pools(block_on(dbus_context.engine.locked_pools()));
+            dbus_context.push_stopped_pools(block_on(dbus_context.engine.stopped_pools()));
+
+            (
+                unlock_action.is_changed(),
+                unlock_action
+                    .changed()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|u| uuid_to_string!(u))
+                    .collect::<Vec<_>>(),
+            )
+        }
+        Ok(SetUnlockAction::Identity) => default_return,
         Err(e) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e);
-            return_message.append3(default_return, rc, rs)
+            return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };
-    Ok(vec![msg])
+    Ok(vec![return_message.append3(
+        ret,
+        DbusErrorEnum::OK as u16,
+        OK_STRING.to_string(),
+    )])
 }
 
 pub fn engine_state_report<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult

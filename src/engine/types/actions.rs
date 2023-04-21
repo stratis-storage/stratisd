@@ -221,59 +221,82 @@ impl Display for MappingDeleteAction<Key> {
     }
 }
 
-/// A type for the return type of idempotent unlocking actions.
-pub struct SetUnlockAction<T> {
-    unlocked: Vec<T>,
+/// A type for the return type of idempotent unlocking actions on an
+/// individual pool.
+pub enum SetUnlockAction<T> {
+    /// If the pool was already started.
+    Identity,
+    /// If the unlock action resulted in the pool being started.
+    Started(Vec<T>),
 }
 
 impl<T> SetUnlockAction<T> {
-    /// Create a new return type with newly unlocked resources and resources that
-    /// are still locked.
+    /// Create a new SetUnlockAction where the pool is started.
     pub fn new(unlocked: Vec<T>) -> SetUnlockAction<T> {
-        SetUnlockAction { unlocked }
+        SetUnlockAction::Started(unlocked)
     }
 
-    /// Create a new return type where no newly unlocked resources are reported.
+    /// Create a new SetUnlockAction when no newly unlocked resources are
+    /// reported but a pool is started as a consequence.
     pub fn empty() -> SetUnlockAction<T> {
-        SetUnlockAction {
-            unlocked: Vec::new(),
-        }
+        SetUnlockAction::Started(Vec::new())
+    }
+
+    ///  Create a new SetUnlockAction where the pool was already set up.
+    pub fn identity() -> SetUnlockAction<T> {
+        SetUnlockAction::Identity
     }
 }
 
 impl<T> EngineAction for SetUnlockAction<T> {
     type Return = Vec<T>;
 
+    /// true if a thing was unlocked.
     fn is_changed(&self) -> bool {
-        !self.unlocked.is_empty()
+        match self {
+            SetUnlockAction::Identity => false,
+            SetUnlockAction::Started(unlocked) => !unlocked.is_empty(),
+        }
     }
 
     fn changed(self) -> Option<Vec<T>> {
-        if self.unlocked.is_empty() {
-            None
-        } else {
-            Some(self.unlocked)
+        match self {
+            SetUnlockAction::Identity => None,
+            SetUnlockAction::Started(unlocked) => {
+                if unlocked.is_empty() {
+                    None
+                } else {
+                    Some(unlocked)
+                }
+            }
         }
     }
 }
 
 impl Display for SetUnlockAction<DevUuid> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.unlocked.is_empty() {
-            write!(
-                f,
-                "No new devices were able to be unlocked; no action was taken"
-            )
-        } else {
-            write!(
-                f,
-                "The devices with UUIDs {} were successfully unlocked",
-                self.unlocked
-                    .iter()
-                    .map(|uuid| uuid.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            )
+        match self {
+            SetUnlockAction::Identity => {
+                write!(f, "The pool was already set up; no action was taken")
+            }
+            SetUnlockAction::Started(unlocked) => {
+                if unlocked.is_empty() {
+                    write!(
+                        f,
+                        "No new devices were able to be unlocked; no action was taken"
+                    )
+                } else {
+                    write!(
+                        f,
+                        "The devices with UUIDs {} were successfully unlocked",
+                        unlocked
+                            .iter()
+                            .map(|uuid| uuid.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
+                }
+            }
         }
     }
 }

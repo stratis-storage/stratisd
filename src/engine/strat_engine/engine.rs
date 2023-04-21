@@ -512,16 +512,26 @@ impl Engine for StratEngine {
         pool_uuid: PoolUuid,
         unlock_method: UnlockMethod,
     ) -> StratisResult<SetUnlockAction<DevUuid>> {
-        let pools_read_all = self.pools.read_all().await;
-        let mut ld_guard = self.liminal_devices.write().await;
-        let unlocked =
-            spawn_blocking!(ld_guard.unlock_pool(&pools_read_all, pool_uuid, unlock_method,))??;
-        Ok(SetUnlockAction::new(
-            unlocked
-                .into_iter()
-                .map(|(uuid, _)| uuid)
-                .collect::<Vec<_>>(),
-        ))
+        let pool_id = PoolIdentifier::Uuid(pool_uuid);
+        if let Some(lock) = self.pools.read(pool_id.clone()).await {
+            let (_, pool_uuid, pool) = lock.as_tuple();
+            if !pool.is_encrypted() {
+                return Err(StratisError::Msg(format!(
+                    "Pool with UUID {pool_uuid} is not encrypted but an attempt is being made to unlock it"
+                )));
+            } else {
+                Ok(SetUnlockAction::identity())
+            }
+        } else {
+            let mut pools = self.pools.write_all().await;
+            let (name, pool_uuid, pool, unlocked_uuids) = self
+                .liminal_devices
+                .write()
+                .await
+                .start_pool(&pools, pool_id, Some(unlock_method))?;
+            pools.insert(name, pool_uuid, pool);
+            Ok(SetUnlockAction::new(unlocked_uuids))
+        }
     }
 
     async fn get_pool(
@@ -637,7 +647,7 @@ impl Engine for StratEngine {
             }
         } else {
             let mut pools = self.pools.write_all().await;
-            let (name, pool_uuid, pool) =
+            let (name, pool_uuid, pool, _) =
                 self.liminal_devices
                     .write()
                     .await

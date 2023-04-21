@@ -1,3 +1,27 @@
+stratisd 3.5.4
+==============
+Recommended Rust toolchain version: 1.68.0
+Lowest supported Rust toolchain version: 1.66.1
+
+Recommended development platform for Python development: Fedora 37
+
+- Remove memory-mapped keyfile workaround:
+  https://github.com/stratis-storage/stratisd/pull/3265
+
+- On UnlockPool, start the pool directly:
+  https://github.com/stratis-storage/stratisd/issues/3324
+  https://github.com/stratis-storage/stratisd/pull/3329
+
+- Increase predicates dependency lower bound to 3.0.0;
+  https://github.com/stratis-storage/stratisd/issues/3318
+  https://github.com/stratis-storage/stratisd/pull/3320
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3330
+  https://github.com/stratis-storage/stratisd/pull/3322
+  https://github.com/stratis-storage/stratisd/pull/3321
+
+
 stratisd 3.5.3
 ==============
 Recommended Rust toolchain version: 1.68.0

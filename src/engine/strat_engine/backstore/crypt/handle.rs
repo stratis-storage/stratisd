@@ -362,7 +362,7 @@ impl CryptHandle {
         log_on_failure!(
             device.token_handle().json_set(TokenInput::ReplaceToken(
                 STRATIS_TOKEN_ID,
-                &to_value(&StratisLuks2Token {
+                &to_value(StratisLuks2Token {
                     devname: activation_name.clone(),
                     identifiers: StratisIdentifiers {
                         pool_uuid,

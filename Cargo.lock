@@ -109,25 +109,6 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
 name = "bindgen"
-version = "0.59.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2bd2a9a458e8f4304c52c43ebb0cfbd520289f8379a52e329a38afda99bf8eb8"
-dependencies = [
- "bitflags",
- "cexpr",
- "clang-sys",
- "lazy_static",
- "lazycell",
- "peeking_take_while",
- "proc-macro2",
- "quote",
- "regex",
- "rustc-hash",
- "shlex",
-]
-
-[[package]]
-name = "bindgen"
 version = "0.63.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "36d860121800b2a9a94f9b5604b332d5cffb234ce17609ea479d723dbc9d3885"
@@ -430,7 +411,7 @@ version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0b0f9d16560f830ae6e90b769017333c4561d2c84f39e7aa7d935d2e7bcbc4c"
 dependencies = [
- "bindgen 0.63.0",
+ "bindgen",
  "nix 0.26.2",
 ]
 
@@ -784,7 +765,7 @@ version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52ee2322d6a28f5672b3d8640fb672c9dbe89e6f1135eb0721eb6ba4e7315ac3"
 dependencies = [
- "bindgen 0.63.0",
+ "bindgen",
  "cc",
 ]
 
@@ -817,7 +798,7 @@ version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "82b3477e195e070996649e455dc5ff8af7aae4032209f738958679f5bbd17409"
 dependencies = [
- "bindgen 0.63.0",
+ "bindgen",
  "cc",
  "pkg-config",
  "semver",
@@ -906,10 +887,9 @@ dependencies = [
 [[package]]
 name = "loopdev"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5bfa0855b04611e38acaff718542e9e809cddfc16535d39f9d9c694ab19f7388"
+source = "git+https://github.com/mulkieran/loopdev?branch=bump-bindgen-reduce-version#f780d0e873960e0eeb997e2bda106d1e30c3afd0"
 dependencies = [
- "bindgen 0.59.2",
+ "bindgen",
  "errno 0.2.8",
  "libc",
 ]
@@ -1376,7 +1356,7 @@ dependencies = [
  "assert_cmd",
  "assert_matches",
  "async-trait",
- "bindgen 0.63.0",
+ "bindgen",
  "byteorder",
  "chrono",
  "clap",

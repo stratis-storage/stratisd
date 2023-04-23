@@ -261,3 +261,8 @@ extras = ["pretty-hex"]
 min = ["rpassword"]
 systemd_compat = ["bindgen"]
 udev_scripts = ["data-encoding"]
+
+# FIXME: remove when loopdev dependency lower bound is increased from 0.4.0
+[patch.crates-io.loopdev]
+git = "https://github.com/mulkieran/loopdev"
+branch = "bump-bindgen-reduce-version"

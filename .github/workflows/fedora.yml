@@ -64,7 +64,7 @@ jobs:
             components: cargo
     runs-on: ubuntu-22.04
     container:
-      image: fedora:37  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:38  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev
     steps:
       - uses: actions/checkout@v3
@@ -99,7 +99,7 @@ jobs:
             components: cargo
     runs-on: ubuntu-22.04
     container:
-      image: fedora:37  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:38  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev --ipc=host
     steps:
       - uses: actions/checkout@v3

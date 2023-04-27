@@ -19,8 +19,7 @@ pub fn key_set(key_desc: KeyDescription, keyfile_path: Option<&str>) -> StratisR
             do_request!(KeySet, key_desc; file.as_raw_fd())
         }
         None => {
-            let password =
-                rpassword::prompt_password_stdout("Enter passphrase followed by return: ")?;
+            let password = rpassword::prompt_password("Enter passphrase followed by return: ")?;
             if password.is_empty() {
                 return Ok(());
             }

@@ -29,7 +29,7 @@ pub fn pool_start(
     prompt: bool,
 ) -> StratisResult<()> {
     if prompt {
-        let password = rpassword::prompt_password_stdout("Enter passphrase followed by return: ")?;
+        let password = rpassword::prompt_password("Enter passphrase followed by return: ")?;
         if password.is_empty() {
             return Ok(());
         }

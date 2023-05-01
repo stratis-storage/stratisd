@@ -18,7 +18,7 @@ General constants.
 SERVICE = "org.storage.stratis3"
 TOP_OBJECT = "/org/storage/stratis3"
 
-REVISION_NUMBER = 5
+REVISION_NUMBER = 6
 
 REVISION = f"r{REVISION_NUMBER}"
 

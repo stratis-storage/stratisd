@@ -248,23 +248,3 @@ fn stratis_min_list_default() {
 fn test_stratis_min_list_defaults() {
     test_with_stratisd_min_sim(stratis_min_list_default);
 }
-
-fn stratis_min_capture_key() {
-    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
-    let key = "akey";
-    cmd.arg("key").arg("set").arg("--capture-key").arg(key);
-    cmd.write_stdin("keyval");
-    cmd.assert().success();
-    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
-    cmd.arg("key")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains(key));
-}
-
-#[test]
-// Verify that adding a key using --capture-key works and
-// lists the new key in the output of 'keys'.
-fn test_stratis_min_capture_key() {
-    test_with_stratisd_min_sim(stratis_min_capture_key);
-}

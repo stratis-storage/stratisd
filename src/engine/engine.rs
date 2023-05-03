@@ -448,7 +448,11 @@ pub trait Engine: Debug + Report + Send + Sync {
 
     /// Stop and tear down a pool, storing the information for it to be started
     /// again later.
-    async fn stop_pool(&self, pool_uuid: PoolUuid) -> StratisResult<StopAction<PoolUuid>>;
+    async fn stop_pool(
+        &self,
+        pool_id: PoolIdentifier<PoolUuid>,
+        has_partially_constructed: bool,
+    ) -> StratisResult<StopAction<PoolUuid>>;
 
     /// Refresh the state of all pools and liminal devices.
     async fn refresh_state(&self) -> StratisResult<()>;

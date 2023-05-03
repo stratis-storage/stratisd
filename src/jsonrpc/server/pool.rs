@@ -40,18 +40,7 @@ pub async fn pool_stop<E>(engine: Arc<E>, id: PoolIdentifier<PoolUuid>) -> Strat
 where
     E: Engine,
 {
-    let pool_uuid = match id {
-        PoolIdentifier::Uuid(u) => u,
-        PoolIdentifier::Name(n) => {
-            engine
-                .pools()
-                .await
-                .get_by_name(&n)
-                .ok_or_else(|| StratisError::Msg(format!("Pool with name {n} not found")))?
-                .0
-        }
-    };
-    Ok(engine.stop_pool(pool_uuid).await?.is_changed())
+    Ok(engine.stop_pool(id, true).await?.is_changed())
 }
 
 // stratis-min pool create

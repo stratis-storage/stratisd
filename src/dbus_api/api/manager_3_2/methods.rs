@@ -45,6 +45,7 @@ where
             return Ok(vec![return_message.append3(default_return, rc, rs)]);
         }
     };
+
     let unlock_method = {
         let unlock_method_tup: (bool, &str) = get_next_arg(&mut iter, 1)?;
         match tuple_to_option(unlock_method_tup) {
@@ -79,7 +80,7 @@ where
                 }
             };
 
-            let (pool_name, _, pool) = guard.as_tuple();
+            let (pool_name, pool_uuid, pool) = guard.as_tuple();
             let pool_path =
                 create_dbus_pool(dbus_context, base_path.clone(), &pool_name, pool_uuid, pool);
             let mut bd_paths = Vec::new();
@@ -169,7 +170,11 @@ where
     })
     .unwrap_or(false);
 
-    let msg = match handle_action!(block_on(dbus_context.engine.stop_pool(pool_uuid))) {
+    let msg = match handle_action!(block_on(
+        dbus_context
+            .engine
+            .stop_pool(PoolIdentifier::Uuid(pool_uuid), false)
+    )) {
         Ok(StopAction::Stopped(_)) => {
             dbus_context.push_remove(&pool_path, consts::pool_interface_list());
             if send_locked_signal {
@@ -182,6 +187,7 @@ where
                 OK_STRING.to_string(),
             )
         }
+        Ok(StopAction::CleanedUp(_)) => unreachable!("!has_partially_constructed above"),
         Ok(StopAction::Identity) => return_message.append3(
             default_return,
             DbusErrorEnum::OK as u16,

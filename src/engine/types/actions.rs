@@ -678,6 +678,7 @@ impl<T> EngineAction for StartAction<T> {
 pub enum StopAction<T> {
     Identity,
     Stopped(T),
+    CleanedUp(T),
 }
 
 impl Display for StopAction<PoolUuid> {
@@ -686,6 +687,10 @@ impl Display for StopAction<PoolUuid> {
             StopAction::Identity => write!(
                 f,
                 "The requested pool is already stopped; no action was taken"
+            ),
+            StopAction::CleanedUp(uuid) => write!(
+                f,
+                "The pool with UUID {uuid} was partially constructed and cleaned up successfully",
             ),
             StopAction::Stopped(uuid) => {
                 write!(f, "The pool with UUID {uuid} was successfully stopped")

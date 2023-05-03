@@ -342,16 +342,34 @@ impl Engine for SimEngine {
         }
     }
 
-    async fn stop_pool(&self, pool_uuid: PoolUuid) -> StratisResult<StopAction<PoolUuid>> {
-        if self
-            .stopped_pools
-            .read()
-            .await
-            .get_by_uuid(pool_uuid)
-            .is_some()
-        {
-            Ok(StopAction::Identity)
-        } else if let Some((name, pool)) = self.pools.write_all().await.remove_by_uuid(pool_uuid) {
+    async fn stop_pool(
+        &self,
+        pool_id: PoolIdentifier<PoolUuid>,
+        _: bool,
+    ) -> StratisResult<StopAction<PoolUuid>> {
+        let is_stopped = match pool_id {
+            PoolIdentifier::Name(ref n) => self.stopped_pools.read().await.get_by_name(n).is_some(),
+            PoolIdentifier::Uuid(u) => self.stopped_pools.read().await.get_by_uuid(u).is_some(),
+        };
+        if is_stopped {
+            return Ok(StopAction::Identity);
+        }
+
+        let pool_entry = match pool_id {
+            PoolIdentifier::Name(ref n) => self
+                .pools
+                .write_all()
+                .await
+                .remove_by_name(n)
+                .map(|(u, p)| (n.clone(), u, p)),
+            PoolIdentifier::Uuid(u) => self
+                .pools
+                .write_all()
+                .await
+                .remove_by_uuid(u)
+                .map(|(n, p)| (n, u, p)),
+        };
+        if let Some((name, pool_uuid, pool)) = pool_entry {
             self.stopped_pools
                 .write()
                 .await
@@ -359,7 +377,7 @@ impl Engine for SimEngine {
             Ok(StopAction::Stopped(pool_uuid))
         } else {
             Err(StratisError::Msg(format!(
-                "Pool with UUID {pool_uuid} was not found and cannot be stopped"
+                "Pool with ID {pool_id} was not found and cannot be stopped"
             )))
         }
     }

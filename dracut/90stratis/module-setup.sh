@@ -12,8 +12,7 @@ check() {
 		xfs_growfs \
 		xfs_db \
 		udevadm \
-		plymouth \
-		/usr/sbin/plymouthd \
+		/usr/bin/systemd-ask-password \
 		/usr/sbin/thin_metadata_size \
 		/usr/lib/udev/stratis-str-cmp \
 		/usr/lib/udev/stratis-base32-decode ||

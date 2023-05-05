@@ -6,23 +6,19 @@ use std::{os::unix::io::RawFd, sync::Arc};
 
 use crate::{
     engine::{
-        Engine, KeyActions, KeyDescription, MappingCreateAction, MappingDeleteAction, Pool,
-        PoolIdentifier, PoolUuid,
+        Engine, KeyDescription, MappingCreateAction, MappingDeleteAction, PoolIdentifier, PoolUuid,
     },
     stratis::{StratisError, StratisResult},
 };
 
 // stratis-min key set
-pub async fn key_set<E>(
-    engine: Arc<E>,
+pub async fn key_set(
+    engine: Arc<dyn Engine>,
     key_desc: &KeyDescription,
     key_fd: RawFd,
-) -> StratisResult<Option<bool>>
-where
-    E: Engine,
-{
+) -> StratisResult<Option<bool>> {
     Ok(
-        match engine.get_key_handler_mut().await.set(key_desc, key_fd)? {
+        match engine.get_key_handler().await.set(key_desc, key_fd)? {
             MappingCreateAction::Created(_) => Some(false),
             MappingCreateAction::ValueChanged(_) => Some(true),
             MappingCreateAction::Identity => None,
@@ -31,36 +27,22 @@ where
 }
 
 // stratis-min key unset
-pub async fn key_unset<E>(engine: Arc<E>, key_desc: &KeyDescription) -> StratisResult<bool>
-where
-    E: Engine,
-{
-    Ok(match engine.get_key_handler_mut().await.unset(key_desc)? {
+pub async fn key_unset(engine: Arc<dyn Engine>, key_desc: &KeyDescription) -> StratisResult<bool> {
+    Ok(match engine.get_key_handler().await.unset(key_desc)? {
         MappingDeleteAction::Deleted(_) => true,
         MappingDeleteAction::Identity => false,
     })
 }
 
 // stratis-min key [list]
-pub async fn key_list<E>(engine: Arc<E>) -> StratisResult<Vec<KeyDescription>>
-where
-    E: Engine,
-{
-    Ok(engine
-        .get_key_handler_mut()
-        .await
-        .list()?
-        .into_iter()
-        .collect())
+pub async fn key_list(engine: Arc<dyn Engine>) -> StratisResult<Vec<KeyDescription>> {
+    Ok(engine.get_key_handler().await.list()?.into_iter().collect())
 }
 
-pub async fn key_get_desc<E>(
-    engine: Arc<E>,
+pub async fn key_get_desc(
+    engine: Arc<dyn Engine>,
     id: PoolIdentifier<PoolUuid>,
-) -> StratisResult<Option<KeyDescription>>
-where
-    E: Engine,
-{
+) -> StratisResult<Option<KeyDescription>> {
     let locked = engine.locked_pools().await;
     let guard = engine.get_pool(id.clone()).await;
     if let Some((_, _, pool)) = guard.as_ref().map(|guard| guard.as_tuple()) {

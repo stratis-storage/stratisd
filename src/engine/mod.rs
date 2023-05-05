@@ -11,7 +11,7 @@ pub use self::{
         StaticHeader, StaticHeaderResult, StratEngine, StratKeyActions, ThinPoolSizeParams, BDA,
         CLEVIS_TANG_TRUST_URL,
     },
-    structures::{ExclusiveGuard, SharedGuard, Table},
+    structures::{AllLockReadGuard, ExclusiveGuard, SharedGuard, Table},
     types::{
         ActionAvailability, BlockDevTier, ClevisInfo, CreateAction, DeleteAction, DevUuid, Diff,
         EncryptionInfo, EngineAction, FilesystemUuid, GrowAction, KeyDescription, Lockable,

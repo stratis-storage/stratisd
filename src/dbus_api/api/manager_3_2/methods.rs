@@ -15,14 +15,11 @@ use crate::{
         types::{DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
-    engine::{Engine, Pool, PoolIdentifier, PoolUuid, StartAction, StopAction, UnlockMethod},
+    engine::{PoolIdentifier, PoolUuid, StartAction, StopAction, UnlockMethod},
     stratis::StratisError,
 };
 
-pub fn start_pool<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn start_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let base_path = m.path.get_name();
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
@@ -126,10 +123,7 @@ where
     )])
 }
 
-pub fn stop_pool<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn stop_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
     let dbus_context = m.tree.get_data();
@@ -202,10 +196,7 @@ where
     Ok(vec![msg])
 }
 
-pub fn refresh_state<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn refresh_state(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let dbus_context = m.tree.get_data();
     let return_message = message.method_return();

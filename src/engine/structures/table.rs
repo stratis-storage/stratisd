@@ -16,6 +16,19 @@ pub struct Table<U, T> {
     items: HashMap<U, (Name, T)>,
 }
 
+impl<U, T> FromIterator<(Name, U, T)> for Table<U, T>
+where
+    U: AsUuid,
+{
+    fn from_iter<I: IntoIterator<Item = (Name, U, T)>>(iter: I) -> Self {
+        iter.into_iter()
+            .fold(Table::default(), |mut table, (n, u, t)| {
+                table.insert(n, u, t);
+                table
+            })
+    }
+}
+
 impl<U, T> fmt::Debug for Table<U, T>
 where
     U: fmt::Debug,

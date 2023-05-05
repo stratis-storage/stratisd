@@ -11,31 +11,25 @@ use crate::{
         pool::shared::{self, get_pool_property, set_pool_property},
         types::TData,
     },
-    engine::{Engine, PropChangeAction},
+    engine::PropChangeAction,
 };
 
-pub fn get_pool_fs_limit<E>(
+pub fn get_pool_fs_limit(
     i: &mut IterAppend<'_>,
-    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<(), MethodErr>
-where
-    E: 'static + Engine,
-{
-    get_pool_property(i, p, |(_, _, pool)| Ok(shared::pool_fs_limit::<E>(pool)))
+    p: &PropInfo<'_, MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
+    get_pool_property(i, p, |(_, _, pool)| Ok(shared::pool_fs_limit(pool)))
 }
 
-pub fn set_pool_fs_limit<E>(
+pub fn set_pool_fs_limit(
     i: &mut Iter<'_>,
-    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<(), MethodErr>
-where
-    E: 'static + Engine,
-{
+    p: &PropInfo<'_, MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
     let fs_limit = i.get().ok_or_else(|| {
         MethodErr::failed("New filesystem limit required as argument to increase it")
     })?;
     let res = set_pool_property(p, consts::POOL_FS_LIMIT_PROP, |(name, uuid, pool)| {
-        shared::set_pool_fs_limit::<E>(&name, uuid, pool, fs_limit)
+        shared::set_pool_fs_limit(&name, uuid, pool, fs_limit)
     });
     match res {
         Ok(PropChangeAction::NewValue(v)) => {
@@ -49,30 +43,22 @@ where
     }
 }
 
-pub fn get_overprov_mode<E>(
+pub fn get_overprov_mode(
     i: &mut IterAppend<'_>,
-    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<(), MethodErr>
-where
-    E: 'static + Engine,
-{
-    get_pool_property(i, p, |(_, _, pool)| {
-        Ok(shared::pool_overprov_enabled::<E>(pool))
-    })
+    p: &PropInfo<'_, MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
+    get_pool_property(i, p, |(_, _, pool)| Ok(shared::pool_overprov_enabled(pool)))
 }
 
-pub fn set_overprov_mode<E>(
+pub fn set_overprov_mode(
     i: &mut Iter<'_>,
-    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<(), MethodErr>
-where
-    E: 'static + Engine,
-{
+    p: &PropInfo<'_, MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
     let disabled = i.get().ok_or_else(|| {
         MethodErr::failed("Overprovisioning mode changes require a boolean as an argument")
     })?;
     let res = set_pool_property(p, consts::POOL_OVERPROV_PROP, |(name, _, pool)| {
-        shared::pool_set_overprov_mode::<E>(pool, &name, disabled)
+        shared::pool_set_overprov_mode(pool, &name, disabled)
     });
     match res {
         Ok(PropChangeAction::NewValue(v)) => {
@@ -86,14 +72,9 @@ where
     }
 }
 
-pub fn get_no_alloc_space<E>(
+pub fn get_no_alloc_space(
     i: &mut IterAppend<'_>,
-    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<(), MethodErr>
-where
-    E: 'static + Engine,
-{
-    get_pool_property(i, p, |(_, _, pool)| {
-        Ok(shared::pool_no_alloc_space::<E>(pool))
-    })
+    p: &PropInfo<'_, MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
+    get_pool_property(i, p, |(_, _, pool)| Ok(shared::pool_no_alloc_space(pool)))
 }

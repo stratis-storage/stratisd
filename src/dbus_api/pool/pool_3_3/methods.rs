@@ -10,13 +10,10 @@ use crate::{
         types::{DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg},
     },
-    engine::{DevUuid, Engine, EngineAction, Pool},
+    engine::{DevUuid, EngineAction},
 };
 
-pub fn grow_physical<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn grow_physical(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 

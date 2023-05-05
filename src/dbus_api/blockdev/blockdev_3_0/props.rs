@@ -5,83 +5,59 @@
 use dbus::arg::IterAppend;
 use dbus_tree::{MTSync, MethodErr, PropInfo};
 
-use crate::{
-    dbus_api::{
-        blockdev::shared::{self, get_blockdev_property},
-        types::TData,
-    },
-    engine::Engine,
+use crate::dbus_api::{
+    blockdev::shared::{self, get_blockdev_property},
+    types::TData,
 };
 
 /// Get the devnode for an object path.
-pub fn get_blockdev_devnode<E>(
+pub fn get_blockdev_devnode(
     i: &mut IterAppend<'_>,
-    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<(), MethodErr>
-where
-    E: Engine,
-{
-    get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_devnode_prop::<E>(p)))
+    p: &PropInfo<'_, MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
+    get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_devnode_prop(p)))
 }
 
-pub fn get_blockdev_hardware_info<E>(
+pub fn get_blockdev_hardware_info(
     i: &mut IterAppend<'_>,
-    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<(), MethodErr>
-where
-    E: Engine,
-{
-    get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_hardware_info_prop::<E>(p)))
+    p: &PropInfo<'_, MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
+    get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_hardware_info_prop(p)))
 }
 
-pub fn get_blockdev_user_info<E>(
+pub fn get_blockdev_user_info(
     i: &mut IterAppend<'_>,
-    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<(), MethodErr>
-where
-    E: Engine,
-{
-    get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_user_info_prop::<E>(p)))
+    p: &PropInfo<'_, MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
+    get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_user_info_prop(p)))
 }
 
-pub fn get_blockdev_initialization_time<E>(
+pub fn get_blockdev_initialization_time(
     i: &mut IterAppend<'_>,
-    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<(), MethodErr>
-where
-    E: Engine,
-{
-    get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_init_time_prop::<E>(p)))
+    p: &PropInfo<'_, MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
+    get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_init_time_prop(p)))
 }
 
-pub fn get_blockdev_tier<E>(
+pub fn get_blockdev_tier(
     i: &mut IterAppend<'_>,
-    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<(), MethodErr>
-where
-    E: Engine,
-{
+    p: &PropInfo<'_, MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
     get_blockdev_property(i, p, |t, _| Ok(shared::blockdev_tier_prop(t)))
 }
 
 /// Get the devnode for an object path.
-pub fn get_blockdev_physical_path<E>(
+pub fn get_blockdev_physical_path(
     i: &mut IterAppend<'_>,
-    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<(), MethodErr>
-where
-    E: Engine,
-{
-    get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_physical_path_prop::<E>(p)))
+    p: &PropInfo<'_, MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
+    get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_physical_path_prop(p)))
 }
 
 /// Get the devnode size
-pub fn get_blockdev_size<E>(
+pub fn get_blockdev_size(
     i: &mut IterAppend<'_>,
-    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<(), MethodErr>
-where
-    E: Engine,
-{
-    get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_size_prop::<E>(p)))
+    p: &PropInfo<'_, MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
+    get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_size_prop(p)))
 }

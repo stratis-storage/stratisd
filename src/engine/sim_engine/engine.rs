@@ -11,16 +11,16 @@ use std::{
 use async_trait::async_trait;
 use futures::executor::block_on;
 use serde_json::{json, Value};
-use tokio::sync::{OwnedRwLockReadGuard, OwnedRwLockWriteGuard, RwLock};
+use tokio::sync::RwLock;
 
 use crate::{
     engine::{
-        engine::{Engine, HandleEvents, Pool, Report},
+        engine::{Engine, HandleEvents, KeyActions, Pool, Report},
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         sim_engine::{keys::SimKeyActions, pool::SimPool},
         structures::{
-            AllLockReadGuard, AllLockWriteGuard, AllOrSomeLock, ExclusiveGuard, Lockable,
-            SharedGuard, SomeLockReadGuard, SomeLockWriteGuard, Table,
+            AllLockReadGuard, AllLockWriteGuard, AllOrSomeLock, Lockable, SomeLockReadGuard,
+            SomeLockWriteGuard, Table,
         },
         types::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockedPoolsInfo,
@@ -35,7 +35,7 @@ use crate::{
 #[derive(Debug)]
 pub struct SimEngine {
     pools: AllOrSomeLock<PoolUuid, SimPool>,
-    key_handler: Lockable<Arc<RwLock<SimKeyActions>>>,
+    key_handler: Arc<SimKeyActions>,
     stopped_pools: Lockable<Arc<RwLock<Table<PoolUuid, SimPool>>>>,
 }
 
@@ -43,7 +43,7 @@ impl Default for SimEngine {
     fn default() -> Self {
         SimEngine {
             pools: AllOrSomeLock::default(),
-            key_handler: Lockable::new_shared(SimKeyActions::default()),
+            key_handler: Arc::new(SimKeyActions::default()),
             stopped_pools: Lockable::new_shared(Table::default()),
         }
     }
@@ -122,9 +122,6 @@ impl Report for SimEngine {
 
 #[async_trait]
 impl Engine for SimEngine {
-    type Pool = SimPool;
-    type KeyActions = SimKeyActions;
-
     async fn create_pool(
         &self,
         name: &str,
@@ -137,7 +134,7 @@ impl Engine for SimEngine {
         validate_paths(blockdev_paths)?;
 
         if let Some(key_desc) = encryption_info.and_then(|ei| ei.key_description()) {
-            if !self.key_handler.read().await.contains_key(key_desc) {
+            if !self.key_handler.contains_key(key_desc) {
                 return Err(StratisError::Msg(format!(
                     "Key {} was not found in the keyring",
                     key_desc.as_application_str()
@@ -159,7 +156,7 @@ impl Engine for SimEngine {
 
                     let (pool_uuid, pool) = SimPool::new(&devices, encryption_info);
 
-                    self.pools.write_all().await.insert(
+                    self.pools.modify_all().await.insert(
                         Name::new(name.to_owned()),
                         pool_uuid,
                         pool,
@@ -171,7 +168,7 @@ impl Engine for SimEngine {
         }
     }
 
-    async fn handle_events(&self, _: Vec<UdevEngineEvent>) -> HandleEvents<Self::Pool> {
+    async fn handle_events(&self, _: Vec<UdevEngineEvent>) -> HandleEvents<dyn Pool> {
         (Vec::new(), HashMap::new())
     }
 
@@ -182,7 +179,7 @@ impl Engine for SimEngine {
             }
             drop(pool);
             self.pools
-                .write_all()
+                .modify_all()
                 .await
                 .remove_by_uuid(uuid)
                 .expect("Must succeed since self.pool.get_by_uuid() returned a value")
@@ -202,7 +199,7 @@ impl Engine for SimEngine {
         let new_name = Name::new(new_name.to_owned());
         rename_pool_pre_idem!(self; uuid; new_name.clone());
 
-        let mut guard = self.pools.write_all().await;
+        let mut guard = self.pools.modify_all().await;
 
         let (_, pool) = guard
             .remove_by_uuid(uuid)
@@ -223,15 +220,15 @@ impl Engine for SimEngine {
     async fn get_pool(
         &self,
         key: PoolIdentifier<PoolUuid>,
-    ) -> Option<SomeLockReadGuard<PoolUuid, Self::Pool>> {
-        get_pool!(self; key)
+    ) -> Option<SomeLockReadGuard<PoolUuid, dyn Pool>> {
+        get_pool!(self; key).map(|l| l.into_dyn())
     }
 
     async fn get_mut_pool(
         &self,
         key: PoolIdentifier<PoolUuid>,
-    ) -> Option<SomeLockWriteGuard<PoolUuid, Self::Pool>> {
-        get_mut_pool!(self; key)
+    ) -> Option<SomeLockWriteGuard<PoolUuid, dyn Pool>> {
+        get_mut_pool!(self; key).map(|l| l.into_dyn())
     }
 
     async fn locked_pools(&self) -> LockedPoolsInfo {
@@ -263,12 +260,12 @@ impl Engine for SimEngine {
         )
     }
 
-    async fn pools(&self) -> AllLockReadGuard<PoolUuid, Self::Pool> {
-        self.pools.read_all().await
+    async fn pools(&self) -> AllLockReadGuard<PoolUuid, dyn Pool> {
+        self.pools.read_all().await.into_dyn()
     }
 
-    async fn pools_mut(&self) -> AllLockWriteGuard<PoolUuid, Self::Pool> {
-        self.pools.write_all().await
+    async fn pools_mut(&self) -> AllLockWriteGuard<PoolUuid, dyn Pool> {
+        self.pools.write_all().await.into_dyn()
     }
 
     async fn get_events(&self) -> StratisResult<HashSet<PoolUuid>> {
@@ -286,12 +283,8 @@ impl Engine for SimEngine {
         HashMap::default()
     }
 
-    async fn get_key_handler(&self) -> SharedGuard<OwnedRwLockReadGuard<Self::KeyActions>> {
-        self.key_handler.read().await
-    }
-
-    async fn get_key_handler_mut(&self) -> ExclusiveGuard<OwnedRwLockWriteGuard<Self::KeyActions>> {
-        self.key_handler.write().await
+    async fn get_key_handler(&self) -> Arc<dyn KeyActions> {
+        Arc::clone(&self.key_handler) as Arc<dyn KeyActions>
     }
 
     async fn start_pool(
@@ -337,7 +330,7 @@ impl Engine for SimEngine {
                     })
                     .map(|(n, p)| (n, u, p))?,
             };
-            self.pools.write_all().await.insert(name, pool_uuid, pool);
+            self.pools.modify_all().await.insert(name, pool_uuid, pool);
             Ok(StartAction::Started(pool_uuid))
         }
     }
@@ -358,13 +351,13 @@ impl Engine for SimEngine {
         let pool_entry = match pool_id {
             PoolIdentifier::Name(ref n) => self
                 .pools
-                .write_all()
+                .modify_all()
                 .await
                 .remove_by_name(n)
                 .map(|(u, p)| (n.clone(), u, p)),
             PoolIdentifier::Uuid(u) => self
                 .pools
-                .write_all()
+                .modify_all()
                 .await
                 .remove_by_uuid(u)
                 .map(|(n, p)| (n, u, p)),
@@ -394,7 +387,7 @@ impl Engine for SimEngine {
 #[cfg(test)]
 mod tests {
     use crate::engine::{
-        engine::{Engine, Pool},
+        engine::Engine,
         types::{EngineAction, RenameAction},
     };
 

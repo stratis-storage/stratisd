@@ -361,7 +361,7 @@ impl StratKeyActions {
 
 impl KeyActions for StratKeyActions {
     fn set(
-        &mut self,
+        &self,
         key_desc: &KeyDescription,
         key_fd: RawFd,
     ) -> StratisResult<MappingCreateAction<Key>> {
@@ -377,7 +377,7 @@ impl KeyActions for StratKeyActions {
         key_ids.to_key_descs()
     }
 
-    fn unset(&mut self, key_desc: &KeyDescription) -> StratisResult<MappingDeleteAction<Key>> {
+    fn unset(&self, key_desc: &KeyDescription) -> StratisResult<MappingDeleteAction<Key>> {
         let keyring_id = get_persistent_keyring()?;
 
         if let Some(key_id) = search_key(keyring_id, key_desc)? {

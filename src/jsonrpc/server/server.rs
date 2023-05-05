@@ -43,10 +43,7 @@ use crate::{
 };
 
 impl StratisParams {
-    async fn process<E>(self, engine: Arc<E>) -> IpcResult<StratisRet>
-    where
-        E: Engine,
-    {
+    async fn process(self, engine: Arc<dyn Engine>) -> IpcResult<StratisRet> {
         match self.type_ {
             StratisParamType::KeySet(key_desc) => {
                 let fd = expects_fd!(self.fd_opt, true);
@@ -250,16 +247,13 @@ impl StratisParams {
     }
 }
 
-pub struct StratisServer<E> {
-    engine: Arc<E>,
+pub struct StratisServer {
+    engine: Arc<dyn Engine>,
     listener: StratisUnixListener,
 }
 
-impl<E> StratisServer<E>
-where
-    E: 'static + Engine,
-{
-    pub fn new<P>(engine: Arc<E>, path: P) -> StratisResult<StratisServer<E>>
+impl StratisServer {
+    pub fn new<P>(engine: Arc<dyn Engine>, path: P) -> StratisResult<StratisServer>
     where
         P: AsRef<Path>,
     {
@@ -490,10 +484,7 @@ impl Stream for StratisUnixListener {
     }
 }
 
-pub fn run_server<E>(engine: Arc<E>) -> JoinHandle<()>
-where
-    E: 'static + Engine,
-{
+pub fn run_server(engine: Arc<dyn Engine>) -> JoinHandle<()> {
     tokio::spawn(async move {
         match StratisServer::new(engine, RPC_SOCKADDR) {
             Ok(server) => server.run().await,

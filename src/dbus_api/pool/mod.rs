@@ -10,7 +10,7 @@ use crate::{
         types::{DbusContext, InterfacesAddedThreadSafe, OPContext},
         util::make_object_path,
     },
-    engine::{Engine, Name, PoolUuid, StratisUuid},
+    engine::{Name, Pool, PoolUuid, StratisUuid},
 };
 
 mod pool_3_0;
@@ -20,16 +20,13 @@ mod pool_3_5;
 pub mod prop_conv;
 mod shared;
 
-pub fn create_dbus_pool<'a, E>(
-    dbus_context: &DbusContext<E>,
+pub fn create_dbus_pool<'a>(
+    dbus_context: &DbusContext,
     parent: dbus::Path<'static>,
     name: &Name,
     uuid: PoolUuid,
-    pool: &E::Pool,
-) -> dbus::Path<'a>
-where
-    E: 'static + Engine,
-{
+    pool: &dyn Pool,
+) -> dbus::Path<'a> {
     let f = Factory::new_sync();
 
     let object_name = make_object_path(dbus_context);
@@ -246,122 +243,119 @@ where
         );
 
     let path = object_path.get_name().to_owned();
-    let interfaces = get_pool_properties::<E>(name, uuid, pool);
+    let interfaces = get_pool_properties(name, uuid, pool);
     dbus_context.push_add(object_path, interfaces);
     path
 }
 
 /// Get the initial state of all properties associated with a pool object.
-pub fn get_pool_properties<E>(
+pub fn get_pool_properties(
     pool_name: &Name,
     pool_uuid: PoolUuid,
-    pool: &E::Pool,
-) -> InterfacesAddedThreadSafe
-where
-    E: 'static + Engine,
-{
+    pool: &dyn Pool,
+) -> InterfacesAddedThreadSafe {
     initial_properties! {
         consts::POOL_INTERFACE_NAME_3_0 => {
             consts::POOL_NAME_PROP => shared::pool_name_prop(pool_name),
             consts::POOL_UUID_PROP => uuid_to_string!(pool_uuid),
-            consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop::<E>(pool),
-            consts::POOL_AVAIL_ACTIONS_PROP => shared::pool_avail_actions_prop::<E>(pool),
-            consts::POOL_KEY_DESC_PROP => shared::pool_key_desc_prop::<E>(pool),
-            consts::POOL_CLEVIS_INFO_PROP => shared::pool_clevis_info_prop::<E>(pool),
-            consts::POOL_HAS_CACHE_PROP => shared::pool_has_cache_prop::<E>(pool),
-            consts::POOL_ALLOC_SIZE_PROP => shared::pool_allocated_size::<E>(pool),
-            consts::POOL_TOTAL_USED_PROP => shared::pool_used_size::<E>(pool),
-            consts::POOL_TOTAL_SIZE_PROP => shared::pool_total_size::<E>(pool)
+            consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop(pool),
+            consts::POOL_AVAIL_ACTIONS_PROP => shared::pool_avail_actions_prop(pool),
+            consts::POOL_KEY_DESC_PROP => shared::pool_key_desc_prop(pool),
+            consts::POOL_CLEVIS_INFO_PROP => shared::pool_clevis_info_prop(pool),
+            consts::POOL_HAS_CACHE_PROP => shared::pool_has_cache_prop(pool),
+            consts::POOL_ALLOC_SIZE_PROP => shared::pool_allocated_size(pool),
+            consts::POOL_TOTAL_USED_PROP => shared::pool_used_size(pool),
+            consts::POOL_TOTAL_SIZE_PROP => shared::pool_total_size(pool)
         },
         consts::POOL_INTERFACE_NAME_3_1 => {
             consts::POOL_NAME_PROP => shared::pool_name_prop(pool_name),
             consts::POOL_UUID_PROP => uuid_to_string!(pool_uuid),
-            consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop::<E>(pool),
-            consts::POOL_AVAIL_ACTIONS_PROP => shared::pool_avail_actions_prop::<E>(pool),
-            consts::POOL_KEY_DESC_PROP => shared::pool_key_desc_prop::<E>(pool),
-            consts::POOL_CLEVIS_INFO_PROP => shared::pool_clevis_info_prop::<E>(pool),
-            consts::POOL_HAS_CACHE_PROP => shared::pool_has_cache_prop::<E>(pool),
-            consts::POOL_ALLOC_SIZE_PROP => shared::pool_allocated_size::<E>(pool),
-            consts::POOL_TOTAL_USED_PROP => shared::pool_used_size::<E>(pool),
-            consts::POOL_TOTAL_SIZE_PROP => shared::pool_total_size::<E>(pool),
-            consts::POOL_FS_LIMIT_PROP => shared::pool_fs_limit::<E>(pool),
-            consts::POOL_OVERPROV_PROP => shared::pool_overprov_enabled::<E>(pool),
-            consts::POOL_NO_ALLOCABLE_SPACE_PROP => shared::pool_no_alloc_space::<E>(pool)
+            consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop(pool),
+            consts::POOL_AVAIL_ACTIONS_PROP => shared::pool_avail_actions_prop(pool),
+            consts::POOL_KEY_DESC_PROP => shared::pool_key_desc_prop(pool),
+            consts::POOL_CLEVIS_INFO_PROP => shared::pool_clevis_info_prop(pool),
+            consts::POOL_HAS_CACHE_PROP => shared::pool_has_cache_prop(pool),
+            consts::POOL_ALLOC_SIZE_PROP => shared::pool_allocated_size(pool),
+            consts::POOL_TOTAL_USED_PROP => shared::pool_used_size(pool),
+            consts::POOL_TOTAL_SIZE_PROP => shared::pool_total_size(pool),
+            consts::POOL_FS_LIMIT_PROP => shared::pool_fs_limit(pool),
+            consts::POOL_OVERPROV_PROP => shared::pool_overprov_enabled(pool),
+            consts::POOL_NO_ALLOCABLE_SPACE_PROP => shared::pool_no_alloc_space(pool)
         },
         consts::POOL_INTERFACE_NAME_3_2 => {
             consts::POOL_NAME_PROP => shared::pool_name_prop(pool_name),
             consts::POOL_UUID_PROP => uuid_to_string!(pool_uuid),
-            consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop::<E>(pool),
-            consts::POOL_AVAIL_ACTIONS_PROP => shared::pool_avail_actions_prop::<E>(pool),
-            consts::POOL_KEY_DESC_PROP => shared::pool_key_desc_prop::<E>(pool),
-            consts::POOL_CLEVIS_INFO_PROP => shared::pool_clevis_info_prop::<E>(pool),
-            consts::POOL_HAS_CACHE_PROP => shared::pool_has_cache_prop::<E>(pool),
-            consts::POOL_ALLOC_SIZE_PROP => shared::pool_allocated_size::<E>(pool),
-            consts::POOL_TOTAL_USED_PROP => shared::pool_used_size::<E>(pool),
-            consts::POOL_TOTAL_SIZE_PROP => shared::pool_total_size::<E>(pool),
-            consts::POOL_FS_LIMIT_PROP => shared::pool_fs_limit::<E>(pool),
-            consts::POOL_OVERPROV_PROP => shared::pool_overprov_enabled::<E>(pool),
-            consts::POOL_NO_ALLOCABLE_SPACE_PROP => shared::pool_no_alloc_space::<E>(pool)
+            consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop(pool),
+            consts::POOL_AVAIL_ACTIONS_PROP => shared::pool_avail_actions_prop(pool),
+            consts::POOL_KEY_DESC_PROP => shared::pool_key_desc_prop(pool),
+            consts::POOL_CLEVIS_INFO_PROP => shared::pool_clevis_info_prop(pool),
+            consts::POOL_HAS_CACHE_PROP => shared::pool_has_cache_prop(pool),
+            consts::POOL_ALLOC_SIZE_PROP => shared::pool_allocated_size(pool),
+            consts::POOL_TOTAL_USED_PROP => shared::pool_used_size(pool),
+            consts::POOL_TOTAL_SIZE_PROP => shared::pool_total_size(pool),
+            consts::POOL_FS_LIMIT_PROP => shared::pool_fs_limit(pool),
+            consts::POOL_OVERPROV_PROP => shared::pool_overprov_enabled(pool),
+            consts::POOL_NO_ALLOCABLE_SPACE_PROP => shared::pool_no_alloc_space(pool)
         },
         consts::POOL_INTERFACE_NAME_3_3 => {
             consts::POOL_NAME_PROP => shared::pool_name_prop(pool_name),
             consts::POOL_UUID_PROP => uuid_to_string!(pool_uuid),
-            consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop::<E>(pool),
-            consts::POOL_AVAIL_ACTIONS_PROP => shared::pool_avail_actions_prop::<E>(pool),
-            consts::POOL_KEY_DESC_PROP => shared::pool_key_desc_prop::<E>(pool),
-            consts::POOL_CLEVIS_INFO_PROP => shared::pool_clevis_info_prop::<E>(pool),
-            consts::POOL_HAS_CACHE_PROP => shared::pool_has_cache_prop::<E>(pool),
-            consts::POOL_ALLOC_SIZE_PROP => shared::pool_allocated_size::<E>(pool),
-            consts::POOL_TOTAL_USED_PROP => shared::pool_used_size::<E>(pool),
-            consts::POOL_TOTAL_SIZE_PROP => shared::pool_total_size::<E>(pool),
-            consts::POOL_FS_LIMIT_PROP => shared::pool_fs_limit::<E>(pool),
-            consts::POOL_OVERPROV_PROP => shared::pool_overprov_enabled::<E>(pool),
-            consts::POOL_NO_ALLOCABLE_SPACE_PROP => shared::pool_no_alloc_space::<E>(pool)
+            consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop(pool),
+            consts::POOL_AVAIL_ACTIONS_PROP => shared::pool_avail_actions_prop(pool),
+            consts::POOL_KEY_DESC_PROP => shared::pool_key_desc_prop(pool),
+            consts::POOL_CLEVIS_INFO_PROP => shared::pool_clevis_info_prop(pool),
+            consts::POOL_HAS_CACHE_PROP => shared::pool_has_cache_prop(pool),
+            consts::POOL_ALLOC_SIZE_PROP => shared::pool_allocated_size(pool),
+            consts::POOL_TOTAL_USED_PROP => shared::pool_used_size(pool),
+            consts::POOL_TOTAL_SIZE_PROP => shared::pool_total_size(pool),
+            consts::POOL_FS_LIMIT_PROP => shared::pool_fs_limit(pool),
+            consts::POOL_OVERPROV_PROP => shared::pool_overprov_enabled(pool),
+            consts::POOL_NO_ALLOCABLE_SPACE_PROP => shared::pool_no_alloc_space(pool)
         },
         consts::POOL_INTERFACE_NAME_3_4 => {
             consts::POOL_NAME_PROP => shared::pool_name_prop(pool_name),
             consts::POOL_UUID_PROP => uuid_to_string!(pool_uuid),
-            consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop::<E>(pool),
-            consts::POOL_AVAIL_ACTIONS_PROP => shared::pool_avail_actions_prop::<E>(pool),
-            consts::POOL_KEY_DESC_PROP => shared::pool_key_desc_prop::<E>(pool),
-            consts::POOL_CLEVIS_INFO_PROP => shared::pool_clevis_info_prop::<E>(pool),
-            consts::POOL_HAS_CACHE_PROP => shared::pool_has_cache_prop::<E>(pool),
-            consts::POOL_ALLOC_SIZE_PROP => shared::pool_allocated_size::<E>(pool),
-            consts::POOL_TOTAL_USED_PROP => shared::pool_used_size::<E>(pool),
-            consts::POOL_TOTAL_SIZE_PROP => shared::pool_total_size::<E>(pool),
-            consts::POOL_FS_LIMIT_PROP => shared::pool_fs_limit::<E>(pool),
-            consts::POOL_OVERPROV_PROP => shared::pool_overprov_enabled::<E>(pool),
-            consts::POOL_NO_ALLOCABLE_SPACE_PROP => shared::pool_no_alloc_space::<E>(pool)
+            consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop(pool),
+            consts::POOL_AVAIL_ACTIONS_PROP => shared::pool_avail_actions_prop(pool),
+            consts::POOL_KEY_DESC_PROP => shared::pool_key_desc_prop(pool),
+            consts::POOL_CLEVIS_INFO_PROP => shared::pool_clevis_info_prop(pool),
+            consts::POOL_HAS_CACHE_PROP => shared::pool_has_cache_prop(pool),
+            consts::POOL_ALLOC_SIZE_PROP => shared::pool_allocated_size(pool),
+            consts::POOL_TOTAL_USED_PROP => shared::pool_used_size(pool),
+            consts::POOL_TOTAL_SIZE_PROP => shared::pool_total_size(pool),
+            consts::POOL_FS_LIMIT_PROP => shared::pool_fs_limit(pool),
+            consts::POOL_OVERPROV_PROP => shared::pool_overprov_enabled(pool),
+            consts::POOL_NO_ALLOCABLE_SPACE_PROP => shared::pool_no_alloc_space(pool)
         },
         consts::POOL_INTERFACE_NAME_3_5 => {
             consts::POOL_NAME_PROP => shared::pool_name_prop(pool_name),
             consts::POOL_UUID_PROP => uuid_to_string!(pool_uuid),
-            consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop::<E>(pool),
-            consts::POOL_AVAIL_ACTIONS_PROP => shared::pool_avail_actions_prop::<E>(pool),
-            consts::POOL_KEY_DESC_PROP => shared::pool_key_desc_prop::<E>(pool),
-            consts::POOL_CLEVIS_INFO_PROP => shared::pool_clevis_info_prop::<E>(pool),
-            consts::POOL_HAS_CACHE_PROP => shared::pool_has_cache_prop::<E>(pool),
-            consts::POOL_ALLOC_SIZE_PROP => shared::pool_allocated_size::<E>(pool),
-            consts::POOL_TOTAL_USED_PROP => shared::pool_used_size::<E>(pool),
-            consts::POOL_TOTAL_SIZE_PROP => shared::pool_total_size::<E>(pool),
-            consts::POOL_FS_LIMIT_PROP => shared::pool_fs_limit::<E>(pool),
-            consts::POOL_OVERPROV_PROP => shared::pool_overprov_enabled::<E>(pool),
-            consts::POOL_NO_ALLOCABLE_SPACE_PROP => shared::pool_no_alloc_space::<E>(pool)
+            consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop(pool),
+            consts::POOL_AVAIL_ACTIONS_PROP => shared::pool_avail_actions_prop(pool),
+            consts::POOL_KEY_DESC_PROP => shared::pool_key_desc_prop(pool),
+            consts::POOL_CLEVIS_INFO_PROP => shared::pool_clevis_info_prop(pool),
+            consts::POOL_HAS_CACHE_PROP => shared::pool_has_cache_prop(pool),
+            consts::POOL_ALLOC_SIZE_PROP => shared::pool_allocated_size(pool),
+            consts::POOL_TOTAL_USED_PROP => shared::pool_used_size(pool),
+            consts::POOL_TOTAL_SIZE_PROP => shared::pool_total_size(pool),
+            consts::POOL_FS_LIMIT_PROP => shared::pool_fs_limit(pool),
+            consts::POOL_OVERPROV_PROP => shared::pool_overprov_enabled(pool),
+            consts::POOL_NO_ALLOCABLE_SPACE_PROP => shared::pool_no_alloc_space(pool)
         },
         consts::POOL_INTERFACE_NAME_3_6 => {
             consts::POOL_NAME_PROP => shared::pool_name_prop(pool_name),
             consts::POOL_UUID_PROP => uuid_to_string!(pool_uuid),
-            consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop::<E>(pool),
-            consts::POOL_AVAIL_ACTIONS_PROP => shared::pool_avail_actions_prop::<E>(pool),
-            consts::POOL_KEY_DESC_PROP => shared::pool_key_desc_prop::<E>(pool),
-            consts::POOL_CLEVIS_INFO_PROP => shared::pool_clevis_info_prop::<E>(pool),
-            consts::POOL_HAS_CACHE_PROP => shared::pool_has_cache_prop::<E>(pool),
-            consts::POOL_ALLOC_SIZE_PROP => shared::pool_allocated_size::<E>(pool),
-            consts::POOL_TOTAL_USED_PROP => shared::pool_used_size::<E>(pool),
-            consts::POOL_TOTAL_SIZE_PROP => shared::pool_total_size::<E>(pool),
-            consts::POOL_FS_LIMIT_PROP => shared::pool_fs_limit::<E>(pool),
-            consts::POOL_OVERPROV_PROP => shared::pool_overprov_enabled::<E>(pool),
-            consts::POOL_NO_ALLOCABLE_SPACE_PROP => shared::pool_no_alloc_space::<E>(pool)
+            consts::POOL_ENCRYPTED_PROP => shared::pool_enc_prop(pool),
+            consts::POOL_AVAIL_ACTIONS_PROP => shared::pool_avail_actions_prop(pool),
+            consts::POOL_KEY_DESC_PROP => shared::pool_key_desc_prop(pool),
+            consts::POOL_CLEVIS_INFO_PROP => shared::pool_clevis_info_prop(pool),
+            consts::POOL_HAS_CACHE_PROP => shared::pool_has_cache_prop(pool),
+            consts::POOL_ALLOC_SIZE_PROP => shared::pool_allocated_size(pool),
+            consts::POOL_TOTAL_USED_PROP => shared::pool_used_size(pool),
+            consts::POOL_TOTAL_SIZE_PROP => shared::pool_total_size(pool),
+            consts::POOL_FS_LIMIT_PROP => shared::pool_fs_limit(pool),
+            consts::POOL_OVERPROV_PROP => shared::pool_overprov_enabled(pool),
+            consts::POOL_NO_ALLOCABLE_SPACE_PROP => shared::pool_no_alloc_space(pool)
         }
     }
 }

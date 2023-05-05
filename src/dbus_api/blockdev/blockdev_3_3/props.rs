@@ -14,37 +14,28 @@ use crate::{
         types::TData,
         util::tuple_to_option,
     },
-    engine::{Engine, PropChangeAction},
+    engine::PropChangeAction,
 };
 
 /// Get the new size for an object path representing a block device.
-pub fn get_blockdev_new_size<E>(
+pub fn get_blockdev_new_size(
     i: &mut IterAppend<'_>,
-    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<(), MethodErr>
-where
-    E: Engine,
-{
-    get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_new_size_prop::<E>(p)))
+    p: &PropInfo<'_, MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
+    get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_new_size_prop(p)))
 }
 
-pub fn get_blockdev_user_info<E>(
+pub fn get_blockdev_user_info(
     i: &mut IterAppend<'_>,
-    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<(), MethodErr>
-where
-    E: Engine,
-{
-    get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_user_info_prop::<E>(p)))
+    p: &PropInfo<'_, MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
+    get_blockdev_property(i, p, |_, p| Ok(shared::blockdev_user_info_prop(p)))
 }
 
-pub fn set_blockdev_user_info<E>(
+pub fn set_blockdev_user_info(
     i: &mut Iter<'_>,
-    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<(), MethodErr>
-where
-    E: Engine,
-{
+    p: &PropInfo<'_, MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
     let user_info_tuple: (bool, String) = i
         .get()
         .ok_or_else(|| MethodErr::failed("User info required as argument to set it"))?;
@@ -52,7 +43,7 @@ where
     let res = set_pool_level_blockdev_property_to_display(
         p,
         consts::BLOCKDEV_USER_INFO_PROP,
-        |n, p, uuid| shared::set_blockdev_user_info_prop::<E>(p, n, uuid, user_info.as_deref()),
+        |n, p, uuid| shared::set_blockdev_user_info_prop(p, n, uuid, user_info.as_deref()),
     );
     match res {
         Ok(PropChangeAction::NewValue(v)) => {

@@ -4,17 +4,11 @@
 
 use dbus_tree::{MTSync, MethodInfo, MethodResult};
 
-use crate::{
-    dbus_api::{
-        pool::shared::{add_blockdevs, BlockDevOp},
-        types::TData,
-    },
-    engine::Engine,
+use crate::dbus_api::{
+    pool::shared::{add_blockdevs, BlockDevOp},
+    types::TData,
 };
 
-pub fn init_cache<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn init_cache(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     add_blockdevs(m, BlockDevOp::InitCacheWithEnc)
 }

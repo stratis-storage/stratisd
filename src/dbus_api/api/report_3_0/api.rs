@@ -4,17 +4,9 @@
 
 use dbus_tree::{Factory, MTSync, Method};
 
-use crate::{
-    dbus_api::{api::report_3_0::methods::get_report, types::TData},
-    engine::Engine,
-};
+use crate::dbus_api::{api::report_3_0::methods::get_report, types::TData};
 
-pub fn get_report_method<E>(
-    f: &Factory<MTSync<TData<E>>, TData<E>>,
-) -> Method<MTSync<TData<E>>, TData<E>>
-where
-    E: 'static + Engine,
-{
+pub fn get_report_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
     f.method("GetReport", (), get_report)
         .in_arg(("name", "s"))
         // The report is a JSON object.

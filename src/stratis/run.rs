@@ -88,15 +88,15 @@ pub fn run(sim: bool) -> StratisResult<()> {
         })
         .build()?;
     runtime.block_on(async move {
-        async fn start_threads<E>(engine: Arc<E>, sim: bool) -> StratisResult<()> where E: 'static + Engine {
+        async fn start_threads(engine: Arc<dyn Engine>, sim: bool) -> StratisResult<()> {
             let (trigger, should_exit) = channel(1);
             let (udev_sender, udev_receiver) = unbounded_channel::<UdevEngineEvent>();
             #[cfg(feature = "dbus_enabled")]
-            let (dbus_sender, dbus_receiver) = unbounded_channel::<DbusAction<E>>();
+            let (dbus_sender, dbus_receiver) = unbounded_channel::<DbusAction>();
 
             let join_udev = udev_thread(udev_sender, should_exit);
             let join_ipc = setup(
-                engine.clone(),
+                Arc::clone(&engine),
                 udev_receiver,
                 #[cfg(feature = "dbus_enabled")]
                 trigger.clone(),
@@ -108,7 +108,7 @@ pub fn run(sim: bool) -> StratisResult<()> {
                 if sim {
                     None
                 } else {
-                    Some(Arc::clone(&engine))
+                    Some(Arc::clone(&engine) as Arc<dyn Engine>)
                 },
                 #[cfg(feature = "dbus_enabled")]
                 dbus_sender.clone(),

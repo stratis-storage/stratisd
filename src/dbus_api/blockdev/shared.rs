@@ -9,22 +9,20 @@ use futures::executor::block_on;
 use crate::{
     dbus_api::{blockdev::prop_conv, types::TData, util::option_to_tuple},
     engine::{
-        BlockDev, BlockDevTier, DevUuid, Engine, Name, Pool, PoolIdentifier, PropChangeAction,
-        ToDisplay,
+        BlockDev, BlockDevTier, DevUuid, Name, Pool, PoolIdentifier, PropChangeAction, ToDisplay,
     },
 };
 
 /// Perform a get operation on a `BlockDev` object for a given
 /// DBus implicit argument that is a block device
-pub fn blockdev_get_operation<F, R, E>(
-    tree: &Tree<MTSync<TData<E>>, TData<E>>,
+pub fn blockdev_get_operation<F, R>(
+    tree: &Tree<MTSync<TData>, TData>,
     object_path: &Path<'static>,
     closure: F,
 ) -> Result<R, String>
 where
-    F: Fn(BlockDevTier, &<E::Pool as Pool>::BlockDev) -> Result<R, String>,
+    F: Fn(BlockDevTier, &dyn BlockDev) -> Result<R, String>,
     R: dbus::arg::Append,
-    E: Engine,
 {
     let dbus_context = tree.get_data();
 
@@ -65,14 +63,13 @@ where
 
 /// Perform a set operation on a `BlockDev` object that requires a pool level API
 /// operation for a given DBus implicit argument that is a block device
-pub fn blockdev_pool_level_set_operation<F, R, E>(
-    tree: &Tree<MTSync<TData<E>>, TData<E>>,
+pub fn blockdev_pool_level_set_operation<F, R>(
+    tree: &Tree<MTSync<TData>, TData>,
     object_path: &Path<'static>,
     closure: F,
 ) -> Result<R, String>
 where
-    F: Fn(&Name, &mut E::Pool, DevUuid) -> Result<R, String>,
-    E: Engine,
+    F: Fn(&Name, &mut dyn Pool, DevUuid) -> Result<R, String>,
 {
     let dbus_context = tree.get_data();
 
@@ -112,15 +109,14 @@ where
 /// Get a blockdev property and place it on the D-Bus. The property is
 /// found by means of the getter method which takes a reference to a
 /// blockdev and obtains the property from the blockdev.
-pub fn get_blockdev_property<F, R, E>(
+pub fn get_blockdev_property<F, R>(
     i: &mut IterAppend<'_>,
-    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+    p: &PropInfo<'_, MTSync<TData>, TData>,
     getter: F,
 ) -> Result<(), MethodErr>
 where
-    F: Fn(BlockDevTier, &<E::Pool as Pool>::BlockDev) -> Result<R, String>,
+    F: Fn(BlockDevTier, &dyn BlockDev) -> Result<R, String>,
     R: dbus::arg::Append,
-    E: Engine,
 {
     i.append(
         blockdev_get_operation(p.tree, p.path.get_name(), getter)
@@ -130,14 +126,13 @@ where
 }
 
 /// Set a blockdev property that needs to be set at the pool level.
-pub fn set_pool_level_blockdev_property_to_display<F, R, E>(
-    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+pub fn set_pool_level_blockdev_property_to_display<F, R>(
+    p: &PropInfo<'_, MTSync<TData>, TData>,
     prop_name: &str,
     setter: F,
 ) -> Result<R, MethodErr>
 where
-    F: Fn(&Name, &mut E::Pool, DevUuid) -> Result<R, String>,
-    E: Engine,
+    F: Fn(&Name, &mut dyn Pool, DevUuid) -> Result<R, String>,
     R: ToDisplay,
 {
     info!("Setting property {}", prop_name);
@@ -150,42 +145,30 @@ where
 
 /// Generate D-Bus representation of devnode property.
 #[inline]
-pub fn blockdev_devnode_prop<E>(dev: &<E::Pool as Pool>::BlockDev) -> String
-where
-    E: Engine,
-{
+pub fn blockdev_devnode_prop(dev: &dyn BlockDev) -> String {
     dev.metadata_path().display().to_string()
 }
 
 /// Generate D-Bus representation of hardware info property.
 #[inline]
-pub fn blockdev_hardware_info_prop<E>(dev: &<E::Pool as Pool>::BlockDev) -> (bool, String)
-where
-    E: Engine,
-{
+pub fn blockdev_hardware_info_prop(dev: &dyn BlockDev) -> (bool, String) {
     option_to_tuple(dev.hardware_info().map(|s| s.to_owned()), String::new())
 }
 
 /// Generate D-Bus representation of user info property.
 #[inline]
-pub fn blockdev_user_info_prop<E>(dev: &<E::Pool as Pool>::BlockDev) -> (bool, String)
-where
-    E: Engine,
-{
+pub fn blockdev_user_info_prop(dev: &dyn BlockDev) -> (bool, String) {
     prop_conv::blockdev_user_info_to_prop(dev.user_info().map(|s| s.to_owned()))
 }
 
 /// Generate D-Bus representation of user info property.
 #[inline]
-pub fn set_blockdev_user_info_prop<'a, E>(
-    pool: &mut E::Pool,
+pub fn set_blockdev_user_info_prop<'a>(
+    pool: &mut dyn Pool,
     pool_name: &Name,
     dev_uuid: DevUuid,
     user_info: Option<&'a str>,
-) -> Result<PropChangeAction<Option<&'a str>>, String>
-where
-    E: Engine,
-{
+) -> Result<PropChangeAction<Option<&'a str>>, String> {
     if pool
         .get_blockdev(dev_uuid)
         .ok_or_else(|| format!("Blockdev with UUID {dev_uuid} not found"))?
@@ -203,10 +186,7 @@ where
 
 /// Generate D-Bus representation of initialization time property.
 #[inline]
-pub fn blockdev_init_time_prop<E>(dev: &<E::Pool as Pool>::BlockDev) -> u64
-where
-    E: Engine,
-{
+pub fn blockdev_init_time_prop(dev: &dyn BlockDev) -> u64 {
     dev.initialization_time().timestamp() as u64
 }
 
@@ -218,27 +198,18 @@ pub fn blockdev_tier_prop(tier: BlockDevTier) -> u16 {
 
 /// Generate a D-Bus representation of the physical path
 #[inline]
-pub fn blockdev_physical_path_prop<E>(dev: &<E::Pool as Pool>::BlockDev) -> String
-where
-    E: Engine,
-{
+pub fn blockdev_physical_path_prop(dev: &dyn BlockDev) -> String {
     dev.devnode().display().to_string()
 }
 
 /// Generate D-Bus representation of devnode size.
 #[inline]
-pub fn blockdev_size_prop<E>(dev: &<E::Pool as Pool>::BlockDev) -> String
-where
-    E: Engine,
-{
+pub fn blockdev_size_prop(dev: &dyn BlockDev) -> String {
     (*dev.size().bytes()).to_string()
 }
 
 /// Generate D-Bus representation of new block device size.
 #[inline]
-pub fn blockdev_new_size_prop<E>(dev: &<E::Pool as Pool>::BlockDev) -> (bool, String)
-where
-    E: Engine,
-{
+pub fn blockdev_new_size_prop(dev: &dyn BlockDev) -> (bool, String) {
     prop_conv::blockdev_new_size_to_prop(dev.new_size())
 }

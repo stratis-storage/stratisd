@@ -15,16 +15,13 @@ use crate::{
         types::{DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
-    engine::{CreateAction, EncryptionInfo, Engine, KeyDescription, Pool, PoolIdentifier},
+    engine::{CreateAction, EncryptionInfo, KeyDescription, PoolIdentifier},
     stratis::StratisError,
 };
 
 type EncryptionParams = (Option<(bool, String)>, Option<(bool, (String, String))>);
 
-pub fn create_pool<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn create_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let base_path = m.path.get_name();
     let message: &Message = m.msg;
     let mut iter = message.iter_init();

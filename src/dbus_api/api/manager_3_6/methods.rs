@@ -12,14 +12,11 @@ use crate::{
         types::{DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg},
     },
-    engine::{Engine, Name, Pool, PoolIdentifier, PoolUuid, StopAction, StratisUuid},
+    engine::{Name, PoolIdentifier, PoolUuid, StopAction, StratisUuid},
     stratis::StratisError,
 };
 
-pub fn stop_pool<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn stop_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
     let dbus_context = m.tree.get_data();

@@ -20,16 +20,13 @@ use crate::{
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
     engine::{
-        CreateAction, DeleteAction, Engine, EngineAction, FilesystemUuid, KeyDescription, Name,
-        Pool, PoolUuid, RenameAction,
+        CreateAction, DeleteAction, EngineAction, FilesystemUuid, KeyDescription, Name, PoolUuid,
+        RenameAction,
     },
     stratis::StratisError,
 };
 
-pub fn create_filesystems<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn create_filesystems(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -131,10 +128,7 @@ where
     )])
 }
 
-pub fn destroy_filesystems<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn destroy_filesystems(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -211,10 +205,7 @@ where
     Ok(vec![msg])
 }
 
-pub fn snapshot_filesystem<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn snapshot_filesystem(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -288,17 +279,11 @@ where
     Ok(vec![msg])
 }
 
-pub fn add_datadevs<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn add_datadevs(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     add_blockdevs(m, BlockDevOp::AddData)
 }
 
-pub fn rename_pool<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn rename_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -351,24 +336,15 @@ where
     Ok(vec![msg])
 }
 
-pub fn init_cache<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn init_cache(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     add_blockdevs(m, BlockDevOp::InitCache)
 }
 
-pub fn add_cachedevs<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn add_cachedevs(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     add_blockdevs(m, BlockDevOp::AddCache)
 }
 
-pub fn bind_clevis<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn bind_clevis(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
     let pin: String = get_next_arg(&mut iter, 0)?;
@@ -419,10 +395,7 @@ where
     Ok(vec![msg])
 }
 
-pub fn unbind_clevis<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn unbind_clevis(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
 
     let dbus_context = m.tree.get_data();
@@ -459,10 +432,7 @@ where
     Ok(vec![msg])
 }
 
-pub fn bind_keyring<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn bind_keyring(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
     let key_desc_str: String = get_next_arg(&mut iter, 0)?;
@@ -513,10 +483,7 @@ where
     Ok(vec![msg])
 }
 
-pub fn unbind_keyring<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn unbind_keyring(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
 
     let dbus_context = m.tree.get_data();
@@ -553,10 +520,7 @@ where
     Ok(vec![msg])
 }
 
-pub fn rebind_keyring<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn rebind_keyring(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
     let key_desc_str: String = get_next_arg(&mut iter, 0)?;
@@ -614,10 +578,7 @@ where
     Ok(vec![msg])
 }
 
-pub fn rebind_clevis<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn rebind_clevis(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
 
     let dbus_context = m.tree.get_data();

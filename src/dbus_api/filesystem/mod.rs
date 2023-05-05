@@ -10,24 +10,21 @@ use crate::{
         types::{DbusContext, InterfacesAddedThreadSafe, OPContext},
         util::make_object_path,
     },
-    engine::{Engine, FilesystemUuid, Name, Pool, StratisUuid},
+    engine::{Filesystem, FilesystemUuid, Name, StratisUuid},
 };
 
 mod filesystem_3_0;
 pub mod prop_conv;
 mod shared;
 
-pub fn create_dbus_filesystem<'a, E>(
-    dbus_context: &DbusContext<E>,
+pub fn create_dbus_filesystem<'a>(
+    dbus_context: &DbusContext,
     parent: dbus::Path<'static>,
     pool_name: &Name,
     name: &Name,
     uuid: FilesystemUuid,
-    filesystem: &<E::Pool as Pool>::Filesystem,
-) -> dbus::Path<'a>
-where
-    E: 'static + Engine,
-{
+    filesystem: &dyn Filesystem,
+) -> dbus::Path<'a> {
     let f = Factory::new_sync();
 
     let object_name = make_object_path(dbus_context);
@@ -117,85 +114,82 @@ where
         );
 
     let path = object_path.get_name().to_owned();
-    let interfaces = get_fs_properties::<E>(parent, pool_name, name, uuid, filesystem);
+    let interfaces = get_fs_properties(parent, pool_name, name, uuid, filesystem);
     dbus_context.push_add(object_path, interfaces);
     path
 }
 
 /// Get the initial state of all properties associated with a filesystem object.
-pub fn get_fs_properties<E>(
+pub fn get_fs_properties(
     parent: dbus::Path<'static>,
     pool_name: &Name,
     fs_name: &Name,
     fs_uuid: FilesystemUuid,
-    fs: &<E::Pool as Pool>::Filesystem,
-) -> InterfacesAddedThreadSafe
-where
-    E: 'static + Engine,
-{
+    fs: &dyn Filesystem,
+) -> InterfacesAddedThreadSafe {
     initial_properties! {
         consts::FILESYSTEM_INTERFACE_NAME_3_0 => {
             consts::FILESYSTEM_NAME_PROP => shared::fs_name_prop(fs_name),
             consts::FILESYSTEM_UUID_PROP => uuid_to_string!(fs_uuid),
-            consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop::<E>(fs, pool_name, fs_name),
+            consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop(fs, pool_name, fs_name),
             consts::FILESYSTEM_POOL_PROP => parent.clone(),
-            consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop::<E>(fs),
+            consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop(fs),
             consts::FILESYSTEM_SIZE_PROP => shared::fs_size_prop(fs),
-            consts::FILESYSTEM_USED_PROP => shared::fs_used_prop::<E>(fs)
+            consts::FILESYSTEM_USED_PROP => shared::fs_used_prop(fs)
         },
         consts::FILESYSTEM_INTERFACE_NAME_3_1 => {
             consts::FILESYSTEM_NAME_PROP => shared::fs_name_prop(fs_name),
             consts::FILESYSTEM_UUID_PROP => uuid_to_string!(fs_uuid),
-            consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop::<E>(fs, pool_name, fs_name),
+            consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop(fs, pool_name, fs_name),
             consts::FILESYSTEM_POOL_PROP => parent.clone(),
-            consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop::<E>(fs),
+            consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop(fs),
             consts::FILESYSTEM_SIZE_PROP => shared::fs_size_prop(fs),
-            consts::FILESYSTEM_USED_PROP => shared::fs_used_prop::<E>(fs)
+            consts::FILESYSTEM_USED_PROP => shared::fs_used_prop(fs)
         },
         consts::FILESYSTEM_INTERFACE_NAME_3_2 => {
             consts::FILESYSTEM_NAME_PROP => shared::fs_name_prop(fs_name),
             consts::FILESYSTEM_UUID_PROP => uuid_to_string!(fs_uuid),
-            consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop::<E>(fs, pool_name, fs_name),
+            consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop(fs, pool_name, fs_name),
             consts::FILESYSTEM_POOL_PROP => parent.clone(),
-            consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop::<E>(fs),
+            consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop(fs),
             consts::FILESYSTEM_SIZE_PROP => shared::fs_size_prop(fs),
-            consts::FILESYSTEM_USED_PROP => shared::fs_used_prop::<E>(fs)
+            consts::FILESYSTEM_USED_PROP => shared::fs_used_prop(fs)
         },
         consts::FILESYSTEM_INTERFACE_NAME_3_3 => {
             consts::FILESYSTEM_NAME_PROP => shared::fs_name_prop(fs_name),
             consts::FILESYSTEM_UUID_PROP => uuid_to_string!(fs_uuid),
-            consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop::<E>(fs, pool_name, fs_name),
+            consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop(fs, pool_name, fs_name),
             consts::FILESYSTEM_POOL_PROP => parent.clone(),
-            consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop::<E>(fs),
+            consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop(fs),
             consts::FILESYSTEM_SIZE_PROP => shared::fs_size_prop(fs),
-            consts::FILESYSTEM_USED_PROP => shared::fs_used_prop::<E>(fs)
+            consts::FILESYSTEM_USED_PROP => shared::fs_used_prop(fs)
         },
         consts::FILESYSTEM_INTERFACE_NAME_3_4 => {
             consts::FILESYSTEM_NAME_PROP => shared::fs_name_prop(fs_name),
             consts::FILESYSTEM_UUID_PROP => uuid_to_string!(fs_uuid),
-            consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop::<E>(fs, pool_name, fs_name),
+            consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop(fs, pool_name, fs_name),
             consts::FILESYSTEM_POOL_PROP => parent.clone(),
-            consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop::<E>(fs),
+            consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop(fs),
             consts::FILESYSTEM_SIZE_PROP => shared::fs_size_prop(fs),
-            consts::FILESYSTEM_USED_PROP => shared::fs_used_prop::<E>(fs)
+            consts::FILESYSTEM_USED_PROP => shared::fs_used_prop(fs)
         },
         consts::FILESYSTEM_INTERFACE_NAME_3_5 => {
             consts::FILESYSTEM_NAME_PROP => shared::fs_name_prop(fs_name),
             consts::FILESYSTEM_UUID_PROP => uuid_to_string!(fs_uuid),
-            consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop::<E>(fs, pool_name, fs_name),
+            consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop(fs, pool_name, fs_name),
             consts::FILESYSTEM_POOL_PROP => parent.clone(),
-            consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop::<E>(fs),
+            consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop(fs),
             consts::FILESYSTEM_SIZE_PROP => shared::fs_size_prop(fs),
-            consts::FILESYSTEM_USED_PROP => shared::fs_used_prop::<E>(fs)
+            consts::FILESYSTEM_USED_PROP => shared::fs_used_prop(fs)
         },
         consts::FILESYSTEM_INTERFACE_NAME_3_6 => {
             consts::FILESYSTEM_NAME_PROP => shared::fs_name_prop(fs_name),
             consts::FILESYSTEM_UUID_PROP => uuid_to_string!(fs_uuid),
-            consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop::<E>(fs, pool_name, fs_name),
+            consts::FILESYSTEM_DEVNODE_PROP => shared::fs_devnode_prop(fs, pool_name, fs_name),
             consts::FILESYSTEM_POOL_PROP => parent,
-            consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop::<E>(fs),
+            consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop(fs),
             consts::FILESYSTEM_SIZE_PROP => shared::fs_size_prop(fs),
-            consts::FILESYSTEM_USED_PROP => shared::fs_used_prop::<E>(fs)
+            consts::FILESYSTEM_USED_PROP => shared::fs_used_prop(fs)
         }
     }
 }

@@ -94,10 +94,7 @@ where
 
 /// Generate a new object path which is guaranteed unique wrt. all previously
 /// generated object paths.
-pub fn make_object_path<E>(context: &DbusContext<E>) -> String
-where
-    E: Engine,
-{
+pub fn make_object_path(context: &DbusContext) -> String {
     format!("{}/{}", consts::STRATIS_BASE_PATH, context.get_next_id())
 }
 
@@ -112,13 +109,10 @@ pub fn engine_to_dbus_err_tuple(err: &StratisError) -> (u16, String) {
 }
 
 /// Get the UUID for an object path.
-pub fn get_uuid<E>(
+pub fn get_uuid(
     i: &mut IterAppend<'_>,
-    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<(), MethodErr>
-where
-    E: Engine,
-{
+    p: &PropInfo<'_, MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
     let object_path = p.path.get_name();
     let path = p
         .tree
@@ -135,13 +129,10 @@ where
 }
 
 /// Get the parent object path for an object path.
-pub fn get_parent<E>(
+pub fn get_parent(
     i: &mut IterAppend<'_>,
-    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
-) -> Result<(), MethodErr>
-where
-    E: Engine,
-{
+    p: &PropInfo<'_, MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
     let object_path = p.path.get_name();
     let path = p
         .tree
@@ -166,18 +157,12 @@ where
 /// Messages may be:
 /// * received by the DbusUdevHandler from the udev thread,
 /// * sent by the DbusContext to the DbusTreeHandler
-pub fn create_dbus_handlers<E>(
-    engine: Arc<E>,
+pub fn create_dbus_handlers(
+    engine: Arc<dyn Engine>,
     udev_receiver: UnboundedReceiver<UdevEngineEvent>,
     trigger: Sender<()>,
-    (tree_sender, tree_receiver): (
-        UnboundedSender<DbusAction<E>>,
-        UnboundedReceiver<DbusAction<E>>,
-    ),
-) -> DbusHandlers<E>
-where
-    E: 'static + Engine,
-{
+    (tree_sender, tree_receiver): (UnboundedSender<DbusAction>, UnboundedReceiver<DbusAction>),
+) -> DbusHandlers {
     let conn = Arc::new(SyncConnection::new_system()?);
     let (tree, object_path) =
         get_base_tree(DbusContext::new(engine, tree_sender, Arc::clone(&conn)));

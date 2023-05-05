@@ -14,7 +14,7 @@ use devicemapper::{Bytes, Sectors, IEC};
 
 use crate::{
     engine::{
-        engine::Pool,
+        engine::{BlockDev, Filesystem, Pool},
         shared::{
             gather_encryption_info, init_cache_idempotent_or_err, validate_filesystem_size_specs,
             validate_name, validate_paths,
@@ -176,9 +176,6 @@ impl<'a> Into<Value> for &'a SimPool {
 }
 
 impl Pool for SimPool {
-    type Filesystem = SimFilesystem;
-    type BlockDev = SimDev;
-
     fn init_cache(
         &mut self,
         _pool_uuid: PoolUuid,
@@ -515,7 +512,7 @@ impl Pool for SimPool {
         _pool_uuid: PoolUuid,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<CreateAction<(FilesystemUuid, &mut Self::Filesystem)>> {
+    ) -> StratisResult<CreateAction<(FilesystemUuid, &mut dyn Filesystem)>> {
         self.check_fs_limit(1)?;
 
         validate_name(snapshot_name)?;
@@ -568,26 +565,26 @@ impl Pool for SimPool {
         Some(Sectors(0))
     }
 
-    fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Self::Filesystem)> {
+    fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)> {
         self.filesystems
             .iter()
-            .map(|(name, uuid, x)| (name.clone(), *uuid, x))
+            .map(|(name, uuid, x)| (name.clone(), *uuid, x as &dyn Filesystem))
             .collect()
     }
 
-    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &Self::Filesystem)> {
+    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &dyn Filesystem)> {
         self.filesystems
             .get_by_uuid(uuid)
-            .map(|(name, p)| (name, p))
+            .map(|(name, p)| (name, p as &dyn Filesystem))
     }
 
-    fn get_filesystem_by_name(&self, name: &Name) -> Option<(FilesystemUuid, &Self::Filesystem)> {
+    fn get_filesystem_by_name(&self, name: &Name) -> Option<(FilesystemUuid, &dyn Filesystem)> {
         self.filesystems
             .get_by_name(name)
-            .map(|(uuid, p)| (uuid, p))
+            .map(|(uuid, p)| (uuid, p as &dyn Filesystem))
     }
 
-    fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &Self::BlockDev)> {
+    fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &dyn BlockDev)> {
         self.block_devs
             .iter()
             .map(|(uuid, dev)| (uuid, BlockDevTier::Data, dev))
@@ -596,31 +593,31 @@ impl Pool for SimPool {
                     .iter()
                     .map(|(uuid, dev)| (uuid, BlockDevTier::Cache, dev)),
             )
-            .map(|(uuid, tier, bd)| (*uuid, tier, bd))
+            .map(|(uuid, tier, bd)| (*uuid, tier, bd as &dyn BlockDev))
             .collect()
     }
 
-    fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &Self::BlockDev)> {
+    fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &dyn BlockDev)> {
         self.block_devs
             .get(&uuid)
-            .map(|bd| (BlockDevTier::Data, bd))
+            .map(|bd| (BlockDevTier::Data, bd as &dyn BlockDev))
             .or_else(move || {
                 self.cache_devs
                     .get(&uuid)
-                    .map(|bd| (BlockDevTier::Cache, bd))
+                    .map(|bd| (BlockDevTier::Cache, bd as &dyn BlockDev))
             })
     }
 
     fn get_mut_blockdev(
         &mut self,
         uuid: DevUuid,
-    ) -> StratisResult<Option<(BlockDevTier, &mut Self::BlockDev)>> {
+    ) -> StratisResult<Option<(BlockDevTier, &mut dyn BlockDev)>> {
         Ok(match self.block_devs.get_mut(&uuid) {
-            Some(bd) => Some((BlockDevTier::Data, bd)),
+            Some(bd) => Some((BlockDevTier::Data, bd as &mut dyn BlockDev)),
             None => self
                 .cache_devs
                 .get_mut(&uuid)
-                .map(|bd| (BlockDevTier::Cache, bd)),
+                .map(|bd| (BlockDevTier::Cache, bd as &mut dyn BlockDev)),
         })
     }
 

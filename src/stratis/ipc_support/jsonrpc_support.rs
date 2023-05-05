@@ -13,10 +13,10 @@ use crate::{
     stratis::{StratisError, StratisResult},
 };
 
-fn handle_udev<E>(engine: Arc<E>, mut recv: UnboundedReceiver<UdevEngineEvent>) -> JoinHandle<()>
-where
-    E: 'static + Engine,
-{
+fn handle_udev(
+    engine: Arc<dyn Engine>,
+    mut recv: UnboundedReceiver<UdevEngineEvent>,
+) -> JoinHandle<()> {
     tokio::spawn(async move {
         loop {
             let mut events = Vec::new();
@@ -46,10 +46,10 @@ where
     })
 }
 
-pub async fn setup<E>(engine: Arc<E>, recv: UnboundedReceiver<UdevEngineEvent>) -> StratisResult<()>
-where
-    E: 'static + Engine,
-{
+pub async fn setup(
+    engine: Arc<dyn Engine>,
+    recv: UnboundedReceiver<UdevEngineEvent>,
+) -> StratisResult<()> {
     let mut udev_join = handle_udev(engine.clone(), recv);
     let mut server_join = run_server(engine);
 

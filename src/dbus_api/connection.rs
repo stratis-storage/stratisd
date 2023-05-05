@@ -16,28 +16,24 @@ use tokio::{
 
 use crate::{
     dbus_api::types::LockableTree,
-    engine::Engine,
     stratis::{StratisError, StratisResult},
 };
 
 /// Handler for a D-Bus receiving connection.
 /// stratisd has exactly one connection handler, but this handler spawns
 /// a thread for every D-Bus method.
-pub struct DbusConnectionHandler<E> {
+pub struct DbusConnectionHandler {
     connection: Arc<SyncConnection>,
-    tree: LockableTree<E>,
+    tree: LockableTree,
     should_exit: Receiver<()>,
 }
 
-impl<E> DbusConnectionHandler<E>
-where
-    E: 'static + Engine,
-{
+impl DbusConnectionHandler {
     pub(super) fn new(
         connection: Arc<SyncConnection>,
-        tree: LockableTree<E>,
+        tree: LockableTree,
         should_exit: Receiver<()>,
-    ) -> DbusConnectionHandler<E> {
+    ) -> DbusConnectionHandler {
         DbusConnectionHandler {
             connection,
             tree,

@@ -11,6 +11,7 @@ repository = "https://github.com/stratis-storage/stratisd/"
 keywords = ["Linux", "filesystem", "storage"]
 categories = ["filesystem"]
 exclude = [
+    "_typos.toml",
     "docs",
     "dracut",
     ".clippy.toml",
@@ -21,6 +22,7 @@ exclude = [
     "tests",
     "udev",
     "Makefile",
+    "Makefile_dependencies",
     "README_tests.md",
     "stratisd.conf"
 ]

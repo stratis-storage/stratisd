@@ -12,7 +12,6 @@ check() {
 		xfs_growfs \
 		xfs_db \
 		udevadm \
-		/usr/bin/systemd-ask-password \
 		/usr/sbin/thin_metadata_size \
 		/usr/lib/udev/stratis-str-cmp \
 		/usr/lib/udev/stratis-base32-decode ||
@@ -22,7 +21,7 @@ check() {
 
 # called by dracut
 depends() {
-	echo dm
+	echo dm systemd-ask-password
 	return 0
 }
 
@@ -43,16 +42,12 @@ install() {
 		xfs_growfs \
 		xfs_db \
 		udevadm \
-		plymouth \
-		/usr/sbin/plymouthd \
 		/usr/sbin/thin_metadata_size \
 		/usr/lib/udev/stratis-base32-decode \
 		/usr/lib/udev/stratis-str-cmp
 
 	# Dracut dependencies
-	inst_multiple $systemdutildir/system-generators/stratis-setup-generator \
-		$systemdutildir/system/plymouth-start.service \
-		plymouth
+	inst_multiple $systemdutildir/system-generators/stratis-setup-generator
 
 	inst_rules "$moddir/61-stratisd.rules"
 	inst_simple "$moddir/stratisd-min.service" $systemdutildir/system/stratisd-min.service

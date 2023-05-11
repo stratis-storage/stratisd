@@ -32,6 +32,7 @@ use devicemapper::{DmName, MetaBlocks, Sectors};
 use crate::{
     engine::{
         engine::MAX_STRATIS_PASS_SIZE,
+        strat_engine::keys::get_persistent_keyring,
         types::{FilesystemUuid, SizedKeyMemory, StratisUuid},
     },
     stratis::{StratisError, StratisResult},
@@ -329,7 +330,10 @@ pub fn clevis_luks_bind(
         .arg(json.to_string());
 
     match existing_auth {
-        Either::Left(_) => execute_cmd(&mut cmd),
+        Either::Left(_) => {
+            get_persistent_keyring()?;
+            execute_cmd(&mut cmd)
+        }
         Either::Right(ref key) => {
             cmd.stdin(Stdio::piped());
             let mut child = cmd.spawn()?;

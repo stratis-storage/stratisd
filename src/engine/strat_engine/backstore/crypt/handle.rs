@@ -424,7 +424,10 @@ impl CryptHandle {
 
     /// Load the required information for Stratis from the LUKS2 metadata.
     pub fn load_metadata(physical_path: &Path) -> StratisResult<Option<CryptMetadata>> {
-        load_crypt_metadata(physical_path)
+        match setup_crypt_device(physical_path)? {
+            Some(ref mut device) => load_crypt_metadata(device, physical_path),
+            None => Ok(None),
+        }
     }
 
     /// Get the encryption info for this encrypted device.

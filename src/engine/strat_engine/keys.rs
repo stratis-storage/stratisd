@@ -38,7 +38,7 @@ pub(super) fn read_key_persistent(
 
 /// Get the ID of the persistent root user keyring and attach it to
 /// the session keyring.
-fn get_persistent_keyring() -> StratisResult<KeySerial> {
+pub fn get_persistent_keyring() -> StratisResult<KeySerial> {
     // Attach persistent keyring to session keyring
     match unsafe {
         syscall(

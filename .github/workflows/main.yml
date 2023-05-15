@@ -5,7 +5,7 @@ name: stratisd CI
 on:
   push:
     branches:
-      - master
+      - patch-3.5.4
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'
@@ -13,7 +13,7 @@ on:
       - 'tests/**'
   pull_request:
     branches:
-      - master
+      - patch-3.5.4
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'
@@ -161,6 +161,9 @@ jobs:
         run: cp stratisd.conf /usr/share/dbus-1/system.d
       - name: Check out stratis-cli
         run: git clone https://github.com/stratis-storage/stratis-cli.git
+      - name: Use stratis-cli 3.5.1
+        run: git checkout tags/v3.5.1 -b version-3.5.1
+        working-directory: ./stratis-cli
       - name: Run stratis-cli tests
         run: >
           RUST_LOG=stratisd=debug
@@ -347,6 +350,9 @@ jobs:
         run: sudo udevadm control --reload
       - name: Clone testing repo
         run: git clone https://github.com/stratis-storage/testing.git
+      - name: Use testing 3.5.2
+        run: git checkout tags/v3.5.2 -b version-3.5.2
+        working-directory: ./testing
       - name: Run stratisd_cert.py using Rust ${{ matrix.toolchain }}
         run: >
           sudo

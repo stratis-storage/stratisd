@@ -1,3 +1,9 @@
+stratisd 3.5.5
+==============
+Recommended Rust toolchain version: 1.69.0
+Lowest supported Rust toolchain version: 1.66.1
+
+
 stratisd 3.5.4
 ==============
 Recommended Rust toolchain version: 1.68.0

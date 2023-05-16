@@ -29,7 +29,7 @@ jobs:
   checks-with-ci-repo:
     runs-on: ubuntu-22.04
     container:
-      image: fedora:37  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:38  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies for Fedora
@@ -51,12 +51,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.68.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.69.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - name: Check out ci repo
         run: git clone https://github.com/stratis-storage/ci.git
       - name: Run comparisons of version specs with available Fedora packages
         # yamllint disable rule:line-length
         run: |
-          COMPARE_FEDORA_VERSIONS=./ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=rawhide IGNORE_ARGS="--ignore-category low --ignore-high=stratisd_proc_macros --ignore-high=libblkid-rs --ignore-high=devicemapper" make -f Makefile_dependencies check-fedora-versions
-          COMPARE_FEDORA_VERSIONS=./ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=f37 IGNORE_ARGS="--ignore-category low --ignore-high=stratisd_proc_macros --ignore-high=libblkid-rs --ignore-high=devicemapper" make -f Makefile_dependencies check-fedora-versions
-          COMPARE_FEDORA_VERSIONS=./ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=f36 IGNORE_ARGS="--ignore-category low --ignore-high=stratisd_proc_macros --ignore-high=libblkid-rs --ignore-high=devicemapper" make -f Makefile_dependencies check-fedora-versions
+          COMPARE_FEDORA_VERSIONS=./ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=rawhide IGNORE_ARGS="--ignore-category low --ignore-high=libcryptsetup-rs" make -f Makefile_dependencies check-fedora-versions
+          COMPARE_FEDORA_VERSIONS=./ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=f37 IGNORE_ARGS="--ignore-category low --ignore-high=libcryptsetup-rs" make -f Makefile_dependencies check-fedora-versions
+          COMPARE_FEDORA_VERSIONS=./ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=f36 IGNORE_ARGS="--ignore-category low --ignore-high=libcryptsetup-rs" make -f Makefile_dependencies check-fedora-versions

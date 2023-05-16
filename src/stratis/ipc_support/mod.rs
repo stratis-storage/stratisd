@@ -1,3 +1,7 @@
+// This Source Code Form is subject to the terms of the Mozilla Public
+// License, v. 2.0. If a copy of the MPL was not distributed with this
+// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
 // NOTE: cargo does not support mutually exclusive features. Because of this,
 // our clippy Makefile target will enable both the dbus_enabled and min features.
 // Currently, this module defaults to using D-Bus if both features are enabled.

@@ -34,37 +34,37 @@ jobs:
       matrix:
         include:
           - task: make -f Makefile clippy
-            toolchain: 1.68.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.69.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: clippy
           - task: PROFILEDIR=debug make -f Makefile build
-            toolchain: 1.68.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.69.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: PROFILEDIR=debug make -f Makefile build-min
-            toolchain: 1.68.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.69.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: PROFILEDIR=debug make -f Makefile stratis-dumpmetadata
-            toolchain: 1.68.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.69.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile docs-travis
-            toolchain: 1.68.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.69.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile test
-            toolchain: 1.68.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.69.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: >-
               TANG_URL=localhost
               make -f Makefile test-clevis-loop-should-fail
-            toolchain: 1.68.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.69.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile build
-            toolchain: 1.68.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.69.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile build-min
-            toolchain: 1.68.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.69.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-22.04
     container:
-      image: fedora:37  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:38  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev
     steps:
       - uses: actions/checkout@v3
@@ -95,11 +95,11 @@ jobs:
       matrix:
         include:
           - task: RUST_LOG=stratisd=debug make -f Makefile test-loop
-            toolchain: 1.68.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.69.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-22.04
     container:
-      image: fedora:37  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:38  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev --ipc=host
     steps:
       - uses: actions/checkout@v3

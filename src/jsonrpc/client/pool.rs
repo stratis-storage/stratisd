@@ -10,7 +10,7 @@ use serde_json::Value;
 
 use crate::{
     engine::{EncryptionInfo, KeyDescription, PoolIdentifier, PoolUuid, UnlockMethod},
-    jsonrpc::client::utils::to_suffix_repr,
+    jsonrpc::client::utils::{prompt_password, to_suffix_repr},
     print_table,
     stratis::{StratisError, StratisResult},
 };
@@ -31,10 +31,9 @@ pub fn pool_start(
     prompt: bool,
 ) -> StratisResult<()> {
     if prompt {
-        let password = rpassword::prompt_password("Enter passphrase followed by return: ")?;
-        if password.is_empty() {
-            return Ok(());
-        }
+        let password = prompt_password()?
+            .ok_or_else(|| StratisError::Msg("Password provided was empty".to_string()))?;
+
         do_request_standard!(PoolStart, id, unlock_method; {
             let (read_end, write_end) = pipe()?;
             write(write_end, password.as_bytes())?;

@@ -524,12 +524,16 @@ impl Engine for StratEngine {
             }
         } else {
             let mut pools = self.pools.write_all().await;
-            let (name, pool_uuid, pool, unlocked_uuids) = self
-                .liminal_devices
-                .write()
-                .await
-                .start_pool(&pools, pool_id, Some(unlock_method))?;
-            pools.insert(name, pool_uuid, pool);
+            let mut liminal = self.liminal_devices.write().await;
+            let unlocked_uuids = spawn_blocking!({
+                let (name, pool_uuid, pool, unlocked_uuids) = liminal.start_pool(
+                    &pools,
+                    PoolIdentifier::Uuid(pool_uuid),
+                    Some(unlock_method),
+                )?;
+                pools.insert(name, pool_uuid, pool);
+                StratisResult::Ok(unlocked_uuids)
+            })??;
             Ok(SetUnlockAction::new(unlocked_uuids))
         }
     }
@@ -647,12 +651,12 @@ impl Engine for StratEngine {
             }
         } else {
             let mut pools = self.pools.write_all().await;
-            let (name, pool_uuid, pool, _) =
-                self.liminal_devices
-                    .write()
-                    .await
-                    .start_pool(&pools, id, unlock_method)?;
-            pools.insert(name, pool_uuid, pool);
+            let mut liminal = self.liminal_devices.write().await;
+            let pool_uuid = spawn_blocking!({
+                let (name, pool_uuid, pool, _) = liminal.start_pool(&pools, id, unlock_method)?;
+                pools.insert(name, pool_uuid, pool);
+                StratisResult::Ok(pool_uuid)
+            })??;
             Ok(StartAction::Started(pool_uuid))
         }
     }
@@ -666,22 +670,27 @@ impl Engine for StratEngine {
 
         let stopped_pools = self.liminal_devices.read().await.stopped_pools();
         let pool_uuid = match pool_id {
-            PoolIdentifier::Name(ref n) => stopped_pools.name_to_uuid.get(n),
-            PoolIdentifier::Uuid(ref u) => Some(u),
+            PoolIdentifier::Name(ref n) => stopped_pools.name_to_uuid.get(n).copied(),
+            PoolIdentifier::Uuid(ref u) => Some(*u),
         };
         if let Some(pool_uuid) = pool_uuid {
             if has_partially_constructed {
-                if stopped_pools.stopped.get(pool_uuid).is_some() {
+                if stopped_pools.stopped.get(&pool_uuid).is_some() {
                     return Ok(StopAction::Identity);
-                } else if stopped_pools.partially_constructed.get(pool_uuid).is_some() {
-                    self.liminal_devices
-                        .write()
-                        .await
-                        .stop_partially_constructed_pool(*pool_uuid)?;
-                    return Ok(StopAction::CleanedUp(*pool_uuid));
+                } else if stopped_pools
+                    .partially_constructed
+                    .get(&pool_uuid)
+                    .is_some()
+                {
+                    let mut lim_devs = self.liminal_devices.write().await;
+                    spawn_blocking!(lim_devs.stop_partially_constructed_pool(pool_uuid))??;
+                    return Ok(StopAction::CleanedUp(pool_uuid));
                 }
-            } else if stopped_pools.stopped.get(pool_uuid).is_some()
-                || stopped_pools.partially_constructed.get(pool_uuid).is_some()
+            } else if stopped_pools.stopped.get(&pool_uuid).is_some()
+                || stopped_pools
+                    .partially_constructed
+                    .get(&pool_uuid)
+                    .is_some()
             {
                 return Ok(StopAction::Identity);
             }
@@ -692,10 +701,8 @@ impl Engine for StratEngine {
             PoolIdentifier::Name(n) => pools.remove_by_name(&n).map(|(u, p)| (n, u, p)),
             PoolIdentifier::Uuid(u) => pools.remove_by_uuid(u).map(|(n, p)| (n, u, p)),
         } {
-            self.liminal_devices
-                .write()
-                .await
-                .stop_pool(&mut pools, name, pool_uuid, pool)?;
+            let mut lim_devs = self.liminal_devices.write().await;
+            spawn_blocking!(lim_devs.stop_pool(&mut pools, name, pool_uuid, pool))??;
             Ok(StopAction::Stopped(pool_uuid))
         } else {
             Err(StratisError::Msg(format!(

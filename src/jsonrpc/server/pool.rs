@@ -6,10 +6,12 @@ use std::{os::unix::io::RawFd, path::Path, sync::Arc};
 
 use tokio::task::block_in_place;
 
+use serde_json::Value;
+
 use crate::{
     engine::{
-        BlockDevTier, CreateAction, EncryptionInfo, Engine, EngineAction, Name, Pool,
-        PoolIdentifier, PoolUuid, RenameAction, UnlockMethod,
+        BlockDevTier, CreateAction, DeleteAction, EncryptionInfo, Engine, EngineAction,
+        KeyDescription, Name, Pool, PoolIdentifier, PoolUuid, RenameAction, UnlockMethod,
     },
     jsonrpc::{
         interface::PoolListType,
@@ -183,6 +185,129 @@ where
                 (name_vec, size_vec, pool_props_vec, uuid_vec)
             },
         )
+}
+
+// stratis-min pool bind keyring
+pub async fn pool_bind_keyring<E>(
+    engine: Arc<E>,
+    id: PoolIdentifier<PoolUuid>,
+    key_desc: &KeyDescription,
+) -> StratisResult<bool>
+where
+    E: Engine,
+{
+    let mut guard = engine
+        .get_mut_pool(id.clone())
+        .await
+        .ok_or_else(|| StratisError::Msg(format!("Pool with {id} not found")))?;
+
+    let (_, _, pool) = guard.as_mut_tuple();
+    match pool.bind_keyring(key_desc)? {
+        CreateAction::Created(_key) => Ok(true),
+        CreateAction::Identity => Ok(false),
+    }
+}
+
+// stratis-min pool bind nbde|tang|tpm2
+pub async fn pool_bind_clevis<E>(
+    engine: Arc<E>,
+    id: PoolIdentifier<PoolUuid>,
+    pin: &str,
+    clevis_info: &Value,
+) -> StratisResult<bool>
+where
+    E: Engine,
+{
+    let mut guard = engine
+        .get_mut_pool(id.clone())
+        .await
+        .ok_or_else(|| StratisError::Msg(format!("Pool with {id} not found")))?;
+
+    let (_, _, pool) = guard.as_mut_tuple();
+    match pool.bind_clevis(pin, clevis_info)? {
+        CreateAction::Created(_clevis) => Ok(true),
+        CreateAction::Identity => Ok(false),
+    }
+}
+
+// stratis-min pool unbind keyring
+pub async fn pool_unbind_keyring<E>(
+    engine: Arc<E>,
+    id: PoolIdentifier<PoolUuid>,
+) -> StratisResult<bool>
+where
+    E: Engine,
+{
+    let mut guard = engine
+        .get_mut_pool(id.clone())
+        .await
+        .ok_or_else(|| StratisError::Msg(format!("Pool with {id} not found")))?;
+
+    let (_, _, pool) = guard.as_mut_tuple();
+    match pool.unbind_keyring()? {
+        DeleteAction::Deleted(_key_desc) => Ok(true),
+        DeleteAction::Identity => Ok(false),
+    }
+}
+
+// stratis-min pool unbind clevis
+pub async fn pool_unbind_clevis<E>(
+    engine: Arc<E>,
+    id: PoolIdentifier<PoolUuid>,
+) -> StratisResult<bool>
+where
+    E: Engine,
+{
+    let mut guard = engine
+        .get_mut_pool(id.clone())
+        .await
+        .ok_or_else(|| StratisError::Msg(format!("Pool with {id} not found")))?;
+
+    let (_, _, pool) = guard.as_mut_tuple();
+    match pool.unbind_clevis()? {
+        DeleteAction::Deleted(_clevis) => Ok(true),
+        DeleteAction::Identity => Ok(false),
+    }
+}
+
+// stratis-min pool rebind keyring
+pub async fn pool_rebind_keyring<E>(
+    engine: Arc<E>,
+    id: PoolIdentifier<PoolUuid>,
+    key_desc: KeyDescription,
+) -> StratisResult<bool>
+where
+    E: Engine,
+{
+    let mut guard = engine
+        .get_mut_pool(id.clone())
+        .await
+        .ok_or_else(|| StratisError::Msg(format!("Pool with {id} not found")))?;
+
+    let (_, _, pool) = guard.as_mut_tuple();
+    match pool.rebind_keyring(&key_desc)? {
+        RenameAction::Renamed(_key) => Ok(true),
+        RenameAction::Identity => Ok(false),
+        RenameAction::NoSource => Ok(false),
+    }
+}
+
+// stratis-min pool rebind clevis
+pub async fn pool_rebind_clevis<E>(
+    engine: Arc<E>,
+    id: PoolIdentifier<PoolUuid>,
+) -> StratisResult<bool>
+where
+    E: Engine,
+{
+    let mut guard = engine
+        .get_mut_pool(id.clone())
+        .await
+        .ok_or_else(|| StratisError::Msg(format!("Pool with {id} not found")))?;
+
+    let (_, _, pool) = guard.as_mut_tuple();
+    pool.rebind_clevis()?;
+    Ok(true)
 }
 
 // stratis-min pool is-encrypted

@@ -121,6 +121,54 @@ fn parse_args() -> Command {
                 Command::new("clevis-pin")
                     .arg(Arg::new("name").long("name").num_args(0))
                     .arg(Arg::new("id").required(true)),
+                Command::new("bind").subcommands(vec![
+                    Command::new("keyring")
+                        .arg(Arg::new("name").long("name").num_args(0))
+                        .arg(Arg::new("id").required(true))
+                        .arg(
+                            Arg::new("key_desc")
+                                .long("key-desc")
+                                .num_args(1)
+                                .required(true),
+                        ),
+                    Command::new("nbde")
+                        .alias("tang")
+                        .arg(Arg::new("name").long("name").num_args(0))
+                        .arg(Arg::new("id").required(true))
+                        .arg(Arg::new("tang_url").required(true))
+                        .arg(Arg::new("thumbprint").long("thumbprint").num_args(1))
+                        .arg(Arg::new("trust_url").long("trust-url").num_args(0))
+                        .group(
+                            ArgGroup::new("tang_args")
+                                .arg("thumbprint")
+                                .arg("trust_url"),
+                        ),
+                    Command::new("tpm2")
+                        .arg(Arg::new("name").long("name").num_args(0))
+                        .arg(Arg::new("id").required(true)),
+                ]),
+                Command::new("unbind").subcommands(vec![
+                    Command::new("keyring")
+                        .arg(Arg::new("name").long("name").num_args(0))
+                        .arg(Arg::new("id").required(true)),
+                    Command::new("clevis")
+                        .arg(Arg::new("name").long("name").num_args(0))
+                        .arg(Arg::new("id").required(true)),
+                ]),
+                Command::new("rebind").subcommands(vec![
+                    Command::new("keyring")
+                        .arg(Arg::new("name").long("name").num_args(0))
+                        .arg(Arg::new("id").required(true))
+                        .arg(
+                            Arg::new("key_desc")
+                                .long("key-desc")
+                                .num_args(1)
+                                .required(true),
+                        ),
+                    Command::new("clevis")
+                        .arg(Arg::new("name").long("name").num_args(0))
+                        .arg(Arg::new("id").required(true)),
+                ]),
             ]),
             Command::new("filesystem").subcommands(vec![
                 Command::new("create")
@@ -350,6 +398,146 @@ fn main() -> Result<(), String> {
                 };
                 println!("{}", pool::pool_clevis_pin(id)?);
                 Ok(())
+            } else if let Some(subcommand) = subcommand.subcommand_matches("bind") {
+                if let Some(args) = subcommand.subcommand_matches("keyring") {
+                    let id = if args.get_flag("name") {
+                        PoolIdentifier::Name(Name::new(
+                            args.get_one::<String>("id").expect("required").to_owned(),
+                        ))
+                    } else {
+                        PoolIdentifier::Uuid(PoolUuid::parse_str(
+                            args.get_one::<String>("id")
+                                .map(|s| s.as_str())
+                                .expect("required"),
+                        )?)
+                    };
+                    let key_desc = KeyDescription::try_from(
+                        args.get_one::<String>("key_desc").expect("required"),
+                    )?;
+                    pool::pool_bind_keyring(id, key_desc)?;
+                    Ok(())
+                } else if let Some(args) = subcommand.subcommand_matches("nbde") {
+                    let id = if args.get_flag("name") {
+                        PoolIdentifier::Name(Name::new(
+                            args.get_one::<String>("id").expect("required").to_owned(),
+                        ))
+                    } else {
+                        PoolIdentifier::Uuid(PoolUuid::parse_str(
+                            args.get_one::<String>("id")
+                                .map(|s| s.as_str())
+                                .expect("required"),
+                        )?)
+                    };
+                    let clevis_info = {
+                        let mut json = Map::new();
+                        json.insert(
+                            "url".to_string(),
+                            Value::from(
+                                args.get_one::<String>("tang_url")
+                                    .map(|s| s.as_str())
+                                    .expect("Required"),
+                            ),
+                        );
+                        if args.get_flag("trust_url") {
+                            json.insert(CLEVIS_TANG_TRUST_URL.to_string(), Value::from(true));
+                        } else if let Some(thp) =
+                            args.get_one::<String>("thumbprint").map(|s| s.as_str())
+                        {
+                            json.insert("thp".to_string(), Value::from(thp));
+                        }
+                        Value::from(json)
+                    };
+                    pool::pool_bind_clevis(id, "tang".to_string(), clevis_info)?;
+                    Ok(())
+                } else if let Some(args) = subcommand.subcommand_matches("tpm2") {
+                    let id = if args.get_flag("name") {
+                        PoolIdentifier::Name(Name::new(
+                            args.get_one::<String>("id").expect("required").to_owned(),
+                        ))
+                    } else {
+                        PoolIdentifier::Uuid(PoolUuid::parse_str(
+                            args.get_one::<String>("id")
+                                .map(|s| s.as_str())
+                                .expect("required"),
+                        )?)
+                    };
+                    let pin = "tpm2";
+                    let clevis_info = {
+                        let json = Map::new();
+                        Value::from(json)
+                    };
+                    pool::pool_bind_clevis(id, pin.to_string(), clevis_info)?;
+                    Ok(())
+                } else {
+                    unreachable!("Parser requires a subcommand")
+                }
+            } else if let Some(subcommand) = subcommand.subcommand_matches("unbind") {
+                if let Some(args) = subcommand.subcommand_matches("keyring") {
+                    let id = if args.get_flag("name") {
+                        PoolIdentifier::Name(Name::new(
+                            args.get_one::<String>("id").expect("required").to_owned(),
+                        ))
+                    } else {
+                        PoolIdentifier::Uuid(PoolUuid::parse_str(
+                            args.get_one::<String>("id")
+                                .map(|s| s.as_str())
+                                .expect("required"),
+                        )?)
+                    };
+                    pool::pool_unbind_keyring(id)?;
+                    Ok(())
+                } else if let Some(args) = subcommand.subcommand_matches("clevis") {
+                    let id = if args.get_flag("name") {
+                        PoolIdentifier::Name(Name::new(
+                            args.get_one::<String>("id").expect("required").to_owned(),
+                        ))
+                    } else {
+                        PoolIdentifier::Uuid(PoolUuid::parse_str(
+                            args.get_one::<String>("id")
+                                .map(|s| s.as_str())
+                                .expect("required"),
+                        )?)
+                    };
+                    pool::pool_unbind_clevis(id)?;
+                    Ok(())
+                } else {
+                    unreachable!("Parser requires a subcommand")
+                }
+            } else if let Some(subcommand) = subcommand.subcommand_matches("rebind") {
+                if let Some(args) = subcommand.subcommand_matches("keyring") {
+                    let id = if args.get_flag("name") {
+                        PoolIdentifier::Name(Name::new(
+                            args.get_one::<String>("id").expect("required").to_owned(),
+                        ))
+                    } else {
+                        PoolIdentifier::Uuid(PoolUuid::parse_str(
+                            args.get_one::<String>("id")
+                                .map(|s| s.as_str())
+                                .expect("required"),
+                        )?)
+                    };
+                    let key_desc = KeyDescription::try_from(
+                        args.get_one::<String>("key_desc").expect("required"),
+                    )?;
+                    pool::pool_rebind_keyring(id, key_desc)?;
+                    Ok(())
+                } else if let Some(args) = subcommand.subcommand_matches("clevis") {
+                    let id = if args.get_flag("name") {
+                        PoolIdentifier::Name(Name::new(
+                            args.get_one::<String>("id").expect("required").to_owned(),
+                        ))
+                    } else {
+                        PoolIdentifier::Uuid(PoolUuid::parse_str(
+                            args.get_one::<String>("id")
+                                .map(|s| s.as_str())
+                                .expect("required"),
+                        )?)
+                    };
+                    pool::pool_rebind_clevis(id)?;
+                    Ok(())
+                } else {
+                    unreachable!("Parser requires a subcommand")
+                }
             } else {
                 pool::pool_list()?;
                 Ok(())

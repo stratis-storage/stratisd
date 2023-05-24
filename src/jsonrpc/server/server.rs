@@ -138,6 +138,48 @@ impl StratisParams {
                 expects_fd!(self.fd_opt, false);
                 Ok(StratisRet::PoolList(pool::pool_list(engine).await))
             }
+            StratisParamType::PoolBindKeyring(id, key_desc) => {
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::PoolBindKeyring(stratis_result_to_return(
+                    pool::pool_bind_keyring(engine, id, &key_desc).await,
+                    false,
+                )))
+            }
+            StratisParamType::PoolBindClevis(id, pin, clevis_info) => {
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::PoolBindClevis(stratis_result_to_return(
+                    pool::pool_bind_clevis(engine, id, &pin, &clevis_info).await,
+                    false,
+                )))
+            }
+            StratisParamType::PoolUnbindKeyring(id) => {
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::PoolUnbindKeyring(stratis_result_to_return(
+                    pool::pool_unbind_keyring(engine, id).await,
+                    false,
+                )))
+            }
+            StratisParamType::PoolUnbindClevis(id) => {
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::PoolUnbindClevis(stratis_result_to_return(
+                    pool::pool_unbind_clevis(engine, id).await,
+                    false,
+                )))
+            }
+            StratisParamType::PoolRebindKeyring(id, key_desc) => {
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::PoolRebindKeyring(stratis_result_to_return(
+                    pool::pool_rebind_keyring(engine, id, key_desc).await,
+                    false,
+                )))
+            }
+            StratisParamType::PoolRebindClevis(id) => {
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::PoolRebindClevis(stratis_result_to_return(
+                    pool::pool_rebind_clevis(engine, id).await,
+                    false,
+                )))
+            }
             StratisParamType::PoolIsEncrypted(id) => {
                 expects_fd!(self.fd_opt, false);
                 Ok(StratisRet::PoolIsEncrypted(stratis_result_to_return(

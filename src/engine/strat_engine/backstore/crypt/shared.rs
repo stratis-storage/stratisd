@@ -402,8 +402,15 @@ pub fn load_crypt_metadata(
     };
     let clevis_info = clevis_info_from_metadata(device)?;
 
-    let encryption_info = EncryptionInfo::from_options((key_description, clevis_info))
-        .expect("Must have at least one unlock method");
+    let encryption_info =
+        if let Some(info) = EncryptionInfo::from_options((key_description, clevis_info)) {
+            info
+        } else {
+            return Err(StratisError::Msg(format!(
+                "No valid encryption method that can be used to unlock device {} found",
+                physical_path.display()
+            )));
+        };
 
     let path = vec![DEVICEMAPPER_PATH, &activation_name.to_string()]
         .into_iter()

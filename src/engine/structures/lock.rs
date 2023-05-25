@@ -520,8 +520,7 @@ impl<U, T> Clone for AllOrSomeLock<U, T> {
 
 impl<U, T> AllOrSomeLock<U, T>
 where
-    U: AsUuid + Unpin,
-    T: Unpin,
+    U: AsUuid,
 {
     /// Issue a read on a single element identified by a name or UUID.
     pub async fn read(&self, key: PoolIdentifier<U>) -> Option<SomeLockReadGuard<U, T>> {
@@ -582,8 +581,7 @@ struct SomeRead<U: AsUuid, T>(AllOrSomeLock<U, T>, PoolIdentifier<U>, AtomicBool
 
 impl<U, T> Future for SomeRead<U, T>
 where
-    U: AsUuid + Unpin,
-    T: Unpin,
+    U: AsUuid,
 {
     type Output = Option<SomeLockReadGuard<U, T>>;
 
@@ -689,8 +687,7 @@ struct SomeWrite<U: AsUuid, T>(AllOrSomeLock<U, T>, PoolIdentifier<U>, AtomicBoo
 
 impl<U, T> Future for SomeWrite<U, T>
 where
-    U: AsUuid + Unpin,
-    T: Unpin,
+    U: AsUuid,
 {
     type Output = Option<SomeLockWriteGuard<U, T>>;
 

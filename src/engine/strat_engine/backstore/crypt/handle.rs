@@ -205,8 +205,15 @@ impl CryptHandle {
             .and_then(|path| clevis_info_from_metadata(&mut device).map(|ci| (path, ci)))
             .and_then(|(_, clevis_info)| {
                 let encryption_info =
-                    EncryptionInfo::from_options((encryption_info.key_description().cloned(), clevis_info))
-                        .expect("Encrypted device must be provided encryption parameters");
+                    if let Some(info) = EncryptionInfo::from_options((encryption_info.key_description().cloned(), clevis_info)) {
+                        info
+                    } else {
+                        return Err(StratisError::Msg(format!(
+                            "No valid encryption method that can be used to unlock device {} found after initialization",
+                            physical_path.display()
+                        )));
+                    };
+
                 let device_path = DevicePath::new(physical_path)?;
                 let devno = get_devno_from_path(physical_path)?;
                 Ok(CryptHandle::new(

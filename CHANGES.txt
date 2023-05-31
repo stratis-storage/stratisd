@@ -1,3 +1,24 @@
+stratisd 3.5.6
+==============
+Recommended Rust toolchain version: 1.69.0
+Lowest supported Rust toolchain version: 1.66.1
+
+Recommended development platform for Python development: Fedora 38
+
+- Cherry-picked commits:
+  * Advance compare_fedora_versions Fedora versions arguments
+  * Remove unnecessary Unpin constraints in futures
+  * Avoid double acquisition of CryptDevice when reading metadata
+  * Return an error if there is no unlock method
+  * Return an error if no unlock method after initialization
+  * Increase libcryptsetup-rs dependency lower bound to 0.7.1
+  * Increase libcryptsetup-rs dependency lower bound to 0.8.0
+
+- Tidies and Maintenance:
+  * Add missing PR entry in changelog for stratisd 3.5.5
+  * Add list of cherry-picked commits for stratisd 3.5.5
+
+
 stratisd 3.5.5
 ==============
 Recommended Rust toolchain version: 1.69.0

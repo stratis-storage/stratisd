@@ -205,8 +205,15 @@ impl CryptHandle {
             .and_then(|path| clevis_info_from_metadata(&mut device).map(|ci| (path, ci)))
             .and_then(|(_, clevis_info)| {
                 let encryption_info =
-                    EncryptionInfo::from_options((encryption_info.key_description().cloned(), clevis_info))
-                        .expect("Encrypted device must be provided encryption parameters");
+                    if let Some(info) = EncryptionInfo::from_options((encryption_info.key_description().cloned(), clevis_info)) {
+                        info
+                    } else {
+                        return Err(StratisError::Msg(format!(
+                            "No valid encryption method that can be used to unlock device {} found after initialization",
+                            physical_path.display()
+                        )));
+                    };
+
                 let device_path = DevicePath::new(physical_path)?;
                 let devno = get_devno_from_path(physical_path)?;
                 Ok(CryptHandle::new(
@@ -424,7 +431,10 @@ impl CryptHandle {
 
     /// Load the required information for Stratis from the LUKS2 metadata.
     pub fn load_metadata(physical_path: &Path) -> StratisResult<Option<CryptMetadata>> {
-        load_crypt_metadata(physical_path)
+        match setup_crypt_device(physical_path)? {
+            Some(ref mut device) => load_crypt_metadata(device, physical_path),
+            None => Ok(None),
+        }
     }
 
     /// Get the encryption info for this encrypted device.

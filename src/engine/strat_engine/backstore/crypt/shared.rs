@@ -370,18 +370,16 @@ pub fn setup_crypt_device(physical_path: &Path) -> StratisResult<Option<CryptDev
 }
 
 /// Load crypt device metadata.
-pub fn load_crypt_metadata(physical_path: &Path) -> StratisResult<Option<CryptMetadata>> {
+pub fn load_crypt_metadata(
+    device: &mut CryptDevice,
+    physical_path: &Path,
+) -> StratisResult<Option<CryptMetadata>> {
     let physical = DevicePath::new(physical_path)?;
 
-    let mut device = match setup_crypt_device(physical_path)? {
-        Some(d) => d,
-        None => return Ok(None),
-    };
-
-    let identifiers = identifiers_from_metadata(&mut device)?;
-    let activation_name = activation_name_from_metadata(&mut device)?;
-    let pool_name = pool_name_from_metadata(&mut device)?;
-    let key_description = key_desc_from_metadata(&mut device);
+    let identifiers = identifiers_from_metadata(device)?;
+    let activation_name = activation_name_from_metadata(device)?;
+    let pool_name = pool_name_from_metadata(device)?;
+    let key_description = key_desc_from_metadata(device);
     let devno = get_devno_from_path(physical_path)?;
     let key_description = match key_description
         .as_ref()
@@ -402,10 +400,17 @@ pub fn load_crypt_metadata(physical_path: &Path) -> StratisResult<Option<CryptMe
         }
         None => None,
     };
-    let clevis_info = clevis_info_from_metadata(&mut device)?;
+    let clevis_info = clevis_info_from_metadata(device)?;
 
-    let encryption_info = EncryptionInfo::from_options((key_description, clevis_info))
-        .expect("Must have at least one unlock method");
+    let encryption_info =
+        if let Some(info) = EncryptionInfo::from_options((key_description, clevis_info)) {
+            info
+        } else {
+            return Err(StratisError::Msg(format!(
+                "No valid encryption method that can be used to unlock device {} found",
+                physical_path.display()
+            )));
+        };
 
     let path = vec![DEVICEMAPPER_PATH, &activation_name.to_string()]
         .into_iter()
@@ -429,7 +434,7 @@ pub fn setup_crypt_handle(
     physical_path: &Path,
     unlock_method: Option<UnlockMethod>,
 ) -> StratisResult<Option<CryptHandle>> {
-    let metadata = match load_crypt_metadata(physical_path)? {
+    let metadata = match load_crypt_metadata(device, physical_path)? {
         Some(m) => m,
         None => return Ok(None),
     };

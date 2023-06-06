@@ -1,3 +1,17 @@
+stratisd 3.5.7
+==============
+Recommended Rust toolchain version: 1.70.0
+Lowest supported Rust toolchain version: 1.66.1
+
+Recommended development platform for Python development: Fedora 38
+
+- Run "cargo update"
+- Increase libc dependency lower bound to 0.2.143
+
+- Cherry-picked commits:
+  * update recommended Rust to 1.70.0
+
+
 stratisd 3.5.6
 ==============
 Recommended Rust toolchain version: 1.69.0

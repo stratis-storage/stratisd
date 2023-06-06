@@ -131,9 +131,11 @@ version = "0.2.141"
 optional = true
 
 [dependencies.libcryptsetup-rs]
-version = "0.7.1"
+version = "0.8.0"
 features = ["mutex"]
 optional = true
+git = "https://github.com/mulkieran/libcryptsetup-rs"
+branch = "libcryptsetup-rs-version-0.8.0"
 
 [dependencies.libmount]
 version = "0.1.9"

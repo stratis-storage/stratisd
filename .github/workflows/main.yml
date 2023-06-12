@@ -353,7 +353,7 @@ jobs:
       - name: Use testing 3.5.2
         run: git checkout tags/v3.5.2 -b version-3.5.2
         working-directory: ./testing
-      - name: Run stratisd_cert.py using Rust ${{ matrix.toolchain }}
+      - name: Run stratisd_cert.py
         run: >
           sudo
           RUST_LOG=stratisd=debug

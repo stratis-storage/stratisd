@@ -1551,7 +1551,7 @@ mod tests {
     }
 
     #[test]
-    fn real_test_mainenance_mode() {
+    fn real_test_maintenance_mode() {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(
                 2,

@@ -347,7 +347,7 @@ jobs:
         run: sudo udevadm control --reload
       - name: Clone testing repo
         run: git clone https://github.com/stratis-storage/testing.git
-      - name: Run stratisd_cert.py using Rust ${{ matrix.toolchain }}
+      - name: Run stratisd_cert.py
         run: >
           sudo
           RUST_LOG=stratisd=debug

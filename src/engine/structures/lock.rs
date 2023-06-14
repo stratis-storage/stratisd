@@ -21,7 +21,8 @@ use futures::executor::block_on;
 use tokio::sync::{OwnedRwLockReadGuard, OwnedRwLockWriteGuard, RwLock};
 
 use crate::engine::{
-    structures::Table,
+    engine::Pool,
+    structures::table::{Iter, IterMut, Table},
     types::{AsUuid, Name, PoolIdentifier},
 };
 
@@ -121,23 +122,25 @@ where
     }
 }
 
+type Mutexes<'a, U, T> = (
+    MutexGuard<'a, LockRecord<U>>,
+    MutexGuard<'a, UnsafeCell<Table<U, T>>>,
+);
+
 /// Data structure containing all state related to the locks acquired and requests to acquire
 /// the lock that are waiting to be processed.
 #[derive(Debug)]
-struct LockRecord<U, T> {
+struct LockRecord<U> {
     all_read_locked: u64,
     all_write_locked: bool,
     read_locked: HashMap<U, u64>,
     write_locked: HashSet<U>,
-    // UnsafeCell is used here to provide interior mutability and avoid any undefined
-    // behavior around immutable references being converted to mutable references.
-    inner: UnsafeCell<Table<U, T>>,
     waiting: VecDeque<Waiter<U>>,
     woken: HashMap<u64, WaitType<U>>,
     next_idx: u64,
 }
 
-impl<U, T> LockRecord<U, T>
+impl<U> LockRecord<U>
 where
     U: AsUuid,
 {
@@ -159,16 +162,6 @@ where
     fn assert(&mut self, wait_type: &WaitType<U>, idx: u64) {
         self.woken_or_new(Some(wait_type), idx);
         assert!(!self.conflicts_with_woken(wait_type));
-    }
-
-    /// Convert a name or UUID into a pair of a name and UUID.
-    fn get_by_lock_key(&self, lock_key: &PoolIdentifier<U>) -> Option<(U, Name)> {
-        match lock_key {
-            PoolIdentifier::Name(ref n) => unsafe { self.inner.get().as_ref() }
-                .and_then(|i| i.get_by_name(n).map(|(u, _)| (u, n.clone()))),
-            PoolIdentifier::Uuid(u) => unsafe { self.inner.get().as_ref() }
-                .and_then(|i| i.get_by_uuid(*u).map(|(n, _)| (*u, n))),
-        }
     }
 
     /// Add a record for a single element indicating a read lock acquisition.
@@ -411,7 +404,7 @@ where
     }
 }
 
-impl<U, T> Display for LockRecord<U, T>
+impl<U> Display for LockRecord<U>
 where
     U: AsUuid,
 {
@@ -456,6 +449,23 @@ where
     }
 }
 
+/// Convert a name or UUID into a pair of a name and UUID.
+fn get_by_lock_key<U, T>(
+    inner: &UnsafeCell<Table<U, T>>,
+    lock_key: &PoolIdentifier<U>,
+) -> Option<(U, Name)>
+where
+    U: AsUuid,
+{
+    match lock_key {
+        PoolIdentifier::Name(ref n) => unsafe { inner.get().as_ref() }
+            .and_then(|i| i.get_by_name(n).map(|(u, _)| (u, n.clone()))),
+        PoolIdentifier::Uuid(u) => {
+            unsafe { inner.get().as_ref() }.and_then(|i| i.get_by_uuid(*u).map(|(n, _)| (*u, n)))
+        }
+    }
+}
+
 /// This data structure is a slightly modified read-write lock. It can either lock all
 /// entries contained in the table with read or write permissions, or it can lock
 /// individual entries with read or write permissions.
@@ -467,7 +477,10 @@ where
 #[derive(Debug)]
 pub struct AllOrSomeLock<U, T> {
     /// Inner record of acquired locks.
-    lock_record: Arc<Mutex<LockRecord<U, T>>>,
+    lock_record: Arc<Mutex<LockRecord<U>>>,
+    // UnsafeCell is used here to provide interior mutability and avoid any undefined
+    // behavior around immutable references being converted to mutable references.
+    inner: Arc<Mutex<UnsafeCell<Table<U, T>>>>,
 }
 
 impl<U, T> AllOrSomeLock<U, T>
@@ -482,19 +495,24 @@ where
                 all_write_locked: false,
                 read_locked: HashMap::new(),
                 write_locked: HashSet::new(),
-                inner: UnsafeCell::new(inner),
                 waiting: VecDeque::new(),
                 woken: HashMap::new(),
                 next_idx: 0,
             })),
+            inner: Arc::new(Mutex::new(UnsafeCell::new(inner))),
         }
     }
 
     /// Acquire the mutex protecting the internal lock state.
-    fn acquire_mutex(&self) -> MutexGuard<'_, LockRecord<U, T>> {
-        self.lock_record
-            .lock()
-            .expect("lock record mutex only locked internally")
+    fn acquire_mutex(&self) -> Mutexes<'_, U, T> {
+        (
+            self.lock_record
+                .lock()
+                .expect("lock record mutex only locked internally"),
+            self.inner
+                .lock()
+                .expect("inner mutex only locked internally"),
+        )
     }
 
     /// Returns the index for a future and increments the index count for the next future when
@@ -503,7 +521,7 @@ where
     /// This counter performs wrapping addition so the maximum number of futures supported by
     /// this lock is u64::MAX.
     fn next_idx(&self) -> u64 {
-        let mut lock_record = self.acquire_mutex();
+        let (mut lock_record, _) = self.acquire_mutex();
         let idx = lock_record.next_idx;
         lock_record.next_idx = lock_record.next_idx.wrapping_add(1);
         idx
@@ -514,6 +532,7 @@ impl<U, T> Clone for AllOrSomeLock<U, T> {
     fn clone(&self) -> Self {
         AllOrSomeLock {
             lock_record: Arc::clone(&self.lock_record),
+            inner: Arc::clone(&self.inner),
         }
     }
 }
@@ -565,6 +584,15 @@ where
         trace!("All write lock acquired");
         guard
     }
+
+    /// Issue a modify on element container.
+    pub async fn modify_all(&self) -> AllLockModifyGuard<U, T> {
+        trace!("Acquiring modify lock on all pools");
+        let idx = self.next_idx();
+        let guard = AllModify(self.clone(), AtomicBool::new(false), idx).await;
+        trace!("All modify lock acquired");
+        guard
+    }
 }
 
 impl<U, T> Default for AllOrSomeLock<U, T>
@@ -586,9 +614,9 @@ where
     type Output = Option<SomeLockReadGuard<U, T>>;
 
     fn poll(self: Pin<&mut Self>, cxt: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut lock_record = self.0.acquire_mutex();
+        let (mut lock_record, inner) = self.0.acquire_mutex();
 
-        let (uuid, name) = if let Some((uuid, name)) = lock_record.get_by_lock_key(&self.1) {
+        let (uuid, name) = if let Some((uuid, name)) = get_by_lock_key(&*inner, &self.1) {
             (uuid, name)
         } else {
             lock_record.woken_or_new(None, self.3);
@@ -602,15 +630,16 @@ where
             Poll::Pending
         } else {
             lock_record.add_read_lock(uuid, Some(self.3));
-            let (_, rf) = unsafe { lock_record.inner.get().as_ref() }
+            let (_, rf) = unsafe { inner.get().as_ref() }
                 .expect("cannot be null")
                 .get_by_uuid(uuid)
                 .expect("Checked above");
             Poll::Ready(Some(SomeLockReadGuard(
-                self.0.clone(),
+                Arc::clone(&self.0.lock_record),
                 uuid,
                 name,
                 rf as *const _,
+                true,
             )))
         };
 
@@ -623,17 +652,28 @@ where
     U: AsUuid,
 {
     fn drop(&mut self) {
-        let mut lock_record = self.0.acquire_mutex();
+        let mut lock_record = self
+            .0
+            .lock_record
+            .lock()
+            .expect("Mutex only locked internally");
         lock_record.cancel(self.3);
     }
 }
 
 /// Guard returned by SomeRead future.
-pub struct SomeLockReadGuard<U: AsUuid, T>(AllOrSomeLock<U, T>, U, Name, *const T);
+pub struct SomeLockReadGuard<U: AsUuid, T: ?Sized>(
+    Arc<Mutex<LockRecord<U>>>,
+    U,
+    Name,
+    *const T,
+    bool,
+);
 
 impl<U, T> SomeLockReadGuard<U, T>
 where
     U: AsUuid,
+    T: ?Sized,
 {
     pub fn as_tuple(&self) -> (Name, U, &T) {
         (
@@ -644,10 +684,27 @@ where
     }
 }
 
+impl<U, T> SomeLockReadGuard<U, T>
+where
+    U: AsUuid,
+    T: 'static + Pool,
+{
+    pub fn into_dyn(mut self) -> SomeLockReadGuard<U, dyn Pool> {
+        self.4 = false;
+        SomeLockReadGuard(
+            Arc::clone(&self.0),
+            self.1,
+            self.2.clone(),
+            self.3 as *const dyn Pool,
+            true,
+        )
+    }
+}
+
 unsafe impl<U, T> Send for SomeLockReadGuard<U, T>
 where
     U: AsUuid + Send,
-    T: Send,
+    T: ?Sized + Send,
 {
 }
 
@@ -661,6 +718,7 @@ where
 impl<U, T> Deref for SomeLockReadGuard<U, T>
 where
     U: AsUuid,
+    T: ?Sized,
 {
     type Target = T;
 
@@ -672,12 +730,15 @@ where
 impl<U, T> Drop for SomeLockReadGuard<U, T>
 where
     U: AsUuid,
+    T: ?Sized,
 {
     fn drop(&mut self) {
         trace!("Dropping read lock on pool with UUID {}", self.1);
-        let mut lock_record = self.0.acquire_mutex();
-        lock_record.remove_read_lock(self.1);
-        lock_record.wake();
+        if self.4 {
+            let mut lock_record = self.0.lock().expect("Mutex only locked internally");
+            lock_record.remove_read_lock(self.1);
+            lock_record.wake();
+        }
         trace!("Read lock on pool with UUID {} dropped", self.1);
     }
 }
@@ -692,9 +753,9 @@ where
     type Output = Option<SomeLockWriteGuard<U, T>>;
 
     fn poll(self: Pin<&mut Self>, cxt: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut lock_record = self.0.acquire_mutex();
+        let (mut lock_record, inner) = self.0.acquire_mutex();
 
-        let (uuid, name) = if let Some((uuid, name)) = lock_record.get_by_lock_key(&self.1) {
+        let (uuid, name) = if let Some((uuid, name)) = get_by_lock_key(&*inner, &self.1) {
             (uuid, name)
         } else {
             lock_record.woken_or_new(None, self.3);
@@ -708,15 +769,16 @@ where
             Poll::Pending
         } else {
             lock_record.add_write_lock(uuid, Some(self.3));
-            let (_, rf) = unsafe { lock_record.inner.get().as_mut() }
+            let (_, rf) = unsafe { inner.get().as_mut() }
                 .expect("cannot be null")
                 .get_mut_by_uuid(uuid)
                 .expect("Checked above");
             Poll::Ready(Some(SomeLockWriteGuard(
-                self.0.clone(),
+                Arc::clone(&self.0.lock_record),
                 uuid,
                 name,
                 rf as *mut _,
+                true,
             )))
         };
 
@@ -729,23 +791,51 @@ where
     U: AsUuid,
 {
     fn drop(&mut self) {
-        let mut lock_record = self.0.acquire_mutex();
+        let mut lock_record = self
+            .0
+            .lock_record
+            .lock()
+            .expect("Mutex only locked internally");
         lock_record.cancel(self.3);
     }
 }
 
 /// Guard returned by SomeWrite future.
-pub struct SomeLockWriteGuard<U: AsUuid, T>(AllOrSomeLock<U, T>, U, Name, *mut T);
+pub struct SomeLockWriteGuard<U: AsUuid, T: ?Sized>(
+    Arc<Mutex<LockRecord<U>>>,
+    U,
+    Name,
+    *mut T,
+    bool,
+);
 
 impl<U, T> SomeLockWriteGuard<U, T>
 where
     U: AsUuid,
+    T: ?Sized,
 {
     pub fn as_mut_tuple(&mut self) -> (Name, U, &mut T) {
         (
             self.2.clone(),
             self.1,
             unsafe { self.3.as_mut() }.expect("Cannot create null pointer from Rust references"),
+        )
+    }
+}
+
+impl<U, T> SomeLockWriteGuard<U, T>
+where
+    U: AsUuid,
+    T: 'static + Pool,
+{
+    pub fn into_dyn(mut self) -> SomeLockWriteGuard<U, dyn Pool> {
+        self.4 = false;
+        SomeLockWriteGuard(
+            Arc::clone(&self.0),
+            self.1,
+            self.2.clone(),
+            self.3 as *mut dyn Pool,
+            true,
         )
     }
 }
@@ -767,6 +857,7 @@ where
 impl<U, T> Deref for SomeLockWriteGuard<U, T>
 where
     U: AsUuid,
+    T: ?Sized,
 {
     type Target = T;
 
@@ -778,6 +869,7 @@ where
 impl<U, T> DerefMut for SomeLockWriteGuard<U, T>
 where
     U: AsUuid,
+    T: ?Sized,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         unsafe { self.3.as_mut() }.expect("Cannot create null pointer through references in Rust")
@@ -787,12 +879,15 @@ where
 impl<U, T> Drop for SomeLockWriteGuard<U, T>
 where
     U: AsUuid,
+    T: ?Sized,
 {
     fn drop(&mut self) {
         trace!("Dropping write lock on pool with UUID {}", self.1);
-        let mut lock_record = self.0.acquire_mutex();
-        lock_record.remove_write_lock(&self.1);
-        lock_record.wake();
+        if self.4 {
+            let mut lock_record = self.0.lock().expect("Mutex only locked internally");
+            lock_record.remove_write_lock(&self.1);
+            lock_record.wake();
+        }
         trace!("Write lock on pool with UUID {} dropped", self.1);
     }
 }
@@ -807,7 +902,7 @@ where
     type Output = AllLockReadGuard<U, T>;
 
     fn poll(self: Pin<&mut Self>, cxt: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut lock_record = self.0.acquire_mutex();
+        let (mut lock_record, inner) = self.0.acquire_mutex();
 
         let wait_type = WaitType::AllRead;
         let poll = if lock_record.should_wait(&wait_type, self.2) {
@@ -816,8 +911,13 @@ where
         } else {
             lock_record.add_read_all_lock(self.2);
             Poll::Ready(AllLockReadGuard(
-                self.0.clone(),
-                lock_record.inner.get() as *const _,
+                Arc::clone(&self.0.lock_record),
+                unsafe { inner.get().as_ref() }
+                    .expect("Not null")
+                    .iter()
+                    .map(|(n, u, t)| (n.clone(), *u, t as *const _))
+                    .collect::<Table<_, _>>(),
+                true,
             ))
         };
 
@@ -830,13 +930,21 @@ where
     U: AsUuid,
 {
     fn drop(&mut self) {
-        let mut lock_record = self.0.acquire_mutex();
+        let mut lock_record = self
+            .0
+            .lock_record
+            .lock()
+            .expect("Mutex only locked internally");
         lock_record.cancel(self.2);
     }
 }
 
 /// Guard returned by AllRead future.
-pub struct AllLockReadGuard<U: AsUuid, T>(AllOrSomeLock<U, T>, *const Table<U, T>);
+pub struct AllLockReadGuard<U: AsUuid, T: ?Sized>(
+    Arc<Mutex<LockRecord<U>>>,
+    Table<U, *const T>,
+    bool,
+);
 
 impl<U, T> Into<Vec<SomeLockReadGuard<U, T>>> for AllLockReadGuard<U, T>
 where
@@ -846,17 +954,17 @@ where
     // different closures in the same iterator.
     #[allow(clippy::needless_collect)]
     fn into(self) -> Vec<SomeLockReadGuard<U, T>> {
-        let mut lock_record = self.0.acquire_mutex();
+        let mut lock_record = self.0.lock().expect("Mutex only acquired internally");
         assert!(lock_record.write_locked.is_empty());
         assert!(!lock_record.all_write_locked);
 
-        let guards = unsafe { lock_record.inner.get().as_ref() }
-            .expect("cannot be null")
+        let guards = self
+            .1
             .iter()
             .map(|(n, u, t)| {
                 (
                     *u,
-                    SomeLockReadGuard(self.0.clone(), *u, n.clone(), t as *const _),
+                    SomeLockReadGuard(Arc::clone(&self.0), *u, n.clone(), *t as *const _, true),
                 )
             })
             .collect::<Vec<_>>();
@@ -870,40 +978,94 @@ where
     }
 }
 
+impl<U, T> AllLockReadGuard<U, T>
+where
+    U: AsUuid,
+    T: 'static + Pool,
+{
+    pub fn into_dyn(mut self) -> AllLockReadGuard<U, dyn Pool> {
+        self.2 = false;
+        AllLockReadGuard(
+            Arc::clone(&self.0),
+            self.1
+                .iter()
+                .map(|(n, u, t)| (n.clone(), *u, *t as *const dyn Pool))
+                .collect::<Table<_, _>>(),
+            true,
+        )
+    }
+}
+
 unsafe impl<U, T> Send for AllLockReadGuard<U, T>
 where
     U: AsUuid + Send,
-    T: Send,
+    T: ?Sized + Send,
 {
 }
 
 unsafe impl<U, T> Sync for AllLockReadGuard<U, T>
 where
     U: AsUuid + Sync,
-    T: Sync,
+    T: ?Sized + Sync,
 {
 }
 
-impl<U, T> Deref for AllLockReadGuard<U, T>
+pub struct AllLockReadGuardIter<'a, U, T: ?Sized>(Iter<'a, U, *const T>);
+
+impl<'a, U, T> Iterator for AllLockReadGuardIter<'a, U, T>
 where
     U: AsUuid,
+    T: ?Sized,
 {
-    type Target = Table<U, T>;
+    type Item = (&'a Name, &'a U, &'a T);
 
-    fn deref(&self) -> &Self::Target {
-        unsafe { self.1.as_ref() }.expect("Cannot create null pointer through references in Rust")
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0
+            .next()
+            .map(|(n, u, t)| (n, u, unsafe { t.as_ref() }.expect("Not null")))
+    }
+}
+
+impl<U, T> AllLockReadGuard<U, T>
+where
+    U: AsUuid,
+    T: ?Sized,
+{
+    pub fn get_by_uuid(&self, u: U) -> Option<(Name, &T)> {
+        self.1
+            .get_by_uuid(u)
+            .map(|(n, p)| (n, unsafe { p.as_ref().expect("Not null") }))
+    }
+
+    pub fn get_by_name(&self, name: &Name) -> Option<(U, &T)> {
+        self.1
+            .get_by_name(name)
+            .map(|(u, p)| (u, unsafe { p.as_ref().expect("Not null") }))
+    }
+
+    pub fn iter(&self) -> AllLockReadGuardIter<'_, U, T> {
+        AllLockReadGuardIter(self.1.iter())
+    }
+
+    #[cfg(test)]
+    #[allow(clippy::len_without_is_empty)]
+    pub fn len(&self) -> usize {
+        self.1.len()
     }
 }
 
 impl<U, T> Drop for AllLockReadGuard<U, T>
 where
     U: AsUuid,
+    T: ?Sized,
 {
     fn drop(&mut self) {
         trace!("Dropping all read lock");
-        let mut lock_record = self.0.acquire_mutex();
-        lock_record.remove_read_all_lock();
-        lock_record.wake();
+        if self.2 {
+            let mut lock_record = self.0.lock().expect("Mutex only locked internally");
+            lock_record.remove_read_all_lock();
+            lock_record.wake();
+        }
         trace!("All read lock dropped");
     }
 }
@@ -918,7 +1080,7 @@ where
     type Output = AllLockWriteGuard<U, T>;
 
     fn poll(self: Pin<&mut Self>, cxt: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut lock_record = self.0.acquire_mutex();
+        let (mut lock_record, inner) = self.0.acquire_mutex();
 
         let wait_type = WaitType::AllWrite;
         let poll = if lock_record.should_wait(&wait_type, self.2) {
@@ -926,7 +1088,15 @@ where
             Poll::Pending
         } else {
             lock_record.add_write_all_lock(self.2);
-            Poll::Ready(AllLockWriteGuard(self.0.clone(), lock_record.inner.get()))
+            Poll::Ready(AllLockWriteGuard(
+                Arc::clone(&self.0.lock_record),
+                unsafe { inner.get().as_mut() }
+                    .expect("Not null")
+                    .iter_mut()
+                    .map(|(n, u, t)| (n.clone(), *u, t as *mut _))
+                    .collect::<Table<_, _>>(),
+                true,
+            ))
         };
 
         poll
@@ -938,13 +1108,21 @@ where
     U: AsUuid,
 {
     fn drop(&mut self) {
-        let mut lock_record = self.0.acquire_mutex();
+        let mut lock_record = self
+            .0
+            .lock_record
+            .lock()
+            .expect("Mutex only locked internally");
         lock_record.cancel(self.2);
     }
 }
 
 /// Guard returned by AllWrite future.
-pub struct AllLockWriteGuard<U: AsUuid, T>(AllOrSomeLock<U, T>, *mut Table<U, T>);
+pub struct AllLockWriteGuard<U: AsUuid, T: ?Sized>(
+    Arc<Mutex<LockRecord<U>>>,
+    Table<U, *mut T>,
+    bool,
+);
 
 impl<U, T> Into<Vec<SomeLockWriteGuard<U, T>>> for AllLockWriteGuard<U, T>
 where
@@ -954,18 +1132,18 @@ where
     // different closures in the same iterator.
     #[allow(clippy::needless_collect)]
     fn into(self) -> Vec<SomeLockWriteGuard<U, T>> {
-        let mut lock_record = self.0.acquire_mutex();
+        let mut lock_record = self.0.lock().expect("Mutex only locked internally");
         assert!(lock_record.read_locked.is_empty());
         assert!(lock_record.write_locked.is_empty());
         assert_eq!(lock_record.all_read_locked, 0);
 
-        let guards = unsafe { lock_record.inner.get().as_mut() }
-            .expect("cannot be null")
-            .iter_mut()
+        let guards = self
+            .1
+            .iter()
             .map(|(n, u, t)| {
                 (
                     *u,
-                    SomeLockWriteGuard(self.0.clone(), *u, n.clone(), t as *mut _),
+                    SomeLockWriteGuard(Arc::clone(&self.0), *u, n.clone(), *t, true),
                 )
             })
             .collect::<Vec<_>>();
@@ -976,6 +1154,24 @@ where
                 guard
             })
             .collect::<Vec<_>>()
+    }
+}
+
+impl<U, T> AllLockWriteGuard<U, T>
+where
+    U: AsUuid,
+    T: 'static + Pool,
+{
+    pub fn into_dyn(mut self) -> AllLockWriteGuard<U, dyn Pool> {
+        self.2 = false;
+        AllLockWriteGuard(
+            Arc::clone(&self.0),
+            self.1
+                .iter()
+                .map(|(n, u, t)| (n.clone(), *u, *t as *mut dyn Pool))
+                .collect::<Table<_, _>>(),
+            true,
+        )
     }
 }
 
@@ -993,35 +1189,187 @@ where
 {
 }
 
-impl<U, T> Deref for AllLockWriteGuard<U, T>
+pub struct AllLockWriteGuardIter<'a, U, T: ?Sized>(Iter<'a, U, *mut T>);
+
+impl<'a, U, T> Iterator for AllLockWriteGuardIter<'a, U, T>
 where
     U: AsUuid,
+    T: ?Sized,
 {
-    type Target = Table<U, T>;
+    type Item = (&'a Name, &'a U, &'a T);
 
-    fn deref(&self) -> &Self::Target {
-        unsafe { self.1.as_ref() }.expect("Cannot create null pointer through references in Rust")
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0
+            .next()
+            .map(|(n, u, t)| (n, u, unsafe { t.as_ref() }.expect("Not null")))
     }
 }
 
-impl<U, T> DerefMut for AllLockWriteGuard<U, T>
+pub struct AllLockWriteGuardIterMut<'a, U, T: ?Sized>(IterMut<'a, U, *mut T>);
+
+impl<'a, U, T> Iterator for AllLockWriteGuardIterMut<'a, U, T>
 where
     U: AsUuid,
+    T: ?Sized,
 {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        unsafe { self.1.as_mut() }.expect("Cannot create null pointer through references in Rust")
+    type Item = (&'a Name, &'a U, &'a mut T);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0
+            .next()
+            .map(|(n, u, t)| (n, u, unsafe { t.as_mut() }.expect("Not null")))
+    }
+}
+
+impl<U, T> AllLockWriteGuard<U, T>
+where
+    U: AsUuid,
+    T: ?Sized,
+{
+    pub fn get_by_uuid(&self, u: U) -> Option<(Name, &T)> {
+        self.1
+            .get_by_uuid(u)
+            .map(|(n, p)| (n, unsafe { p.as_ref().expect("Not null") }))
+    }
+
+    pub fn get_by_name(&self, name: &Name) -> Option<(U, &T)> {
+        self.1
+            .get_by_name(name)
+            .map(|(u, p)| (u, unsafe { p.as_ref().expect("Not null") }))
+    }
+
+    pub fn get_mut_by_uuid(&mut self, u: U) -> Option<(Name, &mut T)> {
+        self.1
+            .get_by_uuid(u)
+            .map(|(n, p)| (n, unsafe { p.as_mut().expect("Not null") }))
+    }
+
+    pub fn get_mut_by_name(&mut self, name: &Name) -> Option<(U, &mut T)> {
+        self.1
+            .get_by_name(name)
+            .map(|(u, p)| (u, unsafe { p.as_mut().expect("Not null") }))
+    }
+
+    pub fn iter(&self) -> AllLockWriteGuardIter<'_, U, T> {
+        AllLockWriteGuardIter(self.1.iter())
+    }
+
+    pub fn iter_mut(&mut self) -> AllLockWriteGuardIterMut<'_, U, T> {
+        AllLockWriteGuardIterMut(self.1.iter_mut())
+    }
+
+    #[cfg(test)]
+    pub fn len(&self) -> usize {
+        self.1.len()
     }
 }
 
 impl<U, T> Drop for AllLockWriteGuard<U, T>
 where
     U: AsUuid,
+    T: ?Sized,
 {
     fn drop(&mut self) {
         trace!("Dropping all write lock");
-        let mut lock_record = self.0.acquire_mutex();
-        lock_record.remove_write_all_lock();
-        lock_record.wake();
+        if self.2 {
+            let mut lock_record = self.0.lock().expect("Mutex only locked internally");
+            lock_record.remove_write_all_lock();
+            lock_record.wake();
+        }
+        trace!("All write lock dropped");
+    }
+}
+
+/// Future returned by AllOrSomeLock::write_all().
+struct AllModify<U: AsUuid, T>(AllOrSomeLock<U, T>, AtomicBool, u64);
+
+impl<U, T> Future for AllModify<U, T>
+where
+    U: AsUuid,
+{
+    type Output = AllLockModifyGuard<U, T>;
+
+    fn poll(self: Pin<&mut Self>, cxt: &mut Context<'_>) -> Poll<Self::Output> {
+        let (mut lock_record, inner) = self.0.acquire_mutex();
+
+        let wait_type = WaitType::AllWrite;
+        let poll = if lock_record.should_wait(&wait_type, self.2) {
+            lock_record.add_waiter(&self.1, wait_type, cxt.waker().clone(), self.2);
+            Poll::Pending
+        } else {
+            lock_record.add_write_all_lock(self.2);
+            Poll::Ready(AllLockModifyGuard(
+                Arc::clone(&self.0.lock_record),
+                inner.get(),
+                true,
+            ))
+        };
+
+        poll
+    }
+}
+
+impl<U, T> Drop for AllModify<U, T>
+where
+    U: AsUuid,
+{
+    fn drop(&mut self) {
+        let mut lock_record = self
+            .0
+            .lock_record
+            .lock()
+            .expect("Mutex only locked internally");
+        lock_record.cancel(self.2);
+    }
+}
+
+pub struct AllLockModifyGuard<U: AsUuid, T>(Arc<Mutex<LockRecord<U>>>, *mut Table<U, T>, bool);
+
+unsafe impl<U, T> Send for AllLockModifyGuard<U, T>
+where
+    U: AsUuid + Send,
+    T: Send,
+{
+}
+
+unsafe impl<U, T> Sync for AllLockModifyGuard<U, T>
+where
+    U: AsUuid + Sync,
+    T: Sync,
+{
+}
+
+impl<U, T> Deref for AllLockModifyGuard<U, T>
+where
+    U: AsUuid,
+{
+    type Target = Table<U, T>;
+
+    fn deref(&self) -> &Self::Target {
+        unsafe { self.1.as_ref() }.expect("Not null")
+    }
+}
+
+impl<U, T> DerefMut for AllLockModifyGuard<U, T>
+where
+    U: AsUuid,
+{
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        unsafe { self.1.as_mut() }.expect("Not null")
+    }
+}
+
+impl<U, T> Drop for AllLockModifyGuard<U, T>
+where
+    U: AsUuid,
+{
+    fn drop(&mut self) {
+        trace!("Dropping all write lock");
+        if self.2 {
+            let mut lock_record = self.0.lock().expect("Mutex only locked internally");
+            lock_record.remove_write_all_lock();
+            lock_record.wake();
+        }
         trace!("All write lock dropped");
     }
 }

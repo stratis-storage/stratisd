@@ -27,18 +27,12 @@ use crate::{
 };
 
 /// Set up the cooperating D-Bus threads.
-pub async fn setup<E>(
-    engine: Arc<E>,
+pub async fn setup(
+    engine: Arc<dyn Engine>,
     receiver: UnboundedReceiver<UdevEngineEvent>,
     trigger: Sender<()>,
-    tree_channel: (
-        UnboundedSender<DbusAction<E>>,
-        UnboundedReceiver<DbusAction<E>>,
-    ),
-) -> StratisResult<()>
-where
-    E: 'static + Engine,
-{
+    tree_channel: (UnboundedSender<DbusAction>, UnboundedReceiver<DbusAction>),
+) -> StratisResult<()> {
     let engine_clone = Arc::clone(&engine);
     let (mut conn, udev, mut tree) =
         spawn_blocking!({ create_dbus_handlers(engine_clone, receiver, trigger, tree_channel) })??;

@@ -4,24 +4,16 @@
 
 use dbus_tree::{Access, EmitsChangedSignal, Factory, MTSync, Property};
 
-use crate::{
-    dbus_api::{
-        consts,
-        pool::pool_3_1::props::{
-            get_no_alloc_space, get_overprov_mode, get_pool_fs_limit, set_overprov_mode,
-            set_pool_fs_limit,
-        },
-        types::TData,
+use crate::dbus_api::{
+    consts,
+    pool::pool_3_1::props::{
+        get_no_alloc_space, get_overprov_mode, get_pool_fs_limit, set_overprov_mode,
+        set_pool_fs_limit,
     },
-    engine::Engine,
+    types::TData,
 };
 
-pub fn fs_limit_property<E>(
-    f: &Factory<MTSync<TData<E>>, TData<E>>,
-) -> Property<MTSync<TData<E>>, TData<E>>
-where
-    E: 'static + Engine,
-{
+pub fn fs_limit_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
     f.property::<u64, _>(consts::POOL_FS_LIMIT_PROP, ())
         .access(Access::ReadWrite)
         .emits_changed(EmitsChangedSignal::True)
@@ -30,12 +22,9 @@ where
         .on_set(set_pool_fs_limit)
 }
 
-pub fn enable_overprov_property<E>(
-    f: &Factory<MTSync<TData<E>>, TData<E>>,
-) -> Property<MTSync<TData<E>>, TData<E>>
-where
-    E: 'static + Engine,
-{
+pub fn enable_overprov_property(
+    f: &Factory<MTSync<TData>, TData>,
+) -> Property<MTSync<TData>, TData> {
     f.property::<bool, _>(consts::POOL_OVERPROV_PROP, ())
         .access(Access::ReadWrite)
         .emits_changed(EmitsChangedSignal::True)
@@ -44,12 +33,9 @@ where
         .on_set(set_overprov_mode)
 }
 
-pub fn no_alloc_space_property<E>(
-    f: &Factory<MTSync<TData<E>>, TData<E>>,
-) -> Property<MTSync<TData<E>>, TData<E>>
-where
-    E: 'static + Engine,
-{
+pub fn no_alloc_space_property(
+    f: &Factory<MTSync<TData>, TData>,
+) -> Property<MTSync<TData>, TData> {
     f.property::<bool, _>(consts::POOL_NO_ALLOCABLE_SPACE_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)

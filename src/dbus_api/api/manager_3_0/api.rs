@@ -4,30 +4,22 @@
 
 use dbus_tree::{Access, EmitsChangedSignal, Factory, MTSync, Method, Property};
 
-use crate::{
-    dbus_api::{
-        api::{
-            manager_3_0::{
-                methods::{
-                    create_pool, destroy_pool, engine_state_report, list_keys, set_key,
-                    unlock_pool, unset_key,
-                },
-                props::{get_locked_pools, get_version},
+use crate::dbus_api::{
+    api::{
+        manager_3_0::{
+            methods::{
+                create_pool, destroy_pool, engine_state_report, list_keys, set_key, unlock_pool,
+                unset_key,
             },
-            prop_conv::StoppedOrLockedPools,
+            props::{get_locked_pools, get_version},
         },
-        consts,
-        types::TData,
+        prop_conv::StoppedOrLockedPools,
     },
-    engine::Engine,
+    consts,
+    types::TData,
 };
 
-pub fn destroy_pool_method<E>(
-    f: &Factory<MTSync<TData<E>>, TData<E>>,
-) -> Method<MTSync<TData<E>>, TData<E>>
-where
-    E: 'static + Engine,
-{
+pub fn destroy_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
     f.method("DestroyPool", (), destroy_pool)
         .in_arg(("pool", "o"))
         // In order from left to right:
@@ -40,12 +32,7 @@ where
         .out_arg(("return_string", "s"))
 }
 
-pub fn list_keys_method<E>(
-    f: &Factory<MTSync<TData<E>>, TData<E>>,
-) -> Method<MTSync<TData<E>>, TData<E>>
-where
-    E: 'static + Engine,
-{
+pub fn list_keys_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
     f.method("ListKeys", (), list_keys)
         // In order from left to right:
         // as: Array of key descriptions as strings.
@@ -56,24 +43,14 @@ where
         .out_arg(("return_string", "s"))
 }
 
-pub fn version_property<E>(
-    f: &Factory<MTSync<TData<E>>, TData<E>>,
-) -> Property<MTSync<TData<E>>, TData<E>>
-where
-    E: 'static + Engine,
-{
+pub fn version_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
     f.property::<&str, _>("Version", ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_version)
 }
 
-pub fn unset_key_method<E>(
-    f: &Factory<MTSync<TData<E>>, TData<E>>,
-) -> Method<MTSync<TData<E>>, TData<E>>
-where
-    E: 'static + Engine,
-{
+pub fn unset_key_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
     f.method("UnsetKey", (), unset_key)
         .in_arg(("key_desc", "s"))
         // b: true if the key was unset from the keyring. false if the key
@@ -85,12 +62,7 @@ where
         .out_arg(("return_string", "s"))
 }
 
-pub fn set_key_method<E>(
-    f: &Factory<MTSync<TData<E>>, TData<E>>,
-) -> Method<MTSync<TData<E>>, TData<E>>
-where
-    E: 'static + Engine,
-{
+pub fn set_key_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
     f.method("SetKey", (), set_key)
         .in_arg(("key_desc", "s"))
         .in_arg(("key_fd", "h"))
@@ -104,12 +76,7 @@ where
         .out_arg(("return_string", "s"))
 }
 
-pub fn unlock_pool_method<E>(
-    f: &Factory<MTSync<TData<E>>, TData<E>>,
-) -> Method<MTSync<TData<E>>, TData<E>>
-where
-    E: 'static + Engine,
-{
+pub fn unlock_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
     f.method("UnlockPool", (), unlock_pool)
         .in_arg(("pool_uuid", "s"))
         .in_arg(("unlock_method", "s"))
@@ -123,12 +90,9 @@ where
         .out_arg(("return_string", "s"))
 }
 
-pub fn engine_state_report_method<E>(
-    f: &Factory<MTSync<TData<E>>, TData<E>>,
-) -> Method<MTSync<TData<E>>, TData<E>>
-where
-    E: 'static + Engine,
-{
+pub fn engine_state_report_method(
+    f: &Factory<MTSync<TData>, TData>,
+) -> Method<MTSync<TData>, TData> {
     f.method("EngineStateReport", (), engine_state_report)
         // s: JSON engine state report as a string.
         //
@@ -138,12 +102,7 @@ where
         .out_arg(("return_string", "s"))
 }
 
-pub fn create_pool_method<E>(
-    f: &Factory<MTSync<TData<E>>, TData<E>>,
-) -> Method<MTSync<TData<E>>, TData<E>>
-where
-    E: 'static + Engine,
-{
+pub fn create_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
     f.method("CreatePool", (), create_pool)
         .in_arg(("name", "s"))
         .in_arg(("redundancy", "(bq)"))
@@ -174,12 +133,7 @@ where
         .out_arg(("return_string", "s"))
 }
 
-pub fn locked_pools_property<E>(
-    f: &Factory<MTSync<TData<E>>, TData<E>>,
-) -> Property<MTSync<TData<E>>, TData<E>>
-where
-    E: 'static + Engine,
-{
+pub fn locked_pools_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
     f.property::<StoppedOrLockedPools, _>(consts::LOCKED_POOLS_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)

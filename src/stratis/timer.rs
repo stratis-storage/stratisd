@@ -14,19 +14,14 @@ use crate::{engine::Engine, stratis::errors::StratisResult};
 
 /// Runs checks on thin pool usage and filesystem usage to determine whether either
 /// need to be extended.
-async fn check_pool_and_fs<E>(
-    engine: Arc<E>,
-    #[cfg(feature = "dbus_enabled")] sender: UnboundedSender<DbusAction<E>>,
-) where
-    E: Engine,
-{
-    async fn process_checks<E>(
-        engine: &Arc<E>,
-        #[cfg(feature = "dbus_enabled")] sender: &UnboundedSender<DbusAction<E>>,
-    ) -> StratisResult<()>
-    where
-        E: Engine,
-    {
+async fn check_pool_and_fs(
+    engine: Arc<dyn Engine>,
+    #[cfg(feature = "dbus_enabled")] sender: UnboundedSender<DbusAction>,
+) {
+    async fn process_checks(
+        engine: &Arc<dyn Engine>,
+        #[cfg(feature = "dbus_enabled")] sender: &UnboundedSender<DbusAction>,
+    ) -> StratisResult<()> {
         #[cfg(feature = "min")]
         {
             let _ = engine.pool_evented(None).await;
@@ -75,13 +70,10 @@ async fn check_pool_and_fs<E>(
 /// Run all timed background tasks.
 ///
 /// Currently runs a timer to check thin pool and filesystem usage.
-pub async fn run_timers<E>(
-    engine: Arc<E>,
-    #[cfg(feature = "dbus_enabled")] sender: UnboundedSender<DbusAction<E>>,
-) -> StratisResult<()>
-where
-    E: 'static + Engine,
-{
+pub async fn run_timers(
+    engine: Arc<dyn Engine>,
+    #[cfg(feature = "dbus_enabled")] sender: UnboundedSender<DbusAction>,
+) -> StratisResult<()> {
     spawn(check_pool_and_fs(
         engine,
         #[cfg(feature = "dbus_enabled")]

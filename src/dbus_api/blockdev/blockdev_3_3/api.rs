@@ -4,35 +4,22 @@
 
 use dbus_tree::{Access, EmitsChangedSignal, Factory, MTSync, Property};
 
-use crate::{
-    dbus_api::{
-        blockdev::blockdev_3_3::props::{
-            get_blockdev_new_size, get_blockdev_user_info, set_blockdev_user_info,
-        },
-        consts,
-        types::TData,
+use crate::dbus_api::{
+    blockdev::blockdev_3_3::props::{
+        get_blockdev_new_size, get_blockdev_user_info, set_blockdev_user_info,
     },
-    engine::Engine,
+    consts,
+    types::TData,
 };
 
-pub fn new_size_property<E>(
-    f: &Factory<MTSync<TData<E>>, TData<E>>,
-) -> Property<MTSync<TData<E>>, TData<E>>
-where
-    E: 'static + Engine,
-{
+pub fn new_size_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
     f.property::<(bool, &str), _>(consts::BLOCKDEV_NEW_SIZE_PROP, ())
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::True)
         .on_get(get_blockdev_new_size)
 }
 
-pub fn user_info_property<E>(
-    f: &Factory<MTSync<TData<E>>, TData<E>>,
-) -> Property<MTSync<TData<E>>, TData<E>>
-where
-    E: 'static + Engine,
-{
+pub fn user_info_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
     f.property::<(bool, &str), _>(consts::BLOCKDEV_USER_INFO_PROP, ())
         .access(Access::ReadWrite)
         .emits_changed(EmitsChangedSignal::True)

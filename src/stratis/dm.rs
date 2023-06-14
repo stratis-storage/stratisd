@@ -25,21 +25,15 @@ const REQUIRED_DM_MINOR_VERSION: u32 = 37;
 // to engine to handle event and waits until control is returned from engine.
 // Accepts None as an argument; this indicates that devicemapper events are
 // to be ignored.
-pub async fn dm_event_thread<E>(
-    engine: Option<Arc<E>>,
-    #[cfg(feature = "dbus_enabled")] sender: UnboundedSender<DbusAction<E>>,
-) -> StratisResult<()>
-where
-    E: 'static + Engine,
-{
-    async fn process_dm_event<E>(
-        engine: &Arc<E>,
-        #[cfg(feature = "dbus_enabled")] sender: &UnboundedSender<DbusAction<E>>,
+pub async fn dm_event_thread(
+    engine: Option<Arc<dyn Engine>>,
+    #[cfg(feature = "dbus_enabled")] sender: UnboundedSender<DbusAction>,
+) -> StratisResult<()> {
+    async fn process_dm_event(
+        engine: &Arc<dyn Engine>,
+        #[cfg(feature = "dbus_enabled")] sender: &UnboundedSender<DbusAction>,
         fd: &AsyncFd<RawFd>,
-    ) -> StratisResult<()>
-    where
-        E: Engine,
-    {
+    ) -> StratisResult<()> {
         {
             let mut guard = fd.readable().await?;
             // Must clear readiness given that we never actually read any data

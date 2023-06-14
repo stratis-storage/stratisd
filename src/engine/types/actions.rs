@@ -115,7 +115,7 @@ impl Display for CreateAction<Key> {
 
 impl<F> Display for CreateAction<(FilesystemUuid, &mut F)>
 where
-    F: Filesystem,
+    F: Filesystem + ?Sized,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

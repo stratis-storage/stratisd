@@ -9,9 +9,6 @@ use serde_json::Value;
 use crate::engine::Engine;
 
 #[inline]
-pub async fn report<E>(engine: Arc<E>) -> Value
-where
-    E: Engine,
-{
+pub async fn report(engine: Arc<dyn Engine>) -> Value {
     engine.engine_state_report()
 }

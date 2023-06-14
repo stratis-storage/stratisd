@@ -10,7 +10,7 @@ use crate::{
         types::{DbusContext, InterfacesAddedThreadSafe, OPContext},
         util::make_object_path,
     },
-    engine::{BlockDevTier, DevUuid, Engine, Pool, StratisUuid},
+    engine::{BlockDev, BlockDevTier, DevUuid, StratisUuid},
 };
 
 mod blockdev_3_0;
@@ -18,16 +18,13 @@ mod blockdev_3_3;
 pub mod prop_conv;
 mod shared;
 
-pub fn create_dbus_blockdev<'a, E>(
-    dbus_context: &DbusContext<E>,
+pub fn create_dbus_blockdev<'a>(
+    dbus_context: &DbusContext,
     parent: dbus::Path<'static>,
     uuid: DevUuid,
     tier: BlockDevTier,
-    blockdev: &<E::Pool as Pool>::BlockDev,
-) -> dbus::Path<'a>
-where
-    E: 'static + Engine,
-{
+    blockdev: &dyn BlockDev,
+) -> dbus::Path<'a> {
     let f = Factory::new_sync();
 
     let object_name = make_object_path(dbus_context);
@@ -131,102 +128,99 @@ where
         );
 
     let path = object_path.get_name().to_owned();
-    let interfaces = get_blockdev_properties::<E>(parent, uuid, tier, blockdev);
+    let interfaces = get_blockdev_properties(parent, uuid, tier, blockdev);
     dbus_context.push_add(object_path, interfaces);
     path
 }
 
 /// Get the initial state of all properties associated with a blockdev object.
-pub fn get_blockdev_properties<E>(
+pub fn get_blockdev_properties(
     parent: dbus::Path<'static>,
     dev_uuid: DevUuid,
     tier: BlockDevTier,
-    dev: &<E::Pool as Pool>::BlockDev,
-) -> InterfacesAddedThreadSafe
-where
-    E: 'static + Engine,
-{
+    dev: &dyn BlockDev,
+) -> InterfacesAddedThreadSafe {
     initial_properties! {
         consts::BLOCKDEV_INTERFACE_NAME_3_0 => {
-            consts::BLOCKDEV_DEVNODE_PROP => shared::blockdev_devnode_prop::<E>(dev),
-            consts::BLOCKDEV_HARDWARE_INFO_PROP => shared::blockdev_hardware_info_prop::<E>(dev),
-            consts::BLOCKDEV_USER_INFO_PROP => shared::blockdev_user_info_prop::<E>(dev),
-            consts::BLOCKDEV_INIT_TIME_PROP => shared::blockdev_init_time_prop::<E>(dev),
+            consts::BLOCKDEV_DEVNODE_PROP => shared::blockdev_devnode_prop(dev),
+            consts::BLOCKDEV_HARDWARE_INFO_PROP => shared::blockdev_hardware_info_prop(dev),
+            consts::BLOCKDEV_USER_INFO_PROP => shared::blockdev_user_info_prop(dev),
+            consts::BLOCKDEV_INIT_TIME_PROP => shared::blockdev_init_time_prop(dev),
             consts::BLOCKDEV_POOL_PROP => parent.clone(),
             consts::BLOCKDEV_UUID_PROP => uuid_to_string!(dev_uuid),
             consts::BLOCKDEV_TIER_PROP => shared::blockdev_tier_prop(tier),
-            consts::BLOCKDEV_PHYSICAL_PATH_PROP => shared::blockdev_physical_path_prop::<E>(dev),
-            consts::BLOCKDEV_TOTAL_SIZE_PROP => shared::blockdev_size_prop::<E>(dev)
+            consts::BLOCKDEV_PHYSICAL_PATH_PROP => shared::blockdev_physical_path_prop(dev),
+            consts::BLOCKDEV_TOTAL_SIZE_PROP => shared::blockdev_size_prop(dev)
         },
         consts::BLOCKDEV_INTERFACE_NAME_3_1 => {
-            consts::BLOCKDEV_DEVNODE_PROP => shared::blockdev_devnode_prop::<E>(dev),
-            consts::BLOCKDEV_HARDWARE_INFO_PROP => shared::blockdev_hardware_info_prop::<E>(dev),
-            consts::BLOCKDEV_USER_INFO_PROP => shared::blockdev_user_info_prop::<E>(dev),
-            consts::BLOCKDEV_INIT_TIME_PROP => shared::blockdev_init_time_prop::<E>(dev),
+            consts::BLOCKDEV_DEVNODE_PROP => shared::blockdev_devnode_prop(dev),
+            consts::BLOCKDEV_HARDWARE_INFO_PROP => shared::blockdev_hardware_info_prop(dev),
+            consts::BLOCKDEV_USER_INFO_PROP => shared::blockdev_user_info_prop(dev),
+            consts::BLOCKDEV_INIT_TIME_PROP => shared::blockdev_init_time_prop(dev),
             consts::BLOCKDEV_POOL_PROP => parent.clone(),
             consts::BLOCKDEV_UUID_PROP => uuid_to_string!(dev_uuid),
             consts::BLOCKDEV_TIER_PROP => shared::blockdev_tier_prop(tier),
-            consts::BLOCKDEV_PHYSICAL_PATH_PROP => shared::blockdev_physical_path_prop::<E>(dev),
-            consts::BLOCKDEV_TOTAL_SIZE_PROP => shared::blockdev_size_prop::<E>(dev)
+            consts::BLOCKDEV_PHYSICAL_PATH_PROP => shared::blockdev_physical_path_prop(dev),
+            consts::BLOCKDEV_TOTAL_SIZE_PROP => shared::blockdev_size_prop(dev)
         },
         consts::BLOCKDEV_INTERFACE_NAME_3_2 => {
-            consts::BLOCKDEV_DEVNODE_PROP => shared::blockdev_devnode_prop::<E>(dev),
-            consts::BLOCKDEV_HARDWARE_INFO_PROP => shared::blockdev_hardware_info_prop::<E>(dev),
-            consts::BLOCKDEV_USER_INFO_PROP => shared::blockdev_user_info_prop::<E>(dev),
-            consts::BLOCKDEV_INIT_TIME_PROP => shared::blockdev_init_time_prop::<E>(dev),
+            consts::BLOCKDEV_DEVNODE_PROP => shared::blockdev_devnode_prop(dev),
+            consts::BLOCKDEV_HARDWARE_INFO_PROP => shared::blockdev_hardware_info_prop(dev),
+            consts::BLOCKDEV_USER_INFO_PROP => shared::blockdev_user_info_prop(dev),
+            consts::BLOCKDEV_INIT_TIME_PROP => shared::blockdev_init_time_prop(dev),
             consts::BLOCKDEV_POOL_PROP => parent.clone(),
             consts::BLOCKDEV_UUID_PROP => uuid_to_string!(dev_uuid),
             consts::BLOCKDEV_TIER_PROP => shared::blockdev_tier_prop(tier),
-            consts::BLOCKDEV_PHYSICAL_PATH_PROP => shared::blockdev_physical_path_prop::<E>(dev),
-            consts::BLOCKDEV_TOTAL_SIZE_PROP => shared::blockdev_size_prop::<E>(dev)
+            consts::BLOCKDEV_PHYSICAL_PATH_PROP => shared::blockdev_physical_path_prop(dev),
+            consts::BLOCKDEV_TOTAL_SIZE_PROP => shared::blockdev_size_prop(dev)
         },
         consts::BLOCKDEV_INTERFACE_NAME_3_3 => {
-            consts::BLOCKDEV_DEVNODE_PROP => shared::blockdev_devnode_prop::<E>(dev),
-            consts::BLOCKDEV_HARDWARE_INFO_PROP => shared::blockdev_hardware_info_prop::<E>(dev),
-            consts::BLOCKDEV_USER_INFO_PROP => shared::blockdev_user_info_prop::<E>(dev),
-            consts::BLOCKDEV_INIT_TIME_PROP => shared::blockdev_init_time_prop::<E>(dev),
+            consts::BLOCKDEV_DEVNODE_PROP => shared::blockdev_devnode_prop(dev),
+            consts::BLOCKDEV_HARDWARE_INFO_PROP => shared::blockdev_hardware_info_prop(dev),
+            consts::BLOCKDEV_USER_INFO_PROP => shared::blockdev_user_info_prop(dev),
+            consts::BLOCKDEV_INIT_TIME_PROP => shared::blockdev_init_time_prop(dev),
             consts::BLOCKDEV_POOL_PROP => parent.clone(),
             consts::BLOCKDEV_UUID_PROP => uuid_to_string!(dev_uuid),
             consts::BLOCKDEV_TIER_PROP => shared::blockdev_tier_prop(tier),
-            consts::BLOCKDEV_PHYSICAL_PATH_PROP => shared::blockdev_physical_path_prop::<E>(dev),
-            consts::BLOCKDEV_TOTAL_SIZE_PROP => shared::blockdev_size_prop::<E>(dev),
-            consts::BLOCKDEV_NEW_SIZE_PROP => shared::blockdev_new_size_prop::<E>(dev)
+            consts::BLOCKDEV_PHYSICAL_PATH_PROP => shared::blockdev_physical_path_prop(dev),
+            consts::BLOCKDEV_TOTAL_SIZE_PROP => shared::blockdev_size_prop(dev),
+            consts::BLOCKDEV_NEW_SIZE_PROP => shared::blockdev_new_size_prop(dev)
         },
         consts::BLOCKDEV_INTERFACE_NAME_3_4 => {
-            consts::BLOCKDEV_DEVNODE_PROP => shared::blockdev_devnode_prop::<E>(dev),
-            consts::BLOCKDEV_HARDWARE_INFO_PROP => shared::blockdev_hardware_info_prop::<E>(dev),
-            consts::BLOCKDEV_USER_INFO_PROP => shared::blockdev_user_info_prop::<E>(dev),
-            consts::BLOCKDEV_INIT_TIME_PROP => shared::blockdev_init_time_prop::<E>(dev),
+            consts::BLOCKDEV_DEVNODE_PROP => shared::blockdev_devnode_prop(dev),
+            consts::BLOCKDEV_HARDWARE_INFO_PROP => shared::blockdev_hardware_info_prop(dev),
+            consts::BLOCKDEV_USER_INFO_PROP => shared::blockdev_user_info_prop(dev),
+            consts::BLOCKDEV_INIT_TIME_PROP => shared::blockdev_init_time_prop(dev),
             consts::BLOCKDEV_POOL_PROP => parent.clone(),
             consts::BLOCKDEV_UUID_PROP => uuid_to_string!(dev_uuid),
             consts::BLOCKDEV_TIER_PROP => shared::blockdev_tier_prop(tier),
-            consts::BLOCKDEV_PHYSICAL_PATH_PROP => shared::blockdev_physical_path_prop::<E>(dev),
-            consts::BLOCKDEV_TOTAL_SIZE_PROP => shared::blockdev_size_prop::<E>(dev),
-            consts::BLOCKDEV_NEW_SIZE_PROP => shared::blockdev_new_size_prop::<E>(dev)
+            consts::BLOCKDEV_PHYSICAL_PATH_PROP => shared::blockdev_physical_path_prop(dev),
+            consts::BLOCKDEV_TOTAL_SIZE_PROP => shared::blockdev_size_prop(dev),
+            consts::BLOCKDEV_NEW_SIZE_PROP => shared::blockdev_new_size_prop(dev)
         },
         consts::BLOCKDEV_INTERFACE_NAME_3_5 => {
-            consts::BLOCKDEV_DEVNODE_PROP => shared::blockdev_devnode_prop::<E>(dev),
-            consts::BLOCKDEV_HARDWARE_INFO_PROP => shared::blockdev_hardware_info_prop::<E>(dev),
-            consts::BLOCKDEV_USER_INFO_PROP => shared::blockdev_user_info_prop::<E>(dev),
-            consts::BLOCKDEV_INIT_TIME_PROP => shared::blockdev_init_time_prop::<E>(dev),
+            consts::BLOCKDEV_DEVNODE_PROP => shared::blockdev_devnode_prop(dev),
+            consts::BLOCKDEV_HARDWARE_INFO_PROP => shared::blockdev_hardware_info_prop(dev),
+            consts::BLOCKDEV_USER_INFO_PROP => shared::blockdev_user_info_prop(dev),
+            consts::BLOCKDEV_INIT_TIME_PROP => shared::blockdev_init_time_prop(dev),
             consts::BLOCKDEV_POOL_PROP => parent.clone(),
             consts::BLOCKDEV_UUID_PROP => uuid_to_string!(dev_uuid),
             consts::BLOCKDEV_TIER_PROP => shared::blockdev_tier_prop(tier),
-            consts::BLOCKDEV_PHYSICAL_PATH_PROP => shared::blockdev_physical_path_prop::<E>(dev),
-            consts::BLOCKDEV_TOTAL_SIZE_PROP => shared::blockdev_size_prop::<E>(dev),
-            consts::BLOCKDEV_NEW_SIZE_PROP => shared::blockdev_new_size_prop::<E>(dev)
+            consts::BLOCKDEV_PHYSICAL_PATH_PROP => shared::blockdev_physical_path_prop(dev),
+            consts::BLOCKDEV_TOTAL_SIZE_PROP => shared::blockdev_size_prop(dev),
+            consts::BLOCKDEV_NEW_SIZE_PROP => shared::blockdev_new_size_prop(dev)
         },
         consts::BLOCKDEV_INTERFACE_NAME_3_6 => {
-            consts::BLOCKDEV_DEVNODE_PROP => shared::blockdev_devnode_prop::<E>(dev),
-            consts::BLOCKDEV_HARDWARE_INFO_PROP => shared::blockdev_hardware_info_prop::<E>(dev),
-            consts::BLOCKDEV_USER_INFO_PROP => shared::blockdev_user_info_prop::<E>(dev),
-            consts::BLOCKDEV_INIT_TIME_PROP => shared::blockdev_init_time_prop::<E>(dev),
+            consts::BLOCKDEV_DEVNODE_PROP => shared::blockdev_devnode_prop(dev),
+            consts::BLOCKDEV_HARDWARE_INFO_PROP => shared::blockdev_hardware_info_prop(dev),
+            consts::BLOCKDEV_USER_INFO_PROP => shared::blockdev_user_info_prop(dev),
+            consts::BLOCKDEV_INIT_TIME_PROP => shared::blockdev_init_time_prop(dev),
             consts::BLOCKDEV_POOL_PROP => parent,
             consts::BLOCKDEV_UUID_PROP => uuid_to_string!(dev_uuid),
             consts::BLOCKDEV_TIER_PROP => shared::blockdev_tier_prop(tier),
-            consts::BLOCKDEV_PHYSICAL_PATH_PROP => shared::blockdev_physical_path_prop::<E>(dev),
-            consts::BLOCKDEV_TOTAL_SIZE_PROP => shared::blockdev_size_prop::<E>(dev),
-            consts::BLOCKDEV_NEW_SIZE_PROP => shared::blockdev_new_size_prop::<E>(dev)
+            consts::BLOCKDEV_PHYSICAL_PATH_PROP => shared::blockdev_physical_path_prop(dev),
+            consts::BLOCKDEV_TOTAL_SIZE_PROP => shared::blockdev_size_prop(dev),
+            consts::BLOCKDEV_NEW_SIZE_PROP => shared::blockdev_new_size_prop(dev)
         }
     }
 }

@@ -14,14 +14,11 @@ use crate::{
         types::{DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
-    engine::{Engine, Name, Pool, PoolIdentifier, PoolUuid, StartAction, UnlockMethod},
+    engine::{Name, PoolIdentifier, PoolUuid, StartAction, UnlockMethod},
     stratis::StratisError,
 };
 
-pub fn start_pool<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn start_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let base_path = m.path.get_name();
     let message: &Message = m.msg;
     let mut iter = message.iter_init();

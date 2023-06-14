@@ -10,13 +10,10 @@ use crate::{
         types::{DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
-    engine::{DevUuid, Engine, Pool, RenameAction},
+    engine::{DevUuid, RenameAction},
 };
 
-pub fn set_user_info<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: Engine,
-{
+pub fn set_user_info(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 

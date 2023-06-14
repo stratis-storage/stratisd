@@ -12,7 +12,7 @@ use async_trait::async_trait;
 use futures::{executor::block_on, future::join_all};
 use serde_json::Value;
 use tokio::{
-    sync::{OwnedRwLockReadGuard, OwnedRwLockWriteGuard, RwLock},
+    sync::RwLock,
     task::{spawn_blocking, JoinHandle},
 };
 
@@ -20,7 +20,7 @@ use devicemapper::DmNameBuf;
 
 use crate::{
     engine::{
-        engine::HandleEvents,
+        engine::{HandleEvents, KeyActions},
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
         strat_engine::{
             backstore::ProcessedPathInfos,
@@ -32,8 +32,8 @@ use crate::{
             pool::StratPool,
         },
         structures::{
-            AllLockReadGuard, AllLockWriteGuard, AllOrSomeLock, ExclusiveGuard, Lockable,
-            SharedGuard, SomeLockReadGuard, SomeLockWriteGuard, Table,
+            AllLockReadGuard, AllLockWriteGuard, AllOrSomeLock, Lockable, SomeLockReadGuard,
+            SomeLockWriteGuard, Table,
         },
         types::{
             CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockedPoolsInfo,
@@ -61,7 +61,7 @@ pub struct StratEngine {
     watched_dev_last_event_nrs: Lockable<Arc<RwLock<EventNumbers>>>,
 
     // Handler for key operations
-    key_handler: Lockable<Arc<RwLock<StratKeyActions>>>,
+    key_handler: Arc<StratKeyActions>,
 
     // In memory filesystem for private namespace mounts.
     #[allow(dead_code)]
@@ -92,9 +92,31 @@ impl StratEngine {
             pools: AllOrSomeLock::new(pools),
             liminal_devices: Lockable::new_shared(liminal_devices),
             watched_dev_last_event_nrs: Lockable::new_shared(HashMap::new()),
-            key_handler: Lockable::new_shared(StratKeyActions),
+            key_handler: Arc::new(StratKeyActions),
             fs,
         })
+    }
+
+    pub async fn get_pool(
+        &self,
+        key: PoolIdentifier<PoolUuid>,
+    ) -> Option<SomeLockReadGuard<PoolUuid, StratPool>> {
+        get_pool!(self; key)
+    }
+
+    pub async fn get_mut_pool(
+        &self,
+        key: PoolIdentifier<PoolUuid>,
+    ) -> Option<SomeLockWriteGuard<PoolUuid, StratPool>> {
+        get_mut_pool!(self; key)
+    }
+
+    pub async fn pools(&self) -> AllLockReadGuard<PoolUuid, StratPool> {
+        self.pools.read_all().await
+    }
+
+    pub async fn pools_mut(&self) -> AllLockWriteGuard<PoolUuid, StratPool> {
+        self.pools.write_all().await
     }
 
     fn spawn_pool_check_handling(
@@ -299,10 +321,7 @@ impl Report for StratEngine {
 
 #[async_trait]
 impl Engine for StratEngine {
-    type Pool = StratPool;
-    type KeyActions = StratKeyActions;
-
-    async fn handle_events(&self, events: Vec<UdevEngineEvent>) -> HandleEvents<Self::Pool> {
+    async fn handle_events(&self, events: Vec<UdevEngineEvent>) -> HandleEvents<dyn Pool> {
         let mut ret_guards = Vec::new();
         let mut diffs = HashMap::new();
 
@@ -311,7 +330,7 @@ impl Engine for StratEngine {
         //
         // Failing to do this can cause two identical pools to be registered in
         // internal data structures.
-        let mut pools_write_all = self.pools.write_all().await;
+        let mut pools_write_all = self.pools.modify_all().await;
         let mut ld_guard = self.liminal_devices.write().await;
 
         match spawn_blocking!({
@@ -351,7 +370,7 @@ impl Engine for StratEngine {
             Ok((uuids, diffs_thread)) => {
                 for uuid in uuids {
                     if let Some(guard) = self.pools.read(PoolIdentifier::Uuid(uuid)).await {
-                        ret_guards.push(guard);
+                        ret_guards.push(guard.into_dyn());
                     }
                 }
                 diffs.extend(diffs_thread.into_iter());
@@ -427,7 +446,7 @@ impl Engine for StratEngine {
             let cloned_enc_info = encryption_info.cloned();
 
             let pool_uuid = {
-                let mut pools = self.pools.write_all().await;
+                let mut pools = self.pools.modify_all().await;
                 let (pool_uuid, pool) = spawn_blocking!({
                     StratPool::initialize(&cloned_name, unowned_devices, cloned_enc_info.as_ref())
                 })??;
@@ -448,7 +467,7 @@ impl Engine for StratEngine {
             return Ok(DeleteAction::Identity);
         }
 
-        let mut guard = self.pools.write_all().await;
+        let mut guard = self.pools.modify_all().await;
         let (pool_name, mut pool) = guard
             .remove_by_uuid(uuid)
             .expect("Must succeed since self.pools.get_by_uuid() returned a value");
@@ -482,7 +501,7 @@ impl Engine for StratEngine {
         let new_name = Name::new(new_name.to_owned());
         let old_name = rename_pool_pre_idem!(self; uuid; new_name.clone());
 
-        let mut guard = self.pools.write_all().await;
+        let mut guard = self.pools.modify_all().await;
 
         let (_, mut pool) = guard
             .remove_by_uuid(uuid)
@@ -523,7 +542,7 @@ impl Engine for StratEngine {
                 Ok(SetUnlockAction::identity())
             }
         } else {
-            let mut pools = self.pools.write_all().await;
+            let mut pools = self.pools.modify_all().await;
             let mut liminal = self.liminal_devices.write().await;
             let unlocked_uuids = spawn_blocking!({
                 let (name, pool_uuid, pool, unlocked_uuids) = liminal.start_pool(
@@ -541,15 +560,15 @@ impl Engine for StratEngine {
     async fn get_pool(
         &self,
         key: PoolIdentifier<PoolUuid>,
-    ) -> Option<SomeLockReadGuard<PoolUuid, Self::Pool>> {
-        get_pool!(self; key)
+    ) -> Option<SomeLockReadGuard<PoolUuid, dyn Pool>> {
+        self.get_pool(key).await.map(|l| l.into_dyn())
     }
 
     async fn get_mut_pool(
         &self,
         key: PoolIdentifier<PoolUuid>,
-    ) -> Option<SomeLockWriteGuard<PoolUuid, Self::Pool>> {
-        get_mut_pool!(self; key)
+    ) -> Option<SomeLockWriteGuard<PoolUuid, dyn Pool>> {
+        self.get_mut_pool(key).await.map(|l| l.into_dyn())
     }
 
     async fn locked_pools(&self) -> LockedPoolsInfo {
@@ -560,12 +579,12 @@ impl Engine for StratEngine {
         self.liminal_devices.read().await.stopped_pools()
     }
 
-    async fn pools(&self) -> AllLockReadGuard<PoolUuid, Self::Pool> {
-        self.pools.read_all().await
+    async fn pools(&self) -> AllLockReadGuard<PoolUuid, dyn Pool> {
+        self.pools().await.into_dyn()
     }
 
-    async fn pools_mut(&self) -> AllLockWriteGuard<PoolUuid, Self::Pool> {
-        self.pools.write_all().await
+    async fn pools_mut(&self) -> AllLockWriteGuard<PoolUuid, dyn Pool> {
+        self.pools_mut().await.into_dyn()
     }
 
     async fn get_events(&self) -> StratisResult<HashSet<PoolUuid>> {
@@ -623,12 +642,8 @@ impl Engine for StratEngine {
         }
     }
 
-    async fn get_key_handler(&self) -> SharedGuard<OwnedRwLockReadGuard<Self::KeyActions>> {
-        self.key_handler.read().await
-    }
-
-    async fn get_key_handler_mut(&self) -> ExclusiveGuard<OwnedRwLockWriteGuard<Self::KeyActions>> {
-        self.key_handler.write().await
+    async fn get_key_handler(&self) -> Arc<dyn KeyActions> {
+        Arc::clone(&self.key_handler) as Arc<dyn KeyActions>
     }
 
     async fn start_pool(
@@ -650,7 +665,7 @@ impl Engine for StratEngine {
                 Ok(StartAction::Identity)
             }
         } else {
-            let mut pools = self.pools.write_all().await;
+            let mut pools = self.pools.modify_all().await;
             let mut liminal = self.liminal_devices.write().await;
             let pool_uuid = spawn_blocking!({
                 let (name, pool_uuid, pool, _) = liminal.start_pool(&pools, id, unlock_method)?;
@@ -696,7 +711,7 @@ impl Engine for StratEngine {
             }
         }
 
-        let mut pools = self.pools.write_all().await;
+        let mut pools = self.pools.modify_all().await;
         if let Some((name, pool_uuid, pool)) = match pool_id {
             PoolIdentifier::Name(n) => pools.remove_by_name(&n).map(|(u, p)| (n, u, p)),
             PoolIdentifier::Uuid(u) => pools.remove_by_uuid(u).map(|(n, p)| (n, u, p)),
@@ -712,7 +727,7 @@ impl Engine for StratEngine {
     }
 
     async fn refresh_state(&self) -> StratisResult<()> {
-        let mut pools = self.pools.write_all().await;
+        let mut pools = self.pools.modify_all().await;
         *pools = Table::default();
         let mut lim = self.liminal_devices.write().await;
         *lim = LiminalDevices::default();

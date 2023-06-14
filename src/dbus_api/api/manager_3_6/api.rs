@@ -4,17 +4,9 @@
 
 use dbus_tree::{Factory, MTSync, Method};
 
-use crate::{
-    dbus_api::{api::manager_3_6::methods::stop_pool, types::TData},
-    engine::Engine,
-};
+use crate::dbus_api::{api::manager_3_6::methods::stop_pool, types::TData};
 
-pub fn stop_pool_method<E>(
-    f: &Factory<MTSync<TData<E>>, TData<E>>,
-) -> Method<MTSync<TData<E>>, TData<E>>
-where
-    E: 'static + Engine,
-{
+pub fn stop_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
     f.method("StopPool", (), stop_pool)
         .in_arg(("id", "s"))
         .in_arg(("id_type", "s"))

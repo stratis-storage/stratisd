@@ -4,17 +4,11 @@
 
 use dbus_tree::{Factory, MTSync, Method};
 
-use crate::{
-    dbus_api::{pool::pool_3_3::methods::grow_physical, types::TData},
-    engine::Engine,
-};
+use crate::dbus_api::{pool::pool_3_3::methods::grow_physical, types::TData};
 
-pub fn grow_physical_device_method<E>(
-    f: &Factory<MTSync<TData<E>>, TData<E>>,
-) -> Method<MTSync<TData<E>>, TData<E>>
-where
-    E: 'static + Engine,
-{
+pub fn grow_physical_device_method(
+    f: &Factory<MTSync<TData>, TData>,
+) -> Method<MTSync<TData>, TData> {
     f.method("GrowPhysicalDevice", (), grow_physical)
         // s: String representation of device UUID
         .in_arg(("dev", "s"))

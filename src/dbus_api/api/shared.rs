@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use dbus::arg::IterAppend;
 use dbus_tree::{
@@ -19,15 +19,12 @@ use crate::{
         types::{GetManagedObjects, InterfacesAddedThreadSafe, TData},
         util::thread_safe_to_dbus_sendable,
     },
-    engine::{DevUuid, Engine, FilesystemUuid, Pool, PoolUuid, StratisUuid, Table},
+    engine::{AllLockReadGuard, DevUuid, Engine, FilesystemUuid, Pool, PoolUuid, StratisUuid},
 };
 
-pub fn get_managed_objects_method<E>(
-    f: &Factory<MTSync<TData<E>>, TData<E>>,
-) -> Method<MTSync<TData<E>>, TData<E>>
-where
-    E: 'static + Engine,
-{
+pub fn get_managed_objects_method(
+    f: &Factory<MTSync<TData>, TData>,
+) -> Method<MTSync<TData>, TData> {
     fn properties_to_get_managed_objects(
         path: dbus::Path<'static>,
         ia: InterfacesAddedThreadSafe,
@@ -37,66 +34,51 @@ where
         gmo
     }
 
-    fn pool_properties<E>(
+    fn pool_properties(
         path: &dbus::Path<'static>,
-        table: &Table<PoolUuid, E::Pool>,
+        table: &AllLockReadGuard<PoolUuid, dyn Pool>,
         pool_uuid: PoolUuid,
-    ) -> Option<GetManagedObjects>
-    where
-        E: 'static + Engine,
-    {
+    ) -> Option<GetManagedObjects> {
         table.get_by_uuid(pool_uuid).map(|(n, p)| {
-            properties_to_get_managed_objects(
-                path.clone(),
-                get_pool_properties::<E>(&n, pool_uuid, p),
-            )
+            properties_to_get_managed_objects(path.clone(), get_pool_properties(&n, pool_uuid, p))
         })
     }
 
-    fn fs_properties<E>(
+    fn fs_properties(
         parent_path: &dbus::Path<'static>,
         path: &dbus::Path<'static>,
-        table: &Table<PoolUuid, E::Pool>,
+        table: &AllLockReadGuard<PoolUuid, dyn Pool>,
         pool_uuid: PoolUuid,
         fs_uuid: FilesystemUuid,
-    ) -> Option<GetManagedObjects>
-    where
-        E: 'static + Engine,
-    {
+    ) -> Option<GetManagedObjects> {
         table.get_by_uuid(pool_uuid).and_then(|(p_n, p)| {
             p.get_filesystem(fs_uuid).map(|(ref fs_n, f)| {
                 properties_to_get_managed_objects(
                     path.clone(),
-                    get_fs_properties::<E>(parent_path.clone(), &p_n, fs_n, fs_uuid, f),
+                    get_fs_properties(parent_path.clone(), &p_n, fs_n, fs_uuid, f),
                 )
             })
         })
     }
 
-    fn blockdev_properties<E>(
+    fn blockdev_properties(
         parent_path: &dbus::Path<'static>,
         path: &dbus::Path<'static>,
-        table: &Table<PoolUuid, E::Pool>,
+        table: &AllLockReadGuard<PoolUuid, dyn Pool>,
         pool_uuid: PoolUuid,
         uuid: DevUuid,
-    ) -> Option<GetManagedObjects>
-    where
-        E: 'static + Engine,
-    {
+    ) -> Option<GetManagedObjects> {
         table.get_by_uuid(pool_uuid).and_then(|(_, p)| {
             p.get_blockdev(uuid).map(|(bd_tier, bd)| {
                 properties_to_get_managed_objects(
                     path.clone(),
-                    get_blockdev_properties::<E>(parent_path.clone(), uuid, bd_tier, bd),
+                    get_blockdev_properties(parent_path.clone(), uuid, bd_tier, bd),
                 )
             })
         })
     }
 
-    fn parent_pool_uuid<E>(op: Option<&ObjectPath<MTSync<TData<E>>, TData<E>>>) -> Option<PoolUuid>
-    where
-        E: 'static + Engine,
-    {
+    fn parent_pool_uuid(op: Option<&ObjectPath<MTSync<TData>, TData>>) -> Option<PoolUuid> {
         op.and_then(|o| {
             o.get_data().as_ref().and_then(|data| match data.uuid {
                 StratisUuid::Pool(p) => Some(p),
@@ -105,10 +87,7 @@ where
         })
     }
 
-    fn get_managed_objects<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-    where
-        E: 'static + Engine,
-    {
+    fn get_managed_objects(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         let dbus_context = m.tree.get_data();
 
         let table = block_on(dbus_context.engine.pools());
@@ -118,8 +97,8 @@ where
             .iter()
             .filter_map(|op| {
                 op.get_data().as_ref().and_then(|data| match data.uuid {
-                    StratisUuid::Pool(uuid) => pool_properties::<E>(op.get_name(), &table, uuid),
-                    StratisUuid::Fs(uuid) => fs_properties::<E>(
+                    StratisUuid::Pool(uuid) => pool_properties(op.get_name(), &table, uuid),
+                    StratisUuid::Fs(uuid) => fs_properties(
                         &data.parent,
                         op.get_name(),
                         &table,
@@ -127,7 +106,7 @@ where
                             .expect("Parent must be present and be pool"),
                         uuid,
                     ),
-                    StratisUuid::Dev(uuid) => blockdev_properties::<E>(
+                    StratisUuid::Dev(uuid) => blockdev_properties(
                         &data.parent,
                         op.get_name(),
                         &table,
@@ -152,15 +131,14 @@ where
 /// Get a Manager property and place it on the D-Bus. The property is
 /// found by means of the getter method which takes a reference to an
 /// engine and obtains the property from the engine.
-pub fn get_manager_property<F, R, E>(
+pub fn get_manager_property<F, R>(
     i: &mut IterAppend<'_>,
-    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+    p: &PropInfo<'_, MTSync<TData>, TData>,
     getter: F,
 ) -> Result<(), MethodErr>
 where
-    F: Fn(&E) -> Result<R, String>,
+    F: Fn(Arc<dyn Engine>) -> Result<R, String>,
     R: dbus::arg::Append,
-    E: Engine,
 {
     i.append(manager_operation(p.tree, getter).map_err(|ref e| MethodErr::failed(e))?);
     Ok(())
@@ -168,33 +146,23 @@ where
 
 /// Perform an operation on an Engine object for a given D-Bus implicit argument
 /// that is a Manager
-pub fn manager_operation<F, R, E>(
-    tree: &Tree<MTSync<TData<E>>, TData<E>>,
-    closure: F,
-) -> Result<R, String>
+pub fn manager_operation<F, R>(tree: &Tree<MTSync<TData>, TData>, closure: F) -> Result<R, String>
 where
-    F: Fn(&E) -> Result<R, String>,
+    F: Fn(Arc<dyn Engine>) -> Result<R, String>,
     R: dbus::arg::Append,
-    E: Engine,
 {
     let dbus_context = tree.get_data();
-    closure(&dbus_context.engine)
+    closure(Arc::clone(&dbus_context.engine))
 }
 
 /// Generate D-Bus representation of locked pools
 #[inline]
-pub fn locked_pools_prop<E>(e: &E) -> StoppedOrLockedPools
-where
-    E: Engine,
-{
+pub fn locked_pools_prop(e: Arc<dyn Engine>) -> StoppedOrLockedPools {
     prop_conv::locked_pools_to_prop(&block_on(e.locked_pools()))
 }
 
 /// Generate D-Bus representation of stopped pools
 #[inline]
-pub fn stopped_pools_prop<E>(e: &E) -> StoppedOrLockedPools
-where
-    E: Engine,
-{
+pub fn stopped_pools_prop(e: Arc<dyn Engine>) -> StoppedOrLockedPools {
     prop_conv::stopped_pools_to_prop(&block_on(e.stopped_pools()))
 }

@@ -7,21 +7,18 @@ use std::{
     fmt::Debug,
     os::unix::io::RawFd,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde_json::Value;
-use tokio::sync::{OwnedRwLockReadGuard, OwnedRwLockWriteGuard};
 
 use devicemapper::{Bytes, Sectors};
 
 use crate::{
     engine::{
-        structures::{
-            AllLockReadGuard, AllLockWriteGuard, ExclusiveGuard, SharedGuard, SomeLockReadGuard,
-            SomeLockWriteGuard,
-        },
+        structures::{AllLockReadGuard, AllLockWriteGuard, SomeLockReadGuard, SomeLockWriteGuard},
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
             EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, LockedPoolsInfo,
@@ -53,7 +50,7 @@ pub trait KeyActions {
     /// * `Ok(MappingCreateAction::Changed)`: The key description was already present
     /// in the keyring but the key data was updated.
     fn set(
-        &mut self,
+        &self,
         key_desc: &KeyDescription,
         key_fd: RawFd,
     ) -> StratisResult<MappingCreateAction<Key>>;
@@ -64,7 +61,7 @@ pub trait KeyActions {
 
     /// Unset a key with the given key description in the root persistent kernel
     /// keyring.
-    fn unset(&mut self, key_desc: &KeyDescription) -> StratisResult<MappingDeleteAction<Key>>;
+    fn unset(&self, key_desc: &KeyDescription) -> StratisResult<MappingDeleteAction<Key>>;
 }
 
 /// An interface for reporting internal engine state.
@@ -126,11 +123,6 @@ pub trait BlockDev: Debug {
 }
 
 pub trait Pool: Debug + Send + Sync {
-    /// Filesystem type associated with this engine type.
-    type Filesystem: Filesystem;
-    /// Block device type associated with this engine type.
-    type BlockDev: BlockDev;
-
     /// Initialize the cache with the provided cache block devices.
     /// Returns a list of the the block devices that were actually added as cache
     /// devices. In practice, this will have three types of return values:
@@ -234,7 +226,7 @@ pub trait Pool: Debug + Send + Sync {
         pool_uuid: PoolUuid,
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
-    ) -> StratisResult<CreateAction<(FilesystemUuid, &mut Self::Filesystem)>>;
+    ) -> StratisResult<CreateAction<(FilesystemUuid, &mut dyn Filesystem)>>;
 
     /// The total number of Sectors belonging to this pool.
     /// There are no exclusions, so this number includes overhead sectors
@@ -263,26 +255,26 @@ pub trait Pool: Debug + Send + Sync {
     fn total_physical_used(&self) -> Option<Sectors>;
 
     /// Get all the filesystems belonging to this pool.
-    fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &Self::Filesystem)>;
+    fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)>;
 
     /// Get the filesystem in this pool with this UUID.
-    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &Self::Filesystem)>;
+    fn get_filesystem(&self, uuid: FilesystemUuid) -> Option<(Name, &dyn Filesystem)>;
 
     /// Get the filesystem in this pool with this name.
-    fn get_filesystem_by_name(&self, name: &Name) -> Option<(FilesystemUuid, &Self::Filesystem)>;
+    fn get_filesystem_by_name(&self, name: &Name) -> Option<(FilesystemUuid, &dyn Filesystem)>;
 
     /// Get _all_ the blockdevs that belong to this pool.
     /// All really means all. For example, it does not exclude cache blockdevs.
-    fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &Self::BlockDev)>;
+    fn blockdevs(&self) -> Vec<(DevUuid, BlockDevTier, &dyn BlockDev)>;
 
     /// Get the blockdev in this pool with this UUID.
-    fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &Self::BlockDev)>;
+    fn get_blockdev(&self, uuid: DevUuid) -> Option<(BlockDevTier, &dyn BlockDev)>;
 
     /// Get the blockdev mutably in this pool with this UUID.
     fn get_mut_blockdev(
         &mut self,
         uuid: DevUuid,
-    ) -> StratisResult<Option<(BlockDevTier, &mut Self::BlockDev)>>;
+    ) -> StratisResult<Option<(BlockDevTier, &mut dyn BlockDev)>>;
 
     /// Set the user-settable string associated with the blockdev specified
     /// by the uuid.
@@ -344,11 +336,6 @@ pub type HandleEvents<P> = (
 
 #[async_trait]
 pub trait Engine: Debug + Report + Send + Sync {
-    /// Pool type associated with this engine type.
-    type Pool: Pool;
-    /// Key handling type associated with this engine type.
-    type KeyActions: KeyActions;
-
     /// Create a Stratis pool.
     /// Returns the UUID of the newly created pool.
     async fn create_pool(
@@ -363,7 +350,7 @@ pub trait Engine: Debug + Report + Send + Sync {
     /// and its UUID.
     ///
     /// Precondition: the subsystem of the device evented on is "block".
-    async fn handle_events(&self, event: Vec<UdevEngineEvent>) -> HandleEvents<Self::Pool>;
+    async fn handle_events(&self, event: Vec<UdevEngineEvent>) -> HandleEvents<dyn Pool>;
 
     /// Destroy a pool.
     /// Ensures that the pool of the given UUID is absent on completion.
@@ -396,13 +383,13 @@ pub trait Engine: Debug + Report + Send + Sync {
     async fn get_pool(
         &self,
         key: PoolIdentifier<PoolUuid>,
-    ) -> Option<SomeLockReadGuard<PoolUuid, Self::Pool>>;
+    ) -> Option<SomeLockReadGuard<PoolUuid, dyn Pool>>;
 
     /// Get a mutable reference to the pool designated by name or UUID.
     async fn get_mut_pool(
         &self,
         key: PoolIdentifier<PoolUuid>,
-    ) -> Option<SomeLockWriteGuard<PoolUuid, Self::Pool>>;
+    ) -> Option<SomeLockWriteGuard<PoolUuid, dyn Pool>>;
 
     /// Get a mapping of encrypted pool UUIDs for pools that have not yet
     /// been set up and need to be unlocked to their encryption infos.
@@ -413,10 +400,10 @@ pub trait Engine: Debug + Report + Send + Sync {
     async fn stopped_pools(&self) -> StoppedPoolsInfo;
 
     /// Get all pools belonging to this engine.
-    async fn pools(&self) -> AllLockReadGuard<PoolUuid, Self::Pool>;
+    async fn pools(&self) -> AllLockReadGuard<PoolUuid, dyn Pool>;
 
     /// Get mutable references to all pools belonging to this engine.
-    async fn pools_mut(&self) -> AllLockWriteGuard<PoolUuid, Self::Pool>;
+    async fn pools_mut(&self) -> AllLockWriteGuard<PoolUuid, dyn Pool>;
 
     /// Get the UUIDs of all pools that experienced an event.
     async fn get_events(&self) -> StratisResult<HashSet<PoolUuid>>;
@@ -433,10 +420,7 @@ pub trait Engine: Debug + Report + Send + Sync {
     ) -> HashMap<FilesystemUuid, StratFilesystemDiff>;
 
     /// Get the handler for kernel keyring operations.
-    async fn get_key_handler(&self) -> SharedGuard<OwnedRwLockReadGuard<Self::KeyActions>>;
-
-    /// Get the handler for kernel keyring operations mutably.
-    async fn get_key_handler_mut(&self) -> ExclusiveGuard<OwnedRwLockWriteGuard<Self::KeyActions>>;
+    async fn get_key_handler(&self) -> Arc<dyn KeyActions>;
 
     /// Start and set up a pool, creating all necessary devicemapper devices to
     /// perform IO operations and start monitoring for events.

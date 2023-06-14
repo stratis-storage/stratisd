@@ -4,17 +4,9 @@
 
 use dbus_tree::{Factory, MTSync, Method};
 
-use crate::{
-    dbus_api::{pool::pool_3_5::methods::init_cache, types::TData},
-    engine::Engine,
-};
+use crate::dbus_api::{pool::pool_3_5::methods::init_cache, types::TData};
 
-pub fn init_cache_method<E>(
-    f: &Factory<MTSync<TData<E>>, TData<E>>,
-) -> Method<MTSync<TData<E>>, TData<E>>
-where
-    E: 'static + Engine,
-{
+pub fn init_cache_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
     f.method("InitCache", (), init_cache)
         .in_arg(("devices", "as"))
         // b: Indicates if any cache devices were added

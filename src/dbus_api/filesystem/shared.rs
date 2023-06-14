@@ -9,20 +9,19 @@ use futures::executor::block_on;
 
 use crate::{
     dbus_api::{filesystem::prop_conv, types::TData},
-    engine::{Engine, Filesystem, Name, Pool, PoolIdentifier},
+    engine::{Filesystem, Name, PoolIdentifier},
 };
 
 /// Get execute a given closure providing a filesystem object and return
 /// the calculated value
-pub fn filesystem_operation<F, R, E>(
-    tree: &Tree<MTSync<TData<E>>, TData<E>>,
+pub fn filesystem_operation<F, R>(
+    tree: &Tree<MTSync<TData>, TData>,
     object_path: &Path<'static>,
     closure: F,
 ) -> Result<R, String>
 where
-    F: Fn((Name, Name, &<E::Pool as Pool>::Filesystem)) -> Result<R, String>,
+    F: Fn((Name, Name, &dyn Filesystem)) -> Result<R, String>,
     R: dbus::arg::Append,
-    E: Engine,
 {
     let dbus_context = tree.get_data();
 
@@ -70,14 +69,7 @@ pub fn fs_name_prop(name: &Name) -> String {
 
 /// Generate D-Bus representation of devnode property.
 #[inline]
-pub fn fs_devnode_prop<E>(
-    fs: &<E::Pool as Pool>::Filesystem,
-    pool_name: &Name,
-    fs_name: &Name,
-) -> String
-where
-    E: Engine,
-{
+pub fn fs_devnode_prop(fs: &dyn Filesystem, pool_name: &Name, fs_name: &Name) -> String {
     fs.path_to_mount_filesystem(pool_name, fs_name)
         .display()
         .to_string()
@@ -85,10 +77,7 @@ where
 
 /// Generate D-Bus representation of created property.
 #[inline]
-pub fn fs_created_prop<E>(fs: &<E::Pool as Pool>::Filesystem) -> String
-where
-    E: Engine,
-{
+pub fn fs_created_prop(fs: &dyn Filesystem) -> String {
     fs.created().to_rfc3339_opts(SecondsFormat::Secs, true)
 }
 
@@ -98,9 +87,6 @@ pub fn fs_size_prop(fs: &dyn Filesystem) -> String {
 }
 
 /// Generate D-Bus representation of used property.
-pub fn fs_used_prop<E>(fs: &<E::Pool as Pool>::Filesystem) -> (bool, String)
-where
-    E: Engine,
-{
+pub fn fs_used_prop(fs: &dyn Filesystem) -> (bool, String) {
     prop_conv::fs_used_to_prop(fs.used().ok())
 }

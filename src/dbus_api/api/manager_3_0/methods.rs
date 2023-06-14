@@ -21,19 +21,16 @@ use crate::{
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
     engine::{
-        CreateAction, DeleteAction, EncryptionInfo, Engine, EngineAction, KeyActions,
-        KeyDescription, MappingCreateAction, MappingDeleteAction, Pool, PoolIdentifier, PoolUuid,
-        SetUnlockAction, UnlockMethod,
+        CreateAction, DeleteAction, EncryptionInfo, EngineAction, KeyDescription,
+        MappingCreateAction, MappingDeleteAction, PoolIdentifier, PoolUuid, SetUnlockAction,
+        UnlockMethod,
     },
     stratis::StratisError,
 };
 
 type EncryptionParams = (Option<(bool, String)>, Option<(bool, (String, String))>);
 
-pub fn destroy_pool<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn destroy_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -82,10 +79,7 @@ where
     Ok(vec![msg])
 }
 
-pub fn unset_key<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn unset_key(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -95,7 +89,7 @@ where
     let default_return = false;
     let return_message = message.method_return();
 
-    let msg = match handle_action!(block_on(dbus_context.engine.get_key_handler_mut()).unset(
+    let msg = match handle_action!(block_on(dbus_context.engine.get_key_handler()).unset(
         &match KeyDescription::try_from(key_desc_str) {
             Ok(kd) => kd,
             Err(e) => {
@@ -120,10 +114,7 @@ where
     Ok(vec![msg])
 }
 
-pub fn set_key<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn set_key(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -134,7 +125,7 @@ where
     let default_return = (false, false);
     let return_message = message.method_return();
 
-    let msg = match handle_action!(block_on(dbus_context.engine.get_key_handler_mut()).set(
+    let msg = match handle_action!(block_on(dbus_context.engine.get_key_handler()).set(
         &match KeyDescription::try_from(key_desc_str) {
             Ok(kd) => kd,
             Err(e) => {
@@ -164,10 +155,7 @@ where
     Ok(vec![msg])
 }
 
-pub fn unlock_pool<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn unlock_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let base_path = m.path.get_name();
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
@@ -262,10 +250,7 @@ where
     )])
 }
 
-pub fn engine_state_report<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn engine_state_report(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
 
     let return_message = message.method_return();
@@ -286,10 +271,7 @@ where
     Ok(vec![msg])
 }
 
-pub fn create_pool<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn create_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let base_path = m.path.get_name();
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
@@ -393,10 +375,7 @@ where
     }
 }
 
-pub fn list_keys<E>(m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn list_keys(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let message: &Message = m.msg;
 
     let return_message = message.method_return();

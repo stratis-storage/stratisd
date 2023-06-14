@@ -8,20 +8,17 @@ use chrono::SecondsFormat;
 use tokio::task::block_in_place;
 
 use crate::{
-    engine::{Engine, EngineAction, Filesystem, Name, Pool, PoolIdentifier},
+    engine::{Engine, EngineAction, Name, PoolIdentifier},
     jsonrpc::interface::FsListType,
     stratis::{StratisError, StratisResult},
 };
 
 // stratis-min filesystem create
-pub async fn filesystem_create<E>(
-    engine: Arc<E>,
-    pool_name: &str,
-    name: &str,
-) -> StratisResult<bool>
-where
-    E: Engine,
-{
+pub async fn filesystem_create<'a>(
+    engine: Arc<dyn Engine>,
+    pool_name: &'a str,
+    name: &'a str,
+) -> StratisResult<bool> {
     let mut guard = engine
         .get_mut_pool(PoolIdentifier::Name(Name::new(pool_name.to_owned())))
         .await
@@ -35,10 +32,7 @@ where
 }
 
 // stratis-min filesystem [list]
-pub async fn filesystem_list<E>(engine: Arc<E>) -> FsListType
-where
-    E: Engine,
-{
+pub async fn filesystem_list(engine: Arc<dyn Engine>) -> FsListType {
     let guard = engine.pools().await;
     guard.iter().fold(
         (
@@ -65,14 +59,11 @@ where
 }
 
 // stratis-min filesystem destroy
-pub async fn filesystem_destroy<E>(
-    engine: Arc<E>,
-    pool_name: &str,
-    fs_name: &str,
-) -> StratisResult<bool>
-where
-    E: Engine,
-{
+pub async fn filesystem_destroy<'a>(
+    engine: Arc<dyn Engine>,
+    pool_name: &'a str,
+    fs_name: &'a str,
+) -> StratisResult<bool> {
     let mut pool = engine
         .get_mut_pool(PoolIdentifier::Name(Name::new(pool_name.to_owned())))
         .await
@@ -84,15 +75,12 @@ where
 }
 
 // stratis-min filesystem rename
-pub async fn filesystem_rename<E>(
-    engine: Arc<E>,
-    pool_name: &str,
-    fs_name: &str,
-    new_fs_name: &str,
-) -> StratisResult<bool>
-where
-    E: Engine,
-{
+pub async fn filesystem_rename<'a>(
+    engine: Arc<dyn Engine>,
+    pool_name: &'a str,
+    fs_name: &'a str,
+    new_fs_name: &'a str,
+) -> StratisResult<bool> {
     let mut pool = engine
         .get_mut_pool(PoolIdentifier::Name(Name::new(pool_name.to_owned())))
         .await

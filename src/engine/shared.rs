@@ -18,7 +18,7 @@ use devicemapper::{Bytes, Sectors, IEC, SECTOR_SIZE};
 
 use crate::{
     engine::{
-        engine::{BlockDev, Pool, MAX_STRATIS_PASS_SIZE},
+        engine::{Pool, MAX_STRATIS_PASS_SIZE},
         types::{
             BlockDevTier, CreateAction, DevUuid, Diff, EncryptionInfo, MaybeInconsistent, Name,
             PoolEncryptionInfo, PoolUuid, SetCreateAction,

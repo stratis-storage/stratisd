@@ -19,8 +19,8 @@ use crate::{
         util::{engine_to_dbus_err_tuple, get_next_arg},
     },
     engine::{
-        total_allocated, total_used, BlockDevTier, Diff, Engine, EngineAction, Name, Pool,
-        PoolIdentifier, PoolUuid, PropChangeAction,
+        total_allocated, total_used, BlockDevTier, Diff, EngineAction, Name, Pool, PoolIdentifier,
+        PoolUuid, PropChangeAction,
     },
 };
 
@@ -31,15 +31,14 @@ pub enum BlockDevOp {
     AddData,
 }
 
-pub fn pool_operation<F, R, E>(
-    tree: &Tree<MTSync<TData<E>>, TData<E>>,
+pub fn pool_operation<F, R>(
+    tree: &Tree<MTSync<TData>, TData>,
     object_path: &dbus::Path<'static>,
     closure: F,
 ) -> Result<R, String>
 where
-    F: Fn((Name, PoolUuid, &E::Pool)) -> Result<R, String>,
+    F: Fn((Name, PoolUuid, &dyn Pool)) -> Result<R, String>,
     R: dbus::arg::Append,
-    E: 'static + Engine,
 {
     let dbus_context = tree.get_data();
 
@@ -67,14 +66,13 @@ where
     closure((pool_name, pool_uuid, pool))
 }
 
-pub fn pool_set_operation<F, R, E>(
-    tree: &Tree<MTSync<TData<E>>, TData<E>>,
+pub fn pool_set_operation<F, R>(
+    tree: &Tree<MTSync<TData>, TData>,
     object_path: &dbus::Path<'static>,
     closure: F,
 ) -> Result<R, String>
 where
-    F: Fn((Name, PoolUuid, &mut E::Pool)) -> Result<R, String>,
-    E: 'static + Engine,
+    F: Fn((Name, PoolUuid, &mut dyn Pool)) -> Result<R, String>,
 {
     let dbus_context = tree.get_data();
 
@@ -108,13 +106,7 @@ where
 /// data tier must already contain some block devices. The op parameter
 /// determines which method belonging to the engine's Pool interface must
 /// be invoked.
-pub fn add_blockdevs<E>(
-    m: &MethodInfo<'_, MTSync<TData<E>>, TData<E>>,
-    op: BlockDevOp,
-) -> MethodResult
-where
-    E: 'static + Engine,
-{
+pub fn add_blockdevs(m: &MethodInfo<'_, MTSync<TData>, TData>, op: BlockDevOp) -> MethodResult {
     let message: &Message = m.msg;
     let mut iter = message.iter_init();
 
@@ -240,15 +232,14 @@ where
 /// Get a pool property and place it on the D-Bus. The property is
 /// found by means of the getter method which takes a reference to a
 /// Pool and obtains the property from the pool.
-pub fn get_pool_property<F, R, E>(
+pub fn get_pool_property<F, R>(
     i: &mut IterAppend<'_>,
-    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+    p: &PropInfo<'_, MTSync<TData>, TData>,
     getter: F,
 ) -> Result<(), MethodErr>
 where
-    F: Fn((Name, PoolUuid, &E::Pool)) -> Result<R, String>,
+    F: Fn((Name, PoolUuid, &dyn Pool)) -> Result<R, String>,
     R: dbus::arg::Append,
-    E: 'static + Engine,
 {
     i.append(
         pool_operation(p.tree, p.path.get_name(), getter).map_err(|ref e| MethodErr::failed(e))?,
@@ -258,14 +249,13 @@ where
 
 /// Set a pool property. The property is found by means of the setter method which
 /// takes a mutable reference to a Pool and sets the property on the pool.
-pub fn set_pool_property<F, R, E>(
-    p: &PropInfo<'_, MTSync<TData<E>>, TData<E>>,
+pub fn set_pool_property<F, R>(
+    p: &PropInfo<'_, MTSync<TData>, TData>,
     prop_name: &str,
     setter: F,
 ) -> Result<PropChangeAction<R>, MethodErr>
 where
-    F: Fn((Name, PoolUuid, &mut E::Pool)) -> Result<PropChangeAction<R>, String>,
-    E: 'static + Engine,
+    F: Fn((Name, PoolUuid, &mut dyn Pool)) -> Result<PropChangeAction<R>, String>,
     R: Display,
 {
     info!("Setting property {}", prop_name);
@@ -282,93 +272,63 @@ pub fn pool_name_prop(name: &Name) -> String {
 
 /// Generate D-Bus representation of encrypted property.
 #[inline]
-pub fn pool_enc_prop<E>(pool: &E::Pool) -> bool
-where
-    E: 'static + Engine,
-{
+pub fn pool_enc_prop(pool: &dyn Pool) -> bool {
     pool.is_encrypted()
 }
 
 /// Generate D-Bus representation of pool state property.
-pub fn pool_avail_actions_prop<E>(pool: &E::Pool) -> String
-where
-    E: 'static + Engine,
-{
+pub fn pool_avail_actions_prop(pool: &dyn Pool) -> String {
     prop_conv::avail_actions_to_prop(pool.avail_actions())
 }
 
 /// Generate D-Bus representation of a pool key description property.
-pub fn pool_key_desc_prop<E>(pool: &E::Pool) -> (bool, (bool, String))
-where
-    E: 'static + Engine,
-{
+pub fn pool_key_desc_prop(pool: &dyn Pool) -> (bool, (bool, String)) {
     prop_conv::key_desc_to_prop(pool.encryption_info())
 }
 
 /// Generate D-Bus representation of a pool Clevis info property.
-pub fn pool_clevis_info_prop<E>(pool: &E::Pool) -> (bool, (bool, (String, String)))
-where
-    E: 'static + Engine,
-{
+pub fn pool_clevis_info_prop(pool: &dyn Pool) -> (bool, (bool, (String, String))) {
     prop_conv::clevis_info_to_prop(pool.encryption_info())
 }
 
 /// Generate D-Bus representation of a boolean indicating whether the pool
 /// has a cache.
 #[inline]
-pub fn pool_has_cache_prop<E>(pool: &E::Pool) -> bool
-where
-    E: 'static + Engine,
-{
+pub fn pool_has_cache_prop(pool: &dyn Pool) -> bool {
     pool.has_cache()
 }
 
 /// Generate D-Bus representation of the number of bytes of physical space
 /// already allocated to this pool.
-pub fn pool_allocated_size<E>(pool: &E::Pool) -> String
-where
-    E: 'static + Engine,
-{
+pub fn pool_allocated_size(pool: &dyn Pool) -> String {
     prop_conv::pool_alloc_to_prop(pool.total_allocated_size().bytes())
 }
 
 /// Generate D-Bus representation of the number of bytes used by this pool.
-pub fn pool_used_size<E>(pool: &E::Pool) -> (bool, String)
-where
-    E: 'static + Engine,
-{
+pub fn pool_used_size(pool: &dyn Pool) -> (bool, String) {
     prop_conv::pool_used_to_prop(pool.total_physical_used().map(|u| u.bytes()))
 }
 
 /// Generate a D-Bus representation of the total size of the pool in bytes.
 #[inline]
-pub fn pool_total_size<E>(pool: &E::Pool) -> String
-where
-    E: 'static + Engine,
-{
+pub fn pool_total_size(pool: &dyn Pool) -> String {
     prop_conv::pool_size_to_prop(pool.total_physical_size().bytes())
 }
 
 /// Generate a D-Bus representation of the filesystem limit on the pool.
 #[inline]
-pub fn pool_fs_limit<E>(pool: &E::Pool) -> u64
-where
-    E: 'static + Engine,
-{
+pub fn pool_fs_limit(pool: &dyn Pool) -> u64 {
     pool.fs_limit()
 }
 
 /// Set the filesystem limit on a pool.
 #[inline]
-pub fn set_pool_fs_limit<E>(
+pub fn set_pool_fs_limit(
     name: &Name,
     pool_uuid: PoolUuid,
-    pool: &mut E::Pool,
+    pool: &mut dyn Pool,
     new_limit: u64,
-) -> Result<PropChangeAction<u64>, String>
-where
-    E: 'static + Engine,
-{
+) -> Result<PropChangeAction<u64>, String> {
     if pool.fs_limit() == new_limit {
         Ok(PropChangeAction::Identity)
     } else {
@@ -381,23 +341,17 @@ where
 /// Generate a D-Bus representation of whether the pool has disabled overprovisioning
 /// or not.
 #[inline]
-pub fn pool_overprov_enabled<E>(pool: &E::Pool) -> bool
-where
-    E: 'static + Engine,
-{
+pub fn pool_overprov_enabled(pool: &dyn Pool) -> bool {
     pool.overprov_enabled()
 }
 
 /// Set the overprovisioning mode on a pool.
 #[inline]
-pub fn pool_set_overprov_mode<E>(
-    pool: &mut E::Pool,
+pub fn pool_set_overprov_mode(
+    pool: &mut dyn Pool,
     name: &Name,
     enabled: bool,
-) -> Result<PropChangeAction<bool>, String>
-where
-    E: 'static + Engine,
-{
+) -> Result<PropChangeAction<bool>, String> {
     if pool.overprov_enabled() == enabled {
         Ok(PropChangeAction::Identity)
     } else {
@@ -410,9 +364,6 @@ where
 /// Generate a D-Bus representation of whether the pool has remaining space to
 /// allocate or not.
 #[inline]
-pub fn pool_no_alloc_space<E>(pool: &E::Pool) -> bool
-where
-    E: 'static + Engine,
-{
+pub fn pool_no_alloc_space(pool: &dyn Pool) -> bool {
     pool.out_of_alloc_space()
 }

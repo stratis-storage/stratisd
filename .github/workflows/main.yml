@@ -305,6 +305,13 @@ jobs:
         working-directory: ./tests/client-dbus
 
   tests-with-testing-repo:
+    strategy:
+      matrix:
+        include:
+          - rev: HEAD
+            args: --verify-devices --monitor-dbus
+          - rev: v3.5.2
+            args: --verify-devices
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
@@ -347,9 +354,13 @@ jobs:
         run: sudo udevadm control --reload
       - name: Clone testing repo
         run: git clone https://github.com/stratis-storage/testing.git
+      - name: Checkout revision ${{ matrix.rev }}
+        run: git checkout -b new-branch ${{ matrix.rev }}
+        working-directory: ./testing
       - name: Run stratisd_cert.py
         run: >
           sudo
           RUST_LOG=stratisd=debug
-          python3 test_harness.py stratisd_cert --monitor-dbus --verify-devices
+          python3 test_harness.py stratisd_cert
+          ${{ matrix.args }}
         working-directory: ./testing

@@ -127,7 +127,7 @@ impl BlockDevMgr {
                 ei.clevis_info().is_some(),
             ) {
                 return Err(StratisError::Msg(
-                    "Neither the key in the kernel keyring nor Clevis could be used to perform encryption operations on the devices in the pool; check that either the appropriate key in the keyring is set or that the Clevis key storage method is available".to_string(),
+                    "Either the key in the kernel keyring, Clevis, or both could not be used to perform encryption operations on the devices in the pool; check that the appropriate key in the keyring is set and that the Clevis key storage method is available depending on your provided unlock methods".to_string(),
                 ));
             }
         }

@@ -4,6 +4,7 @@
 
 mod backstore;
 mod cmd;
+mod crypt;
 mod device;
 mod devlinks;
 mod dm;
@@ -22,7 +23,7 @@ mod udev;
 mod writing;
 
 pub use self::{
-    backstore::{
+    crypt::{
         crypt_metadata_size, register_clevis_token, set_up_crypt_logging, CLEVIS_TANG_TRUST_URL,
     },
     dm::{get_dm, get_dm_init},

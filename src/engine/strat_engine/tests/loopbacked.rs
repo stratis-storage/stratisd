@@ -17,7 +17,7 @@ use devicemapper::{Bytes, Sectors, IEC};
 
 use crate::{
     engine::strat_engine::{
-        backstore::register_clevis_token,
+        crypt::register_clevis_token,
         tests::{logger::init_logger, util::clean_up},
     },
     stratis::StratisResult,

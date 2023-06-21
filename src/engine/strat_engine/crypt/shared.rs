@@ -37,23 +37,20 @@ use libcryptsetup_rs::{
 use crate::{
     engine::{
         strat_engine::{
-            backstore::{
-                crypt::{
-                    consts::{
-                        CLEVIS_LUKS_TOKEN_ID, CLEVIS_RECURSION_LIMIT, CLEVIS_TANG_TRUST_URL,
-                        CLEVIS_TOKEN_NAME, DEFAULT_CRYPT_KEYSLOTS_SIZE,
-                        DEFAULT_CRYPT_METADATA_SIZE, LUKS2_SECTOR_SIZE, LUKS2_TOKEN_ID,
-                        LUKS2_TOKEN_TYPE, STRATIS_TOKEN_DEVNAME_KEY, STRATIS_TOKEN_DEV_UUID_KEY,
-                        STRATIS_TOKEN_ID, STRATIS_TOKEN_POOLNAME_KEY, STRATIS_TOKEN_POOL_UUID_KEY,
-                        STRATIS_TOKEN_TYPE, TOKEN_KEYSLOTS_KEY, TOKEN_TYPE_KEY,
-                    },
-                    handle::{CryptHandle, CryptMetadata},
-                },
-                devices::get_devno_from_path,
-            },
+            backstore::get_devno_from_path,
             cmd::clevis_decrypt,
-            dm::get_dm,
-            dm::DEVICEMAPPER_PATH,
+            crypt::{
+                consts::{
+                    CLEVIS_LUKS_TOKEN_ID, CLEVIS_RECURSION_LIMIT, CLEVIS_TANG_TRUST_URL,
+                    CLEVIS_TOKEN_NAME, DEFAULT_CRYPT_KEYSLOTS_SIZE, DEFAULT_CRYPT_METADATA_SIZE,
+                    LUKS2_SECTOR_SIZE, LUKS2_TOKEN_ID, LUKS2_TOKEN_TYPE, STRATIS_TOKEN_DEVNAME_KEY,
+                    STRATIS_TOKEN_DEV_UUID_KEY, STRATIS_TOKEN_ID, STRATIS_TOKEN_POOLNAME_KEY,
+                    STRATIS_TOKEN_POOL_UUID_KEY, STRATIS_TOKEN_TYPE, TOKEN_KEYSLOTS_KEY,
+                    TOKEN_TYPE_KEY,
+                },
+                handle::{CryptHandle, CryptMetadata},
+            },
+            dm::{get_dm, DEVICEMAPPER_PATH},
             keys,
             metadata::StratisIdentifiers,
         },

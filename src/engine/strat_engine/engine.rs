@@ -752,8 +752,8 @@ mod test {
     use crate::engine::{
         engine::Pool,
         strat_engine::{
-            backstore::crypt_metadata_size,
             cmd,
+            crypt::crypt_metadata_size,
             ns::unshare_mount_namespace,
             tests::{crypt, loopbacked, real, FailDevice},
         },

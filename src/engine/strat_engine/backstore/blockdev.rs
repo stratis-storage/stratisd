@@ -22,11 +22,11 @@ use crate::{
         engine::{BlockDev, DumpState},
         strat_engine::{
             backstore::{
-                crypt::CryptHandle,
                 devices::BlockSizes,
                 range_alloc::{PerDevSegments, RangeAllocator},
                 transaction::RequestTransaction,
             },
+            crypt::CryptHandle,
             device::blkdev_size,
             metadata::{
                 disown_device, static_header, BDAExtendedSize, BlockdevSize, MDADataSize,

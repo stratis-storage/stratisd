@@ -25,24 +25,21 @@ use crate::{
     engine::{
         engine::MAX_STRATIS_PASS_SIZE,
         strat_engine::{
-            backstore::{
-                crypt::{
-                    consts::{
-                        CLEVIS_LUKS_TOKEN_ID, DEFAULT_CRYPT_KEYSLOTS_SIZE,
-                        DEFAULT_CRYPT_METADATA_SIZE, LUKS2_TOKEN_ID, STRATIS_MEK_SIZE,
-                        STRATIS_TOKEN_ID,
-                    },
-                    shared::{
-                        acquire_crypt_device, activate, add_keyring_keyslot, check_luks2_token,
-                        clevis_info_from_metadata, ensure_inactive, ensure_wiped,
-                        get_keyslot_number, interpret_clevis_config, key_desc_from_metadata,
-                        load_crypt_metadata, read_key, replace_pool_name, setup_crypt_device,
-                        setup_crypt_handle, wipe_fallback, StratisLuks2Token,
-                    },
-                },
-                devices::get_devno_from_path,
-            },
+            backstore::get_devno_from_path,
             cmd::{clevis_decrypt, clevis_luks_bind, clevis_luks_regen, clevis_luks_unbind},
+            crypt::{
+                consts::{
+                    CLEVIS_LUKS_TOKEN_ID, DEFAULT_CRYPT_KEYSLOTS_SIZE, DEFAULT_CRYPT_METADATA_SIZE,
+                    LUKS2_TOKEN_ID, STRATIS_MEK_SIZE, STRATIS_TOKEN_ID,
+                },
+                shared::{
+                    acquire_crypt_device, activate, add_keyring_keyslot, check_luks2_token,
+                    clevis_info_from_metadata, ensure_inactive, ensure_wiped, get_keyslot_number,
+                    interpret_clevis_config, key_desc_from_metadata, load_crypt_metadata, read_key,
+                    replace_pool_name, setup_crypt_device, setup_crypt_handle, wipe_fallback,
+                    StratisLuks2Token,
+                },
+            },
             dm::DEVICEMAPPER_PATH,
             metadata::StratisIdentifiers,
             names::format_crypt_name,

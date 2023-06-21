@@ -19,12 +19,12 @@ use crate::{
         strat_engine::{
             backstore::{
                 blockdev::StratBlockDev,
-                crypt::CryptHandle,
                 devices::{initialize_devices, wipe_blockdevs, UnownedDevices},
                 range_alloc::PerDevSegments,
                 shared::{BlkDevSegment, Segment},
                 transaction::RequestTransaction,
             },
+            crypt::CryptHandle,
             metadata::{MDADataSize, BDA},
             serde_structs::{BaseBlockDevSave, Recordable},
             shared::bds_to_bdas,

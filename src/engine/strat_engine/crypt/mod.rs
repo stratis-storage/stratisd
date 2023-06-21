@@ -38,7 +38,7 @@ mod tests {
 
     use crate::engine::{
         strat_engine::{
-            backstore::crypt::{
+            crypt::{
                 consts::{
                     CLEVIS_LUKS_TOKEN_ID, DEFAULT_CRYPT_KEYSLOTS_SIZE, DEFAULT_CRYPT_METADATA_SIZE,
                     LUKS2_TOKEN_ID, STRATIS_MEK_SIZE,

@@ -7,7 +7,6 @@ mod backstore;
 mod blockdev;
 mod blockdevmgr;
 mod cache_tier;
-mod crypt;
 mod data_tier;
 mod devices;
 mod range_alloc;
@@ -17,6 +16,8 @@ mod transaction;
 pub use self::{
     backstore::Backstore,
     blockdev::{StratBlockDev, StratSectorSizes, UnderlyingDevice},
-    crypt::{crypt_metadata_size, set_up_crypt_logging, CryptHandle, CLEVIS_TANG_TRUST_URL},
-    devices::{find_stratis_devs_by_uuid, initialize_devices, ProcessedPathInfos, UnownedDevices},
+    devices::{
+        find_stratis_devs_by_uuid, get_devno_from_path, initialize_devices, ProcessedPathInfos,
+        UnownedDevices,
+    },
 };

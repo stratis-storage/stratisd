@@ -23,10 +23,8 @@ use libblkid_rs::{BlkidCache, BlkidProbe};
 use crate::{
     engine::{
         strat_engine::{
-            backstore::{
-                blockdev::{StratBlockDev, UnderlyingDevice},
-                crypt::CryptHandle,
-            },
+            backstore::blockdev::{StratBlockDev, UnderlyingDevice},
+            crypt::CryptHandle,
             device::{blkdev_logical_sector_size, blkdev_physical_sector_size, blkdev_size},
             metadata::{
                 device_identifiers, disown_device, BlockdevSize, MDADataSize, StratisIdentifiers,
@@ -822,7 +820,7 @@ mod tests {
 
     use crate::engine::{
         strat_engine::{
-            backstore::crypt::CryptHandle,
+            crypt::CryptHandle,
             metadata::device_identifiers,
             tests::{crypt, loopbacked, real},
         },

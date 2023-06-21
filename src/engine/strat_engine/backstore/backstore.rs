@@ -17,15 +17,11 @@ use crate::{
         shared::gather_encryption_info,
         strat_engine::{
             backstore::{
-                blockdev::StratBlockDev,
-                blockdevmgr::BlockDevMgr,
-                cache_tier::CacheTier,
-                crypt::{
-                    back_up_luks_header, interpret_clevis_config, restore_luks_header, CryptHandle,
-                },
-                data_tier::DataTier,
-                devices::UnownedDevices,
-                shared::BlockSizeSummary,
+                blockdev::StratBlockDev, blockdevmgr::BlockDevMgr, cache_tier::CacheTier,
+                data_tier::DataTier, devices::UnownedDevices, shared::BlockSizeSummary,
+            },
+            crypt::{
+                back_up_luks_header, interpret_clevis_config, restore_luks_header, CryptHandle,
             },
             dm::{get_dm, list_of_backstore_devices, remove_optional_devices},
             metadata::{MDADataSize, BDA},

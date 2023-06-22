@@ -86,7 +86,7 @@ version = "2.3.0"
 optional = true
 
 [dependencies.devicemapper]
-version = "0.33.4"
+version = "0.33.5"
 optional = true
 
 [dependencies.dbus]
@@ -127,7 +127,7 @@ version = "0.3.0"
 optional = true
 
 [dependencies.libc]
-version = "0.2.143"
+version = "0.2.144"
 optional = true
 
 [dependencies.libcryptsetup-rs]

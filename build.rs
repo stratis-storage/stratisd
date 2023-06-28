@@ -18,6 +18,8 @@ fn main() {
         panic!("At least version 2.32.0 of blkid is required to compile stratisd: {e}");
     }
 
+    shadow_rs::new().unwrap();
+
     #[cfg(feature = "systemd_compat")]
     {
         let bindings = Builder::default()

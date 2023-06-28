@@ -183,6 +183,10 @@ optional = true
 version = "0.10.1"
 optional = true
 
+[dependencies.shadow-rs]
+version = "0.8.0"
+optional = true
+
 [dependencies.stratisd_proc_macros]
 version = "0.2.0"
 optional = true
@@ -208,6 +212,7 @@ features = ["serde", "v4"]
 
 [build-dependencies]
 pkg-config = "0.3.18"
+shadow-rs = "0.8.0"
 
 [build-dependencies.bindgen]
 default_features = false
@@ -252,6 +257,7 @@ engine = [
     "serde_derive",
     "serde_json",
     "sha2",
+    "shadow-rs",
     "stratisd_proc_macros",
     "tempfile",
     "tokio",

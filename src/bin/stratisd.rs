@@ -22,7 +22,7 @@ use nix::{
     unistd::{getpid, Pid},
 };
 
-use stratisd::stratis::{run, StratisError, StratisResult, VERSION};
+use stratisd::stratis::{run, StratisError, StratisResult, RUST_VERSION, VERSION};
 
 const STRATISD_PID_PATH: &str = "/run/stratisd.pid";
 const STRATISD_MIN_PID_PATH: &str = "/run/stratisd-min.pid";
@@ -133,10 +133,21 @@ fn parse_args() -> Command {
                 .long("log-level")
                 .help("Sets level for generation of log messages."),
         )
+        .arg(
+            Arg::new("rust-version")
+                .action(ArgAction::SetTrue)
+                .long("rust-version")
+                .help("Version of rustc compiled with"),
+        )
 }
 
 fn main() {
     let matches = parse_args().get_matches();
+
+    if matches.get_flag("rust-version") {
+        println!("{RUST_VERSION}");
+        exit(0);
+    }
 
     // Using a let-expression here so that the scope of the lock file
     // is the rest of the block.

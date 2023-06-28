@@ -5,6 +5,7 @@
 pub use self::{
     errors::{StratisError, StratisResult},
     run::run,
+    shadow::build::RUST_VERSION,
     stratis::VERSION,
 };
 
@@ -12,6 +13,7 @@ mod dm;
 mod errors;
 mod ipc_support;
 mod run;
+mod shadow;
 #[allow(clippy::module_inception)]
 mod stratis;
 mod timer;

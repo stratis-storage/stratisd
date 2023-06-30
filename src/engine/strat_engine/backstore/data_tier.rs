@@ -4,6 +4,8 @@
 
 // Code to handle the backing store of a pool.
 
+#![allow(dead_code)]
+
 #[cfg(test)]
 use std::collections::HashSet;
 
@@ -13,12 +15,14 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::{
-                blockdev::{v1::StratBlockDev, InternalBlockDev},
+                blockdev::{v1, v2, InternalBlockDev},
                 blockdevmgr::BlockDevMgr,
                 devices::UnownedDevices,
                 shared::{metadata_to_segment, AllocatedAbove, BlkDevSegment, BlockDevPartition},
             },
-            serde_structs::{BaseDevSave, BlockDevSave, DataTierSave, Recordable},
+            serde_structs::{
+                BaseBlockDevSave, BaseDevSave, BlockDevSave, DataTierSave, Recordable,
+            },
             types::BDARecordResult,
         },
         types::{BlockDevTier, DevUuid, Name, PoolUuid},
@@ -28,45 +32,20 @@ use crate::{
 
 /// Handles the lowest level, base layer of this tier.
 #[derive(Debug)]
-pub struct DataTier {
+pub struct DataTier<B> {
     /// Manages the individual block devices
-    pub(super) block_mgr: BlockDevMgr<StratBlockDev>,
+    pub(super) block_mgr: BlockDevMgr<B>,
     /// The list of segments granted by block_mgr and used by dm_device
     pub(super) segments: AllocatedAbove,
 }
 
-impl DataTier {
-    /// Setup a previously existing data layer from the block_mgr and
-    /// previously allocated segments.
-    pub fn setup(
-        block_mgr: BlockDevMgr<StratBlockDev>,
-        data_tier_save: &DataTierSave,
-    ) -> BDARecordResult<DataTier> {
-        let uuid_to_devno = block_mgr.uuid_to_devno();
-        let mapper = |ld: &BaseDevSave| -> StratisResult<BlkDevSegment> {
-            metadata_to_segment(&uuid_to_devno, ld)
-        };
-        let segments = match data_tier_save.blockdev.allocs[0]
-            .iter()
-            .map(&mapper)
-            .collect::<StratisResult<Vec<_>>>()
-        {
-            Ok(s) => AllocatedAbove { inner: s },
-            Err(e) => return Err((e, block_mgr.into_bdas())),
-        };
-
-        Ok(DataTier {
-            block_mgr,
-            segments,
-        })
-    }
-
+impl DataTier<v1::StratBlockDev> {
     /// Setup a new DataTier struct from the block_mgr.
     ///
     /// Initially 0 segments are allocated.
     ///
     /// WARNING: metadata changing event
-    pub fn new(block_mgr: BlockDevMgr<StratBlockDev>) -> DataTier {
+    pub fn new(block_mgr: BlockDevMgr<v1::StratBlockDev>) -> DataTier<v1::StratBlockDev> {
         DataTier {
             block_mgr,
             segments: AllocatedAbove { inner: vec![] },
@@ -85,6 +64,119 @@ impl DataTier {
     ) -> StratisResult<Vec<DevUuid>> {
         self.block_mgr
             .add(pool_name, pool_uuid, devices, sector_size)
+    }
+
+    /// Lookup an immutable blockdev by its Stratis UUID.
+    pub fn get_blockdev_by_uuid(
+        &self,
+        uuid: DevUuid,
+    ) -> Option<(BlockDevTier, &v1::StratBlockDev)> {
+        self.block_mgr
+            .get_blockdev_by_uuid(uuid)
+            .map(|bd| (BlockDevTier::Data, bd))
+    }
+
+    /// Lookup a mutable blockdev by its Stratis UUID.
+    pub fn get_mut_blockdev_by_uuid(
+        &mut self,
+        uuid: DevUuid,
+    ) -> Option<(BlockDevTier, &mut v1::StratBlockDev)> {
+        self.block_mgr
+            .get_mut_blockdev_by_uuid(uuid)
+            .map(|bd| (BlockDevTier::Data, bd))
+    }
+
+    /// Get the blockdevs belonging to this tier
+    pub fn blockdevs(&self) -> Vec<(DevUuid, &v1::StratBlockDev)> {
+        self.block_mgr.blockdevs()
+    }
+
+    pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut v1::StratBlockDev)> {
+        self.block_mgr.blockdevs_mut()
+    }
+}
+
+impl DataTier<v2::StratBlockDev> {
+    /// Setup a new DataTier struct from the block_mgr.
+    ///
+    /// Initially 0 segments are allocated.
+    ///
+    /// WARNING: metadata changing event
+    pub fn new(block_mgr: BlockDevMgr<v2::StratBlockDev>) -> DataTier<v2::StratBlockDev> {
+        DataTier {
+            block_mgr,
+            segments: AllocatedAbove { inner: vec![] },
+        }
+    }
+
+    /// Add the given paths to self. Return UUIDs of the new blockdevs
+    /// corresponding to the specified paths.
+    /// WARNING: metadata changing event
+    pub fn add(
+        &mut self,
+        pool_uuid: PoolUuid,
+        devices: UnownedDevices,
+    ) -> StratisResult<Vec<DevUuid>> {
+        self.block_mgr.add(pool_uuid, devices)
+    }
+
+    /// Lookup an immutable blockdev by its Stratis UUID.
+    pub fn get_blockdev_by_uuid(
+        &self,
+        uuid: DevUuid,
+    ) -> Option<(BlockDevTier, &v2::StratBlockDev)> {
+        self.block_mgr
+            .get_blockdev_by_uuid(uuid)
+            .map(|bd| (BlockDevTier::Data, bd))
+    }
+
+    /// Lookup a mutable blockdev by its Stratis UUID.
+    pub fn get_mut_blockdev_by_uuid(
+        &mut self,
+        uuid: DevUuid,
+    ) -> Option<(BlockDevTier, &mut v2::StratBlockDev)> {
+        self.block_mgr
+            .get_mut_blockdev_by_uuid(uuid)
+            .map(|bd| (BlockDevTier::Data, bd))
+    }
+
+    /// Get the blockdevs belonging to this tier
+    pub fn blockdevs(&self) -> Vec<(DevUuid, &v2::StratBlockDev)> {
+        self.block_mgr.blockdevs()
+    }
+
+    pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut v2::StratBlockDev)> {
+        self.block_mgr.blockdevs_mut()
+    }
+}
+
+impl<B> DataTier<B>
+where
+    B: InternalBlockDev,
+{
+    /// Setup a previously existing data layer from the block_mgr and
+    /// previously allocated segments.
+    pub fn setup(
+        block_mgr: BlockDevMgr<B>,
+        data_tier_save: &DataTierSave,
+    ) -> BDARecordResult<DataTier<B>> {
+        let uuid_to_devno = block_mgr.uuid_to_devno();
+        let mapper = |ld: &BaseDevSave| -> StratisResult<BlkDevSegment> {
+            metadata_to_segment(&uuid_to_devno, ld)
+        };
+        let segments = match data_tier_save.blockdev.allocs[0]
+            .iter()
+            .map(&mapper)
+            .collect::<StratisResult<Vec<_>>>()
+        {
+            Ok(s) => AllocatedAbove { inner: s },
+            Err(e) => return Err((e, block_mgr.into_bdas())),
+        };
+
+        Ok(DataTier {
+            block_mgr,
+            segments,
+        })
     }
 
     /// Allocate a region for all sector size requests from unallocated segments in
@@ -142,39 +234,13 @@ impl DataTier {
         self.block_mgr.load_state()
     }
 
-    /// Lookup an immutable blockdev by its Stratis UUID.
-    pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<(BlockDevTier, &StratBlockDev)> {
-        self.block_mgr
-            .get_blockdev_by_uuid(uuid)
-            .map(|bd| (BlockDevTier::Data, bd))
-    }
-
-    /// Lookup a mutable blockdev by its Stratis UUID.
-    pub fn get_mut_blockdev_by_uuid(
-        &mut self,
-        uuid: DevUuid,
-    ) -> Option<(BlockDevTier, &mut StratBlockDev)> {
-        self.block_mgr
-            .get_mut_blockdev_by_uuid(uuid)
-            .map(|bd| (BlockDevTier::Data, bd))
-    }
-
-    /// Get the blockdevs belonging to this tier
-    pub fn blockdevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
-        self.block_mgr.blockdevs()
-    }
-
-    pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut StratBlockDev)> {
-        self.block_mgr.blockdevs_mut()
-    }
-
     pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {
         self.block_mgr.grow(dev)
     }
 
     /// Return the partition of the block devs that are in use and those
     /// that are not.
-    pub fn partition_by_use(&self) -> BlockDevPartition<'_> {
+    pub fn partition_by_use(&self) -> BlockDevPartition<'_, B> {
         let blockdevs = self.block_mgr.blockdevs();
         let (used, unused) = blockdevs.iter().partition(|(_, bd)| bd.in_use());
         BlockDevPartition { used, unused }
@@ -194,7 +260,10 @@ impl DataTier {
     }
 }
 
-impl Recordable<DataTierSave> for DataTier {
+impl<B> Recordable<DataTierSave> for DataTier<B>
+where
+    B: Recordable<BaseBlockDevSave>,
+{
     fn record(&self) -> DataTierSave {
         DataTierSave {
             blockdev: BlockDevSave {
@@ -211,7 +280,10 @@ mod tests {
     use std::path::Path;
 
     use crate::engine::strat_engine::{
-        backstore::devices::{ProcessedPathInfos, UnownedDevices},
+        backstore::{
+            blockdev,
+            devices::{ProcessedPathInfos, UnownedDevices},
+        },
         metadata::MDADataSize,
         tests::{loopbacked, real},
     };
@@ -227,84 +299,169 @@ mod tests {
             })
     }
 
-    /// Put the data tier through some paces. Make it, alloc a small amount,
-    /// add some more blockdevs, allocate enough that the newly added blockdevs
-    /// must be allocated from for success.
-    fn test_add_and_alloc(paths: &[&Path]) {
-        assert!(paths.len() > 1);
+    mod v1 {
+        use super::*;
 
-        let pool_uuid = PoolUuid::new_v4();
-        let pool_name = Name::new("pool_name".to_string());
+        /// Put the data tier through some paces. Make it, alloc a small amount,
+        /// add some more blockdevs, allocate enough that the newly added blockdevs
+        /// must be allocated from for success.
+        fn test_add_and_alloc(paths: &[&Path]) {
+            assert!(paths.len() > 1);
 
-        let (paths1, paths2) = paths.split_at(paths.len() / 2);
+            let pool_uuid = PoolUuid::new_v4();
+            let pool_name = Name::new("pool_name".to_string());
 
-        let devices1 = get_devices(paths1).unwrap();
-        let devices2 = get_devices(paths2).unwrap();
+            let (paths1, paths2) = paths.split_at(paths.len() / 2);
 
-        let mgr = BlockDevMgr::<StratBlockDev>::initialize(
-            pool_name.clone(),
-            pool_uuid,
-            devices1,
-            MDADataSize::default(),
-            None,
-            None,
-        )
-        .unwrap();
+            let devices1 = get_devices(paths1).unwrap();
+            let devices2 = get_devices(paths2).unwrap();
 
-        let mut data_tier = DataTier::new(mgr);
-        data_tier.invariant();
+            let mgr = BlockDevMgr::<blockdev::v1::StratBlockDev>::initialize(
+                pool_name.clone(),
+                pool_uuid,
+                devices1,
+                MDADataSize::default(),
+                None,
+                None,
+            )
+            .unwrap();
 
-        // A data_tier w/ some devices but nothing allocated
-        let mut size = data_tier.size();
-        let mut allocated = data_tier.allocated();
-        assert_eq!(allocated, Sectors(0));
-        assert!(size != Sectors(0));
+            let mut data_tier = DataTier::<blockdev::v1::StratBlockDev>::new(mgr);
+            data_tier.invariant();
 
-        let last_request_amount = size;
+            // A data_tier w/ some devices but nothing allocated
+            let mut size = data_tier.size();
+            let mut allocated = data_tier.allocated();
+            assert_eq!(allocated, Sectors(0));
+            assert!(size != Sectors(0));
 
-        let request_amount = data_tier.block_mgr.avail_space() / 2usize;
-        assert!(request_amount != Sectors(0));
+            let last_request_amount = size;
 
-        assert!(data_tier.alloc(&[request_amount]));
-        data_tier.invariant();
+            let request_amount = data_tier.block_mgr.avail_space() / 2usize;
+            assert!(request_amount != Sectors(0));
 
-        // A data tier w/ some amount allocated
-        assert!(data_tier.allocated() >= request_amount);
-        assert_eq!(data_tier.size(), size);
-        allocated = data_tier.allocated();
+            assert!(data_tier.alloc(&[request_amount]));
+            data_tier.invariant();
 
-        data_tier.add(pool_name, pool_uuid, devices2, None).unwrap();
-        data_tier.invariant();
+            // A data tier w/ some amount allocated
+            assert!(data_tier.allocated() >= request_amount);
+            assert_eq!(data_tier.size(), size);
+            allocated = data_tier.allocated();
 
-        // A data tier w/ additional blockdevs added
-        assert!(data_tier.size() > size);
-        assert_eq!(data_tier.allocated(), allocated);
-        assert_eq!(paths.len(), data_tier.blockdevs().len());
-        size = data_tier.size();
+            data_tier.add(pool_name, pool_uuid, devices2, None).unwrap();
+            data_tier.invariant();
 
-        // Allocate enough to get into the newly added block devices
-        assert!(data_tier.alloc(&[last_request_amount]));
-        data_tier.invariant();
+            // A data tier w/ additional blockdevs added
+            assert!(data_tier.size() > size);
+            assert_eq!(data_tier.allocated(), allocated);
+            assert_eq!(paths.len(), data_tier.blockdevs().len());
+            size = data_tier.size();
 
-        assert!(data_tier.allocated() >= request_amount + last_request_amount);
-        assert_eq!(data_tier.size(), size);
+            // Allocate enough to get into the newly added block devices
+            assert!(data_tier.alloc(&[last_request_amount]));
+            data_tier.invariant();
 
-        data_tier.destroy().unwrap();
+            assert!(data_tier.allocated() >= request_amount + last_request_amount);
+            assert_eq!(data_tier.size(), size);
+
+            data_tier.destroy().unwrap();
+        }
+
+        #[test]
+        fn loop_test_add_and_alloc() {
+            loopbacked::test_with_spec(
+                &loopbacked::DeviceLimits::Range(2, 3, None),
+                test_add_and_alloc,
+            );
+        }
+
+        #[test]
+        fn real_test_add_and_alloc() {
+            real::test_with_spec(
+                &real::DeviceLimits::AtLeast(2, None, None),
+                test_add_and_alloc,
+            );
+        }
     }
 
-    #[test]
-    fn loop_test_add_and_alloc() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, None),
-            test_add_and_alloc,
-        );
-    }
+    mod v2 {
+        use super::*;
 
-    #[test]
-    fn real_test_add_and_alloc() {
-        real::test_with_spec(
-            &real::DeviceLimits::AtLeast(2, None, None),
-            test_add_and_alloc,
-        );
+        /// Put the data tier through some paces. Make it, alloc a small amount,
+        /// add some more blockdevs, allocate enough that the newly added blockdevs
+        /// must be allocated from for success.
+        fn test_add_and_alloc(paths: &[&Path]) {
+            assert!(paths.len() > 1);
+
+            let pool_uuid = PoolUuid::new_v4();
+
+            let (paths1, paths2) = paths.split_at(paths.len() / 2);
+
+            let devices1 = get_devices(paths1).unwrap();
+            let devices2 = get_devices(paths2).unwrap();
+
+            let mgr = BlockDevMgr::<blockdev::v2::StratBlockDev>::initialize(
+                pool_uuid,
+                devices1,
+                MDADataSize::default(),
+            )
+            .unwrap();
+
+            let mut data_tier = DataTier::<blockdev::v2::StratBlockDev>::new(mgr);
+            data_tier.invariant();
+
+            // A data_tier w/ some devices but nothing allocated
+            let mut size = data_tier.size();
+            let mut allocated = data_tier.allocated();
+            assert_eq!(allocated, Sectors(0));
+            assert!(size != Sectors(0));
+
+            let last_request_amount = size;
+
+            let request_amount = data_tier.block_mgr.avail_space() / 2usize;
+            assert!(request_amount != Sectors(0));
+
+            assert!(data_tier.alloc(&[request_amount]));
+            data_tier.invariant();
+
+            // A data tier w/ some amount allocated
+            assert!(data_tier.allocated() >= request_amount);
+            assert_eq!(data_tier.size(), size);
+            allocated = data_tier.allocated();
+
+            data_tier.add(pool_uuid, devices2).unwrap();
+            data_tier.invariant();
+
+            // A data tier w/ additional blockdevs added
+            assert!(data_tier.size() > size);
+            assert_eq!(data_tier.allocated(), allocated);
+            assert_eq!(paths.len(), data_tier.blockdevs().len());
+            size = data_tier.size();
+
+            // Allocate enough to get into the newly added block devices
+            assert!(data_tier.alloc(&[last_request_amount]));
+            data_tier.invariant();
+
+            assert!(data_tier.allocated() >= request_amount + last_request_amount);
+            assert_eq!(data_tier.size(), size);
+
+            data_tier.destroy().unwrap();
+        }
+
+        #[test]
+        fn loop_test_add_and_alloc() {
+            loopbacked::test_with_spec(
+                &loopbacked::DeviceLimits::Range(2, 3, None),
+                test_add_and_alloc,
+            );
+        }
+
+        #[test]
+        fn real_test_add_and_alloc() {
+            real::test_with_spec(
+                &real::DeviceLimits::AtLeast(2, None, None),
+                test_add_and_alloc,
+            );
+        }
     }
 }

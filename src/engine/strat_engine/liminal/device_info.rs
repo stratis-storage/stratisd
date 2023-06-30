@@ -18,7 +18,7 @@ use crate::{
     engine::{
         shared::{gather_encryption_info, gather_pool_name},
         strat_engine::{
-            backstore::blockdev::{v1::StratBlockDev, InternalBlockDev},
+            backstore::blockdev::v1::StratBlockDev,
             liminal::{
                 identify::{DeviceInfo, LuksInfo, StratisDevInfo, StratisInfo},
                 setup::get_name,

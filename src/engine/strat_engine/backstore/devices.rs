@@ -24,8 +24,8 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::blockdev::{
-                v1::{StratBlockDev, UnderlyingDevice},
-                InternalBlockDev,
+                v1::{self, UnderlyingDevice},
+                v2, InternalBlockDev,
             },
             crypt::handle::v1::CryptHandle,
             device::{blkdev_logical_sector_size, blkdev_physical_sector_size, blkdev_size},
@@ -501,14 +501,14 @@ impl UnownedDevices {
 ///
 /// Precondition: Each device's DeviceInfo struct contains all necessary
 /// information about the device.
-pub fn initialize_devices(
+pub fn initialize_devices_legacy(
     devices: UnownedDevices,
     pool_name: Name,
     pool_uuid: PoolUuid,
     mda_data_size: MDADataSize,
     encryption_info: Option<&EncryptionInfo>,
     sector_size: Option<u32>,
-) -> StratisResult<Vec<StratBlockDev>> {
+) -> StratisResult<Vec<v1::StratBlockDev>> {
     /// Initialize an encrypted device on the given physical device
     /// using the pool and device UUIDs of the new Stratis block device
     /// and the key description for the key to use for encrypting the
@@ -558,7 +558,7 @@ pub fn initialize_devices(
         dev_uuid: DevUuid,
         sizes: (MDADataSize, BlockdevSize),
         id_wwn: &Option<StratisResult<String>>,
-    ) -> StratisResult<StratBlockDev> {
+    ) -> StratisResult<v1::StratBlockDev> {
         let (mda_data_size, data_size) = sizes;
         let mut f = OpenOptions::new()
             .write(true)
@@ -589,7 +589,7 @@ pub fn initialize_devices(
 
         bda.initialize(&mut f)?;
 
-        StratBlockDev::new(devno, bda, &[], None, hw_id, underlying_device).map_err(|(e, _)| e)
+        v1::StratBlockDev::new(devno, bda, &[], None, hw_id, underlying_device).map_err(|(e, _)| e)
     }
 
     /// Clean up an encrypted device after initialization failure.
@@ -655,7 +655,7 @@ pub fn initialize_devices(
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
         sector_size: Option<u32>,
-    ) -> StratisResult<StratBlockDev> {
+    ) -> StratisResult<v1::StratBlockDev> {
         let dev_uuid = DevUuid::new_v4();
         let (handle, devno, blockdev_size) = if let Some(ei) = encryption_info {
             initialize_encrypted(
@@ -731,8 +731,8 @@ pub fn initialize_devices(
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
         sector_size: Option<u32>,
-    ) -> StratisResult<Vec<StratBlockDev>> {
-        let mut initialized_blockdevs: Vec<StratBlockDev> = Vec::new();
+    ) -> StratisResult<Vec<v1::StratBlockDev>> {
+        let mut initialized_blockdevs: Vec<v1::StratBlockDev> = Vec::new();
         for dev_info in devices.inner {
             match initialize_one(
                 &dev_info,
@@ -787,10 +787,173 @@ pub fn initialize_devices(
     res
 }
 
+/// Initialize devices in devices.
+/// Clean up previously initialized devices if initialization of any single
+/// device fails during initialization. Log at the warning level if cleanup
+/// fails.
+///
+/// Precondition: All devices have been identified as ready to be initialized
+/// in a previous step.
+///
+/// Precondition: Each device's DeviceInfo struct contains all necessary
+/// information about the device.
+pub fn initialize_devices(
+    devices: UnownedDevices,
+    pool_uuid: PoolUuid,
+    mda_data_size: MDADataSize,
+) -> StratisResult<Vec<v2::StratBlockDev>> {
+    fn initialize_stratis_metadata(
+        devnode: DevicePath,
+        devno: Device,
+        pool_uuid: PoolUuid,
+        dev_uuid: DevUuid,
+        sizes: (MDADataSize, BlockdevSize),
+        id_wwn: &Option<StratisResult<String>>,
+    ) -> StratisResult<v2::StratBlockDev> {
+        let (mda_data_size, data_size) = sizes;
+        let mut f = OpenOptions::new().write(true).open(&*devnode)?;
+
+        // NOTE: Encrypted devices will discard the hardware ID as encrypted devices
+        // are always represented as logical, software-based devicemapper devices
+        // which will never have a hardware ID.
+        let hw_id = match id_wwn {
+            Some(Ok(ref hw_id)) => Some(hw_id.to_owned()),
+            Some(Err(_)) => {
+                warn!("Value for ID_WWN for device {} obtained from the udev database could not be decoded; inserting device into pool with UUID {} anyway",
+                      devnode.display(),
+                      pool_uuid);
+                None
+            }
+            None => None,
+        };
+
+        let bda = BDA::new(
+            StratSigblockVersion::V2,
+            StratisIdentifiers::new(pool_uuid, dev_uuid),
+            mda_data_size,
+            data_size,
+            Utc::now(),
+        );
+
+        bda.initialize(&mut f)?;
+
+        v2::StratBlockDev::new(devno, bda, &[], None, hw_id, devnode).map_err(|(e, _)| e)
+    }
+
+    /// Clean up an unencrypted device after initialization failure.
+    fn clean_up(path: &Path, causal_error: StratisError) -> StratisError {
+        if let Err(e) = OpenOptions::new()
+            .write(true)
+            .open(path)
+            .map_err(StratisError::from)
+            .and_then(|mut f| disown_device(&mut f))
+        {
+            let msg = format!(
+                "Failed to clean up unencrypted device {}; cleanup was attempted because initialization of the device failed",
+                path.display(),
+            );
+            warn!("{}; clean up failure cause: {}", msg, e,);
+            StratisError::Chained(
+                msg,
+                Box::new(StratisError::NoActionRollbackError {
+                    causal_error: Box::new(causal_error),
+                    rollback_error: Box::new(e),
+                }),
+            )
+        } else {
+            causal_error
+        }
+    }
+
+    // Initialize a single device using information in dev_info.
+    // If initialization fails at any stage clean up the device.
+    // Return an error if initialization failed. Log a warning if cleanup
+    // fails.
+    //
+    // This method will clean up after LUKS2 and unencrypted Stratis devices
+    // in phases. In the case of encryption, if a device has been initialized
+    // as an encrypted volume, it will either rely on StratBlockDev::disown()
+    // if the in-memory StratBlockDev object has been created or
+    // will call out directly to destroy_encrypted_stratis_device() if it
+    // fails before that.
+    fn initialize_one(
+        dev_info: &DeviceInfo,
+        pool_uuid: PoolUuid,
+        mda_data_size: MDADataSize,
+    ) -> StratisResult<v2::StratBlockDev> {
+        let dev_uuid = DevUuid::new_v4();
+        let (devno, blockdev_size) = (dev_info.devno, dev_info.size.sectors());
+
+        let physical_path = &dev_info.devnode;
+        let blockdev = initialize_stratis_metadata(
+            DevicePath::new(physical_path)?,
+            devno,
+            pool_uuid,
+            dev_uuid,
+            (mda_data_size, BlockdevSize::new(blockdev_size)),
+            &dev_info.id_wwn,
+        );
+        if let Err(err) = blockdev {
+            Err(clean_up(physical_path, err))
+        } else {
+            blockdev
+        }
+    }
+
+    /// Initialize all provided devices with Stratis metadata.
+    fn initialize_all(
+        devices: UnownedDevices,
+        pool_uuid: PoolUuid,
+        mda_data_size: MDADataSize,
+    ) -> StratisResult<Vec<v2::StratBlockDev>> {
+        let mut initialized_blockdevs: Vec<v2::StratBlockDev> = Vec::new();
+        for dev_info in devices.inner {
+            match initialize_one(&dev_info, pool_uuid, mda_data_size) {
+                Ok(blockdev) => initialized_blockdevs.push(blockdev),
+                Err(err) => {
+                    if let Err(err) = wipe_blockdevs(&mut initialized_blockdevs) {
+                        warn!("Failed to clean up some devices after initialization of device {} for pool with UUID {} failed: {}",
+                              dev_info.devnode.display(),
+                              pool_uuid,
+                              err);
+                    }
+                    return Err(err);
+                }
+            }
+        }
+        Ok(initialized_blockdevs)
+    }
+
+    let device_paths = devices
+        .inner
+        .iter()
+        .map(|d| d.devnode.clone())
+        .collect::<Vec<_>>();
+    {
+        let mut guard = (*BLOCKDEVS_IN_PROGRESS).lock().expect("Should not panic");
+        if device_paths.iter().any(|dev| guard.contains(dev)) {
+            return Err(StratisError::Msg(format!("An initialization operation is already in progress with at least one of the following devices: {device_paths:?}")));
+        }
+        guard.extend(device_paths.iter().cloned());
+    }
+
+    let res = initialize_all(devices, pool_uuid, mda_data_size);
+
+    {
+        let mut guard = (*BLOCKDEVS_IN_PROGRESS).lock().expect("Should not panic");
+        guard.retain(|path| !device_paths.contains(path));
+    }
+
+    res
+}
+
 /// Wipe some blockdevs of their identifying headers.
 /// Return an error if any of the blockdevs could not be wiped.
 /// If an error occurs while wiping a blockdev, attempt to wipe all remaining.
-pub fn wipe_blockdevs(blockdevs: &mut [StratBlockDev]) -> StratisResult<()> {
+pub fn wipe_blockdevs<B>(blockdevs: &mut [B]) -> StratisResult<()>
+where
+    B: InternalBlockDev,
+{
     let unerased_devnodes: Vec<_> = blockdevs
         .iter_mut()
         .filter_map(|bd| match bd.disown() {
@@ -823,7 +986,6 @@ mod tests {
 
     use crate::engine::{
         strat_engine::{
-            crypt::handle::v1::CryptHandle,
             metadata::device_identifiers,
             tests::{crypt, loopbacked, real},
         },
@@ -831,200 +993,6 @@ mod tests {
     };
 
     use super::*;
-
-    /// Test that initializing devices claims all and that destroying
-    /// them releases all. Verify that already initialized devices are
-    /// rejected or filtered as appropriate.
-    fn test_ownership(paths: &[&Path], key_description: Option<&KeyDescription>) {
-        let pool_uuid = PoolUuid::new_v4();
-        let pool_name = Name::new("pool_name".to_string());
-        let dev_infos: Vec<_> = ProcessedPathInfos::try_from(paths)
-            .unwrap()
-            .unclaimed_devices;
-
-        if dev_infos.len() != paths.len() {
-            panic!("Some duplicate devices were found");
-        }
-
-        let mut blockdevs = initialize_devices(
-            UnownedDevices { inner: dev_infos },
-            pool_name,
-            pool_uuid,
-            MDADataSize::default(),
-            key_description
-                .map(|kd| EncryptionInfo::KeyDesc(kd.clone()))
-                .as_ref(),
-            None,
-        )
-        .unwrap();
-
-        if blockdevs.len() != paths.len() {
-            panic!("Fewer blockdevices were created than were requested");
-        }
-
-        let stratis_devnodes: Vec<PathBuf> = blockdevs
-            .iter()
-            .map(|bd| bd.metadata_path().to_owned())
-            .collect();
-
-        let stratis_identifiers: Vec<Option<StratisIdentifiers>> = stratis_devnodes
-            .iter()
-            .map(|dev| {
-                OpenOptions::new()
-                    .read(true)
-                    .open(dev)
-                    .map_err(|err| err.into())
-                    .and_then(|mut f| device_identifiers(&mut f))
-            })
-            .collect::<StratisResult<Vec<Option<StratisIdentifiers>>>>()
-            .unwrap();
-
-        if stratis_identifiers.iter().any(Option::is_none) {
-            panic!("Some device which should have had Stratis identifiers on it did not");
-        }
-
-        if stratis_identifiers
-            .iter()
-            .any(|x| x.expect("returned in line above if any are None").pool_uuid != pool_uuid)
-        {
-            panic!("Some device had the wrong pool UUID");
-        }
-
-        if key_description.is_none() {
-            if !ProcessedPathInfos::try_from(
-                stratis_devnodes
-                    .iter()
-                    .map(|p| p.as_path())
-                    .collect::<Vec<_>>()
-                    .as_slice(),
-            )
-            .unwrap()
-            .unpack()
-            .1
-            .inner
-            .is_empty()
-            {
-                panic!(
-                    "Failed to eliminate devices already initialized for this pool from list of devices to initialize"
-                );
-            }
-
-            if ProcessedPathInfos::try_from(
-                stratis_devnodes
-                    .iter()
-                    .map(|p| p.as_path())
-                    .collect::<Vec<_>>()
-                    .as_slice(),
-            )
-            .unwrap()
-            .unpack()
-            .0
-            .partition(pool_uuid)
-            .1
-            .error_on_not_empty()
-            .is_err()
-            {
-                panic!(
-                    "Failed to return an error when some device processed was not in the set of already initialized devices"
-                );
-            }
-        } else {
-            // The devices will be rejected with an errorif they were the
-            // minimum size when initialized.
-            if let Ok(infos) = ProcessedPathInfos::try_from(
-                stratis_devnodes
-                    .iter()
-                    .map(|p| p.as_path())
-                    .collect::<Vec<_>>()
-                    .as_slice(),
-            ) {
-                if !infos.unpack().0.partition(pool_uuid).1.inner.is_empty() {
-                    panic!(
-                        "Failed to eliminate devices already initialized for this pool from list of devices to initialize"
-                    );
-                }
-            }
-
-            if ProcessedPathInfos::try_from(paths).is_ok() {
-                panic!("Failed to return an error when encountering devices that are LUKS2");
-            }
-        }
-
-        if let Ok(infos) = ProcessedPathInfos::try_from(
-            stratis_devnodes
-                .iter()
-                .map(|p| p.as_path())
-                .collect::<Vec<_>>()
-                .as_slice(),
-        ) {
-            if !infos.unpack().0.partition(PoolUuid::new_v4()).0.is_empty() {
-                panic!(
-                    "Failed to leave devices in StratisDevices when processing devices for a pool UUID which is not the same as that for which the devices were initialized"
-                );
-            }
-        };
-
-        wipe_blockdevs(&mut blockdevs).unwrap();
-
-        for path in paths {
-            if key_description.is_some() {
-                if CryptHandle::load_metadata(path).unwrap().is_some() {
-                    panic!("LUKS2 metadata on Stratis devices was not successfully wiped");
-                }
-            } else if (device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
-                .unwrap())
-            .is_some()
-            {
-                panic!("Metadata on Stratis devices was not successfully wiped");
-            }
-        }
-    }
-
-    /// Test ownership with encryption
-    fn test_ownership_crypt(paths: &[&Path]) {
-        fn call_crypt_test(paths: &[&Path], key_description: &KeyDescription) {
-            test_ownership(paths, Some(key_description))
-        }
-
-        crypt::insert_and_cleanup_key(paths, call_crypt_test)
-    }
-
-    /// Test ownership with no encryption
-    fn test_ownership_no_crypt(paths: &[&Path]) {
-        test_ownership(paths, None)
-    }
-
-    #[test]
-    fn loop_test_ownership() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(1, 3, None),
-            test_ownership_no_crypt,
-        );
-    }
-
-    #[test]
-    fn real_test_ownership() {
-        real::test_with_spec(
-            &real::DeviceLimits::AtLeast(1, None, None),
-            test_ownership_no_crypt,
-        );
-    }
-
-    #[test]
-    fn loop_test_crypt_ownership() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(1, 3, None),
-            test_ownership_crypt,
-        );
-    }
-
-    #[test]
-    fn real_test_crypt_ownership() {
-        real::test_with_spec(
-            &real::DeviceLimits::AtLeast(1, None, None),
-            test_ownership_crypt,
-        );
-    }
 
     // Verify that a non-existent path results in a reasonably elegant
     // error, i.e., not an assertion failure.
@@ -1049,128 +1017,6 @@ mod tests {
         real::test_with_spec(
             &real::DeviceLimits::AtLeast(1, None, None),
             test_nonexistent_path,
-        );
-    }
-
-    // Verify that if the last device in a list of devices to initialize
-    // can not be initialized, all the devices previously initialized are
-    // properly cleaned up.
-    fn test_failure_cleanup(paths: &[&Path], key_desc: Option<&KeyDescription>) {
-        if paths.len() <= 1 {
-            panic!("Test requires more than one device");
-        }
-
-        let mut dev_infos = ProcessedPathInfos::try_from(paths)
-            .unwrap()
-            .unclaimed_devices;
-        let pool_uuid = PoolUuid::new_v4();
-        let pool_name = Name::new("pool_name".to_string());
-
-        if dev_infos.len() != paths.len() {
-            panic!("Some duplicate devices were found");
-        }
-
-        // Synthesize a DeviceInfo that will cause initialization to fail.
-        {
-            let old_info = dev_infos.pop().expect("Must contain at least two devices");
-
-            let new_info = DeviceInfo {
-                devnode: PathBuf::from("/srk/cheese"),
-                devno: old_info.devno,
-                id_wwn: None,
-                size: old_info.size,
-                blksizes: old_info.blksizes,
-            };
-
-            dev_infos.push(new_info);
-        }
-
-        if initialize_devices(
-            UnownedDevices { inner: dev_infos },
-            pool_name,
-            pool_uuid,
-            MDADataSize::default(),
-            key_desc
-                .map(|kd| EncryptionInfo::KeyDesc(kd.clone()))
-                .as_ref(),
-            None,
-        )
-        .is_ok()
-        {
-            panic!("Initialization should not have succeeded");
-        }
-
-        // Check all paths for absence of device identifiers or LUKS2 metadata
-        // depending on whether or not it is encrypted. Initialization of the
-        // last path was never attempted, so it should be as bare of Stratis
-        // identifiers as all the other paths that were initialized.
-        for path in paths {
-            if key_desc.is_some() {
-                if CryptHandle::load_metadata(path).unwrap().is_some() {
-                    panic!("Device {} should have no LUKS2 metadata", path.display());
-                }
-            } else {
-                let mut f = OpenOptions::new()
-                    .read(true)
-                    .write(true)
-                    .open(path)
-                    .unwrap();
-                match device_identifiers(&mut f) {
-                    Ok(None) => (),
-                    _ => {
-                        panic!(
-                            "Device {} should have returned nothing for device identifiers",
-                            path.display()
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    // Run test_failure_cleanup for encrypted devices
-    fn test_failure_cleanup_crypt(paths: &[&Path]) {
-        fn failure_cleanup_crypt(paths: &[&Path], key_desc: &KeyDescription) {
-            test_failure_cleanup(paths, Some(key_desc))
-        }
-
-        crypt::insert_and_cleanup_key(paths, failure_cleanup_crypt)
-    }
-
-    // Run test_failure_cleanup for unencrypted devices
-    fn test_failure_cleanup_no_crypt(paths: &[&Path]) {
-        test_failure_cleanup(paths, None)
-    }
-
-    #[test]
-    fn loop_test_crypt_failure_cleanup() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, None),
-            test_failure_cleanup_crypt,
-        );
-    }
-
-    #[test]
-    fn real_test_crypt_failure_cleanup() {
-        real::test_with_spec(
-            &real::DeviceLimits::AtLeast(2, None, None),
-            test_failure_cleanup_crypt,
-        );
-    }
-
-    #[test]
-    fn loop_test_failure_cleanup() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, None),
-            test_failure_cleanup_no_crypt,
-        );
-    }
-
-    #[test]
-    fn real_test_failure_cleanup() {
-        real::test_with_spec(
-            &real::DeviceLimits::AtLeast(2, None, None),
-            test_failure_cleanup_no_crypt,
         );
     }
 
@@ -1206,5 +1052,538 @@ mod tests {
             &real::DeviceLimits::AtLeast(1, None, None),
             test_duplicate_devnodes,
         );
+    }
+
+    mod v1 {
+        use super::*;
+
+        /// Test that initializing devices claims all and that destroying
+        /// them releases all. Verify that already initialized devices are
+        /// rejected or filtered as appropriate.
+        fn test_ownership(paths: &[&Path], key_description: Option<&KeyDescription>) {
+            let pool_uuid = PoolUuid::new_v4();
+            let pool_name = Name::new("pool_name".to_string());
+            let dev_infos: Vec<_> = ProcessedPathInfos::try_from(paths)
+                .unwrap()
+                .unclaimed_devices;
+
+            if dev_infos.len() != paths.len() {
+                panic!("Some duplicate devices were found");
+            }
+
+            let mut blockdevs = initialize_devices_legacy(
+                UnownedDevices { inner: dev_infos },
+                pool_name,
+                pool_uuid,
+                MDADataSize::default(),
+                key_description
+                    .map(|kd| EncryptionInfo::KeyDesc(kd.clone()))
+                    .as_ref(),
+                None,
+            )
+            .unwrap();
+
+            if blockdevs.len() != paths.len() {
+                panic!("Fewer blockdevices were created than were requested");
+            }
+
+            let stratis_devnodes: Vec<PathBuf> = blockdevs
+                .iter()
+                .map(|bd| bd.metadata_path().to_owned())
+                .collect();
+
+            let stratis_identifiers: Vec<Option<StratisIdentifiers>> = stratis_devnodes
+                .iter()
+                .map(|dev| {
+                    OpenOptions::new()
+                        .read(true)
+                        .open(dev)
+                        .map_err(|err| err.into())
+                        .and_then(|mut f| device_identifiers(&mut f))
+                })
+                .collect::<StratisResult<Vec<Option<StratisIdentifiers>>>>()
+                .unwrap();
+
+            if stratis_identifiers.iter().any(Option::is_none) {
+                panic!("Some device which should have had Stratis identifiers on it did not");
+            }
+
+            if stratis_identifiers
+                .iter()
+                .any(|x| x.expect("returned in line above if any are None").pool_uuid != pool_uuid)
+            {
+                panic!("Some device had the wrong pool UUID");
+            }
+
+            if key_description.is_none() {
+                if !ProcessedPathInfos::try_from(
+                    stratis_devnodes
+                        .iter()
+                        .map(|p| p.as_path())
+                        .collect::<Vec<_>>()
+                        .as_slice(),
+                )
+                .unwrap()
+                .unpack()
+                .1
+                .inner
+                .is_empty()
+                {
+                    panic!(
+                        "Failed to eliminate devices already initialized for this pool from list of devices to initialize"
+                    );
+                }
+
+                if ProcessedPathInfos::try_from(
+                    stratis_devnodes
+                        .iter()
+                        .map(|p| p.as_path())
+                        .collect::<Vec<_>>()
+                        .as_slice(),
+                )
+                .unwrap()
+                .unpack()
+                .0
+                .partition(pool_uuid)
+                .1
+                .error_on_not_empty()
+                .is_err()
+                {
+                    panic!(
+                        "Failed to return an error when some device processed was not in the set of already initialized devices"
+                    );
+                }
+            } else {
+                // The devices will be rejected with an errorif they were the
+                // minimum size when initialized.
+                if let Ok(infos) = ProcessedPathInfos::try_from(
+                    stratis_devnodes
+                        .iter()
+                        .map(|p| p.as_path())
+                        .collect::<Vec<_>>()
+                        .as_slice(),
+                ) {
+                    if !infos.unpack().0.partition(pool_uuid).1.inner.is_empty() {
+                        panic!(
+                            "Failed to eliminate devices already initialized for this pool from list of devices to initialize"
+                        );
+                    }
+                }
+
+                if ProcessedPathInfos::try_from(paths).is_ok() {
+                    panic!("Failed to return an error when encountering devices that are LUKS2");
+                }
+            }
+
+            if let Ok(infos) = ProcessedPathInfos::try_from(
+                stratis_devnodes
+                    .iter()
+                    .map(|p| p.as_path())
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            ) {
+                if !infos.unpack().0.partition(PoolUuid::new_v4()).0.is_empty() {
+                    panic!(
+                        "Failed to leave devices in StratisDevices when processing devices for a pool UUID which is not the same as that for which the devices were initialized"
+                    );
+                }
+            };
+
+            wipe_blockdevs(&mut blockdevs).unwrap();
+
+            for path in paths {
+                if key_description.is_some() {
+                    if CryptHandle::load_metadata(path).unwrap().is_some() {
+                        panic!("LUKS2 metadata on Stratis devices was not successfully wiped");
+                    }
+                } else if (device_identifiers(
+                    &mut OpenOptions::new().read(true).open(path).unwrap(),
+                )
+                .unwrap())
+                .is_some()
+                {
+                    panic!("Metadata on Stratis devices was not successfully wiped");
+                }
+            }
+        }
+
+        /// Test ownership with encryption
+        fn test_ownership_crypt(paths: &[&Path]) {
+            fn call_crypt_test(paths: &[&Path], key_description: &KeyDescription) {
+                test_ownership(paths, Some(key_description))
+            }
+
+            crypt::insert_and_cleanup_key(paths, call_crypt_test)
+        }
+
+        /// Test ownership with no encryption
+        fn test_ownership_no_crypt(paths: &[&Path]) {
+            test_ownership(paths, None)
+        }
+
+        #[test]
+        fn loop_test_ownership() {
+            loopbacked::test_with_spec(
+                &loopbacked::DeviceLimits::Range(1, 3, None),
+                test_ownership_no_crypt,
+            );
+        }
+
+        #[test]
+        fn real_test_ownership() {
+            real::test_with_spec(
+                &real::DeviceLimits::AtLeast(1, None, None),
+                test_ownership_no_crypt,
+            );
+        }
+
+        #[test]
+        fn loop_test_crypt_ownership() {
+            loopbacked::test_with_spec(
+                &loopbacked::DeviceLimits::Range(1, 3, None),
+                test_ownership_crypt,
+            );
+        }
+
+        #[test]
+        fn real_test_crypt_ownership() {
+            real::test_with_spec(
+                &real::DeviceLimits::AtLeast(1, None, None),
+                test_ownership_crypt,
+            );
+        }
+
+        // Verify that if the last device in a list of devices to initialize
+        // can not be initialized, all the devices previously initialized are
+        // properly cleaned up.
+        fn test_failure_cleanup(paths: &[&Path], key_desc: Option<&KeyDescription>) {
+            if paths.len() <= 1 {
+                panic!("Test requires more than one device");
+            }
+
+            let mut dev_infos = ProcessedPathInfos::try_from(paths)
+                .unwrap()
+                .unclaimed_devices;
+            let pool_uuid = PoolUuid::new_v4();
+            let pool_name = Name::new("pool_name".to_string());
+
+            if dev_infos.len() != paths.len() {
+                panic!("Some duplicate devices were found");
+            }
+
+            // Synthesize a DeviceInfo that will cause initialization to fail.
+            {
+                let old_info = dev_infos.pop().expect("Must contain at least two devices");
+
+                let new_info = DeviceInfo {
+                    devnode: PathBuf::from("/srk/cheese"),
+                    devno: old_info.devno,
+                    id_wwn: None,
+                    size: old_info.size,
+                    blksizes: old_info.blksizes,
+                };
+
+                dev_infos.push(new_info);
+            }
+
+            if initialize_devices_legacy(
+                UnownedDevices { inner: dev_infos },
+                pool_name,
+                pool_uuid,
+                MDADataSize::default(),
+                key_desc
+                    .map(|kd| EncryptionInfo::KeyDesc(kd.clone()))
+                    .as_ref(),
+                None,
+            )
+            .is_ok()
+            {
+                panic!("Initialization should not have succeeded");
+            }
+
+            // Check all paths for absence of device identifiers or LUKS2 metadata
+            // depending on whether or not it is encrypted. Initialization of the
+            // last path was never attempted, so it should be as bare of Stratis
+            // identifiers as all the other paths that were initialized.
+            for path in paths {
+                if key_desc.is_some() {
+                    if CryptHandle::load_metadata(path).unwrap().is_some() {
+                        panic!("Device {} should have no LUKS2 metadata", path.display());
+                    }
+                } else {
+                    let mut f = OpenOptions::new()
+                        .read(true)
+                        .write(true)
+                        .open(path)
+                        .unwrap();
+                    match device_identifiers(&mut f) {
+                        Ok(None) => (),
+                        _ => {
+                            panic!(
+                                "Device {} should have returned nothing for device identifiers",
+                                path.display()
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Run test_failure_cleanup for encrypted devices
+        fn test_failure_cleanup_crypt(paths: &[&Path]) {
+            fn failure_cleanup_crypt(paths: &[&Path], key_desc: &KeyDescription) {
+                test_failure_cleanup(paths, Some(key_desc))
+            }
+
+            crypt::insert_and_cleanup_key(paths, failure_cleanup_crypt)
+        }
+
+        // Run test_failure_cleanup for unencrypted devices
+        fn test_failure_cleanup_no_crypt(paths: &[&Path]) {
+            test_failure_cleanup(paths, None)
+        }
+
+        #[test]
+        fn loop_test_crypt_failure_cleanup() {
+            loopbacked::test_with_spec(
+                &loopbacked::DeviceLimits::Range(2, 3, None),
+                test_failure_cleanup_crypt,
+            );
+        }
+
+        #[test]
+        fn real_test_crypt_failure_cleanup() {
+            real::test_with_spec(
+                &real::DeviceLimits::AtLeast(2, None, None),
+                test_failure_cleanup_crypt,
+            );
+        }
+
+        #[test]
+        fn loop_test_failure_cleanup() {
+            loopbacked::test_with_spec(
+                &loopbacked::DeviceLimits::Range(2, 3, None),
+                test_failure_cleanup_no_crypt,
+            );
+        }
+
+        #[test]
+        fn real_test_failure_cleanup() {
+            real::test_with_spec(
+                &real::DeviceLimits::AtLeast(2, None, None),
+                test_failure_cleanup_no_crypt,
+            );
+        }
+    }
+
+    mod v2 {
+        use super::*;
+
+        /// Test that initializing devices claims all and that destroying
+        /// them releases all. Verify that already initialized devices are
+        /// rejected or filtered as appropriate.
+        fn test_ownership(paths: &[&Path]) {
+            let pool_uuid = PoolUuid::new_v4();
+            let dev_infos: Vec<_> = ProcessedPathInfos::try_from(paths)
+                .unwrap()
+                .unclaimed_devices;
+
+            if dev_infos.len() != paths.len() {
+                panic!("Some duplicate devices were found")
+            }
+
+            let mut blockdevs = initialize_devices(
+                UnownedDevices { inner: dev_infos },
+                pool_uuid,
+                MDADataSize::default(),
+            )
+            .unwrap();
+
+            if blockdevs.len() != paths.len() {
+                panic!("Fewer blockdevices were created than were requested")
+            }
+
+            let stratis_devnodes: Vec<PathBuf> =
+                blockdevs.iter().map(|bd| bd.devnode().to_owned()).collect();
+
+            let stratis_identifiers: Vec<Option<StratisIdentifiers>> = stratis_devnodes
+                .iter()
+                .map(|dev| {
+                    OpenOptions::new()
+                        .read(true)
+                        .open(dev)
+                        .map_err(|err| err.into())
+                        .and_then(|mut f| device_identifiers(&mut f))
+                })
+                .collect::<StratisResult<Vec<Option<StratisIdentifiers>>>>()
+                .unwrap();
+
+            if stratis_identifiers.iter().any(Option::is_none) {
+                panic!("Some device which should have had Stratis identifiers on it did not")
+            }
+
+            if stratis_identifiers
+                .iter()
+                .any(|x| x.expect("returned in line above if any are None").pool_uuid != pool_uuid)
+            {
+                panic!("Some device had the wrong pool UUID")
+            }
+
+            if !ProcessedPathInfos::try_from(
+                stratis_devnodes
+                    .iter()
+                    .map(|p| p.as_path())
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            )
+            .unwrap()
+            .unpack()
+            .1
+            .inner
+            .is_empty()
+            {
+                panic!(
+                    "Failed to eliminate devices already initialized for this pool from list of devices to initialize"
+                )
+            }
+
+            if ProcessedPathInfos::try_from(
+                stratis_devnodes
+                    .iter()
+                    .map(|p| p.as_path())
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            )
+            .unwrap()
+            .unpack()
+            .0
+            .partition(pool_uuid)
+            .1
+            .error_on_not_empty()
+            .is_err()
+            {
+                panic!(
+                    "Failed to return an error when some device processed was not in the set of already initialized devices"
+                )
+            }
+
+            if let Ok(infos) = ProcessedPathInfos::try_from(
+                stratis_devnodes
+                    .iter()
+                    .map(|p| p.as_path())
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            ) {
+                if !infos.unpack().0.partition(PoolUuid::new_v4()).0.is_empty() {
+                    panic!(
+                        "Failed to leave devices in StratisDevices when processing devices for a pool UUID which is not the same as that for which the devices were initialized"
+                    )
+                }
+            };
+
+            wipe_blockdevs(&mut blockdevs).unwrap();
+
+            for path in paths {
+                if (device_identifiers(&mut OpenOptions::new().read(true).open(path).unwrap())
+                    .unwrap())
+                .is_some()
+                {
+                    panic!("Metadata on Stratis devices was not successfully wiped")
+                }
+            }
+        }
+
+        #[test]
+        fn loop_test_ownership() {
+            loopbacked::test_with_spec(
+                &loopbacked::DeviceLimits::Range(1, 3, None),
+                test_ownership,
+            );
+        }
+
+        #[test]
+        fn real_test_ownership() {
+            real::test_with_spec(&real::DeviceLimits::AtLeast(1, None, None), test_ownership);
+        }
+
+        // Verify that if the last device in a list of devices to initialize
+        // can not be initialized, all the devices previously initialized are
+        // properly cleaned up.
+        fn test_failure_cleanup(paths: &[&Path]) {
+            if paths.len() <= 1 {
+                panic!("Test requires more than one device")
+            }
+
+            let mut dev_infos = ProcessedPathInfos::try_from(paths)
+                .unwrap()
+                .unclaimed_devices;
+            let pool_uuid = PoolUuid::new_v4();
+
+            if dev_infos.len() != paths.len() {
+                panic!("Some duplicate devices were found")
+            }
+
+            // Synthesize a DeviceInfo that will cause initialization to fail.
+            {
+                let old_info = dev_infos.pop().expect("Must contain at least two devices");
+
+                let new_info = DeviceInfo {
+                    devnode: PathBuf::from("/srk/cheese"),
+                    devno: old_info.devno,
+                    id_wwn: None,
+                    size: old_info.size,
+                    blksizes: old_info.blksizes,
+                };
+
+                dev_infos.push(new_info);
+            }
+
+            if initialize_devices(
+                UnownedDevices { inner: dev_infos },
+                pool_uuid,
+                MDADataSize::default(),
+            )
+            .is_ok()
+            {
+                panic!("Initialization should not have succeeded")
+            }
+
+            // Check all paths for absence of device identifiers or LUKS2 metadata
+            // depending on whether or not it is encrypted. Initialization of the
+            // last path was never attempted, so it should be as bare of Stratis
+            // identifiers as all the other paths that were initialized.
+            for path in paths {
+                let mut f = OpenOptions::new()
+                    .read(true)
+                    .write(true)
+                    .open(path)
+                    .unwrap();
+                match device_identifiers(&mut f) {
+                    Ok(None) => (),
+                    _ => {
+                        panic!(
+                            "Device {} should have returned nothing for device identifiers",
+                            path.display()
+                        )
+                    }
+                }
+            }
+        }
+
+        #[test]
+        fn loop_test_failure_cleanup() {
+            loopbacked::test_with_spec(
+                &loopbacked::DeviceLimits::Range(2, 3, None),
+                test_failure_cleanup,
+            );
+        }
+
+        #[test]
+        fn real_test_failure_cleanup() {
+            real::test_with_spec(
+                &real::DeviceLimits::AtLeast(2, None, None),
+                test_failure_cleanup,
+            );
+        }
     }
 }

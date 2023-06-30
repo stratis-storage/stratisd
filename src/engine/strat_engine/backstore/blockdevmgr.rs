@@ -18,7 +18,7 @@ use crate::{
         shared::gather_encryption_info,
         strat_engine::{
             backstore::{
-                blockdev::StratBlockDev,
+                blockdev::{v1::StratBlockDev, InternalBlockDev},
                 devices::{initialize_devices, wipe_blockdevs, UnownedDevices},
                 shared::{BlkDevSegment, Segment},
             },

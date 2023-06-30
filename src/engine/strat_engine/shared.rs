@@ -5,24 +5,33 @@
 use std::collections::HashMap;
 
 use crate::engine::{
-    strat_engine::{backstore::StratBlockDev, metadata::BDA},
+    strat_engine::{backstore::blockdev::InternalBlockDev, metadata::BDA},
     types::DevUuid,
 };
 
 /// Convert a collection of blockdevs to BDAs.
-pub fn bds_to_bdas(bds: Vec<StratBlockDev>) -> HashMap<DevUuid, BDA> {
+pub fn bds_to_bdas<B>(bds: Vec<B>) -> HashMap<DevUuid, BDA>
+where
+    B: InternalBlockDev,
+{
     bds.into_iter()
-        .map(|bd| (bd.bda.dev_uuid(), bd.bda))
+        .map(|bd| {
+            let bda = bd.into_bda();
+            (bda.dev_uuid(), bda)
+        })
         .collect()
 }
 
 /// Convert datadevs and cachedevs to BDAs on error with the option of adding
 /// one additional BDA .
-pub fn tiers_to_bdas(
-    datadevs: Vec<StratBlockDev>,
-    cachedevs: Vec<StratBlockDev>,
+pub fn tiers_to_bdas<B>(
+    datadevs: Vec<B>,
+    cachedevs: Vec<B>,
     bda: Option<BDA>,
-) -> HashMap<DevUuid, BDA> {
+) -> HashMap<DevUuid, BDA>
+where
+    B: InternalBlockDev,
+{
     bds_to_bdas(datadevs)
         .into_iter()
         .chain(bds_to_bdas(cachedevs))

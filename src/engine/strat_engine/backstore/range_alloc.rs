@@ -44,6 +44,7 @@ impl PerDevSegments {
     }
 
     /// The number of distinct ranges
+    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.used.len()
     }

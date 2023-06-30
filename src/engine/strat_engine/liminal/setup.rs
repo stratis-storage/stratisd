@@ -18,7 +18,10 @@ use devicemapper::Sectors;
 use crate::{
     engine::{
         strat_engine::{
-            backstore::{StratBlockDev, UnderlyingDevice},
+            backstore::blockdev::{
+                v1::{StratBlockDev, UnderlyingDevice},
+                InternalBlockDev,
+            },
             crypt::handle::v1::CryptHandle,
             device::blkdev_size,
             liminal::device_info::{LStratisDevInfo, LStratisInfo},

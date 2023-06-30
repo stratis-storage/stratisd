@@ -234,7 +234,7 @@ impl Backstore {
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<Backstore> {
-        let data_tier = DataTier::new(BlockDevMgr::initialize(
+        let data_tier = DataTier::new(BlockDevMgr::<StratBlockDev>::initialize(
             pool_name,
             pool_uuid,
             devices,
@@ -275,7 +275,7 @@ impl Backstore {
                 // If it is desired to change a cache dev to a data dev, it
                 // should be removed and then re-added in order to ensure
                 // that the MDA region is set to the correct size.
-                let bdm = BlockDevMgr::initialize(
+                let bdm = BlockDevMgr::<StratBlockDev>::initialize(
                     pool_name,
                     pool_uuid,
                     devices,

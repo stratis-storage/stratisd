@@ -492,7 +492,7 @@ mod tests {
     use crate::{
         engine::{
             strat_engine::{
-                backstore::{initialize_devices, ProcessedPathInfos, UnownedDevices},
+                backstore::{initialize_devices_legacy, ProcessedPathInfos, UnownedDevices},
                 cmd::create_fs,
                 metadata::MDADataSize,
                 tests::{crypt, loopbacked, real},
@@ -528,7 +528,7 @@ mod tests {
             let pool_uuid = PoolUuid::new_v4();
             let pool_name = Name::new("pool_name".to_string());
 
-            let devices = initialize_devices(
+            let devices = initialize_devices_legacy(
                 get_devices(paths).unwrap(),
                 pool_name,
                 pool_uuid,
@@ -629,7 +629,7 @@ mod tests {
         let pool_uuid = PoolUuid::new_v4();
         let pool_name = Name::new("pool_name".to_string());
 
-        initialize_devices(
+        initialize_devices_legacy(
             get_devices(paths).unwrap(),
             pool_name,
             pool_uuid,

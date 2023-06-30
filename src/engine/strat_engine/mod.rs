@@ -23,7 +23,9 @@ mod udev;
 mod writing;
 
 pub use self::{
-    crypt::{crypt_metadata_size, set_up_crypt_logging, CryptHandle, CLEVIS_TANG_TRUST_URL},
+    crypt::{
+        crypt_metadata_size, handle::v1::CryptHandle, set_up_crypt_logging, CLEVIS_TANG_TRUST_URL,
+    },
     dm::{get_dm, get_dm_init},
     engine::StratEngine,
     keys::StratKeyActions,

@@ -24,7 +24,7 @@ use crate::{
                 shared::{BlkDevSegment, Segment},
                 transaction::RequestTransaction,
             },
-            crypt::CryptHandle,
+            crypt::handle::v1::CryptHandle,
             metadata::{MDADataSize, BDA},
             serde_structs::{BaseBlockDevSave, Recordable},
             shared::bds_to_bdas,

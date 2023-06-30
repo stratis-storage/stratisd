@@ -22,7 +22,8 @@ use crate::{
                 transaction::RequestTransaction,
             },
             crypt::{
-                back_up_luks_header, interpret_clevis_config, restore_luks_header, CryptHandle,
+                back_up_luks_header, handle::v1::CryptHandle, interpret_clevis_config,
+                restore_luks_header,
             },
             dm::{get_dm, list_of_backstore_devices, remove_optional_devices},
             metadata::{MDADataSize, BDA},

@@ -134,6 +134,7 @@ impl Display for StratisUuid {
 pub enum UnlockMethod {
     Clevis,
     Keyring,
+    Any,
 }
 
 impl<'a> TryFrom<&'a str> for UnlockMethod {
@@ -143,6 +144,7 @@ impl<'a> TryFrom<&'a str> for UnlockMethod {
         match s {
             "keyring" => Ok(UnlockMethod::Keyring),
             "clevis" => Ok(UnlockMethod::Clevis),
+            "any" => Ok(UnlockMethod::Any),
             _ => Err(StratisError::Msg(format!(
                 "{s} is an invalid unlock method"
             ))),

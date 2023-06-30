@@ -26,7 +26,7 @@ use crate::{
                 devices::BlockSizes,
                 range_alloc::{PerDevSegments, RangeAllocator},
             },
-            crypt::CryptHandle,
+            crypt::handle::v1::CryptHandle,
             device::blkdev_size,
             metadata::{
                 disown_device, static_header, BDAExtendedSize, BlockdevSize, MDADataSize,

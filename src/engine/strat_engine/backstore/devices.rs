@@ -24,7 +24,7 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::blockdev::{StratBlockDev, UnderlyingDevice},
-            crypt::CryptHandle,
+            crypt::handle::v1::CryptHandle,
             device::{blkdev_logical_sector_size, blkdev_physical_sector_size, blkdev_size},
             metadata::{
                 device_identifiers, disown_device, BlockdevSize, MDADataSize, StratisIdentifiers,
@@ -820,7 +820,7 @@ mod tests {
 
     use crate::engine::{
         strat_engine::{
-            crypt::CryptHandle,
+            crypt::handle::v1::CryptHandle,
             metadata::device_identifiers,
             tests::{crypt, loopbacked, real},
         },

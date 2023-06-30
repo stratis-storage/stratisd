@@ -23,7 +23,10 @@ use libblkid_rs::{BlkidCache, BlkidProbe};
 use crate::{
     engine::{
         strat_engine::{
-            backstore::blockdev::{StratBlockDev, UnderlyingDevice},
+            backstore::blockdev::{
+                v1::{StratBlockDev, UnderlyingDevice},
+                InternalBlockDev,
+            },
             crypt::handle::v1::CryptHandle,
             device::{blkdev_logical_sector_size, blkdev_physical_sector_size, blkdev_size},
             metadata::{

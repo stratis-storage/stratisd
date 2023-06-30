@@ -70,6 +70,26 @@ pub fn format_crypt_name(dev_uuid: &DevUuid) -> DmNameBuf {
     DmNameBuf::new(value).expect("FORMAT_VERSION display length < 73")
 }
 
+/// Get a devicemapper name from the device UUID.
+///
+/// Prerequisite: len(format!("{}", FORMAT_VERSION)
+///             + len("stratis")                         7
+///             + len("private")                         7
+///             + len("crypt")                           5
+///             + num_dashes                             4
+///             + len(dev uuid)                          32
+///             < 128
+///
+/// which is equivalent to len(format!("{}", FORMAT_VERSION) < 73
+pub fn format_crypt_backstore_name(pool_uuid: &PoolUuid) -> DmNameBuf {
+    let value = format!(
+        "stratis-{}-private-{}-crypt",
+        FORMAT_VERSION,
+        uuid_to_string!(pool_uuid)
+    );
+    DmNameBuf::new(value).expect("FORMAT_VERSION display length < 73")
+}
+
 #[derive(Clone, Copy)]
 pub enum FlexRole {
     MetadataVolume,

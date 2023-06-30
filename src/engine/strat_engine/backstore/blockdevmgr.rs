@@ -4,6 +4,8 @@
 
 // Code to handle a collection of block devices.
 
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 #[cfg(test)]
 use std::collections::HashSet;
@@ -18,8 +20,10 @@ use crate::{
         shared::gather_encryption_info,
         strat_engine::{
             backstore::{
-                blockdev::{v1::StratBlockDev, InternalBlockDev},
-                devices::{initialize_devices, wipe_blockdevs, UnownedDevices},
+                blockdev::{v1, v2, InternalBlockDev},
+                devices::{
+                    initialize_devices, initialize_devices_legacy, wipe_blockdevs, UnownedDevices,
+                },
                 range_alloc::PerDevSegments,
                 shared::{BlkDevSegment, Segment},
                 transaction::RequestTransaction,
@@ -37,26 +41,15 @@ use crate::{
 const MAX_NUM_TO_WRITE: usize = 10;
 
 #[derive(Debug)]
-pub struct BlockDevMgr {
+pub struct BlockDevMgr<B> {
     /// All the block devices that belong to this block dev manager.
-    block_devs: Vec<StratBlockDev>,
+    block_devs: Vec<B>,
     /// The most recent time that variable length metadata was saved to the
     /// devices managed by this block dev manager.
     last_update_time: Option<DateTime<Utc>>,
 }
 
-impl BlockDevMgr {
-    /// Make a struct that represents an existing BlockDevMgr.
-    pub fn new(
-        block_devs: Vec<StratBlockDev>,
-        last_update_time: Option<DateTime<Utc>>,
-    ) -> BlockDevMgr {
-        BlockDevMgr {
-            block_devs,
-            last_update_time,
-        }
-    }
-
+impl BlockDevMgr<v1::StratBlockDev> {
     /// Initialize a new StratBlockDevMgr with specified pool and devices.
     pub fn initialize(
         pool_name: Name,
@@ -65,9 +58,9 @@ impl BlockDevMgr {
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
         sector_size: Option<u32>,
-    ) -> StratisResult<BlockDevMgr> {
+    ) -> StratisResult<BlockDevMgr<v1::StratBlockDev>> {
         Ok(BlockDevMgr::new(
-            initialize_devices(
+            initialize_devices_legacy(
                 devices,
                 pool_name,
                 pool_uuid,
@@ -77,24 +70,6 @@ impl BlockDevMgr {
             )?,
             None,
         ))
-    }
-
-    /// Convert the BlockDevMgr into a collection of BDAs.
-    pub fn into_bdas(self) -> HashMap<DevUuid, BDA> {
-        bds_to_bdas(self.block_devs)
-    }
-
-    /// Drain the BlockDevMgr block devices into a collection of block devices.
-    pub fn drain_bds(&mut self) -> Vec<StratBlockDev> {
-        self.block_devs.drain(..).collect::<Vec<_>>()
-    }
-
-    /// Get a hashmap that maps UUIDs to Devices.
-    pub fn uuid_to_devno(&self) -> HashMap<DevUuid, Device> {
-        self.block_devs
-            .iter()
-            .map(|bd| (bd.uuid(), *bd.device()))
-            .collect()
     }
 
     /// Add paths to self.
@@ -136,7 +111,7 @@ impl BlockDevMgr {
         // variable length metadata requires more than the minimum allocated,
         // then the necessary amount must be provided or the data can not be
         // saved.
-        let bds = initialize_devices(
+        let bds = initialize_devices_legacy(
             devices,
             pool_name,
             pool_uuid,
@@ -149,8 +124,155 @@ impl BlockDevMgr {
         Ok(bdev_uuids)
     }
 
+    /// Get the encryption information for a whole pool.
+    pub fn encryption_info(&self) -> Option<PoolEncryptionInfo> {
+        gather_encryption_info(
+            self.block_devs.len(),
+            self.block_devs.iter().map(|bd| bd.encryption_info()),
+        )
+        .expect("Cannot create a pool out of both encrypted and unencrypted devices")
+    }
+
+    pub fn is_encrypted(&self) -> bool {
+        self.encryption_info().is_some()
+    }
+
+    #[cfg(test)]
+    fn invariant(&self) {
+        let pool_uuids = self
+            .block_devs
+            .iter()
+            .map(|bd| bd.pool_uuid())
+            .collect::<HashSet<_>>();
+        assert!(pool_uuids.len() == 1);
+
+        let encryption_infos = self
+            .block_devs
+            .iter()
+            .filter_map(|bd| bd.encryption_info())
+            .collect::<Vec<_>>();
+        if encryption_infos.is_empty() {
+            assert_eq!(self.encryption_info(), None);
+        } else {
+            assert_eq!(encryption_infos.len(), self.block_devs.len());
+
+            let info_set = encryption_infos.iter().collect::<HashSet<_>>();
+            assert!(info_set.len() == 1);
+        }
+
+        for bd in self.block_devs.iter() {
+            bd.invariant();
+        }
+    }
+}
+
+impl BlockDevMgr<v2::StratBlockDev> {
+    /// Initialize a new StratBlockDevMgr with specified pool and devices.
+    pub fn initialize(
+        pool_uuid: PoolUuid,
+        devices: UnownedDevices,
+        mda_data_size: MDADataSize,
+    ) -> StratisResult<BlockDevMgr<v2::StratBlockDev>> {
+        Ok(BlockDevMgr::new(
+            initialize_devices(devices, pool_uuid, mda_data_size)?,
+            None,
+        ))
+    }
+
+    /// Add paths to self.
+    /// Return the uuids of all blockdevs corresponding to paths that were
+    /// added.
+    pub fn add(
+        &mut self,
+        pool_uuid: PoolUuid,
+        devices: UnownedDevices,
+    ) -> StratisResult<Vec<DevUuid>> {
+        let this_pool_uuid = self.block_devs.get(0).map(|bd| bd.pool_uuid());
+        if this_pool_uuid.is_some() && this_pool_uuid != Some(pool_uuid) {
+            return Err(StratisError::Msg(
+                format!("block devices being managed have pool UUID {} but new devices are to be added with pool UUID {}",
+                        this_pool_uuid.expect("guarded by if-expression"),
+                        pool_uuid)
+            ));
+        }
+
+        // FIXME: This is a bug. If new devices are added to a pool, and the
+        // variable length metadata requires more than the minimum allocated,
+        // then the necessary amount must be provided or the data can not be
+        // saved.
+        let bds = initialize_devices(devices, pool_uuid, MDADataSize::default())?;
+        let bdev_uuids = bds.iter().map(|bd| bd.uuid()).collect();
+        self.block_devs.extend(bds);
+        Ok(bdev_uuids)
+    }
+
+    #[cfg(test)]
+    fn invariant(&self) {
+        let pool_uuids = self
+            .block_devs
+            .iter()
+            .map(|bd| bd.pool_uuid())
+            .collect::<HashSet<_>>();
+        assert!(pool_uuids.len() == 1);
+
+        for bd in self.block_devs.iter() {
+            bd.invariant();
+        }
+    }
+}
+
+impl<B> BlockDevMgr<B>
+where
+    B: InternalBlockDev,
+{
+    /// Make a struct that represents an existing BlockDevMgr.
+    pub fn new(block_devs: Vec<B>, last_update_time: Option<DateTime<Utc>>) -> BlockDevMgr<B> {
+        BlockDevMgr {
+            block_devs,
+            last_update_time,
+        }
+    }
+
+    /// Convert the BlockDevMgr into a collection of BDAs.
+    pub fn into_bdas(self) -> HashMap<DevUuid, BDA> {
+        bds_to_bdas(self.block_devs)
+    }
+
+    /// Get a hashmap that maps UUIDs to Devices.
+    pub fn uuid_to_devno(&self) -> HashMap<DevUuid, Device> {
+        self.block_devs
+            .iter()
+            .map(|bd| (bd.uuid(), *bd.device()))
+            .collect()
+    }
+
     pub fn destroy_all(&mut self) -> StratisResult<()> {
         wipe_blockdevs(&mut self.block_devs)
+    }
+
+    /// Drain the BlockDevMgr block devices into a collection of block devices.
+    pub fn drain_bds(&mut self) -> Vec<B> {
+        self.block_devs.drain(..).collect::<Vec<_>>()
+    }
+
+    /// Get references to managed blockdevs.
+    pub fn blockdevs(&self) -> Vec<(DevUuid, &B)> {
+        self.block_devs.iter().map(|bd| (bd.uuid(), bd)).collect()
+    }
+
+    pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut B)> {
+        self.block_devs
+            .iter_mut()
+            .map(|bd| (bd.uuid(), bd))
+            .collect()
+    }
+
+    pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<&B> {
+        self.block_devs.iter().find(|bd| bd.uuid() == uuid)
+    }
+
+    pub fn get_mut_blockdev_by_uuid(&mut self, uuid: DevUuid) -> Option<&mut B> {
+        self.block_devs.iter_mut().find(|bd| bd.uuid() == uuid)
     }
 
     /// Remove the specified block devs and erase their metadata.
@@ -312,26 +434,6 @@ impl BlockDevMgr {
         }
     }
 
-    /// Get references to managed blockdevs.
-    pub fn blockdevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
-        self.block_devs.iter().map(|bd| (bd.uuid(), bd)).collect()
-    }
-
-    pub fn blockdevs_mut(&mut self) -> Vec<(DevUuid, &mut StratBlockDev)> {
-        self.block_devs
-            .iter_mut()
-            .map(|bd| (bd.uuid(), bd as &mut StratBlockDev))
-            .collect()
-    }
-
-    pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<&StratBlockDev> {
-        self.block_devs.iter().find(|bd| bd.uuid() == uuid)
-    }
-
-    pub fn get_mut_blockdev_by_uuid(&mut self, uuid: DevUuid) -> Option<&mut StratBlockDev> {
-        self.block_devs.iter_mut().find(|bd| bd.uuid() == uuid)
-    }
-
     // SIZE methods
 
     /// The number of sectors not allocated for any purpose.
@@ -356,47 +458,6 @@ impl BlockDevMgr {
             .iter()
             .map(|bd| bd.metadata_size().sectors())
             .sum()
-    }
-
-    /// Get the encryption information for a whole pool.
-    pub fn encryption_info(&self) -> Option<PoolEncryptionInfo> {
-        gather_encryption_info(
-            self.block_devs.len(),
-            self.block_devs.iter().map(|bd| bd.encryption_info()),
-        )
-        .expect("Cannot create a pool out of both encrypted and unencrypted devices")
-    }
-
-    pub fn is_encrypted(&self) -> bool {
-        self.encryption_info().is_some()
-    }
-
-    #[cfg(test)]
-    fn invariant(&self) {
-        let pool_uuids = self
-            .block_devs
-            .iter()
-            .map(|bd| bd.pool_uuid())
-            .collect::<HashSet<_>>();
-        assert!(pool_uuids.len() == 1);
-
-        let encryption_infos = self
-            .block_devs
-            .iter()
-            .filter_map(|bd| bd.encryption_info())
-            .collect::<Vec<_>>();
-        if encryption_infos.is_empty() {
-            assert_eq!(self.encryption_info(), None);
-        } else {
-            assert_eq!(encryption_infos.len(), self.block_devs.len());
-
-            let info_set = encryption_infos.iter().collect::<HashSet<_>>();
-            assert!(info_set.len() == 1);
-        }
-
-        for bd in self.block_devs.iter() {
-            bd.invariant();
-        }
     }
 
     pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {
@@ -425,7 +486,10 @@ impl BlockDevMgr {
     }
 }
 
-impl Recordable<Vec<BaseBlockDevSave>> for BlockDevMgr {
+impl<B> Recordable<Vec<BaseBlockDevSave>> for BlockDevMgr<B>
+where
+    B: Recordable<BaseBlockDevSave>,
+{
     fn record(&self) -> Vec<BaseBlockDevSave> {
         self.block_devs.iter().map(|bd| bd.record()).collect()
     }
@@ -437,7 +501,10 @@ mod tests {
 
     use crate::engine::{
         strat_engine::{
-            backstore::devices::{ProcessedPathInfos, UnownedDevices},
+            backstore::{
+                blockdev,
+                devices::{ProcessedPathInfos, UnownedDevices},
+            },
             cmd,
             tests::{crypt, loopbacked, real},
         },
@@ -452,220 +519,344 @@ mod tests {
             .and_then(|(sds, uds)| sds.error_on_not_empty().map(|_| uds))
     }
 
-    /// Verify that initially,
-    /// size() - metadata_size() = avail_space().
-    /// After 2 Sectors have been allocated, that amount must also be included
-    /// in balance.
-    fn test_blockdevmgr_used(paths: &[&Path]) {
-        let pool_uuid = PoolUuid::new_v4();
-        let pool_name = Name::new("pool_name".to_string());
-        let devices = get_devices(paths).unwrap();
-        let mut mgr = BlockDevMgr::initialize(
-            pool_name,
-            pool_uuid,
-            devices,
-            MDADataSize::default(),
-            None,
-            None,
-        )
-        .unwrap();
-        assert_eq!(mgr.avail_space() + mgr.metadata_size(), mgr.size());
+    mod v1 {
+        use super::*;
 
-        let allocated = Sectors(2);
-        let transaction = mgr.request_space(&[allocated]).unwrap().unwrap();
-        mgr.commit_space(transaction).unwrap();
-        assert_eq!(
-            mgr.avail_space() + allocated + mgr.metadata_size(),
-            mgr.size()
-        );
-    }
-
-    #[test]
-    fn loop_test_blockdevmgr_used() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(1, 3, None),
-            test_blockdevmgr_used,
-        );
-    }
-
-    #[test]
-    fn real_test_blockdevmgr_used() {
-        real::test_with_spec(
-            &real::DeviceLimits::AtLeast(1, None, None),
-            test_blockdevmgr_used,
-        );
-    }
-
-    /// Test that the `BlockDevMgr` will add devices if the same key
-    /// is used to encrypted the existing devices and the added devices.
-    fn test_blockdevmgr_same_key(paths: &[&Path]) {
-        fn test_with_key(paths: &[&Path], key_desc: &KeyDescription) {
+        /// Verify that initially,
+        /// size() - metadata_size() = avail_space().
+        /// After 2 Sectors have been allocated, that amount must also be included
+        /// in balance.
+        fn test_blockdevmgr_used(paths: &[&Path]) {
             let pool_uuid = PoolUuid::new_v4();
-
-            let devices1 = get_devices(&paths[..2]).unwrap();
-            let devices2 = get_devices(&paths[2..3]).unwrap();
-
             let pool_name = Name::new("pool_name".to_string());
-            let mut bdm = BlockDevMgr::initialize(
-                pool_name.clone(),
+            let devices = get_devices(paths).unwrap();
+            let mut mgr = BlockDevMgr::<blockdev::v1::StratBlockDev>::initialize(
+                pool_name,
                 pool_uuid,
-                devices1,
+                devices,
                 MDADataSize::default(),
-                Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
+                None,
+                None,
+            )
+            .unwrap();
+            assert_eq!(mgr.avail_space() + mgr.metadata_size(), mgr.size());
+
+            let allocated = Sectors(2);
+            let transaction = mgr.request_space(&[allocated]).unwrap().unwrap();
+            mgr.commit_space(transaction).unwrap();
+            assert_eq!(
+                mgr.avail_space() + allocated + mgr.metadata_size(),
+                mgr.size()
+            );
+        }
+
+        #[test]
+        fn loop_test_blockdevmgr_used() {
+            loopbacked::test_with_spec(
+                &loopbacked::DeviceLimits::Range(1, 3, None),
+                test_blockdevmgr_used,
+            );
+        }
+
+        #[test]
+        fn real_test_blockdevmgr_used() {
+            real::test_with_spec(
+                &real::DeviceLimits::AtLeast(1, None, None),
+                test_blockdevmgr_used,
+            );
+        }
+
+        /// Test that the `BlockDevMgr` will add devices if the same key
+        /// is used to encrypted the existing devices and the added devices.
+        fn test_blockdevmgr_same_key(paths: &[&Path]) {
+            fn test_with_key(paths: &[&Path], key_desc: &KeyDescription) {
+                let pool_uuid = PoolUuid::new_v4();
+
+                let devices1 = get_devices(&paths[..2]).unwrap();
+                let devices2 = get_devices(&paths[2..3]).unwrap();
+
+                let pool_name = Name::new("pool_name".to_string());
+                let mut bdm = BlockDevMgr::<blockdev::v1::StratBlockDev>::initialize(
+                    pool_name.clone(),
+                    pool_uuid,
+                    devices1,
+                    MDADataSize::default(),
+                    Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
+                    None,
+                )
+                .unwrap();
+
+                if bdm.add(pool_name, pool_uuid, devices2, None).is_err() {
+                    panic!(
+                        "Adding a blockdev with the same key to an encrypted pool should succeed"
+                    )
+                }
+            }
+
+            crypt::insert_and_cleanup_key(paths, test_with_key);
+        }
+
+        #[test]
+        fn loop_test_blockdevmgr_same_key() {
+            loopbacked::test_with_spec(
+                &loopbacked::DeviceLimits::Exactly(3, None),
+                test_blockdevmgr_same_key,
+            );
+        }
+
+        #[test]
+        fn real_test_blockdevmgr_same_key() {
+            real::test_with_spec(
+                &real::DeviceLimits::Exactly(3, None, None),
+                test_blockdevmgr_same_key,
+            );
+        }
+
+        /// Test that the `BlockDevMgr` will not add devices if a different key
+        /// is present in the keyring than was used to encrypted the existing
+        /// devices.
+        fn test_blockdevmgr_changed_key(paths: &[&Path]) {
+            fn test_with_key(paths: &[&Path], key_desc: &KeyDescription) {
+                let pool_uuid = PoolUuid::new_v4();
+
+                let devices1 = get_devices(&paths[..2]).unwrap();
+                let devices2 = get_devices(&paths[2..3]).unwrap();
+
+                let pool_name = Name::new("pool_name".to_string());
+                let mut bdm = BlockDevMgr::<blockdev::v1::StratBlockDev>::initialize(
+                    pool_name.clone(),
+                    pool_uuid,
+                    devices1,
+                    MDADataSize::default(),
+                    Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
+                    None,
+                )
+                .unwrap();
+
+                crypt::change_key(key_desc);
+
+                if bdm.add(pool_name, pool_uuid, devices2, None).is_ok() {
+                    panic!("Adding a blockdev with a new key to an encrypted pool should fail")
+                }
+            }
+
+            crypt::insert_and_cleanup_key(paths, test_with_key);
+        }
+
+        #[test]
+        fn loop_test_blockdevmgr_changed_key() {
+            loopbacked::test_with_spec(
+                &loopbacked::DeviceLimits::Exactly(3, None),
+                test_blockdevmgr_changed_key,
+            );
+        }
+
+        #[test]
+        fn real_test_blockdevmgr_changed_key() {
+            real::test_with_spec(
+                &real::DeviceLimits::Exactly(3, None, None),
+                test_blockdevmgr_changed_key,
+            );
+        }
+
+        /// Verify that it is impossible to steal blockdevs from another Stratis
+        /// pool.
+        /// 1. Initialize devices with pool uuid.
+        /// 2. Initializing again with different uuid must fail.
+        /// 3. Adding the devices must succeed, because they already belong.
+        fn test_initialization_add_stratis(paths: &[&Path]) {
+            assert!(paths.len() > 1);
+            let (paths1, paths2) = paths.split_at(paths.len() / 2);
+
+            let uuid = PoolUuid::new_v4();
+            let uuid2 = PoolUuid::new_v4();
+            let pool_name1 = Name::new("pool_name1".to_string());
+            let pool_name2 = Name::new("pool_name2".to_string());
+
+            let bd_mgr = BlockDevMgr::<blockdev::v1::StratBlockDev>::initialize(
+                pool_name1,
+                uuid,
+                get_devices(paths1).unwrap(),
+                MDADataSize::default(),
+                None,
+                None,
+            )
+            .unwrap();
+            cmd::udev_settle().unwrap();
+
+            assert_matches!(get_devices(paths1), Err(_));
+
+            assert!(ProcessedPathInfos::try_from(paths1)
+                .unwrap()
+                .unpack()
+                .0
+                .partition(uuid2)
+                .0
+                .is_empty());
+
+            assert!(!ProcessedPathInfos::try_from(paths1)
+                .unwrap()
+                .unpack()
+                .0
+                .partition(uuid)
+                .0
+                .is_empty());
+
+            BlockDevMgr::<blockdev::v1::StratBlockDev>::initialize(
+                pool_name2,
+                uuid,
+                get_devices(paths2).unwrap(),
+                MDADataSize::default(),
+                None,
                 None,
             )
             .unwrap();
 
-            if bdm.add(pool_name, pool_uuid, devices2, None).is_err() {
-                panic!("Adding a blockdev with the same key to an encrypted pool should succeed")
-            }
+            cmd::udev_settle().unwrap();
+
+            assert!(!ProcessedPathInfos::try_from(paths2)
+                .unwrap()
+                .unpack()
+                .0
+                .partition(uuid)
+                .0
+                .is_empty());
+
+            bd_mgr.invariant()
         }
 
-        crypt::insert_and_cleanup_key(paths, test_with_key);
+        #[test]
+        fn loop_test_initialization_stratis() {
+            loopbacked::test_with_spec(
+                &loopbacked::DeviceLimits::Range(2, 3, None),
+                test_initialization_add_stratis,
+            );
+        }
+
+        #[test]
+        fn real_test_initialization_stratis() {
+            real::test_with_spec(
+                &real::DeviceLimits::AtLeast(2, None, None),
+                test_initialization_add_stratis,
+            );
+        }
     }
 
-    #[test]
-    fn loop_test_blockdevmgr_same_key() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Exactly(3, None),
-            test_blockdevmgr_same_key,
-        );
-    }
+    mod v2 {
+        use super::*;
 
-    #[test]
-    fn real_test_blockdevmgr_same_key() {
-        real::test_with_spec(
-            &real::DeviceLimits::Exactly(3, None, None),
-            test_blockdevmgr_same_key,
-        );
-    }
-
-    /// Test that the `BlockDevMgr` will not add devices if a different key
-    /// is present in the keyring than was used to encrypted the existing
-    /// devices.
-    fn test_blockdevmgr_changed_key(paths: &[&Path]) {
-        fn test_with_key(paths: &[&Path], key_desc: &KeyDescription) {
+        /// Verify that initially,
+        /// size() - metadata_size() = avail_space().
+        /// After 2 Sectors have been allocated, that amount must also be included
+        /// in balance.
+        fn test_blockdevmgr_used(paths: &[&Path]) {
             let pool_uuid = PoolUuid::new_v4();
-
-            let devices1 = get_devices(&paths[..2]).unwrap();
-            let devices2 = get_devices(&paths[2..3]).unwrap();
-
-            let pool_name = Name::new("pool_name".to_string());
-            let mut bdm = BlockDevMgr::initialize(
-                pool_name.clone(),
+            let devices = get_devices(paths).unwrap();
+            let mut mgr = BlockDevMgr::<blockdev::v2::StratBlockDev>::initialize(
                 pool_uuid,
-                devices1,
+                devices,
                 MDADataSize::default(),
-                Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
-                None,
+            )
+            .unwrap();
+            assert_eq!(mgr.avail_space() + mgr.metadata_size(), mgr.size());
+
+            let allocated = Sectors(2);
+            let transaction = mgr.request_space(&[allocated]).unwrap().unwrap();
+            mgr.commit_space(transaction).unwrap();
+            assert_eq!(
+                mgr.avail_space() + allocated + mgr.metadata_size(),
+                mgr.size()
+            );
+        }
+
+        #[test]
+        fn loop_test_blockdevmgr_used() {
+            loopbacked::test_with_spec(
+                &loopbacked::DeviceLimits::Range(1, 3, None),
+                test_blockdevmgr_used,
+            );
+        }
+
+        #[test]
+        fn real_test_blockdevmgr_used() {
+            real::test_with_spec(
+                &real::DeviceLimits::AtLeast(1, None, None),
+                test_blockdevmgr_used,
+            );
+        }
+
+        /// Verify that it is impossible to steal blockdevs from another Stratis
+        /// pool.
+        /// 1. Initialize devices with pool uuid.
+        /// 2. Initializing again with different uuid must fail.
+        /// 3. Adding the devices must succeed, because they already belong.
+        fn test_initialization_add_stratis(paths: &[&Path]) {
+            assert!(paths.len() > 1);
+            let (paths1, paths2) = paths.split_at(paths.len() / 2);
+
+            let uuid = PoolUuid::new_v4();
+            let uuid2 = PoolUuid::new_v4();
+
+            let bd_mgr = BlockDevMgr::<blockdev::v2::StratBlockDev>::initialize(
+                uuid,
+                get_devices(paths1).unwrap(),
+                MDADataSize::default(),
+            )
+            .unwrap();
+            cmd::udev_settle().unwrap();
+
+            assert_matches!(get_devices(paths1), Err(_));
+
+            assert!(ProcessedPathInfos::try_from(paths1)
+                .unwrap()
+                .unpack()
+                .0
+                .partition(uuid2)
+                .0
+                .is_empty());
+
+            assert!(!ProcessedPathInfos::try_from(paths1)
+                .unwrap()
+                .unpack()
+                .0
+                .partition(uuid)
+                .0
+                .is_empty());
+
+            BlockDevMgr::<blockdev::v2::StratBlockDev>::initialize(
+                uuid,
+                get_devices(paths2).unwrap(),
+                MDADataSize::default(),
             )
             .unwrap();
 
-            crypt::change_key(key_desc);
+            cmd::udev_settle().unwrap();
 
-            if bdm.add(pool_name, pool_uuid, devices2, None).is_ok() {
-                panic!("Adding a blockdev with a new key to an encrypted pool should fail")
-            }
+            assert!(!ProcessedPathInfos::try_from(paths2)
+                .unwrap()
+                .unpack()
+                .0
+                .partition(uuid)
+                .0
+                .is_empty());
+
+            bd_mgr.invariant()
         }
 
-        crypt::insert_and_cleanup_key(paths, test_with_key);
-    }
+        #[test]
+        fn loop_test_initialization_stratis() {
+            loopbacked::test_with_spec(
+                &loopbacked::DeviceLimits::Range(2, 3, None),
+                test_initialization_add_stratis,
+            );
+        }
 
-    #[test]
-    fn loop_test_blockdevmgr_changed_key() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Exactly(3, None),
-            test_blockdevmgr_changed_key,
-        );
-    }
-
-    #[test]
-    fn real_test_blockdevmgr_changed_key() {
-        real::test_with_spec(
-            &real::DeviceLimits::Exactly(3, None, None),
-            test_blockdevmgr_changed_key,
-        );
-    }
-
-    /// Verify that it is impossible to steal blockdevs from another Stratis
-    /// pool.
-    /// 1. Initialize devices with pool uuid.
-    /// 2. Initializing again with different uuid must fail.
-    /// 3. Adding the devices must succeed, because they already belong.
-    fn test_initialization_add_stratis(paths: &[&Path]) {
-        assert!(paths.len() > 1);
-        let (paths1, paths2) = paths.split_at(paths.len() / 2);
-
-        let uuid = PoolUuid::new_v4();
-        let uuid2 = PoolUuid::new_v4();
-        let pool_name1 = Name::new("pool_name1".to_string());
-        let pool_name2 = Name::new("pool_name2".to_string());
-
-        let bd_mgr = BlockDevMgr::initialize(
-            pool_name1,
-            uuid,
-            get_devices(paths1).unwrap(),
-            MDADataSize::default(),
-            None,
-            None,
-        )
-        .unwrap();
-        cmd::udev_settle().unwrap();
-
-        assert_matches!(get_devices(paths1), Err(_));
-
-        assert!(ProcessedPathInfos::try_from(paths1)
-            .unwrap()
-            .unpack()
-            .0
-            .partition(uuid2)
-            .0
-            .is_empty());
-
-        assert!(!ProcessedPathInfos::try_from(paths1)
-            .unwrap()
-            .unpack()
-            .0
-            .partition(uuid)
-            .0
-            .is_empty());
-
-        BlockDevMgr::initialize(
-            pool_name2,
-            uuid,
-            get_devices(paths2).unwrap(),
-            MDADataSize::default(),
-            None,
-            None,
-        )
-        .unwrap();
-
-        cmd::udev_settle().unwrap();
-
-        assert!(!ProcessedPathInfos::try_from(paths2)
-            .unwrap()
-            .unpack()
-            .0
-            .partition(uuid)
-            .0
-            .is_empty());
-
-        bd_mgr.invariant()
-    }
-
-    #[test]
-    fn loop_test_initialization_stratis() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Range(2, 3, None),
-            test_initialization_add_stratis,
-        );
-    }
-
-    #[test]
-    fn real_test_initialization_stratis() {
-        real::test_with_spec(
-            &real::DeviceLimits::AtLeast(2, None, None),
-            test_initialization_add_stratis,
-        );
+        #[test]
+        fn real_test_initialization_stratis() {
+            real::test_with_spec(
+                &real::DeviceLimits::AtLeast(2, None, None),
+                test_initialization_add_stratis,
+            );
+        }
     }
 }

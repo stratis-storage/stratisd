@@ -38,7 +38,7 @@ const MAX_CACHE_SIZE: Sectors = Sectors(32 * IEC::Ti / SECTOR_SIZE as u64);
 #[derive(Debug)]
 pub struct CacheTier {
     /// Manages the individual block devices
-    pub(super) block_mgr: BlockDevMgr,
+    pub(super) block_mgr: BlockDevMgr<StratBlockDev>,
     /// The list of segments granted by block_mgr and used by the cache
     /// device.
     pub(super) cache_segments: AllocatedAbove,
@@ -51,7 +51,7 @@ impl CacheTier {
     /// Setup a previously existing cache layer from the block_mgr and
     /// previously allocated segments.
     pub fn setup(
-        block_mgr: BlockDevMgr,
+        block_mgr: BlockDevMgr<StratBlockDev>,
         cache_tier_save: &CacheTierSave,
     ) -> BDARecordResult<CacheTier> {
         if block_mgr.avail_space() != Sectors(0) {
@@ -150,7 +150,7 @@ impl CacheTier {
     /// sub-device too big.
     ///
     /// WARNING: metadata changing event
-    pub fn new(mut block_mgr: BlockDevMgr) -> StratisResult<CacheTier> {
+    pub fn new(mut block_mgr: BlockDevMgr<StratBlockDev>) -> StratisResult<CacheTier> {
         let avail_space = block_mgr.avail_space();
 
         // FIXME: Come up with a better way to choose metadata device size
@@ -307,7 +307,7 @@ mod tests {
         let devices1 = get_devices(paths1).unwrap();
         let devices2 = get_devices(paths2).unwrap();
 
-        let mgr = BlockDevMgr::initialize(
+        let mgr = BlockDevMgr::<StratBlockDev>::initialize(
             pool_name.clone(),
             pool_uuid,
             devices1,

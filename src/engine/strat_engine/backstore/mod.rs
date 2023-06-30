@@ -16,7 +16,7 @@ mod transaction;
 pub use self::{
     backstore::Backstore,
     devices::{
-        find_stratis_devs_by_uuid, get_devno_from_path, initialize_devices, ProcessedPathInfos,
-        UnownedDevices,
+        find_stratis_devs_by_uuid, get_devno_from_path, initialize_devices_legacy,
+        ProcessedPathInfos, UnownedDevices,
     },
 };

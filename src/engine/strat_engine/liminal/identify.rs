@@ -53,7 +53,7 @@ use devicemapper::Device;
 use crate::engine::{
     strat_engine::{
         backstore::StratBlockDev,
-        crypt::CryptHandle,
+        crypt::handle::v1::CryptHandle,
         metadata::{static_header, StratisIdentifiers, BDA},
         udev::{
             block_enumerator, decide_ownership, UdevOwnership, CRYPTO_FS_TYPE, FS_TYPE_KEY,

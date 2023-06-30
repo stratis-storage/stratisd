@@ -4,8 +4,6 @@
 
 // Code to handle the backing store of a pool.
 
-#![allow(dead_code)]
-
 #[cfg(test)]
 use std::collections::HashSet;
 
@@ -45,6 +43,7 @@ impl DataTier<v1::StratBlockDev> {
     /// Initially 0 segments are allocated.
     ///
     /// WARNING: metadata changing event
+    #[cfg(test)]
     pub fn new(block_mgr: BlockDevMgr<v1::StratBlockDev>) -> DataTier<v1::StratBlockDev> {
         DataTier {
             block_mgr,

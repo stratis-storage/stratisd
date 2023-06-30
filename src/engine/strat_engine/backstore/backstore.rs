@@ -53,7 +53,7 @@ const CACHE_BLOCK_SIZE: Sectors = Sectors(2048); // 1024 KiB
 /// take extra steps to make it clean.
 fn make_cache(
     pool_uuid: PoolUuid,
-    cache_tier: &CacheTier,
+    cache_tier: &CacheTier<StratBlockDev>,
     origin: LinearDev,
     new: bool,
 ) -> StratisResult<CacheDev> {
@@ -103,9 +103,9 @@ pub struct Backstore {
     cache: Option<CacheDev>,
     /// Coordinate handling of blockdevs that back the cache. Optional, since
     /// this structure can operate without a cache.
-    cache_tier: Option<CacheTier>,
+    cache_tier: Option<CacheTier<StratBlockDev>>,
     /// Coordinates handling of the blockdevs that form the base.
-    data_tier: DataTier,
+    data_tier: DataTier<StratBlockDev>,
     /// A linear DM device.
     linear: Option<LinearDev>,
     /// Index for managing allocation of cap device
@@ -235,7 +235,7 @@ impl Backstore {
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<Backstore> {
-        let data_tier = DataTier::new(BlockDevMgr::<StratBlockDev>::initialize(
+        let data_tier = DataTier::<StratBlockDev>::new(BlockDevMgr::<StratBlockDev>::initialize(
             pool_name,
             pool_uuid,
             devices,

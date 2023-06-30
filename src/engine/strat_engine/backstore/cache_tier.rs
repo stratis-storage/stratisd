@@ -4,8 +4,6 @@
 
 // Code to handle the backing store of a pool.
 
-#![allow(dead_code)]
-
 #[cfg(test)]
 use std::collections::HashSet;
 

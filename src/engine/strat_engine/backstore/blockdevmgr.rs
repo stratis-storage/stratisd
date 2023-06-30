@@ -4,8 +4,6 @@
 
 // Code to handle a collection of block devices.
 
-#![allow(dead_code)]
-
 use std::collections::HashMap;
 #[cfg(test)]
 use std::collections::HashSet;

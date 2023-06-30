@@ -52,7 +52,7 @@ use devicemapper::Device;
 
 use crate::engine::{
     strat_engine::{
-        backstore::StratBlockDev,
+        backstore::blockdev::{v1::StratBlockDev, InternalBlockDev},
         crypt::handle::v1::CryptHandle,
         metadata::{static_header, StratisIdentifiers, BDA},
         udev::{
@@ -197,7 +197,7 @@ impl From<StratBlockDev> for Vec<DeviceInfo> {
                                 device_number: *bd.device(),
                                 devnode: bd.metadata_path().to_owned(),
                             },
-                            bda: bd.bda,
+                            bda: bd.into_bda(),
                         }));
                     }
                 }
@@ -207,7 +207,7 @@ impl From<StratBlockDev> for Vec<DeviceInfo> {
                     device_number: *bd.device(),
                     devnode: bd.physical_path().to_owned(),
                 },
-                bda: bd.bda,
+                bda: bd.into_bda(),
             })),
             (_, _, _) => unreachable!("If bd.is_encrypted(), all are Some(_)"),
         }

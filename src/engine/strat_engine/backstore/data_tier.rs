@@ -13,7 +13,7 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::{
-                blockdev::StratBlockDev,
+                blockdev::{v1::StratBlockDev, InternalBlockDev},
                 blockdevmgr::BlockDevMgr,
                 devices::UnownedDevices,
                 shared::{metadata_to_segment, AllocatedAbove, BlkDevSegment, BlockDevPartition},

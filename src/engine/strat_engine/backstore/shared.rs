@@ -12,7 +12,7 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::{
-                blockdev::{StratBlockDev, StratSectorSizes},
+                blockdev::{v1::StratBlockDev, InternalBlockDev, StratSectorSizes},
                 devices::BlockSizes,
             },
             serde_structs::{BaseDevSave, Recordable},

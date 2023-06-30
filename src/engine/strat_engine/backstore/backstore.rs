@@ -17,8 +17,12 @@ use crate::{
         shared::gather_encryption_info,
         strat_engine::{
             backstore::{
-                blockdev::StratBlockDev, blockdevmgr::BlockDevMgr, cache_tier::CacheTier,
-                data_tier::DataTier, devices::UnownedDevices, shared::BlockSizeSummary,
+                blockdev::{v1::StratBlockDev, InternalBlockDev},
+                blockdevmgr::BlockDevMgr,
+                cache_tier::CacheTier,
+                data_tier::DataTier,
+                devices::UnownedDevices,
+                shared::BlockSizeSummary,
             },
             crypt::{
                 back_up_luks_header, handle::v1::CryptHandle, interpret_clevis_config,

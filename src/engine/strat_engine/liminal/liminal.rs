@@ -17,7 +17,10 @@ use crate::{
     engine::{
         engine::{DumpState, Pool, StateDiff},
         strat_engine::{
-            backstore::{find_stratis_devs_by_uuid, StratBlockDev},
+            backstore::{
+                blockdev::{v1::StratBlockDev, InternalBlockDev},
+                find_stratis_devs_by_uuid,
+            },
             crypt::handle::v1::CryptHandle,
             dm::{has_leftover_devices, stop_partially_constructed_pool},
             liminal::{

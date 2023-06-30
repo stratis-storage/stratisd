@@ -6,7 +6,6 @@
 
 use std::{
     cmp::Ordering,
-    fmt,
     fs::{File, OpenOptions},
     io::Seek,
     path::Path,
@@ -23,6 +22,7 @@ use crate::{
         engine::{BlockDev, DumpState},
         strat_engine::{
             backstore::{
+                blockdev::{InternalBlockDev, StratSectorSizes},
                 devices::BlockSizes,
                 range_alloc::{PerDevSegments, RangeAllocator},
             },
@@ -79,30 +79,10 @@ impl UnderlyingDevice {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct StratSectorSizes {
-    pub base: BlockSizes,
-    pub crypt: Option<BlockSizes>,
-}
-
-impl fmt::Display for StratSectorSizes {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "base: {}, crypt: {}",
-            self.base,
-            &self
-                .crypt
-                .map(|sz| sz.to_string())
-                .unwrap_or("None".to_string())
-        )
-    }
-}
-
 #[derive(Debug)]
 pub struct StratBlockDev {
     dev: Device,
-    pub(in super::super) bda: BDA,
+    bda: BDA,
     used: RangeAllocator,
     user_info: Option<String>,
     hardware_info: Option<String>,
@@ -195,24 +175,9 @@ impl StratBlockDev {
         })
     }
 
-    /// Returns the blockdev's Device. For unencrypted devices, this is the physical,
-    /// unencrypted device. For encrypted devices, this is the logical, unlocked
-    /// device on top of LUKS2.
-    ///
-    /// Practically, this is the device number that should be used when constructing
-    /// the cap device.
-    pub fn device(&self) -> &Device {
-        &self.dev
-    }
-
     /// Returns the LUKS2 device's Device if encrypted
     pub fn luks_device(&self) -> Option<&Device> {
         self.underlying_device.crypt_handle().map(|ch| ch.device())
-    }
-
-    /// Returns the physical path of the block device structure.
-    pub fn physical_path(&self) -> &Path {
-        self.devnode()
     }
 
     /// Returns the path to the unencrypted metadata stored on the block device structure.
@@ -222,88 +187,9 @@ impl StratBlockDev {
         self.underlying_device.metadata_path()
     }
 
-    /// Remove information that identifies this device as belonging to Stratis
-    ///
-    /// If self.is_encrypted() is true, destroy all keyslots and wipe the LUKS2 header.
-    /// This will render all Stratis and LUKS2 metadata unreadable and unrecoverable
-    /// from the given device.
-    ///
-    /// If self.is_encrypted() is false, wipe the Stratis metadata on the device.
-    /// This will make the Stratis data and metadata invisible to all standard blkid
-    /// and stratisd operations.
-    ///
-    /// Precondition: if self.is_encrypted() == true, the data on
-    ///               self.devnode.physical_path() has been encrypted with
-    ///               aes-xts-plain64 encryption.
-    pub fn disown(&mut self) -> StratisResult<()> {
-        if let Some(ref mut handle) = self.underlying_device.crypt_handle_mut() {
-            handle.wipe()?;
-        } else {
-            disown_device(
-                &mut OpenOptions::new()
-                    .write(true)
-                    .open(self.underlying_device.physical_path())?,
-            )?;
-        }
-        Ok(())
-    }
-
-    pub fn save_state(&mut self, time: &DateTime<Utc>, metadata: &[u8]) -> StratisResult<()> {
-        let mut f = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(self.underlying_device.metadata_path())?;
-        self.bda.save_state(time, metadata, &mut f)?;
-
-        f.rewind()?;
-        let header = static_header(&mut f)?.ok_or_else(|| {
-            StratisError::Msg("Stratis device has no signature buffer".to_string())
-        })?;
-        let bda = BDA::load(header, &mut f)?
-            .ok_or_else(|| StratisError::Msg("Stratis device has no BDA".to_string()))?;
-        self.bda = bda;
-        Ok(())
-    }
-
-    pub fn load_state(&self) -> StratisResult<Option<(Vec<u8>, &DateTime<Utc>)>> {
-        let mut f = OpenOptions::new()
-            .read(true)
-            .open(self.underlying_device.metadata_path())?;
-        match (self.bda.load_state(&mut f)?, self.bda.last_update_time()) {
-            (Some(state), Some(time)) => Ok(Some((state, time))),
-            (None, None) => Ok(None),
-            _ => Err(StratisError::Msg(
-                "Stratis metadata written but unknown update time or vice-versa".into(),
-            )),
-        }
-    }
-
     /// The pool's UUID.
     pub fn pool_uuid(&self) -> PoolUuid {
         self.bda.pool_uuid()
-    }
-
-    /// The device's UUID.
-    pub fn uuid(&self) -> DevUuid {
-        self.bda.dev_uuid()
-    }
-
-    /// Find some sector ranges that could be allocated. If more
-    /// sectors are needed than are available, return partial results.
-    pub fn alloc(&mut self, size: Sectors) -> PerDevSegments {
-        self.used.alloc(size)
-    }
-
-    // ALL SIZE METHODS (except size(), which is in BlockDev impl.)
-    /// The number of Sectors on this device used by Stratis for metadata
-    pub fn metadata_size(&self) -> BDAExtendedSize {
-        self.bda.extended_size()
-    }
-
-    /// The number of Sectors on this device not allocated for any purpose.
-    /// self.total_allocated_size() - self.metadata_size() >= self.available()
-    pub fn available(&self) -> Sectors {
-        self.used.available()
     }
 
     /// The total size of the Stratis block device.
@@ -315,12 +201,6 @@ impl StratBlockDev {
     /// self.max_metadata_size() < self.metadata_size()
     pub fn max_metadata_size(&self) -> MDADataSize {
         self.bda.max_data_size()
-    }
-
-    /// Whether or not the blockdev is in use by upper layers. It is if the
-    /// sum of the blocks used exceeds the Stratis metadata size.
-    pub fn in_use(&self) -> bool {
-        self.used.used() > self.metadata_size().sectors()
     }
 
     /// Set the user info on this blockdev.
@@ -355,11 +235,6 @@ impl StratBlockDev {
         self.underlying_device
             .crypt_handle()
             .map(|ch| ch.pool_name())
-    }
-
-    /// Block size information
-    pub fn blksizes(&self) -> StratSectorSizes {
-        self.blksizes
     }
 
     /// Bind encrypted device using the given clevis configuration.
@@ -413,26 +288,6 @@ impl StratBlockDev {
         crypt_handle.rebind_clevis()
     }
 
-    /// Calculate the new size of the block device specified by physical_path.
-    ///
-    /// Returns:
-    /// * `None` if the size hasn't changed or is equal to the current size recorded
-    /// in the metadata.
-    /// * Otherwise, `Some(_)`
-    pub fn calc_new_size(&self) -> StratisResult<Option<Sectors>> {
-        let s = Self::scan_blkdev_size(
-            self.physical_path(),
-            self.underlying_device.crypt_handle().is_some(),
-        )?;
-        if Some(s) == self.new_size
-            || (self.new_size.is_none() && s == self.bda.dev_size().sectors())
-        {
-            Ok(None)
-        } else {
-            Ok(Some(s))
-        }
-    }
-
     /// Scan the block device specified by physical_path for its size.
     pub fn scan_blkdev_size(physical_path: &Path, is_encrypted: bool) -> StratisResult<Sectors> {
         Ok(blkdev_size(&File::open(physical_path)?)?.sectors()
@@ -463,16 +318,80 @@ impl StratBlockDev {
         }
     }
 
-    /// Grow the block device if the underlying physical device has grown in size.
-    /// Return an error and leave the size as is if the device has shrunk.
-    /// Do nothing if the device is the same size as recorded in the metadata.
-    ///
-    /// This method does not need to block IO to the extended crypt device prior
-    /// to rollback because of per-pool locking. Growing the device will acquire
-    /// an exclusive lock on the pool and therefore the thin pool cannot be
-    /// extended to use the larger or unencrypted block device size until the
-    /// transaction has been completed successfully.
-    pub fn grow(&mut self) -> StratisResult<bool> {
+    /// Rename pool in metadata if it is encrypted.
+    pub fn rename_pool(&mut self, pool_name: Name) -> StratisResult<()> {
+        match self.underlying_device.crypt_handle_mut() {
+            Some(handle) => handle.rename_pool_in_metadata(pool_name),
+            None => Ok(()),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn invariant(&self) {
+        assert!(self.total_size() == self.used.size());
+    }
+}
+
+impl InternalBlockDev for StratBlockDev {
+    fn uuid(&self) -> DevUuid {
+        self.bda.dev_uuid()
+    }
+
+    fn device(&self) -> &Device {
+        &self.dev
+    }
+
+    fn physical_path(&self) -> &Path {
+        self.devnode()
+    }
+
+    fn blksizes(&self) -> StratSectorSizes {
+        self.blksizes
+    }
+
+    fn metadata_version(&self) -> StratSigblockVersion {
+        self.bda.sigblock_version()
+    }
+
+    fn total_size(&self) -> BlockdevSize {
+        self.bda.dev_size()
+    }
+
+    fn available(&self) -> Sectors {
+        self.used.available()
+    }
+
+    fn metadata_size(&self) -> BDAExtendedSize {
+        self.bda.extended_size()
+    }
+
+    fn max_metadata_size(&self) -> MDADataSize {
+        self.bda.max_data_size()
+    }
+
+    fn in_use(&self) -> bool {
+        self.used.used() > self.metadata_size().sectors()
+    }
+
+    fn alloc(&mut self, size: Sectors) -> PerDevSegments {
+        self.used.alloc(size)
+    }
+
+    fn calc_new_size(&self) -> StratisResult<Option<Sectors>> {
+        let s = Self::scan_blkdev_size(
+            self.physical_path(),
+            self.underlying_device.crypt_handle().is_some(),
+        )?;
+        if Some(s) == self.new_size
+            || (self.new_size.is_none() && s == self.bda.dev_size().sectors())
+        {
+            Ok(None)
+        } else {
+            Ok(Some(s))
+        }
+    }
+
+    fn grow(&mut self) -> StratisResult<bool> {
         /// Precondition: size > h.blkdev_size
         fn needs_rollback(bd: &mut StratBlockDev, size: BlockdevSize) -> StratisResult<()> {
             let mut f = OpenOptions::new()
@@ -544,22 +463,37 @@ impl StratBlockDev {
         }
     }
 
-    /// Rename pool in metadata if it is encrypted.
-    pub fn rename_pool(&mut self, pool_name: Name) -> StratisResult<()> {
-        match self.underlying_device.crypt_handle_mut() {
-            Some(handle) => handle.rename_pool_in_metadata(pool_name),
-            None => Ok(()),
+    fn load_state(&self) -> StratisResult<Option<(Vec<u8>, &DateTime<Utc>)>> {
+        let mut f = OpenOptions::new()
+            .read(true)
+            .open(self.underlying_device.metadata_path())?;
+        match (self.bda.load_state(&mut f)?, self.bda.last_update_time()) {
+            (Some(state), Some(time)) => Ok(Some((state, time))),
+            (None, None) => Ok(None),
+            _ => Err(StratisError::Msg(
+                "Stratis metadata written but unknown update time or vice-versa".into(),
+            )),
         }
     }
 
-    #[cfg(test)]
-    pub fn invariant(&self) {
-        assert!(self.total_size() == self.used.size());
+    fn save_state(&mut self, time: &DateTime<Utc>, metadata: &[u8]) -> StratisResult<()> {
+        let mut f = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(self.underlying_device.metadata_path())?;
+        self.bda.save_state(time, metadata, &mut f)?;
+
+        f.rewind()?;
+        let header = static_header(&mut f)?.ok_or_else(|| {
+            StratisError::Msg("Stratis device has no signature buffer".to_string())
+        })?;
+        let bda = BDA::load(header, &mut f)?
+            .ok_or_else(|| StratisError::Msg("Stratis device has no BDA".to_string()))?;
+        self.bda = bda;
+        Ok(())
     }
 
-    /// If a pool is encrypted, tear down the cryptsetup devicemapper devices on the
-    /// physical device.
-    pub fn teardown(&mut self) -> StratisResult<()> {
+    fn teardown(&mut self) -> StratisResult<()> {
         if let Some(ch) = self.underlying_device.crypt_handle() {
             debug!(
                 "Deactivating unlocked encrypted device with UUID {}",
@@ -571,9 +505,21 @@ impl StratBlockDev {
         }
     }
 
-    /// Get metadata version from static header
-    pub fn metadata_version(&self) -> StratSigblockVersion {
-        self.bda.sigblock_version()
+    fn disown(&mut self) -> StratisResult<()> {
+        if let Some(ref mut handle) = self.underlying_device.crypt_handle_mut() {
+            handle.wipe()?;
+        } else {
+            disown_device(
+                &mut OpenOptions::new()
+                    .write(true)
+                    .open(self.underlying_device.physical_path())?,
+            )?;
+        }
+        Ok(())
+    }
+
+    fn into_bda(self) -> BDA {
+        self.bda
     }
 }
 
@@ -634,12 +580,12 @@ impl BlockDev for StratBlockDev {
         self.total_size().sectors()
     }
 
-    fn is_encrypted(&self) -> bool {
-        self.encryption_info().is_some()
-    }
-
     fn new_size(&self) -> Option<Sectors> {
         self.new_size
+    }
+
+    fn metadata_version(&self) -> StratSigblockVersion {
+        self.bda.sigblock_version()
     }
 }
 

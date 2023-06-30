@@ -13,7 +13,7 @@ mod range_alloc;
 mod shared;
 
 #[cfg(test)]
-pub use self::devices::initialize_devices;
+pub use self::devices::initialize_devices_legacy;
 pub use self::{
     backstore::Backstore,
     devices::{find_stratis_devs_by_uuid, get_devno_from_path, ProcessedPathInfos, UnownedDevices},

@@ -18,7 +18,10 @@ use crate::{
             validate_paths,
         },
         strat_engine::{
-            backstore::{Backstore, ProcessedPathInfos, StratBlockDev, UnownedDevices},
+            backstore::{
+                blockdev::{v1::StratBlockDev, InternalBlockDev},
+                Backstore, ProcessedPathInfos, UnownedDevices,
+            },
             liminal::DeviceSet,
             metadata::{MDADataSize, BDA},
             serde_structs::{FlexDevsSave, PoolSave, Recordable},

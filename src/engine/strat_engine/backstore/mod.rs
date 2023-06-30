@@ -4,7 +4,7 @@
 
 #[allow(clippy::module_inception)]
 mod backstore;
-mod blockdev;
+pub mod blockdev;
 mod blockdevmgr;
 mod cache_tier;
 mod data_tier;
@@ -15,7 +15,6 @@ mod transaction;
 
 pub use self::{
     backstore::Backstore,
-    blockdev::{StratBlockDev, StratSectorSizes, UnderlyingDevice},
     devices::{
         find_stratis_devs_by_uuid, get_devno_from_path, initialize_devices, ProcessedPathInfos,
         UnownedDevices,

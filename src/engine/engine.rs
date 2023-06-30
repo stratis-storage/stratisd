@@ -25,7 +25,7 @@ use crate::{
             MappingCreateAction, MappingDeleteAction, Name, PoolDiff, PoolEncryptionInfo,
             PoolIdentifier, PoolUuid, RegenAction, RenameAction, ReportType, SetCreateAction,
             SetDeleteAction, SetUnlockAction, StartAction, StopAction, StoppedPoolsInfo,
-            StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
+            StratFilesystemDiff, StratSigblockVersion, UdevEngineEvent, UnlockMethod,
         },
     },
     stratis::StratisResult,
@@ -112,14 +112,14 @@ pub trait BlockDev: Debug {
     /// The total size of the device, including space not usable for data.
     fn size(&self) -> Sectors;
 
-    /// Get the status of whether a block device is encrypted or not.
-    fn is_encrypted(&self) -> bool;
-
     /// Get the newly registered size, if any, of the block device.
     ///
     /// If internally the new size is None, the block device size is equal to that
     /// registered in the BDA.
     fn new_size(&self) -> Option<Sectors>;
+
+    /// Get metadata version from static header
+    fn metadata_version(&self) -> StratSigblockVersion;
 }
 
 pub trait Pool: Debug + Send + Sync {

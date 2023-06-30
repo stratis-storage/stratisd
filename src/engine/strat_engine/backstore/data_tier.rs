@@ -30,7 +30,7 @@ use crate::{
 #[derive(Debug)]
 pub struct DataTier {
     /// Manages the individual block devices
-    pub(super) block_mgr: BlockDevMgr,
+    pub(super) block_mgr: BlockDevMgr<StratBlockDev>,
     /// The list of segments granted by block_mgr and used by dm_device
     pub(super) segments: AllocatedAbove,
 }
@@ -39,7 +39,7 @@ impl DataTier {
     /// Setup a previously existing data layer from the block_mgr and
     /// previously allocated segments.
     pub fn setup(
-        block_mgr: BlockDevMgr,
+        block_mgr: BlockDevMgr<StratBlockDev>,
         data_tier_save: &DataTierSave,
     ) -> BDARecordResult<DataTier> {
         let uuid_to_devno = block_mgr.uuid_to_devno();
@@ -66,7 +66,7 @@ impl DataTier {
     /// Initially 0 segments are allocated.
     ///
     /// WARNING: metadata changing event
-    pub fn new(block_mgr: BlockDevMgr) -> DataTier {
+    pub fn new(block_mgr: BlockDevMgr<StratBlockDev>) -> DataTier {
         DataTier {
             block_mgr,
             segments: AllocatedAbove { inner: vec![] },
@@ -241,7 +241,7 @@ mod tests {
         let devices1 = get_devices(paths1).unwrap();
         let devices2 = get_devices(paths2).unwrap();
 
-        let mgr = BlockDevMgr::initialize(
+        let mgr = BlockDevMgr::<StratBlockDev>::initialize(
             pool_name.clone(),
             pool_uuid,
             devices1,

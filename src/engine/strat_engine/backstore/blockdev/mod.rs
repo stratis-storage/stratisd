@@ -76,7 +76,6 @@ pub trait InternalBlockDev {
 
     /// The maximum size of variable length metadata that can be accommodated.
     /// self.max_metadata_size() < self.metadata_size()
-    #[allow(dead_code)]
     fn max_metadata_size(&self) -> MDADataSize;
 
     /// Whether or not the blockdev is in use by upper layers. It is if the

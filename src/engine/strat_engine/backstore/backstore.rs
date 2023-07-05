@@ -1089,7 +1089,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::{env, error::Error, fs::OpenOptions, path::Path};
+    use std::{env, fs::OpenOptions, path::Path};
 
     use devicemapper::{CacheDevStatus, DataBlocks, DmOptions, IEC};
 
@@ -1398,8 +1398,8 @@ mod tests {
     }
 
     fn test_clevis_both_initialize(paths: &[&Path]) {
-        fn test_both(paths: &[&Path], key_desc: &KeyDescription) -> Result<(), Box<dyn Error>> {
-            unshare_mount_namespace()?;
+        fn test_both(paths: &[&Path], key_desc: &KeyDescription) {
+            unshare_mount_namespace().unwrap();
             let _memfs = MemoryFilesystem::new().unwrap();
             let pool_uuid = PoolUuid::new_v4();
             let pool_name = Name::new("pool_name".to_string());
@@ -1412,97 +1412,79 @@ mod tests {
                     key_desc.clone(),
                     (
                         "tang".to_string(),
-                        json!({"url": env::var("TANG_URL").map_err(|_| StratisError::Msg("TANG_URL env var required".to_string()))?, "stratis:tang:trust_url": true}),
+                        json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true}),
                     ),
                 )),
-            )?;
-            cmd::udev_settle()?;
+            ).unwrap();
+            cmd::udev_settle().unwrap();
 
             if backstore.bind_clevis(
                 "tang",
-                &json!({"url": env::var("TANG_URL").map_err(|_| StratisError::Msg("TANG_URL env var required".to_string()))?, "stratis:tang:trust_url": true}),
-            )? {
-                return Err(Box::new(StratisError::Msg(
-                    "Clevis bind idempotence test failed".to_string(),
-                )));
+                &json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true}),
+            ).unwrap() {
+                panic!(
+                    "Clevis bind idempotence test failed"
+                );
             }
 
             invariant(&backstore);
 
-            if backstore.bind_keyring(key_desc)? {
-                return Err(Box::new(StratisError::Msg(
-                    "Keyring bind idempotence test failed".to_string(),
-                )));
+            if backstore.bind_keyring(key_desc).unwrap() {
+                panic!("Keyring bind idempotence test failed")
             }
 
             invariant(&backstore);
 
-            if !(backstore.unbind_clevis()?) {
-                return Err(Box::new(StratisError::Msg(
-                    "Clevis unbind test failed".to_string(),
-                )));
+            if !backstore.unbind_clevis().unwrap() {
+                panic!("Clevis unbind test failed");
             }
 
             invariant(&backstore);
 
-            if backstore.unbind_clevis()? {
-                return Err(Box::new(StratisError::Msg(
-                    "Clevis unbind idempotence test failed".to_string(),
-                )));
+            if backstore.unbind_clevis().unwrap() {
+                panic!("Clevis unbind idempotence test failed");
             }
 
             invariant(&backstore);
 
             if backstore.unbind_keyring().is_ok() {
-                return Err(Box::new(StratisError::Msg(
-                    "Keyring unbind check test failed".to_string(),
-                )));
+                panic!("Keyring unbind check test failed");
             }
 
             invariant(&backstore);
 
-            if !(backstore.bind_clevis(
+            if !backstore.bind_clevis(
                 "tang",
-                &json!({"url": env::var("TANG_URL").map_err(|_| StratisError::Msg("TANG_URL env var required".to_string()))?, "stratis:tang:trust_url": true}),
-            )?) {
-                return Err(Box::new(StratisError::Msg(
-                    "Clevis bind test failed".to_string(),
-                )));
+                &json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true}),
+            ).unwrap() {
+                panic!(
+                    "Clevis bind test failed"
+                );
             }
 
             invariant(&backstore);
 
-            if !(backstore.unbind_keyring()?) {
-                return Err(Box::new(StratisError::Msg(
-                    "Keyring unbind test failed".to_string(),
-                )));
+            if !backstore.unbind_keyring().unwrap() {
+                panic!("Keyring unbind test failed");
             }
 
             invariant(&backstore);
 
-            if backstore.unbind_keyring()? {
-                return Err(Box::new(StratisError::Msg(
-                    "Keyring unbind idempotence test failed".to_string(),
-                )));
+            if backstore.unbind_keyring().unwrap() {
+                panic!("Keyring unbind idempotence test failed");
             }
 
             invariant(&backstore);
 
             if backstore.unbind_clevis().is_ok() {
-                return Err(Box::new(StratisError::Msg(
-                    "Clevis unbind check test failed".to_string(),
-                )));
+                panic!("Clevis unbind check test failed");
             }
 
             invariant(&backstore);
 
-            if !(backstore.bind_keyring(key_desc)?) {
-                return Err(Box::new(StratisError::Msg(
-                    "Keyring bind test failed".to_string(),
-                )));
+            if !backstore.bind_keyring(key_desc).unwrap() {
+                panic!("Keyring bind test failed");
             }
-
-            Ok(())
         }
 
         crypt::insert_and_cleanup_key(paths, test_both);

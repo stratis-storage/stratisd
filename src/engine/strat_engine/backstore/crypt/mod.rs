@@ -22,7 +22,6 @@ pub use self::{
 mod tests {
     use std::{
         env,
-        error::Error,
         ffi::CString,
         fs::{File, OpenOptions},
         io::{self, Read, Write},
@@ -37,22 +36,19 @@ mod tests {
         CryptInit, Either,
     };
 
-    use crate::{
-        engine::{
-            strat_engine::{
-                backstore::crypt::{
-                    consts::{
-                        CLEVIS_LUKS_TOKEN_ID, DEFAULT_CRYPT_KEYSLOTS_SIZE,
-                        DEFAULT_CRYPT_METADATA_SIZE, LUKS2_TOKEN_ID, STRATIS_MEK_SIZE,
-                    },
-                    shared::acquire_crypt_device,
+    use crate::engine::{
+        strat_engine::{
+            backstore::crypt::{
+                consts::{
+                    CLEVIS_LUKS_TOKEN_ID, DEFAULT_CRYPT_KEYSLOTS_SIZE, DEFAULT_CRYPT_METADATA_SIZE,
+                    LUKS2_TOKEN_ID, STRATIS_MEK_SIZE,
                 },
-                ns::{unshare_mount_namespace, MemoryFilesystem},
-                tests::{crypt, loopbacked, real},
+                shared::acquire_crypt_device,
             },
-            types::{DevUuid, EncryptionInfo, KeyDescription, Name, PoolUuid, UnlockMethod},
+            ns::{unshare_mount_namespace, MemoryFilesystem},
+            tests::{crypt, loopbacked, real},
         },
-        stratis::StratisError,
+        types::{DevUuid, EncryptionInfo, KeyDescription, Name, PoolUuid, UnlockMethod},
     };
 
     use super::*;
@@ -107,10 +103,7 @@ mod tests {
     /// Test the method `can_unlock` works on an initialized device in both
     /// active and inactive states.
     fn test_can_unlock(paths: &[&Path]) {
-        fn crypt_test(
-            paths: &[&Path],
-            key_desc: &KeyDescription,
-        ) -> std::result::Result<(), Box<dyn Error>> {
+        fn crypt_test(paths: &[&Path], key_desc: &KeyDescription) {
             let mut handles = vec![];
 
             let pool_uuid = PoolUuid::new_v4();
@@ -125,43 +118,36 @@ mod tests {
                     pool_name.clone(),
                     &EncryptionInfo::KeyDesc(key_desc.clone()),
                     None,
-                )?;
+                )
+                .unwrap();
                 handles.push(handle);
             }
 
             for path in paths {
                 if !CryptHandle::can_unlock(path, true, false) {
-                    return Err(Box::new(StratisError::Msg(
-                        "All devices should be able to be unlocked".to_string(),
-                    )));
+                    panic!("All devices should be able to be unlocked");
                 }
             }
 
             for handle in handles.iter_mut() {
-                handle.deactivate()?;
+                handle.deactivate().unwrap();
             }
 
             for path in paths {
                 if !CryptHandle::can_unlock(path, true, false) {
-                    return Err(Box::new(StratisError::Msg(
-                        "All devices should be able to be unlocked".to_string(),
-                    )));
+                    panic!("All devices should be able to be unlocked");
                 }
             }
 
             for handle in handles.iter_mut() {
-                handle.wipe()?;
+                handle.wipe().unwrap();
             }
 
             for path in paths {
                 if CryptHandle::can_unlock(path, true, false) {
-                    return Err(Box::new(StratisError::Msg(
-                        "All devices should no longer be able to be unlocked".to_string(),
-                    )));
+                    panic!("All devices should no longer be able to be unlocked");
                 }
             }
-
-            Ok(())
         }
 
         crypt::insert_and_cleanup_key(paths, crypt_test)
@@ -197,15 +183,10 @@ mod tests {
     /// on the disk due to leftover data from other tests.
     // TODO: Rewrite libc calls using nix crate.
     fn test_crypt_device_ops(paths: &[&Path]) {
-        fn crypt_test(
-            paths: &[&Path],
-            key_desc: &KeyDescription,
-        ) -> std::result::Result<(), Box<dyn Error>> {
-            let path = paths.get(0).ok_or_else(|| {
-                Box::new(StratisError::Msg(
-                    "This test only accepts a single device".to_string(),
-                ))
-            })?;
+        fn crypt_test(paths: &[&Path], key_desc: &KeyDescription) {
+            let path = paths
+                .get(0)
+                .expect("This test only accepts a single device");
 
             let pool_uuid = PoolUuid::new_v4();
             let pool_name = Name::new("pool_name".to_string());
@@ -218,35 +199,34 @@ mod tests {
                 pool_name,
                 &EncryptionInfo::KeyDesc(key_desc.clone()),
                 None,
-            )?;
+            )
+            .unwrap();
             let logical_path = handle.activated_device_path();
 
             const WINDOW_SIZE: usize = 1024 * 1024;
-            let mut devicenode = OpenOptions::new().write(true).open(logical_path)?;
+            let mut devicenode = OpenOptions::new().write(true).open(logical_path).unwrap();
             let mut random_buffer = vec![0; WINDOW_SIZE].into_boxed_slice();
-            File::open("/dev/urandom")?.read_exact(&mut random_buffer)?;
-            devicenode.write_all(&random_buffer)?;
+            File::open("/dev/urandom")
+                .unwrap()
+                .read_exact(&mut random_buffer)
+                .unwrap();
+            devicenode.write_all(&random_buffer).unwrap();
             std::mem::drop(devicenode);
 
-            let dev_path_cstring = CString::new(path.to_str().ok_or_else(|| {
-                Box::new(io::Error::new(
-                    io::ErrorKind::Other,
-                    "Failed to convert path to string",
-                ))
-            })?)
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+            let dev_path_cstring =
+                CString::new(path.to_str().expect("Failed to convert path to string")).unwrap();
             let fd = unsafe { libc::open(dev_path_cstring.as_ptr(), libc::O_RDONLY) };
             if fd < 0 {
-                return Err(Box::new(io::Error::last_os_error()));
+                Result::<(), _>::Err(io::Error::last_os_error()).unwrap();
             }
 
             let mut stat: MaybeUninit<libc::stat> = MaybeUninit::zeroed();
             let fstat_result = unsafe { libc::fstat(fd, stat.as_mut_ptr()) };
             if fstat_result < 0 {
-                return Err(Box::new(io::Error::last_os_error()));
+                Result::<(), _>::Err(io::Error::last_os_error()).unwrap();
             }
             let device_size =
-                convert_int!(unsafe { stat.assume_init() }.st_size, libc::off_t, usize)?;
+                convert_int!(unsafe { stat.assume_init() }.st_size, libc::off_t, usize).unwrap();
             let mapped_ptr = unsafe {
                 libc::mmap(
                     ptr::null_mut(),
@@ -258,10 +238,7 @@ mod tests {
                 )
             };
             if mapped_ptr.is_null() {
-                return Err(Box::new(io::Error::new(
-                    io::ErrorKind::Other,
-                    "mmap failed",
-                )));
+                panic!("mmap failed");
             }
 
             {
@@ -273,10 +250,7 @@ mod tests {
                             libc::munmap(mapped_ptr, device_size);
                             libc::close(fd);
                         };
-                        return Err(Box::new(io::Error::new(
-                            io::ErrorKind::Other,
-                            "Disk was not encrypted!",
-                        )));
+                        panic!("Disk was not encrypted!");
                     }
                 }
             }
@@ -295,35 +269,25 @@ mod tests {
                     Ok(CryptStatusInfo::Busy) => (),
                     Ok(CryptStatusInfo::Active) => break,
                     Ok(s) => {
-                        return Err(Box::new(io::Error::new(
-                            io::ErrorKind::Other,
-                            format!("Crypt device is in invalid state {s:?}"),
-                        )))
+                        panic!("Crypt device is in invalid state {s:?}")
                     }
                     Err(e) => {
-                        return Err(Box::new(io::Error::new(
-                            io::ErrorKind::Other,
-                            format!("Checking device status returned error: {e}"),
-                        )))
+                        panic!("Checking device status returned error: {e}")
                     }
                 }
             }
 
-            handle.deactivate()?;
+            handle.deactivate().unwrap();
 
-            let handle =
-                CryptHandle::setup(path, Some(UnlockMethod::Keyring))?.ok_or_else(|| {
-                    Box::new(io::Error::new(
-                        io::ErrorKind::Other,
-                        format!(
-                            "Device {} no longer appears to be a LUKS2 device",
-                            path.display(),
-                        ),
-                    ))
-                })?;
-            handle.wipe()?;
-
-            Ok(())
+            let handle = CryptHandle::setup(path, Some(UnlockMethod::Keyring))
+                .unwrap()
+                .unwrap_or_else(|| {
+                    panic!(
+                        "Device {} no longer appears to be a LUKS2 device",
+                        path.display(),
+                    )
+                });
+            handle.wipe().unwrap();
         }
 
         assert_eq!(paths.len(), 1);
@@ -367,10 +331,7 @@ mod tests {
     // should be allowed by cryptsetup.
     fn loop_test_set_sector_size() {
         fn the_test(paths: &[&Path]) {
-            fn test_set_sector_size(
-                paths: &[&Path],
-                key_description: &KeyDescription,
-            ) -> std::result::Result<(), Box<dyn Error>> {
+            fn test_set_sector_size(paths: &[&Path], key_description: &KeyDescription) {
                 let pool_uuid = PoolUuid::new_v4();
                 let pool_name = Name::new("pool_name".to_string());
                 let dev_uuid = DevUuid::new_v4();
@@ -383,8 +344,7 @@ mod tests {
                     &EncryptionInfo::KeyDesc(key_description.clone()),
                     Some(4096u32),
                 )
-                .map(|_| ())
-                .map_err(|e| e.into())
+                .unwrap();
             }
 
             crypt::insert_and_cleanup_key(paths, test_set_sector_size);
@@ -394,16 +354,10 @@ mod tests {
     }
 
     fn test_both_initialize(paths: &[&Path]) {
-        fn both_initialize(
-            paths: &[&Path],
-            key_desc: &KeyDescription,
-        ) -> Result<(), Box<dyn Error>> {
-            unshare_mount_namespace()?;
-            let _memfs = MemoryFilesystem::new()?;
-            let path = paths
-                .get(0)
-                .copied()
-                .ok_or_else(|| StratisError::Msg("Expected exactly one path".to_string()))?;
+        fn both_initialize(paths: &[&Path], key_desc: &KeyDescription) {
+            unshare_mount_namespace().unwrap();
+            let _memfs = MemoryFilesystem::new().unwrap();
+            let path = paths.get(0).copied().expect("Expected exactly one path");
             let pool_name = Name::new("pool_name".to_string());
             let handle = CryptHandle::initialize(
                 path,
@@ -414,16 +368,18 @@ mod tests {
                     key_desc.clone(),
                     (
                         "tang".to_string(),
-                        json!({"url": env::var("TANG_URL").map_err(|_| StratisError::Msg("TANG_URL env var required".to_string()))?, "stratis:tang:trust_url": true}),
+                        json!({"url": env::var("TANG_URL").expect("TANG_URL env var required"), "stratis:tang:trust_url": true}),
                     ),
                 ),
                 None,
-            )?;
+            ).unwrap();
 
-            let mut device = acquire_crypt_device(handle.luks2_device_path())?;
-            device.token_handle().json_get(LUKS2_TOKEN_ID)?;
-            device.token_handle().json_get(CLEVIS_LUKS_TOKEN_ID)?;
-            Ok(())
+            let mut device = acquire_crypt_device(handle.luks2_device_path()).unwrap();
+            device.token_handle().json_get(LUKS2_TOKEN_ID).unwrap();
+            device
+                .token_handle()
+                .json_get(CLEVIS_LUKS_TOKEN_ID)
+                .unwrap();
         }
 
         crypt::insert_and_cleanup_key(paths, both_initialize);

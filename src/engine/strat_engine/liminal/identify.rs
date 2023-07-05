@@ -487,9 +487,6 @@ pub fn find_all() -> libudev::Result<(
 
 #[cfg(test)]
 mod tests {
-
-    use std::error::Error;
-
     use crate::{
         engine::{
             strat_engine::{
@@ -501,7 +498,7 @@ mod tests {
             },
             types::{DevicePath, EncryptionInfo, KeyDescription},
         },
-        stratis::{StratisError, StratisResult},
+        stratis::StratisResult,
     };
 
     use super::*;
@@ -525,103 +522,82 @@ mod tests {
     fn test_process_luks_device_initialized(paths: &[&Path]) {
         assert!(!paths.is_empty());
 
-        fn luks_device_test(
-            paths: &[&Path],
-            key_description: &KeyDescription,
-        ) -> Result<(), Box<dyn Error>> {
+        fn luks_device_test(paths: &[&Path], key_description: &KeyDescription) {
             let pool_uuid = PoolUuid::new_v4();
             let pool_name = Name::new("pool_name".to_string());
 
             let devices = initialize_devices(
-                get_devices(paths)?,
+                get_devices(paths).unwrap(),
                 pool_name,
                 pool_uuid,
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_description.clone())),
                 None,
-            )?;
+            )
+            .unwrap();
 
             for dev in devices {
                 let info =
                     block_device_apply(&DevicePath::new(dev.physical_path()).unwrap(), |dev| {
                         process_luks_device(dev)
-                    })?
-                    .ok_or_else(|| {
-                        StratisError::Msg(
-                            "No device with specified devnode found in udev database".into(),
-                        )
-                    })?
-                    .ok_or_else(|| {
-                        StratisError::Msg(
-                            "No LUKS information for Stratis found on specified device".into(),
-                        )
-                    })?;
+                    })
+                    .unwrap()
+                    .expect("No device with specified devnode found in udev database")
+                    .expect("No LUKS information for Stratis found on specified device");
 
                 if info.identifiers.pool_uuid != pool_uuid {
-                    return Err(Box::new(StratisError::Msg(format!(
+                    panic!(
                         "Discovered pool UUID {} != expected pool UUID {}",
                         info.identifiers.pool_uuid, pool_uuid
-                    ))));
+                    );
                 }
 
                 if info.dev_info.devnode != dev.physical_path() {
-                    return Err(Box::new(StratisError::Msg(format!(
+                    panic!(
                         "Discovered device node {} != expected device node {}",
                         info.dev_info.devnode.display(),
                         dev.physical_path().display()
-                    ))));
+                    );
                 }
 
                 if info.encryption_info.key_description() != Some(key_description) {
-                    return Err(Box::new(StratisError::Msg(format!(
+                    panic!(
                         "Discovered key description {:?} != expected key description {:?}",
                         info.encryption_info.key_description(),
                         Some(key_description.as_application_str())
-                    ))));
+                    );
                 }
 
                 let info =
                     block_device_apply(&DevicePath::new(dev.physical_path()).unwrap(), |dev| {
                         process_stratis_device(dev)
-                    })?
-                    .ok_or_else(|| {
-                        StratisError::Msg(
-                            "No device with specified devnode found in udev database".into(),
-                        )
-                    })?;
+                    })
+                    .unwrap()
+                    .expect("No device with specified devnode found in udev database");
                 if info.is_some() {
-                    return Err(Box::new(StratisError::Msg(
-                        "Encrypted block device was incorrectly identified as a Stratis device"
-                            .to_string(),
-                    )));
+                    panic!("Encrypted block device was incorrectly identified as a Stratis device");
                 }
 
                 let info =
                     block_device_apply(&DevicePath::new(dev.metadata_path()).unwrap(), |dev| {
                         process_stratis_device(dev)
-                    })?
-                    .ok_or_else(|| {
-                        StratisError::Msg(
-                            "No device with specified devnode found in udev database".into(),
-                        )
-                    })?
-                    .ok_or_else(|| {
-                        StratisError::Msg("No Stratis metadata found on specified device".into())
-                    })?;
+                    })
+                    .unwrap()
+                    .expect("No device with specified devnode found in udev database")
+                    .expect("No Stratis metadata found on specified device");
 
                 if info.bda.identifiers().pool_uuid != pool_uuid
                     || info.dev_info.devnode != dev.metadata_path()
                 {
-                    return Err(Box::new(StratisError::Msg(format!(
+                    panic!(
                         "Wrong identifiers and devnode found on Stratis block device: found: pool UUID: {}, device node; {} != expected: pool UUID: {}, device node: {}",
                         info.bda.identifiers().pool_uuid,
                         info.dev_info.devnode.display(),
                         pool_uuid,
-                        dev.metadata_path().display()),
-                    )));
+                        dev.metadata_path().display(),
+                    );
                 }
             }
-            Ok(())
         }
 
         crypt::insert_and_cleanup_key(paths, luks_device_test);

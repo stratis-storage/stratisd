@@ -433,7 +433,7 @@ impl Recordable<Vec<BaseBlockDevSave>> for BlockDevMgr {
 
 #[cfg(test)]
 mod tests {
-    use std::{error::Error, path::Path};
+    use std::path::Path;
 
     use crate::engine::{
         strat_engine::{
@@ -499,11 +499,11 @@ mod tests {
     /// Test that the `BlockDevMgr` will add devices if the same key
     /// is used to encrypted the existing devices and the added devices.
     fn test_blockdevmgr_same_key(paths: &[&Path]) {
-        fn test_with_key(paths: &[&Path], key_desc: &KeyDescription) -> Result<(), Box<dyn Error>> {
+        fn test_with_key(paths: &[&Path], key_desc: &KeyDescription) {
             let pool_uuid = PoolUuid::new_v4();
 
-            let devices1 = get_devices(&paths[..2])?;
-            let devices2 = get_devices(&paths[2..3])?;
+            let devices1 = get_devices(&paths[..2]).unwrap();
+            let devices2 = get_devices(&paths[2..3]).unwrap();
 
             let pool_name = Name::new("pool_name".to_string());
             let mut bdm = BlockDevMgr::initialize(
@@ -513,15 +513,11 @@ mod tests {
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
                 None,
-            )?;
+            )
+            .unwrap();
 
             if bdm.add(pool_name, pool_uuid, devices2, None).is_err() {
-                Err(Box::new(StratisError::Msg(
-                    "Adding a blockdev with the same key to an encrypted pool should succeed"
-                        .to_string(),
-                )))
-            } else {
-                Ok(())
+                panic!("Adding a blockdev with the same key to an encrypted pool should succeed")
             }
         }
 
@@ -548,11 +544,11 @@ mod tests {
     /// is present in the keyring than was used to encrypted the existing
     /// devices.
     fn test_blockdevmgr_changed_key(paths: &[&Path]) {
-        fn test_with_key(paths: &[&Path], key_desc: &KeyDescription) -> Result<(), Box<dyn Error>> {
+        fn test_with_key(paths: &[&Path], key_desc: &KeyDescription) {
             let pool_uuid = PoolUuid::new_v4();
 
-            let devices1 = get_devices(&paths[..2])?;
-            let devices2 = get_devices(&paths[2..3])?;
+            let devices1 = get_devices(&paths[..2]).unwrap();
+            let devices2 = get_devices(&paths[2..3]).unwrap();
 
             let pool_name = Name::new("pool_name".to_string());
             let mut bdm = BlockDevMgr::initialize(
@@ -562,16 +558,13 @@ mod tests {
                 MDADataSize::default(),
                 Some(&EncryptionInfo::KeyDesc(key_desc.clone())),
                 None,
-            )?;
+            )
+            .unwrap();
 
-            crypt::change_key(key_desc)?;
+            crypt::change_key(key_desc);
 
             if bdm.add(pool_name, pool_uuid, devices2, None).is_ok() {
-                Err(Box::new(StratisError::Msg(
-                    "Adding a blockdev with a new key to an encrypted pool should fail".to_string(),
-                )))
-            } else {
-                Ok(())
+                panic!("Adding a blockdev with a new key to an encrypted pool should fail")
             }
         }
 

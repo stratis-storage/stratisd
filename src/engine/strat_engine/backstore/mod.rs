@@ -3,7 +3,7 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 #[allow(clippy::module_inception)]
-mod backstore;
+pub mod backstore;
 pub mod blockdev;
 mod blockdevmgr;
 mod cache_tier;
@@ -14,7 +14,6 @@ mod shared;
 
 #[cfg(test)]
 pub use self::devices::initialize_devices_legacy;
-pub use self::{
-    backstore::Backstore,
-    devices::{find_stratis_devs_by_uuid, get_devno_from_path, ProcessedPathInfos, UnownedDevices},
+pub use self::devices::{
+    find_stratis_devs_by_uuid, get_devno_from_path, ProcessedPathInfos, UnownedDevices,
 };

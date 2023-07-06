@@ -13,16 +13,18 @@ use chrono::{DateTime, Utc};
 use either::Either;
 use serde_json::{Map, Value};
 
+use devicemapper::Sectors;
+
 use crate::{
     engine::{
         engine::{DumpState, Pool, StateDiff},
         strat_engine::{
-            backstore::{
-                blockdev::{v1::StratBlockDev, InternalBlockDev},
-                find_stratis_devs_by_uuid,
-            },
+            backstore::{blockdev::InternalBlockDev, find_stratis_devs_by_uuid},
             crypt::handle::v1::CryptHandle,
-            dm::{has_leftover_devices, stop_partially_constructed_pool},
+            dm::{
+                has_leftover_devices, has_leftover_devices_legacy, stop_partially_constructed_pool,
+                stop_partially_constructed_pool_legacy,
+            },
             liminal::{
                 device_info::{
                     reconstruct_stratis_infos, split_stratis_infos, stratis_infos_ref, DeviceSet,
@@ -32,10 +34,10 @@ use crate::{
                     bda_wrapper, identify_block_device, DeviceInfo, LuksInfo, StratisDevInfo,
                     StratisInfo,
                 },
-                setup::{get_blockdevs, get_metadata},
+                setup::{get_blockdevs, get_blockdevs_legacy, get_metadata},
             },
             metadata::{StratisIdentifiers, BDA},
-            pool::StratPool,
+            pool::{v1, v2, AnyPool},
             serde_structs::PoolSave,
             shared::tiers_to_bdas,
             types::BDARecordResult,
@@ -43,8 +45,8 @@ use crate::{
         structures::Table,
         types::{
             DevUuid, LockedPoolsInfo, MaybeInconsistent, Name, PoolEncryptionInfo, PoolIdentifier,
-            PoolUuid, StoppedPoolsInfo, StratBlockDevDiff, UdevEngineEvent, UnlockMethod,
-            UuidOrConflict,
+            PoolUuid, StoppedPoolsInfo, StratBlockDevDiff, StratSigblockVersion, UdevEngineEvent,
+            UnlockMethod, UuidOrConflict,
         },
         BlockDevTier,
     },
@@ -90,7 +92,7 @@ impl LiminalDevices {
     // Unlock the liminal encrypted devices that correspond to the given pool UUID.
     fn unlock_pool(
         &mut self,
-        pools: &Table<PoolUuid, StratPool>,
+        pools: &Table<PoolUuid, AnyPool>,
         pool_uuid: PoolUuid,
         unlock_method: UnlockMethod,
     ) -> StratisResult<Vec<DevUuid>> {
@@ -165,10 +167,10 @@ impl LiminalDevices {
     /// pool.
     pub fn start_pool(
         &mut self,
-        pools: &Table<PoolUuid, StratPool>,
+        pools: &Table<PoolUuid, AnyPool>,
         id: PoolIdentifier<PoolUuid>,
         unlock_method: Option<UnlockMethod>,
-    ) -> StratisResult<(Name, PoolUuid, StratPool, Vec<DevUuid>)> {
+    ) -> StratisResult<(Name, PoolUuid, AnyPool, Vec<DevUuid>)> {
         let pool_uuid = match id {
             PoolIdentifier::Uuid(u) => u,
             PoolIdentifier::Name(n) => self
@@ -250,12 +252,16 @@ impl LiminalDevices {
     /// filesystems, as in that case the pool needs to be administered.
     pub fn stop_pool(
         &mut self,
-        pools: &mut Table<PoolUuid, StratPool>,
+        pools: &mut Table<PoolUuid, AnyPool>,
         pool_name: Name,
         pool_uuid: PoolUuid,
-        mut pool: StratPool,
+        mut pool: AnyPool,
     ) -> StratisResult<bool> {
-        let (devices, err) = match pool.stop(&pool_name, pool_uuid) {
+        let res = match pool {
+            AnyPool::V1(ref mut p) => p.stop(&pool_name, pool_uuid),
+            AnyPool::V2(ref mut p) => p.stop(&pool_name, pool_uuid),
+        };
+        let (devices, err) = match res {
             Ok(devs) => (devs, None),
             Err((e, true)) => {
                 pools.insert(pool_name, pool_uuid, pool);
@@ -263,7 +269,13 @@ impl LiminalDevices {
             }
             Err((e, false)) => {
                 warn!("Failed to stop pool; placing in partially constructed pools");
-                (DeviceSet::from(pool.drain_bds()), Some(e))
+                (
+                    match pool {
+                        AnyPool::V1(ref mut p) => DeviceSet::from(p.drain_bds()),
+                        AnyPool::V2(ref mut p) => DeviceSet::from(p.drain_bds()),
+                    },
+                    Some(e),
+                )
             }
         };
         for (_, device) in devices.iter() {
@@ -305,23 +317,40 @@ impl LiminalDevices {
     /// Tear down a partially constructed pool.
     pub fn stop_partially_constructed_pool(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
         if let Some(device_set) = self.partially_constructed_pools.remove(&pool_uuid) {
-            match stop_partially_constructed_pool(
-                pool_uuid,
-                &device_set
-                    .iter()
-                    .map(|(dev_uuid, _)| *dev_uuid)
-                    .collect::<Vec<_>>(),
-            ) {
-                Ok(_) => {
-                    self.stopped_pools.insert(pool_uuid, device_set);
-                    Ok(())
+            let metadata_version = device_set.metadata_version()?;
+            match metadata_version {
+                StratSigblockVersion::V1 => {
+                    match stop_partially_constructed_pool_legacy(
+                        pool_uuid,
+                        &device_set
+                            .iter()
+                            .map(|(dev_uuid, _)| *dev_uuid)
+                            .collect::<Vec<_>>(),
+                    ) {
+                        Ok(_) => {
+                            self.stopped_pools.insert(pool_uuid, device_set);
+                            Ok(())
+                        }
+                        Err(e) => {
+                            warn!("Failed to stop partially constructed pool: {}", e);
+                            self.partially_constructed_pools
+                                .insert(pool_uuid, device_set);
+                            Err(e)
+                        }
+                    }
                 }
-                Err(e) => {
-                    warn!("Failed to stop partially constructed pool: {}", e);
-                    self.partially_constructed_pools
-                        .insert(pool_uuid, device_set);
-                    Err(e)
-                }
+                StratSigblockVersion::V2 => match stop_partially_constructed_pool(pool_uuid) {
+                    Ok(_) => {
+                        self.stopped_pools.insert(pool_uuid, device_set);
+                        Ok(())
+                    }
+                    Err(e) => {
+                        warn!("Failed to stop partially constructed pool: {}", e);
+                        self.partially_constructed_pools
+                            .insert(pool_uuid, device_set);
+                        Err(e)
+                    }
+                },
             }
         } else {
             Ok(())
@@ -403,11 +432,14 @@ impl LiminalDevices {
     }
 
     /// Calculate whether block device size has changed.
-    fn handle_size_change(
+    fn handle_size_change<'a, B>(
         tier: BlockDevTier,
         dev_uuid: DevUuid,
-        dev: &mut StratBlockDev,
-    ) -> Option<(DevUuid, StratBlockDevDiff)> {
+        dev: &mut B,
+    ) -> Option<(DevUuid, <<B as DumpState<'a>>::State as StateDiff>::Diff)>
+    where
+        B: DumpState<'a, DumpInput = Sectors> + InternalBlockDev,
+    {
         if tier == BlockDevTier::Data {
             let orig = dev.cached();
             match dev.calc_new_size() {
@@ -415,7 +447,7 @@ impl LiminalDevices {
                 Err(e) => {
                     warn!(
                         "Failed to determine device size for {}: {}",
-                        dev.devnode().display(),
+                        dev.physical_path().display(),
                         e
                     );
                     None
@@ -439,7 +471,7 @@ impl LiminalDevices {
             HashMap<PoolUuid, Vec<LuksInfo>>,
             HashMap<PoolUuid, Vec<StratisInfo>>,
         ),
-    ) -> Vec<(Name, PoolUuid, StratPool)> {
+    ) -> Vec<(Name, PoolUuid, AnyPool)> {
         let table = Table::default();
         let (mut luks_devices, mut stratis_devices) = all_devices;
 
@@ -508,26 +540,49 @@ impl LiminalDevices {
 
                 self.try_setup_started_pool(&table, *pool_uuid, info_map)
                     .map(|(pool_name, mut pool)| {
-                        match pool.blockdevs_mut() {
-                            Ok(blockdevs) => {
-                                for (dev_uuid, tier, blockdev) in blockdevs {
-                                    if let Some(size) =
-                                        Self::handle_size_change(tier, dev_uuid, blockdev)
-                                            .and_then(|(_, d)| d.size.changed())
-                                            .and_then(|c| c)
-                                    {
-                                        blockdev.set_new_size(size);
+                        match pool {
+                            AnyPool::V1(ref mut p) => {
+                                match p.blockdevs_mut() {
+                                    Ok(blockdevs) => {
+                                        for (dev_uuid, tier, blockdev) in blockdevs {
+                                            if let Some(size) =
+                                                Self::handle_size_change(tier, dev_uuid, blockdev)
+                                                    .and_then(|(_, d)| d.size.changed())
+                                                    .and_then(|c| c)
+                                            {
+                                                blockdev.set_new_size(size);
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        warn!("Failed to check size of block devices in newly set up pool: {}", e);
                                     }
                                 }
-                            }
-                            Err(e) => {
-                                warn!("Failed to check size of block devices in newly set up pool: {}", e);
-                            }
+                                (pool_name, *pool_uuid, pool)
+                            },
+                            AnyPool::V2(ref mut p) => {
+                                match p.blockdevs_mut() {
+                                    Ok(blockdevs) => {
+                                        for (dev_uuid, tier, blockdev) in blockdevs {
+                                            if let Some(size) =
+                                                Self::handle_size_change(tier, dev_uuid, blockdev)
+                                                    .and_then(|(_, d)| d.size.changed())
+                                                    .and_then(|c| c)
+                                            {
+                                                blockdev.set_new_size(size);
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        warn!("Failed to check size of block devices in newly set up pool: {}", e);
+                                    }
+                                }
+                                (pool_name, *pool_uuid, pool)
+                            },
                         }
-                        (pool_name, *pool_uuid, pool)
                     })
             })
-            .collect::<Vec<(Name, PoolUuid, StratPool)>>()
+            .collect::<Vec<(Name, PoolUuid, AnyPool)>>()
     }
 
     /// Attempt to set up a pool, starting it if it is not already started.
@@ -538,18 +593,18 @@ impl LiminalDevices {
     ///               self.stopped_pools.get(pool_uuid).is_none()
     fn try_setup_pool(
         &mut self,
-        pools: &Table<PoolUuid, StratPool>,
+        pools: &Table<PoolUuid, AnyPool>,
         pool_uuid: PoolUuid,
         device_set: DeviceSet,
-    ) -> StratisResult<(Name, StratPool)> {
+    ) -> StratisResult<(Name, AnyPool)> {
         fn try_setup_pool_failure(
-            pools: &Table<PoolUuid, StratPool>,
+            pools: &Table<PoolUuid, AnyPool>,
             pool_uuid: PoolUuid,
             luks_info: StratisResult<(Option<PoolEncryptionInfo>, MaybeInconsistent<Option<Name>>)>,
             infos: &HashMap<DevUuid, LStratisDevInfo>,
             bdas: HashMap<DevUuid, BDA>,
             meta_res: StratisResult<(DateTime<Utc>, PoolSave)>,
-        ) -> BDARecordResult<(Name, StratPool)> {
+        ) -> BDARecordResult<(Name, AnyPool)> {
             let (timestamp, metadata) = match meta_res {
                 Ok(o) => o,
                 Err(e) => return Err((e, bdas)),
@@ -620,18 +675,18 @@ impl LiminalDevices {
     ///               self.stopped_pools.get(pool_uuid).is_none()
     fn try_setup_started_pool(
         &mut self,
-        pools: &Table<PoolUuid, StratPool>,
+        pools: &Table<PoolUuid, AnyPool>,
         pool_uuid: PoolUuid,
         device_set: DeviceSet,
-    ) -> Option<(Name, StratPool)> {
+    ) -> Option<(Name, AnyPool)> {
         fn try_setup_started_pool_failure(
-            pools: &Table<PoolUuid, StratPool>,
+            pools: &Table<PoolUuid, AnyPool>,
             pool_uuid: PoolUuid,
             luks_info: StratisResult<(Option<PoolEncryptionInfo>, MaybeInconsistent<Option<Name>>)>,
             infos: &HashMap<DevUuid, LStratisDevInfo>,
             bdas: HashMap<DevUuid, BDA>,
             meta_res: StratisResult<(DateTime<Utc>, PoolSave)>,
-        ) -> BDARecordResult<Either<(Name, StratPool), HashMap<DevUuid, BDA>>> {
+        ) -> BDARecordResult<Either<(Name, AnyPool), HashMap<DevUuid, BDA>>> {
             let (timestamp, metadata) = match meta_res {
                 Ok(o) => o,
                 Err(e) => return Err((e, bdas)),
@@ -710,7 +765,7 @@ impl LiminalDevices {
     /// to determine whether the size has indeed changed so we can update it in
     /// our internal data structures.
     pub fn block_evaluate_size(
-        pools: &mut Table<PoolUuid, StratPool>,
+        pools: &mut Table<PoolUuid, AnyPool>,
         event: &UdevEngineEvent,
     ) -> StratisResult<Option<(DevUuid, StratBlockDevDiff)>> {
         let mut ret = None;
@@ -736,8 +791,17 @@ impl LiminalDevices {
                 let pool_uuid = di.stratis_identifiers().pool_uuid;
                 let dev_uuid = di.stratis_identifiers().device_uuid;
                 if let Some((_, pool)) = pools.get_mut_by_uuid(pool_uuid) {
-                    if let Some((tier, dev)) = pool.get_mut_strat_blockdev(dev_uuid)? {
-                        ret = Self::handle_size_change(tier, dev_uuid, dev);
+                    match pool {
+                        AnyPool::V1(p) => {
+                            if let Some((tier, dev)) = p.get_mut_strat_blockdev(dev_uuid)? {
+                                ret = Self::handle_size_change(tier, dev_uuid, dev);
+                            }
+                        }
+                        AnyPool::V2(p) => {
+                            if let Some((tier, dev)) = p.get_mut_strat_blockdev(dev_uuid)? {
+                                ret = Self::handle_size_change(tier, dev_uuid, dev);
+                            }
+                        }
                     }
                 }
             }
@@ -754,9 +818,9 @@ impl LiminalDevices {
     /// constructing the pool, retain the set of devices.
     pub fn block_evaluate(
         &mut self,
-        pools: &Table<PoolUuid, StratPool>,
+        pools: &Table<PoolUuid, AnyPool>,
         event: &UdevEngineEvent,
-    ) -> Option<(Name, PoolUuid, StratPool)> {
+    ) -> Option<(Name, PoolUuid, AnyPool)> {
         let event_type = event.event_type();
         let device_path = match event.device().devnode() {
             Some(d) => d,
@@ -781,10 +845,21 @@ impl LiminalDevices {
                 let pool_uuid = stratis_identifiers.pool_uuid;
                 let device_uuid = stratis_identifiers.device_uuid;
                 if let Some((_, pool)) = pools.get_by_uuid(pool_uuid) {
-                    if pool.get_strat_blockdev(device_uuid).is_none() {
-                        warn!("Found a device with {} that identifies itself as belonging to pool with UUID {}, but that pool is already up and running and does not appear to contain the device",
-                              info,
-                              pool_uuid);
+                    match pool {
+                        AnyPool::V1(p) => {
+                            if p.get_strat_blockdev(device_uuid).is_none() {
+                                warn!("Found a device with {} that identifies itself as belonging to pool with UUID {}, but that pool is already up and running and does not appear to contain the device",
+                                      info,
+                                      pool_uuid);
+                            }
+                        }
+                        AnyPool::V2(p) => {
+                            if p.get_strat_blockdev(device_uuid).is_none() {
+                                warn!("Found a device with {} that identifies itself as belonging to pool with UUID {}, but that pool is already up and running and does not appear to contain the device",
+                                      info,
+                                      pool_uuid);
+                            }
+                        }
                     }
                     // FIXME: There might be something to check if the device is
                     // included in the pool, but that is less clear.
@@ -876,15 +951,38 @@ impl LiminalDevices {
 
     pub fn handle_stopped_pool(&mut self, pool_uuid: PoolUuid, device_set: DeviceSet) {
         if !device_set.is_empty() {
-            let device_uuids = device_set
-                .iter()
-                .map(|(dev_uuid, _)| *dev_uuid)
-                .collect::<Vec<_>>();
-            if has_leftover_devices(pool_uuid, &device_uuids) {
-                self.partially_constructed_pools
-                    .insert(pool_uuid, device_set);
-            } else {
-                self.stopped_pools.insert(pool_uuid, device_set);
+            match device_set.metadata_version() {
+                Ok(mv) => {
+                    match mv {
+                        StratSigblockVersion::V1 => {
+                            let dev_uuids = device_set
+                                .iter()
+                                .map(|(dev_uuid, _)| *dev_uuid)
+                                .collect::<Vec<_>>();
+                            if has_leftover_devices_legacy(pool_uuid, &dev_uuids) {
+                                self.partially_constructed_pools
+                                    .insert(pool_uuid, device_set);
+                            } else {
+                                self.stopped_pools.insert(pool_uuid, device_set);
+                            }
+                        }
+                        StratSigblockVersion::V2 => {
+                            if has_leftover_devices(pool_uuid) {
+                                self.partially_constructed_pools
+                                    .insert(pool_uuid, device_set);
+                            } else {
+                                self.stopped_pools.insert(pool_uuid, device_set);
+                            }
+                        }
+                    };
+                }
+                Err(e) => {
+                    warn!(
+                        "Unable to detect leftover devices: {}; putting in stopped pools",
+                        e
+                    );
+                    self.stopped_pools.insert(pool_uuid, device_set);
+                }
             }
         }
     }
@@ -988,14 +1086,14 @@ fn load_stratis_metadata(
 /// If there is a name conflict between the set of devices in devices
 /// and some existing pool, return an error.
 fn setup_pool(
-    pools: &Table<PoolUuid, StratPool>,
+    pools: &Table<PoolUuid, AnyPool>,
     pool_uuid: PoolUuid,
     luks_info: StratisResult<(Option<PoolEncryptionInfo>, MaybeInconsistent<Option<Name>>)>,
     infos: &HashMap<DevUuid, LStratisDevInfo>,
     bdas: HashMap<DevUuid, BDA>,
     timestamp: DateTime<Utc>,
     metadata: PoolSave,
-) -> BDARecordResult<(Name, StratPool)> {
+) -> BDARecordResult<(Name, AnyPool)> {
     if let Some((uuid, _)) = pools.get_by_name(&metadata.name) {
         return Err((
             StratisError::Msg(format!(
@@ -1006,74 +1104,109 @@ fn setup_pool(
             )), bdas));
     }
 
-    let (datadevs, cachedevs) = match get_blockdevs(&metadata.backstore, infos, bdas) {
-        Err((err, bdas)) => return Err(
-            (StratisError::Chained(
-                format!(
-                    "There was an error encountered when calculating the block devices for pool with UUID {} and name {}",
-                    pool_uuid,
-                    &metadata.name,
-                ),
-                Box::new(err)
-            ), bdas)),
-        Ok((datadevs, cachedevs)) => (datadevs, cachedevs),
-    };
+    let bda = bdas.values().next();
+    let metadata_version = bda.expect("Must have at least one BDA").sigblock_version();
 
-    if datadevs.first().is_none() {
-        return Err((
-            StratisError::Msg(format!(
-                "There do not appear to be any data devices in the set with pool UUID {pool_uuid}"
-            )),
-            tiers_to_bdas(datadevs, cachedevs, None),
-        ));
-    }
+    match metadata_version {
+        StratSigblockVersion::V1 => {
+            let (datadevs, cachedevs) = match get_blockdevs_legacy(&metadata.backstore, infos, bdas) {
+                Err((err, bdas)) => return Err(
+                    (StratisError::Chained(
+                        format!(
+                            "There was an error encountered when calculating the block devices for pool with UUID {} and name {}",
+                            pool_uuid,
+                            &metadata.name,
+                        ),
+                        Box::new(err)
+                    ), bdas)),
+                Ok((datadevs, cachedevs)) => (datadevs, cachedevs),
+            };
 
-    let (pool_einfo, pool_name) = match luks_info {
-        Ok(inner) => inner,
-        Err(_) => {
-            // NOTE: This is not actually a hopeless situation. It may be
-            // that a LUKS device owned by Stratis corresponding to a
-            // Stratis device has just not been discovered yet. If it
-            // is, the appropriate info will be updated, and setup may
-            // yet succeed.
-            return Err((
-                StratisError::Msg(format!(
-                        "Some data devices in the set belonging to pool with UUID {} and name {} appear to be encrypted devices managed by Stratis, and some do not",
-                        pool_uuid,
-                        &metadata.name
-                )), tiers_to_bdas(datadevs, cachedevs, None)));
-        }
-    };
+            let (pool_einfo, pool_name) = match luks_info {
+                Ok(inner) => inner,
+                Err(_) => {
+                    // NOTE: This is not actually a hopeless situation. It may be
+                    // that a LUKS device owned by Stratis corresponding to a
+                    // Stratis device has just not been discovered yet. If it
+                    // is, the appropriate info will be updated, and setup may
+                    // yet succeed.
+                    return Err((
+                        StratisError::Msg(format!(
+                                "Some data devices in the set belonging to pool with UUID {} and name {} appear to be encrypted devices managed by Stratis, and some do not",
+                                pool_uuid,
+                                &metadata.name
+                        )), tiers_to_bdas(datadevs, cachedevs, None)));
+                }
+            };
 
-    StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata, pool_einfo)
-        .map(|(name, mut pool)| {
-            if matches!(pool_name, MaybeInconsistent::Yes | MaybeInconsistent::No(None)) || MaybeInconsistent::No(Some(&name)) != pool_name.as_ref() || pool.blockdevs().iter().map(|(_, _, bd)| {
-                bd.pool_name()
-            }).fold(false, |acc, next| {
-                match next {
-                    Some(Some(name)) => {
-                        if MaybeInconsistent::No(Some(name)) == pool_name.as_ref() {
-                            acc
-                        } else {
-                            true
+            v1::StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata, pool_einfo)
+                .map(|(name, mut pool)| {
+                    if matches!(pool_name, MaybeInconsistent::Yes | MaybeInconsistent::No(None)) || MaybeInconsistent::No(Some(&name)) != pool_name.as_ref() || pool.blockdevs().iter().map(|(_, _, bd)| {
+                        bd.pool_name()
+                    }).fold(false, |acc, next| {
+                        match next {
+                            Some(Some(name)) => {
+                                if MaybeInconsistent::No(Some(name)) == pool_name.as_ref() {
+                                    acc
+                                } else {
+                                    true
+                                }
+                            },
+                            Some(None) => true,
+                            None => false,
                         }
-                    },
-                    Some(None) => true,
-                    None => false,
-                }
-            }) {
-                if let Err(e) = pool.rename_pool(&name) {
-                    warn!("Pool will not be able to be started by name; pool name metadata in LUKS2 token is not consistent across all devices: {}", e);
-                }
+                    }) {
+                        if let Err(e) = pool.rename_pool(&name) {
+                            warn!("Pool will not be able to be started by name; pool name metadata in LUKS2 token is not consistent across all devices: {}", e);
+                        }
+                    }
+                    (name, AnyPool::V1(pool))
+                })
+                .map_err(|(err, bdas)| {
+                    (StratisError::Chained(
+                        format!(
+                            "An attempt to set up pool with UUID {pool_uuid} from the assembled devices failed"
+                        ),
+                        Box::new(err),
+                    ), bdas)
+                })
+        }
+        StratSigblockVersion::V2 => {
+            let (datadevs, cachedevs) = match get_blockdevs(&metadata.backstore, infos, bdas) {
+                Err((err, bdas)) => return Err(
+                    (StratisError::Chained(
+                        format!(
+                            "There was an error encountered when calculating the block devices for pool with UUID {} and name {}",
+                            pool_uuid,
+                            &metadata.name,
+                        ),
+                        Box::new(err)
+                    ), bdas)),
+                Ok((datadevs, cachedevs)) => (datadevs, cachedevs),
+            };
+
+            let dev = datadevs.first();
+            if dev.is_none() {
+                return Err((
+                    StratisError::Msg(format!(
+                        "There do not appear to be any data devices in the set with pool UUID {pool_uuid}"
+                    )),
+                    tiers_to_bdas(datadevs, cachedevs, None),
+                ));
             }
-            (name, pool)
-        })
-        .map_err(|(err, bdas)| {
-            (StratisError::Chained(
-                format!(
-                    "An attempt to set up pool with UUID {pool_uuid} from the assembled devices failed"
-                ),
-                Box::new(err),
-            ), bdas)
-        })
+
+            v2::StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata)
+                .map(|(name, pool)| {
+                    (name, AnyPool::V2(pool))
+                })
+                .map_err(|(err, bdas)| {
+                    (StratisError::Chained(
+                        format!(
+                            "An attempt to set up pool with UUID {pool_uuid} from the assembled devices failed"
+                        ),
+                        Box::new(err),
+                    ), bdas)
+                })
+        }
+    }
 }

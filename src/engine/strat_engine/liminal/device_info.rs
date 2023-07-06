@@ -18,7 +18,7 @@ use crate::{
     engine::{
         shared::{gather_encryption_info, gather_pool_name},
         strat_engine::{
-            backstore::blockdev::{v1::StratBlockDev, InternalBlockDev},
+            backstore::blockdev::{v1, v2, InternalBlockDev},
             liminal::{
                 identify::{DeviceInfo, LuksInfo, StratisDevInfo, StratisInfo},
                 setup::get_name,
@@ -27,10 +27,10 @@ use crate::{
         },
         types::{
             DevUuid, EncryptionInfo, LockedPoolInfo, MaybeInconsistent, Name, PoolDevice,
-            PoolEncryptionInfo, PoolUuid, StoppedPoolInfo,
+            PoolEncryptionInfo, PoolUuid, StoppedPoolInfo, StratSigblockVersion,
         },
     },
-    stratis::StratisResult,
+    stratis::{StratisError, StratisResult},
 };
 
 /// Info for a discovered LUKS device belonging to Stratis.
@@ -516,8 +516,21 @@ impl IntoIterator for DeviceSet {
     }
 }
 
-impl From<Vec<StratBlockDev>> for DeviceSet {
-    fn from(vec: Vec<StratBlockDev>) -> Self {
+impl From<Vec<v1::StratBlockDev>> for DeviceSet {
+    fn from(vec: Vec<v1::StratBlockDev>) -> Self {
+        vec.into_iter()
+            .flat_map(|bd| {
+                let dev_uuid = bd.uuid();
+                Vec::<DeviceInfo>::from(bd)
+                    .into_iter()
+                    .map(move |info| (dev_uuid, LInfo::from(info)))
+            })
+            .collect::<DeviceSet>()
+    }
+}
+
+impl From<Vec<v2::StratBlockDev>> for DeviceSet {
+    fn from(vec: Vec<v2::StratBlockDev>) -> Self {
         vec.into_iter()
             .flat_map(|bd| {
                 let dev_uuid = bd.uuid();
@@ -761,6 +774,25 @@ impl DeviceSet {
                 }
             },
         }
+    }
+
+    pub fn metadata_version(&self) -> StratisResult<StratSigblockVersion> {
+        let metadata_version = self.iter().fold(HashSet::new(), |mut set, (_, info)| {
+            match info {
+                LInfo::Luks(_) => set.insert(StratSigblockVersion::V1),
+                LInfo::Stratis(info) => set.insert(info.bda.sigblock_version()),
+            };
+            set
+        });
+        if metadata_version.len() > 1 {
+            return Err(StratisError::Msg(
+                "Found two versions of metadata for given device set".to_string(),
+            ));
+        }
+        Ok(*metadata_version
+            .iter()
+            .next()
+            .expect("No empty device sets"))
     }
 
     /// Returns a boolean indicating whether the data structure has any devices

@@ -12,8 +12,8 @@ mod devices;
 mod range_alloc;
 mod shared;
 
-#[cfg(test)]
-pub use self::devices::initialize_devices_legacy;
 pub use self::devices::{
     find_stratis_devs_by_uuid, get_devno_from_path, ProcessedPathInfos, UnownedDevices,
 };
+#[cfg(test)]
+pub use self::devices::{initialize_devices, initialize_devices_legacy};

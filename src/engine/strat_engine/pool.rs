@@ -19,8 +19,9 @@ use crate::{
         },
         strat_engine::{
             backstore::{
+                backstore::{v1::Backstore, InternalBackstore},
                 blockdev::{v1::StratBlockDev, InternalBlockDev},
-                Backstore, ProcessedPathInfos, UnownedDevices,
+                ProcessedPathInfos, UnownedDevices,
             },
             liminal::DeviceSet,
             metadata::{MDADataSize, BDA},

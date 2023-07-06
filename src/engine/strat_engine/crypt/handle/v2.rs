@@ -6,6 +6,7 @@
 
 use std::{
     fmt::Debug,
+    iter::once,
     path::{Path, PathBuf},
 };
 
@@ -187,8 +188,8 @@ pub fn setup_crypt_handle(
         None => return Ok(None),
     };
 
-    if !vec![DEVICEMAPPER_PATH, &metadata.activation_name.to_string()]
-        .into_iter()
+    if !once(DEVICEMAPPER_PATH)
+        .chain(once(metadata.activation_name.to_string().as_str()))
         .collect::<PathBuf>()
         .exists()
     {
@@ -285,7 +286,7 @@ impl CryptHandle {
                     };
 
                 let device_path = DevicePath::new(physical_path)?;
-                let devno = get_devno_from_path(physical_path)?;
+                let devno = get_devno_from_path(&once(DEVICEMAPPER_PATH).chain(once(activation_name.to_string().as_str())).collect::<PathBuf>())?;
                 Ok(CryptHandle::new(
                     device_path,
                     pool_uuid,

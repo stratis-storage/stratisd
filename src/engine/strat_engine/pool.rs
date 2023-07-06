@@ -158,7 +158,7 @@ fn get_pool_state(info: Option<PoolEncryptionInfo>, backstore: &Backstore) -> Ac
 #[derive(Debug)]
 pub struct StratPool {
     backstore: Backstore,
-    thin_pool: ThinPool,
+    thin_pool: ThinPool<Backstore>,
     action_avail: ActionAvailability,
     metadata_size: Sectors,
 }
@@ -187,7 +187,7 @@ impl StratPool {
             encryption_info,
         )?;
 
-        let thinpool = ThinPool::new(
+        let thinpool = ThinPool::<Backstore>::new(
             pool_uuid,
             match ThinPoolSizeParams::new(backstore.datatier_usable_size()) {
                 Ok(ref params) => params,
@@ -504,13 +504,14 @@ impl<'a> Into<Value> for &'a StratPool {
     // Precondition: (&ThinPool).into() pattern matches Value::Object(_)
     // Precondition: (&Backstore).into() pattern matches Value::Object(_)
     fn into(self) -> Value {
-        let mut map: Map<_, _> =
-            if let Value::Object(map) = <&ThinPool as Into<Value>>::into(&self.thin_pool) {
-                map.into_iter()
-            } else {
-                unreachable!("ThinPool conversion returns a JSON object")
-            }
-            .collect();
+        let mut map: Map<_, _> = if let Value::Object(map) =
+            <&ThinPool<Backstore> as Into<Value>>::into(&self.thin_pool)
+        {
+            map.into_iter()
+        } else {
+            unreachable!("ThinPool conversion returns a JSON object")
+        }
+        .collect();
         map.extend(
             if let Value::Object(map) = <&Backstore as Into<Value>>::into(&self.backstore) {
                 map.into_iter()

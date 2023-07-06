@@ -25,7 +25,10 @@ use devicemapper::{Bytes, Sectors};
 use crate::{
     dbus_api::{
         api::prop_conv::{locked_pools_to_prop, stopped_pools_to_prop},
-        blockdev::prop_conv::{blockdev_new_size_to_prop, blockdev_user_info_to_prop},
+        blockdev::prop_conv::{
+            blockdev_new_size_to_prop, blockdev_total_physical_size_to_prop,
+            blockdev_user_info_to_prop,
+        },
         consts,
         filesystem::prop_conv::{fs_size_to_prop, fs_used_to_prop},
         pool::prop_conv::{
@@ -779,6 +782,57 @@ where
         }
     }
 
+    /// Send a signal indicating that the blockdev total physical size has
+    /// changed.
+    fn handle_blockdev_total_physical_size_change(
+        &self,
+        path: Path<'static>,
+        new_total_physical_size: Sectors,
+    ) {
+        let total_physical_size_prop =
+            blockdev_total_physical_size_to_prop(new_total_physical_size);
+        if let Err(e) = self.property_changed_invalidated_signal(
+            &path,
+            prop_hashmap!(
+                consts::BLOCKDEV_INTERFACE_NAME_3_0 => {
+                    Vec::new(),
+                    consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
+                    box_variant!(total_physical_size_prop.clone())
+                },
+                consts::BLOCKDEV_INTERFACE_NAME_3_1 => {
+                    Vec::new(),
+                    consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
+                    box_variant!(total_physical_size_prop.clone())
+                },
+                consts::BLOCKDEV_INTERFACE_NAME_3_2 => {
+                    Vec::new(),
+                    consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
+                    box_variant!(total_physical_size_prop.clone())
+                },
+                consts::BLOCKDEV_INTERFACE_NAME_3_3 => {
+                    Vec::new(),
+                    consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
+                    box_variant!(total_physical_size_prop.clone())
+                },
+                consts::BLOCKDEV_INTERFACE_NAME_3_4 => {
+                    Vec::new(),
+                    consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
+                    box_variant!(total_physical_size_prop.clone())
+                },
+                consts::BLOCKDEV_INTERFACE_NAME_3_5 => {
+                    Vec::new(),
+                    consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
+                    box_variant!(total_physical_size_prop)
+                }
+            ),
+        ) {
+            warn!(
+                "Failed to send a signal over D-Bus indicating blockdev total physical size change: {}",
+                e
+            );
+        }
+    }
+
     /// Send a signal indicating that the pool overprovisioning mode has changed.
     fn handle_pool_overprov_mode_change(&self, path: Path<'static>, new_mode: bool) {
         if let Err(e) = self.property_changed_invalidated_signal(
@@ -1021,6 +1075,10 @@ where
             }
             DbusAction::BlockdevUserInfoChange(path, new_user_info) => {
                 self.handle_blockdev_user_info_change(path, new_user_info);
+                Ok(true)
+            }
+            DbusAction::BlockdevTotalPhysicalSizeChange(path, new_total_physical_size) => {
+                self.handle_blockdev_total_physical_size_change(path, new_total_physical_size);
                 Ok(true)
             }
             DbusAction::PoolForegroundChange(item, new_used, new_alloc, new_size, new_no_space) => {

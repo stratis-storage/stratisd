@@ -116,7 +116,7 @@ pub enum DbusAction<E> {
     LockedPoolsChange(LockedPoolsInfo),
     StoppedPoolsChange(StoppedPoolsInfo),
     BlockdevUserInfoChange(Path<'static>, Option<String>),
-
+    BlockdevTotalPhysicalSizeChange(Path<'static>, Sectors),
     FsBackgroundChange(
         FilesystemUuid,
         SignalChange<Option<Bytes>>,
@@ -456,6 +456,26 @@ where
         {
             warn!(
                 "Block device User info change event could not be sent to the processing thread; no signal will be sent out for the block device user info state change: {}",
+                e,
+            )
+        }
+    }
+
+    /// Send changed signal for changed blockdev total size property.
+    pub fn push_blockdev_total_physical_size_change(
+        &self,
+        path: &Path<'static>,
+        total_physical_size: Sectors,
+    ) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::BlockdevTotalPhysicalSizeChange(
+                path.clone(),
+                total_physical_size,
+            ))
+        {
+            warn!(
+                "Block device total physical size change event could not be sent to the processing thread; no signal will be sent out for the block device total physical size state change: {}",
                 e,
             )
         }

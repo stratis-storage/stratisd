@@ -691,8 +691,8 @@ impl Pool for SimPool {
         _: &Name,
         _: PoolUuid,
         _: DevUuid,
-    ) -> StratisResult<GrowAction<(PoolUuid, DevUuid)>> {
-        Ok(GrowAction::Identity)
+    ) -> StratisResult<(GrowAction<(PoolUuid, DevUuid)>, Option<PoolDiff>)> {
+        Ok((GrowAction::Identity, None))
     }
 }
 

@@ -25,7 +25,7 @@ use crate::{
     engine::{
         engine::{DumpState, StateDiff},
         strat_engine::{
-            backstore::Backstore,
+            backstore::backstore::{v1::Backstore, InternalBackstore},
             cmd::{thin_check, thin_metadata_size, thin_repair},
             dm::{get_dm, list_of_thin_pool_devices, remove_optional_devices},
             names::{

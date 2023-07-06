@@ -11,8 +11,8 @@ use devicemapper::{DevId, DmNameBuf, DmOptions, DmResult, DM};
 use crate::{
     engine::{
         strat_engine::names::{
-            format_backstore_ids, format_crypt_name, format_flex_ids, format_thin_ids,
-            format_thinpool_ids, CacheRole, FlexRole, ThinPoolRole, ThinRole,
+            format_backstore_ids, format_crypt_backstore_name, format_crypt_name, format_flex_ids,
+            format_thin_ids, format_thinpool_ids, CacheRole, FlexRole, ThinPoolRole, ThinRole,
         },
         types::{DevUuid, FilesystemUuid, PoolUuid},
     },
@@ -45,8 +45,7 @@ pub fn get_dm() -> &'static DM {
     )
 }
 
-pub fn remove_optional_devices(devs: Vec<DmNameBuf>) -> StratisResult<bool> {
-    let mut did_something = false;
+pub fn remove_optional_devices(devs: Vec<DmNameBuf>) -> StratisResult<()> {
     let devices = get_dm()
         .list_devices()?
         .into_iter()
@@ -54,18 +53,22 @@ pub fn remove_optional_devices(devs: Vec<DmNameBuf>) -> StratisResult<bool> {
         .collect::<Vec<_>>();
     for device in devs {
         if devices.contains(&device) {
-            did_something = true;
             get_dm().device_remove(&DevId::Name(&device), DmOptions::default())?;
         }
     }
-    Ok(did_something)
+    Ok(())
 }
 
-pub fn stop_partially_constructed_pool(
+pub fn stop_partially_constructed_pool_legacy(
     pool_uuid: PoolUuid,
     dev_uuids: &[DevUuid],
-) -> StratisResult<bool> {
-    let devs = list_of_partial_pool_devices(pool_uuid, dev_uuids);
+) -> StratisResult<()> {
+    let devs = list_of_partial_pool_devices_legacy(pool_uuid, dev_uuids);
+    remove_optional_devices(devs)
+}
+
+pub fn stop_partially_constructed_pool(pool_uuid: PoolUuid) -> StratisResult<()> {
+    let devs = list_of_partial_pool_devices(pool_uuid);
     remove_optional_devices(devs)
 }
 
@@ -94,7 +97,7 @@ pub fn mdv_device(pool_uuid: PoolUuid) -> DmNameBuf {
     thin_mdv
 }
 
-pub fn list_of_backstore_devices(pool_uuid: PoolUuid) -> Vec<DmNameBuf> {
+pub fn list_of_backstore_devices_legacy(pool_uuid: PoolUuid) -> Vec<DmNameBuf> {
     let mut devs = Vec::new();
 
     let (cache, _) = format_backstore_ids(pool_uuid, CacheRole::Cache);
@@ -105,6 +108,17 @@ pub fn list_of_backstore_devices(pool_uuid: PoolUuid) -> Vec<DmNameBuf> {
     devs.push(cache_meta);
     let (origin, _) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
     devs.push(origin);
+
+    devs
+}
+
+pub fn list_of_backstore_devices(pool_uuid: PoolUuid) -> Vec<DmNameBuf> {
+    let mut devs = Vec::new();
+
+    let crypt = format_crypt_backstore_name(&pool_uuid);
+    devs.push(crypt);
+
+    devs.extend(list_of_backstore_devices_legacy(pool_uuid));
 
     devs
 }
@@ -123,7 +137,27 @@ pub fn list_of_crypt_devices(dev_uuids: &[DevUuid]) -> Vec<DmNameBuf> {
 /// List of device names for removal on partially constructed pool stop. Does not have
 /// filesystem names because partially constructed pools are guaranteed not to have any
 /// active filesystems.
-fn list_of_partial_pool_devices(pool_uuid: PoolUuid, dev_uuids: &[DevUuid]) -> Vec<DmNameBuf> {
+fn list_of_partial_pool_devices_legacy(
+    pool_uuid: PoolUuid,
+    dev_uuids: &[DevUuid],
+) -> Vec<DmNameBuf> {
+    let mut devs = Vec::new();
+
+    devs.extend(list_of_thin_pool_devices(pool_uuid));
+
+    devs.push(mdv_device(pool_uuid));
+
+    devs.extend(list_of_backstore_devices_legacy(pool_uuid));
+
+    devs.extend(list_of_crypt_devices(dev_uuids));
+
+    devs
+}
+
+/// List of device names for removal on partially constructed pool stop. Does not have
+/// filesystem names because partially constructed pools are guaranteed not to have any
+/// active filesystems.
+fn list_of_partial_pool_devices(pool_uuid: PoolUuid) -> Vec<DmNameBuf> {
     let mut devs = Vec::new();
 
     devs.extend(list_of_thin_pool_devices(pool_uuid));
@@ -132,15 +166,41 @@ fn list_of_partial_pool_devices(pool_uuid: PoolUuid, dev_uuids: &[DevUuid]) -> V
 
     devs.extend(list_of_backstore_devices(pool_uuid));
 
-    devs.extend(list_of_crypt_devices(dev_uuids));
-
     devs
 }
 
 /// Check whether there are any leftover devicemapper devices from the pool.
-pub fn has_leftover_devices(pool_uuid: PoolUuid, dev_uuids: &[DevUuid]) -> bool {
+pub fn has_leftover_devices_legacy(pool_uuid: PoolUuid, dev_uuids: &[DevUuid]) -> bool {
     let mut has_leftover = false;
-    let devices = list_of_partial_pool_devices(pool_uuid, dev_uuids);
+    let devices = list_of_partial_pool_devices_legacy(pool_uuid, dev_uuids);
+    match get_dm().list_devices() {
+        Ok(l) => {
+            let listed_devices = l
+                .into_iter()
+                .map(|(dm_name, _, _)| dm_name)
+                .collect::<Vec<_>>();
+            for device in devices {
+                if listed_devices.contains(&device) {
+                    has_leftover |= true;
+                }
+            }
+        }
+        Err(_) => {
+            for device in devices {
+                if Path::new(&format!("/dev/mapper/{}", &*device)).exists() {
+                    has_leftover |= true;
+                }
+            }
+        }
+    }
+
+    has_leftover
+}
+
+/// Check whether there are any leftover devicemapper devices from the pool.
+pub fn has_leftover_devices(pool_uuid: PoolUuid) -> bool {
+    let mut has_leftover = false;
+    let devices = list_of_partial_pool_devices(pool_uuid);
     match get_dm().list_devices() {
         Ok(l) => {
             let listed_devices = l

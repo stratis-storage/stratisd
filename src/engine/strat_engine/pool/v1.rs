@@ -10,6 +10,15 @@ use serde_json::{Map, Value};
 use devicemapper::{Bytes, DmNameBuf, Sectors};
 use stratisd_proc_macros::strat_pool_impl_gen;
 
+#[cfg(test)]
+use crate::engine::{
+    strat_engine::{
+        backstore::UnownedDevices,
+        metadata::MDADataSize,
+        thinpool::{ThinPoolSizeParams, DATA_BLOCK_SIZE},
+    },
+    types::EncryptionInfo,
+};
 use crate::{
     engine::{
         engine::{BlockDev, DumpState, Filesystem, Pool, StateDiff},
@@ -21,18 +30,18 @@ use crate::{
             backstore::{
                 backstore::{v1::Backstore, InternalBackstore},
                 blockdev::{v1::StratBlockDev, InternalBlockDev},
-                ProcessedPathInfos, UnownedDevices,
+                ProcessedPathInfos,
             },
             liminal::DeviceSet,
-            metadata::{MDADataSize, BDA},
+            metadata::BDA,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             shared::tiers_to_bdas,
-            thinpool::{StratFilesystem, ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
+            thinpool::{StratFilesystem, ThinPool},
             types::BDARecordResult,
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
-            Diff, EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
+            Diff, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
             PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
             SetDeleteAction, StratFilesystemDiff, StratPoolDiff,
         },
@@ -168,6 +177,7 @@ impl StratPool {
     /// 1. Initialize the block devices specified by paths.
     /// 2. Set up thinpool device to back filesystems.
     /// Precondition: p.is_absolute() is true for all p in paths
+    #[cfg(test)]
     pub fn initialize(
         name: &str,
         devices: UnownedDevices,
@@ -1283,6 +1293,7 @@ mod tests {
     use crate::engine::{
         strat_engine::{
             cmd::udev_settle,
+            pool::AnyPool,
             tests::{loopbacked, real},
             thinpool::ThinPoolStatusDigest,
         },
@@ -1744,7 +1755,10 @@ mod tests {
         while !pool.out_of_alloc_space() {
             f.write_all(write_block).unwrap();
             f.sync_all().unwrap();
-            pool.event_on(pool_uuid, &pool_name).unwrap();
+            match pool {
+                AnyPool::V1(p) => p.event_on(pool_uuid, &pool_name).unwrap(),
+                AnyPool::V2(p) => p.event_on(pool_uuid, &pool_name).unwrap(),
+            };
         }
     }
 

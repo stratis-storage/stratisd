@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{cmp::max, collections::HashMap, path::Path, vec::Vec};
+use std::{collections::HashMap, path::Path, vec::Vec};
 
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
@@ -19,8 +19,8 @@ use crate::{
         },
         strat_engine::{
             backstore::{
-                backstore::{v1::Backstore, InternalBackstore},
-                blockdev::{v1::StratBlockDev, InternalBlockDev},
+                backstore::{v2::Backstore, InternalBackstore},
+                blockdev::{v2::StratBlockDev, InternalBlockDev},
                 ProcessedPathInfos, UnownedDevices,
             },
             liminal::DeviceSet,
@@ -33,10 +33,9 @@ use crate::{
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
             Diff, EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
-            PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
-            SetDeleteAction, StratFilesystemDiff, StratPoolDiff,
+            PoolEncryptionInfo, PoolUuid, PropChangeAction, RegenAction, RenameAction,
+            SetCreateAction, SetDeleteAction, StratFilesystemDiff, StratPoolDiff,
         },
-        PropChangeAction,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -139,22 +138,6 @@ fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
     Ok(())
 }
 
-// Takes a set of information determined about the pool in liminal devices and
-// determines what the state of the pool should be when it is set up.
-fn get_pool_state(info: Option<PoolEncryptionInfo>, backstore: &Backstore) -> ActionAvailability {
-    let avail = if let Some(i) = info {
-        if i.is_inconsistent() {
-            warn!("Metadata for encryption inconsistent across devices in pool");
-            ActionAvailability::NoRequests
-        } else {
-            ActionAvailability::Full
-        }
-    } else {
-        ActionAvailability::Full
-    };
-    max(avail, backstore.action_availability())
-}
-
 #[derive(Debug)]
 pub struct StratPool {
     backstore: Backstore,
@@ -179,13 +162,8 @@ impl StratPool {
         // FIXME: Initializing with the minimum MDA size is not necessarily
         // enough. If there are enough devices specified, more space will be
         // required.
-        let mut backstore = Backstore::initialize(
-            Name::new(name.to_string()),
-            pool_uuid,
-            devices,
-            MDADataSize::default(),
-            encryption_info,
-        )?;
+        let mut backstore =
+            Backstore::initialize(pool_uuid, devices, MDADataSize::default(), encryption_info)?;
 
         let thinpool = ThinPool::<Backstore>::new(
             pool_uuid,
@@ -250,7 +228,6 @@ impl StratPool {
         cachedevs: Vec<StratBlockDev>,
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
-        encryption_info: Option<PoolEncryptionInfo>,
     ) -> BDARecordResult<(Name, StratPool)> {
         if let Err(e) = check_metadata(metadata) {
             return Err((e, tiers_to_bdas(datadevs, cachedevs, None)));
@@ -258,7 +235,7 @@ impl StratPool {
 
         let backstore =
             Backstore::setup(uuid, &metadata.backstore, datadevs, cachedevs, timestamp)?;
-        let action_avail = get_pool_state(encryption_info, &backstore);
+        let action_avail = backstore.action_availability();
 
         let pool_name = &metadata.name;
 
@@ -328,8 +305,8 @@ impl StratPool {
     /// Write current metadata to pool members.
     #[pool_mutating_action("NoPoolChanges")]
     pub fn write_metadata(&mut self, name: &str) -> StratisResult<()> {
-        let data = serde_json::to_vec(&self.record(name))?;
-        self.backstore.save_state(&data)
+        let data = serde_json::to_string(&self.record(name))?;
+        self.backstore.save_state(data.as_bytes())
     }
 
     /// Teardown a pool.
@@ -437,8 +414,10 @@ impl StratPool {
         self.thin_pool.teardown(pool_uuid)?;
         let mut data = self.record(pool_name);
         data.started = Some(false);
-        let json = serde_json::to_vec(&data).map_err(|e| (StratisError::from(e), false))?;
-        self.backstore.save_state(&json).map_err(|e| (e, false))?;
+        let json = serde_json::to_string(&data).map_err(|e| (StratisError::from(e), false))?;
+        self.backstore
+            .save_state(json.as_bytes())
+            .map_err(|e| (e, false))?;
         self.backstore.teardown(pool_uuid).map_err(|e| (e, false))?;
         let bds = self.backstore.drain_bds();
         Ok(DeviceSet::from(bds))
@@ -492,11 +471,6 @@ impl StratPool {
         } else {
             Ok(())
         }
-    }
-
-    /// Rename the pool in the LUKS2 metadata if it is encrypted.
-    pub fn rename_pool(&mut self, new_name: &Name) -> StratisResult<()> {
-        self.backstore.rename_pool(new_name)
     }
 }
 
@@ -624,36 +598,8 @@ impl Pool for StratPool {
                 return Err(StratisError::Msg(err_str));
             }
 
-            let sector_size = if self.is_encrypted() {
-                Some(convert_int!(
-                    *current_data_sector_sizes
-                        .crypt
-                        .expect("pool is encrypted")
-                        .logical_sector_size,
-                    u128,
-                    u32
-                )?)
-            } else {
-                None
-            };
-
             self.thin_pool.suspend()?;
-            let devices_result = self
-                .backstore
-                .init_cache(
-                    Name::new(pool_name.to_string()),
-                    pool_uuid,
-                    unowned_devices,
-                    sector_size,
-                )
-                .and_then(|bdi| {
-                    self.thin_pool
-                        .set_device(self.backstore.device().expect(
-                            "Since thin pool exists, space must have been allocated \
-                             from the backstore, so backstore must have a cap device",
-                        ))
-                        .and(Ok(bdi))
-                });
+            let devices_result = self.backstore.init_cache(pool_uuid, unowned_devices);
             self.thin_pool.resume()?;
             let devices = devices_result?;
             self.write_metadata(pool_name)?;
@@ -898,26 +844,8 @@ impl Pool for StratPool {
                     return Err(StratisError::Msg(err_str));
                 }
 
-                let sector_size = if self.is_encrypted() {
-                    Some(convert_int!(
-                        *current_sector_sizes
-                            .crypt
-                            .expect("pool is encrypted")
-                            .logical_sector_size,
-                        u128,
-                        u32
-                    )?)
-                } else {
-                    None
-                };
-
                 self.thin_pool.suspend()?;
-                let bdev_info_res = self.backstore.add_cachedevs(
-                    Name::new(pool_name.to_string()),
-                    pool_uuid,
-                    unowned_devices,
-                    sector_size,
-                );
+                let bdev_info_res = self.backstore.add_cachedevs(pool_uuid, unowned_devices);
                 self.thin_pool.resume()?;
                 let bdev_info = bdev_info_res?;
                 Ok((SetCreateAction::new(bdev_info), None))
@@ -962,29 +890,11 @@ impl Pool for StratPool {
                     return Err(StratisError::Msg(err_str));
                 }
 
-                let sector_size = if self.is_encrypted() {
-                    Some(convert_int!(
-                        *current_sector_sizes
-                            .crypt
-                            .expect("pool is encrypted")
-                            .logical_sector_size,
-                        u128,
-                        u32
-                    )?)
-                } else {
-                    None
-                };
-
                 let cached = self.cached();
 
                 // If just adding data devices, no need to suspend the pool.
                 // No action will be taken on the DM devices.
-                let bdev_info = self.backstore.add_datadevs(
-                    Name::new(pool_name.to_string()),
-                    pool_uuid,
-                    unowned_devices,
-                    sector_size,
-                )?;
+                let bdev_info = self.backstore.add_datadevs(pool_uuid, unowned_devices)?;
                 self.thin_pool.set_queue_mode();
                 self.thin_pool.clear_out_of_meta_flag();
 
@@ -1160,7 +1070,6 @@ impl Pool for StratPool {
         uuid: DevUuid,
         user_info: Option<&str>,
     ) -> StratisResult<RenameAction<DevUuid>> {
-        user_info.map(validate_name).transpose()?;
         let result = self.backstore.set_blockdev_user_info(uuid, user_info);
         match result {
             Ok(Some(uuid)) => {
@@ -1181,7 +1090,9 @@ impl Pool for StratPool {
     }
 
     fn encryption_info(&self) -> Option<PoolEncryptionInfo> {
-        self.backstore.encryption_info()
+        self.backstore
+            .encryption_info()
+            .map(PoolEncryptionInfo::from)
     }
 
     fn avail_actions(&self) -> ActionAvailability {
@@ -1337,6 +1248,7 @@ mod tests {
     use crate::engine::{
         strat_engine::{
             cmd::udev_settle,
+            pool::AnyPool,
             tests::{loopbacked, real},
             thinpool::ThinPoolStatusDigest,
         },
@@ -1683,7 +1595,7 @@ mod tests {
                 &[(
                     "stratis_test_filesystem",
                     Some(pool.backstore.datatier_usable_size().bytes() * 2u64),
-                    None
+                    None,
                 )],
             )
             .is_err());
@@ -1807,7 +1719,10 @@ mod tests {
         while !pool.out_of_alloc_space() {
             f.write_all(write_block).unwrap();
             f.sync_all().unwrap();
-            pool.event_on(pool_uuid, &pool_name).unwrap();
+            match pool {
+                AnyPool::V1(p) => p.event_on(pool_uuid, &pool_name).unwrap(),
+                AnyPool::V2(p) => p.event_on(pool_uuid, &pool_name).unwrap(),
+            };
         }
     }
 

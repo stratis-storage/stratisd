@@ -52,7 +52,7 @@ use devicemapper::Device;
 
 use crate::engine::{
     strat_engine::{
-        backstore::blockdev::{v1::StratBlockDev, InternalBlockDev},
+        backstore::blockdev::{v1, v2, InternalBlockDev},
         crypt::handle::v1::CryptHandle,
         metadata::{static_header, StratisIdentifiers, BDA},
         udev::{
@@ -173,8 +173,8 @@ impl DeviceInfo {
     }
 }
 
-impl From<StratBlockDev> for Vec<DeviceInfo> {
-    fn from(bd: StratBlockDev) -> Self {
+impl From<v1::StratBlockDev> for Vec<DeviceInfo> {
+    fn from(bd: v1::StratBlockDev) -> Self {
         let mut device_infos = Vec::new();
         match (bd.encryption_info(), bd.pool_name(), bd.luks_device()) {
             (Some(ei), Some(pname), Some(dev)) => {
@@ -212,6 +212,18 @@ impl From<StratBlockDev> for Vec<DeviceInfo> {
             (_, _, _) => unreachable!("If bd.is_encrypted(), all are Some(_)"),
         }
         device_infos
+    }
+}
+
+impl From<v2::StratBlockDev> for Vec<DeviceInfo> {
+    fn from(bd: v2::StratBlockDev) -> Self {
+        vec![DeviceInfo::Stratis(StratisInfo {
+            dev_info: StratisDevInfo {
+                device_number: *bd.device(),
+                devnode: bd.physical_path().to_owned(),
+            },
+            bda: bd.into_bda(),
+        })]
     }
 }
 
@@ -492,7 +504,10 @@ mod tests {
     use crate::{
         engine::{
             strat_engine::{
-                backstore::{initialize_devices_legacy, ProcessedPathInfos, UnownedDevices},
+                backstore::{
+                    initialize_devices, initialize_devices_legacy, ProcessedPathInfos,
+                    UnownedDevices,
+                },
                 cmd::create_fs,
                 metadata::MDADataSize,
                 tests::{crypt, loopbacked, real},
@@ -512,165 +527,6 @@ mod tests {
                 sds.error_on_not_empty().unwrap();
                 uds
             })
-    }
-
-    /// Test that an encrypted device initialized by stratisd is properly
-    /// recognized.
-    ///
-    /// * Verify that the physical paths are recognized as LUKS devices
-    /// belonging to Stratis.
-    /// * Verify that the physical paths are not recognized as Stratis devices.
-    /// * Verify that the metadata paths are recognized as Stratis devices.
-    fn test_process_luks_device_initialized(paths: &[&Path]) {
-        assert!(!paths.is_empty());
-
-        fn luks_device_test(paths: &[&Path], key_description: &KeyDescription) {
-            let pool_uuid = PoolUuid::new_v4();
-            let pool_name = Name::new("pool_name".to_string());
-
-            let devices = initialize_devices_legacy(
-                get_devices(paths).unwrap(),
-                pool_name,
-                pool_uuid,
-                MDADataSize::default(),
-                Some(&EncryptionInfo::KeyDesc(key_description.clone())),
-                None,
-            )
-            .unwrap();
-
-            for dev in devices {
-                let info =
-                    block_device_apply(&DevicePath::new(dev.physical_path()).unwrap(), |dev| {
-                        process_luks_device(dev)
-                    })
-                    .unwrap()
-                    .expect("No device with specified devnode found in udev database")
-                    .expect("No LUKS information for Stratis found on specified device");
-
-                if info.identifiers.pool_uuid != pool_uuid {
-                    panic!(
-                        "Discovered pool UUID {} != expected pool UUID {}",
-                        info.identifiers.pool_uuid, pool_uuid
-                    );
-                }
-
-                if info.dev_info.devnode != dev.physical_path() {
-                    panic!(
-                        "Discovered device node {} != expected device node {}",
-                        info.dev_info.devnode.display(),
-                        dev.physical_path().display()
-                    );
-                }
-
-                if info.encryption_info.key_description() != Some(key_description) {
-                    panic!(
-                        "Discovered key description {:?} != expected key description {:?}",
-                        info.encryption_info.key_description(),
-                        Some(key_description.as_application_str())
-                    );
-                }
-
-                let info =
-                    block_device_apply(&DevicePath::new(dev.physical_path()).unwrap(), |dev| {
-                        process_stratis_device(dev)
-                    })
-                    .unwrap()
-                    .expect("No device with specified devnode found in udev database");
-                if info.is_some() {
-                    panic!("Encrypted block device was incorrectly identified as a Stratis device");
-                }
-
-                let info =
-                    block_device_apply(&DevicePath::new(dev.metadata_path()).unwrap(), |dev| {
-                        process_stratis_device(dev)
-                    })
-                    .unwrap()
-                    .expect("No device with specified devnode found in udev database")
-                    .expect("No Stratis metadata found on specified device");
-
-                if info.bda.identifiers().pool_uuid != pool_uuid
-                    || info.dev_info.devnode != dev.metadata_path()
-                {
-                    panic!(
-                        "Wrong identifiers and devnode found on Stratis block device: found: pool UUID: {}, device node; {} != expected: pool UUID: {}, device node: {}",
-                        info.bda.identifiers().pool_uuid,
-                        info.dev_info.devnode.display(),
-                        pool_uuid,
-                        dev.metadata_path().display(),
-                    );
-                }
-            }
-        }
-
-        crypt::insert_and_cleanup_key(paths, luks_device_test);
-    }
-
-    #[test]
-    fn loop_test_process_luks_device_initialized() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Exactly(1, None),
-            test_process_luks_device_initialized,
-        );
-    }
-
-    #[test]
-    fn real_test_process_luks_device_initialized() {
-        real::test_with_spec(
-            &real::DeviceLimits::Exactly(1, None, None),
-            test_process_luks_device_initialized,
-        );
-    }
-
-    /// Test that the process_*_device methods return the expected
-    /// pool UUID and device node for initialized paths.
-    fn test_process_device_initialized(paths: &[&Path]) {
-        assert!(!paths.is_empty());
-
-        let pool_uuid = PoolUuid::new_v4();
-        let pool_name = Name::new("pool_name".to_string());
-
-        initialize_devices_legacy(
-            get_devices(paths).unwrap(),
-            pool_name,
-            pool_uuid,
-            MDADataSize::default(),
-            None,
-            None,
-        )
-        .unwrap();
-
-        for path in paths {
-            let device_path = DevicePath::new(path).expect("our test path");
-            let info = block_device_apply(&device_path, process_stratis_device)
-                .unwrap()
-                .unwrap()
-                .unwrap();
-            assert_eq!(info.bda.identifiers().pool_uuid, pool_uuid);
-            assert_eq!(&&info.dev_info.devnode, path);
-
-            assert_eq!(
-                block_device_apply(&device_path, process_luks_device)
-                    .unwrap()
-                    .unwrap(),
-                None
-            );
-        }
-    }
-
-    #[test]
-    fn loop_test_process_device_initialized() {
-        loopbacked::test_with_spec(
-            &loopbacked::DeviceLimits::Exactly(1, None),
-            test_process_device_initialized,
-        );
-    }
-
-    #[test]
-    fn real_test_process_device_initialized() {
-        real::test_with_spec(
-            &real::DeviceLimits::Exactly(1, None, None),
-            test_process_device_initialized,
-        );
     }
 
     /// Test that the process_*_device methods return None if the device is
@@ -732,5 +588,222 @@ mod tests {
             &real::DeviceLimits::Exactly(1, None, None),
             test_process_device_uninitialized,
         );
+    }
+
+    mod v1 {
+        use super::*;
+
+        /// Test that an encrypted device initialized by stratisd is properly
+        /// recognized.
+        ///
+        /// * Verify that the physical paths are recognized as LUKS devices
+        /// belonging to Stratis.
+        /// * Verify that the physical paths are not recognized as Stratis devices.
+        /// * Verify that the metadata paths are recognized as Stratis devices.
+        fn test_process_luks_device_initialized(paths: &[&Path]) {
+            assert!(!paths.is_empty());
+
+            fn luks_device_test(paths: &[&Path], key_description: &KeyDescription) {
+                let pool_uuid = PoolUuid::new_v4();
+                let pool_name = Name::new("pool_name".to_string());
+
+                let devices = initialize_devices_legacy(
+                    get_devices(paths).unwrap(),
+                    pool_name,
+                    pool_uuid,
+                    MDADataSize::default(),
+                    Some(&EncryptionInfo::KeyDesc(key_description.clone())),
+                    None,
+                )
+                .unwrap();
+
+                for dev in devices {
+                    let info = block_device_apply(
+                        &DevicePath::new(dev.physical_path()).unwrap(),
+                        process_luks_device,
+                    )
+                    .unwrap()
+                    .expect("No device with specified devnode found in udev database")
+                    .expect("No LUKS information for Stratis found on specified device");
+
+                    if info.identifiers.pool_uuid != pool_uuid {
+                        panic!(
+                            "Discovered pool UUID {} != expected pool UUID {}",
+                            info.identifiers.pool_uuid, pool_uuid
+                        );
+                    }
+
+                    if info.dev_info.devnode != dev.physical_path() {
+                        panic!(
+                            "Discovered device node {} != expected device node {}",
+                            info.dev_info.devnode.display(),
+                            dev.physical_path().display()
+                        );
+                    }
+
+                    if info.encryption_info.key_description() != Some(key_description) {
+                        panic!(
+                            "Discovered key description {:?} != expected key description {:?}",
+                            info.encryption_info.key_description(),
+                            Some(key_description.as_application_str())
+                        );
+                    }
+
+                    let info = block_device_apply(
+                        &DevicePath::new(dev.physical_path()).unwrap(),
+                        process_stratis_device,
+                    )
+                    .unwrap()
+                    .expect("No device with specified devnode found in udev database");
+                    if info.is_some() {
+                        panic!(
+                            "Encrypted block device was incorrectly identified as a Stratis device"
+                        );
+                    }
+
+                    let info = block_device_apply(
+                        &DevicePath::new(dev.metadata_path()).unwrap(),
+                        process_stratis_device,
+                    )
+                    .unwrap()
+                    .expect("No device with specified devnode found in udev database")
+                    .expect("No Stratis metadata found on specified device");
+
+                    if info.bda.identifiers().pool_uuid != pool_uuid
+                        || info.dev_info.devnode != dev.metadata_path()
+                    {
+                        panic!(
+                            "Wrong identifiers and devnode found on Stratis block device: found: pool UUID: {}, device node; {} != expected: pool UUID: {}, device node: {}",
+                            info.bda.identifiers().pool_uuid,
+                            info.dev_info.devnode.display(),
+                            pool_uuid,
+                            dev.metadata_path().display(),
+                        );
+                    }
+                }
+            }
+
+            crypt::insert_and_cleanup_key(paths, luks_device_test);
+        }
+
+        #[test]
+        fn loop_test_process_luks_device_initialized() {
+            loopbacked::test_with_spec(
+                &loopbacked::DeviceLimits::Exactly(1, None),
+                test_process_luks_device_initialized,
+            );
+        }
+
+        #[test]
+        fn real_test_process_luks_device_initialized() {
+            real::test_with_spec(
+                &real::DeviceLimits::Exactly(1, None, None),
+                test_process_luks_device_initialized,
+            );
+        }
+
+        /// Test that the process_*_device methods return the expected
+        /// pool UUID and device node for initialized paths.
+        fn test_process_device_initialized(paths: &[&Path]) {
+            assert!(!paths.is_empty());
+
+            let pool_uuid = PoolUuid::new_v4();
+            let pool_name = Name::new("pool_name".to_string());
+
+            initialize_devices_legacy(
+                get_devices(paths).unwrap(),
+                pool_name,
+                pool_uuid,
+                MDADataSize::default(),
+                None,
+                None,
+            )
+            .unwrap();
+
+            for path in paths {
+                let device_path = DevicePath::new(path).expect("our test path");
+                let info = block_device_apply(&device_path, process_stratis_device)
+                    .unwrap()
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(info.bda.identifiers().pool_uuid, pool_uuid);
+                assert_eq!(&&info.dev_info.devnode, path);
+
+                assert_eq!(
+                    block_device_apply(&device_path, process_luks_device)
+                        .unwrap()
+                        .unwrap(),
+                    None
+                );
+            }
+        }
+
+        #[test]
+        fn loop_test_process_device_initialized() {
+            loopbacked::test_with_spec(
+                &loopbacked::DeviceLimits::Exactly(1, None),
+                test_process_device_initialized,
+            );
+        }
+
+        #[test]
+        fn real_test_process_device_initialized() {
+            real::test_with_spec(
+                &real::DeviceLimits::Exactly(1, None, None),
+                test_process_device_initialized,
+            );
+        }
+    }
+
+    mod v2 {
+        use super::*;
+
+        /// Test that the process_*_device methods return the expected
+        /// pool UUID and device node for initialized paths.
+        fn test_process_device_initialized(paths: &[&Path]) {
+            assert!(!paths.is_empty());
+
+            let pool_uuid = PoolUuid::new_v4();
+
+            initialize_devices(
+                get_devices(paths).unwrap(),
+                pool_uuid,
+                MDADataSize::default(),
+            )
+            .unwrap();
+
+            for path in paths {
+                let device_path = DevicePath::new(path).expect("our test path");
+                let info = block_device_apply(&device_path, process_stratis_device)
+                    .unwrap()
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(info.bda.identifiers().pool_uuid, pool_uuid);
+                assert_eq!(&&info.dev_info.devnode, path);
+
+                assert_eq!(
+                    block_device_apply(&device_path, process_luks_device)
+                        .unwrap()
+                        .unwrap(),
+                    None
+                );
+            }
+        }
+
+        #[test]
+        fn loop_test_process_device_initialized() {
+            loopbacked::test_with_spec(
+                &loopbacked::DeviceLimits::Exactly(1, None),
+                test_process_device_initialized,
+            );
+        }
+
+        #[test]
+        fn real_test_process_device_initialized() {
+            real::test_with_spec(
+                &real::DeviceLimits::Exactly(1, None, None),
+                test_process_device_initialized,
+            );
+        }
     }
 }

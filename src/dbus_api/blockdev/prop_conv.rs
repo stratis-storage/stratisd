@@ -17,3 +17,9 @@ pub fn blockdev_new_size_to_prop(new_size: Option<Sectors>) -> (bool, String) {
 pub fn blockdev_user_info_to_prop(user_info: Option<String>) -> (bool, String) {
     option_to_tuple(user_info, String::new())
 }
+
+/// Generate D-Bus representation of block device total physical size property.
+#[inline]
+pub fn blockdev_total_physical_size_to_prop(total_physical_size: Sectors) -> String {
+    (*total_physical_size.bytes()).to_string()
+}

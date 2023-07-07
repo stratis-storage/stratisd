@@ -818,32 +818,32 @@ impl DbusTreeHandler {
         if let Err(e) = self.property_changed_invalidated_signal(
             &path,
             prop_hashmap!(
-                consts::POOL_INTERFACE_NAME_3_1 => {
+                consts::BLOCKDEV_INTERFACE_NAME_3_1 => {
                     Vec::new(),
                     consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
                     box_variant!(user_info_prop.clone())
                 },
-                consts::POOL_INTERFACE_NAME_3_2 => {
+                consts::BLOCKDEV_INTERFACE_NAME_3_2 => {
                     Vec::new(),
                     consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
                     box_variant!(user_info_prop.clone())
                 },
-                consts::POOL_INTERFACE_NAME_3_3 => {
+                consts::BLOCKDEV_INTERFACE_NAME_3_3 => {
                     Vec::new(),
                     consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
                     box_variant!(user_info_prop.clone())
                 },
-                consts::POOL_INTERFACE_NAME_3_4 => {
+                consts::BLOCKDEV_INTERFACE_NAME_3_4 => {
                     Vec::new(),
                     consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
                     box_variant!(user_info_prop.clone())
                 },
-                consts::POOL_INTERFACE_NAME_3_5 => {
+                consts::BLOCKDEV_INTERFACE_NAME_3_5 => {
                     Vec::new(),
                     consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
                     box_variant!(user_info_prop.clone())
                 },
-                consts::POOL_INTERFACE_NAME_3_6 => {
+                consts::BLOCKDEV_INTERFACE_NAME_3_6 => {
                     Vec::new(),
                     consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
                     box_variant!(user_info_prop)

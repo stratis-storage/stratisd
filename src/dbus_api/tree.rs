@@ -818,6 +818,11 @@ impl DbusTreeHandler {
         if let Err(e) = self.property_changed_invalidated_signal(
             &path,
             prop_hashmap!(
+                consts::BLOCKDEV_INTERFACE_NAME_3_0 => {
+                    Vec::new(),
+                    consts::BLOCKDEV_USER_INFO_PROP.to_string() =>
+                    box_variant!(user_info_prop.clone())
+                },
                 consts::BLOCKDEV_INTERFACE_NAME_3_1 => {
                     Vec::new(),
                     consts::BLOCKDEV_USER_INFO_PROP.to_string() =>

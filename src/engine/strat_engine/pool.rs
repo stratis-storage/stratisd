@@ -1751,14 +1751,17 @@ mod tests {
         };
 
         assert!(pool.out_of_alloc_space());
-        pool.grow_physical(pool_name, *pool_uuid, dev_uuid)
-            .unwrap()
-            .0
-            .changed()
-            .unwrap();
+        let (act, pool_diff) = pool.grow_physical(pool_name, *pool_uuid, dev_uuid).unwrap();
+        assert!(act.is_changed());
         let (_, dev) = pool.get_blockdev(dev_uuid).unwrap();
         assert_eq!(dev.size(), 2u64 * size);
         assert!(!pool.out_of_alloc_space());
+        assert!(!pool_diff
+            .unwrap()
+            .pool
+            .out_of_alloc_space
+            .changed()
+            .unwrap());
     }
 
     #[test]

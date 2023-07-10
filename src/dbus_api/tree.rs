@@ -722,55 +722,6 @@ impl DbusTreeHandler {
         );
     }
 
-    /// Send a signal indicating that the pool total size has changed.
-    fn handle_pool_size_change(&self, path: Path<'static>, new_size: Bytes) {
-        if let Err(e) = self.property_changed_invalidated_signal(
-            &path,
-            prop_hashmap! {
-                consts::POOL_INTERFACE_NAME_3_0 => {
-                    Vec::new(),
-                    consts::POOL_TOTAL_SIZE_PROP.to_string() =>
-                    box_variant!(pool_size_to_prop(new_size))
-                },
-                consts::POOL_INTERFACE_NAME_3_1 => {
-                    Vec::new(),
-                    consts::POOL_TOTAL_SIZE_PROP.to_string() =>
-                    box_variant!(pool_size_to_prop(new_size))
-                },
-                consts::POOL_INTERFACE_NAME_3_2 => {
-                    Vec::new(),
-                    consts::POOL_TOTAL_SIZE_PROP.to_string() =>
-                    box_variant!(pool_size_to_prop(new_size))
-                },
-                consts::POOL_INTERFACE_NAME_3_3 => {
-                    Vec::new(),
-                    consts::POOL_TOTAL_SIZE_PROP.to_string() =>
-                    box_variant!(pool_size_to_prop(new_size))
-                },
-                consts::POOL_INTERFACE_NAME_3_4 => {
-                    Vec::new(),
-                    consts::POOL_TOTAL_SIZE_PROP.to_string() =>
-                    box_variant!(pool_size_to_prop(new_size))
-                },
-                consts::POOL_INTERFACE_NAME_3_5 => {
-                    Vec::new(),
-                    consts::POOL_TOTAL_SIZE_PROP.to_string() =>
-                    box_variant!(pool_size_to_prop(new_size))
-                },
-                consts::POOL_INTERFACE_NAME_3_6 => {
-                    Vec::new(),
-                    consts::POOL_TOTAL_SIZE_PROP.to_string() =>
-                    box_variant!(pool_size_to_prop(new_size))
-                }
-            },
-        ) {
-            warn!(
-                "Failed to send a signal over D-Bus indicating pool size change: {}",
-                e
-            );
-        }
-    }
-
     /// Send a signal indicating that the pool filesystem limit has changed.
     fn handle_pool_fs_limit_change(&self, path: Path<'static>, new_fs_limit: u64) {
         if let Err(e) = self.property_changed_invalidated_signal(
@@ -1148,10 +1099,6 @@ impl DbusTreeHandler {
             }
             DbusAction::PoolCacheChange(item, has_cache) => {
                 self.handle_pool_cache_change(item, has_cache);
-                Ok(true)
-            }
-            DbusAction::PoolSizeChange(path, new_size) => {
-                self.handle_pool_size_change(path, new_size);
                 Ok(true)
             }
             DbusAction::PoolFsLimitChange(path, new_limit) => {

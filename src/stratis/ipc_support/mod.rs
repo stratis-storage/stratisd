@@ -10,12 +10,17 @@
 
 #[cfg(feature = "dbus_enabled")]
 mod dbus_support;
+#[cfg(not(any(feature = "dbus_enabled", feature = "min")))]
+mod dummy;
 #[cfg(feature = "min")]
 #[cfg_attr(feature = "dbus_enabled", allow(dead_code))]
 mod jsonrpc_support;
 
 #[cfg(feature = "dbus_enabled")]
 pub use dbus_support::setup;
+
+#[cfg(not(any(feature = "dbus_enabled", feature = "min")))]
+pub use dummy::setup;
 
 #[cfg(all(feature = "min", not(feature = "dbus_enabled")))]
 pub use jsonrpc_support::setup;

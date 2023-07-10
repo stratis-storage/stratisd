@@ -22,7 +22,7 @@ async fn check_pool_and_fs(
         engine: &Arc<dyn Engine>,
         #[cfg(feature = "dbus_enabled")] sender: &UnboundedSender<DbusAction>,
     ) -> StratisResult<()> {
-        #[cfg(feature = "min")]
+        #[cfg(any(feature = "min", not(any(feature = "min", feature = "dbus_enabled"))))]
         {
             let _ = engine.pool_evented(None).await;
             let _ = engine.fs_evented(None).await;

@@ -29,6 +29,7 @@ else
 endif
 
 MIN_FEATURES = --no-default-features --features engine,min
+NO_IPC_FEATURES = --no-default-features --features engine
 SYSTEMD_FEATURES = --no-default-features --features engine,min,systemd_compat
 EXTRAS_FEATURES =  --no-default-features --features engine,extras,min
 UDEV_FEATURES = --no-default-features --features udev_scripts
@@ -221,6 +222,15 @@ build-min:
 	cargo build ${RELEASE_FLAG} \
 	--bin=stratis-min --bin=stratisd-min --bin=stratis-utils \
 	${SYSTEMD_FEATURES} ${TARGET_ARGS}
+
+## Build stratisd-min and stratis-min for early userspace
+build-no-ipc:
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY}" \
+	cargo build ${RELEASE_FLAG} \
+	--bin=stratisd \
+	${NO_IPC_FEATURES} \
+	${TARGET_ARGS}
 
 ## Build stratis-str-cmp binary
 build-stratis-str-cmp:

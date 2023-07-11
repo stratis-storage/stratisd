@@ -85,7 +85,7 @@ jobs:
           STRATIS_DUMPMETADATA=/usr/bin/stratis-dumpmetadata
           STRATISD=/usr/libexec/stratisd
           PYTHONPATH=./src
-          udev-tests dump-metadata-tests
+          udev-tests dump-metadata-tests startup-tests
         working-directory: ./tests/client-dbus
 
   # PYTHON-BASED TESTS WITH TANG

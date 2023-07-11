@@ -6,7 +6,7 @@ lint:
 	pylint tests --disable=R0801
 
 .PHONY: misc-tests
-misc-tests:
+startup-tests:
 	python3 -m unittest ${UNITTEST_OPTS} tests.misc.test_startup
 
 .PHONY: fmt

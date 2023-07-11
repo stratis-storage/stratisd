@@ -20,6 +20,7 @@ Test unique stratis instance.
 # isort: STDLIB
 import os
 import subprocess
+import time
 import unittest
 
 # isort: THIRDPARTY
@@ -47,8 +48,12 @@ class TestUniqueInstance(unittest.TestCase):
             env=os.environ,
         )
 
-        while not psutil.pid_exists(process.pid):
-            pass
+        for _ in range(5):
+            if psutil.pid_exists(process.pid):
+                break
+            time.sleep(1)
+        else:
+            raise RuntimeError("Initial stratisd process was not started.")
 
         def cleanup():
             process.terminate()
@@ -60,6 +65,18 @@ class TestUniqueInstance(unittest.TestCase):
         """
         Verify that a second stratisd instance can not be started.
         """
+
+        stratisd_lock_file = "/run/stratisd.pid"
+
+        for _ in range(5):
+            if os.path.exists(stratisd_lock_file):
+                break
+            time.sleep(1)
+        else:
+            raise RuntimeError(
+                f"Lock file {stratisd_lock_file} does not seem to exist."
+            )
+
         env = dict(os.environ)
         env["RUST_LOG"] = env.get("RUST_LOG", "") + ",nix::fcntl=debug"
         with subprocess.Popen(

@@ -22,6 +22,8 @@ mod types;
 mod udev;
 mod writing;
 
+#[cfg(feature = "test_extras")]
+pub use self::{backstore::ProcessedPathInfos, pool::v1::StratPool};
 pub use self::{
     crypt::{
         crypt_metadata_size, register_clevis_token, set_up_crypt_logging, CLEVIS_TANG_TRUST_URL,

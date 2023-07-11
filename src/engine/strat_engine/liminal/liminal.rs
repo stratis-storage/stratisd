@@ -669,9 +669,7 @@ impl LiminalDevices {
             Err((err, bdas)) => {
                 info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {}", err);
                 let device_set = reconstruct_stratis_infos(infos, bdas);
-                if !device_set.is_empty() {
-                    self.stopped_pools.insert(pool_uuid, device_set);
-                }
+                self.handle_stopped_pool(pool_uuid, device_set);
                 None
             }
         }

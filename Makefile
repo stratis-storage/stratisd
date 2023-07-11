@@ -46,6 +46,7 @@ MIN_FEATURES = --no-default-features --features engine,min
 NO_IPC_FEATURES = --no-default-features --features engine
 SYSTEMD_FEATURES = --no-default-features --features engine,min,systemd_compat
 EXTRAS_FEATURES =  --no-default-features --features engine,extras,min
+TEST_EXTRAS_FEATURES = --no-default-features --features test_extras
 UDEV_FEATURES = --no-default-features --features udev_scripts
 
 DENY = -D warnings -D future-incompatible -D unused -D rust_2018_idioms -D nonstandard_style
@@ -241,6 +242,13 @@ build-stratis-base32-decode:
 # Extra arguments to `rustc` can only be passed to one target
 # so we use two distinct targets to build the two binaries
 build-udev-utils: build-stratis-str-cmp build-stratis-base32-decode
+
+## Build the test extras
+build-test-extras:
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY}" \
+	cargo build ${RELEASE_FLAG} \
+	--bin=stratis-legacy-pool ${TEST_EXTRAS_FEATURES} ${TARGET_ARGS}
 
 ## Build the stratis-dumpmetadata program
 stratis-dumpmetadata:
@@ -456,8 +464,12 @@ clippy-udev-utils:
 clippy-no-ipc:
 	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} ${NO_IPC_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 
+## Run clippy on no-ipc-build
+clippy-test-extras:
+	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} ${TEST_EXTRAS_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+
 ## Run clippy on the current source tree
-clippy: clippy-macros clippy-min clippy-udev-utils clippy-no-ipc
+clippy: clippy-macros clippy-min clippy-udev-utils clippy-no-ipc clippy-test-extras
 	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 
 .PHONY:
@@ -467,6 +479,7 @@ clippy: clippy-macros clippy-min clippy-udev-utils clippy-no-ipc
 	build-all-man
 	build-all-rust
 	build-min
+	build-test-extras
 	build-udev-utils
 	build-stratis-base32-decode
 	build-stratis-str-cmp
@@ -479,6 +492,7 @@ clippy: clippy-macros clippy-min clippy-udev-utils clippy-no-ipc
 	clippy-macros
 	clippy-min
 	clippy-no-ipc
+	clippy-test-extras
 	clippy-udev-utils
 	docs-ci
 	docs-rust

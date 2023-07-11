@@ -1069,7 +1069,12 @@ mod tests {
         assert_eq!(
             backstore.data_tier.allocated(),
             match (&backstore.linear, &backstore.cache) {
-                (None, None) => Sectors(0),
+                (None, None) =>
+                    if backstore.is_encrypted() {
+                        crypt_metadata_size().sectors()
+                    } else {
+                        Sectors(0)
+                    },
                 (&None, Some(cache)) => cache.size(),
                 (Some(linear), &None) => linear.size(),
                 _ => panic!("impossible; see first assertion"),

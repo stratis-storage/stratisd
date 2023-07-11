@@ -34,10 +34,12 @@ import pyudev
 from stratisd_client_dbus import (
     Blockdev,
     Manager,
+    MOBlockDev,
     MOPool,
     ObjectManager,
     Pool,
     StratisdErrors,
+    blockdevs,
     get_object,
     pools,
 )
@@ -47,6 +49,7 @@ from ._dm import _get_stratis_devices, remove_stratis_setup
 from ._loopback import LoopBackDevices
 
 _STRATISD = os.environ["STRATISD"]
+_LEGACY_POOL = os.environ["LEGACY_POOL"]
 
 CRYPTO_LUKS_FS_TYPE = "crypto_LUKS"
 STRATIS_FS_TYPE = "stratis"
@@ -71,36 +74,50 @@ def create_pool(
     :param key_description: optional key description
     :type key_description: str or NoneType
     :param clevis_info: clevis information, pin and config
-    :type clevis_info: pair of str * str
-    :return: result of the CreatePool D-Bus method call if it succeeds
+    :type clevis_info: pair of str * (bool, str)
+    :return: result of pool create if operation succeeds
     :rtype: bool * str * list of str
     :raises RuntimeError: if pool is not created
     """
-    (result, exit_code, error_str) = Manager.Methods.CreatePool(
-        get_object(TOP_OBJECT),
-        {
-            "name": name,
-            "devices": devices,
-            "key_desc": (False, "")
-            if key_description is None
-            else (True, key_description),
-            "clevis_info": (False, ("", ""))
-            if clevis_info is None
-            else (True, clevis_info),
-        },
-    )
+    newly_created = False
 
-    if exit_code != StratisdErrors.OK:
-        raise RuntimeError(
-            f"Unable to create a pool {name} with devices {devices}: {error_str}"
-        )
+    if len(get_pools(name)) == 0:
+        cmdline = [_LEGACY_POOL, name] + devices
+        if key_description is not None:
+            cmdline.extend(["--key-desc", key_description])
+        if clevis_info is not None:
+            (pin, (tang_url, thp)) = clevis_info
+            cmdline.extend(["--clevis", pin])
+            if pin == "tang":
+                cmdline.extend(["--tang-url", tang_url])
+                if thp is None:
+                    cmdline.append("--trust-url")
+                else:
+                    cmdline.extend(["--thumbprint", thp])
 
-    (_, (pool_object_path, _)) = result
+        with subprocess.Popen(
+            cmdline,
+            text=True,
+        ) as output:
+            output.wait()
+            if output.returncode != 0:
+                raise RuntimeError(
+                    f"Unable to create a pool {name} with devices {devices}: {output.stderr}"
+                )
+
+        newly_created = True
+
+    i = 0
+    while get_pools(name) == [] and i < 5:
+        i += 1
+        time.sleep(1)
+    (pool_object_path, _) = next(iter(get_pools(name)))
+    bd_object_paths = [op for op, _ in get_blockdevs(pool_object_path)]
 
     if not overprovision:
         Pool.Properties.Overprovisioning.Set(get_object(pool_object_path), False)
 
-    return result
+    return (newly_created, (pool_object_path, bd_object_paths))
 
 
 def get_pools(name=None):
@@ -119,6 +136,27 @@ def get_pools(name=None):
     return [
         (op, MOPool(info))
         for op, info in pools(props={} if name is None else {"Name": name}).search(
+            managed_objects
+        )
+    ]
+
+
+def get_blockdevs(pool=None):
+    """
+    Get the device nodes belonging to the pool indicated by parent.
+
+    :param parent: list of object paths representing blockdevs
+    :type blockdev_object_paths: list of str
+    :return: list of blockdev information found
+    :rtype: list of (str * MOBlockdev)
+    """
+    managed_objects = ObjectManager.Methods.GetManagedObjects(
+        get_object(TOP_OBJECT), {}
+    )
+
+    return [
+        (op, MOBlockDev(info))
+        for op, info in blockdevs(props={} if pool is None else {"Pool": pool}).search(
             managed_objects
         )
     ]

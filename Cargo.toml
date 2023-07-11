@@ -60,6 +60,10 @@ required-features = ["udev_scripts"]
 name = "stratis-utils"
 required-features = ["engine"]
 
+[[bin]]
+name = "stratis-legacy-pool"
+required-features = ["test_extras"]
+
 [dependencies.async-trait]
 version = "0.1.51"
 optional = true
@@ -263,6 +267,7 @@ extras = ["pretty-hex"]
 min = ["termios"]
 systemd_compat = ["bindgen"]
 udev_scripts = ["data-encoding"]
+test_extras = ["engine"]
 
 # FIXME: remove when loopdev dependency lower bound is increased from 0.4.0
 [patch.crates-io.loopdev]

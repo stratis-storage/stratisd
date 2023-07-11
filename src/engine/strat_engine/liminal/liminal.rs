@@ -301,16 +301,28 @@ impl LiminalDevices {
 
     /// Tear down a partially constructed pool.
     pub fn stop_partially_constructed_pool(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
-        if let Some(device_set) = self.partially_constructed_pools.get(&pool_uuid) {
-            stop_partially_constructed_pool(
+        if let Some(device_set) = self.partially_constructed_pools.remove(&pool_uuid) {
+            match stop_partially_constructed_pool(
                 pool_uuid,
                 &device_set
                     .iter()
                     .map(|(dev_uuid, _)| *dev_uuid)
                     .collect::<Vec<_>>(),
-            )?;
+            ) {
+                Ok(_) => {
+                    self.stopped_pools.insert(pool_uuid, device_set);
+                    Ok(())
+                }
+                Err(e) => {
+                    warn!("Failed to stop partially constructed pool: {}", e);
+                    self.partially_constructed_pools
+                        .insert(pool_uuid, device_set);
+                    Err(e)
+                }
+            }
+        } else {
+            Ok(())
         }
-        Ok(())
     }
 
     /// Get a mapping of pool UUIDs from all of the LUKS2 devices that are currently
@@ -683,9 +695,7 @@ impl LiminalDevices {
             Err((err, bdas)) => {
                 info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {}", err);
                 let device_set = reconstruct_stratis_infos(infos, bdas);
-                if !device_set.is_empty() {
-                    self.stopped_pools.insert(pool_uuid, device_set);
-                }
+                self.handle_stopped_pool(pool_uuid, device_set);
                 None
             }
         }

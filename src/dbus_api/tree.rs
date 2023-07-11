@@ -25,7 +25,10 @@ use devicemapper::{Bytes, Sectors};
 use crate::{
     dbus_api::{
         api::prop_conv::{locked_pools_to_prop, stopped_pools_to_prop},
-        blockdev::prop_conv::{blockdev_new_size_to_prop, blockdev_user_info_to_prop},
+        blockdev::prop_conv::{
+            blockdev_new_size_to_prop, blockdev_total_physical_size_to_prop,
+            blockdev_user_info_to_prop,
+        },
         consts,
         filesystem::prop_conv::{fs_size_to_prop, fs_used_to_prop},
         pool::prop_conv::{
@@ -719,55 +722,6 @@ impl DbusTreeHandler {
         );
     }
 
-    /// Send a signal indicating that the pool total size has changed.
-    fn handle_pool_size_change(&self, path: Path<'static>, new_size: Bytes) {
-        if let Err(e) = self.property_changed_invalidated_signal(
-            &path,
-            prop_hashmap! {
-                consts::POOL_INTERFACE_NAME_3_0 => {
-                    Vec::new(),
-                    consts::POOL_TOTAL_SIZE_PROP.to_string() =>
-                    box_variant!(pool_size_to_prop(new_size))
-                },
-                consts::POOL_INTERFACE_NAME_3_1 => {
-                    Vec::new(),
-                    consts::POOL_TOTAL_SIZE_PROP.to_string() =>
-                    box_variant!(pool_size_to_prop(new_size))
-                },
-                consts::POOL_INTERFACE_NAME_3_2 => {
-                    Vec::new(),
-                    consts::POOL_TOTAL_SIZE_PROP.to_string() =>
-                    box_variant!(pool_size_to_prop(new_size))
-                },
-                consts::POOL_INTERFACE_NAME_3_3 => {
-                    Vec::new(),
-                    consts::POOL_TOTAL_SIZE_PROP.to_string() =>
-                    box_variant!(pool_size_to_prop(new_size))
-                },
-                consts::POOL_INTERFACE_NAME_3_4 => {
-                    Vec::new(),
-                    consts::POOL_TOTAL_SIZE_PROP.to_string() =>
-                    box_variant!(pool_size_to_prop(new_size))
-                },
-                consts::POOL_INTERFACE_NAME_3_5 => {
-                    Vec::new(),
-                    consts::POOL_TOTAL_SIZE_PROP.to_string() =>
-                    box_variant!(pool_size_to_prop(new_size))
-                },
-                consts::POOL_INTERFACE_NAME_3_6 => {
-                    Vec::new(),
-                    consts::POOL_TOTAL_SIZE_PROP.to_string() =>
-                    box_variant!(pool_size_to_prop(new_size))
-                }
-            },
-        ) {
-            warn!(
-                "Failed to send a signal over D-Bus indicating pool size change: {}",
-                e
-            );
-        }
-    }
-
     /// Send a signal indicating that the pool filesystem limit has changed.
     fn handle_pool_fs_limit_change(&self, path: Path<'static>, new_fs_limit: u64) {
         if let Err(e) = self.property_changed_invalidated_signal(
@@ -842,6 +796,62 @@ impl DbusTreeHandler {
         ) {
             warn!(
                 "Failed to send a signal over D-Bus indicating blockdev user info change: {}",
+                e
+            );
+        }
+    }
+
+    /// Send a signal indicating that the blockdev total physical size has
+    /// changed.
+    fn handle_blockdev_total_physical_size_change(
+        &self,
+        path: Path<'static>,
+        new_total_physical_size: Sectors,
+    ) {
+        let total_physical_size_prop =
+            blockdev_total_physical_size_to_prop(new_total_physical_size);
+        if let Err(e) = self.property_changed_invalidated_signal(
+            &path,
+            prop_hashmap!(
+                consts::BLOCKDEV_INTERFACE_NAME_3_0 => {
+                    Vec::new(),
+                    consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
+                    box_variant!(total_physical_size_prop.clone())
+                },
+                consts::BLOCKDEV_INTERFACE_NAME_3_1 => {
+                    Vec::new(),
+                    consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
+                    box_variant!(total_physical_size_prop.clone())
+                },
+                consts::BLOCKDEV_INTERFACE_NAME_3_2 => {
+                    Vec::new(),
+                    consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
+                    box_variant!(total_physical_size_prop.clone())
+                },
+                consts::BLOCKDEV_INTERFACE_NAME_3_3 => {
+                    Vec::new(),
+                    consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
+                    box_variant!(total_physical_size_prop.clone())
+                },
+                consts::BLOCKDEV_INTERFACE_NAME_3_4 => {
+                    Vec::new(),
+                    consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
+                    box_variant!(total_physical_size_prop.clone())
+                },
+                consts::BLOCKDEV_INTERFACE_NAME_3_5 => {
+                    Vec::new(),
+                    consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
+                    box_variant!(total_physical_size_prop.clone())
+                },
+                consts::BLOCKDEV_INTERFACE_NAME_3_6 => {
+                    Vec::new(),
+                    consts::BLOCKDEV_TOTAL_SIZE_PROP.to_string() =>
+                    box_variant!(total_physical_size_prop)
+                }
+            ),
+        ) {
+            warn!(
+                "Failed to send a signal over D-Bus indicating blockdev total physical size change: {}",
                 e
             );
         }
@@ -1091,10 +1101,6 @@ impl DbusTreeHandler {
                 self.handle_pool_cache_change(item, has_cache);
                 Ok(true)
             }
-            DbusAction::PoolSizeChange(path, new_size) => {
-                self.handle_pool_size_change(path, new_size);
-                Ok(true)
-            }
             DbusAction::PoolFsLimitChange(path, new_limit) => {
                 self.handle_pool_fs_limit_change(path, new_limit);
                 Ok(true)
@@ -1113,6 +1119,10 @@ impl DbusTreeHandler {
             }
             DbusAction::BlockdevUserInfoChange(path, new_user_info) => {
                 self.handle_blockdev_user_info_change(path, new_user_info);
+                Ok(true)
+            }
+            DbusAction::BlockdevTotalPhysicalSizeChange(path, new_total_physical_size) => {
+                self.handle_blockdev_total_physical_size_change(path, new_total_physical_size);
                 Ok(true)
             }
             DbusAction::PoolForegroundChange(item, new_used, new_alloc, new_size, new_no_space) => {

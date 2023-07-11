@@ -1200,15 +1200,23 @@ impl Pool for StratPool {
         name: &Name,
         pool_uuid: PoolUuid,
         device: DevUuid,
-    ) -> StratisResult<GrowAction<(PoolUuid, DevUuid)>> {
+    ) -> StratisResult<(GrowAction<(PoolUuid, DevUuid)>, Option<PoolDiff>)> {
+        let cached = self.cached();
+
         let changed = self.backstore.grow(device)?;
         if changed {
             if self.thin_pool.set_queue_mode() {
                 self.write_metadata(name)?;
             }
-            Ok(GrowAction::Grown((pool_uuid, device)))
+            Ok((
+                GrowAction::Grown((pool_uuid, device)),
+                Some(PoolDiff {
+                    thin_pool: self.thin_pool.cached().unchanged(),
+                    pool: cached.diff(&self.dump(())),
+                }),
+            ))
         } else {
-            Ok(GrowAction::Identity)
+            Ok((GrowAction::Identity, None))
         }
     }
 }
@@ -1752,13 +1760,17 @@ mod tests {
         };
 
         assert!(pool.out_of_alloc_space());
-        pool.grow_physical(pool_name, *pool_uuid, dev_uuid)
-            .unwrap()
-            .changed()
-            .unwrap();
+        let (act, pool_diff) = pool.grow_physical(pool_name, *pool_uuid, dev_uuid).unwrap();
+        assert!(act.is_changed());
         let (_, dev) = pool.get_blockdev(dev_uuid).unwrap();
         assert_eq!(dev.size(), 2u64 * size);
         assert!(!pool.out_of_alloc_space());
+        assert!(!pool_diff
+            .unwrap()
+            .pool
+            .out_of_alloc_space
+            .changed()
+            .unwrap());
     }
 
     #[test]

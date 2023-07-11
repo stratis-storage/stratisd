@@ -31,6 +31,8 @@ from ._utils import (
     random_string,
 )
 
+_TANG_URL = os.getenv("TANG_URL")
+
 
 class TestBindingAndAddingTrustedUrl(UdevTest):
     """
@@ -38,7 +40,6 @@ class TestBindingAndAddingTrustedUrl(UdevTest):
     adding data devices in various orders.
     """
 
-    _TANG_URL = os.getenv("TANG_URL")
     _CLEVIS_CONFIG = {"url": _TANG_URL, "stratis:tang:trust_url": True}
     _CLEVIS_CONFIG_STR = json.dumps(_CLEVIS_CONFIG)
 
@@ -161,11 +162,9 @@ class TestBindingAndAddingTrustedUrl(UdevTest):
 
         (key_description, key) = ("key_spec", "data")
         with OptionalKeyServiceContextManager(key_spec=[(key_description, key)]):
-            clevis_info = ("tang", self._CLEVIS_CONFIG_STR)
-
             pool_name = random_string(5)
             (_, (pool_object_path, _)) = create_pool(
-                pool_name, initial_devnodes, clevis_info=clevis_info
+                pool_name, initial_devnodes, clevis_info=("tang", (_TANG_URL, None))
             )
             self.wait_for_pools(1)
 
@@ -201,10 +200,8 @@ class TestBindingAndAddingTrustedUrl(UdevTest):
         with ServiceContextManager():
             pool_name = random_string(5)
 
-            clevis_info = ("tang", self._CLEVIS_CONFIG_STR)
-
             (_, (pool_object_path, _)) = create_pool(
-                pool_name, initial_devnodes, clevis_info=clevis_info
+                pool_name, initial_devnodes, clevis_info=("tang", (_TANG_URL, None))
             )
             self.wait_for_pools(1)
 

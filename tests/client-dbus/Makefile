@@ -6,7 +6,7 @@ lint:
 	pylint tests --disable=R0801
 
 .PHONY: misc-tests
-misc-tests:
+startup-tests:
 	python3 -m unittest ${UNITTEST_OPTS} tests.misc.test_startup
 
 .PHONY: fmt
@@ -38,6 +38,3 @@ filesystem-predict-tests:
 .PHONY: dump-metadata-tests
 dump-metadata-tests:
 	python3 -m unittest ${UNITTEST_OPTS} tests.udev.test_dump
-
-.PHONY: tests
-tests: udev-tests misc-tests

@@ -44,7 +44,7 @@ use crate::{
                         STRATIS_TOKEN_ID, STRATIS_TOKEN_POOLNAME_KEY, STRATIS_TOKEN_POOL_UUID_KEY,
                         STRATIS_TOKEN_TYPE, TOKEN_KEYSLOTS_KEY, TOKEN_TYPE_KEY,
                     },
-                    handle::CryptHandle,
+                    handle::{CryptHandle, CryptMetadata},
                 },
                 devices::get_devno_from_path,
             },
@@ -61,8 +61,6 @@ use crate::{
     },
     stratis::{StratisError, StratisResult},
 };
-
-use super::handle::CryptMetadata;
 
 /// Set up crypt logging to log cryptsetup debug information at the trace level.
 pub fn set_up_crypt_logging() {

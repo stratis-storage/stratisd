@@ -137,7 +137,6 @@ pub fn get_blockdevs(
     backstore_save: &BackstoreSave,
     infos: &HashMap<DevUuid, LStratisDevInfo>,
     mut bdas: HashMap<DevUuid, BDA>,
-    mut handles: HashMap<DevUuid, CryptHandle>,
 ) -> BDARecordResult<(Vec<StratBlockDev>, Vec<StratBlockDev>)> {
     let recorded_data_map: HashMap<DevUuid, (usize, &BaseBlockDevSave)> = backstore_save
         .data_tier
@@ -185,7 +184,6 @@ pub fn get_blockdevs(
     fn get_blockdev(
         info: &LStratisDevInfo,
         bda: BDA,
-        handle: Option<CryptHandle>,
         data_map: &HashMap<DevUuid, (usize, &BaseBlockDevSave)>,
         cache_map: &HashMap<DevUuid, (usize, &BaseBlockDevSave)>,
         segment_table: &HashMap<DevUuid, Vec<(Sectors, Sectors)>>,
@@ -249,6 +247,10 @@ pub fn get_blockdevs(
             Some(luks) => &luks.dev_info.devnode,
             None => &info.dev_info.devnode,
         };
+        let handle = match CryptHandle::setup(physical_path, None) {
+            Ok(h) => h,
+            Err(e) => return Err((e, bda)),
+        };
         let underlying_device = match handle {
             Some(handle) => UnderlyingDevice::Encrypted(handle),
             None => UnderlyingDevice::Unencrypted(match DevicePath::new(physical_path) {
@@ -275,7 +277,6 @@ pub fn get_blockdevs(
         match get_blockdev(
             infos.get(dev_uuid).expect("bdas.keys() == infos.keys()"),
             bdas.remove(dev_uuid).expect("bdas.keys() == infos.keys()"),
-            handles.remove(dev_uuid),
             &recorded_data_map,
             &recorded_cache_map,
             &segment_table,

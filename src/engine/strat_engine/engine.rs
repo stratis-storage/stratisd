@@ -660,11 +660,16 @@ impl Engine for StratEngine {
     async fn stop_pool(&self, pool_uuid: PoolUuid) -> StratisResult<StopAction<PoolUuid>> {
         let mut pools = self.pools.write_all().await;
         if let Some((name, pool)) = pools.remove_by_uuid(pool_uuid) {
-            self.liminal_devices
+            if self
+                .liminal_devices
                 .write()
                 .await
-                .stop_pool(&mut pools, name, pool_uuid, pool)?;
-            return Ok(StopAction::Stopped(pool_uuid));
+                .stop_pool(&mut pools, name, pool_uuid, pool)?
+            {
+                return Ok(StopAction::Stopped(pool_uuid));
+            } else {
+                return Ok(StopAction::Partial(pool_uuid));
+            }
         }
 
         drop(pools);

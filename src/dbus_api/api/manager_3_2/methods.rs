@@ -164,32 +164,40 @@ pub fn stop_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     })
     .unwrap_or(false);
 
-    let msg = match handle_action!(block_on(
+    let action = handle_action!(block_on(
         dbus_context
             .engine
             .stop_pool(PoolIdentifier::Uuid(pool_uuid), false)
-    )) {
-        Ok(StopAction::Stopped(_) | StopAction::Partial(_)) => {
-            dbus_context.push_remove(&pool_path, consts::pool_interface_list());
-            if send_locked_signal {
-                dbus_context.push_locked_pools(block_on(dbus_context.engine.locked_pools()));
-            }
-            dbus_context.push_stopped_pools(block_on(dbus_context.engine.stopped_pools()));
-            return_message.append3(
-                (true, uuid_to_string!(pool_uuid)),
-                DbusErrorEnum::OK as u16,
-                OK_STRING.to_string(),
-            )
+    ));
+
+    if let Ok(StopAction::Stopped(_) | StopAction::Partial(_)) = action {
+        dbus_context.push_remove(&pool_path, consts::pool_interface_list());
+        if send_locked_signal {
+            dbus_context.push_locked_pools(block_on(dbus_context.engine.locked_pools()));
         }
+        dbus_context.push_stopped_pools(block_on(dbus_context.engine.stopped_pools()));
+    }
+
+    let msg = match action {
+        Ok(StopAction::Stopped(_)) => return_message.append3(
+            (true, uuid_to_string!(pool_uuid)),
+            DbusErrorEnum::OK as u16,
+            OK_STRING.to_string(),
+        ),
         Ok(StopAction::CleanedUp(_)) => unreachable!("!has_partially_constructed above"),
         Ok(StopAction::Identity) => return_message.append3(
             default_return,
             DbusErrorEnum::OK as u16,
             OK_STRING.to_string(),
         ),
+        Ok(StopAction::Partial(_)) => {
+            let error_message = "Pool was stopped, but some component devices were not torn down";
+            let (rc, rs) = (DbusErrorEnum::ERROR as u16, error_message);
+            return_message.append3(default_return, rc, rs)
+        }
         Err(e) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e);
-            return Ok(vec![return_message.append3(default_return, rc, rs)]);
+            return_message.append3(default_return, rc, rs)
         }
     };
 

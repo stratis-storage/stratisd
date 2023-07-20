@@ -57,42 +57,44 @@ pub fn stop_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         })
         .unwrap_or(false);
 
-    let msg = match handle_action!(block_on(dbus_context.engine.stop_pool(pool_id, true))) {
-        Ok(StopAction::Stopped(pool_uuid) | StopAction::Partial(pool_uuid)) => {
-            match m.tree.iter().find_map(|opath| {
-                opath
-                    .get_data()
-                    .as_ref()
-                    .and_then(|op_cxt| match op_cxt.uuid {
-                        StratisUuid::Pool(u) => {
-                            if u == pool_uuid {
-                                Some(opath.get_name())
-                            } else {
-                                None
-                            }
+    let action = handle_action!(block_on(dbus_context.engine.stop_pool(pool_id, true)));
+
+    if let Ok(StopAction::Stopped(pool_uuid) | StopAction::Partial(pool_uuid)) = action {
+        match m.tree.iter().find_map(|opath| {
+            opath
+                .get_data()
+                .as_ref()
+                .and_then(|op_cxt| match op_cxt.uuid {
+                    StratisUuid::Pool(u) => {
+                        if u == pool_uuid {
+                            Some(opath.get_name())
+                        } else {
+                            None
                         }
-                        StratisUuid::Fs(_) => None,
-                        StratisUuid::Dev(_) => None,
-                    })
-            }) {
-                Some(pool_path) => {
-                    dbus_context.push_remove(pool_path, consts::pool_interface_list());
-                    if send_locked_signal {
-                        dbus_context
-                            .push_locked_pools(block_on(dbus_context.engine.locked_pools()));
                     }
-                    dbus_context.push_stopped_pools(block_on(dbus_context.engine.stopped_pools()));
+                    StratisUuid::Fs(_) => None,
+                    StratisUuid::Dev(_) => None,
+                })
+        }) {
+            Some(pool_path) => {
+                dbus_context.push_remove(pool_path, consts::pool_interface_list());
+                if send_locked_signal {
+                    dbus_context.push_locked_pools(block_on(dbus_context.engine.locked_pools()));
                 }
-                None => {
-                    warn!("Could not find pool D-Bus path for the pool that was just stopped");
-                }
+                dbus_context.push_stopped_pools(block_on(dbus_context.engine.stopped_pools()));
             }
-            return_message.append3(
-                (true, uuid_to_string!(pool_uuid)),
-                DbusErrorEnum::OK as u16,
-                OK_STRING.to_string(),
-            )
+            None => {
+                warn!("Could not find pool D-Bus path for the pool that was just stopped");
+            }
         }
+    }
+
+    let msg = match action {
+        Ok(StopAction::Stopped(pool_uuid)) => return_message.append3(
+            (true, uuid_to_string!(pool_uuid)),
+            DbusErrorEnum::OK as u16,
+            OK_STRING.to_string(),
+        ),
         Ok(StopAction::CleanedUp(pool_uuid)) => return_message.append3(
             (true, uuid_to_string!(pool_uuid)),
             DbusErrorEnum::OK as u16,
@@ -103,9 +105,14 @@ pub fn stop_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
             DbusErrorEnum::OK as u16,
             OK_STRING.to_string(),
         ),
+        Ok(StopAction::Partial(_)) => {
+            let error_message = "Pool was stopped, but some component devices were not torn down";
+            let (rc, rs) = (DbusErrorEnum::ERROR as u16, error_message);
+            return_message.append3(default_return, rc, rs)
+        }
         Err(e) => {
             let (rc, rs) = engine_to_dbus_err_tuple(&e);
-            return Ok(vec![return_message.append3(default_return, rc, rs)]);
+            return_message.append3(default_return, rc, rs)
         }
     };
 

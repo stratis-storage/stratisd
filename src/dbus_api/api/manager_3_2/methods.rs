@@ -170,7 +170,7 @@ where
     .unwrap_or(false);
 
     let msg = match handle_action!(block_on(dbus_context.engine.stop_pool(pool_uuid))) {
-        Ok(StopAction::Stopped(_)) => {
+        Ok(StopAction::Stopped(_) | StopAction::Partial(_)) => {
             dbus_context.push_remove(&pool_path, consts::pool_interface_list());
             if send_locked_signal {
                 dbus_context.push_locked_pools(block_on(dbus_context.engine.locked_pools()));

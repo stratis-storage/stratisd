@@ -680,6 +680,8 @@ pub enum StopAction<T> {
     Identity,
     /// Stopped and all devices torn down.
     Stopped(T),
+    /// Stopped, but some devices not torn down.
+    Partial(T),
 }
 
 impl Display for StopAction<PoolUuid> {
@@ -691,6 +693,9 @@ impl Display for StopAction<PoolUuid> {
             ),
             StopAction::Stopped(uuid) => {
                 write!(f, "The pool with UUID {uuid} was successfully stopped")
+            }
+            StopAction::Partial(uuid) => {
+                write!(f, "The pool with UUID {uuid} was stopped, but some component devices could not be removed")
             }
         }
     }

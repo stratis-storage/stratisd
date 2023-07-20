@@ -58,7 +58,7 @@ pub fn stop_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         .unwrap_or(false);
 
     let msg = match handle_action!(block_on(dbus_context.engine.stop_pool(pool_id, true))) {
-        Ok(StopAction::Stopped(pool_uuid)) => {
+        Ok(StopAction::Stopped(pool_uuid) | StopAction::Partial(pool_uuid)) => {
             match m.tree.iter().find_map(|opath| {
                 opath
                     .get_data()

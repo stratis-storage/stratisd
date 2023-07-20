@@ -717,8 +717,11 @@ impl Engine for StratEngine {
             PoolIdentifier::Uuid(u) => pools.remove_by_uuid(u).map(|(n, p)| (n, u, p)),
         } {
             let mut lim_devs = self.liminal_devices.write().await;
-            spawn_blocking!(lim_devs.stop_pool(&mut pools, name, pool_uuid, pool))??;
-            Ok(StopAction::Stopped(pool_uuid))
+            if spawn_blocking!(lim_devs.stop_pool(&mut pools, name, pool_uuid, pool))?? {
+                Ok(StopAction::Stopped(pool_uuid))
+            } else {
+                Ok(StopAction::Partial(pool_uuid))
+            }
         } else {
             Err(StratisError::Msg(format!(
                 "Pool with UUID {id_str} could not be found and cannot be stopped"

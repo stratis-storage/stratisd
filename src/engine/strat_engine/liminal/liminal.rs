@@ -241,13 +241,16 @@ impl LiminalDevices {
 
     /// Stop a pool, tear down the devicemapper devices, and store the pool information
     /// in an internal data structure for later starting.
+    /// Returns true if the pool was torn down entirely, false if the pool is
+    /// partially up. Returns an error if the pool has some untorndown
+    /// filesystems, as in that case the pool needs to be administered.
     pub fn stop_pool(
         &mut self,
         pools: &mut Table<PoolUuid, StratPool>,
         pool_name: Name,
         pool_uuid: PoolUuid,
         mut pool: StratPool,
-    ) -> StratisResult<()> {
+    ) -> StratisResult<bool> {
         let (devices, err) = match pool.stop(&pool_name, pool_uuid) {
             Ok(devs) => (devs, None),
             Err((e, true)) => {
@@ -292,11 +295,7 @@ impl LiminalDevices {
             self.name_to_uuid
                 .insert(pool_name.clone(), UuidOrConflict::Uuid(pool_uuid));
         }
-        if let Some(e) = err {
-            Err(e)
-        } else {
-            Ok(())
-        }
+        Ok(err.is_none())
     }
 
     /// Get a mapping of pool UUIDs from all of the LUKS2 devices that are currently

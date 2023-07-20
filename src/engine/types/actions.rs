@@ -676,7 +676,9 @@ impl<T> EngineAction for StartAction<T> {
 
 /// Action indicating an operation for stopped a resource
 pub enum StopAction<T> {
+    /// Was already stopped, so there was nothing to do.
     Identity,
+    /// Stopped and all devices torn down.
     Stopped(T),
 }
 

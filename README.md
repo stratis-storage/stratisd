@@ -30,7 +30,7 @@ Development mailing list: stratis-devel@lists.fedorahosted.org, -- subscribe
 
 #### IRC
 
-irc.freenode.net #stratis-storage.
+irc.libera.chat #stratis-storage.
 
 ## For Developers
 

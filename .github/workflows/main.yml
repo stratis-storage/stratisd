@@ -82,7 +82,7 @@ jobs:
         working-directory: ./testing
       - name: Checkout PR
         # yamllint disable rule:line-length
-        run: git pull https://gitub.com/mulkieran/testing.git fix-up-missing-interface
+        run: git pull https://github.com/mulkieran/testing.git fix-up-missing-interface
         working-directory: ./testing
       - name: Run stratisd_cert.py
         run: >

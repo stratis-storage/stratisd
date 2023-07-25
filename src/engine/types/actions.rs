@@ -676,9 +676,15 @@ impl<T> EngineAction for StartAction<T> {
 
 /// Action indicating an operation for stopped a resource
 pub enum StopAction<T> {
+    /// Was already stopped, so there was nothing to do.
     Identity,
+    /// Stopped and all devices torn down.
     Stopped(T),
+    /// Went from partially stopped state to fully stopped with all devices
+    /// torn down.
     CleanedUp(T),
+    /// Stopped, but some devices not torn down.
+    Partial(T),
 }
 
 impl Display for StopAction<PoolUuid> {
@@ -694,6 +700,9 @@ impl Display for StopAction<PoolUuid> {
             ),
             StopAction::Stopped(uuid) => {
                 write!(f, "The pool with UUID {uuid} was successfully stopped")
+            }
+            StopAction::Partial(uuid) => {
+                write!(f, "The pool with UUID {uuid} was stopped, but some component devices could not be removed")
             }
         }
     }

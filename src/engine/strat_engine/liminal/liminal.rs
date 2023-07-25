@@ -241,13 +241,16 @@ impl LiminalDevices {
 
     /// Stop a pool, tear down the devicemapper devices, and store the pool information
     /// in an internal data structure for later starting.
+    /// Returns true if the pool was torn down entirely, false if the pool is
+    /// partially up. Returns an error if the pool has some untorndown
+    /// filesystems, as in that case the pool needs to be administered.
     pub fn stop_pool(
         &mut self,
         pools: &mut Table<PoolUuid, StratPool>,
         pool_name: Name,
         pool_uuid: PoolUuid,
         mut pool: StratPool,
-    ) -> StratisResult<()> {
+    ) -> StratisResult<bool> {
         let (devices, err) = match pool.stop(&pool_name, pool_uuid) {
             Ok(devs) => (devs, None),
             Err((e, true)) => {
@@ -292,25 +295,33 @@ impl LiminalDevices {
             self.name_to_uuid
                 .insert(pool_name.clone(), UuidOrConflict::Uuid(pool_uuid));
         }
-        if let Some(e) = err {
-            Err(e)
-        } else {
-            Ok(())
-        }
+        Ok(err.is_none())
     }
 
     /// Tear down a partially constructed pool.
     pub fn stop_partially_constructed_pool(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
-        if let Some(device_set) = self.partially_constructed_pools.get(&pool_uuid) {
-            stop_partially_constructed_pool(
+        if let Some(device_set) = self.partially_constructed_pools.remove(&pool_uuid) {
+            match stop_partially_constructed_pool(
                 pool_uuid,
                 &device_set
                     .iter()
                     .map(|(dev_uuid, _)| *dev_uuid)
                     .collect::<Vec<_>>(),
-            )?;
+            ) {
+                Ok(_) => {
+                    self.stopped_pools.insert(pool_uuid, device_set);
+                    Ok(())
+                }
+                Err(e) => {
+                    warn!("Failed to stop partially constructed pool: {}", e);
+                    self.partially_constructed_pools
+                        .insert(pool_uuid, device_set);
+                    Err(e)
+                }
+            }
+        } else {
+            Ok(())
         }
-        Ok(())
     }
 
     /// Get a mapping of pool UUIDs from all of the LUKS2 devices that are currently
@@ -683,9 +694,7 @@ impl LiminalDevices {
             Err((err, bdas)) => {
                 info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {}", err);
                 let device_set = reconstruct_stratis_infos(infos, bdas);
-                if !device_set.is_empty() {
-                    self.stopped_pools.insert(pool_uuid, device_set);
-                }
+                self.handle_stopped_pool(pool_uuid, device_set);
                 None
             }
         }

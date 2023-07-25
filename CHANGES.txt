@@ -1,3 +1,46 @@
+stratisd 3.5.8
+==============
+Recommended Rust toolchain version: 1.71.0
+Lowest supported Rust toolchain version: 1.69.0
+
+Recommended development platform for Python development: Fedora 38
+
+- Run "cargo update"
+
+- Cherry-picked commits:
+  * Revert to returning an error if pool was partially stopped
+  * Use stop_pool return value to decide StopAction
+  * LiminalDevices::stop_pool() returns a bool
+  * Add Partial to the constructors for StopActions
+  * Add some comments to StopAction
+  * Bug fix for liminal device code
+  * README: update IRC network
+  * github actions: update recommended Rust to 1.71.0
+  * Remove dm::stop_partially_constructed_pool
+  * Fix bug in partially unlocked pool setup
+  * Increase itertools dependency lower bound to 0.11.0
+  * Fix manual_next_back lint error
+  * Start running startup test again, slightly modified
+  * Remove tests target
+  * Use enriched return value in test
+  * Remove code for handling only pool size change
+  * Send blockdev and pool change signal on grow physical
+  * Do not send out signal on UserInfo change before r3
+  * No longer ignore RUSTSEC-2021-0145 in audit target
+  * Specify revision 0 blockdev interface for UserInfo signal
+  * Specify blockdev interfaces for blockdev UserInfo
+  * formatting
+  * remove plymouth remnants
+  * dracut: remove dependency on plymouth
+  * Add comment to DM version check in setup_dm()
+  * Increase devicemapper dependency lower bound to 0.33.5
+  * Require udev support in container stratis-min-cli checks in GitHub Actions
+  * Update lowest supported Rust to 1.69.0
+  * Improve error message for unlock check
+  * Do not use undefined matrix field "toolchain" in GitHub Action 
+  * Fix a source code typo in a test method
+
+
 stratisd 3.5.7
 ==============
 Recommended Rust toolchain version: 1.70.0

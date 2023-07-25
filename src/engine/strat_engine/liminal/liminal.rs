@@ -18,7 +18,7 @@ use crate::{
         engine::{DumpState, Pool, StateDiff},
         strat_engine::{
             backstore::{find_stratis_devs_by_uuid, CryptHandle, StratBlockDev},
-            dm::{has_leftover_devices, stop_partially_constructed_pool},
+            dm::has_leftover_devices,
             liminal::{
                 device_info::{
                     reconstruct_stratis_infos, split_stratis_infos, stratis_infos_ref, DeviceSet,

@@ -61,14 +61,6 @@ pub fn remove_optional_devices(devs: Vec<DmNameBuf>) -> StratisResult<bool> {
     Ok(did_something)
 }
 
-pub fn stop_partially_constructed_pool(
-    pool_uuid: PoolUuid,
-    dev_uuids: &[DevUuid],
-) -> StratisResult<bool> {
-    let devs = list_of_partial_pool_devices(pool_uuid, dev_uuids);
-    remove_optional_devices(devs)
-}
-
 pub fn thin_device(pool_uuid: PoolUuid, fs_uuid: FilesystemUuid) -> DmNameBuf {
     let (dm_name, _) = format_thin_ids(pool_uuid, ThinRole::Filesystem(fs_uuid));
     dm_name

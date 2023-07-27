@@ -1,9 +1,9 @@
 [package]
 name = "stratisd"
-version = "3.5.7"
+version = "3.5.8"
 authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.org>"]
 edition = "2021"
-rust-version = "1.66.1"  # LOWEST SUPPORTED RUST TOOLCHAIN
+rust-version = "1.69.0"  # LOWEST SUPPORTED RUST TOOLCHAIN
 build = "build.rs"
 description = "Stratis daemon"
 license = "MPL-2.0"
@@ -86,7 +86,7 @@ version = "2.3.0"
 optional = true
 
 [dependencies.devicemapper]
-version = "0.33.4"
+version = "0.33.5"
 optional = true
 
 [dependencies.dbus]
@@ -115,7 +115,7 @@ version = "0.1.0"
 optional = true
 
 [dependencies.itertools]
-version = "0.10.1"
+version = "0.11.0"
 optional = true
 
 [dependencies.lazy_static]
@@ -127,7 +127,7 @@ version = "0.3.0"
 optional = true
 
 [dependencies.libc]
-version = "0.2.143"
+version = "0.2.147"
 optional = true
 
 [dependencies.libcryptsetup-rs]

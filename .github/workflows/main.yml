@@ -34,10 +34,10 @@ jobs:
       matrix:
         include:
           - task: make -f Makefile fmt-travis
-            toolchain: 1.70.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.71.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: rustfmt
           - task: make -f Makefile check-typos
-            toolchain: 1.70.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.71.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-22.04
     container:
@@ -74,7 +74,7 @@ jobs:
               TANG_URL=tang
               RUST_LOG=stratisd=debug
               make -f Makefile test-clevis-loop
-            toolchain: 1.70.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.71.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
             image: fedora:38  # CURRENT DEVELOPMENT ENVIRONMENT
     runs-on: ubuntu-22.04
@@ -152,7 +152,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.66.1  # LOWEST SUPPORTED RUST TOOLCHAIN
+          toolchain: 1.69.0  # LOWEST SUPPORTED RUST TOOLCHAIN
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd
@@ -176,7 +176,7 @@ jobs:
     runs-on: ubuntu-22.04
     container:
       image: fedora:38  # CURRENT DEVELOPMENT ENVIRONMENT
-      options: --privileged --userns=host --ipc=host -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1
+      options: --privileged --userns=host --ipc=host -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies
@@ -208,7 +208,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.70.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.71.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - name: Run stratisd-min cli tests
         run: make test-stratisd-min
       - name: Run stratis-min cli tests
@@ -260,7 +260,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.70.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.71.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - name: Check out ci repo
         run: git clone https://github.com/stratis-storage/ci.git
       - name: Run ${{ matrix.task }}
@@ -295,7 +295,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.70.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.71.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd
@@ -339,7 +339,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.66.1  # LOWEST SUPPORTED RUST TOOLCHAIN
+          toolchain: 1.69.0  # LOWEST SUPPORTED RUST TOOLCHAIN
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd
@@ -353,7 +353,7 @@ jobs:
       - name: Use testing 3.5.2
         run: git checkout tags/v3.5.2 -b version-3.5.2
         working-directory: ./testing
-      - name: Run stratisd_cert.py using Rust ${{ matrix.toolchain }}
+      - name: Run stratisd_cert.py
         run: >
           sudo
           RUST_LOG=stratisd=debug

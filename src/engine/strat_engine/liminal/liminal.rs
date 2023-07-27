@@ -18,10 +18,7 @@ use crate::{
         engine::{DumpState, Pool, StateDiff},
         strat_engine::{
             backstore::{find_stratis_devs_by_uuid, CryptHandle, StratBlockDev},
-            dm::{
-                has_leftover_devices, list_of_crypt_devices, remove_optional_devices,
-                stop_partially_constructed_pool,
-            },
+            dm::has_leftover_devices,
             liminal::{
                 device_info::{
                     reconstruct_stratis_infos, split_stratis_infos, stratis_infos_ref, DeviceSet,
@@ -92,13 +89,10 @@ impl LiminalDevices {
         pools: &Table<PoolUuid, StratPool>,
         pool_uuid: PoolUuid,
         unlock_method: UnlockMethod,
-    ) -> StratisResult<Vec<(DevUuid, CryptHandle)>> {
-        fn handle_luks(
-            luks_info: &LLuksInfo,
-            unlock_method: UnlockMethod,
-        ) -> StratisResult<CryptHandle> {
-            if let Some(h) = CryptHandle::setup(&luks_info.dev_info.devnode, Some(unlock_method))? {
-                Ok(h)
+    ) -> StratisResult<Vec<DevUuid>> {
+        fn handle_luks(luks_info: &LLuksInfo, unlock_method: UnlockMethod) -> StratisResult<()> {
+            if CryptHandle::setup(&luks_info.dev_info.devnode, Some(unlock_method))?.is_some() {
+                Ok(())
             } else {
                 Err(StratisError::Msg(format!(
                     "Block device {} does not appear to be formatted with
@@ -135,16 +129,8 @@ impl LiminalDevices {
                     match info {
                         LInfo::Stratis(_) => (),
                         LInfo::Luks(ref luks_info) => match handle_luks(luks_info, unlock_method) {
-                            Ok(handle) => unlocked.push((*dev_uuid, handle)),
-                            Err(e) => {
-                                return Err(handle_unlock_rollback(
-                                    e,
-                                    unlocked
-                                        .into_iter()
-                                        .map(|(dev_uuid, _)| dev_uuid)
-                                        .collect::<Vec<_>>(),
-                                ));
-                            }
+                            Ok(()) => unlocked.push(*dev_uuid),
+                            Err(e) => return Err(e),
                         },
                     }
                 }
@@ -216,24 +202,13 @@ impl LiminalDevices {
             (Err(e), _) => return Err(e),
         };
 
-        let (uuids, handles) = unlocked_devices.into_iter().fold(
-            (Vec::new(), HashMap::new()),
-            |(mut uuids, mut handles), (uuid, handle)| {
-                uuids.push(uuid);
-                handles.insert(uuid, handle);
-                (uuids, handles)
-            },
-        );
+        let uuids = unlocked_devices.into_iter().collect::<Vec<_>>();
 
         let mut stopped_pool = self
             .stopped_pools
             .remove(&pool_uuid)
             .or_else(|| self.partially_constructed_pools.remove(&pool_uuid))
             .expect("Checked above");
-        let all_uuids = stopped_pool
-            .iter()
-            .map(|(dev_uuid, _)| *dev_uuid)
-            .collect::<Vec<_>>();
         match find_stratis_devs_by_uuid(pool_uuid, &uuids) {
             Ok(infos) => infos.into_iter().for_each(|(dev_uuid, (path, devno))| {
                 if let Ok(Ok(Some(bda))) = bda_wrapper(&path) {
@@ -256,26 +231,26 @@ impl LiminalDevices {
             }),
             Err(e) => {
                 warn!("Failed to scan for newly unlocked Stratis devices: {}", e);
-                let err = handle_unlock_rollback(e, all_uuids);
-                return Err(err);
+                return Err(e);
             }
         };
 
-        match self.try_setup_pool(pools, pool_uuid, stopped_pool, handles) {
-            Ok((name, pool)) => Ok((name, pool_uuid, pool, uuids)),
-            Err(e) => Err(handle_unlock_rollback(e, all_uuids)),
-        }
+        self.try_setup_pool(pools, pool_uuid, stopped_pool)
+            .map(|(name, pool)| (name, pool_uuid, pool, uuids))
     }
 
     /// Stop a pool, tear down the devicemapper devices, and store the pool information
     /// in an internal data structure for later starting.
+    /// Returns true if the pool was torn down entirely, false if the pool is
+    /// partially up. Returns an error if the pool has some untorndown
+    /// filesystems, as in that case the pool needs to be administered.
     pub fn stop_pool(
         &mut self,
         pools: &mut Table<PoolUuid, StratPool>,
         pool_name: Name,
         pool_uuid: PoolUuid,
         mut pool: StratPool,
-    ) -> StratisResult<()> {
+    ) -> StratisResult<bool> {
         let (devices, err) = match pool.stop(&pool_name, pool_uuid) {
             Ok(devs) => (devs, None),
             Err((e, true)) => {
@@ -320,11 +295,7 @@ impl LiminalDevices {
             self.name_to_uuid
                 .insert(pool_name.clone(), UuidOrConflict::Uuid(pool_uuid));
         }
-        if let Some(e) = err {
-            Err(e)
-        } else {
-            Ok(())
-        }
+        Ok(err.is_none())
     }
 
     /// Get a mapping of pool UUIDs from all of the LUKS2 devices that are currently
@@ -540,7 +511,6 @@ impl LiminalDevices {
         pools: &Table<PoolUuid, StratPool>,
         pool_uuid: PoolUuid,
         device_set: DeviceSet,
-        handles: HashMap<DevUuid, CryptHandle>,
     ) -> StratisResult<(Name, StratPool)> {
         fn try_setup_pool_failure(
             pools: &Table<PoolUuid, StratPool>,
@@ -548,7 +518,6 @@ impl LiminalDevices {
             luks_info: StratisResult<(Option<PoolEncryptionInfo>, MaybeInconsistent<Option<Name>>)>,
             infos: &HashMap<DevUuid, LStratisDevInfo>,
             bdas: HashMap<DevUuid, BDA>,
-            handles: HashMap<DevUuid, CryptHandle>,
             meta_res: StratisResult<(DateTime<Utc>, PoolSave)>,
         ) -> BDARecordResult<(Name, StratPool)> {
             let (timestamp, metadata) = match meta_res {
@@ -557,7 +526,7 @@ impl LiminalDevices {
             };
 
             setup_pool(
-                pools, pool_uuid, luks_info, infos, bdas, handles, timestamp, metadata,
+                pools, pool_uuid, luks_info, infos, bdas, timestamp, metadata,
             )
         }
 
@@ -581,7 +550,7 @@ impl LiminalDevices {
 
         let res = load_stratis_metadata(pool_uuid, stratis_infos_ref(&infos));
         let (infos, bdas) = split_stratis_infos(infos);
-        match try_setup_pool_failure(pools, pool_uuid, luks_info, &infos, bdas, handles, res) {
+        match try_setup_pool_failure(pools, pool_uuid, luks_info, &infos, bdas, res) {
             Ok((name, pool)) => {
                 self.uuid_lookup = self
                     .uuid_lookup
@@ -638,22 +607,8 @@ impl LiminalDevices {
                 Err(e) => return Err((e, bdas)),
             };
             if let Some(true) | None = metadata.started {
-                let mut handles = HashMap::default();
-                for (dev_uuid, info) in infos {
-                    if let Some((dev_uuid, handle)) = match info.luks.as_ref() {
-                        Some(l) => match CryptHandle::setup(&l.dev_info.devnode, None) {
-                            Ok(Some(handle)) => Some((dev_uuid, handle)),
-                            Ok(None) => None,
-                            Err(e) => return Err((e, bdas)),
-                        },
-                        None => None,
-                    } {
-                        handles.insert(*dev_uuid, handle);
-                    }
-                }
-
                 setup_pool(
-                    pools, pool_uuid, luks_info, infos, bdas, handles, timestamp, metadata,
+                    pools, pool_uuid, luks_info, infos, bdas, timestamp, metadata,
                 )
                 .map(Either::Left)
             } else {
@@ -713,9 +668,7 @@ impl LiminalDevices {
             Err((err, bdas)) => {
                 info!("Attempt to set up pool failed, but it may be possible to set up the pool later, if the situation changes: {}", err);
                 let device_set = reconstruct_stratis_infos(infos, bdas);
-                if !device_set.is_empty() {
-                    self.stopped_pools.insert(pool_uuid, device_set);
-                }
+                self.handle_stopped_pool(pool_uuid, device_set);
                 None
             }
         }
@@ -810,6 +763,7 @@ impl LiminalDevices {
                     let mut devices = self
                         .stopped_pools
                         .remove(&pool_uuid)
+                        .or_else(|| self.partially_constructed_pools.remove(&pool_uuid))
                         .unwrap_or_else(DeviceSet::new);
 
                     self.uuid_lookup
@@ -900,44 +854,8 @@ impl LiminalDevices {
                 .map(|(dev_uuid, _)| *dev_uuid)
                 .collect::<Vec<_>>();
             if has_leftover_devices(pool_uuid, &device_uuids) {
-                let dev_uuids = device_set
-                    .iter()
-                    .map(|(dev_uuid, _)| *dev_uuid)
-                    .collect::<Vec<_>>();
-                let res = stop_partially_constructed_pool(pool_uuid, &dev_uuids);
-                let device_set = device_set
-                    .into_iter()
-                    .map(|(dev_uuid, info)| {
-                        (
-                            dev_uuid,
-                            match info {
-                                LInfo::Luks(l) => LInfo::Luks(l),
-                                LInfo::Stratis(mut s) => {
-                                    if let Some(l) = s.luks {
-                                        if !s.dev_info.devnode.exists() {
-                                            LInfo::Luks(l)
-                                        } else {
-                                            s.luks = Some(l);
-                                            LInfo::Stratis(s)
-                                        }
-                                    } else {
-                                        LInfo::Stratis(s)
-                                    }
-                                }
-                            },
-                        )
-                    })
-                    .collect::<DeviceSet>();
-                match res {
-                    Ok(_) => {
-                        assert!(!has_leftover_devices(pool_uuid, &device_uuids));
-                        self.stopped_pools.insert(pool_uuid, device_set);
-                    }
-                    Err(_) => {
-                        self.partially_constructed_pools
-                            .insert(pool_uuid, device_set);
-                    }
-                }
+                self.partially_constructed_pools
+                    .insert(pool_uuid, device_set);
             } else {
                 self.stopped_pools.insert(pool_uuid, device_set);
             }
@@ -1042,14 +960,12 @@ fn load_stratis_metadata(
 ///
 /// If there is a name conflict between the set of devices in devices
 /// and some existing pool, return an error.
-#[allow(clippy::too_many_arguments)]
 fn setup_pool(
     pools: &Table<PoolUuid, StratPool>,
     pool_uuid: PoolUuid,
     luks_info: StratisResult<(Option<PoolEncryptionInfo>, MaybeInconsistent<Option<Name>>)>,
     infos: &HashMap<DevUuid, LStratisDevInfo>,
     bdas: HashMap<DevUuid, BDA>,
-    handles: HashMap<DevUuid, CryptHandle>,
     timestamp: DateTime<Utc>,
     metadata: PoolSave,
 ) -> BDARecordResult<(Name, StratPool)> {
@@ -1063,7 +979,7 @@ fn setup_pool(
             )), bdas));
     }
 
-    let (datadevs, cachedevs) = match get_blockdevs(&metadata.backstore, infos, bdas, handles) {
+    let (datadevs, cachedevs) = match get_blockdevs(&metadata.backstore, infos, bdas) {
         Err((err, bdas)) => return Err(
             (StratisError::Chained(
                 format!(
@@ -1133,22 +1049,4 @@ fn setup_pool(
                 Box::new(err),
             ), bdas)
         })
-}
-
-/// Rollback an unlock operation for some or all devices of a pool that have been
-/// unlocked prior to the failure occurring.
-fn handle_unlock_rollback(causal_error: StratisError, uuids: Vec<DevUuid>) -> StratisError {
-    let devices = list_of_crypt_devices(&uuids);
-    if let Err(e) = remove_optional_devices(devices) {
-        warn!("Failed to roll back encrypted pool unlock; some previously locked encrypted devices may be left in an unlocked state");
-        return StratisError::NoActionRollbackError {
-                causal_error: Box::new(causal_error),
-                rollback_error: Box::new(StratisError::Chained(
-                    "Failed to roll back encrypted pool unlock; some previously locked encrypted devices may be left in an unlocked state".to_string(),
-                    Box::new(e),
-                )),
-            };
-    }
-
-    causal_error
 }

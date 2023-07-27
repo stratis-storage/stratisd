@@ -526,7 +526,9 @@ class UdevTest5(UdevTest):
                 if exit_code == StratisdErrors.OK and changed:
                     blockdevs = blockdevs_tmp
 
-            wait_for_udev_count(len(blockdevs) + len(non_luks_tokens))
+            wait_for_udev_count(
+                len(blockdevs) + len(non_luks_tokens) + len(luks_tokens)
+            )
 
             # The number of pools should never exceed one, since all the pools
             # previously formed in the test have the same name.

@@ -329,12 +329,13 @@ pub trait Pool: Debug + Send + Sync {
 
     /// Grow either a specified device or all devices in a pool if the underlying
     /// physical device or devices have changed in size.
+    #[allow(clippy::type_complexity)]
     fn grow_physical(
         &mut self,
         pool_name: &Name,
         pool_uuid: PoolUuid,
         device: DevUuid,
-    ) -> StratisResult<GrowAction<(PoolUuid, DevUuid)>>;
+    ) -> StratisResult<(GrowAction<(PoolUuid, DevUuid)>, Option<PoolDiff>)>;
 }
 
 pub type HandleEvents<P> = (

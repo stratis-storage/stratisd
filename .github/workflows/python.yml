@@ -33,9 +33,9 @@ jobs:
       matrix:
         include:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT ENVIRONMENT
-          - toolchain: 1.70.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          - toolchain: 1.71.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           # MANDATORY CHECKS USING LOWEST SUPPORTED ENVIRONMENT PROXY
-          - toolchain: 1.66.1  # LOWEST SUPPORTED RUST TOOLCHAIN
+          - toolchain: 1.69.0  # LOWEST SUPPORTED RUST TOOLCHAIN
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
@@ -85,7 +85,7 @@ jobs:
           STRATIS_DUMPMETADATA=/usr/bin/stratis-dumpmetadata
           STRATISD=/usr/libexec/stratisd
           PYTHONPATH=./src
-          udev-tests dump-metadata-tests
+          udev-tests dump-metadata-tests startup-tests
         working-directory: ./tests/client-dbus
 
   # PYTHON-BASED TESTS WITH TANG
@@ -134,7 +134,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.70.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.71.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd

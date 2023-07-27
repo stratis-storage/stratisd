@@ -293,8 +293,7 @@ impl PerDevSegments {
         assert!(self
             .used
             .iter()
-            .rev()
-            .next()
+            .next_back()
             .map(|(s, l)| *s + *l <= self.limit)
             .unwrap_or(true));
         // The complement really is the complement

@@ -115,6 +115,9 @@ where
 /// context for polling for events.
 fn setup_dm() -> StratisResult<AsyncFd<RawFd>> {
     let dm = get_dm_init()?;
+    // This version check also implicitly checks for the presence of a working udevd;
+    // if udev us not running this function should return an error to prevent
+    // stratisd from starting up.
     let minor_dm_version = dm.version()?.1;
     if minor_dm_version < REQUIRED_DM_MINOR_VERSION {
         let err_msg = format!(

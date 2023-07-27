@@ -110,13 +110,12 @@ pub enum DbusAction<E> {
     PoolKeyDescChange(Path<'static>, Option<PoolEncryptionInfo>),
     PoolClevisInfoChange(Path<'static>, Option<PoolEncryptionInfo>),
     PoolCacheChange(Path<'static>, bool),
-    PoolSizeChange(Path<'static>, Bytes),
     PoolFsLimitChange(Path<'static>, u64),
     PoolOverprovModeChange(Path<'static>, bool),
     LockedPoolsChange(LockedPoolsInfo),
     StoppedPoolsChange(StoppedPoolsInfo),
     BlockdevUserInfoChange(Path<'static>, Option<String>),
-
+    BlockdevTotalPhysicalSizeChange(Path<'static>, Sectors),
     FsBackgroundChange(
         FilesystemUuid,
         SignalChange<Option<Bytes>>,
@@ -369,20 +368,6 @@ where
         }
     }
 
-    /// Send changed signal for pool TotalPhysicalSize property.
-    pub fn push_pool_size_change(&self, item: &Path<'static>, new_size: Bytes) {
-        if let Err(e) = self
-            .sender
-            .send(DbusAction::PoolSizeChange(item.clone(), new_size))
-        {
-            warn!(
-                "D-Bus pool size change event could not be sent to the processing thread; \
-                no signal will be sent out for the size change of pool with path {}: {}",
-                item, e,
-            )
-        }
-    }
-
     /// Send changed signal for pool FsLimit property.
     pub fn push_pool_fs_limit_change(&self, item: &Path<'static>, new_fs_limit: u64) {
         if let Err(e) = self
@@ -456,6 +441,26 @@ where
         {
             warn!(
                 "Block device User info change event could not be sent to the processing thread; no signal will be sent out for the block device user info state change: {}",
+                e,
+            )
+        }
+    }
+
+    /// Send changed signal for changed blockdev total size property.
+    pub fn push_blockdev_total_physical_size_change(
+        &self,
+        path: &Path<'static>,
+        total_physical_size: Sectors,
+    ) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::BlockdevTotalPhysicalSizeChange(
+                path.clone(),
+                total_physical_size,
+            ))
+        {
+            warn!(
+                "Block device total physical size change event could not be sent to the processing thread; no signal will be sent out for the block device total physical size state change: {}",
                 e,
             )
         }

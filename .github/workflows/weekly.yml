@@ -57,7 +57,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - tag: v3.5.8
+          - tag: stratisd-v3.5.8
           - tag: v3.5.7
           - tag: v3.5.6
           - tag: v3.5.5

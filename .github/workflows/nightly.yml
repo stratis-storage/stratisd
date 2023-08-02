@@ -223,7 +223,7 @@ jobs:
       matrix:
         include:
           - toolchain: 1.71.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-          - toolchain: 1.69.0  # LOWEST SUPPORTED RUST TOOLCHAIN
+          - toolchain: 1.71.0  # LOWEST SUPPORTED RUST TOOLCHAIN
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3

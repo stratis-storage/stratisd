@@ -509,13 +509,8 @@ class UdevTest5(UdevTest):
                 get_object(TOP_OBJECT)
             )
 
-            blockdevs = []
             for pool_uuid in variant_pool_uuids:
-                (
-                    (changed, (_, blockdevs_tmp, _)),
-                    exit_code,
-                    _,
-                ) = Manager.Methods.StartPool(
+                Manager.Methods.StartPool(
                     get_object(TOP_OBJECT),
                     {
                         "id": pool_uuid,
@@ -523,12 +518,8 @@ class UdevTest5(UdevTest):
                         "id_type": "uuid",
                     },
                 )
-                if exit_code == StratisdErrors.OK and changed:
-                    blockdevs = blockdevs_tmp
 
-            wait_for_udev_count(
-                len(blockdevs) + len(non_luks_tokens) + len(luks_tokens)
-            )
+            wait_for_udev_count(len(non_luks_tokens) + len(luks_tokens))
 
             # The number of pools should never exceed one, since all the pools
             # previously formed in the test have the same name.
@@ -554,7 +545,7 @@ class UdevTest5(UdevTest):
                 )
                 for pool_uuid, props in variant_pool_uuids.items():
                     if "key_description" in props:
-                        ((changed, _), exit_code, _) = Manager.Methods.StartPool(
+                        Manager.Methods.StartPool(
                             get_object(TOP_OBJECT),
                             {
                                 "id": pool_uuid,

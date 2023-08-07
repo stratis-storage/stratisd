@@ -336,9 +336,14 @@ install-daemons:
 ## Install all stratisd files
 install: install-udev-cfg install-man-cfg install-dbus-cfg install-dracut-cfg install-systemd-cfg install-binaries install-udev-binaries install-fstab-script install-daemons
 
+## Build all Rust artifacts
+build-all-rust: build build-min build-udev-utils stratis-dumpmetadata
 
-## Build all stratisd binaries and configuration
-build-all: build build-min build-udev-utils docs/stratisd.8 stratis-dumpmetadata docs/stratis-dumpmetadata.8
+## Build all man pages
+build-all-man: docs/stratisd.8 docs/stratis-dumpmetadata.8
+
+## Build all stratisd binaries and configuration necessary for install
+build-all: build-all-rust build-all-man
 
 ## Remove installed configuration files
 clean-cfg:
@@ -453,6 +458,8 @@ clippy: clippy-macros
 	bloat
 	build
 	build-all
+	build-all-man
+	build-all-rust
 	build-min
 	build-udev-utils
 	build-stratis-base32-decode

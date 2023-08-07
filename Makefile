@@ -181,16 +181,16 @@ check-typos: ${HOME}/.cargo/bin/typos
 fmt: fmt-macros
 	cargo fmt
 
+## Run cargo fmt for CI jobs
+fmt-ci: fmt-macros-ci
+	cargo fmt -- --check
+
 ## Run cargo fmt for stratisd_proc_macros
 fmt-macros:
 	cd stratisd_proc_macros && cargo fmt
 
-## Run cargo fmt for CI jobs
-fmt-travis: fmt-macros-travis
-	cargo fmt -- --check
-
 ## Run cargo fmt on stratisd_proc_macros for CI jobs
-fmt-macros-travis:
+fmt-macros-ci:
 	cd stratisd_proc_macros && cargo fmt -- --check
 
 ## Check shell formatting with shfmt
@@ -346,9 +346,14 @@ install-daemons:
 ## Install all stratisd files
 install: install-udev-cfg install-man-cfg install-dbus-cfg install-dracut-cfg install-systemd-cfg install-binaries install-udev-binaries install-fstab-script install-daemons
 
+## Build all Rust artifacts
+build-all-rust: build build-min build-udev-utils stratis-dumpmetadata
 
-## Build all stratisd binaries and configuration
-build-all: build build-min build-udev-utils docs/stratisd.8 stratis-dumpmetadata docs/stratis-dumpmetadata.8
+## Build all man pages
+build-all-man: docs/stratisd.8 docs/stratis-dumpmetadata.8
+
+## Build all stratisd binaries and configuration necessary for install
+build-all: build-all-rust build-all-man
 
 ## Remove installed configuration files
 clean-cfg:
@@ -438,7 +443,7 @@ yamllint:
 	yamllint --strict .github/workflows/*.yml
 
 ## Build docs-rust for CI
-docs-travis: docs-rust
+docs-ci: docs-rust
 
 ## Build rust documentation
 docs-rust:
@@ -457,12 +462,15 @@ clippy: clippy-macros
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${MIN_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${SYSTEMD_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${UDEV_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${NO_IPC_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 
 .PHONY:
 	audit
 	bloat
 	build
 	build-all
+	build-all-man
+	build-all-rust
 	build-min
 	build-udev-utils
 	build-stratis-base32-decode
@@ -474,15 +482,15 @@ clippy: clippy-macros
 	clean-primary
 	clippy
 	clippy-macros
+	docs-ci
 	docs-rust
-	docs-travis
 	expand
 	fmt
+	fmt-ci
 	fmt-shell
 	fmt-shell-ci
-	fmt-travis
 	fmt-macros
-	fmt-macros-travis
+	fmt-macros-ci
 	help
 	install
 	install-binaries

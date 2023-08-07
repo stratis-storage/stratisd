@@ -46,6 +46,6 @@ pub async fn setup(
         }
     })
     .await
-    .map_err(|e| StratisError::Join(e))
+    .map_err(StratisError::Join)
     .and_then(|res| res)
 }

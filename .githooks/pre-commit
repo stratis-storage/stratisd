@@ -2,7 +2,7 @@
 
 export PROFILEDIR=debug
 
-make fmt-travis &&
+make fmt-ci &&
 	make build &&
 	make stratis-dumpmetadata &&
 	make build-min &&
@@ -14,4 +14,4 @@ make fmt-travis &&
 
 export PYTHONPATH=$PWD/tests/client-dbus/src
 
-cd tests/client-dbus && make fmt-travis && make lint || exit 1
+cd tests/client-dbus && make fmt-ci && make lint || exit 1

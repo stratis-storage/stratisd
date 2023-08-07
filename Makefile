@@ -181,16 +181,16 @@ check-typos: ${HOME}/.cargo/bin/typos
 fmt: fmt-macros
 	cargo fmt
 
+## Run cargo fmt for CI jobs
+fmt-ci: fmt-macros-ci
+	cargo fmt -- --check
+
 ## Run cargo fmt for stratisd_proc_macros
 fmt-macros:
 	cd stratisd_proc_macros && cargo fmt
 
-## Run cargo fmt for CI jobs
-fmt-travis: fmt-macros-travis
-	cargo fmt -- --check
-
 ## Run cargo fmt on stratisd_proc_macros for CI jobs
-fmt-macros-travis:
+fmt-macros-ci:
 	cd stratisd_proc_macros && cargo fmt -- --check
 
 ## Check shell formatting with shfmt
@@ -443,7 +443,7 @@ yamllint:
 	yamllint --strict .github/workflows/*.yml
 
 ## Build docs-rust for CI
-docs-travis: docs-rust
+docs-ci: docs-rust
 
 ## Build rust documentation
 docs-rust:
@@ -482,15 +482,15 @@ clippy: clippy-macros
 	clean-primary
 	clippy
 	clippy-macros
+	docs-ci
 	docs-rust
-	docs-travis
 	expand
 	fmt
+	fmt-ci
 	fmt-shell
 	fmt-shell-ci
-	fmt-travis
 	fmt-macros
-	fmt-macros-travis
+	fmt-macros-ci
 	help
 	install
 	install-binaries

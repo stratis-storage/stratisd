@@ -27,7 +27,7 @@ jobs:
             task: PYTHONPATH=./src make -f Makefile lint
             working-directory: ./tests/client-dbus
           - dependencies: black python3-isort
-            task: make -f Makefile fmt-travis
+            task: make -f Makefile fmt-ci
             working-directory: ./tests/client-dbus
           - dependencies: yamllint
             task: make -f Makefile yamllint

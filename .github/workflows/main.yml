@@ -33,7 +33,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - task: make -f Makefile fmt-travis
+          - task: make -f Makefile fmt-ci
             toolchain: 1.71.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: rustfmt
           - task: make -f Makefile check-typos

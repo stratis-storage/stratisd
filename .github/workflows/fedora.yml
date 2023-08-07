@@ -45,7 +45,7 @@ jobs:
           - task: PROFILEDIR=debug make -f Makefile stratis-dumpmetadata
             toolchain: 1.71.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-          - task: make -f Makefile docs-travis
+          - task: make -f Makefile docs-ci
             toolchain: 1.71.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile test

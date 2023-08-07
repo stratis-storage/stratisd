@@ -14,8 +14,8 @@ fmt:
 	isort src tests
 	black .
 
-.PHONY: fmt-travis
-fmt-travis:
+.PHONY: fmt-ci
+fmt-ci:
 	isort --diff --check-only src tests
 	black . --check
 

@@ -309,7 +309,7 @@ jobs:
       matrix:
         include:
           - rev: HEAD
-            args: --verify-devices --monitor-dbus
+            args: --verify-devices --monitor-dbus --highest-revision-number=6
           - rev: v3.5.2
             args: --verify-devices
     runs-on: ubuntu-22.04

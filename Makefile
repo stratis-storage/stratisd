@@ -1,3 +1,11 @@
+ifeq ($(origin AUDITABLE), undefined)
+  BUILD = build
+  RUSTC = rustc
+else
+  BUILD = auditable build
+  RUSTC = auditable rustc
+endif
+
 ifeq ($(origin TARGET), undefined)
 else
   TARGET_ARGS = --target=${TARGET}
@@ -204,7 +212,7 @@ fmt-shell-ci:
 build:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build ${RELEASE_FLAG} \
+	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratisd \
 	${TARGET_ARGS}
 
@@ -218,7 +226,7 @@ build-tests:
 build-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build ${RELEASE_FLAG} \
+	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratis-min --bin=stratisd-min --bin=stratis-utils \
 	${SYSTEMD_FEATURES} ${TARGET_ARGS}
 
@@ -226,7 +234,7 @@ build-min:
 build-stratis-str-cmp:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo rustc ${RELEASE_FLAG}  \
+	cargo ${RUSTC} ${RELEASE_FLAG}  \
 	--bin=stratis-str-cmp \
 	${UDEV_FEATURES} \
 	${TARGET_ARGS} \
@@ -237,7 +245,7 @@ build-stratis-str-cmp:
 build-stratis-base32-decode:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo rustc ${RELEASE_FLAG}  \
+	cargo ${RUSTC} ${RELEASE_FLAG}  \
 	--bin=stratis-base32-decode \
 	${UDEV_FEATURES} \
 	${TARGET_ARGS} \
@@ -253,21 +261,21 @@ build-udev-utils: build-stratis-str-cmp build-stratis-base32-decode
 stratis-dumpmetadata:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build ${RELEASE_FLAG} \
+	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratis-dumpmetadata ${EXTRAS_FEATURES} ${TARGET_ARGS}
 
 ## Build stratis-min for early userspace
 stratis-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build ${RELEASE_FLAG} \
+	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratis-min ${MIN_FEATURES} ${TARGET_ARGS}
 
 ## Build stratisd-min for early userspace
 stratisd-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build ${RELEASE_FLAG} \
+	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratisd-min ${SYSTEMD_FEATURES} ${TARGET_ARGS}
 
 ## Install udev configuration

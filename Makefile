@@ -142,16 +142,13 @@ CLIPPY_PEDANTIC = -D clippy::await_holding_lock \
                   -D clippy::verbose_bit_mask \
                   -D clippy::wildcard_imports
 
-${HOME}/.cargo/bin/cargo-audit:
-	cargo install cargo-audit
-
 ## Run cargo license
 license:
 	cargo license
 
 ## Run cargo audit
-audit: ${HOME}/.cargo/bin/cargo-audit
-	PATH=${HOME}/.cargo/bin:${PATH} cargo audit -D warnings
+audit:
+	cargo audit -D warnings
 
 ## Check for spelling errors
 check-typos:

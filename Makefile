@@ -147,9 +147,6 @@ ${HOME}/.cargo/bin/cargo-outdated:
 ${HOME}/.cargo/bin/cargo-license:
 	cargo install cargo-license
 
-${HOME}/.cargo/bin/cargo-bloat:
-	cargo install cargo-bloat
-
 ${HOME}/.cargo/bin/cargo-audit:
 	cargo install cargo-audit
 
@@ -163,11 +160,6 @@ outdated: ${HOME}/.cargo/bin/cargo-outdated
 ## Run cargo license
 license: ${HOME}/.cargo/bin/cargo-license
 	PATH=${HOME}/.cargo/bin:${PATH} cargo license
-
-## Run cargo bloat
-bloat: ${HOME}/.cargo/bin/cargo-bloat
-	PATH=${HOME}/.cargo/bin:${PATH} cargo bloat --release
-	PATH=${HOME}/.cargo/bin:${PATH} cargo bloat --release --crates
 
 ## Run cargo audit
 audit: ${HOME}/.cargo/bin/cargo-audit
@@ -460,7 +452,6 @@ clippy: clippy-macros
 
 .PHONY:
 	audit
-	bloat
 	build
 	build-all
 	build-all-man

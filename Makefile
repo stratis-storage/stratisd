@@ -142,18 +142,11 @@ CLIPPY_PEDANTIC = -D clippy::await_holding_lock \
                   -D clippy::verbose_bit_mask \
                   -D clippy::wildcard_imports
 
-${HOME}/.cargo/bin/cargo-outdated:
-	cargo install cargo-outdated
-
 ${HOME}/.cargo/bin/cargo-license:
 	cargo install cargo-license
 
 ${HOME}/.cargo/bin/cargo-audit:
 	cargo install cargo-audit
-
-## Run cargo outdated
-outdated: ${HOME}/.cargo/bin/cargo-outdated
-	PATH=${HOME}/.cargo/bin:${PATH} cargo outdated
 
 ## Run cargo license
 license: ${HOME}/.cargo/bin/cargo-license
@@ -491,7 +484,6 @@ clippy: clippy-macros
 	install-udev-binaries
 	install-udev-cfg
 	license
-	outdated
 	test
 	test-valgrind
 	test-loop

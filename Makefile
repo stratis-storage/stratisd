@@ -151,9 +151,6 @@ ${HOME}/.cargo/bin/cargo-license:
 ${HOME}/.cargo/bin/cargo-audit:
 	cargo install cargo-audit
 
-${HOME}/.cargo/bin/cargo-expand:
-	cargo install cargo-expand
-
 ## Run cargo outdated
 outdated: ${HOME}/.cargo/bin/cargo-outdated
 	PATH=${HOME}/.cargo/bin:${PATH} cargo outdated
@@ -165,10 +162,6 @@ license: ${HOME}/.cargo/bin/cargo-license
 ## Run cargo audit
 audit: ${HOME}/.cargo/bin/cargo-audit
 	PATH=${HOME}/.cargo/bin:${PATH} cargo audit -D warnings
-
-## Run cargo expand
-expand: ${HOME}/.cargo/bin/cargo-expand
-	PATH=${HOME}/.cargo/bin:${PATH} cargo expand --lib engine::strat_engine::pool
 
 ## Check for spelling errors
 check-typos:
@@ -480,7 +473,6 @@ clippy: clippy-macros
 	clippy-macros
 	docs-ci
 	docs-rust
-	expand
 	fmt
 	fmt-ci
 	fmt-shell

@@ -66,6 +66,9 @@ jobs:
         with:
           components: cargo, clippy
           toolchain: 1.71.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+      - uses: baptiste0928/cargo-install@v2
+        with:
+          crate: cargo-audit
       - name: Run cargo-update
         run: cargo update
       - name: Run cargo-clippy

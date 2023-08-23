@@ -159,7 +159,7 @@ jobs:
           # MANDATORY CHECKS USING CURRENT DEVELOPMENT ENVIRONMENT
           - toolchain: 1.71.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           # MANDATORY CHECKS USING LOWEST SUPPORTED ENVIRONMENT PROXY
-          - toolchain: 1.71.1  # LOWEST SUPPORTED RUST TOOLCHAIN
+          - toolchain: 1.71.0  # LOWEST SUPPORTED RUST TOOLCHAIN
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3

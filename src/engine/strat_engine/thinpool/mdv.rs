@@ -59,7 +59,7 @@ impl MetadataVol {
     /// Set up an existing Metadata Volume.
     pub fn setup(pool_uuid: PoolUuid, dev: LinearDev) -> StratisResult<MetadataVol> {
         let filename = format!(".mdv-{}", uuid_to_string!(pool_uuid));
-        let mount_pt: PathBuf = vec![NS_TMPFS_LOCATION, &filename].iter().collect();
+        let mount_pt: PathBuf = [NS_TMPFS_LOCATION, &filename].iter().collect();
 
         let mdv = MetadataVol { dev, mount_pt };
 

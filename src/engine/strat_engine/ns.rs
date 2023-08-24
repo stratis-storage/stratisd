@@ -56,7 +56,7 @@ impl MemoryFilesystem {
                 )));
             } else {
                 let stat_info = stat(NS_TMPFS_LOCATION)?;
-                let parent_path: PathBuf = vec![NS_TMPFS_LOCATION, ".."].iter().collect();
+                let parent_path: PathBuf = [NS_TMPFS_LOCATION, ".."].iter().collect();
                 let parent_stat_info = stat(&parent_path)?;
                 if stat_info.st_dev != parent_stat_info.st_dev {
                     info!("Mount found at {}; unmounting", NS_TMPFS_LOCATION);

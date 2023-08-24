@@ -100,7 +100,7 @@ fn properties_string(properties: Vec<(bool, bool)>) -> Vec<String> {
         .map(|(has_cache, is_encrypted)| {
             let ca = if has_cache { " Ca" } else { "~Ca" };
             let cr = if is_encrypted { " Cr" } else { "~Cr" };
-            vec![ca, cr].join(",")
+            [ca, cr].join(",")
         })
         .collect()
 }

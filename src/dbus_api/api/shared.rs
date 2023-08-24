@@ -138,7 +138,7 @@ where
                 })
             })
             .fold(HashMap::new(), |mut props, prop| {
-                props.extend(prop.into_iter());
+                props.extend(prop);
                 props
             });
 

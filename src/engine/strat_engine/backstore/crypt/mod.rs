@@ -217,13 +217,13 @@ mod tests {
                 CString::new(path.to_str().expect("Failed to convert path to string")).unwrap();
             let fd = unsafe { libc::open(dev_path_cstring.as_ptr(), libc::O_RDONLY) };
             if fd < 0 {
-                Result::<(), _>::Err(io::Error::last_os_error()).unwrap();
+                panic!("{:?}", io::Error::last_os_error());
             }
 
             let mut stat: MaybeUninit<libc::stat> = MaybeUninit::zeroed();
             let fstat_result = unsafe { libc::fstat(fd, stat.as_mut_ptr()) };
             if fstat_result < 0 {
-                Result::<(), _>::Err(io::Error::last_os_error()).unwrap();
+                panic!("{:?}", io::Error::last_os_error());
             }
             let device_size =
                 convert_int!(unsafe { stat.assume_init() }.st_size, libc::off_t, usize).unwrap();

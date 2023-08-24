@@ -299,7 +299,7 @@ impl<'a> Into<Value> for &'a StratEngine {
             json,
             <&LiminalDevices as Into<Value>>::into(&*self.liminal_devices.blocking_read()),
         ) {
-            j.extend(map.into_iter());
+            j.extend(map);
             Value::Object(j)
         } else {
             unreachable!("json!() and LiminalDevices::into() always return JSON object");
@@ -373,7 +373,7 @@ impl Engine for StratEngine {
                         ret_guards.push(guard.into_dyn());
                     }
                 }
-                diffs.extend(diffs_thread.into_iter());
+                diffs.extend(diffs_thread);
             }
             Err(e) => {
                 warn!("Failed to handle udev events: {}", e);

@@ -6,6 +6,12 @@ else
   RUSTC = auditable rustc
 endif
 
+ifeq ($(origin CLIPPY_FIX), undefined)
+  CLIPPY_OPTS = --all-targets --no-deps
+else
+  CLIPPY_OPTS = --fix
+endif
+
 ifeq ($(origin TARGET), undefined)
 else
   TARGET_ARGS = --target=${TARGET}
@@ -431,15 +437,15 @@ docs/%.8: docs/%.txt
 
 ## Run clippy on stratisd_proc_macros
 clippy-macros:
-	cd stratisd_proc_macros && RUSTFLAGS="${DENY}" cargo clippy --all-targets --all-features -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+	cd stratisd_proc_macros && RUSTFLAGS="${DENY}" cargo clippy --all-features ${CLIPPY_OPTS} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 
 ## Run clippy on the current source tree
 clippy: clippy-macros
-	RUSTFLAGS="${DENY}" cargo clippy --all-targets -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
-	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${MIN_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
-	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${SYSTEMD_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
-	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${UDEV_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
-	RUSTFLAGS="${DENY}" cargo clippy --all-targets ${NO_IPC_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} ${MIN_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} ${SYSTEMD_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} ${UDEV_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} ${NO_IPC_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 
 .PHONY:
 	audit

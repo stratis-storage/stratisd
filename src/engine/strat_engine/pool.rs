@@ -755,8 +755,8 @@ impl Pool for StratPool {
         let increase = spec_map.values().copied().sum::<Sectors>();
         self.check_overprov(increase)?;
 
-        spec_map.iter().fold(Ok(()), |res, (name, size)| {
-            res.and_then(|()| validate_name(name))
+        spec_map.iter().try_fold((), |_, (name, size)| {
+            validate_name(name)
                 .and_then(|()| {
                     if let Some((_, fs)) = self.thin_pool.get_filesystem_by_name(name) {
                         if fs.thindev_size() == *size {

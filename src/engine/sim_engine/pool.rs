@@ -221,8 +221,8 @@ impl Pool for SimPool {
 
         let spec_map = validate_filesystem_size_specs(specs)?;
 
-        spec_map.iter().fold(Ok(()), |res, (name, size)| {
-            res.and_then(|()| validate_name(name))
+        spec_map.iter().try_fold((), |_, (name, size)| {
+            validate_name(name)
                 .and_then(|()| {
                     if let Some((_, fs)) = self.filesystems.get_by_name(name) {
                         if fs.size() == *size {

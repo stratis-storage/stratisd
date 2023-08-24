@@ -651,12 +651,10 @@ impl DeviceSet {
                         uuid: *uuid,
                     })
                 })
-                .fold(Some(Vec::new()), |vec, dev_info| {
-                    vec.and_then(|mut v| {
-                        dev_info.map(|d| {
-                            v.push(d);
-                            v
-                        })
+                .try_fold(Vec::new(), |mut vec, dev_info| {
+                    dev_info.map(|d| {
+                        vec.push(d);
+                        vec
                     })
                 })
                 .map(|d| LockedPoolInfo {

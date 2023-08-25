@@ -18,6 +18,7 @@ exclude = [
     ".gitignore",
     ".githooks/*",
     ".github/*",
+    ".packit.yaml",
     "systemd",
     "tests",
     "udev",

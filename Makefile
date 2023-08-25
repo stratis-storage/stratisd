@@ -423,7 +423,7 @@ test-stratis-min:
 
 ## Run yamllint on workflow files
 yamllint:
-	yamllint --strict .github/workflows/*.yml
+	yamllint --strict .github/workflows/*.yml .packit.yaml
 
 ## Build docs-rust for CI
 docs-ci: docs-rust

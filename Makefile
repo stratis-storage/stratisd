@@ -439,13 +439,22 @@ docs/%.8: docs/%.txt
 clippy-macros:
 	cd stratisd_proc_macros && RUSTFLAGS="${DENY}" cargo clippy --all-features ${CLIPPY_OPTS} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 
-## Run clippy on the current source tree
-clippy: clippy-macros
-	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+## Run clippy on the -min build
+clippy-min:
 	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} ${MIN_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} ${SYSTEMD_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+
+## Run clippy on the udev utils
+clippy-udev-utils:
 	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} ${UDEV_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+
+## Run clippy on no-ipc-build
+clippy-no-ipc:
 	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} ${NO_IPC_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+
+## Run clippy on the current source tree
+clippy: clippy-macros clippy-min clippy-udev-utils clippy-no-ipc
+	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 
 .PHONY:
 	audit
@@ -464,6 +473,9 @@ clippy: clippy-macros
 	clean-primary
 	clippy
 	clippy-macros
+	clippy-min
+	clippy-no-ipc
+	clippy-udev-utils
 	docs-ci
 	docs-rust
 	fmt

@@ -168,7 +168,7 @@ default-features = false
 optional = true
 
 [dependencies.serde]
-version = "1.0.119"
+version = "1.0.185"
 optional = true
 
 [dependencies.serde_derive]

@@ -34,3 +34,5 @@ pub const CLEVIS_TANG_TRUST_URL: &str = "stratis:tang:trust_url";
 
 pub const DEFAULT_CRYPT_METADATA_SIZE: Bytes = Bytes(16 * IEC::Ki as u128);
 pub const DEFAULT_CRYPT_KEYSLOTS_SIZE: Bytes = Bytes(16352 * IEC::Ki as u128);
+
+pub const CLEVIS_TOKEN_NAME: &str = "clevis\0";

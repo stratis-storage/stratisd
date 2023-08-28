@@ -133,8 +133,12 @@ version = "0.2.144"
 optional = true
 
 [dependencies.libcryptsetup-rs]
-version = "0.8.0"
+version = "0.9.0"
 features = ["mutex"]
+optional = true
+
+[dependencies.libcryptsetup-rs-sys]
+version = "0.2.4"
 optional = true
 
 [dependencies.libmount]
@@ -243,6 +247,7 @@ engine = [
     "libblkid-rs",
     "libc",
     "libcryptsetup-rs",
+    "libcryptsetup-rs-sys",
     "libmount",
     "libudev",
     "log",

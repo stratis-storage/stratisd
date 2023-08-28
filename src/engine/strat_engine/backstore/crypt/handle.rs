@@ -36,7 +36,7 @@ use crate::{
                         acquire_crypt_device, activate, add_keyring_keyslot, check_luks2_token,
                         clevis_info_from_metadata, ensure_inactive, ensure_wiped,
                         get_keyslot_number, interpret_clevis_config, key_desc_from_metadata,
-                        load_crypt_metadata, read_key, replace_pool_name, setup_crypt_device,
+                        load_crypt_metadata, replace_pool_name, setup_crypt_device,
                         setup_crypt_handle, wipe_fallback, StratisLuks2Token,
                     },
                 },
@@ -129,31 +129,16 @@ impl CryptHandle {
                 }
             }
             if try_unlock_clevis {
-                let token = device.token_handle().json_get(CLEVIS_LUKS_TOKEN_ID).ok();
-                let jwe = token.as_ref().and_then(|t| t.get("jwe"));
-                if let Some(jwe) = jwe {
-                    let pass = clevis_decrypt(jwe)?;
-                    if let Some(keyslot) = get_keyslot_number(&mut device, CLEVIS_LUKS_TOKEN_ID)?
-                        .and_then(|k| k.into_iter().next())
-                    {
-                        log_on_failure!(
-                            device.activate_handle().activate_by_passphrase(
-                                None,
-                                Some(keyslot),
-                                pass.as_ref(),
-                                CryptActivate::empty(),
-                            ),
-                            "libcryptsetup reported that the decrypted Clevis passphrase \
-                            is unable to open the encrypted device"
-                        );
-                    } else {
-                        return Err(StratisError::Msg(
-                            "Clevis JWE was found in the Stratis metadata but was \
-                            not associated with any keyslots"
-                                .to_string(),
-                        ));
-                    }
-                }
+                log_on_failure!(
+                    device.token_handle().activate_by_token::<()>(
+                        None,
+                        Some(CLEVIS_LUKS_TOKEN_ID),
+                        None,
+                        CryptActivate::empty(),
+                    ),
+                    "libcryptsetup reported that the decrypted Clevis passphrase \
+                    is unable to open the encrypted device"
+                );
             }
             Ok(true)
         }
@@ -382,10 +367,15 @@ impl CryptHandle {
         );
 
         activate(
-            if let Some(kd) = encryption_info.key_description() {
-                Either::Left((device, kd))
+            device,
+            encryption_info.key_description(),
+            if matches!(
+                encryption_info,
+                EncryptionInfo::Both(_, _) | EncryptionInfo::KeyDesc(_)
+            ) {
+                UnlockMethod::Keyring
             } else {
-                Either::Right(physical_path)
+                UnlockMethod::Clevis
             },
             &activation_name,
         )
@@ -721,19 +711,10 @@ impl CryptHandle {
             None => 0,
         };
         let mut crypt = self.acquire_crypt_device()?;
-        let passphrase = if let Some(kd) = self.encryption_info().key_description() {
-            read_key(kd)?.ok_or_else(|| {
-                StratisError::Msg("Failed to find key with key description".to_string())
-            })?
-        } else if self.encryption_info().clevis_info().is_some() {
-            Self::clevis_decrypt(&mut crypt)?.expect("Already checked token exists")
-        } else {
-            unreachable!("Must be encrypted")
-        };
-        crypt.activate_handle().activate_by_passphrase(
+        crypt.token_handle().activate_by_token::<()>(
             None,
             None,
-            passphrase.as_ref(),
+            None,
             CryptActivate::KEYRING_KEY,
         )?;
         crypt

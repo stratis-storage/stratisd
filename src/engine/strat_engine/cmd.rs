@@ -27,7 +27,7 @@ use libc::c_uint;
 use libcryptsetup_rs::SafeMemHandle;
 use serde_json::Value;
 
-use devicemapper::{DmName, MetaBlocks, Sectors};
+use devicemapper::{MetaBlocks, Sectors};
 
 use crate::{
     engine::{
@@ -361,19 +361,6 @@ pub fn clevis_luks_unbind(dev_path: &Path, keyslot: libc::c_uint) -> StratisResu
             .arg("-s")
             .arg(keyslot.to_string())
             .arg("-f"),
-    )
-}
-
-/// Unlock a device using the clevis CLI.
-pub fn clevis_luks_unlock(dev_path: &Path, dm_name: &DmName) -> StratisResult<()> {
-    execute_cmd(
-        Command::new(get_clevis_executable(CLEVIS)?)
-            .arg("luks")
-            .arg("unlock")
-            .arg("-d")
-            .arg(dev_path.display().to_string())
-            .arg("-n")
-            .arg(dm_name.to_string()),
     )
 }
 

@@ -747,7 +747,7 @@ impl Backstore {
                 Ok(false)
             } else {
                 Err(StratisError::Msg(format!(
-                    "Block devices have already been bound with pin {existing_pin} and config {existing_info}; \
+                    "Block devices have already been bound with pin {existing_pin} and config {config_to_check}; \
                         requested pin {pin} and config {parsed_config} can't be applied"
                 )))
             }
@@ -1336,6 +1336,7 @@ mod tests {
 
     fn test_clevis_initialize(paths: &[&Path]) {
         unshare_mount_namespace().unwrap();
+
         let pool_name = Name::new("pool_name".to_string());
         let _memfs = MemoryFilesystem::new().unwrap();
         let pool_uuid = PoolUuid::new_v4();
@@ -1400,6 +1401,7 @@ mod tests {
     fn test_clevis_both_initialize(paths: &[&Path]) {
         fn test_both(paths: &[&Path], key_desc: &KeyDescription) {
             unshare_mount_namespace().unwrap();
+
             let _memfs = MemoryFilesystem::new().unwrap();
             let pool_uuid = PoolUuid::new_v4();
             let pool_name = Name::new("pool_name".to_string());

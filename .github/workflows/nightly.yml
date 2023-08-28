@@ -15,7 +15,7 @@ jobs:
       matrix:
         include:
           - task: cargo package
-            toolchain: 1.71.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.72.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-22.04
     container:
@@ -65,7 +65,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo, clippy
-          toolchain: 1.71.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.72.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - uses: baptiste0928/cargo-install@v2
         with:
           crate: cargo-audit
@@ -82,7 +82,7 @@ jobs:
       matrix:
         include:
           - task: make -f Makefile audit
-            toolchain: 1.71.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.72.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           # Allowed because a failure may occur after a new Rust stable
           # version is released.
@@ -143,7 +143,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.71.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.72.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - name: Check out ci repo
         run: git clone https://github.com/stratis-storage/ci.git
       - name: Run comparisons of version specs with available Fedora packages
@@ -203,7 +203,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.71.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.72.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd
@@ -228,7 +228,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - toolchain: 1.71.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          - toolchain: 1.72.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
           - toolchain: 1.71.0  # LOWEST SUPPORTED RUST TOOLCHAIN
     runs-on: ubuntu-22.04
     steps:

@@ -37,7 +37,7 @@ Recommended development platform for Python development: Fedora 38
   * Require udev support in container stratis-min-cli checks in GitHub Actions
   * Update lowest supported Rust to 1.69.0
   * Improve error message for unlock check
-  * Do not use undefined matrix field "toolchain" in GitHub Action 
+  * Do not use undefined matrix field "toolchain" in GitHub Action
   * Fix a source code typo in a test method
 
 

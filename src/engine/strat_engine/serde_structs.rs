@@ -117,4 +117,6 @@ pub struct FilesystemSave {
     pub thin_id: ThinDevId,
     pub size: Sectors,
     pub created: u64, // Unix timestamp
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fs_size_limit: Option<Sectors>,
 }

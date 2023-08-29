@@ -50,6 +50,7 @@ pub struct StratFilesystem {
     thin_dev: ThinDev,
     created: DateTime<Utc>,
     used: Option<Bytes>,
+    size_limit: Option<Sectors>,
 }
 
 fn init_used(thin_dev: &ThinDev) -> Option<Bytes> {
@@ -103,6 +104,7 @@ impl StratFilesystem {
                 used: init_used(&thin_dev),
                 thin_dev,
                 created: Utc::now(),
+                size_limit: None,
             },
         ))
     }
@@ -128,6 +130,7 @@ impl StratFilesystem {
             used: init_used(&thin_dev),
             thin_dev,
             created,
+            size_limit: fssave.fs_size_limit,
         })
     }
 
@@ -175,6 +178,9 @@ impl StratFilesystem {
     /// Mounting a filesystem with a duplicate UUID would require special handling,
     /// so snapshot_fs_uuid is used to update the new snapshot filesystem so it has
     /// a unique UUID.
+    ///
+    /// As of the introduction of filesystem size limits, snapshots inherit the origin size limit
+    /// but the limit can be changed or removed through the API.
     #[allow(clippy::too_many_arguments)]
     pub fn snapshot(
         &self,
@@ -229,6 +235,7 @@ impl StratFilesystem {
                     used: init_used(&thin_dev),
                     thin_dev,
                     created: Utc::now(),
+                    size_limit: self.size_limit,
                 })
             }
             Err(e) => Err(StratisError::Msg(format!(
@@ -341,6 +348,7 @@ impl StratFilesystem {
             thin_id: self.thin_dev.id(),
             size: self.thin_dev.size(),
             created: self.created.timestamp() as u64,
+            fs_size_limit: self.size_limit,
         }
     }
 

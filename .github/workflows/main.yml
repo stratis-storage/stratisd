@@ -232,43 +232,6 @@ jobs:
       - name: Run shell check
         run: make -f Makefile fmt-shell-ci
 
-  checks-with-ci-repo:
-    strategy:
-      matrix:
-        include:
-          - task: >
-              SET_LOWER_BOUNDS=./ci/dependency_management/set_lower_bounds
-              make -f Makefile_dependencies verify-dependency-bounds
-    runs-on: ubuntu-22.04
-    container:
-      image: fedora:38  # CURRENT DEVELOPMENT ENVIRONMENT
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install dependencies for Fedora
-        run: >
-          dnf install -y
-          clang
-          curl
-          cryptsetup-devel
-          dbus-devel
-          device-mapper-devel
-          git
-          libblkid-devel
-          make
-          ncurses
-          openssl-devel
-          python-requests
-          python-semantic_version
-          systemd-devel
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          components: cargo
-          toolchain: 1.72.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-      - name: Check out ci repo
-        run: git clone https://github.com/stratis-storage/ci.git
-      - name: Run ${{ matrix.task }}
-        run: ${{ matrix.task }}
-
   python-based-tests:
     runs-on: ubuntu-22.04
     container:

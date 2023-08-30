@@ -1,3 +1,44 @@
+stratisd 3.5.9
+==============
+Recommended Rust toolchain version: 1.72.0
+Lowest supported Rust toolchain version: 1.71.1
+
+- New commits:
+  * Remove trailing whitespace in CHANGES.txt
+
+- Cherry-picked commits:
+  * Update to nix 0.26.3 and fix compilation error
+  * Revert "Revert "Update lowest supported Rust to 1.71.1""
+  * Remove SET_LOWER_BOUNDS check from CI
+  * Increase serde_derive dependency lower bound to 1.0.185
+  * github actions: update recommended Rust to 1.72.0
+  * jsonrpc: Fix useless-vec lint
+  * Fix clippy manual_try_fold lints
+  * Allow clippy redundant_closure_call
+  * Remove useless .into_inter() calls
+  * Fix useless-vec lint
+  * stratisd_proc_macros v0.2.1
+  * Revert "Update lowest supported Rust to 1.71.1"
+  * Do not use fully qualified name for StratPool
+  * Update lowest supported Rust to 1.71.1
+  * Cargo.toml: add vendor-filter metadata
+  * Remove PATH and install management for audit task
+  * Remove install and PATH setting for license target
+  * Remove outdated-related targets in Makefile
+  * Remove expand-related targets in Makefile
+  * Remove Makefile entries for cargo-bloat
+  * Do not do install and PATH adjustments in Makefile for typos
+  * Add cargo-auditable modification for cargo-build and rustc
+  * github actions: update recommended Rust to 1.71.1
+  * Change -travis to -ci everywhere
+  * Decompose build-all into two sub-targets
+  * Fix bug in udev tests resulting from removing encrypted rollback
+  * Restrict min tests with feature flags
+  * Update lowest supported Rust to 1.71.0
+  * Do not use default features for retry crate
+  * Do not require the futures feature for dbus dependency
+
+
 stratisd 3.5.8
 ==============
 Recommended Rust toolchain version: 1.71.0

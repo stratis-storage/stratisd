@@ -89,7 +89,7 @@ fn process_arguments(fn_arg: &FnArg) -> (Ident, PatType) {
                     colon_token: Token![:](Span::call_site()),
                     ty: Box::new(
                         parse::<Type>(TokenStream::from(quote! {
-                            #reference #mutability crate::engine::strat_engine::pool::StratPool
+                            #reference #mutability StratPool
                         }))
                         .expect("Valid type"),
                     ),

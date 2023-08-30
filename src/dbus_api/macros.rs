@@ -180,6 +180,7 @@ macro_rules! handle_signal_change {
             let mut pairs = std::collections::HashMap::new();
             $(
                 if let $crate::dbus_api::types::SignalChange::Changed(t) = $prop_val {
+                    #[allow(clippy::redundant_closure_call)]
                     pairs.insert($prop, box_variant!($data_to_prop(t)));
                 }
             )+

@@ -1,9 +1,9 @@
 [package]
 name = "stratisd"
-version = "3.5.8"
+version = "3.5.9"
 authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.org>"]
 edition = "2021"
-rust-version = "1.69.0"  # LOWEST SUPPORTED RUST TOOLCHAIN
+rust-version = "1.71.1"  # LOWEST SUPPORTED RUST TOOLCHAIN
 build = "build.rs"
 description = "Stratis daemon"
 license = "MPL-2.0"
@@ -91,7 +91,6 @@ optional = true
 
 [dependencies.dbus]
 version = "0.9.0"
-features = ["futures"]
 optional = true
 
 [dependencies.dbus-tree]
@@ -165,6 +164,7 @@ optional = true
 
 [dependencies.retry]
 version = "1.3.1"
+default-features = false
 optional = true
 
 [dependencies.rpassword]
@@ -176,7 +176,7 @@ version = "1.0.119"
 optional = true
 
 [dependencies.serde_derive]
-version = "1.0.119"
+version = "1.0.185"
 optional = true
 
 [dependencies.serde_json]
@@ -218,7 +218,6 @@ optional = true
 [dev-dependencies]
 assert_cmd = "2.0.8"
 assert_matches = "1.5.0"
-env_logger = "0.10.0"
 loopdev = "0.4.0"
 predicates = "3.0.0"
 proptest = "1.0.0"
@@ -268,3 +267,11 @@ udev_scripts = ["data-encoding"]
 [patch.crates-io.loopdev]
 git = "https://github.com/mulkieran/loopdev"
 branch = "bump-bindgen-reduce-version"
+
+[package.metadata.vendor-filter]
+platforms = ["*-unknown-linux-gnu"]
+tier = "2"
+all-features = true
+exclude-crate-paths = [ { name = "num_cpus", exclude = "ci" },
+                        { name = "libm", exclude = "ci" },
+                        { name = "libdbus-sys", exclude = "vendor/dbus/tools/docker" } ]

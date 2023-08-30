@@ -1,3 +1,11 @@
+ifeq ($(origin AUDITABLE), undefined)
+  BUILD = build
+  RUSTC = rustc
+else
+  BUILD = auditable build
+  RUSTC = auditable rustc
+endif
+
 ifeq ($(origin TARGET), undefined)
 else
   TARGET_ARGS = --target=${TARGET}
@@ -133,63 +141,32 @@ CLIPPY_PEDANTIC = -D clippy::await_holding_lock \
                   -D clippy::verbose_bit_mask \
                   -D clippy::wildcard_imports
 
-${HOME}/.cargo/bin/cargo-outdated:
-	cargo install cargo-outdated
-
-${HOME}/.cargo/bin/cargo-license:
-	cargo install cargo-license
-
-${HOME}/.cargo/bin/cargo-bloat:
-	cargo install cargo-bloat
-
-${HOME}/.cargo/bin/cargo-audit:
-	cargo install cargo-audit
-
-${HOME}/.cargo/bin/cargo-expand:
-	cargo install cargo-expand
-
-${HOME}/.cargo/bin/typos:
-	cargo install typos-cli
-
-## Run cargo outdated
-outdated: ${HOME}/.cargo/bin/cargo-outdated
-	PATH=${HOME}/.cargo/bin:${PATH} cargo outdated
-
 ## Run cargo license
-license: ${HOME}/.cargo/bin/cargo-license
-	PATH=${HOME}/.cargo/bin:${PATH} cargo license
-
-## Run cargo bloat
-bloat: ${HOME}/.cargo/bin/cargo-bloat
-	PATH=${HOME}/.cargo/bin:${PATH} cargo bloat --release
-	PATH=${HOME}/.cargo/bin:${PATH} cargo bloat --release --crates
+license:
+	cargo license
 
 ## Run cargo audit
-audit: ${HOME}/.cargo/bin/cargo-audit
-	PATH=${HOME}/.cargo/bin:${PATH} cargo audit -D warnings
-
-## Run cargo expand
-expand: ${HOME}/.cargo/bin/cargo-expand
-	PATH=${HOME}/.cargo/bin:${PATH} cargo expand --lib engine::strat_engine::pool
+audit:
+	cargo audit -D warnings
 
 ## Check for spelling errors
-check-typos: ${HOME}/.cargo/bin/typos
-	PATH=${HOME}/.cargo/bin:${PATH} typos
+check-typos:
+	typos
 
 ## Run cargo fmt
 fmt: fmt-macros
 	cargo fmt
 
+## Run cargo fmt for CI jobs
+fmt-ci: fmt-macros-ci
+	cargo fmt -- --check
+
 ## Run cargo fmt for stratisd_proc_macros
 fmt-macros:
 	cd stratisd_proc_macros && cargo fmt
 
-## Run cargo fmt for CI jobs
-fmt-travis: fmt-macros-travis
-	cargo fmt -- --check
-
 ## Run cargo fmt on stratisd_proc_macros for CI jobs
-fmt-macros-travis:
+fmt-macros-ci:
 	cd stratisd_proc_macros && cargo fmt -- --check
 
 ## Check shell formatting with shfmt
@@ -204,7 +181,7 @@ fmt-shell-ci:
 build:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build ${RELEASE_FLAG} \
+	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratisd \
 	${TARGET_ARGS}
 
@@ -218,7 +195,7 @@ build-tests:
 build-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build ${RELEASE_FLAG} \
+	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratis-min --bin=stratisd-min --bin=stratis-utils \
 	${SYSTEMD_FEATURES} ${TARGET_ARGS}
 
@@ -226,7 +203,7 @@ build-min:
 build-stratis-str-cmp:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo rustc ${RELEASE_FLAG}  \
+	cargo ${RUSTC} ${RELEASE_FLAG}  \
 	--bin=stratis-str-cmp \
 	${UDEV_FEATURES} \
 	${TARGET_ARGS} \
@@ -237,7 +214,7 @@ build-stratis-str-cmp:
 build-stratis-base32-decode:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo rustc ${RELEASE_FLAG}  \
+	cargo ${RUSTC} ${RELEASE_FLAG}  \
 	--bin=stratis-base32-decode \
 	${UDEV_FEATURES} \
 	${TARGET_ARGS} \
@@ -253,21 +230,21 @@ build-udev-utils: build-stratis-str-cmp build-stratis-base32-decode
 stratis-dumpmetadata:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build ${RELEASE_FLAG} \
+	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratis-dumpmetadata ${EXTRAS_FEATURES} ${TARGET_ARGS}
 
 ## Build stratis-min for early userspace
 stratis-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build ${RELEASE_FLAG} \
+	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratis-min ${MIN_FEATURES} ${TARGET_ARGS}
 
 ## Build stratisd-min for early userspace
 stratisd-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
-	cargo build ${RELEASE_FLAG} \
+	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratisd-min ${SYSTEMD_FEATURES} ${TARGET_ARGS}
 
 ## Install udev configuration
@@ -336,9 +313,14 @@ install-daemons:
 ## Install all stratisd files
 install: install-udev-cfg install-man-cfg install-dbus-cfg install-dracut-cfg install-systemd-cfg install-binaries install-udev-binaries install-fstab-script install-daemons
 
+## Build all Rust artifacts
+build-all-rust: build build-min build-udev-utils stratis-dumpmetadata
 
-## Build all stratisd binaries and configuration
-build-all: build build-min build-udev-utils docs/stratisd.8 stratis-dumpmetadata docs/stratis-dumpmetadata.8
+## Build all man pages
+build-all-man: docs/stratisd.8 docs/stratis-dumpmetadata.8
+
+## Build all stratisd binaries and configuration necessary for install
+build-all: build-all-rust build-all-man
 
 ## Remove installed configuration files
 clean-cfg:
@@ -428,7 +410,7 @@ yamllint:
 	yamllint --strict .github/workflows/*.yml
 
 ## Build docs-rust for CI
-docs-travis: docs-rust
+docs-ci: docs-rust
 
 ## Build rust documentation
 docs-rust:
@@ -450,9 +432,10 @@ clippy: clippy-macros
 
 .PHONY:
 	audit
-	bloat
 	build
 	build-all
+	build-all-man
+	build-all-rust
 	build-min
 	build-udev-utils
 	build-stratis-base32-decode
@@ -464,15 +447,14 @@ clippy: clippy-macros
 	clean-primary
 	clippy
 	clippy-macros
+	docs-ci
 	docs-rust
-	docs-travis
-	expand
 	fmt
+	fmt-ci
 	fmt-shell
 	fmt-shell-ci
-	fmt-travis
 	fmt-macros
-	fmt-macros-travis
+	fmt-macros-ci
 	help
 	install
 	install-binaries
@@ -485,7 +467,6 @@ clippy: clippy-macros
 	install-udev-binaries
 	install-udev-cfg
 	license
-	outdated
 	test
 	test-valgrind
 	test-loop

@@ -315,16 +315,24 @@ impl StratFilesystem {
     }
 
     /// Return an extend size for the thindev under the filesystem
-    pub fn extend_size(current_size: Sectors, remaining_size: Option<&mut Sectors>) -> Sectors {
-        if let Some(rem_size) = remaining_size {
-            // Extend either by the remaining amount left before the data device
-            // overprovisioning limit is reached if it is less than the size of the
-            // filesystem or double the filesystem size.
-            let extend_size = min(*rem_size, current_size);
-            *rem_size -= extend_size;
-            extend_size
-        } else {
-            current_size
+    pub fn extend_size(
+        current_size: Sectors,
+        no_op_remaining_size: Option<&mut Sectors>,
+        fs_limit_remaining_size: Option<Sectors>,
+    ) -> Sectors {
+        match (no_op_remaining_size, fs_limit_remaining_size) {
+            (Some(no_op_rem_size), Some(fs_lim_rem_size)) => {
+                let extend_size = min(min(*no_op_rem_size, current_size), fs_lim_rem_size);
+                *no_op_rem_size -= extend_size;
+                extend_size
+            }
+            (Some(no_op_rem_size), None) => {
+                let extend_size = min(*no_op_rem_size, current_size);
+                *no_op_rem_size -= extend_size;
+                extend_size
+            }
+            (None, Some(fs_lim_rem_size)) => min(fs_lim_rem_size, current_size),
+            (_, _) => current_size,
         }
     }
 
@@ -380,6 +388,10 @@ impl StratFilesystem {
         }
 
         Ok(ret_vec)
+    }
+
+    pub fn size_limit(&self) -> Option<Sectors> {
+        self.size_limit
     }
 
     pub fn thindev_size(&self) -> Sectors {

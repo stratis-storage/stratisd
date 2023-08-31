@@ -701,6 +701,7 @@ impl ThinPool {
                         let extend_size = StratFilesystem::extend_size(
                             fs.thindev_size(),
                             remaining_space.as_mut(),
+                            fs.size_limit().map(|sl| sl - fs.thindev_size()),
                         );
                         if extend_size == Sectors(0) {
                             None

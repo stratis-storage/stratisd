@@ -390,6 +390,20 @@ impl StratFilesystem {
         Ok(ret_vec)
     }
 
+    pub fn set_size_limit(&mut self, limit: Option<Sectors>) -> StratisResult<()> {
+        match limit {
+            Some(lim) if self.thindev_size() > lim => Err(StratisError::Msg(format!(
+                "Limit requested of {} is smaller than current filesystem size of {}",
+                lim,
+                self.thindev_size()
+            ))),
+            Some(_) | None => {
+                self.size_limit = limit;
+                Ok(())
+            }
+        }
+    }
+
     pub fn size_limit(&self) -> Option<Sectors> {
         self.size_limit
     }

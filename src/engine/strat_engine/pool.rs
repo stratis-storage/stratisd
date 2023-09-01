@@ -14,8 +14,8 @@ use crate::{
     engine::{
         engine::{BlockDev, DumpState, Filesystem, Pool, StateDiff},
         shared::{
-            init_cache_idempotent_or_err, validate_filesystem_size_specs, validate_name,
-            validate_paths,
+            init_cache_idempotent_or_err, validate_filesystem_size, validate_filesystem_size_specs,
+            validate_name, validate_paths,
         },
         strat_engine::{
             backstore::{Backstore, ProcessedPathInfos, StratBlockDev, UnownedDevices},
@@ -32,6 +32,7 @@ use crate::{
             PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
             SetDeleteAction, StratFilesystemDiff, StratPoolDiff,
         },
+        PropChangeAction,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -1217,6 +1218,23 @@ impl Pool for StratPool {
             ))
         } else {
             Ok((GrowAction::Identity, None))
+        }
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn set_fs_size_limit(
+        &mut self,
+        fs_uuid: FilesystemUuid,
+        limit: Option<Bytes>,
+    ) -> StratisResult<PropChangeAction<Option<Sectors>>> {
+        let (name, _) = self.get_filesystem(fs_uuid).ok_or_else(|| {
+            StratisError::Msg(format!("Filesystem with UUID {fs_uuid} not found"))
+        })?;
+        let limit = validate_filesystem_size(&name, limit)?;
+        if self.thin_pool.set_fs_size_limit(fs_uuid, limit)? {
+            Ok(PropChangeAction::NewValue(limit))
+        } else {
+            Ok(PropChangeAction::Identity)
         }
     }
 }

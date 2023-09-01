@@ -205,34 +205,41 @@ pub fn validate_paths(paths: &[&Path]) -> StratisResult<()> {
     }
 }
 
+pub fn validate_filesystem_size(
+    name: &str,
+    size_opt: Option<Bytes>,
+) -> StratisResult<Option<Sectors>> {
+    size_opt
+        .map(|size| {
+            let size_sectors = size.sectors();
+            if size_sectors.bytes() != size {
+                Err(StratisError::Msg(format!(
+                    "Requested size or size limit of filesystem {name} must be divisble by {SECTOR_SIZE}"
+                )))
+            } else if size_sectors < MIN_THIN_DEV_SIZE {
+                Err(StratisError::Msg(format!(
+                    "Requested size or size_limit of filesystem {name} is {size_sectors} which is less than minimum required: {MIN_THIN_DEV_SIZE}"
+                )))
+            } else if size_sectors > MAX_THIN_DEV_SIZE {
+                Err(StratisError::Msg(format!(
+                    "Requested size or size limit filesystem {name} is {size_sectors} which is greater than maximum allowed: {MAX_THIN_DEV_SIZE}"
+                )))
+            } else {
+                Ok(size_sectors)
+            }
+        })
+        .transpose()
+}
+
 pub fn validate_filesystem_size_specs<'a>(
     specs: &[(&'a str, Option<Bytes>)],
 ) -> StratisResult<HashMap<&'a str, Sectors>> {
     specs
         .iter()
         .map(|&(name, size_opt)| {
-            size_opt
-                .map(|size| {
-                    let size_sectors = size.sectors();
-                    if size_sectors.bytes() != size {
-                        Err(StratisError::Msg(format!(
-                            "Requested size of filesystem {name} must be divisble by {SECTOR_SIZE}"
-                        )))
-                    } else if size_sectors < MIN_THIN_DEV_SIZE {
-                        Err(StratisError::Msg(format!(
-                            "Requested size of filesystem {name} is {size_sectors} which is less than minimum required: {MIN_THIN_DEV_SIZE}"
-                        )))
-                    } else if size_sectors > MAX_THIN_DEV_SIZE {
-                        Err(StratisError::Msg(format!(
-                            "Requested size of filesystem {name} is {size_sectors} which is greater than maximum allowed: {MAX_THIN_DEV_SIZE}"
-                        )))
-                    } else {
-                        Ok(size_sectors)
-                    }
-                })
-                .transpose()
-                .map(|size_opt| size_opt.unwrap_or(DEFAULT_THIN_DEV_SIZE))
-                .map(|size| (name, size))
+            let size = validate_filesystem_size(name, size_opt)
+                .map(|size_opt| size_opt.unwrap_or(DEFAULT_THIN_DEV_SIZE))?;
+            Ok((name, size))
         })
         .collect::<StratisResult<HashMap<_, Sectors>>>()
 }

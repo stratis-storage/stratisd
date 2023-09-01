@@ -773,7 +773,7 @@ pub enum PropChangeAction<T> {
 
 impl<T> ToDisplay for PropChangeAction<Option<T>>
 where
-    T: Display,
+    T: ToString,
 {
     type Display = PropChangeAction<String>;
 
@@ -781,7 +781,7 @@ where
         match self {
             PropChangeAction::Identity => PropChangeAction::Identity,
             PropChangeAction::NewValue(Some(v)) => {
-                PropChangeAction::NewValue(format!("a value of {v}"))
+                PropChangeAction::NewValue(format!("a value of {}", v.to_string()))
             }
             PropChangeAction::NewValue(None) => {
                 PropChangeAction::NewValue("an empty value".to_string())

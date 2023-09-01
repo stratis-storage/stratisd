@@ -16,8 +16,8 @@ use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
         shared::{
-            gather_encryption_info, init_cache_idempotent_or_err, validate_filesystem_size_specs,
-            validate_name, validate_paths,
+            gather_encryption_info, init_cache_idempotent_or_err, validate_filesystem_size,
+            validate_filesystem_size_specs, validate_name, validate_paths,
         },
         sim_engine::{blockdev::SimDev, filesystem::SimFilesystem},
         structures::Table,
@@ -27,6 +27,7 @@ use crate::{
             PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
             SetDeleteAction,
         },
+        PropChangeAction,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -690,6 +691,23 @@ impl Pool for SimPool {
         _: DevUuid,
     ) -> StratisResult<(GrowAction<(PoolUuid, DevUuid)>, Option<PoolDiff>)> {
         Ok((GrowAction::Identity, None))
+    }
+
+    fn set_fs_size_limit(
+        &mut self,
+        fs_uuid: FilesystemUuid,
+        limit: Option<Bytes>,
+    ) -> StratisResult<PropChangeAction<Option<Sectors>>> {
+        let (name, fs) = self.filesystems.get_mut_by_uuid(fs_uuid).ok_or_else(|| {
+            StratisError::Msg(format!("Filesystem with UUID {fs_uuid} not found"))
+        })?;
+        let limit = validate_filesystem_size(&name, limit)?;
+        let changed = fs.set_size_limit(limit)?;
+        if changed {
+            Ok(PropChangeAction::NewValue(limit))
+        } else {
+            Ok(PropChangeAction::Identity)
+        }
     }
 }
 

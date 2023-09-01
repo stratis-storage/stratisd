@@ -31,7 +31,7 @@ use crate::{
     stratis::StratisResult,
 };
 
-use super::types::StratBlockDevDiff;
+use super::{types::StratBlockDevDiff, PropChangeAction};
 
 pub const DEV_PATH: &str = "/dev/stratis";
 /// The maximum size of pool passphrases stored in the kernel keyring
@@ -90,6 +90,9 @@ pub trait Filesystem: Debug {
 
     /// Get the size of the filesystem in bytes.
     fn size(&self) -> Bytes;
+
+    /// Get filesystem size limit.
+    fn size_limit(&self) -> Option<Sectors>;
 }
 
 pub trait BlockDev: Debug {
@@ -328,6 +331,13 @@ pub trait Pool: Debug + Send + Sync {
         pool_uuid: PoolUuid,
         device: DevUuid,
     ) -> StratisResult<(GrowAction<(PoolUuid, DevUuid)>, Option<PoolDiff>)>;
+
+    /// Set filesystem size limit.
+    fn set_fs_size_limit(
+        &mut self,
+        fs: FilesystemUuid,
+        limit: Option<Bytes>,
+    ) -> StratisResult<PropChangeAction<Option<Sectors>>>;
 }
 
 pub type HandleEvents<P> = (

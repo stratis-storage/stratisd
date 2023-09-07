@@ -42,8 +42,8 @@ DefaultDependencies=no
 Conflicts=shutdown.target
 OnFailure=emergency.target
 OnFailureJobMode=isolate
-Wants=stratisd-min.service plymouth-start.service stratis-clevis-setup.service
-After=paths.target plymouth-start.service stratisd-min.service
+Wants=stratisd-min.service systemd-ask-password-console.service stratis-clevis-setup.service
+After=paths.target systemd-ask-password-console.service stratisd-min.service
 Before=initrd.target
 
 [Service]

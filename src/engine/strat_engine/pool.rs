@@ -32,6 +32,7 @@ use crate::{
             PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
             SetDeleteAction, StratFilesystemDiff, StratPoolDiff,
         },
+        PropChangeAction,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -1217,6 +1218,19 @@ impl Pool for StratPool {
             ))
         } else {
             Ok((GrowAction::Identity, None))
+        }
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn set_fs_size_limit(
+        &mut self,
+        fs_uuid: FilesystemUuid,
+        limit: Option<Sectors>,
+    ) -> StratisResult<PropChangeAction<Option<Sectors>>> {
+        if self.thin_pool.set_fs_size_limit(fs_uuid, limit)? {
+            Ok(PropChangeAction::NewValue(limit))
+        } else {
+            Ok(PropChangeAction::Identity)
         }
     }
 }

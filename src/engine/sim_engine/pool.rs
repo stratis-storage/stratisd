@@ -27,6 +27,7 @@ use crate::{
             PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
             SetDeleteAction,
         },
+        PropChangeAction,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -690,6 +691,22 @@ impl Pool for SimPool {
         _: DevUuid,
     ) -> StratisResult<(GrowAction<(PoolUuid, DevUuid)>, Option<PoolDiff>)> {
         Ok((GrowAction::Identity, None))
+    }
+
+    fn set_fs_size_limit(
+        &mut self,
+        fs_uuid: FilesystemUuid,
+        limit: Option<Sectors>,
+    ) -> StratisResult<PropChangeAction<Option<Sectors>>> {
+        let (_, fs) = self.filesystems.get_mut_by_uuid(fs_uuid).ok_or_else(|| {
+            StratisError::Msg(format!("Filesystem with UUID {fs_uuid} not found"))
+        })?;
+        if fs.size_limit() == limit {
+            Ok(PropChangeAction::Identity)
+        } else {
+            fs.set_size_limit(limit);
+            Ok(PropChangeAction::NewValue(limit))
+        }
     }
 }
 

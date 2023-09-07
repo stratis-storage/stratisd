@@ -23,7 +23,7 @@ use devicemapper::{
 
 use crate::{
     engine::{
-        engine::{DumpState, StateDiff},
+        engine::{DumpState, Filesystem, StateDiff},
         strat_engine::{
             backstore::Backstore,
             cmd::{thin_check, thin_metadata_size, thin_repair},
@@ -1555,6 +1555,27 @@ impl ThinPool {
     /// Indicate to the pool that it may now have more room for metadata growth.
     pub fn clear_out_of_meta_flag(&mut self) {
         self.out_of_meta_space = false;
+    }
+
+    /// Set the filesystem size limit for filesystem with given UUID.
+    pub fn set_fs_size_limit(
+        &mut self,
+        fs_uuid: FilesystemUuid,
+        limit: Option<Sectors>,
+    ) -> StratisResult<bool> {
+        let changed = {
+            let (_, fs) = self.get_mut_filesystem_by_uuid(fs_uuid).ok_or_else(|| {
+                StratisError::Msg(format!("No filesystem with UUID {fs_uuid} found"))
+            })?;
+            fs.set_size_limit(limit)?
+        };
+        let (name, fs) = self
+            .get_filesystem_by_uuid(fs_uuid)
+            .ok_or_else(|| StratisError::Msg(format!("No filesystem with UUID {fs_uuid} found")))?;
+        if changed {
+            self.mdv.save_fs(&name, fs_uuid, fs)?;
+        }
+        Ok(changed)
     }
 }
 

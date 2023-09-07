@@ -390,7 +390,7 @@ impl StratFilesystem {
         Ok(ret_vec)
     }
 
-    pub fn set_size_limit(&mut self, limit: Option<Sectors>) -> StratisResult<()> {
+    pub fn set_size_limit(&mut self, limit: Option<Sectors>) -> StratisResult<bool> {
         match limit {
             Some(lim) if self.thindev_size() > lim => Err(StratisError::Msg(format!(
                 "Limit requested of {} is smaller than current filesystem size of {}",
@@ -398,14 +398,14 @@ impl StratFilesystem {
                 self.thindev_size()
             ))),
             Some(_) | None => {
-                self.size_limit = limit;
-                Ok(())
+                if self.size_limit == limit {
+                    Ok(false)
+                } else {
+                    self.size_limit = limit;
+                    Ok(true)
+                }
             }
         }
-    }
-
-    pub fn size_limit(&self) -> Option<Sectors> {
-        self.size_limit
     }
 
     pub fn thindev_size(&self) -> Sectors {
@@ -445,6 +445,10 @@ impl Filesystem for StratFilesystem {
 
     fn size(&self) -> Bytes {
         self.thin_dev.size().bytes()
+    }
+
+    fn size_limit(&self) -> Option<Sectors> {
+        self.size_limit
     }
 }
 
@@ -521,6 +525,15 @@ impl<'a> Into<Value> for &'a StratFilesystem {
                 self.used()
                     .map(|v| v.to_string())
                     .unwrap_or_else(|_| "Unavailable".to_string()),
+            ),
+        );
+        json.insert(
+            "size_limit".to_string(),
+            Value::from(
+                self.size_limit
+                    .as_ref()
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| "Not set".to_string()),
             ),
         );
         Value::from(json)

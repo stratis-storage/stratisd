@@ -714,25 +714,19 @@ impl Pool for StratPool {
         let increase = spec_map.values().copied().sum::<Sectors>();
         self.check_overprov(increase)?;
 
-        spec_map.iter().fold(Ok(()), |res, (name, size)| {
-            res.and_then(|()| validate_name(name))
-                .and_then(|()| {
-                    if let Some((_, fs)) = self.thin_pool.get_filesystem_by_name(name) {
-                        if fs.thindev_size() == *size {
-                            Ok(())
-                        } else {
-                            Err(StratisError::Msg(format!(
-                                "Size {} of filesystem {} to be created conflicts with size {} for existing filesystem",
-                                size,
-                                name,
-                                fs.thindev_size()
-                            )))
-                        }
-                    } else {
-                        Ok(())
-                    }
-                })
-        })?;
+        for (name, size) in spec_map.iter() {
+            validate_name(name)?;
+            if let Some((_, fs)) = self.thin_pool.get_filesystem_by_name(name) {
+                if fs.thindev_size() != *size {
+                    return Err(StratisError::Msg(format!(
+                        "Size {} of filesystem {} to be created conflicts with size {} for existing filesystem",
+                        size,
+                        name,
+                        fs.thindev_size()
+                    )));
+                }
+            }
+        }
 
         // TODO: Roll back on filesystem initialization failure.
         let mut result = Vec::new();

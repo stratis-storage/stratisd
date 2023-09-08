@@ -347,6 +347,9 @@ pub trait Pool: Debug + Send + Sync {
 
     /// Return the metadata that was last written to pool devices.
     fn last_metadata(&self) -> StratisResult<String>;
+
+    /// Get the metadata version for a given pool.
+    fn metadata_version(&self) -> StratSigblockVersion;
 }
 
 pub type HandleEvents<P> = (

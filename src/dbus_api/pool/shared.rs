@@ -321,6 +321,12 @@ pub fn pool_fs_limit(pool: &dyn Pool) -> u64 {
     pool.fs_limit()
 }
 
+/// Generate a D-Bus representation of the filesystem limit on the pool.
+#[inline]
+pub fn pool_metadata_version(pool: &dyn Pool) -> u64 {
+    pool.metadata_version() as u64
+}
+
 /// Set the filesystem limit on a pool.
 #[inline]
 pub fn set_pool_fs_limit(

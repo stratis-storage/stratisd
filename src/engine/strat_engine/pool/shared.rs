@@ -16,6 +16,7 @@ use crate::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
             FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff, PoolEncryptionInfo,
             PoolUuid, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
+            StratSigblockVersion,
         },
     },
     stratis::StratisResult,
@@ -313,6 +314,13 @@ impl Pool for AnyPool {
         match self {
             AnyPool::V1(p) => p.grow_physical(name, pool_uuid, device),
             AnyPool::V2(p) => p.grow_physical(name, pool_uuid, device),
+        }
+    }
+
+    fn metadata_version(&self) -> StratSigblockVersion {
+        match self {
+            AnyPool::V1(p) => p.metadata_version(),
+            AnyPool::V2(p) => p.metadata_version(),
         }
     }
 }

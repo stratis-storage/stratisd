@@ -25,7 +25,7 @@ use crate::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
             EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
             PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
-            SetDeleteAction,
+            SetDeleteAction, StratSigblockVersion,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -690,6 +690,10 @@ impl Pool for SimPool {
         _: DevUuid,
     ) -> StratisResult<(GrowAction<(PoolUuid, DevUuid)>, Option<PoolDiff>)> {
         Ok((GrowAction::Identity, None))
+    }
+
+    fn metadata_version(&self) -> StratSigblockVersion {
+        StratSigblockVersion::V2
     }
 }
 

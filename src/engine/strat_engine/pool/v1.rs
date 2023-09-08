@@ -43,7 +43,7 @@ use crate::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
             Diff, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
             PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
-            SetDeleteAction, StratFilesystemDiff, StratPoolDiff,
+            SetDeleteAction, StratFilesystemDiff, StratPoolDiff, StratSigblockVersion,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -1227,6 +1227,10 @@ impl Pool for StratPool {
         } else {
             Ok((GrowAction::Identity, None))
         }
+    }
+
+    fn metadata_version(&self) -> StratSigblockVersion {
+        StratSigblockVersion::V1
     }
 }
 

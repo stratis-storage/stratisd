@@ -328,6 +328,9 @@ pub trait Pool: Debug + Send + Sync {
         pool_uuid: PoolUuid,
         device: DevUuid,
     ) -> StratisResult<(GrowAction<(PoolUuid, DevUuid)>, Option<PoolDiff>)>;
+
+    /// Get the metadata version for a given pool.
+    fn metadata_version(&self) -> StratSigblockVersion;
 }
 
 pub type HandleEvents<P> = (

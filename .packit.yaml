@@ -1,0 +1,32 @@
+---
+
+# yamllint disable rule:line-length
+specfile_path: ../distro/stratisd.spec
+merge_pr_in_ci: false
+update_release: false
+
+upstream_package_name: stratisd
+downstream_package_name: stratisd
+
+actions:
+    post-upstream-clone:
+        - "git clone https://github.com/stratis-storage/ci --depth=1 ../distro"
+        - "mv ../distro/mockbuild_test/stratisd.spec ../distro/stratisd.spec"
+    create-archive:
+        - "sh -c 'python3 ../distro/release_management/create_artifacts.py ../distro/ --pre-release --specfile-path=../distro/stratisd.spec stratisd $(rpmspec -q --srpm --qf %{Version} ../distro/stratisd.spec)'"
+    fix-spec-file:
+        - "echo 'skipping automatic fix-spec-file actions'"
+    get-current-version:
+        # TODO:  Figure out a way to get this info via cargo
+        - "rpmspec -q --srpm --qf %{Version}\n ../distro/stratisd.spec"
+
+srpm_build_deps:
+    - git
+    - cargo
+
+jobs:
+    - job: copr_build
+      trigger: pull_request
+      manual_trigger: true
+      targets:
+          - fedora-stable

@@ -11,6 +11,7 @@ on:
       - '**/README.md'
       - 'README_tests.md'
       - 'tests/**'
+      - ".packit.yaml"
   pull_request:
     branches:
       - master
@@ -19,6 +20,7 @@ on:
       - '**/README.md'
       - 'README_tests.md'
       - 'tests/**'
+      - ".packit.yaml"
 
   workflow_dispatch:
 

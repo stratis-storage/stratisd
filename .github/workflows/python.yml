@@ -10,6 +10,7 @@ on:
       - 'CHANGES.txt'
       - '**/README.md'
       - 'README_tests.md'
+      - ".packit.yaml"
   pull_request:
     branches:
       - master
@@ -17,6 +18,7 @@ on:
       - 'CHANGES.txt'
       - '**/README.md'
       - 'README_tests.md'
+      - ".packit.yaml"
 
   workflow_dispatch:
 

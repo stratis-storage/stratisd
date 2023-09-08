@@ -341,6 +341,9 @@ pub trait Pool: Debug + Send + Sync {
         fs: FilesystemUuid,
         limit: Option<Bytes>,
     ) -> StratisResult<PropChangeAction<Option<Sectors>>>;
+
+    /// Get the metadata version for a given pool.
+    fn metadata_version(&self) -> StratSigblockVersion;
 }
 
 pub type HandleEvents<P> = (

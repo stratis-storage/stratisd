@@ -35,6 +35,7 @@ use crate::{
             Diff, EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
             PoolEncryptionInfo, PoolUuid, PropChangeAction, RegenAction, RenameAction,
             SetCreateAction, SetDeleteAction, StratFilesystemDiff, StratPoolDiff,
+            StratSigblockVersion,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -1188,6 +1189,10 @@ impl Pool for StratPool {
             String::from_utf8(v)
                 .map_err(|_| StratisError::Msg("metadata byte array is not utf-8".into()))
         })
+    }
+
+    fn metadata_version(&self) -> StratSigblockVersion {
+        StratSigblockVersion::V2
     }
 }
 

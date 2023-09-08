@@ -21,8 +21,8 @@ pub use self::{
         MaybeInconsistent, Name, PoolDiff, PoolEncryptionInfo, PoolIdentifier, PoolUuid,
         PropChangeAction, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
         SetUnlockAction, StartAction, StopAction, StoppedPoolInfo, StoppedPoolsInfo,
-        StratBlockDevDiff, StratFilesystemDiff, StratPoolDiff, StratisUuid, ThinPoolDiff,
-        ToDisplay, UdevEngineEvent, UnlockMethod,
+        StratBlockDevDiff, StratFilesystemDiff, StratPoolDiff, StratSigblockVersion, StratisUuid,
+        ThinPoolDiff, ToDisplay, UdevEngineEvent, UnlockMethod,
     },
 };
 

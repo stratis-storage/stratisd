@@ -17,6 +17,7 @@ Test that stratis-dumpmetadata can do its job.
 """
 
 # isort: STDLIB
+import json
 import os
 import subprocess
 
@@ -25,15 +26,18 @@ from ._utils import ServiceContextManager, UdevTest, create_pool, random_string
 _STRATIS_DUMPMETADATA = os.environ["STRATIS_DUMPMETADATA"]
 
 
-def _call_stratis_dumpmetadata(dev, *, print_bytes=False):
+def _call_stratis_dumpmetadata(dev, *, print_bytes=False, only=None):
     """
     Call stratis-dumpmetadata and return exit code.
 
     :param str dev: path to Stratis device
     :param bool print_bytes: if true, print bytes also
+    :param bool only: value for only argument
     """
     with subprocess.Popen(
-        [_STRATIS_DUMPMETADATA, f"{dev}"] + (["--print-bytes"] if print_bytes else []),
+        [_STRATIS_DUMPMETADATA, f"{dev}"]
+        + (["--print-bytes"] if print_bytes else [])
+        + ([] if only is None else [f"--only={only}"]),
         stdout=subprocess.PIPE,
     ) as command:
         outs, errs = command.communicate()
@@ -78,4 +82,24 @@ class TestDumpMetadata(UdevTest):
             self.wait_for_pools(1)
             self.assertGreater(
                 len(_call_stratis_dumpmetadata(devnodes[1], print_bytes=True)), 0
+            )
+
+    def test_only_pool(self):
+        """
+        Verify that stratis-dumpmetadata can run on a device with --only set
+        to pool.
+        """
+        device_tokens = self._lb_mgr.create_devices(4)
+        devnodes = self._lb_mgr.device_files(device_tokens)
+
+        with ServiceContextManager():
+            pool_name = random_string(5)
+            create_pool(pool_name, devnodes)
+            self.wait_for_pools(1)
+            result = _call_stratis_dumpmetadata(
+                devnodes[2], print_bytes=True, only="pool"
+            )
+            self.assertGreater(
+                len(json.loads(result)),
+                0,
             )

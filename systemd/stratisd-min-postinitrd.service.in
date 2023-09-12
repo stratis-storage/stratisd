@@ -4,7 +4,7 @@ Documentation=man:stratisd(8)
 DefaultDependencies=no
 After=systemd-udevd.service
 Requires=systemd-udevd.service
-Before=local-fs.target
+Before=local-fs-pre.target
 
 [Service]
 Type=notify
@@ -14,6 +14,3 @@ ExecStart=@LIBEXECDIR@/stratisd-min --log-level debug
 KillSignal=SIGINT
 KillMode=process
 Restart=on-abort
-
-[Install]
-WantedBy=local-fs.target

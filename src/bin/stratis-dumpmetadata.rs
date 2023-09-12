@@ -54,6 +54,66 @@ fn fmt_metadata(shr: &StaticHeaderResult, print_bytes: bool) -> String {
     result
 }
 
+/// Prints signature block
+/// Prints the sigblock bytes if print_bytes is true.
+/// Skips if only_pool is true.
+fn print_signature_block(
+    read_results: &(StaticHeaderResult, StaticHeaderResult),
+    print_bytes: bool,
+    only_pool: bool,
+) {
+    if only_pool {
+        return;
+    }
+
+    if read_results.0 == read_results.1 {
+        println!(
+            "Signature block: \n{}",
+            fmt_metadata(&read_results.0, print_bytes)
+        );
+    } else {
+        println!(
+            "Signature block 1: \n{}",
+            fmt_metadata(&read_results.0, print_bytes)
+        );
+        println!(
+            "Signature block 2: \n{}",
+            fmt_metadata(&read_results.1, print_bytes)
+        );
+    };
+}
+
+/// Prints the bda.
+/// Skips if only_pool is true.
+fn print_bda(bda: &BDA, only_pool: bool) {
+    if only_pool {
+        return;
+    }
+
+    println!("\n{:#?}", bda);
+}
+
+/// Prints the pool level metadata.
+/// Prints in machine-readable form if only_pool is true.
+fn print_pool_metadata(pool_metadata: &Option<Vec<u8>>, only_pool: bool) -> Result<(), String> {
+    if !only_pool {
+        println!("\nPool metadata:");
+    }
+    if let Some(loaded_state) = pool_metadata {
+        let state_json: Value = serde_json::from_slice(&loaded_state)
+            .map_err(|extract_err| format!("Error during state JSON extract: {}", extract_err))?;
+        let state_json_pretty: String = serde_json::to_string_pretty(&state_json)
+            .map_err(|parse_err| format!("Error during state JSON parse: {}", parse_err))?;
+        println!("{}", state_json_pretty);
+    } else {
+        if !only_pool {
+            println!("None found");
+        }
+    }
+
+    Ok(())
+}
+
 /// Configure and initialize the logger.
 /// Read log configuration parameters from the environment if RUST_LOG
 /// is set. Otherwise, just accept the default configuration, which is
@@ -73,38 +133,25 @@ fn initialize_log() {
 // Otherwise display the StaticHeader fields of both sigblocks.
 // If print_bytes flag is set to True, display the bytes buffer
 // of the sigblock alongside the StaticHeader.
-fn run(devpath: &str, print_bytes: bool) -> Result<(), String> {
+fn run(devpath: &str, print_bytes: bool, pool_only: bool) -> Result<(), String> {
     let mut devfile = OpenOptions::new()
         .read(true)
         .open(&devpath)
         .map_err(|the_io_error| format!("Error opening device: {}", the_io_error))?;
 
     let read_results = StaticHeader::read_sigblocks(&mut devfile);
-    if read_results.0 == read_results.1 {
-        println!(
-            "Signature block: \n{}",
-            fmt_metadata(&read_results.0, print_bytes)
-        );
-    } else {
-        println!(
-            "Signature block 1: \n{}",
-            fmt_metadata(&read_results.0, print_bytes)
-        );
-        println!(
-            "Signature block 2: \n{}",
-            fmt_metadata(&read_results.1, print_bytes)
-        );
-    }
+    print_signature_block(&read_results, print_bytes, pool_only);
 
     let header =
         StaticHeader::repair_sigblocks(&mut devfile, read_results, StaticHeader::do_nothing)
             .map_err(|repair_error| format!("No valid StaticHeader found: {}", repair_error))?
             .ok_or_else(|| "No valid Stratis signature found".to_string())?;
+
     let bda = BDA::load(header, &mut devfile)
         .map_err(|bda_load_error| format!("BDA detected but error found: {}", bda_load_error))?
         .ok_or_else(|| "No Stratis BDA metadata found".to_string())?;
 
-    println!("\n{:#?}", bda);
+    print_bda(&bda, pool_only);
 
     devfile
         .seek(SeekFrom::Start(0))
@@ -114,22 +161,14 @@ fn run(devpath: &str, print_bytes: bool) -> Result<(), String> {
         .load_state(&mut devfile)
         .map_err(|stateload_err| format!("Error during load state: {}", stateload_err))?;
 
-    println!("\nPool metadata:");
-    if let Some(loaded_state) = loaded_state {
-        let state_json: Value = serde_json::from_slice(&loaded_state)
-            .map_err(|extract_err| format!("Error during state JSON extract: {}", extract_err))?;
-        let state_json_pretty: String = serde_json::to_string_pretty(&state_json)
-            .map_err(|parse_err| format!("Error during state JSON parse: {}", parse_err))?;
-        println!("{}", state_json_pretty);
-    } else {
-        println!("None found");
-    }
+    print_pool_metadata(&loaded_state, pool_only)?;
 
     Ok(())
 }
 
 fn parse_args() -> Command {
     Command::new("stratis-dumpmetadata")
+        .next_line_help(true)
         .arg(
             Arg::new("dev")
                 .required(true)
@@ -143,6 +182,14 @@ fn parse_args() -> Command {
                 .short('b')
                 .help("Print byte buffer of signature block"),
         )
+        .arg(
+            Arg::new("only")
+                .long("only")
+                .action(ArgAction::Set)
+                .value_name("PORTION")
+                .value_parser(["pool"])
+                .help("Only print specified portion of the metadata"),
+        )
 }
 
 fn main() {
@@ -154,7 +201,14 @@ fn main() {
 
     initialize_log();
 
-    match run(devpath, matches.get_flag("print_bytes")) {
+    match run(
+        devpath,
+        matches.get_flag("print_bytes"),
+        matches
+            .get_one::<String>("only")
+            .map(|v| v == "pool")
+            .unwrap_or(false),
+    ) {
         Ok(()) => {}
         Err(e) => {
             eprintln!("Error encountered: {}", e);

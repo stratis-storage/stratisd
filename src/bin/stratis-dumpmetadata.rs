@@ -141,7 +141,7 @@ fn parse_args() -> Command {
                 .action(ArgAction::SetTrue)
                 .num_args(0)
                 .short('b')
-                .help("Print byte buffer of device"),
+                .help("Print byte buffer of signature block"),
         )
 }
 

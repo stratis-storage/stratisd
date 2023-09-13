@@ -36,14 +36,14 @@ def _call_stratis_dumpmetadata(dev, *, print_bytes=False):
         [_STRATIS_DUMPMETADATA, f"{dev}"] + (["--print-bytes"] if print_bytes else []),
         stdout=subprocess.PIPE,
     ) as command:
-        _, errs = command.communicate()
+        outs, errs = command.communicate()
         exit_code = command.returncode
         if exit_code != 0:
             raise RuntimeError(
                 f"Invocation of {_STRATIS_DUMPMETADATA} returned an error: "
                 f"{command.returncode}, {errs}"
             )
-        return exit_code
+        return outs
 
 
 class TestDumpMetadata(UdevTest):
@@ -62,7 +62,7 @@ class TestDumpMetadata(UdevTest):
             pool_name = random_string(5)
             create_pool(pool_name, devnodes)
             self.wait_for_pools(1)
-            self.assertEqual(_call_stratis_dumpmetadata(devnodes[0]), 0)
+            self.assertGreater(len(_call_stratis_dumpmetadata(devnodes[0])), 0)
 
     def test_printbytes_call(self):
         """
@@ -76,6 +76,6 @@ class TestDumpMetadata(UdevTest):
             pool_name = random_string(5)
             create_pool(pool_name, devnodes)
             self.wait_for_pools(1)
-            self.assertEqual(
-                _call_stratis_dumpmetadata(devnodes[0], print_bytes=True), 0
+            self.assertGreater(
+                len(_call_stratis_dumpmetadata(devnodes[1], print_bytes=True)), 0
             )

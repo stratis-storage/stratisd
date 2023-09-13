@@ -1,0 +1,61 @@
+#!/bin/bash
+
+if [ -z "$1" ]; then
+	echo Stratis symlink with pool name and filesystem name in systemd format \
+	\(dev-stratis-\$POOL_NAME-\$FILESYSTEM_NAME\) required as an argument. >&2
+	exit 1
+fi
+
+
+if [ "$1" != dev-stratis* ]; then
+	echo Argument provided was in incorrect format. Stratis symlink with pool name \
+	and filesystem name in systemd format \(dev-stratis-\$POOL_NAME-\$FILESYSTEM_NAME\) \
+	required as an argument. >&2
+	exit 1
+fi
+
+PATH="$1"
+
+IFS='-' read -ra SEGMENTS <<< "$PATH"
+
+if [ "${#SEGMENTS[@]}" != 4 ]; then
+	echo Argument provided was in incorrect format. Stratis symlink with pool name \
+	and filesystem name in systemd format \(dev-stratis-\$POOL_NAME-\$FILESYSTEM_NAME\) \
+	required as an argument. >&2
+	exit 1
+fi
+
+POOL_NAME="${$SEGMENTS[2]}"
+
+i=0
+while ! stratis-min pool is-stopped --name "$POOL_NAME" >/dev/null; do
+	echo Waiting on pool with name $POOL_NAME...
+	sleep 1
+	if [ "$i" = 5 ]; then
+		break
+	fi
+	i=$(($i + 1))
+done
+
+if $(stratis-min pool is-stopped --name "$POOL_NAME"); then
+	if $(stratis-min pool is-bound --name "$POOL_NAME"); then
+		if ! stratis-min pool start --name --unlock-method=clevis "$POOL_NAME"; then
+			echo Failed to start pool with name $POOL_NAME using Clevis. >&2
+			exit 1
+		fi
+	elif $(stratis-min pool is-encrypted --name "$POOL_NAME"); then
+		if ! systemd-ask-password \
+			"Enter password for pool with name $POOL_NAME" |
+			stratis-min pool start --name --unlock-method=keyring --prompt "$POOL_NAME"; then
+			echo Failed to start pool with name $POOL_NAME using passphrase. >&2
+			exit 1
+		fi
+	else
+		if ! stratis-min pool start --name "$POOL_NAME"; then
+			echo Failed to start pool with name $POOL_NAME. >&2
+			exit 1
+		fi
+	fi
+fi
+
+udevadm settle

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+echo "This fstab setup script is deprecated as it may bump into issues with ordering with regards to systemd fsck. Please switch to stratis-fstab-setup-v2@.service" >&2
+
 if [ -z "$1" ]; then
 	echo Pool UUID required as an argument. >&2
 	exit 1

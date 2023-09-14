@@ -11,6 +11,7 @@ use std::{
     thread::scope,
 };
 
+use itertools::Itertools;
 use retry::{delay::Fixed, retry_with_index};
 use serde_json::{Map, Value};
 
@@ -483,7 +484,7 @@ impl ThinPool {
             thin_pool_save
                 .feature_args
                 .as_ref()
-                .map(|hs| hs.iter().cloned().collect::<Vec<_>>())
+                .map(|x| x.to_vec())
                 .unwrap_or_else(|| {
                     migrate = true;
                     vec![
@@ -1645,7 +1646,17 @@ impl Recordable<ThinPoolDevSave> for ThinPool {
     fn record(&self) -> ThinPoolDevSave {
         ThinPoolDevSave {
             data_block_size: self.thin_pool.data_block_size(),
-            feature_args: Some(self.thin_pool.table().table.params.feature_args.clone()),
+            feature_args: Some(
+                self.thin_pool
+                    .table()
+                    .table
+                    .params
+                    .feature_args
+                    .iter()
+                    .sorted()
+                    .cloned()
+                    .collect(),
+            ),
             fs_limit: Some(self.fs_limit),
             enable_overprov: Some(self.enable_overprov),
         }

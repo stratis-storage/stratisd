@@ -12,8 +12,6 @@
 // can convert to or from them when saving our current state, or
 // restoring state from saved metadata.
 
-use std::collections::HashSet;
-
 use serde::Serialize;
 
 use devicemapper::{Sectors, ThinDevId};
@@ -100,7 +98,7 @@ pub struct ThinPoolDevSave {
     pub data_block_size: Sectors,
     // TODO: This data type should no longer be optional in Stratis 4.0
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub feature_args: Option<HashSet<String>>,
+    pub feature_args: Option<Vec<String>>,
     // TODO: This data type should no longer be optional in Stratis 4.0
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fs_limit: Option<u64>,

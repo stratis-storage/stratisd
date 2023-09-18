@@ -267,7 +267,7 @@ udev_scripts = ["data-encoding"]
 # FIXME: remove when loopdev dependency lower bound is increased from 0.4.0
 [patch.crates-io.loopdev]
 git = "https://github.com/mulkieran/loopdev"
-branch = "bump-bindgen-reduce-version"
+branch = "bump-bindgen-reduce-version-0.68.1"
 
 [package.metadata.vendor-filter]
 platforms = ["*-unknown-linux-gnu"]

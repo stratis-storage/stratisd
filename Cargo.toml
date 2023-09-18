@@ -215,7 +215,7 @@ pkg-config = "0.3.18"
 [build-dependencies.bindgen]
 default_features = false
 features = ["runtime"]
-version = "0.63.0"
+version = "0.68.1"
 optional = true
 
 [dev-dependencies]

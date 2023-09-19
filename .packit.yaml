@@ -11,6 +11,7 @@ downstream_package_name: stratisd
 actions:
     post-upstream-clone:
         - "git clone https://github.com/stratis-storage/ci --depth=1 ../distro"
+        - "sh -c '(cd ../distro; git checkout -b mulkieran-use-tomllib master; git pull https://github.com/mulkieran/ci.git use-tomllib)'"
         - "mv ../distro/mockbuild_test/stratisd.spec ../distro/stratisd.spec"
     create-archive:
         - "sh -c 'python3 ../distro/release_management/create_artifacts.py ../distro/ --pre-release --specfile-path=../distro/stratisd.spec stratisd $(rpmspec -q --srpm --qf %{Version} ../distro/stratisd.spec)'"

@@ -133,7 +133,6 @@ jobs:
           cryptsetup-devel
           clevis
           clevis-luks
-          cracklib-dicts
           curl
           device-mapper-persistent-data
           dbus-devel
@@ -235,7 +234,6 @@ jobs:
           clang
           clevis
           clevis-luks
-          cracklib-dicts
           cryptsetup-devel
           curl
           dbus-devel

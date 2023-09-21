@@ -13,7 +13,8 @@ actions:
         - "git clone https://github.com/stratis-storage/ci --depth=1 ../distro"
         - "mv ../distro/mockbuild_test/stratisd.spec ../distro/stratisd.spec"
     create-archive:
-        - "sh -c 'python3 ../distro/release_management/create_artifacts.py ../distro/ --pre-release --specfile-path=../distro/stratisd.spec stratisd $(rpmspec -q --srpm --qf %{Version} ../distro/stratisd.spec)'"
+        - "cargo install cargo-vendor-filterer"
+        - "sh -c 'python3 ../distro/release_management/create_artifacts.py ../distro/ --pre-release --specfile-path=../distro/stratisd.spec stratisd $(rpmspec -q --srpm --qf %{Version} ../distro/stratisd.spec) --vendor-method=filtered'"
     fix-spec-file:
         - "echo 'skipping automatic fix-spec-file actions'"
     get-current-version:
@@ -23,6 +24,7 @@ actions:
 srpm_build_deps:
     - git
     - cargo
+    - openssl-devel
 
 jobs:
     - job: copr_build

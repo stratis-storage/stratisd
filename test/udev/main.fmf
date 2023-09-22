@@ -8,5 +8,5 @@ require:
   - python3-dbus-python-client-gen
   - python3-psutil
   - python3-pyudev
-test: TANG_URL=localhost RUST_LOG=stratisd=debug STRATISD=/usr/libexec/stratisd STRATIS_DUMPMETADATA=/usr/bin/stratis-dumpmetadata PYTHONPATH=./src make -f Makefile udev-tests
+test: TANG_URL=localhost RUST_LOG=stratisd=debug STRATISD=/usr/libexec/stratisd STRATIS_DUMPMETADATA=/usr/bin/stratis-dumpmetadata LEGACY_POOL=/usr/local/bin/stratis-legacy-pool PYTHONPATH=./src make -f Makefile udev-tests
 path: /tests/client-dbus

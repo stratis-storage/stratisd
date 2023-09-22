@@ -29,8 +29,8 @@ jobs:
           - dependencies: black python3-isort
             task: make -f Makefile fmt-ci
             working-directory: ./tests/client-dbus
-          - dependencies: yamllint
-            task: make -f Makefile yamllint
+          - dependencies: yamllint tmt
+            task: make -f Makefile yamllint tmtlint
             working-directory: .
           - dependencies: shfmt
             task: make -f Makefile fmt-shell-ci

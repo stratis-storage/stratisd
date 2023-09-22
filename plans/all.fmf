@@ -1,38 +1,99 @@
 summary: top level management
 
+enabled: true
 adjust:
   when: plan == cockpit
   enabled: false
 
-prepare:
-  - name: Start TPM2 emulation kernel module
-    how: shell
-    script: modprobe tpm_vtpm_proxy
-  - name: Install packages
-    how: install
-    package:
-     - tang
-     - systemd
-     - swtpm
-     - swtpm-tools
-     - tpm2-tools
-  - name: Start TPM2 emulation
-    how: shell
-    script: mkdir /var/tmp/swtpm; swtpm_setup --tpm-state /var/tmp/swtpm --tpm2; swtpm chardev --vtpm-proxy --tpmstate dir=/var/tmp/swtpm --tpm2 &> /var/log/swtpm &
-  - name: Start tang server
-    how: shell
-    script: systemctl enable tangd.socket --now
-  - name: Reload udev
-    how: shell
-    script: udevadm control --reload
-  - name: Show test system information
-    how: shell
-    script: free -m; lsblk -i; lscpu; cat /proc/1/sched
-  - name: Record mkfs.xfs version
-    how: shell
-    script: mkfs.xfs -V
-discover:
-  how: fmf
-execute:
-  how: tmt
-  exit-first: false
+/python:
+  prepare:
+    - name: Start TPM2 emulation kernel module
+      how: shell
+      script: modprobe tpm_vtpm_proxy
+    - name: Install packages
+      how: install
+      package:
+       - cargo
+       - clang
+       - cryptsetup-devel
+       - curl
+       - dbus-devel
+       - device-mapper-devel
+       - libblkid-devel
+       - make
+       - ncurses
+       - rust
+       - systemd
+       - swtpm
+       - swtpm-tools
+       - tpm2-tools
+       - systemd-devel
+       - tang
+    - name: Start TPM2 emulation
+      how: shell
+      script: mkdir /var/tmp/swtpm; swtpm_setup --tpm-state /var/tmp/swtpm --tpm2; swtpm chardev --vtpm-proxy --tpmstate dir=/var/tmp/swtpm --tpm2 &> /var/log/swtpm &
+    - name: Start tang server
+      how: shell
+      script: systemctl enable tangd.socket --now
+    - name: Show test system information
+      how: shell
+      script: free -m; lsblk -i; lscpu; cat /proc/1/sched
+    - name: Record mkfs.xfs version
+      how: shell
+      script: mkfs.xfs -V
+    - name: Build and install legacy pool script
+      how: shell
+      script:
+        - PROFILEDIR=debug make build-test-extras
+        - mv target/debug/stratis-legacy-pool /usr/local/bin
+
+  discover:
+    how: fmf
+    filter: "tag:python"
+  execute:
+    how: tmt
+    exit-first: false
+
+/rust:
+  prepare:
+    - name: Start TPM2 emulation kernel module
+      how: shell
+      script: modprobe tpm_vtpm_proxy
+    - name: Install packages
+      how: install
+      package:
+       - cargo
+       - clang
+       - cryptsetup-devel
+       - curl
+       - dbus-devel
+       - device-mapper-devel
+       - libblkid-devel
+       - make
+       - ncurses
+       - rust
+       - systemd
+       - swtpm
+       - swtpm-tools
+       - tpm2-tools
+       - systemd-devel
+       - tang
+    - name: Start TPM2 emulation
+      how: shell
+      script: mkdir /var/tmp/swtpm; swtpm_setup --tpm-state /var/tmp/swtpm --tpm2; swtpm chardev --vtpm-proxy --tpmstate dir=/var/tmp/swtpm --tpm2 &> /var/log/swtpm &
+    - name: Start tang server
+      how: shell
+      script: systemctl enable tangd.socket --now
+    - name: Show test system information
+      how: shell
+      script: free -m; lsblk -i; lscpu; cat /proc/1/sched
+    - name: Record mkfs.xfs version
+      how: shell
+      script: mkfs.xfs -V
+
+  discover:
+    how: fmf
+    filter: "tag:rust"
+  execute:
+    how: tmt
+    exit-first: false

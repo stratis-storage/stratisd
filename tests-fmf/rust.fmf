@@ -1,5 +1,6 @@
 path: /
 duration: 20m
+tag: rust
 
 require:
   - cargo

@@ -1,0 +1,18 @@
+summary: top level management
+prepare:
+  - name: Install packages
+    how: install
+    package:
+     - tang
+     - systemd
+  - name: Start tang server
+    how: shell
+    script: systemctl enable tangd.socket --now
+  - name: Reload udev
+    how: shell
+    script: udevadm control --reload
+discover:
+  how: fmf
+execute:
+  how: tmt
+  exit-first: false

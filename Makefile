@@ -425,6 +425,10 @@ test-stratis-min:
 yamllint:
 	yamllint --strict .github/workflows/*.yml .packit.yaml
 
+## Run tmt lint
+tmtlint:
+	tmt lint
+
 ## Build docs-rust for CI
 docs-ci: docs-rust
 
@@ -507,6 +511,7 @@ clippy: clippy-macros clippy-min clippy-udev-utils clippy-no-ipc
 	test-clevis-loop-should-fail-valgrind
 	test-clevis-real
 	test-clevis-real-should-fail
+	tmtlint
 	yamllint
 
 # COLORS

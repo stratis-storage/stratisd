@@ -97,11 +97,21 @@ class LoopBackDevices:
         Note: The first time a loop back device is known it will generate
         a udev "add" event, subsequent backing file changes do not, thus we
         will need to generate it synthetically.
+
+        If this is the absolute first time calling losetup for this sequence,
+        make an extra loop device and skip the first loop device created.
+
         :param int number: the number of devices to create
         :return: list of keys for the devices
         :rtype: list of uuid.UUID
         """
         tokens = []
+
+        first_creation = self.count == 0
+
+        if first_creation:
+            number = number + 1
+
         for _ in range(number):
             backing_file = os.path.join(self.dir, f"block_device_{self.count}")
             self.count += 1
@@ -118,6 +128,9 @@ class LoopBackDevices:
             token = uuid.uuid4()
             self.devices[token] = (device, backing_file)
             tokens.append(token)
+
+        if first_creation:
+            tokens = tokens[1:]
 
         self._wait_for_udev(tokens)
         self.generate_synthetic_udev_events(tokens, UDEV_ADD_EVENT)

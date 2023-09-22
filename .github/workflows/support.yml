@@ -45,8 +45,8 @@ jobs:
           - dependencies: black python3-isort
             task: make -f Makefile fmt-ci
             working-directory: ./tests/client-dbus
-          - dependencies: yamllint
-            task: make -f Makefile yamllint
+          - dependencies: yamllint tmt
+            task: make -f Makefile yamllint tmtlint
             working-directory: .
     runs-on: ubuntu-22.04
     container: fedora:38  # CURRENT DEVELOPMENT ENVIRONMENT

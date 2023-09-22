@@ -1,0 +1,12 @@
+summary: Run udev tests
+duration: 20m
+require:
+  - clevis-luks
+  - make
+  - python3-dbus
+  - python3-dbus-client-gen
+  - python3-dbus-python-client-gen
+  - python3-psutil
+  - python3-pyudev
+test: TANG_URL=localhost RUST_LOG=stratisd=debug STRATISD=/usr/libexec/stratisd STRATIS_DUMPMETADATA=/usr/bin/stratis-dumpmetadata PYTHONPATH=./src make -f Makefile udev-tests
+path: /tests/client-dbus

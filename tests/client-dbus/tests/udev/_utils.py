@@ -436,20 +436,40 @@ class UdevTest(unittest.TestCase):
         """
         Returns a list of all pools found by GetManagedObjects, or a list
         of pools with names matching the specified name, if passed.
+        Tries multiple times to get the list of pools via GetManagedObjects
+        call. Catches the D-Bus error, just in case there are strange behaviors
+        on the test machine, but re-raises the exception if still failing after
+        tries. Uses a count instead of a timer, because the D-Bus call
+        has a built in timer of its own. Still sleeps after each try in case
+        the reason the expected number does not match the real number is that
+        the pools have not been brought up yet.
         :param int expected_num: the number of pools expected
         :param name: filter for pool name
         :type name: str or NoneType
         :return: list of pool information found
         :rtype: list of (str * MOPool)
         """
-        found_num = None
+        (count, limit, dbus_err, found_num, known_pools) = (
+            0,
+            expected_num + 1,
+            None,
+            None,
+            None,
+        )
+        while count < limit and not expected_num == found_num:
+            try:
+                known_pools = get_pools(name=name)
+            except dbus.exceptions.DBusException as err:
+                dbus_err = err
 
-        end_time = time.time() + 30.0
+            if known_pools is not None:
+                found_num = len(known_pools)
 
-        while time.time() < end_time and not expected_num == found_num:
-            known_pools = get_pools(name=name)
-            found_num = len(known_pools)
-            time.sleep(1)
+            time.sleep(3)
+            count += 1
+
+        if found_num is None and dbus_err is not None:
+            raise dbus_err
 
         self.assertEqual(found_num, expected_num)
 

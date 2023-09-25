@@ -9,14 +9,12 @@ on:
     paths:
       - '**/Cargo.toml'
       - '.github/workflows/cargo.yml'
-      - ".packit.yaml"
   pull_request:
     branches:
       - master
     paths:
       - '**/Cargo.toml'
       - '.github/workflows/cargo.yml'
-      - ".packit.yaml"
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:

@@ -22,8 +22,10 @@ exclude = [
     "/README_tests.md",
     "/docs",
     "/dracut",
+    "/plans",
     "/stratisd.conf",
     "/systemd",
+    "/test",
     "/tests",
     "/udev"
 ]

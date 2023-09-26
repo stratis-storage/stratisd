@@ -449,12 +449,13 @@ class UdevTest(unittest.TestCase):
         :return: list of pool information found
         :rtype: list of (str * MOPool)
         """
-        (count, limit, dbus_err, found_num, known_pools) = (
+        (count, limit, dbus_err, found_num, known_pools, start_time) = (
             0,
             expected_num + 1,
             None,
             None,
             None,
+            time.time(),
         )
         while count < limit and not expected_num == found_num:
             try:
@@ -469,7 +470,10 @@ class UdevTest(unittest.TestCase):
             count += 1
 
         if found_num is None and dbus_err is not None:
-            raise dbus_err
+            raise RuntimeError(
+                f"After {time.time() - start_time:.2f} seconds, the only "
+                "response is a D-Bus exception"
+            ) from dbus_err
 
         self.assertEqual(found_num, expected_num)
 

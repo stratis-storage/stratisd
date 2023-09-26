@@ -1297,7 +1297,7 @@ dependencies = [
  "assert_cmd",
  "assert_matches",
  "async-trait",
- "bindgen 0.63.0",
+ "bindgen 0.68.1",
  "byteorder",
  "chrono",
  "clap",

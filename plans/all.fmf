@@ -11,6 +11,9 @@ prepare:
   - name: Reload udev
     how: shell
     script: udevadm control --reload
+  - name: Record mkfs.xfs version
+    how: shell
+    script: mkfs.xfs -V
 discover:
   how: fmf
 execute:

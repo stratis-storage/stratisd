@@ -254,11 +254,9 @@ class UdevTest3(UdevTest):
             (_, (pool_object_path, device_object_paths)) = create_pool(
                 random_string(5), devnodes, key_description=key_description
             )
-            pool_uuid = Pool.Properties.Uuid.Get(get_object(pool_object_path))
-
-            self.wait_for_pools(1)
-
             wait_for_udev(STRATIS_FS_TYPE, get_devnodes(device_object_paths))
+            self.wait_for_pools(1)
+            pool_uuid = Pool.Properties.Uuid.Get(get_object(pool_object_path))
 
         if take_down_dm:
             remove_stratis_dm_devices()
@@ -345,9 +343,8 @@ class UdevTest4(UdevTest):
             (_, (pool_object_path, _)) = create_pool(
                 random_string(5), devnodes, key_description=key_description
             )
-            pool_uuid = Pool.Properties.Uuid.Get(get_object(pool_object_path))
-
             self.wait_for_pools(1)
+            pool_uuid = Pool.Properties.Uuid.Get(get_object(pool_object_path))
 
         remove_stratis_dm_devices()
 

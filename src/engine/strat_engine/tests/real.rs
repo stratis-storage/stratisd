@@ -7,6 +7,7 @@ use std::{
     fs::OpenOptions,
     panic,
     path::{Path, PathBuf},
+    sync::Once,
 };
 
 use either::Either;
@@ -19,12 +20,15 @@ use devicemapper::{
 };
 
 use crate::engine::strat_engine::{
+    backstore::register_clevis_token,
     cmd::udev_settle,
     device::blkdev_size,
     dm::get_dm,
     tests::{logger::init_logger, util::clean_up},
     writing::wipe_sectors,
 };
+
+static CLEVIS_TOKEN_HANDLER: Once = Once::new();
 
 pub struct RealTestDev {
     dev: Either<PathBuf, LinearDev>,
@@ -228,6 +232,7 @@ where
     assert!(!runs.is_empty());
 
     init_logger();
+    CLEVIS_TOKEN_HANDLER.call_once(|| register_clevis_token().unwrap());
 
     for run_paths in runs {
         clean_up().unwrap();

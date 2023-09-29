@@ -9,6 +9,7 @@ use std::{
     os::unix::io::AsRawFd,
     panic,
     path::{Path, PathBuf},
+    sync::Once,
 };
 
 use loopdev::{LoopControl, LoopDevice};
@@ -16,9 +17,14 @@ use loopdev::{LoopControl, LoopDevice};
 use devicemapper::{Bytes, Sectors, IEC};
 
 use crate::{
-    engine::strat_engine::tests::{logger::init_logger, util::clean_up},
+    engine::strat_engine::{
+        backstore::register_clevis_token,
+        tests::{logger::init_logger, util::clean_up},
+    },
     stratis::StratisResult,
 };
+
+static CLEVIS_TOKEN_HANDLER: Once = Once::new();
 
 /// Ways of specifying range of numbers of devices to use for tests.
 /// Unlike real tests, there is no AtLeast constructor, as, at least in theory
@@ -114,6 +120,7 @@ where
     let counts = get_device_counts(limits);
 
     init_logger();
+    CLEVIS_TOKEN_HANDLER.call_once(|| register_clevis_token().unwrap());
 
     for (count, size) in counts {
         let tmpdir = tempfile::Builder::new()
@@ -157,6 +164,7 @@ where
     let counts = get_device_counts(limits);
 
     init_logger();
+    CLEVIS_TOKEN_HANDLER.call_once(|| register_clevis_token().unwrap());
 
     for (count, size) in counts {
         let tmpdir = tempfile::Builder::new()

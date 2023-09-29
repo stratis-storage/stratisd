@@ -13,8 +13,8 @@ pub use self::{
     consts::CLEVIS_TANG_TRUST_URL,
     handle::CryptHandle,
     shared::{
-        back_up_luks_header, crypt_metadata_size, interpret_clevis_config, restore_luks_header,
-        set_up_crypt_logging,
+        back_up_luks_header, crypt_metadata_size, interpret_clevis_config, register_clevis_token,
+        restore_luks_header, set_up_crypt_logging,
     },
 };
 
@@ -421,6 +421,7 @@ mod tests {
 
     fn test_clevis_initialize(paths: &[&Path]) {
         unshare_mount_namespace().unwrap();
+
         let _memfs = MemoryFilesystem::new().unwrap();
         let path = paths[0];
         let pool_name = Name::new("pool_name".to_string());

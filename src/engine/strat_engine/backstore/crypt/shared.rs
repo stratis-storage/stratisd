@@ -6,7 +6,9 @@ use std::{
     fmt::{self, Formatter},
     fs::OpenOptions,
     io::Write,
+    mem::forget,
     path::{Path, PathBuf},
+    slice::from_raw_parts_mut,
 };
 
 use data_encoding::BASE64URL_NOPAD;
@@ -29,7 +31,7 @@ use libcryptsetup_rs::{
             CryptDebugLevel, CryptLogLevel, CryptStatusInfo, CryptWipePattern, EncryptionFormat,
         },
     },
-    set_debug_level, set_log_callback, CryptDevice, CryptInit, TokenInput,
+    register, set_debug_level, set_log_callback, CryptDevice, CryptInit, TokenInput,
 };
 
 use crate::{
@@ -38,17 +40,18 @@ use crate::{
             backstore::{
                 crypt::{
                     consts::{
-                        CLEVIS_LUKS_TOKEN_ID, CLEVIS_TANG_TRUST_URL, DEFAULT_CRYPT_KEYSLOTS_SIZE,
-                        DEFAULT_CRYPT_METADATA_SIZE, LUKS2_SECTOR_SIZE, LUKS2_TOKEN_ID,
-                        LUKS2_TOKEN_TYPE, STRATIS_TOKEN_DEVNAME_KEY, STRATIS_TOKEN_DEV_UUID_KEY,
-                        STRATIS_TOKEN_ID, STRATIS_TOKEN_POOLNAME_KEY, STRATIS_TOKEN_POOL_UUID_KEY,
+                        CLEVIS_LUKS_TOKEN_ID, CLEVIS_TANG_TRUST_URL, CLEVIS_TOKEN_NAME,
+                        DEFAULT_CRYPT_KEYSLOTS_SIZE, DEFAULT_CRYPT_METADATA_SIZE,
+                        LUKS2_SECTOR_SIZE, LUKS2_TOKEN_ID, LUKS2_TOKEN_TYPE,
+                        STRATIS_TOKEN_DEVNAME_KEY, STRATIS_TOKEN_DEV_UUID_KEY, STRATIS_TOKEN_ID,
+                        STRATIS_TOKEN_POOLNAME_KEY, STRATIS_TOKEN_POOL_UUID_KEY,
                         STRATIS_TOKEN_TYPE, TOKEN_KEYSLOTS_KEY, TOKEN_TYPE_KEY,
                     },
                     handle::{CryptHandle, CryptMetadata},
                 },
                 devices::get_devno_from_path,
             },
-            cmd::clevis_luks_unlock,
+            cmd::clevis_decrypt,
             dm::get_dm,
             dm::DEVICEMAPPER_PATH,
             keys,
@@ -442,21 +445,14 @@ pub fn setup_crypt_handle(
         .collect::<PathBuf>()
         .exists()
     {
-        match unlock_method {
-            Some(UnlockMethod::Keyring) => {
-                activate(Either::Left((
-                    device,
-                    metadata.encryption_info.key_description()
-                        .ok_or_else(|| {
-                            StratisError::Msg(
-                                "Unlock action was specified to be keyring but not key description is present in the metadata".to_string(),
-                            )
-                        })?,
-                )), &metadata.activation_name)?
-            }
-            Some(UnlockMethod::Clevis) => activate(Either::Right(physical_path), &metadata.activation_name)?,
-            None => (),
-        };
+        if let Some(unlock) = unlock_method {
+            activate(
+                device,
+                metadata.encryption_info.key_description(),
+                unlock,
+                &metadata.activation_name,
+            )?;
+        }
     }
 
     Ok(Some(CryptHandle::new(
@@ -752,62 +748,51 @@ fn device_is_active(device: Option<&mut CryptDevice>, device_name: &DmName) -> S
     }
 }
 
-/// Activate device by LUKS2 keyring token.
-///
-/// Precondition: The key description has been verified to be present in the keyring
-/// if matches!(unlock_method, UnlockMethod::Keyring).
-fn activate_with_keyring(crypt_device: &mut CryptDevice, name: &DmName) -> StratisResult<()> {
-    // Activate by token
+/// Activate encrypted Stratis device using the name stored in the
+/// Stratis token.
+pub fn activate(
+    device: &mut CryptDevice,
+    key_desc: Option<&KeyDescription>,
+    unlock_method: UnlockMethod,
+    name: &DmName,
+) -> StratisResult<()> {
+    if let Some(kd) = key_desc {
+        let key_description_missing = keys::search_key_persistent(kd)
+            .map_err(|_| {
+                StratisError::Msg(format!(
+                    "Searching the persistent keyring for the key description {} failed.",
+                    kd.as_application_str(),
+                ))
+            })?
+            .is_none();
+        if key_description_missing {
+            warn!(
+                "Key description {} was not found in the keyring",
+                kd.as_application_str()
+            );
+            return Err(StratisError::Msg(format!(
+                "The key description \"{}\" is not currently set.",
+                kd.as_application_str(),
+            )));
+        }
+    }
     log_on_failure!(
-        crypt_device.token_handle().activate_by_token::<()>(
+        device.token_handle().activate_by_token::<()>(
             Some(&name.to_string()),
-            Some(LUKS2_TOKEN_ID),
+            Some(if unlock_method == UnlockMethod::Keyring {
+                LUKS2_TOKEN_ID
+            } else {
+                CLEVIS_LUKS_TOKEN_ID
+            }),
             None,
             CryptActivate::empty(),
         ),
         "Failed to activate device with name {}",
         name
     );
-    Ok(())
-}
-
-/// Activate encrypted Stratis device using the name stored in the
-/// Stratis token.
-pub fn activate(
-    unlock_param: Either<(&mut CryptDevice, &KeyDescription), &Path>,
-    name: &DmName,
-) -> StratisResult<()> {
-    let crypt_device = match unlock_param {
-        Either::Left((device, kd)) => {
-            let key_description_missing = keys::search_key_persistent(kd)
-                .map_err(|_| {
-                    StratisError::Msg(format!(
-                        "Searching the persistent keyring for the key description {} failed.",
-                        kd.as_application_str(),
-                    ))
-                })?
-                .is_none();
-            if key_description_missing {
-                warn!(
-                    "Key description {} was not found in the keyring",
-                    kd.as_application_str()
-                );
-                return Err(StratisError::Msg(format!(
-                    "The key description \"{}\" is not currently set.",
-                    kd.as_application_str(),
-                )));
-            }
-            activate_with_keyring(device, name)?;
-            Some(device)
-        }
-        Either::Right(path) => {
-            clevis_luks_unlock(path, name)?;
-            None
-        }
-    };
 
     // Check activation status.
-    device_is_active(crypt_device, name)?;
+    device_is_active(Some(device), name)?;
 
     Ok(())
 }
@@ -1107,5 +1092,67 @@ pub fn restore_luks_header(dev_path: &Path, backup_path: &Path) -> StratisResult
     acquire_crypt_device(dev_path)?
         .backup_handle()
         .header_restore(Some(EncryptionFormat::Luks2), backup_path)?;
+    Ok(())
+}
+
+fn open_safe(device: &mut CryptDevice, token: libc::c_int) -> StratisResult<SizedKeyMemory> {
+    let token = device.token_handle().json_get(token as c_uint).ok();
+    let jwe = token.as_ref().and_then(|t| t.get("jwe"));
+    if let Some(jwe) = jwe {
+        clevis_decrypt(jwe)
+    } else {
+        Err(StratisError::Msg(format!(
+            "Malformed Clevis token: {:?}",
+            token.map(|t| t.to_string())
+        )))
+    }
+}
+
+unsafe extern "C" fn open(
+    device: *mut libcryptsetup_rs_sys::crypt_device,
+    token: libc::c_int,
+    buffer: *mut *mut libc::c_char,
+    buffer_len: *mut usize,
+    _: *mut libc::c_void,
+) -> i32 {
+    let mut safe_device = CryptDevice::from_ptr(device);
+    let res = open_safe(&mut safe_device, token);
+    // Required to avoid double free
+    forget(safe_device);
+    match res {
+        Ok(pass) => {
+            let malloc_pass = libc::malloc(pass.as_ref().len());
+            let pass_slice =
+                unsafe { from_raw_parts_mut::<u8>(malloc_pass.cast::<u8>(), pass.as_ref().len()) };
+            pass_slice.copy_from_slice(pass.as_ref());
+            *buffer = malloc_pass.cast::<libc::c_char>();
+            *buffer_len = pass.as_ref().len();
+            0
+        }
+        Err(e) => {
+            error!("{}", e.to_string());
+            -1
+        }
+    }
+}
+
+unsafe extern "C" fn validate(
+    _: *mut libcryptsetup_rs_sys::crypt_device,
+    _: *const libc::c_char,
+) -> i32 {
+    0
+}
+
+unsafe extern "C" fn dump(_: *mut libcryptsetup_rs_sys::crypt_device, _: *const libc::c_char) {}
+
+/// Register handler for clevis token
+pub fn register_clevis_token() -> StratisResult<()> {
+    register(
+        CLEVIS_TOKEN_NAME,
+        Some(open),
+        None,
+        Some(validate),
+        Some(dump),
+    )?;
     Ok(())
 }

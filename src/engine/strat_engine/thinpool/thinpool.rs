@@ -2526,4 +2526,147 @@ mod tests {
     fn real_test_set_device() {
         real::test_with_spec(&real::DeviceLimits::AtLeast(2, None, None), test_set_device);
     }
+
+    /// Set up thinpool and backstore. Set up filesystem and set size limit.
+    /// Write past the halfway mark of the filesystem and check that the filesystem
+    /// size limit is respected. Increase the filesystem size limit and check that
+    /// it is respected. Remove the filesystem size limit and verify that the
+    /// filesystem size doubles. Verify that the filesystem size limit cannot be set
+    /// below the current filesystem size.
+    fn test_fs_size_limit(paths: &[&Path]) {
+        let pool_name = "pool";
+        let pool_uuid = PoolUuid::new_v4();
+
+        let devices = get_devices(paths).unwrap();
+
+        let mut backstore = Backstore::initialize(
+            Name::new(pool_name.to_string()),
+            pool_uuid,
+            devices,
+            MDADataSize::default(),
+            None,
+        )
+        .unwrap();
+        let mut pool = ThinPool::new(
+            pool_uuid,
+            &ThinPoolSizeParams::new(backstore.available_in_backstore()).unwrap(),
+            DATA_BLOCK_SIZE,
+            &mut backstore,
+        )
+        .unwrap();
+
+        let fs_uuid = pool
+            .create_filesystem(
+                pool_name,
+                pool_uuid,
+                "stratis_test_filesystem",
+                Sectors::from(1200 * IEC::Ki),
+            )
+            .unwrap();
+        // 700 * IEC::Mi
+        pool.set_fs_size_limit(fs_uuid, Some(Sectors(1400 * IEC::Ki)))
+            .unwrap();
+        let devnode = {
+            let (_, fs) = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap();
+            assert_eq!(fs.size_limit(), Some(Sectors(1400 * IEC::Ki)));
+            fs.devnode()
+        };
+
+        let tmp_dir = tempfile::Builder::new()
+            .prefix("stratis_testing")
+            .tempdir()
+            .unwrap();
+        let new_file = tmp_dir.path().join("stratis_test.txt");
+        mount(
+            Some(&devnode),
+            tmp_dir.path(),
+            Some("xfs"),
+            MsFlags::empty(),
+            None as Option<&str>,
+        )
+        .unwrap();
+        let mut file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(&new_file)
+            .unwrap();
+        let mut bytes_written = Bytes(0);
+        // Write 400 * IEC::Mi
+        while bytes_written < Bytes::from(400 * IEC::Mi) {
+            file.write_all(&[1; 4096]).unwrap();
+            bytes_written += Bytes(4096);
+        }
+        file.sync_all().unwrap();
+        pool.check_fs(pool_uuid, &backstore).unwrap();
+
+        {
+            let (_, fs) = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap();
+            assert_eq!(fs.size_limit(), Some(fs.size().sectors()));
+        }
+
+        // 800 * IEC::Mi
+        pool.set_fs_size_limit(fs_uuid, Some(Sectors(1600 * IEC::Ki)))
+            .unwrap();
+        {
+            let (_, fs) = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap();
+            assert_eq!(fs.size_limit(), Some(Sectors(1600 * IEC::Ki)));
+        }
+        let mut bytes_written = Bytes(0);
+        // Write 100 * IEC::Mi
+        while bytes_written < Bytes::from(100 * IEC::Mi) {
+            file.write_all(&[1; 4096]).unwrap();
+            bytes_written += Bytes(4096);
+        }
+        file.sync_all().unwrap();
+        pool.check_fs(pool_uuid, &backstore).unwrap();
+
+        {
+            let (_, fs) = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap();
+            assert_eq!(fs.size_limit(), Some(fs.size().sectors()));
+        }
+
+        {
+            let (_, fs) = pool
+                .snapshot_filesystem(pool_name, pool_uuid, fs_uuid, "snapshot")
+                .unwrap();
+            assert_eq!(fs.size_limit(), Some(Sectors(1600 * IEC::Ki)));
+        }
+
+        pool.set_fs_size_limit(fs_uuid, None).unwrap();
+        {
+            let (_, fs) = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap();
+            assert_eq!(fs.size_limit(), None);
+        }
+        let mut bytes_written = Bytes(0);
+        // Write 200 * IEC::Mi
+        while bytes_written < Bytes::from(200 * IEC::Mi) {
+            file.write_all(&[1; 4096]).unwrap();
+            bytes_written += Bytes(4096);
+        }
+        file.sync_all().unwrap();
+        pool.check_fs(pool_uuid, &backstore).unwrap();
+
+        {
+            let (_, fs) = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap();
+            assert_eq!(fs.size().sectors(), Sectors(3200 * IEC::Ki));
+        }
+
+        assert!(pool.set_fs_size_limit(fs_uuid, Some(Sectors(50))).is_err());
+    }
+
+    #[test]
+    fn loop_test_fs_size_limit() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Range(1, 3, Some(Sectors(10 * IEC::Mi))),
+            test_fs_size_limit,
+        );
+    }
+
+    #[test]
+    fn real_test_fs_size_limit() {
+        real::test_with_spec(
+            &real::DeviceLimits::Range(1, 3, Some(Sectors(10 * IEC::Mi)), None),
+            test_fs_size_limit,
+        );
+    }
 }

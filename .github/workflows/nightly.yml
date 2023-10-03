@@ -81,9 +81,6 @@ jobs:
     strategy:
       matrix:
         include:
-          - task: make -f Makefile audit
-            toolchain: 1.72.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
           # Allowed because a failure may occur after a new Rust stable
           # version is released.
           - task: make -f Makefile clippy
@@ -116,6 +113,46 @@ jobs:
         with:
           crate: cargo-audit
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
+        run: ${{ matrix.task }}
+
+  cargo-audit-checks:
+    continue-on-error: true
+    strategy:
+      matrix:
+        include:
+          - task: make -f Makefile audit
+          - task: AUDITABLE=1 PROFILEDIR=debug make -f Makefile audit-all-rust
+    runs-on: ubuntu-22.04
+    container:
+      image: fedora:38  # CURRENT DEVELOPMENT ENVIRONMENT
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install dependencies for Fedora
+        run: >
+          dnf install -y
+          clang
+          curl
+          cryptsetup-devel
+          dbus-devel
+          glibc-static
+          libblkid-devel
+          make
+          ncurses
+          openssl-devel
+          python-requests
+          python-semantic_version
+          systemd-devel
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          components: cargo
+          toolchain: 1.72.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+      - uses: baptiste0928/cargo-install@v2
+        with:
+          crate: cargo-audit
+      - uses: baptiste0928/cargo-install@v2
+        with:
+          crate: cargo-auditable
+      - name: Run matrix task
         run: ${{ matrix.task }}
 
   checks-with-ci-repo:

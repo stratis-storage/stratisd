@@ -156,6 +156,17 @@ license:
 audit:
 	cargo audit -D warnings
 
+## Audit Rust executables
+audit-all-rust: build-all-rust
+	cargo audit -D warnings bin \
+		./target/${PROFILEDIR}/stratisd \
+		./target/${PROFILEDIR}/stratisd-min \
+		./target/${PROFILEDIR}/stratis-min \
+		./target/${PROFILEDIR}/stratis-utils \
+	        ./target/${PROFILEDIR}/stratis-str-cmp \
+	        ./target/${PROFILEDIR}/stratis-base32-decode \
+	        ./target/${PROFILEDIR}/stratis-dumpmetadata
+
 ## Check for spelling errors
 check-typos:
 	typos
@@ -462,6 +473,7 @@ clippy: clippy-macros clippy-min clippy-udev-utils clippy-no-ipc
 
 .PHONY:
 	audit
+	audit-all-rust
 	build
 	build-all
 	build-all-man

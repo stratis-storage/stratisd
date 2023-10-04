@@ -28,7 +28,7 @@ discover:
     - name: unit
       test: >
         RUST_LOG=stratisd=debug
-        python3 test_harness.py stratisd_cert
+        python3 test_harness.py --log-level=debug stratisd_cert
         --verify-devices --monitor-dbus --highest-revision-number=6
 execute:
   how: tmt

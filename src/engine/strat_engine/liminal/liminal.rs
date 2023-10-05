@@ -790,7 +790,7 @@ impl LiminalDevices {
                         .stopped_pools
                         .remove(&pool_uuid)
                         .or_else(|| self.partially_constructed_pools.remove(&pool_uuid))
-                        .unwrap_or_else(DeviceSet::new);
+                        .unwrap_or_default();
 
                     self.uuid_lookup
                         .insert(device_path.to_path_buf(), (pool_uuid, device_uuid));
@@ -829,10 +829,7 @@ impl LiminalDevices {
                     return None;
                 };
             if self.stopped_pools.get(&pool_uuid).is_some() {
-                let mut devices = self
-                    .stopped_pools
-                    .remove(&pool_uuid)
-                    .unwrap_or_else(DeviceSet::new);
+                let mut devices = self.stopped_pools.remove(&pool_uuid).unwrap_or_default();
 
                 devices.process_info_remove(device_path, pool_uuid, dev_uuid);
                 self.uuid_lookup.remove(device_path);

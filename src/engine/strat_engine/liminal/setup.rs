@@ -163,7 +163,7 @@ pub fn get_blockdevs(
     for seg in &backstore_save.data_tier.blockdev.allocs[0] {
         segment_table
             .entry(seg.parent)
-            .or_insert_with(Vec::default)
+            .or_default()
             .push((seg.start, seg.length))
     }
 
@@ -171,7 +171,7 @@ pub fn get_blockdevs(
         for seg in cache_tier.blockdev.allocs.iter().flat_map(|i| i.iter()) {
             segment_table
                 .entry(seg.parent)
-                .or_insert_with(Vec::default)
+                .or_default()
                 .push((seg.start, seg.length))
         }
     }

@@ -192,7 +192,7 @@ pub fn get_fs_properties(
             consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop(fs),
             consts::FILESYSTEM_SIZE_PROP => shared::fs_size_prop(fs),
             consts::FILESYSTEM_USED_PROP => shared::fs_used_prop(fs),
-            consts::FILESYSTEM_USED_PROP => shared::fs_size_limit_prop(fs)
+            consts::FILESYSTEM_SIZE_LIMIT_PROP => shared::fs_size_limit_prop(fs)
         }
     }
 }

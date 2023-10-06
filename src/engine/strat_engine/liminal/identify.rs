@@ -333,9 +333,9 @@ fn find_all_luks_devices() -> libudev::Result<HashMap<PoolUuid, Vec<LuksInfo>>> 
     let pool_map = enumerator
         .scan_devices()?
         .filter_map(|dev| identify_luks_device(&UdevEngineDevice::from(&dev)))
-        .fold(HashMap::new(), |mut acc, info| {
+        .fold(HashMap::<PoolUuid, Vec<_>>::new(), |mut acc, info| {
             acc.entry(info.identifiers.pool_uuid)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(info);
             acc
         });
@@ -351,9 +351,9 @@ fn find_all_stratis_devices() -> libudev::Result<HashMap<PoolUuid, Vec<StratisIn
     let pool_map = enumerator
         .scan_devices()?
         .filter_map(|dev| identify_stratis_device(&UdevEngineDevice::from(&dev)))
-        .fold(HashMap::new(), |mut acc, info| {
+        .fold(HashMap::<PoolUuid, Vec<_>>::new(), |mut acc, info| {
             acc.entry(info.bda.identifiers().pool_uuid)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(info);
             acc
         });

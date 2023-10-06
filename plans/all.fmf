@@ -13,7 +13,7 @@ prepare:
     script: udevadm control --reload
   - name: Show test system information
     how: shell
-    script: free -m; lsblk -i; lscpu
+    script: free -m; lsblk -i; lscpu; cat /proc/1/sched
   - name: Record mkfs.xfs version
     how: shell
     script: mkfs.xfs -V

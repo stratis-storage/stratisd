@@ -281,9 +281,9 @@ jobs:
       matrix:
         include:
           - rev: HEAD
-            args: --verify-devices --monitor-dbus --highest-revision-number=6
+            args: --log-level=debug stratisd_cert --verify-devices --monitor-dbus --highest-revision-number=6
           - rev: v3.5.2
-            args: --verify-devices
+            args: stratisd_cert --verify-devices
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
@@ -333,6 +333,6 @@ jobs:
         run: >
           sudo
           RUST_LOG=stratisd=debug
-          python3 test_harness.py stratisd_cert
+          python3 test_harness.py
           ${{ matrix.args }}
         working-directory: ./testing

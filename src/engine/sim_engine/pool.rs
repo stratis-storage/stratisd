@@ -213,13 +213,13 @@ impl Pool for SimPool {
         &mut self,
         _pool_name: &str,
         _pool_uuid: PoolUuid,
-        specs: &[(&'b str, Option<Bytes>)],
+        specs: &[(&'b str, Option<Bytes>, Option<Bytes>)],
     ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid, Sectors)>> {
         self.check_fs_limit(specs.len())?;
 
         let spec_map = validate_filesystem_size_specs(specs)?;
 
-        spec_map.iter().try_fold((), |_, (name, size)| {
+        spec_map.iter().try_fold((), |_, (name, (size, _))| {
             validate_name(name)
                 .and_then(|()| {
                     if let Some((_, fs)) = self.filesystems.get_by_name(name) {
@@ -240,10 +240,10 @@ impl Pool for SimPool {
         })?;
 
         let mut result = Vec::new();
-        for (name, size) in spec_map {
+        for (name, (size, size_limit)) in spec_map {
             if !self.filesystems.contains_name(name) {
                 let uuid = FilesystemUuid::new_v4();
-                let new_filesystem = SimFilesystem::new(size);
+                let new_filesystem = SimFilesystem::new(size, size_limit)?;
                 self.filesystems
                     .insert(Name::new((name).to_owned()), uuid, new_filesystem);
                 result.push((name, uuid, size));
@@ -533,7 +533,7 @@ impl Pool for SimPool {
                         return Ok(CreateAction::Identity);
                     }
                 }
-                SimFilesystem::new(filesystem.size())
+                SimFilesystem::new(filesystem.size(), filesystem.size_limit())?
             }
             None => {
                 return Err(StratisError::Msg(origin_uuid.to_string()));
@@ -759,7 +759,7 @@ mod tests {
         .unwrap();
         let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
         let infos = pool
-            .create_filesystems(pool_name, uuid, &[("old_name", None)])
+            .create_filesystems(pool_name, uuid, &[("old_name", None, None)])
             .unwrap()
             .changed()
             .unwrap();
@@ -787,7 +787,11 @@ mod tests {
         .unwrap();
         let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
         let results = pool
-            .create_filesystems(pool_name, uuid, &[(old_name, None), (new_name, None)])
+            .create_filesystems(
+                pool_name,
+                uuid,
+                &[(old_name, None, None), (new_name, None, None)],
+            )
             .unwrap()
             .changed()
             .unwrap();
@@ -874,7 +878,7 @@ mod tests {
         .unwrap();
         let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
         let fs_results = pool
-            .create_filesystems(pool_name, uuid, &[("fs_name", None)])
+            .create_filesystems(pool_name, uuid, &[("fs_name", None, None)])
             .unwrap()
             .changed()
             .unwrap();
@@ -918,7 +922,7 @@ mod tests {
         .unwrap();
         let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
         assert!(match pool
-            .create_filesystems(pool_name, uuid, &[("name", None)])
+            .create_filesystems(pool_name, uuid, &[("name", None, None)])
             .ok()
             .and_then(|fs| fs.changed())
         {
@@ -942,10 +946,10 @@ mod tests {
         .changed()
         .unwrap();
         let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
-        pool.create_filesystems(pool_name, uuid, &[(fs_name, None)])
+        pool.create_filesystems(pool_name, uuid, &[(fs_name, None, None)])
             .unwrap();
         let set_create_action = pool
-            .create_filesystems(pool_name, uuid, &[(fs_name, None)])
+            .create_filesystems(pool_name, uuid, &[(fs_name, None, None)])
             .unwrap();
         assert!(!set_create_action.is_changed());
     }
@@ -966,7 +970,11 @@ mod tests {
         .unwrap();
         let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
         assert!(match pool
-            .create_filesystems(pool_name, uuid, &[(fs_name, None), (fs_name, None)])
+            .create_filesystems(
+                pool_name,
+                uuid,
+                &[(fs_name, None, None), (fs_name, None, None)]
+            )
             .ok()
             .and_then(|fs| fs.changed())
         {

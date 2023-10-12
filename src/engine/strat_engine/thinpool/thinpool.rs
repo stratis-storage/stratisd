@@ -1190,6 +1190,7 @@ impl ThinPool {
         pool_uuid: PoolUuid,
         name: &str,
         size: Sectors,
+        size_limit: Option<Sectors>,
     ) -> StratisResult<FilesystemUuid> {
         if self
             .mdv
@@ -1204,8 +1205,13 @@ impl ThinPool {
             )));
         }
 
-        let (fs_uuid, mut new_filesystem) =
-            StratFilesystem::initialize(pool_uuid, &self.thin_pool, size, self.id_gen.new_id()?)?;
+        let (fs_uuid, mut new_filesystem) = StratFilesystem::initialize(
+            pool_uuid,
+            &self.thin_pool,
+            size,
+            size_limit,
+            self.id_gen.new_id()?,
+        )?;
         let name = Name::new(name.to_owned());
         if let Err(err) = self.mdv.save_fs(&name, fs_uuid, &new_filesystem) {
             if let Err(err2) = retry_with_index(Fixed::from_millis(100).take(4), |i| {
@@ -1829,6 +1835,7 @@ mod tests {
                 pool_uuid,
                 format!("testfs{i}").as_str(),
                 Sectors(2 * IEC::Gi),
+                None,
             )
             .unwrap();
             i += 1;
@@ -1915,6 +1922,7 @@ mod tests {
                 pool_uuid,
                 "stratis_test_filesystem",
                 DEFAULT_THIN_DEV_SIZE,
+                None,
             )
             .unwrap();
 
@@ -2050,7 +2058,13 @@ mod tests {
 
         let filesystem_name = "stratis_test_filesystem";
         let fs_uuid = pool
-            .create_filesystem(pool_name, pool_uuid, filesystem_name, DEFAULT_THIN_DEV_SIZE)
+            .create_filesystem(
+                pool_name,
+                pool_uuid,
+                filesystem_name,
+                DEFAULT_THIN_DEV_SIZE,
+                None,
+            )
             .unwrap();
 
         cmd::udev_settle().unwrap();
@@ -2164,7 +2178,7 @@ mod tests {
 
         let pool_name = "stratis_test_pool";
         let fs_uuid = pool
-            .create_filesystem(pool_name, pool_uuid, name1, DEFAULT_THIN_DEV_SIZE)
+            .create_filesystem(pool_name, pool_uuid, name1, DEFAULT_THIN_DEV_SIZE, None)
             .unwrap();
 
         cmd::udev_settle().unwrap();
@@ -2233,7 +2247,7 @@ mod tests {
         .unwrap();
 
         let fs_uuid = pool
-            .create_filesystem(pool_name, pool_uuid, "fsname", DEFAULT_THIN_DEV_SIZE)
+            .create_filesystem(pool_name, pool_uuid, "fsname", DEFAULT_THIN_DEV_SIZE, None)
             .unwrap();
 
         let tmp_dir = tempfile::Builder::new()
@@ -2309,7 +2323,7 @@ mod tests {
         let pool_name = "stratis_test_pool";
         let fs_name = "stratis_test_filesystem";
         let fs_uuid = pool
-            .create_filesystem(pool_name, pool_uuid, fs_name, DEFAULT_THIN_DEV_SIZE)
+            .create_filesystem(pool_name, pool_uuid, fs_name, DEFAULT_THIN_DEV_SIZE, None)
             .unwrap();
 
         retry_operation!(pool.destroy_filesystem(pool_name, fs_uuid));
@@ -2379,6 +2393,7 @@ mod tests {
             pool_uuid,
             "stratis_test_filesystem",
             DEFAULT_THIN_DEV_SIZE,
+            None,
         )
         .unwrap();
 
@@ -2441,6 +2456,7 @@ mod tests {
                 pool_uuid,
                 "stratis_test_filesystem",
                 DEFAULT_THIN_DEV_SIZE,
+                None,
             )
             .unwrap();
 
@@ -2561,10 +2577,9 @@ mod tests {
                 pool_uuid,
                 "stratis_test_filesystem",
                 Sectors::from(1200 * IEC::Ki),
+                // 700 * IEC::Mi
+                Some(Sectors(1400 * IEC::Ki)),
             )
-            .unwrap();
-        // 700 * IEC::Mi
-        pool.set_fs_size_limit(fs_uuid, Some(Sectors(1400 * IEC::Ki)))
             .unwrap();
         let devnode = {
             let (_, fs) = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap();

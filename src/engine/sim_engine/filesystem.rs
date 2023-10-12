@@ -23,13 +23,20 @@ pub struct SimFilesystem {
 }
 
 impl SimFilesystem {
-    pub fn new(size: Sectors) -> SimFilesystem {
-        SimFilesystem {
+    pub fn new(size: Sectors, size_limit: Option<Sectors>) -> StratisResult<SimFilesystem> {
+        if let Some(limit) = size_limit {
+            if limit < size {
+                return Err(StratisError::Msg(format!(
+                    "Limit of {limit} is less than requested size {size}"
+                )));
+            }
+        }
+        Ok(SimFilesystem {
             rand: rand::random::<u32>(),
             created: Utc::now(),
             size,
-            size_limit: None,
-        }
+            size_limit,
+        })
     }
 
     pub fn size(&self) -> Sectors {

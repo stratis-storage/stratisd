@@ -72,8 +72,17 @@ impl StratFilesystem {
         pool_uuid: PoolUuid,
         thinpool_dev: &ThinPoolDev,
         size: Sectors,
+        size_limit: Option<Sectors>,
         id: ThinDevId,
     ) -> StratisResult<(FilesystemUuid, StratFilesystem)> {
+        if let Some(limit) = size_limit {
+            if limit < size {
+                return Err(StratisError::Msg(format!(
+                    "Requested limit {limit} is less than requested size {size}",
+                )));
+            }
+        }
+
         let fs_uuid = FilesystemUuid::new_v4();
         let (dm_name, dm_uuid) = format_thin_ids(pool_uuid, ThinRole::Filesystem(fs_uuid));
         let mut thin_dev =
@@ -104,7 +113,7 @@ impl StratFilesystem {
                 used: init_used(&thin_dev),
                 thin_dev,
                 created: Utc::now(),
-                size_limit: None,
+                size_limit,
             },
         ))
     }

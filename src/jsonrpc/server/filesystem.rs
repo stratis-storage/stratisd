@@ -26,7 +26,7 @@ pub async fn filesystem_create<'a>(
     let (_, pool_uuid, pool) = guard.as_mut_tuple();
     block_in_place(|| {
         Ok(pool
-            .create_filesystems(pool_name, pool_uuid, &[(name, None)])?
+            .create_filesystems(pool_name, pool_uuid, &[(name, None, None)])?
             .is_changed())
     })
 }

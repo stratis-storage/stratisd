@@ -157,7 +157,7 @@ pub trait Pool: Debug + Send + Sync {
         &mut self,
         pool_name: &str,
         pool_uuid: PoolUuid,
-        specs: &[(&'b str, Option<Bytes>)],
+        specs: &[(&'b str, Option<Bytes>, Option<Bytes>)],
     ) -> StratisResult<SetCreateAction<(&'b str, FilesystemUuid, Sectors)>>;
 
     /// Adds blockdevs specified by paths to pool.

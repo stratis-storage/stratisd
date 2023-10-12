@@ -232,16 +232,17 @@ pub fn validate_filesystem_size(
 }
 
 pub fn validate_filesystem_size_specs<'a>(
-    specs: &[(&'a str, Option<Bytes>)],
-) -> StratisResult<HashMap<&'a str, Sectors>> {
+    specs: &[(&'a str, Option<Bytes>, Option<Bytes>)],
+) -> StratisResult<HashMap<&'a str, (Sectors, Option<Sectors>)>> {
     specs
         .iter()
-        .map(|&(name, size_opt)| {
+        .map(|&(name, size_opt, size_limit_opt)| {
             let size = validate_filesystem_size(name, size_opt)
                 .map(|size_opt| size_opt.unwrap_or(DEFAULT_THIN_DEV_SIZE))?;
-            Ok((name, size))
+            let size_limit = validate_filesystem_size(name, size_limit_opt)?;
+            Ok((name, (size, size_limit)))
         })
-        .collect::<StratisResult<HashMap<_, Sectors>>>()
+        .collect::<StratisResult<HashMap<_, (Sectors, Option<Sectors>)>>>()
 }
 
 /// Gather a collection of information from block devices that may or may not

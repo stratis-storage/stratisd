@@ -756,16 +756,20 @@ impl Pool for StratPool {
         &mut self,
         pool_name: &str,
         pool_uuid: PoolUuid,
-        specs: &[(&'a str, Option<Bytes>)],
+        specs: &[(&'a str, Option<Bytes>, Option<Bytes>)],
     ) -> StratisResult<SetCreateAction<(&'a str, FilesystemUuid, Sectors)>> {
         self.check_fs_limit(specs.len())?;
 
         let spec_map = validate_filesystem_size_specs(specs)?;
 
-        let increase = spec_map.values().copied().sum::<Sectors>();
+        let increase = spec_map
+            .values()
+            .map(|(size, _)| size)
+            .copied()
+            .sum::<Sectors>();
         self.check_overprov(increase)?;
 
-        spec_map.iter().try_fold((), |_, (name, size)| {
+        spec_map.iter().try_fold((), |_, (name, (size, _))| {
             validate_name(name)
                 .and_then(|()| {
                     if let Some((_, fs)) = self.thin_pool.get_filesystem_by_name(name) {
@@ -787,11 +791,11 @@ impl Pool for StratPool {
 
         // TODO: Roll back on filesystem initialization failure.
         let mut result = Vec::new();
-        for (name, size) in spec_map {
+        for (name, (size, size_limit)) in spec_map {
             if self.thin_pool.get_mut_filesystem_by_name(name).is_none() {
                 let fs_uuid = self
                     .thin_pool
-                    .create_filesystem(pool_name, pool_uuid, name, size)?;
+                    .create_filesystem(pool_name, pool_uuid, name, size, size_limit)?;
                 result.push((name, fs_uuid, size));
             }
         }
@@ -1349,7 +1353,7 @@ mod tests {
         assert_matches!(metadata1.backstore.cache_tier, None);
 
         let (_, fs_uuid, _) = pool
-            .create_filesystems(name, uuid, &[("stratis-filesystem", None)])
+            .create_filesystems(name, uuid, &[("stratis-filesystem", None, None)])
             .unwrap()
             .changed()
             .and_then(|mut fs| fs.pop())
@@ -1474,7 +1478,7 @@ mod tests {
 
         let fs_name = "stratis_test_filesystem";
         let (_, fs_uuid, _) = pool
-            .create_filesystems(name, pool_uuid, &[(fs_name, None)])
+            .create_filesystems(name, pool_uuid, &[(fs_name, None, None)])
             .unwrap()
             .changed()
             .and_then(|mut fs| fs.pop())
@@ -1618,6 +1622,7 @@ mod tests {
                 &[(
                     "stratis_test_filesystem",
                     Some(pool.backstore.datatier_usable_size().bytes() * 2u64),
+                    None,
                 )],
             )
             .unwrap()
@@ -1639,7 +1644,8 @@ mod tests {
                 pool_uuid,
                 &[(
                     "stratis_test_filesystem",
-                    Some(pool.backstore.datatier_usable_size().bytes() * 2u64)
+                    Some(pool.backstore.datatier_usable_size().bytes() * 2u64),
+                    None
                 )],
             )
             .is_err());
@@ -1651,7 +1657,7 @@ mod tests {
             .create_filesystems(
                 pool_name,
                 pool_uuid,
-                &[("stratis_test_filesystem", Some(initial_fs_size))],
+                &[("stratis_test_filesystem", Some(initial_fs_size), None)],
             )
             .unwrap()
             .changed()
@@ -1723,7 +1729,11 @@ mod tests {
         let (_, _, pool) = guard.as_mut_tuple();
 
         let (_, fs_uuid, _) = pool
-            .create_filesystems(&pool_name, pool_uuid, &[("stratis_test_filesystem", None)])
+            .create_filesystems(
+                &pool_name,
+                pool_uuid,
+                &[("stratis_test_filesystem", None, None)],
+            )
             .unwrap()
             .changed()
             .unwrap()

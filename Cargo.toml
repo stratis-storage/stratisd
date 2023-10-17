@@ -134,11 +134,15 @@ optional = true
 
 [dependencies.libcryptsetup-rs]
 version = "0.9.0"
+git = "https://github.com/jbaublitz/libcryptsetup-rs"
+branch = "new-mutex"
 features = ["mutex"]
 optional = true
 
 [dependencies.libcryptsetup-rs-sys]
-version = "0.2.4"
+version = "0.3.0"
+git = "https://github.com/jbaublitz/libcryptsetup-rs"
+branch = "new-mutex"
 optional = true
 
 [dependencies.libmount]

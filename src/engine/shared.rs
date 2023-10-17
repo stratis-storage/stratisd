@@ -32,9 +32,6 @@ const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 #[cfg(test)]
 pub const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
-// Maximum taken from "XFS Algorithms and Data Structured: 3rd edition"
-const MAX_THIN_DEV_SIZE: Sectors = Sectors(16 * IEC::Pi); // 8 EiB
-
 // xfs is planning to reject making "small" filesystems:
 // https://www.spinics.net/lists/linux-xfs/msg59453.html
 const MIN_THIN_DEV_SIZE: Sectors = Sectors(IEC::Mi); // 512 MiB
@@ -219,10 +216,6 @@ pub fn validate_filesystem_size(
             } else if size_sectors < MIN_THIN_DEV_SIZE {
                 Err(StratisError::Msg(format!(
                     "Requested size or size_limit of filesystem {name} is {size_sectors} which is less than minimum required: {MIN_THIN_DEV_SIZE}"
-                )))
-            } else if size_sectors > MAX_THIN_DEV_SIZE {
-                Err(StratisError::Msg(format!(
-                    "Requested size or size limit filesystem {name} is {size_sectors} which is greater than maximum allowed: {MAX_THIN_DEV_SIZE}"
                 )))
             } else {
                 Ok(size_sectors)

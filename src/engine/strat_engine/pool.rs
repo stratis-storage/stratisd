@@ -479,12 +479,12 @@ impl StratPool {
     /// Verifies that the filesystem operation to be performed is allowed to perform
     /// overprovisioning if it is determined to be the end result.
     fn check_overprov(&self, increase: Sectors) -> StratisResult<()> {
+        let cur_filesystem_size_sum = self.thin_pool.filesystem_logical_size_sum()?;
         if !self.thin_pool.overprov_enabled()
-            && self.thin_pool.filesystem_logical_size_sum()? + increase
-                > self.thin_pool.total_fs_limit(&self.backstore)
+            && cur_filesystem_size_sum + increase > self.thin_pool.total_fs_limit(&self.backstore)
         {
             Err(StratisError::Msg(format!(
-                "Overprovisioning is disabled on this pool and increasing total filesystems size by {increase} would result in overprovisioning"
+                "Overprovisioning is disabled on this pool and increasing total filesystem size ({cur_filesystem_size_sum}) by {increase} would result in overprovisioning"
             )))
         } else {
             Ok(())

@@ -1536,7 +1536,7 @@ impl ThinPool {
             };
             if sum > data_limit {
                 (false, Err(StratisError::Msg(format!(
-                    "Cannot disable overprovisioning on a pool that is already overprovisioned; the sum of the logical sizes of all filesystems and snapshots must be less than the data space available to the thin pool ({data_limit}) to disable overprovisioning"
+                    "Cannot disable overprovisioning on a pool that is already overprovisioned; the sum of the logical sizes of all filesystems and snapshots ({sum}) must be less than the data space available to the thin pool ({data_limit}) to disable overprovisioning"
                 ))))
             } else {
                 self.enable_overprov = false;

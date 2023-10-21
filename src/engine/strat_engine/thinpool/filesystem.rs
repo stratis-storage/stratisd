@@ -50,6 +50,7 @@ pub struct StratFilesystem {
     thin_dev: ThinDev,
     created: DateTime<Utc>,
     used: Option<Bytes>,
+    size_limit: Option<Sectors>,
 }
 
 fn init_used(thin_dev: &ThinDev) -> Option<Bytes> {
@@ -71,8 +72,17 @@ impl StratFilesystem {
         pool_uuid: PoolUuid,
         thinpool_dev: &ThinPoolDev,
         size: Sectors,
+        size_limit: Option<Sectors>,
         id: ThinDevId,
     ) -> StratisResult<(FilesystemUuid, StratFilesystem)> {
+        if let Some(limit) = size_limit {
+            if limit < size {
+                return Err(StratisError::Msg(format!(
+                    "Requested limit {limit} is less than requested size {size}",
+                )));
+            }
+        }
+
         let fs_uuid = FilesystemUuid::new_v4();
         let (dm_name, dm_uuid) = format_thin_ids(pool_uuid, ThinRole::Filesystem(fs_uuid));
         let mut thin_dev =
@@ -103,6 +113,7 @@ impl StratFilesystem {
                 used: init_used(&thin_dev),
                 thin_dev,
                 created: Utc::now(),
+                size_limit,
             },
         ))
     }
@@ -128,6 +139,7 @@ impl StratFilesystem {
             used: init_used(&thin_dev),
             thin_dev,
             created,
+            size_limit: fssave.fs_size_limit,
         })
     }
 
@@ -175,6 +187,9 @@ impl StratFilesystem {
     /// Mounting a filesystem with a duplicate UUID would require special handling,
     /// so snapshot_fs_uuid is used to update the new snapshot filesystem so it has
     /// a unique UUID.
+    ///
+    /// As of the introduction of filesystem size limits, snapshots inherit the origin size limit
+    /// but the limit can be changed or removed through the API.
     #[allow(clippy::too_many_arguments)]
     pub fn snapshot(
         &self,
@@ -229,6 +244,7 @@ impl StratFilesystem {
                     used: init_used(&thin_dev),
                     thin_dev,
                     created: Utc::now(),
+                    size_limit: self.size_limit,
                 })
             }
             Err(e) => Err(StratisError::Msg(format!(
@@ -308,16 +324,24 @@ impl StratFilesystem {
     }
 
     /// Return an extend size for the thindev under the filesystem
-    pub fn extend_size(current_size: Sectors, remaining_size: Option<&mut Sectors>) -> Sectors {
-        if let Some(rem_size) = remaining_size {
-            // Extend either by the remaining amount left before the data device
-            // overprovisioning limit is reached if it is less than the size of the
-            // filesystem or double the filesystem size.
-            let extend_size = min(*rem_size, current_size);
-            *rem_size -= extend_size;
-            extend_size
-        } else {
-            current_size
+    pub fn extend_size(
+        current_size: Sectors,
+        no_op_remaining_size: Option<&mut Sectors>,
+        fs_limit_remaining_size: Option<Sectors>,
+    ) -> Sectors {
+        match (no_op_remaining_size, fs_limit_remaining_size) {
+            (Some(no_op_rem_size), Some(fs_lim_rem_size)) => {
+                let extend_size = min(min(*no_op_rem_size, current_size), fs_lim_rem_size);
+                *no_op_rem_size -= extend_size;
+                extend_size
+            }
+            (Some(no_op_rem_size), None) => {
+                let extend_size = min(*no_op_rem_size, current_size);
+                *no_op_rem_size -= extend_size;
+                extend_size
+            }
+            (None, Some(fs_lim_rem_size)) => min(fs_lim_rem_size, current_size),
+            (_, _) => current_size,
         }
     }
 
@@ -341,6 +365,7 @@ impl StratFilesystem {
             thin_id: self.thin_dev.id(),
             size: self.thin_dev.size(),
             created: self.created.timestamp() as u64,
+            fs_size_limit: self.size_limit,
         }
     }
 
@@ -372,6 +397,24 @@ impl StratFilesystem {
         }
 
         Ok(ret_vec)
+    }
+
+    pub fn set_size_limit(&mut self, limit: Option<Sectors>) -> StratisResult<bool> {
+        match limit {
+            Some(lim) if self.thindev_size() > lim => Err(StratisError::Msg(format!(
+                "Limit requested of {} is smaller than current filesystem size of {}",
+                lim,
+                self.thindev_size()
+            ))),
+            Some(_) | None => {
+                if self.size_limit == limit {
+                    Ok(false)
+                } else {
+                    self.size_limit = limit;
+                    Ok(true)
+                }
+            }
+        }
     }
 
     pub fn thindev_size(&self) -> Sectors {
@@ -411,6 +454,10 @@ impl Filesystem for StratFilesystem {
 
     fn size(&self) -> Bytes {
         self.thin_dev.size().bytes()
+    }
+
+    fn size_limit(&self) -> Option<Sectors> {
+        self.size_limit
     }
 }
 
@@ -487,6 +534,15 @@ impl<'a> Into<Value> for &'a StratFilesystem {
                 self.used()
                     .map(|v| v.to_string())
                     .unwrap_or_else(|_| "Unavailable".to_string()),
+            ),
+        );
+        json.insert(
+            "size_limit".to_string(),
+            Value::from(
+                self.size_limit
+                    .as_ref()
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| "Not set".to_string()),
             ),
         );
         Value::from(json)

@@ -788,12 +788,12 @@ mod test {
         let (fs_uuid1, fs_uuid2) = {
             let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid1))).unwrap();
             let fs_uuid1 = pool
-                .create_filesystems(name1, uuid1, &[(fs_name1, None)])
+                .create_filesystems(name1, uuid1, &[(fs_name1, None, None)])
                 .unwrap()
                 .changed()
                 .unwrap();
             let fs_uuid2 = pool
-                .create_filesystems(name1, uuid1, &[(fs_name2, None)])
+                .create_filesystems(name1, uuid1, &[(fs_name2, None, None)])
                 .unwrap()
                 .changed()
                 .unwrap();

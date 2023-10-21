@@ -445,7 +445,7 @@ mod tests {
             .unwrap();
         {
             let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
-            pool.create_filesystems(pool_name, uuid, &[("test", None)])
+            pool.create_filesystems(pool_name, uuid, &[("test", None, None)])
                 .unwrap();
         }
         assert!(test_async!(engine.destroy_pool(uuid)).is_err());

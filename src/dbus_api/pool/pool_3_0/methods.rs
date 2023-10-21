@@ -66,9 +66,9 @@ pub fn create_filesystems(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodRes
                     })
                 })
                 .transpose()
-                .map(|size_opt| (name, size_opt.map(Bytes)))
+                .map(|size_opt| (name, size_opt.map(Bytes), None))
         })
-        .collect::<Result<Vec<(&str, Option<Bytes>)>, String>>()
+        .collect::<Result<Vec<(&str, Option<Bytes>, Option<Bytes>)>, String>>()
     {
         Ok(val) => val,
         Err(err) => {

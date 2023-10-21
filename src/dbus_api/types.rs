@@ -106,6 +106,7 @@ pub enum DbusAction {
     StoppedPoolsChange(StoppedPoolsInfo),
     BlockdevUserInfoChange(Path<'static>, Option<String>),
     BlockdevTotalPhysicalSizeChange(Path<'static>, Sectors),
+    FsSizeLimitChange(Path<'static>, Option<Sectors>),
     FsBackgroundChange(
         FilesystemUuid,
         SignalChange<Option<Bytes>>,
@@ -360,6 +361,19 @@ impl DbusContext {
         {
             warn!(
                 "D-Bus pool filesystem limit change event could not be sent to the processing thread; no signal will be sent out for the filesystem limit change of pool with path {}: {}",
+                item, e,
+            )
+        }
+    }
+
+    /// Send changed signal for pool SizeLimit property.
+    pub fn push_fs_size_limit_change(&self, item: &Path<'static>, new_size_limit: Option<Sectors>) {
+        if let Err(e) = self
+            .sender
+            .send(DbusAction::FsSizeLimitChange(item.clone(), new_size_limit))
+        {
+            warn!(
+                "D-Bus filesystem size limit change event could not be sent to the processing thread; no signal will be sent out for the size limit change of filesystem with path {}: {}",
                 item, e,
             )
         }

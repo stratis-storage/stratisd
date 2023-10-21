@@ -30,7 +30,7 @@ use crate::{
             blockdev_user_info_to_prop,
         },
         consts,
-        filesystem::prop_conv::{fs_size_to_prop, fs_used_to_prop},
+        filesystem::prop_conv::{fs_size_limit_to_prop, fs_size_to_prop, fs_used_to_prop},
         pool::prop_conv::{
             avail_actions_to_prop, clevis_info_to_prop, key_desc_to_prop, pool_alloc_to_prop,
             pool_size_to_prop, pool_used_to_prop,
@@ -766,6 +766,26 @@ impl DbusTreeHandler {
         }
     }
 
+    /// Send a signal indicating that the filesystem size limit has changed.
+    fn handle_fs_size_limit_change(&self, path: Path<'static>, new_size_limit: Option<Sectors>) {
+        let size_limit = fs_size_limit_to_prop(new_size_limit);
+        if let Err(e) = self.property_changed_invalidated_signal(
+            &path,
+            prop_hashmap!(
+                consts::FILESYSTEM_INTERFACE_NAME_3_6 => {
+                    Vec::new(),
+                    consts::FILESYSTEM_SIZE_LIMIT_PROP.to_string() =>
+                    box_variant!(size_limit)
+                }
+            ),
+        ) {
+            warn!(
+                "Failed to send a signal over D-Bus indicating filesystem size limit change: {}",
+                e
+            );
+        }
+    }
+
     /// Send a signal indicating that the blockdev user info has changed.
     fn handle_blockdev_user_info_change(&self, path: Path<'static>, new_user_info: Option<String>) {
         let user_info_prop = blockdev_user_info_to_prop(new_user_info);
@@ -1103,6 +1123,10 @@ impl DbusTreeHandler {
             }
             DbusAction::PoolFsLimitChange(path, new_limit) => {
                 self.handle_pool_fs_limit_change(path, new_limit);
+                Ok(true)
+            }
+            DbusAction::FsSizeLimitChange(path, new_limit) => {
+                self.handle_fs_size_limit_change(path, new_limit);
                 Ok(true)
             }
             DbusAction::PoolOverprovModeChange(path, new_mode) => {

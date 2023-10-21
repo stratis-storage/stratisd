@@ -14,8 +14,8 @@ use crate::{
     engine::{
         engine::{BlockDev, DumpState, Filesystem, Pool, StateDiff},
         shared::{
-            init_cache_idempotent_or_err, validate_filesystem_size_specs, validate_name,
-            validate_paths,
+            init_cache_idempotent_or_err, validate_filesystem_size, validate_filesystem_size_specs,
+            validate_name, validate_paths,
         },
         strat_engine::{
             backstore::{Backstore, ProcessedPathInfos, StratBlockDev, UnownedDevices},
@@ -32,6 +32,7 @@ use crate::{
             PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
             SetDeleteAction, StratFilesystemDiff, StratPoolDiff,
         },
+        PropChangeAction,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -755,16 +756,20 @@ impl Pool for StratPool {
         &mut self,
         pool_name: &str,
         pool_uuid: PoolUuid,
-        specs: &[(&'a str, Option<Bytes>)],
+        specs: &[(&'a str, Option<Bytes>, Option<Bytes>)],
     ) -> StratisResult<SetCreateAction<(&'a str, FilesystemUuid, Sectors)>> {
         self.check_fs_limit(specs.len())?;
 
         let spec_map = validate_filesystem_size_specs(specs)?;
 
-        let increase = spec_map.values().copied().sum::<Sectors>();
+        let increase = spec_map
+            .values()
+            .map(|(size, _)| size)
+            .copied()
+            .sum::<Sectors>();
         self.check_overprov(increase)?;
 
-        spec_map.iter().try_fold((), |_, (name, size)| {
+        spec_map.iter().try_fold((), |_, (name, (size, _))| {
             validate_name(name)
                 .and_then(|()| {
                     if let Some((_, fs)) = self.thin_pool.get_filesystem_by_name(name) {
@@ -786,11 +791,11 @@ impl Pool for StratPool {
 
         // TODO: Roll back on filesystem initialization failure.
         let mut result = Vec::new();
-        for (name, size) in spec_map {
+        for (name, (size, size_limit)) in spec_map {
             if self.thin_pool.get_mut_filesystem_by_name(name).is_none() {
                 let fs_uuid = self
                     .thin_pool
-                    .create_filesystem(pool_name, pool_uuid, name, size)?;
+                    .create_filesystem(pool_name, pool_uuid, name, size, size_limit)?;
                 result.push((name, fs_uuid, size));
             }
         }
@@ -1219,6 +1224,23 @@ impl Pool for StratPool {
             Ok((GrowAction::Identity, None))
         }
     }
+
+    #[pool_mutating_action("NoRequests")]
+    fn set_fs_size_limit(
+        &mut self,
+        fs_uuid: FilesystemUuid,
+        limit: Option<Bytes>,
+    ) -> StratisResult<PropChangeAction<Option<Sectors>>> {
+        let (name, _) = self.get_filesystem(fs_uuid).ok_or_else(|| {
+            StratisError::Msg(format!("Filesystem with UUID {fs_uuid} not found"))
+        })?;
+        let limit = validate_filesystem_size(&name, limit)?;
+        if self.thin_pool.set_fs_size_limit(fs_uuid, limit)? {
+            Ok(PropChangeAction::NewValue(limit))
+        } else {
+            Ok(PropChangeAction::Identity)
+        }
+    }
 }
 
 pub struct StratPoolState {
@@ -1331,7 +1353,7 @@ mod tests {
         assert_matches!(metadata1.backstore.cache_tier, None);
 
         let (_, fs_uuid, _) = pool
-            .create_filesystems(name, uuid, &[("stratis-filesystem", None)])
+            .create_filesystems(name, uuid, &[("stratis-filesystem", None, None)])
             .unwrap()
             .changed()
             .and_then(|mut fs| fs.pop())
@@ -1456,7 +1478,7 @@ mod tests {
 
         let fs_name = "stratis_test_filesystem";
         let (_, fs_uuid, _) = pool
-            .create_filesystems(name, pool_uuid, &[(fs_name, None)])
+            .create_filesystems(name, pool_uuid, &[(fs_name, None, None)])
             .unwrap()
             .changed()
             .and_then(|mut fs| fs.pop())
@@ -1600,6 +1622,7 @@ mod tests {
                 &[(
                     "stratis_test_filesystem",
                     Some(pool.backstore.datatier_usable_size().bytes() * 2u64),
+                    None,
                 )],
             )
             .unwrap()
@@ -1621,7 +1644,8 @@ mod tests {
                 pool_uuid,
                 &[(
                     "stratis_test_filesystem",
-                    Some(pool.backstore.datatier_usable_size().bytes() * 2u64)
+                    Some(pool.backstore.datatier_usable_size().bytes() * 2u64),
+                    None
                 )],
             )
             .is_err());
@@ -1633,7 +1657,7 @@ mod tests {
             .create_filesystems(
                 pool_name,
                 pool_uuid,
-                &[("stratis_test_filesystem", Some(initial_fs_size))],
+                &[("stratis_test_filesystem", Some(initial_fs_size), None)],
             )
             .unwrap()
             .changed()
@@ -1705,7 +1729,11 @@ mod tests {
         let (_, _, pool) = guard.as_mut_tuple();
 
         let (_, fs_uuid, _) = pool
-            .create_filesystems(&pool_name, pool_uuid, &[("stratis_test_filesystem", None)])
+            .create_filesystems(
+                &pool_name,
+                pool_uuid,
+                &[("stratis_test_filesystem", None, None)],
+            )
             .unwrap()
             .changed()
             .unwrap()

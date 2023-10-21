@@ -32,9 +32,6 @@ const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 #[cfg(test)]
 pub const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
-// Maximum taken from "XFS Algorithms and Data Structured: 3rd edition"
-const MAX_THIN_DEV_SIZE: Sectors = Sectors(16 * IEC::Pi); // 8 EiB
-
 // xfs is planning to reject making "small" filesystems:
 // https://www.spinics.net/lists/linux-xfs/msg59453.html
 const MIN_THIN_DEV_SIZE: Sectors = Sectors(IEC::Mi); // 512 MiB
@@ -205,36 +202,40 @@ pub fn validate_paths(paths: &[&Path]) -> StratisResult<()> {
     }
 }
 
+pub fn validate_filesystem_size(
+    name: &str,
+    size_opt: Option<Bytes>,
+) -> StratisResult<Option<Sectors>> {
+    size_opt
+        .map(|size| {
+            let size_sectors = size.sectors();
+            if size_sectors.bytes() != size {
+                Err(StratisError::Msg(format!(
+                    "Requested size or size limit of filesystem {name} must be divisble by {SECTOR_SIZE}"
+                )))
+            } else if size_sectors < MIN_THIN_DEV_SIZE {
+                Err(StratisError::Msg(format!(
+                    "Requested size or size_limit of filesystem {name} is {size_sectors} which is less than minimum required: {MIN_THIN_DEV_SIZE}"
+                )))
+            } else {
+                Ok(size_sectors)
+            }
+        })
+        .transpose()
+}
+
 pub fn validate_filesystem_size_specs<'a>(
-    specs: &[(&'a str, Option<Bytes>)],
-) -> StratisResult<HashMap<&'a str, Sectors>> {
+    specs: &[(&'a str, Option<Bytes>, Option<Bytes>)],
+) -> StratisResult<HashMap<&'a str, (Sectors, Option<Sectors>)>> {
     specs
         .iter()
-        .map(|&(name, size_opt)| {
-            size_opt
-                .map(|size| {
-                    let size_sectors = size.sectors();
-                    if size_sectors.bytes() != size {
-                        Err(StratisError::Msg(format!(
-                            "Requested size of filesystem {name} must be divisble by {SECTOR_SIZE}"
-                        )))
-                    } else if size_sectors < MIN_THIN_DEV_SIZE {
-                        Err(StratisError::Msg(format!(
-                            "Requested size of filesystem {name} is {size_sectors} which is less than minimum required: {MIN_THIN_DEV_SIZE}"
-                        )))
-                    } else if size_sectors > MAX_THIN_DEV_SIZE {
-                        Err(StratisError::Msg(format!(
-                            "Requested size of filesystem {name} is {size_sectors} which is greater than maximum allowed: {MAX_THIN_DEV_SIZE}"
-                        )))
-                    } else {
-                        Ok(size_sectors)
-                    }
-                })
-                .transpose()
-                .map(|size_opt| size_opt.unwrap_or(DEFAULT_THIN_DEV_SIZE))
-                .map(|size| (name, size))
+        .map(|&(name, size_opt, size_limit_opt)| {
+            let size = validate_filesystem_size(name, size_opt)
+                .map(|size_opt| size_opt.unwrap_or(DEFAULT_THIN_DEV_SIZE))?;
+            let size_limit = validate_filesystem_size(name, size_limit_opt)?;
+            Ok((name, (size, size_limit)))
         })
-        .collect::<StratisResult<HashMap<_, Sectors>>>()
+        .collect::<StratisResult<HashMap<_, (Sectors, Option<Sectors>)>>>()
 }
 
 /// Gather a collection of information from block devices that may or may not

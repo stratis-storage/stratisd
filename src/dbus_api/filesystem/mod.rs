@@ -14,6 +14,7 @@ use crate::{
 };
 
 mod filesystem_3_0;
+mod filesystem_3_6;
 pub mod prop_conv;
 mod shared;
 
@@ -110,7 +111,8 @@ pub fn create_dbus_filesystem<'a>(
                 .add_p(filesystem_3_0::uuid_property(&f))
                 .add_p(filesystem_3_0::created_property(&f))
                 .add_p(filesystem_3_0::size_property(&f))
-                .add_p(filesystem_3_0::used_property(&f)),
+                .add_p(filesystem_3_0::used_property(&f))
+                .add_p(filesystem_3_6::size_limit_property(&f)),
         );
 
     let path = object_path.get_name().to_owned();
@@ -189,7 +191,8 @@ pub fn get_fs_properties(
             consts::FILESYSTEM_POOL_PROP => parent,
             consts::FILESYSTEM_CREATED_PROP => shared::fs_created_prop(fs),
             consts::FILESYSTEM_SIZE_PROP => shared::fs_size_prop(fs),
-            consts::FILESYSTEM_USED_PROP => shared::fs_used_prop(fs)
+            consts::FILESYSTEM_USED_PROP => shared::fs_used_prop(fs),
+            consts::FILESYSTEM_SIZE_LIMIT_PROP => shared::fs_size_limit_prop(fs)
         }
     }
 }

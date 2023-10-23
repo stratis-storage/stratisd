@@ -438,14 +438,15 @@ impl StratisUnixListener {
             SockFlag::empty(),
             None,
         )?;
-        let flags = OFlag::from_bits(fcntl(fd, FcntlArg::F_GETFL)?).ok_or_else(|| {
-            StratisError::Msg("Unrecognized flag types returned from fcntl".to_string())
-        })?;
-        fcntl(fd, FcntlArg::F_SETFL(flags | OFlag::O_NONBLOCK))?;
-        bind(fd, &UnixAddr::new(path.as_ref())?)?;
-        listen(fd, 0)?;
+        let flags =
+            OFlag::from_bits(fcntl(fd.as_raw_fd(), FcntlArg::F_GETFL)?).ok_or_else(|| {
+                StratisError::Msg("Unrecognized flag types returned from fcntl".to_string())
+            })?;
+        fcntl(fd.as_raw_fd(), FcntlArg::F_SETFL(flags | OFlag::O_NONBLOCK))?;
+        bind(fd.as_raw_fd(), &UnixAddr::new(path.as_ref())?)?;
+        listen(&fd, 0)?;
         Ok(StratisUnixListener {
-            fd: AsyncFd::new(fd)?,
+            fd: AsyncFd::new(fd.as_raw_fd())?,
         })
     }
 }

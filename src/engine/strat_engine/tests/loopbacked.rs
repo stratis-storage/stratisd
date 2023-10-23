@@ -6,7 +6,7 @@ use std::{
     env,
     fs::{File, OpenOptions},
     mem::forget,
-    os::unix::io::AsRawFd,
+    os::fd::AsFd,
     panic,
     path::{Path, PathBuf},
     sync::Once,
@@ -59,7 +59,7 @@ impl LoopTestDev {
             .unwrap();
 
         nix::unistd::ftruncate(
-            f.as_raw_fd(),
+            f.as_fd(),
             convert_test!(*size.bytes(), u128, nix::libc::off_t),
         )
         .unwrap();

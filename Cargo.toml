@@ -155,7 +155,8 @@ version = "0.4.19"
 optional = true
 
 [dependencies.nix]
-version = "0.26.0"
+version = "0.27.1"
+features = ["fs", "ioctl", "mount", "poll", "process", "sched", "socket"]
 optional = true
 
 [dependencies.pretty-hex]

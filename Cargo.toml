@@ -283,4 +283,4 @@ tier = "2"
 all-features = true
 exclude-crate-paths = [ { name = "num_cpus", exclude = "ci" },
                         { name = "libm", exclude = "ci" },
-                        { name = "libdbus-sys", exclude = "vendor/dbus/tools/docker" } ]
+                        { name = "libdbus-sys", exclude = "vendor" } ]

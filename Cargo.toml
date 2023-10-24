@@ -25,8 +25,8 @@ exclude = [
     "/plans",
     "/stratisd.conf",
     "/systemd",
-    "/test",
     "/tests",
+    "/tests-fmf",
     "/udev"
 ]
 

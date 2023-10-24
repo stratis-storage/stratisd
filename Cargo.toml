@@ -12,6 +12,7 @@ keywords = ["Linux", "filesystem", "storage"]
 categories = ["filesystem"]
 exclude = [
     "/.clippy.toml",
+    "/.fmf",
     "/.githooks",
     "/.github",
     "/.gitignore",

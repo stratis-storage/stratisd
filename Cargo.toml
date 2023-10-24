@@ -179,7 +179,7 @@ version = "1.0.185"
 optional = true
 
 [dependencies.serde_derive]
-version = "1.0.119"
+version = "1.0.185"
 optional = true
 
 [dependencies.serde_json]

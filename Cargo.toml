@@ -129,7 +129,7 @@ version = "0.3.1"
 optional = true
 
 [dependencies.libc]
-version = "0.2.144"
+version = "0.2.147"
 optional = true
 
 [dependencies.libcryptsetup-rs]
@@ -150,7 +150,7 @@ version = "0.3.0"
 optional = true
 
 [dependencies.log]
-version = "0.4.14"
+version = "0.4.19"
 optional = true
 
 [dependencies.nix]

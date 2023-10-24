@@ -186,9 +186,9 @@ jobs:
       - name: Run comparisons of version specs with available Fedora packages
         # yamllint disable rule:line-length
         run: |
-          COMPARE_FEDORA_VERSIONS=./ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=rawhide IGNORE_ARGS="--ignore-high=libcryptsetup-rs" make -f Makefile_dependencies check-fedora-versions
-          COMPARE_FEDORA_VERSIONS=./ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=f38 IGNORE_ARGS="--ignore-high=libcryptsetup-rs" make -f Makefile_dependencies check-fedora-versions
-          COMPARE_FEDORA_VERSIONS=./ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=f37 IGNORE_ARGS="--ignore-high=libcryptsetup-rs" make -f Makefile_dependencies check-fedora-versions
+          COMPARE_FEDORA_VERSIONS=./ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=rawhide IGNORE_ARGS="--ignore-high=libcryptsetup-rs --ignore-high=libcryptsetup-rs-sys --ignore-high=devicemapper" make -f Makefile_dependencies check-fedora-versions
+          COMPARE_FEDORA_VERSIONS=./ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=f38 IGNORE_ARGS="--ignore-high=libcryptsetup-rs --ignore-high=libcryptsetup-rs-sys --ignore-high=devicemapper" make -f Makefile_dependencies check-fedora-versions
+          COMPARE_FEDORA_VERSIONS=./ci/dependency_management/compare_fedora_versions FEDORA_RELEASE=f37 IGNORE_ARGS="--ignore-high=libcryptsetup-rs --ignore-high=libcryptsetup-rs-sys --ignore-high=devicemapper" make -f Makefile_dependencies check-fedora-versions
 
   legacy-cli-checks:
     continue-on-error: true

@@ -281,7 +281,7 @@ jobs:
       matrix:
         include:
           - rev: HEAD
-            args: --log-level=debug stratisd_cert --verify-devices --monitor-dbus --highest-revision-number=6
+            args: --log-level=debug stratisd_cert --verify-devices --monitor-dbus --highest-revision-number=7
           - rev: v3.5.2
             args: stratisd_cert --verify-devices
     runs-on: ubuntu-22.04

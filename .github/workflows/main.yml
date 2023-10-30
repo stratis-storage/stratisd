@@ -170,6 +170,9 @@ jobs:
         run: cp stratisd.conf /usr/share/dbus-1/system.d
       - name: Check out stratis-cli
         run: git clone https://github.com/stratis-storage/stratis-cli.git
+      - name: Use stratis-cli 3.6.0
+        run: git checkout tags/v3.6.0 -b version-3.6.0
+        working-directory: ./stratis-cli
       - name: Run stratis-cli tests
         run: >
           RUST_LOG=stratisd=debug

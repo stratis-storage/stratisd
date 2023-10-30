@@ -756,7 +756,7 @@ pub fn activate(
     unlock_method: UnlockMethod,
     name: &DmName,
 ) -> StratisResult<()> {
-    if let Some(kd) = key_desc {
+    if let (Some(kd), UnlockMethod::Keyring) = (key_desc, unlock_method) {
         let key_description_missing = keys::search_key_persistent(kd)
             .map_err(|_| {
                 StratisError::Msg(format!(

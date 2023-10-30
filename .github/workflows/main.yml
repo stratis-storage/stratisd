@@ -283,10 +283,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - rev: HEAD
+          - rev: v3.6.0
             args: --log-level=debug stratisd_cert --verify-devices --monitor-dbus --highest-revision-number=6
-          - rev: v3.5.2
-            args: stratisd_cert --verify-devices
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3

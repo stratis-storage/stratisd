@@ -1,3 +1,17 @@
+stratisd 3.6.1
+==============
+Recommended Rust toolchain version: 1.73.0
+Recommended development platform for Python development: Fedora 38
+
+- Cherry-picked commits:
+  * Regression test for CryptHandle unlocking with both keyring and Clevis
+  * Fix bug where Clevis and keyring implementations are enabled together
+  * Run "cargo update --package=rustix --precise=0.37.25"
+
+- Set up patch branch:
+  https://github.com/stratis-storage/stratisd/pull/3487
+
+
 stratisd 3.6.0
 ==============
 Recommended Rust toolchain version: 1.73.0

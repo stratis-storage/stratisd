@@ -5,7 +5,7 @@ name: stratisd CI
 on:
   push:
     branches:
-      - master
+      - patch-3.6.0
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'
@@ -16,7 +16,7 @@ on:
       - 'test/**'
   pull_request:
     branches:
-      - master
+      - patch-3.6.0
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'
@@ -170,6 +170,9 @@ jobs:
         run: cp stratisd.conf /usr/share/dbus-1/system.d
       - name: Check out stratis-cli
         run: git clone https://github.com/stratis-storage/stratis-cli.git
+      - name: Use stratis-cli 3.6.0
+        run: git checkout tags/v3.6.0 -b version-3.6.0
+        working-directory: ./stratis-cli
       - name: Run stratis-cli tests
         run: >
           RUST_LOG=stratisd=debug
@@ -280,10 +283,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - rev: HEAD
+          - rev: v3.6.0
             args: --log-level=debug stratisd_cert --verify-devices --monitor-dbus --highest-revision-number=6
-          - rev: v3.5.2
-            args: stratisd_cert --verify-devices
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3

@@ -380,9 +380,17 @@ mod tests {
                 .token_handle()
                 .json_get(CLEVIS_LUKS_TOKEN_ID)
                 .unwrap();
+            handle.deactivate().unwrap();
         }
 
-        crypt::insert_and_cleanup_key(paths, both_initialize);
+        fn unlock_clevis(paths: &[&Path]) {
+            let path = paths.get(0).copied().expect("Expected exactly one path");
+            CryptHandle::setup(path, Some(UnlockMethod::Clevis))
+                .unwrap()
+                .unwrap();
+        }
+
+        crypt::insert_and_remove_key(paths, both_initialize, unlock_clevis);
     }
 
     #[test]

@@ -60,6 +60,29 @@ where
 }
 
 /// Takes physical device paths from loopback or real tests and passes
+/// them through to a compatible test definition. This harness runs two test
+/// methods, one with a key description set and one after the key description
+/// used in the previous test has been unset. This can be helpful for testing cases
+/// where a key description is missing but Clevis is enabled.
+pub fn insert_and_remove_key<F1, F2>(physical_paths: &[&Path], test_pre: F1, test_post: F2)
+where
+    F1: FnOnce(&[&Path], &KeyDescription) + UnwindSafe,
+    F2: FnOnce(&[&Path]),
+{
+    let key_description = set_up_key("test-description-for-stratisd");
+
+    let result = catch_unwind(|| test_pre(physical_paths, &key_description));
+
+    StratKeyActions.unset(&key_description).unwrap();
+
+    if let Err(e) = result {
+        resume_unwind(e)
+    }
+
+    test_post(physical_paths)
+}
+
+/// Takes physical device paths from loopback or real tests and passes
 /// them through to a compatible test definition. This method
 /// will also enrich the context passed to the test with two different key
 /// descriptions pointing to keys in the kernel keyring that have been randomly

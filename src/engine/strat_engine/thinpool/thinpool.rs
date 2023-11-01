@@ -315,17 +315,16 @@ impl ThinPool {
         data_block_size: Sectors,
         backstore: &mut Backstore,
     ) -> StratisResult<ThinPool> {
-        let mut segments_list = match backstore.request_alloc(&[
-            thin_pool_size.meta_size(),
-            thin_pool_size.meta_size(),
-            thin_pool_size.data_size(),
-            thin_pool_size.mdv_size(),
-        ])? {
-            Some(trans) => {
-                let segs = trans.get_backstore();
-                backstore.commit_alloc(pool_uuid, trans)?;
-                segs
-            }
+        let mut segments_list = match backstore.alloc(
+            pool_uuid,
+            &[
+                thin_pool_size.meta_size(),
+                thin_pool_size.meta_size(),
+                thin_pool_size.data_size(),
+                thin_pool_size.mdv_size(),
+            ],
+        )? {
+            Some(segs) => segs,
             None => {
                 let err_msg = "Could not allocate sufficient space for thinpool devices";
                 return Err(StratisError::Msg(err_msg.into()));
@@ -918,11 +917,8 @@ impl ThinPool {
 
             let requests = vec![data_extend_size];
             let data_index = 0;
-            match backstore.request_alloc(&requests) {
-                Ok(Some(transaction)) => {
-                    let backstore_segs = transaction.get_backstore();
-                    backstore.commit_alloc(pool_uuid, transaction)?;
-
+            match backstore.alloc(pool_uuid, &requests) {
+                Ok(Some(backstore_segs)) => {
                     let data_segment = backstore_segs.get(data_index).cloned();
                     let data_segments =
                         data_segment.map(|seg| coalesce_segs(data_existing_segments, &[seg]));
@@ -1017,11 +1013,8 @@ impl ThinPool {
             let requests = vec![meta_extend_size, meta_extend_size];
             let meta_index = 0;
             let spare_index = 1;
-            match backstore.request_alloc(&requests) {
-                Ok(Some(transaction)) => {
-                    let backstore_segs = transaction.get_backstore();
-                    backstore.commit_alloc(pool_uuid, transaction)?;
-
+            match backstore.alloc(pool_uuid, &requests) {
+                Ok(Some(backstore_segs)) => {
                     let meta_and_spare_segment = backstore_segs.get(meta_index).and_then(|seg| {
                         backstore_segs.get(spare_index).map(|seg_s| (*seg, *seg_s))
                     });

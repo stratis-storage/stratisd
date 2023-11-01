@@ -21,9 +21,7 @@ use crate::{
                 blockdev::StratBlockDev,
                 crypt::CryptHandle,
                 devices::{initialize_devices, wipe_blockdevs, UnownedDevices},
-                range_alloc::PerDevSegments,
                 shared::{BlkDevSegment, Segment},
-                transaction::RequestTransaction,
             },
             metadata::{MDADataSize, BDA},
             serde_structs::{BaseBlockDevSave, Recordable},
@@ -194,16 +192,17 @@ impl BlockDevMgr {
     /// not possible to satisfy the request.
     /// This method is atomic, it either allocates all requested or allocates
     /// nothing.
-    pub fn request_space(&self, sizes: &[Sectors]) -> StratisResult<Option<RequestTransaction>> {
-        let mut transaction = RequestTransaction::default();
-
+    pub fn alloc(&mut self, sizes: &[Sectors]) -> Option<Vec<Vec<BlkDevSegment>>> {
         let total_needed: Sectors = sizes.iter().cloned().sum();
         if self.avail_space() < total_needed {
-            return Ok(None);
+            return None;
         }
 
-        for (idx, &needed) in sizes.iter().enumerate() {
+        let mut lists = Vec::new();
+
+        for &needed in sizes.iter() {
             let mut alloc = Sectors(0);
+            let mut segs = Vec::new();
             // TODO: Consider greater efficiency for allocation generally.
             // Over time, the blockdevs at the start will be exhausted. It
             // might be a good idea to keep an auxiliary structure, so that
@@ -211,63 +210,23 @@ impl BlockDevMgr {
             // In the context of this major inefficiency that ensues over time
             // the obvious but more minor inefficiency of this inner loop is
             // not worth worrying about.
-            for bd in &self.block_devs {
+            for bd in &mut self.block_devs {
                 if alloc == needed {
                     break;
                 }
 
-                let r_segs = bd.request_space(needed - alloc, &transaction)?;
-                for (&start, &length) in r_segs.iter() {
-                    transaction.add_bd_seg_req(
-                        idx,
-                        BlkDevSegment::new(bd.uuid(), Segment::new(*bd.device(), start, length)),
-                    );
-                }
+                let r_segs = bd.alloc(needed - alloc);
+                let blkdev_segs = r_segs.iter().map(|(&start, &length)| {
+                    BlkDevSegment::new(bd.uuid(), Segment::new(*bd.device(), start, length))
+                });
+                segs.extend(blkdev_segs);
                 alloc += r_segs.sum();
             }
             assert_eq!(alloc, needed);
+            lists.push(segs);
         }
 
-        Ok(Some(transaction))
-    }
-
-    /// Commit the allocations calculated by the request_space() method.
-    ///
-    /// This method converts the block device segments into the necessary data
-    /// structure and dispatches them to the corresponding block devices to
-    /// update the internal records of allocated space.
-    pub fn commit_space(&mut self, mut transaction: RequestTransaction) -> StratisResult<()> {
-        let mut segs = transaction.drain_blockdevmgr().try_fold(
-            HashMap::<DevUuid, PerDevSegments>::new(),
-            |mut map, seg| -> StratisResult<_> {
-                if let Some(segs) = map.get_mut(&seg.uuid) {
-                    segs.insert(&(seg.segment.start, seg.segment.length))?;
-                } else {
-                    let mut segs = PerDevSegments::new(
-                        self.block_devs
-                            .iter()
-                            .find(|bd| bd.uuid() == seg.uuid)
-                            .expect(
-                                "Block dev was determined to be present during allocation request",
-                            )
-                            .total_size()
-                            .sectors(),
-                    );
-                    segs.insert(&(seg.segment.start, seg.segment.length))?;
-                    map.insert(seg.uuid, segs);
-                }
-
-                Ok(map)
-            },
-        )?;
-
-        for (uuid, bd) in self.blockdevs_mut() {
-            if let Some(segs) = segs.remove(&uuid) {
-                bd.commit_space(segs);
-            }
-        }
-
-        Ok(())
+        Some(lists)
     }
 
     /// Write the given data to all blockdevs marking with current time.
@@ -472,8 +431,7 @@ mod tests {
         assert_eq!(mgr.avail_space() + mgr.metadata_size(), mgr.size());
 
         let allocated = Sectors(2);
-        let transaction = mgr.request_space(&[allocated]).unwrap().unwrap();
-        mgr.commit_space(transaction).unwrap();
+        mgr.alloc(&[allocated]).unwrap();
         assert_eq!(
             mgr.avail_space() + allocated + mgr.metadata_size(),
             mgr.size()

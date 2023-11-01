@@ -7,6 +7,7 @@
 use std::{cmp, collections::HashMap, iter::once, path::PathBuf};
 
 use chrono::{DateTime, Utc};
+use either::Either;
 use serde_json::Value;
 
 use devicemapper::{
@@ -117,7 +118,10 @@ fn make_cache(
 
 /// Set up the linear device on top of the data tier that can later be converted to a
 /// cache device and serves as a placeholder for the device beneath encryption.
-fn make_cap_linear_dev(pool_uuid: PoolUuid, origin: &LinearDev) -> Result<LinearDev, StratisError> {
+fn make_placeholder_dev(
+    pool_uuid: PoolUuid,
+    origin: &LinearDev,
+) -> Result<LinearDev, StratisError> {
     let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::Cache);
     let target = vec![TargetLine::new(
         Sectors(0),
@@ -132,33 +136,35 @@ fn make_cap_linear_dev(pool_uuid: PoolUuid, origin: &LinearDev) -> Result<Linear
 /// returned space the allocation algorithm will have to be revised.
 #[derive(Debug)]
 pub struct Backstore {
-    /// A cache DM Device.
-    cache: Option<CacheDev>,
     /// Coordinate handling of blockdevs that back the cache. Optional, since
     /// this structure can operate without a cache.
     cache_tier: Option<CacheTier<StratBlockDev>>,
     /// Coordinates handling of the blockdevs that form the base.
     data_tier: DataTier<StratBlockDev>,
     /// A linear DM device.
-    linear: Option<LinearDev>,
-    /// A placeholder device to be converted to cache.
-    cap_linear: Option<LinearDev>,
-    /// Handle for encryption layer in backstore.
-    handle: Option<CryptHandle>,
-    /// Encryption info for encryption layer.
-    encryption_info: Option<EncryptionInfo>,
+    origin: Option<LinearDev>,
+    /// A placeholder device to be converted to cache or a cache device.
+    cache: Option<CacheDev>,
+    /// A placeholder device to be converted to cache; necessary for reencryption support.
+    placeholder: Option<LinearDev>,
+    /// Either encryption information for a handle to be created at a later time or
+    /// handle for encryption layer in backstore.
+    enc: Option<Either<EncryptionInfo, CryptHandle>>,
     /// Index for managing allocation of cap device
     next: Sectors,
 }
 
 impl InternalBackstore for Backstore {
     fn device(&self) -> Option<Device> {
-        self.handle.as_ref().map(|h| h.device()).or_else(|| {
-            self.cache
-                .as_ref()
-                .map(|d| d.device())
-                .or_else(|| self.cap_linear.as_ref().map(|d| d.device()))
-        })
+        self.enc
+            .as_ref()
+            .and_then(|either| either.as_ref().right().map(|h| h.device()))
+            .or_else(|| {
+                self.cache
+                    .as_ref()
+                    .map(|c| c.device())
+                    .or_else(|| self.placeholder.as_ref().map(|lin| lin.device()))
+            })
     }
 
     fn datatier_allocated_size(&self) -> Sectors {
@@ -167,7 +173,7 @@ impl InternalBackstore for Backstore {
 
     fn datatier_usable_size(&self) -> Sectors {
         self.data_tier.usable_size()
-            - if self.encryption_info.is_some() {
+            - if self.enc.is_some() {
                 crypt_metadata_size().sectors()
             } else {
                 Sectors(0)
@@ -177,7 +183,7 @@ impl InternalBackstore for Backstore {
     fn available_in_backstore(&self) -> Sectors {
         self.data_tier.usable_size()
             - self.next
-            - if self.encryption_info.is_some() {
+            - if self.enc.is_some() {
                 crypt_metadata_size().sectors()
             } else {
                 Sectors(0)
@@ -241,7 +247,7 @@ impl Backstore {
     ///   * no StratBlockDev in cachedevs has a key description
     ///
     /// Postcondition:
-    /// self.linear.is_some() XOR self.cache.is_some()
+    /// self.origin.is_some() XOR self.cache.is_some()
     /// self.cache.is_some() <=> self.cache_tier.is_some()
     pub fn setup(
         pool_uuid: PoolUuid,
@@ -273,7 +279,7 @@ impl Backstore {
             }
         };
 
-        let (cap_linear, cache_tier, cache, origin) = if !cachedevs.is_empty() {
+        let (placeholder, cache, cache_tier, origin) = if !cachedevs.is_empty() {
             let block_mgr = BlockDevMgr::new(cachedevs, Some(last_update_time));
             match backstore_save.cache_tier {
                 Some(ref cache_tier_save) => {
@@ -300,7 +306,7 @@ impl Backstore {
                             ));
                         }
                     };
-                    (None, Some(cache_tier), Some(cache_device), None)
+                    (None, Some(cache_device), Some(cache_tier), None)
                 }
                 None => {
                     let err_msg = "Cachedevs exist, but cache metadata does not exist";
@@ -316,43 +322,36 @@ impl Backstore {
                 }
             }
         } else {
-            let cap_linear = match make_cap_linear_dev(pool_uuid, &origin) {
-                Ok(cap) => cap,
+            let placeholder = match make_placeholder_dev(pool_uuid, &origin) {
+                Ok(pl) => pl,
                 Err(e) => return Err((e, data_tier.block_mgr.into_bdas())),
             };
-            (Some(cap_linear), None, None, Some(origin))
+            (Some(placeholder), None, None, Some(origin))
         };
 
-        let (encryption_info, handle) = {
-            let handle = match CryptHandle::setup(
-                &once(DEVICEMAPPER_PATH)
-                    .chain(once(
-                        format_backstore_ids(pool_uuid, CacheRole::Cache)
-                            .0
-                            .to_string()
-                            .as_str(),
-                    ))
-                    .collect::<PathBuf>(),
-                pool_uuid,
-                UnlockMethod::Any,
-            ) {
-                Ok(opt) => opt,
-                Err(e) => return Err((e, data_tier.block_mgr.into_bdas())),
-            };
-            match handle {
-                Some(handle) => (Some(handle.encryption_info().clone()), Some(handle)),
-                None => (None, None),
-            }
+        let enc = match CryptHandle::setup(
+            &once(DEVICEMAPPER_PATH)
+                .chain(once(
+                    format_backstore_ids(pool_uuid, CacheRole::Cache)
+                        .0
+                        .to_string()
+                        .as_str(),
+                ))
+                .collect::<PathBuf>(),
+            pool_uuid,
+            UnlockMethod::Any,
+        ) {
+            Ok(opt) => opt.map(Either::Right),
+            Err(e) => return Err((e, data_tier.block_mgr.into_bdas())),
         };
 
         Ok(Backstore {
             data_tier,
             cache_tier,
-            linear: origin,
+            origin,
             cache,
-            cap_linear,
-            encryption_info,
-            handle,
+            placeholder,
+            enc,
             next: backstore_save.cap.allocs[0].1,
         })
     }
@@ -372,26 +371,28 @@ impl Backstore {
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<Backstore> {
-        let mut data_tier = DataTier::<StratBlockDev>::new(
-            BlockDevMgr::<StratBlockDev>::initialize(pool_uuid, devices, mda_data_size)?,
-        );
-        if encryption_info.is_some() && !data_tier.alloc(&[crypt_metadata_size().sectors()]) {
-            return Err(StratisError::Msg(
-                "There was not enough space on the device to satisfy the allocation request"
-                    .to_string(),
-            ));
-        }
+        let data_tier = DataTier::<StratBlockDev>::new(BlockDevMgr::<StratBlockDev>::initialize(
+            pool_uuid,
+            devices,
+            mda_data_size,
+        )?);
 
-        Ok(Backstore {
+        let mut backstore = Backstore {
             data_tier,
+            placeholder: None,
             cache_tier: None,
-            linear: None,
             cache: None,
-            cap_linear: None,
-            handle: None,
-            encryption_info: encryption_info.cloned(),
+            origin: None,
+            enc: encryption_info.cloned().map(Either::Left),
             next: Sectors(0),
-        })
+        };
+
+        let size = crypt_metadata_size().sectors();
+        backstore.alloc(pool_uuid, &[size])?.ok_or_else(|| {
+            StratisError::Msg(format!("Failed to satisfy request in backstore for {size}"))
+        })?;
+
+        Ok(backstore)
     }
 
     /// Initialize the cache tier and add cachedevs to the backstore.
@@ -400,8 +401,8 @@ impl Backstore {
     ///
     /// Precondition: Must be invoked only after some space has been allocated
     /// from the backstore. This ensures that there is certainly a cap device.
-    // Precondition: self.cache.is_none() && self.linear.is_some()
-    // Postcondition: self.cache.is_some() && self.linear.is_none()
+    // Precondition: self.cache.is_none() && self.placeholder.is_some()
+    // Postcondition: self.cache.is_some() && self.placeholder.is_none()
     pub fn init_cache(
         &mut self,
         pool_uuid: PoolUuid,
@@ -423,14 +424,14 @@ impl Backstore {
 
                 let cache_tier = CacheTier::new(bdm)?;
 
-                let linear = self.linear
+                let origin = self.origin
                     .take()
-                    .expect("some space has already been allocated from the backstore => (cache_tier.is_none() <=> self.linear.is_some())");
-                let cap = self.cap_linear
+                    .expect("some space has already been allocated from the backstore => (cache_tier.is_none() <=> self.origin.is_some())");
+                let placeholder = self.placeholder
                     .take()
-                    .expect("some space has already been allocated from the backstore => (cache_tier.is_none() <=> self.cap_linear.is_some())");
+                    .expect("some space has already been allocated from the backstore => (cache_tier.is_none() <=> self.placeholder.is_some())");
 
-                let cache = make_cache(pool_uuid, &cache_tier, linear, Some(cap), true)?;
+                let cache = make_cache(pool_uuid, &cache_tier, origin, Some(placeholder), true)?;
 
                 self.cache = Some(cache);
 
@@ -457,9 +458,9 @@ impl Backstore {
     ///
     /// Precondition: Must be invoked only after some space has been allocated
     /// from the backstore. This ensures that there is certainly a cap device.
-    // Precondition: self.linear.is_none() && self.cache.is_some()
+    // Precondition: self.origin.is_none() && self.cache.is_some()
     // Precondition: self.cache_key_desc has the desired key description
-    // Precondition: self.cache.is_some() && self.linear.is_none()
+    // Precondition: self.cache.is_some() && self.origin.is_none()
     pub fn add_cachedevs(
         &mut self,
         pool_uuid: PoolUuid,
@@ -510,13 +511,14 @@ impl Backstore {
     fn extend_cap_device(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
         let create = match (
             self.cache.as_mut(),
-            self.cap_linear
+            self.placeholder
                 .as_mut()
-                .and_then(|c| self.linear.as_mut().map(|l| (c, l))),
-            self.handle.as_mut(),
+                .and_then(|c| self.origin.as_mut().map(|l| (c, l))),
+            self.enc.as_mut(),
         ) {
             (None, None, None) => true,
-            (Some(cache), None, Some(handle)) => {
+            (_, _, Some(Either::Left(_))) => true,
+            (Some(cache), None, Some(Either::Right(handle))) => {
                 let table = self.data_tier.segments.map_to_dm();
                 cache.set_origin_table(get_dm(), table)?;
                 cache.resume(get_dm())?;
@@ -529,7 +531,7 @@ impl Backstore {
                 cache.resume(get_dm())?;
                 false
             }
-            (None, Some((cap, linear)), Some(handle)) => {
+            (None, Some((cap, linear)), Some(Either::Right(handle))) => {
                 let table = self.data_tier.segments.map_to_dm();
                 linear.set_table(get_dm(), table)?;
                 linear.resume(get_dm())?;
@@ -562,16 +564,16 @@ impl Backstore {
                 cap.resume(get_dm())?;
                 false
             }
-            _ => panic!("NOT (self.cache().is_some() AND self.linear.is_some())"),
+            _ => panic!("NOT (self.cache().is_some() AND self.origin.is_some())"),
         };
 
         if create {
             let table = self.data_tier.segments.map_to_dm();
             let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
             let origin = LinearDev::setup(get_dm(), &dm_name, Some(&dm_uuid), table)?;
-            let cap = make_cap_linear_dev(pool_uuid, &origin)?;
-            let handle = match self.encryption_info {
-                Some(ref einfo) => Some(CryptHandle::initialize(
+            let placeholder = make_placeholder_dev(pool_uuid, &origin)?;
+            let handle = match self.enc {
+                Some(Either::Left(ref einfo)) => Some(CryptHandle::initialize(
                     &once(DEVICEMAPPER_PATH)
                         .chain(once(
                             format_backstore_ids(pool_uuid, CacheRole::Cache)
@@ -584,11 +586,12 @@ impl Backstore {
                     einfo,
                     None,
                 )?),
+                Some(Either::Right(_)) => unreachable!("Checked above"),
                 None => None,
             };
-            self.linear = Some(origin);
-            self.cap_linear = Some(cap);
-            self.handle = handle;
+            self.origin = Some(origin);
+            self.placeholder = Some(placeholder);
+            self.enc = handle.map(Either::Right);
         }
 
         Ok(())
@@ -657,16 +660,17 @@ impl Backstore {
     /// no ioctl is required.
     #[cfg(test)]
     fn size(&self) -> Sectors {
-        self.linear
+        self.enc
             .as_ref()
-            .map(|d| d.size())
+            .and_then(|either| either.as_ref().right().map(|handle| handle.size()))
+            .or_else(|| self.placeholder.as_ref().map(|d| d.size()))
             .or_else(|| self.cache.as_ref().map(|d| d.size()))
             .unwrap_or(Sectors(0))
     }
 
     /// Destroy the entire store.
     pub fn destroy(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
-        if let Some(h) = self.handle.as_mut() {
+        if let Some(h) = self.enc.as_mut().and_then(|either| either.as_ref().right()) {
             h.wipe()?;
         }
         let devs = list_of_backstore_devices(pool_uuid);
@@ -783,7 +787,7 @@ impl Backstore {
     }
 
     pub fn is_encrypted(&self) -> bool {
-        self.encryption_info.is_some()
+        self.enc.is_some()
     }
 
     pub fn has_cache(&self) -> bool {
@@ -792,7 +796,9 @@ impl Backstore {
 
     /// Get the encryption information for the backstore.
     pub fn encryption_info(&self) -> Option<&EncryptionInfo> {
-        self.encryption_info.as_ref()
+        self.enc
+            .as_ref()
+            .map(|either| either.as_ref().either(|e| e, |h| h.encryption_info()))
     }
 
     /// Bind device in the given backstore using the given clevis
@@ -804,9 +810,14 @@ impl Backstore {
     /// * Returns Err(_) if binding failed.
     pub fn bind_clevis(&mut self, pin: &str, clevis_info: &Value) -> StratisResult<bool> {
         let handle = self
-            .handle
+            .enc
             .as_mut()
-            .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?;
+            .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?
+            .as_mut()
+            .right()
+            .ok_or_else(|| {
+                StratisError::Msg("No space has been allocated from the backstore".to_string())
+            })?;
 
         let mut parsed_config = clevis_info.clone();
         let yes = interpret_clevis_config(pin, &mut parsed_config)?;
@@ -844,9 +855,14 @@ impl Backstore {
     /// * Returns Err(_) if unbinding failed.
     pub fn unbind_clevis(&mut self) -> StratisResult<bool> {
         let handle = self
-            .handle
+            .enc
             .as_mut()
-            .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?;
+            .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?
+            .as_mut()
+            .right()
+            .ok_or_else(|| {
+                StratisError::Msg("No space has been allocated from the backstore".to_string())
+            })?;
 
         if handle.encryption_info().clevis_info().is_some() {
             handle.clevis_unbind()?;
@@ -865,9 +881,14 @@ impl Backstore {
     /// * Returns Err(_) if binding failed.
     pub fn bind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<bool> {
         let handle = self
-            .handle
+            .enc
             .as_mut()
-            .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?;
+            .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?
+            .as_mut()
+            .right()
+            .ok_or_else(|| {
+                StratisError::Msg("No space has been allocated from the backstore".to_string())
+            })?;
 
         if let Some(kd) = handle.encryption_info().key_description() {
             if kd == key_desc {
@@ -895,9 +916,14 @@ impl Backstore {
     /// * Returns Err(_) if unbinding failed.
     pub fn unbind_keyring(&mut self) -> StratisResult<bool> {
         let handle = self
-            .handle
+            .enc
             .as_mut()
-            .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?;
+            .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?
+            .as_mut()
+            .right()
+            .ok_or_else(|| {
+                StratisError::Msg("No space has been allocated from the backstore".to_string())
+            })?;
 
         if handle.encryption_info().key_description().is_some() {
             handle.unbind_keyring()?;
@@ -917,9 +943,14 @@ impl Backstore {
     /// * Err(_) if an operation fails while changing the passphrase.
     pub fn rebind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<Option<bool>> {
         let handle = self
-            .handle
+            .enc
             .as_mut()
-            .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?;
+            .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?
+            .as_mut()
+            .right()
+            .ok_or_else(|| {
+                StratisError::Msg("No space has been allocated from the backstore".to_string())
+            })?;
 
         if handle.encryption_info().key_description() == Some(key_desc) {
             Ok(Some(false))
@@ -941,9 +972,14 @@ impl Backstore {
     /// result in a metadata change.
     pub fn rebind_clevis(&mut self) -> StratisResult<()> {
         let handle = self
-            .handle
+            .enc
             .as_mut()
-            .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?;
+            .ok_or_else(|| StratisError::Msg("Pool is not encrypted".to_string()))?
+            .as_mut()
+            .right()
+            .ok_or_else(|| {
+                StratisError::Msg("No space has been allocated from the backstore".to_string())
+            })?;
 
         if handle.encryption_info().clevis_info().is_none() {
             Err(StratisError::Msg(
@@ -1048,7 +1084,7 @@ mod tests {
 
     /// Assert some invariants of the backstore
     /// * backstore.cache_tier.is_some() <=> backstore.cache.is_some() &&
-    ///   backstore.cache_tier.is_some() => backstore.linear.is_none()
+    ///   backstore.cache_tier.is_some() => backstore.origin.is_none()
     /// * backstore's data tier allocated is equal to the size of the cap device
     /// * backstore's next index is always less than the size of the cap
     ///   device
@@ -1057,11 +1093,11 @@ mod tests {
             (backstore.cache_tier.is_none() && backstore.cache.is_none())
                 || (backstore.cache_tier.is_some()
                     && backstore.cache.is_some()
-                    && backstore.linear.is_none())
+                    && backstore.origin.is_none())
         );
         assert_eq!(
             backstore.data_tier.allocated(),
-            match (&backstore.linear, &backstore.cache) {
+            match (&backstore.origin, &backstore.cache) {
                 (None, None) =>
                     if backstore.is_encrypted() {
                         crypt_metadata_size().sectors()
@@ -1128,7 +1164,7 @@ mod tests {
         invariant(&backstore);
 
         assert_eq!(cache_uuids.len(), initcachepaths.len());
-        assert_matches!(backstore.linear, None);
+        assert_matches!(backstore.origin, None);
 
         let cache_status = backstore
             .cache

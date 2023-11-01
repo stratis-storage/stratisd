@@ -4,6 +4,7 @@
 
 use std::{
     fmt::Debug,
+    fs::File,
     iter::once,
     path::{Path, PathBuf},
 };
@@ -42,6 +43,7 @@ use crate::{
                     wipe_fallback,
                 },
             },
+            device::blkdev_size,
             dm::DEVICEMAPPER_PATH,
             names::format_crypt_backstore_name,
         },
@@ -99,6 +101,7 @@ pub fn load_crypt_metadata(
         .collect::<PathBuf>();
     let activated_path = path.canonicalize().unwrap_or(path);
     let devno = get_devno_from_path(&activated_path)?;
+    let size = blkdev_size(&File::open(&activated_path)?)?.sectors();
     Ok(Some(CryptMetadata {
         physical_path: physical,
         pool_uuid,
@@ -106,6 +109,7 @@ pub fn load_crypt_metadata(
         activation_name,
         activated_path,
         device: devno,
+        size,
     }))
 }
 
@@ -117,6 +121,7 @@ pub struct CryptMetadata {
     pub activation_name: DmNameBuf,
     pub activated_path: PathBuf,
     pub device: Device,
+    pub size: Sectors,
 }
 
 /// Check whether the physical device path corresponds to an encrypted
@@ -204,6 +209,7 @@ pub fn setup_crypt_handle(
         metadata.pool_uuid,
         metadata.encryption_info,
         metadata.device,
+        metadata.size,
     )))
 }
 
@@ -222,6 +228,7 @@ impl CryptHandle {
         pool_uuid: PoolUuid,
         encryption_info: EncryptionInfo,
         devno: Device,
+        size: Sectors,
     ) -> CryptHandle {
         let activation_name = format_crypt_backstore_name(&pool_uuid);
         let path = vec![DEVICEMAPPER_PATH, &activation_name.to_string()]
@@ -236,6 +243,7 @@ impl CryptHandle {
                 activation_name,
                 device: devno,
                 activated_path,
+                size,
             },
         }
     }
@@ -285,11 +293,13 @@ impl CryptHandle {
 
                 let device_path = DevicePath::new(physical_path)?;
                 let devno = get_devno_from_path(&once(DEVICEMAPPER_PATH).chain(once(activation_name.to_string().as_str())).collect::<PathBuf>())?;
+                let size = blkdev_size(&File::open(["/dev", "mapper", &activation_name.to_string()].iter().collect::<PathBuf>())?)?.sectors();
                 Ok(CryptHandle::new(
                     device_path,
                     pool_uuid,
                     encryption_info,
                     devno,
+                    size,
                 ))
             })
             .map_err(|e| {
@@ -486,6 +496,12 @@ impl CryptHandle {
             Some(ref mut device) => load_crypt_metadata(device, physical_path, pool_uuid),
             None => Ok(None),
         }
+    }
+
+    /// Get the device size for this encrypted device.
+    #[cfg(test)]
+    pub fn size(&self) -> Sectors {
+        self.metadata.size
     }
 
     /// Get the encryption info for this encrypted device.
@@ -731,7 +747,7 @@ impl CryptHandle {
     /// Changed the encrypted device size
     /// `None` will fill up the entire underlying physical device.
     /// `Some(_)` will resize the device to the given number of sectors.
-    pub fn resize(&self, size: Option<Sectors>) -> StratisResult<()> {
+    pub fn resize(&mut self, size: Option<Sectors>) -> StratisResult<()> {
         let processed_size = match size {
             Some(s) => {
                 if s == Sectors(0) {
@@ -754,7 +770,9 @@ impl CryptHandle {
         crypt
             .context_handle()
             .resize(&self.activation_name().to_string(), processed_size)
-            .map_err(StratisError::Crypt)
+            .map_err(StratisError::Crypt)?;
+        self.metadata.size = blkdev_size(&File::open(&self.metadata.activated_path)?)?.sectors();
+        Ok(())
     }
 }
 

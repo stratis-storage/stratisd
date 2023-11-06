@@ -98,7 +98,7 @@ impl StratEngine {
     }
 
     #[cfg(test)]
-    async fn create_pool_legacy(
+    pub(crate) async fn create_pool_legacy(
         &self,
         name: &str,
         blockdev_paths: &[&Path],

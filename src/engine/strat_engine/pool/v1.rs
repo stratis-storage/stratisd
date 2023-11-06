@@ -1356,7 +1356,7 @@ mod tests {
             thinpool::ThinPoolStatusDigest,
         },
         types::{EngineAction, PoolIdentifier},
-        Engine, StratEngine,
+        StratEngine,
     };
 
     use super::*;
@@ -1775,7 +1775,7 @@ mod tests {
     fn test_grow_physical_pre_grow(paths: &[&Path]) {
         let pool_name = Name::new("pool".to_string());
         let engine = StratEngine::initialize().unwrap();
-        let pool_uuid = test_async!(engine.create_pool(&pool_name, paths, None))
+        let pool_uuid = test_async!(engine.create_pool_legacy(&pool_name, paths, None))
             .unwrap()
             .changed()
             .unwrap();

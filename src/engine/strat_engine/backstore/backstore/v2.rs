@@ -150,8 +150,10 @@ pub struct Backstore {
     /// Either encryption information for a handle to be created at a later time or
     /// handle for encryption layer in backstore.
     enc: Option<Either<EncryptionInfo, CryptHandle>>,
-    /// Index for managing allocation of cap device
-    next: Sectors,
+    /// Data allocations on the cap device,
+    allocs: Vec<(Sectors, Sectors)>,
+    /// Metadata allocations on the cache or placeholder device.
+    crypt_meta_allocs: Vec<(Sectors, Sectors)>,
 }
 
 impl InternalBackstore for Backstore {
@@ -159,12 +161,8 @@ impl InternalBackstore for Backstore {
         self.enc
             .as_ref()
             .and_then(|either| either.as_ref().right().map(|h| h.device()))
-            .or_else(|| {
-                self.cache
-                    .as_ref()
-                    .map(|c| c.device())
-                    .or_else(|| self.placeholder.as_ref().map(|lin| lin.device()))
-            })
+            .or_else(|| self.cache.as_ref().map(|c| c.device()))
+            .or_else(|| self.placeholder.as_ref().map(|lin| lin.device()))
     }
 
     fn datatier_allocated_size(&self) -> Sectors {
@@ -172,22 +170,13 @@ impl InternalBackstore for Backstore {
     }
 
     fn datatier_usable_size(&self) -> Sectors {
-        self.data_tier.usable_size()
-            - if self.enc.is_some() {
-                crypt_metadata_size().sectors()
-            } else {
-                Sectors(0)
-            }
+        self.data_tier.usable_size() - self.crypt_meta_allocs.iter().map(|(_, len)| *len).sum()
     }
 
     fn available_in_backstore(&self) -> Sectors {
         self.data_tier.usable_size()
-            - self.next
-            - if self.enc.is_some() {
-                crypt_metadata_size().sectors()
-            } else {
-                Sectors(0)
-            }
+            - self.allocs.iter().map(|(_, len)| *len).sum()
+            - self.crypt_meta_allocs.iter().map(|(_, len)| *len).sum()
     }
 
     fn alloc(
@@ -208,8 +197,10 @@ impl InternalBackstore for Backstore {
 
         let mut chunks = Vec::new();
         for size in sizes {
-            chunks.push((self.next, *size));
-            self.next += *size;
+            let next = self.calc_next_cap();
+            let seg = (next, *size);
+            chunks.push(seg);
+            self.allocs.push(seg);
         }
 
         // Assert that the postcondition holds.
@@ -227,6 +218,66 @@ impl InternalBackstore for Backstore {
 }
 
 impl Backstore {
+    /// Calculate size allocated to data and not metadata in the backstore.
+    #[cfg(test)]
+    pub fn data_alloc_size(&self) -> Sectors {
+        self.allocs.iter().map(|(_, length)| *length).sum()
+    }
+
+    /// Calculate next from all of the metadata and data allocations present in the backstore.
+    fn calc_next_cache(&self) -> StratisResult<Sectors> {
+        let mut all_allocs = if self.allocs.is_empty() {
+            if matches!(self.enc, Some(Either::Right(_))) {
+                return Err(StratisError::Msg(
+                    "Metadata can only be allocated at the beginning of the cache device before the encryption device".to_string()
+                ));
+            } else {
+                self.crypt_meta_allocs.clone()
+            }
+        } else {
+            return Err(StratisError::Msg(
+                "Metadata can only be allocated at the beginning of the cache device before the encryption device".to_string()
+            ));
+        };
+        all_allocs.sort();
+
+        for window in all_allocs.windows(2) {
+            let (start, length) = (window[0].0, window[0].1);
+            let start_next = window[1].0;
+            assert_eq!(start + length, start_next);
+        }
+
+        Ok(all_allocs
+            .last()
+            .map(|(offset, len)| *offset + *len)
+            .unwrap_or(Sectors(0)))
+    }
+
+    /// Calculate next from all of the metadata and data allocations present in the backstore.
+    fn calc_next_cap(&self) -> Sectors {
+        let mut all_allocs = if self.is_encrypted() {
+            self.allocs.clone()
+        } else {
+            self.allocs
+                .iter()
+                .cloned()
+                .chain(self.crypt_meta_allocs.iter().cloned())
+                .collect::<Vec<_>>()
+        };
+        all_allocs.sort();
+
+        for window in all_allocs.windows(2) {
+            let (start, length) = (window[0].0, window[0].1);
+            let start_next = window[1].0;
+            assert_eq!(start + length, start_next);
+        }
+
+        all_allocs
+            .last()
+            .map(|(offset, len)| *offset + *len)
+            .unwrap_or(Sectors(0))
+    }
+
     /// Make a Backstore object from blockdevs that already belong to Stratis.
     /// Precondition: every device in datadevs and cachedevs has already been
     /// determined to belong to the pool with the specified pool_uuid.
@@ -352,7 +403,8 @@ impl Backstore {
             cache,
             placeholder,
             enc,
-            next: backstore_save.cap.allocs[0].1,
+            allocs: backstore_save.cap.allocs.clone(),
+            crypt_meta_allocs: backstore_save.cap.crypt_meta_allocs.clone(),
         })
     }
 
@@ -384,15 +436,50 @@ impl Backstore {
             cache: None,
             origin: None,
             enc: encryption_info.cloned().map(Either::Left),
-            next: Sectors(0),
+            allocs: Vec::new(),
+            crypt_meta_allocs: Vec::new(),
         };
 
         let size = crypt_metadata_size().sectors();
-        backstore.alloc(pool_uuid, &[size])?.ok_or_else(|| {
-            StratisError::Msg(format!("Failed to satisfy request in backstore for {size}"))
-        })?;
+        if !backstore.meta_alloc_cache(&[size])? {
+            return Err(StratisError::Msg(format!(
+                "Failed to satisfy request in backstore for {size}"
+            )));
+        }
 
         Ok(backstore)
+    }
+
+    fn meta_alloc_cache(&mut self, sizes: &[Sectors]) -> StratisResult<bool> {
+        let total_required = sizes.iter().cloned().sum();
+        let available = self.available_in_backstore();
+        if available < total_required {
+            return Ok(false);
+        }
+
+        if !self.data_tier.alloc(sizes) {
+            return Ok(false);
+        }
+
+        let mut chunks = Vec::new();
+        for size in sizes {
+            let next = self.calc_next_cache()?;
+            let seg = (next, *size);
+            chunks.push(seg);
+            self.crypt_meta_allocs.push(seg);
+        }
+
+        // Assert that the postcondition holds.
+        assert_eq!(
+            sizes,
+            chunks
+                .iter()
+                .map(|x| x.1)
+                .collect::<Vec<Sectors>>()
+                .as_slice()
+        );
+
+        Ok(true)
     }
 
     /// Initialize the cache tier and add cachedevs to the backstore.
@@ -513,7 +600,7 @@ impl Backstore {
             self.cache.as_mut(),
             self.placeholder
                 .as_mut()
-                .and_then(|c| self.origin.as_mut().map(|l| (c, l))),
+                .and_then(|p| self.origin.as_mut().map(|o| (p, o))),
             self.enc.as_mut(),
         ) {
             (None, None, None) => true,
@@ -531,20 +618,20 @@ impl Backstore {
                 cache.resume(get_dm())?;
                 false
             }
-            (None, Some((cap, linear)), Some(Either::Right(handle))) => {
+            (None, Some((placeholder, origin)), Some(Either::Right(handle))) => {
                 let table = self.data_tier.segments.map_to_dm();
-                linear.set_table(get_dm(), table)?;
-                linear.resume(get_dm())?;
+                origin.set_table(get_dm(), table)?;
+                origin.resume(get_dm())?;
                 let table = vec![TargetLine::new(
                     Sectors(0),
-                    linear.size(),
+                    origin.size(),
                     LinearDevTargetParams::Linear(LinearTargetParams::new(
-                        linear.device(),
+                        origin.device(),
                         Sectors(0),
                     )),
                 )];
-                cap.set_table(get_dm(), table)?;
-                cap.resume(get_dm())?;
+                placeholder.set_table(get_dm(), table)?;
+                placeholder.resume(get_dm())?;
                 handle.resize(None)?;
                 false
             }
@@ -1056,7 +1143,8 @@ impl Recordable<BackstoreSave> for Backstore {
         BackstoreSave {
             cache_tier: self.cache_tier.as_ref().map(|c| c.record()),
             cap: CapSave {
-                allocs: vec![(Sectors(0), self.next)],
+                allocs: self.allocs.clone(),
+                crypt_meta_allocs: self.crypt_meta_allocs.clone(),
             },
             data_tier: self.data_tier.record(),
         }
@@ -1098,18 +1186,20 @@ mod tests {
         assert_eq!(
             backstore.data_tier.allocated(),
             match (&backstore.origin, &backstore.cache) {
-                (None, None) =>
-                    if backstore.is_encrypted() {
-                        crypt_metadata_size().sectors()
-                    } else {
-                        Sectors(0)
-                    },
+                (None, None) => crypt_metadata_size().sectors(),
                 (&None, Some(cache)) => cache.size(),
                 (Some(linear), &None) => linear.size(),
                 _ => panic!("impossible; see first assertion"),
             }
         );
-        assert!(backstore.next <= backstore.size());
+        assert!(
+            backstore
+                .allocs
+                .iter()
+                .map(|(_, len)| *len)
+                .sum::<Sectors>()
+                <= backstore.size()
+        );
 
         backstore.data_tier.invariant();
 

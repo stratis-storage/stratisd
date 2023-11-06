@@ -127,6 +127,9 @@ pub struct BaseBlockDevSave {
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CapSave {
     pub allocs: Vec<(Sectors, Sectors)>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub crypt_meta_allocs: Vec<(Sectors, Sectors)>,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]

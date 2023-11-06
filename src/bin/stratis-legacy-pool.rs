@@ -108,6 +108,8 @@ fn parse_args() -> ParseReturn {
 }
 
 fn main() -> StratisResult<()> {
+    env_logger::init();
+
     let (name, devices, key_desc, clevis_info) = parse_args()?;
     let unowned = ProcessedPathInfos::try_from(
         devices

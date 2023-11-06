@@ -2951,7 +2951,7 @@ mod tests {
                 .unwrap()
             );
             assert_eq!(
-                backstore.datatier_allocated_size(),
+                backstore.data_alloc_size(),
                 pool.thin_pool.data_dev().size()
                     + pool.thin_pool.meta_dev().size() * 2u64
                     + pool.mdv.device().size()

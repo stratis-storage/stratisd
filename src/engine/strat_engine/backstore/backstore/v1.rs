@@ -984,6 +984,7 @@ impl Recordable<BackstoreSave> for Backstore {
             cache_tier: self.cache_tier.as_ref().map(|c| c.record()),
             cap: CapSave {
                 allocs: vec![(Sectors(0), self.next)],
+                crypt_meta_allocs: Vec::new(),
             },
             data_tier: self.data_tier.record(),
         }

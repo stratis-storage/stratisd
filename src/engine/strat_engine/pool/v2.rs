@@ -50,29 +50,15 @@ use crate::{
 /// Precondition: This method is called only when setting up a pool, which
 /// ensures that the flex devs metadata lists are all non-empty.
 fn next_index(flex_devs: &FlexDevsSave) -> Sectors {
-    let expect_msg = "Setting up rather than initializing a pool, so each flex dev must have been allocated at least some segments.";
     [
-        flex_devs
-            .meta_dev
-            .last()
-            .unwrap_or_else(|| panic!("{}", expect_msg)),
-        flex_devs
-            .thin_meta_dev
-            .last()
-            .unwrap_or_else(|| panic!("{}", expect_msg)),
-        flex_devs
-            .thin_data_dev
-            .last()
-            .unwrap_or_else(|| panic!("{}", expect_msg)),
-        flex_devs
-            .thin_meta_dev_spare
-            .last()
-            .unwrap_or_else(|| panic!("{}", expect_msg)),
+        &flex_devs.meta_dev,
+        &flex_devs.thin_meta_dev,
+        &flex_devs.thin_data_dev,
+        &flex_devs.thin_meta_dev_spare,
     ]
     .iter()
-    .max_by_key(|x| x.0)
-    .map(|&&(start, length)| start + length)
-    .expect("iterator is non-empty")
+    .flat_map(|vec| vec.iter().map(|(_, length)| *length))
+    .sum()
 }
 
 /// Check the metadata of an individual pool for consistency.
@@ -81,7 +67,13 @@ fn next_index(flex_devs: &FlexDevsSave) -> Sectors {
 fn check_metadata(metadata: &PoolSave) -> StratisResult<()> {
     let flex_devs = &metadata.flex_devs;
     let next = next_index(flex_devs);
-    let allocated_from_cap = metadata.backstore.cap.allocs[0].1;
+    let allocated_from_cap = metadata
+        .backstore
+        .cap
+        .allocs
+        .iter()
+        .map(|(_, size)| *size)
+        .sum::<Sectors>();
 
     if allocated_from_cap != next {
         let err_msg = format!(
@@ -168,7 +160,7 @@ impl StratPool {
 
         let thinpool = ThinPool::<Backstore>::new(
             pool_uuid,
-            match ThinPoolSizeParams::new(backstore.datatier_usable_size()) {
+            match ThinPoolSizeParams::new(backstore.available_in_backstore()) {
                 Ok(ref params) => params,
                 Err(causal_error) => {
                     if let Err(cleanup_err) = backstore.destroy(pool_uuid) {

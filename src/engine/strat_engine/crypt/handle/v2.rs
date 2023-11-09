@@ -100,16 +100,12 @@ pub fn load_crypt_metadata(
         .into_iter()
         .collect::<PathBuf>();
     let activated_path = path.canonicalize().unwrap_or(path);
-    let devno = get_devno_from_path(&activated_path)?;
-    let size = blkdev_size(&File::open(&activated_path)?)?.sectors();
     Ok(Some(CryptMetadata {
         physical_path: physical,
         pool_uuid,
         encryption_info,
         activation_name,
         activated_path,
-        device: devno,
-        size,
     }))
 }
 
@@ -120,8 +116,6 @@ pub struct CryptMetadata {
     pub encryption_info: EncryptionInfo,
     pub activation_name: DmNameBuf,
     pub activated_path: PathBuf,
-    pub device: Device,
-    pub size: Sectors,
 }
 
 /// Check whether the physical device path corresponds to an encrypted
@@ -204,12 +198,15 @@ pub fn setup_crypt_handle(
         )?
     }
 
+    let device = get_devno_from_path(&metadata.activated_path)?;
+    let size = blkdev_size(&File::open(&metadata.activated_path)?)?.sectors();
+
     Ok(Some(CryptHandle::new(
         metadata.physical_path,
         metadata.pool_uuid,
         metadata.encryption_info,
-        metadata.device,
-        metadata.size,
+        device,
+        size,
     )))
 }
 
@@ -220,6 +217,8 @@ pub fn setup_crypt_handle(
 #[derive(Debug, Clone)]
 pub struct CryptHandle {
     metadata: CryptMetadata,
+    device: Device,
+    size: Sectors,
 }
 
 impl CryptHandle {
@@ -241,10 +240,10 @@ impl CryptHandle {
                 pool_uuid,
                 encryption_info,
                 activation_name,
-                device: devno,
                 activated_path,
-                size,
             },
+            device: devno,
+            size,
         }
     }
 
@@ -501,7 +500,7 @@ impl CryptHandle {
     /// Get the device size for this encrypted device.
     #[cfg(test)]
     pub fn size(&self) -> Sectors {
-        self.metadata.size
+        self.size
     }
 
     /// Get the encryption info for this encrypted device.
@@ -528,7 +527,7 @@ impl CryptHandle {
 
     /// Device number for the LUKS2 encrypted device.
     pub fn device(&self) -> Device {
-        self.metadata.device
+        self.device
     }
 
     /// Get the keyslot associated with the given token ID.
@@ -771,7 +770,7 @@ impl CryptHandle {
             .context_handle()
             .resize(&self.activation_name().to_string(), processed_size)
             .map_err(StratisError::Crypt)?;
-        self.metadata.size = blkdev_size(&File::open(&self.metadata.activated_path)?)?.sectors();
+        self.size = blkdev_size(&File::open(&self.metadata.activated_path)?)?.sectors();
         Ok(())
     }
 }
@@ -1034,8 +1033,6 @@ mod tests {
 
     fn test_both_initialize(paths: &[&Path]) {
         fn both_initialize(paths: &[&Path], key_desc: &KeyDescription, pool_uuid: PoolUuid) {
-            unshare_mount_namespace().unwrap();
-            let _memfs = MemoryFilesystem::new().unwrap();
             let path = paths.first().copied().expect("Expected exactly one path");
             let handle = CryptHandle::initialize(
                 path,

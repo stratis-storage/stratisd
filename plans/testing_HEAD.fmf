@@ -1,0 +1,35 @@
+summary: Run testing scripts from HEAD revision
+prepare:
+  - name: Install packages
+    how: install
+    package:
+     - python3-dbus-python-client-gen
+     - python3-gobject
+     - python3-psutil
+     - systemd
+     - tang
+     - util-linux
+  - name: Start tang server
+    how: shell
+    script: systemctl enable tangd.socket --now
+  - name: Reload udev
+    how: shell
+    script: udevadm control --reload
+  - name: Show test system information
+    how: shell
+    script: free -m; lsblk -i; lscpu; cat /proc/1/sched
+  - name: Record mkfs.xfs version
+    how: shell
+    script: mkfs.xfs -V
+discover:
+  url: https://github.com/stratis-storage/testing.git
+  ref: HEAD
+  tests:
+    - name: unit
+      test: >
+        RUST_LOG=stratisd=debug
+        python3 test_harness.py --log-level=debug stratisd_cert
+        --verify-devices --monitor-dbus --highest-revision-number=6
+execute:
+  how: tmt
+  exit-first: false

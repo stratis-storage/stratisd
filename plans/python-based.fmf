@@ -1,4 +1,4 @@
-summary: top level management
+summary: whole install Python-based tests
 prepare:
   - name: Install packages
     how: install

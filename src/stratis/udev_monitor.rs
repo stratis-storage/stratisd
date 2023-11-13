@@ -4,7 +4,7 @@
 
 //! Support for monitoring udev events.
 
-use std::os::unix::io::{AsRawFd, RawFd};
+use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd};
 
 use libudev::Event;
 use nix::poll::{poll, PollFd, PollFlags};
@@ -32,8 +32,8 @@ pub async fn udev_thread(
         let mut udev = UdevMonitor::create(&context)?;
 
 
-        let mut pollers = [PollFd::new(udev.as_raw_fd(), PollFlags::POLLIN)];
         loop {
+            let mut pollers = [PollFd::new(&udev, PollFlags::POLLIN)];
             match poll(&mut pollers, 100)? {
                 0 => {
                     match should_exit.try_recv() {
@@ -88,8 +88,8 @@ impl UdevMonitor {
     }
 }
 
-impl AsRawFd for UdevMonitor {
-    fn as_raw_fd(&self) -> RawFd {
-        self.socket.as_raw_fd()
+impl AsFd for UdevMonitor {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        unsafe { BorrowedFd::borrow_raw(self.socket.as_raw_fd()) }
     }
 }

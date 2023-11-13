@@ -33,6 +33,25 @@ jobs:
           - fedora-stable
 
     - job: tests
+      identifier: local
       trigger: pull_request
       targets:
           - fedora-stable
+
+    # run Cockpit storage tests, see plans/ with `cockpit == yes`
+    - job: tests
+      identifier: cockpit
+      trigger: pull_request
+      notifications:
+        failure_comment:
+          message: "Cockpit tests failed for commit {commit_sha}. @martinpitt, @jelly, @mvollmer please check."
+      targets:
+      - fedora-development
+      tf_extra_params:
+        environments:
+          - artifacts:
+            - type: repository-file
+              id: https://copr.fedorainfracloud.org/coprs/g/cockpit/main-builds/repo/fedora-$releasever/group_cockpit-main-builds-fedora-$releasever.repo
+            tmt:
+              context:
+                plan: "cockpit"

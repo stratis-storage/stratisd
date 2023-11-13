@@ -6,7 +6,6 @@ use std::{
     env,
     fs::{File, OpenOptions},
     mem::forget,
-    os::unix::io::AsRawFd,
     panic,
     path::{Path, PathBuf},
     sync::Once,
@@ -58,11 +57,7 @@ impl LoopTestDev {
             .open(path)
             .unwrap();
 
-        nix::unistd::ftruncate(
-            f.as_raw_fd(),
-            convert_test!(*size.bytes(), u128, nix::libc::off_t),
-        )
-        .unwrap();
+        nix::unistd::ftruncate(&f, convert_test!(*size.bytes(), u128, nix::libc::off_t)).unwrap();
         f.sync_all().unwrap();
 
         let ld = lc.next_free().unwrap();

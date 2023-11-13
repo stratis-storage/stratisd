@@ -1,3 +1,14 @@
+stratisd 3.6.2
+==============
+Recommended Rust toolchain version: 1.73.0
+Recommended development platform for Python development: Fedora 38
+
+- Cherry-picked commits:
+  * Run cockpit storage tests in PRs
+  * Remove manual_trigger key from packit test config
+  * Fix alignment of metadata device to data block size
+
+
 stratisd 3.6.1
 ==============
 Recommended Rust toolchain version: 1.73.0

@@ -1,4 +1,9 @@
 summary: top level management
+
+adjust:
+  when: plan == cockpit
+  enabled: false
+
 prepare:
   - name: Install packages
     how: install

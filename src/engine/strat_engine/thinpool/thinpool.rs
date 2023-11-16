@@ -2596,7 +2596,7 @@ mod tests {
         let mut file = OpenOptions::new()
             .create(true)
             .write(true)
-            .open(&new_file)
+            .open(new_file)
             .unwrap();
         let mut bytes_written = Bytes(0);
         // Write 400 * IEC::Mi

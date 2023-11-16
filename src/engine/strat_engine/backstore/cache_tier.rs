@@ -128,17 +128,14 @@ impl CacheTier {
             )));
         }
 
-        let trans = self
+        let segments = self
             .block_mgr
-            .request_space(&[avail_space])?
-            .expect("asked for exactly the space available, must get");
-        let segments = trans.get_blockdevmgr();
-        if let Err(e) = self.block_mgr.commit_space(trans) {
-            self.block_mgr.remove_blockdevs(&uuids)?;
-            return Err(StratisError::Msg(format!(
-                "Failed to commit metadata changes: {e}"
-            )));
-        }
+            .alloc(&[avail_space])
+            .expect("asked for exactly the space available, must get")
+            .iter()
+            .flat_map(|s| s.iter())
+            .cloned()
+            .collect::<Vec<_>>();
         self.cache_segments.coalesce_blkdevsegs(&segments);
 
         Ok((uuids, (true, false)))
@@ -170,21 +167,15 @@ impl CacheTier {
             )));
         }
 
-        let trans = block_mgr
-            .request_space(&[meta_space, avail_space - meta_space])?
+        let mut segments = block_mgr
+            .alloc(&[meta_space, avail_space - meta_space])
             .expect("asked for exactly the space available, must get");
-        let meta_segments = AllocatedAbove {
-            inner: trans.get_segs_for_req(0).expect("segments.len() == 2"),
-        };
         let cache_segments = AllocatedAbove {
-            inner: trans.get_segs_for_req(1).expect("segments.len() == 2"),
+            inner: segments.pop().expect("segments.len() == 2"),
         };
-        if let Err(e) = block_mgr.commit_space(trans) {
-            block_mgr.destroy_all()?;
-            return Err(StratisError::Msg(format!(
-                "Failed to commit metadata changes: {e}"
-            )));
-        }
+        let meta_segments = AllocatedAbove {
+            inner: segments.pop().expect("segments.len() == 1"),
+        };
 
         Ok(CacheTier {
             block_mgr,

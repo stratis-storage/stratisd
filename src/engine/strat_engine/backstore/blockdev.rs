@@ -25,7 +25,6 @@ use crate::{
                 crypt::CryptHandle,
                 devices::BlockSizes,
                 range_alloc::{PerDevSegments, RangeAllocator},
-                transaction::RequestTransaction,
             },
             device::blkdev_size,
             metadata::{
@@ -267,19 +266,8 @@ impl StratBlockDev {
 
     /// Find some sector ranges that could be allocated. If more
     /// sectors are needed than are available, return partial results.
-    pub fn request_space(
-        &self,
-        size: Sectors,
-        transaction: &RequestTransaction,
-    ) -> StratisResult<PerDevSegments> {
-        self.used.request(self.uuid(), size, transaction)
-    }
-
-    /// Commit allocation requested by request_space().
-    ///
-    /// This method will record the requested allocations in the metadata.
-    pub fn commit_space(&mut self, segs: PerDevSegments) {
-        self.used.commit(segs);
+    pub fn alloc(&mut self, size: Sectors) -> PerDevSegments {
+        self.used.alloc(size)
     }
 
     // ALL SIZE METHODS (except size(), which is in BlockDev impl.)

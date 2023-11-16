@@ -559,8 +559,8 @@ fn tang_dispatch(json: &Value) -> StratisResult<Value> {
         })?;
     let mut key = keys
         .iter()
+        .find(|&obj| obj.get("key_ops") == Some(&Value::Array(vec![Value::from("verify")])))
         .cloned()
-        .find(|obj| obj.get("key_ops") == Some(&Value::Array(vec![Value::from("verify")])))
         .ok_or_else(|| {
             StratisError::Msg("Verification key not found in clevis metadata".to_string())
         })?;

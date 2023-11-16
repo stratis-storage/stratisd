@@ -30,13 +30,13 @@ jobs:
     - job: copr_build
       trigger: pull_request
       targets:
-          - fedora-stable
+          - fedora-all
 
     - job: tests
       identifier: local
       trigger: pull_request
       targets:
-          - fedora-stable
+          - fedora-all
 
     # run Cockpit storage tests, see plans/ with `cockpit == yes`
     - job: tests

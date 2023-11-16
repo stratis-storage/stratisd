@@ -42,11 +42,11 @@ jobs:
     - job: tests
       identifier: cockpit
       trigger: pull_request
+      targets:
+          - fedora-development
       notifications:
           failure_comment:
               message: "Cockpit tests failed for commit {commit_sha}. @martinpitt, @jelly, @mvollmer please check."
-      targets:
-          - fedora-development
       tf_extra_params:
           environments:
               - artifacts:

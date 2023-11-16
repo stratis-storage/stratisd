@@ -440,6 +440,8 @@ pub fn clevis_luks_regen(dev_path: &Path, keyslot: c_uint) -> StratisResult<()> 
 
 /// Determine the number of sectors required to house the specified parameters for
 /// the thin pool that determine metadata size.
+///
+/// Precondition: block_size is a power of 2.
 pub fn thin_metadata_size(
     block_size: Sectors,
     pool_size: Sectors,
@@ -468,16 +470,22 @@ pub fn thin_metadata_size(
         })?
         .read_to_string(&mut output)?;
     if is_ok {
-        Ok(min(
-            THIN_META_MULT_FACTOR
+        let round = block_size - Sectors(1);
+        let determined_size = Sectors(
+            *(THIN_META_MULT_FACTOR
                 * Sectors(
                     output
                         .trim()
                         .parse::<u64>()
                         .map_err(|e| StratisError::Msg(e.to_string()))?,
-                ),
-            MAX_META_SIZE.sectors(),
-        ))
+                )
+                + round)
+                & !*round,
+        );
+        assert!(determined_size % block_size == Sectors(0));
+        let max = Sectors(*MAX_META_SIZE.sectors() & !*round);
+        assert!(max % block_size == Sectors(0));
+        Ok(min(determined_size, max))
     } else {
         Err(StratisError::Msg(format!(
             "thin_metadata_size failed: {output}"

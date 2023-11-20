@@ -116,6 +116,12 @@ pub struct BaseDevSave {
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BaseBlockDevSave {
     pub uuid: DevUuid,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub raid_meta_allocs: Vec<(Sectors, Sectors)>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub integrity_meta_allocs: Vec<(Sectors, Sectors)>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(serialize_with = "serialize_option_string")]
     pub user_info: Option<String>,

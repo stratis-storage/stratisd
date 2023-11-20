@@ -43,15 +43,15 @@ jobs:
       identifier: cockpit
       trigger: pull_request
       notifications:
-        failure_comment:
-          message: "Cockpit tests failed for commit {commit_sha}. @martinpitt, @jelly, @mvollmer please check."
+          failure_comment:
+              message: "Cockpit tests failed for commit {commit_sha}. @martinpitt, @jelly, @mvollmer please check."
       targets:
-      - fedora-development
+          - fedora-development
       tf_extra_params:
-        environments:
-          - artifacts:
-            - type: repository-file
-              id: https://copr.fedorainfracloud.org/coprs/g/cockpit/main-builds/repo/fedora-$releasever/group_cockpit-main-builds-fedora-$releasever.repo
-            tmt:
-              context:
-                plan: "cockpit"
+          environments:
+              - artifacts:
+                    - type: repository-file
+                      id: https://copr.fedorainfracloud.org/coprs/g/cockpit/main-builds/repo/fedora-$releasever/group_cockpit-main-builds-fedora-$releasever.repo
+                tmt:
+                context:
+                    plan: "cockpit"

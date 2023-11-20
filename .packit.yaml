@@ -9,49 +9,49 @@ upstream_package_name: stratisd
 downstream_package_name: stratisd
 
 actions:
-    post-upstream-clone:
-        - "git clone https://github.com/stratis-storage/ci --depth=1 ../distro"
-        - "mv ../distro/mockbuild_test/stratisd.spec ../distro/stratisd.spec"
-        - "cargo install cargo-version-util"
-        - "cargo install cargo-vendor-filterer"
-    create-archive:
-        - "sh -c 'python3 ../distro/release_management/create_artifacts.py ../distro/ --pre-release --specfile-path=../distro/stratisd.spec stratisd --vendor-method=filtered'"
-    fix-spec-file:
-        - "echo 'skipping automatic fix-spec-file actions'"
-    get-current-version:
-        - "cargo version-util get-version"
+  post-upstream-clone:
+    - "git clone https://github.com/stratis-storage/ci --depth=1 ../distro"
+    - "mv ../distro/mockbuild_test/stratisd.spec ../distro/stratisd.spec"
+    - "cargo install cargo-version-util"
+    - "cargo install cargo-vendor-filterer"
+  create-archive:
+    - "sh -c 'python3 ../distro/release_management/create_artifacts.py ../distro/ --pre-release --specfile-path=../distro/stratisd.spec stratisd --vendor-method=filtered'"
+  fix-spec-file:
+    - "echo 'skipping automatic fix-spec-file actions'"
+  get-current-version:
+    - "cargo version-util get-version"
 
 srpm_build_deps:
-    - git
-    - cargo
-    - openssl-devel
+  - git
+  - cargo
+  - openssl-devel
 
 jobs:
-    - job: copr_build
-      trigger: pull_request
-      targets:
-          - fedora-rawhide
+  - job: copr_build
+    trigger: pull_request
+    targets:
+      - fedora-rawhide
 
-    - job: tests
-      identifier: local
-      trigger: pull_request
-      targets:
-          - fedora-rawhide
+  - job: tests
+    identifier: local
+    trigger: pull_request
+    targets:
+      - fedora-rawhide
 
-    # run Cockpit storage tests, see plans/ with `cockpit == yes`
-    - job: tests
-      identifier: cockpit
-      trigger: pull_request
-      notifications:
-        failure_comment:
-          message: "Cockpit tests failed for commit {commit_sha}. @martinpitt, @jelly, @mvollmer please check."
-      targets:
+  # run Cockpit storage tests, see plans/ with `cockpit == yes`
+  - job: tests
+    identifier: cockpit
+    trigger: pull_request
+    notifications:
+      failure_comment:
+        message: "Cockpit tests failed for commit {commit_sha}. @martinpitt, @jelly, @mvollmer please check."
+    targets:
       - fedora-development
-      tf_extra_params:
-        environments:
-          - artifacts:
+    tf_extra_params:
+      environments:
+        - artifacts:
             - type: repository-file
               id: https://copr.fedorainfracloud.org/coprs/g/cockpit/main-builds/repo/fedora-$releasever/group_cockpit-main-builds-fedora-$releasever.repo
-            tmt:
-              context:
-                plan: "cockpit"
+          tmt:
+            context:
+              plan: "cockpit"

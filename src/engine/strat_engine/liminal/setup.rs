@@ -495,7 +495,14 @@ fn get_blockdev(
     // least the recorded size, so all segments should be
     // available to be allocated. If this fails, the most likely
     // conclusion is metadata corruption.
-    let segments = segment_table.get(&dev_uuid);
+    let segs = segment_table.get(&dev_uuid);
+    let mut segments = vec![];
+    segments.extend(segs.unwrap_or(&vec![]));
+    let meta = data_map.get(&dev_uuid);
+    let raid = meta.map(|base| &base.1.raid_meta_allocs);
+    let integrity = meta.map(|base| &base.1.integrity_meta_allocs);
+    segments.extend(raid.unwrap_or(&vec![]));
+    segments.extend(integrity.unwrap_or(&vec![]));
 
     assert_eq!(info.luks, None);
     Ok((
@@ -503,7 +510,7 @@ fn get_blockdev(
         v2::StratBlockDev::new(
             info.dev_info.device_number,
             bda,
-            segments.unwrap_or(&vec![]),
+            &segments,
             bd_save.user_info.clone(),
             bd_save.hardware_info.clone(),
             devnode,

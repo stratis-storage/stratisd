@@ -8,6 +8,9 @@ on:
     branches:
       - master
     paths:
+      - ".packit.yaml"
+      - "plans/**"
+      - "tests-fmf/**"
       - "**/*.yml"
       - "tests/**"
       - "!tests/**/README.*"
@@ -15,6 +18,9 @@ on:
     branches:
       - master
     paths:
+      - ".packit.yaml"
+      - "plans/**"
+      - "tests-fmf/**"
       - "**/*.yml"
       - "tests/**"
       - "!tests/**/README.*"

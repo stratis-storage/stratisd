@@ -51,6 +51,8 @@ pub struct StratBlockDev {
     devnode: DevicePath,
     new_size: Option<Sectors>,
     blksizes: StratSectorSizes,
+    raid_meta_allocs: Vec<(Sectors, Sectors)>,
+    integrity_meta_allocs: Vec<(Sectors, Sectors)>,
 }
 
 impl StratBlockDev {
@@ -115,6 +117,8 @@ impl StratBlockDev {
             devnode,
             new_size: None,
             blksizes,
+            raid_meta_allocs: Vec::new(),
+            integrity_meta_allocs: Vec::new(),
         })
     }
 
@@ -158,6 +162,18 @@ impl StratBlockDev {
     /// Scan the block device specified by physical_path for its size.
     pub fn scan_blkdev_size(physical_path: &Path) -> StratisResult<Sectors> {
         Ok(blkdev_size(&File::open(physical_path)?)?.sectors())
+    }
+
+    /// Allocate room for metadata from the front of the device.
+    #[allow(dead_code)]
+    fn alloc_meta_front(&mut self, size: Sectors) -> PerDevSegments {
+        self.used.alloc_front(size)
+    }
+
+    /// Allocate room for metadata from the back of the device.
+    #[allow(dead_code)]
+    fn alloc_meta_back(&mut self, size: Sectors) -> PerDevSegments {
+        self.used.alloc_back(size)
     }
 
     /// Set the newly detected size of a block device.
@@ -228,7 +244,7 @@ impl InternalBlockDev for StratBlockDev {
     }
 
     fn alloc(&mut self, size: Sectors) -> PerDevSegments {
-        self.used.alloc(size)
+        self.used.alloc_front(size)
     }
 
     fn calc_new_size(&self) -> StratisResult<Option<Sectors>> {
@@ -376,6 +392,8 @@ impl Recordable<BaseBlockDevSave> for StratBlockDev {
             uuid: self.uuid(),
             user_info: self.user_info.clone(),
             hardware_info: self.hardware_info.clone(),
+            raid_meta_allocs: self.raid_meta_allocs.clone(),
+            integrity_meta_allocs: self.integrity_meta_allocs.clone(),
         }
     }
 }

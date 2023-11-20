@@ -374,7 +374,7 @@ impl InternalBlockDev for StratBlockDev {
     }
 
     fn alloc(&mut self, size: Sectors) -> PerDevSegments {
-        self.used.alloc(size)
+        self.used.alloc_front(size)
     }
 
     fn calc_new_size(&self) -> StratisResult<Option<Sectors>> {
@@ -595,6 +595,8 @@ impl Recordable<BaseBlockDevSave> for StratBlockDev {
             uuid: self.uuid(),
             user_info: self.user_info.clone(),
             hardware_info: self.hardware_info.clone(),
+            raid_meta_allocs: Vec::new(),
+            integrity_meta_allocs: Vec::new(),
         }
     }
 }

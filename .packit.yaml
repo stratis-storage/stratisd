@@ -53,5 +53,5 @@ jobs:
                     - type: repository-file
                       id: https://copr.fedorainfracloud.org/coprs/g/cockpit/main-builds/repo/fedora-$releasever/group_cockpit-main-builds-fedora-$releasever.repo
                 tmt:
-                context:
-                    plan: "cockpit"
+                    context:
+                        plan: "cockpit"

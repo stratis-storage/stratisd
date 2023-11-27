@@ -29,7 +29,7 @@ jobs:
             components: cargo
     runs-on: ubuntu-22.04
     container:
-      image: fedora:38  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev
     steps:
       - uses: actions/checkout@v3
@@ -64,7 +64,7 @@ jobs:
             components: cargo
     runs-on: ubuntu-22.04
     container:
-      image: fedora:38  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev --ipc=host
     steps:
       - uses: actions/checkout@v3
@@ -111,7 +111,7 @@ jobs:
               make -f Makefile test-clevis-loop-valgrind
             toolchain: 1.74.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-            image: fedora:38  # CURRENT DEVELOPMENT ENVIRONMENT
+            image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
     runs-on: ubuntu-22.04
     container:
       image: ${{ matrix.image }}
@@ -119,7 +119,7 @@ jobs:
     services:
       tang:
         # yamllint disable rule:line-length
-        image: ghcr.io/stratis-storage/stratisd/tang:38  # CURRENT DEVELOPMENT ENVIRONMENT
+        image: ghcr.io/stratis-storage/stratisd/tang:39  # CURRENT DEVELOPMENT ENVIRONMENT
         credentials:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
@@ -216,12 +216,12 @@ jobs:
   python-based-checks_with_tang:
     runs-on: ubuntu-22.04
     container:
-      image: fedora:38  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev --userns=host --ipc=host -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1 -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev
     services:
       tang:
         # yamllint disable rule:line-length
-        image: ghcr.io/stratis-storage/stratisd/tang:38  # CURRENT DEVELOPMENT ENVIRONMENT
+        image: ghcr.io/stratis-storage/stratisd/tang:39  # CURRENT DEVELOPMENT ENVIRONMENT
         credentials:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}

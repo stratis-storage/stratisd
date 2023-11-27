@@ -55,7 +55,7 @@ jobs:
             task: make -f Makefile yamllint tmtlint
             working-directory: .
     runs-on: ubuntu-22.04
-    container: fedora:38  # CURRENT DEVELOPMENT ENVIRONMENT
+    container: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies

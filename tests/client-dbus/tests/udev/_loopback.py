@@ -207,7 +207,7 @@ class LoopBackDevices:
         Detach loopbacks and remove backing files
         :return:
         """
-        for (device, backing_file) in self.devices.values():
+        for device, backing_file in self.devices.values():
             if device is not None:
                 subprocess.check_call([_LOSETUP_BIN, "-d", device])
             os.remove(backing_file)

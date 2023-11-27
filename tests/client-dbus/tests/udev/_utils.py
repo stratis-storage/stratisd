@@ -326,7 +326,7 @@ class KernelKey:
         :raises RuntimeError: if setting a key in the keyring through stratisd
                               fails
         """
-        for (key_desc, key_data) in self._key_descs:
+        for key_desc, key_data in self._key_descs:
             with NamedTemporaryFile(mode="w") as temp_file:
                 temp_file.write(key_data)
                 temp_file.flush()
@@ -349,7 +349,7 @@ class KernelKey:
 
     def __exit__(self, exception_type, exception_value, traceback):
         try:
-            for (key_desc, _) in reversed(self._key_descs):
+            for key_desc, _ in reversed(self._key_descs):
                 (_, return_code, message) = Manager.Methods.UnsetKey(
                     get_object(TOP_OBJECT), {"key_desc": key_desc}
                 )

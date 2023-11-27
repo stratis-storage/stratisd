@@ -117,7 +117,11 @@ def _possibly_add_filesystems(pool_object_path, *, fs_specs=None):
         if not real:
             raise RuntimeError("Failed to get pool usage before creating filesystems.")
 
-        (_, return_code, message,) = Pool.Methods.CreateFilesystems(
+        (
+            _,
+            return_code,
+            message,
+        ) = Pool.Methods.CreateFilesystems(
             pool_proxy,
             {"specs": map(lambda x: (x[0], (True, str(x[1].magnitude))), fs_specs)},
         )

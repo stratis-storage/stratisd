@@ -244,6 +244,15 @@ pub fn create_fs(devnode: &Path, uuid: Option<StratisUuid>) -> StratisResult<()>
         command.arg("-m");
         command.arg(format!("uuid={uuid}"));
     }
+
+    // Use smaller size extent counters. Note that the size of the extent
+    // counters can be increased using an xfs_repair command, although this can
+    // be a costly operation. If a filesystem is created with the larger size
+    // extent counters, which is the default for mkfs.xfs >= 6.5.0, then it
+    // will be unmountable on kernels which do not support the larger size.
+    command.arg("-i");
+    command.arg("nrext64=0");
+
     execute_cmd(&mut command)
 }
 

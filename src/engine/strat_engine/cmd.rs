@@ -233,12 +233,8 @@ fn get_clevis_executable(name: &str) -> StratisResult<PathBuf> {
 }
 
 /// Create a filesystem on devnode. If uuid specified, set the UUID of the
-/// filesystem on creation. If 'noalign', set the noalign option.
-/// NOTE: It used to be desirable to set the noalign option when creating the
-/// MDV, because it was very small; since then the size of the MDV has been
-/// increased, and it is no longer necessary to pass the noalign option when
-/// creating the MDV.
-pub fn create_fs(devnode: &Path, uuid: Option<StratisUuid>, noalign: bool) -> StratisResult<()> {
+/// filesystem on creation.
+pub fn create_fs(devnode: &Path, uuid: Option<StratisUuid>) -> StratisResult<()> {
     let mut command = Command::new(get_executable(MKFS_XFS).as_os_str());
     command.arg("-f");
     command.arg("-q");
@@ -247,10 +243,6 @@ pub fn create_fs(devnode: &Path, uuid: Option<StratisUuid>, noalign: bool) -> St
     if let Some(uuid) = uuid {
         command.arg("-m");
         command.arg(format!("uuid={uuid}"));
-    }
-    if noalign {
-        command.arg("-d");
-        command.arg("noalign");
     }
     execute_cmd(&mut command)
 }

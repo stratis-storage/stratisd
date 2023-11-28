@@ -88,7 +88,7 @@ impl StratFilesystem {
         let mut thin_dev =
             ThinDev::new(get_dm(), &dm_name, Some(&dm_uuid), size, thinpool_dev, id)?;
 
-        if let Err(err) = create_fs(&thin_dev.devnode(), Some(StratisUuid::Fs(fs_uuid)), false) {
+        if let Err(err) = create_fs(&thin_dev.devnode(), Some(StratisUuid::Fs(fs_uuid))) {
             if let Err(err2) = retry_with_index(Fixed::from_millis(100).take(4), |i| {
                 trace!(
                     "Cleanup new thin device after failed create_fs() attempt {}",

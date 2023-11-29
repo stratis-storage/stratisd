@@ -699,7 +699,7 @@ mod tests {
         }
 
         for path in paths {
-            create_fs(path, None, false).unwrap();
+            create_fs(path, None).unwrap();
             let device_path = DevicePath::new(path).expect("our test path");
             assert_eq!(
                 block_device_apply(&device_path, process_stratis_device)

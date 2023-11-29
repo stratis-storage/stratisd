@@ -77,7 +77,7 @@ jobs:
           - tag: v3.0.0
     runs-on: ubuntu-22.04
     container:
-      image: fedora:38  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v3

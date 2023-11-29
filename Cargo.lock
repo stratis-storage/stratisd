@@ -1305,6 +1305,7 @@ dependencies = [
  "rand",
  "regex",
  "retry",
+ "semver",
  "serde",
  "serde_derive",
  "serde_json",

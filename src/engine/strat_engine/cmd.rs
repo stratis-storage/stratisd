@@ -25,6 +25,7 @@ use std::{
 use either::Either;
 use libc::c_uint;
 use libcryptsetup_rs::SafeMemHandle;
+use semver::{Version, VersionReq};
 use serde_json::Value;
 
 use devicemapper::{MetaBlocks, Sectors};
@@ -271,29 +272,22 @@ pub fn create_fs(devnode: &Path, uuid: Option<StratisUuid>) -> StratisResult<()>
     // version of mkfs.xfs is new enough to use the nrext64 option. This will
     // become more and more true with time. If the version is not high enough,
     // this will be obvious when the command-line invocation fails.
-    // The check only verifies that the major number is greater than 5, because
-    // before that time, the larger extent counter size was not used by default,
-    // so, for earlier versions, it is unnecessary to turn it off explicitly.
-    // Choose not to use a semantic version package, because there is no Rust
-    // package availabe that necessarily adheres to the xfsprogs versioning
-    // scheme.
+    // The nrext64 option became available in xfsprogs 5.19.0-rc0 and the
+    // larger extent counter size began to be used by default in xfsprogs
+    // 6.5.0. This code sets the option when the xfsprogs version is at least
+    // 6.0.0, i.e., slightly after it was introduced and a deal before it
+    // became the default.
     let use_nrext64_option = match get_mkfs_xfs_version().and_then(|v| {
-        v.split('.')
-            .next()
-            .ok_or_else(|| {
-                StratisError::Msg(
-                    "Unable to parse major version number from version string".to_string(),
-                )
+        v.parse::<Version>()
+            .map_err(|_| {
+                StratisError::Msg(format!(
+                    "Unable to parse version number from version string {v}"
+                ))
             })
-            .and_then(|n| {
-                n.parse::<u64>()
-                    .map_err(|_| {
-                        StratisError::Msg(
-                            "Unable to parse major version number from major version string"
-                                .to_string(),
-                        )
-                    })
-                    .map(|r| r > 5u64)
+            .map(|v| {
+                VersionReq::parse(">=6.0.0")
+                    .expect("req string is valid")
+                    .matches(&v)
             })
     }) {
         Ok(val) => val,

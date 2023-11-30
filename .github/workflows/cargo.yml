@@ -29,7 +29,7 @@ jobs:
   checks-with-ci-repo:
     runs-on: ubuntu-22.04
     container:
-      image: fedora:38  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v3
       - name: Install dependencies for Fedora
@@ -51,7 +51,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.73.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.74.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - name: Check out ci repo
         run: git clone https://github.com/stratis-storage/ci.git
       - name: Run comparisons of version specs with available Fedora packages

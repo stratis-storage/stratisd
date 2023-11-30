@@ -1,3 +1,26 @@
+stratisd 3.6.3
+==============
+Recommended Rust toolchain version: 1.74.0
+Recommended development platform for Python development: Fedora 39
+
+- Cherry-picked commits:
+  * Fix clippy 1.74 errors
+  * packit.yaml: fix indentation
+  * support.yml: trigger on packit and tmt changes
+  * Fix up excludes for tests-fmf
+  * Re-indent .packit.yaml
+  * github actions: update recommended Rust to 1.74.0
+  * Tidy up targets key
+  * Use fedora-all for our tests
+  * Advance current development environment to Fedora 39
+  * Leave tang container as F38
+  * Apply formatting changes from black 23.7.0
+  * Remove obsolete parameter
+  * Unconditionally add nrext64=0 to inode options
+  * Check the mkfs.xfs version
+  * Use semver crate to compare versions
+
+
 stratisd 3.6.2
 ==============
 Recommended Rust toolchain version: 1.73.0

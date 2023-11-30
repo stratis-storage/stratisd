@@ -25,6 +25,7 @@ use std::{
 use either::Either;
 use libc::c_uint;
 use libcryptsetup_rs::SafeMemHandle;
+use semver::{Version, VersionReq};
 use serde_json::Value;
 
 use devicemapper::{MetaBlocks, Sectors};
@@ -232,13 +233,70 @@ fn get_clevis_executable(name: &str) -> StratisResult<PathBuf> {
     }
 }
 
+// Return the mkfs.xfs version reported by the "-V" option as a string.
+fn get_mkfs_xfs_version() -> StratisResult<String> {
+    let mut command = Command::new(get_executable(MKFS_XFS).as_os_str())
+        .arg("-V")
+        .stdout(Stdio::piped())
+        .spawn()?;
+    command.wait()?;
+
+    let mut output = String::new();
+    let is_ok = command.wait()?.code() == Some(0);
+    command
+        .stdout
+        .ok_or_else(|| {
+            StratisError::Msg("Could not read string value from xfs.mkfs output".to_string())
+        })?
+        .read_to_string(&mut output)?;
+
+    if is_ok {
+        output
+            .trim()
+            .strip_prefix("mkfs.xfs version ")
+            .ok_or_else(|| {
+                StratisError::Msg("Could not parse version string from mkfs.xfs output".to_string())
+            })
+            .map(|v| v.to_string())
+    } else {
+        Err(StratisError::Msg(
+            "\"mkfs.xfs -V\" returned an error".to_string(),
+        ))
+    }
+}
+
 /// Create a filesystem on devnode. If uuid specified, set the UUID of the
-/// filesystem on creation. If 'noalign', set the noalign option.
-/// NOTE: It used to be desirable to set the noalign option when creating the
-/// MDV, because it was very small; since then the size of the MDV has been
-/// increased, and it is no longer necessary to pass the noalign option when
-/// creating the MDV.
-pub fn create_fs(devnode: &Path, uuid: Option<StratisUuid>, noalign: bool) -> StratisResult<()> {
+/// filesystem on creation.
+pub fn create_fs(devnode: &Path, uuid: Option<StratisUuid>) -> StratisResult<()> {
+    // If the version can not be obtained, which is unlikely, assume that the
+    // version of mkfs.xfs is new enough to use the nrext64 option. This will
+    // become more and more true with time. If the version is not high enough,
+    // this will be obvious when the command-line invocation fails.
+    // The nrext64 option became available in xfsprogs 5.19.0-rc0 and the
+    // larger extent counter size began to be used by default in xfsprogs
+    // 6.5.0. This code sets the option when the xfsprogs version is at least
+    // 6.0.0, i.e., slightly after it was introduced and a deal before it
+    // became the default.
+    let use_nrext64_option = match get_mkfs_xfs_version().and_then(|v| {
+        v.parse::<Version>()
+            .map_err(|_| {
+                StratisError::Msg(format!(
+                    "Unable to parse version number from version string {v}"
+                ))
+            })
+            .map(|v| {
+                VersionReq::parse(">=6.0.0")
+                    .expect("req string is valid")
+                    .matches(&v)
+            })
+    }) {
+        Ok(val) => val,
+        Err(err) => {
+            warn!("Unable to read version of mkfs.xfs: {err}; guessing that mkfs.xfs version is high enough to support nrext64 option");
+            true
+        }
+    };
+
     let mut command = Command::new(get_executable(MKFS_XFS).as_os_str());
     command.arg("-f");
     command.arg("-q");
@@ -248,10 +306,17 @@ pub fn create_fs(devnode: &Path, uuid: Option<StratisUuid>, noalign: bool) -> St
         command.arg("-m");
         command.arg(format!("uuid={uuid}"));
     }
-    if noalign {
-        command.arg("-d");
-        command.arg("noalign");
+
+    // Use smaller size extent counters. Note that the size of the extent
+    // counters can be increased using an xfs_repair command, although this can
+    // be a costly operation. If a filesystem is created with the larger size
+    // extent counters, which is the default for mkfs.xfs >= 6.0.0, then it
+    // will be unmountable on kernels which do not support the larger size.
+    if use_nrext64_option {
+        command.arg("-i");
+        command.arg("nrext64=0");
     }
+
     execute_cmd(&mut command)
 }
 

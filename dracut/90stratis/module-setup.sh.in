@@ -3,7 +3,7 @@
 # called by dracut
 check() {
 	require_binaries stratis-min \
-		/usr/libexec/stratisd-min \
+		@LIBEXECDIR@/stratisd-min \
 		$systemdutildir/system-generators/stratis-setup-generator \
 		thin_check \
 		thin_repair \
@@ -34,7 +34,7 @@ installkernel() {
 install() {
 	# Stratis dependencies
 	inst_multiple stratis-min \
-		/usr/libexec/stratisd-min \
+		@LIBEXECDIR@/stratisd-min \
 		thin_check \
 		thin_repair \
 		mkfs.xfs \

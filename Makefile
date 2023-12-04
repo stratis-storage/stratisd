@@ -294,9 +294,9 @@ install-dbus-cfg:
 install-dracut-cfg:
 	mkdir -p $(DESTDIR)$(DRACUTDIR)/modules.d
 	$(INSTALL) -Dpm0755 -d $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis
-	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/module-setup.sh
+	sed 's|@LIBEXECDIR@|$(LIBEXECDIR)|' dracut/90stratis/stratisd-min.service.in > $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis/stratisd-min.service
+	sed 's|@LIBEXECDIR@|$(LIBEXECDIR)|' dracut/90stratis/module-setup.sh.in > $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis/module-setup.sh
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/stratis-rootfs-setup
-	$(INSTALL) -Dpm0644 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/stratisd-min.service
 	$(INSTALL) -Dpm0644 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis dracut/90stratis/61-stratisd.rules
 	$(INSTALL) -Dpm0755 -d $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis-clevis
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(DRACUTDIR)/modules.d/90stratis-clevis dracut/90stratis-clevis/module-setup.sh

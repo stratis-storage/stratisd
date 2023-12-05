@@ -1,3 +1,50 @@
+stratisd 3.7.0 (UNRELEASED)
+===========================
+Recommended Rust toolchain version: 1.73.0
+Recommended development platform for Python development: Fedora 39
+
+- Increase D-Bus revision number to 6:
+  https://github.com/stratis-storage/stratisd/pull/3483
+
+- Fix behavior where key is checked when unlock method is Clevis:
+  https://github.com/stratis-storage/stratisd/pull/3486
+
+- Fix a misalignment that may occur when extending the thin pool:
+  https://github.com/stratis-storage/stratisd/pull/3494
+
+- Specify nrext64 option as 0 when creating XFS filesystem:
+  https://github.com/stratis-storage/stratisd/pull/3511
+
+- Simplify allocation procedure:
+  https://github.com/stratis-storage/stratisd/pull/3491
+
+- Increase nix dependency lower bound to 0.27.1:
+  https://github.com/stratis-storage/stratisd/pull/3500
+
+- Increase version of rustix dependency to 0.37.25:
+  https://github.com/stratis-storage/stratisd/pull/3489
+
+- Use LIBEXECDIR as a substitution variable in all scripts:
+  https://github.com/stratis-storage/stratisd/pull/3514
+
+- Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3518
+  https://github.com/stratis-storage/stratisd/pull/3513
+  https://github.com/stratis-storage/stratisd/pull/3510
+  https://github.com/stratis-storage/stratisd/pull/3509
+  https://github.com/stratis-storage/stratisd/pull/3508
+  https://github.com/stratis-storage/stratisd/pull/3507
+  https://github.com/stratis-storage/stratisd/pull/3505
+  https://github.com/stratis-storage/stratisd/pull/3503
+  https://github.com/stratis-storage/stratisd/pull/3502
+  https://github.com/stratis-storage/stratisd/pull/3496
+  https://github.com/stratis-storage/stratisd/pull/3495
+  https://github.com/stratis-storage/stratisd/pull/3492
+  https://github.com/stratis-storage/stratisd/pull/3488
+  https://github.com/stratis-storage/stratisd/pull/3484
+  https://github.com/stratis-storage/stratisd/pull/3477
+
+
 stratisd 3.6.0
 ==============
 Recommended Rust toolchain version: 1.73.0

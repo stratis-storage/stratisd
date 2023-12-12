@@ -243,7 +243,7 @@ impl Pool for SimPool {
         for (name, (size, size_limit)) in spec_map {
             if !self.filesystems.contains_name(name) {
                 let uuid = FilesystemUuid::new_v4();
-                let new_filesystem = SimFilesystem::new(size, size_limit)?;
+                let new_filesystem = SimFilesystem::new(size, size_limit, None)?;
                 self.filesystems
                     .insert(Name::new((name).to_owned()), uuid, new_filesystem);
                 result.push((name, uuid, size));
@@ -534,7 +534,11 @@ impl Pool for SimPool {
                         return Ok(CreateAction::Identity);
                     }
                 }
-                SimFilesystem::new(filesystem.size(), filesystem.size_limit())?
+                SimFilesystem::new(
+                    filesystem.size(),
+                    filesystem.size_limit(),
+                    Some(origin_uuid),
+                )?
             }
             None => {
                 return Err(StratisError::Msg(origin_uuid.to_string()));

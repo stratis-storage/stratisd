@@ -10,7 +10,7 @@ use serde_json::{Map, Value};
 use devicemapper::{Bytes, Sectors};
 
 use crate::{
-    engine::Filesystem,
+    engine::{types::FilesystemUuid, Filesystem},
     stratis::{StratisError, StratisResult},
 };
 
@@ -20,10 +20,15 @@ pub struct SimFilesystem {
     created: DateTime<Utc>,
     size: Sectors,
     size_limit: Option<Sectors>,
+    origin: Option<FilesystemUuid>,
 }
 
 impl SimFilesystem {
-    pub fn new(size: Sectors, size_limit: Option<Sectors>) -> StratisResult<SimFilesystem> {
+    pub fn new(
+        size: Sectors,
+        size_limit: Option<Sectors>,
+        origin: Option<FilesystemUuid>,
+    ) -> StratisResult<SimFilesystem> {
         if let Some(limit) = size_limit {
             if limit < size {
                 return Err(StratisError::Msg(format!(
@@ -36,6 +41,7 @@ impl SimFilesystem {
             created: Utc::now(),
             size,
             size_limit,
+            origin,
         })
     }
 
@@ -88,6 +94,10 @@ impl Filesystem for SimFilesystem {
 
     fn size_limit(&self) -> Option<Sectors> {
         self.size_limit
+    }
+
+    fn origin(&self) -> Option<FilesystemUuid> {
+        self.origin
     }
 }
 

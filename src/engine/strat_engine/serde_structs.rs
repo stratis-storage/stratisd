@@ -119,4 +119,6 @@ pub struct FilesystemSave {
     pub created: u64, // Unix timestamp
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fs_size_limit: Option<Sectors>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub origin: Option<FilesystemUuid>,
 }

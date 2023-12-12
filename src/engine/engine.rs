@@ -93,6 +93,9 @@ pub trait Filesystem: Debug {
 
     /// Get filesystem size limit.
     fn size_limit(&self) -> Option<Sectors>;
+
+    /// Get filesystem snapshot origin.
+    fn origin(&self) -> Option<FilesystemUuid>;
 }
 
 pub trait BlockDev: Debug {

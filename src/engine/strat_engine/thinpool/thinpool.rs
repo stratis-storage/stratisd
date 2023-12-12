@@ -1253,6 +1253,7 @@ impl ThinPool {
                 &fs_name,
                 snapshot_fs_uuid,
                 snapshot_id,
+                origin_uuid,
             )?,
             None => {
                 return Err(StratisError::Msg(

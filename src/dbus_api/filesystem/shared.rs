@@ -202,3 +202,8 @@ pub fn fs_size_prop(fs: &dyn Filesystem) -> String {
 pub fn fs_used_prop(fs: &dyn Filesystem) -> (bool, String) {
     prop_conv::fs_used_to_prop(fs.used().ok())
 }
+
+/// Generate D-Bus representation of origin property.
+pub fn fs_origin_prop(fs: &dyn Filesystem) -> (bool, String) {
+    prop_conv::fs_origin_to_prop(fs.origin())
+}

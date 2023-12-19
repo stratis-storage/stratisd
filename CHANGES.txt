@@ -1,6 +1,6 @@
 stratisd 3.7.0 (UNRELEASED)
 ===========================
-Recommended Rust toolchain version: 1.73.0
+Recommended Rust toolchain version: 1.74.1
 Recommended development platform for Python development: Fedora 39
 
 - Increase D-Bus revision number to 6:

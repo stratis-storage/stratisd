@@ -413,17 +413,6 @@ dependencies = [
 
 [[package]]
 name = "errno"
-version = "0.2.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f639046355ee4f37944e44f60642c6f3a7efa3cf6b78c78a0d989a8ce6c396a1"
-dependencies = [
- "errno-dragonfly",
- "libc",
- "winapi",
-]
-
-[[package]]
-name = "errno"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4bcfec3a70f97c962c307b2d2c56e358cf1d00b558d74262b5f929ee8cc7e73a"
@@ -837,12 +826,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b06a4cde4c0f271a446782e3eff8de789548ce57dbc8eca9292c27f4a42004b4"
 
 [[package]]
-name = "loopdev"
-version = "0.4.0"
-source = "git+https://github.com/mulkieran/loopdev?branch=bump-bindgen-reduce-version-0.68.1#63e6105d5599d9df00041de873d7fc91f53b9f20"
+name = "loopdev-3"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "378e7ca4e85e592564e6a96c362303972b5c7860367014383aadc10a8704fc38"
 dependencies = [
  "bindgen",
- "errno 0.2.8",
+ "errno",
  "libc",
 ]
 
@@ -1175,7 +1165,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d4eb579851244c2c03e7c24f501c3432bed80b8f720af1d6e5b0e0f01555a035"
 dependencies = [
  "bitflags 1.3.2",
- "errno 0.3.1",
+ "errno",
  "io-lifetimes",
  "libc",
  "linux-raw-sys",
@@ -1317,7 +1307,7 @@ dependencies = [
  "libmount",
  "libudev",
  "log",
- "loopdev",
+ "loopdev-3",
  "nix 0.27.1",
  "pkg-config",
  "predicates",

@@ -574,7 +574,7 @@ impl Display for DeleteAction<Key> {
     }
 }
 
-/// An action which may create multiple things.
+/// An action which may delete multiple things.
 #[derive(Debug, PartialEq, Eq)]
 pub struct SetDeleteAction<T> {
     changed: Vec<T>,

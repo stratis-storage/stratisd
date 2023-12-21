@@ -1011,7 +1011,29 @@ impl Pool for StratPool {
             }
         }
 
-        Ok(SetDeleteAction::new(removed, vec![]))
+        let snapshots: Vec<FilesystemUuid> = self
+            .thin_pool
+            .filesystems()
+            .iter()
+            .filter_map(|(_, u, fs)| {
+                fs.origin()
+                    .and_then(|x| if removed.contains(&x) { Some(*u) } else { None })
+            })
+            .collect();
+
+        let mut updated_origins = vec![];
+        for sn_uuid in snapshots {
+            if let Err(err) = self.thin_pool.unset_fs_origin(sn_uuid) {
+                warn!(
+                    "Failed to write null origin to metadata for filesystem with UUID {}: {}",
+                    sn_uuid, err
+                );
+            } else {
+                updated_origins.push(sn_uuid);
+            }
+        }
+
+        Ok(SetDeleteAction::new(removed, updated_origins))
     }
 
     #[pool_mutating_action("NoRequests")]

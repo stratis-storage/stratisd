@@ -1577,6 +1577,22 @@ impl ThinPool {
         }
         Ok(changed)
     }
+
+    pub fn unset_fs_origin(&mut self, fs_uuid: FilesystemUuid) -> StratisResult<bool> {
+        let changed = {
+            let (_, fs) = self.get_mut_filesystem_by_uuid(fs_uuid).ok_or_else(|| {
+                StratisError::Msg(format!("No filesystem with UUID {fs_uuid} found"))
+            })?;
+            fs.unset_origin()
+        };
+        if changed {
+            let (name, fs) = self
+                .get_filesystem_by_uuid(fs_uuid)
+                .expect("Looked up above.");
+            self.mdv.save_fs(&name, fs_uuid, fs)?;
+        }
+        Ok(changed)
+    }
 }
 
 impl<'a> Into<Value> for &'a ThinPool {

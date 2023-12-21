@@ -67,6 +67,12 @@ impl SimFilesystem {
             }
         }
     }
+
+    pub fn unset_origin(&mut self) -> bool {
+        let changed = self.origin.is_some();
+        self.origin = None;
+        changed
+    }
 }
 
 impl Filesystem for SimFilesystem {

@@ -1003,7 +1003,7 @@ impl Pool for StratPool {
         &mut self,
         pool_name: &str,
         fs_uuids: &[FilesystemUuid],
-    ) -> StratisResult<SetDeleteAction<FilesystemUuid>> {
+    ) -> StratisResult<SetDeleteAction<FilesystemUuid, FilesystemUuid>> {
         let mut removed = Vec::new();
         for &uuid in fs_uuids {
             if let Some(uuid) = self.thin_pool.destroy_filesystem(pool_name, uuid)? {
@@ -1011,7 +1011,7 @@ impl Pool for StratPool {
             }
         }
 
-        Ok(SetDeleteAction::new(removed))
+        Ok(SetDeleteAction::new(removed, vec![]))
     }
 
     #[pool_mutating_action("NoRequests")]

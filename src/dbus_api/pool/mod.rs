@@ -18,6 +18,7 @@ mod pool_3_1;
 mod pool_3_3;
 mod pool_3_5;
 mod pool_3_6;
+mod pool_3_7;
 pub mod prop_conv;
 mod shared;
 
@@ -245,7 +246,7 @@ pub fn create_dbus_pool<'a>(
         .add(
             f.interface(consts::POOL_INTERFACE_NAME_3_7, ())
                 .add_m(pool_3_6::create_filesystems_method(&f))
-                .add_m(pool_3_0::destroy_filesystems_method(&f))
+                .add_m(pool_3_7::destroy_filesystems_method(&f))
                 .add_m(pool_3_0::snapshot_filesystem_method(&f))
                 .add_m(pool_3_0::add_blockdevs_method(&f))
                 .add_m(pool_3_0::bind_clevis_method(&f))

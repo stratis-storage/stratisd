@@ -476,14 +476,15 @@ impl Pool for SimPool {
         &mut self,
         _pool_name: &str,
         fs_uuids: &[FilesystemUuid],
-    ) -> StratisResult<SetDeleteAction<FilesystemUuid>> {
+    ) -> StratisResult<SetDeleteAction<FilesystemUuid, FilesystemUuid>> {
         let mut removed = Vec::new();
         for &uuid in fs_uuids {
             if self.filesystems.remove_by_uuid(uuid).is_some() {
                 removed.push(uuid);
             }
         }
-        Ok(SetDeleteAction::new(removed))
+
+        Ok(SetDeleteAction::new(removed, vec![]))
     }
 
     fn rename_filesystem(
@@ -884,7 +885,7 @@ mod tests {
             .unwrap();
         let fs_uuid = fs_results[0].1;
         assert!(match pool.destroy_filesystems(pool_name, &[fs_uuid]) {
-            Ok(filesystems) => filesystems == SetDeleteAction::new(vec![fs_uuid]),
+            Ok(filesystems) => filesystems == SetDeleteAction::new(vec![fs_uuid], vec![]),
             _ => false,
         });
     }

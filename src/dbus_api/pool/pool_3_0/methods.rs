@@ -177,7 +177,7 @@ pub fn destroy_filesystems(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodRe
         Ok(uuids) => {
             // Only get changed values here as non-existent filesystems will have been filtered out
             // before calling destroy_filesystems
-            let uuid_vec: Vec<String> = if let Some(ref changed_uuids) = uuids.changed() {
+            let uuid_vec: Vec<String> = if let Some((ref changed_uuids, _)) = uuids.changed() {
                 for uuid in changed_uuids {
                     let op = filesystem_map
                         .get(uuid)

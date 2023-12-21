@@ -426,6 +426,12 @@ impl StratFilesystem {
     pub fn thindev_size(&self) -> Sectors {
         self.thin_dev.size()
     }
+
+    pub fn unset_origin(&mut self) -> bool {
+        let changed = self.origin.is_some();
+        self.origin = None;
+        changed
+    }
 }
 
 impl Filesystem for StratFilesystem {

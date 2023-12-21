@@ -118,6 +118,13 @@ impl SimPool {
             Ok(())
         }
     }
+
+    fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut SimFilesystem)> {
+        self.filesystems
+            .iter_mut()
+            .map(|(name, uuid, x)| (name.clone(), *uuid, x))
+            .collect()
+    }
 }
 
 // Precondition: SimDev::into() always returns a value that matches Value::Object(_).
@@ -484,7 +491,25 @@ impl Pool for SimPool {
             }
         }
 
-        Ok(SetDeleteAction::new(removed, vec![]))
+        let updated_origins: Vec<FilesystemUuid> = self
+            .filesystems_mut()
+            .iter_mut()
+            .filter_map(|(_, u, fs)| {
+                fs.origin().and_then(|x| {
+                    if removed.contains(&x) {
+                        if fs.unset_origin() {
+                            Some(*u)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect();
+
+        Ok(SetDeleteAction::new(removed, updated_origins))
     }
 
     fn rename_filesystem(

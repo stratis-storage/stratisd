@@ -106,6 +106,7 @@ pub enum DbusAction {
     StoppedPoolsChange(StoppedPoolsInfo),
     BlockdevUserInfoChange(Path<'static>, Option<String>),
     BlockdevTotalPhysicalSizeChange(Path<'static>, Sectors),
+    FsOriginChange(Path<'static>),
     FsSizeLimitChange(Path<'static>, Option<Sectors>),
     FsBackgroundChange(
         FilesystemUuid,
@@ -483,6 +484,16 @@ impl DbusContext {
         )) {
             warn!(
                 "Pool foreground change event could not be sent to the processing thread; no signal will be sent out for the pool allocated size state change: {}",
+                e,
+            )
+        }
+    }
+
+    /// Send changed signal for changed filesystem origin property.
+    pub fn push_filesystem_origin_change(&self, path: &Path<'static>) {
+        if let Err(e) = self.sender.send(DbusAction::FsOriginChange(path.clone())) {
+            warn!(
+                "Filesystem origin change event could not be sent to the processing thread; no signal will be sent out for the filesystem origin state change: {}",
                 e,
             )
         }

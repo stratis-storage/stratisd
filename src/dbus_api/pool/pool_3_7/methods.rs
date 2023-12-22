@@ -13,7 +13,7 @@ use crate::{
         types::{DbusErrorEnum, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg},
     },
-    engine::{EngineAction, FilesystemUuid},
+    engine::{EngineAction, FilesystemUuid, StratisUuid},
 };
 
 pub fn destroy_filesystems(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
@@ -65,20 +65,34 @@ pub fn destroy_filesystems(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodRe
         Ok(uuids) => {
             // Only get changed values here as non-existent filesystems will have been filtered out
             // before calling destroy_filesystems
-            let uuid_vec: Vec<String> = if let Some((ref changed_uuids, _)) = uuids.changed() {
-                for uuid in changed_uuids {
-                    let op = filesystem_map
-                        .get(uuid)
-                        .expect("'uuids' is a subset of filesystem_map.keys()");
-                    dbus_context.push_remove(op, filesystem_interface_list());
-                }
-                changed_uuids
-                    .iter()
-                    .map(|uuid| uuid_to_string!(uuid))
-                    .collect()
-            } else {
-                Vec::new()
-            };
+            let uuid_vec: Vec<String> =
+                if let Some((ref changed_uuids, ref updated_uuids)) = uuids.changed() {
+                    for uuid in changed_uuids {
+                        let op = filesystem_map
+                            .get(uuid)
+                            .expect("'uuids' is a subset of filesystem_map.keys()");
+                        dbus_context.push_remove(op, filesystem_interface_list());
+                    }
+
+                    for sn_op in m.tree.iter().filter(|op| {
+                        op.get_data()
+                            .as_ref()
+                            .map(|data| match data.uuid {
+                                StratisUuid::Fs(uuid) => updated_uuids.contains(&uuid),
+                                _ => false,
+                            })
+                            .unwrap_or(false)
+                    }) {
+                        dbus_context.push_filesystem_origin_change(sn_op.get_name());
+                    }
+
+                    changed_uuids
+                        .iter()
+                        .map(|uuid| uuid_to_string!(uuid))
+                        .collect()
+                } else {
+                    Vec::new()
+                };
             return_message.append3(
                 (true, uuid_vec),
                 DbusErrorEnum::OK as u16,

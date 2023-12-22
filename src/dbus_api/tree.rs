@@ -30,7 +30,9 @@ use crate::{
             blockdev_user_info_to_prop,
         },
         consts,
-        filesystem::prop_conv::{fs_size_limit_to_prop, fs_size_to_prop, fs_used_to_prop},
+        filesystem::prop_conv::{
+            fs_origin_to_prop, fs_size_limit_to_prop, fs_size_to_prop, fs_used_to_prop,
+        },
         pool::prop_conv::{
             avail_actions_to_prop, clevis_info_to_prop, key_desc_to_prop, pool_alloc_to_prop,
             pool_size_to_prop, pool_used_to_prop,
@@ -198,6 +200,25 @@ impl DbusTreeHandler {
             .is_err()
         {
             warn!("Signal on filesystem name change was not sent to the D-Bus client");
+        }
+    }
+
+    fn handle_fs_origin_change(&self, item: Path<'static>) {
+        let origin_prop = fs_origin_to_prop(None);
+        if self
+            .property_changed_invalidated_signal(
+                &item,
+                prop_hashmap! {
+                    consts::FILESYSTEM_INTERFACE_NAME_3_7 => {
+                        vec![],
+                        consts::FILESYSTEM_ORIGIN_PROP.to_string() =>
+                        box_variant!(origin_prop.clone())
+                    }
+                },
+            )
+            .is_err()
+        {
+            warn!("Signal on filesystem origin change was not sent to the D-Bus client");
         }
     }
 
@@ -1193,6 +1214,10 @@ impl DbusTreeHandler {
             }
             DbusAction::FsNameChange(item, new_name) => {
                 self.handle_fs_name_change(item, new_name);
+                Ok(true)
+            }
+            DbusAction::FsOriginChange(item) => {
+                self.handle_fs_origin_change(item);
                 Ok(true)
             }
             DbusAction::PoolNameChange(item, new_name) => {

@@ -371,7 +371,7 @@ where
     /// * The waiting task does not conflict with any already woken tasks.
     /// * The waiting task does not conflict with any locks currently held.
     fn should_wake(&self) -> bool {
-        if let Some(w) = self.waiting.get(0) {
+        if let Some(w) = self.waiting.front() {
             !self.conflicts_with_woken(&w.ty) && !self.already_acquired(&w.ty)
         } else {
             false

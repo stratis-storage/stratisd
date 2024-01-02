@@ -59,7 +59,7 @@ mod tests {
     fn test_failed_init(paths: &[&Path]) {
         assert_eq!(paths.len(), 1);
 
-        let path = paths.get(0).expect("There must be exactly one path");
+        let path = paths.first().expect("There must be exactly one path");
         let key_description =
             KeyDescription::try_from("I am not a key".to_string()).expect("no semi-colons");
 
@@ -185,7 +185,7 @@ mod tests {
     fn test_crypt_device_ops(paths: &[&Path]) {
         fn crypt_test(paths: &[&Path], key_desc: &KeyDescription) {
             let path = paths
-                .get(0)
+                .first()
                 .expect("This test only accepts a single device");
 
             let pool_uuid = PoolUuid::new_v4();
@@ -357,7 +357,7 @@ mod tests {
         fn both_initialize(paths: &[&Path], key_desc: &KeyDescription) {
             unshare_mount_namespace().unwrap();
             let _memfs = MemoryFilesystem::new().unwrap();
-            let path = paths.get(0).copied().expect("Expected exactly one path");
+            let path = paths.first().copied().expect("Expected exactly one path");
             let pool_name = Name::new("pool_name".to_string());
             let handle = CryptHandle::initialize(
                 path,
@@ -384,7 +384,7 @@ mod tests {
         }
 
         fn unlock_clevis(paths: &[&Path]) {
-            let path = paths.get(0).copied().expect("Expected exactly one path");
+            let path = paths.first().copied().expect("Expected exactly one path");
             CryptHandle::setup(path, Some(UnlockMethod::Clevis))
                 .unwrap()
                 .unwrap();

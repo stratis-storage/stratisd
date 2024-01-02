@@ -736,7 +736,7 @@ impl Backstore {
             if (existing_pin.as_str(), &config_to_check) == (pin, &parsed_config)
                 && CryptHandle::can_unlock(
                     self.blockdevs()
-                        .get(0)
+                        .first()
                         .expect("Must have at least one blockdev")
                         .2
                         .physical_path(),
@@ -810,7 +810,7 @@ impl Backstore {
             if kd == key_desc {
                 if CryptHandle::can_unlock(
                     self.blockdevs()
-                        .get(0)
+                        .first()
                         .expect("Must have at least one blockdev")
                         .2
                         .physical_path(),

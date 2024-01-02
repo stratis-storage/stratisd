@@ -8,8 +8,4 @@ mod identify;
 mod liminal;
 mod setup;
 
-pub use self::{
-    device_info::{DeviceSet, LInfo},
-    identify::{find_all, DeviceInfo},
-    liminal::LiminalDevices,
-};
+pub use self::{device_info::DeviceSet, identify::find_all, liminal::LiminalDevices};

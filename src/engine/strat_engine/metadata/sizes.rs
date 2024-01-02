@@ -6,7 +6,7 @@ pub use self::{
     bda_size::{BDAExtendedSize, ReservedSize},
     blkdev_size::BlockdevSize,
     mda_size::{MDADataSize, MDARegionSize, MDASize},
-    static_header_size::{StaticHeaderSize, STATIC_HEADER_SIZE},
+    static_header_size::STATIC_HEADER_SIZE,
 };
 
 /// A module which defines constants and types related to static header sizes.

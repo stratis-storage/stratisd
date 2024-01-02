@@ -107,7 +107,7 @@ impl BlockDevMgr {
         devices: UnownedDevices,
         sector_size: Option<u32>,
     ) -> StratisResult<Vec<DevUuid>> {
-        let this_pool_uuid = self.block_devs.get(0).map(|bd| bd.pool_uuid());
+        let this_pool_uuid = self.block_devs.first().map(|bd| bd.pool_uuid());
         if this_pool_uuid.is_some() && this_pool_uuid != Some(pool_uuid) {
             return Err(StratisError::Msg(
                 format!("block devices being managed have pool UUID {} but new devices are to be added with pool UUID {}",
@@ -120,7 +120,7 @@ impl BlockDevMgr {
         if let Some(ref ei) = encryption_info {
             if !CryptHandle::can_unlock(
                 self.block_devs
-                    .get(0)
+                    .first()
                     .expect("Must have at least one blockdev")
                     .physical_path(),
                 ei.key_description().is_some(),

@@ -57,7 +57,7 @@ def _call_predict_usage(encrypted, device_sizes, *, fs_specs=None, overprovision
     :param device_sizes: list of sizes of devices for pool
     :type device_sizes: list of str
     :param fs_specs: list of filesystem specs
-    :type fs_specs: list of str * Range
+    :type fs_specs: list of str * (Range or NoneType) * (Range or NoneType)
     :param bool overprovision: whether it is allowed to overprovision the pool
     """
     with subprocess.Popen(
@@ -66,7 +66,11 @@ def _call_predict_usage(encrypted, device_sizes, *, fs_specs=None, overprovision
         + (
             []
             if fs_specs is None
-            else [f"--filesystem-size={size.magnitude}" for _, size in fs_specs]
+            else [
+                f"--filesystem-size={size.magnitude}"
+                for _, size, _ in fs_specs
+                if size is not None
+            ]
         )
         + (["--encrypted"] if encrypted else [])
         + ([] if overprovision else ["--no-overprovision"]),
@@ -105,7 +109,7 @@ def _possibly_add_filesystems(pool_object_path, *, fs_specs=None):
 
     :param str pool_object_path: the D-Bus object path
     :param fs_specs: the filesystem specs
-    :type fs_specs: list of str * Range or NoneType
+    :type fs_specs: list of str * (Range or NoneType) * (Range or NoneType)
 
     :returns: the change in size of pool's TotalPhysicalUsed value
     :rtype: Range
@@ -123,7 +127,16 @@ def _possibly_add_filesystems(pool_object_path, *, fs_specs=None):
             message,
         ) = Pool.Methods.CreateFilesystems(
             pool_proxy,
-            {"specs": map(lambda x: (x[0], (True, str(x[1].magnitude))), fs_specs)},
+            {
+                "specs": map(
+                    lambda x: (
+                        x[0],
+                        (False, "") if x[1] is None else (True, str(x[1].magnitude)),
+                        (False, "") if x[2] is None else (True, str(x[2].magnitude)),
+                    ),
+                    fs_specs,
+                )
+            },
         )
 
         if return_code != 0:
@@ -302,7 +315,7 @@ class TestSpaceUsagePrediction(UdevTest):
             pool_name = random_string(5)
             create_pool(pool_name, devnodes)
             self.wait_for_pools(1)
-            self._test_prediction(pool_name, fs_specs=[("fs1", Range(1, TiB))])
+            self._test_prediction(pool_name, fs_specs=[("fs1", Range(1, TiB), None)])
 
     def test_prediction_no_overprov(self):
         """
@@ -317,5 +330,5 @@ class TestSpaceUsagePrediction(UdevTest):
             create_pool(pool_name, devnodes, overprovision=False)
             self.wait_for_pools(1)
             self._test_prediction(
-                pool_name, fs_specs=[("fs1", Range(2, GiB))], overprovision=False
+                pool_name, fs_specs=[("fs1", Range(2, GiB), None)], overprovision=False
             )

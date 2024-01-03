@@ -40,10 +40,10 @@ jobs:
       matrix:
         include:
           - task: make -f Makefile fmt-ci
-            toolchain: 1.74.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: rustfmt
           - task: make -f Makefile check-typos
-            toolchain: 1.74.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-22.04
     container:
@@ -83,7 +83,7 @@ jobs:
               TANG_URL=tang
               RUST_LOG=stratisd=debug
               make -f Makefile test-clevis-loop
-            toolchain: 1.74.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
             image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
     runs-on: ubuntu-22.04
@@ -214,7 +214,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.74.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - name: Run stratisd-min cli tests
         run: make test-stratisd-min
       - name: Run stratis-min cli tests
@@ -264,7 +264,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.74.1  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd

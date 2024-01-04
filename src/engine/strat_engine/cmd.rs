@@ -299,7 +299,6 @@ pub fn create_fs(devnode: &Path, uuid: Option<StratisUuid>) -> StratisResult<()>
 
     let mut command = Command::new(get_executable(MKFS_XFS).as_os_str());
     command.arg("-f");
-    command.arg("-q");
     command.arg(devnode);
 
     if let Some(uuid) = uuid {

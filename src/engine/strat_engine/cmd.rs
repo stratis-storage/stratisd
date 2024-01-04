@@ -342,11 +342,7 @@ pub fn set_uuid(devnode: &Path, uuid: FilesystemUuid) -> StratisResult<()> {
 
 /// Call thin_check on a thinpool
 pub fn thin_check(devnode: &Path) -> StratisResult<()> {
-    execute_cmd(
-        Command::new(get_executable(THIN_CHECK).as_os_str())
-            .arg("-q")
-            .arg(devnode),
-    )
+    execute_cmd(Command::new(get_executable(THIN_CHECK).as_os_str()).arg(devnode))
 }
 
 /// Call thin_repair on a thinpool

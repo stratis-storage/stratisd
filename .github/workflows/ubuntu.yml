@@ -51,7 +51,7 @@ jobs:
           - task: PROFILEDIR=debug make -f Makefile build-no-ipc
             toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-          - task: PROFILEDIR=debug make -f Makefile stratis-dumpmetadata
+          - task: PROFILEDIR=debug make -f Makefile stratisd-tools
             toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile docs-ci

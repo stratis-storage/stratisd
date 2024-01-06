@@ -165,7 +165,7 @@ audit-all-rust: build-all-rust
 		./target/${PROFILEDIR}/stratis-utils \
 	        ./target/${PROFILEDIR}/stratis-str-cmp \
 	        ./target/${PROFILEDIR}/stratis-base32-decode \
-	        ./target/${PROFILEDIR}/stratis-dumpmetadata
+	        ./target/${PROFILEDIR}/stratisd-tools
 
 ## Check for spelling errors
 check-typos:
@@ -253,12 +253,12 @@ build-stratis-base32-decode:
 # so we use two distinct targets to build the two binaries
 build-udev-utils: build-stratis-str-cmp build-stratis-base32-decode
 
-## Build the stratis-dumpmetadata program
-stratis-dumpmetadata:
+## Build the stratisd-tools program
+stratisd-tools:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
 	cargo ${BUILD} ${RELEASE_FLAG} \
-	--bin=stratis-dumpmetadata ${EXTRAS_FEATURES} ${TARGET_ARGS}
+	--bin=stratisd-tools ${EXTRAS_FEATURES} ${TARGET_ARGS}
 
 ## Build stratis-min for early userspace
 stratis-min:
@@ -314,8 +314,11 @@ install-binaries:
 	mkdir -p $(DESTDIR)$(BINDIR)
 	mkdir -p $(DESTDIR)$(UNITGENDIR)
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(BINDIR) target/$(PROFILEDIR)/stratis-min
+
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(BINDIR) target/$(PROFILEDIR)/stratisd-tools
+	ln --force --verbose $(DESTDIR)$(BINDIR)/stratisd-tools $(DESTDIR)$(BINDIR)/stratis-dumpmetadata
+
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(BINDIR) target/$(PROFILEDIR)/stratis-utils
-	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(BINDIR) target/$(PROFILEDIR)/stratis-dumpmetadata
 	mv --force --verbose $(DESTDIR)$(BINDIR)/stratis-utils $(DESTDIR)$(BINDIR)/stratis-predict-usage
 	ln --force --verbose $(DESTDIR)$(BINDIR)/stratis-predict-usage $(DESTDIR)$(UNITGENDIR)/stratis-clevis-setup-generator
 	ln --force --verbose $(DESTDIR)$(BINDIR)/stratis-predict-usage $(DESTDIR)$(UNITGENDIR)/stratis-setup-generator
@@ -341,7 +344,7 @@ install-daemons:
 install: install-udev-cfg install-man-cfg install-dbus-cfg install-dracut-cfg install-systemd-cfg install-binaries install-udev-binaries install-fstab-script install-daemons
 
 ## Build all Rust artifacts
-build-all-rust: build build-min build-udev-utils stratis-dumpmetadata
+build-all-rust: build build-min build-udev-utils stratisd-tools
 
 ## Build all man pages
 build-all-man: docs/stratisd.8 docs/stratis-dumpmetadata.8
@@ -366,6 +369,7 @@ clean-ancillary:
 	rm -fv $(DESTDIR)$(UDEVDIR)/stratis-str-cmp
 	rm -fv $(DESTDIR)$(UDEVDIR)/stratis-base32-decode
 	rm -fv $(DESTDIR)$(BINDIR)/stratis-predict-usage
+	rm -fv $(DESTDIR)$(BINDIR)/stratisd-tools
 	rm -fv $(DESTDIR)$(BINDIR)/stratis-dumpmetadata
 	rm -fv $(DESTDIR)$(UNITGENDIR)/stratis-setup-generator
 	rm -fv $(DESTDIR)$(UNITGENDIR)/stratis-clevis-setup-generator

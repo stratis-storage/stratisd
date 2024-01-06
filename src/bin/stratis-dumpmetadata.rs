@@ -100,15 +100,13 @@ fn print_pool_metadata(pool_metadata: &Option<Vec<u8>>, only_pool: bool) -> Resu
         println!("\nPool metadata:");
     }
     if let Some(loaded_state) = pool_metadata {
-        let state_json: Value = serde_json::from_slice(&loaded_state)
+        let state_json: Value = serde_json::from_slice(loaded_state)
             .map_err(|extract_err| format!("Error during state JSON extract: {}", extract_err))?;
         let state_json_pretty: String = serde_json::to_string_pretty(&state_json)
             .map_err(|parse_err| format!("Error during state JSON parse: {}", parse_err))?;
         println!("{}", state_json_pretty);
-    } else {
-        if !only_pool {
-            println!("None found");
-        }
+    } else if !only_pool {
+        println!("None found");
     }
 
     Ok(())
@@ -136,7 +134,7 @@ fn initialize_log() {
 fn run(devpath: &str, print_bytes: bool, pool_only: bool) -> Result<(), String> {
     let mut devfile = OpenOptions::new()
         .read(true)
-        .open(&devpath)
+        .open(devpath)
         .map_err(|the_io_error| format!("Error opening device: {}", the_io_error))?;
 
     let read_results = StaticHeader::read_sigblocks(&mut devfile);

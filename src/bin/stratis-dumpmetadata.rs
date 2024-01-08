@@ -195,7 +195,7 @@ fn main() {
     let devpath = matches
         .get_one::<String>("dev")
         .map(|s| s.as_str())
-        .unwrap();
+        .expect("'dev' is a mandatory argument");
 
     initialize_log();
 

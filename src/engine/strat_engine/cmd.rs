@@ -344,17 +344,6 @@ pub fn thin_check(devnode: &Path) -> StratisResult<()> {
     execute_cmd(Command::new(get_executable(THIN_CHECK).as_os_str()).arg(devnode))
 }
 
-/// Call thin_repair on a thinpool
-pub fn thin_repair(meta_dev: &Path, new_meta_dev: &Path) -> StratisResult<()> {
-    execute_cmd(
-        Command::new(get_executable(THIN_REPAIR).as_os_str())
-            .arg("-i")
-            .arg(meta_dev)
-            .arg("-o")
-            .arg(new_meta_dev),
-    )
-}
-
 /// Call udevadm settle
 #[cfg(test)]
 pub fn udev_settle() -> StratisResult<()> {

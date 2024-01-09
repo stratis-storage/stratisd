@@ -26,7 +26,7 @@ use crate::{
         engine::{DumpState, Filesystem, StateDiff},
         strat_engine::{
             backstore::Backstore,
-            cmd::{thin_check, thin_metadata_size, thin_repair},
+            cmd::{thin_check, thin_metadata_size},
             dm::{get_dm, list_of_thin_pool_devices, remove_optional_devices},
             names::{
                 format_flex_ids, format_thin_ids, format_thinpool_ids, FlexRole, ThinPoolRole,
@@ -1706,7 +1706,7 @@ fn setup_metadev(
     spare_segments: Vec<(Sectors, Sectors)>,
 ) -> StratisResult<(LinearDev, Vec<(Sectors, Sectors)>, Vec<(Sectors, Sectors)>)> {
     let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::ThinMeta);
-    let mut meta_dev = LinearDev::setup(
+    let meta_dev = LinearDev::setup(
         get_dm(),
         &dm_name,
         Some(&dm_uuid),
@@ -1719,38 +1719,10 @@ fn setup_metadev(
         // mean that data is corrupted.
         if let Err(e) = thin_check(&meta_dev.devnode()) {
             warn!("Thin check failed: {}", e);
-            meta_dev = attempt_thin_repair(pool_uuid, meta_dev, device, &spare_segments)?;
-            return Ok((meta_dev, spare_segments, meta_segments));
         }
     }
 
     Ok((meta_dev, meta_segments, spare_segments))
-}
-
-/// Attempt a thin repair operation on the meta device.
-/// If the operation succeeds, teardown the old meta device,
-/// and return the new meta device.
-fn attempt_thin_repair(
-    pool_uuid: PoolUuid,
-    mut meta_dev: LinearDev,
-    device: Device,
-    spare_segments: &[(Sectors, Sectors)],
-) -> StratisResult<LinearDev> {
-    let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::ThinMetaSpare);
-    let mut new_meta_dev = LinearDev::setup(
-        get_dm(),
-        &dm_name,
-        Some(&dm_uuid),
-        segs_to_table(device, spare_segments),
-    )?;
-
-    thin_repair(&meta_dev.devnode(), &new_meta_dev.devnode())?;
-
-    let name = meta_dev.name().to_owned();
-    meta_dev.teardown(get_dm())?;
-    new_meta_dev.set_name(get_dm(), &name)?;
-
-    Ok(new_meta_dev)
 }
 
 #[cfg(test)]

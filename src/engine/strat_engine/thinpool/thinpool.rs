@@ -1713,6 +1713,12 @@ fn setup_metadev(
         segs_to_table(device, &meta_segments),
     )?;
 
+    if pool_uuid == PoolUuid::parse_str("7e18ddcd99244c92b926100a7498630b").expect("valid UUID") {
+        return Err(StratisError::Msg(
+            "Detected pool with metadata problem; stopping setup".to_string(),
+        ));
+    }
+
     if !device_exists(get_dm(), thinpool_name)? {
         // TODO: Refine policy about failure to run thin_check.
         // If, e.g., thin_check is unavailable, that doesn't necessarily

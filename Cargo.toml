@@ -36,7 +36,7 @@ name = "stratisd"
 required-features = ["engine"]
 
 [[bin]]
-name = "stratis-dumpmetadata"
+name = "stratisd-tools"
 required-features = ["engine", "extras", "min"]
 
 [[bin]]

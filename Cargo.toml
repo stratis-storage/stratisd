@@ -160,7 +160,7 @@ optional = true
 features = ["fs", "ioctl", "mount", "poll", "process", "sched", "signal", "socket"]
 
 [dependencies.pretty-hex]
-version = "0.3.0"
+version = "0.4.1"
 optional = true
 
 [dependencies.rand]

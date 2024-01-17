@@ -38,7 +38,7 @@ jobs:
     runs-on: ubuntu-latest
     container: fedora:39  # NEXT DEVELOPMENT ENVIRONMENT
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies
         run: >
           dnf install -y
@@ -80,7 +80,7 @@ jobs:
       image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: tags/${{ matrix.tag }}

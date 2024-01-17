@@ -31,7 +31,7 @@ jobs:
     container:
       image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies for Fedora
         run: >
           dnf install -y

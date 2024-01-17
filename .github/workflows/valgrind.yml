@@ -32,7 +32,7 @@ jobs:
       image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -67,7 +67,7 @@ jobs:
       image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev --ipc=host
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -125,7 +125,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
         options: --privileged -p 80:80
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -162,7 +162,7 @@ jobs:
           - toolchain: 1.71.1  # LOWEST SUPPORTED RUST TOOLCHAIN
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies for Ubuntu
         run: sudo apt-get -q update
       - name: Install dependencies for Ubuntu
@@ -227,7 +227,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
         options: --privileged -p 80:80
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies for Fedora
         run: >
           dnf install -y

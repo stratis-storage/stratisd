@@ -50,7 +50,7 @@ jobs:
       image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -99,7 +99,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
         options: --privileged -p 80:80
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies for Fedora
         # cracklib-dicts: https://github.com/stratis-storage/project/issues/581
         run: >
@@ -133,7 +133,7 @@ jobs:
       image: fedora:34  # LOWEST DEVELOPMENT ENVIRONMENT
       options: --privileged --userns=host --ipc=host -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies
         run: >
           dnf install -y
@@ -187,7 +187,7 @@ jobs:
       image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged --userns=host --ipc=host -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies
         run: >
           dnf install -y
@@ -228,7 +228,7 @@ jobs:
     container:
       image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies
         run: >
           dnf install -y
@@ -244,7 +244,7 @@ jobs:
       image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -289,7 +289,7 @@ jobs:
             options:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Run apt-get update
         run: sudo apt-get -q update
       - name: Install dependencies

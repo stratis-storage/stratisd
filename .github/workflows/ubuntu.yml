@@ -74,7 +74,7 @@ jobs:
       image: ubuntu:jammy
       options: --privileged -v /dev:/dev
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies for Ubuntu
         run: apt-get -q update
       - name: Install dependencies for Ubuntu
@@ -112,7 +112,7 @@ jobs:
       image: ubuntu:jammy
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev --ipc=host
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies for Ubuntu
         run: apt-get -q update
       - name: Install dependencies for Ubuntu

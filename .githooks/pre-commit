@@ -4,7 +4,7 @@ export PROFILEDIR=debug
 
 make fmt-ci &&
 	make build &&
-	make stratis-dumpmetadata &&
+	make stratisd-tools &&
 	make build-min &&
 	make build-no-ipc &&
 	make test &&

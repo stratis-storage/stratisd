@@ -181,6 +181,9 @@ fn parse_args() -> Command {
                     .arg(Arg::new("pool_name").required(true))
                     .arg(Arg::new("fs_name").required(true))
                     .arg(Arg::new("new_fs_name").required(true)),
+                Command::new("origin")
+                    .arg(Arg::new("pool_name").required(true))
+                    .arg(Arg::new("fs_name").required(true)),
             ]),
             Command::new("report"),
         ])
@@ -575,6 +578,19 @@ fn main() -> Result<(), String> {
                         .expect("required")
                         .to_owned(),
                 )?;
+                Ok(())
+            } else if let Some(args) = subcommand.subcommand_matches("origin") {
+                filesystem::filesystem_origin(
+                    args.get_one::<String>("pool_name")
+                        .expect("required")
+                        .to_owned(),
+                    args.get_one::<String>("fs_name")
+                        .expect("required")
+                        .to_owned(),
+                )
+                .map(|origin| {
+                    println!("{}", origin);
+                })?;
                 Ok(())
             } else {
                 filesystem::filesystem_list()?;

@@ -128,6 +128,15 @@ impl<'a> Into<Value> for &'a SimFilesystem {
                     .unwrap_or_else(|| "Not set".to_string()),
             ),
         );
+        json.insert(
+            "origin".to_string(),
+            Value::from(
+                self.origin
+                    .as_ref()
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| "Not set".to_string()),
+            ),
+        );
         Value::from(json)
     }
 }

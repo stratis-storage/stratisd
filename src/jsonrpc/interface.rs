@@ -58,6 +58,7 @@ pub enum StratisParamType {
     FsCreate(String, String),
     FsDestroy(String, String),
     FsRename(String, String, String),
+    FsOrigin(String, String),
     FsList,
     Report,
 }
@@ -98,5 +99,6 @@ pub enum StratisRet {
     FsList(FsListType),
     FsDestroy((bool, u16, String)),
     FsRename((bool, u16, String)),
+    FsOrigin((Option<String>, u16, String)),
     Report(Value),
 }

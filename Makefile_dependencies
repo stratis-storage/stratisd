@@ -15,7 +15,7 @@ test-set-lower-bounds:
 	echo "Testing that SET_LOWER_BOUNDS environment variable is set to a valid path"
 	test -e "${SET_LOWER_BOUNDS}"
 
-verify-dependency-bounds: test-set-lower-bounds vdb-build vdb-min vdb-tests vdb-stratis-dumpmetadata
+verify-dependency-bounds: test-set-lower-bounds vdb-build vdb-min vdb-tests vdb-stratisd-tools
 
 vdb-build:
 	cargo clean
@@ -35,11 +35,11 @@ vdb-tests:
 	${SET_LOWER_BOUNDS} ${MANIFEST_PATH_ARGS}
 	make -f Makefile build-tests
 
-vdb-stratis-dumpmetadata:
+vdb-stratisd-tools:
 	cargo clean
-	make -f Makefile stratis-dumpmetadata
+	make -f Makefile stratisd-tools
 	${SET_LOWER_BOUNDS} ${MANIFEST_PATH_ARGS}
-	make -f Makefile stratis-dumpmetadata
+	make -f Makefile stratisd-tools
 
 
 COMPARE_FEDORA_VERSIONS ?=

@@ -12,7 +12,7 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::{devices::BlockSizes, range_alloc::PerDevSegments},
-            metadata::{BDAExtendedSize, BlockdevSize, MDADataSize, BDA},
+            metadata::{BlockdevSize, MDADataSize, BDA},
         },
         types::{DevUuid, StratSigblockVersion},
     },
@@ -71,12 +71,13 @@ pub trait InternalBlockDev {
     fn available(&self) -> Sectors;
 
     // ALL SIZE METHODS (except size(), which is in BlockDev impl.)
-    /// The number of Sectors on this device used by Stratis for metadata
-    fn metadata_size(&self) -> BDAExtendedSize;
+    /// The number of Sectors on this device used by Stratis and potentially other devicemapper
+    /// layers for metadata
+    fn metadata_size(&self) -> Sectors;
 
-    /// The maximum size of variable length metadata that can be accommodated.
+    /// The maximum size of variable length Stratis metadata that can be accommodated.
     /// self.max_metadata_size() < self.metadata_size()
-    fn max_metadata_size(&self) -> MDADataSize;
+    fn max_stratis_metadata_size(&self) -> MDADataSize;
 
     /// Whether or not the blockdev is in use by upper layers. It is if the
     /// sum of the blocks used exceeds the Stratis metadata size.

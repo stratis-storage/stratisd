@@ -14,7 +14,7 @@ use std::{
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 
-use devicemapper::{Device, Sectors};
+use devicemapper::{Bytes, Device, Sectors, IEC};
 
 use crate::{
     engine::{
@@ -27,8 +27,8 @@ use crate::{
             },
             device::blkdev_size,
             metadata::{
-                disown_device, static_header, BDAExtendedSize, BlockdevSize, MDADataSize,
-                MetadataLocation, StaticHeader, BDA,
+                disown_device, static_header, BlockdevSize, MDADataSize, MetadataLocation,
+                StaticHeader, BDA,
             },
             serde_structs::{BaseBlockDevSave, Recordable},
             types::BDAResult,
@@ -40,6 +40,17 @@ use crate::{
     },
     stratis::{StratisError, StratisResult},
 };
+
+/// Return the amount of space required for integrity for a device of the given size.
+///
+/// This is a slight overestimation for the sake of simplicity. Because it uses the whole disk
+/// size, once the integrity metadata size is calculated, the remaining data size is now smaller
+/// than the metadata region could support for integrity.
+pub fn integrity_meta_space(total_space: Sectors) -> Sectors {
+    Bytes(4096).sectors()
+        + Bytes::from(64 * IEC::Mi).sectors()
+        + Bytes::from((*total_space * 32u64 + 4095) & !4096).sectors()
+}
 
 #[derive(Debug)]
 pub struct StratBlockDev {
@@ -164,16 +175,12 @@ impl StratBlockDev {
         Ok(blkdev_size(&File::open(physical_path)?)?.sectors())
     }
 
-    /// Allocate room for metadata from the front of the device.
-    #[allow(dead_code)]
-    fn alloc_meta_front(&mut self, size: Sectors) -> PerDevSegments {
-        self.used.alloc_front(size)
-    }
-
-    /// Allocate room for metadata from the back of the device.
-    #[allow(dead_code)]
-    fn alloc_meta_back(&mut self, size: Sectors) -> PerDevSegments {
-        self.used.alloc_back(size)
+    /// Allocate room for integrity metadata from the back of the device.
+    pub fn alloc_int_meta_back(&mut self, size: Sectors) {
+        let segs = self.used.alloc_back(size);
+        for (start, len) in segs.iter() {
+            self.integrity_meta_allocs.push((*start, *len));
+        }
     }
 
     /// Set the newly detected size of a block device.
@@ -231,16 +238,17 @@ impl InternalBlockDev for StratBlockDev {
         self.used.available()
     }
 
-    fn metadata_size(&self) -> BDAExtendedSize {
-        self.bda.extended_size()
+    fn metadata_size(&self) -> Sectors {
+        self.bda.extended_size().sectors()
+            + self.integrity_meta_allocs.iter().map(|(_, len)| *len).sum()
     }
 
-    fn max_metadata_size(&self) -> MDADataSize {
+    fn max_stratis_metadata_size(&self) -> MDADataSize {
         self.bda.max_data_size()
     }
 
     fn in_use(&self) -> bool {
-        self.used.used() > self.metadata_size().sectors()
+        self.used.used() > self.metadata_size()
     }
 
     fn alloc(&mut self, size: Sectors) -> PerDevSegments {

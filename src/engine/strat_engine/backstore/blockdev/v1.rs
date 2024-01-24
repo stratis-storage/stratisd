@@ -28,8 +28,8 @@ use crate::{
             crypt::handle::v1::CryptHandle,
             device::blkdev_size,
             metadata::{
-                disown_device, static_header, BDAExtendedSize, BlockdevSize, MDADataSize,
-                MetadataLocation, StaticHeader, BDA,
+                disown_device, static_header, BlockdevSize, MDADataSize, MetadataLocation,
+                StaticHeader, BDA,
             },
             serde_structs::{BaseBlockDevSave, Recordable},
             types::BDAResult,
@@ -197,8 +197,8 @@ impl StratBlockDev {
     }
 
     /// The maximum size of variable length metadata that can be accommodated.
-    /// self.max_metadata_size() < self.metadata_size()
-    pub fn max_metadata_size(&self) -> MDADataSize {
+    /// self.max_stratis_metadata_size() > self.metadata_size()
+    pub fn max_stratis_metadata_size(&self) -> MDADataSize {
         self.bda.max_data_size()
     }
 
@@ -360,16 +360,16 @@ impl InternalBlockDev for StratBlockDev {
         self.used.available()
     }
 
-    fn metadata_size(&self) -> BDAExtendedSize {
-        self.bda.extended_size()
+    fn metadata_size(&self) -> Sectors {
+        self.bda.extended_size().sectors()
     }
 
-    fn max_metadata_size(&self) -> MDADataSize {
+    fn max_stratis_metadata_size(&self) -> MDADataSize {
         self.bda.max_data_size()
     }
 
     fn in_use(&self) -> bool {
-        self.used.used() > self.metadata_size().sectors()
+        self.used.used() > self.metadata_size()
     }
 
     fn alloc(&mut self, size: Sectors) -> PerDevSegments {

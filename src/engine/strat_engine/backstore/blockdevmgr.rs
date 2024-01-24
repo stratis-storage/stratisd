@@ -371,7 +371,7 @@ where
         let candidates = self
             .block_devs
             .iter_mut()
-            .filter(|b| b.max_metadata_size().bytes() >= data_size);
+            .filter(|b| b.max_stratis_metadata_size().bytes() >= data_size);
 
         // TODO: consider making selection not entirely random, i.e, ensuring
         // distribution of metadata over different paths.
@@ -411,10 +411,7 @@ where
     /// The number of sectors given over to Stratis metadata
     /// self.allocated_size() - self.metadata_size() >= self.avail_space()
     pub fn metadata_size(&self) -> Sectors {
-        self.block_devs
-            .iter()
-            .map(|bd| bd.metadata_size().sectors())
-            .sum()
+        self.block_devs.iter().map(|bd| bd.metadata_size()).sum()
     }
 
     pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {

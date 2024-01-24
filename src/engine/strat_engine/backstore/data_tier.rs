@@ -28,6 +28,8 @@ use crate::{
     stratis::StratisResult,
 };
 
+use super::blockdev::v2::integrity_meta_space;
+
 /// Handles the lowest level, base layer of this tier.
 #[derive(Debug)]
 pub struct DataTier<B> {
@@ -101,7 +103,15 @@ impl DataTier<v2::StratBlockDev> {
     /// Initially 0 segments are allocated.
     ///
     /// WARNING: metadata changing event
-    pub fn new(block_mgr: BlockDevMgr<v2::StratBlockDev>) -> DataTier<v2::StratBlockDev> {
+    pub fn new(mut block_mgr: BlockDevMgr<v2::StratBlockDev>) -> DataTier<v2::StratBlockDev> {
+        for (_, bd) in block_mgr.blockdevs_mut() {
+            bd.alloc_int_meta_back(integrity_meta_space(
+                // NOTE: Subtracting metadata size works here because the only metadata currently
+                // recorded in a newly created block device is the BDA. If this becomes untrue in
+                // the future, this code will no longer work.
+                bd.total_size().sectors() - bd.metadata_size(),
+            ))
+        }
         DataTier {
             block_mgr,
             segments: AllocatedAbove { inner: vec![] },
@@ -116,7 +126,29 @@ impl DataTier<v2::StratBlockDev> {
         pool_uuid: PoolUuid,
         devices: UnownedDevices,
     ) -> StratisResult<Vec<DevUuid>> {
-        self.block_mgr.add(pool_uuid, devices)
+        let uuids = self.block_mgr.add(pool_uuid, devices)?;
+        let bds = self
+            .block_mgr
+            .blockdevs_mut()
+            .into_iter()
+            .filter_map(|(uuid, bd)| {
+                if uuids.contains(&uuid) {
+                    Some(bd)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(bds.len(), uuids.len());
+        for bd in bds {
+            bd.alloc_int_meta_back(integrity_meta_space(
+                // NOTE: Subtracting metadata size works here because the only metadata currently
+                // recorded in a newly created block device is the BDA. If this becomes untrue in
+                // the future, this code will no longer work.
+                bd.total_size().sectors() - bd.metadata_size(),
+            ));
+        }
+        Ok(uuids)
     }
 
     /// Lookup an immutable blockdev by its Stratis UUID.

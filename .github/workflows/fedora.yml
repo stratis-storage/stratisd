@@ -40,46 +40,46 @@ jobs:
       matrix:
         include:
           - task: make -f Makefile clippy
-            toolchain: 1.74.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: clippy
           - task: PROFILEDIR=debug make -f Makefile build
-            toolchain: 1.74.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: PROFILEDIR=debug make -f Makefile build-min
-            toolchain: 1.74.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: PROFILEDIR=debug make -f Makefile build-no-ipc
-            toolchain: 1.74.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-          - task: PROFILEDIR=debug make -f Makefile stratis-dumpmetadata
-            toolchain: 1.74.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          - task: PROFILEDIR=debug make -f Makefile stratisd-tools
+            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile docs-ci
-            toolchain: 1.74.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile test
-            toolchain: 1.74.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: >-
               TANG_URL=localhost
               make -f Makefile test-clevis-loop-should-fail
-            toolchain: 1.74.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile build
-            toolchain: 1.74.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile build-min
-            toolchain: 1.74.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile build-no-ipc
-            toolchain: 1.74.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-22.04
     container:
       image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
@@ -107,14 +107,14 @@ jobs:
       matrix:
         include:
           - task: RUST_LOG=stratisd=debug make -f Makefile test-loop
-            toolchain: 1.74.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-22.04
     container:
       image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev --ipc=host
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install dependencies for Fedora
         run: >
           dnf install -y

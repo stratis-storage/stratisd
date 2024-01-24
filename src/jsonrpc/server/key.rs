@@ -43,21 +43,25 @@ pub async fn key_get_desc(
     engine: Arc<dyn Engine>,
     id: PoolIdentifier<PoolUuid>,
 ) -> StratisResult<Option<KeyDescription>> {
-    let locked = engine.locked_pools().await;
+    let stopped = engine.stopped_pools().await;
     let guard = engine.get_pool(id.clone()).await;
     if let Some((_, _, pool)) = guard.as_ref().map(|guard| guard.as_tuple()) {
         match pool.encryption_info() {
             Some(ei) => ei.key_description().map(|opt| opt.cloned()),
             None => Ok(None),
         }
-    } else if let Some(info) = locked.locked.get(match id {
+    } else if let Some(info) = stopped.stopped.get(match id {
         PoolIdentifier::Uuid(ref u) => u,
-        PoolIdentifier::Name(ref n) => locked
+        PoolIdentifier::Name(ref n) => stopped
             .name_to_uuid
             .get(n)
             .ok_or_else(|| StratisError::Msg(format!("Pool with name {n} not found")))?,
     }) {
-        info.info.key_description().map(|opt| opt.cloned())
+        if let Some(ref i) = info.info {
+            i.key_description().map(|opt| opt.cloned())
+        } else {
+            Ok(None)
+        }
     } else {
         Err(StratisError::Msg(format!("Pool with {id} not found")))
     }

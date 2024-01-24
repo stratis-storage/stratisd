@@ -8,4 +8,4 @@ pub mod loopbacked;
 pub mod real;
 mod util;
 
-pub use util::{dm_stratis_devices_remove, FailDevice};
+pub use util::FailDevice;

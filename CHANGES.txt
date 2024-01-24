@@ -1,3 +1,36 @@
+stratisd 3.6.4
+==============
+Recommended Rust toolchain version: 1.75.0
+Recommended development platform for Python development: Fedora 39
+
+- Cherry-picked commits:
+  * Update to nix 0.27.1
+  * github actions: update FEDORA_RELEASE to F39, F38
+  * Parameterize /usr/libexec everywhere
+  * github actions: update recommended Rust to 1.74.1
+  * Increase itertools dependency lower bound to 0.12.0
+  * Replace get(0) with first()
+  * Remove unused imports
+  * Move initialize_devices import to cfg(test)
+  * should_wake: replace get(0) with front()
+  * github actions: update recommended Rust to 1.75.0
+  * Fix up prediction tests to match new filesystem interface
+  * Start running clippy on stratis-dumpmetadata
+  * Remove unwrap() in stratis-dumpmetadata
+  * Run thin_check in loud mode
+  * Do not pass -q option to xfs.mkfs
+  * Try both Clevis and passphrase in /etc/fstab setup
+  * Put dump-metadata code in separate file
+  * Improve dispatch for tools in tools package
+  * Use loopdev-3 instead of loopdev crate
+  * Use checkout@v4
+  * Fix bug where unencrypted pools can't be started in stratisd-min
+  * Increase shlex version in Cargo.lock to 1.3.0
+  * Fix for githooks
+  * Increase pretty-hex dependency lower bound to 0.4.1
+  * Makefile_dependencies: fix verify-dependency-bounds target
+
+
 stratisd 3.6.3
 ==============
 Recommended Rust toolchain version: 1.74.0

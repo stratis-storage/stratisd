@@ -16,10 +16,13 @@ mod transaction;
 
 pub use self::{
     backstore::Backstore,
-    blockdev::{StratBlockDev, StratSectorSizes, UnderlyingDevice},
+    blockdev::{StratBlockDev, UnderlyingDevice},
     crypt::{
         crypt_metadata_size, register_clevis_token, set_up_crypt_logging, CryptHandle,
         CLEVIS_TANG_TRUST_URL,
     },
-    devices::{find_stratis_devs_by_uuid, initialize_devices, ProcessedPathInfos, UnownedDevices},
+    devices::{find_stratis_devs_by_uuid, ProcessedPathInfos, UnownedDevices},
 };
+
+#[cfg(test)]
+pub use self::devices::initialize_devices;

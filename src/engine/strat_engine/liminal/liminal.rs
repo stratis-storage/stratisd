@@ -1015,7 +1015,7 @@ fn setup_pool(
         Ok((datadevs, cachedevs)) => (datadevs, cachedevs),
     };
 
-    if datadevs.get(0).is_none() {
+    if datadevs.first().is_none() {
         return Err((
             StratisError::Msg(format!(
                 "There do not appear to be any data devices in the set with pool UUID {pool_uuid}"

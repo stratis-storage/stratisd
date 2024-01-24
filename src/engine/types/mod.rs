@@ -19,7 +19,7 @@ use serde_json::Value;
 use uuid::Uuid;
 
 pub use crate::engine::{
-    engine::{Engine, StateDiff},
+    engine::StateDiff,
     structures::Lockable,
     types::{
         actions::{

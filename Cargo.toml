@@ -1,6 +1,6 @@
 [package]
 name = "stratisd"
-version = "3.6.3"
+version = "3.6.4"
 authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.org>"]
 edition = "2021"
 rust-version = "1.71.1"  # LOWEST SUPPORTED RUST TOOLCHAIN
@@ -36,7 +36,7 @@ name = "stratisd"
 required-features = ["engine"]
 
 [[bin]]
-name = "stratis-dumpmetadata"
+name = "stratisd-tools"
 required-features = ["engine", "extras", "min"]
 
 [[bin]]
@@ -118,7 +118,7 @@ version = "0.1.0"
 optional = true
 
 [dependencies.itertools]
-version = "0.11.0"
+version = "0.12.0"
 optional = true
 
 [dependencies.lazy_static]
@@ -155,11 +155,12 @@ version = "0.4.19"
 optional = true
 
 [dependencies.nix]
-version = "0.26.0"
+version = "0.27.1"
 optional = true
+features = ["fs", "ioctl", "mount", "poll", "process", "sched", "signal", "socket"]
 
 [dependencies.pretty-hex]
-version = "0.3.0"
+version = "0.4.1"
 optional = true
 
 [dependencies.rand]
@@ -230,7 +231,7 @@ optional = true
 [dev-dependencies]
 assert_cmd = "2.0.8"
 assert_matches = "1.5.0"
-loopdev = "0.4.0"
+loopdev-3 = "0.5.0"
 predicates = "3.0.0"
 proptest = "1.0.0"
 
@@ -276,11 +277,6 @@ extras = ["pretty-hex"]
 min = ["termios"]
 systemd_compat = ["bindgen"]
 udev_scripts = ["data-encoding"]
-
-# FIXME: remove when loopdev dependency lower bound is increased from 0.4.0
-[patch.crates-io.loopdev]
-git = "https://github.com/mulkieran/loopdev"
-branch = "bump-bindgen-reduce-version-0.68.1"
 
 [package.metadata.vendor-filter]
 platforms = ["*-unknown-linux-gnu"]

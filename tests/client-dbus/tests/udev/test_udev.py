@@ -124,8 +124,6 @@ class UdevTest1(UdevTest):
             for name in pool_data:
                 self.wait_for_pools(1, name=name)
 
-        remove_stratis_dm_devices()
-
     def test_generic(self):
         """
         See _test_driver for description.
@@ -198,8 +196,6 @@ class UdevTest2(UdevTest):
             settle()
 
             self.wait_for_pools(1)
-
-        remove_stratis_dm_devices()
 
     def test_simultaneous(self):
         """
@@ -280,8 +276,6 @@ class UdevTest3(UdevTest):
             wait_for_udev_count(num_devices)
 
             self.wait_for_pools(1)
-
-        remove_stratis_dm_devices()
 
     def test_encryption_simple_initial_discovery(self):
         """
@@ -403,8 +397,6 @@ class UdevTest4(UdevTest):
             wait_for_udev_count(num_devices)
 
             self.wait_for_pools(1)
-
-        remove_stratis_dm_devices()
 
     def test_simple_event(self):
         """
@@ -556,8 +548,6 @@ class UdevTest5(UdevTest):
                 self.wait_for_pools(pool_count + 1)
 
             self.wait_for_pools(num_pools)
-
-        remove_stratis_dm_devices()
 
 
 class UdevTest6(UdevTest):

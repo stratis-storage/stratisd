@@ -23,6 +23,7 @@ from stratisd_client_dbus import Manager, Pool, StratisdErrors, get_object
 from stratisd_client_dbus._constants import TOP_OBJECT
 from stratisd_client_dbus._stratisd_constants import EncryptionMethod
 
+from ._dm import remove_stratis_setup
 from ._loopback import UDEV_ADD_EVENT, UDEV_REMOVE_EVENT
 from ._utils import (
     CRYPTO_LUKS_FS_TYPE,
@@ -33,7 +34,6 @@ from ._utils import (
     create_pool,
     get_devnodes,
     random_string,
-    remove_stratis_dm_devices,
     settle,
     wait_for_udev,
     wait_for_udev_count,
@@ -79,7 +79,7 @@ class UdevTest1(UdevTest):
                 create_pool(pool_name, self._lb_mgr.device_files(device_tokens))
                 pool_data[pool_name] = device_tokens
 
-        remove_stratis_dm_devices()
+        remove_stratis_setup()
 
         all_tokens = [
             dev for device_tokens in pool_data.values() for dev in device_tokens
@@ -91,7 +91,7 @@ class UdevTest1(UdevTest):
         with ServiceContextManager():
             self.wait_for_pools(number_of_pools)
 
-        remove_stratis_dm_devices()
+        remove_stratis_setup()
 
         self._lb_mgr.unplug(all_tokens)
 
@@ -168,12 +168,12 @@ class UdevTest2(UdevTest):
             self.assertEqual(len(device_object_paths), len(devnodes))
             wait_for_udev(STRATIS_FS_TYPE, get_devnodes(device_object_paths))
 
-        remove_stratis_dm_devices()
+        remove_stratis_setup()
 
         with ServiceContextManager():
             self.wait_for_pools(1)
 
-        remove_stratis_dm_devices()
+        remove_stratis_setup()
 
         self._lb_mgr.unplug(device_tokens)
 
@@ -255,7 +255,7 @@ class UdevTest3(UdevTest):
             pool_uuid = Pool.Properties.Uuid.Get(get_object(pool_object_path))
 
         if take_down_dm:
-            remove_stratis_dm_devices()
+            remove_stratis_setup()
 
         with OptionalKeyServiceContextManager(key_spec=key_spec):
             ((changed, _), exit_code, _) = Manager.Methods.StartPool(
@@ -340,7 +340,7 @@ class UdevTest4(UdevTest):
             self.wait_for_pools(1)
             pool_uuid = Pool.Properties.Uuid.Get(get_object(pool_object_path))
 
-        remove_stratis_dm_devices()
+        remove_stratis_setup()
 
         self._lb_mgr.unplug(device_tokens)
         wait_for_udev(udev_wait_type, [])
@@ -466,7 +466,7 @@ class UdevTest5(UdevTest):
 
             pool_tokens.append(this_pool)
 
-            remove_stratis_dm_devices()
+            remove_stratis_setup()
 
             self._lb_mgr.unplug(this_pool)
 
@@ -592,7 +592,7 @@ class UdevTest6(UdevTest):
 
             self.wait_for_pools(2)
 
-        remove_stratis_dm_devices()
+        remove_stratis_setup()
 
         with OptionalKeyServiceContextManager():
             self.wait_for_pools(2)
@@ -616,7 +616,7 @@ class UdevTest6(UdevTest):
                 1,
             )
 
-        remove_stratis_dm_devices()
+        remove_stratis_setup()
 
         with OptionalKeyServiceContextManager():
             self.wait_for_pools(1)

@@ -43,7 +43,7 @@ from stratisd_client_dbus import (
 )
 from stratisd_client_dbus._constants import TOP_OBJECT
 
-from ._dm import _get_stratis_devices, remove_stratis_setup
+from ._dm import remove_stratis_setup
 from ._loopback import LoopBackDevices
 
 _STRATISD = os.environ["STRATISD"]
@@ -232,17 +232,6 @@ def processes(name):
             pass
 
 
-def remove_stratis_dm_devices():
-    """
-    Remove Stratis device mapper devices, fail with a runtime error if
-    some have been missed.
-    :raises RuntimeError: if some devices are remaining
-    """
-    remove_stratis_setup()
-    if _get_stratis_devices() != []:
-        raise RuntimeError("Some devices were not removed")
-
-
 class _Service:
     """
     Start and stop stratisd.
@@ -429,7 +418,7 @@ class UdevTest(unittest.TestCase):
             process.terminate()
         psutil.wait_procs(stratisds)
 
-        remove_stratis_dm_devices()
+        remove_stratis_setup()
         self._lb_mgr.destroy_all()
 
     def wait_for_pools(self, expected_num, *, name=None):

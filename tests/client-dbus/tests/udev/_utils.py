@@ -416,7 +416,9 @@ class UdevTest(unittest.TestCase):
         stratisds = list(processes("stratisd"))
         for process in stratisds:
             process.terminate()
-        psutil.wait_procs(stratisds)
+        (_, alive) = psutil.wait_procs(stratisds, timeout=10)
+        for process in alive:
+            process.kill()
 
         remove_stratis_setup()
         self._lb_mgr.destroy_all()

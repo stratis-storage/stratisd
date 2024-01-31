@@ -16,6 +16,7 @@ Used to test behavior of the udev device discovery mechanism.
 """
 
 # isort: STDLIB
+import logging
 import random
 
 # isort: LOCAL
@@ -38,6 +39,8 @@ from ._utils import (
     wait_for_udev,
     wait_for_udev_count,
 )
+
+logging.basicConfig(level=logging.INFO)
 
 
 class UdevTest1(UdevTest):

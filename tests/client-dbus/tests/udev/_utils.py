@@ -16,6 +16,7 @@ Support for testing udev device discovery.
 """
 
 # isort: STDLIB
+import logging
 import os
 import random
 import signal
@@ -415,9 +416,14 @@ class UdevTest(unittest.TestCase):
         """
         stratisds = list(processes("stratisd"))
         for process in stratisds:
+            logging.warning("stratisd process %s still running, terminating", process)
             process.terminate()
         (_, alive) = psutil.wait_procs(stratisds, timeout=10)
         for process in alive:
+            logging.warning(
+                "stratisd process %s did not respond to terminate signal, killing",
+                process,
+            )
             process.kill()
 
         remove_stratis_setup()

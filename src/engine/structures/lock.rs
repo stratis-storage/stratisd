@@ -146,6 +146,9 @@ where
 {
     /// * Asserts that tasks performing an actions either are performing an action immediately
     /// after being spawned or are in the list of woken tasks.
+    ///
+    /// NOTE: This method has the side effect of clearing a woken waiter if it is the waiter that
+    /// is currently acquiring the lock.
     fn woken_or_new(&mut self, wait_type: Option<&WaitType<U>>, idx: u64) {
         if self.woken.contains_key(&idx) {
             let woken = self.woken.remove(&idx);
@@ -159,7 +162,10 @@ where
     /// after being spawned or are in the list of woken tasks.
     /// * Asserts that the current task never conflicts with tasks that have been woken but
     /// not processed yet.
-    fn assert(&mut self, wait_type: &WaitType<U>, idx: u64) {
+    ///
+    /// NOTE: This method has the side effect of clearing a woken waiter if it is the waiter that
+    /// is currently acquiring the lock.
+    fn pre_acquire_assertion(&mut self, wait_type: &WaitType<U>, idx: u64) {
         self.woken_or_new(Some(wait_type), idx);
         assert!(!self.conflicts_with_woken(wait_type));
     }
@@ -176,7 +182,7 @@ where
         }
 
         if let Some(i) = idx {
-            self.assert(&WaitType::SomeRead(uuid), i);
+            self.pre_acquire_assertion(&WaitType::SomeRead(uuid), i);
         }
 
         trace!("Lock record after acquisition: {}", self);
@@ -201,7 +207,7 @@ where
         self.write_locked.insert(uuid);
 
         if let Some(i) = idx {
-            self.assert(&WaitType::SomeWrite(uuid), i);
+            self.pre_acquire_assertion(&WaitType::SomeWrite(uuid), i);
         }
 
         trace!("Lock record after acquisition: {}", self);
@@ -218,7 +224,7 @@ where
     fn add_read_all_lock(&mut self, idx: u64) {
         self.all_read_locked += 1;
 
-        self.assert(&WaitType::AllRead, idx);
+        self.pre_acquire_assertion(&WaitType::AllRead, idx);
 
         trace!("Lock record after acquisition: {}", self);
     }
@@ -237,7 +243,7 @@ where
     fn add_write_all_lock(&mut self, idx: u64) {
         self.all_write_locked = true;
 
-        self.assert(&WaitType::AllWrite, idx);
+        self.pre_acquire_assertion(&WaitType::AllWrite, idx);
 
         trace!("Lock record after acquisition: {}", self);
     }

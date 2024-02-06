@@ -286,7 +286,7 @@ class _Service:
         :return: None
         """
         self._service.send_signal(signal.SIGINT)
-        self._service.wait()
+        self._service.wait(timeout=30)
         if next(processes("stratisd"), None) is not None:
             raise RuntimeError("Failed to stop stratisd service")
 

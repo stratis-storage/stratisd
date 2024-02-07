@@ -3,6 +3,6 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 mod cmds;
-pub mod dump_metadata;
+mod dump_metadata;
 
 pub use cmds::cmds;

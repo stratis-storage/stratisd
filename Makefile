@@ -217,6 +217,14 @@ build-min:
 	--bin=stratis-min --bin=stratisd-min --bin=stratis-utils \
 	${SYSTEMD_FEATURES} ${TARGET_ARGS}
 
+## Build min targets without systemd support enabled
+build-min-no-systemd:
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY}" \
+	cargo ${BUILD} ${RELEASE_FLAG} \
+	--bin=stratis-min --bin=stratisd-min --bin=stratis-utils \
+	${MIN_FEATURES} ${TARGET_ARGS}
+
 ## Build stratisd-min and stratis-min for early userspace
 build-no-ipc:
 	PKG_CONFIG_ALLOW_CROSS=1 \

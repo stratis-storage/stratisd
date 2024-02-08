@@ -211,11 +211,45 @@ impl<'a> UtilCommand<'a> for StratisClevisSetupGenerator {
     }
 }
 
+struct StratisNewTool;
+
+impl StratisNewTool {
+    fn cmd() -> Command {
+        Command::new("stratis-new-tool")
+            .about("Calculate Stratis-specific values from Stratis filesystem devicemapper path (format '/dev/mapper/<devicemapper-name>')")
+                    .arg(Arg::new("path")
+                        .required(true)
+                        .value_name("PATH")
+                        .help("The devicemapper path ('/dev/mapper/<devicemapper-name>')")
+                    )
+                    .arg(
+                        Arg::new("output")
+                        .required(true)
+                        .long("output")
+                        .value_name("OUTPUT_MODE")
+                        .value_parser(["symlink", "pool", "filesystem"])
+                        .help("Stratis value to print")
+                    )
+    }
+}
+
+impl<'a> UtilCommand<'a> for StratisNewTool {
+    fn name(&self) -> &'a str {
+        "stratis-new-tool"
+    }
+
+    fn run(&self, command_line_args: Vec<String>) -> Result<(), Box<dyn Error>> {
+        let _matches = StratisNewTool::cmd().get_matches_from(command_line_args);
+        Ok(())
+    }
+}
+
 pub fn cmds<'a>() -> Vec<Box<dyn UtilCommand<'a>>> {
     vec![
         Box::new(StratisPredictUsage),
         Box::new(StratisSetupGenerator),
         Box::new(StratisClevisSetupGenerator),
+        Box::new(StratisNewTool),
     ]
 }
 

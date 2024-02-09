@@ -47,6 +47,7 @@ NO_IPC_FEATURES = --no-default-features --features engine
 SYSTEMD_FEATURES = --no-default-features --features engine,min,systemd_compat
 EXTRAS_FEATURES =  --no-default-features --features engine,extras,min
 UDEV_FEATURES = --no-default-features --features udev_scripts
+UTILS_FEATURES = --no-default-features --features engine,systemd_compat
 
 DENY = -D warnings -D future-incompatible -D unused -D rust_2018_idioms -D nonstandard_style
 
@@ -209,12 +210,27 @@ build-tests:
 	RUSTFLAGS="${DENY}" \
 	cargo test --no-run ${RELEASE_FLAG} ${TARGET_ARGS}
 
+## Build stratis-utils only
+build-utils:
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY}" \
+	cargo ${BUILD} ${RELEASE_FLAG} \
+	--bin=stratis-utils \
+	${UTILS_FEATURES} ${TARGET_ARGS}
+
+build-utils-no-systemd:
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY}" \
+	cargo ${BUILD} ${RELEASE_FLAG} \
+	--bin=stratis-utils \
+	${NO_IPC_FEATURES} ${TARGET_ARGS}
+
 ## Build stratisd-min and stratis-min for early userspace
 build-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
 	cargo ${BUILD} ${RELEASE_FLAG} \
-	--bin=stratis-min --bin=stratisd-min --bin=stratis-utils \
+	--bin=stratis-min --bin=stratisd-min \
 	${SYSTEMD_FEATURES} ${TARGET_ARGS}
 
 ## Build min targets without systemd support enabled
@@ -222,7 +238,7 @@ build-min-no-systemd:
 	PKG_CONFIG_ALLOW_CROSS=1 \
 	RUSTFLAGS="${DENY}" \
 	cargo ${BUILD} ${RELEASE_FLAG} \
-	--bin=stratis-min --bin=stratisd-min --bin=stratis-utils \
+	--bin=stratis-min --bin=stratisd-min \
 	${MIN_FEATURES} ${TARGET_ARGS}
 
 ## Build stratisd-min and stratis-min for early userspace
@@ -352,7 +368,7 @@ install-daemons:
 install: install-udev-cfg install-man-cfg install-dbus-cfg install-dracut-cfg install-systemd-cfg install-binaries install-udev-binaries install-fstab-script install-daemons
 
 ## Build all Rust artifacts
-build-all-rust: build build-min build-udev-utils stratisd-tools
+build-all-rust: build build-min build-utils build-udev-utils stratisd-tools
 
 ## Build all man pages
 build-all-man: docs/stratisd.8 docs/stratis-dumpmetadata.8
@@ -476,12 +492,16 @@ clippy-min:
 clippy-udev-utils:
 	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} ${UDEV_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 
+## Run clippy on the utils binary
+clippy-utils:
+	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} ${UTILS_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+
 ## Run clippy on no-ipc-build
 clippy-no-ipc:
 	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} ${NO_IPC_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 
 ## Run clippy on the current source tree
-clippy: clippy-macros clippy-min clippy-udev-utils clippy-no-ipc
+clippy: clippy-macros clippy-min clippy-udev-utils clippy-no-ipc clippy-utils
 	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 
 .PHONY:

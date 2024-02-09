@@ -4,7 +4,13 @@
 
 // Functions for dealing with stratis and device mapper names.
 
-use std::fmt::{self, Display};
+use std::{
+    error::Error,
+    fmt::{self, Display},
+    str::FromStr,
+};
+
+use uuid::Uuid;
 
 use devicemapper::{DmNameBuf, DmUuidBuf};
 
@@ -47,6 +53,68 @@ impl KeyDescription {
     /// to Stratis.
     pub fn to_system_string(&self) -> String {
         format!("{}{}", key_description_prefix(), self.as_application_str())
+    }
+}
+
+struct StratisDmThinId {
+    #[allow(dead_code)]
+    pool_uuid: PoolUuid,
+    #[allow(dead_code)]
+    fs_uuid: FilesystemUuid,
+}
+
+#[derive(Debug)]
+struct DmParseError(pub String);
+
+impl Display for DmParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl Error for DmParseError {}
+
+impl FromStr for StratisDmThinId {
+    type Err = DmParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let vals = s.split('-').collect::<Vec<_>>();
+
+        if vals.len() != 6 {
+            return Err(DmParseError("error".into()));
+        }
+
+        if vals[0] != "stratis" {
+            return Err(DmParseError("error".into()));
+        }
+
+        if vals[1]
+            .parse::<u16>()
+            .map(|v| v != FORMAT_VERSION)
+            .unwrap_or(true)
+        {
+            return Err(DmParseError("error".into()));
+        }
+
+        if vals[3] != "thin" {
+            return Err(DmParseError("error".into()));
+        }
+
+        if vals[4] != "fs" {
+            return Err(DmParseError("error".into()));
+        }
+
+        let pool_uuid = vals[2]
+            .parse::<Uuid>()
+            .map(PoolUuid)
+            .map_err(|_| DmParseError("stuff".to_string()))?;
+
+        let fs_uuid = vals[5]
+            .parse::<Uuid>()
+            .map(FilesystemUuid)
+            .map_err(|_| DmParseError("stuff".to_string()))?;
+
+        Ok(StratisDmThinId { pool_uuid, fs_uuid })
     }
 }
 

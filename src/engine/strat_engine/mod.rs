@@ -29,6 +29,7 @@ pub use self::{
     engine::StratEngine,
     keys::StratKeyActions,
     metadata::{StaticHeader, StaticHeaderResult, BDA},
+    names::StratisDmThinId,
     ns::unshare_mount_namespace,
     thinpool::ThinPoolSizeParams,
 };

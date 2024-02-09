@@ -56,15 +56,13 @@ impl KeyDescription {
     }
 }
 
-struct StratisDmThinId {
-    #[allow(dead_code)]
-    pool_uuid: PoolUuid,
-    #[allow(dead_code)]
-    fs_uuid: FilesystemUuid,
+pub struct StratisDmThinId {
+    pub pool_uuid: PoolUuid,
+    pub fs_uuid: FilesystemUuid,
 }
 
 #[derive(Debug)]
-struct DmParseError(pub String);
+pub struct DmParseError(pub String);
 
 impl Display for DmParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

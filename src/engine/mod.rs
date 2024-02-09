@@ -9,7 +9,7 @@ pub use self::{
     strat_engine::{
         crypt_metadata_size, get_dm, get_dm_init, register_clevis_token, set_up_crypt_logging,
         unshare_mount_namespace, StaticHeader, StaticHeaderResult, StratEngine, StratKeyActions,
-        ThinPoolSizeParams, BDA, CLEVIS_TANG_TRUST_URL,
+        StratisDmThinId, ThinPoolSizeParams, BDA, CLEVIS_TANG_TRUST_URL,
     },
     structures::{AllLockReadGuard, ExclusiveGuard, SharedGuard, Table},
     types::{

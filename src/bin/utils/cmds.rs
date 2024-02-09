@@ -243,10 +243,13 @@ impl<'a> UtilCommand<'a> for StratisNewTool {
     fn run(&self, command_line_args: Vec<String>) -> Result<(), Box<dyn Error>> {
         let matches = StratisNewTool::cmd().get_matches_from(command_line_args);
 
-        let path: &PathBuf = matches.get_one("path").expect("required argument");
+        let path = matches
+            .get_one::<String>("path")
+            .expect("required argument")
+            .parse::<PathBuf>()?;
 
         let output_mode: &String = matches.get_one("output").expect("required_argument");
-        new_tool::print_value(path, output_mode)?;
+        new_tool::print_value(&path, output_mode)?;
 
         Ok(())
     }

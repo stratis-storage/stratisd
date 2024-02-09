@@ -2,10 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-mod cmds;
-#[cfg(feature = "systemd_compat")]
-mod generators;
-mod new_tool;
-mod predict_usage;
+use std::{error::Error, path::Path};
 
-pub use cmds::{cmds, ExecutableError};
+pub fn print_value(_path: &Path, _mode: &str) -> Result<(), Box<dyn Error>> {
+    unimplemented!()
+}

@@ -5,6 +5,7 @@
 use std::{
     error::Error,
     fmt::{self, Display},
+    path::PathBuf,
 };
 
 use clap::{Arg, ArgAction, Command};
@@ -14,6 +15,7 @@ use clap::builder::Str;
 
 use devicemapper::Bytes;
 
+use crate::utils::new_tool;
 use crate::utils::predict_usage;
 
 #[cfg(feature = "systemd_compat")]
@@ -239,7 +241,13 @@ impl<'a> UtilCommand<'a> for StratisNewTool {
     }
 
     fn run(&self, command_line_args: Vec<String>) -> Result<(), Box<dyn Error>> {
-        let _matches = StratisNewTool::cmd().get_matches_from(command_line_args);
+        let matches = StratisNewTool::cmd().get_matches_from(command_line_args);
+
+        let path: &PathBuf = matches.get_one("path").expect("required argument");
+
+        let output_mode: &String = matches.get_one("output").expect("required_argument");
+        new_tool::print_value(path, output_mode)?;
+
         Ok(())
     }
 }

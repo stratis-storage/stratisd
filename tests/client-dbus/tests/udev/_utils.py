@@ -82,12 +82,12 @@ def create_pool(
         {
             "name": name,
             "devices": devices,
-            "key_desc": (False, "")
-            if key_description is None
-            else (True, key_description),
-            "clevis_info": (False, ("", ""))
-            if clevis_info is None
-            else (True, clevis_info),
+            "key_desc": (
+                (False, "") if key_description is None else (True, key_description)
+            ),
+            "clevis_info": (
+                (False, ("", "")) if clevis_info is None else (True, clevis_info)
+            ),
         },
     )
 

@@ -40,34 +40,34 @@ jobs:
       matrix:
         include:
           - task: make -f Makefile clippy
-            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.76.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: clippy
           - task: PROFILEDIR=debug make -f Makefile build
-            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.76.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: PROFILEDIR=debug make -f Makefile build-min
-            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.76.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: PROFILEDIR=debug make -f Makefile build-no-ipc
-            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.76.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: PROFILEDIR=debug make -f Makefile stratisd-tools
-            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.76.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile docs-ci
-            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.76.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile test
-            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.76.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile build
-            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.76.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile build-min
-            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.76.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
           - task: make -f Makefile build-no-ipc
-            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.76.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-22.04
     container:
@@ -105,7 +105,7 @@ jobs:
       matrix:
         include:
           - task: RUST_LOG=stratisd=debug make -f Makefile test-loop
-            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.76.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-22.04
     container:

@@ -8,7 +8,7 @@ use std::{
     path::{Component, Path},
 };
 
-use stratisd::engine::StratisDmThinId;
+use stratisd::engine::{filesystem_mount_path, StratisDmThinId};
 
 pub fn print_value(path: &Path, mode: &str) -> Result<(), Box<dyn Error>> {
     let mut components = path.components();
@@ -34,8 +34,16 @@ pub fn print_value(path: &Path, mode: &str) -> Result<(), Box<dyn Error>> {
             println!("{}", thin_id_parts.pool_uuid);
         } else if mode == "filesystem" {
             println!("{}", thin_id_parts.fs_uuid);
+        } else if mode == "symlink" {
+            println!(
+                "{}",
+                filesystem_mount_path(
+                    thin_id_parts.pool_uuid.to_string(),
+                    thin_id_parts.fs_uuid.to_string()
+                ).display()
+            );
         } else {
-            unimplemented!();
+            unreachable!("all command-line options accounted for")
         }
     } else {
         unimplemented!();

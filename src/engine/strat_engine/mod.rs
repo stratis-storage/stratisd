@@ -25,6 +25,7 @@ pub use self::{
     backstore::{
         crypt_metadata_size, register_clevis_token, set_up_crypt_logging, CLEVIS_TANG_TRUST_URL,
     },
+    devlinks::filesystem_mount_path,
     dm::{get_dm, get_dm_init},
     engine::StratEngine,
     keys::StratKeyActions,

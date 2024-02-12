@@ -48,6 +48,12 @@ jobs:
           - task: PROFILEDIR=debug make -f Makefile build-min
             toolchain: 1.76.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
+          - task: PROFILEDIR=debug make -f Makefile build-min-no-systemd
+            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            components: cargo
+          - task: PROFILEDIR=debug make -f Makefile build-utils
+            toolchain: 1.75.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            components: cargo
           - task: PROFILEDIR=debug make -f Makefile build-no-ipc
             toolchain: 1.76.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo

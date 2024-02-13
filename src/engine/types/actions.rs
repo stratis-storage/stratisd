@@ -359,7 +359,7 @@ impl Display for SetCreateAction<DevUuid> {
         if self.changed.is_empty() {
             write!(
                 f,
-                "The requested filesystems already exist; no action taken"
+                "The specified devices already belong to the pool; no action taken"
             )
         } else {
             write!(
@@ -574,7 +574,7 @@ impl Display for DeleteAction<Key> {
     }
 }
 
-/// An action which may create multiple things.
+/// An action which may delete multiple things.
 #[derive(Debug, PartialEq, Eq)]
 pub struct SetDeleteAction<T> {
     changed: Vec<T>,

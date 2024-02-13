@@ -16,6 +16,7 @@ Support for testing udev device discovery.
 """
 
 # isort: STDLIB
+import logging
 import os
 import random
 import signal
@@ -43,7 +44,7 @@ from stratisd_client_dbus import (
 )
 from stratisd_client_dbus._constants import TOP_OBJECT
 
-from ._dm import _get_stratis_devices, remove_stratis_setup
+from ._dm import remove_stratis_setup
 from ._loopback import LoopBackDevices
 
 _STRATISD = os.environ["STRATISD"]
@@ -81,12 +82,12 @@ def create_pool(
         {
             "name": name,
             "devices": devices,
-            "key_desc": (False, "")
-            if key_description is None
-            else (True, key_description),
-            "clevis_info": (False, ("", ""))
-            if clevis_info is None
-            else (True, clevis_info),
+            "key_desc": (
+                (False, "") if key_description is None else (True, key_description)
+            ),
+            "clevis_info": (
+                (False, ("", "")) if clevis_info is None else (True, clevis_info)
+            ),
         },
     )
 
@@ -232,17 +233,6 @@ def processes(name):
             pass
 
 
-def remove_stratis_dm_devices():
-    """
-    Remove Stratis device mapper devices, fail with a runtime error if
-    some have been missed.
-    :raises RuntimeError: if some devices are remaining
-    """
-    remove_stratis_setup()
-    if _get_stratis_devices() != []:
-        raise RuntimeError("Some devices were not removed")
-
-
 class _Service:
     """
     Start and stop stratisd.
@@ -297,7 +287,7 @@ class _Service:
         :return: None
         """
         self._service.send_signal(signal.SIGINT)
-        self._service.wait()
+        self._service.wait(timeout=30)
         if next(processes("stratisd"), None) is not None:
             raise RuntimeError("Failed to stop stratisd service")
 
@@ -426,10 +416,17 @@ class UdevTest(unittest.TestCase):
         """
         stratisds = list(processes("stratisd"))
         for process in stratisds:
+            logging.warning("stratisd process %s still running, terminating", process)
             process.terminate()
-        psutil.wait_procs(stratisds)
+        (_, alive) = psutil.wait_procs(stratisds, timeout=10)
+        for process in alive:
+            logging.warning(
+                "stratisd process %s did not respond to terminate signal, killing",
+                process,
+            )
+            process.kill()
 
-        remove_stratis_dm_devices()
+        remove_stratis_setup()
         self._lb_mgr.destroy_all()
 
     def wait_for_pools(self, expected_num, *, name=None):

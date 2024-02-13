@@ -3,6 +3,8 @@
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 mod cmds;
-mod dump_metadata;
+#[cfg(feature = "systemd_compat")]
+mod generators;
+mod predict_usage;
 
-pub use cmds::cmds;
+pub use cmds::{cmds, ExecutableError};

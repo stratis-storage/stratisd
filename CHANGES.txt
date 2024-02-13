@@ -1,3 +1,26 @@
+stratisd 3.6.5
+==============
+Recommended Rust toolchain version: 1.76.0
+Recommended development platform for Python development: Fedora 39
+
+* Cherry-picked commits:
+  * Improve readability of locking code
+  * Change comment
+  * Relax fairness restriction on AllOrSomeLock
+  * Fix log message in SetCreateAction
+  * Remove redundant remove_stratis_dm_devices()
+  * Remove remove_stratis_dm_devices entirely
+  * Set timeout of 30 sec after interrupt signal sent
+  * Kill stratisd process if a terminate has not worked
+  * Add some Python logging in test infrastructure
+  * Make dump_metadata module private
+  * create_pool(): reformat for black 24.1.1
+  * github actions: update recommended Rust to 1.76.0
+  * Refactor stratis-utils for better modularity and more convenient dispatch
+  * Build min targets without systemd enabled
+  * Build the -utils binary separately
+
+
 stratisd 3.6.4
 ==============
 Recommended Rust toolchain version: 1.75.0

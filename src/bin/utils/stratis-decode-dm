@@ -1,0 +1,203 @@
+#!/usr/bin/env python3
+
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+"""
+Script to map from devicemapper name to Stratis values
+"""
+
+# isort: STDLIB
+import argparse
+import pathlib
+from enum import Enum
+from uuid import UUID
+
+# isort: THIRDPARTY
+import dbus
+
+_REVISION_NUMBER = 7
+_REVISION = f"r{_REVISION_NUMBER}"
+_BUS_NAME = "org.storage.stratis3"
+_TOP_OBJECT = "/org/storage/stratis3"
+_OBJECT_MANAGER = "org.freedesktop.DBus.ObjectManager"
+_TIMEOUT = 120000
+_POOL_IFACE = f"{_BUS_NAME}.pool.{_REVISION}"
+_FS_IFACE = f"{_BUS_NAME}.filesystem.{_REVISION}"
+_DEV_PATH = "/dev/stratis"
+
+
+class OutputMode(Enum):
+    """
+    Output mode choices.
+    """
+
+    FILESYSTEM_NAME = "filesystem-name"
+    POOL_NAME = "pool-name"
+    SYMLINK = "symlink"
+
+    def __str__(self):
+        return self.value
+
+
+def _parse_dm_name(dmname):
+    """
+    Parse a Stratis filesystem devicemapper name.
+
+    :param str dmname: the devicemapper name of the filesystem device
+    :returns: the pool and filesystem UUID
+    :rtype: UUID * UUID
+    """
+    try:
+        (stratis, format_version, pool_uuid, thin, fs, filesystem_uuid) = dmname.split(
+            "-"
+        )
+    except ValueError as err:
+        raise RuntimeError(
+            f"error parsing Stratis filesystem devicemapper name {dmname}"
+        ) from err
+
+    if stratis != "stratis" or format_version != "1" or thin != "thin" or fs != "fs":
+        raise RuntimeError(
+            f"error parsing Stratis filesystem devicemapper name {dmname}"
+        )
+
+    return (UUID(pool_uuid), UUID(filesystem_uuid))
+
+
+def _extract_dm_name(dmpath):
+    """
+    Extract the devicemapper name from the devicemapper path.
+
+    :param Path dmpath: The devicemapper path.
+    :returns: devicemapper name
+    :rtype: str
+    """
+
+    assert dmpath.is_absolute(), "parser ensures absolute path"
+
+    try:
+        (_, dev, mapper, name) = dmpath.parts
+    except ValueError as err:
+        raise RuntimeError(
+            f"error decomposing Stratis filesystem devicemapper path: {dmpath}"
+        ) from err
+
+    if dev != "dev" or mapper != "mapper":
+        raise RuntimeError(
+            f"error decomposing Stratis filesystem devicemapper path: {dmpath}"
+        )
+
+    return name
+
+
+def _get_managed_objects():
+    """
+    Get managed objects for stratis
+    :return: A dict,  Keys are object paths with dicts containing interface
+                      names mapped to property dicts.
+                      Property dicts map names to values.
+    """
+    object_manager = dbus.Interface(
+        dbus.SystemBus().get_object(_BUS_NAME, _TOP_OBJECT),
+        _OBJECT_MANAGER,
+    )
+    return object_manager.GetManagedObjects(timeout=_TIMEOUT)
+
+
+def _get_parser():
+    """
+    Build a parser for this script.
+    """
+
+    def _abs_path(path):
+        parsed_path = pathlib.Path(path)
+        if not parsed_path.is_absolute():
+            raise argparse.ArgumentTypeError(
+                f"{path} must be specified as an absolute path"
+            )
+
+        return parsed_path
+
+    parser = argparse.ArgumentParser(
+        description="Utility that maps from Stratis filesystem devicemapper path to a Stratis value"
+    )
+    parser.add_argument(
+        "path",
+        help="The absolute path of the devicemapper device ('/dev/mapper/<devicemapper-name>')",
+        metavar="PATH",
+        type=_abs_path,
+    )
+    parser.add_argument(
+        "--output",
+        choices=list(OutputMode),
+        help="Stratis value to print",
+        type=OutputMode,
+        required=True,
+    )
+    return parser
+
+
+def main():
+    """
+    The main method.
+    """
+    parser = _get_parser()
+    namespace = parser.parse_args()
+
+    dm_name = _extract_dm_name(namespace.path)
+
+    (pool_uuid, filesystem_uuid) = _parse_dm_name(dm_name)
+
+    managed_objects = _get_managed_objects()
+
+    (pool_uuid_str, filesystem_uuid_str) = (pool_uuid.hex, filesystem_uuid.hex)
+
+    pool_name = next(
+        (
+            obj_data[_POOL_IFACE]["Name"]
+            for obj_data in managed_objects.values()
+            if _POOL_IFACE in obj_data
+            and obj_data[_POOL_IFACE]["Uuid"] == pool_uuid_str
+        ),
+        None,
+    )
+
+    filesystem_name = next(
+        (
+            obj_data[_FS_IFACE]["Name"]
+            for obj_data in managed_objects.values()
+            if _FS_IFACE in obj_data
+            and obj_data[_FS_IFACE]["Uuid"] == filesystem_uuid_str
+        ),
+        None,
+    )
+
+    if namespace.output is OutputMode.SYMLINK:
+        if pool_name is None:
+            raise RuntimeError(
+                "Pool name could not be found; can not synthesize Stratis filesystem symlink"
+            )
+        if filesystem_name is None:
+            raise RuntimeError(
+                "Filesystem name could not be found; can not synthesize Stratis filesystem symlink"
+            )
+        print(pathlib.Path(_DEV_PATH, pool_name, filesystem_name))
+
+    elif namespace.output is OutputMode.FILESYSTEM_NAME:
+        if filesystem_name is None:
+            raise RuntimeError("Filesystem name could not be found")
+        print(filesystem_name)
+
+    elif namespace.output is OutputMode.POOL_NAME:
+        if filesystem_name is None:
+            raise RuntimeError("Pool name could not be found")
+        print(pool_name)
+
+    else:
+        assert False, "unreachable"
+
+
+if __name__ == "__main__":
+    main()

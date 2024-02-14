@@ -54,6 +54,7 @@ jobs:
       - name: Install dependencies for Fedora
         run: >
           dnf install -y
+          black
           clang
           curl
           cryptsetup-devel
@@ -62,6 +63,7 @@ jobs:
           libblkid-devel
           make
           ncurses
+          python3-isort
           systemd-devel
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -237,6 +239,21 @@ jobs:
           shfmt
       - name: Run shell check
         run: make -f Makefile fmt-shell-ci
+
+  pylint:
+    runs-on: ubuntu-22.04
+    container:
+      image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: >
+          dnf install -y
+          make
+          pylint
+          python3-dbus
+      - name: Run pylint
+        run: make -f Makefile pylint
 
   python-based-tests:
     runs-on: ubuntu-22.04

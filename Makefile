@@ -175,10 +175,14 @@ check-typos:
 ## Run cargo fmt
 fmt: fmt-macros
 	cargo fmt
+	isort ./src/bin/utils/stratis-decode-dm
+	black ./src/bin/utils/stratis-decode-dm
 
 ## Run cargo fmt for CI jobs
 fmt-ci: fmt-macros-ci
 	cargo fmt -- --check
+	isort --diff --check-only ./src/bin/utils/stratis-decode-dm
+	black ./src/bin/utils/stratis-decode-dm --check
 
 ## Run cargo fmt for stratisd_proc_macros
 fmt-macros:
@@ -333,6 +337,11 @@ install-systemd-cfg:
 	sed 's|@LIBEXECDIR@|$(LIBEXECDIR)|' systemd/stratisd-min-postinitrd.service.in > $(DESTDIR)$(UNITDIR)/stratisd-min-postinitrd.service
 	sed 's|@UNITEXECDIR@|$(UNITEXECDIR)|' systemd/stratis-fstab-setup@.service.in > $(DESTDIR)$(UNITDIR)/stratis-fstab-setup@.service
 
+## Install scripts
+install-scripts:
+	mkdir -p $(DESTDIR)$(BINDIR)
+	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(BINDIR) src/bin/utils/stratis-decode-dm
+
 ## Install binaries
 install-binaries:
 	mkdir -p $(DESTDIR)$(BINDIR)
@@ -365,7 +374,7 @@ install-daemons:
 	$(INSTALL) -Dpm0755 -t $(DESTDIR)$(LIBEXECDIR) target/$(PROFILEDIR)/stratisd-min
 
 ## Install all stratisd files
-install: install-udev-cfg install-man-cfg install-dbus-cfg install-dracut-cfg install-systemd-cfg install-binaries install-udev-binaries install-fstab-script install-daemons
+install: install-udev-cfg install-man-cfg install-dbus-cfg install-dracut-cfg install-systemd-cfg install-scripts install-binaries install-udev-binaries install-fstab-script install-daemons
 
 ## Build all Rust artifacts
 build-all-rust: build build-min build-utils build-udev-utils stratisd-tools
@@ -504,6 +513,10 @@ clippy-no-ipc:
 clippy: clippy-macros clippy-min clippy-udev-utils clippy-no-ipc clippy-utils
 	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 
+## Lint Python parts of the source code
+pylint:
+	pylint --disable=invalid-name ./src/bin/utils/stratis-decode-dm
+
 .PHONY:
 	audit
 	audit-all-rust
@@ -541,10 +554,12 @@ clippy: clippy-macros clippy-min clippy-udev-utils clippy-no-ipc clippy-utils
 	install-dracut-cfg
 	install-fstab-script
 	install-man-cfg
+	install-scripts
 	install-systemd-cfg
 	install-udev-binaries
 	install-udev-cfg
 	license
+	pylint
 	test
 	test-valgrind
 	test-loop

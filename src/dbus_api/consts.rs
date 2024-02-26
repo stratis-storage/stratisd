@@ -65,6 +65,7 @@ pub const FILESYSTEM_POOL_PROP: &str = "Pool";
 pub const FILESYSTEM_CREATED_PROP: &str = "Created";
 pub const FILESYSTEM_SIZE_PROP: &str = "Size";
 pub const FILESYSTEM_SIZE_LIMIT_PROP: &str = "SizeLimit";
+pub const FILESYSTEM_ORIGIN_PROP: &str = "Origin";
 
 pub const BLOCKDEV_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.blockdev.r0";
 pub const BLOCKDEV_INTERFACE_NAME_3_1: &str = "org.storage.stratis3.blockdev.r1";

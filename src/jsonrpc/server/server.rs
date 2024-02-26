@@ -239,6 +239,13 @@ impl StratisParams {
                     false,
                 )))
             }
+            StratisParamType::FsOrigin(pool_name, fs_name) => {
+                expects_fd!(self.fd_opt, false);
+                Ok(StratisRet::FsOrigin(stratis_result_to_return(
+                    filesystem::filesystem_origin(engine, &pool_name, &fs_name).await,
+                    None,
+                )))
+            }
             StratisParamType::Report => {
                 expects_fd!(self.fd_opt, false);
                 Ok(StratisRet::Report(report::report(engine).await))

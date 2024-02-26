@@ -51,6 +51,7 @@ pub struct StratFilesystem {
     created: DateTime<Utc>,
     used: Option<Bytes>,
     size_limit: Option<Sectors>,
+    origin: Option<FilesystemUuid>,
 }
 
 fn init_used(thin_dev: &ThinDev) -> Option<Bytes> {
@@ -114,6 +115,7 @@ impl StratFilesystem {
                 thin_dev,
                 created: Utc::now(),
                 size_limit,
+                origin: None,
             },
         ))
     }
@@ -140,6 +142,7 @@ impl StratFilesystem {
             thin_dev,
             created,
             size_limit: fssave.fs_size_limit,
+            origin: fssave.origin,
         })
     }
 
@@ -200,6 +203,7 @@ impl StratFilesystem {
         snapshot_fs_name: &Name,
         snapshot_fs_uuid: FilesystemUuid,
         snapshot_thin_id: ThinDevId,
+        origin_uuid: FilesystemUuid,
     ) -> StratisResult<StratFilesystem> {
         match self.thin_dev.snapshot(
             get_dm(),
@@ -245,6 +249,7 @@ impl StratFilesystem {
                     thin_dev,
                     created: Utc::now(),
                     size_limit: self.size_limit,
+                    origin: Some(origin_uuid),
                 })
             }
             Err(e) => Err(StratisError::Msg(format!(
@@ -366,6 +371,7 @@ impl StratFilesystem {
             size: self.thin_dev.size(),
             created: self.created.timestamp() as u64,
             fs_size_limit: self.size_limit,
+            origin: self.origin,
         }
     }
 
@@ -420,6 +426,12 @@ impl StratFilesystem {
     pub fn thindev_size(&self) -> Sectors {
         self.thin_dev.size()
     }
+
+    pub fn unset_origin(&mut self) -> bool {
+        let changed = self.origin.is_some();
+        self.origin = None;
+        changed
+    }
 }
 
 impl Filesystem for StratFilesystem {
@@ -458,6 +470,10 @@ impl Filesystem for StratFilesystem {
 
     fn size_limit(&self) -> Option<Sectors> {
         self.size_limit
+    }
+
+    fn origin(&self) -> Option<FilesystemUuid> {
+        self.origin
     }
 }
 
@@ -540,6 +556,15 @@ impl<'a> Into<Value> for &'a StratFilesystem {
             "size_limit".to_string(),
             Value::from(
                 self.size_limit
+                    .as_ref()
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| "Not set".to_string()),
+            ),
+        );
+        json.insert(
+            "origin".to_string(),
+            Value::from(
+                self.origin
                     .as_ref()
                     .map(|v| v.to_string())
                     .unwrap_or_else(|| "Not set".to_string()),

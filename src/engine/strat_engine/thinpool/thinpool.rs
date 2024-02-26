@@ -1253,6 +1253,7 @@ impl ThinPool {
                 &fs_name,
                 snapshot_fs_uuid,
                 snapshot_id,
+                origin_uuid,
             )?,
             None => {
                 return Err(StratisError::Msg(
@@ -1572,6 +1573,22 @@ impl ThinPool {
             .get_filesystem_by_uuid(fs_uuid)
             .ok_or_else(|| StratisError::Msg(format!("No filesystem with UUID {fs_uuid} found")))?;
         if changed {
+            self.mdv.save_fs(&name, fs_uuid, fs)?;
+        }
+        Ok(changed)
+    }
+
+    pub fn unset_fs_origin(&mut self, fs_uuid: FilesystemUuid) -> StratisResult<bool> {
+        let changed = {
+            let (_, fs) = self.get_mut_filesystem_by_uuid(fs_uuid).ok_or_else(|| {
+                StratisError::Msg(format!("No filesystem with UUID {fs_uuid} found"))
+            })?;
+            fs.unset_origin()
+        };
+        if changed {
+            let (name, fs) = self
+                .get_filesystem_by_uuid(fs_uuid)
+                .expect("Looked up above.");
             self.mdv.save_fs(&name, fs_uuid, fs)?;
         }
         Ok(changed)

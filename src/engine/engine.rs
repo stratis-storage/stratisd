@@ -93,6 +93,9 @@ pub trait Filesystem: Debug {
 
     /// Get filesystem size limit.
     fn size_limit(&self) -> Option<Sectors>;
+
+    /// Get filesystem snapshot origin.
+    fn origin(&self) -> Option<FilesystemUuid>;
 }
 
 pub trait BlockDev: Debug {
@@ -207,7 +210,7 @@ pub trait Pool: Debug + Send + Sync {
         &mut self,
         pool_name: &str,
         fs_uuids: &[FilesystemUuid],
-    ) -> StratisResult<SetDeleteAction<FilesystemUuid>>;
+    ) -> StratisResult<SetDeleteAction<FilesystemUuid, FilesystemUuid>>;
 
     /// Rename filesystem
     /// Rename pool with uuid to new_name.

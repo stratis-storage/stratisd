@@ -118,6 +118,13 @@ impl SimPool {
             Ok(())
         }
     }
+
+    fn filesystems_mut(&mut self) -> Vec<(Name, FilesystemUuid, &mut SimFilesystem)> {
+        self.filesystems
+            .iter_mut()
+            .map(|(name, uuid, x)| (name.clone(), *uuid, x))
+            .collect()
+    }
 }
 
 // Precondition: SimDev::into() always returns a value that matches Value::Object(_).
@@ -243,7 +250,7 @@ impl Pool for SimPool {
         for (name, (size, size_limit)) in spec_map {
             if !self.filesystems.contains_name(name) {
                 let uuid = FilesystemUuid::new_v4();
-                let new_filesystem = SimFilesystem::new(size, size_limit)?;
+                let new_filesystem = SimFilesystem::new(size, size_limit, None)?;
                 self.filesystems
                     .insert(Name::new((name).to_owned()), uuid, new_filesystem);
                 result.push((name, uuid, size));
@@ -476,14 +483,33 @@ impl Pool for SimPool {
         &mut self,
         _pool_name: &str,
         fs_uuids: &[FilesystemUuid],
-    ) -> StratisResult<SetDeleteAction<FilesystemUuid>> {
+    ) -> StratisResult<SetDeleteAction<FilesystemUuid, FilesystemUuid>> {
         let mut removed = Vec::new();
         for &uuid in fs_uuids {
             if self.filesystems.remove_by_uuid(uuid).is_some() {
                 removed.push(uuid);
             }
         }
-        Ok(SetDeleteAction::new(removed))
+
+        let updated_origins: Vec<FilesystemUuid> = self
+            .filesystems_mut()
+            .iter_mut()
+            .filter_map(|(_, u, fs)| {
+                fs.origin().and_then(|x| {
+                    if removed.contains(&x) {
+                        if fs.unset_origin() {
+                            Some(*u)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect();
+
+        Ok(SetDeleteAction::new(removed, updated_origins))
     }
 
     fn rename_filesystem(
@@ -533,7 +559,11 @@ impl Pool for SimPool {
                         return Ok(CreateAction::Identity);
                     }
                 }
-                SimFilesystem::new(filesystem.size(), filesystem.size_limit())?
+                SimFilesystem::new(
+                    filesystem.size(),
+                    filesystem.size_limit(),
+                    Some(origin_uuid),
+                )?
             }
             None => {
                 return Err(StratisError::Msg(origin_uuid.to_string()));
@@ -884,7 +914,7 @@ mod tests {
             .unwrap();
         let fs_uuid = fs_results[0].1;
         assert!(match pool.destroy_filesystems(pool_name, &[fs_uuid]) {
-            Ok(filesystems) => filesystems == SetDeleteAction::new(vec![fs_uuid]),
+            Ok(filesystems) => filesystems == SetDeleteAction::new(vec![fs_uuid], vec![]),
             _ => false,
         });
     }

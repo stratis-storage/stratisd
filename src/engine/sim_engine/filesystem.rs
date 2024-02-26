@@ -10,7 +10,7 @@ use serde_json::{Map, Value};
 use devicemapper::{Bytes, Sectors};
 
 use crate::{
-    engine::Filesystem,
+    engine::{types::FilesystemUuid, Filesystem},
     stratis::{StratisError, StratisResult},
 };
 
@@ -20,10 +20,15 @@ pub struct SimFilesystem {
     created: DateTime<Utc>,
     size: Sectors,
     size_limit: Option<Sectors>,
+    origin: Option<FilesystemUuid>,
 }
 
 impl SimFilesystem {
-    pub fn new(size: Sectors, size_limit: Option<Sectors>) -> StratisResult<SimFilesystem> {
+    pub fn new(
+        size: Sectors,
+        size_limit: Option<Sectors>,
+        origin: Option<FilesystemUuid>,
+    ) -> StratisResult<SimFilesystem> {
         if let Some(limit) = size_limit {
             if limit < size {
                 return Err(StratisError::Msg(format!(
@@ -36,6 +41,7 @@ impl SimFilesystem {
             created: Utc::now(),
             size,
             size_limit,
+            origin,
         })
     }
 
@@ -60,6 +66,12 @@ impl SimFilesystem {
                 }
             }
         }
+    }
+
+    pub fn unset_origin(&mut self) -> bool {
+        let changed = self.origin.is_some();
+        self.origin = None;
+        changed
     }
 }
 
@@ -89,6 +101,10 @@ impl Filesystem for SimFilesystem {
     fn size_limit(&self) -> Option<Sectors> {
         self.size_limit
     }
+
+    fn origin(&self) -> Option<FilesystemUuid> {
+        self.origin
+    }
 }
 
 impl<'a> Into<Value> for &'a SimFilesystem {
@@ -107,6 +123,15 @@ impl<'a> Into<Value> for &'a SimFilesystem {
             "size_limit".to_string(),
             Value::from(
                 self.size_limit
+                    .as_ref()
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| "Not set".to_string()),
+            ),
+        );
+        json.insert(
+            "origin".to_string(),
+            Value::from(
+                self.origin
                     .as_ref()
                     .map(|v| v.to_string())
                     .unwrap_or_else(|| "Not set".to_string()),

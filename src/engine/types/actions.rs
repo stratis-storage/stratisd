@@ -575,38 +575,44 @@ impl Display for DeleteAction<Key> {
 }
 
 /// An action which may delete multiple things.
+/// This action may also cause other values to require updating.
 #[derive(Debug, PartialEq, Eq)]
-pub struct SetDeleteAction<T> {
+pub struct SetDeleteAction<T, U> {
     changed: Vec<T>,
+    updated: Vec<U>,
 }
 
-impl<T> SetDeleteAction<T> {
-    pub fn new(changed: Vec<T>) -> Self {
-        SetDeleteAction { changed }
+impl<T, U> SetDeleteAction<T, U> {
+    pub fn new(changed: Vec<T>, updated: Vec<U>) -> Self {
+        assert!(!changed.is_empty() || updated.is_empty());
+        SetDeleteAction { changed, updated }
     }
 
     pub fn empty() -> Self {
-        SetDeleteAction { changed: vec![] }
+        SetDeleteAction {
+            changed: vec![],
+            updated: vec![],
+        }
     }
 }
 
-impl<T> EngineAction for SetDeleteAction<T> {
-    type Return = Vec<T>;
+impl<T, U> EngineAction for SetDeleteAction<T, U> {
+    type Return = (Vec<T>, Vec<U>);
 
     fn is_changed(&self) -> bool {
         !self.changed.is_empty()
     }
 
-    fn changed(self) -> Option<Vec<T>> {
+    fn changed(self) -> Option<(Vec<T>, Vec<U>)> {
         if self.changed.is_empty() {
             None
         } else {
-            Some(self.changed)
+            Some((self.changed, self.updated))
         }
     }
 }
 
-impl Display for SetDeleteAction<FilesystemUuid> {
+impl Display for SetDeleteAction<FilesystemUuid, FilesystemUuid> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.changed.is_empty() {
             write!(

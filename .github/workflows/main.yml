@@ -298,9 +298,9 @@ jobs:
       matrix:
         include:
           - rev: HEAD
-            options: --post-test-check=monitor-dbus --post-test-check=verify-sysfs --post-test-check=verify-private-symlinks --post-test-check=verify-filesystem-symlinks
-          - rev: v3.6.0
-            options: --verify-devices --monitor-dbus
+            options: --post-test-check=verify-filesystem-symlinks --highest-revision-number=7
+          - rev: v3.6.2
+            options: --highest-revision-number=6
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -352,6 +352,8 @@ jobs:
           RUST_LOG=stratisd=debug
           python3 test_harness.py --log-level=debug
           stratisd_cert
-          --highest-revision-number=7
+          --post-test-check=monitor-dbus
+          --post-test-check=verify-sysfs
+          --post-test-check=verify-private-symlinks
           ${{ matrix.options }}
         working-directory: ./testing

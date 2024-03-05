@@ -847,11 +847,11 @@ checksum = "b06a4cde4c0f271a446782e3eff8de789548ce57dbc8eca9292c27f4a42004b4"
 
 [[package]]
 name = "loopdev-3"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "378e7ca4e85e592564e6a96c362303972b5c7860367014383aadc10a8704fc38"
+checksum = "90a97d7a5124296ee9124a815acdc3dc4a91f577b72812b3f1f99bb959b46e8d"
 dependencies = [
- "bindgen 0.68.1",
+ "bindgen 0.69.4",
  "errno",
  "libc",
 ]

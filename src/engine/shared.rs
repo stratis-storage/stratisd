@@ -38,6 +38,11 @@ pub const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 // metadata.
 const MIN_THIN_DEV_SIZE: Sectors = Sectors(IEC::Mi); // 512 MiB
 
+// Linux has a maximum filename length of 255 bytes. We use this length
+// as a cap on the size of the pool name also. This ensures that the name
+// serialized in the pool-level metadata has a bounded length.
+const MAXIMUM_NAME_SIZE: usize = 255;
+
 /// Called when the name of a requested pool coincides with the name of an
 /// existing pool. Returns an error if the specifications of the requested
 /// pool differ from the specifications of the existing pool, otherwise
@@ -143,10 +148,9 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
     if name == "." || name == ".." {
         return Err(StratisError::Msg(format!("Name is . or .. : {name}")));
     }
-    // Linux has a maximum filename length of 255 bytes
-    if name.len() > 255 {
+    if name.len() > MAXIMUM_NAME_SIZE {
         return Err(StratisError::Msg(format!(
-            "Name has more than 255 bytes: {name}"
+            "Name has more than {MAXIMUM_NAME_SIZE} bytes: {name}"
         )));
     }
     if name.len() != name.trim().len() {

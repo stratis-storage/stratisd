@@ -32,8 +32,10 @@ const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 #[cfg(test)]
 pub const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
-// xfs is planning to reject making "small" filesystems:
-// https://www.spinics.net/lists/linux-xfs/msg59453.html
+// Current versions of xfs now reject "small" filesystems:
+// The data section of the filesystem must be at least 300 MiB.
+// A Stratis imposed minimum of 512 MiB allows sufficient space for XFS
+// metadata.
 const MIN_THIN_DEV_SIZE: Sectors = Sectors(IEC::Mi); // 512 MiB
 
 /// Called when the name of a requested pool coincides with the name of an

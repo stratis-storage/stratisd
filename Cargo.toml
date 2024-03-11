@@ -1,9 +1,9 @@
 [package]
 name = "stratisd"
 version = "3.6.5"
-authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.org>"]
-edition = "2021"
-rust-version = "1.71.1"  # LOWEST SUPPORTED RUST TOOLCHAIN
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
 build = "build.rs"
 description = "Stratis daemon"
 license = "MPL-2.0"
@@ -30,6 +30,14 @@ exclude = [
     "/tests-fmf",
     "/udev"
 ]
+
+[workspace]
+members = [".", "stratisd_proc_macros"]
+
+[workspace.package]
+authors = ["Stratis Developers <stratis-devel@lists.fedorahosted.org>"]
+edition = "2021"
+rust-version = "1.71.1"  # LOWEST SUPPORTED RUST TOOLCHAIN
 
 [[bin]]
 name = "stratisd"

@@ -110,7 +110,7 @@ impl MetadataVol {
         uuid: FilesystemUuid,
         fs: &StratFilesystem,
     ) -> StratisResult<()> {
-        let data = serde_json::to_string(&fs.record(name, uuid))?;
+        let data = serde_json::to_vec(&fs.record(name, uuid))?;
         let path = self
             .mount_pt
             .join(FILESYSTEM_DIR)
@@ -125,7 +125,7 @@ impl MetadataVol {
                 .create(true)
                 .open(&temp_path)?;
 
-            mdv_record_file.write_all(data.as_bytes())?;
+            mdv_record_file.write_all(&data)?;
             // This ultimately results in an fsync() on the file.
             mdv_record_file.sync_all()?;
         }

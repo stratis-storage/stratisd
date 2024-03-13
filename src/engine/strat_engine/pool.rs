@@ -1151,7 +1151,7 @@ impl Pool for StratPool {
     #[pool_mutating_action("NoRequests")]
     fn set_blockdev_user_info(
         &mut self,
-        pool_name: &str,
+        pool_name: &Name,
         uuid: DevUuid,
         user_info: Option<&str>,
     ) -> StratisResult<RenameAction<DevUuid>> {

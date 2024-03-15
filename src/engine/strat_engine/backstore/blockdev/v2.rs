@@ -52,6 +52,14 @@ pub fn integrity_meta_space(total_space: Sectors) -> Sectors {
         + Bytes::from((*total_space * 32u64 + 4095) & !4096).sectors()
 }
 
+/// Return the amount of space required for integrity for a device of the given size.
+///
+/// This is a slight overestimation for the sake of simplicity. The maximum metadata size is used
+/// to leave adequate room for any sized device's metadata.
+pub fn raid_meta_space() -> Sectors {
+    Bytes::from(129 * IEC::Mi).sectors()
+}
+
 #[derive(Debug)]
 pub struct StratBlockDev {
     dev: Device,
@@ -175,6 +183,14 @@ impl StratBlockDev {
         Ok(blkdev_size(&File::open(physical_path)?)?.sectors())
     }
 
+    /// Allocate room for RAID metadata from the back of the device.
+    pub fn alloc_raid_meta(&mut self, size: Sectors) {
+        let segs = self.used.alloc_front(size);
+        for (start, len) in segs.iter() {
+            self.raid_meta_allocs.push((*start, *len));
+        }
+    }
+
     /// Allocate room for integrity metadata from the back of the device.
     pub fn alloc_int_meta_back(&mut self, size: Sectors) {
         let segs = self.used.alloc_back(size);
@@ -241,6 +257,7 @@ impl InternalBlockDev for StratBlockDev {
     fn metadata_size(&self) -> Sectors {
         self.bda.extended_size().sectors()
             + self.integrity_meta_allocs.iter().map(|(_, len)| *len).sum()
+            + self.raid_meta_allocs.iter().map(|(_, len)| *len).sum()
     }
 
     fn max_stratis_metadata_size(&self) -> MDADataSize {

@@ -3113,6 +3113,7 @@ mod tests {
                 None,
             )
             .unwrap();
+            warn!("Available: {}", backstore.available_in_backstore());
             let mut pool = ThinPool::<backstore::v2::Backstore>::new(
                 pool_uuid,
                 &ThinPoolSizeParams::new(backstore.available_in_backstore()).unwrap(),
@@ -3207,7 +3208,7 @@ mod tests {
         #[test]
         fn loop_test_filesystem_snapshot() {
             loopbacked::test_with_spec(
-                &loopbacked::DeviceLimits::Range(2, 3, None),
+                &loopbacked::DeviceLimits::Range(2, 3, Some(Bytes::from(5 * IEC::Gi).sectors())),
                 test_filesystem_snapshot,
             );
         }
@@ -3215,7 +3216,7 @@ mod tests {
         #[test]
         fn real_test_filesystem_snapshot() {
             real::test_with_spec(
-                &real::DeviceLimits::AtLeast(2, None, None),
+                &real::DeviceLimits::AtLeast(2, Some(Bytes::from(5 * IEC::Gi).sectors()), None),
                 test_filesystem_snapshot,
             );
         }

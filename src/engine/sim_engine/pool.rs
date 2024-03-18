@@ -658,6 +658,7 @@ impl Pool for SimPool {
         uuid: DevUuid,
         user_info: Option<&str>,
     ) -> StratisResult<RenameAction<DevUuid>> {
+        user_info.map(validate_name).transpose()?;
         Ok(self.get_mut_blockdev_internal(uuid).map_or_else(
             || RenameAction::NoSource,
             |(_, b)| {

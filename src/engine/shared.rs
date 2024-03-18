@@ -142,7 +142,7 @@ pub fn set_key_shared(key_fd: RawFd, memory: &mut [u8]) -> StratisResult<usize> 
 pub fn validate_name(name: &str) -> StratisResult<()> {
     if name.contains('\u{0}') {
         return Err(StratisError::Msg(format!(
-            "Name contains NULL characters: {name}"
+            "Provided string contains NULL characters: {name}"
         )));
     }
     if name == "." || name == ".." {
@@ -150,17 +150,17 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
     }
     if name.len() > MAXIMUM_NAME_SIZE {
         return Err(StratisError::Msg(format!(
-            "Name has more than {MAXIMUM_NAME_SIZE} bytes: {name}"
+            "Provided string has more than {MAXIMUM_NAME_SIZE} bytes: {name}"
         )));
     }
     if name.len() != name.trim().len() {
         return Err(StratisError::Msg(format!(
-            "Name contains leading or trailing space: {name}"
+            "Provided string contains leading or trailing space: {name}"
         )));
     }
     if name.chars().any(|c| c.is_control()) {
         return Err(StratisError::Msg(format!(
-            "Name contains control characters: {name}"
+            "Provided string contains control characters: {name}"
         )));
     }
     lazy_static! {
@@ -169,19 +169,19 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
     }
     if NAME_UDEVREGEX.is_match(name) {
         return Err(StratisError::Msg(format!(
-            "Name contains characters not allowed in udev symlinks: {name}"
+            "Provided string contains characters not allowed in udev symlinks: {name}"
         )));
     }
 
     let name_path = Path::new(name);
     if name_path.components().count() != 1 {
         return Err(StratisError::Msg(format!(
-            "Name is a path with 0 or more than 1 components: {name}"
+            "Provided string is a path with 0 or more than 1 components: {name}"
         )));
     }
     if name_path.is_absolute() {
         return Err(StratisError::Msg(format!(
-            "Name is an absolute path: {name}"
+            "Provided string is an absolute path: {name}"
         )));
     }
     Ok(())

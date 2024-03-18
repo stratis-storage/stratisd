@@ -140,6 +140,12 @@ pub fn set_key_shared(key_fd: RawFd, memory: &mut [u8]) -> StratisResult<usize> 
 
 /// Validate a str for use as a Pool or Filesystem name.
 pub fn validate_name(name: &str) -> StratisResult<()> {
+    if name.is_empty() {
+        return Err(StratisError::Msg(format!(
+            "Provided string is empty: {name}"
+        )));
+    }
+
     if name.contains('\u{0}') {
         return Err(StratisError::Msg(format!(
             "Provided string contains NULL characters: {name}"
@@ -174,14 +180,9 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
     }
 
     let name_path = Path::new(name);
-    if name_path.components().count() != 1 {
+    if name_path.components().count() > 1 || name_path.is_absolute() {
         return Err(StratisError::Msg(format!(
-            "Provided string is a path with 0 or more than 1 components: {name}"
-        )));
-    }
-    if name_path.is_absolute() {
-        return Err(StratisError::Msg(format!(
-            "Provided string is an absolute path: {name}"
+            "Provided string is a directory path: {name}"
         )));
     }
     Ok(())

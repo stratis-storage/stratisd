@@ -12,11 +12,57 @@
 // can convert to or from them when saving our current state, or
 // restoring state from saved metadata.
 
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 
 use devicemapper::{Sectors, ThinDevId};
 
 use crate::engine::types::{DevUuid, FilesystemUuid};
+
+const MAXIMUM_STRING_SIZE: usize = 255;
+
+// Find the largest index which occurs on a char boundary of value which is no
+// greater than len.
+// TODO: Replace this method with String::floor_char_boundary when
+// possible.
+fn our_floor_char_boundary(value: &str, len: usize) -> usize {
+    let len = std::cmp::min(len, value.len());
+
+    let mut new_index = len;
+    while !value.is_char_boundary(new_index) && new_index != 0 {
+        new_index -= 1;
+    }
+
+    new_index
+}
+
+// Return a new String, split at the highest index which lies on a char
+// boundary of value which is no greater than len.
+fn safe_split_at(value: &str, len: usize) -> &str {
+    value.split_at(our_floor_char_boundary(value, len)).0
+}
+
+// Serialize a string. Only the first MAXIMUM_STRING_SIZE bytes of the string
+// are serialized.
+fn serialize_string<S>(value: &str, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    str::serialize(safe_split_at(value, MAXIMUM_STRING_SIZE), serializer)
+}
+
+// Serialize an optional string. Only the first MAXIMUM_STRING_SIZE bytes of
+// the string are serialized.
+fn serialize_option_string<S>(value: &Option<String>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    Option::serialize(
+        &value
+            .as_ref()
+            .map(|v| safe_split_at(v, MAXIMUM_STRING_SIZE)),
+        serializer,
+    )
+}
 
 /// Implements saving struct data to a serializable form. The form should be
 /// sufficient, in conjunction with the environment, to reconstruct the
@@ -31,6 +77,7 @@ pub trait Recordable<T: Serialize> {
 // some duplicate type definitions which are obviously not defined twice.
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct PoolSave {
+    #[serde(serialize_with = "serialize_string")]
     pub name: String,
     pub backstore: BackstoreSave,
     pub flex_devs: FlexDevsSave,
@@ -70,8 +117,10 @@ pub struct BaseDevSave {
 pub struct BaseBlockDevSave {
     pub uuid: DevUuid,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(serialize_with = "serialize_option_string")]
     pub user_info: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(serialize_with = "serialize_option_string")]
     pub hardware_info: Option<String>,
 }
 
@@ -112,6 +161,7 @@ pub struct ThinPoolDevSave {
 // by stratisd.
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct FilesystemSave {
+    #[serde(serialize_with = "serialize_string")]
     pub name: String,
     pub uuid: FilesystemUuid,
     pub thin_id: ThinDevId,
@@ -121,4 +171,24 @@ pub struct FilesystemSave {
     pub fs_size_limit: Option<Sectors>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub origin: Option<FilesystemUuid>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::safe_split_at;
+    proptest! {
+        #[test]
+        /// Check safe splitting on random strings.
+        fn test_split(s in "\\PC*", index in 0..10usize) {
+            let result = safe_split_at(&s, s.len().saturating_sub(index));
+            prop_assert_eq!(s.find(result), Some(0));
+            // A UTF8 String character requires at most 4 bytes.
+            prop_assert!(s.len() - result.len() <= index + 3);
+
+            prop_assert!((index == 0 || s.is_empty()) || result.len() < s.len());
+            prop_assert!(result.len() != s.len() || (index == 0 || s.is_empty()));
+            prop_assert!(result.is_char_boundary(result.len()));
+
+        }
+    }
 }

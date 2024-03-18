@@ -1133,6 +1133,7 @@ impl Pool for StratPool {
         uuid: DevUuid,
         user_info: Option<&str>,
     ) -> StratisResult<RenameAction<DevUuid>> {
+        user_info.map(validate_name).transpose()?;
         let result = self.backstore.set_blockdev_user_info(uuid, user_info);
         match result {
             Ok(Some(uuid)) => {

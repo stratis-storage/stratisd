@@ -23,6 +23,12 @@ Recommended development platform for Python development: Fedora 39
   https://github.com/stratis-storage/stratisd/pull/3543
   https://github.com/stratis-storage/stratisd/pull/3544
 
+- Reject UserInfo argument values that do not satisfy validate_name:
+  https://github.com/stratis-storage/stratisd/pull/3570
+
+- Truncate String values in pool metadata to maximum length:
+  https://github.com/stratis-storage/stratisd/pull/3568
+
 - Specify nrext64 option as 0 when creating XFS filesystem:
   https://github.com/stratis-storage/stratisd/pull/3511
 
@@ -83,6 +89,8 @@ Recommended development platform for Python development: Fedora 39
   https://github.com/stratis-storage/stratisd/pull/3514
 
 - Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3567
+  https://github.com/stratis-storage/stratisd/pull/3566
   https://github.com/stratis-storage/stratisd/pull/3563
   https://github.com/stratis-storage/stratisd/pull/3562
   https://github.com/stratis-storage/stratisd/pull/3560

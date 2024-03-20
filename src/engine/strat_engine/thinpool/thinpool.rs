@@ -78,6 +78,14 @@ mod consts {
     pub const DATA_LOWATER: DataBlocks = DataBlocks(4 * IEC::Ki);
 }
 
+#[derive(strum_macros::AsRefStr)]
+#[strum(serialize_all = "snake_case")]
+enum FeatureArg {
+    ErrorIfNoSpace,
+    NoDiscardPassdown,
+    SkipBlockZeroing,
+}
+
 fn sectors_to_datablocks(sectors: Sectors) -> DataBlocks {
     DataBlocks(sectors / DATA_BLOCK_SIZE)
 }
@@ -452,7 +460,7 @@ impl<B> ThinPool<B> {
             .table
             .params
             .feature_args
-            .contains("error_if_no_space")
+            .contains(FeatureArg::ErrorIfNoSpace.as_ref())
     }
 
     pub fn get_filesystem_by_uuid(&self, uuid: FilesystemUuid) -> Option<(Name, &StratFilesystem)> {
@@ -865,8 +873,8 @@ impl ThinPool<v1::Backstore> {
                 DataBlocks((data_dev_size / DATA_BLOCK_SIZE) / 2),
             ),
             vec![
-                "no_discard_passdown".to_string(),
-                "skip_block_zeroing".to_string(),
+                FeatureArg::NoDiscardPassdown.as_ref().to_string(),
+                FeatureArg::SkipBlockZeroing.as_ref().to_string(),
             ],
         )?;
 
@@ -1052,8 +1060,8 @@ impl ThinPool<v2::Backstore> {
                 DataBlocks((data_dev_size / DATA_BLOCK_SIZE) / 2),
             ),
             vec![
-                "no_discard_passdown".to_string(),
-                "skip_block_zeroing".to_string(),
+                FeatureArg::NoDiscardPassdown.as_ref().to_string(),
+                FeatureArg::SkipBlockZeroing.as_ref().to_string(),
             ],
         )?;
 
@@ -1244,9 +1252,9 @@ where
                 .unwrap_or_else(|| {
                     migrate = true;
                     vec![
-                        "no_discard_passdown".to_owned(),
-                        "skip_block_zeroing".to_owned(),
-                        "error_if_no_space".to_owned(),
+                        FeatureArg::NoDiscardPassdown.as_ref().to_string(),
+                        FeatureArg::SkipBlockZeroing.as_ref().to_string(),
+                        FeatureArg::ErrorIfNoSpace.as_ref().to_string(),
                     ]
                 }),
         )?;

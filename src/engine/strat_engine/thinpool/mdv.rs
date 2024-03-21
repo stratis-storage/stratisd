@@ -123,6 +123,7 @@ impl MetadataVol {
             let mut mdv_record_file = OpenOptions::new()
                 .write(true)
                 .create(true)
+                .truncate(true)
                 .open(&temp_path)?;
 
             mdv_record_file.write_all(&data)?;

@@ -25,6 +25,7 @@ static mut DM_CONTEXT: Option<DmResult<DM>> = None;
 /// Path to logical devices for encrypted devices
 pub const DEVICEMAPPER_PATH: &str = "/dev/mapper";
 
+#[allow(unknown_lints)]
 #[allow(static_mut_refs)]
 pub fn get_dm_init() -> StratisResult<&'static DM> {
     unsafe {

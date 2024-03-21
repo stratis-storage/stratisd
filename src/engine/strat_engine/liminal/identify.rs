@@ -150,6 +150,7 @@ impl fmt::Display for StratisInfo {
 /// An enum type to distinguish between LUKS devices belong to Stratis and
 /// Stratis devices.
 #[derive(Debug, Eq, Hash, PartialEq)]
+#[allow(clippy::large_enum_variant)]
 pub enum DeviceInfo {
     Luks(LuksInfo),
     Stratis(StratisInfo),

@@ -1377,6 +1377,7 @@ mod tests {
             .unwrap();
             OpenOptions::new()
                 .create(true)
+                .truncate(true)
                 .write(true)
                 .open(&new_file)
                 .unwrap()
@@ -1685,6 +1686,7 @@ mod tests {
 
         let mut f = OpenOptions::new()
             .create(true)
+            .truncate(true)
             .write(true)
             .open(new_file)
             .unwrap();
@@ -1760,6 +1762,7 @@ mod tests {
 
         let mut f = OpenOptions::new()
             .create(true)
+            .truncate(true)
             .write(true)
             .open(new_file)
             .unwrap();

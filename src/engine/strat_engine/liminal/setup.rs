@@ -84,7 +84,7 @@ pub fn get_name(infos: HashMap<DevUuid, &LStratisInfo>) -> StratisResult<Option<
     let found_uuids = infos.keys().copied().collect::<HashSet<_>>();
     match get_metadata(infos)? {
         Some((_, pool)) => {
-            let v = vec![];
+            let v = [];
             let meta_uuids = pool
                 .backstore
                 .data_tier

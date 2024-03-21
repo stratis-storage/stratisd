@@ -54,6 +54,7 @@ impl LoopTestDev {
             .read(true)
             .write(true)
             .create(true)
+            .truncate(true)
             .open(path)
             .unwrap();
 

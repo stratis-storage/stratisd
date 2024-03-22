@@ -516,7 +516,7 @@ where
     /// This counter performs wrapping addition so the maximum number of futures supported by
     /// this lock is u64::MAX.
     fn next_idx(&self) -> u64 {
-        let (mut lock_record, _) = self.acquire_mutex();
+        let (mut lock_record, _unused) = self.acquire_mutex();
         let idx = lock_record.next_idx;
         lock_record.next_idx = lock_record.next_idx.wrapping_add(1);
         idx

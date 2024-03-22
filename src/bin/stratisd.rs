@@ -67,7 +67,17 @@ fn trylock_pid_file() -> StratisResult<File> {
         })?;
     let stratisd_file = match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
         Ok(_) => {
-            f.write_all(getpid().to_string().as_bytes())?;
+            let pid = getpid().to_string();
+            let pid_bytes = pid.as_bytes();
+            f.write_all(pid_bytes).and_then(|_| {
+                f.set_len(
+                    pid_bytes
+                        .len()
+                        .try_into()
+                        .expect("No process id requires more than 64 bits"),
+                )
+            })?;
+
             Ok(f)
         }
         Err(_) => {

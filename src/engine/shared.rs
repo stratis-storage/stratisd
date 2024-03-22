@@ -215,10 +215,17 @@ pub fn validate_filesystem_size(
 ) -> StratisResult<Option<Sectors>> {
     size_opt
         .map(|size| {
+            let max_size = Sectors(u64::MAX).bytes();
+            if size > max_size {
+                return Err(StratisError::Msg(format!(
+                    "Requested size or size limit of filesystem {name} exceeds maximum specifiable filesystem size {max_size}"
+                )));
+            }
+
             let size_sectors = size.sectors();
             if size_sectors.bytes() != size {
                 Err(StratisError::Msg(format!(
-                    "Requested size or size limit of filesystem {name} must be divisble by {SECTOR_SIZE}"
+                    "Requested size or size limit of filesystem {name} must be divisible by {SECTOR_SIZE}"
                 )))
             } else if size_sectors < MIN_THIN_DEV_SIZE {
                 Err(StratisError::Msg(format!(

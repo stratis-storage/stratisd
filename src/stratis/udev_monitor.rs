@@ -33,8 +33,8 @@ pub async fn udev_thread(
 
 
         loop {
-            let mut pollers = [PollFd::new(&udev, PollFlags::POLLIN)];
-            match poll(&mut pollers, 100)? {
+            let mut pollers = [PollFd::new(udev.as_fd(), PollFlags::POLLIN)];
+            match poll(&mut pollers, 100u8)? {
                 0 => {
                     match should_exit.try_recv() {
                         Ok(()) => {

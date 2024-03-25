@@ -22,8 +22,8 @@ use futures::{
 use nix::{
     fcntl::{fcntl, FcntlArg, OFlag},
     sys::socket::{
-        accept, bind, listen, recvmsg, sendmsg, socket, AddressFamily, ControlMessageOwned,
-        MsgFlags, SockFlag, SockType, UnixAddr,
+        accept, bind, listen, recvmsg, sendmsg, socket, AddressFamily, Backlog,
+        ControlMessageOwned, MsgFlags, SockFlag, SockType, UnixAddr,
     },
     unistd::close,
 };
@@ -451,7 +451,7 @@ impl StratisUnixListener {
             })?;
         fcntl(fd.as_raw_fd(), FcntlArg::F_SETFL(flags | OFlag::O_NONBLOCK))?;
         bind(fd.as_raw_fd(), &UnixAddr::new(path.as_ref())?)?;
-        listen(&fd, 0)?;
+        listen(&fd, Backlog::new(0).expect("0 is always valid"))?;
         Ok(StratisUnixListener {
             fd: AsyncFd::new(fd)?,
         })

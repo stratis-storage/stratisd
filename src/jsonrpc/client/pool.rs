@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::path::PathBuf;
+use std::{os::fd::AsRawFd, path::PathBuf};
 
 use nix::unistd::{pipe, write};
 
@@ -37,7 +37,7 @@ pub fn pool_start(
         do_request_standard!(PoolStart, id, unlock_method; {
             let (read_end, write_end) = pipe()?;
             write(write_end, password.as_bytes())?;
-            read_end
+            read_end.as_raw_fd()
         })
     } else {
         do_request_standard!(PoolStart, id, unlock_method)

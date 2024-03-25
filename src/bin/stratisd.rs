@@ -67,6 +67,7 @@ fn trylock_pid_file() -> StratisResult<File> {
         })?;
     let stratisd_file = match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
         Ok(_) => {
+            f.set_len(0)?;
             f.write_all(getpid().to_string().as_bytes())?;
             Ok(f)
         }

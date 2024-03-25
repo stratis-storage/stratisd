@@ -25,7 +25,7 @@ pub fn key_set(key_desc: KeyDescription, keyfile_path: Option<&str>) -> StratisR
 
             let (read_end, write_end) = pipe()?;
             write(write_end, password.as_bytes())?;
-            do_request!(KeySet, key_desc; read_end)
+            do_request!(KeySet, key_desc; read_end.as_raw_fd())
         }
     };
     if rc != 0 {

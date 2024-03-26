@@ -6,7 +6,10 @@ use std::{
     collections::{hash_map::RandomState, HashMap, HashSet},
     fs::File,
     io::Read,
-    os::unix::io::{FromRawFd, RawFd},
+    os::{
+        fd::AsFd,
+        unix::io::{FromRawFd, RawFd},
+    },
     path::{Path, PathBuf},
 };
 
@@ -125,8 +128,8 @@ pub fn set_key_shared(key_fd: RawFd, memory: &mut [u8]) -> StratisResult<usize> 
     let bytes_read = key_file.read(memory)?;
 
     if bytes_read == MAX_STRATIS_PASS_SIZE {
-        let mut pollers = [PollFd::new(&key_file, PollFlags::POLLIN)];
-        let num_events = poll(&mut pollers, 0)?;
+        let mut pollers = [PollFd::new(key_file.as_fd(), PollFlags::POLLIN)];
+        let num_events = poll(&mut pollers, 0u8)?;
         if num_events > 0 {
             return Err(StratisError::Msg(format!(
                 "Provided key exceeded maximum allow length of {}",

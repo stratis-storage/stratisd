@@ -324,8 +324,8 @@ impl StratPool {
     /// Write current metadata to pool members.
     #[pool_mutating_action("NoPoolChanges")]
     pub fn write_metadata(&mut self, name: &str) -> StratisResult<()> {
-        let data = serde_json::to_string(&self.record(name))?;
-        self.backstore.save_state(data.as_bytes())
+        let data = serde_json::to_vec(&self.record(name))?;
+        self.backstore.save_state(&data)
     }
 
     /// Teardown a pool.
@@ -433,10 +433,8 @@ impl StratPool {
         self.thin_pool.teardown(pool_uuid)?;
         let mut data = self.record(pool_name);
         data.started = Some(false);
-        let json = serde_json::to_string(&data).map_err(|e| (StratisError::from(e), false))?;
-        self.backstore
-            .save_state(json.as_bytes())
-            .map_err(|e| (e, false))?;
+        let json = serde_json::to_vec(&data).map_err(|e| (StratisError::from(e), false))?;
+        self.backstore.save_state(&json).map_err(|e| (e, false))?;
         self.backstore.teardown(pool_uuid).map_err(|e| (e, false))?;
         let bds = self.backstore.drain_bds();
         Ok(DeviceSet::from(bds))
@@ -1135,6 +1133,7 @@ impl Pool for StratPool {
         uuid: DevUuid,
         user_info: Option<&str>,
     ) -> StratisResult<RenameAction<DevUuid>> {
+        user_info.map(validate_name).transpose()?;
         let result = self.backstore.set_blockdev_user_info(uuid, user_info);
         match result {
             Ok(Some(uuid)) => {
@@ -1378,6 +1377,7 @@ mod tests {
             .unwrap();
             OpenOptions::new()
                 .create(true)
+                .truncate(true)
                 .write(true)
                 .open(&new_file)
                 .unwrap()
@@ -1686,6 +1686,7 @@ mod tests {
 
         let mut f = OpenOptions::new()
             .create(true)
+            .truncate(true)
             .write(true)
             .open(new_file)
             .unwrap();
@@ -1761,6 +1762,7 @@ mod tests {
 
         let mut f = OpenOptions::new()
             .create(true)
+            .truncate(true)
             .write(true)
             .open(new_file)
             .unwrap();

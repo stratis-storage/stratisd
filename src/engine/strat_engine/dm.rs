@@ -4,9 +4,11 @@
 
 // Get ability to instantiate a devicemapper context.
 
-use std::{path::Path, sync::Once};
+use std::path::Path;
 
-use devicemapper::{DevId, DmNameBuf, DmOptions, DmResult, DM};
+use once_cell::sync::Lazy;
+
+use devicemapper::{DevId, DmError, DmNameBuf, DmOptions, DM};
 
 use crate::{
     engine::{
@@ -19,23 +21,18 @@ use crate::{
     stratis::{StratisError, StratisResult},
 };
 
-static INIT: Once = Once::new();
-static mut DM_CONTEXT: Option<DmResult<DM>> = None;
-
 /// Path to logical devices for encrypted devices
 pub const DEVICEMAPPER_PATH: &str = "/dev/mapper";
 
+pub static DM_CONTEXT: Lazy<Result<DM, DmError>> = Lazy::new(DM::new);
+
 pub fn get_dm_init() -> StratisResult<&'static DM> {
-    unsafe {
-        INIT.call_once(|| DM_CONTEXT = Some(DM::new()));
-        match &DM_CONTEXT {
-            Some(Ok(ref context)) => Ok(context),
-            Some(Err(e)) => Err(StratisError::Chained(
-                "Failed to initialize DM context".to_string(),
-                Box::new(e.clone().into()),
-            )),
-            _ => panic!("DM_CONTEXT.is_some()"),
-        }
+    match *DM_CONTEXT {
+        Ok(ref context) => Ok(context),
+        Err(ref e) => Err(StratisError::Chained(
+            "Failed to initialize DM context".to_string(),
+            Box::new(e.clone().into()),
+        )),
     }
 }
 

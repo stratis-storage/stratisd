@@ -1947,6 +1947,7 @@ mod tests {
                 convert_test!(IEC::Mi, u64, usize),
                 OpenOptions::new()
                     .create(true)
+                    .truncate(true)
                     .write(true)
                     .open(file_path)
                     .unwrap(),
@@ -2095,6 +2096,7 @@ mod tests {
                     convert_test!(IEC::Mi, u64, usize),
                     OpenOptions::new()
                         .create(true)
+                        .truncate(true)
                         .write(true)
                         .open(file_path)
                         .unwrap(),
@@ -2268,6 +2270,7 @@ mod tests {
             writeln!(
                 &OpenOptions::new()
                     .create(true)
+                    .truncate(true)
                     .write(true)
                     .open(new_file)
                     .unwrap(),
@@ -2478,6 +2481,7 @@ mod tests {
             .unwrap();
             OpenOptions::new()
                 .create(true)
+                .truncate(true)
                 .write(true)
                 .open(&new_file)
                 .unwrap()
@@ -2602,6 +2606,7 @@ mod tests {
         .unwrap();
         let mut file = OpenOptions::new()
             .create(true)
+            .truncate(true)
             .write(true)
             .open(new_file)
             .unwrap();

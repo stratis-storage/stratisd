@@ -2,6 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#![allow(deprecated)]
+
 use std::{
     env,
     fs::{File, OpenOptions},
@@ -52,6 +54,8 @@ fn initialize_log(log_level: Option<&str>) {
 /// To ensure only one instance of stratisd runs at a time, acquire an
 /// exclusive lock. Return an error if lock attempt fails.
 fn trylock_pid_file() -> StratisResult<File> {
+    #[allow(unknown_lints)]
+    #[allow(clippy::suspicious_open_options)]
     let mut f = OpenOptions::new()
         .read(true)
         .write(true)
@@ -65,6 +69,7 @@ fn trylock_pid_file() -> StratisResult<File> {
         })?;
     let stratisd_file = match flock(f.as_raw_fd(), FlockArg::LockExclusiveNonblock) {
         Ok(_) => {
+            f.set_len(0)?;
             f.write_all(getpid().to_string().as_bytes())?;
             Ok(f)
         }
@@ -81,6 +86,8 @@ fn trylock_pid_file() -> StratisResult<File> {
         }
     };
 
+    #[allow(unknown_lints)]
+    #[allow(clippy::suspicious_open_options)]
     let mut f = OpenOptions::new()
         .read(true)
         .write(true)

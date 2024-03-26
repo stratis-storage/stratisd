@@ -12,14 +12,15 @@ actions:
     post-upstream-clone:
         - "git clone https://github.com/stratis-storage/ci --depth=1 ../distro"
         - "mv ../distro/mockbuild_test/stratisd.spec ../distro/stratisd.spec"
-        - "cargo install cargo-version-util"
+        - "sed -i '/stratis-decode-dm/d' ../distro/stratisd.spec"
+        - "cargo install cargo-get"
         - "cargo install cargo-vendor-filterer"
     create-archive:
         - "sh -c 'python3 ../distro/release_management/create_artifacts.py ../distro/ --pre-release --specfile-path=../distro/stratisd.spec stratisd --vendor-method=filtered'"
     fix-spec-file:
         - "echo 'skipping automatic fix-spec-file actions'"
     get-current-version:
-        - "cargo version-util get-version"
+        - "cargo get package.version"
 
 srpm_build_deps:
     - git

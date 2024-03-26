@@ -6,7 +6,10 @@ use std::{
     collections::{hash_map::RandomState, HashMap, HashSet},
     fs::File,
     io::Read,
-    os::unix::io::{FromRawFd, RawFd},
+    os::{
+        fd::AsFd,
+        unix::io::{FromRawFd, RawFd},
+    },
     path::{Path, PathBuf},
 };
 
@@ -32,9 +35,16 @@ const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 #[cfg(test)]
 pub const DEFAULT_THIN_DEV_SIZE: Sectors = Sectors(2 * IEC::Gi); // 1 TiB
 
-// xfs is planning to reject making "small" filesystems:
-// https://www.spinics.net/lists/linux-xfs/msg59453.html
+// Current versions of xfs now reject "small" filesystems:
+// The data section of the filesystem must be at least 300 MiB.
+// A Stratis imposed minimum of 512 MiB allows sufficient space for XFS
+// metadata.
 const MIN_THIN_DEV_SIZE: Sectors = Sectors(IEC::Mi); // 512 MiB
+
+// Linux has a maximum filename length of 255 bytes. We use this length
+// as a cap on the size of the pool name also. This ensures that the name
+// serialized in the pool-level metadata has a bounded length.
+const MAXIMUM_NAME_SIZE: usize = 255;
 
 /// Called when the name of a requested pool coincides with the name of an
 /// existing pool. Returns an error if the specifications of the requested
@@ -118,8 +128,8 @@ pub fn set_key_shared(key_fd: RawFd, memory: &mut [u8]) -> StratisResult<usize> 
     let bytes_read = key_file.read(memory)?;
 
     if bytes_read == MAX_STRATIS_PASS_SIZE {
-        let mut pollers = [PollFd::new(&key_file, PollFlags::POLLIN)];
-        let num_events = poll(&mut pollers, 0)?;
+        let mut pollers = [PollFd::new(key_file.as_fd(), PollFlags::POLLIN)];
+        let num_events = poll(&mut pollers, 0u8)?;
         if num_events > 0 {
             return Err(StratisError::Msg(format!(
                 "Provided key exceeded maximum allow length of {}",
@@ -133,28 +143,33 @@ pub fn set_key_shared(key_fd: RawFd, memory: &mut [u8]) -> StratisResult<usize> 
 
 /// Validate a str for use as a Pool or Filesystem name.
 pub fn validate_name(name: &str) -> StratisResult<()> {
+    if name.is_empty() {
+        return Err(StratisError::Msg(format!(
+            "Provided string is empty: {name}"
+        )));
+    }
+
     if name.contains('\u{0}') {
         return Err(StratisError::Msg(format!(
-            "Name contains NULL characters: {name}"
+            "Provided string contains NULL characters: {name}"
         )));
     }
     if name == "." || name == ".." {
         return Err(StratisError::Msg(format!("Name is . or .. : {name}")));
     }
-    // Linux has a maximum filename length of 255 bytes
-    if name.len() > 255 {
+    if name.len() > MAXIMUM_NAME_SIZE {
         return Err(StratisError::Msg(format!(
-            "Name has more than 255 bytes: {name}"
+            "Provided string has more than {MAXIMUM_NAME_SIZE} bytes: {name}"
         )));
     }
     if name.len() != name.trim().len() {
         return Err(StratisError::Msg(format!(
-            "Name contains leading or trailing space: {name}"
+            "Provided string contains leading or trailing space: {name}"
         )));
     }
     if name.chars().any(|c| c.is_control()) {
         return Err(StratisError::Msg(format!(
-            "Name contains control characters: {name}"
+            "Provided string contains control characters: {name}"
         )));
     }
     lazy_static! {
@@ -163,19 +178,14 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
     }
     if NAME_UDEVREGEX.is_match(name) {
         return Err(StratisError::Msg(format!(
-            "Name contains characters not allowed in udev symlinks: {name}"
+            "Provided string contains characters not allowed in udev symlinks: {name}"
         )));
     }
 
     let name_path = Path::new(name);
-    if name_path.components().count() != 1 {
+    if name_path.components().count() > 1 || name_path.is_absolute() {
         return Err(StratisError::Msg(format!(
-            "Name is a path with 0 or more than 1 components: {name}"
-        )));
-    }
-    if name_path.is_absolute() {
-        return Err(StratisError::Msg(format!(
-            "Name is an absolute path: {name}"
+            "Provided string is a directory path: {name}"
         )));
     }
     Ok(())
@@ -208,10 +218,17 @@ pub fn validate_filesystem_size(
 ) -> StratisResult<Option<Sectors>> {
     size_opt
         .map(|size| {
+            let max_size = Sectors(u64::MAX).bytes();
+            if size > max_size {
+                return Err(StratisError::Msg(format!(
+                    "Requested size or size limit of filesystem {name} exceeds maximum specifiable filesystem size {max_size}"
+                )));
+            }
+
             let size_sectors = size.sectors();
             if size_sectors.bytes() != size {
                 Err(StratisError::Msg(format!(
-                    "Requested size or size limit of filesystem {name} must be divisble by {SECTOR_SIZE}"
+                    "Requested size or size limit of filesystem {name} must be divisible by {SECTOR_SIZE}"
                 )))
             } else if size_sectors < MIN_THIN_DEV_SIZE {
                 Err(StratisError::Msg(format!(

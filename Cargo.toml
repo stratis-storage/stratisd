@@ -98,7 +98,7 @@ version = "2.3.0"
 optional = true
 
 [dependencies.devicemapper]
-version = "0.34.0"
+version = "0.34.2"
 optional = true
 
 [dependencies.dbus]
@@ -134,7 +134,7 @@ version = "1.4.0"
 optional = true
 
 [dependencies.libblkid-rs]
-version = "0.3.1"
+version = "0.3.2"
 optional = true
 
 [dependencies.libc]
@@ -142,12 +142,12 @@ version = "0.2.147"
 optional = true
 
 [dependencies.libcryptsetup-rs]
-version = "0.9.1"
+version = "0.9.3"
 features = ["mutex"]
 optional = true
 
 [dependencies.libcryptsetup-rs-sys]
-version = "0.3.0"
+version = "0.4.0"
 optional = true
 
 [dependencies.libmount]
@@ -243,7 +243,7 @@ optional = true
 [dev-dependencies]
 assert_cmd = "2.0.8"
 assert_matches = "1.5.0"
-loopdev-3 = "0.5.0"
+loopdev-3 = "0.5.1"
 predicates = "3.0.0"
 proptest = "1.0.0"
 

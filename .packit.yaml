@@ -12,6 +12,7 @@ actions:
     post-upstream-clone:
         - "git clone https://github.com/stratis-storage/ci --depth=1 ../distro"
         - "mv ../distro/mockbuild_test/stratisd.spec ../distro/stratisd.spec"
+        - "sed -i '/stratis-decode-dm/d' ../distro/stratisd.spec"
         - "cargo install cargo-get"
         - "cargo install cargo-vendor-filterer"
     create-archive:

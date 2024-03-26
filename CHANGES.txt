@@ -1,3 +1,42 @@
+stratisd 3.6.6
+==============
+Recommended Rust toolchain version: 1.76.0
+Recommended development platform for Python development: Fedora 39
+
+* New commits:
+  * Increase lower bounds of Stratis-project dependencies
+  * Increase mio transitive dependency to 0.8.11
+  * Hack .packit.yaml to remove stratis-decode-dm from spec file
+
+* Cherry-picked commits:
+  * Increase retry dependency lower bound to 2.0.0
+  * Increase bindgen dependency lower bound to 0.69.0
+  * Update a comment justifying the minimum thin dev size
+  * Use a constant for the maximum name size
+  * Do not construct a String from metadata when saving
+  * Cargo.toml: Set up workspace table
+  * github actions: update FEDORA_RELEASE to F40, F39
+  * Add serializer for Strings
+  * validate_name: Change error strings
+  * validate_name: Clarify some error messages
+  * Reject UserInfo values that do not satisfy validate_name
+  * Fix clippy::useless-vec lint
+  * Fix let-underscore-lock lint
+  * Use explicit OpenOptions::truncate()
+  * get_dm_init: Allow static_mut_refs
+  * DeviceInfo: allow clippy lint large_enum_variant
+  * stratisd: Allow clippy lint suspicious_open_options
+  * stratisd-min: Allow clippy lint suspicious_open_options
+  * generators: Use explicit OpenOptions::truncate()
+  * Allow unknown lint for static_mut_refs
+  * validate_filesystem_size: divisble -> divisible
+  * validate_filesystem_size: return more specific error
+  * Increase env_logger dependency lower bound to 0.11.0
+  * Fix PID file bug in stratisd and stratisd-min
+  * Initialize devicemapper context without mutability
+  * Increase nix dependency lower bound to 0.28.0
+
+
 stratisd 3.6.5
 ==============
 Recommended Rust toolchain version: 1.76.0

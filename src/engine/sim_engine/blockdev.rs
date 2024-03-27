@@ -12,7 +12,7 @@ use devicemapper::{Bytes, Sectors, IEC};
 use crate::engine::{
     engine::BlockDev,
     shared::now_to_timestamp,
-    types::{DevUuid, EncryptionInfo, KeyDescription},
+    types::{DevUuid, EncryptionInfo, KeyDescription, StratSigblockVersion},
 };
 
 #[derive(Debug)]
@@ -57,12 +57,12 @@ impl BlockDev for SimDev {
         Bytes::from(IEC::Gi).sectors()
     }
 
-    fn is_encrypted(&self) -> bool {
-        self.encryption_info.is_some()
-    }
-
     fn new_size(&self) -> Option<Sectors> {
         None
+    }
+
+    fn metadata_version(&self) -> StratSigblockVersion {
+        StratSigblockVersion::V2
     }
 }
 

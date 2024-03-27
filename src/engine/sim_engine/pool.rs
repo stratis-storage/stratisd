@@ -25,7 +25,7 @@ use crate::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
             EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
             PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
-            SetDeleteAction,
+            SetDeleteAction, StratSigblockVersion,
         },
         PropChangeAction,
     },
@@ -739,6 +739,10 @@ impl Pool for SimPool {
         } else {
             Ok(PropChangeAction::Identity)
         }
+    }
+
+    fn metadata_version(&self) -> StratSigblockVersion {
+        StratSigblockVersion::V2
     }
 }
 

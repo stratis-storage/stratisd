@@ -8,8 +8,19 @@ prepare:
   - name: Install packages
     how: install
     package:
-     - tang
+     - cargo
+     - clang
+     - cryptsetup-devel
+     - curl
+     - dbus-devel
+     - device-mapper-devel
+     - libblkid-devel
+     - make
+     - ncurses
+     - rust
      - systemd
+     - systemd-devel
+     - tang
   - name: Start tang server
     how: shell
     script: systemctl enable tangd.socket --now
@@ -22,6 +33,11 @@ prepare:
   - name: Record mkfs.xfs version
     how: shell
     script: mkfs.xfs -V
+  - name: Build and install legacy pool script
+    how: shell
+    script:
+      - PROFILEDIR=debug make build-test-extras
+      - mv target/debug/stratis-legacy-pool /usr/local/bin
 discover:
   how: fmf
 execute:

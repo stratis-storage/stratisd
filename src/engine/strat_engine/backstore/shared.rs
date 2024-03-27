@@ -12,7 +12,7 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::{
-                blockdev::{StratBlockDev, StratSectorSizes},
+                blockdev::{InternalBlockDev, StratSectorSizes},
                 devices::BlockSizes,
             },
             serde_structs::{BaseDevSave, Recordable},
@@ -150,9 +150,9 @@ impl AllocatedAbove {
 
 /// A partition of blockdevs in a BlockDevMgr between those in use by
 /// upper layers and those that are not.
-pub struct BlockDevPartition<'a> {
-    pub(super) used: Vec<(DevUuid, &'a StratBlockDev)>,
-    pub(super) unused: Vec<(DevUuid, &'a StratBlockDev)>,
+pub struct BlockDevPartition<'a, B> {
+    pub(super) used: Vec<(DevUuid, &'a B)>,
+    pub(super) unused: Vec<(DevUuid, &'a B)>,
 }
 
 /// A summary of block sizes for a BlockDevMgr, distinguishing between used
@@ -162,8 +162,11 @@ pub struct BlockSizeSummary {
     pub(super) unused: HashMap<StratSectorSizes, HashSet<DevUuid>>,
 }
 
-impl<'a> From<BlockDevPartition<'a>> for BlockSizeSummary {
-    fn from(pair: BlockDevPartition<'a>) -> BlockSizeSummary {
+impl<'a, B> From<BlockDevPartition<'a, B>> for BlockSizeSummary
+where
+    B: InternalBlockDev,
+{
+    fn from(pair: BlockDevPartition<'a, B>) -> BlockSizeSummary {
         let mut used = HashMap::new();
         for (u, bd) in pair.used {
             used.entry(bd.blksizes())

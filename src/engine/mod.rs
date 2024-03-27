@@ -2,6 +2,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
+#[cfg(feature = "test_extras")]
+pub use self::strat_engine::{ProcessedPathInfos, StratPool};
 pub use self::{
     engine::{BlockDev, Engine, Filesystem, KeyActions, Pool, Report},
     shared::{total_allocated, total_used},
@@ -19,8 +21,8 @@ pub use self::{
         MaybeInconsistent, Name, PoolDiff, PoolEncryptionInfo, PoolIdentifier, PoolUuid,
         PropChangeAction, RenameAction, ReportType, SetCreateAction, SetDeleteAction,
         SetUnlockAction, StartAction, StopAction, StoppedPoolInfo, StoppedPoolsInfo,
-        StratBlockDevDiff, StratFilesystemDiff, StratPoolDiff, StratisUuid, ThinPoolDiff,
-        ToDisplay, UdevEngineEvent, UnlockMethod,
+        StratBlockDevDiff, StratFilesystemDiff, StratPoolDiff, StratSigblockVersion, StratisUuid,
+        ThinPoolDiff, ToDisplay, UdevEngineEvent, UnlockMethod,
     },
 };
 

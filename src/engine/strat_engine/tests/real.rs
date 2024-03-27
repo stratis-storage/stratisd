@@ -20,8 +20,8 @@ use devicemapper::{
 };
 
 use crate::engine::strat_engine::{
-    backstore::register_clevis_token,
     cmd::udev_settle,
+    crypt::register_clevis_token,
     device::blkdev_size,
     dm::get_dm,
     tests::{logger::init_logger, util::clean_up},

@@ -253,6 +253,11 @@ impl BlockDevMgr {
             .iter_mut()
             .filter(|b| b.max_metadata_size().bytes() >= data_size);
 
+        debug!(
+            "Writing {} of pool level metadata to devices in pool",
+            data_size
+        );
+
         // TODO: consider making selection not entirely random, i.e, ensuring
         // distribution of metadata over different paths.
         let saved = candidates

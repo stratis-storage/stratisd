@@ -34,9 +34,9 @@ pub fn pool_start(
         let password = prompt_password()?
             .ok_or_else(|| StratisError::Msg("Password provided was empty".to_string()))?;
 
+        let (read_end, write_end) = pipe()?;
+        write(write_end, password.as_bytes())?;
         do_request_standard!(PoolStart, id, unlock_method; {
-            let (read_end, write_end) = pipe()?;
-            write(write_end, password.as_bytes())?;
             read_end.as_raw_fd()
         })
     } else {

@@ -251,3 +251,21 @@ fn stratis_min_list_default() {
 fn test_stratis_min_list_defaults() {
     test_with_stratisd_min_sim(stratis_min_list_default);
 }
+
+fn stratis_min_key_set() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.write_stdin("thisisatestpassphrase\n")
+        .arg("key")
+        .arg("set")
+        .arg("--capture-key")
+        .arg("testkey");
+    cmd.assert().success();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("key").arg("unset").arg("testkey");
+    cmd.assert().success();
+}
+
+#[test]
+fn test_stratis_min_key_set() {
+    test_with_stratisd_min_sim(stratis_min_key_set);
+}

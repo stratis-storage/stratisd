@@ -1,6 +1,6 @@
 [package]
 name = "stratisd"
-version = "3.6.6"
+version = "3.6.7"
 authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -138,7 +138,7 @@ version = "0.3.2"
 optional = true
 
 [dependencies.libc]
-version = "0.2.147"
+version = "0.2.153"
 optional = true
 
 [dependencies.libcryptsetup-rs]

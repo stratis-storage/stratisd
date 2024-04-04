@@ -4,6 +4,14 @@ Strat = "Strat"
 strat = "strat"
 STRAT = "STRAT"
 
+# Misidentified as misspelling of "ME"
+MEK = "MEK"
+
+[default.extend-identifiers]
+# Misidentified as misspelling of "on"
+pn = "pn"
+
+
 [files]
 # typos tries to correct the spelling of D-Bus signatures
 extend-exclude = ["_introspect.py", "api.rs"]

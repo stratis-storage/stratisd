@@ -1,3 +1,19 @@
+stratisd 3.6.7
+==============
+Recommended Rust toolchain version: 1.77.0
+Recommended development platform for Python development: Fedora 39
+
+* New commits:
+  * Increase libc dependency lower bound to 0.2.153
+
+* Cherry-picked commits:
+  * github actions: update recommended Rust to 1.77.0
+  * Add a debug entry for writing metadata to pool
+  * Allow two frequenty used abbreviations
+  * Create pipe so file descriptor is not dropped early
+  * Fix for /etc/fstab setup script
+
+
 stratisd 3.6.6
 ==============
 Recommended Rust toolchain version: 1.76.0

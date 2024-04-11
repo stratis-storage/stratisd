@@ -144,6 +144,17 @@ fn test_stratis_min_create_no_blockdevs() {
     ));
 }
 
+#[test]
+// Test stopping a pool using an invalid name, that will fail with a
+// "Uuid error".
+fn test_stratis_min_pool_stop_invalid_name() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("stop").arg("pn");
+    cmd.assert()
+        .failure()
+        .stderr(predicate::str::contains("Uuid error"));
+}
+
 // stratis-min tests with sim engine
 
 fn stratis_min_create_pool_and_fs() {
@@ -212,6 +223,141 @@ fn stratis_min_pool_rename() {
 // present in stratis-min pool output.
 fn test_stratis_min_pool_rename() {
     test_with_stratisd_min_sim(stratis_min_pool_rename);
+}
+
+fn stratis_min_fs_rename() {
+    stratis_min_create_pool_and_fs();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("filesystem")
+        .arg("rename")
+        .arg("pn")
+        .arg("fn")
+        .arg("fm");
+    cmd.assert().success();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("filesystem")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("fm"));
+}
+
+#[test]
+// Test renaming a filesystem.
+fn test_stratis_min_fs_rename() {
+    test_with_stratisd_min_sim(stratis_min_fs_rename);
+}
+
+fn stratis_min_pool_stop_name() {
+    stratis_min_create_pool_and_fs();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("stop").arg("--name").arg("pn");
+    cmd.assert().success();
+}
+
+#[test]
+// Test stopping a pool using a valid name.
+fn test_stratis_min_pool_stop_name() {
+    test_with_stratisd_min_sim(stratis_min_pool_stop_name);
+}
+
+fn stratis_min_pool_stop_start_name() {
+    stratis_min_create_pool_and_fs();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("stop").arg("--name").arg("pn");
+    cmd.assert().success();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("start").arg("--name").arg("pn");
+    cmd.assert().success();
+}
+
+#[test]
+// Test stopping and starting a pool using a valid name.
+fn test_stratis_min_pool_stop_start_name() {
+    test_with_stratisd_min_sim(stratis_min_pool_stop_start_name);
+}
+
+fn stratis_min_pool_is_encrypted() {
+    stratis_min_create_pool_and_fs();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("is-encrypted").arg("--name").arg("pn");
+    cmd.assert().success();
+}
+
+#[test]
+// Test if a pool is encrypted.
+fn test_stratis_min_pool_is_encrypted() {
+    test_with_stratisd_min_sim(stratis_min_pool_is_encrypted);
+}
+
+fn stratis_min_pool_is_stopped() {
+    stratis_min_create_pool_and_fs();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("is-stopped").arg("--name").arg("pn");
+    cmd.assert().success();
+}
+
+#[test]
+// Test if a pool is stopped.
+fn test_stratis_min_pool_is_stopped() {
+    test_with_stratisd_min_sim(stratis_min_pool_is_stopped);
+}
+
+fn stratis_min_pool_is_bound() {
+    stratis_min_create_pool_and_fs();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("is-bound").arg("--name").arg("pn");
+    cmd.assert().success();
+}
+
+#[test]
+// Test if a pool is bound.
+fn test_stratis_min_pool_is_bound() {
+    test_with_stratisd_min_sim(stratis_min_pool_is_bound);
+}
+
+fn stratis_min_pool_has_passphrase() {
+    stratis_min_create_pool_and_fs();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool")
+        .arg("has-passphrase")
+        .arg("--name")
+        .arg("pn");
+    cmd.assert().success();
+}
+
+#[test]
+// Test if a pool has a passphrase.
+fn test_stratis_min_pool_has_passphrase() {
+    test_with_stratisd_min_sim(stratis_min_pool_has_passphrase);
+}
+
+fn stratis_min_pool_stop_nonexistent_uuid() {
+    stratis_min_create_pool_and_fs();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool")
+        .arg("stop")
+        .arg("44444444444444444444444444444444");
+    cmd.assert().failure().stderr(predicate::str::contains(
+        "was not found and cannot be stopped",
+    ));
+}
+
+#[test]
+// Test trying to stop a pool with a nonexistent UUID.
+fn test_stratis_min_pool_stop_nonexistent_uuid() {
+    test_with_stratisd_min_sim(stratis_min_pool_stop_nonexistent_uuid);
+}
+
+fn stratis_min_fs_origin() {
+    stratis_min_create_pool_and_fs();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("filesystem").arg("origin").arg("pn").arg("fn");
+    cmd.assert().success();
+}
+
+#[test]
+fn test_stratis_min_fs_origin() {
+    test_with_stratisd_min_sim(stratis_min_fs_origin);
 }
 
 fn stratis_min_report() {

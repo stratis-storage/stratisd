@@ -99,7 +99,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.77.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.77.2  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - uses: baptiste0928/cargo-install@v2
         with:
           crate: cargo-audit

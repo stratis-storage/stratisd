@@ -41,6 +41,13 @@ pub struct SimPool {
     enable_overprov: bool,
 }
 
+#[derive(Debug, Eq, PartialEq, Serialize)]
+pub struct PoolSave {
+    name: String,
+    fs_limit: Option<u64>,
+    enable_overprov: Option<bool>,
+}
+
 impl SimPool {
     pub fn new(paths: &[&Path], enc_info: Option<&EncryptionInfo>) -> (PoolUuid, SimPool) {
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
@@ -124,6 +131,14 @@ impl SimPool {
             .iter_mut()
             .map(|(name, uuid, x)| (name.clone(), *uuid, x))
             .collect()
+    }
+
+    pub fn record(&self, name: &str) -> PoolSave {
+        PoolSave {
+            name: name.to_owned(),
+            enable_overprov: Some(self.enable_overprov),
+            fs_limit: Some(self.fs_limit),
+        }
     }
 }
 
@@ -739,6 +754,15 @@ impl Pool for SimPool {
         } else {
             Ok(PropChangeAction::Identity)
         }
+    }
+
+    fn current_metadata(&self, pool_name: &Name) -> StratisResult<String> {
+        serde_json::to_string(&self.record(pool_name)).map_err(|e| e.into())
+    }
+
+    fn last_metadata(&self) -> StratisResult<String> {
+        // Just invent a name for the pool; a sim pool has no real metadata
+        serde_json::to_string(&self.record("<name>")).map_err(|e| e.into())
     }
 }
 

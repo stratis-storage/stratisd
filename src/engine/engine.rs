@@ -341,6 +341,12 @@ pub trait Pool: Debug + Send + Sync {
         fs: FilesystemUuid,
         limit: Option<Bytes>,
     ) -> StratisResult<PropChangeAction<Option<Sectors>>>;
+
+    /// Return the metadata that would be written if metadata were written.
+    fn current_metadata(&self, pool_name: &Name) -> StratisResult<String>;
+
+    /// Return the metadata that was last written to pool devices.
+    fn last_metadata(&self) -> StratisResult<String>;
 }
 
 pub type HandleEvents<P> = (

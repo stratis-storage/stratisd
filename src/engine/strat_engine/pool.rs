@@ -1262,6 +1262,17 @@ impl Pool for StratPool {
             Ok(PropChangeAction::Identity)
         }
     }
+
+    fn current_metadata(&self, pool_name: &Name) -> StratisResult<String> {
+        serde_json::to_string(&self.record(pool_name)).map_err(|e| e.into())
+    }
+
+    fn last_metadata(&self) -> StratisResult<String> {
+        self.backstore.load_state().and_then(|v| {
+            String::from_utf8(v)
+                .map_err(|_| StratisError::Msg("metadata byte array is not utf-8".into()))
+        })
+    }
 }
 
 pub struct StratPoolState {

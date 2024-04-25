@@ -341,6 +341,30 @@ impl BlockDevMgr {
         }
     }
 
+    /// Load the most recently written metadata from the block devices.
+    /// Returns an error if there is some metadata on a device but it could
+    /// not be loaded.
+    pub fn load_state(&self) -> StratisResult<Vec<u8>> {
+        let (mut last_updated, mut result) = (None, None);
+        for metadata in self.block_devs.iter().map(|dev| dev.load_state()) {
+            match metadata {
+                Ok(Some((metadata, updated))) => {
+                    if Some(updated) > last_updated {
+                        (last_updated, result) = (Some(updated), Some(metadata));
+                    }
+                }
+                Ok(None) => {}
+                Err(err) => return Err(err),
+            }
+        }
+
+        result.ok_or_else(|| {
+            StratisError::Msg(
+                "No pool-level metadata could be obtained for the specified pool".into(),
+            )
+        })
+    }
+
     /// Get references to managed blockdevs.
     pub fn blockdevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
         self.block_devs.iter().map(|bd| (bd.uuid(), bd)).collect()

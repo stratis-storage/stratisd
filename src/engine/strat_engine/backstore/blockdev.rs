@@ -266,6 +266,19 @@ impl StratBlockDev {
         Ok(())
     }
 
+    pub fn load_state(&self) -> StratisResult<Option<(Vec<u8>, &DateTime<Utc>)>> {
+        let mut f = OpenOptions::new()
+            .read(true)
+            .open(self.underlying_device.metadata_path())?;
+        match (self.bda.load_state(&mut f)?, self.bda.last_update_time()) {
+            (Some(state), Some(time)) => Ok(Some((state, time))),
+            (None, None) => Ok(None),
+            _ => Err(StratisError::Msg(
+                "Stratis metadata written but unknown update time or vice-versa".into(),
+            )),
+        }
+    }
+
     /// The pool's UUID.
     pub fn pool_uuid(&self) -> PoolUuid {
         self.bda.pool_uuid()

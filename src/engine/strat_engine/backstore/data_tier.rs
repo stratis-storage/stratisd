@@ -137,6 +137,10 @@ impl DataTier {
         self.block_mgr.save_state(metadata)
     }
 
+    pub fn load_state(&self) -> StratisResult<Vec<u8>> {
+        self.block_mgr.load_state()
+    }
+
     /// Lookup an immutable blockdev by its Stratis UUID.
     pub fn get_blockdev_by_uuid(&self, uuid: DevUuid) -> Option<(BlockDevTier, &StratBlockDev)> {
         self.block_mgr

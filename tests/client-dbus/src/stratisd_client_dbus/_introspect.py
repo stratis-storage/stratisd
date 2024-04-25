@@ -187,6 +187,12 @@ SPECS = {
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
+    <method name="Metadata">
+      <arg name="current" type="b" direction="in" />
+      <arg name="results" type="s" direction="out" />
+      <arg name="return_code" type="q" direction="out" />
+      <arg name="return_string" type="s" direction="out" />
+    </method>
     <method name="RebindClevis">
       <arg name="results" type="b" direction="out" />
       <arg name="return_code" type="q" direction="out" />

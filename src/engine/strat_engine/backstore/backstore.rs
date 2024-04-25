@@ -632,6 +632,11 @@ impl Backstore {
         self.data_tier.save_state(metadata)
     }
 
+    /// Read the currently saved state from the data tier's devices.
+    pub fn load_state(&self) -> StratisResult<Vec<u8>> {
+        self.data_tier.load_state()
+    }
+
     /// Set user info field on the specified blockdev.
     /// May return an error if there is no blockdev for the given UUID.
     ///

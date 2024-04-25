@@ -106,3 +106,45 @@ pub fn destroy_filesystems(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodRe
     };
     Ok(vec![msg])
 }
+
+pub fn metadata(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
+    let default_return = String::new();
+
+    let message: &Message = m.msg;
+    let mut iter = message.iter_init();
+    let current: bool = get_next_arg(&mut iter, 0)?;
+
+    let return_message = message.method_return();
+
+    let dbus_context = m.tree.get_data();
+    let object_path = m.path.get_name();
+
+    let pool_path = m
+        .tree
+        .get(object_path)
+        .expect("implicit argument must be in tree");
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
+
+    let guard = get_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let (pool_name, _, pool) = guard.as_tuple();
+
+    let result = if current {
+        pool.current_metadata(&pool_name)
+    } else {
+        pool.last_metadata()
+    };
+
+    let msg = match result {
+        Ok(v) => return_message.append3(v, DbusErrorEnum::OK as u16, OK_STRING.to_string()),
+        Err(err) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&err);
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+    Ok(vec![msg])
+}

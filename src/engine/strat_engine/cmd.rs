@@ -25,6 +25,7 @@ use std::{
 use either::Either;
 use libc::c_uint;
 use libcryptsetup_rs::SafeMemHandle;
+use once_cell::sync::Lazy;
 use semver::{Version, VersionReq};
 use serde_json::Value;
 
@@ -118,8 +119,8 @@ const CLEVIS_EXEC_NAMES: &[&str] = &[
     MKTEMP,
 ];
 
-lazy_static! {
-    static ref EXECUTABLES: HashMap<String, Option<PathBuf>> = [
+static EXECUTABLES: Lazy<HashMap<String, Option<PathBuf>>> = Lazy::new(|| {
+    [
         (MKFS_XFS.to_string(), find_executable(MKFS_XFS)),
         (THIN_CHECK.to_string(), find_executable(THIN_CHECK)),
         (THIN_REPAIR.to_string(), find_executable(THIN_REPAIR)),
@@ -129,20 +130,22 @@ lazy_static! {
         (XFS_GROWFS.to_string(), find_executable(XFS_GROWFS)),
         (
             THIN_METADATA_SIZE.to_string(),
-            find_executable(THIN_METADATA_SIZE)
+            find_executable(THIN_METADATA_SIZE),
         ),
     ]
     .iter()
     .cloned()
-    .collect();
-    static ref EXECUTABLES_PATHS: Vec<PathBuf> = match std::option_env!("EXECUTABLES_PATHS") {
+    .collect()
+});
+
+static EXECUTABLES_PATHS: Lazy<Vec<PathBuf>> =
+    Lazy::new(|| match std::option_env!("EXECUTABLES_PATHS") {
         Some(paths) => std::env::split_paths(paths).collect(),
         None => ["/usr/sbin", "/sbin", "/usr/bin", "/bin"]
             .iter()
             .map(|p| p.into())
             .collect(),
-    };
-}
+    });
 
 /// Verify that all executables that the engine might invoke are available at some
 /// path. Return an error if any are missing. Required to be called on engine

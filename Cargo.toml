@@ -129,10 +129,6 @@ optional = true
 version = "0.12.0"
 optional = true
 
-[dependencies.lazy_static]
-version = "1.4.0"
-optional = true
-
 [dependencies.libblkid-rs]
 version = "0.3.2"
 optional = true
@@ -261,7 +257,6 @@ engine = [
     "futures",
     "iocuddle",
     "itertools",
-    "lazy_static",
     "libblkid-rs",
     "libc",
     "libcryptsetup-rs",

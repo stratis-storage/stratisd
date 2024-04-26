@@ -1305,7 +1305,6 @@ dependencies = [
  "futures",
  "iocuddle",
  "itertools 0.12.0",
- "lazy_static",
  "libblkid-rs",
  "libc",
  "libcryptsetup-rs",

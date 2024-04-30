@@ -144,6 +144,30 @@ fn test_stratis_min_create_no_blockdevs() {
     ));
 }
 
+#[test]
+// Test running "stratis pool bind" with missing subcommand.
+fn test_stratis_min_pool_bind_missing_subcommand() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("bind");
+    cmd.assert().failure().code(2);
+}
+
+#[test]
+// Test running "stratis pool unbind" with missing subcommand.
+fn test_stratis_min_pool_unbind_missing_subcommand() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("unbind");
+    cmd.assert().failure().code(2);
+}
+
+#[test]
+// Test running "stratis pool rebind" with missing subcommand.
+fn test_stratis_min_pool_rebind_missing_subcommand() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("rebind");
+    cmd.assert().failure().code(2);
+}
+
 // stratis-min tests with sim engine
 
 fn stratis_min_create_pool_and_fs() {

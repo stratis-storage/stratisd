@@ -1,6 +1,6 @@
 stratisd 3.7.0 (UNRELEASED)
 ===========================
-Recommended Rust toolchain version: 1.76.0
+Recommended Rust toolchain version: 1.77.2
 Recommended development platform for Python development: Fedora 39
 
 - Increase D-Bus revision number to 6:
@@ -35,14 +35,23 @@ Recommended development platform for Python development: Fedora 39
 - Do not suppress output for mkfs.xfs or thin_check:
   https://github.com/stratis-storage/stratisd/pull/3525
 
-- Try both Clevis and passphrase in /etc/fstab setup:
+- Try both Clevis and passphrase in /etc/fstab setup,
+  fix for missing pool UUID:
+  https://github.com/stratis-storage/stratisd/issues/3587
+  https://github.com/stratis-storage/stratisd/pull/3592
   https://github.com/stratis-storage/stratisd/pull/3528
 
 - Add script to get Stratis info from devicemapper path:
   https://github.com/stratis-storage/stratisd/pull/3556
 
+- Fix PID file bug in stratisd and stratisd-min:
+  https://github.com/stratis-storage/stratisd/pull/3578
+
 - Fix log message in SetCreateAction:
   https://github.com/stratis-storage/stratisd/pull/3548
+
+- Add a debug-level log entry when writing metadata to a pool:
+  https://github.com/stratis-storage/stratisd/pull/3584
 
 - Simplify allocation procedure:
   https://github.com/stratis-storage/stratisd/pull/3491
@@ -61,8 +70,18 @@ Recommended development platform for Python development: Fedora 39
 - Cargo.toml: Set up workspace table:
   https://github.com/stratis-storage/stratisd/pull/3564
 
+- Use once_cell crate instead of lazy_static crate:
+  https://github.com/stratis-storage/stratisd/pull/3600
+  https://github.com/stratis-storage/stratisd/pull/3577
+
 - Use loopdev-3 instead of loopdev crate:
   https://github.com/stratis-storage/stratisd/pull/3498
+
+- Increase lower bounds of Stratis project dependencies:
+  https://github.com/stratis-storage/stratisd/pull/3585
+
+- Increase env_logger dependency lower bound to 0.11.0:
+  https://github.com/stratis-storage/stratisd/pull/3559
 
 - Increase bindgen dependency lower bound to 0.69.0:
   https://github.com/stratis-storage/stratisd/pull/3557
@@ -76,7 +95,11 @@ Recommended development platform for Python development: Fedora 39
 - Increase itertools dependency lower bound to 0.12.0:
   https://github.com/stratis-storage/stratisd/pull/3519
 
-- Increase nix dependency lower bound to 0.27.1:
+- Increase nix dependency lower bound to 0.28.0,
+  Create pipe so file descriptor is not dropped early:
+  https://github.com/stratis-storage/stratisd/issues/3586
+  https://github.com/stratis-storage/stratisd/pull/3588
+  https://github.com/stratis-storage/stratisd/pull/3580
   https://github.com/stratis-storage/stratisd/pull/3500
 
 - Increase version of rustix dependency to 0.37.25:
@@ -89,6 +112,13 @@ Recommended development platform for Python development: Fedora 39
   https://github.com/stratis-storage/stratisd/pull/3514
 
 - Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3596
+  https://github.com/stratis-storage/stratisd/pull/3594
+  https://github.com/stratis-storage/stratisd/pull/3591
+  https://github.com/stratis-storage/stratisd/pull/3589
+  https://github.com/stratis-storage/stratisd/pull/3581
+  https://github.com/stratis-storage/stratisd/pull/3573
+  https://github.com/stratis-storage/stratisd/pull/3572
   https://github.com/stratis-storage/stratisd/pull/3567
   https://github.com/stratis-storage/stratisd/pull/3566
   https://github.com/stratis-storage/stratisd/pull/3563
@@ -113,6 +143,7 @@ Recommended development platform for Python development: Fedora 39
   https://github.com/stratis-storage/stratisd/pull/3505
   https://github.com/stratis-storage/stratisd/pull/3503
   https://github.com/stratis-storage/stratisd/pull/3502
+  https://github.com/stratis-storage/stratisd/pull/3499
   https://github.com/stratis-storage/stratisd/pull/3496
   https://github.com/stratis-storage/stratisd/pull/3495
   https://github.com/stratis-storage/stratisd/pull/3492

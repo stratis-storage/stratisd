@@ -29,8 +29,7 @@ fn test_stratis_min_version() -> Result<(), Box<dyn std::error::Error>> {
 // Test stratis-min when no subcommand is given.
 fn test_stratis_min_no_subcommand() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin("stratis-min")?;
-    let assert = cmd.assert();
-    assert.failure().code(2);
+    cmd.assert().failure().code(2);
     Ok(())
 }
 
@@ -38,8 +37,11 @@ fn test_stratis_min_no_subcommand() -> Result<(), Box<dyn std::error::Error>> {
 // Test that stratis-min rejects an unknown subcommand.
 fn test_stratis_min_bad_subcommand() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin("stratis-min")?;
-    let assert = cmd.arg("notasub").assert();
-    assert.failure().code(2);
+    cmd.arg("notasub");
+    cmd.assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("unrecognized subcommand"));
     Ok(())
 }
 
@@ -50,6 +52,7 @@ fn test_stratis_min_report_no_daemon() {
     cmd.arg("report");
     cmd.assert()
         .failure()
+        .code(1)
         .stderr(predicates::str::contains("IO error"));
 }
 
@@ -61,6 +64,7 @@ fn test_stratis_min_report_bad_subreport() {
     cmd.arg("report").arg("stopped_pools");
     cmd.assert()
         .failure()
+        .code(2)
         .stderr(predicate::str::contains("unexpected argument"));
 }
 
@@ -80,9 +84,12 @@ fn test_stratis_min_create_with_clevis_1() {
         .arg("--trust-url")
         .arg("pn")
         .arg("/dev/n");
-    cmd.assert().failure().stderr(predicate::str::contains(
-        "'--thumbprint <thumbprint>' cannot be used with '--trust-url'",
-    ));
+    cmd.assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains(
+            "'--thumbprint <thumbprint>' cannot be used with '--trust-url'",
+        ));
 }
 
 #[test]
@@ -95,9 +102,12 @@ fn test_stratis_min_create_with_clevis_invalid() {
         .arg("nosuch")
         .arg("pn")
         .arg("/dev/n");
-    cmd.assert().failure().stderr(predicate::str::contains(
-        "invalid value 'nosuch' for '--clevis <clevis>'",
-    ));
+    cmd.assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains(
+            "invalid value 'nosuch' for '--clevis <clevis>'",
+        ));
 }
 
 #[test]
@@ -111,9 +121,12 @@ fn test_stratis_min_create_with_clevis_missing_args() {
         .arg("tang")
         .arg("pn")
         .arg("/dev/n");
-    cmd.assert().failure().stderr(predicate::str::contains(
-        "required arguments were not provided",
-    ));
+    cmd.assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains(
+            "required arguments were not provided",
+        ));
 }
 
 #[test]
@@ -129,9 +142,12 @@ fn test_stratis_min_create_with_clevis_invalid_2() {
         .arg("url")
         .arg("pn")
         .arg("/dev/n");
-    cmd.assert().failure().stderr(predicate::str::contains(
-        "required arguments were not provided",
-    ));
+    cmd.assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains(
+            "required arguments were not provided",
+        ));
 }
 
 #[test]
@@ -139,9 +155,12 @@ fn test_stratis_min_create_with_clevis_invalid_2() {
 fn test_stratis_min_create_no_blockdevs() {
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();
     cmd.arg("pool").arg("create").arg("pn");
-    cmd.assert().failure().stderr(predicate::str::contains(
-        "required arguments were not provided",
-    ));
+    cmd.assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains(
+            "required arguments were not provided",
+        ));
 }
 
 #[test]
@@ -152,6 +171,7 @@ fn test_stratis_min_pool_stop_invalid_name() {
     cmd.arg("pool").arg("stop").arg("pn");
     cmd.assert()
         .failure()
+        .code(1)
         .stderr(predicate::str::contains("Uuid error"));
 }
 
@@ -196,6 +216,7 @@ fn stratis_min_destroy_with_fs() {
     cmd.arg("pool").arg("destroy").arg("pn");
     cmd.assert()
         .failure()
+        .code(1)
         .stderr(predicate::str::contains("filesystems remaining on pool"));
 }
 
@@ -337,9 +358,12 @@ fn stratis_min_pool_stop_nonexistent_uuid() {
     cmd.arg("pool")
         .arg("stop")
         .arg("44444444444444444444444444444444");
-    cmd.assert().failure().stderr(predicate::str::contains(
-        "was not found and cannot be stopped",
-    ));
+    cmd.assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains(
+            "was not found and cannot be stopped",
+        ));
 }
 
 #[test]

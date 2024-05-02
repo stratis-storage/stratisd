@@ -278,17 +278,13 @@ pub async fn pool_is_encrypted(
     let guard = engine.get_pool(id.clone()).await;
     if let Some((_, _, pool)) = guard.as_ref().map(|guard| guard.as_tuple()) {
         Ok(pool.is_encrypted())
-    } else if locked
-        .locked
-        .get(match id {
-            PoolIdentifier::Uuid(ref u) => u,
-            PoolIdentifier::Name(ref n) => locked
-                .name_to_uuid
-                .get(n)
-                .ok_or_else(|| StratisError::Msg(format!("Could not find pool with name {n}")))?,
-        })
-        .is_some()
-    {
+    } else if locked.locked.contains_key(match id {
+        PoolIdentifier::Uuid(ref u) => u,
+        PoolIdentifier::Name(ref n) => locked
+            .name_to_uuid
+            .get(n)
+            .ok_or_else(|| StratisError::Msg(format!("Could not find pool with name {n}")))?,
+    }) {
         Ok(true)
     } else {
         Err(StratisError::Msg(format!("Pool with {id} not found")))

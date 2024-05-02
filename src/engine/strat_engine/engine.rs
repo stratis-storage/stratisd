@@ -690,22 +690,15 @@ impl Engine for StratEngine {
         };
         if let Some(pool_uuid) = pool_uuid {
             if has_partially_constructed {
-                if stopped_pools.stopped.get(&pool_uuid).is_some() {
+                if stopped_pools.stopped.contains_key(&pool_uuid) {
                     return Ok(StopAction::Identity);
-                } else if stopped_pools
-                    .partially_constructed
-                    .get(&pool_uuid)
-                    .is_some()
-                {
+                } else if stopped_pools.partially_constructed.contains_key(&pool_uuid) {
                     let mut lim_devs = self.liminal_devices.write().await;
                     spawn_blocking!(lim_devs.stop_partially_constructed_pool(pool_uuid))??;
                     return Ok(StopAction::CleanedUp(pool_uuid));
                 }
-            } else if stopped_pools.stopped.get(&pool_uuid).is_some()
-                || stopped_pools
-                    .partially_constructed
-                    .get(&pool_uuid)
-                    .is_some()
+            } else if stopped_pools.stopped.contains_key(&pool_uuid)
+                || stopped_pools.partially_constructed.contains_key(&pool_uuid)
             {
                 return Ok(StopAction::Identity);
             }

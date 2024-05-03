@@ -8,6 +8,7 @@ use std::{
     cmp::Ordering,
     fmt,
     fs::{File, OpenOptions},
+    io::Seek,
     path::Path,
 };
 
@@ -249,9 +250,19 @@ impl StratBlockDev {
 
     pub fn save_state(&mut self, time: &DateTime<Utc>, metadata: &[u8]) -> StratisResult<()> {
         let mut f = OpenOptions::new()
+            .read(true)
             .write(true)
             .open(self.underlying_device.metadata_path())?;
-        self.bda.save_state(time, metadata, &mut f)
+        self.bda.save_state(time, metadata, &mut f)?;
+
+        f.rewind()?;
+        let header = static_header(&mut f)?.ok_or_else(|| {
+            StratisError::Msg("Stratis device has no signature buffer".to_string())
+        })?;
+        let bda = BDA::load(header, &mut f)?
+            .ok_or_else(|| StratisError::Msg("Stratis device has no BDA".to_string()))?;
+        self.bda = bda;
+        Ok(())
     }
 
     /// The pool's UUID.

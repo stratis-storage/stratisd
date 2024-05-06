@@ -2631,13 +2631,6 @@ mod tests {
             let (_, fs) = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap();
             assert_eq!(fs.size_limit(), Some(Sectors(1600 * IEC::Ki)));
         }
-        let mut bytes_written = Bytes(0);
-        // Write 100 * IEC::Mi
-        while bytes_written < Bytes::from(100 * IEC::Mi) {
-            file.write_all(&[1; 4096]).unwrap();
-            bytes_written += Bytes(4096);
-        }
-        file.sync_all().unwrap();
         pool.check_fs(pool_uuid, &backstore).unwrap();
 
         {

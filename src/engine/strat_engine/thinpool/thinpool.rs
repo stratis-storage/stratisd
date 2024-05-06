@@ -2643,7 +2643,7 @@ mod tests {
         }
         let mut bytes_written = Bytes(0);
         // Write 100 * IEC::Mi
-        while bytes_written < Bytes::from(50 * IEC::Mi) {
+        while bytes_written < Bytes::from(100 * IEC::Mi) {
             file.write_all(&[1; 4096]).unwrap();
             bytes_written += Bytes(4096);
         }

@@ -164,11 +164,142 @@ fn test_stratis_min_create_no_blockdevs() {
 }
 
 #[test]
-// Test stopping a pool using an invalid name, that will fail with a
-// "Uuid error".
-fn test_stratis_min_pool_stop_invalid_name() {
+// Test stopping a pool using an invalid UUID; unless name is specified the
+// id value is interpreted as a UUID.
+fn test_stratis_min_pool_stop_invalid_uuid() {
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();
     cmd.arg("pool").arg("stop").arg("pn");
+    cmd.assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("Uuid error"));
+}
+
+#[test]
+// Test starting a pool using an invalid UUID; unless name is specified the
+// id value is interpreted as a UUID.
+fn test_stratis_min_pool_start_invalid_uuid() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("start").arg("pn");
+    cmd.assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("Uuid error"));
+}
+
+#[test]
+// Test binding a pool using an invalid UUID; unless name is specified the
+// id value is interpreted as a UUID.
+fn test_stratis_min_pool_bind_invalid_uuid() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool")
+        .arg("bind")
+        .arg("keyring")
+        .arg("pn")
+        .arg("--key-desc")
+        .arg("desc");
+    cmd.assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("Uuid error"));
+
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool")
+        .arg("bind")
+        .arg("tang")
+        .arg("pn")
+        .arg("http://abc")
+        .arg("--trust-url");
+    cmd.assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("Uuid error"));
+
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("bind").arg("tpm2").arg("pn");
+    cmd.assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("Uuid error"));
+}
+
+#[test]
+// Test unbinding a pool using an invalid UUID; unless name is specified the
+// id value is interpreted as a UUID.
+fn test_stratis_min_pool_unbind_invalid_uuid() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("unbind").arg("keyring").arg("pn");
+    cmd.assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("Uuid error"));
+
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("unbind").arg("clevis").arg("pn");
+    cmd.assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("Uuid error"));
+}
+
+#[test]
+// Test rebinding a pool using an invalid UUID; unless name is specified the
+// id value is interpreted as a UUID.
+fn test_stratis_min_pool_rebind_invalid_uuid() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool")
+        .arg("rebind")
+        .arg("keyring")
+        .arg("--key-desc")
+        .arg("desc")
+        .arg("pn");
+    cmd.assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("Uuid error"));
+
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("rebind").arg("clevis").arg("pn");
+    cmd.assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("Uuid error"));
+}
+
+#[test]
+// Test checking a pool property using an invalid UUID; unless name is
+// specified the id value is interpreted as a UUID.
+fn test_stratis_min_pool_properties_invalid_uuid() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("is-encrypted").arg("pn");
+    cmd.assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("Uuid error"));
+
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("is-stopped").arg("pn");
+    cmd.assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("Uuid error"));
+
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("is-bound").arg("pn");
+    cmd.assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("Uuid error"));
+
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("has-passphrase").arg("pn");
+    cmd.assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("Uuid error"));
+
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("clevis-pin").arg("pn");
     cmd.assert()
         .failure()
         .code(1)

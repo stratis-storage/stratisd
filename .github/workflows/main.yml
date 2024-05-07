@@ -47,7 +47,7 @@ jobs:
             components: cargo
     runs-on: ubuntu-22.04
     container:
-      image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:40  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v4
@@ -87,7 +87,7 @@ jobs:
               make -f Makefile test-clevis-loop
             toolchain: 1.78.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-            image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
+            image: fedora:40  # CURRENT DEVELOPMENT ENVIRONMENT
     runs-on: ubuntu-22.04
     container:
       image: ${{ matrix.image }}
@@ -186,7 +186,7 @@ jobs:
   stratis-min-cli-checks:
     runs-on: ubuntu-22.04
     container:
-      image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:40  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged --userns=host --ipc=host -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1
     steps:
       - uses: actions/checkout@v4
@@ -228,7 +228,7 @@ jobs:
   shell-checks:
     runs-on: ubuntu-22.04
     container:
-      image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:40  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies
@@ -243,7 +243,7 @@ jobs:
   pylint:
     runs-on: ubuntu-22.04
     container:
-      image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:40  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies
@@ -258,7 +258,7 @@ jobs:
   python-based-tests:
     runs-on: ubuntu-22.04
     container:
-      image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:40  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v4

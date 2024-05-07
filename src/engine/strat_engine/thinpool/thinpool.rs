@@ -2590,14 +2590,14 @@ mod tests {
                 pool_name,
                 pool_uuid,
                 "stratis_test_filesystem",
-                Sectors::from(1200 * IEC::Ki),
-                // 700 * IEC::Mi
-                Some(Sectors(1400 * IEC::Ki)),
+                Sectors::from(2400 * IEC::Ki),
+                // 1400 * IEC::Mi
+                Some(Sectors(2800 * IEC::Ki)),
             )
             .unwrap();
         let devnode = {
             let (_, fs) = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap();
-            assert_eq!(fs.size_limit(), Some(Sectors(1400 * IEC::Ki)));
+            assert_eq!(fs.size_limit(), Some(Sectors(2800 * IEC::Ki)));
             fs.devnode()
         };
 
@@ -2621,8 +2621,8 @@ mod tests {
             .open(new_file)
             .unwrap();
         let mut bytes_written = Bytes(0);
-        // Write 400 * IEC::Mi
-        while bytes_written < Bytes::from(400 * IEC::Mi) {
+        // Write 800 * IEC::Mi
+        while bytes_written < Bytes::from(800 * IEC::Mi) {
             file.write_all(&[1; 4096]).unwrap();
             bytes_written += Bytes(4096);
         }
@@ -2634,31 +2634,12 @@ mod tests {
             assert_eq!(fs.size_limit(), Some(fs.size().sectors()));
         }
 
-        // 800 * IEC::Mi
-        pool.set_fs_size_limit(fs_uuid, Some(Sectors(1600 * IEC::Ki)))
+        // 1600 * IEC::Mi
+        pool.set_fs_size_limit(fs_uuid, Some(Sectors(3200 * IEC::Ki)))
             .unwrap();
         {
             let (_, fs) = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap();
-            assert_eq!(fs.size_limit(), Some(Sectors(1600 * IEC::Ki)));
-        }
-        pool.check_fs(pool_uuid, &backstore).unwrap();
-
-        {
-            let (_, fs) = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap();
-            assert_eq!(fs.size_limit(), Some(fs.size().sectors()));
-        }
-
-        {
-            let (_, fs) = pool
-                .snapshot_filesystem(pool_name, pool_uuid, fs_uuid, "snapshot")
-                .unwrap();
-            assert_eq!(fs.size_limit(), Some(Sectors(1600 * IEC::Ki)));
-        }
-
-        pool.set_fs_size_limit(fs_uuid, None).unwrap();
-        {
-            let (_, fs) = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap();
-            assert_eq!(fs.size_limit(), None);
+            assert_eq!(fs.size_limit(), Some(Sectors(3200 * IEC::Ki)));
         }
         let mut bytes_written = Bytes(0);
         // Write 200 * IEC::Mi
@@ -2671,7 +2652,33 @@ mod tests {
 
         {
             let (_, fs) = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap();
-            assert_eq!(fs.size().sectors(), Sectors(3200 * IEC::Ki));
+            assert_eq!(fs.size_limit(), Some(fs.size().sectors()));
+        }
+
+        {
+            let (_, fs) = pool
+                .snapshot_filesystem(pool_name, pool_uuid, fs_uuid, "snapshot")
+                .unwrap();
+            assert_eq!(fs.size_limit(), Some(Sectors(3200 * IEC::Ki)));
+        }
+
+        pool.set_fs_size_limit(fs_uuid, None).unwrap();
+        {
+            let (_, fs) = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap();
+            assert_eq!(fs.size_limit(), None);
+        }
+        let mut bytes_written = Bytes(0);
+        // Write 400 * IEC::Mi
+        while bytes_written < Bytes::from(400 * IEC::Mi) {
+            file.write_all(&[1; 4096]).unwrap();
+            bytes_written += Bytes(4096);
+        }
+        file.sync_all().unwrap();
+        pool.check_fs(pool_uuid, &backstore).unwrap();
+
+        {
+            let (_, fs) = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap();
+            assert_eq!(fs.size().sectors(), Sectors(6400 * IEC::Ki));
         }
 
         assert!(pool.set_fs_size_limit(fs_uuid, Some(Sectors(50))).is_err());

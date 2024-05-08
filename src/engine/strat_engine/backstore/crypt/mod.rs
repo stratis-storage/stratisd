@@ -534,4 +534,57 @@ mod tests {
             test_clevis_tang_configs,
         );
     }
+
+    fn test_clevis_sss_configs(paths: &[&Path]) {
+        let path = paths[0];
+        let pool_name = Name::new("pool_name".to_string());
+
+        assert!(CryptHandle::initialize(
+            path,
+            PoolUuid::new_v4(),
+            DevUuid::new_v4(),
+            pool_name.clone(),
+            &EncryptionInfo::ClevisInfo((
+                "sss".to_string(),
+                json!({"t": 1, "pins": {"tang": {"url": env::var("TANG_URL").expect("TANG_URL env var required")}, "tpm2": {}}}),
+            )),
+            None,
+        )
+        .is_err());
+        CryptHandle::initialize(
+            path,
+            PoolUuid::new_v4(),
+            DevUuid::new_v4(),
+            pool_name,
+            &EncryptionInfo::ClevisInfo((
+                "sss".to_string(),
+                json!({
+                    "t": 1,
+                    "stratis:tang:trust_url": true,
+                    "pins": {
+                        "tang": {"url": env::var("TANG_URL").expect("TANG_URL env var required")},
+                        "tpm2": {}
+                    }
+                }),
+            )),
+            None,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn clevis_real_test_clevis_sss_configs() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(1, None, None),
+            test_clevis_sss_configs,
+        );
+    }
+
+    #[test]
+    fn clevis_loop_test_clevis_sss_configs() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(1, None),
+            test_clevis_sss_configs,
+        );
+    }
 }

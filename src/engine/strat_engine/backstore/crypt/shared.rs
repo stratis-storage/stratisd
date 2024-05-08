@@ -40,11 +40,11 @@ use crate::{
             backstore::{
                 crypt::{
                     consts::{
-                        CLEVIS_LUKS_TOKEN_ID, CLEVIS_TANG_TRUST_URL, CLEVIS_TOKEN_NAME,
-                        DEFAULT_CRYPT_KEYSLOTS_SIZE, DEFAULT_CRYPT_METADATA_SIZE,
-                        LUKS2_SECTOR_SIZE, LUKS2_TOKEN_ID, LUKS2_TOKEN_TYPE,
-                        STRATIS_TOKEN_DEVNAME_KEY, STRATIS_TOKEN_DEV_UUID_KEY, STRATIS_TOKEN_ID,
-                        STRATIS_TOKEN_POOLNAME_KEY, STRATIS_TOKEN_POOL_UUID_KEY,
+                        CLEVIS_LUKS_TOKEN_ID, CLEVIS_RECURSION_LIMIT, CLEVIS_TANG_TRUST_URL,
+                        CLEVIS_TOKEN_NAME, DEFAULT_CRYPT_KEYSLOTS_SIZE,
+                        DEFAULT_CRYPT_METADATA_SIZE, LUKS2_SECTOR_SIZE, LUKS2_TOKEN_ID,
+                        LUKS2_TOKEN_TYPE, STRATIS_TOKEN_DEVNAME_KEY, STRATIS_TOKEN_DEV_UUID_KEY,
+                        STRATIS_TOKEN_ID, STRATIS_TOKEN_POOLNAME_KEY, STRATIS_TOKEN_POOL_UUID_KEY,
                         STRATIS_TOKEN_TYPE, TOKEN_KEYSLOTS_KEY, TOKEN_TYPE_KEY,
                     },
                     handle::{CryptHandle, CryptMetadata},
@@ -511,7 +511,54 @@ pub fn clevis_info_from_metadata(
 
     let subjson: Value = serde_json::from_slice(json_bytes.as_slice())?;
 
-    pin_dispatch(&subjson).map(Some)
+    pin_dispatch(&subjson, CLEVIS_RECURSION_LIMIT).map(Some)
+}
+
+/// Returns true if the Tang config has a thumbprint or all Tang configs in the nested sss config
+/// have thumbprints.
+fn all_tang_configs_have_thp(
+    pin: &str,
+    clevis_config: &Value,
+    recursion_limit: u64,
+) -> StratisResult<bool> {
+    if recursion_limit == 0 {
+        return Err(StratisError::Msg(
+            "Reached the recursion limit for parsing nested SSS tokens".to_string(),
+        ));
+    }
+
+    if pin == "tang" {
+        if let Some(obj) = clevis_config.as_object() {
+            Ok(obj
+                .get("thp")
+                .map(|val| val.as_str().is_some())
+                .unwrap_or(false))
+        } else {
+            Err(StratisError::Msg(format!(
+                "configuration for Clevis is is not in JSON object format: {clevis_config}"
+            )))
+        }
+    } else if pin == "sss" {
+        if let Some(obj) = clevis_config.as_object() {
+            if let Some(obj) = obj.get("pins").and_then(|val| val.as_object()) {
+                obj.iter().try_fold(true, |b, (pin, config)| {
+                    Ok(b && all_tang_configs_have_thp(pin, config, recursion_limit - 1)?)
+                })
+            } else {
+                Err(StratisError::Msg(
+                    "Unexpected format for Clevis config".to_string(),
+                ))
+            }
+        } else {
+            Err(StratisError::Msg(format!(
+                "configuration for Clevis is is not in JSON object format: {clevis_config}"
+            )))
+        }
+    } else if pin == "tpm2" {
+        Ok(true)
+    } else {
+        Err(StratisError::Msg(format!("Unrecognized pin {pin}")))
+    }
 }
 
 /// Interpret non-Clevis keys that may contain additional information about
@@ -520,7 +567,8 @@ pub fn clevis_info_from_metadata(
 /// The only value to be returned is whether or not the bind command should be
 /// passed the argument yes.
 pub fn interpret_clevis_config(pin: &str, clevis_config: &mut Value) -> StratisResult<bool> {
-    let yes = if pin == "tang" {
+    let all_tang_has_thp = all_tang_configs_have_thp(pin, clevis_config, CLEVIS_RECURSION_LIMIT)?;
+    let yes = if pin == "tang" || pin == "sss" {
         if let Some(map) = clevis_config.as_object_mut() {
             map.remove(CLEVIS_TANG_TRUST_URL)
                 .and_then(|v| v.as_bool())
@@ -533,6 +581,12 @@ pub fn interpret_clevis_config(pin: &str, clevis_config: &mut Value) -> StratisR
     } else {
         false
     };
+
+    if !all_tang_has_thp && !yes {
+        return Err(StratisError::Msg(
+            "Either thumbprints for all Tang servers or a directive to trust all Tang servers is required".to_string()
+        ));
+    }
 
     Ok(yes)
 }
@@ -585,7 +639,13 @@ fn tang_dispatch(json: &Value) -> StratisResult<Value> {
 }
 
 /// Generate Shamir secret sharing JSON
-fn sss_dispatch(json: &Value) -> StratisResult<Value> {
+fn sss_dispatch(json: &Value, recursion_limit: u64) -> StratisResult<Value> {
+    if recursion_limit == 0 {
+        return Err(StratisError::Msg(
+            "Reached the recursion limit for parsing nested SSS tokens".to_string(),
+        ));
+    }
+
     let object = json
         .get("clevis")
         .and_then(|map| map.get("sss"))
@@ -625,7 +685,7 @@ fn sss_dispatch(json: &Value) -> StratisResult<Value> {
 
             let json_bytes = BASE64URL_NOPAD.decode(json_s.as_bytes())?;
             let value: Value = serde_json::from_slice(&json_bytes)?;
-            let (pin, value) = pin_dispatch(&value)?;
+            let (pin, value) = pin_dispatch(&value, recursion_limit - 1)?;
             match pin_map.get_mut(&pin) {
                 Some(Value::Array(ref mut vec)) => vec.push(value),
                 None => {
@@ -651,7 +711,7 @@ fn sss_dispatch(json: &Value) -> StratisResult<Value> {
 }
 
 /// Match pin for existing JWE
-fn pin_dispatch(decoded_jwe: &Value) -> StratisResult<(String, Value)> {
+fn pin_dispatch(decoded_jwe: &Value, recursion_limit: u64) -> StratisResult<(String, Value)> {
     let pin_value = decoded_jwe
         .get("clevis")
         .and_then(|map| map.get("pin"))
@@ -660,7 +720,9 @@ fn pin_dispatch(decoded_jwe: &Value) -> StratisResult<(String, Value)> {
         })?;
     match pin_value.as_str() {
         Some("tang") => tang_dispatch(decoded_jwe).map(|val| ("tang".to_owned(), val)),
-        Some("sss") => sss_dispatch(decoded_jwe).map(|val| ("sss".to_owned(), val)),
+        Some("sss") => {
+            sss_dispatch(decoded_jwe, recursion_limit).map(|val| ("sss".to_owned(), val))
+        }
         Some("tpm2") => Ok(("tpm2".to_owned(), json!({}))),
         _ => Err(StratisError::Msg("Unsupported clevis pin".to_string())),
     }

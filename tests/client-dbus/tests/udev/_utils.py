@@ -30,7 +30,13 @@ from tempfile import NamedTemporaryFile
 import dbus
 import psutil
 import pyudev
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fixed
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    retry_if_not_result,
+    stop_after_attempt,
+    wait_fixed,
+)
 
 # isort: FIRSTPARTY
 import dbus_python_client_gen
@@ -455,32 +461,18 @@ class UdevTest(unittest.TestCase):
         :return: list of pool information found
         :rtype: list of (str * MOPool)
         """
-        (count, limit, dbus_err, found_num, known_pools, start_time) = (
-            0,
-            expected_num + 1,
-            None,
-            None,
-            None,
-            time.time(),
+
+        @retry(
+            retry=(
+                retry_if_exception_type(dbus.exceptions.DBusException)
+                | retry_if_not_result(
+                    lambda x: x is not None and len(x) == expected_num
+                )
+            ),
+            stop=stop_after_attempt(expected_num + 1),
+            wait=wait_fixed(3),
         )
-        while count < limit and not expected_num == found_num:
-            try:
-                known_pools = get_pools(name=name)
-            except dbus.exceptions.DBusException as err:
-                dbus_err = err
+        def try_get_pools(*, name=None):
+            return get_pools(name=name)
 
-            if known_pools is not None:
-                found_num = len(known_pools)
-
-            time.sleep(3)
-            count += 1
-
-        if found_num is None and dbus_err is not None:
-            raise RuntimeError(
-                f"After {time.time() - start_time:.2f} seconds, the only "
-                "response is a D-Bus exception"
-            ) from dbus_err
-
-        self.assertEqual(found_num, expected_num)
-
-        return known_pools
+        return try_get_pools(name=name)

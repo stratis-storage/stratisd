@@ -75,8 +75,8 @@ jobs:
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
-  # TESTS WITH TANG
-  checks_with_tang:
+  # TESTS WITH CLEVIS
+  checks_with_clevis:
     strategy:
       matrix:
         include:
@@ -91,7 +91,7 @@ jobs:
     runs-on: ubuntu-22.04
     container:
       image: ${{ matrix.image }}
-      options: --privileged -v /dev:/dev -v /run/udev:/run/udev --ipc=host
+      options: --privileged -v /dev:/dev -v /lib/modules:/lib/modules -v /run/udev:/run/udev --ipc=host
     services:
       tang:
         # yamllint disable rule:line-length
@@ -119,9 +119,14 @@ jobs:
           make
           ncurses
           sudo
+          swtpm
+          swtpm-tools
           systemd-devel
           systemd-udev
+          tpm2-tools
           xfsprogs
+      - name: Insert TPM2 module
+        run: modprobe tpm_vtpm_proxy
       - uses: dtolnay/rust-toolchain@master
         with:
           components: ${{ matrix.components }}

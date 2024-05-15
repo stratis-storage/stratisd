@@ -30,7 +30,7 @@ from tempfile import NamedTemporaryFile
 import dbus
 import psutil
 import pyudev
-from reretry import retry
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_fixed
 
 # isort: FIRSTPARTY
 import dbus_python_client_gen
@@ -129,7 +129,11 @@ def get_pools(name=None):
     ]
 
 
-@retry(exceptions=dbus_python_client_gen.DPClientInvocationError, tries=5, delay=1)
+@retry(
+    retry=retry_if_exception_type(dbus_python_client_gen.DPClientInvocationError),
+    stop=stop_after_attempt(5),
+    wait=wait_fixed(1),
+)
 def get_devnodes(device_object_paths):
     """
     Get the device nodes belonging to these object paths.

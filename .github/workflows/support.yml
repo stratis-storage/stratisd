@@ -45,6 +45,7 @@ jobs:
               python3-justbytes
               python3-psutil
               python3-pyudev
+              python3-retry
               python3-semantic_version
             task: PYTHONPATH=./src make -f Makefile lint
             working-directory: ./tests/client-dbus

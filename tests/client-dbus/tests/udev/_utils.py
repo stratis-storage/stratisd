@@ -30,6 +30,10 @@ from tempfile import NamedTemporaryFile
 import dbus
 import psutil
 import pyudev
+from reretry import retry
+
+# isort: FIRSTPARTY
+import dbus_python_client_gen
 
 # isort: LOCAL
 from stratisd_client_dbus import (
@@ -125,6 +129,7 @@ def get_pools(name=None):
     ]
 
 
+@retry(exceptions=dbus_python_client_gen.DPClientInvocationError, tries=5, delay=1)
 def get_devnodes(device_object_paths):
     """
     Get the device nodes belonging to these object paths.

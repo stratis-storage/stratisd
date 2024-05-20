@@ -46,6 +46,7 @@ jobs:
               python3-psutil
               python3-pyudev
               python3-semantic_version
+              python3-tenacity
             task: PYTHONPATH=./src make -f Makefile lint
             working-directory: ./tests/client-dbus
           - dependencies: black python3-isort

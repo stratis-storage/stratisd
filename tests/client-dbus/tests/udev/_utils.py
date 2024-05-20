@@ -30,6 +30,19 @@ from tempfile import NamedTemporaryFile
 import dbus
 import psutil
 import pyudev
+from tenacity import (
+    RetryError,
+    retry,
+    retry_if_exception_type,
+    retry_if_not_result,
+    retry_if_result,
+    stop_after_attempt,
+    stop_after_delay,
+    wait_fixed,
+)
+
+# isort: FIRSTPARTY
+import dbus_python_client_gen
 
 # isort: LOCAL
 from stratisd_client_dbus import (
@@ -125,6 +138,11 @@ def get_pools(name=None):
     ]
 
 
+@retry(
+    retry=retry_if_exception_type(dbus_python_client_gen.DPClientInvocationError),
+    stop=stop_after_attempt(5),
+    wait=wait_fixed(1),
+)
 def get_devnodes(device_object_paths):
     """
     Get the device nodes belonging to these object paths.
@@ -256,27 +274,31 @@ class _Service:
             text=True,
         )
 
-        dbus_interface_present = False
-        limit = time.time() + 120.0
-        while (
-            time.time() <= limit
-            and not dbus_interface_present
-            and service.poll() is None
-        ):
-            try:
-                get_object(TOP_OBJECT)
-                dbus_interface_present = True
-            except dbus.exceptions.DBusException:
-                time.sleep(0.5)
+        @retry(
+            retry=(
+                retry_if_exception_type(dbus.exceptions.DBusException)
+                | retry_if_result(lambda x: x is None)
+            ),
+            stop=stop_after_delay(120),
+            wait=wait_fixed(10),
+        )
+        def check_for_dbus():
+            get_object(TOP_OBJECT)
+            return service.poll()
 
-        time.sleep(1)
-        if service.poll() is not None:
-            raise RuntimeError(
-                f"Daemon unexpectedly exited with exit code {service.returncode}"
-            )
+        try:
+            check_for_dbus()
+        except RetryError as err:
+            time.sleep(1)
+            if service.poll() is not None:
+                raise RuntimeError(
+                    f"Daemon unexpectedly exited with exit code {service.returncode}"
+                ) from err
 
-        if not dbus_interface_present:
-            raise RuntimeError("No D-Bus interface for stratisd found")
+        try:
+            get_object(TOP_OBJECT)
+        except dbus.exceptions.DBusException as err:
+            raise RuntimeError("No D-Bus interface for stratisd found") from err
 
         self._service = service  # pylint: disable=attribute-defined-outside-init
         return self
@@ -446,32 +468,18 @@ class UdevTest(unittest.TestCase):
         :return: list of pool information found
         :rtype: list of (str * MOPool)
         """
-        (count, limit, dbus_err, found_num, known_pools, start_time) = (
-            0,
-            expected_num + 1,
-            None,
-            None,
-            None,
-            time.time(),
+
+        @retry(
+            retry=(
+                retry_if_exception_type(dbus.exceptions.DBusException)
+                | retry_if_not_result(
+                    lambda x: x is not None and len(x) == expected_num
+                )
+            ),
+            stop=stop_after_attempt(expected_num + 1),
+            wait=wait_fixed(3),
         )
-        while count < limit and not expected_num == found_num:
-            try:
-                known_pools = get_pools(name=name)
-            except dbus.exceptions.DBusException as err:
-                dbus_err = err
+        def try_get_pools(*, name=None):
+            return get_pools(name=name)
 
-            if known_pools is not None:
-                found_num = len(known_pools)
-
-            time.sleep(3)
-            count += 1
-
-        if found_num is None and dbus_err is not None:
-            raise RuntimeError(
-                f"After {time.time() - start_time:.2f} seconds, the only "
-                "response is a D-Bus exception"
-            ) from dbus_err
-
-        self.assertEqual(found_num, expected_num)
-
-        return known_pools
+        return try_get_pools(name=name)

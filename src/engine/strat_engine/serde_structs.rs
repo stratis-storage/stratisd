@@ -12,6 +12,7 @@
 // can convert to or from them when saving our current state, or
 // restoring state from saved metadata.
 
+use itertools::Itertools;
 use serde::{Serialize, Serializer};
 
 use devicemapper::{Sectors, ThinDevId};
@@ -71,6 +72,36 @@ pub trait Recordable<T: Serialize> {
     fn record(&self) -> T;
 }
 
+/// List of optional features for pools.
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize, Hash, Copy, Clone)]
+pub enum PoolFeatures {
+    Raid,
+    Integrity,
+    Encryption,
+}
+
+/// Features enabled on the given pool to be stored in the metadata.
+#[derive(Default, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct EnabledPoolFeatures {
+    features: Vec<PoolFeatures>,
+}
+
+impl EnabledPoolFeatures {
+    pub fn new(features: Vec<PoolFeatures>) -> Self {
+        EnabledPoolFeatures {
+            features: features.into_iter().unique().collect::<Vec<_>>(),
+        }
+    }
+
+    pub fn contains(&self, feat: PoolFeatures) -> bool {
+        self.features.contains(&feat)
+    }
+
+    fn is_empty(&self) -> bool {
+        self.features.is_empty()
+    }
+}
+
 // ALL structs that represent variable length metadata in pre-order
 // depth-first traversal order. Note that when organized by types rather than
 // values the structure is a DAG not a tree. This just means that there are
@@ -85,6 +116,9 @@ pub struct PoolSave {
     // TODO: This data type should no longer be optional in Stratis 4.0
     #[serde(skip_serializing_if = "Option::is_none")]
     pub started: Option<bool>,
+    #[serde(skip_serializing_if = "EnabledPoolFeatures::is_empty")]
+    #[serde(default)]
+    pub features: EnabledPoolFeatures,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]

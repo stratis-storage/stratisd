@@ -34,7 +34,7 @@ use crate::{
             },
             liminal::DeviceSet,
             metadata::BDA,
-            serde_structs::{FlexDevsSave, PoolSave, Recordable},
+            serde_structs::{EnabledPoolFeatures, FlexDevsSave, PoolSave, Recordable},
             shared::tiers_to_bdas,
             thinpool::{StratFilesystem, ThinPool},
             types::BDARecordResult,
@@ -389,6 +389,7 @@ impl StratPool {
             flex_devs: self.thin_pool.record(),
             thinpool_dev: self.thin_pool.record(),
             started: Some(true),
+            features: EnabledPoolFeatures::new(vec![]),
         }
     }
 

@@ -25,7 +25,7 @@ use crate::{
             },
             liminal::DeviceSet,
             metadata::{MDADataSize, BDA},
-            serde_structs::{FlexDevsSave, PoolSave, Recordable},
+            serde_structs::{FlexDevsSave, PoolFeatures, PoolSave, Recordable},
             shared::tiers_to_bdas,
             thinpool::{StratFilesystem, ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
             types::BDARecordResult,
@@ -343,12 +343,17 @@ impl StratPool {
     }
 
     pub fn record(&self, name: &str) -> PoolSave {
+        let mut features = vec![];
+        if self.is_encrypted() {
+            features.push(PoolFeatures::Encryption);
+        }
         PoolSave {
             name: name.to_owned(),
             backstore: self.backstore.record(),
             flex_devs: self.thin_pool.record(),
             thinpool_dev: self.thin_pool.record(),
             started: Some(true),
+            features,
         }
     }
 

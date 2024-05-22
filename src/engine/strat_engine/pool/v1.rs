@@ -389,6 +389,7 @@ impl StratPool {
             flex_devs: self.thin_pool.record(),
             thinpool_dev: self.thin_pool.record(),
             started: Some(true),
+            features: vec![],
         }
     }
 

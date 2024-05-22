@@ -71,6 +71,14 @@ pub trait Recordable<T: Serialize> {
     fn record(&self) -> T;
 }
 
+/// List of optional features for pools.
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize, Hash, Copy, Clone)]
+pub enum PoolFeatures {
+    Raid,
+    Integrity,
+    Encryption,
+}
+
 // ALL structs that represent variable length metadata in pre-order
 // depth-first traversal order. Note that when organized by types rather than
 // values the structure is a DAG not a tree. This just means that there are
@@ -85,6 +93,9 @@ pub struct PoolSave {
     // TODO: This data type should no longer be optional in Stratis 4.0
     #[serde(skip_serializing_if = "Option::is_none")]
     pub started: Option<bool>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub features: Vec<PoolFeatures>,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]

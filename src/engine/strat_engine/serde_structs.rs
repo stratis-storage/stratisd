@@ -171,6 +171,8 @@ pub struct FilesystemSave {
     pub fs_size_limit: Option<Sectors>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub origin: Option<FilesystemUuid>,
+    #[serde(default)]
+    pub merge: bool,
 }
 
 #[cfg(test)]

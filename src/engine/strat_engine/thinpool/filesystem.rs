@@ -390,6 +390,7 @@ impl StratFilesystem {
             created: self.created.timestamp() as u64,
             fs_size_limit: self.size_limit,
             origin: self.origin,
+            merge: None,
         }
     }
 

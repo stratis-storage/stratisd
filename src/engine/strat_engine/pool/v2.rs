@@ -922,36 +922,7 @@ impl Pool for StratPool {
         pool_name: &str,
         fs_uuids: &HashSet<FilesystemUuid>,
     ) -> StratisResult<SetDeleteAction<FilesystemUuid, FilesystemUuid>> {
-        let mut removed = Vec::new();
-        for &uuid in fs_uuids {
-            if let Some(uuid) = self.thin_pool.destroy_filesystem(pool_name, uuid)? {
-                removed.push(uuid);
-            }
-        }
-
-        let snapshots: Vec<FilesystemUuid> = self
-            .thin_pool
-            .filesystems()
-            .iter()
-            .filter_map(|(_, u, fs)| {
-                fs.origin()
-                    .and_then(|x| if removed.contains(&x) { Some(*u) } else { None })
-            })
-            .collect();
-
-        let mut updated_origins = vec![];
-        for sn_uuid in snapshots {
-            if let Err(err) = self.thin_pool.unset_fs_origin(sn_uuid) {
-                warn!(
-                    "Failed to write null origin to metadata for filesystem with UUID {}: {}",
-                    sn_uuid, err
-                );
-            } else {
-                updated_origins.push(sn_uuid);
-            }
-        }
-
-        Ok(SetDeleteAction::new(removed, updated_origins))
+        self.thin_pool.destroy_filesystems(pool_name, fs_uuids)
     }
 
     #[pool_mutating_action("NoRequests")]
@@ -1205,6 +1176,22 @@ impl Pool for StratPool {
 
     fn last_fs_metadata(&self, fs_name: Option<&str>) -> StratisResult<String> {
         self.thin_pool.last_fs_metadata(fs_name)
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn set_fs_merge_scheduled(
+        &mut self,
+        fs_uuid: FilesystemUuid,
+        new_scheduled: bool,
+    ) -> StratisResult<PropChangeAction<bool>> {
+        if self
+            .thin_pool
+            .set_fs_merge_scheduled(fs_uuid, new_scheduled)?
+        {
+            Ok(PropChangeAction::NewValue(new_scheduled))
+        } else {
+            Ok(PropChangeAction::Identity)
+        }
     }
 }
 

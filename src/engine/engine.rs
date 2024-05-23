@@ -96,6 +96,8 @@ pub trait Filesystem: Debug {
 
     /// Get filesystem snapshot origin.
     fn origin(&self) -> Option<FilesystemUuid>;
+
+    fn merge_scheduled(&self) -> bool;
 }
 
 pub trait BlockDev: Debug {
@@ -356,6 +358,13 @@ pub trait Pool: Debug + Send + Sync {
 
     /// Get the last written filesystem metadata.
     fn last_fs_metadata(&self, fs_name: Option<&str>) -> StratisResult<String>;
+
+    /// Set whether a merge of the filesystem is scheduled.
+    fn set_fs_merge_scheduled(
+        &mut self,
+        fs: FilesystemUuid,
+        new_scheduled: bool,
+    ) -> StratisResult<PropChangeAction<bool>>;
 }
 
 pub type HandleEvents<P> = (

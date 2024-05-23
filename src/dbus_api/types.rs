@@ -108,6 +108,7 @@ pub enum DbusAction {
     BlockdevTotalPhysicalSizeChange(Path<'static>, Sectors),
     FsOriginChange(Path<'static>),
     FsSizeLimitChange(Path<'static>, Option<Sectors>),
+    FsMergeScheduledChange(Path<'static>, bool),
     FsBackgroundChange(
         FilesystemUuid,
         SignalChange<Option<Bytes>>,
@@ -495,6 +496,18 @@ impl DbusContext {
             warn!(
                 "Filesystem origin change event could not be sent to the processing thread; no signal will be sent out for the filesystem origin state change: {}",
                 e,
+            )
+        }
+    }
+
+    /// Send changed signal for pool MergeScheduled property.
+    pub fn push_fs_merge_scheduled_change(&self, item: &Path<'static>, new_merge_scheduled: bool) {
+        if let Err(e) = self.sender.send(DbusAction::FsMergeScheduledChange(
+            item.clone(),
+            new_merge_scheduled,
+        )) {
+            warn!(
+                "D-Bus filesystem merge scheduled change event could not be sent to the processing thread; no signal will be sent out for the merge scheduled change of filesystem with path {item}: {e}"
             )
         }
     }

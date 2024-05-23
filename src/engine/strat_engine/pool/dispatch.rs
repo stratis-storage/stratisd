@@ -362,4 +362,15 @@ impl Pool for AnyPool {
             AnyPool::V2(p) => p.last_fs_metadata(fs_name),
         }
     }
+
+    fn set_fs_merge_scheduled(
+        &mut self,
+        fs_uuid: FilesystemUuid,
+        new_scheduled: bool,
+    ) -> StratisResult<PropChangeAction<bool>> {
+        match self {
+            AnyPool::V1(p) => p.set_fs_merge_scheduled(fs_uuid, new_scheduled),
+            AnyPool::V2(p) => p.set_fs_merge_scheduled(fs_uuid, new_scheduled),
+        }
+    }
 }

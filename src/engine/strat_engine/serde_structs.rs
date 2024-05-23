@@ -196,6 +196,13 @@ pub struct FilesystemSave {
     pub fs_size_limit: Option<Sectors>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub origin: Option<FilesystemUuid>,
+    // if self.origin is None, then self.merge must be None
+    // if self.origin is Some,
+    //   then self.merge is None is equivalent to self.merge is Some(false)
+    //   this definition is fully backward compatible.
+    // TODO: This data type should no longer be optional in Stratis 4.0
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub merge: Option<bool>,
 }
 
 #[cfg(test)]

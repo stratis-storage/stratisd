@@ -52,6 +52,7 @@ pub struct StratFilesystem {
     used: Option<Bytes>,
     size_limit: Option<Sectors>,
     origin: Option<FilesystemUuid>,
+    merge_scheduled: bool,
 }
 
 fn init_used(thin_dev: &ThinDev) -> Option<Bytes> {
@@ -116,6 +117,7 @@ impl StratFilesystem {
                 created: Utc::now(),
                 size_limit,
                 origin: None,
+                merge_scheduled: false,
             },
         ))
     }
@@ -143,6 +145,7 @@ impl StratFilesystem {
             created,
             size_limit: fssave.fs_size_limit,
             origin: fssave.origin,
+            merge_scheduled: fssave.merge.unwrap_or_default(),
         })
     }
 
@@ -250,6 +253,7 @@ impl StratFilesystem {
                     created: Utc::now(),
                     size_limit: self.size_limit,
                     origin: Some(origin_uuid),
+                    merge_scheduled: false,
                 })
             }
             Err(e) => Err(StratisError::Msg(format!(
@@ -390,6 +394,7 @@ impl StratFilesystem {
             created: self.created.timestamp() as u64,
             fs_size_limit: self.size_limit,
             origin: self.origin,
+            merge: self.origin.map(|_| self.merge_scheduled),
         }
     }
 
@@ -450,6 +455,20 @@ impl StratFilesystem {
         self.origin = None;
         changed
     }
+
+    /// Set the merge scheduled value for the filesystem.
+    pub fn set_merge_scheduled(&mut self, scheduled: bool) -> StratisResult<bool> {
+        if self.merge_scheduled == scheduled {
+            Ok(false)
+        } else if scheduled && self.origin.is_none() {
+            Err(StratisError::Msg(
+                "Filesystem has no origin filesystem; can not schedule a merge".into(),
+            ))
+        } else {
+            self.merge_scheduled = scheduled;
+            Ok(true)
+        }
+    }
 }
 
 impl Filesystem for StratFilesystem {
@@ -492,6 +511,10 @@ impl Filesystem for StratFilesystem {
 
     fn origin(&self) -> Option<FilesystemUuid> {
         self.origin
+    }
+
+    fn merge_scheduled(&self) -> bool {
+        self.merge_scheduled
     }
 }
 

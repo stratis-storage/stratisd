@@ -354,7 +354,7 @@ fn try_recvmsg(fd: RawFd) -> StratisResult<StratisParams> {
     let (cmsgs, bytes) = {
         let mut iovecs = [IoSliceMut::new(vec.as_mut_slice())];
         let rmsg = recvmsg::<UnixAddr>(fd, &mut iovecs, Some(&mut cmsg_space), MsgFlags::empty())?;
-        (rmsg.cmsgs().collect(), rmsg.bytes)
+        (rmsg.cmsgs()?.collect(), rmsg.bytes)
     };
 
     let fd_opt = handle_cmsgs(cmsgs)?;

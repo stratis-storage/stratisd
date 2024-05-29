@@ -4,19 +4,15 @@
 
 use std::{os::unix::io::RawFd, path::Path, sync::Arc};
 
-use tokio::task::block_in_place;
-
 use serde_json::Value;
+use tokio::task::block_in_place;
 
 use crate::{
     engine::{
         BlockDevTier, CreateAction, DeleteAction, EncryptionInfo, Engine, EngineAction,
         KeyDescription, Name, PoolIdentifier, PoolUuid, RenameAction, UnlockMethod,
     },
-    jsonrpc::{
-        interface::PoolListType,
-        server::key::{key_get_desc, key_set},
-    },
+    jsonrpc::interface::PoolListType,
     stratis::{StratisError, StratisResult},
 };
 
@@ -27,11 +23,10 @@ pub async fn pool_start(
     unlock_method: Option<UnlockMethod>,
     prompt: Option<RawFd>,
 ) -> StratisResult<bool> {
-    if let (Some(fd), Some(kd)) = (prompt, key_get_desc(Arc::clone(&engine), id.clone()).await?) {
-        key_set(engine.clone(), &kd, fd).await?;
-    }
-
-    Ok(engine.start_pool(id, unlock_method).await?.is_changed())
+    Ok(engine
+        .start_pool(id, unlock_method, prompt)
+        .await?
+        .is_changed())
 }
 
 // stratis-min pool stop

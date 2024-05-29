@@ -4,6 +4,7 @@
 
 use std::{
     collections::{HashMap, HashSet},
+    os::fd::RawFd,
     path::Path,
     sync::Arc,
 };
@@ -679,6 +680,7 @@ impl Engine for StratEngine {
                     &pools,
                     PoolIdentifier::Uuid(pool_uuid),
                     Some(unlock_method),
+                    None,
                 )?;
                 pools.insert(name, pool_uuid, pool);
                 StratisResult::Ok(unlocked_uuids)
@@ -783,6 +785,7 @@ impl Engine for StratEngine {
         &self,
         id: PoolIdentifier<PoolUuid>,
         unlock_method: Option<UnlockMethod>,
+        passphrase_fd: Option<RawFd>,
     ) -> StratisResult<StartAction<PoolUuid>> {
         if let Some(lock) = self.pools.read(id.clone()).await {
             let (_, pool_uuid, pool) = lock.as_tuple();
@@ -794,6 +797,10 @@ impl Engine for StratEngine {
                 return Err(StratisError::Msg(format!(
                     "Pool with UUID {pool_uuid} is not encrypted but an unlock method was provided"
                 )));
+            } else if !pool.is_encrypted() && passphrase_fd.is_some() {
+                return Err(StratisError::Msg(format!(
+                    "Pool with UUID {pool_uuid} is not encrypted but a passphrase was provided"
+                )));
             } else {
                 Ok(StartAction::Identity)
             }
@@ -801,7 +808,8 @@ impl Engine for StratEngine {
             let mut pools = self.pools.modify_all().await;
             let mut liminal = self.liminal_devices.write().await;
             let pool_uuid = spawn_blocking!({
-                let (name, pool_uuid, pool, _) = liminal.start_pool(&pools, id, unlock_method)?;
+                let (name, pool_uuid, pool, _) =
+                    liminal.start_pool(&pools, id, unlock_method, passphrase_fd)?;
                 pools.insert(name, pool_uuid, pool);
                 StratisResult::Ok(pool_uuid)
             })??;
@@ -1093,7 +1101,8 @@ mod test {
 
         test_async!(engine.stop_pool(PoolIdentifier::Uuid(uuid), true)).unwrap();
 
-        test_async!(engine.start_pool(PoolIdentifier::Uuid(uuid), Some(unlock_method))).unwrap();
+        test_async!(engine.start_pool(PoolIdentifier::Uuid(uuid), Some(unlock_method), None))
+            .unwrap();
         test_async!(engine.destroy_pool(uuid)).unwrap();
         cmd::udev_settle().unwrap();
         engine.teardown().unwrap();
@@ -1492,7 +1501,7 @@ mod test {
         assert_eq!(test_async!(engine.pools()).len(), 0);
 
         assert!(
-            test_async!(engine.start_pool(PoolIdentifier::Uuid(uuid), None))
+            test_async!(engine.start_pool(PoolIdentifier::Uuid(uuid), None, None))
                 .unwrap()
                 .is_changed()
         );

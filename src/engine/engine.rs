@@ -451,6 +451,7 @@ pub trait Engine: Debug + Report + Send + Sync {
         &self,
         pool_id: PoolIdentifier<PoolUuid>,
         unlock_method: Option<UnlockMethod>,
+        passphrase_fd: Option<RawFd>,
     ) -> StratisResult<StartAction<PoolUuid>>;
 
     /// Stop and tear down a pool, storing the information for it to be started

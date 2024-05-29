@@ -4,7 +4,7 @@
 
 use std::{
     fs::OpenOptions,
-    io::Write,
+    io::{ErrorKind, Write},
     mem::forget,
     path::{Path, PathBuf},
     slice::from_raw_parts_mut,
@@ -25,7 +25,7 @@ use libcryptsetup_rs::{
             CryptDebugLevel, CryptLogLevel, CryptStatusInfo, CryptWipePattern, EncryptionFormat,
         },
     },
-    register, set_debug_level, set_log_callback, CryptDevice, CryptInit,
+    register, set_debug_level, set_log_callback, CryptDevice, CryptInit, LibcryptErr,
 };
 
 use crate::{
@@ -423,7 +423,7 @@ fn device_is_active(device: Option<&mut CryptDevice>, device_name: &DmName) -> S
         Ok(CryptStatusInfo::Active) => Ok(()),
         Ok(CryptStatusInfo::Busy) => {
             info!(
-                "Newly activated device {} reported that it was busy; you may see \
+                "Newly device {} reported that it was busy; you may see \
                 temporary failures due to the device being busy.",
                 device_name,
             );
@@ -461,6 +461,7 @@ pub fn activate(
     device: &mut CryptDevice,
     key_desc: Option<&KeyDescription>,
     unlock_method: UnlockMethod,
+    passphrase: Option<&SizedKeyMemory>,
     name: &DmName,
 ) -> StratisResult<()> {
     if let (Some(kd), UnlockMethod::Keyring) = (key_desc, unlock_method) {
@@ -483,22 +484,55 @@ pub fn activate(
             )));
         }
     }
-    log_on_failure!(
-        device.token_handle().activate_by_token::<()>(
-            Some(&name.to_string()),
+    if let Some(p) = passphrase {
+        let key_slot =
             if unlock_method == UnlockMethod::Keyring {
-                Some(LUKS2_TOKEN_ID)
+                Some(get_keyslot_number(device, LUKS2_TOKEN_ID)?.ok_or_else(|| {
+                    StratisError::Msg("LUKS keyring keyslot not found".to_string())
+                })?)
             } else if unlock_method == UnlockMethod::Clevis {
-                Some(CLEVIS_LUKS_TOKEN_ID)
+                Some(
+                    get_keyslot_number(device, CLEVIS_LUKS_TOKEN_ID)?
+                        .ok_or_else(|| StratisError::Msg("Clevis keyslot not found".to_string()))?,
+                )
             } else {
                 None
-            },
-            None,
-            CryptActivate::empty(),
-        ),
-        "Failed to activate device with name {}",
-        name
-    );
+            };
+        log_on_failure!(
+            device.activate_handle().activate_by_passphrase(
+                Some(&name.to_string()),
+                key_slot,
+                p.as_ref(),
+                CryptActivate::empty(),
+            ),
+            "Failed to activate device with name {}",
+            name
+        );
+    } else {
+        device
+            .token_handle()
+            .activate_by_token::<()>(
+                Some(&name.to_string()),
+                if unlock_method == UnlockMethod::Keyring {
+                    Some(LUKS2_TOKEN_ID)
+                } else if unlock_method == UnlockMethod::Clevis {
+                    Some(CLEVIS_LUKS_TOKEN_ID)
+                } else {
+                    None
+                },
+                None,
+                CryptActivate::empty(),
+            )
+            .map_err(|e| match e {
+                LibcryptErr::IOError(e) => match e.kind() {
+                    ErrorKind::NotFound => StratisError::Msg(format!(
+                        "Token slot for unlock method {unlock_method:?} was empty"
+                    )),
+                    _ => StratisError::from(e),
+                },
+                _ => StratisError::from(e),
+            })?;
+    }
 
     // Check activation status.
     device_is_active(Some(device), name)?;
@@ -512,7 +546,7 @@ pub fn activate(
 pub fn get_keyslot_number(
     device: &mut CryptDevice,
     token_id: c_uint,
-) -> StratisResult<Option<Vec<c_uint>>> {
+) -> StratisResult<Option<c_uint>> {
     let json = match device.token_handle().json_get(token_id) {
         Ok(j) => j,
         Err(_) => return Ok(None),
@@ -521,32 +555,38 @@ pub fn get_keyslot_number(
         .get(TOKEN_KEYSLOTS_KEY)
         .and_then(|k| k.as_array())
         .ok_or_else(|| StratisError::Msg("keyslots value was malformed".to_string()))?;
-    Ok(Some(
-        vec.iter()
-            .filter_map(|int_val| {
-                let as_str = int_val.as_str();
-                if as_str.is_none() {
-                    warn!(
-                        "Discarding invalid value in LUKS2 token keyslot array: {}",
-                        int_val
-                    );
-                }
-                let s = match as_str {
-                    Some(s) => s,
-                    None => return None,
-                };
-                let as_c_uint = s.parse::<c_uint>();
-                if let Err(ref e) = as_c_uint {
-                    warn!(
-                        "Discarding invalid value in LUKS2 token keyslot array: {}; \
+    let mut keyslots = vec
+        .iter()
+        .filter_map(|int_val| {
+            let as_str = int_val.as_str();
+            if as_str.is_none() {
+                warn!(
+                    "Discarding invalid value in LUKS2 token keyslot array: {}",
+                    int_val
+                );
+            }
+            let s = match as_str {
+                Some(s) => s,
+                None => return None,
+            };
+            let as_c_uint = s.parse::<c_uint>();
+            if let Err(ref e) = as_c_uint {
+                warn!(
+                    "Discarding invalid value in LUKS2 token keyslot array: {}; \
                     failed to convert it to an integer: {}",
-                        s, e,
-                    );
-                }
-                as_c_uint.ok()
-            })
-            .collect::<Vec<_>>(),
-    ))
+                    s, e,
+                );
+            }
+            as_c_uint.ok()
+        })
+        .collect::<Vec<_>>();
+    if keyslots.len() > 1 {
+        return Err(StratisError::Msg(format!(
+            "Each token should be associated with exactly one keyslot; found {}",
+            keyslots.len()
+        )));
+    }
+    Ok(keyslots.pop())
 }
 
 /// Deactivate an encrypted Stratis device but do not wipe it. This is not
@@ -619,14 +659,12 @@ pub fn ensure_wiped(
     ensure_inactive(device, name)?;
     let keyslot_number = get_keyslot_number(device, LUKS2_TOKEN_ID);
     match keyslot_number {
-        Ok(Some(nums)) => {
-            for i in nums.iter() {
-                log_on_failure!(
-                    device.keyslot_handle().destroy(*i),
-                    "Failed to destroy keyslot at index {}",
-                    i
-                );
-            }
+        Ok(Some(keyslot)) => {
+            log_on_failure!(
+                device.keyslot_handle().destroy(keyslot),
+                "Failed to destroy keyslot at index {}",
+                keyslot
+            );
         }
         Ok(None) => {
             info!(

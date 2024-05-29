@@ -36,8 +36,8 @@ use crate::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
             Diff, EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
             PoolEncryptionInfo, PoolUuid, PropChangeAction, RegenAction, RenameAction,
-            SetCreateAction, SetDeleteAction, StratFilesystemDiff, StratPoolDiff,
-            StratSigblockVersion,
+            SetCreateAction, SetDeleteAction, SizedKeyMemory, StratFilesystemDiff, StratPoolDiff,
+            StratSigblockVersion, UnlockMethod,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -223,13 +223,22 @@ impl StratPool {
         cachedevs: Vec<StratBlockDev>,
         timestamp: DateTime<Utc>,
         metadata: &PoolSave,
+        unlock_method: Option<UnlockMethod>,
+        passphrase: Option<SizedKeyMemory>,
     ) -> BDARecordResult<(Name, StratPool)> {
         if let Err(e) = check_metadata(metadata) {
             return Err((e, tiers_to_bdas(datadevs, cachedevs, None)));
         }
 
-        let backstore =
-            Backstore::setup(uuid, &metadata.backstore, datadevs, cachedevs, timestamp)?;
+        let backstore = Backstore::setup(
+            uuid,
+            metadata,
+            datadevs,
+            cachedevs,
+            timestamp,
+            unlock_method,
+            passphrase,
+        )?;
         let action_avail = backstore.action_availability();
 
         let pool_name = &metadata.name;

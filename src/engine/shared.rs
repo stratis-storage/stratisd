@@ -121,9 +121,9 @@ where
     }
 }
 
-/// Shared implementation of setting keys in the keyring for both the strat_engine
+/// Shared implementation of reading keys from file descriptors in both the strat_engine
 /// and sim_engine.
-pub fn set_key_shared(key_fd: RawFd, memory: &mut [u8]) -> StratisResult<usize> {
+pub fn read_key_shared(key_fd: RawFd, memory: &mut [u8]) -> StratisResult<usize> {
     let mut key_file = unsafe { File::from_raw_fd(key_fd) };
 
     let bytes_read = key_file.read(memory)?;

@@ -9,7 +9,7 @@ use libcryptsetup_rs::SafeMemHandle;
 use crate::{
     engine::{
         engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
-        shared,
+        shared::read_key_shared,
         types::{Key, KeyDescription, MappingCreateAction, MappingDeleteAction, SizedKeyMemory},
     },
     stratis::StratisResult,
@@ -52,7 +52,7 @@ impl KeyActions for SimKeyActions {
         key_fd: RawFd,
     ) -> StratisResult<MappingCreateAction<Key>> {
         let mut memory = vec![0; MAX_STRATIS_PASS_SIZE];
-        let size = shared::set_key_shared(key_fd, memory.as_mut_slice())?;
+        let size = read_key_shared(key_fd, memory.as_mut_slice())?;
         memory.truncate(size);
 
         match self.read(key_desc) {

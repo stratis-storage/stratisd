@@ -409,10 +409,11 @@ pub fn setup_crypt_device(physical_path: &Path) -> StratisResult<Option<CryptDev
 
 /// Set up a handle to a crypt device using either Clevis or the keyring to activate
 /// the device.
-pub fn setup_crypt_handle(
+fn setup_crypt_handle(
     device: &mut CryptDevice,
     physical_path: &Path,
     unlock_method: Option<UnlockMethod>,
+    passphrase: Option<&SizedKeyMemory>,
 ) -> StratisResult<Option<CryptHandle>> {
     let metadata = match load_crypt_metadata(device, physical_path)? {
         Some(m) => m,
@@ -429,6 +430,7 @@ pub fn setup_crypt_handle(
                 device,
                 metadata.encryption_info.key_description(),
                 unlock,
+                passphrase,
                 &metadata.activation_name,
             )?
         };
@@ -758,6 +760,7 @@ impl CryptHandle {
             device,
             encryption_info.key_description(),
             UnlockMethod::Any,
+            None,
             &activation_name,
         )
     }
@@ -793,9 +796,12 @@ impl CryptHandle {
     pub fn setup(
         physical_path: &Path,
         unlock_method: Option<UnlockMethod>,
+        passphrase: Option<&SizedKeyMemory>,
     ) -> StratisResult<Option<CryptHandle>> {
         match setup_crypt_device(physical_path)? {
-            Some(ref mut device) => setup_crypt_handle(device, physical_path, unlock_method),
+            Some(ref mut device) => {
+                setup_crypt_handle(device, physical_path, unlock_method, passphrase)
+            }
             None => Ok(None),
         }
     }
@@ -845,7 +851,7 @@ impl CryptHandle {
     }
 
     /// Get the keyslot associated with the given token ID.
-    pub fn keyslots(&self, token_id: c_uint) -> StratisResult<Option<Vec<c_uint>>> {
+    pub fn keyslot(&self, token_id: c_uint) -> StratisResult<Option<c_uint>> {
         get_keyslot_number(&mut self.acquire_crypt_device()?, token_id)
     }
 
@@ -890,18 +896,16 @@ impl CryptHandle {
             ));
         }
 
-        let keyslots = self.keyslots(CLEVIS_LUKS_TOKEN_ID)?.ok_or_else(|| {
+        let keyslot = self.keyslot(CLEVIS_LUKS_TOKEN_ID)?.ok_or_else(|| {
             StratisError::Msg(format!(
                 "Token slot {CLEVIS_LUKS_TOKEN_ID} appears to be empty; could not determine keyslots"
             ))
         })?;
-        for keyslot in keyslots {
-            log_on_failure!(
-                clevis_luks_unbind(self.luks2_device_path(), keyslot),
-                "Failed to unbind device {} from Clevis",
-                self.luks2_device_path().display()
-            );
-        }
+        log_on_failure!(
+            clevis_luks_unbind(self.luks2_device_path(), keyslot),
+            "Failed to unbind device {} from Clevis",
+            self.luks2_device_path().display()
+        );
         self.metadata.encryption_info = self.metadata.encryption_info.clone().unset_clevis_info();
         Ok(())
     }
@@ -919,11 +923,9 @@ impl CryptHandle {
         }
 
         let mut device = self.acquire_crypt_device()?;
-        let keyslot = get_keyslot_number(&mut device, CLEVIS_LUKS_TOKEN_ID)?
-            .and_then(|vec| vec.into_iter().next())
-            .ok_or_else(|| {
-                StratisError::Msg("Clevis binding found but no keyslot was associated".to_string())
-            })?;
+        let keyslot = get_keyslot_number(&mut device, CLEVIS_LUKS_TOKEN_ID)?.ok_or_else(|| {
+            StratisError::Msg("Clevis binding found but no keyslot was associated".to_string())
+        })?;
 
         clevis_luks_regen(self.luks2_device_path(), keyslot)?;
         // Need to reload LUKS2 metadata after Clevis metadata modification.
@@ -984,15 +986,13 @@ impl CryptHandle {
         }
 
         let mut device = self.acquire_crypt_device()?;
-        let keyslots = get_keyslot_number(&mut device, LUKS2_TOKEN_ID)?
+        let keyslot = get_keyslot_number(&mut device, LUKS2_TOKEN_ID)?
             .ok_or_else(|| StratisError::Msg("No LUKS2 keyring token was found".to_string()))?;
-        for keyslot in keyslots {
-            log_on_failure!(
-                device.keyslot_handle().destroy(keyslot),
-                "Failed partway through the kernel keyring unbinding operation \
-                which cannot be rolled back; manual intervention may be required"
-            )
-        }
+        log_on_failure!(
+            device.keyslot_handle().destroy(keyslot),
+            "Failed partway through the kernel keyring unbinding operation \
+            which cannot be rolled back; manual intervention may be required"
+        );
         device
             .token_handle()
             .json_set(TokenInput::RemoveToken(LUKS2_TOKEN_ID))?;
@@ -1375,7 +1375,7 @@ mod tests {
 
             handle.deactivate().unwrap();
 
-            let handle = CryptHandle::setup(path, Some(UnlockMethod::Keyring))
+            let handle = CryptHandle::setup(path, Some(UnlockMethod::Keyring), None)
                 .unwrap()
                 .unwrap_or_else(|| {
                     panic!(
@@ -1481,7 +1481,7 @@ mod tests {
 
         fn unlock_clevis(paths: &[&Path]) {
             let path = paths.first().copied().expect("Expected exactly one path");
-            CryptHandle::setup(path, Some(UnlockMethod::Clevis))
+            CryptHandle::setup(path, Some(UnlockMethod::Clevis), None)
                 .unwrap()
                 .unwrap();
         }

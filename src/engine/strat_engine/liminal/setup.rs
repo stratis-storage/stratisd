@@ -401,7 +401,7 @@ fn get_blockdev_legacy(
         Some(luks) => &luks.dev_info.devnode,
         None => &info.dev_info.devnode,
     };
-    let handle = match CryptHandle::setup(physical_path, None) {
+    let handle = match CryptHandle::setup(physical_path, None, None) {
         Ok(h) => h,
         Err(e) => return Err((e, bda)),
     };

@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use dbus::{Message, Path};
+use dbus::{arg::OwnedFd, Message, Path};
 use dbus_tree::{MTSync, MethodInfo, MethodResult};
 use futures::executor::block_on;
 
@@ -62,11 +62,13 @@ pub fn start_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
             None => None,
         }
     };
+    let fd_opt: (bool, OwnedFd) = get_next_arg(&mut iter, 3)?;
+    let fd = tuple_to_option(fd_opt);
 
     let ret = match handle_action!(block_on(dbus_context.engine.start_pool(
         id.clone(),
         unlock_method,
-        None
+        fd.map(|f| f.into_fd()),
     ))) {
         Ok(StartAction::Started(_)) => {
             let guard = match block_on(dbus_context.engine.get_pool(id.clone())) {

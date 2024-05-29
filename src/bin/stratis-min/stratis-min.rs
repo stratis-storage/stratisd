@@ -13,7 +13,7 @@ use stratisd::{
         CLEVIS_TANG_TRUST_URL,
     },
     jsonrpc::client::{filesystem, key, pool, report},
-    stratis::{StratisError, VERSION},
+    stratis::VERSION,
 };
 
 fn parse_args() -> Command {
@@ -244,12 +244,6 @@ fn main() -> Result<(), String> {
                         None => None,
                     };
                 let prompt = args.get_flag("prompt");
-                if prompt && unlock_method == Some(UnlockMethod::Clevis) {
-                    return Err(Box::new(StratisError::Msg(
-                        "--prompt and an unlock_method of clevis are mutually exclusive"
-                            .to_string(),
-                    )));
-                }
                 pool::pool_start(id, unlock_method, prompt)?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("stop") {

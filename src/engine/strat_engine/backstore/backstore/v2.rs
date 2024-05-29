@@ -27,14 +27,14 @@ use crate::{
             dm::{get_dm, list_of_backstore_devices, remove_optional_devices, DEVICEMAPPER_PATH},
             metadata::{MDADataSize, BDA},
             names::{format_backstore_ids, CacheRole},
-            serde_structs::{BackstoreSave, CapSave, Recordable},
+            serde_structs::{BackstoreSave, CapSave, PoolFeatures, PoolSave, Recordable},
             shared::bds_to_bdas,
             types::BDARecordResult,
             writing::wipe_sectors,
         },
         types::{
             ActionAvailability, BlockDevTier, DevUuid, EncryptionInfo, KeyDescription, PoolUuid,
-            UnlockMethod,
+            SizedKeyMemory, UnlockMethod,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -302,13 +302,15 @@ impl Backstore {
     /// self.cache.is_some() <=> self.cache_tier.is_some()
     pub fn setup(
         pool_uuid: PoolUuid,
-        backstore_save: &BackstoreSave,
+        pool_save: &PoolSave,
         datadevs: Vec<StratBlockDev>,
         cachedevs: Vec<StratBlockDev>,
         last_update_time: DateTime<Utc>,
+        unlock_method: Option<UnlockMethod>,
+        passphrase: Option<SizedKeyMemory>,
     ) -> BDARecordResult<Backstore> {
         let block_mgr = BlockDevMgr::new(datadevs, Some(last_update_time));
-        let data_tier = DataTier::setup(block_mgr, &backstore_save.data_tier)?;
+        let data_tier = DataTier::setup(block_mgr, &pool_save.backstore.data_tier)?;
         let (dm_name, dm_uuid) = format_backstore_ids(pool_uuid, CacheRole::OriginSub);
         let origin = match LinearDev::setup(
             get_dm(),
@@ -332,7 +334,7 @@ impl Backstore {
 
         let (placeholder, cache, cache_tier, origin) = if !cachedevs.is_empty() {
             let block_mgr = BlockDevMgr::new(cachedevs, Some(last_update_time));
-            match backstore_save.cache_tier {
+            match pool_save.backstore.cache_tier {
                 Some(ref cache_tier_save) => {
                     let cache_tier = match CacheTier::setup(block_mgr, cache_tier_save) {
                         Ok(ct) => ct,
@@ -380,20 +382,41 @@ impl Backstore {
             (Some(placeholder), None, None, Some(origin))
         };
 
-        let enc = match CryptHandle::setup(
-            &once(DEVICEMAPPER_PATH)
-                .chain(once(
-                    format_backstore_ids(pool_uuid, CacheRole::Cache)
-                        .0
-                        .to_string()
-                        .as_str(),
-                ))
-                .collect::<PathBuf>(),
-            pool_uuid,
-            UnlockMethod::Any,
-        ) {
-            Ok(opt) => opt.map(Either::Right),
-            Err(e) => return Err((e, data_tier.block_mgr.into_bdas())),
+        let metadata_enc_enabled = pool_save.features.contains(PoolFeatures::Encryption);
+        let crypt_physical_path = &once(DEVICEMAPPER_PATH)
+            .chain(once(
+                format_backstore_ids(pool_uuid, CacheRole::Cache)
+                    .0
+                    .to_string()
+                    .as_str(),
+            ))
+            .collect::<PathBuf>();
+        let enc = match (metadata_enc_enabled, unlock_method, passphrase.as_ref()) {
+            (true, Some(unlock_method), pass) => {
+                match CryptHandle::setup(crypt_physical_path, pool_uuid, unlock_method, pass) {
+                    Ok(opt) => {
+                        if let Some(h) = opt {
+                            Some(Either::Right(h))
+                        } else {
+                            return Err((StratisError::Msg("Metadata reported that encryption is enabled but no crypt header was found".to_string()), data_tier.block_mgr.into_bdas()));
+                        }
+                    }
+                    Err(e) => return Err((e, data_tier.block_mgr.into_bdas())),
+                }
+            }
+            (true, None, _) => {
+                unreachable!("Checked in liminal device code");
+            }
+            (false, _, _) => match CryptHandle::load_metadata(crypt_physical_path, pool_uuid) {
+                Ok(opt) => {
+                    if opt.is_some() {
+                        return Err((StratisError::Msg("Metadata reported that encryption is not enabled but a crypt header was found".to_string()), data_tier.block_mgr.into_bdas()));
+                    } else {
+                        None
+                    }
+                }
+                Err(e) => return Err((e, data_tier.block_mgr.into_bdas())),
+            },
         };
 
         Ok(Backstore {
@@ -403,8 +426,8 @@ impl Backstore {
             cache,
             placeholder,
             enc,
-            allocs: backstore_save.cap.allocs.clone(),
-            crypt_meta_allocs: backstore_save.cap.crypt_meta_allocs.clone(),
+            allocs: pool_save.backstore.cap.allocs.clone(),
+            crypt_meta_allocs: pool_save.backstore.cap.crypt_meta_allocs.clone(),
         })
     }
 

@@ -69,11 +69,6 @@ jobs:
           - task: make -f Makefile test
             toolchain: 1.79.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
-          - task: >-
-              TANG_URL=localhost
-              make -f Makefile test-clevis-loop-should-fail
-            toolchain: 1.79.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
           - task: make -f Makefile build
             toolchain: 1.79.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
@@ -132,6 +127,54 @@ jobs:
           dnf install -y
           asciidoc
           clang
+          cryptsetup-devel
+          curl
+          dbus-devel
+          glibc-static
+          device-mapper-devel
+          device-mapper-persistent-data
+          libblkid-devel
+          make
+          ncurses
+          sudo
+          systemd-devel
+          systemd-udev
+          xfsprogs
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          components: ${{ matrix.components }}
+          toolchain: ${{ matrix.toolchain }}
+      - name: Build stratisd
+        run: PROFILEDIR=debug make -f Makefile build-all
+      - name: Install stratisd
+        run: PROFILEDIR=debug make -f Makefile install
+      - name: Reload udev
+        run: udevadm control --reload
+      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
+        run: ${{ matrix.task }}
+
+  # TESTS WITH UDEV
+  checks_with_tang_should_fail:
+    strategy:
+      matrix:
+        include:
+          - task: >-
+              TANG_URL=localhost
+              make -f Makefile test-clevis-loop-should-fail
+            toolchain: 1.78.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            components: cargo
+    runs-on: ubuntu-22.04
+    container:
+      image: fedora:40  # CURRENT DEVELOPMENT ENVIRONMENT
+      options: --privileged -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev --ipc=host
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies for Fedora
+        run: >
+          dnf install -y
+          asciidoc
+          clang
+          clevis
           cryptsetup-devel
           curl
           dbus-devel

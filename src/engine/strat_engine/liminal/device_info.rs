@@ -708,6 +708,7 @@ impl DeviceSet {
                     }
                 })
                 .collect::<Vec<_>>(),
+            metadata_version: self.metadata_version().ok(),
         })
     }
 

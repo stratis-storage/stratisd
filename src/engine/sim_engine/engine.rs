@@ -29,6 +29,7 @@ use crate::{
             SetUnlockAction, StartAction, StopAction, StoppedPoolInfo, StoppedPoolsInfo,
             StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
         },
+        StratSigblockVersion,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -254,6 +255,7 @@ impl Engine for SimEngine {
                                 uuid: dev_uuid,
                             })
                             .collect::<Vec<_>>(),
+                        metadata_version: Some(StratSigblockVersion::V2),
                     },
                 );
                 st

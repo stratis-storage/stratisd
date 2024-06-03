@@ -1486,7 +1486,7 @@ mod tests {
                 .unwrap();
         }
 
-        crypt::insert_and_remove_key(paths, both_initialize, unlock_clevis);
+        crypt::insert_and_remove_key(paths, both_initialize, |paths, _| unlock_clevis(paths));
     }
 
     #[test]
@@ -1680,6 +1680,49 @@ mod tests {
         loopbacked::test_with_spec(
             &loopbacked::DeviceLimits::Exactly(1, None),
             test_clevis_sss_configs,
+        );
+    }
+
+    fn test_passphrase_unlock(paths: &[&Path]) {
+        fn init(paths: &[&Path], key_desc: &KeyDescription) {
+            let path = paths[0];
+
+            let handle = CryptHandle::initialize(
+                path,
+                PoolUuid::new_v4(),
+                DevUuid::new_v4(),
+                Name::new("pool_name".to_string()),
+                &EncryptionInfo::KeyDesc(key_desc.clone()),
+                None,
+            )
+            .unwrap();
+            handle.deactivate().unwrap();
+        }
+
+        fn unlock(paths: &[&Path], key: &SizedKeyMemory) {
+            let path = paths[0];
+
+            CryptHandle::setup(path, Some(UnlockMethod::Any), Some(key))
+                .unwrap()
+                .unwrap();
+        }
+
+        crypt::insert_and_remove_key(paths, init, unlock);
+    }
+
+    #[test]
+    fn real_test_passphrase_unlock() {
+        real::test_with_spec(
+            &real::DeviceLimits::Exactly(1, None, None),
+            test_passphrase_unlock,
+        );
+    }
+
+    #[test]
+    fn loop_test_passphrase_unlock() {
+        loopbacked::test_with_spec(
+            &loopbacked::DeviceLimits::Exactly(1, None),
+            test_passphrase_unlock,
         );
     }
 }

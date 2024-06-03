@@ -578,32 +578,32 @@ impl DbusTreeHandler {
                     consts::MANAGER_INTERFACE_NAME_3_2 => {
                         Vec::new(),
                         consts::STOPPED_POOLS_PROP.to_string() =>
-                        box_variant!(stopped_pools_to_prop(&stopped_pools))
+                        box_variant!(stopped_pools_to_prop(&stopped_pools, false))
                     },
                     consts::MANAGER_INTERFACE_NAME_3_3 => {
                         Vec::new(),
                         consts::STOPPED_POOLS_PROP.to_string() =>
-                        box_variant!(stopped_pools_to_prop(&stopped_pools))
+                        box_variant!(stopped_pools_to_prop(&stopped_pools, false))
                     },
                     consts::MANAGER_INTERFACE_NAME_3_4 => {
                         Vec::new(),
                         consts::STOPPED_POOLS_PROP.to_string() =>
-                        box_variant!(stopped_pools_to_prop(&stopped_pools))
+                        box_variant!(stopped_pools_to_prop(&stopped_pools, false))
                     },
                     consts::MANAGER_INTERFACE_NAME_3_5 => {
                         Vec::new(),
                         consts::STOPPED_POOLS_PROP.to_string() =>
-                        box_variant!(stopped_pools_to_prop(&stopped_pools))
+                        box_variant!(stopped_pools_to_prop(&stopped_pools, false))
                     },
                     consts::MANAGER_INTERFACE_NAME_3_6 => {
                         Vec::new(),
                         consts::STOPPED_POOLS_PROP.to_string() =>
-                        box_variant!(stopped_pools_to_prop(&stopped_pools))
+                        box_variant!(stopped_pools_to_prop(&stopped_pools, false))
                     },
                     consts::MANAGER_INTERFACE_NAME_3_7 => {
                         Vec::new(),
                         consts::STOPPED_POOLS_PROP.to_string() =>
-                        box_variant!(stopped_pools_to_prop(&stopped_pools))
+                        box_variant!(stopped_pools_to_prop(&stopped_pools, true))
                     }
                 },
             )

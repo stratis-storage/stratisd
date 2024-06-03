@@ -66,7 +66,7 @@ pub fn locked_pools_to_prop(pools: &LockedPoolsInfo) -> StoppedOrLockedPools {
 }
 
 /// Convert a stopped pool data structure to a property format.
-pub fn stopped_pools_to_prop(pools: &StoppedPoolsInfo) -> StoppedOrLockedPools {
+pub fn stopped_pools_to_prop(pools: &StoppedPoolsInfo, metadata: bool) -> StoppedOrLockedPools {
     pools
         .stopped
         .iter()
@@ -111,6 +111,15 @@ pub fn stopped_pools_to_prop(pools: &StoppedPoolsInfo) -> StoppedOrLockedPools {
                         .collect::<Vec<_>>(),
                 )),
             );
+            if metadata {
+                map.insert(
+                    "metadata_version".to_string(),
+                    match stopped.metadata_version {
+                        Some(m) => Variant(Box::new((true, m as u64))),
+                        None => Variant(Box::new((false, 0))),
+                    },
+                );
+            }
             (uuid_to_string!(u), map)
         })
         .collect::<HashMap<_, _>>()

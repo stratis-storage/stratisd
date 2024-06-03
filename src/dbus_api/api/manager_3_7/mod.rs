@@ -4,5 +4,6 @@
 
 mod api;
 mod methods;
+mod props;
 
-pub use api::start_pool_method;
+pub use api::{start_pool_method, stopped_pools_property};

@@ -148,7 +148,7 @@ pub fn get_base_tree<'a>(
                 .add_m(manager_3_6::stop_pool_method(&f))
                 .add_m(manager_3_2::refresh_state_method(&f))
                 .add_p(manager_3_0::version_property(&f))
-                .add_p(manager_3_2::stopped_pools_property(&f)),
+                .add_p(manager_3_7::stopped_pools_property(&f)),
         )
         .add(
             f.interface(consts::REPORT_INTERFACE_NAME_3_0, ())

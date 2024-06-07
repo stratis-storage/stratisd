@@ -16,7 +16,7 @@ use serde::{Serialize, Serializer};
 
 use devicemapper::{Sectors, ThinDevId};
 
-use crate::engine::types::{DevUuid, FilesystemUuid};
+use crate::engine::types::{DevUuid, Features, FilesystemUuid};
 
 const MAXIMUM_STRING_SIZE: usize = 255;
 
@@ -77,6 +77,14 @@ pub enum PoolFeatures {
     Raid,
     Integrity,
     Encryption,
+}
+
+impl From<Vec<PoolFeatures>> for Features {
+    fn from(v: Vec<PoolFeatures>) -> Self {
+        Features {
+            encryption: v.contains(&PoolFeatures::Encryption),
+        }
+    }
 }
 
 // ALL structs that represent variable length metadata in pre-order

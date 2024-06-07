@@ -66,6 +66,9 @@ pub fn locked_pools_to_prop(pools: &LockedPoolsInfo) -> StoppedOrLockedPools {
 }
 
 /// Convert a stopped pool data structure to a property format.
+///
+/// if metadata is true show pool V2 D-Bus attributes such as metadata version and enabled features
+/// for the stopped pool.
 pub fn stopped_pools_to_prop(pools: &StoppedPoolsInfo, metadata: bool) -> StoppedOrLockedPools {
     pools
         .stopped
@@ -117,6 +120,19 @@ pub fn stopped_pools_to_prop(pools: &StoppedPoolsInfo, metadata: bool) -> Stoppe
                     match stopped.metadata_version {
                         Some(m) => Variant(Box::new((true, m as u64))),
                         None => Variant(Box::new((false, 0))),
+                    },
+                );
+                map.insert(
+                    "features".to_string(),
+                    match stopped.features {
+                        Some(ref f) => {
+                            let mut feat = HashMap::new();
+                            if f.encryption {
+                                feat.insert("encryption".to_string(), true);
+                            }
+                            Variant(Box::new((true, feat)))
+                        }
+                        None => Variant(Box::new((false, HashMap::<String, bool>::new()))),
                     },
                 );
             }

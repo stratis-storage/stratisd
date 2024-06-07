@@ -382,7 +382,7 @@ impl Backstore {
             (Some(placeholder), None, None, Some(origin))
         };
 
-        let metadata_enc_enabled = pool_save.features.contains(PoolFeatures::Encryption);
+        let metadata_enc_enabled = pool_save.features.contains(&PoolFeatures::Encryption);
         let crypt_physical_path = &once(DEVICEMAPPER_PATH)
             .chain(once(
                 format_backstore_ids(pool_uuid, CacheRole::Cache)

@@ -119,6 +119,19 @@ pub fn stopped_pools_to_prop(pools: &StoppedPoolsInfo, metadata: bool) -> Stoppe
                         None => Variant(Box::new((false, 0))),
                     },
                 );
+                map.insert(
+                    "features".to_string(),
+                    match stopped.features {
+                        Some(ref f) => {
+                            let mut feat = HashMap::new();
+                            if f.encryption {
+                                feat.insert("encryption".to_string(), true);
+                            }
+                            Variant(Box::new((true, feat)))
+                        }
+                        None => Variant(Box::new((false, HashMap::<String, bool>::new()))),
+                    },
+                );
             }
             (uuid_to_string!(u), map)
         })

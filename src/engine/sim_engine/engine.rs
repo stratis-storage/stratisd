@@ -24,10 +24,10 @@ use crate::{
             SomeLockWriteGuard, Table,
         },
         types::{
-            CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockedPoolsInfo,
-            Name, PoolDevice, PoolDiff, PoolIdentifier, PoolUuid, RenameAction, ReportType,
-            SetUnlockAction, StartAction, StopAction, StoppedPoolInfo, StoppedPoolsInfo,
-            StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
+            CreateAction, DeleteAction, DevUuid, EncryptionInfo, Features, FilesystemUuid,
+            LockedPoolsInfo, Name, PoolDevice, PoolDiff, PoolIdentifier, PoolUuid, RenameAction,
+            ReportType, SetUnlockAction, StartAction, StopAction, StoppedPoolInfo,
+            StoppedPoolsInfo, StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
         },
         StratSigblockVersion,
     },
@@ -256,6 +256,9 @@ impl Engine for SimEngine {
                             })
                             .collect::<Vec<_>>(),
                         metadata_version: Some(StratSigblockVersion::V2),
+                        features: Some(Features {
+                            encryption: pool.is_encrypted(),
+                        }),
                     },
                 );
                 st

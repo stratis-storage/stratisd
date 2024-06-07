@@ -189,7 +189,7 @@ impl LiminalDevices {
         fn start_pool_failure(
             pools: &Table<PoolUuid, AnyPool>,
             pool_uuid: PoolUuid,
-            luks_info: StratisResult<(Option<PoolEncryptionInfo>, MaybeInconsistent<Option<Name>>)>,
+            luks_info: StratisResult<Option<PoolEncryptionInfo>>,
             infos: &HashMap<DevUuid, LStratisDevInfo>,
             bdas: HashMap<DevUuid, BDA>,
             meta_res: StratisResult<(DateTime<Utc>, PoolSave)>,
@@ -276,9 +276,7 @@ impl LiminalDevices {
         assert!(pools.get_by_uuid(pool_uuid).is_none());
         assert!(!self.stopped_pools.contains_key(&pool_uuid));
 
-        let encryption_info = stopped_pool.encryption_info();
-        let pool_name = stopped_pool.pool_name();
-        let luks_info = encryption_info.and_then(|ei| pool_name.map(|pn| (ei, pn)));
+        let luks_info = stopped_pool.encryption_info();
         let infos = match stopped_pool.into_opened_set() {
             Either::Left(i) => i,
             Either::Right(ds) => {
@@ -768,8 +766,8 @@ impl LiminalDevices {
                     info_map.process_info_add(info);
                 }
 
-                match info_map.pool_name() {
-                    Ok(MaybeInconsistent::No(Some(name))) => {
+                match info_map.pool_level_metadata_info() {
+                    Ok((MaybeInconsistent::No(Some(name)), _)) => {
                         if let Some(maybe_conflict) = self.name_to_uuid.get_mut(&name) {
                             maybe_conflict.add(*pool_uuid);
                             if let UuidOrConflict::Conflict(set) = maybe_conflict {
@@ -847,7 +845,7 @@ impl LiminalDevices {
         fn try_setup_started_pool_failure(
             pools: &Table<PoolUuid, AnyPool>,
             pool_uuid: PoolUuid,
-            luks_info: StratisResult<(Option<PoolEncryptionInfo>, MaybeInconsistent<Option<Name>>)>,
+            luks_info: StratisResult<Option<PoolEncryptionInfo>>,
             infos: &HashMap<DevUuid, LStratisDevInfo>,
             bdas: HashMap<DevUuid, BDA>,
             metadata_version: StratisResult<StratSigblockVersion>,
@@ -895,9 +893,7 @@ impl LiminalDevices {
         assert!(!self.stopped_pools.contains_key(&pool_uuid));
 
         let metadata_version = device_set.metadata_version();
-        let encryption_info = device_set.encryption_info();
-        let pool_name = device_set.pool_name();
-        let luks_info = encryption_info.and_then(|ei| pool_name.map(|pn| (ei, pn)));
+        let luks_info = device_set.encryption_info();
         let infos = match device_set.into_opened_set() {
             Either::Left(i) => i,
             Either::Right(ds) => {
@@ -1074,8 +1070,8 @@ impl LiminalDevices {
                         .insert(device_path.to_path_buf(), (pool_uuid, device_uuid));
 
                     devices.process_info_add(info);
-                    match devices.pool_name() {
-                        Ok(MaybeInconsistent::No(Some(name))) => {
+                    match devices.pool_level_metadata_info() {
+                        Ok((MaybeInconsistent::No(Some(name)), _)) => {
                             if let Some(maybe_conflict) = self.name_to_uuid.get_mut(&name) {
                                 maybe_conflict.add(pool_uuid);
                                 if let UuidOrConflict::Conflict(set) = maybe_conflict {
@@ -1111,8 +1107,8 @@ impl LiminalDevices {
 
                 devices.process_info_remove(device_path, pool_uuid, dev_uuid);
                 self.uuid_lookup.remove(device_path);
-                match devices.pool_name() {
-                    Ok(MaybeInconsistent::No(Some(name))) => {
+                match devices.pool_level_metadata_info() {
+                    Ok((MaybeInconsistent::No(Some(name)), _)) => {
                         if let Some(maybe_conflict) = self.name_to_uuid.get_mut(&name) {
                             maybe_conflict.add(pool_uuid);
                             if let UuidOrConflict::Conflict(set) = maybe_conflict {
@@ -1261,7 +1257,7 @@ fn load_stratis_metadata(
             )));
     }
 
-    match get_metadata(infos) {
+    match get_metadata(&infos) {
         Ok(opt) => opt
             .ok_or_else(|| {
                 StratisError::Msg(format!(
@@ -1288,7 +1284,7 @@ fn load_stratis_metadata(
 fn setup_pool_legacy(
     pools: &Table<PoolUuid, AnyPool>,
     pool_uuid: PoolUuid,
-    luks_info: StratisResult<(Option<PoolEncryptionInfo>, MaybeInconsistent<Option<Name>>)>,
+    luks_info: StratisResult<Option<PoolEncryptionInfo>>,
     infos: &HashMap<DevUuid, LStratisDevInfo>,
     bdas: HashMap<DevUuid, BDA>,
     timestamp: DateTime<Utc>,
@@ -1317,7 +1313,7 @@ fn setup_pool_legacy(
         Ok((datadevs, cachedevs)) => (datadevs, cachedevs),
     };
 
-    let (pool_einfo, pool_name) = match luks_info {
+    let pool_einfo = match luks_info {
         Ok(inner) => inner,
         Err(_) => {
             // NOTE: This is not actually a hopeless situation. It may be
@@ -1336,21 +1332,9 @@ fn setup_pool_legacy(
 
     v1::StratPool::setup(pool_uuid, datadevs, cachedevs, timestamp, &metadata, pool_einfo)
         .map(|(name, mut pool)| {
-            if matches!(pool_name, MaybeInconsistent::Yes | MaybeInconsistent::No(None)) || MaybeInconsistent::No(Some(&name)) != pool_name.as_ref() || pool.blockdevs().iter().map(|(_, _, bd)| {
+            if pool.blockdevs().iter().map(|(_, _, bd)| {
                 bd.pool_name()
-            }).fold(false, |acc, next| {
-                match next {
-                    Some(Some(name)) => {
-                        if MaybeInconsistent::No(Some(name)) == pool_name.as_ref() {
-                            acc
-                        } else {
-                            true
-                        }
-                    },
-                    Some(None) => true,
-                    None => false,
-                }
-            }) {
+            }).any(|name| name != Some(Some(&Name::new(metadata.name.clone()))) || matches!(name, Some(None))) {
                 if let Err(e) = pool.rename_pool(&name) {
                     warn!("Pool will not be able to be started by name; pool name metadata in LUKS2 token is not consistent across all devices: {}", e);
                 }

@@ -26,7 +26,7 @@ use crate::{
             device::blkdev_size,
             liminal::device_info::{LStratisDevInfo, LStratisInfo},
             metadata::BDA,
-            serde_structs::{BackstoreSave, BaseBlockDevSave, PoolSave},
+            serde_structs::{BackstoreSave, BaseBlockDevSave, EnabledPoolFeatures, PoolSave},
             shared::{bds_to_bdas, tiers_to_bdas},
             types::{BDARecordResult, BDAResult},
         },
@@ -44,7 +44,7 @@ use crate::{
 ///
 /// Precondition: infos and bdas have identical sets of keys
 pub fn get_metadata(
-    infos: HashMap<DevUuid, &LStratisInfo>,
+    infos: &HashMap<DevUuid, &LStratisInfo>,
 ) -> StratisResult<Option<(DateTime<Utc>, PoolSave)>> {
     // Try to read from all available devnodes that could contain most
     // recent metadata. In the event of errors, continue to try until all are
@@ -82,9 +82,7 @@ pub fn get_metadata(
 /// metadata could be written.
 /// Returns an error if devices provided don't match the devices recorded in the
 /// metadata.
-///
-/// Precondition: infos and bdas have identical sets of keys
-pub fn get_name(infos: HashMap<DevUuid, &LStratisInfo>) -> StratisResult<Option<Name>> {
+pub fn get_name(infos: &HashMap<DevUuid, &LStratisInfo>) -> StratisResult<Option<Name>> {
     let found_uuids = infos.keys().copied().collect::<HashSet<_>>();
     match get_metadata(infos)? {
         Some((_, pool)) => {
@@ -123,6 +121,58 @@ pub fn get_name(infos: HashMap<DevUuid, &LStratisInfo>) -> StratisResult<Option<
             }
 
             Ok(Some(Name::new(pool.name)))
+        }
+        None => Ok(None),
+    }
+}
+
+/// Get the feature set from the most recent metadata from a set of devices.
+/// Returns None if no metadata found for this pool on any device. This can
+/// happen if the pool was constructed but failed in the interval before the
+/// metadata could be written.
+/// Returns an error if devices provided don't match the devices recorded in the
+/// metadata.
+pub fn get_feature_set(
+    infos: &HashMap<DevUuid, &LStratisInfo>,
+) -> StratisResult<Option<EnabledPoolFeatures>> {
+    let found_uuids = infos.keys().copied().collect::<HashSet<_>>();
+    match get_metadata(infos)? {
+        Some((_, pool)) => {
+            let v = [];
+            let meta_uuids = pool
+                .backstore
+                .data_tier
+                .blockdev
+                .devs
+                .iter()
+                .map(|bd| bd.uuid)
+                .chain(
+                    pool.backstore
+                        .cache_tier
+                        .as_ref()
+                        .map(|ct| ct.blockdev.devs.iter())
+                        .unwrap_or_else(|| v.iter())
+                        .map(|bd| bd.uuid),
+                )
+                .collect::<HashSet<_>>();
+
+            if found_uuids != meta_uuids {
+                return Err(StratisError::Msg(format!(
+                    "UUIDs in metadata ({}) did not match UUIDs found ({})",
+                    Itertools::intersperse(
+                        meta_uuids.into_iter().map(|u| u.to_string()),
+                        ", ".to_string(),
+                    )
+                    .collect::<String>(),
+                    Itertools::intersperse(
+                        found_uuids.into_iter().map(|u| u.to_string()),
+                        ", ".to_string(),
+                    )
+                    .collect::<String>(),
+                )));
+            }
+
+            Ok(Some(pool.features))
         }
         None => Ok(None),
     }

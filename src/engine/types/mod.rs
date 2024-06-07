@@ -247,6 +247,12 @@ pub struct StoppedPoolInfo {
     pub info: Option<PoolEncryptionInfo>,
     pub devices: Vec<PoolDevice>,
     pub metadata_version: Option<StratSigblockVersion>,
+    pub features: Option<Features>,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct Features {
+    pub encryption: bool,
 }
 
 #[derive(Default, Debug, Eq, PartialEq)]

@@ -17,7 +17,7 @@ use serde::{Serialize, Serializer};
 
 use devicemapper::{Sectors, ThinDevId};
 
-use crate::engine::types::{DevUuid, FilesystemUuid};
+use crate::engine::types::{DevUuid, Features, FilesystemUuid};
 
 const MAXIMUM_STRING_SIZE: usize = 255;
 
@@ -99,6 +99,14 @@ impl EnabledPoolFeatures {
 
     fn is_empty(&self) -> bool {
         self.features.is_empty()
+    }
+}
+
+impl From<EnabledPoolFeatures> for Features {
+    fn from(enabled: EnabledPoolFeatures) -> Self {
+        Features {
+            encryption: enabled.contains(PoolFeatures::Encryption),
+        }
     }
 }
 

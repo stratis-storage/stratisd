@@ -21,12 +21,12 @@ use crate::{
             backstore::blockdev::{v1, v2},
             liminal::{
                 identify::{DeviceInfo, LuksInfo, StratisDevInfo, StratisInfo},
-                setup::get_name,
+                setup::{get_feature_set, get_name},
             },
             metadata::{StratisIdentifiers, BDA},
         },
         types::{
-            DevUuid, EncryptionInfo, LockedPoolInfo, MaybeInconsistent, Name, PoolDevice,
+            DevUuid, EncryptionInfo, Features, LockedPoolInfo, MaybeInconsistent, Name, PoolDevice,
             PoolEncryptionInfo, PoolUuid, StoppedPoolInfo, StratSigblockVersion,
         },
     },
@@ -611,11 +611,15 @@ impl DeviceSet {
         )
     }
 
-    /// Get the name, if available, of the pool formed by the devices
+    /// Get the required pool level metadata information, if available, of the pool formed by the devices
     /// in this DeviceSet.
-    pub fn pool_name(&self) -> StratisResult<MaybeInconsistent<Option<Name>>> {
+    pub fn pool_level_metadata_info(
+        &self,
+    ) -> StratisResult<(MaybeInconsistent<Option<Name>>, Option<Features>)> {
         match self.as_opened_set() {
-            Some(set) => get_name(set).map(MaybeInconsistent::No),
+            Some(set) => get_name(&set).map(MaybeInconsistent::No).and_then(|name| {
+                get_feature_set(&set).map(|feat| (name, feat.map(Features::from)))
+            }),
             None => gather_pool_name(
                 self.internal.len(),
                 self.internal.values().map(|info| match info {
@@ -623,7 +627,12 @@ impl DeviceSet {
                     LInfo::Luks(l) => Some(l.pool_name.as_ref()),
                 }),
             )
-            .map(|opt| opt.expect("self.as_opened_set().is_some() if pool is unencrypted")),
+            .map(|opt| {
+                (
+                    opt.expect("self.as_opened_set().is_some() if pool is unencrypted"),
+                    Some(Features { encryption: true }),
+                )
+            }),
         }
     }
 
@@ -688,27 +697,37 @@ impl DeviceSet {
             self.internal.values().map(|info| info.encryption_info()),
         )
         .ok()
-        .map(|info| StoppedPoolInfo {
-            info,
-            devices: self
-                .internal
-                .iter()
-                .map(|(uuid, l)| {
-                    let devnode = match l {
-                        LInfo::Stratis(strat_info) => strat_info
-                            .luks
-                            .as_ref()
-                            .map(|l| l.dev_info.devnode.clone())
-                            .unwrap_or_else(|| strat_info.dev_info.devnode.clone()),
-                        LInfo::Luks(luks_info) => luks_info.dev_info.devnode.clone(),
-                    };
-                    PoolDevice {
-                        devnode,
-                        uuid: *uuid,
-                    }
-                })
-                .collect::<Vec<_>>(),
-            metadata_version: self.metadata_version().ok(),
+        .map(|info| {
+            let features = match self.pool_level_metadata_info() {
+                Ok((_, opt)) => opt,
+                Err(e) => {
+                    warn!("Failed to read metadata for pool: {e}");
+                    None
+                }
+            };
+            StoppedPoolInfo {
+                info,
+                devices: self
+                    .internal
+                    .iter()
+                    .map(|(uuid, l)| {
+                        let devnode = match l {
+                            LInfo::Stratis(strat_info) => strat_info
+                                .luks
+                                .as_ref()
+                                .map(|l| l.dev_info.devnode.clone())
+                                .unwrap_or_else(|| strat_info.dev_info.devnode.clone()),
+                            LInfo::Luks(luks_info) => luks_info.dev_info.devnode.clone(),
+                        };
+                        PoolDevice {
+                            devnode,
+                            uuid: *uuid,
+                        }
+                    })
+                    .collect::<Vec<_>>(),
+                metadata_version: self.metadata_version().ok(),
+                features,
+            }
         })
     }
 

@@ -460,9 +460,7 @@ mod tests {
     /// Verify that the largest possible limit may be used for the
     /// allocator.
     fn test_max_allocator_range() {
-        use std::u64::MAX;
-
-        PerDevSegments::new(Sectors(MAX));
+        PerDevSegments::new(Sectors(u64::MAX));
     }
 
     #[test]
@@ -519,12 +517,10 @@ mod tests {
     /// Verify that insert() errors when an element in a requested range
     /// exceeds u64::MAX.
     fn test_allocator_failures_overflow_max() {
-        use std::u64::MAX;
-
-        let mut allocator = PerDevSegments::new(Sectors(MAX));
+        let mut allocator = PerDevSegments::new(Sectors(u64::MAX));
 
         // overflow max u64
-        assert_matches!(allocator.insert(&(Sectors(MAX), Sectors(1))), Err(_));
+        assert_matches!(allocator.insert(&(Sectors(u64::MAX), Sectors(1))), Err(_));
         allocator.invariant();
     }
 

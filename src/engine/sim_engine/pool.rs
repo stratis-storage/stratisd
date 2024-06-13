@@ -669,7 +669,7 @@ impl Pool for SimPool {
 
     fn set_blockdev_user_info(
         &mut self,
-        _pool_name: &str,
+        _pool_name: &Name,
         uuid: DevUuid,
         user_info: Option<&str>,
     ) -> StratisResult<RenameAction<DevUuid>> {

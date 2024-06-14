@@ -633,6 +633,24 @@ fn test_stratis_min_key_set() {
     test_with_stratisd_min_sim(stratis_min_key_set);
 }
 
+fn stratis_min_key_set_empty() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.write_stdin("")
+        .arg("key")
+        .arg("set")
+        .arg("--capture-key")
+        .arg("testkey");
+    cmd.assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("Password provided was empty"));
+}
+
+#[test]
+fn test_stratis_min_key_set_empty() {
+    test_with_stratisd_min_sim(stratis_min_key_set_empty);
+}
+
 fn stratis_min_pool_clevis_pin() {
     stratis_min_create_pool_and_fs();
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();

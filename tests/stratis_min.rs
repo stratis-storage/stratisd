@@ -436,6 +436,44 @@ fn test_stratis_min_pool_stop_name() {
     test_with_stratisd_min_sim(stratis_min_pool_stop_name);
 }
 
+fn stratis_min_pool_add_data() {
+    stratis_min_create_pool_and_fs();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool")
+        .arg("add-data")
+        .arg("pn")
+        .arg("/dev/nonexistentblockdev1");
+    cmd.assert().success();
+}
+
+#[test]
+// Test adding a data device to a pool.
+fn test_stratis_min_pool_add_data() {
+    test_with_stratisd_min_sim(stratis_min_pool_add_data);
+}
+
+fn stratis_min_pool_add_cache() {
+    stratis_min_create_pool_and_fs();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool")
+        .arg("init-cache")
+        .arg("pn")
+        .arg("/dev/nonexistentblockdev1");
+    cmd.assert().success();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool")
+        .arg("add-cache")
+        .arg("pn")
+        .arg("/dev/nonexistentblockdev2");
+    cmd.assert().success();
+}
+
+#[test]
+// Test adding a cache device to a pool.
+fn test_stratis_min_pool_add_cache() {
+    test_with_stratisd_min_sim(stratis_min_pool_add_cache);
+}
+
 fn stratis_min_pool_stop_start_name() {
     stratis_min_create_pool_and_fs();
     let mut cmd = Command::cargo_bin("stratis-min").unwrap();

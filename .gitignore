@@ -45,3 +45,7 @@ stratisd_proc_macros/Cargo.lock
 
 # packit
 *.rpm
+
+# LLVM profiler trace data
+*.profraw
+*.profdata

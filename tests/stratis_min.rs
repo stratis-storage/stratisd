@@ -632,3 +632,15 @@ fn stratis_min_key_set() {
 fn test_stratis_min_key_set() {
     test_with_stratisd_min_sim(stratis_min_key_set);
 }
+
+fn stratis_min_pool_clevis_pin() {
+    stratis_min_create_pool_and_fs();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("clevis-pin").arg("--name").arg("pn");
+    cmd.assert().success();
+}
+
+#[test]
+fn test_stratis_min_pool_clevis_pin() {
+    test_with_stratisd_min_sim(stratis_min_pool_clevis_pin);
+}

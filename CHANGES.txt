@@ -10,6 +10,10 @@ Recommended development platform for Python development: Fedora 39
   https://github.com/stratis-storage/stratisd/issues/3515
   https://github.com/stratis-storage/stratisd/pull/3516
 
+- Add D-Bus method to return Stratis pool-level metadata:
+  https://github.com/stratis-storage/stratisd/pull/3618
+  https://github.com/stratis-storage/stratisd/pull/3599
+
 - Fix a bug where unencrypted pools can't be started in stratisd-min:
   https://github.com/stratis-storage/stratisd/pull/3538
 
@@ -28,6 +32,12 @@ Recommended development platform for Python development: Fedora 39
 
 - Truncate String values in pool metadata to maximum length:
   https://github.com/stratis-storage/stratisd/pull/3568
+
+- Cache BDA in blockdev after pool-level metadata write:
+  https://github.com/stratis-storage/stratisd/pull/3606
+
+- Verify correct Clevis configuration before passing to clevis:
+  https://github.com/stratis-storage/stratisd/pull/3613
 
 - Specify nrext64 option as 0 when creating XFS filesystem:
   https://github.com/stratis-storage/stratisd/pull/3511
@@ -92,7 +102,8 @@ Recommended development platform for Python development: Fedora 39
 - Increase pretty-hex dependency lower bound to 0.4.1:
   https://github.com/stratis-storage/stratisd/pull/3536
 
-- Increase itertools dependency lower bound to 0.12.0:
+- Increase itertools dependency lower bound to 0.13.0:
+  https://github.com/stratis-storage/stratisd/pull/3627
   https://github.com/stratis-storage/stratisd/pull/3519
 
 - Increase nix dependency lower bound to 0.28.0,
@@ -108,10 +119,31 @@ Recommended development platform for Python development: Fedora 39
 - Increase shlex version in Cargo.lock to 1.3.0:
   https://github.com/stratis-storage/stratisd/pull/3540
 
+- Increase mio version in Cargo.lock to 0.8.11:
+  https://github.com/stratis-storage/stratisd/pull/3626
+
 - Use LIBEXECDIR as a substitution variable in all scripts:
   https://github.com/stratis-storage/stratisd/pull/3514
 
+- Improve test coverage of stratis-min:
+  https://github.com/stratis-storage/stratisd/pull/3631
+  https://github.com/stratis-storage/stratisd/pull/3630
+  https://github.com/stratis-storage/stratisd/pull/3610
+  https://github.com/stratis-storage/stratisd/pull/3603
+  https://github.com/stratis-storage/stratisd/pull/3602
+
 - Tidies and Maintenance:
+  https://github.com/stratis-storage/stratisd/pull/3617
+  https://github.com/stratis-storage/stratisd/pull/3629
+  https://github.com/stratis-storage/stratisd/pull/3628
+  https://github.com/stratis-storage/stratisd/pull/3625
+  https://github.com/stratis-storage/stratisd/pull/3615
+  https://github.com/stratis-storage/stratisd/pull/3614
+  https://github.com/stratis-storage/stratisd/pull/3612
+  https://github.com/stratis-storage/stratisd/pull/3611
+  https://github.com/stratis-storage/stratisd/pull/3608
+  https://github.com/stratis-storage/stratisd/pull/3607
+  https://github.com/stratis-storage/stratisd/pull/3605
   https://github.com/stratis-storage/stratisd/pull/3596
   https://github.com/stratis-storage/stratisd/pull/3594
   https://github.com/stratis-storage/stratisd/pull/3591

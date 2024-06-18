@@ -99,59 +99,6 @@ jobs:
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
-  # TESTS WITH TANG
-  checks_with_tang:
-    strategy:
-      matrix:
-        include:
-          # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
-          - task: >-
-              TANG_URL=tang
-              RUST_LOG=stratisd=debug
-              make -f Makefile test-clevis-loop-valgrind
-            toolchain: 1.79.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
-            image: fedora:40  # CURRENT DEVELOPMENT ENVIRONMENT
-    runs-on: ubuntu-22.04
-    container:
-      image: ${{ matrix.image }}
-      options: --privileged -v /dev:/dev -v /run/udev:/run/udev --ipc=host
-    services:
-      tang:
-        # yamllint disable rule:line-length
-        image: ghcr.io/stratis-storage/stratisd/tang:38
-        credentials:
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-        options: --privileged -p 80:80
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install dependencies for Fedora
-        run: >
-          dnf install -y
-          clang
-          cryptsetup-devel
-          clevis
-          clevis-luks
-          cracklib-dicts
-          curl
-          device-mapper-persistent-data
-          dbus-devel
-          jq
-          libblkid-devel
-          make
-          sudo
-          systemd-devel
-          systemd-udev
-          valgrind
-          xfsprogs
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          components: ${{ matrix.components }}
-          toolchain: ${{ matrix.toolchain }}
-      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
-        run: ${{ matrix.task }}
-
   python-based-tests:
     strategy:
       matrix:

@@ -152,3 +152,83 @@ jobs:
         run: udevadm control --reload
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
+
+  # /etc/fstab tests
+  fstab-checks:
+    strategy:
+      matrix:
+        include:
+          - toolchain: 1.77.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            components: cargo
+            task: |
+              sudo losetup -f img.bin
+              LOOPBACK=$(losetup -j img.bin | awk '{ print $1 }' | sed -e "s/://")
+              sudo stratis pool create testpool $LOOPBACK
+          - toolchain: 1.77.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            components: cargo
+            task: |
+              sudo losetup -f img.bin
+              LOOPBACK=$(losetup -j img.bin | awk '{ print $1 }' | sed -e "s/://")
+              echo -ne "thisisatest\nthisisatest\n" | sudo stratis key set --capture-key testkey
+              sudo stratis pool create testpool --key-desc=testkey $LOOPBACK
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies for Ubuntu
+        run: sudo apt-get update
+      - name: Install dependencies for Ubuntu
+        run: >
+          sudo DEBIAN_FRONTEND=noninteractive
+          apt-get install -y
+          asciidoc
+          clang
+          curl
+          libblkid-dev
+          libcryptsetup-dev
+          libdbus-1-dev
+          libdevmapper-dev
+          libglib2.0-dev
+          libsystemd-dev
+          libudev-dev
+          make
+          python3-pip
+          sudo
+          systemd
+          thin-provisioning-tools
+          udev
+          xfsprogs
+      - name: Install stratis-cli
+        run: |
+          sudo pip install --upgrade pip
+          git clone https://github.com/stratis-storage/stratis-cli
+          sudo pip install ./stratis-cli
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          components: ${{ matrix.components }}
+          toolchain: ${{ matrix.toolchain }}
+      - name: Build stratisd
+        run: PROFILEDIR=debug make -f Makefile build-all
+      - name: Install stratisd
+        run: sudo PROFILEDIR=debug make -f Makefile install
+      - name: Reload udev
+        run: sudo udevadm control --reload
+      - name: Start stratisd
+        run: sudo systemctl start stratisd
+      - name: Create loopback device backing file
+        run: truncate -s 5g img.bin
+      - name: Create Stratis pool
+        run: ${{ matrix.task }}
+      - name: Create Stratis filesystem
+        run: sudo stratis fs create testpool testfs
+      - name: Stop Stratis pool
+        run: sudo stratis pool stop --name testpool
+      - name: Run test
+        run: |
+          POOL_UUID=$(stratis pool list --stopped | tail -1 | awk '{ print $2 }')
+          sudo systemctl stop stratisd
+          sudo systemctl start stratis-fstab-setup@$POOL_UUID.service
+      - name: Log output of service
+        run: sudo journalctl -xe --no-pager
+        if: always()
+      - name: Mount filesystem
+        run: sudo mount /dev/stratis/testpool/testfs /mnt

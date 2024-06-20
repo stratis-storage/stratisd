@@ -666,17 +666,22 @@ impl DeviceSet {
     /// The encryption information and devices registered for stopped pools to
     /// be exported over the API.
     ///
-    /// Error from gather_encryption_info is converted into an option because
-    /// unlocked Stratis devices and LUKS2 devices on which the Stratis devices are
-    /// stored may appear at different times in udev. This is not necessarily
-    /// an error case and may resolve itself after more devices appear in udev.
-    pub fn stopped_pool_info(&self) -> Option<StoppedPoolInfo> {
-        gather_encryption_info(
+    /// Converts an error result from gather_encryption_info into maximum
+    /// uncertainty, since the error means that encryption information is
+    /// completely missing from one device.
+    pub fn stopped_pool_info(&self) -> StoppedPoolInfo {
+        let info = gather_encryption_info(
             self.internal.len(),
             self.internal.values().map(|info| info.encryption_info()),
         )
-        .ok()
-        .map(|info| StoppedPoolInfo {
+        .unwrap_or({
+            Some(PoolEncryptionInfo::Both(
+                MaybeInconsistent::Yes,
+                MaybeInconsistent::Yes,
+            ))
+        });
+
+        StoppedPoolInfo {
             info,
             devices: self
                 .internal
@@ -696,7 +701,7 @@ impl DeviceSet {
                     }
                 })
                 .collect::<Vec<_>>(),
-        })
+        }
     }
 
     /// Process the data from a remove udev event. Since remove events are

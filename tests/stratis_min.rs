@@ -164,6 +164,23 @@ fn test_stratis_min_create_no_blockdevs() {
 }
 
 #[test]
+// Test starting a pool using both a prompt and an unlock method of clevis.
+fn test_stratis_min_pool_start_invalid_arg_combination() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool")
+        .arg("start")
+        .arg("--name")
+        .arg("pn")
+        .arg("--unlock-method")
+        .arg("clevis")
+        .arg("--prompt");
+    cmd.assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("mutually exclusive"));
+}
+
+#[test]
 // Test stopping a pool using an invalid UUID; unless name is specified the
 // id value is interpreted as a UUID.
 fn test_stratis_min_pool_stop_invalid_uuid() {

@@ -246,7 +246,8 @@ fn main() -> Result<(), String> {
                 let prompt = args.get_flag("prompt");
                 if prompt && unlock_method == Some(UnlockMethod::Clevis) {
                     return Err(Box::new(StratisError::Msg(
-                        "--prompt and an unlock_method of clevis are mutally exclusive".to_string(),
+                        "--prompt and an unlock_method of clevis are mutually exclusive"
+                            .to_string(),
                     )));
                 }
                 pool::pool_start(id, unlock_method, prompt)?;

@@ -1,6 +1,6 @@
 stratisd 3.7.0 (UNRELEASED)
 ===========================
-Recommended Rust toolchain version: 1.77.2
+Recommended Rust toolchain version: 1.79.0
 Recommended development platform for Python development: Fedora 39
 
 - Increase D-Bus revision number to 6:
@@ -133,10 +133,12 @@ Recommended development platform for Python development: Fedora 39
   https://github.com/stratis-storage/stratisd/pull/3602
 
 - Tidies and Maintenance:
-  https://github.com/stratis-storage/stratisd/pull/3617
+  https://github.com/stratis-storage/stratisd/pull/3632
   https://github.com/stratis-storage/stratisd/pull/3629
   https://github.com/stratis-storage/stratisd/pull/3628
   https://github.com/stratis-storage/stratisd/pull/3625
+  https://github.com/stratis-storage/stratisd/pull/3617
+  https://github.com/stratis-storage/stratisd/pull/3616
   https://github.com/stratis-storage/stratisd/pull/3615
   https://github.com/stratis-storage/stratisd/pull/3614
   https://github.com/stratis-storage/stratisd/pull/3612

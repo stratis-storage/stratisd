@@ -192,16 +192,33 @@ impl MetadataVol {
 
     /// Tear down a Metadata Volume.
     pub fn teardown(&mut self, pool_uuid: PoolUuid) -> StratisResult<()> {
-        if let Err(retry::Error { error, .. }) =
-            retry_with_index(Fixed::from_millis(100).take(2), |i| {
-                trace!("MDV unmount attempt {}", i);
-                umount(&self.mount_pt)
-            })
-        {
-            return Err(StratisError::Chained(
-                "Failed to unmount MDV".to_string(),
-                Box::new(StratisError::from(error)),
-            ));
+        let mtpt_stat = match stat(&self.mount_pt) {
+            Ok(s) => s,
+            Err(e) => match e {
+                nix::errno::Errno::ENOENT => return Ok(()),
+                e => return Err(StratisError::Nix(e)),
+            },
+        };
+        let parent_stat = match stat(&self.mount_pt.join("..")) {
+            Ok(s) => s,
+            Err(e) => match e {
+                nix::errno::Errno::ENOENT => return Ok(()),
+                e => return Err(StratisError::Nix(e)),
+            },
+        };
+
+        if mtpt_stat.st_dev != parent_stat.st_dev {
+            if let Err(retry::Error { error, .. }) =
+                retry_with_index(Fixed::from_millis(100).take(2), |i| {
+                    trace!("MDV unmount attempt {}", i);
+                    umount(&self.mount_pt)
+                })
+            {
+                return Err(StratisError::Chained(
+                    "Failed to unmount MDV".to_string(),
+                    Box::new(StratisError::from(error)),
+                ));
+            }
         }
 
         if let Err(err) = remove_dir(&self.mount_pt) {

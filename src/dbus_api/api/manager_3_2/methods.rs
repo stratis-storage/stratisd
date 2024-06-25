@@ -57,11 +57,11 @@ pub fn start_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         }
     };
 
-    let ret = match handle_action!(block_on(
-        dbus_context
-            .engine
-            .start_pool(PoolIdentifier::Uuid(pool_uuid), unlock_method)
-    )) {
+    let ret = match handle_action!(block_on(dbus_context.engine.start_pool(
+        PoolIdentifier::Uuid(pool_uuid),
+        unlock_method,
+        None
+    ))) {
         Ok(StartAction::Started(_)) => {
             let guard = match block_on(
                 dbus_context

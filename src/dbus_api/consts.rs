@@ -48,6 +48,7 @@ pub const POOL_ALLOC_SIZE_PROP: &str = "AllocatedSize";
 pub const POOL_FS_LIMIT_PROP: &str = "FsLimit";
 pub const POOL_OVERPROV_PROP: &str = "Overprovisioning";
 pub const POOL_NO_ALLOCABLE_SPACE_PROP: &str = "NoAllocSpace";
+pub const POOL_METADATA_VERSION_PROP: &str = "MetadataVersion";
 
 pub const FILESYSTEM_INTERFACE_NAME_3_0: &str = "org.storage.stratis3.filesystem.r0";
 pub const FILESYSTEM_INTERFACE_NAME_3_1: &str = "org.storage.stratis3.filesystem.r1";

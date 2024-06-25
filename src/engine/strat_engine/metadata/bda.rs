@@ -16,7 +16,7 @@ use crate::{
             },
             writing::SyncAll,
         },
-        types::{DevUuid, PoolUuid},
+        types::{DevUuid, PoolUuid, StratSigblockVersion},
     },
     stratis::StratisResult,
 };
@@ -30,6 +30,7 @@ pub struct BDA {
 impl Default for BDA {
     fn default() -> BDA {
         BDA::new(
+            StratSigblockVersion::V1,
             StratisIdentifiers::new(PoolUuid::nil(), DevUuid::nil()),
             MDADataSize::default(),
             BlockdevSize::default(),
@@ -40,13 +41,19 @@ impl Default for BDA {
 
 impl BDA {
     pub fn new(
+        sigblock_version: StratSigblockVersion,
         identifiers: StratisIdentifiers,
         mda_data_size: MDADataSize,
         blkdev_size: BlockdevSize,
         initialization_time: DateTime<Utc>,
     ) -> BDA {
-        let header =
-            StaticHeader::new(identifiers, mda_data_size, blkdev_size, initialization_time);
+        let header = StaticHeader::new(
+            sigblock_version,
+            identifiers,
+            mda_data_size,
+            blkdev_size,
+            initialization_time,
+        );
 
         let regions = mda::MDARegions::new(header.mda_size);
 
@@ -148,6 +155,11 @@ impl BDA {
     pub fn initialization_time(&self) -> DateTime<Utc> {
         self.header.initialization_time
     }
+
+    /// Get the sigblock version for this device.
+    pub fn sigblock_version(&self) -> StratSigblockVersion {
+        self.header.sigblock_version
+    }
 }
 
 #[cfg(test)]
@@ -172,6 +184,7 @@ mod tests {
             let mut buf = Cursor::new(vec![0; buf_size]);
 
             let bda = BDA::new(
+                StratSigblockVersion::V1,
                 sh.identifiers,
                 sh.mda_size.region_size().data_size(),
                 sh.blkdev_size,
@@ -203,6 +216,7 @@ mod tests {
             )
         ]);
         let mut bda = BDA::new(
+            StratSigblockVersion::V1,
             sh.identifiers,
             sh.mda_size.region_size().data_size(),
             sh.blkdev_size,
@@ -253,6 +267,7 @@ mod tests {
             let buf_size = convert_test!(*sh.mda_size.bda_size().sectors().bytes(), u128, usize);
             let mut buf = Cursor::new(vec![0; buf_size]);
             let mut bda = BDA::new(
+                StratSigblockVersion::V1,
                 sh.identifiers,
                 sh.mda_size.region_size().data_size(),
                 sh.blkdev_size,

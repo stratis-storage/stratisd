@@ -18,19 +18,19 @@ use crate::{
     engine::{
         shared::{gather_encryption_info, gather_pool_name},
         strat_engine::{
-            backstore::StratBlockDev,
+            backstore::blockdev::{v1, v2},
             liminal::{
                 identify::{DeviceInfo, LuksInfo, StratisDevInfo, StratisInfo},
-                setup::get_name,
+                setup::{get_feature_set, get_name},
             },
             metadata::{StratisIdentifiers, BDA},
         },
         types::{
-            DevUuid, EncryptionInfo, LockedPoolInfo, MaybeInconsistent, Name, PoolDevice,
-            PoolEncryptionInfo, PoolUuid, StoppedPoolInfo,
+            DevUuid, EncryptionInfo, Features, LockedPoolInfo, MaybeInconsistent, Name, PoolDevice,
+            PoolEncryptionInfo, PoolUuid, StoppedPoolInfo, StratSigblockVersion,
         },
     },
-    stratis::StratisResult,
+    stratis::{StratisError, StratisResult},
 };
 
 /// Info for a discovered LUKS device belonging to Stratis.
@@ -516,8 +516,20 @@ impl IntoIterator for DeviceSet {
     }
 }
 
-impl From<Vec<StratBlockDev>> for DeviceSet {
-    fn from(vec: Vec<StratBlockDev>) -> Self {
+impl From<Vec<v1::StratBlockDev>> for DeviceSet {
+    fn from(vec: Vec<v1::StratBlockDev>) -> Self {
+        vec.into_iter()
+            .fold(DeviceSet::default(), |mut device_set, bd| {
+                for info in Vec::<DeviceInfo>::from(bd) {
+                    device_set.process_info_add(info);
+                }
+                device_set
+            })
+    }
+}
+
+impl From<Vec<v2::StratBlockDev>> for DeviceSet {
+    fn from(vec: Vec<v2::StratBlockDev>) -> Self {
         vec.into_iter()
             .fold(DeviceSet::default(), |mut device_set, bd| {
                 for info in Vec::<DeviceInfo>::from(bd) {
@@ -599,11 +611,15 @@ impl DeviceSet {
         )
     }
 
-    /// Get the name, if available, of the pool formed by the devices
+    /// Get the required pool level metadata information, if available, of the pool formed by the devices
     /// in this DeviceSet.
-    pub fn pool_name(&self) -> StratisResult<MaybeInconsistent<Option<Name>>> {
+    pub fn pool_level_metadata_info(
+        &self,
+    ) -> StratisResult<(MaybeInconsistent<Option<Name>>, Option<Features>)> {
         match self.as_opened_set() {
-            Some(set) => get_name(set).map(MaybeInconsistent::No),
+            Some(set) => get_name(&set).map(MaybeInconsistent::No).and_then(|name| {
+                get_feature_set(&set).map(|feat| (name, feat.map(Features::from)))
+            }),
             None => gather_pool_name(
                 self.internal.len(),
                 self.internal.values().map(|info| match info {
@@ -611,7 +627,12 @@ impl DeviceSet {
                     LInfo::Luks(l) => Some(l.pool_name.as_ref()),
                 }),
             )
-            .map(|opt| opt.expect("self.as_opened_set().is_some() if pool is unencrypted")),
+            .map(|opt| {
+                (
+                    opt.expect("self.as_opened_set().is_some() if pool is unencrypted"),
+                    Some(Features { encryption: true }),
+                )
+            }),
         }
     }
 
@@ -676,26 +697,37 @@ impl DeviceSet {
             self.internal.values().map(|info| info.encryption_info()),
         )
         .ok()
-        .map(|info| StoppedPoolInfo {
-            info,
-            devices: self
-                .internal
-                .iter()
-                .map(|(uuid, l)| {
-                    let devnode = match l {
-                        LInfo::Stratis(strat_info) => strat_info
-                            .luks
-                            .as_ref()
-                            .map(|l| l.dev_info.devnode.clone())
-                            .unwrap_or_else(|| strat_info.dev_info.devnode.clone()),
-                        LInfo::Luks(luks_info) => luks_info.dev_info.devnode.clone(),
-                    };
-                    PoolDevice {
-                        devnode,
-                        uuid: *uuid,
-                    }
-                })
-                .collect::<Vec<_>>(),
+        .map(|info| {
+            let features = match self.pool_level_metadata_info() {
+                Ok((_, opt)) => opt,
+                Err(e) => {
+                    warn!("Failed to read metadata for pool: {e}");
+                    None
+                }
+            };
+            StoppedPoolInfo {
+                info,
+                devices: self
+                    .internal
+                    .iter()
+                    .map(|(uuid, l)| {
+                        let devnode = match l {
+                            LInfo::Stratis(strat_info) => strat_info
+                                .luks
+                                .as_ref()
+                                .map(|l| l.dev_info.devnode.clone())
+                                .unwrap_or_else(|| strat_info.dev_info.devnode.clone()),
+                            LInfo::Luks(luks_info) => luks_info.dev_info.devnode.clone(),
+                        };
+                        PoolDevice {
+                            devnode,
+                            uuid: *uuid,
+                        }
+                    })
+                    .collect::<Vec<_>>(),
+                metadata_version: self.metadata_version().ok(),
+                features,
+            }
         })
     }
 
@@ -760,6 +792,25 @@ impl DeviceSet {
                 }
             },
         }
+    }
+
+    pub fn metadata_version(&self) -> StratisResult<StratSigblockVersion> {
+        let metadata_version = self.iter().fold(HashSet::new(), |mut set, (_, info)| {
+            match info {
+                LInfo::Luks(_) => set.insert(StratSigblockVersion::V1),
+                LInfo::Stratis(info) => set.insert(info.bda.sigblock_version()),
+            };
+            set
+        });
+        if metadata_version.len() > 1 {
+            return Err(StratisError::Msg(
+                "Found two versions of metadata for given device set".to_string(),
+            ));
+        }
+        Ok(*metadata_version
+            .iter()
+            .next()
+            .expect("No empty device sets"))
     }
 
     /// Returns a boolean indicating whether the data structure has any devices

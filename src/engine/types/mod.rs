@@ -130,10 +130,11 @@ impl Display for StratisUuid {
 }
 
 /// Use Clevis or keyring to unlock LUKS volume.
-#[derive(Serialize, Deserialize, Clone, Copy, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, Copy, Eq, PartialEq, Debug)]
 pub enum UnlockMethod {
     Clevis,
     Keyring,
+    Any,
 }
 
 impl<'a> TryFrom<&'a str> for UnlockMethod {
@@ -143,6 +144,7 @@ impl<'a> TryFrom<&'a str> for UnlockMethod {
         match s {
             "keyring" => Ok(UnlockMethod::Keyring),
             "clevis" => Ok(UnlockMethod::Clevis),
+            "any" => Ok(UnlockMethod::Any),
             _ => Err(StratisError::Msg(format!(
                 "{s} is an invalid unlock method"
             ))),
@@ -244,6 +246,13 @@ pub struct LockedPoolsInfo {
 pub struct StoppedPoolInfo {
     pub info: Option<PoolEncryptionInfo>,
     pub devices: Vec<PoolDevice>,
+    pub metadata_version: Option<StratSigblockVersion>,
+    pub features: Option<Features>,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct Features {
+    pub encryption: bool,
 }
 
 #[derive(Default, Debug, Eq, PartialEq)]
@@ -497,6 +506,35 @@ impl UuidOrConflict {
                 }
                 false
             }
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub enum StratSigblockVersion {
+    V1 = 1,
+    V2 = 2,
+}
+
+impl TryFrom<u8> for StratSigblockVersion {
+    type Error = StratisError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            1u8 => Ok(StratSigblockVersion::V1),
+            2u8 => Ok(StratSigblockVersion::V2),
+            _ => Err(StratisError::Msg(format!(
+                "Unknown sigblock version: {value}"
+            ))),
+        }
+    }
+}
+
+impl From<StratSigblockVersion> for u8 {
+    fn from(version: StratSigblockVersion) -> Self {
+        match version {
+            StratSigblockVersion::V1 => 1u8,
+            StratSigblockVersion::V2 => 2u8,
         }
     }
 }

@@ -13,7 +13,10 @@ use libcryptsetup_rs::SafeMemHandle;
 
 use crate::engine::{
     engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
-    strat_engine::{keys::StratKeyActions, names::KeyDescription},
+    strat_engine::{
+        keys::{read_key_persistent, StratKeyActions},
+        names::KeyDescription,
+    },
     types::SizedKeyMemory,
 };
 
@@ -67,19 +70,20 @@ where
 pub fn insert_and_remove_key<F1, F2>(physical_paths: &[&Path], test_pre: F1, test_post: F2)
 where
     F1: FnOnce(&[&Path], &KeyDescription) + UnwindSafe,
-    F2: FnOnce(&[&Path]),
+    F2: FnOnce(&[&Path], &SizedKeyMemory),
 {
     let key_description = set_up_key("test-description-for-stratisd");
 
     let result = catch_unwind(|| test_pre(physical_paths, &key_description));
 
+    let (_, key) = read_key_persistent(&key_description).unwrap().unwrap();
     StratKeyActions.unset(&key_description).unwrap();
 
     if let Err(e) = result {
         resume_unwind(e)
     }
 
-    test_post(physical_paths)
+    test_post(physical_paths, &key)
 }
 
 /// Takes physical device paths from loopback or real tests and passes

@@ -1,5 +1,6 @@
 path: /tests/client-dbus
 duration: 20m
+tag: python
 
 require:
   - clevis-luks
@@ -16,6 +17,7 @@ environment:
   STRATISD: /usr/libexec/stratisd
   STRATIS_DUMPMETADATA: /usr/bin/stratis-dumpmetadata
   PYTHONPATH: ./src
+  LEGACY_POOL: /usr/local/bin/stratis-legacy-pool
 
 /udev:
   summary: Run Python udev tests

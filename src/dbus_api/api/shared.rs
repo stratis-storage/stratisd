@@ -163,6 +163,6 @@ pub fn locked_pools_prop(e: Arc<dyn Engine>) -> StoppedOrLockedPools {
 
 /// Generate D-Bus representation of stopped pools
 #[inline]
-pub fn stopped_pools_prop(e: Arc<dyn Engine>) -> StoppedOrLockedPools {
-    prop_conv::stopped_pools_to_prop(&block_on(e.stopped_pools()))
+pub fn stopped_pools_prop(e: Arc<dyn Engine>, metadata: bool) -> StoppedOrLockedPools {
+    prop_conv::stopped_pools_to_prop(&block_on(e.stopped_pools()), metadata)
 }

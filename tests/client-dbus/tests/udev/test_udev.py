@@ -267,6 +267,7 @@ class UdevTest3(UdevTest):
                     "id": pool_uuid,
                     "unlock_method": (True, str(EncryptionMethod.KEYRING)),
                     "id_type": "uuid",
+                    "key_fd": (False, 0),
                 },
             )
             if key_spec is None:
@@ -367,6 +368,7 @@ class UdevTest4(UdevTest):
                     "id": pool_uuid,
                     "unlock_method": (True, str(EncryptionMethod.KEYRING)),
                     "id_type": "uuid",
+                    "key_fd": (False, 0),
                 },
             )
             # This should always fail because a pool cannot be successfully
@@ -387,6 +389,7 @@ class UdevTest4(UdevTest):
                     "id": pool_uuid,
                     "unlock_method": (True, str(EncryptionMethod.KEYRING)),
                     "id_type": "uuid",
+                    "key_fd": (False, 0),
                 },
             )
 
@@ -508,6 +511,7 @@ class UdevTest5(UdevTest):
                         "id": pool_uuid,
                         "unlock_method": (True, str(EncryptionMethod.KEYRING)),
                         "id_type": "uuid",
+                        "key_fd": (False, 0),
                     },
                 )
 
@@ -543,6 +547,7 @@ class UdevTest5(UdevTest):
                                 "id": pool_uuid,
                                 "unlock_method": (True, str(EncryptionMethod.KEYRING)),
                                 "id_type": "uuid",
+                                "key_fd": (False, 0),
                             },
                         )
 
@@ -708,6 +713,7 @@ class UdevTest7(UdevTest):
                     "id": "encrypted",
                     "unlock_method": (True, str(EncryptionMethod.KEYRING)),
                     "id_type": "name",
+                    "key_fd": (False, 0),
                 },
             )
             self.assertFalse(changed)
@@ -723,6 +729,7 @@ class UdevTest7(UdevTest):
                     "id": "unencrypted",
                     "unlock_method": (False, ""),
                     "id_type": "name",
+                    "key_fd": (False, 0),
                 },
             )
             self.assertFalse(changed)
@@ -743,6 +750,7 @@ class UdevTest7(UdevTest):
                     "id": "encrypted",
                     "unlock_method": (True, str(EncryptionMethod.KEYRING)),
                     "id_type": "name",
+                    "key_fd": (False, 0),
                 },
             )
             self.assertTrue(changed)
@@ -757,6 +765,7 @@ class UdevTest7(UdevTest):
                     "id": "unencrypted",
                     "unlock_method": (False, ""),
                     "id_type": "name",
+                    "key_fd": (False, 0),
                 },
             )
             self.assertTrue(changed)

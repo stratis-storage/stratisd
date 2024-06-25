@@ -243,10 +243,12 @@ jobs:
     strategy:
       matrix:
         include:
-          - rev: HEAD
+          - rev: origin/fix-start-pool
             options: --post-test-check=verify-filesystem-symlinks --post-test-check=verify-pool-metadata --highest-revision-number=7
+            repo: https://github.com/jbaublitz/testing
           - rev: v3.6.2
             options: --highest-revision-number=6
+            repo: https://github.com/stratis-storage/testing
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -288,7 +290,7 @@ jobs:
       - name: Reload udev
         run: sudo udevadm control --reload
       - name: Clone testing repo
-        run: git clone https://github.com/stratis-storage/testing.git
+        run: git clone ${{ matrix.repo }}
       - name: Checkout revision ${{ matrix.rev }}
         run: git checkout -b new-branch ${{ matrix.rev }}
         working-directory: ./testing

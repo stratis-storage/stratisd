@@ -51,6 +51,7 @@ MIN_FEATURES = --no-default-features --features engine,min
 NO_IPC_FEATURES = --no-default-features --features engine
 SYSTEMD_FEATURES = --no-default-features --features engine,min,systemd_compat
 EXTRAS_FEATURES =  --no-default-features --features engine,extras,min
+TEST_EXTRAS_FEATURES = --no-default-features --features test_extras
 UDEV_FEATURES = --no-default-features --features udev_scripts
 UTILS_FEATURES = --no-default-features --features engine,systemd_compat
 
@@ -293,6 +294,14 @@ stratisd-tools:
 	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratisd-tools ${EXTRAS_FEATURES} ${TARGET_ARGS}
 
+## Build the test extras
+build-test-extras:
+	PKG_CONFIG_ALLOW_CROSS=1 \
+	RUSTFLAGS="${DENY}" \
+	cargo build ${RELEASE_FLAG} \
+	--bin=stratis-legacy-pool ${TEST_EXTRAS_FEATURES} ${TARGET_ARGS}
+
+## Build the stratis-dumpmetadata program
 ## Build stratis-min for early userspace
 stratis-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
@@ -514,8 +523,12 @@ clippy-utils:
 clippy-no-ipc:
 	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} ${NO_IPC_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 
+## Run clippy on no-ipc-build
+clippy-test-extras:
+	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} ${TEST_EXTRAS_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+
 ## Run clippy on the current source tree
-clippy: clippy-macros clippy-min clippy-udev-utils clippy-no-ipc clippy-utils
+clippy: clippy-macros clippy-min clippy-udev-utils clippy-no-ipc clippy-utils clippy-test-extras
 	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
 
 ## Lint Python parts of the source code
@@ -530,6 +543,7 @@ pylint:
 	build-all-man
 	build-all-rust
 	build-min
+	build-test-extras
 	build-udev-utils
 	build-stratis-base32-decode
 	build-stratis-str-cmp
@@ -542,6 +556,7 @@ pylint:
 	clippy-macros
 	clippy-min
 	clippy-no-ipc
+	clippy-test-extras
 	clippy-udev-utils
 	docs-ci
 	docs-rust

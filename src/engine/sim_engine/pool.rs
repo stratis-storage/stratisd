@@ -25,7 +25,7 @@ use crate::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
             EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
             PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
-            SetDeleteAction,
+            SetDeleteAction, StratSigblockVersion,
         },
         PropChangeAction,
     },
@@ -763,6 +763,10 @@ impl Pool for SimPool {
     fn last_metadata(&self) -> StratisResult<String> {
         // Just invent a name for the pool; a sim pool has no real metadata
         serde_json::to_string(&self.record("<name>")).map_err(|e| e.into())
+    }
+
+    fn metadata_version(&self) -> StratSigblockVersion {
+        StratSigblockVersion::V2
     }
 }
 

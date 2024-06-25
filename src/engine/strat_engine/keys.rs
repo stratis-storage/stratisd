@@ -11,7 +11,7 @@ use libcryptsetup_rs::SafeMemHandle;
 use crate::{
     engine::{
         engine::{KeyActions, MAX_STRATIS_PASS_SIZE},
-        shared,
+        shared::read_key_shared,
         strat_engine::names::KeyDescription,
         types::{Key, MappingCreateAction, MappingDeleteAction, SizedKeyMemory},
     },
@@ -366,7 +366,7 @@ impl KeyActions for StratKeyActions {
         key_fd: RawFd,
     ) -> StratisResult<MappingCreateAction<Key>> {
         let mut memory = SafeMemHandle::alloc(MAX_STRATIS_PASS_SIZE)?;
-        let bytes = shared::set_key_shared(key_fd, memory.as_mut())?;
+        let bytes = read_key_shared(key_fd, memory.as_mut())?;
 
         set_key_idem(key_desc, SizedKeyMemory::new(memory, bytes))
     }

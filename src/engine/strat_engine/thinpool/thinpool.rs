@@ -683,10 +683,6 @@ impl ThinPool {
             None
         };
 
-        if let Some(Sectors(0)) = remaining_space.as_ref() {
-            return Ok(HashMap::default());
-        };
-
         scope(|s| {
             // This collect is needed to ensure all threads are spawned in
             // parallel, not each thread being spawned and immediately joined

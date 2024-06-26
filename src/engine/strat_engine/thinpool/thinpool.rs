@@ -709,7 +709,7 @@ impl ThinPool {
                 })
                 .map(|(name, uuid, fs, mt_pt, extend_size)| {
                     s.spawn(move || -> StratisResult<_> {
-                        let diff = fs.handle_extension(&mt_pt, extend_size)?;
+                        let diff = fs.handle_fs_changes(&mt_pt, extend_size)?;
                         Ok((name, uuid, fs, diff))
                     })
                 })

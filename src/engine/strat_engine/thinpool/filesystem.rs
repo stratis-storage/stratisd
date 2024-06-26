@@ -329,6 +329,7 @@ impl StratFilesystem {
     }
 
     /// Return an extend size for the thindev under the filesystem
+    /// If no_op_remaining_size is None, then the pool allows overprovisioning.
     pub fn extend_size(
         current_size: Sectors,
         no_op_remaining_size: Option<&mut Sectors>,

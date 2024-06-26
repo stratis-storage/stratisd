@@ -258,20 +258,36 @@ impl StratFilesystem {
         }
     }
 
-    /// Check the filesystem usage and determine whether it should extend.
+    /// Check the filesystem usage and determine whether it should extend
+    /// or just update. If extend, return the amount to extend.
     ///
     /// Returns:
-    /// * Some(mount_point) if the filesystem should be extended
-    /// * None if the filesystem does not need to be extended
-    pub fn should_extend(&self) -> Option<PathBuf> {
-        fn should_extend_fail(fs: &StratFilesystem) -> StratisResult<Option<PathBuf>> {
+    /// * Some(_) if the filesystem is mounted and should be visited
+    /// * Some((_, 0)) if the filesystem does not need to be extended
+    /// * None if the filesystem is unmounted and should not be visited
+    pub fn visit_values(
+        &self,
+        no_op_remaining_size: Option<&mut Sectors>,
+    ) -> Option<(PathBuf, Sectors)> {
+        fn visit_values_fail(
+            fs: &StratFilesystem,
+            no_op_remaining_size: Option<&mut Sectors>,
+        ) -> StratisResult<Option<(PathBuf, Sectors)>> {
             match fs.thin_dev.status(get_dm(), DmOptions::default())? {
                 ThinStatus::Working(_) => {
                     if let Some(mount_point) = fs.mount_points()?.first() {
-                        let (fs_total_bytes, fs_total_used_bytes) = fs_usage(mount_point)?;
-                        if 2u64 * fs_total_used_bytes > fs_total_bytes {
-                            return Ok(Some(mount_point.clone()));
-                        }
+                        return fs_usage(mount_point).map(
+                            |(fs_total_bytes, fs_total_used_bytes)| {
+                                Some((
+                                    mount_point.clone(),
+                                    if 2u64 * fs_total_used_bytes > fs_total_bytes {
+                                        fs.extend_size(no_op_remaining_size)
+                                    } else {
+                                        Sectors(0)
+                                    },
+                                ))
+                            },
+                        );
                     }
                     Ok(None)
                 }
@@ -286,11 +302,11 @@ impl StratFilesystem {
             }
         }
 
-        match should_extend_fail(self) {
+        match visit_values_fail(self, no_op_remaining_size) {
             Ok(mt_pt) => mt_pt,
             Err(e) => {
                 warn!(
-                    "Checking whether the filesystem should be extended failed: {}; ignoring",
+                    "Checking whether the filesystem should be visited failed: {}; ignoring",
                     e
                 );
                 None
@@ -333,11 +349,9 @@ impl StratFilesystem {
 
     /// Return an extend size for the thindev under the filesystem
     /// If no_op_remaining_size is None, then the pool allows overprovisioning.
-    pub fn extend_size(
-        current_size: Sectors,
-        no_op_remaining_size: Option<&mut Sectors>,
-        fs_limit_remaining_size: Option<Sectors>,
-    ) -> Sectors {
+    fn extend_size(&self, no_op_remaining_size: Option<&mut Sectors>) -> Sectors {
+        let current_size = self.thindev_size();
+        let fs_limit_remaining_size = self.size_limit().map(|sl| sl - self.thindev_size());
         match (no_op_remaining_size, fs_limit_remaining_size) {
             (Some(no_op_rem_size), Some(fs_lim_rem_size)) => {
                 let extend_size = min(min(*no_op_rem_size, current_size), fs_lim_rem_size);

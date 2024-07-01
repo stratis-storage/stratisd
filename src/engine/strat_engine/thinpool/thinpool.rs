@@ -23,7 +23,7 @@ use devicemapper::{
 
 use crate::{
     engine::{
-        engine::{DumpState, Filesystem, StateDiff},
+        engine::{DumpState, StateDiff},
         strat_engine::{
             backstore::Backstore,
             cmd::{thin_check, thin_metadata_size, thin_repair},
@@ -682,10 +682,6 @@ impl ThinPool {
             None
         };
 
-        if let Some(Sectors(0)) = remaining_space.as_ref() {
-            return Ok(HashMap::default());
-        };
-
         scope(|s| {
             // This collect is needed to ensure all threads are spawned in
             // parallel, not each thread being spawned and immediately joined
@@ -696,24 +692,12 @@ impl ThinPool {
                 .filesystems
                 .iter_mut()
                 .filter_map(|(name, uuid, fs)| {
-                    if let Some(mt_pt) = fs.should_extend() {
-                        let extend_size = StratFilesystem::extend_size(
-                            fs.thindev_size(),
-                            remaining_space.as_mut(),
-                            fs.size_limit().map(|sl| sl - fs.thindev_size()),
-                        );
-                        if extend_size == Sectors(0) {
-                            None
-                        } else {
-                            Some((name, *uuid, fs, mt_pt, extend_size))
-                        }
-                    } else {
-                        None
-                    }
+                    fs.visit_values(remaining_space.as_mut())
+                        .map(|(mt_pt, extend_size)| (name, *uuid, fs, mt_pt, extend_size))
                 })
                 .map(|(name, uuid, fs, mt_pt, extend_size)| {
                     s.spawn(move || -> StratisResult<_> {
-                        let diff = fs.handle_extension(&mt_pt, extend_size)?;
+                        let diff = fs.handle_fs_changes(&mt_pt, extend_size)?;
                         Ok((name, uuid, fs, diff))
                     })
                 })
@@ -724,15 +708,19 @@ impl ThinPool {
                 .filter_map(|h| {
                     h.join()
                         .map_err(|_| {
-                            warn!("Failed to get status of filesystem extension");
+                            warn!("Failed to get status of filesystem operation");
                         })
                         .ok()
                 })
                 .fold(Vec::new(), |mut acc, res| {
                     match res {
                         Ok((name, uuid, fs, diff)) => {
-                            updated.insert(uuid, diff);
-                            acc.push((name, uuid, fs));
+                            if diff.size.is_changed() {
+                                acc.push((name, uuid, fs));
+                            }
+                            if diff.size.is_changed() || diff.used.is_changed() {
+                                updated.insert(uuid, diff);
+                            }
                         }
                         Err(e) => {
                             warn!("Failed to extend filesystem: {}", e);

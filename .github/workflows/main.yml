@@ -10,7 +10,7 @@ on:
       - 'CHANGES.txt'
       - '**/README.md'
       - 'README_tests.md'
-      - 'tests/**'
+      - 'tests/client-dbus/**'
       - '.packit.yaml'
       - 'plans/**'
       - 'tests-fmf/**'
@@ -21,7 +21,7 @@ on:
       - 'CHANGES.txt'
       - '**/README.md'
       - 'README_tests.md'
-      - 'tests/**'
+      - 'tests/client-dbus/**'
       - '.packit.yaml'
       - 'plans/**'
       - 'tests-fmf/**'
@@ -40,14 +40,14 @@ jobs:
       matrix:
         include:
           - task: make -f Makefile fmt-ci
-            toolchain: 1.77.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.79.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: rustfmt
           - task: make -f Makefile check-typos
-            toolchain: 1.77.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+            toolchain: 1.79.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
             components: cargo
     runs-on: ubuntu-22.04
     container:
-      image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:40  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v4
@@ -70,60 +70,6 @@ jobs:
       - uses: baptiste0928/cargo-install@v2
         with:
           crate: typos-cli
-      - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
-        run: ${{ matrix.task }}
-
-  # TESTS WITH TANG
-  checks_with_tang:
-    strategy:
-      matrix:
-        include:
-          # MANDATORY CHECKS USING CURRENT DEVELOPMENT COMPILER
-          - task: >-
-              TANG_URL=tang
-              RUST_LOG=stratisd=debug
-              make -f Makefile test-clevis-loop
-            toolchain: 1.77.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-            components: cargo
-            image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
-    runs-on: ubuntu-22.04
-    container:
-      image: ${{ matrix.image }}
-      options: --privileged -v /dev:/dev -v /run/udev:/run/udev --ipc=host
-    services:
-      tang:
-        # yamllint disable rule:line-length
-        image: ghcr.io/stratis-storage/stratisd/tang:38
-        credentials:
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-        options: --privileged -p 80:80
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install dependencies for Fedora
-        # cracklib-dicts: https://github.com/stratis-storage/project/issues/581
-        run: >
-          dnf install -y
-          clang
-          cryptsetup-devel
-          clevis
-          clevis-luks
-          cracklib-dicts
-          curl
-          dbus-devel
-          device-mapper-devel
-          device-mapper-persistent-data
-          libblkid-devel
-          make
-          ncurses
-          sudo
-          systemd-devel
-          systemd-udev
-          xfsprogs
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          components: ${{ matrix.components }}
-          toolchain: ${{ matrix.toolchain }}
       - name: Test ${{ matrix.task }} on ${{ matrix.toolchain }} toolchain
         run: ${{ matrix.task }}
 
@@ -184,7 +130,7 @@ jobs:
   stratis-min-cli-checks:
     runs-on: ubuntu-22.04
     container:
-      image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:40  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged --userns=host --ipc=host -v /dev:/dev -v /run/udev:/run/udev -v /usr/lib/udev:/usr/lib/udev -v /run/dbus/system_bus_socket:/run/dbus/system_bus_socket:ro -v /usr/share/dbus-1:/usr/share/dbus-1
     steps:
       - uses: actions/checkout@v4
@@ -217,7 +163,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.77.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.79.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - name: Run stratisd-min cli tests
         run: make test-stratisd-min
       - name: Run stratis-min cli tests
@@ -226,7 +172,7 @@ jobs:
   shell-checks:
     runs-on: ubuntu-22.04
     container:
-      image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:40  # CURRENT DEVELOPMENT ENVIRONMENT
     steps:
       - uses: actions/checkout@v4
       - name: Install dependencies
@@ -241,7 +187,7 @@ jobs:
   python-based-tests:
     runs-on: ubuntu-22.04
     container:
-      image: fedora:39  # CURRENT DEVELOPMENT ENVIRONMENT
+      image: fedora:40  # CURRENT DEVELOPMENT ENVIRONMENT
       options: --privileged -v /dev:/dev
     steps:
       - uses: actions/checkout@v4
@@ -267,7 +213,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo
-          toolchain: 1.77.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
+          toolchain: 1.79.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
       - name: Build stratisd
         run: PROFILEDIR=debug make -f Makefile build-all
       - name: Install stratisd

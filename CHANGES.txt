@@ -1,3 +1,45 @@
+stratisd 3.6.8
+==============
+Recommended Rust toolchain version: 1.79.0
+Recommended development platform for Python development: Fedora 40
+
+* New commits:
+  * Increase libc dependency lower bound to 0.2.155
+
+* Cherry-picked commits:
+  * Regression test for key set in stratis-min
+  * Add PROFILE_FLAGS to profileable targets
+  * github actions: ignore only pushes to tests/client-dbus dir
+  * github actions: update recommended Rust to 1.77.2
+  * Use once_cell instead of lazy_static for lazy statics
+  * Fix unnecessary-get-then-check with contains_key()
+  * Put timestamp management in a separate implementation
+  * Re-load the BDA after writing pool-level metadata
+  * Add stratis-min tests for missing subcommands
+  * test_fs_size_limit: Run fs_check after increasing limit
+  * github actions: update recommended Rust to 1.78.0
+  * Change deprecated use of default_features
+  * Advance current development environment to Fedora 40
+  * Revert "test_fs_size_limit: Run fs_check after increasing limit"
+  * test_fs_size_limit: Increase sizes by a factor of 2
+  * ci: Adjust Cockpit test plans
+  * Increase itertools dependency lower bound to 0.13.0
+  * Clarify conversion for set up pool to stopped pool
+  * Remove legacy std::u64::MAX constant
+  * Add test_stratis_min_pool_clevis_pin()
+  * Add stratis_min_key_set_empty()
+  * Add .gitignore entries for LLVM profiler traces
+  * Do software emulation of a TPM2 module
+  * github actions: update recommended Rust to 1.79.0
+  * Move to TMT with TPM2
+  * Increase nix dependency lower bound to 0.29.0
+  * Fix a typo in an error string
+  * Remove early exit
+  * Add a clarifying comment
+  * Change handle_extension to handle_fs_changes
+  * Merge invocation of should_extend and extend_size
+
+
 stratisd 3.6.7
 ==============
 Recommended Rust toolchain version: 1.77.0

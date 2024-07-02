@@ -23,7 +23,7 @@ use devicemapper::{
 
 use crate::{
     engine::{
-        engine::{DumpState, Filesystem, StateDiff},
+        engine::{DumpState, StateDiff},
         strat_engine::{
             backstore::Backstore,
             cmd::{thin_check, thin_metadata_size, thin_repair},
@@ -683,10 +683,6 @@ impl ThinPool {
             None
         };
 
-        if let Some(Sectors(0)) = remaining_space.as_ref() {
-            return Ok(HashMap::default());
-        };
-
         scope(|s| {
             // This collect is needed to ensure all threads are spawned in
             // parallel, not each thread being spawned and immediately joined
@@ -697,24 +693,12 @@ impl ThinPool {
                 .filesystems
                 .iter_mut()
                 .filter_map(|(name, uuid, fs)| {
-                    if let Some(mt_pt) = fs.should_extend() {
-                        let extend_size = StratFilesystem::extend_size(
-                            fs.thindev_size(),
-                            remaining_space.as_mut(),
-                            fs.size_limit().map(|sl| sl - fs.thindev_size()),
-                        );
-                        if extend_size == Sectors(0) {
-                            None
-                        } else {
-                            Some((name, *uuid, fs, mt_pt, extend_size))
-                        }
-                    } else {
-                        None
-                    }
+                    fs.visit_values(remaining_space.as_mut())
+                        .map(|(mt_pt, extend_size)| (name, *uuid, fs, mt_pt, extend_size))
                 })
                 .map(|(name, uuid, fs, mt_pt, extend_size)| {
                     s.spawn(move || -> StratisResult<_> {
-                        let diff = fs.handle_extension(&mt_pt, extend_size)?;
+                        let diff = fs.handle_fs_changes(&mt_pt, extend_size)?;
                         Ok((name, uuid, fs, diff))
                     })
                 })
@@ -725,15 +709,19 @@ impl ThinPool {
                 .filter_map(|h| {
                     h.join()
                         .map_err(|_| {
-                            warn!("Failed to get status of filesystem extension");
+                            warn!("Failed to get status of filesystem operation");
                         })
                         .ok()
                 })
                 .fold(Vec::new(), |mut acc, res| {
                     match res {
                         Ok((name, uuid, fs, diff)) => {
-                            updated.insert(uuid, diff);
-                            acc.push((name, uuid, fs));
+                            if diff.size.is_changed() {
+                                acc.push((name, uuid, fs));
+                            }
+                            if diff.size.is_changed() || diff.used.is_changed() {
+                                updated.insert(uuid, diff);
+                            }
                         }
                         Err(e) => {
                             warn!("Failed to extend filesystem: {}", e);
@@ -2580,14 +2568,14 @@ mod tests {
                 pool_name,
                 pool_uuid,
                 "stratis_test_filesystem",
-                Sectors::from(1200 * IEC::Ki),
-                // 700 * IEC::Mi
-                Some(Sectors(1400 * IEC::Ki)),
+                Sectors::from(2400 * IEC::Ki),
+                // 1400 * IEC::Mi
+                Some(Sectors(2800 * IEC::Ki)),
             )
             .unwrap();
         let devnode = {
             let (_, fs) = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap();
-            assert_eq!(fs.size_limit(), Some(Sectors(1400 * IEC::Ki)));
+            assert_eq!(fs.size_limit(), Some(Sectors(2800 * IEC::Ki)));
             fs.devnode()
         };
 
@@ -2611,8 +2599,8 @@ mod tests {
             .open(new_file)
             .unwrap();
         let mut bytes_written = Bytes(0);
-        // Write 400 * IEC::Mi
-        while bytes_written < Bytes::from(400 * IEC::Mi) {
+        // Write 800 * IEC::Mi
+        while bytes_written < Bytes::from(800 * IEC::Mi) {
             file.write_all(&[1; 4096]).unwrap();
             bytes_written += Bytes(4096);
         }
@@ -2624,16 +2612,16 @@ mod tests {
             assert_eq!(fs.size_limit(), Some(fs.size().sectors()));
         }
 
-        // 800 * IEC::Mi
-        pool.set_fs_size_limit(fs_uuid, Some(Sectors(1600 * IEC::Ki)))
+        // 1600 * IEC::Mi
+        pool.set_fs_size_limit(fs_uuid, Some(Sectors(3200 * IEC::Ki)))
             .unwrap();
         {
             let (_, fs) = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap();
-            assert_eq!(fs.size_limit(), Some(Sectors(1600 * IEC::Ki)));
+            assert_eq!(fs.size_limit(), Some(Sectors(3200 * IEC::Ki)));
         }
         let mut bytes_written = Bytes(0);
-        // Write 100 * IEC::Mi
-        while bytes_written < Bytes::from(100 * IEC::Mi) {
+        // Write 200 * IEC::Mi
+        while bytes_written < Bytes::from(200 * IEC::Mi) {
             file.write_all(&[1; 4096]).unwrap();
             bytes_written += Bytes(4096);
         }
@@ -2649,7 +2637,7 @@ mod tests {
             let (_, fs) = pool
                 .snapshot_filesystem(pool_name, pool_uuid, fs_uuid, "snapshot")
                 .unwrap();
-            assert_eq!(fs.size_limit(), Some(Sectors(1600 * IEC::Ki)));
+            assert_eq!(fs.size_limit(), Some(Sectors(3200 * IEC::Ki)));
         }
 
         pool.set_fs_size_limit(fs_uuid, None).unwrap();
@@ -2658,8 +2646,8 @@ mod tests {
             assert_eq!(fs.size_limit(), None);
         }
         let mut bytes_written = Bytes(0);
-        // Write 200 * IEC::Mi
-        while bytes_written < Bytes::from(200 * IEC::Mi) {
+        // Write 400 * IEC::Mi
+        while bytes_written < Bytes::from(400 * IEC::Mi) {
             file.write_all(&[1; 4096]).unwrap();
             bytes_written += Bytes(4096);
         }
@@ -2668,7 +2656,7 @@ mod tests {
 
         {
             let (_, fs) = pool.get_mut_filesystem_by_uuid(fs_uuid).unwrap();
-            assert_eq!(fs.size().sectors(), Sectors(3200 * IEC::Ki));
+            assert_eq!(fs.size().sectors(), Sectors(6400 * IEC::Ki));
         }
 
         assert!(pool.set_fs_size_limit(fs_uuid, Some(Sectors(50))).is_err());

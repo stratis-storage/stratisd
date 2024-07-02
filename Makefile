@@ -1,3 +1,8 @@
+ifeq ($(origin PROFILE), undefined)
+else
+  PROFILE_FLAGS = -C instrument-coverage
+endif
+
 ifeq ($(origin AUDITABLE), undefined)
   BUILD = build
   RUSTC = rustc
@@ -199,7 +204,7 @@ fmt-shell-ci:
 ## Build stratisd
 build:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
+	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" \
 	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratisd \
 	${TARGET_ARGS}
@@ -207,7 +212,7 @@ build:
 ## Build the stratisd test suite
 build-tests:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
+	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" \
 	cargo test --no-run ${RELEASE_FLAG} ${TARGET_ARGS}
 
 ## Build stratis-utils only
@@ -228,7 +233,7 @@ build-utils-no-systemd:
 ## Build stratisd-min and stratis-min for early userspace
 build-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
+	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" \
 	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratis-min --bin=stratisd-min \
 	${SYSTEMD_FEATURES} ${TARGET_ARGS}
@@ -244,7 +249,7 @@ build-min-no-systemd:
 ## Build stratisd-min and stratis-min for early userspace
 build-no-ipc:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
+	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" \
 	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratisd \
 	${NO_IPC_FEATURES} \
@@ -253,7 +258,7 @@ build-no-ipc:
 ## Build stratis-str-cmp binary
 build-stratis-str-cmp:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
+	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" \
 	cargo ${RUSTC} ${RELEASE_FLAG}  \
 	--bin=stratis-str-cmp \
 	${UDEV_FEATURES} \
@@ -264,7 +269,7 @@ build-stratis-str-cmp:
 ## Build stratis-base32-decode binary
 build-stratis-base32-decode:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
+	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" \
 	cargo ${RUSTC} ${RELEASE_FLAG}  \
 	--bin=stratis-base32-decode \
 	${UDEV_FEATURES} \
@@ -280,21 +285,21 @@ build-udev-utils: build-stratis-str-cmp build-stratis-base32-decode
 ## Build the stratisd-tools program
 stratisd-tools:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
+	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" \
 	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratisd-tools ${EXTRAS_FEATURES} ${TARGET_ARGS}
 
 ## Build stratis-min for early userspace
 stratis-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
+	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" \
 	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratis-min ${MIN_FEATURES} ${TARGET_ARGS}
 
 ## Build stratisd-min for early userspace
 stratisd-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
+	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" \
 	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratisd-min ${SYSTEMD_FEATURES} ${TARGET_ARGS}
 
@@ -410,7 +415,7 @@ clean: clean-cfg clean-ancillary clean-primary
 
 ## Tests with loop devices
 test-loop:
-	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test loop_ -- --skip clevis_loop_
+	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test loop_ -- --skip clevis_loop_
 
 ## Tests run under valgrind with loop devices
 test-loop-valgrind:
@@ -418,11 +423,11 @@ test-loop-valgrind:
 
 ## Tests with real devices
 test-real:
-	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test real_ -- --skip clevis_real_
+	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test real_ -- --skip clevis_real_
 
 ## Basic tests
 test:
-	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 cargo test --all-features -- --skip real_ --skip loop_ --skip clevis_ --skip test_stratis_min_ --skip test_stratisd_min_
+	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" RUST_BACKTRACE=1 cargo test --all-features -- --skip real_ --skip loop_ --skip clevis_ --skip test_stratis_min_ --skip test_stratisd_min_
 
 ## Basic tests run under valgrind
 test-valgrind:
@@ -430,15 +435,15 @@ test-valgrind:
 
 ## Clevis tests with real devices
 test-clevis-real:
-	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test clevis_real_ -- --skip clevis_real_should_fail
+	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test clevis_real_ -- --skip clevis_real_should_fail
 
 ## Clevis real device tests that are expected to fail
 test-clevis-real-should-fail:
-	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test clevis_real_should_fail
+	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test clevis_real_should_fail
 
 ## Clevis tests with loop devices
 test-clevis-loop:
-	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test clevis_loop_ -- --skip clevis_loop_should_fail_
+	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test clevis_loop_ -- --skip clevis_loop_should_fail_
 
 ## Clevis tests with loop devices with valgrind
 test-clevis-loop-valgrind:
@@ -446,7 +451,7 @@ test-clevis-loop-valgrind:
 
 ## Clevis loop device tests that are expected to fail
 test-clevis-loop-should-fail:
-	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test clevis_loop_should_fail_
+	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test clevis_loop_should_fail_
 
 ## Clevis loop device tests that are expected to fail run under valgrind
 test-clevis-loop-should-fail-valgrind:
@@ -454,11 +459,11 @@ test-clevis-loop-should-fail-valgrind:
 
 ## Test stratisd-min CLI
 test-stratisd-min:
-	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test --no-default-features --features "engine,min" test_stratisd_min
+	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test --no-default-features --features "engine,min" test_stratisd_min
 
 ## Test stratis-min CLI
 test-stratis-min:
-	RUSTFLAGS="${DENY}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 cargo test --no-default-features --features "engine,min" test_stratis_min
+	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test --no-default-features --features "engine,min" test_stratis_min
 
 ## Run yamllint on workflow files
 yamllint:

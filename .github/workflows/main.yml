@@ -292,8 +292,8 @@ jobs:
         working-directory: ./testing
       - name: Switch
         run: |
-          git checkout -b mulkieran-issue_testing_213 master
-          git pull https://github.com/mulkieran/testing.git issue_testing_213
+          git checkout -b bgurney-rh-stratis-cli-fsmountwrite master
+          git pull https://github.com/bgurney-rh/testing.git stratis-cli-fsmountwrite
         working-directory: ./testing
       - name: Run stratisd_cert.py
         run: >

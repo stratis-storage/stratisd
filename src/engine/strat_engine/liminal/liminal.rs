@@ -557,7 +557,7 @@ impl LiminalDevices {
         }
 
         assert!(pools.get_by_uuid(pool_uuid).is_none());
-        assert!(self.stopped_pools.get(&pool_uuid).is_none());
+        assert!(!self.stopped_pools.contains_key(&pool_uuid));
 
         let encryption_info = device_set.encryption_info();
         let pool_name = device_set.pool_name();
@@ -643,7 +643,7 @@ impl LiminalDevices {
         }
 
         assert!(pools.get_by_uuid(pool_uuid).is_none());
-        assert!(self.stopped_pools.get(&pool_uuid).is_none());
+        assert!(!self.stopped_pools.contains_key(&pool_uuid));
 
         let encryption_info = device_set.encryption_info();
         let pool_name = device_set.pool_name();
@@ -828,7 +828,7 @@ impl LiminalDevices {
                 } else {
                     return None;
                 };
-            if self.stopped_pools.get(&pool_uuid).is_some() {
+            if self.stopped_pools.contains_key(&pool_uuid) {
                 let mut devices = self.stopped_pools.remove(&pool_uuid).unwrap_or_default();
 
                 devices.process_info_remove(device_path, pool_uuid, dev_uuid);

@@ -144,6 +144,30 @@ fn test_stratis_min_create_no_blockdevs() {
     ));
 }
 
+#[test]
+// Test running "stratis pool bind" with missing subcommand.
+fn test_stratis_min_pool_bind_missing_subcommand() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("bind");
+    cmd.assert().failure().code(2);
+}
+
+#[test]
+// Test running "stratis pool unbind" with missing subcommand.
+fn test_stratis_min_pool_unbind_missing_subcommand() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("unbind");
+    cmd.assert().failure().code(2);
+}
+
+#[test]
+// Test running "stratis pool rebind" with missing subcommand.
+fn test_stratis_min_pool_rebind_missing_subcommand() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("rebind");
+    cmd.assert().failure().code(2);
+}
+
 // stratis-min tests with sim engine
 
 fn stratis_min_create_pool_and_fs() {
@@ -250,4 +274,52 @@ fn stratis_min_list_default() {
 // report headings.
 fn test_stratis_min_list_defaults() {
     test_with_stratisd_min_sim(stratis_min_list_default);
+}
+
+fn stratis_min_key_set() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.write_stdin("thisisatestpassphrase\n")
+        .arg("key")
+        .arg("set")
+        .arg("--capture-key")
+        .arg("testkey");
+    cmd.assert().success();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("key").arg("unset").arg("testkey");
+    cmd.assert().success();
+}
+
+#[test]
+fn test_stratis_min_key_set() {
+    test_with_stratisd_min_sim(stratis_min_key_set);
+}
+
+fn stratis_min_key_set_empty() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.write_stdin("")
+        .arg("key")
+        .arg("set")
+        .arg("--capture-key")
+        .arg("testkey");
+    cmd.assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains("Password provided was empty"));
+}
+
+#[test]
+fn test_stratis_min_key_set_empty() {
+    test_with_stratisd_min_sim(stratis_min_key_set_empty);
+}
+
+fn stratis_min_pool_clevis_pin() {
+    stratis_min_create_pool_and_fs();
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool").arg("clevis-pin").arg("--name").arg("pn");
+    cmd.assert().success();
+}
+
+#[test]
+fn test_stratis_min_pool_clevis_pin() {
+    test_with_stratisd_min_sim(stratis_min_pool_clevis_pin);
 }

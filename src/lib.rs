@@ -25,10 +25,6 @@ extern crate assert_matches;
 
 #[cfg(feature = "engine")]
 #[macro_use]
-extern crate lazy_static;
-
-#[cfg(feature = "engine")]
-#[macro_use]
 extern crate serde_json;
 
 #[cfg(feature = "engine")]

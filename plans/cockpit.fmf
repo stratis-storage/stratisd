@@ -14,7 +14,7 @@ discover:
 execute:
     how: tmt
 
-/optional:
-    summary: Run tests for optional packages (including storage)
+/storage-basic:
+    summary: Basic storage tests
     discover+:
-        test: /test/browser/optional
+        test: /test/browser/storage-basic

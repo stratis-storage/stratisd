@@ -15,6 +15,7 @@ use std::{
 use chrono::Utc;
 use itertools::Itertools;
 use nix::sys::stat::stat;
+use once_cell::sync::Lazy;
 
 use devicemapper::{Bytes, Device, Sectors, IEC};
 use libblkid_rs::{BlkidCache, BlkidProbe};
@@ -43,9 +44,8 @@ use crate::{
 
 const MIN_DEV_SIZE: Bytes = Bytes(IEC::Gi as u128);
 
-lazy_static! {
-    static ref BLOCKDEVS_IN_PROGRESS: Mutex<HashSet<PathBuf>> = Mutex::new(HashSet::new());
-}
+static BLOCKDEVS_IN_PROGRESS: Lazy<Mutex<HashSet<PathBuf>>> =
+    Lazy::new(|| Mutex::new(HashSet::new()));
 
 // Get information that can be obtained from udev for the block device
 // identified by devnode. Return an error if there was an error finding the

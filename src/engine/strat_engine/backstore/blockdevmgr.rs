@@ -37,12 +37,44 @@ use crate::{
 const MAX_NUM_TO_WRITE: usize = 10;
 
 #[derive(Debug)]
+struct TimeStamp {
+    inner: Option<DateTime<Utc>>,
+}
+
+impl From<Option<DateTime<Utc>>> for TimeStamp {
+    fn from(time: Option<DateTime<Utc>>) -> Self {
+        TimeStamp { inner: time }
+    }
+}
+
+impl TimeStamp {
+    // Get the best next time stamp; at least now() and at least one
+    // nanosecond more than the previous.
+    fn next(&self) -> DateTime<Utc> {
+        let current_time = Utc::now();
+        if Some(current_time) <= self.inner {
+            self.inner
+                .expect("self.inner >= Some(current_time")
+                .checked_add_signed(Duration::nanoseconds(1))
+                .expect("self.inner << maximum representable DateTime")
+        } else {
+            current_time
+        }
+    }
+
+    // Set the time stamp to a new value.
+    fn set(&mut self, time: DateTime<Utc>) {
+        self.inner = Some(time);
+    }
+}
+
+#[derive(Debug)]
 pub struct BlockDevMgr {
     /// All the block devices that belong to this block dev manager.
     block_devs: Vec<StratBlockDev>,
     /// The most recent time that variable length metadata was saved to the
     /// devices managed by this block dev manager.
-    last_update_time: Option<DateTime<Utc>>,
+    last_update_time: TimeStamp,
 }
 
 impl BlockDevMgr {
@@ -53,7 +85,7 @@ impl BlockDevMgr {
     ) -> BlockDevMgr {
         BlockDevMgr {
             block_devs,
-            last_update_time,
+            last_update_time: last_update_time.into(),
         }
     }
 
@@ -278,15 +310,7 @@ impl BlockDevMgr {
     /// written. Randomly select no more than MAX_NUM_TO_WRITE blockdevs to
     /// write to.
     pub fn save_state(&mut self, metadata: &[u8]) -> StratisResult<()> {
-        let current_time = Utc::now();
-        let stamp_time = if Some(current_time) <= self.last_update_time {
-            self.last_update_time
-                .expect("self.last_update_time >= Some(current_time")
-                .checked_add_signed(Duration::nanoseconds(1))
-                .expect("self.last_update_time << maximum representable DateTime")
-        } else {
-            current_time
-        };
+        let stamp_time = self.last_update_time.next();
 
         let data_size = Bytes::from(metadata.len());
         let candidates = self
@@ -309,7 +333,7 @@ impl BlockDevMgr {
             });
 
         if saved {
-            self.last_update_time = Some(stamp_time);
+            self.last_update_time.set(stamp_time);
             Ok(())
         } else {
             let err_msg = "Failed to save metadata to even one device in pool";

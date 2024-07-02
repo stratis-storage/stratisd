@@ -15,6 +15,7 @@ use std::{
 
 use chrono::{DateTime, LocalResult, TimeZone, Utc};
 use nix::poll::{poll, PollFd, PollFlags};
+use once_cell::sync::Lazy;
 use regex::Regex;
 
 use devicemapper::{Bytes, Sectors, IEC, SECTOR_SIZE};
@@ -172,10 +173,10 @@ pub fn validate_name(name: &str) -> StratisResult<()> {
             "Provided string contains control characters: {name}"
         )));
     }
-    lazy_static! {
-        static ref NAME_UDEVREGEX: Regex =
-            Regex::new(r"[[:ascii:]&&[^0-9A-Za-z#+-.:=@_/]]+").expect("regex is valid");
-    }
+
+    static NAME_UDEVREGEX: Lazy<Regex> =
+        Lazy::new(|| Regex::new(r"[[:ascii:]&&[^0-9A-Za-z#+-.:=@_/]]+").expect("regex is valid"));
+
     if NAME_UDEVREGEX.is_match(name) {
         return Err(StratisError::Msg(format!(
             "Provided string contains characters not allowed in udev symlinks: {name}"

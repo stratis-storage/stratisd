@@ -253,20 +253,36 @@ impl StratFilesystem {
         }
     }
 
-    /// Check the filesystem usage and determine whether it should extend.
+    /// Check the filesystem usage and determine whether it should extend
+    /// or just update. If extend, return the amount to extend.
     ///
     /// Returns:
-    /// * Some(mount_point) if the filesystem should be extended
-    /// * None if the filesystem does not need to be extended
-    pub fn should_extend(&self) -> Option<PathBuf> {
-        fn should_extend_fail(fs: &StratFilesystem) -> StratisResult<Option<PathBuf>> {
+    /// * Some(_) if the filesystem is mounted and should be visited
+    /// * Some((_, 0)) if the filesystem does not need to be extended
+    /// * None if the filesystem is unmounted and should not be visited
+    pub fn visit_values(
+        &self,
+        no_op_remaining_size: Option<&mut Sectors>,
+    ) -> Option<(PathBuf, Sectors)> {
+        fn visit_values_fail(
+            fs: &StratFilesystem,
+            no_op_remaining_size: Option<&mut Sectors>,
+        ) -> StratisResult<Option<(PathBuf, Sectors)>> {
             match fs.thin_dev.status(get_dm(), DmOptions::default())? {
                 ThinStatus::Working(_) => {
                     if let Some(mount_point) = fs.mount_points()?.first() {
-                        let (fs_total_bytes, fs_total_used_bytes) = fs_usage(mount_point)?;
-                        if 2u64 * fs_total_used_bytes > fs_total_bytes {
-                            return Ok(Some(mount_point.clone()));
-                        }
+                        return fs_usage(mount_point).map(
+                            |(fs_total_bytes, fs_total_used_bytes)| {
+                                Some((
+                                    mount_point.clone(),
+                                    if 2u64 * fs_total_used_bytes > fs_total_bytes {
+                                        fs.extend_size(no_op_remaining_size)
+                                    } else {
+                                        Sectors(0)
+                                    },
+                                ))
+                            },
+                        );
                     }
                     Ok(None)
                 }
@@ -281,11 +297,11 @@ impl StratFilesystem {
             }
         }
 
-        match should_extend_fail(self) {
+        match visit_values_fail(self, no_op_remaining_size) {
             Ok(mt_pt) => mt_pt,
             Err(e) => {
                 warn!(
-                    "Checking whether the filesystem should be extended failed: {}; ignoring",
+                    "Checking whether the filesystem should be visited failed: {}; ignoring",
                     e
                 );
                 None
@@ -293,30 +309,33 @@ impl StratFilesystem {
         }
     }
 
-    /// Handle the extension once the filesystem has been determined to be getting full
-    /// and needs to be extended.
+    /// Handle filesystem changes while checking, including updating cached
+    /// state.
     ///
-    /// Precondition: should_extend has returned Some(_) before invocation.
-    pub fn handle_extension(
+    /// If extend_size is 0, it is not necessary to extend the filesystem,
+    /// but the state may have changed.
+    pub fn handle_fs_changes(
         &mut self,
         mount_point: &Path,
         extend_size: Sectors,
     ) -> StratisResult<StratFilesystemDiff> {
         let original_state = self.cached();
 
-        let old_table = self.thin_dev.table().table.clone();
-        let mut new_table = old_table.clone();
-        new_table.length = original_state.size.sectors() + extend_size;
-        self.thin_dev.set_table(get_dm(), new_table)?;
-        if let Err(causal) = xfs_growfs(mount_point) {
-            if let Err(rollback) = self.thin_dev.set_table(get_dm(), old_table) {
-                return Err(StratisError::RollbackError {
-                    causal_error: Box::new(causal),
-                    rollback_error: Box::new(StratisError::from(rollback)),
-                    level: ActionAvailability::NoPoolChanges,
-                });
-            } else {
-                return Err(causal);
+        if extend_size > Sectors(0) {
+            let old_table = self.thin_dev.table().table.clone();
+            let mut new_table = old_table.clone();
+            new_table.length = original_state.size.sectors() + extend_size;
+            self.thin_dev.set_table(get_dm(), new_table)?;
+            if let Err(causal) = xfs_growfs(mount_point) {
+                if let Err(rollback) = self.thin_dev.set_table(get_dm(), old_table) {
+                    return Err(StratisError::RollbackError {
+                        causal_error: Box::new(causal),
+                        rollback_error: Box::new(StratisError::from(rollback)),
+                        level: ActionAvailability::NoPoolChanges,
+                    });
+                } else {
+                    return Err(causal);
+                }
             }
         }
 
@@ -324,11 +343,10 @@ impl StratFilesystem {
     }
 
     /// Return an extend size for the thindev under the filesystem
-    pub fn extend_size(
-        current_size: Sectors,
-        no_op_remaining_size: Option<&mut Sectors>,
-        fs_limit_remaining_size: Option<Sectors>,
-    ) -> Sectors {
+    /// If no_op_remaining_size is None, then the pool allows overprovisioning.
+    fn extend_size(&self, no_op_remaining_size: Option<&mut Sectors>) -> Sectors {
+        let current_size = self.thindev_size();
+        let fs_limit_remaining_size = self.size_limit().map(|sl| sl - self.thindev_size());
         match (no_op_remaining_size, fs_limit_remaining_size) {
             (Some(no_op_rem_size), Some(fs_lim_rem_size)) => {
                 let extend_size = min(min(*no_op_rem_size, current_size), fs_lim_rem_size);

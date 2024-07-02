@@ -519,13 +519,12 @@ impl IntoIterator for DeviceSet {
 impl From<Vec<StratBlockDev>> for DeviceSet {
     fn from(vec: Vec<StratBlockDev>) -> Self {
         vec.into_iter()
-            .flat_map(|bd| {
-                let dev_uuid = bd.uuid();
-                Vec::<DeviceInfo>::from(bd)
-                    .into_iter()
-                    .map(move |info| (dev_uuid, LInfo::from(info)))
+            .fold(DeviceSet::default(), |mut device_set, bd| {
+                for info in Vec::<DeviceInfo>::from(bd) {
+                    device_set.process_info_add(info);
+                }
+                device_set
             })
-            .collect::<DeviceSet>()
     }
 }
 

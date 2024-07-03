@@ -7,7 +7,6 @@
 use std::{
     cmp::{max, min, Ordering},
     collections::{HashMap, HashSet},
-    fmt,
     thread::scope,
 };
 
@@ -71,6 +70,14 @@ mod consts {
     pub const DATA_ALLOC_SIZE: DataBlocks = DataBlocks(5 * IEC::Ki);
     // 4 GiB
     pub const DATA_LOWATER: DataBlocks = DataBlocks(4 * IEC::Ki);
+}
+
+#[derive(strum_macros::AsRefStr)]
+#[strum(serialize_all = "snake_case")]
+enum FeatureArgs {
+    ErrorIfNoSpace,
+    NoDiscardPassdown,
+    SkipBlockZeroing,
 }
 
 fn sectors_to_datablocks(sectors: Sectors) -> DataBlocks {
@@ -166,12 +173,19 @@ struct Segments {
 /// that can be checked for equality. This way, two statuses,
 /// collected at different times can be checked to determine whether their
 /// gross, as opposed to fine, differences are significant.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+/// In this implementation convert the status designations to strings which
+/// match those strings that the kernel uses to identify the different states
+#[derive(Clone, Copy, Debug, Eq, PartialEq, strum_macros::AsRefStr)]
 pub enum ThinPoolStatusDigest {
+    #[strum(serialize = "Fail")]
     Fail,
+    #[strum(serialize = "Error")]
     Error,
+    #[strum(serialize = "rw")]
     Good,
+    #[strum(serialize = "ro")]
     ReadOnly,
+    #[strum(serialize = "out_of_data_space")]
     OutOfSpace,
 }
 
@@ -185,21 +199,6 @@ impl From<&ThinPoolStatus> for ThinPoolStatusDigest {
             },
             ThinPoolStatus::Fail => ThinPoolStatusDigest::Fail,
             ThinPoolStatus::Error => ThinPoolStatusDigest::Error,
-        }
-    }
-}
-
-/// In this implementation convert the status designations to strings which
-/// match those strings that the kernel uses to identify the different states
-/// in the ioctl result.
-impl fmt::Display for ThinPoolStatusDigest {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ThinPoolStatusDigest::Good => write!(f, "rw"),
-            ThinPoolStatusDigest::ReadOnly => write!(f, "ro"),
-            ThinPoolStatusDigest::OutOfSpace => write!(f, "out_of_data_space"),
-            ThinPoolStatusDigest::Fail => write!(f, "Fail"),
-            ThinPoolStatusDigest::Error => write!(f, "Error"),
         }
     }
 }
@@ -400,8 +399,8 @@ impl ThinPool {
                 DataBlocks((data_dev_size / DATA_BLOCK_SIZE) / 2),
             ),
             vec![
-                "no_discard_passdown".to_string(),
-                "skip_block_zeroing".to_string(),
+                FeatureArgs::NoDiscardPassdown.as_ref().to_string(),
+                FeatureArgs::SkipBlockZeroing.as_ref().to_string(),
             ],
         )?;
 
@@ -487,9 +486,9 @@ impl ThinPool {
                 .unwrap_or_else(|| {
                     migrate = true;
                     vec![
-                        "no_discard_passdown".to_owned(),
-                        "skip_block_zeroing".to_owned(),
-                        "error_if_no_space".to_owned(),
+                        FeatureArgs::NoDiscardPassdown.as_ref().to_string(),
+                        FeatureArgs::SkipBlockZeroing.as_ref().to_string(),
+                        FeatureArgs::ErrorIfNoSpace.as_ref().to_string(),
                     ]
                 }),
         )?;
@@ -770,8 +769,9 @@ impl ThinPool {
 
         if current_status != new_status {
             let current_status_str = current_status
-                .map(|x| x.to_string())
-                .unwrap_or_else(|| "none".to_string());
+                .as_ref()
+                .map(|x| x.as_ref())
+                .unwrap_or_else(|| "none");
 
             if new_status != Some(ThinPoolStatusDigest::Good) {
                 warn!(
@@ -779,8 +779,9 @@ impl ThinPool {
                     thin_pool_identifiers(&self.thin_pool),
                     current_status_str,
                     new_status
-                        .map(|s| s.to_string())
-                        .unwrap_or_else(|| "none".to_string()),
+                        .as_ref()
+                        .map(|s| s.as_ref())
+                        .unwrap_or_else(|| "none"),
                 );
             } else {
                 info!(
@@ -788,8 +789,9 @@ impl ThinPool {
                     thin_pool_identifiers(&self.thin_pool),
                     current_status_str,
                     new_status
-                        .map(|s| s.to_string())
-                        .unwrap_or_else(|| "none".to_string()),
+                        .as_ref()
+                        .map(|s| s.as_ref())
+                        .unwrap_or_else(|| "none"),
                 );
             }
         }
@@ -876,7 +878,7 @@ impl ThinPool {
             .table
             .params
             .feature_args
-            .contains("error_if_no_space")
+            .contains(FeatureArgs::ErrorIfNoSpace.as_ref())
     }
 
     /// Extend thinpool's data dev.

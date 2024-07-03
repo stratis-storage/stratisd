@@ -384,16 +384,12 @@ impl LiminalDevices {
             stopped: self
                 .stopped_pools
                 .iter()
-                .filter_map(|(pool_uuid, map)| {
-                    map.stopped_pool_info().map(|info| (*pool_uuid, info))
-                })
+                .map(|(pool_uuid, map)| (*pool_uuid, map.stopped_pool_info()))
                 .collect(),
             partially_constructed: self
                 .partially_constructed_pools
                 .iter()
-                .filter_map(|(pool_uuid, map)| {
-                    map.stopped_pool_info().map(|info| (*pool_uuid, info))
-                })
+                .map(|(pool_uuid, map)| (*pool_uuid, map.stopped_pool_info()))
                 .collect(),
         }
     }

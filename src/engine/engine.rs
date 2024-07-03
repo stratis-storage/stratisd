@@ -286,7 +286,7 @@ pub trait Pool: Debug + Send + Sync {
     /// by the uuid.
     fn set_blockdev_user_info(
         &mut self,
-        pool_name: &str,
+        pool_name: &Name,
         uuid: DevUuid,
         user_info: Option<&str>,
     ) -> StratisResult<RenameAction<DevUuid>>;

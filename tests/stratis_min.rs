@@ -188,6 +188,23 @@ fn test_stratis_min_pool_start_invalid_uuid() {
 }
 
 #[test]
+// Test starting a pool using an invalid unlock method.
+fn test_stratis_min_pool_start_invalid_unlock_method() {
+    let mut cmd = Command::cargo_bin("stratis-min").unwrap();
+    cmd.arg("pool")
+        .arg("start")
+        .arg("--name")
+        .arg("pn")
+        .arg("--unlock-method=bogus");
+    cmd.assert()
+        .failure()
+        .code(1)
+        .stderr(predicate::str::contains(
+            "bogus is an invalid unlock method",
+        ));
+}
+
+#[test]
 // Test binding a pool using an invalid UUID; unless name is specified the
 // id value is interpreted as a UUID.
 fn test_stratis_min_pool_bind_invalid_uuid() {

@@ -4,7 +4,7 @@
 
 use std::{error::Error, path::PathBuf};
 
-use clap::{Arg, ArgAction, ArgGroup, ArgMatches, Command};
+use clap::{Arg, ArgAction, ArgGroup, Command};
 use serde_json::{json, Map, Value};
 
 use stratisd::{
@@ -56,6 +56,7 @@ fn parse_args() -> Command {
                     .arg(
                         Arg::new("blockdevs")
                             .action(ArgAction::Append)
+                            .value_parser(clap::value_parser!(PathBuf))
                             .required(true),
                     )
                     .arg(Arg::new("key_desc").long("key-desc").num_args(1))
@@ -86,6 +87,7 @@ fn parse_args() -> Command {
                     .arg(
                         Arg::new("blockdevs")
                             .action(ArgAction::Append)
+                            .value_parser(clap::value_parser!(PathBuf))
                             .required(true),
                     ),
                 Command::new("rename")
@@ -96,6 +98,7 @@ fn parse_args() -> Command {
                     .arg(
                         Arg::new("blockdevs")
                             .action(ArgAction::Append)
+                            .value_parser(clap::value_parser!(PathBuf))
                             .required(true),
                     ),
                 Command::new("add-cache")
@@ -103,6 +106,7 @@ fn parse_args() -> Command {
                     .arg(
                         Arg::new("blockdevs")
                             .action(ArgAction::Append)
+                            .value_parser(clap::value_parser!(PathBuf))
                             .required(true),
                     ),
                 Command::new("destroy").arg(Arg::new("name").required(true)),
@@ -195,13 +199,6 @@ fn parse_args() -> Command {
         ])
 }
 
-fn get_paths_from_args(args: &ArgMatches) -> Vec<PathBuf> {
-    args.get_many::<String>("blockdevs")
-        .expect("required")
-        .map(PathBuf::from)
-        .collect::<Vec<_>>()
-}
-
 fn main() -> Result<(), String> {
     fn main_box() -> Result<(), Box<dyn Error>> {
         let cmd = parse_args();
@@ -267,7 +264,6 @@ fn main() -> Result<(), String> {
                 pool::pool_stop(id)?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("create") {
-                let paths = get_paths_from_args(args);
                 let key_description = match args.get_one::<String>("key_desc").map(|s| s.to_owned())
                 {
                     Some(string) => Some(KeyDescription::try_from(string)?),
@@ -300,7 +296,10 @@ fn main() -> Result<(), String> {
                 };
                 pool::pool_create(
                     args.get_one::<String>("name").expect("required").to_owned(),
-                    paths,
+                    args.get_many::<PathBuf>("blockdevs")
+                        .expect("required")
+                        .cloned()
+                        .collect::<Vec<_>>(),
                     EncryptionInfo::from_options((key_description, clevis_info)),
                 )?;
                 Ok(())
@@ -308,10 +307,12 @@ fn main() -> Result<(), String> {
                 pool::pool_destroy(args.get_one::<String>("name").expect("required").to_owned())?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("init-cache") {
-                let paths = get_paths_from_args(args);
                 pool::pool_init_cache(
                     args.get_one::<String>("name").expect("required").to_owned(),
-                    paths,
+                    args.get_many::<PathBuf>("blockdevs")
+                        .expect("required")
+                        .cloned()
+                        .collect::<Vec<_>>(),
                 )?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("rename") {
@@ -325,17 +326,21 @@ fn main() -> Result<(), String> {
                 )?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("add-data") {
-                let paths = get_paths_from_args(args);
                 pool::pool_add_data(
                     args.get_one::<String>("name").expect("required").to_owned(),
-                    paths,
+                    args.get_many::<PathBuf>("blockdevs")
+                        .expect("required")
+                        .cloned()
+                        .collect::<Vec<_>>(),
                 )?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("add-cache") {
-                let paths = get_paths_from_args(args);
                 pool::pool_add_cache(
                     args.get_one::<String>("name").expect("required").to_owned(),
-                    paths,
+                    args.get_many::<PathBuf>("blockdevs")
+                        .expect("required")
+                        .cloned()
+                        .collect::<Vec<_>>(),
                 )?;
                 Ok(())
             } else if let Some(args) = subcommand.subcommand_matches("is-encrypted") {

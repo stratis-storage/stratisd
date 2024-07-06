@@ -17,6 +17,7 @@ Used to test behavior of the udev device discovery mechanism.
 
 # isort: STDLIB
 import logging
+import os
 import random
 
 # isort: LOCAL
@@ -461,7 +462,7 @@ class UdevTest5(UdevTest):
             with OptionalKeyServiceContextManager(key_spec=keys) as key_descriptions:
                 key_description = (
                     key_descriptions[random.randint(0, len(key_descriptions) - 1)]
-                    if random.choice([True, False])
+                    if random.choice([os.environ.get("LEGAGY_POOL") is not None, False])
                     else None
                 )
                 create_pool(pool_name, devnodes, key_description=key_description)

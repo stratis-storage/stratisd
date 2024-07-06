@@ -330,7 +330,11 @@ class UdevTest4(UdevTest):
         :type key_spec: (str, bytes) or NoneType
         """
         num_devices = 3
-        udev_wait_type = STRATIS_FS_TYPE if key_spec is None else CRYPTO_LUKS_FS_TYPE
+        udev_wait_type = (
+            STRATIS_FS_TYPE
+            if key_spec is None or os.environ.get("LEGACY_POOL") is None
+            else CRYPTO_LUKS_FS_TYPE
+        )
         device_tokens = self._lb_mgr.create_devices(num_devices)
         devnodes = self._lb_mgr.device_files(device_tokens)
         key_spec = None if key_spec is None else [key_spec]

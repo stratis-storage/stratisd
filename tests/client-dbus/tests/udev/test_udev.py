@@ -388,7 +388,7 @@ class UdevTest4(UdevTest):
 
             wait_for_udev(udev_wait_type, self._lb_mgr.device_files(tokens_up))
 
-            ((changed, _), exit_code, _) = Manager.Methods.StartPool(
+            ((changed, _), exit_code, msg) = Manager.Methods.StartPool(
                 get_object(TOP_OBJECT),
                 {
                     "id": pool_uuid,
@@ -402,7 +402,7 @@ class UdevTest4(UdevTest):
                 self.assertNotEqual(exit_code, StratisdErrors.OK)
                 self.assertEqual(changed, False)
             else:
-                self.assertEqual(exit_code, StratisdErrors.OK)
+                self.assertEqual(exit_code, StratisdErrors.OK, msg=msg)
                 self.assertEqual(changed, True)
 
             wait_for_udev_count(num_devices)

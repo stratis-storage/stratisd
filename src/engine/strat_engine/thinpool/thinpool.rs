@@ -1105,7 +1105,7 @@ impl ThinPool {
             }
         }
 
-        if meta_growth > backstore.available_in_backstore() {
+        if 2u64 * meta_growth > backstore.available_in_backstore() {
             self.out_of_meta_space = true;
             (
                 self.set_error_mode(),

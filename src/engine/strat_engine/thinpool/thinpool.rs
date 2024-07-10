@@ -1780,7 +1780,10 @@ where
                 meta_growth,
             );
 
-            (ext.is_ok(), ext)
+            match ext {
+                Ok(Sectors(0)) | Err(_) => (false, ext),
+                Ok(_) => (true, ext),
+            }
         } else {
             (false, Ok(Sectors(0)))
         }

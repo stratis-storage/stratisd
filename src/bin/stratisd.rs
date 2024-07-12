@@ -51,7 +51,6 @@ fn initialize_log(log_level: Option<&str>) {
 /// To ensure only one instance of stratisd runs at a time, acquire an
 /// exclusive lock. Return an error if lock attempt fails.
 fn trylock_pid_file() -> StratisResult<Flock<File>> {
-    #[allow(unknown_lints)]
     #[allow(clippy::suspicious_open_options)]
     let f = OpenOptions::new()
         .read(true)
@@ -83,7 +82,6 @@ fn trylock_pid_file() -> StratisResult<Flock<File>> {
         }
     };
 
-    #[allow(unknown_lints)]
     #[allow(clippy::suspicious_open_options)]
     let f = OpenOptions::new()
         .read(true)

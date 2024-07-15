@@ -492,17 +492,30 @@ class UdevTest5(UdevTest):
             (luks_tokens, non_luks_tokens) = (
                 [
                     dev
-                    for sublist in (pool_tokens[i] for i in encrypted_indices)
+                    for sublist in (
+                        pool_tokens[i]
+                        for i in (encrypted_indices if _LEGACY_POOL is not None else [])
+                    )
                     for dev in sublist
                 ],
                 [
                     dev
-                    for sublist in (pool_tokens[i] for i in unencrypted_indices)
+                    for sublist in (
+                        pool_tokens[i]
+                        for i in (
+                            unencrypted_indices
+                            if _LEGACY_POOL is not None
+                            else unencrypted_indices + encrypted_indices
+                        )
+                    )
                     for dev in sublist
                 ],
             )
 
-            wait_for_udev(CRYPTO_LUKS_FS_TYPE, self._lb_mgr.device_files(luks_tokens))
+            wait_for_udev(
+                CRYPTO_LUKS_FS_TYPE,
+                self._lb_mgr.device_files(luks_tokens),
+            )
             wait_for_udev(STRATIS_FS_TYPE, self._lb_mgr.device_files(non_luks_tokens))
 
             variant_pool_uuids = Manager.Properties.StoppedPools.Get(
@@ -541,20 +554,28 @@ class UdevTest5(UdevTest):
                         get_object(object_path), {"name": random_string(10)}
                     )
 
-                self._lb_mgr.generate_synthetic_udev_events(
-                    non_luks_tokens, UDEV_ADD_EVENT
-                )
-                for pool_uuid, props in variant_pool_uuids.items():
-                    if "key_description" in props:
-                        Manager.Methods.StartPool(
-                            get_object(TOP_OBJECT),
-                            {
-                                "id": pool_uuid,
-                                "unlock_method": (True, str(EncryptionMethod.KEYRING)),
-                                "id_type": "uuid",
-                                "key_fd": (False, 0),
-                            },
-                        )
+                if _LEGACY_POOL is not None:
+                    self._lb_mgr.generate_synthetic_udev_events(
+                        non_luks_tokens, UDEV_ADD_EVENT
+                    )
+                    for pool_uuid, props in variant_pool_uuids.items():
+                        if "key_description" in props:
+                            Manager.Methods.StartPool(
+                                get_object(TOP_OBJECT),
+                                {
+                                    "id": pool_uuid,
+                                    "unlock_method": (
+                                        True,
+                                        str(EncryptionMethod.KEYRING),
+                                    ),
+                                    "id_type": "uuid",
+                                    "key_fd": (False, 0),
+                                },
+                            )
+                else:
+                    self._lb_mgr.generate_synthetic_udev_events(
+                        non_luks_tokens + luks_tokens, UDEV_ADD_EVENT
+                    )
 
                 settle()
 

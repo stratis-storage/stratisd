@@ -42,8 +42,7 @@ use crate::{
             dm::get_dm,
             keys,
         },
-        types::{KeyDescription, SizedKeyMemory, UnlockMechanism},
-        EncryptionInfo,
+        types::{EncryptionInfo, KeyDescription, SizedKeyMemory, UnlockMechanism},
     },
     stratis::{StratisError, StratisResult},
 };

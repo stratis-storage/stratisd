@@ -15,9 +15,10 @@ use crate::{
         strat_engine::pool::{v1, v2},
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name,
-            OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolUuid, PropChangeAction,
-            RegenAction, RenameAction, SetCreateAction, SetDeleteAction, StratSigblockVersion,
+            EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo, Key,
+            KeyDescription, Name, OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolUuid,
+            PropChangeAction, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
+            StratSigblockVersion,
         },
     },
     stratis::StratisResult,
@@ -337,6 +338,18 @@ impl Pool for AnyPool {
         match self {
             AnyPool::V1(p) => p.set_fs_size_limit(fs, limit),
             AnyPool::V2(p) => p.set_fs_size_limit(fs, limit),
+        }
+    }
+
+    fn encrypt_pool(
+        &mut self,
+        name: &Name,
+        pool_uuid: PoolUuid,
+        encryption_info: &InputEncryptionInfo,
+    ) -> StratisResult<CreateAction<EncryptedDevice>> {
+        match self {
+            AnyPool::V1(p) => p.encrypt_pool(name, pool_uuid, encryption_info),
+            AnyPool::V2(p) => p.encrypt_pool(name, pool_uuid, encryption_info),
         }
     }
 

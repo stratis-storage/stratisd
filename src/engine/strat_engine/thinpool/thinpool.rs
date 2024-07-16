@@ -682,6 +682,17 @@ impl<B> ThinPool<B> {
         )
         .map_err(|e| e.into())
     }
+
+    /// Get the minimum logical sector size for all filesystems in the thin pool or return None if
+    /// there are no filesystems.
+    pub fn min_logical_sector_size(&self) -> StratisResult<Option<Bytes>> {
+        let sectors = self
+            .filesystems()
+            .iter()
+            .map(|(_, _, fs)| fs.logical_sector_size())
+            .collect::<StratisResult<Vec<Bytes>>>()?;
+        Ok(sectors.iter().min().cloned())
+    }
 }
 
 impl ThinPool<v1::Backstore> {

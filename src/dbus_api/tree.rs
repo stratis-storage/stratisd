@@ -1117,6 +1117,65 @@ impl DbusTreeHandler {
         }
     }
 
+    /// Send a signal indicating that the pool encryption status has changed.
+    fn handle_pool_encryption_change(&self, path: Path<'static>, new_encryption: bool) {
+        if let Err(e) = self.property_changed_invalidated_signal(
+            &path,
+            prop_hashmap!(
+                consts::POOL_INTERFACE_NAME_3_0 => {
+                    Vec::new(),
+                    consts::POOL_ENCRYPTED_PROP.to_string() =>
+                    box_variant!(new_encryption)
+                },
+                consts::POOL_INTERFACE_NAME_3_1 => {
+                    Vec::new(),
+                    consts::POOL_ENCRYPTED_PROP.to_string() =>
+                    box_variant!(new_encryption)
+                },
+                consts::POOL_INTERFACE_NAME_3_2 => {
+                    Vec::new(),
+                    consts::POOL_ENCRYPTED_PROP.to_string() =>
+                    box_variant!(new_encryption)
+                },
+                consts::POOL_INTERFACE_NAME_3_3 => {
+                    Vec::new(),
+                    consts::POOL_ENCRYPTED_PROP.to_string() =>
+                    box_variant!(new_encryption)
+                },
+                consts::POOL_INTERFACE_NAME_3_4 => {
+                    Vec::new(),
+                    consts::POOL_ENCRYPTED_PROP.to_string() =>
+                    box_variant!(new_encryption)
+                },
+                consts::POOL_INTERFACE_NAME_3_5 => {
+                    Vec::new(),
+                    consts::POOL_ENCRYPTED_PROP.to_string() =>
+                    box_variant!(new_encryption)
+                },
+                consts::POOL_INTERFACE_NAME_3_6 => {
+                    Vec::new(),
+                    consts::POOL_ENCRYPTED_PROP.to_string() =>
+                    box_variant!(new_encryption)
+                },
+                consts::POOL_INTERFACE_NAME_3_7 => {
+                    Vec::new(),
+                    consts::POOL_ENCRYPTED_PROP.to_string() =>
+                    box_variant!(new_encryption)
+                },
+                consts::POOL_INTERFACE_NAME_3_8 => {
+                    Vec::new(),
+                    consts::POOL_ENCRYPTED_PROP.to_string() =>
+                    box_variant!(new_encryption)
+                }
+            ),
+        ) {
+            warn!(
+                "Failed to send a signal over D-Bus indicating blockdev total physical size change: {}",
+                e
+            );
+        }
+    }
+
     /// Send a signal indicating that the pool overprovisioning mode has changed.
     fn handle_pool_overprov_mode_change(&self, path: Path<'static>, new_mode: bool) {
         if let Err(e) = self.property_changed_invalidated_signal(
@@ -1443,6 +1502,10 @@ impl DbusTreeHandler {
             }
             DbusAction::BlockdevTotalPhysicalSizeChange(path, new_total_physical_size) => {
                 self.handle_blockdev_total_physical_size_change(path, new_total_physical_size);
+                Ok(true)
+            }
+            DbusAction::PoolEncryptionChange(path, encryption_change) => {
+                self.handle_pool_encryption_change(path, encryption_change);
                 Ok(true)
             }
             DbusAction::PoolForegroundChange(item, new_used, new_alloc, new_size, new_no_space) => {

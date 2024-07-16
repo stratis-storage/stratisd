@@ -21,16 +21,17 @@ use crate::{
             init_cache_idempotent_or_err, validate_filesystem_size, validate_filesystem_size_specs,
             validate_name, validate_paths,
         },
-        sim_engine::{blockdev::SimDev, filesystem::SimFilesystem},
+        sim_engine::{
+            blockdev::SimDev, filesystem::SimFilesystem, shared::convert_encryption_info,
+        },
         structures::Table,
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name,
-            OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolUuid, RegenAction,
-            RenameAction, SetCreateAction, SetDeleteAction, StratSigblockVersion, UnlockMechanism,
-            ValidatedIntegritySpec,
+            EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo, Key,
+            KeyDescription, Name, OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolUuid,
+            PropChangeAction, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
+            StratSigblockVersion, UnlockMechanism, ValidatedIntegritySpec,
         },
-        PropChangeAction,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -868,6 +869,16 @@ impl Pool for SimPool {
         } else {
             Ok(PropChangeAction::Identity)
         }
+    }
+
+    fn encrypt_pool(
+        &mut self,
+        _: &Name,
+        _: PoolUuid,
+        enc: &InputEncryptionInfo,
+    ) -> StratisResult<CreateAction<EncryptedDevice>> {
+        self.encryption_info = convert_encryption_info(Some(enc), None)?;
+        Ok(CreateAction::Created(EncryptedDevice))
     }
 
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String> {

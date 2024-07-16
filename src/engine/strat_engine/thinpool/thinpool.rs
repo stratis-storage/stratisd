@@ -45,8 +45,8 @@ use crate::{
         },
         structures::Table,
         types::{
-            Compare, Diff, FilesystemUuid, Name, PoolUuid, SetDeleteAction, StratFilesystemDiff,
-            ThinPoolDiff,
+            Compare, Diff, FilesystemUuid, Name, OffsetDirection, PoolUuid, SetDeleteAction,
+            StratFilesystemDiff, ThinPoolDiff,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -819,28 +819,6 @@ impl ThinPool<v1::Backstore> {
             out_of_meta_space: false,
             backstore: PhantomData,
         })
-    }
-
-    /// Set the device on all DM devices
-    pub fn set_device(&mut self, backstore_device: Device) -> StratisResult<bool> {
-        if backstore_device == self.backstore_device {
-            return Ok(false);
-        }
-
-        let meta_table =
-            linear_table::set_target_device(self.thin_pool.meta_dev().table(), backstore_device);
-        let data_table =
-            linear_table::set_target_device(self.thin_pool.data_dev().table(), backstore_device);
-        let mdv_table =
-            linear_table::set_target_device(self.mdv.device().table(), backstore_device);
-
-        self.thin_pool.set_meta_table(get_dm(), meta_table)?;
-        self.thin_pool.set_data_table(get_dm(), data_table)?;
-        self.mdv.set_table(mdv_table)?;
-
-        self.backstore_device = backstore_device;
-
-        Ok(true)
     }
 }
 
@@ -1921,6 +1899,70 @@ where
 
         Ok(SetDeleteAction::new(removed, updated_origins))
     }
+
+    /// Set the device on all DM devices
+    pub fn set_device(
+        &mut self,
+        backstore_device: Device,
+        offset: Sectors,
+        offset_direction: OffsetDirection,
+    ) -> StratisResult<bool> {
+        if backstore_device == self.backstore_device {
+            return Ok(false);
+        }
+
+        let meta_table = linear_table::set_target_device(
+            self.thin_pool.meta_dev().table(),
+            backstore_device,
+            offset,
+            offset_direction,
+        );
+        let data_table = linear_table::set_target_device(
+            self.thin_pool.data_dev().table(),
+            backstore_device,
+            offset,
+            offset_direction,
+        );
+        let mdv_table = linear_table::set_target_device(
+            self.mdv.device().table(),
+            backstore_device,
+            offset,
+            offset_direction,
+        );
+
+        for (start, _) in self.segments.mdv_segments.iter_mut() {
+            match offset_direction {
+                OffsetDirection::Forwards => *start += offset,
+                OffsetDirection::Backwards => *start -= offset,
+            }
+        }
+        for (start, _) in self.segments.data_segments.iter_mut() {
+            match offset_direction {
+                OffsetDirection::Forwards => *start += offset,
+                OffsetDirection::Backwards => *start -= offset,
+            }
+        }
+        for (start, _) in self.segments.meta_segments.iter_mut() {
+            match offset_direction {
+                OffsetDirection::Forwards => *start += offset,
+                OffsetDirection::Backwards => *start -= offset,
+            }
+        }
+        for (start, _) in self.segments.meta_spare_segments.iter_mut() {
+            match offset_direction {
+                OffsetDirection::Forwards => *start += offset,
+                OffsetDirection::Backwards => *start -= offset,
+            }
+        }
+
+        self.thin_pool.set_meta_table(get_dm(), meta_table)?;
+        self.thin_pool.set_data_table(get_dm(), data_table)?;
+        self.mdv.set_table(mdv_table)?;
+
+        self.backstore_device = backstore_device;
+
+        Ok(true)
+    }
 }
 
 impl<B> Into<Value> for &ThinPool<B> {
@@ -2871,7 +2913,8 @@ mod tests {
                 .device()
                 .expect("Space already allocated from backstore, backstore must have device");
             assert_ne!(old_device, new_device);
-            pool.set_device(new_device).unwrap();
+            pool.set_device(new_device, Sectors(0), OffsetDirection::Forwards)
+                .unwrap();
             pool.resume().unwrap();
 
             let mut buf = [0u8; 10];

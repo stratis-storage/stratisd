@@ -18,13 +18,10 @@ use devicemapper::{Bytes, DmNameBuf, Sectors};
 use stratisd_proc_macros::strat_pool_impl_gen;
 
 #[cfg(any(test, feature = "extras"))]
-use crate::engine::{
-    strat_engine::{
-        backstore::UnownedDevices,
-        metadata::MDADataSize,
-        thinpool::{ThinPoolSizeParams, DATA_BLOCK_SIZE},
-    },
-    types::InputEncryptionInfo,
+use crate::engine::strat_engine::{
+    backstore::UnownedDevices,
+    metadata::MDADataSize,
+    thinpool::{ThinPoolSizeParams, DATA_BLOCK_SIZE},
 };
 use crate::{
     engine::{
@@ -47,12 +44,12 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
-            Diff, FilesystemUuid, GrowAction, Key, KeyDescription, Name, OptionalTokenSlotInput,
-            PoolDiff, PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
-            SetDeleteAction, StratFilesystemDiff, StratPoolDiff, StratSigblockVersion,
-            TokenUnlockMethod,
+            Diff, EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo,
+            Key, KeyDescription, Name, OffsetDirection, OptionalTokenSlotInput, PoolDiff,
+            PoolEncryptionInfo, PoolUuid, PropChangeAction, RegenAction, RenameAction,
+            SetCreateAction, SetDeleteAction, StratFilesystemDiff, StratPoolDiff,
+            StratSigblockVersion, TokenUnlockMethod,
         },
-        EncryptionInfo, PropChangeAction,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -280,8 +277,8 @@ impl StratPool {
 
         if action_avail != ActionAvailability::Full {
             warn!(
-                "Disabling some actions for pool {pool_name} with UUID {uuid}; pool is designated {action_avail}"
-            );
+            "Disabling some actions for pool {pool_name} with UUID {uuid}; pool is designated {action_avail}"
+        );
         }
 
         let thinpool = ThinPool::setup(
@@ -695,10 +692,14 @@ impl Pool for StratPool {
                 )
                 .and_then(|bdi| {
                     self.thin_pool
-                        .set_device(self.backstore.device().expect(
-                            "Since thin pool exists, space must have been allocated \
+                        .set_device(
+                            self.backstore.device().expect(
+                                "Since thin pool exists, space must have been allocated \
                              from the backstore, so backstore must have a cap device",
-                        ))
+                            ),
+                            Sectors(0),
+                            OffsetDirection::Forwards,
+                        )
                         .and(Ok(bdi))
                 });
             self.thin_pool.resume()?;
@@ -1333,6 +1334,17 @@ impl Pool for StratPool {
         } else {
             Ok(PropChangeAction::Identity)
         }
+    }
+
+    fn encrypt_pool(
+        &mut self,
+        _: &Name,
+        _: PoolUuid,
+        _: &InputEncryptionInfo,
+    ) -> StratisResult<CreateAction<EncryptedDevice>> {
+        Err(StratisError::Msg(
+            "Encrypting an unencrypted device is only supported in V2 of the metadata".to_string(),
+        ))
     }
 
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String> {

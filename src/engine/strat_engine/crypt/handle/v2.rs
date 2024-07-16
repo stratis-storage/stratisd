@@ -747,7 +747,6 @@ impl CryptHandle {
     }
 
     /// Encrypt an unencrypted pool.
-    #[allow(dead_code)]
     pub fn encrypt(
         pool_uuid: PoolUuid,
         thinpool: &mut ThinPool<v2::Backstore>,

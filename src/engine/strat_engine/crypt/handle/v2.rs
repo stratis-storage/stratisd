@@ -764,14 +764,13 @@ impl CryptHandle {
         Ok(())
     }
 
-    /// Encrypt an unencrypted pool.
-    #[allow(dead_code)]
-    pub fn encrypt(
+    /// Set up encryption for an unencrypted pool.
+    pub fn setup_encrypt(
         pool_uuid: PoolUuid,
         thinpool: &mut ThinPool<v2::Backstore>,
         unencrypted_path: &Path,
         encryption_info: &InputEncryptionInfo,
-    ) -> StratisResult<Self> {
+    ) -> StratisResult<(CryptDevice, u32, (u32, SizedKeyMemory))> {
         let tmp_header = format!("/tmp/temp-header-{pool_uuid}");
         {
             let mut file = OpenOptions::new()
@@ -860,6 +859,23 @@ impl CryptHandle {
             CryptActivate::SHARED,
         )?;
 
+        Ok((device, sector_size, (keyslot, key)))
+    }
+
+    /// Perform the online encryption operation that was set up.
+    ///
+    /// Precondition: setup_encrypt was already called
+    /// Precondition: crypt device was already added as the backing device for the thin pool
+    ///               failure to do so will result in corruption
+    pub fn do_encrypt(
+        device: &mut CryptDevice,
+        unencrypted_path: &Path,
+        pool_uuid: PoolUuid,
+        sector_size: u32,
+        key_info: (u32, SizedKeyMemory),
+    ) -> StratisResult<Self> {
+        let activation_name = &format_crypt_backstore_name(&pool_uuid).to_string();
+        let (keyslot, key) = key_info;
         device.reencrypt_handle().reencrypt_init_by_passphrase(
             Some(activation_name),
             key.as_ref(),

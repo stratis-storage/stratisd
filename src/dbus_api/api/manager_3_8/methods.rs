@@ -19,7 +19,7 @@ use crate::{
         blockdev::create_dbus_blockdev,
         filesystem::create_dbus_filesystem,
         pool::create_dbus_pool,
-        types::{DbusErrorEnum, TData, OK_STRING},
+        types::{DbusErrorEnum, EncryptionInfos, TData, OK_STRING},
         util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
     engine::{
@@ -28,11 +28,6 @@ use crate::{
     },
     stratis::StratisError,
 };
-
-type EncryptionInfos<'a> = (
-    Vec<((bool, u32), &'a str)>,
-    Vec<((bool, u32), &'a str, &'a str)>,
-);
 
 pub fn start_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     let base_path = m.path.get_name();

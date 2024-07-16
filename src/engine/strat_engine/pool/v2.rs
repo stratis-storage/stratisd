@@ -28,6 +28,7 @@ use crate::{
                 blockdev::{v2::StratBlockDev, InternalBlockDev},
                 ProcessedPathInfos, UnownedDevices,
             },
+            crypt::DEFAULT_CRYPT_DATA_OFFSET_V2,
             liminal::DeviceSet,
             metadata::{MDADataSize, BDA},
             serde_structs::{FlexDevsSave, PoolFeatures, PoolSave, Recordable},
@@ -37,11 +38,11 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
-            Diff, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo, Key,
-            KeyDescription, Name, OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolUuid,
-            PropChangeAction, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
-            SizedKeyMemory, StratFilesystemDiff, StratPoolDiff, StratSigblockVersion,
-            TokenUnlockMethod, ValidatedIntegritySpec,
+            Diff, EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo,
+            Key, KeyDescription, Name, OffsetDirection, OptionalTokenSlotInput, PoolDiff,
+            PoolEncryptionInfo, PoolUuid, PropChangeAction, RegenAction, RenameAction,
+            SetCreateAction, SetDeleteAction, SizedKeyMemory, StratFilesystemDiff, StratPoolDiff,
+            StratSigblockVersion, TokenUnlockMethod, ValidatedIntegritySpec,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -1162,6 +1163,39 @@ impl Pool for StratPool {
             Ok(PropChangeAction::NewValue(limit))
         } else {
             Ok(PropChangeAction::Identity)
+        }
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn encrypt_pool(
+        &mut self,
+        name: &Name,
+        pool_uuid: PoolUuid,
+        encryption_info: &InputEncryptionInfo,
+    ) -> StratisResult<CreateAction<EncryptedDevice>> {
+        match self.backstore.encryption_info() {
+            Some(_) => Ok(CreateAction::Identity),
+            None => {
+                self.thin_pool.suspend()?;
+                let encrypt_res = self
+                    .backstore
+                    .encrypt(pool_uuid, &mut self.thin_pool, encryption_info)
+                    .map(|_| {
+                        self.thin_pool.set_device(
+                            self.backstore.device().expect(
+                                "Since thin pool exists, space must have been allocated \
+                             from the backstore, so backstore must have a cap device",
+                            ),
+                            DEFAULT_CRYPT_DATA_OFFSET_V2,
+                            OffsetDirection::Backwards,
+                        )
+                    });
+                self.thin_pool.resume()?;
+                let metadata_res = self.write_metadata(name);
+                let _ = encrypt_res?;
+                metadata_res?;
+                Ok(CreateAction::Created(EncryptedDevice))
+            }
         }
     }
 

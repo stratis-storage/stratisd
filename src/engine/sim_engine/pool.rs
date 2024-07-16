@@ -24,8 +24,8 @@ use crate::{
         structures::Table,
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
-            PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
+            EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name,
+            PoolDiff, PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
             SetDeleteAction, StratSigblockVersion,
         },
         PropChangeAction,
@@ -744,6 +744,15 @@ impl Pool for SimPool {
         } else {
             Ok(PropChangeAction::Identity)
         }
+    }
+
+    fn encrypt_pool(
+        &mut self,
+        _pool_uuid: PoolUuid,
+        enc: &EncryptionInfo,
+    ) -> StratisResult<CreateAction<EncryptedDevice>> {
+        self.encryption_info = Some(enc.clone());
+        Ok(CreateAction::Created(EncryptedDevice))
     }
 
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String> {

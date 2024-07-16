@@ -21,11 +21,12 @@ use crate::{
         structures::{AllLockReadGuard, AllLockWriteGuard, SomeLockReadGuard, SomeLockWriteGuard},
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, LockedPoolsInfo,
-            MappingCreateAction, MappingDeleteAction, Name, PoolDiff, PoolEncryptionInfo,
-            PoolIdentifier, PoolUuid, RegenAction, RenameAction, ReportType, SetCreateAction,
-            SetDeleteAction, SetUnlockAction, StartAction, StopAction, StoppedPoolsInfo,
-            StratFilesystemDiff, StratSigblockVersion, UdevEngineEvent, UnlockMethod,
+            EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription,
+            LockedPoolsInfo, MappingCreateAction, MappingDeleteAction, Name, PoolDiff,
+            PoolEncryptionInfo, PoolIdentifier, PoolUuid, RegenAction, RenameAction, ReportType,
+            SetCreateAction, SetDeleteAction, SetUnlockAction, StartAction, StopAction,
+            StoppedPoolsInfo, StratFilesystemDiff, StratSigblockVersion, UdevEngineEvent,
+            UnlockMethod,
         },
     },
     stratis::StratisResult,
@@ -341,6 +342,13 @@ pub trait Pool: Debug + Send + Sync {
         fs: FilesystemUuid,
         limit: Option<Bytes>,
     ) -> StratisResult<PropChangeAction<Option<Sectors>>>;
+
+    /// Encrypted an unencrypted pool.
+    fn encrypt_pool(
+        &mut self,
+        pool_uuid: PoolUuid,
+        encryption_info: &EncryptionInfo,
+    ) -> StratisResult<CreateAction<EncryptedDevice>>;
 
     /// Return the metadata that would be written if metadata were written.
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String>;

@@ -27,7 +27,7 @@ pub use crate::{
         structures::Lockable,
         types::{
             actions::{
-                Clevis, CreateAction, DeleteAction, EngineAction, GrowAction, Key,
+                Clevis, CreateAction, DeleteAction, EncryptedDevice, EngineAction, GrowAction, Key,
                 MappingCreateAction, MappingDeleteAction, PropChangeAction, RegenAction,
                 RenameAction, SetCreateAction, SetDeleteAction, SetUnlockAction, StartAction,
                 StopAction, ToDisplay,
@@ -484,6 +484,37 @@ impl UuidOrConflict {
 pub enum StratSigblockVersion {
     V1 = 1,
     V2 = 2,
+}
+
+impl TryFrom<u8> for StratSigblockVersion {
+    type Error = StratisError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            1u8 => Ok(StratSigblockVersion::V1),
+            2u8 => Ok(StratSigblockVersion::V2),
+            _ => Err(StratisError::Msg(format!(
+                "Unknown sigblock version: {value}"
+            ))),
+        }
+    }
+}
+
+impl From<StratSigblockVersion> for u8 {
+    fn from(version: StratSigblockVersion) -> Self {
+        match version {
+            StratSigblockVersion::V1 => 1u8,
+            StratSigblockVersion::V2 => 2u8,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum OffsetDirection {
+    /// Subtract the offset from the current offset.
+    Backwards,
+    /// Add the offset to the current offset.
+    Forwards,
 }
 
 /// A way to specify an integrity tag size. It is possible for the specification

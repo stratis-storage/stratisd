@@ -4,7 +4,7 @@
 
 // Code to handle the backing store of a pool.
 
-use std::{cmp, collections::HashMap, iter::once, path::PathBuf};
+use std::{cmp, collections::HashMap, iter::once, path::Path, path::PathBuf};
 
 use chrono::{DateTime, Utc};
 use either::Either;
@@ -29,6 +29,7 @@ use crate::{
             names::{format_backstore_ids, CacheRole},
             serde_structs::{BackstoreSave, CapSave, PoolFeatures, PoolSave, Recordable},
             shared::bds_to_bdas,
+            thinpool::ThinPool,
             types::BDARecordResult,
             writing::wipe_sectors,
         },
@@ -1317,6 +1318,23 @@ impl Backstore {
 
     pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {
         self.data_tier.grow(dev)
+    }
+
+    pub fn encrypt(
+        &mut self,
+        pool_uuid: PoolUuid,
+        thinpool: &mut ThinPool<Self>,
+        encryption_info: &InputEncryptionInfo,
+    ) -> StratisResult<()> {
+        let (dm_name, _) = format_backstore_ids(pool_uuid, CacheRole::Cache);
+        let handle = CryptHandle::encrypt(
+            pool_uuid,
+            thinpool,
+            Path::new(&format!("/dev/mapper/{}", &dm_name.to_string())),
+            encryption_info,
+        )?;
+        self.enc = Some(Either::Right(handle));
+        Ok(())
     }
 
     /// A summary of block sizes

@@ -1810,3 +1810,14 @@ pub async fn send_user_info_signal(connection: &Arc<Connection>, path: &ObjectPa
         "blockdev.r9"
     );
 }
+
+pub async fn send_encrypted_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    send_signal!(
+        connection,
+        PoolR9,
+        path,
+        encrypted_changed,
+        "encryption status",
+        "pool.r9"
+    );
+}

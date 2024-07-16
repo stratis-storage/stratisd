@@ -20,6 +20,7 @@ mod pool_3_5;
 mod pool_3_6;
 mod pool_3_7;
 mod pool_3_8;
+mod pool_3_9;
 pub mod prop_conv;
 mod shared;
 
@@ -329,6 +330,7 @@ pub fn create_dbus_pool<'a>(
                 .add_m(pool_3_3::grow_physical_device_method(&f))
                 .add_m(pool_3_7::get_metadata_method(&f))
                 .add_m(pool_3_7::get_fs_metadata_method(&f))
+                .add_m(pool_3_9::encrypt_pool_method(&f))
                 .add_p(pool_3_0::name_property(&f))
                 .add_p(pool_3_0::uuid_property(&f))
                 .add_p(pool_3_0::encrypted_property(&f))

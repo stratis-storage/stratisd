@@ -25,13 +25,13 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
-            EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo, IntegritySpec, Key,
-            KeyDescription, LockedPoolsInfo, MappingCreateAction, MappingDeleteAction, Name,
-            OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolIdentifier, PoolUuid,
-            PropChangeAction, RegenAction, RenameAction, ReportType, SetCreateAction,
-            SetDeleteAction, SetUnlockAction, StartAction, StopAction, StoppedPoolsInfo,
-            StratBlockDevDiff, StratFilesystemDiff, StratSigblockVersion, TokenUnlockMethod,
-            UdevEngineEvent, UnlockMethod,
+            EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo,
+            IntegritySpec, Key, KeyDescription, LockedPoolsInfo, MappingCreateAction,
+            MappingDeleteAction, Name, OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo,
+            PoolIdentifier, PoolUuid, PropChangeAction, RegenAction, RenameAction, ReportType,
+            SetCreateAction, SetDeleteAction, SetUnlockAction, StartAction, StopAction,
+            StoppedPoolsInfo, StratBlockDevDiff, StratFilesystemDiff, StratSigblockVersion,
+            TokenUnlockMethod, UdevEngineEvent, UnlockMethod,
         },
     },
     stratis::StratisResult,
@@ -400,6 +400,14 @@ pub trait Pool: Debug + Send + Sync {
         fs: FilesystemUuid,
         limit: Option<Bytes>,
     ) -> StratisResult<PropChangeAction<Option<Sectors>>>;
+
+    /// Encrypted an unencrypted pool.
+    fn encrypt_pool(
+        &mut self,
+        name: &Name,
+        pool_uuid: PoolUuid,
+        encryption_info: &InputEncryptionInfo,
+    ) -> StratisResult<CreateAction<EncryptedDevice>>;
 
     /// Return the metadata that would be written if metadata were written.
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String>;

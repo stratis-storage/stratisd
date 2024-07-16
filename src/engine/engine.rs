@@ -96,6 +96,8 @@ pub trait Filesystem: Debug {
 
     /// Get filesystem snapshot origin.
     fn origin(&self) -> Option<FilesystemUuid>;
+
+    fn merge_scheduled(&self) -> bool;
 }
 
 pub trait BlockDev: Debug {

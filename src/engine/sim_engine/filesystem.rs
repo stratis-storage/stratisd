@@ -21,6 +21,7 @@ pub struct SimFilesystem {
     size: Sectors,
     size_limit: Option<Sectors>,
     origin: Option<FilesystemUuid>,
+    merge_scheduled: bool,
 }
 
 impl SimFilesystem {
@@ -42,6 +43,7 @@ impl SimFilesystem {
             size,
             size_limit,
             origin,
+            merge_scheduled: false,
         })
     }
 
@@ -104,6 +106,10 @@ impl Filesystem for SimFilesystem {
 
     fn origin(&self) -> Option<FilesystemUuid> {
         self.origin
+    }
+
+    fn merge_scheduled(&self) -> bool {
+        self.merge_scheduled
     }
 }
 

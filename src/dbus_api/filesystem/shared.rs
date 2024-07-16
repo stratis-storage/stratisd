@@ -207,3 +207,8 @@ pub fn fs_used_prop(fs: &dyn Filesystem) -> (bool, String) {
 pub fn fs_origin_prop(fs: &dyn Filesystem) -> (bool, String) {
     prop_conv::fs_origin_to_prop(fs.origin())
 }
+
+/// Generate D-Bus representation of merge scheduled property
+pub fn fs_merge_scheduled_prop(fs: &dyn Filesystem) -> bool {
+    fs.merge_scheduled()
+}

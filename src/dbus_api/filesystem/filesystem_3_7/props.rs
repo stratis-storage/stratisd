@@ -16,3 +16,10 @@ pub fn get_fs_origin(
 ) -> Result<(), MethodErr> {
     get_filesystem_property(i, p, |(_, _, f)| Ok(shared::fs_origin_prop(f)))
 }
+
+pub fn get_fs_merge_scheduled(
+    i: &mut IterAppend<'_>,
+    p: &PropInfo<'_, MTSync<TData>, TData>,
+) -> Result<(), MethodErr> {
+    get_filesystem_property(i, p, |(_, _, f)| Ok(shared::fs_merge_scheduled_prop(f)))
+}

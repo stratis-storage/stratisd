@@ -5,4 +5,4 @@
 mod api;
 mod props;
 
-pub use api::origin_property;
+pub use api::{merge_scheduled_property, origin_property};

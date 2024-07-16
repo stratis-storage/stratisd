@@ -1539,3 +1539,14 @@ pub async fn send_new_physical_size_signal(connection: &Arc<Connection>, path: &
         "blockdev.r9"
     );
 }
+
+pub async fn send_encrypted_signal(connection: &Arc<Connection>, path: &ObjectPath<'_>) {
+    send_signal!(
+        connection,
+        PoolR9,
+        path,
+        encrypted_changed,
+        "encryption status",
+        "pool.r9"
+    );
+}

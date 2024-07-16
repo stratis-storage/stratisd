@@ -18,18 +18,18 @@ use crate::{
     engine::{
         engine::{Engine, HandleEvents, KeyActions, Pool, Report},
         shared::{create_pool_idempotent_or_err, validate_name, validate_paths},
-        sim_engine::{keys::SimKeyActions, pool::SimPool},
+        sim_engine::{keys::SimKeyActions, pool::SimPool, shared::convert_encryption_info},
         structures::{
             AllLockReadAvailableGuard, AllLockReadGuard, AllLockWriteAvailableGuard,
             AllLockWriteGuard, AllOrSomeLock, Lockable, SomeLockReadGuard, SomeLockWriteGuard,
             Table,
         },
         types::{
-            CreateAction, DeleteAction, DevUuid, EncryptionInfo, Features, FilesystemUuid,
-            InputEncryptionInfo, IntegritySpec, LockedPoolsInfo, Name, PoolDevice, PoolDiff,
-            PoolIdentifier, PoolUuid, RenameAction, ReportType, SetUnlockAction, StartAction,
-            StopAction, StoppedPoolInfo, StoppedPoolsInfo, StratFilesystemDiff, TokenUnlockMethod,
-            UdevEngineEvent, UnlockMechanism, UnlockMethod, ValidatedIntegritySpec,
+            CreateAction, DeleteAction, DevUuid, Features, FilesystemUuid, InputEncryptionInfo,
+            IntegritySpec, LockedPoolsInfo, Name, PoolDevice, PoolDiff, PoolIdentifier, PoolUuid,
+            RenameAction, ReportType, SetUnlockAction, StartAction, StopAction, StoppedPoolInfo,
+            StoppedPoolsInfo, StratFilesystemDiff, TokenUnlockMethod, UdevEngineEvent,
+            UnlockMethod, ValidatedIntegritySpec,
         },
         StratSigblockVersion,
     },
@@ -140,30 +140,7 @@ impl Engine for SimEngine {
 
         let integrity_spec = ValidatedIntegritySpec::try_from(integrity_spec)?;
 
-        let converted_ei = encryption_info
-            .cloned()
-            .map(|ei| {
-                ei.into_iter().try_fold(
-                    EncryptionInfo::new(),
-                    |mut info, (token_slot, unlock_mechanism)| {
-                        let ts = match token_slot {
-                            Some(t) => t,
-                            None => info.free_token_slot(),
-                        };
-                        if let UnlockMechanism::KeyDesc(ref kd) = unlock_mechanism {
-                            if !self.key_handler.contains_key(kd) {
-                                return Err(StratisError::Msg(format!(
-                                    "Key {} was not found in the keyring",
-                                    kd.as_application_str()
-                                )));
-                            }
-                        }
-                        info.add_info(ts, unlock_mechanism)?;
-                        Ok(info)
-                    },
-                )
-            })
-            .transpose()?;
+        let converted_ei = convert_encryption_info(encryption_info, Some(&self.key_handler))?;
 
         let guard = self.pools.read(PoolIdentifier::Name(name.clone())).await;
         match guard.as_ref().map(|g| g.as_tuple()) {

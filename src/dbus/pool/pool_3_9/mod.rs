@@ -47,6 +47,10 @@ use crate::{
     stratis::StratisResult,
 };
 
+mod methods;
+
+pub use methods::encrypt_pool_method;
+
 pub struct PoolR9 {
     connection: Arc<Connection>,
     engine: Arc<dyn Engine>,
@@ -311,6 +315,22 @@ impl PoolR9 {
         filesystem_metadata_method(&self.engine, self.uuid, fs_name, current).await
     }
 
+    async fn encrypt_pool(
+        &self,
+        key_descs: Vec<((bool, u32), KeyDescription)>,
+        clevis_infos: Vec<((bool, u32), &str, &str)>,
+    ) -> (bool, u16, String) {
+        encrypt_pool_method(
+            &self.engine,
+            &self.connection,
+            &self.manager,
+            self.uuid,
+            key_descs,
+            clevis_infos,
+        )
+        .await
+    }
+
     #[zbus(property(emits_changed_signal = "const"))]
     fn uuid(&self) -> PoolUuid {
         self.uuid
@@ -321,7 +341,7 @@ impl PoolR9 {
         pool_prop(&self.engine, self.uuid, name_prop).await
     }
 
-    #[zbus(property(emits_changed_signal = "const"))]
+    #[zbus(property(emits_changed_signal = "true"))]
     async fn encrypted(&self) -> Result<bool, Error> {
         pool_prop(&self.engine, self.uuid, encrypted_prop).await
     }

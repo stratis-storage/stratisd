@@ -42,9 +42,9 @@ use crate::{
             keys,
         },
         types::{
-            KeyDescription, PoolUuid, SizedKeyMemory, UnlockMechanism, VolumeKeyKeyDescription,
+            EncryptionInfo, KeyDescription, PoolUuid, SizedKeyMemory, UnlockMechanism,
+            VolumeKeyKeyDescription,
         },
-        EncryptionInfo,
     },
     stratis::{StratisError, StratisResult},
 };

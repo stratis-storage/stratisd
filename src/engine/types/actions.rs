@@ -23,6 +23,9 @@ pub struct Key;
 /// Return value indicating clevis operation
 pub struct Clevis;
 
+/// Return value indicating an encrypt operation on the pool
+pub struct EncryptedDevice(pub PoolUuid);
+
 /// A trait for a generic kind of action. Defines the type of the thing to
 /// be changed, and also a method to indicate what changed.
 pub trait EngineAction {
@@ -132,6 +135,22 @@ where
                     f,
                     "The snapshot requested for creation is already present; no action taken"
                 )
+            }
+        }
+    }
+}
+
+impl Display for CreateAction<EncryptedDevice> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CreateAction::Created(EncryptedDevice(uuid)) => {
+                write!(
+                    f,
+                    "Unencrypted pool with UUID {uuid} successfully encrypted"
+                )
+            }
+            CreateAction::Identity => {
+                write!(f, "The requested pool was already encrypted")
             }
         }
     }

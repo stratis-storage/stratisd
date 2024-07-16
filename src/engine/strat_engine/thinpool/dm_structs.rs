@@ -80,6 +80,8 @@ pub mod linear_table {
         LinearTargetParams, Sectors, TargetLine,
     };
 
+    use crate::engine::types::OffsetDirection;
+
     /// Transform a list of segments belonging to a single device into a
     /// list of target lines for a linear device.
     pub fn segs_to_table(
@@ -106,33 +108,46 @@ pub mod linear_table {
     pub fn set_target_device(
         table: &LinearDevTargetTable,
         device: Device,
+        offset: Sectors,
+        offset_direction: OffsetDirection,
     ) -> Vec<TargetLine<LinearDevTargetParams>> {
-        let xform_target_line =
-            |line: &TargetLine<LinearDevTargetParams>| -> TargetLine<LinearDevTargetParams> {
-                let new_params = match line.params {
-                    LinearDevTargetParams::Linear(ref params) => LinearDevTargetParams::Linear(
-                        LinearTargetParams::new(device, params.start_offset),
-                    ),
-                    LinearDevTargetParams::Flakey(ref params) => {
-                        let feature_args = params.feature_args.iter().cloned().collect::<Vec<_>>();
-                        LinearDevTargetParams::Flakey(FlakeyTargetParams::new(
-                            device,
-                            params.start_offset,
-                            params.up_interval,
-                            params.down_interval,
-                            feature_args,
-                        ))
-                    }
-                };
-
-                TargetLine::new(line.start, line.length, new_params)
+        let xform_target_line = |line: &TargetLine<LinearDevTargetParams>,
+                                 offset,
+                                 offset_direction|
+         -> TargetLine<LinearDevTargetParams> {
+            let new_params = match line.params {
+                LinearDevTargetParams::Linear(ref params) => {
+                    LinearDevTargetParams::Linear(LinearTargetParams::new(
+                        device,
+                        match offset_direction {
+                            OffsetDirection::Forwards => params.start_offset + offset,
+                            OffsetDirection::Backwards => params.start_offset - offset,
+                        },
+                    ))
+                }
+                LinearDevTargetParams::Flakey(ref params) => {
+                    let feature_args = params.feature_args.iter().cloned().collect::<Vec<_>>();
+                    LinearDevTargetParams::Flakey(FlakeyTargetParams::new(
+                        device,
+                        match offset_direction {
+                            OffsetDirection::Forwards => params.start_offset + offset,
+                            OffsetDirection::Backwards => params.start_offset - offset,
+                        },
+                        params.up_interval,
+                        params.down_interval,
+                        feature_args,
+                    ))
+                }
             };
+
+            TargetLine::new(line.start, line.length, new_params)
+        };
 
         table
             .table
             .clone()
             .iter()
-            .map(&xform_target_line)
+            .map(|line| xform_target_line(line, offset, offset_direction))
             .collect::<Vec<_>>()
     }
 }

@@ -16,13 +16,10 @@ use devicemapper::{Bytes, DmNameBuf, Sectors};
 use stratisd_proc_macros::strat_pool_impl_gen;
 
 #[cfg(any(test, feature = "test_extras"))]
-use crate::engine::{
-    strat_engine::{
-        backstore::UnownedDevices,
-        metadata::MDADataSize,
-        thinpool::{ThinPoolSizeParams, DATA_BLOCK_SIZE},
-    },
-    types::EncryptionInfo,
+use crate::engine::strat_engine::{
+    backstore::UnownedDevices,
+    metadata::MDADataSize,
+    thinpool::{ThinPoolSizeParams, DATA_BLOCK_SIZE},
 };
 use crate::{
     engine::{
@@ -46,9 +43,10 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
-            Diff, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
-            PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
-            SetDeleteAction, StratFilesystemDiff, StratPoolDiff, StratSigblockVersion,
+            Diff, EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription,
+            Name, OffsetDirection, PoolDiff, PoolEncryptionInfo, PoolUuid, RegenAction,
+            RenameAction, SetCreateAction, SetDeleteAction, StratFilesystemDiff, StratPoolDiff,
+            StratSigblockVersion,
         },
         PropChangeAction,
     },
@@ -664,10 +662,14 @@ impl Pool for StratPool {
                 )
                 .and_then(|bdi| {
                     self.thin_pool
-                        .set_device(self.backstore.device().expect(
-                            "Since thin pool exists, space must have been allocated \
+                        .set_device(
+                            self.backstore.device().expect(
+                                "Since thin pool exists, space must have been allocated \
                              from the backstore, so backstore must have a cap device",
-                        ))
+                            ),
+                            Sectors(0),
+                            OffsetDirection::Forwards,
+                        )
                         .and(Ok(bdi))
                 });
             self.thin_pool.resume()?;
@@ -1282,6 +1284,17 @@ impl Pool for StratPool {
         } else {
             Ok(PropChangeAction::Identity)
         }
+    }
+
+    fn encrypt_pool(
+        &mut self,
+        _: &Name,
+        _: PoolUuid,
+        _: &EncryptionInfo,
+    ) -> StratisResult<CreateAction<EncryptedDevice>> {
+        Err(StratisError::Msg(
+            "Encrypting an unencrypted device is only supported in V2 of the metadata".to_string(),
+        ))
     }
 
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String> {

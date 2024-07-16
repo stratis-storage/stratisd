@@ -31,7 +31,7 @@ use libcryptsetup_rs::{
 use crate::{
     engine::{
         strat_engine::{
-            cmd::clevis_decrypt,
+            cmd,
             crypt::consts::{
                 CLEVIS_LUKS_TOKEN_ID, CLEVIS_RECURSION_LIMIT, CLEVIS_TANG_TRUST_URL,
                 CLEVIS_TOKEN_NAME, DEFAULT_CRYPT_KEYSLOTS_SIZE, DEFAULT_CRYPT_METADATA_SIZE,
@@ -42,6 +42,7 @@ use crate::{
             keys,
         },
         types::{KeyDescription, SizedKeyMemory, UnlockMethod},
+        EncryptionInfo,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -800,7 +801,7 @@ fn open_safe(device: &mut CryptDevice, token: libc::c_int) -> StratisResult<Size
     let token = device.token_handle().json_get(token as c_uint).ok();
     let jwe = token.as_ref().and_then(|t| t.get("jwe"));
     if let Some(jwe) = jwe {
-        clevis_decrypt(jwe)
+        cmd::clevis_decrypt(jwe)
     } else {
         Err(StratisError::Msg(format!(
             "Malformed Clevis token: {:?}",
@@ -856,4 +857,75 @@ pub fn register_clevis_token() -> StratisResult<()> {
         Some(dump),
     )?;
     Ok(())
+}
+
+/// Decrypt a Clevis passphrase and return it securely.
+pub fn clevis_decrypt(device: &mut CryptDevice) -> StratisResult<Option<SizedKeyMemory>> {
+    let mut token = match device.token_handle().json_get(CLEVIS_LUKS_TOKEN_ID).ok() {
+        Some(t) => t,
+        None => return Ok(None),
+    };
+    let jwe = token
+        .as_object_mut()
+        .and_then(|map| map.remove("jwe"))
+        .ok_or_else(|| {
+            StratisError::Msg(format!(
+                "Token slot {CLEVIS_LUKS_TOKEN_ID} is occupied but does not appear to be a Clevis \
+                    token; aborting"
+            ))
+        })?;
+    cmd::clevis_decrypt(&jwe).map(Some)
+}
+
+/// Get one of the passphrases for the encrypted device.
+pub fn get_passphrase(
+    device: &mut CryptDevice,
+    encryption_info: &EncryptionInfo,
+) -> StratisResult<(c_uint, SizedKeyMemory)> {
+    match encryption_info {
+        EncryptionInfo::KeyDesc(kd) => Ok((
+            get_keyslot_number(device, LUKS2_TOKEN_ID)?
+                .expect("encryption info specified that there is a keyring binding"),
+            read_key(kd)?.ok_or_else(|| {
+                StratisError::Msg("Key description {kd} was not found in the keyring".to_string())
+            })?,
+        )),
+        EncryptionInfo::ClevisInfo(_) => Ok((
+            get_keyslot_number(device, CLEVIS_LUKS_TOKEN_ID)?
+                .expect("encryption info specified that there is a Clevis binding"),
+            clevis_decrypt(device)?
+                .expect("encryption info specified that there is a Clevis binding"),
+        )),
+        EncryptionInfo::Both(kd, _) => match read_key(kd) {
+            Ok(Some(key)) => Ok((
+                get_keyslot_number(device, LUKS2_TOKEN_ID)?
+                    .expect("encryption info specified that there is a keyring binding"),
+                key,
+            )),
+            Ok(None) => {
+                warn!(
+                    "Key description {} not found in keyring; falling back on Clevis",
+                    kd.as_application_str()
+                );
+                Ok((
+                    get_keyslot_number(device, CLEVIS_LUKS_TOKEN_ID)?
+                        .expect("encryption info specified that there is a Clevis binding"),
+                    clevis_decrypt(device)?
+                        .expect("encryption info specified that there is a Clevis binding"),
+                ))
+            }
+            Err(_) => {
+                warn!(
+                    "Fetching key description {} failed; falling back on Clevis",
+                    kd.as_application_str()
+                );
+                Ok((
+                    get_keyslot_number(device, CLEVIS_LUKS_TOKEN_ID)?
+                        .expect("encryption info specified that there is a Clevis binding"),
+                    clevis_decrypt(device)?
+                        .expect("encryption info specified that there is a Clevis binding"),
+                ))
+            }
+        },
+    }
 }

@@ -23,9 +23,9 @@ pub use crate::engine::{
     structures::Lockable,
     types::{
         actions::{
-            Clevis, CreateAction, DeleteAction, EngineAction, GrowAction, Key, MappingCreateAction,
-            MappingDeleteAction, PropChangeAction, RegenAction, RenameAction, SetCreateAction,
-            SetDeleteAction, SetUnlockAction, StartAction, StopAction, ToDisplay,
+            Clevis, CreateAction, DeleteAction, EncryptedDevice, EngineAction, GrowAction, Key,
+            MappingCreateAction, MappingDeleteAction, PropChangeAction, RegenAction, RenameAction,
+            SetCreateAction, SetDeleteAction, SetUnlockAction, StartAction, StopAction, ToDisplay,
         },
         diff::{
             Compare, Diff, PoolDiff, StratBlockDevDiff, StratFilesystemDiff, StratPoolDiff,
@@ -537,4 +537,9 @@ impl From<StratSigblockVersion> for u8 {
             StratSigblockVersion::V2 => 2u8,
         }
     }
+}
+
+pub enum OffsetDirection {
+    Backwards,
+    Forwards,
 }

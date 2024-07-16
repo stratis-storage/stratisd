@@ -7,6 +7,7 @@ mod methods;
 mod props;
 
 pub use api::{
-    bind_clevis_method, bind_keyring_method, clevis_infos_property, key_descs_property,
-    rebind_clevis_method, rebind_keyring_method, unbind_clevis_method, unbind_keyring_method,
+    bind_clevis_method, bind_keyring_method, clevis_infos_property, encrypt_pool_method,
+    key_descs_property, rebind_clevis_method, rebind_keyring_method, unbind_clevis_method,
+    unbind_keyring_method,
 };

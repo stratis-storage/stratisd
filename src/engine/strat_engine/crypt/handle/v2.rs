@@ -4,7 +4,8 @@
 
 use std::{
     fmt::Debug,
-    fs::File,
+    fs::{File, OpenOptions},
+    io::Write,
     iter::once,
     path::{Path, PathBuf},
 };
@@ -13,14 +14,19 @@ use either::Either;
 use rand::{distr::Alphanumeric, rng, Rng};
 use serde_json::Value;
 
-use devicemapper::{Device, DmName, DmNameBuf, Sectors};
+use devicemapper::{Bytes, Device, DmName, DmNameBuf, Sectors, IEC};
+use libblkid_rs::BlkidProbe;
 use libcryptsetup_rs::{
     c_uint,
     consts::{
-        flags::{CryptActivate, CryptVolumeKey},
-        vals::{EncryptionFormat, KeyslotsSize, MetadataSize},
+        flags::{CryptActivate, CryptReencrypt, CryptVolumeKey},
+        vals::{
+            CryptReencryptDirectionInfo, CryptReencryptModeInfo, EncryptionFormat, KeyslotsSize,
+            MetadataSize,
+        },
     },
-    CryptDevice, CryptInit, CryptParamsLuks2, CryptParamsLuks2Ref, SafeMemHandle, TokenInput,
+    CryptDevice, CryptInit, CryptParamsLuks2, CryptParamsLuks2Ref, CryptParamsReencrypt,
+    SafeMemHandle, TokenInput,
 };
 
 #[cfg(test)]
@@ -29,7 +35,7 @@ use crate::{
     engine::{
         engine::MAX_STRATIS_PASS_SIZE,
         strat_engine::{
-            backstore::get_devno_from_path,
+            backstore::{backstore::v2, get_devno_from_path},
             cmd::{clevis_luks_bind, clevis_luks_regen, clevis_luks_unbind},
             crypt::{
                 consts::{
@@ -46,6 +52,7 @@ use crate::{
             device::blkdev_size,
             dm::DEVICEMAPPER_PATH,
             names::format_crypt_backstore_name,
+            thinpool::ThinPool,
         },
         types::{
             DevicePath, EncryptionInfo, InputEncryptionInfo, KeyDescription, PoolUuid,
@@ -54,6 +61,8 @@ use crate::{
     },
     stratis::{StratisError, StratisResult},
 };
+
+type PassphraseInfo = Either<(u32, u32, SizedKeyMemory), (u32, SizedKeyMemory)>;
 
 /// Load crypt device metadata.
 pub fn load_crypt_metadata(
@@ -180,12 +189,23 @@ fn setup_crypt_handle(
 fn get_passphrase(
     device: &mut CryptDevice,
     encryption_info: &EncryptionInfo,
-) -> StratisResult<Either<(u32, SizedKeyMemory), SizedKeyMemory>> {
+) -> StratisResult<PassphraseInfo> {
     for (ts, mech) in encryption_info.all_infos() {
+        let keyslot = match get_keyslot_number(device, *ts) {
+            Ok(Some(ks)) => ks,
+            Ok(None) => {
+                warn!("Unable to find associated keyslot for token slot");
+                continue;
+            }
+            Err(e) => {
+                warn!("Error while querying associated keyslot for token slot: {e}");
+                continue;
+            }
+        };
         match mech {
             UnlockMechanism::KeyDesc(kd) => match read_key(kd) {
                 Ok(Some(key)) => {
-                    return Ok(Either::Left((*ts, key)));
+                    return Ok(Either::Left((keyslot, *ts, key)));
                 }
                 Ok(None) => {
                     info!("Key description was not in keyring; trying next unlock mechanism")
@@ -194,7 +214,7 @@ fn get_passphrase(
             },
             UnlockMechanism::ClevisInfo(_) => match clevis_decrypt(device, *ts) {
                 Ok(Some(pass)) => {
-                    return Ok(Either::Right(pass));
+                    return Ok(Either::Right((keyslot, pass)));
                 }
                 Ok(None) => {
                     info!("Failed to find the given token; trying next unlock method");
@@ -305,13 +325,13 @@ impl CryptHandle {
             })
     }
 
-    fn initialize_with_err(
+    /// Format the device and initialize the unlock methods.
+    fn initialize_unlock_methods(
         device: &mut CryptDevice,
         physical_path: &Path,
-        pool_uuid: PoolUuid,
         encryption_info: &InputEncryptionInfo,
         luks2_params: Option<&CryptParamsLuks2>,
-    ) -> StratisResult<()> {
+    ) -> StratisResult<EncryptionInfo> {
         let mut luks2_params_ref: Option<CryptParamsLuks2Ref<'_>> =
             luks2_params.map(|lp| lp.try_into()).transpose()?;
 
@@ -423,6 +443,21 @@ impl CryptHandle {
         }
 
         let encryption_info = encryption_info_from_metadata(device)?;
+
+        Ok(encryption_info)
+    }
+
+    /// Format the device and initialize the unlock methods, activating the device once it is
+    /// successfully set up.
+    fn initialize_with_err(
+        device: &mut CryptDevice,
+        physical_path: &Path,
+        pool_uuid: PoolUuid,
+        encryption_info: &InputEncryptionInfo,
+        luks2_params: Option<&CryptParamsLuks2>,
+    ) -> StratisResult<()> {
+        let encryption_info =
+            Self::initialize_unlock_methods(device, physical_path, encryption_info, luks2_params)?;
 
         let activation_name = format_crypt_backstore_name(&pool_uuid);
         activate(device, &encryption_info, None, None, &activation_name)
@@ -551,7 +586,7 @@ impl CryptHandle {
 
         clevis_luks_bind(
             self.luks2_device_path(),
-            &either.map_left(|(ts, _)| ts),
+            &either.map_left(|(_, ts, _)| ts).map_right(|(_, key)| key),
             token_slot,
             pin,
             &json_owned,
@@ -639,8 +674,8 @@ impl CryptHandle {
         }
 
         let mut device = self.acquire_crypt_device()?;
-        let key =
-            get_passphrase(&mut device, self.encryption_info())?.either(|(_, key)| key, |key| key);
+        let key = get_passphrase(&mut device, self.encryption_info())?
+            .either(|(_, _, key)| key, |(_, key)| key);
 
         let t = match token_slot {
             Some(t) => t,
@@ -709,6 +744,135 @@ impl CryptHandle {
             UnlockMechanism::KeyDesc(new_key_desc.to_owned()),
         )?;
         Ok(())
+    }
+
+    /// Encrypt an unencrypted pool.
+    #[allow(dead_code)]
+    pub fn encrypt(
+        pool_uuid: PoolUuid,
+        thinpool: &mut ThinPool<v2::Backstore>,
+        unencrypted_path: &Path,
+        encryption_info: &InputEncryptionInfo,
+    ) -> StratisResult<Self> {
+        let tmp_header = format!("/tmp/temp-header-{pool_uuid}");
+        {
+            let mut file = OpenOptions::new()
+                .create(true)
+                .truncate(true)
+                .write(true)
+                .open(&tmp_header)?;
+            file.write_all(&[0; 4096])?;
+        }
+
+        let mut device = CryptInit::init(Path::new(&tmp_header))?;
+        let data_offset = Bytes::from(16 * IEC::Mi).sectors();
+        device.set_data_offset(*data_offset)?;
+
+        let sectors = thinpool
+            .filesystems()
+            .iter()
+            .map(|(_, _, fs)| fs.block_size())
+            .collect::<StratisResult<Vec<u64>>>()?;
+        let min_sector = sectors.iter().min();
+        let sector_size = match min_sector {
+            Some(min) => convert_int!(*min, u64, u32)?,
+            None => {
+                let mut probe = BlkidProbe::new_from_filename(unencrypted_path)?;
+                let top = probe.get_topology()?;
+                convert_int!(top.get_logical_sector_size(), u64, u32)?
+            }
+        };
+        let params = CryptParamsLuks2 {
+            data_alignment: 0,
+            data_device: None,
+            integrity: None,
+            integrity_params: None,
+            pbkdf: None,
+            label: None,
+            sector_size,
+            subsystem: None,
+        };
+
+        let encryption_info = Self::initialize_unlock_methods(
+            &mut device,
+            Path::new(&tmp_header),
+            encryption_info,
+            Some(&params),
+        )?;
+        let (keyslot, key) = get_passphrase(&mut device, &encryption_info)?
+            .either(|(keyslot, _, key)| (keyslot, key), |tup| tup);
+        device.reencrypt_handle().reencrypt_init_by_passphrase(
+            None,
+            key.as_ref(),
+            None,
+            Some(keyslot),
+            Some(("aes", "xts-plain")),
+            CryptParamsReencrypt {
+                mode: CryptReencryptModeInfo::Encrypt,
+                direction: CryptReencryptDirectionInfo::Forward,
+                resilience: "checksum".to_string(),
+                hash: "sha256".to_string(),
+                data_shift: 0,
+                max_hotzone_size: 0,
+                device_size: 0,
+                luks2: CryptParamsLuks2 {
+                    data_alignment: 0,
+                    data_device: None,
+                    integrity: None,
+                    integrity_params: None,
+                    pbkdf: None,
+                    label: None,
+                    sector_size,
+                    subsystem: None,
+                },
+                flags: CryptReencrypt::INITIALIZE_ONLY,
+            },
+        )?;
+
+        let mut device = CryptInit::init(unencrypted_path)?;
+        device
+            .backup_handle()
+            .header_restore(Some(EncryptionFormat::Luks2), Path::new(&tmp_header))?;
+
+        let activation_name = &format_crypt_backstore_name(&pool_uuid).to_string();
+        device.activate_handle().activate_by_passphrase(
+            Some(activation_name),
+            None,
+            key.as_ref(),
+            CryptActivate::SHARED,
+        )?;
+
+        device.reencrypt_handle().reencrypt_init_by_passphrase(
+            Some(activation_name),
+            key.as_ref(),
+            None,
+            Some(keyslot),
+            Some(("aes", "xts-plain")),
+            CryptParamsReencrypt {
+                mode: CryptReencryptModeInfo::Encrypt,
+                direction: CryptReencryptDirectionInfo::Forward,
+                resilience: "checksum".to_string(),
+                hash: "sha256".to_string(),
+                data_shift: 0,
+                max_hotzone_size: 0,
+                device_size: 0,
+                luks2: CryptParamsLuks2 {
+                    data_alignment: 0,
+                    data_device: None,
+                    integrity: None,
+                    integrity_params: None,
+                    pbkdf: None,
+                    label: None,
+                    sector_size,
+                    subsystem: None,
+                },
+                flags: CryptReencrypt::RESUME_ONLY,
+            },
+        )?;
+        device.reencrypt_handle().reencrypt2::<()>(None, None)?;
+
+        CryptHandle::setup(unencrypted_path, pool_uuid, TokenUnlockMethod::Any, None)
+            .map(|h| h.expect("should have crypt device after online encrypt"))
     }
 
     /// Deactivate the device referenced by the current device handle.

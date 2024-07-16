@@ -29,6 +29,7 @@ use crate::{
                 blockdev::{v2::StratBlockDev, InternalBlockDev},
                 ProcessedPathInfos, UnownedDevices,
             },
+            crypt::DEFAULT_CRYPT_DATA_OFFSET_V2,
             liminal::DeviceSet,
             metadata::{disown_device, MDADataSize},
             serde_structs::{FlexDevsSave, PoolFeatures, PoolSave, Recordable},
@@ -36,11 +37,11 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
-            Diff, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo, Key,
-            KeyDescription, Name, OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolUuid,
-            PropChangeAction, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
-            SizedKeyMemory, StratFilesystemDiff, StratPoolDiff, StratSigblockVersion,
-            TokenUnlockMethod, ValidatedIntegritySpec,
+            Diff, EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo,
+            Key, KeyDescription, Name, OffsetDirection, OptionalTokenSlotInput, PoolDiff,
+            PoolEncryptionInfo, PoolUuid, PropChangeAction, RegenAction, RenameAction,
+            SetCreateAction, SetDeleteAction, SizedKeyMemory, StratFilesystemDiff, StratPoolDiff,
+            StratSigblockVersion, TokenUnlockMethod, ValidatedIntegritySpec,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -1202,6 +1203,31 @@ impl Pool for StratPool {
             Ok(PropChangeAction::NewValue(limit))
         } else {
             Ok(PropChangeAction::Identity)
+        }
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn encrypt_pool(
+        &mut self,
+        name: &Name,
+        pool_uuid: PoolUuid,
+        encryption_info: &InputEncryptionInfo,
+    ) -> StratisResult<CreateAction<EncryptedDevice>> {
+        let offset = DEFAULT_CRYPT_DATA_OFFSET_V2;
+        let direction = OffsetDirection::Backwards;
+        match self.backstore.encryption_info() {
+            Some(_) => Ok(CreateAction::Identity),
+            None => {
+                self.backstore.encrypt(
+                    pool_uuid,
+                    &mut self.thin_pool,
+                    offset,
+                    direction,
+                    encryption_info,
+                )?;
+                self.write_metadata(name)?;
+                Ok(CreateAction::Created(EncryptedDevice))
+            }
         }
     }
 

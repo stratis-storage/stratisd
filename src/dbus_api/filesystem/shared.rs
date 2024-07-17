@@ -212,3 +212,13 @@ pub fn fs_origin_prop(fs: &dyn Filesystem) -> (bool, String) {
 pub fn fs_merge_scheduled_prop(fs: &dyn Filesystem) -> bool {
     fs.merge_scheduled()
 }
+
+#[inline]
+pub fn set_fs_merge_scheduled_prop(
+    uuid: FilesystemUuid,
+    pool: &mut dyn Pool,
+    schedule: bool,
+) -> Result<PropChangeAction<bool>, String> {
+    pool.set_fs_merge_scheduled(uuid, schedule)
+        .map_err(|e| e.to_string())
+}

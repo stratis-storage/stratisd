@@ -758,6 +758,22 @@ impl Pool for SimPool {
     fn metadata_version(&self) -> StratSigblockVersion {
         StratSigblockVersion::V2
     }
+
+    fn set_fs_merge_scheduled(
+        &mut self,
+        fs_uuid: FilesystemUuid,
+        schedule: bool,
+    ) -> StratisResult<PropChangeAction<bool>> {
+        let (_, fs) = self.filesystems.get_mut_by_uuid(fs_uuid).ok_or_else(|| {
+            StratisError::Msg(format!("Filesystem with UUID {fs_uuid} not found"))
+        })?;
+        let changed = fs.set_merge_scheduled(schedule)?;
+        if changed {
+            Ok(PropChangeAction::NewValue(schedule))
+        } else {
+            Ok(PropChangeAction::Identity)
+        }
+    }
 }
 
 #[cfg(test)]

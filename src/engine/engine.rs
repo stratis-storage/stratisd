@@ -352,6 +352,13 @@ pub trait Pool: Debug + Send + Sync {
 
     /// Get the metadata version for a given pool.
     fn metadata_version(&self) -> StratSigblockVersion;
+
+    /// Set whether a merge of the filesystem is scheduled.
+    fn set_fs_merge_scheduled(
+        &mut self,
+        fs: FilesystemUuid,
+        new_scheduled: bool,
+    ) -> StratisResult<PropChangeAction<bool>>;
 }
 
 pub type HandleEvents<P> = (

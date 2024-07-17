@@ -75,6 +75,17 @@ impl SimFilesystem {
         self.origin = None;
         changed
     }
+
+    /// Set the merge scheduled value for the filesystem.
+    pub fn set_merge_scheduled(&mut self, scheduled: bool) -> StratisResult<bool> {
+        if self.merge_scheduled == scheduled {
+            Ok(false)
+        } else {
+            // TODO: reject if conflict or no origin
+            self.merge_scheduled = scheduled;
+            Ok(true)
+        }
+    }
 }
 
 impl Filesystem for SimFilesystem {

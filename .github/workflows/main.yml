@@ -244,7 +244,7 @@ jobs:
       matrix:
         include:
           - rev: HEAD
-            options: --post-test-check=verify-filesystem-symlinks --post-test-check=verify-pool-metadata --highest-revision-number=7
+            options: --post-test-check=verify-filesystem-symlinks --post-test-check=verify-pool-metadata --highest-revision-number=8
           - rev: v3.6.2
             options: --highest-revision-number=6
     runs-on: ubuntu-22.04

@@ -6,7 +6,7 @@ use dbus_tree::{Access, EmitsChangedSignal, Factory, MTSync, Method, Property};
 
 use crate::dbus_api::{
     api::{
-        manager_3_7::{methods::start_pool, props::get_stopped_pools},
+        manager_3_8::{methods::start_pool, props::get_stopped_pools},
         prop_conv::StoppedOrLockedPools,
     },
     consts,

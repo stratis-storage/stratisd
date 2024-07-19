@@ -4,6 +4,7 @@
 
 use std::{
     collections::{hash_map::RandomState, HashMap, HashSet},
+    iter::once,
     path::Path,
     vec::Vec,
 };
@@ -16,8 +17,8 @@ use crate::{
     engine::{
         engine::{BlockDev, Filesystem, Pool},
         shared::{
-            gather_encryption_info, init_cache_idempotent_or_err, validate_filesystem_size,
-            validate_filesystem_size_specs, validate_name, validate_paths,
+            init_cache_idempotent_or_err, validate_filesystem_size, validate_filesystem_size_specs,
+            validate_name, validate_paths,
         },
         sim_engine::{blockdev::SimDev, filesystem::SimFilesystem},
         structures::Table,
@@ -39,6 +40,7 @@ pub struct SimPool {
     filesystems: Table<FilesystemUuid, SimFilesystem>,
     fs_limit: u64,
     enable_overprov: bool,
+    encryption_info: Option<EncryptionInfo>,
 }
 
 #[derive(Debug, Eq, PartialEq, Serialize)]
@@ -51,7 +53,7 @@ pub struct PoolSave {
 impl SimPool {
     pub fn new(paths: &[&Path], enc_info: Option<&EncryptionInfo>) -> (PoolUuid, SimPool) {
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
-        let device_pairs = devices.iter().map(|p| SimDev::new(p, enc_info));
+        let device_pairs = devices.iter().map(|p| SimDev::new(p));
         (
             PoolUuid::new_v4(),
             SimPool {
@@ -60,6 +62,7 @@ impl SimPool {
                 filesystems: Table::default(),
                 fs_limit: 10,
                 enable_overprov: true,
+                encryption_info: enc_info.cloned(),
             },
         )
     }
@@ -86,35 +89,31 @@ impl SimPool {
     }
 
     fn encryption_info(&self) -> Option<PoolEncryptionInfo> {
-        gather_encryption_info(
-            self.block_devs.len(),
-            self.block_devs.values().map(|bd| bd.encryption_info()),
-        )
-        .expect("sim engine cannot create pools with encrypted and unencrypted devices together")
+        self.encryption_info
+            .as_ref()
+            .map(|p| PoolEncryptionInfo::from(once(p)))
     }
 
     fn add_clevis_info(&mut self, pin: &str, config: &Value) {
-        self.block_devs
-            .iter_mut()
-            .for_each(|(_, bd)| bd.set_clevis_info(pin, config))
+        self.encryption_info = self
+            .encryption_info
+            .take()
+            .map(|ei| ei.set_clevis_info((pin.to_owned(), config.to_owned())));
     }
 
     fn clear_clevis_info(&mut self) {
-        self.block_devs
-            .iter_mut()
-            .for_each(|(_, bd)| bd.unset_clevis_info())
+        self.encryption_info = self.encryption_info.take().map(|ei| ei.unset_clevis_info());
     }
 
     fn add_key_desc(&mut self, key_desc: &KeyDescription) {
-        self.block_devs
-            .iter_mut()
-            .for_each(|(_, bd)| bd.set_key_desc(key_desc))
+        self.encryption_info = self
+            .encryption_info
+            .take()
+            .map(|ei| ei.set_key_desc(key_desc.to_owned()));
     }
 
     fn clear_key_desc(&mut self) {
-        self.block_devs
-            .iter_mut()
-            .for_each(|(_, bd)| bd.unset_key_desc())
+        self.encryption_info = self.encryption_info.take().map(|ei| ei.unset_key_desc());
     }
 
     /// Check the limit of filesystems on a pool and return an error if it has been passed.
@@ -219,7 +218,7 @@ impl Pool for SimPool {
                     "At least one blockdev path is required to initialize a cache.".to_string(),
                 ));
             }
-            let blockdev_pairs: Vec<_> = blockdevs.iter().map(|p| SimDev::new(p, None)).collect();
+            let blockdev_pairs: Vec<_> = blockdevs.iter().map(|p| SimDev::new(p)).collect();
             let blockdev_uuids: Vec<_> = blockdev_pairs.iter().map(|(uuid, _)| *uuid).collect();
             self.cache_devs.extend(blockdev_pairs);
             Ok(SetCreateAction::new(blockdev_uuids))
@@ -296,7 +295,6 @@ impl Pool for SimPool {
         }
 
         let devices: HashSet<_, RandomState> = HashSet::from_iter(paths);
-        let encryption_info = pool_enc_to_enc!(self.encryption_info());
 
         let the_vec = match tier {
             BlockDevTier::Cache => &self.cache_devs,
@@ -307,15 +305,7 @@ impl Pool for SimPool {
 
         let filtered_device_pairs: Vec<_> = devices
             .iter()
-            .map(|p| {
-                SimDev::new(
-                    p,
-                    match tier {
-                        BlockDevTier::Data => encryption_info.as_ref(),
-                        BlockDevTier::Cache => None,
-                    },
-                )
-            })
+            .map(|p| SimDev::new(p))
             .filter(|(_, sd)| !filter.contains(&sd.devnode()))
             .collect();
 

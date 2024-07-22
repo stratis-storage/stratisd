@@ -44,6 +44,7 @@ impl PerDevSegments {
     }
 
     /// The number of distinct ranges
+    #[cfg(test)]
     pub fn len(&self) -> usize {
         self.used.len()
     }
@@ -314,6 +315,12 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
+impl<'a> DoubleEndedIterator for Iter<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.items.next_back()
+    }
+}
+
 #[derive(Debug)]
 pub struct RangeAllocator {
     segments: PerDevSegments,
@@ -347,9 +354,9 @@ impl RangeAllocator {
         self.segments.sum()
     }
 
-    /// Attempt to allocate.
+    /// Attempt to allocate from the front of the device.
     /// Returns a PerDevSegments object containing the allocated ranges.
-    pub fn alloc(&mut self, amount: Sectors) -> PerDevSegments {
+    pub fn alloc_front(&mut self, amount: Sectors) -> PerDevSegments {
         let mut segs = PerDevSegments::new(self.segments.limit());
         let mut needed = amount;
 
@@ -359,6 +366,31 @@ impl RangeAllocator {
             }
             let to_use = min(needed, len);
             let used_range = (start, to_use);
+            segs.insert(&used_range)
+                .expect("wholly disjoint from other elements in segs");
+            needed -= to_use;
+        }
+        self.segments = self
+            .segments
+            .union(&segs)
+            .expect("all segments verified to be in available ranges");
+
+        segs
+    }
+
+    /// Attempt to allocate from the back of the device.
+    /// Returns a PerDevSegments object containing the allocated ranges.
+    #[allow(dead_code)]
+    pub fn alloc_back(&mut self, amount: Sectors) -> PerDevSegments {
+        let mut segs = PerDevSegments::new(self.segments.limit());
+        let mut needed = amount;
+
+        for (&start, &len) in self.segments.complement().iter().rev() {
+            if needed == Sectors(0) {
+                break;
+            }
+            let to_use = min(needed, len);
+            let used_range = (start + len - to_use, to_use);
             segs.insert(&used_range)
                 .expect("wholly disjoint from other elements in segs");
             needed -= to_use;
@@ -409,14 +441,14 @@ mod tests {
         assert_eq!(allocator.used(), Sectors(100));
         assert_eq!(allocator.available(), Sectors(28));
 
-        let seg = allocator.alloc(Sectors(50));
+        let seg = allocator.alloc_front(Sectors(50));
         assert_eq!(seg.len(), 2);
         assert_eq!(seg.sum(), Sectors(28));
         assert_eq!(allocator.used(), Sectors(128));
         assert_eq!(allocator.available(), Sectors(0));
 
         let available = allocator.available();
-        allocator.alloc(available);
+        allocator.alloc_front(available);
         assert_eq!(allocator.available(), Sectors(0));
     }
 
@@ -487,7 +519,7 @@ mod tests {
     fn test_allocator_failures_range_overwrite() {
         let mut allocator = RangeAllocator::new(BlockdevSize::new(Sectors(128)), &[]).unwrap();
 
-        let seg = allocator.alloc(Sectors(128));
+        let seg = allocator.alloc_front(Sectors(128));
         assert_eq!(allocator.used(), Sectors(128));
         assert_eq!(
             seg.iter().collect::<Vec<_>>(),

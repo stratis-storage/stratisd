@@ -16,7 +16,7 @@ use serde::{Serialize, Serializer};
 
 use devicemapper::{Sectors, ThinDevId};
 
-use crate::engine::types::{DevUuid, FilesystemUuid};
+use crate::engine::types::{DevUuid, Features, FilesystemUuid};
 
 const MAXIMUM_STRING_SIZE: usize = 255;
 
@@ -71,6 +71,22 @@ pub trait Recordable<T: Serialize> {
     fn record(&self) -> T;
 }
 
+/// List of optional features for pools.
+#[derive(Debug, Deserialize, Eq, PartialEq, Serialize, Hash, Copy, Clone)]
+pub enum PoolFeatures {
+    Raid,
+    Integrity,
+    Encryption,
+}
+
+impl From<Vec<PoolFeatures>> for Features {
+    fn from(v: Vec<PoolFeatures>) -> Self {
+        Features {
+            encryption: v.contains(&PoolFeatures::Encryption),
+        }
+    }
+}
+
 // ALL structs that represent variable length metadata in pre-order
 // depth-first traversal order. Note that when organized by types rather than
 // values the structure is a DAG not a tree. This just means that there are
@@ -85,6 +101,9 @@ pub struct PoolSave {
     // TODO: This data type should no longer be optional in Stratis 4.0
     #[serde(skip_serializing_if = "Option::is_none")]
     pub started: Option<bool>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub features: Vec<PoolFeatures>,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -116,6 +135,12 @@ pub struct BaseDevSave {
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct BaseBlockDevSave {
     pub uuid: DevUuid,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub raid_meta_allocs: Vec<(Sectors, Sectors)>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub integrity_meta_allocs: Vec<(Sectors, Sectors)>,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(serialize_with = "serialize_option_string")]
     pub user_info: Option<String>,
@@ -127,6 +152,9 @@ pub struct BaseBlockDevSave {
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct CapSave {
     pub allocs: Vec<(Sectors, Sectors)>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
+    pub crypt_meta_allocs: Vec<(Sectors, Sectors)>,
 }
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Serialize)]

@@ -17,15 +17,17 @@ use crate::{
         shared::gather_encryption_info,
         strat_engine::{
             backstore::{
-                blockdev::StratBlockDev,
+                backstore::InternalBackstore,
+                blockdev::{v1::StratBlockDev, InternalBlockDev},
                 blockdevmgr::BlockDevMgr,
                 cache_tier::CacheTier,
-                crypt::{
-                    back_up_luks_header, interpret_clevis_config, restore_luks_header, CryptHandle,
-                },
                 data_tier::DataTier,
                 devices::UnownedDevices,
                 shared::BlockSizeSummary,
+            },
+            crypt::{
+                back_up_luks_header, handle::v1::CryptHandle, interpret_clevis_config,
+                restore_luks_header,
             },
             dm::{get_dm, list_of_backstore_devices, remove_optional_devices},
             metadata::{MDADataSize, BDA},
@@ -51,7 +53,7 @@ const CACHE_BLOCK_SIZE: Sectors = Sectors(2048); // 1024 KiB
 /// take extra steps to make it clean.
 fn make_cache(
     pool_uuid: PoolUuid,
-    cache_tier: &CacheTier,
+    cache_tier: &CacheTier<StratBlockDev>,
     origin: LinearDev,
     new: bool,
 ) -> StratisResult<CacheDev> {
@@ -101,13 +103,69 @@ pub struct Backstore {
     cache: Option<CacheDev>,
     /// Coordinate handling of blockdevs that back the cache. Optional, since
     /// this structure can operate without a cache.
-    cache_tier: Option<CacheTier>,
+    cache_tier: Option<CacheTier<StratBlockDev>>,
     /// Coordinates handling of the blockdevs that form the base.
-    data_tier: DataTier,
+    data_tier: DataTier<StratBlockDev>,
     /// A linear DM device.
     linear: Option<LinearDev>,
     /// Index for managing allocation of cap device
     next: Sectors,
+}
+
+impl InternalBackstore for Backstore {
+    fn device(&self) -> Option<Device> {
+        self.cache
+            .as_ref()
+            .map(|d| d.device())
+            .or_else(|| self.linear.as_ref().map(|d| d.device()))
+    }
+
+    fn datatier_allocated_size(&self) -> Sectors {
+        self.data_tier.allocated()
+    }
+
+    fn datatier_usable_size(&self) -> Sectors {
+        self.data_tier.usable_size()
+    }
+
+    fn available_in_backstore(&self) -> Sectors {
+        self.data_tier.usable_size() - self.next
+    }
+
+    fn alloc(
+        &mut self,
+        pool_uuid: PoolUuid,
+        sizes: &[Sectors],
+    ) -> StratisResult<Option<Vec<(Sectors, Sectors)>>> {
+        let total_required = sizes.iter().cloned().sum();
+        if self.available_in_backstore() < total_required {
+            return Ok(None);
+        }
+
+        if self.data_tier.alloc(sizes) {
+            self.extend_cap_device(pool_uuid)?;
+        } else {
+            return Ok(None);
+        }
+
+        let mut chunks = Vec::new();
+        for size in sizes {
+            chunks.push((self.next, *size));
+            self.next += *size;
+        }
+
+        // Assert that the postcondition holds.
+        assert_eq!(
+            sizes,
+            chunks
+                .iter()
+                .map(|x| x.1)
+                .collect::<Vec<Sectors>>()
+                .as_slice()
+        );
+
+        Ok(Some(chunks))
+    }
 }
 
 impl Backstore {
@@ -226,6 +284,7 @@ impl Backstore {
     /// be encrypted only with a kernel keyring and without Clevis information.
     ///
     /// WARNING: metadata changing event
+    #[cfg(any(test, feature = "test_extras"))]
     pub fn initialize(
         pool_name: Name,
         pool_uuid: PoolUuid,
@@ -233,7 +292,7 @@ impl Backstore {
         mda_data_size: MDADataSize,
         encryption_info: Option<&EncryptionInfo>,
     ) -> StratisResult<Backstore> {
-        let data_tier = DataTier::new(BlockDevMgr::initialize(
+        let data_tier = DataTier::<StratBlockDev>::new(BlockDevMgr::<StratBlockDev>::initialize(
             pool_name,
             pool_uuid,
             devices,
@@ -274,7 +333,7 @@ impl Backstore {
                 // If it is desired to change a cache dev to a data dev, it
                 // should be removed and then re-added in order to ensure
                 // that the MDA region is set to the correct size.
-                let bdm = BlockDevMgr::initialize(
+                let bdm = BlockDevMgr::<StratBlockDev>::initialize(
                     pool_name,
                     pool_uuid,
                     devices,
@@ -403,55 +462,6 @@ impl Backstore {
         Ok(())
     }
 
-    /// Satisfy a request for multiple segments. This request must
-    /// always be satisfied exactly, None is returned if this can not
-    /// be done.
-    ///
-    /// Precondition: self.next <= self.size()
-    /// Postcondition: self.next <= self.size()
-    ///
-    /// Postcondition: forall i, sizes_i == result_i.1. The second value
-    /// in each pair in the returned vector is therefore redundant, but is
-    /// retained as a convenience to the caller.
-    /// Postcondition:
-    /// forall i, result_i.0 = result_(i - 1).0 + result_(i - 1).1
-    ///
-    /// WARNING: metadata changing event
-    pub fn alloc(
-        &mut self,
-        pool_uuid: PoolUuid,
-        sizes: &[Sectors],
-    ) -> StratisResult<Option<Vec<(Sectors, Sectors)>>> {
-        let total_required = sizes.iter().cloned().sum();
-        if self.available_in_backstore() < total_required {
-            return Ok(None);
-        }
-
-        if self.data_tier.alloc(sizes) {
-            self.extend_cap_device(pool_uuid)?;
-        } else {
-            return Ok(None);
-        }
-
-        let mut chunks = Vec::new();
-        for size in sizes {
-            chunks.push((self.next, *size));
-            self.next += *size;
-        }
-
-        // Assert that the postcondition holds.
-        assert_eq!(
-            sizes,
-            chunks
-                .iter()
-                .map(|x| x.1)
-                .collect::<Vec<Sectors>>()
-                .as_slice()
-        );
-
-        Ok(Some(chunks))
-    }
-
     /// Get only the datadevs in the pool.
     pub fn datadevs(&self) -> Vec<(DevUuid, &StratBlockDev)> {
         self.data_tier.blockdevs()
@@ -507,16 +517,6 @@ impl Backstore {
         self.data_tier.size()
     }
 
-    /// The current size of allocated space on the blockdevs in the data tier.
-    pub fn datatier_allocated_size(&self) -> Sectors {
-        self.data_tier.allocated()
-    }
-
-    /// The current usable size of all the blockdevs in the data tier.
-    pub fn datatier_usable_size(&self) -> Sectors {
-        self.data_tier.usable_size()
-    }
-
     /// The size of the cap device.
     ///
     /// The size of the cap device is obtained from the size of the component
@@ -530,13 +530,6 @@ impl Backstore {
             .map(|d| d.size())
             .or_else(|| self.cache.as_ref().map(|d| d.size()))
             .unwrap_or(Sectors(0))
-    }
-
-    /// The total number of unallocated usable sectors in the
-    /// backstore. Includes both in the cap but unallocated as well as not yet
-    /// added to cap.
-    pub fn available_in_backstore(&self) -> Sectors {
-        self.data_tier.usable_size() - self.next
     }
 
     /// Destroy the entire store.
@@ -584,17 +577,6 @@ impl Backstore {
                 .unwrap_or_default(),
         );
         bds
-    }
-
-    /// Return the device that this tier is currently using.
-    /// This changes, depending on whether the backstore is supporting a cache
-    /// or not. There may be no device if no data has yet been allocated from
-    /// the backstore.
-    pub fn device(&self) -> Option<Device> {
-        self.cache
-            .as_ref()
-            .map(|d| d.device())
-            .or_else(|| self.linear.as_ref().map(|d| d.device()))
     }
 
     /// Lookup an immutable blockdev by its Stratis UUID.
@@ -1002,6 +984,7 @@ impl Recordable<BackstoreSave> for Backstore {
             cache_tier: self.cache_tier.as_ref().map(|c| c.record()),
             cap: CapSave {
                 allocs: vec![(Sectors(0), self.next)],
+                crypt_meta_allocs: Vec::new(),
             },
             data_tier: self.data_tier.record(),
         }

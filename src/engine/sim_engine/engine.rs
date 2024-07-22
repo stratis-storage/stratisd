@@ -4,6 +4,7 @@
 
 use std::{
     collections::{hash_map::RandomState, HashMap, HashSet},
+    os::fd::RawFd,
     path::Path,
     sync::Arc,
 };
@@ -23,11 +24,12 @@ use crate::{
             SomeLockWriteGuard, Table,
         },
         types::{
-            CreateAction, DeleteAction, DevUuid, EncryptionInfo, FilesystemUuid, LockedPoolsInfo,
-            Name, PoolDevice, PoolDiff, PoolIdentifier, PoolUuid, RenameAction, ReportType,
-            SetUnlockAction, StartAction, StopAction, StoppedPoolInfo, StoppedPoolsInfo,
-            StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
+            CreateAction, DeleteAction, DevUuid, EncryptionInfo, Features, FilesystemUuid,
+            LockedPoolsInfo, Name, PoolDevice, PoolDiff, PoolIdentifier, PoolUuid, RenameAction,
+            ReportType, SetUnlockAction, StartAction, StopAction, StoppedPoolInfo,
+            StoppedPoolsInfo, StratFilesystemDiff, UdevEngineEvent, UnlockMethod,
         },
+        StratSigblockVersion,
     },
     stratis::{StratisError, StratisResult},
 };
@@ -253,6 +255,10 @@ impl Engine for SimEngine {
                                 uuid: dev_uuid,
                             })
                             .collect::<Vec<_>>(),
+                        metadata_version: Some(StratSigblockVersion::V2),
+                        features: Some(Features {
+                            encryption: pool.is_encrypted(),
+                        }),
                     },
                 );
                 st
@@ -291,6 +297,7 @@ impl Engine for SimEngine {
         &self,
         id: PoolIdentifier<PoolUuid>,
         unlock_method: Option<UnlockMethod>,
+        passphrase_fd: Option<RawFd>,
     ) -> StratisResult<StartAction<PoolUuid>> {
         if let Some(guard) = self.pools.read(id.clone()).await {
             let (_, pool_uuid, pool) = guard.as_tuple();
@@ -301,6 +308,10 @@ impl Engine for SimEngine {
             } else if !pool.is_encrypted() && unlock_method.is_some() {
                 return Err(StratisError::Msg(format!(
                     "Pool with UUID {pool_uuid} is not encrypted but an unlock method was provided"
+                )));
+            } else if !pool.is_encrypted() && passphrase_fd.is_some() {
+                return Err(StratisError::Msg(format!(
+                    "Pool with UUID {pool_uuid} is not encrypted but a passphrase was provided"
                 )));
             } else {
                 Ok(StartAction::Identity)
@@ -330,6 +341,19 @@ impl Engine for SimEngine {
                     })
                     .map(|(n, p)| (n, u, p))?,
             };
+            if pool.is_encrypted() && unlock_method.is_none() {
+                return Err(StratisError::Msg(format!(
+                    "Pool with UUID {pool_uuid} is encrypted but no unlock method was provided"
+                )));
+            } else if !pool.is_encrypted() && unlock_method.is_some() {
+                return Err(StratisError::Msg(format!(
+                    "Pool with UUID {pool_uuid} is not encrypted but an unlock method was provided"
+                )));
+            } else if !pool.is_encrypted() && passphrase_fd.is_some() {
+                return Err(StratisError::Msg(format!(
+                    "Pool with UUID {pool_uuid} is not encrypted but a passphrase was provided"
+                )));
+            }
             self.pools.modify_all().await.insert(name, pool_uuid, pool);
             Ok(StartAction::Started(pool_uuid))
         }

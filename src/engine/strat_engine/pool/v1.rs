@@ -10,6 +10,15 @@ use serde_json::{Map, Value};
 use devicemapper::{Bytes, DmNameBuf, Sectors};
 use stratisd_proc_macros::strat_pool_impl_gen;
 
+#[cfg(any(test, feature = "test_extras"))]
+use crate::engine::{
+    strat_engine::{
+        backstore::UnownedDevices,
+        metadata::MDADataSize,
+        thinpool::{ThinPoolSizeParams, DATA_BLOCK_SIZE},
+    },
+    types::EncryptionInfo,
+};
 use crate::{
     engine::{
         engine::{BlockDev, DumpState, Filesystem, Pool, StateDiff},
@@ -18,19 +27,23 @@ use crate::{
             validate_name, validate_paths,
         },
         strat_engine::{
-            backstore::{Backstore, ProcessedPathInfos, StratBlockDev, UnownedDevices},
+            backstore::{
+                backstore::{v1::Backstore, InternalBackstore},
+                blockdev::{v1::StratBlockDev, InternalBlockDev},
+                ProcessedPathInfos,
+            },
             liminal::DeviceSet,
-            metadata::{MDADataSize, BDA},
+            metadata::BDA,
             serde_structs::{FlexDevsSave, PoolSave, Recordable},
             shared::tiers_to_bdas,
-            thinpool::{StratFilesystem, ThinPool, ThinPoolSizeParams, DATA_BLOCK_SIZE},
+            thinpool::{StratFilesystem, ThinPool},
             types::BDARecordResult,
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
-            Diff, EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
+            Diff, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
             PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
-            SetDeleteAction, StratFilesystemDiff, StratPoolDiff,
+            SetDeleteAction, StratFilesystemDiff, StratPoolDiff, StratSigblockVersion,
         },
         PropChangeAction,
     },
@@ -154,7 +167,7 @@ fn get_pool_state(info: Option<PoolEncryptionInfo>, backstore: &Backstore) -> Ac
 #[derive(Debug)]
 pub struct StratPool {
     backstore: Backstore,
-    thin_pool: ThinPool,
+    thin_pool: ThinPool<Backstore>,
     action_avail: ActionAvailability,
     metadata_size: Sectors,
 }
@@ -165,6 +178,7 @@ impl StratPool {
     /// 1. Initialize the block devices specified by paths.
     /// 2. Set up thinpool device to back filesystems.
     /// Precondition: p.is_absolute() is true for all p in paths
+    #[cfg(any(test, feature = "test_extras"))]
     pub fn initialize(
         name: &str,
         devices: UnownedDevices,
@@ -183,7 +197,7 @@ impl StratPool {
             encryption_info,
         )?;
 
-        let thinpool = ThinPool::new(
+        let thinpool = ThinPool::<Backstore>::new(
             pool_uuid,
             match ThinPoolSizeParams::new(backstore.datatier_usable_size()) {
                 Ok(ref params) => params,
@@ -375,6 +389,7 @@ impl StratPool {
             flex_devs: self.thin_pool.record(),
             thinpool_dev: self.thin_pool.record(),
             started: Some(true),
+            features: vec![],
         }
     }
 
@@ -500,13 +515,14 @@ impl<'a> Into<Value> for &'a StratPool {
     // Precondition: (&ThinPool).into() pattern matches Value::Object(_)
     // Precondition: (&Backstore).into() pattern matches Value::Object(_)
     fn into(self) -> Value {
-        let mut map: Map<_, _> =
-            if let Value::Object(map) = <&ThinPool as Into<Value>>::into(&self.thin_pool) {
-                map.into_iter()
-            } else {
-                unreachable!("ThinPool conversion returns a JSON object")
-            }
-            .collect();
+        let mut map: Map<_, _> = if let Value::Object(map) =
+            <&ThinPool<Backstore> as Into<Value>>::into(&self.thin_pool)
+        {
+            map.into_iter()
+        } else {
+            unreachable!("ThinPool conversion returns a JSON object")
+        }
+        .collect();
         map.extend(
             if let Value::Object(map) = <&Backstore as Into<Value>>::into(&self.backstore) {
                 map.into_iter()
@@ -1273,6 +1289,10 @@ impl Pool for StratPool {
                 .map_err(|_| StratisError::Msg("metadata byte array is not utf-8".into()))
         })
     }
+
+    fn metadata_version(&self) -> StratSigblockVersion {
+        StratSigblockVersion::V1
+    }
 }
 
 pub struct StratPoolState {
@@ -1332,11 +1352,12 @@ mod tests {
     use crate::engine::{
         strat_engine::{
             cmd::udev_settle,
+            pool::AnyPool,
             tests::{loopbacked, real},
             thinpool::ThinPoolStatusDigest,
         },
         types::{EngineAction, PoolIdentifier},
-        Engine, StratEngine,
+        StratEngine,
     };
 
     use super::*;
@@ -1755,7 +1776,7 @@ mod tests {
     fn test_grow_physical_pre_grow(paths: &[&Path]) {
         let pool_name = Name::new("pool".to_string());
         let engine = StratEngine::initialize().unwrap();
-        let pool_uuid = test_async!(engine.create_pool(&pool_name, paths, None))
+        let pool_uuid = test_async!(engine.create_pool_legacy(&pool_name, paths, None))
             .unwrap()
             .changed()
             .unwrap();
@@ -1802,7 +1823,10 @@ mod tests {
         while !pool.out_of_alloc_space() {
             f.write_all(write_block).unwrap();
             f.sync_all().unwrap();
-            pool.event_on(pool_uuid, &pool_name).unwrap();
+            match pool {
+                AnyPool::V1(p) => p.event_on(pool_uuid, &pool_name).unwrap(),
+                AnyPool::V2(p) => p.event_on(pool_uuid, &pool_name).unwrap(),
+            };
         }
     }
 

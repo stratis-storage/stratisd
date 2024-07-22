@@ -14,5 +14,5 @@ pub fn get_stopped_pools(
     i: &mut IterAppend<'_>,
     p: &PropInfo<'_, MTSync<TData>, TData>,
 ) -> Result<(), MethodErr> {
-    get_manager_property(i, p, |e| Ok(shared::stopped_pools_prop(e)))
+    get_manager_property(i, p, |e| Ok(shared::stopped_pools_prop(e, false)))
 }

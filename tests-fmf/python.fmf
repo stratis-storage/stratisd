@@ -1,5 +1,6 @@
 path: /tests/client-dbus
 duration: 20m
+tag: python
 
 require:
   - clevis-luks
@@ -17,10 +18,22 @@ environment:
   STRATIS_DUMPMETADATA: /usr/bin/stratis-dumpmetadata
   PYTHONPATH: ./src
 
-/udev:
+/legacy:
+  environment+:
+    LEGACY_POOL: /usr/local/bin/stratis-legacy-pool
+
+/legacy/udev:
   summary: Run Python udev tests
   test: make -f Makefile udev-tests
 
-/loop:
+/legacy/loop:
+  summary: Run Python tests that use loopbacked device framework
+  test: make -f Makefile tang-tests dump-metadata-tests
+
+/v2/udev:
+  summary: Run Python udev tests
+  test: make -f Makefile udev-tests
+
+/v2/loop:
   summary: Run Python tests that use loopbacked device framework
   test: make -f Makefile tang-tests dump-metadata-tests

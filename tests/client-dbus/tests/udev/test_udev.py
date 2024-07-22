@@ -27,6 +27,7 @@ from stratisd_client_dbus._stratisd_constants import EncryptionMethod
 from ._dm import remove_stratis_setup
 from ._loopback import UDEV_ADD_EVENT, UDEV_REMOVE_EVENT
 from ._utils import (
+    _LEGACY_POOL,
     CRYPTO_LUKS_FS_TYPE,
     STRATIS_FS_TYPE,
     OptionalKeyServiceContextManager,
@@ -267,6 +268,7 @@ class UdevTest3(UdevTest):
                     "id": pool_uuid,
                     "unlock_method": (True, str(EncryptionMethod.KEYRING)),
                     "id_type": "uuid",
+                    "key_fd": (False, 0),
                 },
             )
             if key_spec is None:
@@ -328,7 +330,11 @@ class UdevTest4(UdevTest):
         :type key_spec: (str, bytes) or NoneType
         """
         num_devices = 3
-        udev_wait_type = STRATIS_FS_TYPE if key_spec is None else CRYPTO_LUKS_FS_TYPE
+        udev_wait_type = (
+            STRATIS_FS_TYPE
+            if key_spec is None or _LEGACY_POOL is None
+            else CRYPTO_LUKS_FS_TYPE
+        )
         device_tokens = self._lb_mgr.create_devices(num_devices)
         devnodes = self._lb_mgr.device_files(device_tokens)
         key_spec = None if key_spec is None else [key_spec]
@@ -367,6 +373,7 @@ class UdevTest4(UdevTest):
                     "id": pool_uuid,
                     "unlock_method": (True, str(EncryptionMethod.KEYRING)),
                     "id_type": "uuid",
+                    "key_fd": (False, 0),
                 },
             )
             # This should always fail because a pool cannot be successfully
@@ -387,10 +394,11 @@ class UdevTest4(UdevTest):
                     "id": pool_uuid,
                     "unlock_method": (True, str(EncryptionMethod.KEYRING)),
                     "id_type": "uuid",
+                    "key_fd": (False, 0),
                 },
             )
 
-            if key_spec is None:
+            if key_spec is None or _LEGACY_POOL is None:
                 self.assertNotEqual(exit_code, StratisdErrors.OK)
                 self.assertEqual(changed, False)
             else:
@@ -484,17 +492,30 @@ class UdevTest5(UdevTest):
             (luks_tokens, non_luks_tokens) = (
                 [
                     dev
-                    for sublist in (pool_tokens[i] for i in encrypted_indices)
+                    for sublist in (
+                        pool_tokens[i]
+                        for i in (encrypted_indices if _LEGACY_POOL is not None else [])
+                    )
                     for dev in sublist
                 ],
                 [
                     dev
-                    for sublist in (pool_tokens[i] for i in unencrypted_indices)
+                    for sublist in (
+                        pool_tokens[i]
+                        for i in (
+                            unencrypted_indices
+                            if _LEGACY_POOL is not None
+                            else unencrypted_indices + encrypted_indices
+                        )
+                    )
                     for dev in sublist
                 ],
             )
 
-            wait_for_udev(CRYPTO_LUKS_FS_TYPE, self._lb_mgr.device_files(luks_tokens))
+            wait_for_udev(
+                CRYPTO_LUKS_FS_TYPE,
+                self._lb_mgr.device_files(luks_tokens),
+            )
             wait_for_udev(STRATIS_FS_TYPE, self._lb_mgr.device_files(non_luks_tokens))
 
             variant_pool_uuids = Manager.Properties.StoppedPools.Get(
@@ -508,6 +529,7 @@ class UdevTest5(UdevTest):
                         "id": pool_uuid,
                         "unlock_method": (True, str(EncryptionMethod.KEYRING)),
                         "id_type": "uuid",
+                        "key_fd": (False, 0),
                     },
                 )
 
@@ -532,19 +554,28 @@ class UdevTest5(UdevTest):
                         get_object(object_path), {"name": random_string(10)}
                     )
 
-                self._lb_mgr.generate_synthetic_udev_events(
-                    non_luks_tokens, UDEV_ADD_EVENT
-                )
-                for pool_uuid, props in variant_pool_uuids.items():
-                    if "key_description" in props:
-                        Manager.Methods.StartPool(
-                            get_object(TOP_OBJECT),
-                            {
-                                "id": pool_uuid,
-                                "unlock_method": (True, str(EncryptionMethod.KEYRING)),
-                                "id_type": "uuid",
-                            },
-                        )
+                if _LEGACY_POOL is not None:
+                    self._lb_mgr.generate_synthetic_udev_events(
+                        non_luks_tokens, UDEV_ADD_EVENT
+                    )
+                    for pool_uuid, props in variant_pool_uuids.items():
+                        if "key_description" in props:
+                            Manager.Methods.StartPool(
+                                get_object(TOP_OBJECT),
+                                {
+                                    "id": pool_uuid,
+                                    "unlock_method": (
+                                        True,
+                                        str(EncryptionMethod.KEYRING),
+                                    ),
+                                    "id_type": "uuid",
+                                    "key_fd": (False, 0),
+                                },
+                            )
+                else:
+                    self._lb_mgr.generate_synthetic_udev_events(
+                        non_luks_tokens + luks_tokens, UDEV_ADD_EVENT
+                    )
 
                 settle()
 
@@ -708,6 +739,7 @@ class UdevTest7(UdevTest):
                     "id": "encrypted",
                     "unlock_method": (True, str(EncryptionMethod.KEYRING)),
                     "id_type": "name",
+                    "key_fd": (False, 0),
                 },
             )
             self.assertFalse(changed)
@@ -723,6 +755,7 @@ class UdevTest7(UdevTest):
                     "id": "unencrypted",
                     "unlock_method": (False, ""),
                     "id_type": "name",
+                    "key_fd": (False, 0),
                 },
             )
             self.assertFalse(changed)
@@ -743,6 +776,7 @@ class UdevTest7(UdevTest):
                     "id": "encrypted",
                     "unlock_method": (True, str(EncryptionMethod.KEYRING)),
                     "id_type": "name",
+                    "key_fd": (False, 0),
                 },
             )
             self.assertTrue(changed)
@@ -757,6 +791,7 @@ class UdevTest7(UdevTest):
                     "id": "unencrypted",
                     "unlock_method": (False, ""),
                     "id_type": "name",
+                    "key_fd": (False, 0),
                 },
             )
             self.assertTrue(changed)

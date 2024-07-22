@@ -30,9 +30,6 @@ dbus-signature-pyparsing/src
 To run only the udev tests: ::
    > make udev-tests
 
-To run only the miscellaneous tests: ::
-   > make misc-tests
-
 Contributing
 ------------
 Issues suggesting tests or pull requests that extend the existing test suite

@@ -5,9 +5,9 @@ lint:
 	pylint src/stratisd_client_dbus --ignore=_introspect.py
 	pylint tests --disable=R0801
 
-.PHONY: misc-tests
+.PHONY: startup-tests
 startup-tests:
-	python3 -m unittest ${UNITTEST_OPTS} tests.misc.test_startup
+	python3 -m unittest ${UNITTEST_OPTS} tests.udev.test_startup
 
 .PHONY: fmt
 fmt:

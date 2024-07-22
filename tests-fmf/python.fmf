@@ -23,4 +23,4 @@ environment:
 
 /loop:
   summary: Run Python tests that use loopbacked device framework
-  test: make -f Makefile tang-tests dump-metadata-tests
+  test: make -f Makefile tang-tests dump-metadata-tests startup-tests

@@ -1715,6 +1715,27 @@ where
         }
         Ok(changed)
     }
+
+    /// Set the filesystem merge scheduled value for filesystem with given UUID.
+    pub fn set_fs_merge_scheduled(
+        &mut self,
+        fs_uuid: FilesystemUuid,
+        scheduled: bool,
+    ) -> StratisResult<bool> {
+        let changed = {
+            let (_, fs) = self.get_mut_filesystem_by_uuid(fs_uuid).ok_or_else(|| {
+                StratisError::Msg(format!("No filesystem with UUID {fs_uuid} found"))
+            })?;
+            fs.set_merge_scheduled(scheduled)?
+        };
+        let (name, fs) = self
+            .get_filesystem_by_uuid(fs_uuid)
+            .expect("Looked up above");
+        if changed {
+            self.mdv.save_fs(&name, fs_uuid, fs)?;
+        }
+        Ok(changed)
+    }
 }
 
 impl<'a, B> Into<Value> for &'a ThinPool<B> {

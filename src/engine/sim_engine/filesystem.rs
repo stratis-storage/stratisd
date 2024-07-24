@@ -21,6 +21,7 @@ pub struct SimFilesystem {
     size: Sectors,
     size_limit: Option<Sectors>,
     origin: Option<FilesystemUuid>,
+    merge_scheduled: bool,
 }
 
 impl SimFilesystem {
@@ -42,6 +43,7 @@ impl SimFilesystem {
             size,
             size_limit,
             origin,
+            merge_scheduled: false,
         })
     }
 
@@ -72,6 +74,17 @@ impl SimFilesystem {
         let changed = self.origin.is_some();
         self.origin = None;
         changed
+    }
+
+    /// Set the merge scheduled value for the filesystem.
+    pub fn set_merge_scheduled(&mut self, scheduled: bool) -> StratisResult<bool> {
+        if self.merge_scheduled == scheduled {
+            Ok(false)
+        } else {
+            // TODO: reject if conflict or no origin
+            self.merge_scheduled = scheduled;
+            Ok(true)
+        }
     }
 }
 
@@ -104,6 +117,10 @@ impl Filesystem for SimFilesystem {
 
     fn origin(&self) -> Option<FilesystemUuid> {
         self.origin
+    }
+
+    fn merge_scheduled(&self) -> bool {
+        self.merge_scheduled
     }
 }
 

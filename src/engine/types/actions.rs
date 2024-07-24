@@ -796,6 +796,19 @@ where
     }
 }
 
+impl ToDisplay for PropChangeAction<bool> {
+    type Display = PropChangeAction<String>;
+
+    fn to_display(&self) -> PropChangeAction<String> {
+        match self {
+            PropChangeAction::Identity => PropChangeAction::Identity,
+            PropChangeAction::NewValue(v) => {
+                PropChangeAction::NewValue(format!("a value of {}", v))
+            }
+        }
+    }
+}
+
 impl<T> Display for PropChangeAction<T>
 where
     T: Display,

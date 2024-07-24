@@ -7,7 +7,7 @@ use dbus_tree::{Access, EmitsChangedSignal, Factory, MTSync, Method, Property};
 use crate::dbus_api::{
     consts,
     pool::pool_3_7::{
-        methods::{destroy_filesystems, metadata},
+        methods::{destroy_filesystems, fs_metadata, metadata},
         props::get_pool_metadata_version,
     },
     types::TData,
@@ -46,4 +46,17 @@ pub fn metadata_version_property(
         .access(Access::Read)
         .emits_changed(EmitsChangedSignal::Const)
         .on_get(get_pool_metadata_version)
+}
+
+pub fn get_fs_metadata_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
+    f.method("FilesystemMetadata", (), fs_metadata)
+        .in_arg(("fs_name", "(bs)"))
+        .in_arg(("current", "b"))
+        // A string representing the pool's filesystem metadata in serialized
+        // JSON format.
+        //
+        // Rust representation: String
+        .out_arg(("results", "s"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"))
 }

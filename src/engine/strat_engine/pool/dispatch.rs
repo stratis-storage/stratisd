@@ -348,4 +348,18 @@ impl Pool for AnyPool {
             AnyPool::V2(p) => p.metadata_version(),
         }
     }
+
+    fn current_fs_metadata(&self, fs_name: Option<&str>) -> StratisResult<String> {
+        match self {
+            AnyPool::V1(p) => p.current_fs_metadata(fs_name),
+            AnyPool::V2(p) => p.current_fs_metadata(fs_name),
+        }
+    }
+
+    fn last_fs_metadata(&self, fs_name: Option<&str>) -> StratisResult<String> {
+        match self {
+            AnyPool::V1(p) => p.last_fs_metadata(fs_name),
+            AnyPool::V2(p) => p.last_fs_metadata(fs_name),
+        }
+    }
 }

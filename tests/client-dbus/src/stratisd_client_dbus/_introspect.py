@@ -176,6 +176,13 @@ SPECS = {
       <arg name="return_code" type="q" direction="out" />
       <arg name="return_string" type="s" direction="out" />
     </method>
+    <method name="FilesystemMetadata">
+      <arg name="fs_name" type="(bs)" direction="in" />
+      <arg name="current" type="b" direction="in" />
+      <arg name="results" type="s" direction="out" />
+      <arg name="return_code" type="q" direction="out" />
+      <arg name="return_string" type="s" direction="out" />
+    </method>
     <method name="GrowPhysicalDevice">
       <arg name="dev" type="s" direction="in" />
       <arg name="results" type="b" direction="out" />

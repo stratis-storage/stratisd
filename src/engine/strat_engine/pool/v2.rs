@@ -1200,6 +1200,14 @@ impl Pool for StratPool {
     fn metadata_version(&self) -> StratSigblockVersion {
         StratSigblockVersion::V2
     }
+
+    fn current_fs_metadata(&self, fs_name: Option<&str>) -> StratisResult<String> {
+        self.thin_pool.current_fs_metadata(fs_name)
+    }
+
+    fn last_fs_metadata(&self, fs_name: Option<&str>) -> StratisResult<String> {
+        self.thin_pool.last_fs_metadata(fs_name)
+    }
 }
 
 pub struct StratPoolState {

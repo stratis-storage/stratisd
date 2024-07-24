@@ -1207,9 +1207,6 @@ impl Pool for StratPool {
         fs_uuid: FilesystemUuid,
         new_scheduled: bool,
     ) -> StratisResult<PropChangeAction<bool>> {
-        let (_, _) = self.get_filesystem(fs_uuid).ok_or_else(|| {
-            StratisError::Msg(format!("Filesystem with UUID {fs_uuid} not found"))
-        })?;
         if self
             .thin_pool
             .set_fs_merge_scheduled(fs_uuid, new_scheduled)?

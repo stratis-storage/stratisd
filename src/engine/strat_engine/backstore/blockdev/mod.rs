@@ -91,7 +91,7 @@ pub trait InternalBlockDev {
     ///
     /// Returns:
     /// * `None` if the size hasn't changed or is equal to the current size recorded
-    /// in the metadata.
+    ///   in the metadata.
     /// * Otherwise, `Some(_)`
     fn calc_new_size(&self) -> StratisResult<Option<Sectors>>;
 

@@ -86,6 +86,7 @@ impl StratBlockDev {
     /// - hardware_info: identifying information in the hardware
     /// - key_description: optional argument enabling encryption using
     ///                    the specified key in the kernel keyring
+    ///
     /// Returns an error if it is impossible to allocate all segments on the
     /// device.
     /// NOTE: It is possible that the actual device size is greater than

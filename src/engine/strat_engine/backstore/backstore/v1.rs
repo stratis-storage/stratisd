@@ -183,9 +183,9 @@ impl Backstore {
     ///
     /// Precondition:
     ///   * key_description.is_some() -> every StratBlockDev in datadevs has a
-    ///   key description and that key description == key_description
+    ///     key description and that key description == key_description
     ///   * key_description.is_none() -> no StratBlockDev in datadevs has a
-    ///   key description.
+    ///     key description.
     ///   * no StratBlockDev in cachedevs has a key description
     ///
     /// Postcondition:
@@ -625,7 +625,7 @@ impl Backstore {
     /// * Ok(Some(uuid)) provides the uuid of the changed blockdev
     /// * Ok(None) is returned if the blockdev was unchanged
     /// * Err(StratisError::Engine(_)) is returned if the UUID
-    /// does not correspond to a blockdev
+    ///   does not correspond to a blockdev
     pub fn set_blockdev_user_info(
         &mut self,
         uuid: DevUuid,
@@ -676,9 +676,9 @@ impl Backstore {
     ///
     /// * Returns Ok(true) if the binding was performed.
     /// * Returns Ok(false) if the binding had already been previously performed and
-    /// nothing was changed.
+    ///   nothing was changed.
     /// * Returns Err(_) if an inconsistency was found in the metadata across pools
-    /// or binding failed.
+    ///   or binding failed.
     pub fn bind_clevis(&mut self, pin: &str, clevis_info: &Value) -> StratisResult<bool> {
         let encryption_info = match pool_enc_to_enc!(self.encryption_info()) {
             Some(ei) => ei,
@@ -733,9 +733,9 @@ impl Backstore {
     ///
     /// * Returns Ok(true) if the unbinding was performed.
     /// * Returns Ok(false) if the unbinding had already been previously performed and
-    /// nothing was changed.
+    ///   nothing was changed.
     /// * Returns Err(_) if an inconsistency was found in the metadata across pools
-    /// or unbinding failed.
+    ///   or unbinding failed.
     pub fn unbind_clevis(&mut self) -> StratisResult<bool> {
         let encryption_info = match pool_enc_to_enc!(self.encryption_info()) {
             Some(ei) => ei,
@@ -762,9 +762,9 @@ impl Backstore {
     ///
     /// * Returns Ok(true) if the binding was performed.
     /// * Returns Ok(false) if the binding had already been previously performed and
-    /// nothing was changed.
+    ///   nothing was changed.
     /// * Returns Err(_) if an inconsistency was found in the metadata across pools
-    /// or binding failed.
+    ///   or binding failed.
     pub fn bind_keyring(&mut self, key_desc: &KeyDescription) -> StratisResult<bool> {
         let encryption_info = match pool_enc_to_enc!(self.encryption_info()) {
             Some(ei) => ei,
@@ -817,9 +817,9 @@ impl Backstore {
     ///
     /// * Returns Ok(true) if the unbinding was performed.
     /// * Returns Ok(false) if the unbinding had already been previously performed and
-    /// nothing was changed.
+    ///   nothing was changed.
     /// * Returns Err(_) if an inconsistency was found in the metadata across pools
-    /// or unbinding failed.
+    ///   or unbinding failed.
     pub fn unbind_keyring(&mut self) -> StratisResult<bool> {
         let encryption_info = match pool_enc_to_enc!(self.encryption_info()) {
             Some(ei) => ei,

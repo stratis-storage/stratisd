@@ -145,7 +145,7 @@ where
     U: AsUuid,
 {
     /// * Asserts that tasks performing an actions either are performing an action immediately
-    /// after being spawned or are in the list of woken tasks.
+    ///   after being spawned or are in the list of woken tasks.
     ///
     /// NOTE: This method has the side effect of clearing a woken waiter if it is the waiter that
     /// is currently acquiring the lock.
@@ -159,9 +159,9 @@ where
     }
 
     /// * Asserts that tasks performing an actions either are performing an action immediately
-    /// after being spawned or are in the list of woken tasks.
+    ///   after being spawned or are in the list of woken tasks.
     /// * Asserts that the current task never conflicts with tasks that have been woken but
-    /// not processed yet.
+    ///   not processed yet.
     ///
     /// NOTE: This method has the side effect of clearing a woken waiter if it is the waiter that
     /// is currently acquiring the lock.
@@ -291,7 +291,7 @@ where
 
     /// Returns true if the current request should be put in the wait queue.
     /// * Always returns false if the index for the given request is in the record of woken
-    /// tasks.
+    ///   tasks.
     /// * Otherwise, returns true if either of the following conditions are met:
     ///   * The lock already has a conflicting acquisition.
     ///   * The request conflicts with any tasks that have already been woken up.

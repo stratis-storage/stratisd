@@ -180,7 +180,7 @@ pub fn device_from_physical_path(physical_path: &Path) -> StratisResult<Option<C
 /// This method returns:
 /// * Ok(Some(_)) if a Clevis token was detected
 /// * Ok(None) if no token in the Clevis slot was detected or a token was detected
-/// but does not appear to be a Clevis token
+///   but does not appear to be a Clevis token
 /// * Err(_) if the token appears to be a Clevis token but is malformed in some way
 pub fn clevis_info_from_metadata(
     device: &mut CryptDevice,

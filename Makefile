@@ -92,6 +92,7 @@ CLIPPY_PEDANTIC = -D clippy::await_holding_lock \
                   -D clippy::checked_conversions \
                   -D clippy::copy_iterator \
                   -A clippy::default_trait_access \
+                  -A clippy::doc_lazy_continuation \
                   -D clippy::empty_enum \
                   -D clippy::enum_glob_use \
                   -D clippy::expl_impl_clone_on_copy \

@@ -291,6 +291,20 @@ systemd_compat = ["bindgen"]
 udev_scripts = ["data-encoding"]
 test_extras = ["engine"]
 
+[lints.rust]
+warnings = { level = "deny" }
+future_incompatible = { level = "deny", priority = 1 }
+unused = { level = "deny", priority = 2}
+rust_2018_idioms = { level = "deny", priority = 3 }
+nonstandard_style = { level = "deny", priority = 4 }
+
+[lints.clippy]
+all = { level = "deny" }
+cargo = { level = "deny", priority = 1 }
+multiple-crate-versions = { level = "allow", priority = 2 }
+from_over_into = { level = "allow", priority = 3 }
+upper_case_acronyms = { level = "allow", priority = 3 }
+
 [package.metadata.vendor-filter]
 platforms = ["*-unknown-linux-gnu"]
 tier = "2"

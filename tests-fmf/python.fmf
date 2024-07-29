@@ -28,7 +28,7 @@ environment:
 
 /legacy/loop:
   summary: Run Python tests that use loopbacked device framework
-  test: make -f Makefile tang-tests dump-metadata-tests
+  test: make -f Makefile tang-tests dump-metadata-tests startup-tests
 
 /v2/udev:
   summary: Run Python udev tests
@@ -36,4 +36,4 @@ environment:
 
 /v2/loop:
   summary: Run Python tests that use loopbacked device framework
-  test: make -f Makefile tang-tests dump-metadata-tests
+  test: make -f Makefile tang-tests dump-metadata-tests startup-tests

@@ -51,6 +51,7 @@ from ._dm import remove_stratis_setup
 from ._loopback import LoopBackDevices
 
 _STRATISD = os.environ["STRATISD"]
+STRATISD = _STRATISD
 _LEGACY_POOL = os.environ.get("LEGACY_POOL")
 
 CRYPTO_LUKS_FS_TYPE = "crypto_LUKS"

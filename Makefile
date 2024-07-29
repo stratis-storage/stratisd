@@ -54,105 +54,7 @@ EXTRAS_FEATURES =  --no-default-features --features engine,extras,min
 UDEV_FEATURES = --no-default-features --features udev_scripts
 UTILS_FEATURES = --no-default-features --features engine,systemd_compat
 
-DENY = -D warnings -D future-incompatible -D unused -D rust_2018_idioms -D nonstandard_style
-
 STATIC_FLAG = -C target-feature=+crt-static
-
-CLIPPY_DENY = -D clippy::all -D clippy::cargo -A clippy::multiple-crate-versions
-
-# Explicitly allow these lints because they don't seem helpful
-# doc_markdown: we would rather have useful than well-formatted docs
-# from_over_into: preferring from over into is very awkward with JSON report
-# manual_filter_map: sometimes map() after filter_map() is clearer
-# map_err_ignore: we generally drop the errors for a reason
-# option_if_let_else: causing problems with if-else chains
-# similar_names: judges "yes" and "res" to be too similar
-# upper_case_acronyms: We use upper case for initialisms, e.g., BDA
-CLIPPY_PEDANTIC_USELESS = -A clippy::doc_markdown \
-                          -A clippy::from_over_into \
-                          -A clippy::manual_filter_map \
-                          -A clippy::map_err_ignore \
-                          -A clippy::option_if_let_else \
-                          -A clippy::similar_names \
-                          -A clippy::upper_case_acronyms \
-
-# Clippy allow/deny adjudications for pedantic lints
-#
-# Allows represent lints we fail but which we may
-# conclude are helpful at some time.
-CLIPPY_PEDANTIC = -D clippy::await_holding_lock \
-                  -D clippy::await_holding_refcell_ref \
-                  -D clippy::cast_lossless \
-                  -D clippy::cast_possible_truncation \
-                  -A clippy::cast_possible_wrap \
-                  -D clippy::cast_precision_loss \
-                  -D clippy::cast_ptr_alignment \
-                  -A clippy::cast_sign_loss \
-                  -D clippy::checked_conversions \
-                  -D clippy::copy_iterator \
-                  -A clippy::default_trait_access \
-                  -D clippy::empty_enum \
-                  -D clippy::enum_glob_use \
-                  -D clippy::expl_impl_clone_on_copy \
-                  -D clippy::explicit_deref_methods \
-                  -D clippy::explicit_into_iter_loop \
-                  -A clippy::explicit_iter_loop \
-                  -A clippy::filter_map_next \
-                  -D clippy::fn_params_excessive_bools \
-                  -A clippy::if_not_else \
-                  -D clippy::implicit_hasher \
-                  -D clippy::implicit_saturating_sub \
-                  -D clippy::inefficient_to_string \
-                  -D clippy::inline_always \
-                  -D clippy::invalid_upcast_comparisons \
-                  -A clippy::items_after_statements \
-                  -D clippy::large_digit_groups \
-                  -D clippy::large_stack_arrays \
-                  -D clippy::large_types_passed_by_value \
-                  -D clippy::let_unit_value \
-                  -D clippy::linkedlist \
-                  -D clippy::macro_use_imports \
-                  -D clippy::manual_ok_or \
-                  -D clippy::map_flatten \
-                  -A clippy::map_unwrap_or \
-                  -D clippy::match_bool \
-                  -D clippy::match_on_vec_items \
-                  -A clippy::match_same_arms \
-                  -D clippy::match_wild_err_arm \
-                  -A clippy::match_wildcard_for_single_variants \
-                  -D clippy::maybe_infinite_iter \
-                  -A clippy::missing_errors_doc \
-                  -A clippy::module_name_repetitions \
-                  -A clippy::must_use_candidate \
-                  -D clippy::mut_mut \
-                  -D clippy::needless_continue \
-                  -A clippy::needless_pass_by_value \
-                  -A clippy::non_ascii_literal \
-                  -A clippy::option_if_let_else \
-                  -D clippy::option_option \
-                  -D clippy::range_minus_one \
-                  -D clippy::range_plus_one \
-                  -A clippy::redundant_closure_for_method_calls \
-                  -D clippy::ref_option_ref \
-                  -D clippy::same_functions_in_if_condition \
-                  -A clippy::shadow_unrelated \
-                  -A clippy::single_match_else \
-                  -D clippy::string_add_assign \
-                  -D clippy::struct_excessive_bools \
-                  -A clippy::too_many_lines \
-                  -D clippy::trait_duplication_in_bounds \
-                  -D clippy::trivially_copy_pass_by_ref \
-                  -D clippy::type_repetition_in_bounds \
-                  -D clippy::unicode_not_nfc \
-                  -D clippy::unnested_or_patterns \
-                  -D clippy::unreadable_literal \
-                  -D clippy::unsafe_derive_deserialize \
-                  -A clippy::unseparated_literal_suffix \
-                  -D clippy::unused_self \
-                  -D clippy::used_underscore_binding \
-                  -D clippy::used_underscore_binding \
-                  -D clippy::verbose_bit_mask \
-                  -D clippy::wildcard_imports
 
 ## Run cargo license
 license:
@@ -208,7 +110,7 @@ fmt-shell-ci:
 ## Build stratisd
 build:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" \
+	RUSTFLAGS="${PROFILE_FLAGS}" \
 	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratisd \
 	${TARGET_ARGS}
@@ -216,20 +118,18 @@ build:
 ## Build the stratisd test suite
 build-tests:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" \
+	RUSTFLAGS="${PROFILE_FLAGS}" \
 	cargo test --no-run ${RELEASE_FLAG} ${TARGET_ARGS}
 
 ## Build stratis-utils only
 build-utils:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
 	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratis-utils \
 	${UTILS_FEATURES} ${TARGET_ARGS}
 
 build-utils-no-systemd:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
 	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratis-utils \
 	${NO_IPC_FEATURES} ${TARGET_ARGS}
@@ -237,7 +137,7 @@ build-utils-no-systemd:
 ## Build stratisd-min and stratis-min for early userspace
 build-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" \
+	RUSTFLAGS="${PROFILE_FLAGS}" \
 	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratis-min --bin=stratisd-min \
 	${SYSTEMD_FEATURES} ${TARGET_ARGS}
@@ -245,7 +145,6 @@ build-min:
 ## Build min targets without systemd support enabled
 build-min-no-systemd:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY}" \
 	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratis-min --bin=stratisd-min \
 	${MIN_FEATURES} ${TARGET_ARGS}
@@ -253,7 +152,7 @@ build-min-no-systemd:
 ## Build stratisd-min and stratis-min for early userspace
 build-no-ipc:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" \
+	RUSTFLAGS="${PROFILE_FLAGS}" \
 	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratisd \
 	${NO_IPC_FEATURES} \
@@ -262,7 +161,7 @@ build-no-ipc:
 ## Build stratis-str-cmp binary
 build-stratis-str-cmp:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" \
+	RUSTFLAGS="${PROFILE_FLAGS}" \
 	cargo ${RUSTC} ${RELEASE_FLAG}  \
 	--bin=stratis-str-cmp \
 	${UDEV_FEATURES} \
@@ -273,7 +172,7 @@ build-stratis-str-cmp:
 ## Build stratis-base32-decode binary
 build-stratis-base32-decode:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" \
+	RUSTFLAGS="${PROFILE_FLAGS}" \
 	cargo ${RUSTC} ${RELEASE_FLAG}  \
 	--bin=stratis-base32-decode \
 	${UDEV_FEATURES} \
@@ -289,21 +188,21 @@ build-udev-utils: build-stratis-str-cmp build-stratis-base32-decode
 ## Build the stratisd-tools program
 stratisd-tools:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" \
+	RUSTFLAGS="${PROFILE_FLAGS}" \
 	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratisd-tools ${EXTRAS_FEATURES} ${TARGET_ARGS}
 
 ## Build stratis-min for early userspace
 stratis-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" \
+	RUSTFLAGS="${PROFILE_FLAGS}" \
 	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratis-min ${MIN_FEATURES} ${TARGET_ARGS}
 
 ## Build stratisd-min for early userspace
 stratisd-min:
 	PKG_CONFIG_ALLOW_CROSS=1 \
-	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" \
+	RUSTFLAGS="${PROFILE_FLAGS}" \
 	cargo ${BUILD} ${RELEASE_FLAG} \
 	--bin=stratisd-min ${SYSTEMD_FEATURES} ${TARGET_ARGS}
 
@@ -424,55 +323,55 @@ clean: clean-cfg clean-ancillary clean-primary
 
 ## Tests with loop devices
 test-loop:
-	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test loop_ -- --skip clevis_loop_
+	RUSTFLAGS="${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test loop_ -- --skip clevis_loop_
 
 ## Tests run under valgrind with loop devices
 test-loop-valgrind:
-	RUST_TEST_THREADS=1 sudo -E valgrind --leak-check=full --num-callers=500 $(shell RUSTFLAGS="${DENY}" cargo test --no-run --all-features --message-format=json 2>/dev/null | jq -r 'select(.target.src_path == "'${PWD}/src/lib.rs'") | select(.executable != null) | .executable') loop_ --skip real_ --skip clevis_
+	RUST_TEST_THREADS=1 sudo -E valgrind --leak-check=full --num-callers=500 $(shell cargo test --no-run --all-features --message-format=json 2>/dev/null | jq -r 'select(.target.src_path == "'${PWD}/src/lib.rs'") | select(.executable != null) | .executable') loop_ --skip real_ --skip clevis_
 
 ## Tests with real devices
 test-real:
-	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test real_ -- --skip clevis_real_
+	RUSTFLAGS="${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test real_ -- --skip clevis_real_
 
 ## Basic tests
 test:
-	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" RUST_BACKTRACE=1 cargo test --all-features -- --skip real_ --skip loop_ --skip clevis_ --skip test_stratis_min_ --skip test_stratisd_min_
+	RUSTFLAGS="${PROFILE_FLAGS}" RUST_BACKTRACE=1 cargo test --all-features -- --skip real_ --skip loop_ --skip clevis_ --skip test_stratis_min_ --skip test_stratisd_min_
 
 ## Basic tests run under valgrind
 test-valgrind:
-	RUST_TEST_THREADS=1 valgrind --leak-check=full --num-callers=500 $(shell RUSTFLAGS="${DENY}" cargo test --no-run --all-features --message-format=json 2>/dev/null | jq -r 'select(.target.src_path == "'${PWD}/src/lib.rs'") | select(.executable != null) | .executable') --skip real_ --skip loop_ --skip clevis_
+	RUST_TEST_THREADS=1 valgrind --leak-check=full --num-callers=500 $(shell cargo test --no-run --all-features --message-format=json 2>/dev/null | jq -r 'select(.target.src_path == "'${PWD}/src/lib.rs'") | select(.executable != null) | .executable') --skip real_ --skip loop_ --skip clevis_
 
 ## Clevis tests with real devices
 test-clevis-real:
-	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test clevis_real_ -- --skip clevis_real_should_fail
+	RUSTFLAGS="${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test clevis_real_ -- --skip clevis_real_should_fail
 
 ## Clevis real device tests that are expected to fail
 test-clevis-real-should-fail:
-	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test clevis_real_should_fail
+	RUSTFLAGS="${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test clevis_real_should_fail
 
 ## Clevis tests with loop devices
 test-clevis-loop:
-	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test clevis_loop_ -- --skip clevis_loop_should_fail_
+	RUSTFLAGS="${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test clevis_loop_ -- --skip clevis_loop_should_fail_
 
 ## Clevis tests with loop devices with valgrind
 test-clevis-loop-valgrind:
-	RUST_TEST_THREADS=1 sudo -E valgrind --leak-check=full --num-callers=500 $(shell RUSTFLAGS="${DENY}" cargo test --no-run --all-features --message-format=json 2>/dev/null | jq -r 'select(.target.src_path == "'${PWD}/src/lib.rs'") | select(.executable != null) | .executable') clevis_loop_ --skip clevis_loop_should_fail_
+	RUST_TEST_THREADS=1 sudo -E valgrind --leak-check=full --num-callers=500 $(shell cargo test --no-run --all-features --message-format=json 2>/dev/null | jq -r 'select(.target.src_path == "'${PWD}/src/lib.rs'") | select(.executable != null) | .executable') clevis_loop_ --skip clevis_loop_should_fail_
 
 ## Clevis loop device tests that are expected to fail
 test-clevis-loop-should-fail:
-	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test clevis_loop_should_fail_
+	RUSTFLAGS="${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test clevis_loop_should_fail_
 
 ## Clevis loop device tests that are expected to fail run under valgrind
 test-clevis-loop-should-fail-valgrind:
-	RUST_TEST_THREADS=1 sudo -E valgrind --leak-check=full --num-callers=500 $(shell RUSTFLAGS="${DENY}" cargo test --no-run --all-features --message-format=json 2>/dev/null | jq -r 'select(.target.src_path == "'${PWD}/src/lib.rs'") | select(.executable != null) | .executable') clevis_loop_should_fail_
+	RUST_TEST_THREADS=1 sudo -E valgrind --leak-check=full --num-callers=500 $(shell cargo test --no-run --all-features --message-format=json 2>/dev/null | jq -r 'select(.target.src_path == "'${PWD}/src/lib.rs'") | select(.executable != null) | .executable') clevis_loop_should_fail_
 
 ## Test stratisd-min CLI
 test-stratisd-min:
-	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test --no-default-features --features "engine,min" test_stratisd_min
+	RUSTFLAGS="${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test --no-default-features --features "engine,min" test_stratisd_min
 
 ## Test stratis-min CLI
 test-stratis-min:
-	RUSTFLAGS="${DENY} ${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test --no-default-features --features "engine,min" test_stratis_min
+	RUSTFLAGS="${PROFILE_FLAGS}" RUST_BACKTRACE=1 RUST_TEST_THREADS=1 CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER='sudo -E' cargo test --no-default-features --features "engine,min" test_stratis_min
 
 ## Run yamllint on workflow files
 yamllint:
@@ -494,29 +393,29 @@ docs/%.8: docs/%.txt
 
 ## Run clippy on stratisd_proc_macros
 clippy-macros:
-	cd stratisd_proc_macros && RUSTFLAGS="${DENY}" cargo clippy --all-features ${CLIPPY_OPTS} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+	cd stratisd_proc_macros && cargo clippy --all-features ${CLIPPY_OPTS}
 
 ## Run clippy on the -min build
 clippy-min:
-	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} ${MIN_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
-	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} ${SYSTEMD_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
-	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} ${EXTRAS_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+	cargo clippy ${CLIPPY_OPTS} ${MIN_FEATURES}
+	cargo clippy ${CLIPPY_OPTS} ${SYSTEMD_FEATURES}
+	cargo clippy ${CLIPPY_OPTS} ${EXTRAS_FEATURES}
 
 ## Run clippy on the udev utils
 clippy-udev-utils:
-	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} ${UDEV_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+	cargo clippy ${CLIPPY_OPTS} ${UDEV_FEATURES}
 
 ## Run clippy on the utils binary
 clippy-utils:
-	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} ${UTILS_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+	cargo clippy ${CLIPPY_OPTS} ${UTILS_FEATURES}
 
 ## Run clippy on no-ipc-build
 clippy-no-ipc:
-	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} ${NO_IPC_FEATURES} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+	cargo clippy ${CLIPPY_OPTS} ${NO_IPC_FEATURES}
 
 ## Run clippy on the current source tree
 clippy: clippy-macros clippy-min clippy-udev-utils clippy-no-ipc clippy-utils
-	RUSTFLAGS="${DENY}" cargo clippy ${CLIPPY_OPTS} -- ${CLIPPY_DENY} ${CLIPPY_PEDANTIC} ${CLIPPY_PEDANTIC_USELESS}
+	cargo clippy ${CLIPPY_OPTS}
 
 ## Lint Python parts of the source code
 pylint:

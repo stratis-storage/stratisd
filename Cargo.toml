@@ -304,9 +304,10 @@ cargo = { level = "deny", priority = 1 }
 multiple-crate-versions = { level = "allow", priority = 2 }
 from_over_into = { level = "allow", priority = 3 }
 upper_case_acronyms = { level = "allow", priority = 3 }
-# PEDANTIC LINTS
-await_holding_lock = { level = "deny", priority = 4 }
-await_holding_refcell_ref = { level = "deny", priority = 4 }
+# SOME PEDANTIC OR NURSERY LINTS THAT STRATISD CURRENTLY OBEYS.
+# IF ANY OF THESE LINTS ARE DISCOVERED TO BE UNNECESSARILY RESTRICTIVE,
+# CHOOSING TO ALLOW THE LINT BY REMOVING THE DENY ENTRY SHOULD BE A MINOR
+# DECISION AND EASILY MADE.
 cast_lossless = { level = "deny", priority = 4 }
 cast_possible_truncation = { level = "deny", priority = 4 }
 cast_precision_loss = { level = "deny", priority = 4 }
@@ -320,18 +321,15 @@ explicit_deref_methods = { level = "deny", priority = 4 }
 explicit_into_iter_loop = { level = "deny", priority = 4 }
 fn_params_excessive_bools = { level = "deny", priority = 4 }
 implicit_hasher = { level = "deny", priority = 4 }
-implicit_saturating_sub = { level = "deny", priority = 4 }
 inefficient_to_string = { level = "deny", priority = 4 }
 inline_always = { level = "deny", priority = 4 }
 invalid_upcast_comparisons = { level = "deny", priority = 4 }
 large_digit_groups = { level = "deny", priority = 4 }
 large_stack_arrays = { level = "deny", priority = 4 }
 large_types_passed_by_value = { level = "deny", priority = 4 }
-let_unit_value = { level = "deny", priority = 4 }
 linkedlist = { level = "deny", priority = 4 }
 macro_use_imports = { level = "deny", priority = 4 }
 manual_ok_or = { level = "deny", priority = 4 }
-map_flatten = { level = "deny", priority = 4 }
 match_bool = { level = "deny", priority = 4 }
 match_on_vec_items = { level = "deny", priority = 4 }
 match_wild_err_arm = { level = "deny", priority = 4 }

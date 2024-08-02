@@ -11,7 +11,7 @@ use crate::{
     dbus_api::{
         consts::filesystem_interface_list,
         types::{DbusErrorEnum, TData, OK_STRING},
-        util::{engine_to_dbus_err_tuple, get_next_arg},
+        util::{engine_to_dbus_err_tuple, get_next_arg, tuple_to_option},
     },
     engine::{EngineAction, FilesystemUuid, StratisUuid},
 };
@@ -137,6 +137,50 @@ pub fn metadata(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
         pool.current_metadata(&pool_name)
     } else {
         pool.last_metadata()
+    };
+
+    let msg = match result {
+        Ok(v) => return_message.append3(v, DbusErrorEnum::OK as u16, OK_STRING.to_string()),
+        Err(err) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&err);
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+    Ok(vec![msg])
+}
+
+pub fn fs_metadata(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
+    let default_return = String::new();
+
+    let message: &Message = m.msg;
+
+    let return_message = message.method_return();
+
+    let dbus_context = m.tree.get_data();
+    let object_path = m.path.get_name();
+
+    let pool_path = m
+        .tree
+        .get(object_path)
+        .expect("implicit argument must be in tree");
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
+
+    let mut iter = message.iter_init();
+    let filesystem_name: Option<&str> = tuple_to_option(get_next_arg(&mut iter, 0)?);
+    let current: bool = get_next_arg(&mut iter, 1)?;
+
+    let guard = get_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let (_, _, pool) = guard.as_tuple();
+
+    let result = if current {
+        pool.current_fs_metadata(filesystem_name)
+    } else {
+        pool.last_fs_metadata(filesystem_name)
     };
 
     let msg = match result {

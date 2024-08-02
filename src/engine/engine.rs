@@ -350,6 +350,12 @@ pub trait Pool: Debug + Send + Sync {
 
     /// Get the metadata version for a given pool.
     fn metadata_version(&self) -> StratSigblockVersion;
+
+    /// Get the filesystem metadata that would be written if written now.
+    fn current_fs_metadata(&self, fs_name: Option<&str>) -> StratisResult<String>;
+
+    /// Get the last written filesystem metadata.
+    fn last_fs_metadata(&self, fs_name: Option<&str>) -> StratisResult<String>;
 }
 
 pub type HandleEvents<P> = (

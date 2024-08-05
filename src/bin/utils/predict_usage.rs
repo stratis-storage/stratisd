@@ -11,7 +11,9 @@ use serde_json::{json, Value};
 
 use devicemapper::{Bytes, Sectors};
 
-use stratisd::engine::{crypt_metadata_size, ThinPoolSizeParams, BDA};
+use stratisd::engine::{
+    crypt_metadata_size, integrity_meta_space, raid_meta_space, ThinPoolSizeParams, BDA,
+};
 
 // 2^FS_SIZE_START_POWER is the logical size of the smallest Stratis
 // filesystem for which usage data exists in FSSizeLookup::internal, i.e.,
@@ -156,11 +158,45 @@ pub fn predict_filesystem_usage(
     Ok(())
 }
 
+struct V2usage {
+    crypt_metadata_alloc: Sectors,
+    raid_metadata_alloc: Sectors,
+    stratis_metadata_alloc: Sectors,
+}
+
+impl V2usage {
+    fn collect_usage_params(crypt_meta_alloc: Sectors) -> Self {
+        V2usage {
+            crypt_metadata_alloc: crypt_meta_alloc,
+            raid_metadata_alloc: raid_meta_space(),
+            stratis_metadata_alloc: BDA::default().extended_size().sectors(),
+        }
+    }
+
+    fn predict_pool_usage(&self, device_sizes: Vec<Sectors>) -> Result<Sectors, Box<dyn Error>> {
+        let stratis_avail_sizes = device_sizes
+            .iter()
+            .map(|&s| {
+                (*s).checked_sub(*self.stratis_metadata_alloc)
+                    .and_then(|r| r.checked_sub(*integrity_meta_space(s)))
+                    .and_then(|r| r.checked_sub(*self.raid_metadata_alloc))
+                    .map(Sectors)
+                    .ok_or_else(|| {
+                        Box::new(PredictError(
+                            "Some device sizes too small for DM metadata.".into(),
+                        ))
+                    })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(stratis_avail_sizes.iter().cloned().sum::<Sectors>() - self.crypt_metadata_alloc)
+    }
+}
+
 // Predict usage for a newly created pool given information about whether
 // or not the pool is encrypted, a list of device sizes, and an optional list
 // of filesystem sizes.
 pub fn predict_pool_usage(
-    encrypted: bool,
     overprovisioned: bool,
     device_sizes: Vec<Bytes>,
     filesystem_sizes: Option<Vec<Bytes>>,
@@ -169,48 +205,16 @@ pub fn predict_pool_usage(
         .map(|sizes| get_filesystem_prediction(overprovisioned, sizes))
         .transpose()?;
 
-    let crypt_metadata_size = if encrypted {
-        crypt_metadata_size()
-    } else {
-        Bytes(0)
-    };
-
+    let crypt_metadata_size = crypt_metadata_size();
     let crypt_metadata_size_sectors = crypt_metadata_size.sectors();
-
     // verify that crypt metadata size is divisible by sector size
     assert_eq!(crypt_metadata_size_sectors.bytes(), crypt_metadata_size);
 
     let device_sizes = device_sizes.iter().map(|s| s.sectors()).collect::<Vec<_>>();
-
-    let stratis_device_sizes = device_sizes
-        .iter()
-        .map(|&s| {
-            (*s).checked_sub(*crypt_metadata_size_sectors)
-                .map(Sectors)
-                .ok_or_else(|| {
-                    Box::new(PredictError(
-                        "Some device sizes too small for encryption metadata.".into(),
-                    ))
-                })
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-
-    let stratis_metadata_size = BDA::default().extended_size().sectors();
-    let stratis_avail_sizes = stratis_device_sizes
-        .iter()
-        .map(|&s| {
-            (*s).checked_sub(*stratis_metadata_size)
-                .map(Sectors)
-                .ok_or_else(|| {
-                    Box::new(PredictError(
-                        "Some device sizes too small for Stratis metadata.".into(),
-                    ))
-                })
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-
     let total_size: Sectors = device_sizes.iter().cloned().sum();
-    let non_metadata_size: Sectors = stratis_avail_sizes.iter().cloned().sum();
+
+    let non_metadata_size = V2usage::collect_usage_params(crypt_metadata_size_sectors)
+        .predict_pool_usage(device_sizes)?;
 
     let size_params = ThinPoolSizeParams::new(non_metadata_size)?;
     let total_non_data = 2usize * size_params.meta_size() + size_params.mdv_size();

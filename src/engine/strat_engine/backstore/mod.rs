@@ -12,8 +12,10 @@ mod devices;
 mod range_alloc;
 mod shared;
 
-pub use self::devices::{
-    find_stratis_devs_by_uuid, get_devno_from_path, ProcessedPathInfos, UnownedDevices,
+pub use self::{
+    blockdev::v2::{integrity_meta_space, raid_meta_space},
+    devices::{find_stratis_devs_by_uuid, get_devno_from_path, ProcessedPathInfos, UnownedDevices},
 };
+
 #[cfg(test)]
 pub use self::devices::{initialize_devices, initialize_devices_legacy};

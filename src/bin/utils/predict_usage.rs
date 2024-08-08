@@ -246,8 +246,10 @@ pub fn predict_pool_usage(
     let stratis_metadata_str =
         Value::String((*((total_size - non_metadata_size).bytes())).to_string());
 
+    let crypt_metadata_str = Value::String((*crypt_metadata_size).to_string());
+
     let json = json! {
-        {"total": total_size_str, "used": used_size_str, "free": avail_size_str, "stratis-admin-space": stratis_admin_str, "stratis-metadata-space": stratis_metadata_str}
+        {"total": total_size_str, "used": used_size_str, "free": avail_size_str, "stratis-admin-space": stratis_admin_str, "stratis-metadata-space": stratis_metadata_str, "crypt-metadata-space": crypt_metadata_str}
     };
 
     println!("{json}");

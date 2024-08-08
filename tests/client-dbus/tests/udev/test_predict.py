@@ -94,7 +94,7 @@ def _call_blockdev_size(dev):
     :rtype: str
     """
     with subprocess.Popen(
-        ["blockdev", "--getsize64", dev],
+        ["/usr/sbin/blockdev", "--getsize64", dev],
         stdout=subprocess.PIPE,
     ) as command:
         outs, _ = command.communicate()

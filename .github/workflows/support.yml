@@ -39,6 +39,7 @@ jobs:
       matrix:
         include:
           - dependencies: >
+              bandit
               pylint
               python3-dbus-client-gen
               python3-dbus-python-client-gen
@@ -47,7 +48,9 @@ jobs:
               python3-pyudev
               python3-semantic_version
               python3-tenacity
-            task: PYTHONPATH=./src make -f Makefile lint
+            task: >
+              PATH=${PATH}:/github/home/.local/bin
+              PYTHONPATH=./src make -f Makefile lint
             working-directory: ./tests/client-dbus
           - dependencies: black python3-isort
             task: make -f Makefile fmt-ci
@@ -64,7 +67,10 @@ jobs:
           dnf install -y
           make
           ncurses
+          pip
           ${{ matrix.dependencies }}
+      - name: Install pyright
+        run: pip install --user pyright
       - name: Run test
         run: ${{ matrix.task }}
         working-directory: ${{ matrix.working-directory }}

@@ -430,8 +430,10 @@ clippy: clippy-macros clippy-min clippy-udev-utils clippy-no-ipc clippy-utils cl
 	cargo clippy ${CLIPPY_OPTS}
 
 ## Lint Python parts of the source code
-pylint:
+lint:
 	pylint --disable=invalid-name ./src/bin/utils/stratis-decode-dm
+	bandit ./src/bin/utils/stratis-decode-dm --skip B101
+	pyright ./src/bin/utils/stratis-decode-dm
 
 .PHONY:
 	audit
@@ -477,7 +479,7 @@ pylint:
 	install-udev-binaries
 	install-udev-cfg
 	license
-	pylint
+	lint
 	test
 	test-valgrind
 	test-loop

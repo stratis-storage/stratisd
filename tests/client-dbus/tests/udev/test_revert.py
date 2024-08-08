@@ -42,6 +42,9 @@ from ._utils import (
     settle,
 )
 
+_MOUNT = "/usr/bin/mount"
+_UMOUNT = "/usr/bin/umount"
+
 
 def write_file(mountdir, filename):
     """
@@ -99,7 +102,7 @@ class TestRevert(UdevTest):
             settle()
 
             filepath = f"/dev/stratis/{pool_name}/{fs_name}"
-            subprocess.check_call(["mount", filepath, mountdir])
+            subprocess.check_call([_MOUNT, filepath, mountdir])
 
             file1 = "file1.txt"
             write_file(mountdir, file1)
@@ -119,7 +122,7 @@ class TestRevert(UdevTest):
             write_file(mountdir, file2)
 
             Filesystem.Properties.MergeScheduled.Set(get_object(snap_object_path), True)
-            subprocess.check_call(["umount", mountdir])
+            subprocess.check_call([_UMOUNT, mountdir])
 
             self.assertTrue(os.path.exists(f"/dev/stratis/{pool_name}/{snap_name}"))
 
@@ -131,12 +134,12 @@ class TestRevert(UdevTest):
 
             settle()
 
-            subprocess.check_call(["mount", filepath, mountdir])
+            subprocess.check_call([_MOUNT, filepath, mountdir])
 
             self.read_file(mountdir, file1)
             self.read_file(mountdir, file2)
 
-            subprocess.check_call(["umount", mountdir])
+            subprocess.check_call([_UMOUNT, mountdir])
 
             # Now stop the pool, which should tear down the devices
             (_, return_code, message) = Manager.Methods.StopPool(
@@ -167,14 +170,14 @@ class TestRevert(UdevTest):
 
             settle()
 
-            subprocess.check_call(["mount", filepath, mountdir])
+            subprocess.check_call([_MOUNT, filepath, mountdir])
 
             self.read_file(mountdir, file1)
 
             self.assertFalse(os.path.exists(os.path.join(mountdir, file2)))
             self.assertFalse(os.path.exists(f"/dev/stratis/{pool_name}/{snap_name}"))
 
-            subprocess.check_call(["umount", mountdir])
+            subprocess.check_call([_UMOUNT, mountdir])
 
     def test_revert_snapshot_chain(self):  # pylint: disable=too-many-locals
         """
@@ -211,7 +214,7 @@ class TestRevert(UdevTest):
             settle()
 
             filepath = f"/dev/stratis/{pool_name}/{fs_name}"
-            subprocess.check_call(["mount", filepath, mountdir])
+            subprocess.check_call([_MOUNT, filepath, mountdir])
 
             file1 = "file1.txt"
             write_file(mountdir, file1)
@@ -233,7 +236,7 @@ class TestRevert(UdevTest):
             Filesystem.Properties.MergeScheduled.Set(
                 get_object(snap_object_path_1), True
             )
-            subprocess.check_call(["umount", mountdir])
+            subprocess.check_call([_UMOUNT, mountdir])
 
             self.assertTrue(os.path.exists(f"/dev/stratis/{pool_name}/{snap_name_1}"))
 
@@ -285,7 +288,7 @@ class TestRevert(UdevTest):
 
             settle()
 
-            subprocess.check_call(["mount", filepath, mountdir])
+            subprocess.check_call([_MOUNT, filepath, mountdir])
 
             self.read_file(mountdir, file1)
 
@@ -293,4 +296,4 @@ class TestRevert(UdevTest):
             self.assertFalse(os.path.exists(f"/dev/stratis/{pool_name}/{snap_name_1}"))
             self.assertTrue(os.path.exists(f"/dev/stratis/{pool_name}/{snap_name_2}"))
 
-            subprocess.check_call(["umount", mountdir])
+            subprocess.check_call([_UMOUNT, mountdir])

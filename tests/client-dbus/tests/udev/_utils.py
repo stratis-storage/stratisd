@@ -231,7 +231,7 @@ def settle():
     :return: None
     """
     time.sleep(2)
-    subprocess.check_call(["udevadm", "settle"])
+    subprocess.check_call(["/usr/bin/udevadm", "settle"])
 
 
 def wait_for_udev_count(expected_num):

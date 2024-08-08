@@ -219,8 +219,22 @@ class TestSpaceUsagePrediction(UdevTest):
             prediction["total"],
         )
 
-        self.assertEqual(mopool.TotalPhysicalSize(), total_prediction)
-        self.assertEqual(total_physical_used, used_prediction)
+        self.assertEqual(
+            mopool.TotalPhysicalSize(),
+            total_prediction,
+            msg=(
+                "Total physical size predictions do not match. "
+                f"Predicted sizes: {prediction}"
+            ),
+        )
+        self.assertEqual(
+            total_physical_used,
+            used_prediction,
+            msg=(
+                "Total physical used predictions do not match. "
+                f"Predicted sizes: {prediction}"
+            ),
+        )
 
     def _test_prediction(self, pool_name, *, fs_specs=None, overprovision=True):
         """

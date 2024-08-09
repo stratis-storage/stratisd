@@ -32,10 +32,10 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
-            Diff, EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
-            PoolEncryptionInfo, PoolUuid, PropChangeAction, RegenAction, RenameAction,
-            SetCreateAction, SetDeleteAction, SizedKeyMemory, StratFilesystemDiff, StratPoolDiff,
-            StratSigblockVersion, UnlockMethod,
+            Diff, EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription,
+            Name, PoolDiff, PoolEncryptionInfo, PoolUuid, PropChangeAction, RegenAction,
+            RenameAction, SetCreateAction, SetDeleteAction, SizedKeyMemory, StratFilesystemDiff,
+            StratPoolDiff, StratSigblockVersion, UnlockMethod,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -1183,6 +1183,19 @@ impl Pool for StratPool {
             Ok(PropChangeAction::NewValue(limit))
         } else {
             Ok(PropChangeAction::Identity)
+        }
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn encrypt_pool(
+        &mut self,
+        pool_uuid: PoolUuid,
+        enc: &EncryptionInfo,
+    ) -> StratisResult<CreateAction<EncryptedDevice>> {
+        match self.backstore.encrypt(pool_uuid, &mut self.thin_pool, enc) {
+            Ok(true) => Ok(CreateAction::Created(EncryptedDevice)),
+            Ok(false) => Ok(CreateAction::Identity),
+            Err(e) => Err(e),
         }
     }
 

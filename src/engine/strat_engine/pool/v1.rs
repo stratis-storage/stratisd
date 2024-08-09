@@ -11,13 +11,10 @@ use devicemapper::{Bytes, DmNameBuf, Sectors};
 use stratisd_proc_macros::strat_pool_impl_gen;
 
 #[cfg(any(test, feature = "test_extras"))]
-use crate::engine::{
-    strat_engine::{
-        backstore::UnownedDevices,
-        metadata::MDADataSize,
-        thinpool::{ThinPoolSizeParams, DATA_BLOCK_SIZE},
-    },
-    types::EncryptionInfo,
+use crate::engine::strat_engine::{
+    backstore::UnownedDevices,
+    metadata::MDADataSize,
+    thinpool::{ThinPoolSizeParams, DATA_BLOCK_SIZE},
 };
 use crate::{
     engine::{
@@ -41,9 +38,10 @@ use crate::{
         },
         types::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
-            Diff, FilesystemUuid, GrowAction, Key, KeyDescription, Name, PoolDiff,
-            PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction, SetCreateAction,
-            SetDeleteAction, StratFilesystemDiff, StratPoolDiff, StratSigblockVersion,
+            Diff, EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription,
+            Name, PoolDiff, PoolEncryptionInfo, PoolUuid, RegenAction, RenameAction,
+            SetCreateAction, SetDeleteAction, StratFilesystemDiff, StratPoolDiff,
+            StratSigblockVersion,
         },
         PropChangeAction,
     },
@@ -1277,6 +1275,16 @@ impl Pool for StratPool {
         } else {
             Ok(PropChangeAction::Identity)
         }
+    }
+
+    fn encrypt_pool(
+        &mut self,
+        _: PoolUuid,
+        _: &EncryptionInfo,
+    ) -> StratisResult<CreateAction<EncryptedDevice>> {
+        Err(StratisError::Msg(
+            "Encrypting an unencrypted device is only supported in V2 of the metadata".to_string(),
+        ))
     }
 
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String> {

@@ -887,72 +887,6 @@ impl ThinPool<v1::Backstore> {
             backstore: PhantomData,
         })
     }
-
-    /// Set the device on all DM devices
-    pub fn set_device(&mut self, backstore_device: Device) -> StratisResult<bool> {
-        if backstore_device == self.backstore_device {
-            return Ok(false);
-        }
-
-        let xform_target_line =
-            |line: &TargetLine<LinearDevTargetParams>| -> TargetLine<LinearDevTargetParams> {
-                let new_params = match line.params {
-                    LinearDevTargetParams::Linear(ref params) => LinearDevTargetParams::Linear(
-                        LinearTargetParams::new(backstore_device, params.start_offset),
-                    ),
-                    LinearDevTargetParams::Flakey(ref params) => {
-                        let feature_args = params.feature_args.iter().cloned().collect::<Vec<_>>();
-                        LinearDevTargetParams::Flakey(FlakeyTargetParams::new(
-                            backstore_device,
-                            params.start_offset,
-                            params.up_interval,
-                            params.down_interval,
-                            feature_args,
-                        ))
-                    }
-                };
-
-                TargetLine::new(line.start, line.length, new_params)
-            };
-
-        let meta_table = self
-            .thin_pool
-            .meta_dev()
-            .table()
-            .table
-            .clone()
-            .iter()
-            .map(&xform_target_line)
-            .collect::<Vec<_>>();
-
-        let data_table = self
-            .thin_pool
-            .data_dev()
-            .table()
-            .table
-            .clone()
-            .iter()
-            .map(&xform_target_line)
-            .collect::<Vec<_>>();
-
-        let mdv_table = self
-            .mdv
-            .device()
-            .table()
-            .table
-            .clone()
-            .iter()
-            .map(&xform_target_line)
-            .collect::<Vec<_>>();
-
-        self.thin_pool.set_meta_table(get_dm(), meta_table)?;
-        self.thin_pool.set_data_table(get_dm(), data_table)?;
-        self.mdv.set_table(mdv_table)?;
-
-        self.backstore_device = backstore_device;
-
-        Ok(true)
-    }
 }
 
 impl ThinPool<v2::Backstore> {
@@ -1751,6 +1685,72 @@ where
             self.mdv.save_fs(&name, fs_uuid, fs)?;
         }
         Ok(changed)
+    }
+
+    /// Set the device on all DM devices
+    pub fn set_device(&mut self, backstore_device: Device) -> StratisResult<bool> {
+        if backstore_device == self.backstore_device {
+            return Ok(false);
+        }
+
+        let xform_target_line =
+            |line: &TargetLine<LinearDevTargetParams>| -> TargetLine<LinearDevTargetParams> {
+                let new_params = match line.params {
+                    LinearDevTargetParams::Linear(ref params) => LinearDevTargetParams::Linear(
+                        LinearTargetParams::new(backstore_device, params.start_offset),
+                    ),
+                    LinearDevTargetParams::Flakey(ref params) => {
+                        let feature_args = params.feature_args.iter().cloned().collect::<Vec<_>>();
+                        LinearDevTargetParams::Flakey(FlakeyTargetParams::new(
+                            backstore_device,
+                            params.start_offset,
+                            params.up_interval,
+                            params.down_interval,
+                            feature_args,
+                        ))
+                    }
+                };
+
+                TargetLine::new(line.start, line.length, new_params)
+            };
+
+        let meta_table = self
+            .thin_pool
+            .meta_dev()
+            .table()
+            .table
+            .clone()
+            .iter()
+            .map(&xform_target_line)
+            .collect::<Vec<_>>();
+
+        let data_table = self
+            .thin_pool
+            .data_dev()
+            .table()
+            .table
+            .clone()
+            .iter()
+            .map(&xform_target_line)
+            .collect::<Vec<_>>();
+
+        let mdv_table = self
+            .mdv
+            .device()
+            .table()
+            .table
+            .clone()
+            .iter()
+            .map(&xform_target_line)
+            .collect::<Vec<_>>();
+
+        self.thin_pool.set_meta_table(get_dm(), meta_table)?;
+        self.thin_pool.set_data_table(get_dm(), data_table)?;
+        self.mdv.set_table(mdv_table)?;
+
+        self.backstore_device = backstore_device;
+
+        Ok(true)
     }
 }
 

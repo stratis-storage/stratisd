@@ -130,7 +130,7 @@ pub fn add_cachedevs_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<
 pub fn encrypted_property(f: &Factory<MTSync<TData>, TData>) -> Property<MTSync<TData>, TData> {
     f.property::<bool, _>(consts::POOL_ENCRYPTED_PROP, ())
         .access(Access::Read)
-        .emits_changed(EmitsChangedSignal::Const)
+        .emits_changed(EmitsChangedSignal::True)
         .on_get(get_pool_encrypted)
 }
 

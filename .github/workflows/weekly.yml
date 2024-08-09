@@ -100,7 +100,7 @@ jobs:
         with:
           components: cargo
           toolchain: 1.80.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-      - uses: baptiste0928/cargo-install@v2
+      - uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-audit
       - name: Run audit task on ${{ matrix.tag }}

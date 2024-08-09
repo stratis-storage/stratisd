@@ -3,6 +3,12 @@ name: stratisd nightly
 
 # yamllint disable-line rule:truthy
 on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
   schedule:
     - cron: 15 3 * * *
 
@@ -195,7 +201,6 @@ jobs:
       matrix:
         include:
           - toolchain: 1.80.0  # CURRENT DEVELOPMENT RUST TOOLCHAIN
-          - toolchain: 1.71.1  # LOWEST SUPPORTED RUST TOOLCHAIN
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -239,6 +244,8 @@ jobs:
         run: sudo cp stratisd.conf /usr/share/dbus-1/system.d
       - name: Reload udev
         run: sudo udevadm control --reload
+      - name: Build test extras
+        run: PROFILEDIR=debug make -f Makefile build-test-extras
       - name: Tests using Rust ${{ matrix.toolchain }}
         run: >
           sudo make

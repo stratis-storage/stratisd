@@ -4,14 +4,16 @@
 
 #[cfg(feature = "test_extras")]
 pub use self::strat_engine::{ProcessedPathInfos, StratPool};
+
 pub use self::{
     engine::{BlockDev, Engine, Filesystem, KeyActions, Pool, Report},
     shared::{total_allocated, total_used},
     sim_engine::SimEngine,
     strat_engine::{
-        crypt_metadata_size, get_dm, get_dm_init, register_clevis_token, set_up_crypt_logging,
-        unshare_mount_namespace, StaticHeader, StaticHeaderResult, StratEngine, StratKeyActions,
-        ThinPoolSizeParams, BDA, CLEVIS_TANG_TRUST_URL,
+        crypt_metadata_size, get_dm, get_dm_init, integrity_meta_space, raid_meta_space,
+        register_clevis_token, set_up_crypt_logging, unshare_mount_namespace, StaticHeader,
+        StaticHeaderResult, StratEngine, StratKeyActions, ThinPoolSizeParams, BDA,
+        CLEVIS_TANG_TRUST_URL,
     },
     structures::{AllLockReadGuard, ExclusiveGuard, SharedGuard, Table},
     types::{

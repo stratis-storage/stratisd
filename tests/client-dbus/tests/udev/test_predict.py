@@ -203,37 +203,50 @@ class TestSpaceUsagePrediction(UdevTest):
             # actual used for any filesystem.
             self.assertLess(change, prediction_change)
 
-    def _check_prediction(self, prediction, mopool):
+    def _check_prediction(self, prediction, mopool, pool_metadata):
         """
         Check the prediction against the values obtained from the D-Bus.
 
         :param str prediction: result of calling script, JSON format
         :param MOPool mopool: object with pool properties
+        :param dict pool_metadata: metadata just obtained from pool
         """
-        encrypted = mopool.Encrypted()
-
         (success, total_physical_used) = mopool.TotalPhysicalUsed()
         if not success:
             raise RuntimeError("Pool's TotalPhysicalUsed property was invalid.")
 
-        (used_prediction, total_prediction) = (
+        (used_prediction, total_prediction, crypt_metadata_space) = (
             prediction["used"],
             prediction["total"],
+            prediction["crypt-metadata-space"],
         )
 
-        if encrypted:
-            self.assertLess(mopool.TotalPhysicalSize(), total_prediction)
-            self.assertLess(total_physical_used, used_prediction)
+        self.assertEqual(
+            mopool.TotalPhysicalSize(),
+            total_prediction,
+            msg=(
+                "Total physical size predictions do not match. "
+                f"Predicted sizes: {prediction}"
+            ),
+        )
 
-            diff1 = Range(total_prediction) - Range(mopool.TotalPhysicalSize())
-            diff2 = Range(used_prediction) - Range(total_physical_used)
+        self.assertEqual(
+            Range(crypt_metadata_space),
+            Range(pool_metadata["backstore"]["cap"]["crypt_meta_allocs"][0][1], 512),
+        )
 
-            self.assertEqual(diff1, diff2)
-        else:
-            self.assertEqual(mopool.TotalPhysicalSize(), total_prediction)
-            self.assertEqual(total_physical_used, used_prediction)
+        self.assertEqual(
+            total_physical_used,
+            used_prediction,
+            msg=(
+                "Total physical used predictions do not match. "
+                f"Predicted sizes: {prediction}"
+            ),
+        )
 
-    def _test_prediction(self, pool_name, *, fs_specs=None, overprovision=True):
+    def _test_prediction(
+        self, pool_name, *, fs_specs=None, overprovision=True
+    ):  # pylint: disable=too-many-locals
         """
         Helper function to verify that the prediction matches the reality to
         an acceptable degree.
@@ -256,11 +269,19 @@ class TestSpaceUsagePrediction(UdevTest):
         mopool = MOPool(pool)
 
         physical_sizes = _get_block_device_sizes(pool_object_path, managed_objects)
+        pool_proxy = get_object(pool_object_path)
+        (pool_metadata, return_code, message) = Pool.Methods.Metadata(
+            pool_proxy, {"current": False}
+        )
+
+        if return_code != 0:
+            raise RuntimeError(f"Failed to create a requested filesystem: {message}")
+
         pre_prediction = _call_predict_usage(
             mopool.Encrypted(), physical_sizes, overprovision=overprovision
         )
 
-        self._check_prediction(pre_prediction, mopool)
+        self._check_prediction(pre_prediction, mopool, json.loads(pool_metadata))
 
         change = _possibly_add_filesystems(pool_object_path, fs_specs=fs_specs)
 

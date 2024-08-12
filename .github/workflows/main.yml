@@ -274,6 +274,7 @@ jobs:
           sudo python -m pip install
           dbus-python
           dbus-python-client-gen
+          justbytes
           psutil
       - uses: dtolnay/rust-toolchain@master
         with:

@@ -46,10 +46,11 @@ use crate::{
 /// This is a slight overestimation for the sake of simplicity. Because it uses the whole disk
 /// size, once the integrity metadata size is calculated, the remaining data size is now smaller
 /// than the metadata region could support for integrity.
+/// The result is divisible by 8 sectors.
 pub fn integrity_meta_space(total_space: Sectors) -> Sectors {
     Bytes(4096).sectors()
         + Bytes::from(64 * IEC::Mi).sectors()
-        + Bytes::from((*total_space * 32u64 + 4095) & !4096).sectors()
+        + Bytes::from((*total_space * 32u64 + 4095) & !4095).sectors()
 }
 
 /// Return the amount of space required for RAID for a device of the given size.

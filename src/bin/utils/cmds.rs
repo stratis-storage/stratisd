@@ -5,12 +5,14 @@
 use std::{
     error::Error,
     fmt::{self, Display},
+    str::FromStr,
 };
 
 use clap::{Arg, ArgAction, Command};
 
 #[cfg(feature = "systemd_compat")]
 use clap::builder::Str;
+use log::LevelFilter;
 
 use devicemapper::Bytes;
 
@@ -41,6 +43,13 @@ impl StratisPredictUsage {
     fn cmd() -> Command {
         Command::new("stratis-predict-usage")
             .about("Predicts space usage for Stratis.")
+            .arg(
+                Arg::new("log-level")
+                .value_parser(["off", "error", "warn", "info", "debug", "trace"])
+                .default_value("off")
+                .long("log-level")
+                .help("Sets level for generation of log messages"),
+            )
             .subcommand_required(true)
             .subcommands(vec![
                 Command::new("pool")
@@ -119,6 +128,12 @@ impl<'a> UtilCommand<'a> for StratisPredictUsage {
                             .collect::<Result<Vec<_>, _>>()
                     })
                     .transpose()?,
+                LevelFilter::from_str(
+                    matches
+                        .get_one::<String>("log-level")
+                        .expect("default value set"),
+                )
+                .expect("only valid entries allowed"),
             ),
             Some(("filesystem", sub_m)) => predict_usage::predict_filesystem_usage(
                 !sub_m.get_flag("no-overprovision"),
@@ -129,6 +144,12 @@ impl<'a> UtilCommand<'a> for StratisPredictUsage {
                             .collect::<Result<Vec<_>, _>>()
                     })
                     .expect("required argument")?,
+                LevelFilter::from_str(
+                    matches
+                        .get_one::<String>("log-level")
+                        .expect("default value set"),
+                )
+                .expect("only valid entries allowed"),
             ),
             _ => unreachable!("Impossible subcommand name"),
         }

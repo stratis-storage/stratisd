@@ -7,6 +7,8 @@ use std::{
     fmt::{self, Display},
 };
 
+use env_logger::Builder;
+use log::LevelFilter;
 use serde_json::{json, Value};
 
 use devicemapper::{Bytes, Sectors};
@@ -142,7 +144,10 @@ fn get_filesystem_prediction(
 pub fn predict_filesystem_usage(
     overprovisioned: bool,
     filesystem_sizes: Vec<Bytes>,
+    log_level: LevelFilter,
 ) -> Result<(), Box<dyn Error>> {
+    Builder::new().filter(None, log_level).init();
+
     let fs_used = get_filesystem_prediction(overprovisioned, filesystem_sizes)?;
 
     let used_size_str = Value::String((*(fs_used.bytes())).to_string());
@@ -164,7 +169,10 @@ pub fn predict_pool_usage(
     overprovisioned: bool,
     device_sizes: Vec<Bytes>,
     filesystem_sizes: Option<Vec<Bytes>>,
+    log_level: LevelFilter,
 ) -> Result<(), Box<dyn Error>> {
+    Builder::new().filter(None, log_level).init();
+
     let fs_used = filesystem_sizes
         .map(|sizes| get_filesystem_prediction(overprovisioned, sizes))
         .transpose()?;

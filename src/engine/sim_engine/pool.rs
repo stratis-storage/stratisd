@@ -487,7 +487,7 @@ impl Pool for SimPool {
     fn destroy_filesystems(
         &mut self,
         _pool_name: &str,
-        fs_uuids: &[FilesystemUuid],
+        fs_uuids: &HashSet<FilesystemUuid>,
     ) -> StratisResult<SetDeleteAction<FilesystemUuid, FilesystemUuid>> {
         let mut removed = Vec::new();
         for &uuid in fs_uuids {
@@ -909,7 +909,7 @@ mod tests {
         .changed()
         .unwrap();
         let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
-        assert!(match pool.destroy_filesystems(pool_name, &[]) {
+        assert!(match pool.destroy_filesystems(pool_name, &HashSet::new()) {
             Ok(uuids) => !uuids.is_changed(),
             _ => false,
         });
@@ -930,7 +930,7 @@ mod tests {
         .unwrap();
         let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid))).unwrap();
         assert_matches!(
-            pool.destroy_filesystems(pool_name, &[FilesystemUuid::new_v4()]),
+            pool.destroy_filesystems(pool_name, &[FilesystemUuid::new_v4()].into()),
             Ok(_)
         );
     }
@@ -955,10 +955,12 @@ mod tests {
             .changed()
             .unwrap();
         let fs_uuid = fs_results[0].1;
-        assert!(match pool.destroy_filesystems(pool_name, &[fs_uuid]) {
-            Ok(filesystems) => filesystems == SetDeleteAction::new(vec![fs_uuid], vec![]),
-            _ => false,
-        });
+        assert!(
+            match pool.destroy_filesystems(pool_name, &[fs_uuid].into()) {
+                Ok(filesystems) => filesystems == SetDeleteAction::new(vec![fs_uuid], vec![]),
+                _ => false,
+            }
+        );
     }
 
     #[test]

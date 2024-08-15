@@ -71,7 +71,11 @@ pub async fn filesystem_destroy<'a>(
     let (uuid, _) = pool
         .get_filesystem_by_name(&Name::new(fs_name.to_string()))
         .ok_or_else(|| StratisError::Msg(format!("No filesystem named {fs_name} found")))?;
-    block_in_place(|| Ok(pool.destroy_filesystems(pool_name, &[uuid])?.is_changed()))
+    block_in_place(|| {
+        Ok(pool
+            .destroy_filesystems(pool_name, &[uuid].into())?
+            .is_changed())
+    })
 }
 
 // stratis-min filesystem rename

@@ -2,7 +2,7 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::path::Path;
+use std::{collections::HashSet, path::Path};
 
 use serde_json::Value;
 
@@ -122,7 +122,7 @@ impl Pool for AnyPool {
     fn destroy_filesystems(
         &mut self,
         pool_name: &str,
-        fs_uuids: &[FilesystemUuid],
+        fs_uuids: &HashSet<FilesystemUuid>,
     ) -> StratisResult<SetDeleteAction<FilesystemUuid, FilesystemUuid>> {
         match self {
             AnyPool::V1(p) => p.destroy_filesystems(pool_name, fs_uuids),

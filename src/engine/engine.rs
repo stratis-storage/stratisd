@@ -209,7 +209,7 @@ pub trait Pool: Debug + Send + Sync {
     fn destroy_filesystems(
         &mut self,
         pool_name: &str,
-        fs_uuids: &[FilesystemUuid],
+        fs_uuids: &HashSet<FilesystemUuid>,
     ) -> StratisResult<SetDeleteAction<FilesystemUuid, FilesystemUuid>>;
 
     /// Rename filesystem

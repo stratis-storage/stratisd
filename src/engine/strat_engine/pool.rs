@@ -2,7 +2,12 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::{cmp::max, collections::HashMap, path::Path, vec::Vec};
+use std::{
+    cmp::max,
+    collections::{HashMap, HashSet},
+    path::Path,
+    vec::Vec,
+};
 
 use chrono::{DateTime, Utc};
 use serde_json::{Map, Value};
@@ -1000,7 +1005,7 @@ impl Pool for StratPool {
     fn destroy_filesystems(
         &mut self,
         pool_name: &str,
-        fs_uuids: &[FilesystemUuid],
+        fs_uuids: &HashSet<FilesystemUuid>,
     ) -> StratisResult<SetDeleteAction<FilesystemUuid, FilesystemUuid>> {
         let mut removed = Vec::new();
         for &uuid in fs_uuids {
@@ -1675,7 +1680,8 @@ mod tests {
         assert!(pool
             .set_overprov_mode(&Name::new(pool_name.to_string()), false)
             .is_err());
-        pool.destroy_filesystems(pool_name, &[fs_uuid]).unwrap();
+        pool.destroy_filesystems(pool_name, &[fs_uuid].into())
+            .unwrap();
 
         pool.set_overprov_mode(&Name::new(pool_name.to_string()), false)
             .unwrap();

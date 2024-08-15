@@ -812,20 +812,18 @@ mod test {
             let mut pool = test_async!(engine.get_mut_pool(PoolIdentifier::Uuid(uuid1))).unwrap();
             pool.destroy_filesystems(
                 name2,
-                fs_uuid1
+                &fs_uuid1
                     .into_iter()
                     .map(|(_, u, _)| u)
-                    .collect::<Vec<_>>()
-                    .as_slice(),
+                    .collect::<HashSet<_>>(),
             )
             .unwrap();
             pool.destroy_filesystems(
                 name2,
-                fs_uuid2
+                &fs_uuid2
                     .into_iter()
                     .map(|(_, u, _)| u)
-                    .collect::<Vec<_>>()
-                    .as_slice(),
+                    .collect::<HashSet<_>>(),
             )
             .unwrap();
         }

@@ -6,7 +6,7 @@
 
 use std::{
     cmp::{max, min, Ordering},
-    collections::{HashMap, HashSet},
+    collections::{hash_map::Entry, HashMap, HashSet},
     fmt,
     marker::PhantomData,
     thread::scope,
@@ -17,7 +17,7 @@ use retry::{delay::Fixed, retry_with_index};
 use serde_json::{Map, Value};
 
 use devicemapper::{
-    device_exists, Bytes, DataBlocks, Device, DmDevice, DmName, DmNameBuf, DmOptions,
+    device_exists, message, Bytes, DataBlocks, Device, DmDevice, DmName, DmNameBuf, DmOptions,
     FlakeyTargetParams, LinearDev, LinearDevTargetParams, LinearTargetParams, MetaBlocks, Sectors,
     TargetLine, ThinDevId, ThinPoolDev, ThinPoolStatus, ThinPoolStatusSummary, ThinPoolUsage, IEC,
 };
@@ -27,13 +27,14 @@ use crate::{
         engine::{DumpState, Filesystem, StateDiff},
         strat_engine::{
             backstore::backstore::{v1, v2, InternalBackstore},
-            cmd::{thin_check, thin_metadata_size, thin_repair},
+            cmd::{set_uuid, thin_check, thin_metadata_size, thin_repair},
             dm::{get_dm, list_of_thin_pool_devices, remove_optional_devices},
             names::{
                 format_flex_ids, format_thin_ids, format_thinpool_ids, FlexRole, ThinPoolRole,
                 ThinRole,
             },
             serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave},
+            shared::merge,
             thinpool::{filesystem::StratFilesystem, mdv::MetadataVol, thinids::ThinDevIdPool},
             writing::wipe_sectors,
         },
@@ -1105,6 +1106,105 @@ where
 
         let backstore_device = backstore.device().expect("When stratisd was running previously, space was allocated from the backstore, so backstore must have a cap device");
 
+        let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::MetadataVolume);
+        let mdv_dev = LinearDev::setup(
+            get_dm(),
+            &dm_name,
+            Some(&dm_uuid),
+            segs_to_table(backstore_device, &mdv_segments),
+        )?;
+        let mdv = MetadataVol::setup(pool_uuid, mdv_dev)?;
+
+        let mut filesystem_metadata_map = HashMap::new();
+        let mut names = HashSet::new();
+        for fs in mdv.filesystems()?.drain(..) {
+            if !names.insert(fs.name.to_string()) {
+                return Err(StratisError::Msg(format!(
+                    "Two filesystems with the same name, {:}, found in filesystem metadata",
+                    fs.name
+                )));
+            }
+
+            let fs_uuid = *fs.uuid;
+            if filesystem_metadata_map.insert(fs_uuid, fs).is_some() {
+                return Err(StratisError::Msg(format!(
+                    "Two filesystems with the same UUID, {fs_uuid}, found in filesystem metadata"
+                )));
+            }
+        }
+
+        let (duplicates_scheduled, mut ready_to_merge, origins, snaps_to_merge) = filesystem_metadata_map
+            .values()
+            .filter(|md| md.merge)
+            .fold((HashMap::new(), HashMap::new(), HashSet::new(), HashSet::new()), |(mut dups_sched, mut ready_to_merge, mut origins, mut snaps_to_merge), md| {
+                match md.origin {
+                    None => {
+                        warn!("Filesystem with UUID {:} and name {:} which has no origin has been scheduled to be merged; this makes no sense.", md.uuid, md.name);
+                    }
+                    Some(origin) => {
+                        let fs_uuid = md.uuid;
+                        match dups_sched.entry(origin) {
+                            Entry::Vacant(o_dups) => {
+                                match ready_to_merge.entry(origin) {
+                                    Entry::Vacant(o_ready) => {
+                                        o_ready.insert(fs_uuid);
+                                        origins.insert(origin);
+                                        snaps_to_merge.insert(fs_uuid);
+                                    },
+                                    Entry::Occupied(o_ready) => {
+                                        o_dups.insert(vec![fs_uuid]);
+                                        o_ready.remove_entry();
+                                        origins.remove(&origin);
+                                    },
+                                }
+                            },
+                            Entry::Occupied(o_dups) => {
+                                o_dups.into_mut().push(fs_uuid);
+                            }
+                        }
+                    }
+                };
+                (dups_sched, ready_to_merge, origins, snaps_to_merge)                });
+
+        if !duplicates_scheduled.is_empty() {
+            let msg_string = duplicates_scheduled
+                .iter()
+                .map(|(origin, ss)| {
+                    format!(
+                        "{:} -> {:}",
+                        ss.iter()
+                            .map(|u| u.to_string())
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                        origin
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("; ");
+            warn!("Ambiguous revert request; at least two snapshots scheduled to be reverted into a single origin. The scheduled reverts will not occur. Snapshots: {msg_string}");
+        }
+
+        let links = origins
+            .intersection(&snaps_to_merge)
+            .collect::<HashSet<_>>();
+        let ready_to_merge = ready_to_merge
+            .drain()
+            .filter(|(origin, snap)| {
+                if links.contains(origin) || links.contains(snap) {
+                    warn!("A chain of reverts that includes {origin} and {snap} has been scheduled. The intended order of reverts is ambiguous, the scheduled revert will not occur.");
+                    false
+                } else {
+                    true
+                }
+            })
+            .map(|(origin, snap)| {
+                (
+                    filesystem_metadata_map.remove(&origin).expect("origin and snap sets are disjoint, have no duplicates"),
+                    filesystem_metadata_map.remove(&snap).expect("origin and snap sets are disjoint, have no duplicates")
+                )
+            })
+            .collect::<Vec<_>>();
+
         let (thinpool_name, thinpool_uuid) = format_thinpool_ids(pool_uuid, ThinPoolRole::Pool);
         let (meta_dev, meta_segments, spare_segments) = setup_metadev(
             pool_uuid,
@@ -1156,46 +1256,84 @@ where
             thinpool_dev.queue_if_no_space(get_dm())?;
         }
 
-        let (dm_name, dm_uuid) = format_flex_ids(pool_uuid, FlexRole::MetadataVolume);
-        let mdv_dev = LinearDev::setup(
-            get_dm(),
-            &dm_name,
-            Some(&dm_uuid),
-            segs_to_table(backstore_device, &mdv_segments),
-        )?;
-        let mdv = MetadataVol::setup(pool_uuid, mdv_dev)?;
-        let filesystem_metadatas = mdv.filesystems()?;
-
-        let filesystems = filesystem_metadatas
-            .iter()
-            .filter_map(
-                |fssave| match StratFilesystem::setup(pool_uuid, &thinpool_dev, fssave) {
-                    Ok(fs) => {
-                        fs.udev_fs_change(pool_name, fssave.uuid, &fssave.name);
-                        Some((Name::new(fssave.name.to_owned()), fssave.uuid, fs))
-                    },
-                    Err(err) => {
-                        warn!(
-                            "Filesystem specified by metadata {:?} could not be setup, reason: {:?}",
-                            fssave,
-                            err
-                        );
-                        None
-                    }
-                },
-            )
-            .collect::<Vec<_>>();
-
         let mut fs_table = Table::default();
-        for (name, uuid, fs) in filesystems {
-            let evicted = fs_table.insert(name, uuid, fs);
-            if evicted.is_some() {
-                let err_msg = "filesystems with duplicate UUID or name specified in metadata";
-                return Err(StratisError::Msg(err_msg.into()));
+        for (origin, snap) in ready_to_merge {
+            assert!(!origin.merge);
+            let merged = merge(&origin, &snap);
+
+            match StratFilesystem::setup(pool_uuid, &thinpool_dev, &merged) {
+                Ok(fs) => {
+                    if let Err(e) = set_uuid(&fs.devnode(), merged.uuid) {
+                        error!(
+                            "Could not set the UUID of the XFS filesystem on the Stratis filesystem with UUID {} after revert, reason: {e:?}",
+                            merged.uuid
+                        );
+                    };
+                    fs.udev_fs_change(pool_name, merged.uuid, &merged.name);
+
+                    let name = Name::new(merged.name.to_owned());
+                    if let Err(e) = mdv.save_fs(&name, merged.uuid, &fs) {
+                        error!(
+                            "Could not save MDV for fs with UUID {} and name {} belonging to pool with UUID {pool_uuid} after revert, reason: {e:?}",
+                            merged.uuid, merged.name
+                        );
+                    }
+                    if let Err(e) = mdv.rm_fs(snap.uuid) {
+                        error!(
+                            "Could not remove old MDV for fs with UUID {} belonging to pool with UUID {pool_uuid} after revert, reason: {e:?}",
+                            snap.uuid
+                        );
+                    };
+                    assert!(
+                        fs_table.insert(name, merged.uuid, fs).is_none(),
+                        "Duplicates already removed when building filesystem_metadata_map"
+                    );
+                    if let Err(e) = message(
+                        get_dm(),
+                        &thinpool_dev,
+                        &format!("delete {:}", origin.thin_id),
+                    ) {
+                        warn!(
+                            "Failed to delete space allocated for deleted origin filesystem with UUID {:} and thin id {:}: {e:?} after revert",
+                            origin.uuid, origin.thin_id
+                        );
+                    }
+                    for fs in filesystem_metadata_map.values_mut() {
+                        if fs.origin.map(|o| o == snap.uuid).unwrap_or(false) {
+                            fs.origin = Some(origin.uuid);
+                        }
+                    }
+                }
+                Err(err) => {
+                    warn!(
+                        "Snapshot {snap:?} could not be reverted into origin {origin:?}, reason: {err:?}"
+                    );
+                    filesystem_metadata_map.insert(*origin.uuid, origin);
+                    filesystem_metadata_map.insert(*snap.uuid, snap);
+                }
             }
         }
 
-        let thin_ids: Vec<ThinDevId> = filesystem_metadatas.iter().map(|x| x.thin_id).collect();
+        for fssave in filesystem_metadata_map.values() {
+            match StratFilesystem::setup(pool_uuid, &thinpool_dev, fssave) {
+                Ok(fs) => {
+                    fs.udev_fs_change(pool_name, fssave.uuid, &fssave.name);
+                    assert!(
+                        fs_table
+                            .insert(Name::new(fssave.name.to_owned()), fssave.uuid, fs)
+                            .is_none(),
+                        "Duplicates already removed when building filesystem_metadata_map"
+                    );
+                }
+                Err(err) => {
+                    warn!(
+                        "Filesystem specified by metadata {fssave:?} could not be setup, reason: {err:?}"
+                    );
+                }
+            }
+        }
+
+        let thin_ids: Vec<ThinDevId> = fs_table.iter().map(|(_, _, fs)| fs.thin_id()).collect();
         let thin_pool_status = thinpool_dev.status(get_dm(), DmOptions::default()).ok();
         let segments = Segments {
             meta_segments,

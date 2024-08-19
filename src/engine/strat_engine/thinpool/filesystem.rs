@@ -469,6 +469,10 @@ impl StratFilesystem {
             Ok(true)
         }
     }
+
+    pub fn thin_id(&self) -> ThinDevId {
+        self.thin_dev.id()
+    }
 }
 
 impl Filesystem for StratFilesystem {

@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 
 use crate::engine::{
-    strat_engine::{backstore::StratBlockDev, metadata::BDA},
+    strat_engine::{backstore::StratBlockDev, metadata::BDA, serde_structs::FilesystemSave},
     types::DevUuid,
 };
 
@@ -28,4 +28,19 @@ pub fn tiers_to_bdas(
         .chain(bds_to_bdas(cachedevs))
         .chain(bda.map(|bda| (bda.dev_uuid(), bda)))
         .collect::<HashMap<_, _>>()
+}
+
+/// Define how an origin and its snapshot are merged when a filesystem is
+/// reverted.
+pub fn merge(origin: &FilesystemSave, snap: &FilesystemSave) -> FilesystemSave {
+    FilesystemSave {
+        name: origin.name.to_owned(),
+        uuid: origin.uuid,
+        thin_id: snap.thin_id,
+        size: snap.size,
+        created: origin.created,
+        fs_size_limit: snap.fs_size_limit,
+        origin: origin.origin,
+        merge: origin.merge,
+    }
 }

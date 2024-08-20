@@ -1228,6 +1228,7 @@ impl ThinPool {
         origin_uuid: FilesystemUuid,
         snapshot_name: &str,
     ) -> StratisResult<(FilesystemUuid, &mut StratFilesystem)> {
+        assert!(self.get_filesystem_by_name(snapshot_name).is_none());
         let snapshot_fs_uuid = FilesystemUuid::new_v4();
         let (snapshot_dm_name, snapshot_dm_uuid) =
             format_thin_ids(pool_uuid, ThinRole::Filesystem(snapshot_fs_uuid));

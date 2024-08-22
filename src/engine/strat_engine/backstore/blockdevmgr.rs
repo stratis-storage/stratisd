@@ -68,6 +68,87 @@ impl TimeStamp {
     }
 }
 
+/// Type for the block dev mgr size.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BlockDevMgrSize(pub Sectors);
+
+impl BlockDevMgrSize {
+    pub fn sectors(self) -> Sectors {
+        self.0
+    }
+}
+
+impl<B> From<&[B]> for BlockDevMgrSize
+where
+    B: InternalBlockDev,
+{
+    fn from(blockdevs: &[B]) -> Self {
+        BlockDevMgrSize(blockdevs.iter().map(|b| b.total_size().sectors()).sum())
+    }
+}
+
+/// All metadata allocated to individual block devs in the backstore.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BlockDevMgrMetaSize(pub Sectors);
+
+impl BlockDevMgrMetaSize {
+    pub fn sectors(self) -> Sectors {
+        self.0
+    }
+}
+
+impl<B> From<&[B]> for BlockDevMgrMetaSize
+where
+    B: InternalBlockDev,
+{
+    fn from(blockdevs: &[B]) -> Self {
+        BlockDevMgrMetaSize(blockdevs.iter().map(|bd| bd.metadata_size()).sum())
+    }
+}
+
+/// All space that has not been allocated for any purpose.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BlockDevMgrAvailSpace(pub Sectors);
+
+impl BlockDevMgrAvailSpace {
+    pub fn sectors(self) -> Sectors {
+        self.0
+    }
+}
+
+impl<B> From<&[B]> for BlockDevMgrAvailSpace
+where
+    B: InternalBlockDev,
+{
+    fn from(blockdevs: &[B]) -> Self {
+        BlockDevMgrAvailSpace(blockdevs.iter().map(|bd| bd.available()).sum())
+    }
+}
+
+/// All space that has not been allocated to metadata on the devices.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct BlockDevMgrUsableSpace(pub Sectors);
+
+impl BlockDevMgrUsableSpace {
+    pub fn sectors(self) -> Sectors {
+        self.0
+    }
+}
+
+impl<B> From<&[B]> for BlockDevMgrUsableSpace
+where
+    B: InternalBlockDev,
+{
+    fn from(blockdevs: &[B]) -> Self {
+        BlockDevMgrUsableSpace(
+            blockdevs
+                .iter()
+                .map(|b| b.total_size().sectors() - b.metadata_size())
+                .sum(),
+        )
+    }
+}
+
 #[derive(Debug)]
 pub struct BlockDevMgr<B> {
     /// All the block devices that belong to this block dev manager.
@@ -75,6 +156,10 @@ pub struct BlockDevMgr<B> {
     /// The most recent time that variable length metadata was saved to the
     /// devices managed by this block dev manager.
     last_update_time: TimeStamp,
+}
+
+pub struct Sizer<'a, B> {
+    block_devs: &'a [B],
 }
 
 impl BlockDevMgr<v1::StratBlockDev> {
@@ -249,6 +334,27 @@ impl BlockDevMgr<v2::StratBlockDev> {
     }
 }
 
+impl<B> Sizer<'_, B>
+where
+    B: InternalBlockDev,
+{
+    pub fn avail_space(&self) -> BlockDevMgrAvailSpace {
+        self.block_devs.into()
+    }
+
+    pub fn size(&self) -> BlockDevMgrSize {
+        self.block_devs.into()
+    }
+
+    pub fn metadata_size(&self) -> BlockDevMgrMetaSize {
+        self.block_devs.into()
+    }
+
+    pub fn usable_size(&self) -> BlockDevMgrUsableSpace {
+        self.block_devs.into()
+    }
+}
+
 impl<B> BlockDevMgr<B>
 where
     B: InternalBlockDev,
@@ -346,7 +452,7 @@ where
     /// nothing.
     pub fn alloc(&mut self, sizes: &[Sectors]) -> Option<Vec<Vec<BlkDevSegment>>> {
         let total_needed: Sectors = sizes.iter().cloned().sum();
-        if self.avail_space() < total_needed {
+        if self.sizer().avail_space().sectors() < total_needed {
             return None;
         }
 
@@ -444,27 +550,10 @@ where
         })
     }
 
-    // SIZE methods
-
-    /// The number of sectors not allocated for any purpose.
-    pub fn avail_space(&self) -> Sectors {
-        self.block_devs.iter().map(|bd| bd.available()).sum()
-    }
-
-    /// The current size of all the blockdevs.
-    /// self.size() > self.avail_space() because some sectors are certainly
-    /// allocated for Stratis metadata
-    pub fn size(&self) -> Sectors {
-        self.block_devs
-            .iter()
-            .map(|b| b.total_size().sectors())
-            .sum()
-    }
-
-    /// The number of sectors given over to Stratis metadata
-    /// self.allocated_size() - self.metadata_size() >= self.avail_space()
-    pub fn metadata_size(&self) -> Sectors {
-        self.block_devs.iter().map(|bd| bd.metadata_size()).sum()
+    pub fn sizer(&self) -> Sizer<'_, B> {
+        Sizer {
+            block_devs: &self.block_devs,
+        }
     }
 
     pub fn grow(&mut self, dev: DevUuid) -> StratisResult<bool> {
@@ -546,13 +635,18 @@ mod tests {
                 None,
             )
             .unwrap();
-            assert_eq!(mgr.avail_space() + mgr.metadata_size(), mgr.size());
+            assert_eq!(
+                mgr.sizer().avail_space().sectors() + mgr.sizer().metadata_size().sectors(),
+                mgr.sizer().size().sectors()
+            );
 
             let allocated = Sectors(2);
             mgr.alloc(&[allocated]).unwrap();
             assert_eq!(
-                mgr.avail_space() + allocated + mgr.metadata_size(),
-                mgr.size()
+                mgr.sizer().avail_space().sectors()
+                    + allocated
+                    + mgr.sizer().metadata_size().sectors(),
+                mgr.sizer().size().sectors()
             );
         }
 
@@ -764,13 +858,18 @@ mod tests {
                 MDADataSize::default(),
             )
             .unwrap();
-            assert_eq!(mgr.avail_space() + mgr.metadata_size(), mgr.size());
+            assert_eq!(
+                mgr.sizer().avail_space().sectors() + mgr.sizer().metadata_size().sectors(),
+                mgr.sizer().size().sectors()
+            );
 
             let allocated = Sectors(2);
             mgr.alloc(&[allocated]).unwrap();
             assert_eq!(
-                mgr.avail_space() + allocated + mgr.metadata_size(),
-                mgr.size()
+                mgr.sizer().avail_space().sectors()
+                    + allocated
+                    + mgr.sizer().metadata_size().sectors(),
+                mgr.sizer().size().sectors()
             );
         }
 

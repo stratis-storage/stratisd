@@ -19,9 +19,13 @@ use crate::{
     engine::{
         strat_engine::{
             backstore::{
-                backstore::InternalBackstore, blockdev::v2::StratBlockDev,
-                blockdevmgr::BlockDevMgr, cache_tier::CacheTier, data_tier::DataTier,
-                devices::UnownedDevices, shared::BlockSizeSummary,
+                backstore::InternalBackstore,
+                blockdev::v2::StratBlockDev,
+                blockdevmgr::{BlockDevMgr, BlockDevMgrMetaSize, BlockDevMgrSize},
+                cache_tier::CacheTier,
+                data_tier::DataTier,
+                devices::UnownedDevices,
+                shared::BlockSizeSummary,
             },
             crypt::{crypt_metadata_size, handle::v2::CryptHandle, interpret_clevis_config},
             dm::{get_dm, list_of_backstore_devices, remove_optional_devices, DEVICEMAPPER_PATH},
@@ -170,11 +174,12 @@ impl InternalBackstore for Backstore {
     }
 
     fn datatier_usable_size(&self) -> Sectors {
-        self.data_tier.usable_size() - self.crypt_meta_allocs.iter().map(|(_, len)| *len).sum()
+        self.data_tier.usable_size().sectors()
+            - self.crypt_meta_allocs.iter().map(|(_, len)| *len).sum()
     }
 
     fn available_in_backstore(&self) -> Sectors {
-        self.data_tier.usable_size()
+        self.data_tier.usable_size().sectors()
             - self.allocs.iter().map(|(_, len)| *len).sum()
             - self.crypt_meta_allocs.iter().map(|(_, len)| *len).sum()
     }
@@ -758,7 +763,7 @@ impl Backstore {
     }
 
     /// The current size of all the blockdevs in the data tier.
-    pub fn datatier_size(&self) -> Sectors {
+    pub fn datatier_size(&self) -> BlockDevMgrSize {
         self.data_tier.size()
     }
 
@@ -854,7 +859,7 @@ impl Backstore {
 
     /// The number of sectors in the backstore given up to Stratis metadata
     /// on devices in the data tier.
-    pub fn datatier_metadata_size(&self) -> Sectors {
+    pub fn datatier_metadata_size(&self) -> BlockDevMgrMetaSize {
         self.data_tier.metadata_size()
     }
 

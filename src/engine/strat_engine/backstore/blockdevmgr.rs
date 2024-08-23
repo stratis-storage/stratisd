@@ -636,17 +636,15 @@ mod tests {
             )
             .unwrap();
             assert_eq!(
-                mgr.sizer().avail_space().sectors() + mgr.sizer().metadata_size().sectors(),
-                mgr.sizer().size().sectors()
+                mgr.sizer().avail_space().sectors(),
+                mgr.sizer().usable_size().sectors()
             );
 
             let allocated = Sectors(2);
             mgr.alloc(&[allocated]).unwrap();
             assert_eq!(
-                mgr.sizer().avail_space().sectors()
-                    + allocated
-                    + mgr.sizer().metadata_size().sectors(),
-                mgr.sizer().size().sectors()
+                mgr.sizer().avail_space().sectors() + allocated,
+                mgr.sizer().usable_size().sectors()
             );
         }
 
@@ -859,17 +857,15 @@ mod tests {
             )
             .unwrap();
             assert_eq!(
-                mgr.sizer().avail_space().sectors() + mgr.sizer().metadata_size().sectors(),
-                mgr.sizer().size().sectors()
+                mgr.sizer().avail_space().sectors(),
+                mgr.sizer().usable_size().sectors()
             );
 
             let allocated = Sectors(2);
             mgr.alloc(&[allocated]).unwrap();
             assert_eq!(
-                mgr.sizer().avail_space().sectors()
-                    + allocated
-                    + mgr.sizer().metadata_size().sectors(),
-                mgr.sizer().size().sectors()
+                mgr.sizer().avail_space().sectors() + allocated,
+                mgr.sizer().usable_size().sectors()
             );
         }
 

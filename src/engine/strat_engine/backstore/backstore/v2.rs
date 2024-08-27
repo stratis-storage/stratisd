@@ -174,14 +174,13 @@ impl InternalBackstore for Backstore {
     }
 
     fn datatier_usable_size(&self) -> Sectors {
-        self.data_tier.usable_size().sectors()
-            - self.crypt_meta_allocs.iter().map(|(_, len)| *len).sum()
+        self.data_tier.usable_size().sectors() - self.datatier_crypt_meta_size()
     }
 
     fn available_in_backstore(&self) -> Sectors {
         self.data_tier.usable_size().sectors()
             - self.allocs.iter().map(|(_, len)| *len).sum()
-            - self.crypt_meta_allocs.iter().map(|(_, len)| *len).sum()
+            - self.datatier_crypt_meta_size()
     }
 
     fn alloc(

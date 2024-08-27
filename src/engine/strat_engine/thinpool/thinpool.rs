@@ -27,7 +27,7 @@ use crate::{
         engine::{DumpState, Filesystem, StateDiff},
         strat_engine::{
             backstore::backstore::{v1, v2, InternalBackstore},
-            cmd::{thin_check, thin_metadata_size, thin_repair},
+            cmd::{set_uuid, thin_check, thin_metadata_size, thin_repair},
             dm::{get_dm, list_of_thin_pool_devices, remove_optional_devices},
             names::{
                 format_flex_ids, format_thin_ids, format_thinpool_ids, FlexRole, ThinPoolRole,
@@ -1340,18 +1340,24 @@ where
 
             match StratFilesystem::setup(pool_uuid, &thinpool_dev, &snap) {
                 Ok(fs) => {
+                    if let Err(e) = set_uuid(&fs.devnode(), snap.uuid) {
+                        error!(
+                            "Could not set the UUID of the XFS filesystem on the Stratis filesystem with UUID {} after revert, reason: {:?}",
+                            snap.uuid, e
+                        );
+                    };
                     fs.udev_fs_change(pool_name, snap.uuid, &snap.name);
 
                     let name = Name::new(snap.name.to_owned());
                     if let Err(e) = mdv.save_fs(&name, snap.uuid, &fs) {
                         error!(
-                            "Could not save MDV for fs with UUID {} and name {} belonging to pool with UUID {}, reason: {:?}",
+                            "Could not save MDV for fs with UUID {} and name {} belonging to pool with UUID {} after revert, reason: {:?}",
                             snap.uuid, snap.name, pool_uuid, e
                         );
                     }
                     if let Err(e) = mdv.rm_fs(snap_uuid) {
                         error!(
-                            "Could not remove old MDV for fs with UUID {} belonging to pool with UUID {}, reason: {:?}",
+                            "Could not remove old MDV for fs with UUID {} belonging to pool with UUID {} after revert, reason: {:?}",
                             snap_uuid, pool_uuid, e
                         );
                     };
@@ -1364,7 +1370,10 @@ where
                         &thinpool_dev,
                         &format!("delete {:}", origin.thin_id),
                     ) {
-                        warn!("Failed to delete space allocated for deleted origin filesystem with UUID {:} and thin id {:}: {:?}", origin.uuid, origin.thin_id, e);
+                        warn!(
+                            "Failed to delete space allocated for deleted origin filesystem with UUID {:} and thin id {:}: {:?} after revert",
+                            origin.uuid, origin.thin_id, e
+                        );
                     }
                 }
                 Err(err) => {

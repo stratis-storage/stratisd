@@ -412,9 +412,8 @@ mod tests {
             // the tier.
             let cache_metadata_size = cache_tier.meta_segments.size();
 
-            let mut metadata_size = cache_tier.block_mgr.sizer().metadata_size();
-            let mut size = cache_tier.block_mgr.sizer().size();
-            let mut allocated = cache_tier.cache_segments.size();
+            let metadata_size = cache_tier.block_mgr.sizer().metadata_size();
+            let size = cache_tier.block_mgr.sizer().size();
 
             assert_eq!(
                 cache_tier.block_mgr.sizer().avail_space(),
@@ -422,7 +421,7 @@ mod tests {
             );
             assert_eq!(
                 size.sectors() - metadata_size.sectors(),
-                allocated + cache_metadata_size
+                cache_tier.cache_segments.size() + cache_metadata_size
             );
 
             let (_, (cache, meta)) = cache_tier
@@ -442,12 +441,10 @@ mod tests {
                 cache_tier.block_mgr.sizer().metadata_size().sectors() > metadata_size.sectors()
             );
 
-            metadata_size = cache_tier.block_mgr.sizer().metadata_size();
-            size = cache_tier.block_mgr.sizer().size();
-            allocated = cache_tier.cache_segments.size();
             assert_eq!(
-                size.sectors() - metadata_size.sectors(),
-                allocated + cache_metadata_size
+                cache_tier.block_mgr.sizer().size().sectors()
+                    - cache_tier.block_mgr.sizer().metadata_size().sectors(),
+                cache_tier.cache_segments.size() + cache_metadata_size
             );
 
             cache_tier.destroy().unwrap();
@@ -497,9 +494,8 @@ mod tests {
             // the tier.
             let cache_metadata_size = cache_tier.meta_segments.size();
 
-            let mut metadata_size = cache_tier.block_mgr.sizer().metadata_size();
-            let mut size = cache_tier.block_mgr.sizer().size();
-            let mut allocated = cache_tier.cache_segments.size();
+            let metadata_size = cache_tier.block_mgr.sizer().metadata_size();
+            let size = cache_tier.block_mgr.sizer().size();
 
             assert_eq!(
                 cache_tier.block_mgr.sizer().avail_space(),
@@ -507,7 +503,7 @@ mod tests {
             );
             assert_eq!(
                 size.sectors() - metadata_size.sectors(),
-                allocated + cache_metadata_size
+                cache_tier.cache_segments.size() + cache_metadata_size
             );
 
             let (_, (cache, meta)) = cache_tier.add(pool_uuid, devices2).unwrap();
@@ -525,12 +521,10 @@ mod tests {
                 cache_tier.block_mgr.sizer().metadata_size().sectors() > metadata_size.sectors()
             );
 
-            metadata_size = cache_tier.block_mgr.sizer().metadata_size();
-            size = cache_tier.block_mgr.sizer().size();
-            allocated = cache_tier.cache_segments.size();
             assert_eq!(
-                size.sectors() - metadata_size.sectors(),
-                allocated + cache_metadata_size
+                cache_tier.block_mgr.sizer().size().sectors()
+                    - cache_tier.block_mgr.sizer().metadata_size().sectors(),
+                cache_tier.cache_segments.size() + cache_metadata_size
             );
 
             cache_tier.destroy().unwrap();

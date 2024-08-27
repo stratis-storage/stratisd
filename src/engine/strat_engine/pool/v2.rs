@@ -1031,7 +1031,7 @@ impl Pool for StratPool {
         // event of, e.g, VDO, the amount will be far too large to be useful.
         self.thin_pool
             .total_physical_used()
-            .map(|u| u + self.metadata_size)
+            .map(|u| u + self.metadata_size + self.backstore.datatier_crypt_meta_size())
     }
 
     fn filesystems(&self) -> Vec<(Name, FilesystemUuid, &dyn Filesystem)> {

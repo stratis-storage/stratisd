@@ -863,6 +863,12 @@ impl Backstore {
         self.data_tier.metadata_size()
     }
 
+    /// Return the space used for crypt meta data. This space is rather hybrid,
+    /// because it is a component of allocated space but it is also metadata.
+    pub fn datatier_crypt_meta_size(&self) -> Sectors {
+        self.crypt_meta_allocs.iter().map(|(_, len)| *len).sum()
+    }
+
     /// Write the given data to the data tier's devices.
     pub fn save_state(&mut self, metadata: &[u8]) -> StratisResult<()> {
         self.data_tier.save_state(metadata)

@@ -1338,6 +1338,9 @@ where
             let snap_name = snap.name;
             snap.name = origin.name.to_owned();
 
+            let created = snap.created;
+            snap.created = origin.created;
+
             match StratFilesystem::setup(pool_uuid, &thinpool_dev, &snap) {
                 Ok(fs) => {
                     if let Err(e) = set_uuid(&fs.devnode(), snap.uuid) {
@@ -1381,6 +1384,7 @@ where
                     snap.origin = snap_origin;
                     snap.merge = snap_merge;
                     snap.name = snap_name;
+                    snap.created = created;
                     warn!(
                         "Snapshot {:?} could not be reverted into origin {:?}, reason: {:?}",
                         snap, origin, err

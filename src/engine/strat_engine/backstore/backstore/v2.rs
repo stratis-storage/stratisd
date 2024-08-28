@@ -1217,13 +1217,10 @@ mod tests {
                 _ => panic!("impossible; see first assertion"),
             }
         );
-        assert!(
-            backstore
-                .allocs
-                .iter()
-                .map(|(_, len)| *len)
-                .sum::<Sectors>()
-                <= backstore.size()
+        assert!(backstore.datatier_allocated_size() <= backstore.size());
+        assert_eq!(
+            backstore.datatier_allocated_size() + backstore.datatier_crypt_meta_size(),
+            backstore.data_tier.allocated()
         );
 
         backstore.data_tier.invariant();

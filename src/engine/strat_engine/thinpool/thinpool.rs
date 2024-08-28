@@ -1378,6 +1378,14 @@ where
                             origin.uuid, origin.thin_id, e
                         );
                     }
+                    for fs in filesystem_metadata_map.values_mut() {
+                        if fs.origin.map(|o| o == snap_uuid).unwrap_or(false)
+                            || (fs.origin.map(|o| o == origin.uuid).unwrap_or(false)
+                                && fs.created > created)
+                        {
+                            fs.origin = None;
+                        }
+                    }
                 }
                 Err(err) => {
                     snap.uuid = snap_uuid;

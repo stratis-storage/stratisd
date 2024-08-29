@@ -363,9 +363,8 @@ mod tests {
             data_tier.invariant();
 
             // A data_tier w/ some devices but nothing allocated
-            let mut size = data_tier.size();
-            let mut allocated = data_tier.allocated();
-            assert_eq!(allocated, Sectors(0));
+            let size = data_tier.size();
+            assert_eq!(data_tier.allocated(), Sectors(0));
             assert!(size != Sectors(0));
 
             let last_request_amount = size;
@@ -379,7 +378,8 @@ mod tests {
             // A data tier w/ some amount allocated
             assert!(data_tier.allocated() >= request_amount);
             assert_eq!(data_tier.size(), size);
-            allocated = data_tier.allocated();
+
+            let allocated = data_tier.allocated();
 
             data_tier.add(pool_name, pool_uuid, devices2, None).unwrap();
             data_tier.invariant();
@@ -388,7 +388,8 @@ mod tests {
             assert!(data_tier.size() > size);
             assert_eq!(data_tier.allocated(), allocated);
             assert_eq!(paths.len(), data_tier.blockdevs().len());
-            size = data_tier.size();
+
+            let size = data_tier.size();
 
             // Allocate enough to get into the newly added block devices
             assert!(data_tier.alloc(&[last_request_amount]));
@@ -444,9 +445,8 @@ mod tests {
             data_tier.invariant();
 
             // A data_tier w/ some devices but nothing allocated
-            let mut size = data_tier.size();
-            let mut allocated = data_tier.allocated();
-            assert_eq!(allocated, Sectors(0));
+            let size = data_tier.size();
+            assert_eq!(data_tier.allocated(), Sectors(0));
             assert!(size != Sectors(0));
 
             let last_request_amount = size;
@@ -460,7 +460,8 @@ mod tests {
             // A data tier w/ some amount allocated
             assert!(data_tier.allocated() >= request_amount);
             assert_eq!(data_tier.size(), size);
-            allocated = data_tier.allocated();
+
+            let allocated = data_tier.allocated();
 
             data_tier.add(pool_uuid, devices2).unwrap();
             data_tier.invariant();
@@ -469,7 +470,8 @@ mod tests {
             assert!(data_tier.size() > size);
             assert_eq!(data_tier.allocated(), allocated);
             assert_eq!(paths.len(), data_tier.blockdevs().len());
-            size = data_tier.size();
+
+            let size = data_tier.size();
 
             // Allocate enough to get into the newly added block devices
             assert!(data_tier.alloc(&[last_request_amount]));

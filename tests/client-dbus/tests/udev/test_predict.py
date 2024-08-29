@@ -61,7 +61,7 @@ def _call_predict_usage(encrypted, device_sizes, *, fs_specs=None, overprovision
     :param bool overprovision: whether it is allowed to overprovision the pool
     """
     with subprocess.Popen(
-        [_STRATIS_PREDICT_USAGE, "pool"]
+        [_STRATIS_PREDICT_USAGE, "--log-level=trace", "pool"]
         + [f"--device-size={size}" for size in device_sizes]
         + (
             []
@@ -210,8 +210,6 @@ class TestSpaceUsagePrediction(UdevTest):
         :param str prediction: result of calling script, JSON format
         :param MOPool mopool: object with pool properties
         """
-        encrypted = mopool.Encrypted()
-
         (success, total_physical_used) = mopool.TotalPhysicalUsed()
         if not success:
             raise RuntimeError("Pool's TotalPhysicalUsed property was invalid.")
@@ -221,17 +219,22 @@ class TestSpaceUsagePrediction(UdevTest):
             prediction["total"],
         )
 
-        if encrypted:
-            self.assertLess(mopool.TotalPhysicalSize(), total_prediction)
-            self.assertLess(total_physical_used, used_prediction)
-
-            diff1 = Range(total_prediction) - Range(mopool.TotalPhysicalSize())
-            diff2 = Range(used_prediction) - Range(total_physical_used)
-
-            self.assertEqual(diff1, diff2)
-        else:
-            self.assertEqual(mopool.TotalPhysicalSize(), total_prediction)
-            self.assertEqual(total_physical_used, used_prediction)
+        self.assertEqual(
+            mopool.TotalPhysicalSize(),
+            total_prediction,
+            msg=(
+                "Total physical size predictions do not match. "
+                f"Predicted sizes: {prediction}"
+            ),
+        )
+        self.assertEqual(
+            total_physical_used,
+            used_prediction,
+            msg=(
+                "Total physical used predictions do not match. "
+                f"Predicted sizes: {prediction}"
+            ),
+        )
 
     def _test_prediction(self, pool_name, *, fs_specs=None, overprovision=True):
         """

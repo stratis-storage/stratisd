@@ -43,7 +43,7 @@ def _call_predict_usage_pool(
     :param bool overprovision: whether it is allowed to overprovision the pool
     """
     with subprocess.Popen(
-        [_STRATIS_PREDICT_USAGE, "pool"]
+        [_STRATIS_PREDICT_USAGE, "--log-level=trace", "pool"]
         + [f"--device-size={size.magnitude}" for size in device_sizes]
         + (
             []
@@ -75,7 +75,7 @@ def _call_predict_usage_filesystem(fs_sizes, overprovision):
     """
 
     with subprocess.Popen(
-        [_STRATIS_PREDICT_USAGE, "filesystem"]
+        [_STRATIS_PREDICT_USAGE, "--log-level=trace", "filesystem"]
         + [f"--filesystem-size={size.magnitude}" for size in fs_sizes]
         + ([] if overprovision else ["--no-overprovision"]),
         stdout=subprocess.PIPE,

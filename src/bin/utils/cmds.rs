@@ -57,7 +57,10 @@ impl StratisPredictUsage {
                     .arg(Arg::new("encrypted")
                         .long("encrypted")
                         .action(ArgAction::SetTrue)
-                        .help("Whether the pool will be encrypted."),
+                        .help("Whether the pool will be encrypted.")
+                        .long_help(
+"Since space for crypt metadata is allocated regardless of whether or not the
+pool is encrypted, setting this option has no effect on the prediction."),
                     )
                     .arg(
                         Arg::new("no-overprovision")
@@ -112,7 +115,6 @@ impl<'a> UtilCommand<'a> for StratisPredictUsage {
         let matches = StratisPredictUsage::cmd().get_matches_from(command_line_args);
         match matches.subcommand() {
             Some(("pool", sub_m)) => predict_usage::predict_pool_usage(
-                sub_m.get_flag("encrypted"),
                 !sub_m.get_flag("no-overprovision"),
                 sub_m
                     .get_many::<String>("device-size")

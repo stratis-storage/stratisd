@@ -8,12 +8,14 @@ use std::{
 };
 
 use env_logger::Builder;
-use log::LevelFilter;
+use log::{info, LevelFilter};
 use serde_json::{json, Value};
 
 use devicemapper::{Bytes, Sectors};
 
-use stratisd::engine::{crypt_metadata_size, ThinPoolSizeParams, BDA};
+use stratisd::engine::{
+    crypt_metadata_size, integrity_meta_space, raid_meta_space, ThinPoolSizeParams, BDA,
+};
 
 // 2^FS_SIZE_START_POWER is the logical size of the smallest Stratis
 // filesystem for which usage data exists in FSSizeLookup::internal, i.e.,
@@ -161,11 +163,50 @@ pub fn predict_filesystem_usage(
     Ok(())
 }
 
+fn predict_pool_metadata_usage(device_sizes: Vec<Sectors>) -> Result<Sectors, Box<dyn Error>> {
+    let raid_metadata_alloc = raid_meta_space();
+    let stratis_metadata_alloc = BDA::default().extended_size().sectors();
+    let stratis_avail_sizes = device_sizes
+        .iter()
+        .map(|&s| {
+            info!("Total size of device: {:}", s);
+
+            let integrity_deduction = integrity_meta_space(s);
+            info!(
+                "Deduction for stratis metadata: {:}",
+                stratis_metadata_alloc
+            );
+
+            info!("Deduction for integrity space: {:}", integrity_deduction);
+            info!("Deduction for raid space: {:}", raid_metadata_alloc);
+            (*s).checked_sub(*stratis_metadata_alloc)
+                .and_then(|r| r.checked_sub(*raid_metadata_alloc))
+                .and_then(|r| r.checked_sub(*integrity_deduction))
+                .map(Sectors)
+                .map(|x| {
+                    info!("Size after deductions: {:}", x);
+                    x
+                })
+                .ok_or_else(|| {
+                    Box::new(PredictError(
+                        "Some device sizes too small for DM metadata.".into(),
+                    ))
+                })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let crypt_metadata_size = crypt_metadata_size();
+    let crypt_metadata_size_sectors = crypt_metadata_size.sectors();
+    // verify that crypt metadata size is divisible by sector size
+    assert_eq!(crypt_metadata_size_sectors.bytes(), crypt_metadata_size);
+
+    Ok(stratis_avail_sizes.iter().cloned().sum::<Sectors>() - crypt_metadata_size_sectors)
+}
+
 // Predict usage for a newly created pool given information about whether
 // or not the pool is encrypted, a list of device sizes, and an optional list
 // of filesystem sizes.
 pub fn predict_pool_usage(
-    encrypted: bool,
     overprovisioned: bool,
     device_sizes: Vec<Bytes>,
     filesystem_sizes: Option<Vec<Bytes>>,
@@ -177,48 +218,10 @@ pub fn predict_pool_usage(
         .map(|sizes| get_filesystem_prediction(overprovisioned, sizes))
         .transpose()?;
 
-    let crypt_metadata_size = if encrypted {
-        crypt_metadata_size()
-    } else {
-        Bytes(0)
-    };
-
-    let crypt_metadata_size_sectors = crypt_metadata_size.sectors();
-
-    // verify that crypt metadata size is divisible by sector size
-    assert_eq!(crypt_metadata_size_sectors.bytes(), crypt_metadata_size);
-
     let device_sizes = device_sizes.iter().map(|s| s.sectors()).collect::<Vec<_>>();
-
-    let stratis_device_sizes = device_sizes
-        .iter()
-        .map(|&s| {
-            (*s).checked_sub(*crypt_metadata_size_sectors)
-                .map(Sectors)
-                .ok_or_else(|| {
-                    Box::new(PredictError(
-                        "Some device sizes too small for encryption metadata.".into(),
-                    ))
-                })
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-
-    let stratis_metadata_size = BDA::default().extended_size().sectors();
-    let stratis_avail_sizes = stratis_device_sizes
-        .iter()
-        .map(|&s| {
-            (*s).checked_sub(*stratis_metadata_size)
-                .map(Sectors)
-                .ok_or_else(|| {
-                    Box::new(PredictError(
-                        "Some device sizes too small for Stratis metadata.".into(),
-                    ))
-                })
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-
     let total_size: Sectors = device_sizes.iter().cloned().sum();
-    let non_metadata_size: Sectors = stratis_avail_sizes.iter().cloned().sum();
+
+    let non_metadata_size = predict_pool_metadata_usage(device_sizes)?;
 
     let size_params = ThinPoolSizeParams::new(non_metadata_size)?;
     let total_non_data = 2usize * size_params.meta_size() + size_params.mdv_size();

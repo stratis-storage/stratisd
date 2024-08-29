@@ -24,7 +24,9 @@ mod writing;
 
 #[cfg(feature = "test_extras")]
 pub use self::{backstore::ProcessedPathInfos, pool::v1::StratPool};
+
 pub use self::{
+    backstore::{integrity_meta_space, raid_meta_space},
     crypt::{
         crypt_metadata_size, register_clevis_token, set_up_crypt_logging, CLEVIS_TANG_TRUST_URL,
     },

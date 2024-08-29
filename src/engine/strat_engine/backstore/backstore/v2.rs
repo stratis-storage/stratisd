@@ -166,17 +166,15 @@ impl InternalBackstore for Backstore {
     }
 
     fn datatier_allocated_size(&self) -> Sectors {
-        self.data_tier.allocated()
+        self.allocs.iter().map(|(_, length)| *length).sum()
     }
 
     fn datatier_usable_size(&self) -> Sectors {
-        self.data_tier.usable_size() - self.crypt_meta_allocs.iter().map(|(_, len)| *len).sum()
+        self.datatier_size() - self.datatier_metadata_size()
     }
 
     fn available_in_backstore(&self) -> Sectors {
-        self.data_tier.usable_size()
-            - self.allocs.iter().map(|(_, len)| *len).sum()
-            - self.crypt_meta_allocs.iter().map(|(_, len)| *len).sum()
+        self.datatier_usable_size() - self.datatier_allocated_size()
     }
 
     fn alloc(
@@ -218,12 +216,6 @@ impl InternalBackstore for Backstore {
 }
 
 impl Backstore {
-    /// Calculate size allocated to data and not metadata in the backstore.
-    #[cfg(test)]
-    pub fn data_alloc_size(&self) -> Sectors {
-        self.allocs.iter().map(|(_, length)| *length).sum()
-    }
-
     /// Calculate next from all of the metadata and data allocations present in the backstore.
     fn calc_next_cache(&self) -> StratisResult<Sectors> {
         let mut all_allocs = if self.allocs.is_empty() {
@@ -852,10 +844,20 @@ impl Backstore {
             })
     }
 
-    /// The number of sectors in the backstore given up to Stratis metadata
-    /// on devices in the data tier.
+    /// The space for the crypt meta device is allocated for the data tier,
+    /// but not directly from the devices of the data tier. Although it is,
+    /// strictly speaking, metadata, it is not included in the
+    /// data_tier.metadata_size() result, which only includes metadata
+    /// allocated directly from the blockdevs in the data tier.
+    /// The space is included in the data_tier.allocated() result, since it is
+    /// allocated from the assembled devices of the data tier.
+    fn datatier_crypt_meta_size(&self) -> Sectors {
+        self.crypt_meta_allocs.iter().map(|(_, len)| *len).sum()
+    }
+
+    /// Metadata size on the data tier, including crypt metadata space.
     pub fn datatier_metadata_size(&self) -> Sectors {
-        self.data_tier.metadata_size()
+        self.datatier_crypt_meta_size() + self.data_tier.metadata_size()
     }
 
     /// Write the given data to the data tier's devices.
@@ -1215,13 +1217,10 @@ mod tests {
                 _ => panic!("impossible; see first assertion"),
             }
         );
-        assert!(
-            backstore
-                .allocs
-                .iter()
-                .map(|(_, len)| *len)
-                .sum::<Sectors>()
-                <= backstore.size()
+        assert!(backstore.datatier_allocated_size() <= backstore.size());
+        assert_eq!(
+            backstore.datatier_allocated_size() + backstore.datatier_crypt_meta_size(),
+            backstore.data_tier.allocated()
         );
 
         backstore.data_tier.invariant();

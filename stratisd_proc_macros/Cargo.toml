@@ -19,7 +19,7 @@ proc-macro2 = "1.0.27"
 quote = "1.0.9"
 
 [dependencies.syn]
-version = "1.0.73"
+version = "2.0.0"
 features = ["full", "extra-traits"]
 
 [lints.rust]

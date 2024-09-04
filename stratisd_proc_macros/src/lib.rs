@@ -8,16 +8,16 @@ use proc_macro::TokenStream;
 use proc_macro2::{Group, Span, TokenStream as TokenStream2, TokenTree};
 use quote::quote;
 use syn::{
-    parse, parse_str, punctuated::Punctuated, token::Comma, Attribute, Block, FnArg, Ident,
-    ImplItem, ImplItemMethod, Item, Lit, Meta, MetaList, NestedMeta, Pat, PatIdent, PatType, Path,
-    PathSegment, Receiver, ReturnType, Stmt, Token, Type, TypePath,
+    parse, punctuated::Punctuated, token::Comma, Attribute, Block, FnArg, Ident, ImplItem,
+    ImplItemFn, Item, LitStr, Pat, PatIdent, PatType, Path, PathSegment, Receiver, ReturnType,
+    Stmt, Token, Type, TypePath,
 };
 
 /// Add guard for mutating actions when the pool is in maintenance mode.
 ///
 /// This method adds a statement that returns an error if the pool is set
 /// to limit available actions.
-fn add_method_guards(method: &mut ImplItemMethod, level: Ident) {
+fn add_method_guards(method: &mut ImplItemFn, level: Ident) {
     let stmt = if let ReturnType::Type(_, ty) = &method.sig.output {
         if let Type::Path(TypePath {
             path: Path { segments, .. },
@@ -136,7 +136,7 @@ fn process_token_stream(token: TokenTree) -> TokenTree {
 
 /// Take the body of the method and wrap it in an inner method, replacing the
 /// body with a check for an error that limits available actions.
-fn wrap_method(f: &mut ImplItemMethod) {
+fn wrap_method(f: &mut ImplItemFn) {
     let wrapped_ident = Ident::new(
         format!("{}_wrapped", f.sig.ident.clone()).as_str(),
         Span::call_site(),
@@ -190,62 +190,55 @@ fn wrap_method(f: &mut ImplItemMethod) {
         .expect("Could not parse generated method body as a block");
 }
 
-/// Get the pool available action state level at which a pool operation ceases to be
-/// accepted.
+/// Get the pool available action state level at which a pool operation ceases
+/// to be accepted. Panic if there is more than one pool_mutating_action
+/// specified.
 fn get_attr_level(attrs: &mut Vec<Attribute>) -> Option<Ident> {
-    let mut return_value = None;
-    let mut index = None;
-    for (i, attr) in attrs.iter().enumerate() {
-        if let Meta::List(MetaList {
-            ref path,
-            ref nested,
-            ..
-        }) = attr
-            .parse_meta()
-            .unwrap_or_else(|_| panic!("Attribute {attr:?} cannot be parsed"))
-        {
-            if path
-                == &parse_str("pool_mutating_action").expect("pool_mutating_action is valid path")
-            {
-                for nested_meta in nested.iter() {
-                    if let NestedMeta::Lit(Lit::Str(litstr)) = nested_meta {
-                        index = Some(i);
-                        return_value =
-                            Some(parse_str::<Ident>(&litstr.value()).unwrap_or_else(|_| {
-                                panic!("{} is not a valid identifier", litstr.value())
-                            }));
-                    } else {
-                        panic!("pool_mutating_action attribute must be in form #[pool_mutating_action(\"REJECTION LEVEL\")]");
-                    }
-                }
+    let matching_attrs = attrs
+        .iter()
+        .enumerate()
+        .filter(|(_, a)| a.path().is_ident("pool_mutating_action"))
+        .map(|(i, a)| {
+            if let Ok(level) = a.parse_args::<LitStr>() {
+                (i, level.parse::<Ident>().unwrap_or_else(|_| {panic!("{} is expected to be a valid identifier", level.value())}))
+            } else {
+                panic!("pool_mutating_action attribute must be in form #[pool_mutating_action(\"REJECTION LEVEL\")]")
             }
+        }).collect::<Vec<_>>();
+
+    match matching_attrs.len() {
+        0 => None,
+        1 => {
+            let (index, return_value) = &matching_attrs[0];
+            attrs.remove(*index);
+            Some(return_value.clone())
         }
+        _ => panic!(
+            "More than 1 pool_mutating_action arguments specified; ambiguous request can not be satisfied."
+        ),
     }
-    if let Some(i) = index {
-        attrs.remove(i);
-    }
-    return_value
 }
 
 /// Determine whether a method has the given attribute.
 fn has_attribute(attrs: &mut Vec<Attribute>, attribute: &str) -> bool {
-    let mut return_value = false;
-    let mut index = None;
-    for (i, attr) in attrs.iter().enumerate() {
-        if let Meta::Path(path) = attr
-            .parse_meta()
-            .unwrap_or_else(|_| panic!("Attribute {attr:?} cannot be parsed"))
-        {
-            if path == parse_str(attribute).expect("pool_mutating_action is valid path") {
-                index = Some(i);
-                return_value = true;
-            }
+    let matching_attrs = attrs
+        .iter()
+        .enumerate()
+        .filter(|(_, a)| a.path().is_ident(attribute))
+        .collect::<Vec<_>>();
+
+    match matching_attrs.len() {
+        0 => false,
+        1 => {
+            let (index, _) = matching_attrs[0];
+            attrs.remove(index);
+            true
         }
+        _ => panic!(
+            "More than 1 {} attribute specified for the same syntactic entity.",
+            attribute
+        ),
     }
-    if let Some(i) = index {
-        attrs.remove(i);
-    }
-    return_value
 }
 
 /// Determine whether a method should be marked as needing to handle failed rollback
@@ -265,7 +258,7 @@ fn process_item(mut item: Item) -> Item {
     };
 
     for impl_item in i.items.iter_mut() {
-        if let ImplItem::Method(ref mut f) = impl_item {
+        if let ImplItem::Fn(ref mut f) = impl_item {
             if let Some(level) = get_attr_level(&mut f.attrs) {
                 add_method_guards(f, level);
             }

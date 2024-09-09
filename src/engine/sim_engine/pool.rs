@@ -521,7 +521,7 @@ impl Pool for SimPool {
                     // removal.
                     if let Some((_, sn)) = self.filesystems.get_mut_by_uuid(sn_uuid) {
                         assert!(
-                            sn.unset_origin(),
+                            sn.set_origin(None),
                             "A snapshot can only have one origin, so it can be in snapshots.values() only once, so its origin value can be unset only once"
                         );
                         updated_origins.push(sn_uuid);

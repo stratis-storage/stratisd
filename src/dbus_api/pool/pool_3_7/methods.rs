@@ -83,7 +83,7 @@ pub fn destroy_filesystems(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodRe
                             })
                             .unwrap_or(false)
                     }) {
-                        dbus_context.push_filesystem_origin_change(sn_op.get_name());
+                        dbus_context.push_filesystem_origin_change(sn_op.get_name(), None);
                     }
 
                     changed_uuids

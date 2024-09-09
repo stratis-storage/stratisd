@@ -203,8 +203,7 @@ impl DbusTreeHandler {
         }
     }
 
-    fn handle_fs_origin_change(&self, item: Path<'static>) {
-        let origin_prop = fs_origin_to_prop(None);
+    fn handle_fs_origin_change(&self, item: Path<'static>, new_origin: Option<FilesystemUuid>) {
         if self
             .property_changed_invalidated_signal(
                 &item,
@@ -212,7 +211,7 @@ impl DbusTreeHandler {
                     consts::FILESYSTEM_INTERFACE_NAME_3_7 => {
                         vec![],
                         consts::FILESYSTEM_ORIGIN_PROP.to_string() =>
-                        box_variant!(origin_prop.clone())
+                        box_variant!(fs_origin_to_prop(new_origin))
                     }
                 },
             )
@@ -1235,8 +1234,8 @@ impl DbusTreeHandler {
                 self.handle_fs_name_change(item, new_name);
                 Ok(true)
             }
-            DbusAction::FsOriginChange(item) => {
-                self.handle_fs_origin_change(item);
+            DbusAction::FsOriginChange(item, new_origin) => {
+                self.handle_fs_origin_change(item, new_origin);
                 Ok(true)
             }
             DbusAction::PoolNameChange(item, new_name) => {

@@ -1826,7 +1826,8 @@ impl ThinPool {
         &mut self,
         pool_name: &str,
         fs_uuids: &HashSet<FilesystemUuid>,
-    ) -> StratisResult<SetDeleteAction<FilesystemUuid, FilesystemUuid>> {
+    ) -> StratisResult<SetDeleteAction<FilesystemUuid, (FilesystemUuid, Option<FilesystemUuid>)>>
+    {
         let to_be_merged = fs_uuids
             .iter()
             .filter(|u| {
@@ -1871,7 +1872,11 @@ impl ThinPool {
 
         let (mut removed, mut updated_origins) = (Vec::new(), Vec::new());
         for &uuid in fs_uuids {
-            if let Some(uuid) = self.destroy_filesystem(pool_name, uuid)? {
+            if let Some((_, fs)) = self.get_filesystem_by_uuid(uuid) {
+                let fs_origin = fs.origin();
+                let uuid = self
+                    .destroy_filesystem(pool_name, uuid)?
+                    .expect("just looked up");
                 removed.push(uuid);
 
                 for (sn_uuid, _) in snapshots.remove(&uuid).unwrap_or_else(Vec::new) {
@@ -1880,10 +1885,10 @@ impl ThinPool {
                     // removal.
                     if let Some((_, sn)) = self.get_mut_filesystem_by_uuid(sn_uuid) {
                         assert!(
-                            sn.set_origin(None),
-                            "A snapshot can only have one origin, so it can be in snapshots.values() only once, so its origin value can be unset only once"
+                            sn.set_origin(fs_origin),
+                            "A snapshot can only have one origin, so it can be in snapshots.values() only once, so its origin value can be set only once"
                         );
-                        updated_origins.push(sn_uuid);
+                        updated_origins.push((sn_uuid, fs_origin));
 
                         let (name, sn) = self.get_filesystem_by_uuid(sn_uuid).expect("just got");
                         self.mdv.save_fs(&name, sn_uuid, sn)?;

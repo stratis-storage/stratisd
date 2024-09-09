@@ -491,7 +491,8 @@ impl Pool for SimPool {
         &mut self,
         _pool_name: &str,
         fs_uuids: &HashSet<FilesystemUuid>,
-    ) -> StratisResult<SetDeleteAction<FilesystemUuid, FilesystemUuid>> {
+    ) -> StratisResult<SetDeleteAction<FilesystemUuid, (FilesystemUuid, Option<FilesystemUuid>)>>
+    {
         let mut snapshots = self
             .filesystems()
             .iter()
@@ -522,7 +523,11 @@ impl Pool for SimPool {
 
         let (mut removed, mut updated_origins) = (Vec::new(), Vec::new());
         for &uuid in fs_uuids {
-            if self.filesystems.remove_by_uuid(uuid).is_some() {
+            if let Some((_, fs)) = self.get_filesystem(uuid) {
+                let fs_origin = fs.origin();
+                self.filesystems
+                    .remove_by_uuid(uuid)
+                    .expect("just looked up");
                 removed.push(uuid);
 
                 for (sn_uuid, _) in snapshots.remove(&uuid).unwrap_or_else(Vec::new) {
@@ -531,10 +536,10 @@ impl Pool for SimPool {
                     // removal.
                     if let Some((_, sn)) = self.filesystems.get_mut_by_uuid(sn_uuid) {
                         assert!(
-                            sn.set_origin(None),
-                            "A snapshot can only have one origin, so it can be in snapshots.values() only once, so its origin value can be unset only once"
+                            sn.set_origin(fs_origin),
+                            "A snapshot can only have one origin, so it can be in snapshots.values() only once, so its origin value can be set only once"
                         );
-                        updated_origins.push(sn_uuid);
+                        updated_origins.push((sn_uuid, fs_origin));
                     };
                 }
             }

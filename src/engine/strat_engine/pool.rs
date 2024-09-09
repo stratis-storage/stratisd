@@ -1006,7 +1006,8 @@ impl Pool for StratPool {
         &mut self,
         pool_name: &str,
         fs_uuids: &HashSet<FilesystemUuid>,
-    ) -> StratisResult<SetDeleteAction<FilesystemUuid, FilesystemUuid>> {
+    ) -> StratisResult<SetDeleteAction<FilesystemUuid, (FilesystemUuid, Option<FilesystemUuid>)>>
+    {
         self.thin_pool.destroy_filesystems(pool_name, fs_uuids)
     }
 

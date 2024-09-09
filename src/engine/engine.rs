@@ -212,7 +212,7 @@ pub trait Pool: Debug + Send + Sync {
         &mut self,
         pool_name: &str,
         fs_uuids: &HashSet<FilesystemUuid>,
-    ) -> StratisResult<SetDeleteAction<FilesystemUuid, FilesystemUuid>>;
+    ) -> StratisResult<SetDeleteAction<FilesystemUuid, (FilesystemUuid, Option<FilesystemUuid>)>>;
 
     /// Rename filesystem
     /// Rename pool with uuid to new_name.

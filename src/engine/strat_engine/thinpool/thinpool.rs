@@ -1380,7 +1380,7 @@ where
                     }
                     for fs in filesystem_metadata_map.values_mut() {
                         if fs.origin.map(|o| o == snap_uuid).unwrap_or(false) {
-                            fs.origin = None;
+                            fs.origin = Some(origin.uuid);
                         }
                     }
                 }

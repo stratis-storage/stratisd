@@ -87,9 +87,9 @@ impl SimFilesystem {
         }
     }
 
-    pub fn unset_origin(&mut self) -> bool {
-        let changed = self.origin.is_some();
-        self.origin = None;
+    pub fn set_origin(&mut self, value: Option<FilesystemUuid>) -> bool {
+        let changed = self.origin != value;
+        self.origin = value;
         changed
     }
 

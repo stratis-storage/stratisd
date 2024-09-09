@@ -123,7 +123,8 @@ impl Pool for AnyPool {
         &mut self,
         pool_name: &str,
         fs_uuids: &HashSet<FilesystemUuid>,
-    ) -> StratisResult<SetDeleteAction<FilesystemUuid, FilesystemUuid>> {
+    ) -> StratisResult<SetDeleteAction<FilesystemUuid, (FilesystemUuid, Option<FilesystemUuid>)>>
+    {
         match self {
             AnyPool::V1(p) => p.destroy_filesystems(pool_name, fs_uuids),
             AnyPool::V2(p) => p.destroy_filesystems(pool_name, fs_uuids),

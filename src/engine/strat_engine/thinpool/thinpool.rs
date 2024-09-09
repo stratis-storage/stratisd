@@ -1330,10 +1330,11 @@ where
             snap.uuid = origin.uuid;
 
             let snap_origin = snap.origin;
-            snap.origin = None;
+            snap.origin = origin.origin;
 
+            assert!(!origin.merge.unwrap_or(false));
             let snap_merge = snap.merge;
-            snap.merge = Some(false);
+            snap.merge = origin.merge;
 
             let snap_name = snap.name;
             snap.name = origin.name.to_owned();

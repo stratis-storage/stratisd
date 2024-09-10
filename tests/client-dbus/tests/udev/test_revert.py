@@ -49,6 +49,9 @@ class TestRevert(UdevTest):
         """
         Schedule a revert and verify that it has succeeded when the pool is
         restarted.
+
+        First simply stop and start stratisd. In this way it is possible to
+        verify that when a revert fails, the pool is setup, without the revert.
         """
         mountdir = tempfile.mkdtemp("_stratis_mnt")
 

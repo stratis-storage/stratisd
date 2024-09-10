@@ -55,3 +55,7 @@ jobs:
                 tmt:
                     context:
                         plan: "cockpit"
+
+notifications:
+    pull_request:
+        successful_build: true

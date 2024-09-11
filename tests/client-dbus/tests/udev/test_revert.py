@@ -43,10 +43,25 @@ from ._utils import (
 )
 
 
+def write_file(mountdir, filename):
+    """
+    Write a sentinel value derived from the filename to a file.
+    """
+    with open(os.path.join(mountdir, filename), encoding="utf-8", mode="w") as fd:
+        print(filename, file=fd, end="")
+
+
 class TestRevert(UdevTest):
     """
     Test reverting a filesystem.
     """
+
+    def read_file(self, mountdir, filename):
+        """
+        Read a file and verify that it contains the expected sentinel value.
+        """
+        with open(os.path.join(mountdir, filename), encoding="utf-8") as fd:
+            self.assertEqual(fd.read(), filename)
 
     def test_revert(self):  # pylint: disable=too-many-locals
         """
@@ -87,8 +102,7 @@ class TestRevert(UdevTest):
             subprocess.check_call(["mount", filepath, mountdir])
 
             file1 = "file1.txt"
-            with open(os.path.join(mountdir, file1), encoding="utf-8", mode="w") as fd:
-                print(file1, file=fd, end="")
+            write_file(mountdir, file1)
 
             snap_name = "snap1"
             ((_, snap_object_path), return_code, message) = (
@@ -102,8 +116,7 @@ class TestRevert(UdevTest):
                 raise RuntimeError(f"Failed to create requested snapshot: {message}")
 
             file2 = "file2.txt"
-            with open(os.path.join(mountdir, file2), encoding="utf-8", mode="w") as fd:
-                print(file2, file=fd, end="")
+            write_file(mountdir, file2)
 
             Filesystem.Properties.MergeScheduled.Set(get_object(snap_object_path), True)
             subprocess.check_call(["umount", mountdir])
@@ -120,11 +133,8 @@ class TestRevert(UdevTest):
 
             subprocess.check_call(["mount", filepath, mountdir])
 
-            with open(os.path.join(mountdir, file1), encoding="utf-8") as fd:
-                self.assertEqual(fd.read(), file1)
-
-            with open(os.path.join(mountdir, file2), encoding="utf-8") as fd:
-                self.assertEqual(fd.read(), file2)
+            self.read_file(mountdir, file1)
+            self.read_file(mountdir, file2)
 
             subprocess.check_call(["umount", mountdir])
 
@@ -159,8 +169,7 @@ class TestRevert(UdevTest):
 
             subprocess.check_call(["mount", filepath, mountdir])
 
-            with open(os.path.join(mountdir, file1), encoding="utf-8") as fd:
-                self.assertEqual(fd.read(), file1)
+            self.read_file(mountdir, file1)
 
             self.assertFalse(os.path.exists(os.path.join(mountdir, file2)))
             self.assertFalse(os.path.exists(f"/dev/stratis/{pool_name}/{snap_name}"))
@@ -205,8 +214,7 @@ class TestRevert(UdevTest):
             subprocess.check_call(["mount", filepath, mountdir])
 
             file1 = "file1.txt"
-            with open(os.path.join(mountdir, file1), encoding="utf-8", mode="w") as fd:
-                print(file1, file=fd, end="")
+            write_file(mountdir, file1)
 
             snap_name_1 = "snap1"
             ((_, snap_object_path_1), return_code, message) = (
@@ -220,8 +228,7 @@ class TestRevert(UdevTest):
                 raise RuntimeError(f"Failed to create requested snapshot: {message}")
 
             file2 = "file2.txt"
-            with open(os.path.join(mountdir, file2), encoding="utf-8", mode="w") as fd:
-                print(file2, file=fd, end="")
+            write_file(mountdir, file2)
 
             Filesystem.Properties.MergeScheduled.Set(
                 get_object(snap_object_path_1), True
@@ -280,8 +287,7 @@ class TestRevert(UdevTest):
 
             subprocess.check_call(["mount", filepath, mountdir])
 
-            with open(os.path.join(mountdir, file1), encoding="utf-8") as fd:
-                self.assertEqual(fd.read(), file1)
+            self.read_file(mountdir, file1)
 
             self.assertFalse(os.path.exists(os.path.join(mountdir, file2)))
             self.assertFalse(os.path.exists(f"/dev/stratis/{pool_name}/{snap_name_1}"))

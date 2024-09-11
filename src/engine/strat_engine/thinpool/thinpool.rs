@@ -34,6 +34,7 @@ use crate::{
                 ThinRole,
             },
             serde_structs::{FlexDevsSave, Recordable, ThinPoolDevSave},
+            shared::merge,
             thinpool::{filesystem::StratFilesystem, mdv::MetadataVol, thinids::ThinDevIdPool},
             writing::wipe_sectors,
         },
@@ -1330,48 +1331,35 @@ where
         }
 
         let mut fs_table = Table::default();
-        for (origin, mut snap) in ready_to_merge {
-            let snap_uuid = snap.uuid;
-            snap.uuid = origin.uuid;
-
-            let snap_origin = snap.origin;
-            snap.origin = origin.origin;
-
+        for (origin, snap) in ready_to_merge {
             assert!(!origin.merge.unwrap_or(false));
-            let snap_merge = snap.merge;
-            snap.merge = origin.merge;
+            let merged = merge(&origin, &snap);
 
-            let snap_name = snap.name;
-            snap.name = origin.name.to_owned();
-
-            let created = snap.created;
-            snap.created = origin.created;
-
-            match StratFilesystem::setup(pool_uuid, &thinpool_dev, &snap) {
+            match StratFilesystem::setup(pool_uuid, &thinpool_dev, &merged) {
                 Ok(fs) => {
-                    if let Err(e) = set_uuid(&fs.devnode(), snap.uuid) {
+                    if let Err(e) = set_uuid(&fs.devnode(), merged.uuid) {
                         error!(
                             "Could not set the UUID of the XFS filesystem on the Stratis filesystem with UUID {} after revert, reason: {:?}",
-                            snap.uuid, e
+                            merged.uuid, e
                         );
                     };
-                    fs.udev_fs_change(pool_name, snap.uuid, &snap.name);
+                    fs.udev_fs_change(pool_name, merged.uuid, &merged.name);
 
-                    let name = Name::new(snap.name.to_owned());
-                    if let Err(e) = mdv.save_fs(&name, snap.uuid, &fs) {
+                    let name = Name::new(merged.name.to_owned());
+                    if let Err(e) = mdv.save_fs(&name, merged.uuid, &fs) {
                         error!(
                             "Could not save MDV for fs with UUID {} and name {} belonging to pool with UUID {} after revert, reason: {:?}",
-                            snap.uuid, snap.name, pool_uuid, e
+                            merged.uuid, merged.name, pool_uuid, e
                         );
                     }
-                    if let Err(e) = mdv.rm_fs(snap_uuid) {
+                    if let Err(e) = mdv.rm_fs(snap.uuid) {
                         error!(
                             "Could not remove old MDV for fs with UUID {} belonging to pool with UUID {} after revert, reason: {:?}",
-                            snap_uuid, pool_uuid, e
+                            snap.uuid, pool_uuid, e
                         );
                     };
                     assert!(
-                        fs_table.insert(name, snap.uuid, fs).is_none(),
+                        fs_table.insert(name, merged.uuid, fs).is_none(),
                         "Duplicates already removed when building filesystem_metadata_map"
                     );
                     if let Err(e) = message(
@@ -1385,17 +1373,12 @@ where
                         );
                     }
                     for fs in filesystem_metadata_map.values_mut() {
-                        if fs.origin.map(|o| o == snap_uuid).unwrap_or(false) {
+                        if fs.origin.map(|o| o == snap.uuid).unwrap_or(false) {
                             fs.origin = Some(origin.uuid);
                         }
                     }
                 }
                 Err(err) => {
-                    snap.uuid = snap_uuid;
-                    snap.origin = snap_origin;
-                    snap.merge = snap_merge;
-                    snap.name = snap_name;
-                    snap.created = created;
                     warn!(
                         "Snapshot {:?} could not be reverted into origin {:?}, reason: {:?}",
                         snap, origin, err

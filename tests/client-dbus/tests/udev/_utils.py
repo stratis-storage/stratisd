@@ -30,6 +30,7 @@ from tempfile import NamedTemporaryFile
 import dbus
 import psutil
 import pyudev
+from tenacity import Retrying, retry_if_exception_type, stop_after_delay, wait_fixed
 
 # isort: LOCAL
 from stratisd_client_dbus import (
@@ -256,27 +257,24 @@ class _Service:
             text=True,
         )
 
-        dbus_interface_present = False
-        limit = time.time() + 120.0
-        while (
-            time.time() <= limit
-            and not dbus_interface_present
-            and service.poll() is None
-        ):
-            try:
-                get_object(TOP_OBJECT)
-                dbus_interface_present = True
-            except dbus.exceptions.DBusException:
-                time.sleep(0.5)
+        try:
+            for attempt in Retrying(
+                retry=(retry_if_exception_type(dbus.exceptions.DBusException)),
+                stop=stop_after_delay(120),
+                wait=wait_fixed(0.5),
+                reraise=True,
+            ):
+                if service.poll() is not None:
+                    raise RuntimeError(
+                        f"Daemon unexpectedly exited with exit code {service.returncode}"
+                    )
 
-        time.sleep(1)
-        if service.poll() is not None:
+                with attempt:
+                    get_object(TOP_OBJECT)
+        except dbus.exceptions.DBusException as err:
             raise RuntimeError(
-                f"Daemon unexpectedly exited with exit code {service.returncode}"
-            )
-
-        if not dbus_interface_present:
-            raise RuntimeError("No D-Bus interface for stratisd found")
+                "No D-Bus interface for stratisd found although stratisd appears to be running"
+            ) from err
 
         self._service = service  # pylint: disable=attribute-defined-outside-init
         return self

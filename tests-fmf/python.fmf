@@ -9,6 +9,7 @@ require:
   - python3-dbus-python-client-gen
   - python3-psutil
   - python3-pyudev
+  - python3-tenacity
 
 environment:
   TANG_URL: localhost

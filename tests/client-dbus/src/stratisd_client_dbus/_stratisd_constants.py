@@ -50,6 +50,5 @@ class EncryptionMethod(Enum):
     KEYRING = "keyring"
     CLEVIS = "clevis"
 
-    # pylint: disable=invalid-str-returned
     def __str__(self):
         return self.value

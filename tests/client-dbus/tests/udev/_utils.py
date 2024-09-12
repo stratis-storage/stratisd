@@ -324,7 +324,6 @@ class _Service:
     Start and stop stratisd.
     """
 
-    # pylint: disable=consider-using-with
     def start_service(self):
         """
         Starts the stratisd service if it is not already started. Verifies
@@ -337,7 +336,7 @@ class _Service:
         if next(processes("stratisd"), None) is not None:
             raise RuntimeError("A stratisd process is already running")
 
-        service = subprocess.Popen(
+        service = subprocess.Popen(  # pylint: disable=consider-using-with
             [x for x in _STRATISD.split(" ") if x != ""],
             text=True,
         )

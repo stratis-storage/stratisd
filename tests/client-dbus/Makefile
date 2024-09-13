@@ -38,3 +38,7 @@ filesystem-predict-tests:
 .PHONY: dump-metadata-tests
 dump-metadata-tests:
 	python3 -m unittest ${UNITTEST_OPTS} tests.udev.test_dump
+
+.PHONY: model-tests
+model-tests:
+	python3 -m unittest ${UNITTEST_OPTS} tests.udev.test_hypothesis_stateful

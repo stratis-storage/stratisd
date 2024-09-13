@@ -42,6 +42,7 @@ jobs:
               pylint
               python3-dbus-client-gen
               python3-dbus-python-client-gen
+              python3-hypothesis
               python3-justbytes
               python3-psutil
               python3-pyudev

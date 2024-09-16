@@ -226,6 +226,7 @@ jobs:
           justbytes
           psutil
           pyudev
+          tenacity
       - uses: dtolnay/rust-toolchain@master
         with:
           components: cargo

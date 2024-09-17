@@ -17,8 +17,8 @@ use crate::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
             EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo, Key,
             KeyDescription, Name, OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolUuid,
-            PropChangeAction, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
-            StratSigblockVersion,
+            PropChangeAction, ReencryptedDevice, RegenAction, RenameAction, SetCreateAction,
+            SetDeleteAction, StratSigblockVersion,
         },
     },
     stratis::StratisResult,
@@ -360,6 +360,13 @@ impl Pool for AnyPool {
         match self {
             AnyPool::V1(p) => p.encrypt_pool(name, pool_uuid, encryption_info),
             AnyPool::V2(p) => p.encrypt_pool(name, pool_uuid, encryption_info),
+        }
+    }
+
+    fn reencrypt_pool(&mut self, pool_uuid: PoolUuid) -> StratisResult<ReencryptedDevice> {
+        match self {
+            AnyPool::V1(p) => p.reencrypt_pool(pool_uuid),
+            AnyPool::V2(p) => p.reencrypt_pool(pool_uuid),
         }
     }
 

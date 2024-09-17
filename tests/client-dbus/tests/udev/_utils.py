@@ -240,6 +240,9 @@ class _Service:
     Start and stop stratisd.
     """
 
+    def __init__(self):
+        self._service = None
+
     def start_service(self):
         """
         Starts the stratisd service if it is not already started. Verifies
@@ -276,7 +279,7 @@ class _Service:
                 "No D-Bus interface for stratisd found although stratisd appears to be running"
             ) from err
 
-        self._service = service  # pylint: disable=attribute-defined-outside-init
+        self._service = service
         return self
 
     def stop_service(self):
@@ -284,6 +287,9 @@ class _Service:
         Stops the stratisd daemon previously spawned.
         :return: None
         """
+        if self._service is None:
+            return
+
         self._service.send_signal(signal.SIGINT)
         self._service.wait(timeout=30)
         if next(processes("stratisd"), None) is not None:

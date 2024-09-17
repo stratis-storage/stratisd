@@ -1322,6 +1322,20 @@ impl Backstore {
         Ok(())
     }
 
+    pub fn reencrypt(&self, pool_uuid: PoolUuid) -> StratisResult<()> {
+        match self.cap_device.enc {
+            Some(Either::Left(_)) => {
+                Err(StratisError::Msg("Encrypted pool where the encrypted device has not yet been created cannot be reencrypted".to_string()))
+            }
+            Some(Either::Right(ref handle)) => {
+                handle.reencrypt(pool_uuid)
+            }
+            None => {
+                Err(StratisError::Msg("Unencrypted device cannot be reencrypted".to_string()))
+            }
+        }
+    }
+
     /// A summary of block sizes
     pub fn block_size_summary(&self, tier: BlockDevTier) -> Option<BlockSizeSummary> {
         match tier {

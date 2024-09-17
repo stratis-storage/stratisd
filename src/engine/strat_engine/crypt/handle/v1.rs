@@ -44,7 +44,8 @@ use crate::{
                     acquire_crypt_device, activate, add_keyring_keyslot, check_luks2_token,
                     clevis_decrypt, clevis_info_from_metadata, device_from_physical_path,
                     ensure_inactive, ensure_wiped, get_keyslot_number, interpret_clevis_config,
-                    key_desc_from_metadata, luks2_token_type_is_valid, read_key, wipe_fallback,
+                    key_desc_from_metadata, luks2_token_type_is_valid, read_key, reencrypt_shared,
+                    wipe_fallback,
                 },
             },
             dm::DEVICEMAPPER_PATH,
@@ -1022,6 +1023,11 @@ impl CryptHandle {
             .clone()
             .set_key_desc(new_key_desc.clone());
         Ok(())
+    }
+
+    /// Encrypt an unencrypted pool.
+    pub fn reencrypt(&self) -> StratisResult<()> {
+        reencrypt_shared(self.luks2_device_path(), self.encryption_info())
     }
 
     /// Rename the pool in the LUKS2 token.

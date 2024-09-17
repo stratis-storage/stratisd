@@ -23,8 +23,8 @@ use crate::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
             EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription,
             LockedPoolsInfo, MappingCreateAction, MappingDeleteAction, Name, PoolDiff,
-            PoolEncryptionInfo, PoolIdentifier, PoolUuid, RegenAction, RenameAction, ReportType,
-            SetCreateAction, SetDeleteAction, SetUnlockAction, StartAction, StopAction,
+            PoolEncryptionInfo, PoolIdentifier, PoolUuid, Reencrypt, RegenAction, RenameAction,
+            ReportType, SetCreateAction, SetDeleteAction, SetUnlockAction, StartAction, StopAction,
             StoppedPoolsInfo, StratFilesystemDiff, StratSigblockVersion, UdevEngineEvent,
             UnlockMethod,
         },
@@ -350,6 +350,9 @@ pub trait Pool: Debug + Send + Sync {
         pool_uuid: PoolUuid,
         encryption_info: &EncryptionInfo,
     ) -> StratisResult<CreateAction<EncryptedDevice>>;
+
+    /// Reencrypt an encrypted pool.
+    fn reencrypt_pool(&mut self) -> StratisResult<Reencrypt>;
 
     /// Return the metadata that would be written if metadata were written.
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String>;

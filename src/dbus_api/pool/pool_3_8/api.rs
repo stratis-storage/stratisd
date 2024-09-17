@@ -4,7 +4,10 @@
 
 use dbus_tree::{Factory, MTSync, Method};
 
-use crate::dbus_api::{pool::pool_3_8::methods::encrypt_pool, types::TData};
+use crate::dbus_api::{
+    pool::pool_3_8::methods::{encrypt_pool, reencrypt_pool},
+    types::TData,
+};
 
 pub fn encrypt_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
     f.method("EncryptPool", (), encrypt_pool)
@@ -24,6 +27,16 @@ pub fn encrypt_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<T
         // Rust representation: (bool, (String, String))
         .in_arg(("clevis_info", "(b(ss))"))
         // b: true if pool was newly encrypted
+        //
+        // Rust representation: bool
+        .out_arg(("results", "b"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"))
+}
+
+pub fn reencrypt_pool_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
+    f.method("ReencryptPool", (), reencrypt_pool)
+        // b: true if successful
         //
         // Rust representation: bool
         .out_arg(("results", "b"))

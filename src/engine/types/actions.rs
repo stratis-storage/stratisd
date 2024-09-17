@@ -838,3 +838,12 @@ impl<T> EngineAction for PropChangeAction<T> {
         }
     }
 }
+
+/// Return value indicating a successful reencrypt operation on the pool
+pub struct Reencrypt;
+
+impl Display for Reencrypt {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Reencryption operation was completed successfully")
+    }
+}

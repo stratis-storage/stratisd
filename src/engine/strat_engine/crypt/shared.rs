@@ -20,12 +20,14 @@ use devicemapper::{Bytes, DevId, DmName, DmOptions};
 use libcryptsetup_rs::{
     c_uint,
     consts::{
-        flags::{CryptActivate, CryptVolumeKey, CryptWipe},
+        flags::{CryptActivate, CryptReencrypt, CryptVolumeKey, CryptWipe},
         vals::{
-            CryptDebugLevel, CryptLogLevel, CryptStatusInfo, CryptWipePattern, EncryptionFormat,
+            CryptDebugLevel, CryptLogLevel, CryptReencryptDirectionInfo, CryptReencryptModeInfo,
+            CryptStatusInfo, CryptWipePattern, EncryptionFormat,
         },
     },
-    register, set_debug_level, set_log_callback, CryptDevice, CryptInit, LibcryptErr,
+    get_sector_size, register, set_debug_level, set_log_callback, CryptDevice, CryptInit,
+    CryptParamsLuks2, CryptParamsReencrypt, LibcryptErr,
 };
 
 use crate::{
@@ -928,4 +930,49 @@ pub fn get_passphrase(
             }
         },
     }
+}
+
+pub fn reencrypt_shared(luks2_path: &Path, encryption_info: &EncryptionInfo) -> StratisResult<()> {
+    let mut device = CryptInit::init(luks2_path)?;
+
+    let (keyslot, key) = get_passphrase(&mut device, encryption_info)?;
+    let new_keyslot =
+        device
+            .keyslot_handle()
+            .add_by_key(None, None, key.as_ref(), CryptVolumeKey::NO_SEGMENT)?;
+
+    let cipher = device.status_handle().get_cipher()?;
+    let cipher_mode = device.status_handle().get_cipher_mode()?;
+    let sector_size = convert_int!(get_sector_size(Some(&mut device)), i32, u32)?;
+    device.reencrypt_handle().reencrypt_init_by_passphrase(
+        None,
+        key.as_ref(),
+        Some(keyslot),
+        new_keyslot,
+        (&cipher, &cipher_mode),
+        CryptParamsReencrypt {
+            mode: CryptReencryptModeInfo::Reencrypt,
+            direction: CryptReencryptDirectionInfo::Forward,
+            resilience: "checksum".to_string(),
+            hash: "sha256".to_string(),
+            data_shift: 0,
+            max_hotzone_size: 0,
+            device_size: 0,
+            luks2: CryptParamsLuks2 {
+                data_alignment: 0,
+                data_device: None,
+                integrity: None,
+                integrity_params: None,
+                pbkdf: None,
+                label: None,
+                sector_size,
+                subsystem: None,
+            },
+            flags: CryptReencrypt::INITIALIZE_ONLY,
+        },
+    )?;
+
+    device.reencrypt_handle().reencrypt2::<()>(None, None)?;
+
+    Ok(())
 }

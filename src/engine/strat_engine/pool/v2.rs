@@ -39,7 +39,7 @@ use crate::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
             Diff, EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, Key, KeyDescription,
             Name, OffsetDirection, PoolDiff, PoolEncryptionInfo, PoolUuid, PropChangeAction,
-            RegenAction, RenameAction, SetCreateAction, SetDeleteAction, SizedKeyMemory,
+            Reencrypt, RegenAction, RenameAction, SetCreateAction, SetDeleteAction, SizedKeyMemory,
             StratFilesystemDiff, StratPoolDiff, StratSigblockVersion, UnlockMethod,
         },
     },
@@ -1228,6 +1228,14 @@ impl Pool for StratPool {
                 Ok(CreateAction::Created(EncryptedDevice))
             }
         }
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn reencrypt_pool(&mut self) -> StratisResult<Reencrypt> {
+        self.thin_pool.suspend()?;
+        let encrypt_res = self.backstore.reencrypt();
+        self.thin_pool.resume()?;
+        encrypt_res.map(|_| Reencrypt)
     }
 
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String> {

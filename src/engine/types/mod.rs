@@ -24,8 +24,9 @@ pub use crate::engine::{
     types::{
         actions::{
             Clevis, CreateAction, DeleteAction, EncryptedDevice, EngineAction, GrowAction, Key,
-            MappingCreateAction, MappingDeleteAction, PropChangeAction, RegenAction, RenameAction,
-            SetCreateAction, SetDeleteAction, SetUnlockAction, StartAction, StopAction, ToDisplay,
+            MappingCreateAction, MappingDeleteAction, PropChangeAction, Reencrypt, RegenAction,
+            RenameAction, SetCreateAction, SetDeleteAction, SetUnlockAction, StartAction,
+            StopAction, ToDisplay,
         },
         diff::{
             Compare, Diff, PoolDiff, StratBlockDevDiff, StratFilesystemDiff, StratPoolDiff,

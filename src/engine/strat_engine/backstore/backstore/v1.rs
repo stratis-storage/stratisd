@@ -862,6 +862,26 @@ impl Backstore {
         }
     }
 
+    /// Reencrypt all encrypted devices in the pool.
+    ///
+    /// Returns:
+    /// * Ok(()) if successful
+    /// * Err(_) if an operation fails while reencrypting the devices.
+    pub fn reencrypt(&mut self) -> StratisResult<()> {
+        if self.encryption_info().is_none() {
+            return Err(StratisError::Msg(
+                "Requested pool does not appear to be encrypted".to_string(),
+            ));
+        };
+
+        // Keys are not the same but key description is present
+        operation_loop(
+            self.blockdevs_mut().into_iter().map(|(_, _, bd)| bd),
+            |blockdev| blockdev.reencrypt(),
+        )?;
+        Ok(())
+    }
+
     /// Regenerate the Clevis bindings with the block devices in this pool using
     /// the same configuration.
     ///

@@ -46,8 +46,8 @@ use crate::{
             ActionAvailability, BlockDevTier, Clevis, Compare, CreateAction, DeleteAction, DevUuid,
             Diff, EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo,
             Key, KeyDescription, Name, OffsetDirection, OptionalTokenSlotInput, PoolDiff,
-            PoolEncryptionInfo, PoolUuid, PropChangeAction, RegenAction, RenameAction,
-            SetCreateAction, SetDeleteAction, StratFilesystemDiff, StratPoolDiff,
+            PoolEncryptionInfo, PoolUuid, PropChangeAction, ReencryptedDevice, RegenAction,
+            RenameAction, SetCreateAction, SetDeleteAction, StratFilesystemDiff, StratPoolDiff,
             StratSigblockVersion, TokenUnlockMethod,
         },
     },
@@ -1345,6 +1345,11 @@ impl Pool for StratPool {
         Err(StratisError::Msg(
             "Encrypting an unencrypted device is only supported in V2 of the metadata".to_string(),
         ))
+    }
+
+    #[pool_mutating_action("NoRequests")]
+    fn reencrypt_pool(&mut self) -> StratisResult<ReencryptedDevice> {
+        self.backstore.reencrypt().map(|_| ReencryptedDevice)
     }
 
     fn current_metadata(&self, pool_name: &Name) -> StratisResult<String> {

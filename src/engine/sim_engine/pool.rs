@@ -29,8 +29,8 @@ use crate::{
             ActionAvailability, BlockDevTier, Clevis, CreateAction, DeleteAction, DevUuid,
             EncryptedDevice, EncryptionInfo, FilesystemUuid, GrowAction, InputEncryptionInfo, Key,
             KeyDescription, Name, OptionalTokenSlotInput, PoolDiff, PoolEncryptionInfo, PoolUuid,
-            PropChangeAction, RegenAction, RenameAction, SetCreateAction, SetDeleteAction,
-            StratSigblockVersion, UnlockMechanism, ValidatedIntegritySpec,
+            PropChangeAction, ReencryptedDevice, RegenAction, RenameAction, SetCreateAction,
+            SetDeleteAction, StratSigblockVersion, UnlockMechanism, ValidatedIntegritySpec,
         },
     },
     stratis::{StratisError, StratisResult},
@@ -937,6 +937,16 @@ impl Pool for SimPool {
         } else {
             self.encryption_info = convert_encryption_info(Some(enc), None)?;
             Ok(CreateAction::Created(EncryptedDevice))
+        }
+    }
+
+    fn reencrypt_pool(&mut self) -> StratisResult<ReencryptedDevice> {
+        if self.encryption_info.is_none() {
+            Err(StratisError::Msg(
+                "Cannot reencrypt unencrypted pool".to_string(),
+            ))
+        } else {
+            Ok(ReencryptedDevice)
         }
     }
 

@@ -853,3 +853,16 @@ impl<T> EngineAction for PropChangeAction<T> {
         }
     }
 }
+
+/// Return value indicating a successful reencrypt operation on the pool
+pub struct ReencryptedDevice(pub PoolUuid);
+
+impl Display for ReencryptedDevice {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let uuid = self.0;
+        write!(
+            f,
+            "Reencryption operation on pool with UUID {uuid} was completed successfully"
+        )
+    }
+}

@@ -518,3 +518,36 @@ pub fn encrypt_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
     };
     Ok(vec![msg])
 }
+
+pub fn reencrypt_pool(m: &MethodInfo<'_, MTSync<TData>, TData>) -> MethodResult {
+    let message: &Message = m.msg;
+
+    let dbus_context = m.tree.get_data();
+    let object_path = m.path.get_name();
+    let return_message = message.method_return();
+    let default_return = false;
+
+    let pool_path = m
+        .tree
+        .get(object_path)
+        .expect("implicit argument must be in tree");
+    let pool_uuid = typed_uuid!(
+        get_data!(pool_path; default_return; return_message).uuid;
+        Pool;
+        default_return;
+        return_message
+    );
+
+    let mut guard = get_mut_pool!(dbus_context.engine; pool_uuid; default_return; return_message);
+    let (_, _, pool) = guard.as_mut_tuple();
+
+    let result = handle_action!(pool.reencrypt_pool(), dbus_context, pool_path.get_name());
+    let msg = match result {
+        Ok(_) => return_message.append3(true, DbusErrorEnum::OK as u16, OK_STRING.to_string()),
+        Err(err) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&err);
+            return_message.append3(default_return, rc, rs)
+        }
+    };
+    Ok(vec![msg])
+}

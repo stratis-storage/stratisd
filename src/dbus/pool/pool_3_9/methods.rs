@@ -118,3 +118,32 @@ pub async fn encrypt_pool_method(
         }
     }
 }
+
+pub async fn reencrypt_pool_method(
+    engine: &Arc<dyn Engine>,
+    pool_uuid: PoolUuid,
+) -> (bool, u16, String) {
+    let default_return = false;
+
+    let guard_res = engine
+        .get_mut_pool(PoolIdentifier::Uuid(pool_uuid))
+        .await
+        .ok_or_else(|| StratisError::Msg(format!("No pool associated with uuid {pool_uuid}")));
+    match tokio::task::spawn_blocking(move || {
+        let mut guard = guard_res?;
+
+        handle_action!(guard.reencrypt_pool(pool_uuid))
+    })
+    .await
+    {
+        Ok(Ok(_)) => (true, DbusErrorEnum::OK as u16, OK_STRING.to_string()),
+        Ok(Err(e)) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&e);
+            (default_return, rc, rs)
+        }
+        Err(e) => {
+            let (rc, rs) = engine_to_dbus_err_tuple(&StratisError::from(e));
+            (default_return, rc, rs)
+        }
+    }
+}

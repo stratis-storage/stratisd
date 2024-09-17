@@ -48,7 +48,7 @@ use crate::{
 
 mod methods;
 
-pub use methods::encrypt_pool_method;
+pub use methods::{encrypt_pool_method, reencrypt_pool_method};
 
 pub struct PoolR9 {
     connection: Arc<Connection>,
@@ -328,6 +328,10 @@ impl PoolR9 {
             clevis_infos,
         )
         .await
+    }
+
+    async fn reencrypt_pool(&self) -> (bool, u16, String) {
+        reencrypt_pool_method(&self.engine, self.uuid).await
     }
 
     #[zbus(property(emits_changed_signal = "const"))]

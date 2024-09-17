@@ -415,6 +415,16 @@ impl StratBlockDev {
             }
         }
     }
+
+    /// Reencrypt an individual block device in a pool.
+    pub fn reencrypt(&self) -> StratisResult<()> {
+        let crypt_handle = self
+            .underlying_device
+            .crypt_handle()
+            .expect("Checked that pool is encrypted");
+        crypt_handle.reencrypt()
+    }
+
     #[cfg(test)]
     pub fn invariant(&self) {
         assert!(self.total_size() == self.used.size());

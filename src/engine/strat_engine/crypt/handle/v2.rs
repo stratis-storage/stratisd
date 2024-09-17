@@ -855,7 +855,6 @@ impl CryptHandle {
     }
 
     /// Reencrypt an encrypted pool with a new volume key.
-    #[allow(dead_code)]
     pub fn reencrypt(&self, pool_uuid: PoolUuid) -> StratisResult<()> {
         reencrypt_shared(
             self.metadata.activation_name.to_string().as_str(),

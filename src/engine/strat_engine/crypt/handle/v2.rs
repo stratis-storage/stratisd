@@ -43,9 +43,10 @@ use crate::{
                 },
                 shared::{
                     acquire_crypt_device, activate, activate_by_token, add_keyring_keyslot,
-                    clevis_decrypt, clevis_info_from_json, device_from_physical_path,
+                    clevis_info_from_json, device_from_physical_path,
                     encryption_info_from_metadata, ensure_wiped, get_keyslot_number,
-                    interpret_clevis_config, read_key, wipe_fallback,
+                    get_passphrase, interpret_clevis_config, read_key, reencrypt_shared,
+                    wipe_fallback,
                 },
             },
             device::blkdev_size,
@@ -180,61 +181,6 @@ fn setup_crypt_handle(
         device,
         size,
     )))
-}
-
-/// Get one of the passphrases for the encrypted device.
-fn get_passphrase(
-    device: &mut CryptDevice,
-    encryption_info: &EncryptionInfo,
-) -> StratisResult<(c_uint, SizedKeyMemory)> {
-    for (ts, mech) in encryption_info.all_infos() {
-        match mech {
-            UnlockMechanism::KeyDesc(kd) => match read_key(kd) {
-                Ok(Some(pass)) => {
-                    let keyslot = match get_keyslot_number(device, *ts) {
-                        Ok(Some(ks)) => ks,
-                        Ok(None) => {
-                            warn!("Failed to find keyslot associated with the given token");
-                            continue;
-                        }
-                        Err(e) => {
-                            warn!("Failure while finding keyslot associated with the given token: {e}");
-                            continue;
-                        }
-                    };
-                    return Ok((keyslot, pass));
-                }
-                Ok(None) => {
-                    info!("Key description was not in keyring; trying next unlock mechanism")
-                }
-                Err(e) => info!("Error searching keyring: {e}"),
-            },
-            UnlockMechanism::ClevisInfo(_) => match clevis_decrypt(device, *ts) {
-                Ok(Some(pass)) => {
-                    let keyslot = match get_keyslot_number(device, *ts) {
-                        Ok(Some(ks)) => ks,
-                        Ok(None) => {
-                            warn!("Failed to find keyslot associated with the given token");
-                            continue;
-                        }
-                        Err(e) => {
-                            warn!("Failure while finding keyslot associated with the given token: {e}");
-                            continue;
-                        }
-                    };
-                    return Ok((keyslot, pass));
-                }
-                Ok(None) => {
-                    info!("Failed to find the given token; trying next unlock method");
-                }
-                Err(e) => info!("Error searching keyring: {e}"),
-            },
-        }
-    }
-
-    Err(StratisError::Msg(
-        "Unable to get passphrase for any available token slots".to_string(),
-    ))
 }
 
 /// Handle for performing all operations on an encrypted device.
@@ -871,6 +817,15 @@ impl CryptHandle {
 
         CryptHandle::setup(unencrypted_path, pool_uuid, TokenUnlockMethod::Any, None)
             .map(|h| h.expect("should have crypt device after online encrypt"))
+    }
+
+    /// Encrypt an unencrypted pool.
+    pub fn reencrypt(&self) -> StratisResult<()> {
+        reencrypt_shared(
+            &format_crypt_backstore_name(&self.metadata.pool_uuid).to_string(),
+            self.luks2_device_path(),
+            self.encryption_info(),
+        )
     }
 
     /// Deactivate the device referenced by the current device handle.

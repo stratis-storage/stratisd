@@ -28,7 +28,7 @@ pub use crate::{
         types::{
             actions::{
                 Clevis, CreateAction, DeleteAction, EncryptedDevice, EngineAction, GrowAction, Key,
-                MappingCreateAction, MappingDeleteAction, PropChangeAction, RegenAction,
+                MappingCreateAction, MappingDeleteAction, PropChangeAction, Reencrypt, RegenAction,
                 RenameAction, SetCreateAction, SetDeleteAction, SetUnlockAction, StartAction,
                 StopAction, ToDisplay,
             },

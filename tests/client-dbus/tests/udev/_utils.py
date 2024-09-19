@@ -259,29 +259,31 @@ def wait_for_udev_count(expected_num):
     :return: None
     :raises RuntimeError: if unexpected number of device nodes is found
     """
-    found_num = None
-
     context = pyudev.Context()
-    end_time = time.time() + 10.0
 
-    while time.time() < end_time and not expected_num == found_num:
-        found_num = len(
-            frozenset(
-                [
-                    x.device_node
-                    for x in context.list_devices(
-                        subsystem="block", ID_FS_TYPE=STRATIS_FS_TYPE
+    try:
+        for attempt in Retrying(
+            retry=retry_if_not_result(lambda found_num: found_num == expected_num),
+            stop=stop_after_delay(10),
+            wait=wait_fixed(1),
+        ):
+            with attempt:
+                found_num = len(
+                    frozenset(
+                        [
+                            x.device_node
+                            for x in context.list_devices(
+                                subsystem="block", ID_FS_TYPE=STRATIS_FS_TYPE
+                            )
+                        ]
                     )
-                ]
-            )
-        )
-        time.sleep(1)
-
-    if expected_num != found_num:
+                )
+            attempt.retry_state.set_result(found_num)
+    except RetryError as err:
         raise RuntimeError(
-            f"Found unexpected number of devnodes: "
-            f"expected number: {expected_num} != found number: {found_num}"
-        )
+            "Found unexpected number of devnodes: expected number: "
+            f"{expected_num} != found number: {err.last_attempt.result()}"
+        ) from err
 
 
 def wait_for_udev(fs_type, expected_paths):
@@ -296,25 +298,32 @@ def wait_for_udev(fs_type, expected_paths):
     :raises RuntimeError: if unexpected device nodes are found
     """
     expected_devnodes = frozenset((os.path.realpath(x) for x in expected_paths))
-    found_devnodes = None
-
     context = pyudev.Context()
-    end_time = time.time() + 10.0
 
-    while time.time() < end_time and not expected_devnodes == found_devnodes:
-        found_devnodes = frozenset(
-            [
-                x.device_node
-                for x in context.list_devices(subsystem="block", ID_FS_TYPE=fs_type)
-            ]
-        )
-        time.sleep(1)
+    try:
+        for attempt in Retrying(
+            retry=retry_if_not_result(
+                lambda found_devnodes: found_devnodes == expected_devnodes
+            ),
+            stop=stop_after_delay(10),
+            wait=wait_fixed(1),
+        ):
+            with attempt:
+                found_devnodes = frozenset(
+                    [
+                        x.device_node
+                        for x in context.list_devices(
+                            subsystem="block", ID_FS_TYPE=fs_type
+                        )
+                    ]
+                )
+            attempt.retry_state.set_result(found_devnodes)
 
-    if expected_devnodes != found_devnodes:
+    except RetryError as err:
         raise RuntimeError(
             f'Found unexpected devnodes: expected devnodes: {", ".join(expected_devnodes)} '
-            f'!= found_devnodes: {", ".join(found_devnodes)}'
-        )
+            f'!= found_devnodes: {", ".join(err.last_attempt.result())}'
+        ) from err
 
 
 def processes(name):

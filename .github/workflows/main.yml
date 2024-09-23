@@ -5,7 +5,7 @@ name: stratisd CI
 on:
   push:
     branches:
-      - master
+      - rebase-3.6.0
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'
@@ -16,7 +16,7 @@ on:
       - 'test/**'
   pull_request:
     branches:
-      - master
+      - rebase-3.6.0
     paths-ignore:
       - 'CHANGES.txt'
       - '**/README.md'

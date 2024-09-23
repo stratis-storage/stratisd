@@ -6,14 +6,14 @@ name: stratisd support CI
 on:
   push:
     branches:
-      - master
+      - rebase-3.6.0
     paths:
       - "**/*.yml"
       - "tests/**"
       - "!tests/**/README.*"
   pull_request:
     branches:
-      - master
+      - rebase-3.6.0
     paths:
       - "**/*.yml"
       - "tests/**"

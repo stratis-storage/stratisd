@@ -187,10 +187,10 @@ fn set_key(
 ///
 /// Successful return values:
 /// * `Ok(MappingCreateAction::Identity)`: The key was already in the keyring with the
-/// appropriate key description and key data.
+///   appropriate key description and key data.
 /// * `Ok(MappingCreateAction::Created(()))`: The key was newly added to the keyring.
 /// * `Ok(MappingCreateAction::ValueChanged(()))`: The key description was already present
-/// in the keyring but the key data was updated.
+///   in the keyring but the key data was updated.
 fn set_key_idem(
     key_desc: &KeyDescription,
     key_data: SizedKeyMemory,

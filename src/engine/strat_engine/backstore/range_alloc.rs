@@ -22,7 +22,7 @@ use crate::{
 /// It enforces some invariants:
 /// * No 0 length segment
 /// * No contiguous segments; if two segments would be contiguous they are
-/// coalesced into a single segment.
+///   coalesced into a single segment.
 /// * No overlapping segments
 /// * No segments that extend beyond limit
 #[derive(Debug, Clone)]

@@ -283,7 +283,7 @@ fn process_item(mut item: Item) -> Item {
 /// implementations. It provides two facilities:
 /// * checking if the error returned should cause the pool to refuse mutating actions.
 /// * returning an error if the method called would cause a mutating action to occur if
-/// the pool cannot accept mutating actions.
+///   the pool cannot accept mutating actions.
 ///
 /// This macro should be applied to `impl` items only.
 #[proc_macro_attribute]

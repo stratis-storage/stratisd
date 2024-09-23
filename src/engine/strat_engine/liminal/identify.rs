@@ -517,7 +517,7 @@ mod tests {
     /// recognized.
     ///
     /// * Verify that the physical paths are recognized as LUKS devices
-    /// belonging to Stratis.
+    ///   belonging to Stratis.
     /// * Verify that the physical paths are not recognized as Stratis devices.
     /// * Verify that the metadata paths are recognized as Stratis devices.
     fn test_process_luks_device_initialized(paths: &[&Path]) {

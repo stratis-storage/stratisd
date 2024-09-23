@@ -123,8 +123,10 @@ impl StratBlockDev {
     /// - hardware_info: identifying information in the hardware
     /// - key_description: optional argument enabling encryption using
     ///                    the specified key in the kernel keyring
+    ///
     /// Returns an error if it is impossible to allocate all segments on the
     /// device.
+    ///
     /// NOTE: It is possible that the actual device size is greater than
     /// the recorded device size. In that case, the additional space available
     /// on the device is simply invisible to the blockdev. Consequently, it
@@ -346,9 +348,9 @@ impl StratBlockDev {
     ///
     /// Returns:
     /// * Some(Some(_)) if the pool is encrypted and the pool name is set in the
-    /// metadata
+    ///   metadata
     /// * Some(None) if the pool is encrypted and the pool name is not set in the
-    /// metadata
+    ///   metadata
     /// * None if the pool is not encrypted
     #[allow(clippy::option_option)]
     pub fn pool_name(&self) -> Option<Option<&Name>> {
@@ -417,7 +419,7 @@ impl StratBlockDev {
     ///
     /// Returns:
     /// * `None` if the size hasn't changed or is equal to the current size recorded
-    /// in the metadata.
+    ///   in the metadata.
     /// * Otherwise, `Some(_)`
     pub fn calc_new_size(&self) -> StratisResult<Option<Sectors>> {
         let s = Self::scan_blkdev_size(

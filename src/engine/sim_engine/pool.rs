@@ -764,6 +764,29 @@ impl Pool for SimPool {
         // Just invent a name for the pool; a sim pool has no real metadata
         serde_json::to_string(&self.record("<name>")).map_err(|e| e.into())
     }
+
+    fn current_fs_metadata(&self, fs_name: Option<&str>) -> StratisResult<String> {
+        serde_json::to_string(
+            &self
+                .filesystems
+                .iter()
+                .filter_map(|(name, uuid, fs)| {
+                    if fs_name.map(|n| *n == **name).unwrap_or(true) {
+                        Some((uuid, fs.record(name, *uuid)))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<HashMap<_, _>>(),
+        )
+        .map_err(|e| e.into())
+    }
+
+    fn last_fs_metadata(&self, fs_name: Option<&str>) -> StratisResult<String> {
+        // The sim pool doesn't write data, so the last fs metadata and the
+        // current fs metadata are, by definition, the same.
+        self.current_fs_metadata(fs_name)
+    }
 }
 
 #[cfg(test)]

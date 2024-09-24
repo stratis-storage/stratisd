@@ -347,6 +347,12 @@ pub trait Pool: Debug + Send + Sync {
 
     /// Return the metadata that was last written to pool devices.
     fn last_metadata(&self) -> StratisResult<String>;
+
+    /// Get the filesystem metadata that would be written if written now.
+    fn current_fs_metadata(&self, fs_name: Option<&str>) -> StratisResult<String>;
+
+    /// Get the last written filesystem metadata.
+    fn last_fs_metadata(&self, fs_name: Option<&str>) -> StratisResult<String>;
 }
 
 pub type HandleEvents<P> = (

@@ -10,9 +10,24 @@ use serde_json::{Map, Value};
 use devicemapper::{Bytes, Sectors};
 
 use crate::{
-    engine::{types::FilesystemUuid, Filesystem},
+    engine::{
+        types::{FilesystemUuid, Name},
+        Filesystem,
+    },
     stratis::{StratisError, StratisResult},
 };
+
+#[derive(Debug, Eq, PartialEq, Serialize)]
+pub struct FilesystemSave {
+    name: String,
+    uuid: FilesystemUuid,
+    size: Sectors,
+    created: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fs_size_limit: Option<Sectors>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    origin: Option<FilesystemUuid>,
+}
 
 #[derive(Debug)]
 pub struct SimFilesystem {
@@ -72,6 +87,17 @@ impl SimFilesystem {
         let changed = self.origin.is_some();
         self.origin = None;
         changed
+    }
+
+    pub fn record(&self, name: &Name, uuid: FilesystemUuid) -> FilesystemSave {
+        FilesystemSave {
+            name: name.to_owned(),
+            uuid,
+            size: self.size,
+            created: self.created.timestamp() as u64,
+            fs_size_limit: self.size_limit,
+            origin: self.origin,
+        }
     }
 }
 

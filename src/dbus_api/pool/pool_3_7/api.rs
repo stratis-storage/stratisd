@@ -5,7 +5,7 @@
 use dbus_tree::{Factory, MTSync, Method};
 
 use crate::dbus_api::{
-    pool::pool_3_7::methods::{destroy_filesystems, metadata},
+    pool::pool_3_7::methods::{destroy_filesystems, fs_metadata, metadata},
     types::TData,
 };
 
@@ -28,6 +28,19 @@ pub fn get_metadata_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<T
         .in_arg(("current", "b"))
         // A string representing the pool-level metadata in serialized JSON
         // format.
+        //
+        // Rust representation: String
+        .out_arg(("results", "s"))
+        .out_arg(("return_code", "q"))
+        .out_arg(("return_string", "s"))
+}
+
+pub fn get_fs_metadata_method(f: &Factory<MTSync<TData>, TData>) -> Method<MTSync<TData>, TData> {
+    f.method("FilesystemMetadata", (), fs_metadata)
+        .in_arg(("fs_name", "(bs)"))
+        .in_arg(("current", "b"))
+        // A string representing the pool's filesystem metadata in serialized
+        // JSON format.
         //
         // Rust representation: String
         .out_arg(("results", "s"))

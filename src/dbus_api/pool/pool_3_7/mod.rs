@@ -5,4 +5,4 @@
 mod api;
 mod methods;
 
-pub use api::{destroy_filesystems_method, get_metadata_method};
+pub use api::{destroy_filesystems_method, get_fs_metadata_method, get_metadata_method};

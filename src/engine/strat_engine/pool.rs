@@ -1273,6 +1273,14 @@ impl Pool for StratPool {
                 .map_err(|_| StratisError::Msg("metadata byte array is not utf-8".into()))
         })
     }
+
+    fn current_fs_metadata(&self, fs_name: Option<&str>) -> StratisResult<String> {
+        self.thin_pool.current_fs_metadata(fs_name)
+    }
+
+    fn last_fs_metadata(&self, fs_name: Option<&str>) -> StratisResult<String> {
+        self.thin_pool.last_fs_metadata(fs_name)
+    }
 }
 
 pub struct StratPoolState {

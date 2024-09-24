@@ -1581,6 +1581,43 @@ impl ThinPool {
         }
         Ok(changed)
     }
+
+    /// Calculate filesystem metadata from current state
+    pub fn current_fs_metadata(&self, fs_name: Option<&str>) -> StratisResult<String> {
+        serde_json::to_string(
+            &self
+                .filesystems
+                .iter()
+                .filter_map(|(name, uuid, fs)| {
+                    if fs_name.map(|n| *n == **name).unwrap_or(true) {
+                        Some((*uuid, fs.record(name, *uuid)))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<HashMap<_, _>>(),
+        )
+        .map_err(|e| e.into())
+    }
+
+    /// Read filesystem metadata from mdv
+    pub fn last_fs_metadata(&self, fs_name: Option<&str>) -> StratisResult<String> {
+        serde_json::to_string(
+            &self
+                .mdv
+                .filesystems()?
+                .iter()
+                .filter_map(|fssave| {
+                    if fs_name.map(|n| *n == fssave.name).unwrap_or(true) {
+                        Some((fssave.uuid, fssave))
+                    } else {
+                        None
+                    }
+                })
+                .collect::<HashMap<_, _>>(),
+        )
+        .map_err(|e| e.into())
+    }
 }
 
 impl<'a> Into<Value> for &'a ThinPool {

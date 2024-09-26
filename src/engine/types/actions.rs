@@ -612,7 +612,7 @@ impl<T, U> EngineAction for SetDeleteAction<T, U> {
     }
 }
 
-impl Display for SetDeleteAction<FilesystemUuid, FilesystemUuid> {
+impl Display for SetDeleteAction<FilesystemUuid, (FilesystemUuid, Option<FilesystemUuid>)> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.changed.is_empty() {
             write!(
@@ -791,6 +791,19 @@ where
             }
             PropChangeAction::NewValue(None) => {
                 PropChangeAction::NewValue("an empty value".to_string())
+            }
+        }
+    }
+}
+
+impl ToDisplay for PropChangeAction<bool> {
+    type Display = PropChangeAction<String>;
+
+    fn to_display(&self) -> PropChangeAction<String> {
+        match self {
+            PropChangeAction::Identity => PropChangeAction::Identity,
+            PropChangeAction::NewValue(v) => {
+                PropChangeAction::NewValue(format!("a value of {}", v))
             }
         }
     }

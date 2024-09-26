@@ -8,6 +8,7 @@ require:
   - python3-dbus
   - python3-dbus-client-gen
   - python3-dbus-python-client-gen
+  - python3-justbytes
   - python3-psutil
   - python3-pyudev
   - python3-tenacity
@@ -29,7 +30,7 @@ environment:
 
 /legacy/loop:
   summary: Run Python tests that use loopbacked device framework
-  test: make -f Makefile tang-tests dump-metadata-tests startup-tests
+  test: make -f Makefile tang-tests dump-metadata-tests startup-tests revert-tests
 
 /v2/udev:
   summary: Run Python udev tests
@@ -37,4 +38,4 @@ environment:
 
 /v2/loop:
   summary: Run Python tests that use loopbacked device framework
-  test: make -f Makefile tang-tests dump-metadata-tests startup-tests
+  test: make -f Makefile tang-tests dump-metadata-tests startup-tests revert-tests

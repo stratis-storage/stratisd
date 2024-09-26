@@ -126,7 +126,8 @@ pub fn create_dbus_filesystem<'a>(
                 .add_p(filesystem_3_0::size_property(&f))
                 .add_p(filesystem_3_0::used_property(&f))
                 .add_p(filesystem_3_6::size_limit_property(&f))
-                .add_p(filesystem_3_7::origin_property(&f)),
+                .add_p(filesystem_3_7::origin_property(&f))
+                .add_p(filesystem_3_7::merge_scheduled_property(&f)),
         );
 
     let path = object_path.get_name().to_owned();
@@ -217,7 +218,8 @@ pub fn get_fs_properties(
             consts::FILESYSTEM_SIZE_PROP => shared::fs_size_prop(fs),
             consts::FILESYSTEM_USED_PROP => shared::fs_used_prop(fs),
             consts::FILESYSTEM_SIZE_LIMIT_PROP => shared::fs_size_limit_prop(fs),
-            consts::FILESYSTEM_ORIGIN_PROP => shared::fs_origin_prop(fs)
+            consts::FILESYSTEM_ORIGIN_PROP => shared::fs_origin_prop(fs),
+            consts::FILESYSTEM_MERGE_SCHEDULED_PROP => shared::fs_merge_scheduled_prop(fs)
         }
     }
 }
